@@ -61,17 +61,18 @@ int64_t get_current_timestamp_ms() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
 }
 
-// Ensure random number generator is seeded (called once)
+// Thread-safe seeding flag
+std::once_flag rand_seed_flag;
+
+// Ensure random number generator is seeded exactly once (thread-safe)
 void ensure_rand_seeded() {
-    static bool seeded = false;
-    if (!seeded) {
+    std::call_once(rand_seed_flag, []() {
         // Seed with combination of time and memory address for better entropy
         auto now = std::chrono::high_resolution_clock::now();
         auto nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
-        unsigned int seed = static_cast<unsigned int>(nanos ^ reinterpret_cast<uintptr_t>(&seeded));
+        unsigned int seed = static_cast<unsigned int>(nanos ^ reinterpret_cast<uintptr_t>(&rand_seed_flag));
         srand(seed);
-        seeded = true;
-    }
+    });
 }
 
 // Generate UUID

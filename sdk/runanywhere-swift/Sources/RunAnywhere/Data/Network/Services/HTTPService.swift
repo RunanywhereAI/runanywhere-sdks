@@ -6,6 +6,7 @@
 //  All network logic is centralized here.
 //
 
+import CRACommons
 import Foundation
 
 /// HTTP Service - Core network implementation
@@ -93,7 +94,7 @@ public actor HTTPService: NetworkService {
         // Supabase PostgREST requires both:
         // 1. The `Prefer: resolution=merge-duplicates` header
         // 2. The `?on_conflict=device_id` query parameter to specify the conflict column
-        if path.contains("/rest/v1/sdk_devices") {
+        if path.contains(RAC_ENDPOINT_DEV_DEVICE_REGISTER) {
             // Add on_conflict query parameter to the path
             let upsertPath = path.contains("?") ? "\(path)&on_conflict=device_id" : "\(path)?on_conflict=device_id"
             return try await postRawWithHeaders(upsertPath, payload, requiresAuth: requiresAuth, additionalHeaders: ["Prefer": "resolution=merge-duplicates"])
@@ -234,7 +235,7 @@ public actor HTTPService: NetworkService {
 
         // Check status code
         // For device registration, 409 (Conflict) means device already exists, which is fine
-        let isDeviceRegistration = request.url?.absoluteString.contains("/rest/v1/sdk_devices") ?? false
+        let isDeviceRegistration = request.url?.absoluteString.contains(RAC_ENDPOINT_DEV_DEVICE_REGISTER) ?? false
         let isSuccess = (200...299).contains(httpResponse.statusCode) || (isDeviceRegistration && httpResponse.statusCode == 409)
         
         guard isSuccess else {

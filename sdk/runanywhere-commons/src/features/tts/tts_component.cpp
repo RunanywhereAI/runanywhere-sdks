@@ -286,7 +286,6 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
         event_data.data.tts_synthesis.synthesis_id = synthesis_id.c_str();
         event_data.data.tts_synthesis.model_id = voice_id;
         event_data.data.tts_synthesis.model_name = voice_name;
-        event_data.data.tts_synthesis.model_name = voice_name;
         event_data.data.tts_synthesis.character_count = static_cast<int32_t>(std::strlen(text));
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_STARTED, &event_data);
     }
@@ -390,7 +389,6 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
         event_data.data.tts_synthesis = RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT;
         event_data.data.tts_synthesis.synthesis_id = synthesis_id.c_str();
         event_data.data.tts_synthesis.model_id = voice_id;
-        event_data.data.tts_synthesis.model_name = voice_name;
         event_data.data.tts_synthesis.model_name = voice_name;
         event_data.data.tts_synthesis.character_count = char_count;
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_STARTED, &event_data);

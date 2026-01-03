@@ -124,7 +124,6 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
         return RAC_ERROR_INVALID_STATE;
     }
     RAC_LOG_INFO(LOG_CAT, "Device ID for registration: %s", device_id);
-    RAC_LOG_INFO(LOG_CAT, "Device ID for registration: %s", device_id);
 
     // Step 3: Get device info
     rac_device_registration_info_t device_info = {};
