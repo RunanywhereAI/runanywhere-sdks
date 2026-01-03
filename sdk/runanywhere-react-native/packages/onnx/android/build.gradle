@@ -1,0 +1,193 @@
+def getExtOrIntegerDefault(name) {
+    if (rootProject.ext.has(name)) {
+        return rootProject.ext.get(name)
+    } else if (project.properties.containsKey('ONNX_' + name)) {
+        return (project.properties['ONNX_' + name]).toInteger()
+    }
+    def defaults = [
+        'compileSdkVersion': 36,
+        'minSdkVersion': 24,
+        'targetSdkVersion': 36
+    ]
+    return defaults[name] ?: 36
+}
+
+// =============================================================================
+// Version Constants (MUST match Swift Package.swift and iOS Podspec)
+// =============================================================================
+def commonsVersion = "0.1.0"
+def coreVersion = "0.1.1-dev.03aacf9"
+
+// =============================================================================
+// Binary Sources
+// =============================================================================
+def githubOrg = "RunanywhereAI"
+def commonsRepo = "runanywhere-sdks"
+def coreRepo = "runanywhere-binaries"
+
+// =============================================================================
+// testLocal Toggle
+// =============================================================================
+def useLocalBuild = project.findProperty("runanywhere.testLocal")?.toBoolean() ?:
+                    System.getenv("RA_TEST_LOCAL") == "1" ?: false
+
+// Native libraries directory
+def jniLibsDir = file("src/main/jniLibs")
+def downloadedLibsDir = file("build/downloaded-libs")
+
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+android {
+    namespace "com.runanywhere.onnx"
+
+    compileSdkVersion getExtOrIntegerDefault('compileSdkVersion')
+
+    defaultConfig {
+        minSdkVersion getExtOrIntegerDefault('minSdkVersion')
+        targetSdkVersion getExtOrIntegerDefault('targetSdkVersion')
+
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
+    }
+
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    sourceSets {
+        main {
+            jniLibs.srcDirs = [jniLibsDir]
+        }
+    }
+}
+
+// =============================================================================
+// Download RABackendONNX + onnxruntime
+// =============================================================================
+
+task downloadNativeLibs {
+    description = "Downloads RABackendONNX and onnxruntime from GitHub releases"
+    group = "build setup"
+
+    def versionFile = file("${jniLibsDir}/.version")
+    def combinedVersion = "${commonsVersion}-${coreVersion}"
+
+    outputs.dir(jniLibsDir)
+    outputs.upToDateWhen {
+        versionFile.exists() && versionFile.text.trim() == combinedVersion
+    }
+
+    doLast {
+        if (useLocalBuild) {
+            logger.lifecycle("[ONNXBackend] Skipping download - using local build mode")
+            return
+        }
+
+        def currentVersion = versionFile.exists() ? versionFile.text.trim() : ""
+        if (currentVersion == combinedVersion) {
+            logger.lifecycle("[ONNXBackend] ONNX libraries already downloaded")
+            return
+        }
+
+        logger.lifecycle("[ONNXBackend] Downloading ONNX libraries...")
+        logger.lifecycle("  RABackendONNX version: $commonsVersion")
+        logger.lifecycle("  onnxruntime version: $coreVersion")
+
+        downloadedLibsDir.mkdirs()
+        jniLibsDir.deleteDir()
+        jniLibsDir.mkdirs()
+
+        def downloads = [
+            [
+                name: "RABackendONNX",
+                url: "https://github.com/${githubOrg}/${commonsRepo}/releases/download/commons-v${commonsVersion}/RABackendONNX-android-${commonsVersion}.zip",
+                required: true
+            ],
+            [
+                name: "onnxruntime",
+                url: "https://github.com/${githubOrg}/${coreRepo}/releases/download/core-v${coreVersion}/onnxruntime-android-v${coreVersion}.zip",
+                required: true
+            ]
+        ]
+
+        downloads.each { download ->
+            logger.lifecycle("📦 Downloading ${download.name}...")
+            logger.lifecycle("   URL: ${download.url}")
+
+            def zipFile = file("${downloadedLibsDir}/${download.name}.zip")
+
+            try {
+                new URL(download.url).withInputStream { input ->
+                    zipFile.withOutputStream { output ->
+                        output << input
+                    }
+                }
+                logger.lifecycle("   Downloaded: ${zipFile.length() / 1024}KB")
+
+                copy {
+                    from zipTree(zipFile)
+                    into jniLibsDir
+                }
+
+                logger.lifecycle("✅ ${download.name} installed")
+            } catch (Exception e) {
+                if (download.required) {
+                    logger.error("❌ Failed to download ${download.name}: ${e.message}")
+                    throw new GradleException("Failed to download ${download.name}", e)
+                } else {
+                    logger.warn("⚠️  Optional library ${download.name} not available: ${e.message}")
+                }
+            }
+        }
+
+        versionFile.text = combinedVersion
+        logger.lifecycle("\n✅ ONNX libraries installed")
+    }
+}
+
+if (!useLocalBuild) {
+    preBuild.dependsOn downloadNativeLibs
+}
+
+task cleanNativeLibs(type: Delete) {
+    description = "Removes downloaded native libraries"
+    group = "build"
+    delete jniLibsDir
+    delete downloadedLibsDir
+}
+
+clean.dependsOn cleanNativeLibs
+
+repositories {
+    mavenCentral()
+    google()
+}
+
+dependencies {
+    implementation "com.facebook.react:react-android"
+    // Depends on core native module
+    implementation project(":runanywhere-native")
+}

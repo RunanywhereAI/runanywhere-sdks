@@ -1,0 +1,16 @@
+# testLocal Mode Configuration
+#
+# To enable local development mode:
+# 1. Rename this file to `.testlocal` (remove .example)
+# 2. Copy your locally-built XCFrameworks to ios/Binaries/
+#
+# OR set the environment variable:
+#   export RA_TEST_LOCAL=1
+#
+# This will skip downloading binaries from GitHub and use local files instead.
+#
+# Required XCFrameworks for local mode:
+# - ios/Binaries/RACommons.xcframework (required)
+# - ios/Binaries/RABackendLlamaCPP.xcframework (optional)
+# - ios/Binaries/RABackendONNX.xcframework (optional)
+# - ios/Binaries/onnxruntime.xcframework (optional)

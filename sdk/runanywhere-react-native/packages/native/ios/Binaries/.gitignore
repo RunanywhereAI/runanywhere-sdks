@@ -1,0 +1,2 @@
+# Ignore XCFrameworks - they are downloaded or copied locally
+*.xcframework
