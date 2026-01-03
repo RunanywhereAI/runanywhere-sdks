@@ -239,9 +239,14 @@ if(APPLE)
     )
 endif()
 
-target_link_libraries(rac_commons PUBLIC
-    runanywhere_bridge
-)
+# Note: rac_commons does NOT link against runanywhere_bridge directly.
+# The backends (llamacpp, onnx, etc.) link against their respective core libraries.
+# This avoids duplicate symbol issues when both bridge and backend libs have
+# implementations of the same functions (ra_stt_*, ra_tts_*, ra_vad_*).
+# target_link_libraries(rac_commons PUBLIC runanywhere_bridge)
+
+# Instead, backends link against their specific runanywhere-core backend libraries
+# (runanywhere_llamacpp, runanywhere_onnx, etc.) via their own CMakeLists.txt
 
 # Symbol visibility for shared builds
 if(RAC_BUILD_SHARED)

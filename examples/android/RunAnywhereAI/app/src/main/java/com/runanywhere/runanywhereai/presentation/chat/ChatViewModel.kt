@@ -6,26 +6,32 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.RunAnywhereApplication
 import com.runanywhere.runanywhereai.data.ConversationStore
-import com.runanywhere.runanywhereai.domain.models.*
-import com.runanywhere.sdk.features.llm.LLMEvent
-import com.runanywhere.sdk.models.enums.InferenceFramework
-import com.runanywhere.sdk.models.enums.ModelCategory
+import com.runanywhere.runanywhereai.domain.models.ChatMessage
+import com.runanywhere.runanywhereai.domain.models.CompletionStatus
+import com.runanywhere.runanywhereai.domain.models.Conversation
+import com.runanywhere.runanywhereai.domain.models.GenerationMode
+import com.runanywhere.runanywhereai.domain.models.GenerationParameters
+import com.runanywhere.runanywhereai.domain.models.MessageAnalytics
+import com.runanywhere.runanywhereai.domain.models.MessageModelInfo
+import com.runanywhere.runanywhereai.domain.models.MessageRole
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.events.EventBus
+import com.runanywhere.sdk.public.events.LLMEvent
+import com.runanywhere.sdk.public.extensions.Models.ModelCategory
+import com.runanywhere.sdk.public.extensions.availableModels
 import com.runanywhere.sdk.public.extensions.cancelGeneration
 import com.runanywhere.sdk.public.extensions.currentLLMModelId
 import com.runanywhere.sdk.public.extensions.generate
 import com.runanywhere.sdk.public.extensions.generateStream
-import com.runanywhere.sdk.public.extensions.isModelLoaded
-import com.runanywhere.sdk.public.extensions.listAvailableModels
-import com.runanywhere.sdk.public.extensions.loadModel
+import com.runanywhere.sdk.public.extensions.isLLMModelLoaded
+import com.runanywhere.sdk.public.extensions.loadLLMModel
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.launch
-import java.util.*
-import kotlin.collections.map
-import kotlin.collections.toMutableList
 import kotlin.math.ceil
-import com.runanywhere.sdk.models.MessageModelInfo as SDKMessageModelInfo
 
 /**
  * Enhanced ChatUiState matching iOS functionality
@@ -50,7 +56,7 @@ data class ChatUiState(
  *
  * Architecture:
  * - Uses RunAnywhere SDK extension functions directly
- * - Model lifecycle via RunAnywhere.events.events with LLMEvent filtering
+ * - Model lifecycle via EventBus with LLMEvent filtering
  * - Generation via RunAnywhere.generate() and RunAnywhere.generateStream()
  */
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
@@ -70,7 +76,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         // Subscribe to LLM events from SDK EventBus
         viewModelScope.launch {
-            RunAnywhere.events.events
+            EventBus.events
                 .filterIsInstance<LLMEvent>()
                 .collect { event ->
                     handleLLMEvent(event)
@@ -89,65 +95,29 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Handle LLM events from SDK EventBus
-     * iOS Reference: Event subscription via RunAnywhere.events
+     * Uses the new data class with enum event types pattern
      */
     private fun handleLLMEvent(event: LLMEvent) {
-        when (event) {
-            is LLMEvent.ModelLoadStarted -> {
-                Log.d("ChatViewModel", "LLM model loading started: ${event.modelId}")
+        when (event.eventType) {
+            LLMEvent.LLMEventType.GENERATION_STARTED -> {
+                Log.d(TAG, "LLM generation started: ${event.modelId}")
             }
-            is LLMEvent.ModelLoadCompleted -> {
-                val wasLoaded = _uiState.value.isModelLoaded
-                Log.i("ChatViewModel", "✅ LLM model loaded: ${event.modelId} (${event.durationMs}ms)")
-                _uiState.value =
-                    _uiState.value.copy(
-                        isModelLoaded = true,
-                        loadedModelName = event.modelId,
-                    )
-                // Add system message when model becomes loaded
-                if (!wasLoaded) {
-                    addSystemMessage()
-                }
+            LLMEvent.LLMEventType.GENERATION_COMPLETED -> {
+                Log.i(TAG, "✅ Generation completed: ${event.tokensGenerated} tokens")
+                _uiState.value = _uiState.value.copy(isGenerating = false)
             }
-            is LLMEvent.ModelLoadFailed -> {
-                Log.e("ChatViewModel", "LLM model load failed: ${event.modelId} - ${event.error}")
-                _uiState.value =
-                    _uiState.value.copy(
-                        isModelLoaded = false,
-                        loadedModelName = null,
-                        error = Exception(event.error),
-                    )
+            LLMEvent.LLMEventType.GENERATION_FAILED -> {
+                Log.e(TAG, "Generation failed: ${event.error}")
+                _uiState.value = _uiState.value.copy(
+                    isGenerating = false,
+                    error = Exception(event.error ?: "Generation failed"),
+                )
             }
-            is LLMEvent.ModelUnloadStarted -> {
-                Log.d("ChatViewModel", "LLM model unload started: ${event.modelId}")
+            LLMEvent.LLMEventType.STREAM_TOKEN -> {
+                // Token received during streaming - handled by flow collection
             }
-            is LLMEvent.ModelUnloaded -> {
-                Log.d("ChatViewModel", "LLM model unloaded: ${event.modelId}")
-                _uiState.value =
-                    _uiState.value.copy(
-                        isModelLoaded = false,
-                        loadedModelName = null,
-                    )
-            }
-            is LLMEvent.GenerationStarted -> {
-                Log.d("ChatViewModel", "Generation started: ${event.generationId}")
-            }
-            is LLMEvent.FirstToken -> {
-                Log.d("ChatViewModel", "First token received: ${event.latencyMs}ms")
-            }
-            is LLMEvent.StreamingUpdate -> {
-                // Analytics only
-            }
-            is LLMEvent.GenerationCompleted -> {
-                Log.i("ChatViewModel", "Generation completed: ${event.outputTokens} tokens, ${event.tokensPerSecond} tok/s")
-            }
-            is LLMEvent.GenerationFailed -> {
-                Log.e("ChatViewModel", "Generation failed: ${event.error}")
-                _uiState.value =
-                    _uiState.value.copy(
-                        isGenerating = false,
-                        error = Exception(event.error),
-                    )
+            LLMEvent.LLMEventType.STREAM_COMPLETED -> {
+                Log.d(TAG, "Stream completed")
             }
         }
     }
@@ -159,11 +129,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val modelName = _uiState.value.loadedModelName ?: return
 
         val content = "Model '$modelName' is loaded and ready to chat!"
-        val systemMessage =
-            ChatMessage(
-                role = MessageRole.SYSTEM,
-                content = content,
-            )
+        val systemMessage = ChatMessage.system(content)
 
         val currentMessages = _uiState.value.messages.toMutableList()
         currentMessages.add(0, systemMessage)
@@ -183,41 +149,32 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun sendMessage() {
         val currentState = _uiState.value
 
-        Log.i("ChatViewModel", "🎯 sendMessage() called")
-        Log.i(
-            "ChatViewModel",
-            "📝 canSend: ${currentState.canSend}, isModelLoaded: ${currentState.isModelLoaded}, loadedModelName: ${currentState.loadedModelName}",
-        )
+        Log.i(TAG, "🎯 sendMessage() called")
+        Log.i(TAG, "📝 canSend: ${currentState.canSend}, isModelLoaded: ${currentState.isModelLoaded}, loadedModelName: ${currentState.loadedModelName}")
 
         if (!currentState.canSend) {
-            Log.w("ChatViewModel", "Cannot send message - canSend is false")
+            Log.w(TAG, "Cannot send message - canSend is false")
             return
         }
 
-        Log.i("ChatViewModel", "✅ canSend is true, proceeding")
+        Log.i(TAG, "✅ canSend is true, proceeding")
 
         val prompt = currentState.currentInput
-        Log.i("ChatViewModel", "🎯 Sending message: ${prompt.take(50)}...")
+        Log.i(TAG, "🎯 Sending message: ${prompt.take(50)}...")
 
         // Clear input and set generating state
-        _uiState.value =
-            currentState.copy(
-                currentInput = "",
-                isGenerating = true,
-                error = null,
-            )
+        _uiState.value = currentState.copy(
+            currentInput = "",
+            isGenerating = true,
+            error = null,
+        )
 
         // Add user message
-        val userMessage =
-            ChatMessage(
-                role = MessageRole.USER,
-                content = prompt,
-            )
+        val userMessage = ChatMessage.user(prompt)
 
-        _uiState.value =
-            _uiState.value.copy(
-                messages = _uiState.value.messages + userMessage,
-            )
+        _uiState.value = _uiState.value.copy(
+            messages = _uiState.value.messages + userMessage,
+        )
 
         // Save user message to conversation
         _uiState.value.currentConversation?.let { conversation ->
@@ -225,36 +182,31 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         // Create assistant message that will be updated with streaming tokens
-        // Include ModelInfo matching iOS pattern for message attribution
         val currentModelInfo = createCurrentModelInfo()
-        val assistantMessage =
-            ChatMessage(
-                role = MessageRole.ASSISTANT,
-                content = "",
-                modelInfo = currentModelInfo,
-            )
+        val assistantMessage = ChatMessage.assistant(
+            content = "",
+            modelInfo = currentModelInfo,
+        )
 
-        _uiState.value =
-            _uiState.value.copy(
-                messages = _uiState.value.messages + assistantMessage,
-            )
+        _uiState.value = _uiState.value.copy(
+            messages = _uiState.value.messages + assistantMessage,
+        )
 
         // Start generation
-        generationJob =
-            viewModelScope.launch {
-                try {
-                    // Clear metrics from previous generation
-                    tokensPerSecondHistory.clear()
+        generationJob = viewModelScope.launch {
+            try {
+                // Clear metrics from previous generation
+                tokensPerSecondHistory.clear()
 
-                    if (currentState.useStreaming) {
-                        generateWithStreaming(prompt, assistantMessage.id)
-                    } else {
-                        generateWithoutStreaming(prompt, assistantMessage.id)
-                    }
-                } catch (e: Exception) {
-                    handleGenerationError(e, assistantMessage.id)
+                if (currentState.useStreaming) {
+                    generateWithStreaming(prompt, assistantMessage.id)
+                } else {
+                    generateWithoutStreaming(prompt, assistantMessage.id)
                 }
+            } catch (e: Exception) {
+                handleGenerationError(e, assistantMessage.id)
             }
+        }
     }
 
     /**
@@ -277,12 +229,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         var totalTokensReceived = 0
         var wasInterrupted = false
 
-        Log.i("ChatViewModel", "📤 Starting streaming generation")
+        Log.i(TAG, "📤 Starting streaming generation")
 
         try {
-            // Use KMP SDK streaming generation - returns LLMStreamingResult
-            val streamResult = RunAnywhere.generateStream(prompt)
-            streamResult.stream.collect { token ->
+            // Use SDK streaming generation - returns Flow<String>
+            RunAnywhere.generateStream(prompt).collect { token ->
                 fullResponse += token
                 totalTokensReceived++
 
@@ -304,7 +255,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 if (fullResponse.contains("<think>") && !isInThinkingMode) {
                     isInThinkingMode = true
                     thinkingStartTime = System.currentTimeMillis()
-                    Log.i("ChatViewModel", "🧠 Entering thinking mode")
+                    Log.i(TAG, "🧠 Entering thinking mode")
                 }
 
                 if (isInThinkingMode) {
@@ -314,12 +265,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         val thinkingEndRange = fullResponse.indexOf("</think>")
 
                         if (thinkingRange < thinkingEndRange) {
-                            thinkingContent =
-                                fullResponse.substring(thinkingRange, thinkingEndRange)
+                            thinkingContent = fullResponse.substring(thinkingRange, thinkingEndRange)
                             responseContent = fullResponse.substring(thinkingEndRange + 8)
                             isInThinkingMode = false
                             thinkingEndTime = System.currentTimeMillis()
-                            Log.i("ChatViewModel", "🧠 Exiting thinking mode")
+                            Log.i(TAG, "🧠 Exiting thinking mode")
                         }
                     } else {
                         // Still in thinking mode
@@ -341,7 +291,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
         } catch (e: Exception) {
-            Log.e("ChatViewModel", "Streaming failed", e)
+            Log.e(TAG, "Streaming failed", e)
             wasInterrupted = true
             throw e
         }
@@ -350,22 +300,20 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         // Handle edge case: Stream ended while still in thinking mode
         if (isInThinkingMode && !fullResponse.contains("</think>")) {
-            Log.w("ChatViewModel", "⚠️ Stream ended while in thinking mode")
+            Log.w(TAG, "⚠️ Stream ended while in thinking mode")
             wasInterrupted = true
 
             if (thinkingContent.isNotEmpty()) {
-                val remainingContent =
-                    fullResponse
-                        .replace("<think>", "")
-                        .replace(thinkingContent, "")
-                        .trim()
+                val remainingContent = fullResponse
+                    .replace("<think>", "")
+                    .replace(thinkingContent, "")
+                    .trim()
 
-                val intelligentResponse =
-                    if (remainingContent.isEmpty()) {
-                        generateThinkingSummaryResponse(thinkingContent)
-                    } else {
-                        remainingContent
-                    }
+                val intelligentResponse = if (remainingContent.isEmpty()) {
+                    generateThinkingSummaryResponse(thinkingContent)
+                } else {
+                    remainingContent
+                }
 
                 updateAssistantMessage(
                     messageId = messageId,
@@ -376,28 +324,23 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         // Create analytics
-        val analytics =
-            createMessageAnalytics(
-                messageId = messageId,
-                conversationId = _uiState.value.currentConversation?.id ?: "",
-                startTime = startTime,
-                endTime = endTime,
-                firstTokenTime = firstTokenTime,
-                thinkingStartTime = thinkingStartTime,
-                thinkingEndTime = thinkingEndTime,
-                inputText = prompt,
-                outputText = responseContent,
-                thinkingText = thinkingContent.takeIf { it.isNotEmpty() },
-                tokensPerSecondHistory = tokensPerSecondHistory.toList(),
-                wasInterrupted = wasInterrupted,
-                generationMode = GenerationMode.STREAMING,
-            )
+        val analytics = createMessageAnalytics(
+            startTime = startTime,
+            endTime = endTime,
+            firstTokenTime = firstTokenTime,
+            thinkingStartTime = thinkingStartTime,
+            thinkingEndTime = thinkingEndTime,
+            inputText = prompt,
+            outputText = responseContent,
+            thinkingText = thinkingContent.takeIf { it.isNotEmpty() },
+            wasInterrupted = wasInterrupted,
+        )
 
         // Update message with analytics
         updateAssistantMessageWithAnalytics(messageId, analytics)
 
         _uiState.value = _uiState.value.copy(isGenerating = false)
-        Log.i("ChatViewModel", "✅ Streaming generation completed")
+        Log.i(TAG, "✅ Streaming generation completed")
     }
 
     /**
@@ -417,22 +360,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
             updateAssistantMessage(messageId, response, null)
 
-            val analytics =
-                createMessageAnalytics(
-                    messageId = messageId,
-                    conversationId = _uiState.value.currentConversation?.id ?: "",
-                    startTime = startTime,
-                    endTime = endTime,
-                    firstTokenTime = null,
-                    thinkingStartTime = null,
-                    thinkingEndTime = null,
-                    inputText = prompt,
-                    outputText = response,
-                    thinkingText = null,
-                    tokensPerSecondHistory = emptyList(),
-                    wasInterrupted = false,
-                    generationMode = GenerationMode.NON_STREAMING,
-                )
+            val analytics = createMessageAnalytics(
+                startTime = startTime,
+                endTime = endTime,
+                firstTokenTime = null,
+                thinkingStartTime = null,
+                thinkingEndTime = null,
+                inputText = prompt,
+                outputText = response,
+                thinkingText = null,
+                wasInterrupted = false,
+            )
 
             updateAssistantMessageWithAnalytics(messageId, analytics)
         } catch (e: Exception) {
@@ -445,25 +383,20 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Handle generation errors
      */
-    private fun handleGenerationError(
-        error: Exception,
-        messageId: String,
-    ) {
-        Log.e("ChatViewModel", "❌ Generation failed", error)
+    private fun handleGenerationError(error: Exception, messageId: String) {
+        Log.e(TAG, "❌ Generation failed", error)
 
-        val errorMessage =
-            when {
-                !_uiState.value.isModelLoaded -> "❌ No model is loaded. Please select and load a model first."
-                else -> "❌ Generation failed: ${error.message}"
-            }
+        val errorMessage = when {
+            !_uiState.value.isModelLoaded -> "❌ No model is loaded. Please select and load a model first."
+            else -> "❌ Generation failed: ${error.message}"
+        }
 
         updateAssistantMessage(messageId, errorMessage, null)
 
-        _uiState.value =
-            _uiState.value.copy(
-                isGenerating = false,
-                error = error,
-            )
+        _uiState.value = _uiState.value.copy(
+            isGenerating = false,
+            error = error,
+        )
     }
 
     /**
@@ -475,17 +408,16 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         thinkingContent: String?,
     ) {
         val currentMessages = _uiState.value.messages
-        val updatedMessages =
-            currentMessages.map { message ->
-                if (message.id == messageId) {
-                    message.copy(
-                        content = content,
-                        thinkingContent = thinkingContent,
-                    )
-                } else {
-                    message
-                }
+        val updatedMessages = currentMessages.map { message ->
+            if (message.id == messageId) {
+                message.copy(
+                    content = content,
+                    thinkingContent = thinkingContent,
+                )
+            } else {
+                message
             }
+        }
 
         _uiState.value = _uiState.value.copy(messages = updatedMessages)
     }
@@ -498,24 +430,21 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         analytics: MessageAnalytics,
     ) {
         val currentMessages = _uiState.value.messages
-        val updatedMessages =
-            currentMessages.map { message ->
-                if (message.id == messageId) {
-                    message.copy(analytics = analytics)
-                } else {
-                    message
-                }
+        val updatedMessages = currentMessages.map { message ->
+            if (message.id == messageId) {
+                message.copy(analytics = analytics)
+            } else {
+                message
             }
+        }
 
         _uiState.value = _uiState.value.copy(messages = updatedMessages)
     }
 
     /**
-     * Create comprehensive message analytics
+     * Create message analytics using app-local types
      */
-    private suspend fun createMessageAnalytics(
-        messageId: String,
-        conversationId: String,
+    private fun createMessageAnalytics(
         startTime: Long,
         endTime: Long,
         firstTokenTime: Long?,
@@ -524,67 +453,35 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         inputText: String,
         outputText: String,
         thinkingText: String?,
-        tokensPerSecondHistory: List<Double>,
         wasInterrupted: Boolean,
-        generationMode: GenerationMode,
     ): MessageAnalytics {
         val totalGenerationTime = endTime - startTime
-        val timeToFirstToken = firstTokenTime?.let { it - startTime }
-
-        val thinkingTime =
-            if (thinkingStartTime != null && thinkingEndTime != null) {
-                thinkingEndTime - thinkingStartTime
-            } else {
-                null
-            }
-
-        val responseTime = thinkingTime?.let { totalGenerationTime - it }
+        val timeToFirstToken = firstTokenTime?.let { it - startTime } ?: 0L
 
         // Estimate token counts (simple approximation)
         val inputTokens = estimateTokenCount(inputText)
         val outputTokens = estimateTokenCount(outputText)
-        val thinkingTokens = thinkingText?.let { estimateTokenCount(it) }
-        val responseTokens = outputTokens - (thinkingTokens ?: 0)
 
-        val averageTokensPerSecond =
-            if (totalGenerationTime > 0) {
-                outputTokens.toDouble() / (totalGenerationTime / 1000.0)
-            } else {
-                0.0
-            }
+        val averageTokensPerSecond = if (totalGenerationTime > 0) {
+            outputTokens.toDouble() / (totalGenerationTime / 1000.0)
+        } else {
+            0.0
+        }
 
-        val completionStatus =
-            if (wasInterrupted) {
-                CompletionStatus.INTERRUPTED
-            } else {
-                CompletionStatus.COMPLETE
-            }
+        val completionStatus = if (wasInterrupted) {
+            CompletionStatus.INTERRUPTED
+        } else {
+            CompletionStatus.COMPLETE
+        }
 
         return MessageAnalytics(
-            messageId = messageId,
-            conversationId = conversationId,
-            modelId = _uiState.value.loadedModelName ?: "unknown",
-            modelName = _uiState.value.loadedModelName ?: "Unknown",
-            framework = InferenceFramework.LLAMA_CPP,
-            timestamp = startTime,
-            timeToFirstToken = timeToFirstToken,
-            totalGenerationTime = totalGenerationTime,
-            thinkingTime = thinkingTime,
-            responseTime = responseTime,
             inputTokens = inputTokens,
             outputTokens = outputTokens,
-            thinkingTokens = thinkingTokens,
-            responseTokens = responseTokens,
+            totalGenerationTime = totalGenerationTime,
+            timeToFirstToken = timeToFirstToken,
             averageTokensPerSecond = averageTokensPerSecond,
-            messageLength = outputText.length,
             wasThinkingMode = thinkingText != null,
-            wasInterrupted = wasInterrupted,
-            retryCount = 0,
             completionStatus = completionStatus,
-            tokensPerSecondHistory = tokensPerSecondHistory,
-            generationMode = generationMode,
-            contextWindowUsage = 0.0,
-            generationParameters = GenerationParameters(),
         )
     }
 
@@ -597,16 +494,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Create MessageModelInfo for the current loaded model
-     * Matches iOS pattern for attaching model info to messages
      */
     private fun createCurrentModelInfo(): MessageModelInfo? {
         val modelName = _uiState.value.loadedModelName ?: return null
         val modelId = RunAnywhere.currentLLMModelId ?: modelName
 
-        return SDKMessageModelInfo(
+        return MessageModelInfo(
             modelId = modelId,
             modelName = modelName,
-            framework = InferenceFramework.LLAMA_CPP,
+            framework = "LLAMA_CPP",
         )
     }
 
@@ -647,14 +543,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun clearChat() {
         generationJob?.cancel()
 
-        val currentMessages = _uiState.value.messages
-        _uiState.value =
-            _uiState.value.copy(
-                messages = emptyList(),
-                currentInput = "",
-                isGenerating = false,
-                error = null,
-            )
+        _uiState.value = _uiState.value.copy(
+            messages = emptyList(),
+            currentInput = "",
+            isGenerating = false,
+            error = null,
+        )
 
         // Create new conversation
         val conversation = conversationStore.createConversation()
@@ -677,90 +571,73 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Check model status and load appropriate chat model.
-     *
-     * This method uses the SDK's model discovery API to find and load
-     * only LANGUAGE (chat) models, ensuring we don't accidentally
-     * load STT/TTS models on the chat screen.
      */
     suspend fun checkModelStatus() {
         try {
             if (app.isSDKReady()) {
                 // Check if LLM is already loaded via SDK
-                if (RunAnywhere.isModelLoaded) {
+                if (RunAnywhere.isLLMModelLoaded()) {
                     val loadedModelId = RunAnywhere.currentLLMModelId
-                    Log.i("ChatViewModel", "✅ LLM model already loaded: $loadedModelId")
-                    _uiState.value =
-                        _uiState.value.copy(
-                            isModelLoaded = true,
-                            loadedModelName = loadedModelId,
-                        )
+                    Log.i(TAG, "✅ LLM model already loaded: $loadedModelId")
+                    _uiState.value = _uiState.value.copy(
+                        isModelLoaded = true,
+                        loadedModelName = loadedModelId,
+                    )
                     addSystemMessageIfNeeded()
                     return
                 }
 
                 // Use SDK's model listing API to find chat models
-                val allModels = listAvailableModels()
-                val chatModel =
-                    allModels.firstOrNull { model ->
-                        model.category == ModelCategory.LANGUAGE && model.isDownloaded
-                    }
+                val allModels = RunAnywhere.availableModels()
+                val chatModel = allModels.firstOrNull { model ->
+                    model.category == ModelCategory.LANGUAGE && model.isDownloaded
+                }
 
                 if (chatModel != null) {
-                    Log.i(
-                        "ChatViewModel",
-                        "📦 Found downloaded chat model: ${chatModel.name} (category: ${chatModel.category}), loading...",
-                    )
+                    Log.i(TAG, "📦 Found downloaded chat model: ${chatModel.name}, loading...")
 
                     try {
                         // Load the chat model into memory
-                        RunAnywhere.loadModel(chatModel.id)
+                        RunAnywhere.loadLLMModel(chatModel.id)
 
-                        _uiState.value =
-                            _uiState.value.copy(
-                                isModelLoaded = true,
-                                loadedModelName = chatModel.name,
-                            )
-                        Log.i(
-                            "ChatViewModel",
-                            "✅ Chat model loaded successfully: ${chatModel.name}",
+                        _uiState.value = _uiState.value.copy(
+                            isModelLoaded = true,
+                            loadedModelName = chatModel.name,
                         )
-                    } catch (e: Exception) {
-                        Log.e("ChatViewModel", "❌ Failed to load chat model: ${e.message}", e)
-                        _uiState.value =
-                            _uiState.value.copy(
-                                isModelLoaded = false,
-                                loadedModelName = null,
-                                error = e,
-                            )
-                    }
-                } else {
-                    _uiState.value =
-                        _uiState.value.copy(
+                        Log.i(TAG, "✅ Chat model loaded successfully: ${chatModel.name}")
+                    } catch (e: Throwable) {
+                        // Catch Throwable to handle both Exception and Error (e.g., UnsatisfiedLinkError)
+                        Log.e(TAG, "❌ Failed to load chat model: ${e.message}", e)
+                        _uiState.value = _uiState.value.copy(
                             isModelLoaded = false,
                             loadedModelName = null,
+                            error = if (e is Exception) e else Exception("Native library not available: ${e.message}", e),
                         )
-                    Log.i(
-                        "ChatViewModel",
-                        "ℹ️ No downloaded chat models (LANGUAGE) found. STT/TTS models are ignored for chat.",
+                    }
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        isModelLoaded = false,
+                        loadedModelName = null,
                     )
+                    Log.i(TAG, "ℹ️ No downloaded chat models found.")
                 }
 
                 addSystemMessageIfNeeded()
             } else {
-                _uiState.value =
-                    _uiState.value.copy(
-                        isModelLoaded = false,
-                        loadedModelName = null,
-                    )
-                Log.i("ChatViewModel", "❌ SDK not ready")
-            }
-        } catch (e: Exception) {
-            Log.e("ChatViewModel", "Failed to check model status", e)
-            _uiState.value =
-                _uiState.value.copy(
+                _uiState.value = _uiState.value.copy(
                     isModelLoaded = false,
                     loadedModelName = null,
                 )
+                Log.i(TAG, "❌ SDK not ready")
+            }
+        } catch (e: Throwable) {
+            // Catch Throwable to handle both Exception and Error (e.g., UnsatisfiedLinkError)
+            Log.e(TAG, "Failed to check model status: ${e.message}", e)
+            _uiState.value = _uiState.value.copy(
+                isModelLoaded = false,
+                loadedModelName = null,
+                error = if (e is Exception) e else Exception("Failed to check model status: ${e.message}", e),
+            )
         }
     }
 
@@ -798,10 +675,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value = _uiState.value.copy(messages = conversation.messages)
 
             val analyticsCount = conversation.messages.mapNotNull { it.analytics }.size
-            Log.i(
-                "ChatViewModel",
-                "📂 Loaded conversation with ${conversation.messages.size} messages, $analyticsCount have analytics",
-            )
+            Log.i(TAG, "📂 Loaded conversation with ${conversation.messages.size} messages, $analyticsCount have analytics")
         }
 
         // Update model info if available
@@ -822,5 +696,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
+    }
+
+    companion object {
+        private const val TAG = "ChatViewModel"
     }
 }

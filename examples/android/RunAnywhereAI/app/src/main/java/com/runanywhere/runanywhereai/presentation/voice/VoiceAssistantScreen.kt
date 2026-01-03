@@ -34,7 +34,7 @@ import com.google.accompanist.permissions.rememberPermissionState
 import com.runanywhere.runanywhereai.domain.models.SessionState
 import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
 import com.runanywhere.runanywhereai.ui.theme.AppColors
-import com.runanywhere.sdk.models.enums.ModelSelectionContext
+import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
 
 /**
  * Voice Assistant screen matching iOS VoiceAssistantView
@@ -110,7 +110,7 @@ fun VoiceAssistantScreen(viewModel: VoiceAssistantViewModel = viewModel()) {
             context = ModelSelectionContext.STT,
             onDismiss = { showSTTModelSelection = false },
             onModelSelected = { model ->
-                val framework = model.preferredFramework?.displayName ?: "Unknown"
+                val framework = model.framework.displayName
                 viewModel.setSTTModel(framework, model.name, model.id)
                 showSTTModelSelection = false
             },
@@ -122,7 +122,7 @@ fun VoiceAssistantScreen(viewModel: VoiceAssistantViewModel = viewModel()) {
             context = ModelSelectionContext.LLM,
             onDismiss = { showLLMModelSelection = false },
             onModelSelected = { model ->
-                val framework = model.preferredFramework?.displayName ?: "Unknown"
+                val framework = model.framework.displayName
                 viewModel.setLLMModel(framework, model.name, model.id)
                 showLLMModelSelection = false
             },
@@ -134,7 +134,7 @@ fun VoiceAssistantScreen(viewModel: VoiceAssistantViewModel = viewModel()) {
             context = ModelSelectionContext.TTS,
             onDismiss = { showTTSModelSelection = false },
             onModelSelected = { model ->
-                val framework = model.preferredFramework?.displayName ?: "Unknown"
+                val framework = model.framework.displayName
                 viewModel.setTTSModel(framework, model.name, model.id)
                 showTTSModelSelection = false
             },

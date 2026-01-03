@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 RunAnywhere SDK
+ * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
  * TTS extension for CppBridge.
@@ -10,7 +10,9 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import com.runanywhere.sdk.foundation.bridge.CppBridge
 import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
  * TTS bridge that provides Text-to-Speech component lifecycle management for C++ core.
@@ -556,7 +558,28 @@ object CppBridgeTTS {
                 return 0
             }
 
-            val result = nativeCreate()
+            // Check if native commons library is loaded
+            if (!CppBridge.isNativeLibraryLoaded) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.ERROR,
+                    TAG,
+                    "Native library not loaded. TTS inference requires native libraries to be bundled."
+                )
+                throw SDKError.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
+            }
+
+            // Create TTS component via RunAnywhereBridge
+            val result = try {
+                RunAnywhereBridge.racTtsComponentCreate()
+            } catch (e: UnsatisfiedLinkError) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.ERROR,
+                    TAG,
+                    "TTS component creation failed. Native method not available: ${e.message}"
+                )
+                throw SDKError.notInitialized("TTS native library not available. Please ensure the TTS backend is bundled in your APK.")
+            }
+
             if (result == 0L) {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
@@ -614,7 +637,7 @@ object CppBridgeTTS {
                 "Loading model: $modelId from $modelPath"
             )
 
-            val result = nativeLoadModel(handle, modelPath, config.toJson())
+            val result = RunAnywhereBridge.racTtsComponentLoadModel(handle, modelPath, config.toJson())
             if (result != 0) {
                 setState(TTSState.ERROR)
                 CppBridgePlatformAdapter.logCallback(
@@ -702,7 +725,7 @@ object CppBridgeTTS {
             val startTime = System.currentTimeMillis()
 
             try {
-                val audioData = nativeSynthesize(handle, text, config.toJson())
+                val audioData = RunAnywhereBridge.racTtsComponentSynthesize(handle, text, config.toJson())
                     ?: throw SDKError.tts("Synthesis failed: null result")
 
                 val processingTimeMs = System.currentTimeMillis() - startTime
@@ -782,7 +805,7 @@ object CppBridgeTTS {
             val startTime = System.currentTimeMillis()
 
             try {
-                val audioData = nativeSynthesizeStream(handle, text, config.toJson())
+                val audioData = RunAnywhereBridge.racTtsComponentSynthesizeStream(handle, text, config.toJson())
                     ?: throw SDKError.tts("Streaming synthesis failed: null result")
 
                 val processingTimeMs = System.currentTimeMillis() - startTime
@@ -861,7 +884,7 @@ object CppBridgeTTS {
             val startTime = System.currentTimeMillis()
 
             try {
-                val durationMs = nativeSynthesizeToFile(handle, text, outputPath, config.toJson())
+                val durationMs = RunAnywhereBridge.racTtsComponentSynthesizeToFile(handle, text, outputPath, config.toJson())
                 if (durationMs < 0) {
                     throw SDKError.tts("Synthesis to file failed: error code $durationMs")
                 }
@@ -918,7 +941,7 @@ object CppBridgeTTS {
                 "Cancelling synthesis"
             )
 
-            nativeCancel(handle)
+            RunAnywhereBridge.racTtsComponentCancel(handle)
         }
     }
 
@@ -941,7 +964,7 @@ object CppBridgeTTS {
                 "Unloading model: $previousModelId"
             )
 
-            nativeUnload(handle)
+            RunAnywhereBridge.racTtsComponentUnload(handle)
 
             loadedModelId = null
             loadedModelPath = null
@@ -992,7 +1015,7 @@ object CppBridgeTTS {
                 "Destroying TTS component"
             )
 
-            nativeDestroy(handle)
+            RunAnywhereBridge.racTtsComponentDestroy(handle)
 
             handle = 0
             setState(TTSState.NOT_CREATED)
@@ -1349,7 +1372,7 @@ object CppBridgeTTS {
             if (handle == 0L || state != TTSState.READY) {
                 return emptyList()
             }
-            val json = nativeGetVoices(handle) ?: return emptyList()
+            val json = RunAnywhereBridge.racTtsComponentGetVoices(handle) ?: return emptyList()
             return parseVoicesJson(json)
         }
     }
@@ -1365,7 +1388,7 @@ object CppBridgeTTS {
             if (handle == 0L || state != TTSState.READY) {
                 return false
             }
-            return nativeSetVoice(handle, voiceId) == 0
+            return RunAnywhereBridge.racTtsComponentSetVoice(handle, voiceId) == 0
         }
     }
 
@@ -1379,7 +1402,7 @@ object CppBridgeTTS {
             if (handle == 0L || state != TTSState.READY) {
                 return emptyList()
             }
-            val json = nativeGetLanguages(handle) ?: return emptyList()
+            val json = RunAnywhereBridge.racTtsComponentGetLanguages(handle) ?: return emptyList()
             // Parse JSON array
             val pattern = "\"([^\"]+)\""
             return Regex(pattern).findAll(json).map { it.groupValues[1] }.toList()

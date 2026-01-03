@@ -410,20 +410,8 @@ rac_result_t rac_model_registry_update_download_status(rac_model_registry_handle
 // PUBLIC API - QUERY HELPERS
 // =============================================================================
 
-rac_bool_t rac_model_info_is_downloaded(const rac_model_info_t* model) {
-    if (!model) {
-        return RAC_FALSE;
-    }
-    return (model->local_path && strlen(model->local_path) > 0) ? RAC_TRUE : RAC_FALSE;
-}
-
-rac_bool_t rac_model_category_requires_context_length(rac_model_category_t category) {
-    return (category == RAC_MODEL_CATEGORY_LANGUAGE) ? RAC_TRUE : RAC_FALSE;
-}
-
-rac_bool_t rac_model_category_supports_thinking(rac_model_category_t category) {
-    return (category == RAC_MODEL_CATEGORY_LANGUAGE) ? RAC_TRUE : RAC_FALSE;
-}
+// NOTE: rac_model_info_is_downloaded, rac_model_category_requires_context_length,
+// and rac_model_category_supports_thinking are defined in model_types.cpp
 
 rac_artifact_type_kind_t rac_model_infer_artifact_type(const char* url, rac_model_format_t format) {
     // Infer from URL extension

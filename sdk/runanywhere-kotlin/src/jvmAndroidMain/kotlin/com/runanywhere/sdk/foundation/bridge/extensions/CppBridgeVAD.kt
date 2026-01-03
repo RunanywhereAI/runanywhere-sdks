@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 RunAnywhere SDK
+ * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
  * VAD extension for CppBridge.
@@ -10,7 +10,9 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import com.runanywhere.sdk.foundation.bridge.CppBridge
 import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
  * VAD bridge that provides Voice Activity Detection component lifecycle management for C++ core.
@@ -516,7 +518,28 @@ object CppBridgeVAD {
                 return 0
             }
 
-            val result = nativeCreate()
+            // Check if native commons library is loaded
+            if (!CppBridge.isNativeLibraryLoaded) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.ERROR,
+                    TAG,
+                    "Native library not loaded. VAD inference requires native libraries to be bundled."
+                )
+                throw SDKError.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
+            }
+
+            // Create VAD component via RunAnywhereBridge
+            val result = try {
+                RunAnywhereBridge.racVadComponentCreate()
+            } catch (e: UnsatisfiedLinkError) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.ERROR,
+                    TAG,
+                    "VAD component creation failed. Native method not available: ${e.message}"
+                )
+                throw SDKError.notInitialized("VAD native library not available. Please ensure the VAD backend is bundled in your APK.")
+            }
+
             if (result == 0L) {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
@@ -574,7 +597,7 @@ object CppBridgeVAD {
                 "Loading model: $modelId from $modelPath"
             )
 
-            val result = nativeLoadModel(handle, modelPath, config.toJson())
+            val result = RunAnywhereBridge.racVadComponentLoadModel(handle, modelPath, config.toJson())
             if (result != 0) {
                 setState(VADState.ERROR)
                 CppBridgePlatformAdapter.logCallback(
@@ -662,7 +685,7 @@ object CppBridgeVAD {
             val startTime = System.currentTimeMillis()
 
             try {
-                val resultJson = nativeProcess(handle, audioData, config.toJson())
+                val resultJson = RunAnywhereBridge.racVadComponentProcess(handle, audioData, config.toJson())
                     ?: throw SDKError.vad("Detection failed: null result")
 
                 val result = parseDetectionResult(resultJson, System.currentTimeMillis() - startTime)
@@ -729,7 +752,7 @@ object CppBridgeVAD {
             val startTime = System.currentTimeMillis()
 
             try {
-                val resultJson = nativeProcessStream(handle, audioData, config.toJson())
+                val resultJson = RunAnywhereBridge.racVadComponentProcessStream(handle, audioData, config.toJson())
                     ?: throw SDKError.vad("Streaming detection failed: null result")
 
                 val result = parseDetectionResult(resultJson, System.currentTimeMillis() - startTime)
@@ -775,7 +798,7 @@ object CppBridgeVAD {
             }
 
             try {
-                val resultJson = nativeProcessFrame(handle, audioData, config.toJson())
+                val resultJson = RunAnywhereBridge.racVadComponentProcessFrame(handle, audioData, config.toJson())
                     ?: throw SDKError.vad("Frame processing failed: null result")
 
                 return parseFrameResult(resultJson)
@@ -803,7 +826,7 @@ object CppBridgeVAD {
                 "Cancelling detection"
             )
 
-            nativeCancel(handle)
+            RunAnywhereBridge.racVadComponentCancel(handle)
         }
     }
 
@@ -824,7 +847,7 @@ object CppBridgeVAD {
                 "Resetting VAD state"
             )
 
-            nativeReset(handle)
+            RunAnywhereBridge.racVadComponentReset(handle)
         }
     }
 
@@ -847,7 +870,7 @@ object CppBridgeVAD {
                 "Unloading model: $previousModelId"
             )
 
-            nativeUnload(handle)
+            RunAnywhereBridge.racVadComponentUnload(handle)
 
             loadedModelId = null
             loadedModelPath = null
@@ -898,7 +921,7 @@ object CppBridgeVAD {
                 "Destroying VAD component"
             )
 
-            nativeDestroy(handle)
+            RunAnywhereBridge.racVadComponentDestroy(handle)
 
             handle = 0
             setState(VADState.NOT_CREATED)
@@ -1377,7 +1400,7 @@ object CppBridgeVAD {
             if (handle == 0L || state != VADState.READY) {
                 return 0
             }
-            return nativeGetMinFrameSize(handle)
+            return RunAnywhereBridge.racVadComponentGetMinFrameSize(handle)
         }
     }
 
@@ -1391,7 +1414,7 @@ object CppBridgeVAD {
             if (handle == 0L || state != VADState.READY) {
                 return emptyList()
             }
-            val json = nativeGetSampleRates(handle) ?: return emptyList()
+            val json = RunAnywhereBridge.racVadComponentGetSampleRates(handle) ?: return emptyList()
             // Parse JSON array of integers
             val pattern = "\\d+"
             return Regex(pattern).findAll(json).map { it.value.toInt() }.toList()

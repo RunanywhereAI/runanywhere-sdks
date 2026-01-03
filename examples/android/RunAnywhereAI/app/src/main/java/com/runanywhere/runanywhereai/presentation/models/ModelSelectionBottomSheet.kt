@@ -21,9 +21,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppTypography
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
+import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.models.DeviceInfo
-import com.runanywhere.sdk.models.enums.InferenceFramework
-import com.runanywhere.sdk.models.enums.ModelSelectionContext
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.Models.ModelCategory
+import com.runanywhere.sdk.public.extensions.Models.ModelFormat
+import com.runanywhere.sdk.public.extensions.Models.ModelInfo
+import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
 import com.runanywhere.sdk.public.extensions.loadTTSVoice
 import kotlinx.coroutines.launch
 
@@ -50,7 +54,7 @@ import kotlinx.coroutines.launch
 fun ModelSelectionBottomSheet(
     context: ModelSelectionContext = ModelSelectionContext.LLM,
     onDismiss: () -> Unit,
-    onModelSelected: suspend (com.runanywhere.sdk.models.ModelInfo) -> Unit,
+    onModelSelected: suspend (ModelInfo) -> Unit,
     viewModel: ModelSelectionViewModel =
         viewModel(
             factory = ModelSelectionViewModel.Factory(context),
@@ -148,19 +152,17 @@ fun ModelSelectionBottomSheet(
                                         viewModel.setLoadingModel(true)
                                         try {
                                             // Load System TTS via SDK to trigger lifecycle tracker
-                                            com.runanywhere.sdk.public.RunAnywhere.loadTTSVoice("system-tts")
+                                            RunAnywhere.loadTTSVoice("system-tts")
 
                                             // Create pseudo ModelInfo for System TTS (matches iOS)
-                                            val systemTTSModel =
-                                                com.runanywhere.sdk.models.ModelInfo(
-                                                    id = "system-tts",
-                                                    name = "System TTS",
-                                                    downloadURL = null,
-                                                    format = com.runanywhere.sdk.models.enums.ModelFormat.UNKNOWN,
-                                                    category = com.runanywhere.sdk.models.enums.ModelCategory.SPEECH_SYNTHESIS,
-                                                    compatibleFrameworks = listOf(InferenceFramework.SYSTEM_TTS),
-                                                    preferredFramework = InferenceFramework.SYSTEM_TTS,
-                                                )
+                                            val systemTTSModel = ModelInfo(
+                                                id = "system-tts",
+                                                name = "System TTS",
+                                                downloadURL = null,
+                                                format = ModelFormat.UNKNOWN,
+                                                category = ModelCategory.SPEECH_SYNTHESIS,
+                                                framework = InferenceFramework.SYSTEM_TTS,
+                                            )
 
                                             kotlinx.coroutines.delay(300)
                                             onModelSelected(systemTTSModel)
@@ -436,14 +438,11 @@ private fun FrameworkRow(
 private fun getFrameworkIcon(framework: InferenceFramework): ImageVector {
     return when (framework) {
         InferenceFramework.LLAMA_CPP -> Icons.Default.Memory
-        InferenceFramework.MEDIA_PIPE -> Icons.Default.Psychology
-        InferenceFramework.WHISPER_KIT, InferenceFramework.WHISPER_CPP, InferenceFramework.OPEN_AI_WHISPER -> Icons.Default.Mic
+        InferenceFramework.ONNX -> Icons.Default.Hub
         InferenceFramework.SYSTEM_TTS -> Icons.Default.VolumeUp
         InferenceFramework.FOUNDATION_MODELS -> Icons.Default.AutoAwesome
-        InferenceFramework.CORE_ML -> Icons.Default.Memory
-        InferenceFramework.TENSOR_FLOW_LITE -> Icons.Default.Analytics
-        InferenceFramework.ONNX -> Icons.Default.Hub
-        InferenceFramework.MLX, InferenceFramework.MLC -> Icons.Default.Speed
+        InferenceFramework.FLUID_AUDIO -> Icons.Default.Mic
+        InferenceFramework.BUILT_IN -> Icons.Default.Settings
         else -> Icons.Default.Settings
     }
 }
@@ -454,20 +453,9 @@ private fun getFrameworkIcon(framework: InferenceFramework): ImageVector {
 private fun getFrameworkDescription(framework: InferenceFramework): String {
     return when (framework) {
         InferenceFramework.LLAMA_CPP -> "High-performance LLM inference"
-        InferenceFramework.MEDIA_PIPE -> "Multi-task AI inference"
-        InferenceFramework.WHISPER_KIT -> "Optimized speech recognition"
-        InferenceFramework.WHISPER_CPP -> "C++ speech recognition"
-        InferenceFramework.OPEN_AI_WHISPER -> "OpenAI Whisper models"
+        InferenceFramework.ONNX -> "ONNX Runtime inference"
         InferenceFramework.SYSTEM_TTS -> "Built-in text-to-speech"
         InferenceFramework.FOUNDATION_MODELS -> "Foundation models"
-        InferenceFramework.CORE_ML -> "Core ML inference"
-        InferenceFramework.TENSOR_FLOW_LITE -> "TensorFlow Lite models"
-        InferenceFramework.ONNX -> "ONNX Runtime inference"
-        InferenceFramework.MLX -> "MLX framework"
-        InferenceFramework.MLC -> "Machine Learning Compilation"
-        InferenceFramework.EXECU_TORCH -> "PyTorch mobile inference"
-        InferenceFramework.PICO_LLM -> "Embedded LLM inference"
-        InferenceFramework.SWIFT_TRANSFORMERS -> "Swift Transformers"
         InferenceFramework.FLUID_AUDIO -> "FluidAudio synthesis"
         InferenceFramework.BUILT_IN -> "Built-in algorithms"
         InferenceFramework.NONE -> "No framework"
@@ -500,14 +488,14 @@ private fun EmptyModelsMessage(framework: InferenceFramework) {
 
 @Composable
 private fun SelectableModelRow(
-    model: com.runanywhere.sdk.models.ModelInfo,
+    model: ModelInfo,
     isSelected: Boolean,
     isLoading: Boolean,
     onDownloadModel: () -> Unit,
     onSelectModel: () -> Unit,
 ) {
     // State detection - matches iOS logic
-    val isDownloaded = model.localPath != null
+    val isDownloaded = model.isDownloaded
     val canDownload = model.downloadURL != null
 
     Card(
@@ -543,10 +531,10 @@ private fun SelectableModelRow(
                     horizontalArrangement = Arrangement.spacedBy(Dimensions.smallMedium),
                 ) {
                     // Size badge
-                    val memReq = model.memoryRequired ?: 0L
-                    if (memReq > 0) {
+                    val downloadSize = model.downloadSize ?: 0L
+                    if (downloadSize > 0) {
                         ModelBadge(
-                            text = formatBytes(memReq),
+                            text = formatBytes(downloadSize),
                             icon = Icons.Default.Memory,
                         )
                     }

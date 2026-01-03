@@ -593,7 +593,7 @@ private fun formatTimestamp(timestamp: Long): String {
 @Composable
 fun ModelBadge(
     modelName: String,
-    framework: com.runanywhere.sdk.models.enums.InferenceFramework,
+    framework: String? = null,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.primary,
@@ -630,11 +630,13 @@ fun ModelBadge(
                 style = AppTypography.caption2Medium,
                 color = MaterialTheme.colorScheme.onPrimary,
             )
-            Text(
-                text = framework.displayName,
-                style = AppTypography.caption2,
-                color = MaterialTheme.colorScheme.onPrimary,
-            )
+            if (framework != null) {
+                Text(
+                    text = framework,
+                    style = AppTypography.caption2,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+            }
         }
     }
 }

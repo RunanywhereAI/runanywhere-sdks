@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 RunAnywhere SDK
+ * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
  * Public API for text generation (LLM) operations.
@@ -86,3 +86,13 @@ expect suspend fun RunAnywhere.generateStreamWithMetrics(
     prompt: String,
     options: LLMGenerationOptions? = null
 ): LLMStreamingResult
+
+// MARK: - Generation Control
+
+/**
+ * Cancel any ongoing text generation.
+ *
+ * This will interrupt the current generation and stop producing tokens.
+ * Safe to call even if no generation is in progress.
+ */
+expect fun RunAnywhere.cancelGeneration()

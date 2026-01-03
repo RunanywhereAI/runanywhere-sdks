@@ -4,17 +4,28 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
  * JVM/Android implementation of LlamaCPP native registration.
- * Calls rac_backend_llamacpp_register() via JNI.
+ *
+ * Uses the self-contained LlamaCPPBridge to register the backend,
+ * mirroring the Swift LlamaCPPBackend XCFramework architecture.
+ *
+ * The LlamaCPP module has its own JNI library (librac_backend_llamacpp_jni.so)
+ * that provides backend registration, separate from the main commons JNI.
  */
 internal actual fun LlamaCPP.registerNative(): Int {
+    // Ensure commons JNI is loaded first (provides service registry)
     RunAnywhereBridge.ensureNativeLibraryLoaded()
-    return RunAnywhereBridge.racBackendLlamacppRegister()
+
+    // Load and use the dedicated LlamaCPP JNI
+    if (!LlamaCPPBridge.ensureNativeLibraryLoaded()) {
+        throw UnsatisfiedLinkError("Failed to load LlamaCPP native library")
+    }
+
+    return LlamaCPPBridge.nativeRegister()
 }
 
 /**
  * JVM/Android implementation of LlamaCPP native unregistration.
- * Calls rac_backend_llamacpp_unregister() via JNI.
  */
 internal actual fun LlamaCPP.unregisterNative(): Int {
-    return RunAnywhereBridge.racBackendLlamacppUnregister()
+    return LlamaCPPBridge.nativeUnregister()
 }

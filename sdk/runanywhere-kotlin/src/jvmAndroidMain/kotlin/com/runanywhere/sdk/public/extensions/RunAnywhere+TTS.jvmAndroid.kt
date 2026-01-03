@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 RunAnywhere SDK
+ * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
  * JVM/Android actual implementations for Text-to-Speech operations.
@@ -21,7 +21,7 @@ actual suspend fun RunAnywhere.loadTTSVoice(voiceId: String) {
         throw SDKError.notInitialized("SDK not initialized")
     }
 
-    val modelInfo = CppBridgeModelRegistry.getModel(voiceId)
+    val modelInfo = CppBridgeModelRegistry.get(voiceId)
         ?: throw SDKError.tts("Voice '$voiceId' not found in registry")
 
     val localPath = modelInfo.localPath
@@ -40,6 +40,12 @@ actual suspend fun RunAnywhere.unloadTTSVoice() {
 actual suspend fun RunAnywhere.isTTSVoiceLoaded(): Boolean {
     return CppBridgeTTS.isLoaded
 }
+
+actual val RunAnywhere.currentTTSVoiceId: String?
+    get() = CppBridgeTTS.getLoadedModelId()
+
+actual val RunAnywhere.isTTSVoiceLoadedSync: Boolean
+    get() = CppBridgeTTS.isLoaded
 
 actual suspend fun RunAnywhere.availableTTSVoices(): List<String> {
     // Get available voices from TTS component

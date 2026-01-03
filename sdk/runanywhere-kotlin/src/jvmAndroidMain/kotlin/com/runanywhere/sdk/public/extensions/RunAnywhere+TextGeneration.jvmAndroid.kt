@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 RunAnywhere SDK
+ * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
  * JVM/Android actual implementations for text generation (LLM) operations.
@@ -180,4 +180,9 @@ actual suspend fun RunAnywhere.generateStreamWithMetrics(
         stream = tokenStream,
         result = scope.async { resultDeferred.await() }
     )
+}
+
+actual fun RunAnywhere.cancelGeneration() {
+    // Cancel any ongoing generation via CppBridge
+    CppBridgeLLM.cancel()
 }

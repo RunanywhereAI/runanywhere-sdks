@@ -135,7 +135,7 @@ copy_libraries() {
         fi
     done
 
-    # Copy JNI library (runanywhere_jni.so)
+    # Copy main JNI library (runanywhere_jni.so - commons JNI)
     if [ -f "${ABI_BUILD_DIR}/src/jni/librunanywhere_jni.so" ]; then
         cp "${ABI_BUILD_DIR}/src/jni/librunanywhere_jni.so" "${ABI_DIST_DIR}/"
         [ -n "${STRIP}" ] && "${STRIP}" "${ABI_DIST_DIR}/librunanywhere_jni.so"
@@ -143,6 +143,27 @@ copy_libraries() {
         cp "${ABI_BUILD_DIR}/librunanywhere_jni.so" "${ABI_DIST_DIR}/"
         [ -n "${STRIP}" ] && "${STRIP}" "${ABI_DIST_DIR}/librunanywhere_jni.so"
     fi
+
+    # Copy backend-specific JNI libraries (for modular backend loading)
+    # LlamaCPP JNI
+    for loc in "${ABI_BUILD_DIR}/backends/llamacpp/src/jni" "${ABI_BUILD_DIR}/backends/llamacpp"; do
+        if [ -f "${loc}/librac_backend_llamacpp_jni.so" ]; then
+            cp "${loc}/librac_backend_llamacpp_jni.so" "${ABI_DIST_DIR}/"
+            [ -n "${STRIP}" ] && "${STRIP}" "${ABI_DIST_DIR}/librac_backend_llamacpp_jni.so"
+            echo "  ✓ librac_backend_llamacpp_jni.so"
+            break
+        fi
+    done
+
+    # ONNX JNI
+    for loc in "${ABI_BUILD_DIR}/backends/onnx/src/jni" "${ABI_BUILD_DIR}/backends/onnx"; do
+        if [ -f "${loc}/librac_backend_onnx_jni.so" ]; then
+            cp "${loc}/librac_backend_onnx_jni.so" "${ABI_DIST_DIR}/"
+            [ -n "${STRIP}" ] && "${STRIP}" "${ABI_DIST_DIR}/librac_backend_onnx_jni.so"
+            echo "  ✓ librac_backend_onnx_jni.so"
+            break
+        fi
+    done
 
     # Copy STL library (required for c++_shared)
     local STL_DIR="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/*/sysroot/usr/lib"

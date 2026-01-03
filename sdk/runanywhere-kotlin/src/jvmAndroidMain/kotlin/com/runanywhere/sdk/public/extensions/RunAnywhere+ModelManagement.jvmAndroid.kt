@@ -8,6 +8,10 @@
 package com.runanywhere.sdk.public.extensions
 
 import com.runanywhere.sdk.core.types.InferenceFramework
+import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDownload
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeEvents
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
@@ -18,54 +22,170 @@ import com.runanywhere.sdk.public.extensions.Models.DownloadState
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.Models.ModelInfo
 import com.runanywhere.sdk.public.extensions.Models.ModelFormat
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.withContext
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
+import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
+import java.io.BufferedInputStream
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.util.zip.ZipInputStream
+
+// MARK: - Model Registration Implementation
+
+private val registrationLogger = SDKLogger("RunAnywhere.Models")
+
+/**
+ * Internal implementation for registering a model to the C++ registry.
+ * This is called by the public registerModel() function in commonMain.
+ *
+ * IMPORTANT: This saves directly to the C++ registry so that C++ service providers
+ * (like LlamaCPP) can find the model when loading. The framework field is critical
+ * for correct backend selection.
+ */
+internal actual fun registerModelInternal(modelInfo: ModelInfo) {
+    try {
+        // Convert public ModelInfo to bridge ModelInfo
+        // CRITICAL: The framework field must be set correctly for C++ can_handle() to work
+        val bridgeModelInfo = CppBridgeModelRegistry.ModelInfo(
+            modelId = modelInfo.id,
+            name = modelInfo.name,
+            category = when (modelInfo.category) {
+                ModelCategory.LANGUAGE -> CppBridgeModelRegistry.ModelCategory.LANGUAGE
+                ModelCategory.SPEECH_RECOGNITION -> CppBridgeModelRegistry.ModelCategory.SPEECH_RECOGNITION
+                ModelCategory.SPEECH_SYNTHESIS -> CppBridgeModelRegistry.ModelCategory.SPEECH_SYNTHESIS
+                ModelCategory.AUDIO -> CppBridgeModelRegistry.ModelCategory.AUDIO
+                else -> CppBridgeModelRegistry.ModelCategory.LANGUAGE
+            },
+            format = when (modelInfo.format) {
+                ModelFormat.GGUF -> CppBridgeModelRegistry.ModelFormat.GGUF
+                ModelFormat.ONNX -> CppBridgeModelRegistry.ModelFormat.ONNX
+                ModelFormat.ORT -> CppBridgeModelRegistry.ModelFormat.ORT
+                else -> CppBridgeModelRegistry.ModelFormat.UNKNOWN
+            },
+            // CRITICAL: Map InferenceFramework to C++ framework constant
+            framework = when (modelInfo.framework) {
+                InferenceFramework.LLAMA_CPP -> CppBridgeModelRegistry.Framework.LLAMACPP
+                InferenceFramework.ONNX -> CppBridgeModelRegistry.Framework.ONNX
+                InferenceFramework.FOUNDATION_MODELS -> CppBridgeModelRegistry.Framework.FOUNDATION_MODELS
+                InferenceFramework.SYSTEM_TTS -> CppBridgeModelRegistry.Framework.SYSTEM_TTS
+                InferenceFramework.FLUID_AUDIO -> CppBridgeModelRegistry.Framework.FLUID_AUDIO
+                InferenceFramework.BUILT_IN -> CppBridgeModelRegistry.Framework.BUILTIN
+                InferenceFramework.NONE -> CppBridgeModelRegistry.Framework.NONE
+                InferenceFramework.UNKNOWN -> CppBridgeModelRegistry.Framework.UNKNOWN
+            },
+            downloadUrl = modelInfo.downloadURL,
+            localPath = modelInfo.localPath,
+            downloadSize = modelInfo.downloadSize ?: 0,
+            contextLength = modelInfo.contextLength ?: 0,
+            supportsThinking = modelInfo.supportsThinking,
+            description = modelInfo.description,
+            status = CppBridgeModelRegistry.ModelStatus.AVAILABLE
+        )
+
+        // Save directly to C++ registry - this is where C++ backends look for models
+        CppBridgeModelRegistry.save(bridgeModelInfo)
+
+        // Also add to the in-memory cache for immediate availability from Kotlin
+        addToModelCache(modelInfo)
+
+        registrationLogger.info("Registered model: ${modelInfo.name} (${modelInfo.id})")
+    } catch (e: Exception) {
+        registrationLogger.error("Failed to register model: ${e.message}")
+    }
+}
+
+// In-memory model cache for registered models
+private val registeredModels = mutableListOf<ModelInfo>()
+private val modelCacheLock = Any()
+
+private fun addToModelCache(modelInfo: ModelInfo) {
+    synchronized(modelCacheLock) {
+        // Remove existing if present (update)
+        registeredModels.removeAll { it.id == modelInfo.id }
+        registeredModels.add(modelInfo)
+    }
+}
+
+private fun getRegisteredModels(): List<ModelInfo> {
+    synchronized(modelCacheLock) {
+        return registeredModels.toList()
+    }
+}
 
 // Convert CppBridgeModelRegistry.ModelInfo to public ModelInfo
 private fun CppBridgeModelRegistry.ModelInfo.toPublicModelInfo(): ModelInfo {
-    return ModelInfo(
-        id = this.modelId,
-        name = this.name,
-        category = when (this.type) {
-            CppBridgeModelRegistry.ModelType.LLM -> ModelCategory.LANGUAGE
-            CppBridgeModelRegistry.ModelType.STT -> ModelCategory.SPEECH_RECOGNITION
-            CppBridgeModelRegistry.ModelType.TTS -> ModelCategory.SPEECH_SYNTHESIS
-            CppBridgeModelRegistry.ModelType.VAD -> ModelCategory.AUDIO
-            CppBridgeModelRegistry.ModelType.EMBEDDING -> ModelCategory.LANGUAGE
-            else -> ModelCategory.LANGUAGE
-        },
-        format = when (this.format) {
-            CppBridgeModelRegistry.ModelFormat.GGUF -> ModelFormat.GGUF
-            CppBridgeModelRegistry.ModelFormat.ONNX -> ModelFormat.ONNX
-            else -> ModelFormat.UNKNOWN
-        },
-        downloadURL = this.downloadUrl,
-        localPath = this.localPath,
-        downloadSize = this.size,
-        framework = InferenceFramework.LLAMA_CPP,
-        description = this.metadata["description"]
-    )
+    return bridgeModelToPublic(this)
 }
 
 private fun getAllBridgeModels(): List<CppBridgeModelRegistry.ModelInfo> {
-    // Parse the JSON from getAllModelsCallback
-    val json = CppBridgeModelRegistry.getAllModelsCallback()
-    return parseModelInfoListJson(json)
+    // Get all models directly from C++ registry
+    return CppBridgeModelRegistry.getAll()
 }
 
-private fun parseModelInfoListJson(json: String): List<CppBridgeModelRegistry.ModelInfo> {
-    // Simple JSON parsing for model info array
-    val models = mutableListOf<CppBridgeModelRegistry.ModelInfo>()
-    if (json == "[]" || json.isBlank()) return models
-    // Full JSON parsing would need kotlinx.serialization - simplified for now
-    return models
-}
+// Track if we've scanned for downloaded models
+@Volatile
+private var hasScannedForDownloads = false
+private val scanLock = Any()
 
 actual suspend fun RunAnywhere.availableModels(): List<ModelInfo> {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
-    return getAllBridgeModels().map { it.toPublicModelInfo() }
+
+    // Scan for downloaded models once on first call
+    synchronized(scanLock) {
+        if (!hasScannedForDownloads) {
+            CppBridgeModelRegistry.scanAndRestoreDownloadedModels()
+            syncRegisteredModelsWithBridge()
+            hasScannedForDownloads = true
+        }
+    }
+
+    // Get models from in-memory cache (registered via registerModel())
+    val registeredModelList = getRegisteredModels()
+
+    // Get models from C++ bridge
+    val bridgeModels = getAllBridgeModels().map { it.toPublicModelInfo() }
+
+    // Merge both lists, with registered models taking precedence
+    val allModels = mutableMapOf<String, ModelInfo>()
+    for (model in bridgeModels) {
+        allModels[model.id] = model
+    }
+    for (model in registeredModelList) {
+        allModels[model.id] = model
+    }
+
+    return allModels.values.toList()
+}
+
+/**
+ * Sync the registered models cache with the bridge registry.
+ * This updates localPath for models that were found on disk.
+ */
+private fun syncRegisteredModelsWithBridge() {
+    synchronized(modelCacheLock) {
+        val updatedModels = mutableListOf<ModelInfo>()
+        for (model in registeredModels) {
+            // Check bridge registry for updated info (especially localPath)
+            val bridgeModel = CppBridgeModelRegistry.get(model.id)
+            if (bridgeModel != null && bridgeModel.localPath != null) {
+                // Model was found on disk, update local path (isDownloaded is computed from localPath)
+                updatedModels.add(model.copy(localPath = bridgeModel.localPath))
+            } else {
+                updatedModels.add(model)
+            }
+        }
+        registeredModels.clear()
+        registeredModels.addAll(updatedModels)
+    }
 }
 
 actual suspend fun RunAnywhere.models(category: ModelCategory): List<ModelInfo> {
@@ -79,73 +199,457 @@ actual suspend fun RunAnywhere.models(category: ModelCategory): List<ModelInfo> 
         ModelCategory.AUDIO -> CppBridgeModelRegistry.ModelType.VAD
         else -> return emptyList()
     }
-    val json = CppBridgeModelRegistry.getModelsByTypeCallback(type)
-    return parseModelInfoListJson(json).map { it.toPublicModelInfo() }
+    return CppBridgeModelRegistry.getModelsByType(type).map { bridgeModelToPublic(it) }
 }
 
 actual suspend fun RunAnywhere.downloadedModels(): List<ModelInfo> {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
-    val json = CppBridgeModelRegistry.getDownloadedModelsCallback()
-    return parseModelInfoListJson(json).map { it.toPublicModelInfo() }
+    return CppBridgeModelRegistry.getDownloaded().map { bridgeModelToPublic(it) }
 }
 
 actual suspend fun RunAnywhere.model(modelId: String): ModelInfo? {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
-    CppBridgeModelRegistry.getModelInfoCallback(modelId) ?: return null
-    // Would need to parse single model JSON - simplified for now
-    return null
+    // Get model from C++ registry
+    val bridgeModel = CppBridgeModelRegistry.get(modelId) ?: return null
+    return bridgeModelToPublic(bridgeModel)
 }
 
-actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> = flow {
-    emit(DownloadProgress(
+// Convert CppBridgeModelRegistry.ModelInfo to public ModelInfo
+private fun bridgeModelToPublic(bridge: CppBridgeModelRegistry.ModelInfo): ModelInfo {
+    return ModelInfo(
+        id = bridge.modelId,
+        name = bridge.name,
+        category = when (bridge.category) {
+            CppBridgeModelRegistry.ModelCategory.LANGUAGE -> ModelCategory.LANGUAGE
+            CppBridgeModelRegistry.ModelCategory.SPEECH_RECOGNITION -> ModelCategory.SPEECH_RECOGNITION
+            CppBridgeModelRegistry.ModelCategory.SPEECH_SYNTHESIS -> ModelCategory.SPEECH_SYNTHESIS
+            CppBridgeModelRegistry.ModelCategory.AUDIO -> ModelCategory.AUDIO
+            else -> ModelCategory.LANGUAGE
+        },
+        format = when (bridge.format) {
+            CppBridgeModelRegistry.ModelFormat.GGUF -> ModelFormat.GGUF
+            CppBridgeModelRegistry.ModelFormat.ONNX -> ModelFormat.ONNX
+            CppBridgeModelRegistry.ModelFormat.ORT -> ModelFormat.ORT
+            else -> ModelFormat.UNKNOWN
+        },
+        framework = when (bridge.framework) {
+            CppBridgeModelRegistry.Framework.LLAMACPP -> InferenceFramework.LLAMA_CPP
+            CppBridgeModelRegistry.Framework.ONNX -> InferenceFramework.ONNX
+            CppBridgeModelRegistry.Framework.FOUNDATION_MODELS -> InferenceFramework.FOUNDATION_MODELS
+            CppBridgeModelRegistry.Framework.SYSTEM_TTS -> InferenceFramework.SYSTEM_TTS
+            else -> InferenceFramework.UNKNOWN
+        },
+        downloadURL = bridge.downloadUrl,
+        localPath = bridge.localPath,
+        downloadSize = if (bridge.downloadSize > 0) bridge.downloadSize else null,
+        contextLength = if (bridge.contextLength > 0) bridge.contextLength else null,
+        supportsThinking = bridge.supportsThinking,
+        description = bridge.description
+    )
+}
+
+/**
+ * Download a model by ID.
+ *
+ * Mirrors Swift `RunAnywhere.downloadModel()` exactly:
+ * 1. Gets model info from registry
+ * 2. Starts download via CppBridgeDownload
+ * 3. Handles archive extraction for .tar.gz and .zip
+ * 4. Updates model registry with local path
+ *
+ * @param modelId The model ID to download
+ * @return Flow of DownloadProgress updates
+ */
+actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> = callbackFlow {
+    val downloadLogger = SDKLogger("RunAnywhere.Download")
+
+    // 0. Check network connectivity first (for better user experience)
+    val (isNetworkAvailable, networkDescription) = CppBridgeDownload.checkNetworkStatus()
+    if (!isNetworkAvailable) {
+        downloadLogger.error("No internet connection: $networkDescription")
+        throw SDKError.networkUnavailable(
+            IllegalStateException("No internet connection. Please check your network settings and try again.")
+        )
+    }
+    downloadLogger.debug("Network status: $networkDescription")
+
+    // 1. Get model info from registered models
+    val modelInfo = getRegisteredModels().find { it.id == modelId }
+        ?: throw SDKError.model("Model '$modelId' not found in registry")
+
+    val downloadUrl = modelInfo.downloadURL
+        ?: throw SDKError.model("Model '$modelId' has no download URL")
+
+    downloadLogger.info("Starting download for model: $modelId")
+    downloadLogger.info("  URL: $downloadUrl")
+    downloadLogger.info("  Category: ${modelInfo.category}")
+    downloadLogger.info("  Framework: ${modelInfo.framework}")
+
+    // 2. Emit initial progress
+    trySend(DownloadProgress(
         modelId = modelId,
         progress = 0f,
         bytesDownloaded = 0,
-        totalBytes = null,
+        totalBytes = modelInfo.downloadSize,
         state = DownloadState.PENDING
     ))
 
-    // Update status to downloading
-    CppBridgeModelRegistry.updateModelStatusCallback(modelId, CppBridgeModelRegistry.ModelStatus.DOWNLOADING)
+    // 3. Determine model type for path resolution
+    val modelType = when (modelInfo.category) {
+        ModelCategory.LANGUAGE -> CppBridgeModelRegistry.ModelType.LLM
+        ModelCategory.SPEECH_RECOGNITION -> CppBridgeModelRegistry.ModelType.STT
+        ModelCategory.SPEECH_SYNTHESIS -> CppBridgeModelRegistry.ModelType.TTS
+        ModelCategory.AUDIO -> CppBridgeModelRegistry.ModelType.VAD
+        else -> CppBridgeModelRegistry.ModelType.LLM
+    }
 
-    // TODO: Implement actual download via CppBridge.Download
-    // For now just mark as complete
-    CppBridgeModelRegistry.updateModelStatusCallback(modelId, CppBridgeModelRegistry.ModelStatus.DOWNLOADED)
+    // 4. Emit download started event
+    CppBridgeEvents.emitDownloadStarted(modelId, modelInfo.downloadSize ?: 0)
 
-    emit(DownloadProgress(
-        modelId = modelId,
-        progress = 1f,
-        bytesDownloaded = 0,
-        totalBytes = null,
-        state = DownloadState.COMPLETED
-    ))
+    // 5. Create a CompletableDeferred to wait for download completion
+    // This is used to properly suspend until the async download finishes
+    data class DownloadResult(
+        val success: Boolean,
+        val filePath: String?,
+        val fileSize: Long,
+        val error: String?
+    )
+    val downloadCompletion = CompletableDeferred<DownloadResult>()
+
+    // 6. Set up download listener to convert callbacks to Flow
+    val downloadListener = object : CppBridgeDownload.DownloadListener {
+        override fun onDownloadStarted(downloadId: String, modelId: String, url: String) {
+            downloadLogger.debug("Download actually started: $downloadId")
+            trySend(DownloadProgress(
+                modelId = modelId,
+                progress = 0f,
+                bytesDownloaded = 0,
+                totalBytes = modelInfo.downloadSize,
+                state = DownloadState.DOWNLOADING
+            ))
+        }
+
+        override fun onDownloadProgress(downloadId: String, downloadedBytes: Long, totalBytes: Long, progress: Int) {
+            val progressFraction = progress.toFloat() / 100f
+            downloadLogger.debug("Download progress: $progress% ($downloadedBytes / $totalBytes)")
+
+            // Emit progress event every 5%
+            if (progress % 5 == 0) {
+                CppBridgeEvents.emitDownloadProgress(modelId, progressFraction, downloadedBytes, totalBytes)
+            }
+
+            trySend(DownloadProgress(
+                modelId = modelId,
+                progress = progressFraction,
+                bytesDownloaded = downloadedBytes,
+                totalBytes = if (totalBytes > 0) totalBytes else modelInfo.downloadSize,
+                state = DownloadState.DOWNLOADING
+            ))
+        }
+
+        override fun onDownloadCompleted(downloadId: String, modelId: String, filePath: String, fileSize: Long) {
+            downloadLogger.info("Download completed callback: $filePath ($fileSize bytes)")
+            // Signal completion to the waiting coroutine
+            downloadCompletion.complete(DownloadResult(
+                success = true,
+                filePath = filePath,
+                fileSize = fileSize,
+                error = null
+            ))
+        }
+
+        override fun onDownloadFailed(downloadId: String, modelId: String, error: Int, errorMessage: String) {
+            downloadLogger.error("Download failed callback: $errorMessage (error code: $error)")
+            // Signal failure to the waiting coroutine
+            downloadCompletion.complete(DownloadResult(
+                success = false,
+                filePath = null,
+                fileSize = 0,
+                error = errorMessage
+            ))
+        }
+
+        override fun onDownloadPaused(downloadId: String) {
+            downloadLogger.info("Download paused: $downloadId")
+            trySend(DownloadProgress(
+                modelId = modelId,
+                progress = 0f,
+                bytesDownloaded = 0,
+                totalBytes = modelInfo.downloadSize,
+                state = DownloadState.PENDING
+            ))
+        }
+
+        override fun onDownloadResumed(downloadId: String) {
+            downloadLogger.info("Download resumed: $downloadId")
+        }
+
+        override fun onDownloadCancelled(downloadId: String) {
+            downloadLogger.info("Download cancelled: $downloadId")
+            downloadCompletion.complete(DownloadResult(
+                success = false,
+                filePath = null,
+                fileSize = 0,
+                error = "Download cancelled"
+            ))
+        }
+    }
+
+    // Register listener BEFORE starting download
+    CppBridgeDownload.downloadListener = downloadListener
+
+    try {
+        // 7. Start the actual download (runs asynchronously on thread pool)
+        val downloadId = CppBridgeDownload.startDownload(
+            url = downloadUrl,
+            modelId = modelId,
+            modelType = modelType,
+            priority = CppBridgeDownload.DownloadPriority.NORMAL,
+            expectedChecksum = null
+        ) ?: throw SDKError.download("Failed to start download for model: $modelId")
+
+        downloadLogger.info("Download queued with ID: $downloadId, waiting for completion...")
+
+        // 8. Wait for download to complete (suspends until callback fires)
+        val result = downloadCompletion.await()
+
+        // 9. Handle result
+        if (!result.success) {
+            val errorMsg = result.error ?: "Unknown download error"
+            CppBridgeEvents.emitDownloadFailed(modelId, errorMsg)
+            trySend(DownloadProgress(
+                modelId = modelId,
+                progress = 0f,
+                bytesDownloaded = 0,
+                totalBytes = modelInfo.downloadSize,
+                state = DownloadState.ERROR,
+                error = errorMsg
+            ))
+            throw SDKError.download("Download failed for model: $modelId - $errorMsg")
+        }
+
+        // 10. Get the downloaded file path
+        val downloadedPath = result.filePath ?: CppBridgeModelPaths.getModelPath(modelId, modelType)
+        val downloadedFile = File(downloadedPath)
+
+        downloadLogger.info("Downloaded file: $downloadedPath (exists: ${downloadedFile.exists()}, size: ${result.fileSize})")
+
+        // 11. Handle extraction if needed (for .tar.gz or .zip archives)
+        val finalModelPath = if (requiresExtraction(downloadUrl)) {
+            downloadLogger.info("Extracting archive...")
+            trySend(DownloadProgress(
+                modelId = modelId,
+                progress = 0.95f,
+                bytesDownloaded = result.fileSize,
+                totalBytes = result.fileSize,
+                state = DownloadState.EXTRACTING
+            ))
+
+            val extractedPath = extractArchive(downloadedFile, modelId, modelType, downloadLogger)
+            downloadLogger.info("Extraction complete: $extractedPath")
+            extractedPath
+        } else {
+            downloadedPath
+        }
+
+        // 12. Update model in C++ registry with local path
+        val updatedModelInfo = modelInfo.copy(localPath = finalModelPath)
+        addToModelCache(updatedModelInfo)
+        CppBridgeModelRegistry.updateDownloadStatus(modelId, finalModelPath)
+
+        downloadLogger.info("Model ready at: $finalModelPath")
+
+        // 13. Emit completion events
+        CppBridgeEvents.emitDownloadCompleted(modelId, result.fileSize, result.fileSize)
+
+        trySend(DownloadProgress(
+            modelId = modelId,
+            progress = 1f,
+            bytesDownloaded = result.fileSize,
+            totalBytes = result.fileSize,
+            state = DownloadState.COMPLETED
+        ))
+
+        // Close the channel to signal completion to collectors
+        close()
+
+    } catch (e: Exception) {
+        downloadLogger.error("Download error: ${e.message}")
+        CppBridgeEvents.emitDownloadFailed(modelId, e.message ?: "Unknown error")
+        // Close with exception so collectors receive the error
+        close(e)
+    } finally {
+        // Clean up listener
+        CppBridgeDownload.downloadListener = null
+    }
+
+    awaitClose {
+        downloadLogger.debug("Download flow closed for: $modelId")
+    }
+}
+
+/**
+ * Check if URL requires extraction (is an archive).
+ */
+private fun requiresExtraction(url: String): Boolean {
+    val lowercaseUrl = url.lowercase()
+    return lowercaseUrl.endsWith(".tar.gz") ||
+           lowercaseUrl.endsWith(".tgz") ||
+           lowercaseUrl.endsWith(".zip")
+}
+
+/**
+ * Extract an archive to the model directory.
+ *
+ * Supports:
+ * - .tar.gz / .tgz → Uses Apache Commons Compress
+ * - .zip → Uses java.util.zip
+ */
+private suspend fun extractArchive(
+    archiveFile: File,
+    modelId: String,
+    modelType: Int,
+    logger: SDKLogger
+): String = withContext(Dispatchers.IO) {
+    // Get destination directory
+    val destDir = File(CppBridgeModelPaths.getModelPath(modelId, modelType))
+    if (!destDir.exists()) {
+        destDir.mkdirs()
+    }
+
+    logger.info("Extracting to: ${destDir.absolutePath}")
+
+    val archiveName = archiveFile.name.lowercase()
+
+    when {
+        archiveName.endsWith(".tar.gz") || archiveName.endsWith(".tgz") -> {
+            extractTarGz(archiveFile, destDir, logger)
+        }
+        archiveName.endsWith(".zip") -> {
+            extractZip(archiveFile, destDir, logger)
+        }
+        else -> {
+            // Not an archive, just return the file path
+            archiveFile.absolutePath
+        }
+    }
+
+    // Clean up archive file after extraction
+    try {
+        if (archiveFile.name != destDir.name) {
+            archiveFile.delete()
+            logger.debug("Cleaned up archive: ${archiveFile.absolutePath}")
+        }
+    } catch (e: Exception) {
+        logger.warn("Failed to clean up archive: ${e.message}")
+    }
+
+    // Return the model directory path
+    destDir.absolutePath
+}
+
+/**
+ * Extract a .tar.gz archive.
+ */
+private fun extractTarGz(archiveFile: File, destDir: File, logger: SDKLogger) {
+    logger.debug("Extracting tar.gz: ${archiveFile.absolutePath}")
+
+    FileInputStream(archiveFile).use { fis ->
+        BufferedInputStream(fis).use { bis ->
+            GzipCompressorInputStream(bis).use { gzis ->
+                TarArchiveInputStream(gzis).use { tais ->
+                    var entry = tais.nextEntry
+                    var fileCount = 0
+
+                    while (entry != null) {
+                        val destFile = File(destDir, entry.name)
+
+                        // Security check - prevent path traversal
+                        if (!destFile.canonicalPath.startsWith(destDir.canonicalPath)) {
+                            throw SecurityException("Tar entry outside destination: ${entry.name}")
+                        }
+
+                        if (entry.isDirectory) {
+                            destFile.mkdirs()
+                        } else {
+                            destFile.parentFile?.mkdirs()
+                            FileOutputStream(destFile).use { fos ->
+                                tais.copyTo(fos)
+                            }
+                            fileCount++
+                        }
+
+                        entry = tais.nextEntry
+                    }
+
+                    logger.info("Extracted $fileCount files from tar.gz")
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Extract a .zip archive.
+ */
+private fun extractZip(archiveFile: File, destDir: File, logger: SDKLogger) {
+    logger.debug("Extracting zip: ${archiveFile.absolutePath}")
+
+    ZipInputStream(FileInputStream(archiveFile)).use { zis ->
+        var entry = zis.nextEntry
+        var fileCount = 0
+
+        while (entry != null) {
+            val destFile = File(destDir, entry.name)
+
+            // Security check - prevent path traversal
+            if (!destFile.canonicalPath.startsWith(destDir.canonicalPath)) {
+                throw SecurityException("Zip entry outside destination: ${entry.name}")
+            }
+
+            if (entry.isDirectory) {
+                destFile.mkdirs()
+            } else {
+                destFile.parentFile?.mkdirs()
+                FileOutputStream(destFile).use { fos ->
+                    zis.copyTo(fos)
+                }
+                fileCount++
+            }
+
+            zis.closeEntry()
+            entry = zis.nextEntry
+        }
+
+        logger.info("Extracted $fileCount files from zip")
+    }
 }
 
 actual suspend fun RunAnywhere.cancelDownload(modelId: String) {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
-    CppBridgeModelRegistry.updateModelStatusCallback(modelId, CppBridgeModelRegistry.ModelStatus.AVAILABLE)
+    // Update C++ registry to mark download cancelled
+    CppBridgeModelRegistry.updateDownloadStatus(modelId, null)
 }
 
 actual suspend fun RunAnywhere.isModelDownloaded(modelId: String): Boolean {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
-    val json = CppBridgeModelRegistry.getModelInfoCallback(modelId) ?: return false
-    // Check if status indicates downloaded - simplified
-    return json.contains("\"status\":3") || json.contains("\"status\":5")
+    val model = CppBridgeModelRegistry.get(modelId) ?: return false
+    return model.localPath != null && model.localPath.isNotEmpty()
 }
 
 actual suspend fun RunAnywhere.deleteModel(modelId: String) {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
-    CppBridgeModelRegistry.deleteModelInfoCallback(modelId)
+    CppBridgeModelRegistry.remove(modelId)
 }
 
 actual suspend fun RunAnywhere.deleteAllModels() {
@@ -168,12 +672,10 @@ actual suspend fun RunAnywhere.loadLLMModel(modelId: String) {
         throw SDKError.notInitialized("SDK not initialized")
     }
 
-    val json = CppBridgeModelRegistry.getModelInfoCallback(modelId)
+    val model = CppBridgeModelRegistry.get(modelId)
         ?: throw SDKError.model("Model '$modelId' not found in registry")
 
-    // Extract local path from JSON
-    val localPathMatch = Regex("\"localPath\"\\s*:\\s*\"([^\"]+)\"").find(json)
-    val localPath = localPathMatch?.groupValues?.get(1)
+    val localPath = model.localPath
         ?: throw SDKError.model("Model '$modelId' is not downloaded")
 
     CppBridgeLLM.loadModel(localPath, modelId)
@@ -190,17 +692,36 @@ actual suspend fun RunAnywhere.isLLMModelLoaded(): Boolean {
     return CppBridgeLLM.isLoaded
 }
 
+actual val RunAnywhere.currentLLMModelId: String?
+    get() = CppBridgeLLM.getLoadedModelId()
+
+actual suspend fun RunAnywhere.currentLLMModel(): ModelInfo? {
+    val modelId = CppBridgeLLM.getLoadedModelId() ?: return null
+    // Look up in registered models first
+    val registeredModel = getRegisteredModels().find { it.id == modelId }
+    if (registeredModel != null) return registeredModel
+    // Fall back to bridge models
+    return getAllBridgeModels().find { it.modelId == modelId }?.toPublicModelInfo()
+}
+
+actual suspend fun RunAnywhere.currentSTTModel(): ModelInfo? {
+    val modelId = CppBridgeSTT.getLoadedModelId() ?: return null
+    // Look up in registered models first
+    val registeredModel = getRegisteredModels().find { it.id == modelId }
+    if (registeredModel != null) return registeredModel
+    // Fall back to bridge models
+    return getAllBridgeModels().find { it.modelId == modelId }?.toPublicModelInfo()
+}
+
 actual suspend fun RunAnywhere.loadSTTModel(modelId: String) {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
 
-    val json = CppBridgeModelRegistry.getModelInfoCallback(modelId)
+    val model = CppBridgeModelRegistry.get(modelId)
         ?: throw SDKError.model("Model '$modelId' not found in registry")
 
-    // Extract local path from JSON
-    val localPathMatch = Regex("\"localPath\"\\s*:\\s*\"([^\"]+)\"").find(json)
-    val localPath = localPathMatch?.groupValues?.get(1)
+    val localPath = model.localPath
         ?: throw SDKError.model("Model '$modelId' is not downloaded")
 
     CppBridgeSTT.loadModel(localPath, modelId)

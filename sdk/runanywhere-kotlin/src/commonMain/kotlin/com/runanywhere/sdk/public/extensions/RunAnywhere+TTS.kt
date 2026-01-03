@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 RunAnywhere SDK
+ * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
  * Public API for Text-to-Speech operations.
@@ -35,6 +35,21 @@ expect suspend fun RunAnywhere.unloadTTSVoice()
  * Check if a TTS voice is loaded.
  */
 expect suspend fun RunAnywhere.isTTSVoiceLoaded(): Boolean
+
+/**
+ * Get the currently loaded TTS voice ID.
+ *
+ * This is a synchronous property that returns the ID of the currently loaded TTS voice,
+ * or null if no voice is loaded.
+ */
+expect val RunAnywhere.currentTTSVoiceId: String?
+
+/**
+ * Check if a TTS voice is loaded (non-suspend version for quick checks).
+ *
+ * This accesses cached state and doesn't require suspension.
+ */
+expect val RunAnywhere.isTTSVoiceLoadedSync: Boolean
 
 /**
  * Get available TTS voices.

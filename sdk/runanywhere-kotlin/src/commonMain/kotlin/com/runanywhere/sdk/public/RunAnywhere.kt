@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 RunAnywhere SDK
+ * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
  * Main entry point for the RunAnywhere SDK.
@@ -322,9 +322,8 @@ object RunAnywhere {
      * Implementation is in jvmAndroidMain via expect/actual
      */
     private fun initializeCppBridge(environment: SDKEnvironment) {
-        // This will be implemented via expect/actual to call CppBridge.initialize()
-        // For now, this is a placeholder that works in commonMain
         logger.debug("CppBridge initialization requested for $environment")
+        initializePlatformBridge(environment)
     }
 
     /**
@@ -332,8 +331,8 @@ object RunAnywhere {
      * Implementation is in jvmAndroidMain via expect/actual
      */
     private fun initializeCppBridgeServices() {
-        // This will be implemented via expect/actual to call CppBridge.initializeServices()
         logger.debug("CppBridge services initialization requested")
+        initializePlatformBridgeServices()
     }
 
     /**
@@ -341,7 +340,29 @@ object RunAnywhere {
      * Implementation is in jvmAndroidMain via expect/actual
      */
     private fun shutdownCppBridge() {
-        // This will be implemented via expect/actual to call CppBridge.shutdown()
         logger.debug("CppBridge shutdown requested")
+        shutdownPlatformBridge()
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Platform-specific bridge functions (expect/actual pattern)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Initialize platform-specific bridge (Phase 1).
+ * On JVM/Android, this calls CppBridge.initialize() to load native libraries.
+ */
+internal expect fun initializePlatformBridge(environment: SDKEnvironment)
+
+/**
+ * Initialize platform-specific bridge services (Phase 2).
+ * On JVM/Android, this calls CppBridge.initializeServices().
+ */
+internal expect fun initializePlatformBridgeServices()
+
+/**
+ * Shutdown platform-specific bridge.
+ * On JVM/Android, this calls CppBridge.shutdown().
+ */
+internal expect fun shutdownPlatformBridge()

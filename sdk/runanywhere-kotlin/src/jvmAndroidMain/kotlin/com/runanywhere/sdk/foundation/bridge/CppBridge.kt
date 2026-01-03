@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 RunAnywhere SDK
+ * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
  * Central coordinator for all C++ bridge operations.
@@ -14,6 +14,7 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelAssignment
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatform
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
  * CppBridge is the central coordinator for all C++ interop via JNI.
@@ -23,8 +24,13 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
  * - Phase 2 (asynchronous): Service initialization for model assignment and platform services
  *
  * CRITICAL: Platform adapter must be registered FIRST before any C++ calls.
+ *
+ * NOTE: This SDK is backend-agnostic. Backend registration (LlamaCPP, ONNX, etc.)
+ * is handled by the individual backend modules, not by the core SDK.
  */
 object CppBridge {
+
+    private const val TAG = "CppBridge"
 
     /**
      * SDK environment configuration.
@@ -50,6 +56,9 @@ object CppBridge {
     @Volatile
     private var _servicesInitialized: Boolean = false
 
+    @Volatile
+    private var _nativeLibraryLoaded: Boolean = false
+
     private val lock = Any()
 
     /**
@@ -71,14 +80,26 @@ object CppBridge {
         get() = _servicesInitialized
 
     /**
+     * Whether the native commons library is loaded.
+     * This only indicates the core library - backend availability is separate.
+     */
+    val isNativeLibraryLoaded: Boolean
+        get() = _nativeLibraryLoaded
+
+    /**
      * Phase 1: Core Initialization (Synchronous)
      *
      * Initializes the core SDK components in this order:
-     * 1. Platform Adapter - MUST be first
-     * 2. Logging configuration
-     * 3. Events registration
-     * 4. Telemetry initialization
-     * 5. Device registration
+     * 1. Native Library Loading - Load core JNI library (if available)
+     * 2. Platform Adapter - MUST be before C++ calls
+     * 3. Logging configuration
+     * 4. Events registration
+     * 5. Telemetry initialization
+     * 6. Device registration
+     *
+     * NOTE: Backend registration (LlamaCPP, ONNX) is NOT done here.
+     * Backends are registered by the app calling LlamaCPP.register() and ONNX.register()
+     * from the respective backend modules.
      *
      * @param environment The SDK environment to use
      */
@@ -89,6 +110,9 @@ object CppBridge {
             }
 
             _environment = environment
+
+            // Try to load native library (optional - SDK works without it for non-inference features)
+            tryLoadNativeLibrary()
 
             // CRITICAL: Register platform adapter FIRST before any C++ calls
             CppBridgePlatformAdapter.register()
@@ -105,6 +129,29 @@ object CppBridge {
             CppBridgeDevice.register()
 
             _isInitialized = true
+        }
+    }
+
+    /**
+     * Try to load the native commons library.
+     * This is optional - the SDK works without it for non-inference features.
+     *
+     * NOTE: Backend registration (LlamaCPP, ONNX) is NOT done here.
+     * Apps must call LlamaCPP.register() and ONNX.register() from the
+     * respective backend modules to enable AI inference.
+     */
+    private fun tryLoadNativeLibrary() {
+        android.util.Log.i(TAG, "Starting native library loading sequence...")
+
+        _nativeLibraryLoaded = RunAnywhereBridge.ensureNativeLibraryLoaded()
+
+        if (_nativeLibraryLoaded) {
+            android.util.Log.i(TAG, "✅ Native commons library loaded successfully")
+            android.util.Log.i(TAG, "AI inference features are AVAILABLE")
+        } else {
+            android.util.Log.w(TAG, "❌ Native commons library not available.")
+            android.util.Log.w(TAG, "AI inference features are DISABLED.")
+            android.util.Log.w(TAG, "Ensure librunanywhere_jni.so is in your APK's lib/ folder.")
         }
     }
 

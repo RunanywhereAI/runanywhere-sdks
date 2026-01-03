@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 RunAnywhere SDK
+ * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
  * Download extension for CppBridge.
@@ -119,6 +119,15 @@ object CppBridgeDownload {
         /** Download timeout */
         const val TIMEOUT = 8
 
+        /** Network is unavailable (no internet connection) */
+        const val NETWORK_UNAVAILABLE = 9
+
+        /** DNS resolution failed */
+        const val DNS_ERROR = 10
+
+        /** SSL/TLS error */
+        const val SSL_ERROR = 11
+
         /** Unknown error */
         const val UNKNOWN = 99
 
@@ -135,8 +144,31 @@ object CppBridgeDownload {
             CANCELLED -> "CANCELLED"
             SERVER_ERROR -> "SERVER_ERROR"
             TIMEOUT -> "TIMEOUT"
+            NETWORK_UNAVAILABLE -> "NETWORK_UNAVAILABLE"
+            DNS_ERROR -> "DNS_ERROR"
+            SSL_ERROR -> "SSL_ERROR"
             UNKNOWN -> "UNKNOWN"
             else -> "UNKNOWN($error)"
+        }
+
+        /**
+         * Get a user-friendly error message for the error code.
+         */
+        fun getUserMessage(error: Int): String = when (error) {
+            NONE -> "No error"
+            NETWORK_ERROR -> "Network error. Please check your internet connection and try again."
+            FILE_ERROR -> "Failed to save the file. Please check available storage."
+            INSUFFICIENT_STORAGE -> "Not enough storage space. Please free up some space and try again."
+            INVALID_URL -> "Invalid download URL."
+            CHECKSUM_FAILED -> "File verification failed. The download may be corrupted."
+            CANCELLED -> "Download was cancelled."
+            SERVER_ERROR -> "Server error. Please try again later."
+            TIMEOUT -> "Connection timed out. Please check your internet connection and try again."
+            NETWORK_UNAVAILABLE -> "No internet connection. Please check your network settings and try again."
+            DNS_ERROR -> "Unable to connect to server. Please check your internet connection."
+            SSL_ERROR -> "Secure connection failed. Please try again."
+            UNKNOWN -> "An unexpected error occurred. Please try again."
+            else -> "Download failed. Please try again."
         }
     }
 
@@ -438,6 +470,28 @@ object CppBridgeDownload {
         expectedChecksum: String?
     ): String? {
         return try {
+            // Check network connectivity first
+            if (!checkNetworkConnectivity()) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.ERROR,
+                    TAG,
+                    "No internet connection. Please check your network settings and try again."
+                )
+                // Notify listener of failure
+                val downloadId = UUID.randomUUID().toString()
+                try {
+                    downloadListener?.onDownloadFailed(
+                        downloadId,
+                        modelId,
+                        DownloadError.NETWORK_UNAVAILABLE,
+                        "No internet connection. Please check your network settings and try again."
+                    )
+                } catch (e: Exception) {
+                    // Ignore listener errors
+                }
+                return null
+            }
+
             // Validate URL
             try {
                 URL(url)
@@ -452,6 +506,12 @@ object CppBridgeDownload {
 
             // Get destination path
             val tempPath = CppBridgeModelPaths.getTempDownloadPath(modelId)
+
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.INFO,
+                TAG,
+                "Download destination path: $tempPath"
+            )
 
             // Check available storage
             val availableStorage = CppBridgeModelPaths.getAvailableStorage()
@@ -483,11 +543,8 @@ object CppBridgeDownload {
                 "Starting download: $downloadId for model $modelId"
             )
 
-            // Update model status to downloading
-            CppBridgeModelRegistry.updateModelStatusCallback(
-                modelId,
-                CppBridgeModelRegistry.ModelStatus.DOWNLOADING
-            )
+            // Note: Download status is tracked by the download manager, not model registry
+            // The C++ registry just stores the local_path when download is complete
 
             // Start download on background thread
             val future = downloadExecutor.submit {
@@ -549,11 +606,8 @@ object CppBridgeDownload {
             "Download cancelled: $downloadId"
         )
 
-        // Update model status
-        CppBridgeModelRegistry.updateModelStatusCallback(
-            task.modelId,
-            CppBridgeModelRegistry.ModelStatus.AVAILABLE
-        )
+        // Clear model download status on cancellation
+        CppBridgeModelRegistry.updateDownloadStatus(task.modelId, null)
 
         // Cleanup temp file
         try {
@@ -909,20 +963,55 @@ object CppBridgeDownload {
             completeDownload(task)
 
         } catch (e: java.net.SocketTimeoutException) {
-            failDownload(task, DownloadError.TIMEOUT, "Connection timeout: ${e.message}")
+            failDownload(task, DownloadError.TIMEOUT, DownloadError.getUserMessage(DownloadError.TIMEOUT))
         } catch (e: java.net.UnknownHostException) {
-            failDownload(task, DownloadError.NETWORK_ERROR, "Unknown host: ${e.message}")
+            // DNS resolution failed - likely no internet or DNS issue
+            val userMessage = if (!checkNetworkConnectivity()) {
+                DownloadError.getUserMessage(DownloadError.NETWORK_UNAVAILABLE)
+            } else {
+                DownloadError.getUserMessage(DownloadError.DNS_ERROR)
+            }
+            failDownload(task, DownloadError.DNS_ERROR, userMessage)
+        } catch (e: java.net.ConnectException) {
+            // Connection refused or network unreachable
+            val userMessage = if (!checkNetworkConnectivity()) {
+                DownloadError.getUserMessage(DownloadError.NETWORK_UNAVAILABLE)
+            } else {
+                DownloadError.getUserMessage(DownloadError.NETWORK_ERROR)
+            }
+            failDownload(task, DownloadError.NETWORK_ERROR, userMessage)
+        } catch (e: java.net.NoRouteToHostException) {
+            failDownload(task, DownloadError.NETWORK_UNAVAILABLE, DownloadError.getUserMessage(DownloadError.NETWORK_UNAVAILABLE))
+        } catch (e: javax.net.ssl.SSLException) {
+            failDownload(task, DownloadError.SSL_ERROR, DownloadError.getUserMessage(DownloadError.SSL_ERROR))
         } catch (e: java.io.IOException) {
             if (Thread.currentThread().isInterrupted) {
                 // Download was cancelled/paused
                 return
             }
-            failDownload(task, DownloadError.FILE_ERROR, "I/O error: ${e.message}")
+            // Check if this is a network-related IO error
+            val errorMessage = e.message?.lowercase() ?: ""
+            val (errorCode, userMessage) = when {
+                errorMessage.contains("network") || errorMessage.contains("connection") -> {
+                    if (!checkNetworkConnectivity()) {
+                        Pair(DownloadError.NETWORK_UNAVAILABLE, DownloadError.getUserMessage(DownloadError.NETWORK_UNAVAILABLE))
+                    } else {
+                        Pair(DownloadError.NETWORK_ERROR, DownloadError.getUserMessage(DownloadError.NETWORK_ERROR))
+                    }
+                }
+                errorMessage.contains("space") || errorMessage.contains("storage") -> {
+                    Pair(DownloadError.INSUFFICIENT_STORAGE, DownloadError.getUserMessage(DownloadError.INSUFFICIENT_STORAGE))
+                }
+                else -> {
+                    Pair(DownloadError.FILE_ERROR, DownloadError.getUserMessage(DownloadError.FILE_ERROR))
+                }
+            }
+            failDownload(task, errorCode, userMessage)
         } catch (e: Exception) {
             if (Thread.currentThread().isInterrupted) {
                 return
             }
-            failDownload(task, DownloadError.UNKNOWN, "Download failed: ${e.message}")
+            failDownload(task, DownloadError.UNKNOWN, DownloadError.getUserMessage(DownloadError.UNKNOWN))
         } finally {
             try {
                 inputStream?.close()
@@ -966,15 +1055,9 @@ object CppBridgeDownload {
         )
 
         if (moved) {
-            // Update model status to downloaded
-            CppBridgeModelRegistry.updateModelStatusCallback(
-                task.modelId,
-                CppBridgeModelRegistry.ModelStatus.DOWNLOADED
-            )
-
-            // Update model local path
+            // Update model download status in C++ registry with local path
             val finalPath = CppBridgeModelPaths.getModelPath(task.modelId, task.modelType)
-            CppBridgeModelRegistry.setModelLocalPathCallback(task.modelId, finalPath)
+            CppBridgeModelRegistry.updateDownloadStatus(task.modelId, finalPath)
 
             // Notify listener
             try {
@@ -1005,11 +1088,8 @@ object CppBridgeDownload {
             "Download failed: ${task.downloadId} - $message"
         )
 
-        // Update model status to failed
-        CppBridgeModelRegistry.updateModelStatusCallback(
-            task.modelId,
-            CppBridgeModelRegistry.ModelStatus.DOWNLOAD_FAILED
-        )
+        // Clear download status on failure (model is no longer downloaded)
+        CppBridgeModelRegistry.updateDownloadStatus(task.modelId, null)
 
         // Cleanup temp file
         try {
@@ -1045,17 +1125,8 @@ object CppBridgeDownload {
             // Ignore progress listener errors
         }
 
-        // Also invoke C++ progress callback
-        try {
-            nativeInvokeProgressCallback(
-                task.downloadId,
-                task.downloadedBytes,
-                task.totalBytes,
-                task.getProgress()
-            )
-        } catch (e: Exception) {
-            // Ignore native callback errors
-        }
+        // Note: C++ progress callback not used - downloads are managed entirely in Kotlin
+        // The progress is reported through downloadListener to the SDK's Flow-based API
     }
 
     /**
@@ -1122,23 +1193,8 @@ object CppBridgeDownload {
     @JvmStatic
     private external fun nativeUnsetDownloadCallbacks()
 
-    /**
-     * Native method to invoke the C++ progress callback.
-     *
-     * @param downloadId The download ID
-     * @param downloadedBytes Bytes downloaded so far
-     * @param totalBytes Total file size
-     * @param progress Progress percentage
-     *
-     * C API: rac_download_invoke_progress(download_id, downloaded, total, progress)
-     */
-    @JvmStatic
-    private external fun nativeInvokeProgressCallback(
-        downloadId: String,
-        downloadedBytes: Long,
-        totalBytes: Long,
-        progress: Int
-    )
+    // Note: nativeInvokeProgressCallback removed - downloads are managed entirely in Kotlin
+    // Progress is reported through downloadListener to the SDK's Flow-based API
 
     /**
      * Native method to start a download from C++.
@@ -1405,5 +1461,59 @@ object CppBridgeDownload {
             .replace("\n", "\\n")
             .replace("\r", "\\r")
             .replace("\t", "\\t")
+    }
+
+    // ========================================================================
+    // NETWORK CONNECTIVITY
+    // ========================================================================
+
+    /**
+     * Check if network connectivity is available.
+     *
+     * On Android, uses ConnectivityManager to check network state.
+     * On JVM, attempts a simple connection check.
+     *
+     * @return true if network is available, false otherwise
+     */
+    private fun checkNetworkConnectivity(): Boolean {
+        return try {
+            // Try to use Android's NetworkConnectivity if available
+            val networkClass = Class.forName("com.runanywhere.sdk.platform.NetworkConnectivity")
+            val isAvailableMethod = networkClass.getDeclaredMethod("isNetworkAvailable")
+            val instance = networkClass.getDeclaredField("INSTANCE").get(null)
+            isAvailableMethod.invoke(instance) as Boolean
+        } catch (e: ClassNotFoundException) {
+            // Not on Android, assume network is available (will fail with proper error if not)
+            true
+        } catch (e: Exception) {
+            // If we can't check, assume available and let it fail with proper error message
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.DEBUG,
+                TAG,
+                "Could not check network connectivity: ${e.message}"
+            )
+            true
+        }
+    }
+
+    /**
+     * Check network connectivity and return detailed status.
+     *
+     * @return Pair of (isAvailable, statusMessage)
+     */
+    fun checkNetworkStatus(): Pair<Boolean, String> {
+        return try {
+            val networkClass = Class.forName("com.runanywhere.sdk.platform.NetworkConnectivity")
+            val isAvailableMethod = networkClass.getDeclaredMethod("isNetworkAvailable")
+            val getDescriptionMethod = networkClass.getDeclaredMethod("getNetworkDescription")
+            val instance = networkClass.getDeclaredField("INSTANCE").get(null)
+
+            val isAvailable = isAvailableMethod.invoke(instance) as Boolean
+            val description = getDescriptionMethod.invoke(instance) as String
+
+            Pair(isAvailable, description)
+        } catch (e: Exception) {
+            Pair(true, "Unknown")
+        }
     }
 }

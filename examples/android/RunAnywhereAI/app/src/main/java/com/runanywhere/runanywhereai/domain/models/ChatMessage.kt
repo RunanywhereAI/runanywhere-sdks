@@ -1,29 +1,116 @@
 package com.runanywhere.runanywhereai.domain.models
 
-import com.runanywhere.sdk.models.Message
 import kotlinx.serialization.Serializable
 import java.util.UUID
-import com.runanywhere.sdk.models.CompletionStatus as SDKCompletionStatus
-import com.runanywhere.sdk.models.ConversationAnalytics as SDKConversationAnalytics
-import com.runanywhere.sdk.models.GenerationMode as SDKGenerationMode
-import com.runanywhere.sdk.models.GenerationParameters as SDKGenerationParameters
-import com.runanywhere.sdk.models.MessageAnalytics as SDKMessageAnalytics
-import com.runanywhere.sdk.models.MessageModelInfo as SDKMessageModelInfo
-import com.runanywhere.sdk.models.MessageRole as SDKMessageRole
-import com.runanywhere.sdk.models.PerformanceSummary as SDKPerformanceSummary
-
-// Re-export SDK types for use throughout the app
-typealias MessageRole = SDKMessageRole
-typealias MessageAnalytics = SDKMessageAnalytics
-typealias MessageModelInfo = SDKMessageModelInfo
-typealias CompletionStatus = SDKCompletionStatus
-typealias GenerationMode = SDKGenerationMode
-typealias GenerationParameters = SDKGenerationParameters
-typealias ConversationAnalytics = SDKConversationAnalytics
-typealias PerformanceSummary = SDKPerformanceSummary
 
 /**
- * App-specific wrapper for SDK Message that adds an id field
+ * App-local message role enum.
+ * Matches iOS MessageRole exactly.
+ */
+@Serializable
+enum class MessageRole {
+    USER,
+    ASSISTANT,
+    SYSTEM;
+
+    val displayName: String
+        get() = when (this) {
+            USER -> "User"
+            ASSISTANT -> "Assistant"
+            SYSTEM -> "System"
+        }
+}
+
+/**
+ * App-local completion status enum.
+ * Matches iOS CompletionStatus exactly.
+ */
+@Serializable
+enum class CompletionStatus {
+    COMPLETE,
+    STREAMING,
+    INTERRUPTED,
+    ERROR;
+}
+
+/**
+ * App-local generation mode enum.
+ * Matches iOS GenerationMode exactly.
+ */
+@Serializable
+enum class GenerationMode {
+    STREAMING,
+    NON_STREAMING;
+}
+
+/**
+ * App-local generation parameters.
+ * Matches iOS GenerationParameters exactly.
+ */
+@Serializable
+data class GenerationParameters(
+    val temperature: Float = 0.7f,
+    val maxTokens: Int = 2048,
+    val topP: Float = 0.9f,
+    val topK: Int = 40,
+    val enableThinking: Boolean = false,
+)
+
+/**
+ * App-local model info for messages.
+ * Matches iOS MessageModelInfo exactly.
+ */
+@Serializable
+data class MessageModelInfo(
+    val modelId: String,
+    val modelName: String,
+    val framework: String? = null,
+)
+
+/**
+ * App-local message analytics.
+ * Matches iOS MessageAnalytics exactly.
+ */
+@Serializable
+data class MessageAnalytics(
+    val timestamp: Long = System.currentTimeMillis(), // When the message was generated
+    val inputTokens: Int = 0,
+    val outputTokens: Int = 0,
+    val totalGenerationTime: Long = 0, // milliseconds
+    val timeToFirstToken: Long? = null, // milliseconds (nullable since not always available)
+    val averageTokensPerSecond: Double = 0.0,
+    val wasThinkingMode: Boolean = false,
+    val completionStatus: CompletionStatus = CompletionStatus.COMPLETE,
+)
+
+/**
+ * App-local conversation analytics.
+ * Matches iOS ConversationAnalytics exactly.
+ */
+@Serializable
+data class ConversationAnalytics(
+    val totalMessages: Int = 0,
+    val totalTokens: Int = 0,
+    val totalDuration: Long = 0, // milliseconds
+)
+
+/**
+ * App-local performance summary.
+ * Matches iOS PerformanceSummary exactly.
+ */
+@Serializable
+data class PerformanceSummary(
+    val totalMessages: Int = 0,
+    val averageResponseTime: Double = 0.0, // seconds
+    val averageTokensPerSecond: Double = 0.0,
+    val totalTokensProcessed: Int = 0,
+    val thinkingModeUsage: Double = 0.0, // ratio 0-1
+    val successRate: Double = 1.0, // ratio 0-1
+)
+
+/**
+ * App-specific ChatMessage for conversations.
+ * Self-contained with app-local types.
  */
 @Serializable
 data class ChatMessage(
@@ -37,38 +124,52 @@ data class ChatMessage(
     val metadata: Map<String, String>? = null,
 ) {
     val isFromUser: Boolean get() = role == MessageRole.USER
-
-    fun toSDKMessage(): Message =
-        Message(
-            role = role,
-            content = content,
-            thinkingContent = thinkingContent,
-            metadata = metadata,
-            timestamp = timestamp,
-            analytics = analytics,
-            modelInfo = modelInfo,
-        )
+    val isFromAssistant: Boolean get() = role == MessageRole.ASSISTANT
+    val isSystem: Boolean get() = role == MessageRole.SYSTEM
 
     companion object {
-        fun fromSDKMessage(
-            message: Message,
-            id: String = UUID.randomUUID().toString(),
+        /**
+         * Create a user message
+         */
+        fun user(content: String, metadata: Map<String, String>? = null): ChatMessage =
+            ChatMessage(
+                role = MessageRole.USER,
+                content = content,
+                metadata = metadata,
+            )
+
+        /**
+         * Create an assistant message
+         */
+        fun assistant(
+            content: String,
+            thinkingContent: String? = null,
+            analytics: MessageAnalytics? = null,
+            modelInfo: MessageModelInfo? = null,
+            metadata: Map<String, String>? = null,
         ): ChatMessage =
             ChatMessage(
-                id = id,
-                role = message.role,
-                content = message.content,
-                thinkingContent = message.thinkingContent,
-                timestamp = message.timestamp,
-                analytics = message.analytics,
-                modelInfo = message.modelInfo,
-                metadata = message.metadata,
+                role = MessageRole.ASSISTANT,
+                content = content,
+                thinkingContent = thinkingContent,
+                analytics = analytics,
+                modelInfo = modelInfo,
+                metadata = metadata,
+            )
+
+        /**
+         * Create a system message
+         */
+        fun system(content: String): ChatMessage =
+            ChatMessage(
+                role = MessageRole.SYSTEM,
+                content = content,
             )
     }
 }
 
 /**
- * App-specific Conversation that uses ChatMessage instead of Message
+ * App-specific Conversation that uses ChatMessage
  */
 @Serializable
 data class Conversation(
@@ -88,7 +189,7 @@ data class Conversation(
 fun createPerformanceSummary(messages: List<ChatMessage>): PerformanceSummary {
     val analyticsMessages = messages.mapNotNull { it.analytics }
 
-    return SDKPerformanceSummary(
+    return PerformanceSummary(
         totalMessages = messages.size,
         averageResponseTime =
             if (analyticsMessages.isNotEmpty()) {
@@ -114,7 +215,7 @@ fun createPerformanceSummary(messages: List<ChatMessage>): PerformanceSummary {
                 analyticsMessages.count { it.completionStatus == CompletionStatus.COMPLETE }
                     .toDouble() / analyticsMessages.size
             } else {
-                0.0
+                1.0
             },
     )
 }

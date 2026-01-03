@@ -4,15 +4,16 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.runanywhere.sdk.infrastructure.events.EventBus
-import com.runanywhere.sdk.infrastructure.events.SDKModelEvent
-import com.runanywhere.sdk.`public`.extensions.cleanTempFiles
-import com.runanywhere.sdk.`public`.extensions.clearCache
-import com.runanywhere.sdk.`public`.extensions.deleteModel
-import com.runanywhere.sdk.`public`.extensions.getStorageInfo
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.events.EventBus
+import com.runanywhere.sdk.public.events.ModelEvent
+import com.runanywhere.sdk.public.extensions.clearCache
+import com.runanywhere.sdk.public.extensions.deleteModel
+import com.runanywhere.sdk.public.extensions.storageInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -66,36 +67,38 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
      */
     private fun subscribeToModelEvents() {
         viewModelScope.launch {
-            EventBus.modelEvents.collect { event ->
-                when (event) {
-                    is SDKModelEvent.DownloadCompleted -> {
-                        Log.d(TAG, "📥 Model download completed: ${event.modelId}, refreshing storage...")
-                        loadStorageData()
-                    }
-                    is SDKModelEvent.DeleteCompleted -> {
-                        Log.d(TAG, "🗑️ Model deleted: ${event.modelId}, refreshing storage...")
-                        loadStorageData()
-                    }
-                    else -> {
-                        // Other events don't require storage refresh
+            EventBus.events
+                .filterIsInstance<ModelEvent>()
+                .collect { event ->
+                    when (event.eventType) {
+                        ModelEvent.ModelEventType.DOWNLOAD_COMPLETED -> {
+                            Log.d(TAG, "📥 Model download completed: ${event.modelId}, refreshing storage...")
+                            loadStorageData()
+                        }
+                        ModelEvent.ModelEventType.DELETED -> {
+                            Log.d(TAG, "🗑️ Model deleted: ${event.modelId}, refreshing storage...")
+                            loadStorageData()
+                        }
+                        else -> {
+                            // Other events don't require storage refresh
+                        }
                     }
                 }
-            }
         }
     }
 
     /**
-     * Load storage data using SDK's getStorageInfo() API
+     * Load storage data using SDK's storageInfo() API
      */
     private fun loadStorageData() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
 
             try {
-                Log.d(TAG, "Loading storage info via getStorageInfo()...")
+                Log.d(TAG, "Loading storage info via storageInfo()...")
 
-                // Use SDK's getStorageInfo()
-                val storageInfo = getStorageInfo()
+                // Use SDK's storageInfo()
+                val storageInfo = RunAnywhere.storageInfo()
 
                 // Map stored models to UI model
                 val storedModels =
@@ -110,14 +113,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 Log.d(TAG, "Storage info received:")
                 Log.d(TAG, "  - Total space: ${storageInfo.deviceStorage.totalSpace}")
                 Log.d(TAG, "  - Free space: ${storageInfo.deviceStorage.freeSpace}")
-                Log.d(TAG, "  - Model storage size: ${storageInfo.modelStorage.totalSize}")
+                Log.d(TAG, "  - Model storage size: ${storageInfo.totalModelsSize}")
                 Log.d(TAG, "  - Stored models count: ${storedModels.size}")
 
                 _uiState.update {
                     it.copy(
                         totalStorageSize = storageInfo.deviceStorage.totalSpace,
                         availableSpace = storageInfo.deviceStorage.freeSpace,
-                        modelStorageSize = storageInfo.modelStorage.totalSize,
+                        modelStorageSize = storageInfo.totalModelsSize,
                         downloadedModels = storedModels,
                         isLoading = false,
                     )
@@ -151,7 +154,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             try {
                 Log.d(TAG, "Deleting model: $modelId")
                 // Use SDK's deleteModel extension function
-                com.runanywhere.sdk.public.extensions.deleteModel(modelId)
+                RunAnywhere.deleteModel(modelId)
                 Log.d(TAG, "Model deleted successfully: $modelId")
 
                 // Refresh storage data after deletion
@@ -172,7 +175,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             try {
                 Log.d(TAG, "Clearing cache via clearCache()...")
-                clearCache()
+                RunAnywhere.clearCache()
                 Log.d(TAG, "Cache cleared successfully")
 
                 // Refresh storage data after clearing cache
@@ -187,13 +190,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Clean temporary files using SDK's cleanTempFiles() API
+     * Clean temporary files
      */
     fun cleanTempFiles() {
         viewModelScope.launch {
             try {
-                Log.d(TAG, "Cleaning temp files via cleanTempFiles()...")
-                cleanTempFiles()
+                Log.d(TAG, "Cleaning temp files (via clearing cache)...")
+                // Clean temp files by clearing cache
+                RunAnywhere.clearCache()
                 Log.d(TAG, "Temp files cleaned successfully")
 
                 // Refresh storage data after cleaning
