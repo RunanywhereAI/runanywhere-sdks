@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 RunAnywhere SDK
+ * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
  * STT extension for CppBridge.
@@ -10,7 +10,9 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import com.runanywhere.sdk.foundation.bridge.CppBridge
 import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
  * STT bridge that provides Speech-to-Text component lifecycle management for C++ core.
@@ -511,7 +513,28 @@ object CppBridgeSTT {
                 return 0
             }
 
-            val result = nativeCreate()
+            // Check if native commons library is loaded
+            if (!CppBridge.isNativeLibraryLoaded) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.ERROR,
+                    TAG,
+                    "Native library not loaded. STT inference requires native libraries to be bundled."
+                )
+                throw SDKError.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
+            }
+
+            // Create STT component via RunAnywhereBridge
+            val result = try {
+                RunAnywhereBridge.racSttComponentCreate()
+            } catch (e: UnsatisfiedLinkError) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.ERROR,
+                    TAG,
+                    "STT component creation failed. Native method not available: ${e.message}"
+                )
+                throw SDKError.notInitialized("STT native library not available. Please ensure the STT backend is bundled in your APK.")
+            }
+
             if (result == 0L) {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
@@ -569,7 +592,7 @@ object CppBridgeSTT {
                 "Loading model: $modelId from $modelPath"
             )
 
-            val result = nativeLoadModel(handle, modelPath, config.toJson())
+            val result = RunAnywhereBridge.racSttComponentLoadModel(handle, modelPath, config.toJson())
             if (result != 0) {
                 setState(STTState.ERROR)
                 CppBridgePlatformAdapter.logCallback(
@@ -657,7 +680,7 @@ object CppBridgeSTT {
             val startTime = System.currentTimeMillis()
 
             try {
-                val resultJson = nativeTranscribe(handle, audioData, config.toJson())
+                val resultJson = RunAnywhereBridge.racSttComponentTranscribe(handle, audioData, config.toJson())
                     ?: throw SDKError.stt("Transcription failed: null result")
 
                 val result = parseTranscriptionResult(resultJson, System.currentTimeMillis() - startTime)
@@ -718,7 +741,7 @@ object CppBridgeSTT {
             val startTime = System.currentTimeMillis()
 
             try {
-                val resultJson = nativeTranscribeFile(handle, audioPath, config.toJson())
+                val resultJson = RunAnywhereBridge.racSttComponentTranscribeFile(handle, audioPath, config.toJson())
                     ?: throw SDKError.stt("Transcription failed: null result")
 
                 val result = parseTranscriptionResult(resultJson, System.currentTimeMillis() - startTime)
@@ -785,7 +808,7 @@ object CppBridgeSTT {
             val startTime = System.currentTimeMillis()
 
             try {
-                val resultJson = nativeTranscribeStream(handle, audioData, config.toJson())
+                val resultJson = RunAnywhereBridge.racSttComponentTranscribeStream(handle, audioData, config.toJson())
                     ?: throw SDKError.stt("Streaming transcription failed: null result")
 
                 val result = parseTranscriptionResult(resultJson, System.currentTimeMillis() - startTime)
@@ -832,7 +855,7 @@ object CppBridgeSTT {
                 "Cancelling transcription"
             )
 
-            nativeCancel(handle)
+            RunAnywhereBridge.racSttComponentCancel(handle)
         }
     }
 
@@ -855,7 +878,7 @@ object CppBridgeSTT {
                 "Unloading model: $previousModelId"
             )
 
-            nativeUnload(handle)
+            RunAnywhereBridge.racSttComponentUnload(handle)
 
             loadedModelId = null
             loadedModelPath = null
@@ -906,7 +929,7 @@ object CppBridgeSTT {
                 "Destroying STT component"
             )
 
-            nativeDestroy(handle)
+            RunAnywhereBridge.racSttComponentDestroy(handle)
 
             handle = 0
             setState(STTState.NOT_CREATED)
@@ -1292,7 +1315,7 @@ object CppBridgeSTT {
             if (handle == 0L || state != STTState.READY) {
                 return emptyList()
             }
-            val json = nativeGetLanguages(handle) ?: return emptyList()
+            val json = RunAnywhereBridge.racSttComponentGetLanguages(handle) ?: return emptyList()
             // Parse JSON array
             val pattern = "\"([^\"]+)\""
             return Regex(pattern).findAll(json).map { it.groupValues[1] }.toList()
@@ -1310,7 +1333,7 @@ object CppBridgeSTT {
             if (handle == 0L || state != STTState.READY) {
                 return Language.AUTO
             }
-            return nativeDetectLanguage(handle, audioData) ?: Language.AUTO
+            return RunAnywhereBridge.racSttComponentDetectLanguage(handle, audioData) ?: Language.AUTO
         }
     }
 

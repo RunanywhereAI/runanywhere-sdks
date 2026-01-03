@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 RunAnywhere SDK
+ * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
  * Public API for Speech-to-Text operations.
@@ -37,6 +37,21 @@ expect suspend fun RunAnywhere.unloadSTTModel()
  * Check if an STT model is loaded.
  */
 expect suspend fun RunAnywhere.isSTTModelLoaded(): Boolean
+
+/**
+ * Get the currently loaded STT model ID.
+ *
+ * This is a synchronous property that returns the ID of the currently loaded STT model,
+ * or null if no model is loaded.
+ */
+expect val RunAnywhere.currentSTTModelId: String?
+
+/**
+ * Check if an STT model is loaded (non-suspend version for quick checks).
+ *
+ * This accesses cached state and doesn't require suspension.
+ */
+expect val RunAnywhere.isSTTModelLoadedSync: Boolean
 
 // MARK: - Transcription with Options
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 RunAnywhere SDK
+ * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
  * Public types for model management.
@@ -62,7 +62,39 @@ enum class ModelSelectionContext(val value: String) {
     TTS("tts"),
 
     /** Select models for voice agent (all 3 types) */
-    VOICE("voice")
+    VOICE("voice");
+
+    /** Human-readable title for the selection context */
+    val title: String
+        get() = when (this) {
+            LLM -> "Select LLM Model"
+            STT -> "Select STT Model"
+            TTS -> "Select TTS Voice"
+            VOICE -> "Select Voice Models"
+        }
+
+    /** Check if a category is relevant for this selection context */
+    fun isCategoryRelevant(category: ModelCategory): Boolean = when (this) {
+        LLM -> category == ModelCategory.LANGUAGE
+        STT -> category == ModelCategory.SPEECH_RECOGNITION
+        TTS -> category == ModelCategory.SPEECH_SYNTHESIS
+        VOICE -> category == ModelCategory.LANGUAGE ||
+                 category == ModelCategory.SPEECH_RECOGNITION ||
+                 category == ModelCategory.SPEECH_SYNTHESIS
+    }
+
+    /** Check if a framework is relevant for this selection context */
+    fun isFrameworkRelevant(framework: com.runanywhere.sdk.core.types.InferenceFramework): Boolean = when (this) {
+        LLM -> framework == com.runanywhere.sdk.core.types.InferenceFramework.LLAMA_CPP ||
+               framework == com.runanywhere.sdk.core.types.InferenceFramework.FOUNDATION_MODELS
+        STT -> framework == com.runanywhere.sdk.core.types.InferenceFramework.ONNX
+        TTS -> framework == com.runanywhere.sdk.core.types.InferenceFramework.ONNX ||
+               framework == com.runanywhere.sdk.core.types.InferenceFramework.SYSTEM_TTS ||
+               framework == com.runanywhere.sdk.core.types.InferenceFramework.FLUID_AUDIO
+        VOICE -> LLM.isFrameworkRelevant(framework) ||
+                 STT.isFrameworkRelevant(framework) ||
+                 TTS.isFrameworkRelevant(framework)
+    }
 }
 
 // MARK: - Model Category

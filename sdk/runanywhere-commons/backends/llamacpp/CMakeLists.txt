@@ -129,6 +129,48 @@ set_target_properties(rac_backend_llamacpp PROPERTIES
 target_compile_definitions(rac_backend_llamacpp PRIVATE RAC_LLAMACPP_BUILDING)
 
 # =============================================================================
+# JNI TARGET (Android/JVM)
+# =============================================================================
+
+# Only build JNI if we have JNI and building for Android
+if(RAC_BUILD_JNI AND ANDROID)
+    # Find JNI
+    find_package(JNI)
+
+    if(JNI_FOUND)
+        set(LLAMACPP_JNI_SOURCES
+            src/jni/rac_backend_llamacpp_jni.cpp
+        )
+
+        add_library(rac_backend_llamacpp_jni SHARED ${LLAMACPP_JNI_SOURCES})
+
+        target_include_directories(rac_backend_llamacpp_jni PRIVATE
+            ${JNI_INCLUDE_DIRS}
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_SOURCE_DIR}/include
+        )
+
+        target_link_libraries(rac_backend_llamacpp_jni PRIVATE
+            rac_backend_llamacpp
+            rac_commons
+            ${JNI_LIBRARIES}
+        )
+
+        # Android-specific logging
+        if(ANDROID)
+            target_link_libraries(rac_backend_llamacpp_jni PRIVATE log)
+        endif()
+
+        # Install JNI library
+        install(TARGETS rac_backend_llamacpp_jni
+            LIBRARY DESTINATION lib
+            ARCHIVE DESTINATION lib
+            RUNTIME DESTINATION bin
+        )
+    endif()
+endif()
+
+# =============================================================================
 # INSTALLATION
 # =============================================================================
 

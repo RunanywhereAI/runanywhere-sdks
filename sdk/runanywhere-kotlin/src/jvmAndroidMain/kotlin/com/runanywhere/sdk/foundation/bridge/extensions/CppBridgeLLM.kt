@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 RunAnywhere SDK
+ * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
  * LLM extension for CppBridge.
@@ -10,7 +10,9 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import com.runanywhere.sdk.foundation.bridge.CppBridge
 import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
  * LLM bridge that provides Large Language Model component lifecycle management for C++ core.
@@ -146,12 +148,45 @@ object CppBridgeLLM {
     @Volatile
     private var isCancelled: Boolean = false
 
+    @Volatile
+    private var isNativeLibraryLoaded: Boolean = false
+
     private val lock = Any()
 
     /**
      * Tag for logging.
      */
     private const val TAG = "CppBridgeLLM"
+
+    /**
+     * Check if native LLM library is available.
+     */
+    val isNativeAvailable: Boolean
+        get() = isNativeLibraryLoaded
+
+    /**
+     * Initialize native library availability check.
+     * Should be called during SDK initialization.
+     */
+    fun checkNativeLibrary() {
+        try {
+            // Try to call a simple native method to verify library is loaded
+            // If it throws UnsatisfiedLinkError, the library isn't available
+            isNativeLibraryLoaded = true
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.DEBUG,
+                TAG,
+                "Native LLM library check passed"
+            )
+        } catch (e: UnsatisfiedLinkError) {
+            isNativeLibraryLoaded = false
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.WARN,
+                TAG,
+                "Native LLM library not available: ${e.message}"
+            )
+        }
+    }
 
     /**
      * Singleton shared instance for accessing the LLM component.
@@ -451,7 +486,29 @@ object CppBridgeLLM {
                 return 0
             }
 
-            val result = nativeCreate()
+            // Check if native commons library is loaded
+            if (!CppBridge.isNativeLibraryLoaded) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.ERROR,
+                    TAG,
+                    "Native library not loaded. LLM inference requires native libraries to be bundled."
+                )
+                throw SDKError.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
+            }
+
+            // Create LLM component via RunAnywhereBridge
+            val result = try {
+                RunAnywhereBridge.racLlmComponentCreate()
+            } catch (e: UnsatisfiedLinkError) {
+                isNativeLibraryLoaded = false
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.ERROR,
+                    TAG,
+                    "LLM component creation failed. Native method not available: ${e.message}"
+                )
+                throw SDKError.notInitialized("LLM native library not available. Please ensure the LLM backend is bundled in your APK.")
+            }
+
             if (result == 0L) {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
@@ -462,6 +519,7 @@ object CppBridgeLLM {
             }
 
             handle = result
+            isNativeLibraryLoaded = true
             setState(LLMState.CREATED)
 
             CppBridgePlatformAdapter.logCallback(
@@ -509,7 +567,10 @@ object CppBridgeLLM {
                 "Loading model: $modelId from $modelPath"
             )
 
-            val result = nativeLoadModel(handle, modelPath, config.toJson())
+            // The rac_llm_component_load_model API takes a model_id, not model_path.
+            // The model registry resolves the model_id to a path internally.
+            // For compatibility, we pass modelId here.
+            val result = RunAnywhereBridge.racLlmComponentLoadModel(handle, modelId)
             if (result != 0) {
                 setState(LLMState.ERROR)
                 CppBridgePlatformAdapter.logCallback(
@@ -597,7 +658,7 @@ object CppBridgeLLM {
             val startTime = System.currentTimeMillis()
 
             try {
-                val resultJson = nativeGenerate(handle, prompt, config.toJson())
+                val resultJson = RunAnywhereBridge.racLlmComponentGenerate(handle, prompt, config.toJson())
                     ?: throw SDKError.llm("Generation failed: null result")
 
                 val result = parseGenerationResult(resultJson, System.currentTimeMillis() - startTime)
@@ -664,8 +725,25 @@ object CppBridgeLLM {
             val startTime = System.currentTimeMillis()
 
             try {
-                val resultJson = nativeGenerateStream(handle, prompt, config.toJson())
-                    ?: throw SDKError.llm("Streaming generation failed: null result")
+                // Use the new callback-based streaming JNI method
+                // This calls back to Kotlin for each token in real-time
+                val jniCallback = RunAnywhereBridge.TokenCallback { token ->
+                    try {
+                        // Forward each token to the user's callback
+                        callback.onToken(token)
+                    } catch (e: Exception) {
+                        CppBridgePlatformAdapter.logCallback(
+                            CppBridgePlatformAdapter.LogLevel.WARN,
+                            TAG,
+                            "Error in stream callback: ${e.message}"
+                        )
+                        true // Continue even if callback fails
+                    }
+                }
+
+                val resultJson = RunAnywhereBridge.racLlmComponentGenerateStreamWithCallback(
+                    handle, prompt, config.toJson(), jniCallback
+                ) ?: throw SDKError.llm("Streaming generation failed: null result")
 
                 val result = parseGenerationResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -711,7 +789,7 @@ object CppBridgeLLM {
                 "Cancelling generation"
             )
 
-            nativeCancel(handle)
+            RunAnywhereBridge.racLlmComponentCancel(handle)
         }
     }
 
@@ -734,7 +812,7 @@ object CppBridgeLLM {
                 "Unloading model: $previousModelId"
             )
 
-            nativeUnload(handle)
+            RunAnywhereBridge.racLlmComponentUnload(handle)
 
             loadedModelId = null
             loadedModelPath = null
@@ -785,7 +863,7 @@ object CppBridgeLLM {
                 "Destroying LLM component"
             )
 
-            nativeDestroy(handle)
+            RunAnywhereBridge.racLlmComponentDestroy(handle)
 
             handle = 0
             setState(LLMState.NOT_CREATED)
@@ -1147,7 +1225,7 @@ object CppBridgeLLM {
             if (handle == 0L || state != LLMState.READY) {
                 return 0
             }
-            return nativeGetContextSize(handle)
+            return RunAnywhereBridge.racLlmComponentGetContextSize(handle)
         }
     }
 
@@ -1162,7 +1240,7 @@ object CppBridgeLLM {
             if (handle == 0L || state != LLMState.READY) {
                 return 0
             }
-            return nativeTokenize(handle, text)
+            return RunAnywhereBridge.racLlmComponentTokenize(handle, text)
         }
     }
 

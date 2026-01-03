@@ -6,12 +6,15 @@ import android.media.AudioTrack
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.runanywhere.sdk.features.tts.TTSEvent
-import com.runanywhere.sdk.features.tts.TTSOptions
-import com.runanywhere.sdk.models.enums.InferenceFramework
+import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.events.EventBus
+import com.runanywhere.sdk.public.events.EventCategory
+import com.runanywhere.sdk.public.events.ModelEvent
+import com.runanywhere.sdk.public.events.TTSEvent
+import com.runanywhere.sdk.public.extensions.TTS.TTSOptions
 import com.runanywhere.sdk.public.extensions.currentTTSVoiceId
-import com.runanywhere.sdk.public.extensions.isTTSVoiceLoaded
+import com.runanywhere.sdk.public.extensions.isTTSVoiceLoadedSync
 import com.runanywhere.sdk.public.extensions.loadTTSVoice
 import com.runanywhere.sdk.public.extensions.stopSynthesis
 import com.runanywhere.sdk.public.extensions.synthesize
@@ -21,7 +24,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -63,7 +65,7 @@ val funnyTTSSampleTexts =
         "RunAnywhere: because your AI should work even when your WiFi doesn't.",
         "We're a Y Combinator company now. Our moms are finally proud of us.",
         "On-device AI means your voice data stays on your phone. Unlike your ex, we respect privacy.",
-        "RunAnywhere: Making cloud APIs jealous since 2024.",
+        "RunAnywhere: Making cloud APIs jealous since 2026.",
         "Our SDK is so fast, it finished processing before you finished reading this sentence.",
         "Why pay per API call when you can run AI locally? Your wallet called, it says thank you.",
         "RunAnywhere: We put the 'smart' in smartphone, and the 'savings' in your bank account.",
@@ -139,13 +141,18 @@ class TextToSpeechViewModel : ViewModel() {
     init {
         Log.i(TAG, "Initializing TTS ViewModel...")
 
-        // Subscribe to TTS events from SDK EventBus
+        // Subscribe to SDK events for TTS model state
         viewModelScope.launch {
-            RunAnywhere.events.events
-                .filterIsInstance<TTSEvent>()
-                .collect { event ->
+            EventBus.events.collect { event ->
+                // Handle TTS-specific events
+                if (event is TTSEvent) {
                     handleTTSEvent(event)
                 }
+                // Handle model events with TTS category
+                if (event is ModelEvent && event.category == EventCategory.TTS) {
+                    handleModelEvent(event)
+                }
+            }
         }
 
         // Check initial TTS state
@@ -157,34 +164,49 @@ class TextToSpeechViewModel : ViewModel() {
      * iOS Reference: Event subscription in TTSViewModel
      */
     private fun handleTTSEvent(event: TTSEvent) {
-        when (event) {
-            is TTSEvent.ModelLoadStarted -> {
-                Log.d(TAG, "TTS model loading started: ${event.modelId}")
+        when (event.eventType) {
+            TTSEvent.TTSEventType.SYNTHESIS_STARTED -> {
+                Log.d(TAG, "Synthesis started")
             }
-            is TTSEvent.ModelLoadCompleted -> {
-                Log.i(TAG, "✅ TTS model loaded: ${event.modelId} (${event.durationMs}ms)")
+            TTSEvent.TTSEventType.SYNTHESIS_COMPLETED -> {
+                Log.i(TAG, "Synthesis completed: ${event.durationMs}ms")
+            }
+            TTSEvent.TTSEventType.SYNTHESIS_FAILED -> {
+                Log.e(TAG, "Synthesis failed: ${event.error}")
+                _uiState.update {
+                    it.copy(
+                        isGenerating = false,
+                        errorMessage = "Synthesis failed: ${event.error}",
+                    )
+                }
+            }
+            TTSEvent.TTSEventType.PLAYBACK_STARTED -> {
+                Log.d(TAG, "Playback started")
+            }
+            TTSEvent.TTSEventType.PLAYBACK_COMPLETED -> {
+                Log.d(TAG, "Playback completed")
+            }
+        }
+    }
+
+    /**
+     * Handle model events for TTS
+     */
+    private fun handleModelEvent(event: ModelEvent) {
+        when (event.eventType) {
+            ModelEvent.ModelEventType.LOADED -> {
+                Log.i(TAG, "✅ TTS model loaded: ${event.modelId}")
                 _uiState.update {
                     it.copy(
                         isModelLoaded = true,
                         selectedModelId = event.modelId,
                         selectedModelName = event.modelId,
-                        selectedFramework = event.framework,
-                        isSystemTTS = event.framework == InferenceFramework.SYSTEM_TTS,
                     )
                 }
                 // Shuffle sample text when model is first loaded
                 shuffleSampleText()
             }
-            is TTSEvent.ModelLoadFailed -> {
-                Log.e(TAG, "TTS model load failed: ${event.modelId} - ${event.error}")
-                _uiState.update {
-                    it.copy(
-                        isModelLoaded = false,
-                        errorMessage = "Failed to load voice: ${event.error}",
-                    )
-                }
-            }
-            is TTSEvent.ModelUnloaded -> {
+            ModelEvent.ModelEventType.UNLOADED -> {
                 Log.d(TAG, "TTS model unloaded: ${event.modelId}")
                 _uiState.update {
                     it.copy(
@@ -194,24 +216,21 @@ class TextToSpeechViewModel : ViewModel() {
                     )
                 }
             }
-            is TTSEvent.SynthesisStarted -> {
-                Log.d(TAG, "Synthesis started: ${event.synthesisId}")
+            ModelEvent.ModelEventType.DOWNLOAD_STARTED -> {
+                Log.d(TAG, "TTS model download started: ${event.modelId}")
             }
-            is TTSEvent.SynthesisChunk -> {
-                // Analytics only, no UI update needed
+            ModelEvent.ModelEventType.DOWNLOAD_COMPLETED -> {
+                Log.d(TAG, "TTS model download completed: ${event.modelId}")
             }
-            is TTSEvent.SynthesisCompleted -> {
-                Log.i(TAG, "Synthesis completed: ${event.audioSizeBytes} bytes, ${event.audioDurationMs}ms")
-            }
-            is TTSEvent.SynthesisFailed -> {
-                Log.e(TAG, "Synthesis failed: ${event.error}")
+            ModelEvent.ModelEventType.DOWNLOAD_FAILED -> {
+                Log.e(TAG, "TTS model download failed: ${event.modelId} - ${event.error}")
                 _uiState.update {
                     it.copy(
-                        isGenerating = false,
-                        errorMessage = "Synthesis failed: ${event.error}",
+                        errorMessage = "Download failed: ${event.error}",
                     )
                 }
             }
+            else -> { /* Other events not relevant for TTS state */ }
         }
     }
 
@@ -219,7 +238,7 @@ class TextToSpeechViewModel : ViewModel() {
      * Update TTS state from SDK
      */
     private fun updateTTSState() {
-        val isLoaded = RunAnywhere.isTTSVoiceLoaded
+        val isLoaded = RunAnywhere.isTTSVoiceLoadedSync
         val voiceId = RunAnywhere.currentTTSVoiceId
 
         _uiState.update {
@@ -312,7 +331,7 @@ class TextToSpeechViewModel : ViewModel() {
             val text = _uiState.value.inputText
             if (text.isEmpty()) return@launch
 
-            if (!RunAnywhere.isTTSVoiceLoaded) {
+            if (!RunAnywhere.isTTSVoiceLoadedSync) {
                 _uiState.update {
                     it.copy(errorMessage = "No TTS model loaded. Please select a voice first.")
                 }
@@ -537,7 +556,9 @@ class TextToSpeechViewModel : ViewModel() {
      * Stop current synthesis
      */
     fun stopSynthesis() {
-        RunAnywhere.stopSynthesis()
+        viewModelScope.launch {
+            RunAnywhere.stopSynthesis()
+        }
         _uiState.update { it.copy(isGenerating = false) }
     }
 

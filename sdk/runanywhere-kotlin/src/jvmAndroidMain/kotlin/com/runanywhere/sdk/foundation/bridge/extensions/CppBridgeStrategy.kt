@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 RunAnywhere SDK
+ * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
  * Strategy extension for CppBridge.
@@ -1004,8 +1004,8 @@ object CppBridgeStrategy {
 
         // Check if we have a local model
         val hasLocalModel = if (modelId != null) {
-            CppBridgeModelRegistry.hasModel(modelId) &&
-                    CppBridgeModelRegistry.getModel(modelId)?.isReady() == true
+            val model = CppBridgeModelRegistry.get(modelId)
+            model != null && model.localPath != null
         } else {
             caps.hasLocalModel
         }

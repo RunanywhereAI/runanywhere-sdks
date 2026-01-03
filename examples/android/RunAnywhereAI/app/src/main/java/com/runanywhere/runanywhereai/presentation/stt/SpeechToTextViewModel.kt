@@ -8,12 +8,14 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.domain.services.AudioCaptureService
-import com.runanywhere.sdk.features.stt.STTEvent
-import com.runanywhere.sdk.features.stt.STTOptions
-import com.runanywhere.sdk.models.enums.InferenceFramework
+import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.events.EventBus
+import com.runanywhere.sdk.public.events.EventCategory
+import com.runanywhere.sdk.public.events.ModelEvent
+import com.runanywhere.sdk.public.extensions.STT.STTOptions
 import com.runanywhere.sdk.public.extensions.currentSTTModelId
-import com.runanywhere.sdk.public.extensions.isSTTModelLoaded
+import com.runanywhere.sdk.public.extensions.isSTTModelLoadedSync
 import com.runanywhere.sdk.public.extensions.loadSTTModel
 import com.runanywhere.sdk.public.extensions.transcribe
 import com.runanywhere.sdk.public.extensions.transcribeStream
@@ -22,7 +24,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -175,47 +176,34 @@ class SpeechToTextViewModel : ViewModel() {
 
         eventSubscriptionJob =
             viewModelScope.launch {
-                RunAnywhere.events.events
-                    .filterIsInstance<STTEvent>()
-                    .collect { event ->
-                        handleSTTEvent(event)
+                // Listen for model events with STT category
+                EventBus.events.collect { event ->
+                    // Filter for model events with STT category
+                    if (event is ModelEvent && event.category == EventCategory.STT) {
+                        handleModelEvent(event)
                     }
+                }
             }
     }
 
     /**
-     * Handle STT events from SDK
+     * Handle model events for STT
      * iOS Reference: handleSDKEvent() in STTViewModel.swift
      */
-    private fun handleSTTEvent(event: STTEvent) {
-        when (event) {
-            is STTEvent.ModelLoadStarted -> {
-                Log.i(TAG, "STT model loading: ${event.modelId}")
-                _uiState.update { it.copy(isProcessing = true) }
-            }
-            is STTEvent.ModelLoadCompleted -> {
+    private fun handleModelEvent(event: ModelEvent) {
+        when (event.eventType) {
+            ModelEvent.ModelEventType.LOADED -> {
                 Log.i(TAG, "STT model loaded: ${event.modelId}")
                 _uiState.update {
                     it.copy(
                         isModelLoaded = true,
                         selectedModelId = event.modelId,
                         selectedModelName = it.selectedModelName ?: event.modelId,
-                        selectedFramework = event.framework,
                         isProcessing = false,
                     )
                 }
             }
-            is STTEvent.ModelLoadFailed -> {
-                Log.e(TAG, "STT model load failed: ${event.error}")
-                _uiState.update {
-                    it.copy(
-                        isModelLoaded = false,
-                        errorMessage = "Failed to load model: ${event.error}",
-                        isProcessing = false,
-                    )
-                }
-            }
-            is STTEvent.ModelUnloaded -> {
+            ModelEvent.ModelEventType.UNLOADED -> {
                 Log.i(TAG, "STT model unloaded: ${event.modelId}")
                 _uiState.update {
                     it.copy(
@@ -226,9 +214,24 @@ class SpeechToTextViewModel : ViewModel() {
                     )
                 }
             }
-            else -> {
-                // Other STT events (transcription events) handled elsewhere
+            ModelEvent.ModelEventType.DOWNLOAD_STARTED -> {
+                Log.i(TAG, "STT model download started: ${event.modelId}")
+                _uiState.update { it.copy(isProcessing = true) }
             }
+            ModelEvent.ModelEventType.DOWNLOAD_COMPLETED -> {
+                Log.i(TAG, "STT model download completed: ${event.modelId}")
+                _uiState.update { it.copy(isProcessing = false) }
+            }
+            ModelEvent.ModelEventType.DOWNLOAD_FAILED -> {
+                Log.e(TAG, "STT model download failed: ${event.modelId} - ${event.error}")
+                _uiState.update {
+                    it.copy(
+                        errorMessage = "Download failed: ${event.error}",
+                        isProcessing = false,
+                    )
+                }
+            }
+            else -> { /* Other events not relevant for STT state */ }
         }
     }
 
@@ -237,7 +240,7 @@ class SpeechToTextViewModel : ViewModel() {
      * iOS Reference: checkInitialModelState() in STTViewModel.swift
      */
     private fun checkInitialModelState() {
-        if (RunAnywhere.isSTTModelLoaded) {
+        if (RunAnywhere.isSTTModelLoadedSync) {
             val modelId = RunAnywhere.currentSTTModelId
             _uiState.update {
                 it.copy(
@@ -396,26 +399,61 @@ class SpeechToTextViewModel : ViewModel() {
     }
 
     /**
-     * Start live streaming recording - transcribe in real-time
+     * Start live streaming recording - transcribe in chunks
      * iOS Reference: Live mode in startRecording() with liveTranscribe
+     *
+     * Note: The SDK's transcribeStream API takes a ByteArray, not a Flow.
+     * For live mode, we collect audio chunks and transcribe them incrementally.
      */
     private fun startLiveRecording(audioCapture: AudioCaptureService) {
         recordingJob =
             viewModelScope.launch {
                 try {
-                    // Create audio flow with level updates
-                    val audioFlow =
-                        audioCapture.startCapture().onEach { audioData ->
-                            val rms = audioCapture.calculateRMS(audioData)
-                            val normalizedLevel = normalizeAudioLevel(rms)
-                            _uiState.update { it.copy(audioLevel = normalizedLevel) }
-                        }
+                    val chunkBuffer = ByteArrayOutputStream()
+                    var lastTranscription = ""
 
-                    // Use SDK's streaming transcription
-                    RunAnywhere.transcribeStream(audioFlow, STTOptions(language = _uiState.value.language))
-                        .collect { text ->
-                            handleSTTStreamText(text)
+                    audioCapture.startCapture().collect { audioData ->
+                        // Update audio level
+                        val rms = audioCapture.calculateRMS(audioData)
+                        val normalizedLevel = normalizeAudioLevel(rms)
+                        _uiState.update { it.copy(audioLevel = normalizedLevel) }
+
+                        // Append to chunk buffer
+                        chunkBuffer.write(audioData)
+
+                        // Transcribe every ~1 second of audio (16000 samples * 2 bytes = 32000 bytes)
+                        if (chunkBuffer.size() >= 32000) {
+                            val chunkData = chunkBuffer.toByteArray()
+                            chunkBuffer.reset()
+
+                            // Transcribe in background
+                            withContext(Dispatchers.IO) {
+                                try {
+                                    val options = STTOptions(language = _uiState.value.language)
+                                    val result = RunAnywhere.transcribeStream(
+                                        audioData = chunkData,
+                                        options = options
+                                    ) { partial ->
+                                        // Update UI with partial result (non-suspend callback)
+                                        if (partial.transcript.isNotBlank()) {
+                                            val newText = lastTranscription + " " + partial.transcript
+                                            // Use launch since we're in a non-suspend callback
+                                            viewModelScope.launch(Dispatchers.Main) {
+                                                handleSTTStreamText(newText.trim())
+                                            }
+                                        }
+                                    }
+                                    // Update with final result
+                                    lastTranscription = (lastTranscription + " " + result.text).trim()
+                                    withContext(Dispatchers.Main) {
+                                        handleSTTStreamText(lastTranscription)
+                                    }
+                                } catch (e: Exception) {
+                                    Log.w(TAG, "Chunk transcription error: ${e.message}")
+                                }
+                            }
                         }
+                    }
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     Log.d(TAG, "Live recording cancelled (expected when stopping)")
                 } catch (e: Exception) {

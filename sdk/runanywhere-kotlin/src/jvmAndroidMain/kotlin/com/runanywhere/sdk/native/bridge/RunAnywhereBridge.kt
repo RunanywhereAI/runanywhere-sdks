@@ -1,16 +1,15 @@
 /*
- * Copyright 2024 RunAnywhere SDK
+ * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
- * JNI Bridge for runanywhere-commons C API.
- * Contains external function declarations for all rac_* C API functions.
+ * JNI Bridge for runanywhere-commons C API (rac_* functions).
  *
- * This object provides the low-level JNI bindings that are consumed by
- * the higher-level CppBridge extensions.
+ * This matches the Swift SDK's CppBridge pattern where:
+ * - Swift uses CRACommons (C headers) → RACommons.xcframework
+ * - Kotlin uses RunAnywhereBridge (JNI) → librunanywhere_jni.so
  *
- * IMPORTANT: This is a low-level API. For application-level usage, use
- * [CppBridge] which provides a higher-level, type-safe interface with
- * proper initialization ordering and lifecycle management.
+ * The JNI library is built from runanywhere-commons/src/jni/runanywhere_commons_jni.cpp
+ * and provides the rac_* API surface that wraps the C++ commons layer.
  */
 
 package com.runanywhere.sdk.native.bridge
@@ -18,49 +17,25 @@ package com.runanywhere.sdk.native.bridge
 /**
  * RunAnywhereBridge provides low-level JNI bindings for the runanywhere-commons C API.
  *
- * This object contains external function declarations that map to the C API
- * exported by librunanywhere_commons. The native library must be loaded
- * before calling any of these functions.
- *
- * ## Recommended Usage
- *
- * **DO NOT** use this class directly in application code. Instead, use
- * [CppBridge][com.runanywhere.sdk.foundation.bridge.CppBridge] which provides:
- * - Automatic initialization ordering (platform adapter first)
- * - Two-phase initialization (core, then services)
- * - Type-safe component wrappers (CppBridge.LLM, CppBridge.STT, etc.)
- * - Proper lifecycle management and cleanup
- *
- * ## Internal Usage
- *
- * This class is intended for use by CppBridge extensions only:
- * - CppBridge extensions use these JNI functions internally
- * - The native library is loaded via [NativeLoader]
- * - Platform adapter must be registered before calling rac_init()
- *
- * ## Thread Safety
- *
- * These JNI functions are thread-safe as they wrap thread-safe C++ code.
+ * This object maps directly to the JNI functions in runanywhere_commons_jni.cpp.
+ * For higher-level usage, use CppBridge and its extensions.
  *
  * @see com.runanywhere.sdk.foundation.bridge.CppBridge
  */
 object RunAnywhereBridge {
 
+    private const val TAG = "RunAnywhereBridge"
+
     // ========================================================================
     // NATIVE LIBRARY LOADING
     // ========================================================================
 
-    /**
-     * Whether the native library has been loaded.
-     */
     @Volatile
     private var nativeLibraryLoaded = false
-
     private val loadLock = Any()
 
     /**
-     * Load the native library if not already loaded.
-     *
+     * Load the native commons library if not already loaded.
      * @return true if the library is loaded, false otherwise
      */
     fun ensureNativeLibraryLoaded(): Boolean {
@@ -69,839 +44,287 @@ object RunAnywhereBridge {
         synchronized(loadLock) {
             if (nativeLibraryLoaded) return true
 
+            android.util.Log.i(TAG, "Loading native library 'runanywhere_jni'...")
+
             try {
                 System.loadLibrary("runanywhere_jni")
                 nativeLibraryLoaded = true
+                android.util.Log.i(TAG, "✅ Native library loaded successfully")
                 return true
             } catch (e: UnsatisfiedLinkError) {
-                System.err.println("RunAnywhereBridge: Failed to load native library: ${e.message}")
+                android.util.Log.e(TAG, "❌ Failed to load native library: ${e.message}", e)
+                return false
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "❌ Unexpected error: ${e.message}", e)
                 return false
             }
         }
     }
 
-    /**
-     * Check if the unified JNI library is loaded.
-     * @deprecated Use [ensureNativeLibraryLoaded] instead
-     */
-    @Deprecated("Use ensureNativeLibraryLoaded()", ReplaceWith("ensureNativeLibraryLoaded()"))
-    fun isLoaded(): Boolean = nativeLibraryLoaded
-
-    /**
-     * Load the unified JNI bridge library.
-     * @deprecated Use [ensureNativeLibraryLoaded] instead
-     */
-    @Deprecated("Use ensureNativeLibraryLoaded()", ReplaceWith("ensureNativeLibraryLoaded()"))
-    @Synchronized
-    fun loadLibrary() {
-        ensureNativeLibraryLoaded()
-    }
+    fun isNativeLibraryLoaded(): Boolean = nativeLibraryLoaded
 
     // ========================================================================
-    // CORE INITIALIZATION FUNCTIONS
+    // CORE INITIALIZATION (rac_core.h)
     // ========================================================================
 
-    /**
-     * Initialize the runanywhere-commons C++ library.
-     *
-     * This must be called before any other rac_* functions (except rac_set_platform_adapter
-     * which must be called BEFORE this).
-     *
-     * CRITICAL: Platform adapter must be registered via [racSetPlatformAdapter] before
-     * calling this function.
-     *
-     * @return RAC_SUCCESS (0) on success, error code otherwise
-     *
-     * C API: rac_init()
-     */
     @JvmStatic
     external fun racInit(): Int
 
-    /**
-     * Shutdown the runanywhere-commons C++ library and release all resources.
-     *
-     * After calling this, no other rac_* functions should be called until
-     * [racInit] is called again.
-     *
-     * @return RAC_SUCCESS (0) on success, error code otherwise
-     *
-     * C API: rac_shutdown()
-     */
     @JvmStatic
     external fun racShutdown(): Int
 
-    /**
-     * Check if the runanywhere-commons C++ library is initialized.
-     *
-     * @return true if initialized, false otherwise
-     *
-     * C API: rac_is_initialized()
-     */
     @JvmStatic
     external fun racIsInitialized(): Boolean
 
     // ========================================================================
-    // PLATFORM ADAPTER FUNCTIONS
+    // PLATFORM ADAPTER (rac_platform_adapter.h)
     // ========================================================================
 
-    /**
-     * Set the platform adapter for the C++ library.
-     *
-     * CRITICAL: This MUST be called BEFORE [racInit].
-     *
-     * The platform adapter provides callbacks for platform-specific operations:
-     * - Logging: Route C++ logs to Kotlin logging system
-     * - File Operations: fileExists, fileRead, fileWrite, fileDelete
-     * - Secure Storage: secureGet, secureSet, secureDelete
-     * - Clock: nowMs (current timestamp)
-     *
-     * @param adapter The platform adapter object reference (JNI global ref)
-     * @return RAC_SUCCESS (0) on success, error code otherwise
-     *
-     * C API: rac_set_platform_adapter(rac_platform_adapter_t* adapter)
-     */
     @JvmStatic
     external fun racSetPlatformAdapter(adapter: Any): Int
 
-    /**
-     * Get the currently registered platform adapter.
-     *
-     * @return The platform adapter object, or null if not set
-     *
-     * C API: rac_get_platform_adapter()
-     */
     @JvmStatic
     external fun racGetPlatformAdapter(): Any?
 
     // ========================================================================
-    // LOGGING CONFIGURATION
+    // LOGGING (rac_logger.h)
     // ========================================================================
 
-    /**
-     * Log level constants matching C++ RAC_LOG_LEVEL_* values.
-     */
-    object LogLevel {
-        /** Most verbose logging - typically disabled in production */
-        const val TRACE = 0
-
-        /** Debug information for development */
-        const val DEBUG = 1
-
-        /** General information messages */
-        const val INFO = 2
-
-        /** Warning messages for potentially problematic situations */
-        const val WARN = 3
-
-        /** Error messages for failures that may be recoverable */
-        const val ERROR = 4
-
-        /** Fatal errors that require immediate attention */
-        const val FATAL = 5
-    }
-
-    /**
-     * Configure logging for the C++ library.
-     *
-     * Sets the minimum log level and optional log file path.
-     *
-     * @param level The minimum log level to output (see [LogLevel] constants)
-     * @param logFilePath Optional path to a log file (null for no file logging)
-     * @return RAC_SUCCESS (0) on success, error code otherwise
-     *
-     * C API: rac_configure_logging(int level, const char* log_file_path)
-     */
     @JvmStatic
     external fun racConfigureLogging(level: Int, logFilePath: String?): Int
 
-    /**
-     * Log a message to the C++ logging system.
-     *
-     * @param level The log level (see [LogLevel] constants)
-     * @param tag The log tag/category
-     * @param message The log message
-     *
-     * C API: rac_log(int level, const char* tag, const char* message)
-     */
     @JvmStatic
     external fun racLog(level: Int, tag: String, message: String)
 
     // ========================================================================
-    // ERROR CODE CONSTANTS
+    // LLM COMPONENT (rac_llm_component.h)
     // ========================================================================
 
-    /**
-     * Error code constants matching C++ RAC_* return values.
-     */
-    object ErrorCode {
-        /** Operation completed successfully */
-        const val SUCCESS = 0
-
-        /** Generic error */
-        const val ERROR = -1
-
-        /** Invalid argument provided */
-        const val ERROR_INVALID_ARGUMENT = -2
-
-        /** Library not initialized */
-        const val ERROR_NOT_INITIALIZED = -3
-
-        /** Already initialized */
-        const val ERROR_ALREADY_INITIALIZED = -4
-
-        /** Out of memory */
-        const val ERROR_OUT_OF_MEMORY = -5
-
-        /** File not found */
-        const val ERROR_FILE_NOT_FOUND = -6
-
-        /** Operation timed out */
-        const val ERROR_TIMEOUT = -7
-
-        /** Operation was cancelled */
-        const val ERROR_CANCELLED = -8
-
-        /** Network error */
-        const val ERROR_NETWORK = -9
-
-        /** Model not loaded */
-        const val ERROR_MODEL_NOT_LOADED = -10
-
-        /** Model load failed */
-        const val ERROR_MODEL_LOAD_FAILED = -11
-
-        /** Platform adapter not set */
-        const val ERROR_PLATFORM_ADAPTER_NOT_SET = -12
-
-        /** Invalid handle */
-        const val ERROR_INVALID_HANDLE = -13
-
-        /**
-         * Check if an error code indicates success.
-         */
-        fun isSuccess(code: Int): Boolean = code == SUCCESS
-
-        /**
-         * Check if an error code indicates failure.
-         */
-        fun isError(code: Int): Boolean = code < SUCCESS
-    }
-
-    // ========================================================================
-    // LLM COMPONENT JNI BINDINGS
-    // ========================================================================
-
-    /**
-     * Create a new LLM component instance.
-     *
-     * @return Handle to the created component, or 0 on failure
-     *
-     * C API: rac_llm_component_create()
-     */
     @JvmStatic
     external fun racLlmComponentCreate(): Long
 
-    /**
-     * Destroy an LLM component instance and release resources.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_llm_component_destroy(handle)
-     */
     @JvmStatic
     external fun racLlmComponentDestroy(handle: Long)
 
-    /**
-     * Load a model into the LLM component.
-     *
-     * @param handle The component handle
-     * @param modelPath Path to the model file
-     * @param configJson JSON configuration string
-     * @return RAC_SUCCESS (0) on success, error code otherwise
-     *
-     * C API: rac_llm_component_load_model(handle, model_path, config)
-     */
     @JvmStatic
-    external fun racLlmComponentLoadModel(handle: Long, modelPath: String, configJson: String): Int
+    external fun racLlmComponentConfigure(handle: Long, configJson: String): Int
 
-    /**
-     * Unload the model from the LLM component.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_llm_component_unload(handle)
-     */
-    @JvmStatic
-    external fun racLlmComponentUnload(handle: Long)
-
-    /**
-     * Generate text from a prompt.
-     *
-     * @param handle The component handle
-     * @param prompt The input prompt
-     * @param configJson JSON configuration string
-     * @return JSON-encoded result, or null on failure
-     *
-     * C API: rac_llm_component_generate(handle, prompt, config)
-     */
-    @JvmStatic
-    external fun racLlmComponentGenerate(handle: Long, prompt: String, configJson: String): String?
-
-    /**
-     * Generate text with streaming output.
-     *
-     * @param handle The component handle
-     * @param prompt The input prompt
-     * @param configJson JSON configuration string
-     * @return JSON-encoded result, or null on failure
-     *
-     * C API: rac_llm_component_generate_stream(handle, prompt, config)
-     */
-    @JvmStatic
-    external fun racLlmComponentGenerateStream(handle: Long, prompt: String, configJson: String): String?
-
-    /**
-     * Cancel an ongoing LLM generation.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_llm_component_cancel(handle)
-     */
-    @JvmStatic
-    external fun racLlmComponentCancel(handle: Long)
-
-    /**
-     * Get the context size of the loaded LLM model.
-     *
-     * @param handle The component handle
-     * @return The context size in tokens, or 0 if no model loaded
-     *
-     * C API: rac_llm_component_get_context_size(handle)
-     */
-    @JvmStatic
-    external fun racLlmComponentGetContextSize(handle: Long): Int
-
-    /**
-     * Tokenize text using the loaded LLM model.
-     *
-     * @param handle The component handle
-     * @param text The text to tokenize
-     * @return The number of tokens
-     *
-     * C API: rac_llm_component_tokenize(handle, text)
-     */
-    @JvmStatic
-    external fun racLlmComponentTokenize(handle: Long, text: String): Int
-
-    /**
-     * Get the LLM component state.
-     *
-     * @param handle The component handle
-     * @return The component state (see LLMState constants)
-     *
-     * C API: rac_llm_component_get_state(handle)
-     */
-    @JvmStatic
-    external fun racLlmComponentGetState(handle: Long): Int
-
-    /**
-     * Check if the LLM component has a model loaded.
-     *
-     * @param handle The component handle
-     * @return true if a model is loaded
-     *
-     * C API: rac_llm_component_is_loaded(handle)
-     */
     @JvmStatic
     external fun racLlmComponentIsLoaded(handle: Long): Boolean
 
+    @JvmStatic
+    external fun racLlmComponentGetModelId(handle: Long): String?
+
     /**
-     * Set LLM component callbacks.
-     *
-     * @param streamCallback The streaming token callback object
-     * @param progressCallback The progress callback object
-     *
-     * C API: rac_llm_set_callbacks(...)
+     * Load a model. Takes model path (or ID) and optional config JSON.
      */
+    @JvmStatic
+    external fun racLlmComponentLoadModel(handle: Long, modelId: String): Int
+
+    @JvmStatic
+    external fun racLlmComponentUnload(handle: Long): Int
+
+    @JvmStatic
+    external fun racLlmComponentCleanup(handle: Long): Int
+
+    @JvmStatic
+    external fun racLlmComponentCancel(handle: Long): Int
+
+    /**
+     * Generate text (non-streaming).
+     * @return JSON result string or null on error
+     */
+    @JvmStatic
+    external fun racLlmComponentGenerate(handle: Long, prompt: String, optionsJson: String?): String?
+
+    /**
+     * Generate text with streaming - simplified version that returns result JSON.
+     * Streaming is handled internally, result returned on completion.
+     */
+    @JvmStatic
+    external fun racLlmComponentGenerateStream(handle: Long, prompt: String, optionsJson: String?): String?
+
+    /**
+     * Token callback interface for streaming generation.
+     */
+    fun interface TokenCallback {
+        fun onToken(token: String): Boolean
+    }
+
+    /**
+     * Generate text with true streaming - calls tokenCallback for each token.
+     * This provides real-time token-by-token streaming.
+     *
+     * @param handle LLM component handle
+     * @param prompt The prompt to generate from
+     * @param optionsJson Options as JSON string
+     * @param tokenCallback Callback invoked for each generated token
+     * @return JSON result string with final metrics, or null on error
+     */
+    @JvmStatic
+    external fun racLlmComponentGenerateStreamWithCallback(
+        handle: Long,
+        prompt: String,
+        optionsJson: String?,
+        tokenCallback: TokenCallback
+    ): String?
+
+    @JvmStatic
+    external fun racLlmComponentSupportsStreaming(handle: Long): Boolean
+
+    @JvmStatic
+    external fun racLlmComponentGetState(handle: Long): Int
+
+    @JvmStatic
+    external fun racLlmComponentGetMetrics(handle: Long): String?
+
+    @JvmStatic
+    external fun racLlmComponentGetContextSize(handle: Long): Int
+
+    @JvmStatic
+    external fun racLlmComponentTokenize(handle: Long, text: String): Int
+
     @JvmStatic
     external fun racLlmSetCallbacks(streamCallback: Any?, progressCallback: Any?)
 
     // ========================================================================
-    // STT COMPONENT JNI BINDINGS
+    // STT COMPONENT (rac_stt_component.h)
     // ========================================================================
 
-    /**
-     * Create a new STT component instance.
-     *
-     * @return Handle to the created component, or 0 on failure
-     *
-     * C API: rac_stt_component_create()
-     */
     @JvmStatic
     external fun racSttComponentCreate(): Long
 
-    /**
-     * Destroy an STT component instance and release resources.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_stt_component_destroy(handle)
-     */
     @JvmStatic
     external fun racSttComponentDestroy(handle: Long)
 
-    /**
-     * Load a model into the STT component.
-     *
-     * @param handle The component handle
-     * @param modelPath Path to the model file
-     * @param configJson JSON configuration string
-     * @return RAC_SUCCESS (0) on success, error code otherwise
-     *
-     * C API: rac_stt_component_load_model(handle, model_path, config)
-     */
-    @JvmStatic
-    external fun racSttComponentLoadModel(handle: Long, modelPath: String, configJson: String): Int
-
-    /**
-     * Unload the model from the STT component.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_stt_component_unload(handle)
-     */
-    @JvmStatic
-    external fun racSttComponentUnload(handle: Long)
-
-    /**
-     * Transcribe audio data.
-     *
-     * @param handle The component handle
-     * @param audioData Raw audio bytes
-     * @param configJson JSON configuration string
-     * @return JSON-encoded result, or null on failure
-     *
-     * C API: rac_stt_component_transcribe(handle, audio_data, audio_size, config)
-     */
-    @JvmStatic
-    external fun racSttComponentTranscribe(handle: Long, audioData: ByteArray, configJson: String): String?
-
-    /**
-     * Transcribe audio file.
-     *
-     * @param handle The component handle
-     * @param audioPath Path to the audio file
-     * @param configJson JSON configuration string
-     * @return JSON-encoded result, or null on failure
-     *
-     * C API: rac_stt_component_transcribe_file(handle, audio_path, config)
-     */
-    @JvmStatic
-    external fun racSttComponentTranscribeFile(handle: Long, audioPath: String, configJson: String): String?
-
-    /**
-     * Transcribe audio with streaming output.
-     *
-     * @param handle The component handle
-     * @param audioData Raw audio bytes
-     * @param configJson JSON configuration string
-     * @return JSON-encoded result, or null on failure
-     *
-     * C API: rac_stt_component_transcribe_stream(handle, audio_data, audio_size, config)
-     */
-    @JvmStatic
-    external fun racSttComponentTranscribeStream(handle: Long, audioData: ByteArray, configJson: String): String?
-
-    /**
-     * Cancel an ongoing STT transcription.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_stt_component_cancel(handle)
-     */
-    @JvmStatic
-    external fun racSttComponentCancel(handle: Long)
-
-    /**
-     * Get the STT component state.
-     *
-     * @param handle The component handle
-     * @return The component state (see STTState constants)
-     *
-     * C API: rac_stt_component_get_state(handle)
-     */
-    @JvmStatic
-    external fun racSttComponentGetState(handle: Long): Int
-
-    /**
-     * Check if the STT component has a model loaded.
-     *
-     * @param handle The component handle
-     * @return true if a model is loaded
-     *
-     * C API: rac_stt_component_is_loaded(handle)
-     */
     @JvmStatic
     external fun racSttComponentIsLoaded(handle: Long): Boolean
 
-    /**
-     * Get supported languages for the STT component.
-     *
-     * @param handle The component handle
-     * @return JSON array of supported language codes
-     *
-     * C API: rac_stt_component_get_languages(handle)
-     */
+    @JvmStatic
+    external fun racSttComponentLoadModel(handle: Long, modelId: String, configJson: String?): Int
+
+    @JvmStatic
+    external fun racSttComponentUnload(handle: Long): Int
+
+    @JvmStatic
+    external fun racSttComponentCancel(handle: Long): Int
+
+    @JvmStatic
+    external fun racSttComponentTranscribe(handle: Long, audioData: ByteArray, optionsJson: String?): String?
+
+    @JvmStatic
+    external fun racSttComponentTranscribeFile(handle: Long, audioPath: String, optionsJson: String?): String?
+
+    @JvmStatic
+    external fun racSttComponentTranscribeStream(handle: Long, audioData: ByteArray, optionsJson: String?): String?
+
+    @JvmStatic
+    external fun racSttComponentSupportsStreaming(handle: Long): Boolean
+
+    @JvmStatic
+    external fun racSttComponentGetState(handle: Long): Int
+
     @JvmStatic
     external fun racSttComponentGetLanguages(handle: Long): String?
 
-    /**
-     * Detect language from audio sample.
-     *
-     * @param handle The component handle
-     * @param audioData Raw audio bytes
-     * @return Detected language code
-     *
-     * C API: rac_stt_component_detect_language(handle, audio_data, audio_size)
-     */
     @JvmStatic
     external fun racSttComponentDetectLanguage(handle: Long, audioData: ByteArray): String?
 
-    /**
-     * Set STT component callbacks.
-     *
-     * @param partialCallback The partial result callback object
-     * @param progressCallback The progress callback object
-     *
-     * C API: rac_stt_set_callbacks(...)
-     */
     @JvmStatic
-    external fun racSttSetCallbacks(partialCallback: Any?, progressCallback: Any?)
+    external fun racSttSetCallbacks(frameCallback: Any?, progressCallback: Any?)
 
     // ========================================================================
-    // TTS COMPONENT JNI BINDINGS
+    // TTS COMPONENT (rac_tts_component.h)
     // ========================================================================
 
-    /**
-     * Create a new TTS component instance.
-     *
-     * @return Handle to the created component, or 0 on failure
-     *
-     * C API: rac_tts_component_create()
-     */
     @JvmStatic
     external fun racTtsComponentCreate(): Long
 
-    /**
-     * Destroy a TTS component instance and release resources.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_tts_component_destroy(handle)
-     */
     @JvmStatic
     external fun racTtsComponentDestroy(handle: Long)
 
-    /**
-     * Load a model into the TTS component.
-     *
-     * @param handle The component handle
-     * @param modelPath Path to the model file
-     * @param configJson JSON configuration string
-     * @return RAC_SUCCESS (0) on success, error code otherwise
-     *
-     * C API: rac_tts_component_load_model(handle, model_path, config)
-     */
-    @JvmStatic
-    external fun racTtsComponentLoadModel(handle: Long, modelPath: String, configJson: String): Int
-
-    /**
-     * Unload the model from the TTS component.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_tts_component_unload(handle)
-     */
-    @JvmStatic
-    external fun racTtsComponentUnload(handle: Long)
-
-    /**
-     * Synthesize audio from text.
-     *
-     * @param handle The component handle
-     * @param text The input text
-     * @param configJson JSON configuration string
-     * @return Audio data bytes, or null on failure
-     *
-     * C API: rac_tts_component_synthesize(handle, text, config)
-     */
-    @JvmStatic
-    external fun racTtsComponentSynthesize(handle: Long, text: String, configJson: String): ByteArray?
-
-    /**
-     * Synthesize audio with streaming output.
-     *
-     * @param handle The component handle
-     * @param text The input text
-     * @param configJson JSON configuration string
-     * @return Final audio data bytes, or null on failure
-     *
-     * C API: rac_tts_component_synthesize_stream(handle, text, config)
-     */
-    @JvmStatic
-    external fun racTtsComponentSynthesizeStream(handle: Long, text: String, configJson: String): ByteArray?
-
-    /**
-     * Synthesize audio to file.
-     *
-     * @param handle The component handle
-     * @param text The input text
-     * @param outputPath Path to save the audio file
-     * @param configJson JSON configuration string
-     * @return Audio duration in milliseconds, or negative error code on failure
-     *
-     * C API: rac_tts_component_synthesize_to_file(handle, text, output_path, config)
-     */
-    @JvmStatic
-    external fun racTtsComponentSynthesizeToFile(handle: Long, text: String, outputPath: String, configJson: String): Long
-
-    /**
-     * Cancel an ongoing TTS synthesis.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_tts_component_cancel(handle)
-     */
-    @JvmStatic
-    external fun racTtsComponentCancel(handle: Long)
-
-    /**
-     * Get the TTS component state.
-     *
-     * @param handle The component handle
-     * @return The component state (see TTSState constants)
-     *
-     * C API: rac_tts_component_get_state(handle)
-     */
-    @JvmStatic
-    external fun racTtsComponentGetState(handle: Long): Int
-
-    /**
-     * Check if the TTS component has a model loaded.
-     *
-     * @param handle The component handle
-     * @return true if a model is loaded
-     *
-     * C API: rac_tts_component_is_loaded(handle)
-     */
     @JvmStatic
     external fun racTtsComponentIsLoaded(handle: Long): Boolean
 
-    /**
-     * Get available voices for the TTS component.
-     *
-     * @param handle The component handle
-     * @return JSON array of voice information
-     *
-     * C API: rac_tts_component_get_voices(handle)
-     */
+    @JvmStatic
+    external fun racTtsComponentLoadModel(handle: Long, modelId: String, configJson: String?): Int
+
+    @JvmStatic
+    external fun racTtsComponentUnload(handle: Long): Int
+
+    @JvmStatic
+    external fun racTtsComponentCancel(handle: Long): Int
+
+    @JvmStatic
+    external fun racTtsComponentSynthesize(handle: Long, text: String, optionsJson: String?): ByteArray?
+
+    @JvmStatic
+    external fun racTtsComponentSynthesizeToFile(handle: Long, text: String, outputPath: String, optionsJson: String?): Long
+
+    @JvmStatic
+    external fun racTtsComponentSynthesizeStream(handle: Long, text: String, optionsJson: String?): ByteArray?
+
     @JvmStatic
     external fun racTtsComponentGetVoices(handle: Long): String?
 
-    /**
-     * Set the active voice for the TTS component.
-     *
-     * @param handle The component handle
-     * @param voiceId The voice ID to use
-     * @return RAC_SUCCESS (0) on success, error code otherwise
-     *
-     * C API: rac_tts_component_set_voice(handle, voice_id)
-     */
     @JvmStatic
     external fun racTtsComponentSetVoice(handle: Long, voiceId: String): Int
 
-    /**
-     * Get supported languages for the TTS component.
-     *
-     * @param handle The component handle
-     * @return JSON array of supported language codes
-     *
-     * C API: rac_tts_component_get_languages(handle)
-     */
+    @JvmStatic
+    external fun racTtsComponentGetState(handle: Long): Int
+
     @JvmStatic
     external fun racTtsComponentGetLanguages(handle: Long): String?
 
-    /**
-     * Set TTS component callbacks.
-     *
-     * @param audioCallback The audio chunk callback object
-     * @param progressCallback The progress callback object
-     *
-     * C API: rac_tts_set_callbacks(...)
-     */
     @JvmStatic
     external fun racTtsSetCallbacks(audioCallback: Any?, progressCallback: Any?)
 
     // ========================================================================
-    // VAD COMPONENT JNI BINDINGS
+    // VAD COMPONENT (rac_vad_component.h)
     // ========================================================================
 
-    /**
-     * Create a new VAD component instance.
-     *
-     * @return Handle to the created component, or 0 on failure
-     *
-     * C API: rac_vad_component_create()
-     */
     @JvmStatic
     external fun racVadComponentCreate(): Long
 
-    /**
-     * Destroy a VAD component instance and release resources.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_vad_component_destroy(handle)
-     */
     @JvmStatic
     external fun racVadComponentDestroy(handle: Long)
 
-    /**
-     * Load a model into the VAD component.
-     *
-     * @param handle The component handle
-     * @param modelPath Path to the model file
-     * @param configJson JSON configuration string
-     * @return RAC_SUCCESS (0) on success, error code otherwise
-     *
-     * C API: rac_vad_component_load_model(handle, model_path, config)
-     */
-    @JvmStatic
-    external fun racVadComponentLoadModel(handle: Long, modelPath: String, configJson: String): Int
-
-    /**
-     * Unload the model from the VAD component.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_vad_component_unload(handle)
-     */
-    @JvmStatic
-    external fun racVadComponentUnload(handle: Long)
-
-    /**
-     * Process audio data for voice activity detection.
-     *
-     * @param handle The component handle
-     * @param audioData Raw audio bytes
-     * @param configJson JSON configuration string
-     * @return JSON-encoded result, or null on failure
-     *
-     * C API: rac_vad_component_process(handle, audio_data, audio_size, config)
-     */
-    @JvmStatic
-    external fun racVadComponentProcess(handle: Long, audioData: ByteArray, configJson: String): String?
-
-    /**
-     * Process audio with streaming output.
-     *
-     * @param handle The component handle
-     * @param audioData Raw audio bytes
-     * @param configJson JSON configuration string
-     * @return JSON-encoded result, or null on failure
-     *
-     * C API: rac_vad_component_process_stream(handle, audio_data, audio_size, config)
-     */
-    @JvmStatic
-    external fun racVadComponentProcessStream(handle: Long, audioData: ByteArray, configJson: String): String?
-
-    /**
-     * Process a single audio frame for real-time detection.
-     *
-     * @param handle The component handle
-     * @param audioData Raw audio bytes for the frame
-     * @param configJson JSON configuration string
-     * @return JSON-encoded result, or null on failure
-     *
-     * C API: rac_vad_component_process_frame(handle, audio_data, audio_size, config)
-     */
-    @JvmStatic
-    external fun racVadComponentProcessFrame(handle: Long, audioData: ByteArray, configJson: String): String?
-
-    /**
-     * Cancel an ongoing VAD detection.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_vad_component_cancel(handle)
-     */
-    @JvmStatic
-    external fun racVadComponentCancel(handle: Long)
-
-    /**
-     * Reset the VAD state for a new stream.
-     *
-     * @param handle The component handle
-     *
-     * C API: rac_vad_component_reset(handle)
-     */
-    @JvmStatic
-    external fun racVadComponentReset(handle: Long)
-
-    /**
-     * Get the VAD component state.
-     *
-     * @param handle The component handle
-     * @return The component state (see VADState constants)
-     *
-     * C API: rac_vad_component_get_state(handle)
-     */
-    @JvmStatic
-    external fun racVadComponentGetState(handle: Long): Int
-
-    /**
-     * Check if the VAD component has a model loaded.
-     *
-     * @param handle The component handle
-     * @return true if a model is loaded
-     *
-     * C API: rac_vad_component_is_loaded(handle)
-     */
     @JvmStatic
     external fun racVadComponentIsLoaded(handle: Long): Boolean
 
-    /**
-     * Get the minimum frame size for VAD processing.
-     *
-     * @param handle The component handle
-     * @return The minimum frame size in samples
-     *
-     * C API: rac_vad_component_get_min_frame_size(handle)
-     */
+    @JvmStatic
+    external fun racVadComponentLoadModel(handle: Long, modelId: String?, configJson: String?): Int
+
+    @JvmStatic
+    external fun racVadComponentUnload(handle: Long): Int
+
+    @JvmStatic
+    external fun racVadComponentProcess(handle: Long, samples: ByteArray, optionsJson: String?): String?
+
+    @JvmStatic
+    external fun racVadComponentProcessStream(handle: Long, samples: ByteArray, optionsJson: String?): String?
+
+    @JvmStatic
+    external fun racVadComponentProcessFrame(handle: Long, samples: ByteArray, optionsJson: String?): String?
+
+    @JvmStatic
+    external fun racVadComponentReset(handle: Long): Int
+
+    @JvmStatic
+    external fun racVadComponentCancel(handle: Long): Int
+
+    @JvmStatic
+    external fun racVadComponentSetThreshold(handle: Long, threshold: Float): Int
+
+    @JvmStatic
+    external fun racVadComponentGetState(handle: Long): Int
+
     @JvmStatic
     external fun racVadComponentGetMinFrameSize(handle: Long): Int
 
-    /**
-     * Get supported sample rates for the VAD component.
-     *
-     * @param handle The component handle
-     * @return JSON array of supported sample rates
-     *
-     * C API: rac_vad_component_get_sample_rates(handle)
-     */
     @JvmStatic
     external fun racVadComponentGetSampleRates(handle: Long): String?
 
-    /**
-     * Set VAD component callbacks.
-     *
-     * @param frameCallback The frame result callback object
-     * @param speechStartCallback The speech start callback object
-     * @param speechEndCallback The speech end callback object
-     * @param progressCallback The progress callback object
-     *
-     * C API: rac_vad_set_callbacks(...)
-     */
     @JvmStatic
     external fun racVadSetCallbacks(
         frameCallback: Any?,
@@ -911,100 +334,147 @@ object RunAnywhereBridge {
     )
 
     // ========================================================================
-    // AI COMPONENT STATE CONSTANTS
+    // BACKEND REGISTRATION
+    // ========================================================================
+    // NOTE: Backend registration has been MOVED to their respective module JNI bridges:
+    //
+    //   LlamaCPP: com.runanywhere.sdk.llm.llamacpp.LlamaCPPBridge.nativeRegister()
+    //             (in module: runanywhere-core-llamacpp)
+    //
+    //   ONNX:     com.runanywhere.sdk.core.onnx.ONNXBridge.nativeRegister()
+    //             (in module: runanywhere-core-onnx)
+    //
+    // This mirrors the Swift SDK architecture where each backend has its own
+    // XCFramework (RABackendLlamaCPP, RABackendONNX) with separate registration.
     // ========================================================================
 
     // ========================================================================
-    // BACKEND REGISTRATION JNI BINDINGS
+    // DOWNLOAD MANAGER (rac_download.h)
+    // ========================================================================
+
+    @JvmStatic
+    external fun racDownloadStart(url: String, destPath: String, progressCallback: Any?): Long
+
+    @JvmStatic
+    external fun racDownloadCancel(downloadId: Long): Int
+
+    @JvmStatic
+    external fun racDownloadGetProgress(downloadId: Long): String?
+
+    // ========================================================================
+    // MODEL REGISTRY - Direct C++ registry access (mirrors Swift CppBridge+ModelRegistry)
     // ========================================================================
 
     /**
-     * Register the LlamaCPP backend with the C++ service registry.
+     * Save model to C++ registry.
+     * This stores the model directly in the C++ model registry for service provider lookup.
      *
-     * @return RAC_SUCCESS (0) on success, error code otherwise
-     *
-     * C API: rac_backend_llamacpp_register()
+     * @param modelId Unique model identifier
+     * @param name Display name
+     * @param category Model category (0=LLM, 1=STT, 2=TTS, 3=VAD)
+     * @param format Model format (0=UNKNOWN, 1=GGUF, 2=ONNX, etc.)
+     * @param framework Inference framework (0=LLAMACPP, 1=ONNX, etc.)
+     * @param downloadUrl Download URL (nullable)
+     * @param localPath Local file path (nullable)
+     * @param downloadSize Size in bytes
+     * @param contextLength Context length for LLM
+     * @param supportsThinking Whether model supports thinking mode
+     * @param description Model description (nullable)
+     * @return RAC_SUCCESS on success, error code on failure
      */
     @JvmStatic
-    external fun racBackendLlamacppRegister(): Int
+    external fun racModelRegistrySave(
+        modelId: String,
+        name: String,
+        category: Int,
+        format: Int,
+        framework: Int,
+        downloadUrl: String?,
+        localPath: String?,
+        downloadSize: Long,
+        contextLength: Int,
+        supportsThinking: Boolean,
+        description: String?
+    ): Int
 
     /**
-     * Unregister the LlamaCPP backend from the C++ service registry.
+     * Get model info from C++ registry as JSON.
      *
-     * @return RAC_SUCCESS (0) on success, error code otherwise
-     *
-     * C API: rac_backend_llamacpp_unregister()
+     * @param modelId Model identifier
+     * @return JSON string with model info, or null if not found
      */
     @JvmStatic
-    external fun racBackendLlamacppUnregister(): Int
+    external fun racModelRegistryGet(modelId: String): String?
 
     /**
-     * Register the ONNX backend with the C++ service registry.
+     * Get all models from C++ registry as JSON array.
      *
-     * @return RAC_SUCCESS (0) on success, error code otherwise
-     *
-     * C API: rac_backend_onnx_register()
+     * @return JSON array string with all models
      */
     @JvmStatic
-    external fun racBackendOnnxRegister(): Int
+    external fun racModelRegistryGetAll(): String
 
     /**
-     * Unregister the ONNX backend from the C++ service registry.
+     * Get downloaded models from C++ registry as JSON array.
      *
-     * @return RAC_SUCCESS (0) on success, error code otherwise
-     *
-     * C API: rac_backend_onnx_unregister()
+     * @return JSON array string with downloaded models
      */
     @JvmStatic
-    external fun racBackendOnnxUnregister(): Int
+    external fun racModelRegistryGetDownloaded(): String
+
+    /**
+     * Remove model from C++ registry.
+     *
+     * @param modelId Model identifier
+     * @return RAC_SUCCESS on success, error code on failure
+     */
+    @JvmStatic
+    external fun racModelRegistryRemove(modelId: String): Int
+
+    /**
+     * Update download status in C++ registry.
+     *
+     * @param modelId Model identifier
+     * @param localPath Local path after download (or null to clear)
+     * @return RAC_SUCCESS on success, error code on failure
+     */
+    @JvmStatic
+    external fun racModelRegistryUpdateDownloadStatus(modelId: String, localPath: String?): Int
 
     // ========================================================================
-    // AI COMPONENT STATE CONSTANTS
+    // CONSTANTS
     // ========================================================================
 
-    /**
-     * AI component state constants matching C++ RAC_COMPONENT_STATE_* values.
-     * Used for LLM, STT, TTS, and VAD components.
-     */
-    object ComponentState {
-        /** Component not created */
-        const val NOT_CREATED = 0
+    // Result codes
+    const val RAC_SUCCESS = 0
+    const val RAC_ERROR_INVALID_PARAMS = -1
+    const val RAC_ERROR_INVALID_HANDLE = -2
+    const val RAC_ERROR_NOT_INITIALIZED = -3
+    const val RAC_ERROR_ALREADY_INITIALIZED = -4
+    const val RAC_ERROR_OPERATION_FAILED = -5
+    const val RAC_ERROR_NOT_SUPPORTED = -6
+    const val RAC_ERROR_MODEL_NOT_LOADED = -7
+    const val RAC_ERROR_OUT_OF_MEMORY = -8
+    const val RAC_ERROR_IO = -9
+    const val RAC_ERROR_CANCELLED = -10
+    const val RAC_ERROR_MODULE_ALREADY_REGISTERED = -20
+    const val RAC_ERROR_MODULE_NOT_FOUND = -21
+    const val RAC_ERROR_SERVICE_NOT_FOUND = -22
 
-        /** Component created but no model loaded */
-        const val CREATED = 1
+    // Lifecycle states
+    const val RAC_LIFECYCLE_IDLE = 0
+    const val RAC_LIFECYCLE_INITIALIZING = 1
+    const val RAC_LIFECYCLE_LOADING = 2
+    const val RAC_LIFECYCLE_READY = 3
+    const val RAC_LIFECYCLE_ACTIVE = 4
+    const val RAC_LIFECYCLE_UNLOADING = 5
+    const val RAC_LIFECYCLE_ERROR = 6
 
-        /** Model is loading */
-        const val LOADING = 2
-
-        /** Model loaded and ready for processing */
-        const val READY = 3
-
-        /** Processing in progress (generating/transcribing/synthesizing/detecting) */
-        const val PROCESSING = 4
-
-        /** Model is unloading */
-        const val UNLOADING = 5
-
-        /** Component in error state */
-        const val ERROR = 6
-
-        /**
-         * Get a human-readable name for the component state.
-         */
-        fun getName(state: Int): String = when (state) {
-            NOT_CREATED -> "NOT_CREATED"
-            CREATED -> "CREATED"
-            LOADING -> "LOADING"
-            READY -> "READY"
-            PROCESSING -> "PROCESSING"
-            UNLOADING -> "UNLOADING"
-            ERROR -> "ERROR"
-            else -> "UNKNOWN($state)"
-        }
-
-        /**
-         * Check if the state indicates the component is usable.
-         */
-        fun isReady(state: Int): Boolean = state == READY
-    }
+    // Log levels
+    const val RAC_LOG_TRACE = 0
+    const val RAC_LOG_DEBUG = 1
+    const val RAC_LOG_INFO = 2
+    const val RAC_LOG_WARN = 3
+    const val RAC_LOG_ERROR = 4
+    const val RAC_LOG_FATAL = 5
 }

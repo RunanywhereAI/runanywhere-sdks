@@ -126,6 +126,48 @@ set_target_properties(rac_backend_onnx PROPERTIES
 target_compile_definitions(rac_backend_onnx PRIVATE RAC_ONNX_BUILDING)
 
 # =============================================================================
+# JNI TARGET (Android/JVM)
+# =============================================================================
+
+# Only build JNI if we have JNI and building for Android
+if(RAC_BUILD_JNI AND ANDROID)
+    # Find JNI
+    find_package(JNI)
+
+    if(JNI_FOUND)
+        set(ONNX_JNI_SOURCES
+            src/jni/rac_backend_onnx_jni.cpp
+        )
+
+        add_library(rac_backend_onnx_jni SHARED ${ONNX_JNI_SOURCES})
+
+        target_include_directories(rac_backend_onnx_jni PRIVATE
+            ${JNI_INCLUDE_DIRS}
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_SOURCE_DIR}/include
+        )
+
+        target_link_libraries(rac_backend_onnx_jni PRIVATE
+            rac_backend_onnx
+            rac_commons
+            ${JNI_LIBRARIES}
+        )
+
+        # Android-specific logging
+        if(ANDROID)
+            target_link_libraries(rac_backend_onnx_jni PRIVATE log)
+        endif()
+
+        # Install JNI library
+        install(TARGETS rac_backend_onnx_jni
+            LIBRARY DESTINATION lib
+            ARCHIVE DESTINATION lib
+            RUNTIME DESTINATION bin
+        )
+    endif()
+endif()
+
+# =============================================================================
 # INSTALLATION
 # =============================================================================
 

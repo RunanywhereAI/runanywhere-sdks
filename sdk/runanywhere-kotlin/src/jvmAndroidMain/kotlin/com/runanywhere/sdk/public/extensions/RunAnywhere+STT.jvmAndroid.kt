@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 RunAnywhere SDK
+ * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
  * JVM/Android actual implementations for Speech-to-Text operations.
@@ -30,6 +30,12 @@ actual suspend fun RunAnywhere.unloadSTTModel() {
 actual suspend fun RunAnywhere.isSTTModelLoaded(): Boolean {
     return CppBridgeSTT.isLoaded
 }
+
+actual val RunAnywhere.currentSTTModelId: String?
+    get() = CppBridgeSTT.getLoadedModelId()
+
+actual val RunAnywhere.isSTTModelLoadedSync: Boolean
+    get() = CppBridgeSTT.isLoaded
 
 actual suspend fun RunAnywhere.transcribeWithOptions(
     audioData: ByteArray,

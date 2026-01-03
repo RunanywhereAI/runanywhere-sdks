@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 RunAnywhere SDK
+ * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
  * ModelPaths extension for CppBridge.
@@ -105,9 +105,29 @@ object CppBridgeModelPaths {
     /**
      * Optional provider for platform-specific paths.
      * Set this on Android to provide proper app-specific directories.
+     * Setting this resets the base directory so it will be re-initialized
+     * with the new provider on next access.
      */
     @Volatile
-    var pathProvider: ModelPathProvider? = null
+    private var _pathProvider: ModelPathProvider? = null
+
+    var pathProvider: ModelPathProvider?
+        get() = _pathProvider
+        set(value) {
+            synchronized(lock) {
+                _pathProvider = value
+                // Reset base directory so it gets re-initialized with the new provider
+                if (value != null && baseDirectory != null) {
+                    val previousBase = baseDirectory
+                    baseDirectory = null
+                    CppBridgePlatformAdapter.logCallback(
+                        CppBridgePlatformAdapter.LogLevel.DEBUG,
+                        TAG,
+                        "Path provider set, resetting base directory (was: $previousBase)"
+                    )
+                }
+            }
+        }
 
     /**
      * Listener interface for model path change events.

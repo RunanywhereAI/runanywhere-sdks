@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 RunAnywhere SDK
+ * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
  * Events extension for CppBridge.
@@ -286,5 +286,67 @@ object CppBridgeEvents {
      */
     fun trackWarning(warningMessage: String, warningData: String? = null) {
         trackEvent(EventType.WARNING, warningMessage, warningData)
+    }
+
+    // ========================================================================
+    // DOWNLOAD EVENT HELPERS (mirrors Swift CppBridge+Events.swift)
+    // ========================================================================
+
+    /**
+     * Emit download started event.
+     *
+     * @param modelId The model being downloaded
+     * @param totalBytes Expected total bytes (0 if unknown)
+     */
+    fun emitDownloadStarted(modelId: String, totalBytes: Long) {
+        val eventData = """{"modelId":"$modelId","totalBytes":$totalBytes}"""
+        trackEvent(EventType.DOWNLOAD_STARTED, "download.started", eventData)
+    }
+
+    /**
+     * Emit download progress event.
+     *
+     * @param modelId The model being downloaded
+     * @param progress Progress fraction (0.0 to 1.0)
+     * @param bytesDownloaded Bytes downloaded so far
+     * @param totalBytes Total bytes to download
+     */
+    fun emitDownloadProgress(modelId: String, progress: Float, bytesDownloaded: Long, totalBytes: Long) {
+        val eventData = """{"modelId":"$modelId","progress":$progress,"bytesDownloaded":$bytesDownloaded,"totalBytes":$totalBytes}"""
+        trackEvent(EventType.DOWNLOAD_PROGRESS, "download.progress", eventData)
+    }
+
+    /**
+     * Emit download completed event.
+     *
+     * @param modelId The model that was downloaded
+     * @param downloadedBytes Total bytes downloaded
+     * @param totalBytes Total file size
+     */
+    fun emitDownloadCompleted(modelId: String, downloadedBytes: Long, totalBytes: Long) {
+        val eventData = """{"modelId":"$modelId","downloadedBytes":$downloadedBytes,"totalBytes":$totalBytes}"""
+        trackEvent(EventType.DOWNLOAD_COMPLETED, "download.completed", eventData)
+    }
+
+    /**
+     * Emit download failed event.
+     *
+     * @param modelId The model that failed to download
+     * @param errorMessage Error description
+     */
+    fun emitDownloadFailed(modelId: String, errorMessage: String) {
+        val escapedMessage = errorMessage.replace("\"", "\\\"")
+        val eventData = """{"modelId":"$modelId","error":"$escapedMessage"}"""
+        trackEvent(EventType.DOWNLOAD_FAILED, "download.failed", eventData)
+    }
+
+    /**
+     * Emit download cancelled event.
+     *
+     * @param modelId The model whose download was cancelled
+     */
+    fun emitDownloadCancelled(modelId: String) {
+        val eventData = """{"modelId":"$modelId"}"""
+        trackEvent(EventType.DOWNLOAD_CANCELLED, "download.cancelled", eventData)
     }
 }
