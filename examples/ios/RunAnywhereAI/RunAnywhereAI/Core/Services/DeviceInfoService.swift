@@ -164,10 +164,10 @@ class DeviceInfoService: ObservableObject {
         // Direct neural engine detection since SDK properties are private
 
         // Fallback - assume true for modern devices
-        return true
+        true
     }
 
     private func getAppVersion() -> String {
-        return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
     }
 }

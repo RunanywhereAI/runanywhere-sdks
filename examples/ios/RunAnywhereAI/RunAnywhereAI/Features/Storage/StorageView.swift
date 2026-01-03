@@ -29,13 +29,16 @@ struct StorageView: View {
 
                         Spacer()
 
-                        Button(action: {
-                            Task {
-                                await viewModel.refreshData()
+                        Button(
+                            action: {
+                                Task {
+                                    await viewModel.refreshData()
+                                }
+                            },
+                            label: {
+                                Label("Refresh", systemImage: "arrow.clockwise")
                             }
-                        }) {
-                            Label("Refresh", systemImage: "arrow.clockwise")
-                        }
+                        )
                         .buttonStyle(.bordered)
                         .tint(AppColors.primaryAccent)
                     }
@@ -145,7 +148,7 @@ struct StorageView: View {
                     Text("\(viewModel.storedModels.count)")
                         .foregroundColor(AppColors.textSecondary)
                 }
-            }
+        }
         }
     #endif
 
@@ -239,22 +242,25 @@ struct StorageView: View {
     #if os(macOS)
     private var cacheManagementContent: some View {
         VStack(spacing: AppSpacing.large) {
-            Button(action: {
-                Task {
-                    await viewModel.clearCache()
+            Button(
+                action: {
+                    Task {
+                        await viewModel.clearCache()
+                    }
+                },
+                label: {
+                    HStack {
+                        Image(systemName: "trash")
+                            .foregroundColor(AppColors.primaryRed)
+                        Text("Clear Cache")
+                        Spacer()
+                        Text("Free up space by clearing cached data")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-            }) {
-                HStack {
-                    Image(systemName: "trash")
-                        .foregroundColor(AppColors.primaryRed)
-                    Text("Clear Cache")
-                    Spacer()
-                    Text("Free up space by clearing cached data")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.textSecondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            )
             .buttonStyle(.plain)
             .padding(AppSpacing.mediumLarge)
             .background(AppColors.badgeRed)
@@ -264,22 +270,25 @@ struct StorageView: View {
                     .stroke(AppColors.primaryRed.opacity(0.3), lineWidth: AppSpacing.strokeRegular)
             )
 
-            Button(action: {
-                Task {
-                    await viewModel.cleanTempFiles()
+            Button(
+                action: {
+                    Task {
+                        await viewModel.cleanTempFiles()
+                    }
+                },
+                label: {
+                    HStack {
+                        Image(systemName: "trash")
+                            .foregroundColor(AppColors.primaryOrange)
+                        Text("Clean Temporary Files")
+                        Spacer()
+                        Text("Remove temporary files and logs")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-            }) {
-                HStack {
-                    Image(systemName: "trash")
-                        .foregroundColor(AppColors.primaryOrange)
-                    Text("Clean Temporary Files")
-                    Spacer()
-                    Text("Remove temporary files and logs")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.textSecondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            )
             .buttonStyle(.plain)
             .padding(AppSpacing.mediumLarge)
             .background(AppColors.badgeOrange)
@@ -294,33 +303,39 @@ struct StorageView: View {
 
     private var cacheManagementSection: some View {
         Section("Storage Management") {
-            Button(action: {
-                Task {
-                    await viewModel.clearCache()
+            Button(
+                action: {
+                    Task {
+                        await viewModel.clearCache()
+                    }
+                },
+                label: {
+                    HStack {
+                        Image(systemName: "trash")
+                            .foregroundColor(AppColors.primaryRed)
+                        Text("Clear Cache")
+                            .foregroundColor(AppColors.primaryRed)
+                        Spacer()
+                    }
                 }
-            }) {
-                HStack {
-                    Image(systemName: "trash")
-                        .foregroundColor(AppColors.primaryRed)
-                    Text("Clear Cache")
-                        .foregroundColor(AppColors.primaryRed)
-                    Spacer()
-                }
-            }
+            )
 
-            Button(action: {
-                Task {
-                    await viewModel.cleanTempFiles()
+            Button(
+                action: {
+                    Task {
+                        await viewModel.cleanTempFiles()
+                    }
+                },
+                label: {
+                    HStack {
+                        Image(systemName: "trash")
+                            .foregroundColor(AppColors.primaryOrange)
+                        Text("Clean Temporary Files")
+                            .foregroundColor(AppColors.primaryOrange)
+                        Spacer()
+                    }
                 }
-            }) {
-                HStack {
-                    Image(systemName: "trash")
-                        .foregroundColor(AppColors.primaryOrange)
-                    Text("Clean Temporary Files")
-                        .foregroundColor(AppColors.primaryOrange)
-                    Spacer()
-                }
-            }
+            )
         }
     }
 }
@@ -377,12 +392,15 @@ private struct StoredModelRow: View {
                         .tint(AppColors.primaryAccent)
                         .controlSize(.mini)
 
-                        Button(action: {
-                            showingDeleteConfirmation = true
-                        }) {
-                            Image(systemName: "trash")
-                                .foregroundColor(AppColors.primaryRed)
-                        }
+                        Button(
+                            action: {
+                                showingDeleteConfirmation = true
+                            },
+                            label: {
+                                Image(systemName: "trash")
+                                    .foregroundColor(AppColors.primaryRed)
+                            }
+                        )
                         .font(AppTypography.caption2)
                         .buttonStyle(.bordered)
                         .tint(AppColors.primaryRed)
@@ -425,24 +443,6 @@ private struct StoredModelRow: View {
                         }
                     }
 
-                    // Tags
-                    if !model.tags.isEmpty {
-                        VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
-                            Text("Tags:")
-                                .font(AppTypography.caption2Medium)
-                            HStack(spacing: AppSpacing.xSmall) {
-                                ForEach(model.tags, id: \.self) { tag in
-                                    Text(tag)
-                                        .font(AppTypography.caption2)
-                                        .padding(.horizontal, AppSpacing.small)
-                                        .padding(.vertical, AppSpacing.xxSmall)
-                                        .background(AppColors.badgePrimary)
-                                        .cornerRadius(AppSpacing.cornerRadiusSmall)
-                                }
-                            }
-                        }
-                    }
-
                     Divider()
 
                     // File Information
@@ -475,15 +475,6 @@ private struct StoredModelRow: View {
                             .foregroundColor(AppColors.textSecondary)
                     }
 
-                    if let lastUsed = model.lastUsed {
-                        HStack {
-                            Text("Last used:")
-                                .font(AppTypography.caption2Medium)
-                            Text(lastUsed, style: .relative)
-                                .font(AppTypography.caption2)
-                                .foregroundColor(AppColors.textSecondary)
-                        }
-                    }
                 }
                 .padding(.top, AppSpacing.xSmall)
                 .padding(.horizontal, AppSpacing.smallMedium)

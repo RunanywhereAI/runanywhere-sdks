@@ -1,24 +1,53 @@
 # Binary Distribution
 
+## Overview
+
+The RunAnywhere Swift SDK uses a **modular XCFramework architecture** with separate binaries for:
+
+| XCFramework | Size | Contents |
+|-------------|------|----------|
+| `RACommons.xcframework` | ~1-2MB | Core commons library (service registry, model management, events) |
+| `RABackendLlamaCPP.xcframework` | ~30MB | LLM backend (llama.cpp + GGML + Metal) |
+| `RABackendONNX.xcframework` | ~400KB | STT/TTS/VAD backend wrapper (+ Sherpa-ONNX) |
+| `onnxruntime.xcframework` | ~48MB | ONNX Runtime engine (linked separately) |
+
+### Why Two ONNX XCFrameworks?
+
+- **`RABackendONNX.xcframework`**: Contains the RunAnywhere wrapper code + Sherpa-ONNX static library for STT/TTS/VAD capabilities
+- **`onnxruntime.xcframework`**: The ONNX Runtime inference engine itself
+
+They are separate because:
+- ONNX Runtime is huge (48MB) - shouldn't bloat every backend
+- Different licensing (MIT for ONNX Runtime)
+- Can be updated independently
+- Some apps may already have ONNX Runtime from other dependencies
+
 ## Remote Distribution (Default)
 
 By default, the RunAnywhere Swift SDK uses **remote XCFramework distribution** via Swift Package Manager binary targets.
 
-The XCFramework is automatically downloaded from the [runanywhere-binaries](https://github.com/RunanywhereAI/runanywhere-binaries) repository during package resolution.
+XCFrameworks are automatically downloaded from the [runanywhere-binaries](https://github.com/RunanywhereAI/runanywhere-binaries) repository during package resolution.
 
 ### Default Configuration (testLocal = false)
 
 ```swift
+// In Package.swift
 .binaryTarget(
-    name: "RunAnywhereCoreBinary",
-    url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.e6b7a2f/RunAnywhereCore.xcframework.zip",
-    checksum: "0c2da2bacb4931cdbe77eb0686ed20351ffe4ea1a66384f4522a61e1e4efa7aa"
-)
+    name: "RACommonsBinary",
+    url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v2.0.0/RACommons.xcframework.zip",
+    checksum: "..."
+),
+.binaryTarget(
+    name: "RABackendLlamaCPPBinary",
+    url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v2.0.0/RABackendLlamaCPP.xcframework.zip",
+    checksum: "..."
+),
+// ... etc
 ```
 
 ### Benefits
 
-- **No local builds required**: SDK consumers don't need to build runanywhere-core
+- **No local builds required**: SDK consumers don't need to build runanywhere-core or runanywhere-commons
 - **Consistent versions**: All developers use the same binary version
 - **Reduced repository size**: Large binaries are not committed to git
 - **Automatic caching**: SPM caches downloaded binaries for faster subsequent builds
@@ -35,11 +64,29 @@ For local testing or development with custom-built XCFrameworks, you can enable 
    let testLocal = true
    ```
 
-2. **Place XCFramework**: Put `RunAnywhereCore.xcframework` in this `Binaries/` directory
-   - Download from [runanywhere-binaries releases](https://github.com/RunanywhereAI/runanywhere-binaries/releases)
-   - Or build locally from runanywhere-core
+2. **Place XCFrameworks**: Put the following in this `Binaries/` directory:
+   - `RACommons.xcframework`
+   - `RABackendLlamaCPP.xcframework`
+   - `RABackendONNX.xcframework`
+   - `onnxruntime.xcframework`
 
 3. **Resolve package**: Run `swift package resolve` to update dependencies
+
+### Building XCFrameworks Locally
+
+To build the modular XCFrameworks from source:
+
+```bash
+cd sdks/sdk/runanywhere-commons
+./scripts/build-ios.sh
+```
+
+This will create XCFrameworks in `dist/`:
+- `RACommons.xcframework`
+- `RABackendLlamaCPP.xcframework`
+- `RABackendONNX.xcframework`
+
+Copy them to this `Binaries/` directory.
 
 ### When to Use Local Mode
 
@@ -48,45 +95,15 @@ For local testing or development with custom-built XCFrameworks, you can enable 
 - Developing offline without network access
 - Validating XCFramework changes before creating a release
 
-**Important**: Local XCFrameworks should NOT be committed to git. The `.gitignore` excludes `*.xcframework` files.
-
-### To update to a new release:
-
-1. Find the latest release at: https://github.com/RunanywhereAI/runanywhere-binaries/releases
-2. Download the `RunAnywhereCore.xcframework.zip` artifact
-3. Generate the SHA256 checksum: `shasum -a 256 RunAnywhereCore.xcframework.zip`
-4. Update `Package.swift` with the new URL and checksum
-5. Test with `swift package resolve` and `swift build`
-
-### Verifying the binary
-
-```bash
-# Download the binary
-curl -L -o RunAnywhereCore.xcframework.zip \
-  "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.e6b7a2f/RunAnywhereCore.xcframework.zip"
-
-# Verify checksum
-shasum -a 256 RunAnywhereCore.xcframework.zip
-# Should output: 0c2da2bacb4931cdbe77eb0686ed20351ffe4ea1a66384f4522a61e1e4efa7aa
-```
-
-## Architecture
-
-The `RunAnywhereCore.xcframework` is a unified binary that includes:
-
-- **ONNX Runtime backend**: STT, TTS, VAD capabilities via Sherpa-ONNX
-- **LlamaCPP backend**: LLM text generation with GGUF models and Metal GPU acceleration
-- **Multi-platform support**: iOS (arm64), iOS Simulator (arm64 + x86_64), macOS (arm64 + x86_64)
-
-The XCFramework is consumed by Swift through the `CRunAnywhereCore` C bridge module, which exposes the native C++ API to Swift code.
+**Important**: Local XCFrameworks should NOT be committed to git. The `.gitignore` excludes `*.xcframework` directories.
 
 ## macOS ONNX Runtime Dylib
 
 **Important**: For macOS apps using the ONNX backend (STT/TTS/VAD), you must embed the ONNX Runtime dynamic library.
 
-### Location
+### Obtaining the Dylib
 
-**Important**: The `onnxruntime-macos/` directory is **NOT committed to git**. You must obtain the ONNX Runtime dylib from one of these sources:
+The `onnxruntime-macos/` directory is **NOT committed to git**. Obtain the ONNX Runtime dylib from:
 
 1. **Download from GitHub releases** (Recommended for production):
    - Get `onnxruntime-macos.zip` from [runanywhere-binaries releases](https://github.com/RunanywhereAI/runanywhere-binaries/releases)
@@ -94,12 +111,9 @@ The XCFramework is consumed by Swift through the `CRunAnywhereCore` C bridge mod
    - The dylib will be at: `Binaries/onnxruntime-macos/libonnxruntime.dylib`
 
 2. **Install via Homebrew** (Development only):
-
    ```bash
    brew install onnxruntime
    ```
-
-   The system-wide installation is only recommended for development, not production deployment.
 
 ### Integration
 
@@ -109,5 +123,21 @@ The XCFramework is consumed by Swift through the `CRunAnywhereCore` C bridge mod
 
 ### Why is this needed?
 
-- iOS: ONNX Runtime is statically linked into the XCFramework
-- macOS: ONNX Runtime is dynamically linked to reduce binary size and allow updates
+- **iOS**: ONNX Runtime is statically linked into `onnxruntime.xcframework`
+- **macOS**: ONNX Runtime is dynamically linked to reduce binary size and allow independent updates
+
+## Updating to a New Release
+
+1. Find the latest release at: https://github.com/RunanywhereAI/runanywhere-binaries/releases
+2. Download the XCFramework ZIPs
+3. Generate SHA256 checksums: `shasum -a 256 *.zip`
+4. Update `Package.swift` with the new URLs and checksums
+5. Test with `swift package resolve` and `swift build`
+
+## Architecture Support
+
+| Platform | Architecture | Type |
+|----------|--------------|------|
+| iOS Device | arm64 | Static library |
+| iOS Simulator | arm64 + x86_64 | Static library |
+| macOS | arm64 + x86_64 | Static library (+ ONNX dylib) |

@@ -1,0 +1,17 @@
+# RABackendLlamaCPP Symbol Exports
+# Symbols to export from the RABackendLlamaCPP XCFramework
+
+# Backend Registration
+_rac_backend_llamacpp_register
+_rac_backend_llamacpp_unregister
+
+# LlamaCPP-specific API
+_rac_llm_llamacpp_create
+_rac_llm_llamacpp_load_model
+_rac_llm_llamacpp_unload_model
+_rac_llm_llamacpp_is_model_loaded
+_rac_llm_llamacpp_generate
+_rac_llm_llamacpp_generate_stream
+_rac_llm_llamacpp_cancel
+_rac_llm_llamacpp_get_model_info
+_rac_llm_llamacpp_destroy

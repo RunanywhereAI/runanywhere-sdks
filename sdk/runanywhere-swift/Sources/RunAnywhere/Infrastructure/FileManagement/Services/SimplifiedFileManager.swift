@@ -7,14 +7,25 @@ import Foundation
 /// ```
 /// Documents/RunAnywhere/
 ///   Models/
-///     {framework}/          # e.g., "onnx", "llamacpp", "whisperkit"
+///     {framework}/          # e.g., "onnx", "llamacpp"
 ///       {modelId}/          # e.g., "sherpa-onnx-whisper-tiny.en"
 ///         [model files]     # Single file or directory with multiple files
 ///   Cache/
 ///   Temp/
 ///   Downloads/
 /// ```
-public class SimplifiedFileManager: FileManagementService {
+public class SimplifiedFileManager {
+
+    // MARK: - Shared Instance
+
+    /// Shared file manager instance
+    public static let shared: SimplifiedFileManager = {
+        do {
+            return try SimplifiedFileManager()
+        } catch {
+            fatalError("Failed to initialize SimplifiedFileManager: \(error)")
+        }
+    }()
 
     // MARK: - Properties
 
@@ -25,7 +36,7 @@ public class SimplifiedFileManager: FileManagementService {
 
     public init() throws {
         guard let documentsFolder = Folder.documents else {
-            throw RunAnywhereError.storageError("Unable to access documents directory")
+            throw SDKError.fileManagement(.permissionDenied, "Unable to access documents directory")
         }
         self.baseFolder = try documentsFolder.createSubfolderIfNeeded(withName: "RunAnywhere")
         try createDirectoryStructure()
@@ -42,13 +53,13 @@ public class SimplifiedFileManager: FileManagementService {
 
     /// Get the model folder path: Models/{framework}/{modelId}/
     public func getModelFolder(for modelId: String, framework: InferenceFramework) throws -> Folder {
-        let modelFolderURL = try ModelPathUtils.getModelFolder(modelId: modelId, framework: framework)
+        let modelFolderURL = try CppBridge.ModelPaths.getModelFolder(modelId: modelId, framework: framework)
         return try createFolderIfNeeded(at: modelFolderURL)
     }
 
     /// Check if a model folder exists and contains files
     public func modelFolderExists(modelId: String, framework: InferenceFramework) -> Bool {
-        guard let folderURL = try? ModelPathUtils.getModelFolder(modelId: modelId, framework: framework) else {
+        guard let folderURL = try? CppBridge.ModelPaths.getModelFolder(modelId: modelId, framework: framework) else {
             return false
         }
         return folderExistsAndHasContents(at: folderURL)
@@ -56,12 +67,12 @@ public class SimplifiedFileManager: FileManagementService {
 
     /// Get the model folder URL (without creating it)
     public func getModelFolderURL(modelId: String, framework: InferenceFramework) throws -> URL {
-        return try ModelPathUtils.getModelFolder(modelId: modelId, framework: framework)
+        return try CppBridge.ModelPaths.getModelFolder(modelId: modelId, framework: framework)
     }
 
     /// Delete a model folder and all its contents
     public func deleteModel(modelId: String, framework: InferenceFramework) throws {
-        let folderURL = try ModelPathUtils.getModelFolder(modelId: modelId, framework: framework)
+        let folderURL = try CppBridge.ModelPaths.getModelFolder(modelId: modelId, framework: framework)
         if FileManager.default.fileExists(atPath: folderURL.path) {
             try FileManager.default.removeItem(at: folderURL)
             logger.info("Deleted model: \(modelId) from \(framework.rawValue)")
@@ -75,7 +86,7 @@ public class SimplifiedFileManager: FileManagementService {
     public func getDownloadedModels() -> [InferenceFramework: [String]] {
         var result: [InferenceFramework: [String]] = [:]
 
-        guard let modelsURL = try? ModelPathUtils.getModelsDirectory(),
+        guard let modelsURL = try? CppBridge.ModelPaths.getModelsDirectory(),
               let contents = try? FileManager.default.contentsOfDirectory(at: modelsURL, includingPropertiesForKeys: [.isDirectoryKey]) else {
             return result
         }
@@ -114,17 +125,14 @@ public class SimplifiedFileManager: FileManagementService {
     /// Check if a specific model is downloaded
     @MainActor
     public func isModelDownloaded(modelId: String, framework: InferenceFramework) -> Bool {
-        // First check if the folder exists and has contents
-        guard let folderURL = try? ModelPathUtils.getModelFolder(modelId: modelId, framework: framework),
+        // Check if the folder exists and has contents
+        guard let folderURL = try? CppBridge.ModelPaths.getModelFolder(modelId: modelId, framework: framework),
               folderExistsAndHasContents(at: folderURL) else {
             return false
         }
 
-        // Use storage strategy if available for more accurate detection
-        if let strategy = ModuleRegistry.shared.storageStrategy(for: framework) {
-            return strategy.isValidModelStorage(at: folderURL)
-        }
-
+        // Folder exists with contents - model is downloaded
+        // Module-specific validation can be done by the service when loading
         return true
     }
 
