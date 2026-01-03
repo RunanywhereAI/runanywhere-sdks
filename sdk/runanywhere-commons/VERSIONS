@@ -1,0 +1,43 @@
+# =============================================================================
+# RunAnywhere Commons - Dependency Versions
+# =============================================================================
+# This file is the SINGLE SOURCE OF TRUTH for all dependency versions.
+# All scripts and CMake files should read from this file.
+#
+# IMPORTANT: These versions MUST match runanywhere-core/VERSIONS
+# The ONNX Runtime version used here must match what's in runanywhere-swift/Binaries/
+#
+# Format: KEY=VALUE (no spaces around =)
+# Lines starting with # are comments
+# =============================================================================
+
+# Project version (read from VERSION file, but also defined here for scripts)
+PROJECT_VERSION=1.0.0
+
+# =============================================================================
+# ONNX Runtime
+# =============================================================================
+# iOS version MUST match:
+#   1. What sherpa-onnx was built against
+#   2. What's in runanywhere-swift/Binaries/onnxruntime.xcframework
+# sherpa-onnx 1.12.17+ requires ONNX Runtime >= 1.17.1
+ONNX_VERSION_IOS=1.17.1
+
+# macOS/Linux can use latest
+ONNX_VERSION_MACOS=1.23.2
+
+# =============================================================================
+# Sherpa-ONNX (via runanywhere-core)
+# =============================================================================
+SHERPA_ONNX_VERSION_IOS=1.12.18
+SHERPA_ONNX_VERSION_MACOS=1.12.18
+
+# =============================================================================
+# llama.cpp (via runanywhere-core)
+# =============================================================================
+LLAMACPP_VERSION=b7199
+
+# =============================================================================
+# nlohmann/json
+# =============================================================================
+NLOHMANN_JSON_VERSION=3.11.3
