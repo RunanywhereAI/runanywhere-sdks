@@ -111,8 +111,12 @@ static const rac_voice_agent_vad_config_t RAC_VOICE_AGENT_VAD_CONFIG_DEFAULT = {
  * Mirrors Swift's STTConfiguration.
  */
 typedef struct rac_voice_agent_stt_config {
-    /** Model ID (can be NULL to use already-loaded model) */
+    /** Model path - file path used for loading (can be NULL to use already-loaded model) */
+    const char* model_path;
+    /** Model ID - identifier for telemetry (e.g., "whisper-base") */
     const char* model_id;
+    /** Model name - human-readable name (e.g., "Whisper Base") */
+    const char* model_name;
 } rac_voice_agent_stt_config_t;
 
 /**
@@ -120,8 +124,12 @@ typedef struct rac_voice_agent_stt_config {
  * Mirrors Swift's LLMConfiguration.
  */
 typedef struct rac_voice_agent_llm_config {
-    /** Model ID (can be NULL to use already-loaded model) */
+    /** Model path - file path used for loading (can be NULL to use already-loaded model) */
+    const char* model_path;
+    /** Model ID - identifier for telemetry (e.g., "llama-3.2-1b") */
     const char* model_id;
+    /** Model name - human-readable name (e.g., "Llama 3.2 1B Instruct") */
+    const char* model_name;
 } rac_voice_agent_llm_config_t;
 
 /**
@@ -129,8 +137,12 @@ typedef struct rac_voice_agent_llm_config {
  * Mirrors Swift's TTSConfiguration.
  */
 typedef struct rac_voice_agent_tts_config {
-    /** Voice ID (can be NULL/empty to use already-loaded voice) */
-    const char* voice;
+    /** Voice path - file path used for loading (can be NULL/empty to use already-loaded voice) */
+    const char* voice_path;
+    /** Voice ID - identifier for telemetry (e.g., "vits-piper-en_GB-alba-medium") */
+    const char* voice_id;
+    /** Voice name - human-readable voice name (e.g., "Piper TTS (British English)") */
+    const char* voice_name;
 } rac_voice_agent_tts_config_t;
 
 /**
@@ -156,9 +168,9 @@ typedef struct rac_voice_agent_config {
  */
 static const rac_voice_agent_config_t RAC_VOICE_AGENT_CONFIG_DEFAULT = {
     .vad_config = {.sample_rate = 16000, .frame_length = 0.1f, .energy_threshold = 0.005f},
-    .stt_config = {.model_id = RAC_NULL},
-    .llm_config = {.model_id = RAC_NULL},
-    .tts_config = {.voice = RAC_NULL}};
+    .stt_config = {.model_path = RAC_NULL, .model_id = RAC_NULL, .model_name = RAC_NULL},
+    .llm_config = {.model_path = RAC_NULL, .model_id = RAC_NULL, .model_name = RAC_NULL},
+    .tts_config = {.voice_path = RAC_NULL, .voice_id = RAC_NULL, .voice_name = RAC_NULL}};
 
 // =============================================================================
 // AUDIO PIPELINE STATE MANAGER CONFIG - Mirrors Swift's AudioPipelineStateManager.Configuration
@@ -347,31 +359,43 @@ RAC_API void rac_voice_agent_destroy(rac_voice_agent_handle_t handle);
  * @brief Load an STT model into the voice agent.
  *
  * @param handle Voice agent handle
- * @param model_id STT model identifier
+ * @param model_path File path to the model (used for loading)
+ * @param model_id Model identifier (used for telemetry, e.g., "whisper-base")
+ * @param model_name Human-readable model name (e.g., "Whisper Base")
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t handle,
-                                                    const char* model_id);
+                                                    const char* model_path,
+                                                    const char* model_id,
+                                                    const char* model_name);
 
 /**
  * @brief Load an LLM model into the voice agent.
  *
  * @param handle Voice agent handle
- * @param model_id LLM model identifier
+ * @param model_path File path to the model (used for loading)
+ * @param model_id Model identifier (used for telemetry, e.g., "llama-3.2-1b")
+ * @param model_name Human-readable model name (e.g., "Llama 3.2 1B Instruct")
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t handle,
-                                                    const char* model_id);
+                                                    const char* model_path,
+                                                    const char* model_id,
+                                                    const char* model_name);
 
 /**
  * @brief Load a TTS voice into the voice agent.
  *
  * @param handle Voice agent handle
- * @param voice_id TTS voice identifier
+ * @param voice_path File path to the voice (used for loading)
+ * @param voice_id Voice identifier (used for telemetry, e.g., "vits-piper-en_GB-alba-medium")
+ * @param voice_name Human-readable voice name (e.g., "Piper TTS (British English)")
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t handle,
-                                                    const char* voice_id);
+                                                    const char* voice_path,
+                                                    const char* voice_id,
+                                                    const char* voice_name);
 
 /**
  * @brief Check if STT model is loaded.
