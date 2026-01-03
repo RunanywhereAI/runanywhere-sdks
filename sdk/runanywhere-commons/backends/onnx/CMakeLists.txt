@@ -80,6 +80,8 @@ target_include_directories(rac_backend_onnx PUBLIC
 )
 
 # Link against runanywhere-core's onnx backend
+# Note: runanywhere_onnx includes standalone ra_* functions (ra_create_backend, ra_stt_*, etc.)
+# Do NOT link against runanywhere_bridge as it has conflicting symbols
 if(TARGET runanywhere_onnx)
     target_link_libraries(rac_backend_onnx PRIVATE runanywhere_onnx)
     # Include runanywhere-core headers for backend APIs
@@ -128,6 +130,16 @@ target_compile_definitions(rac_backend_onnx PRIVATE RAC_ONNX_BUILDING)
 # =============================================================================
 # JNI TARGET (Android/JVM)
 # =============================================================================
+#
+# Matches iOS architecture where RABackendONNX.xcframework combines:
+#   - librac_backend_onnx.a (this module)
+#   - librunanywhere_onnx.a (from runanywhere-core)
+#   - libsherpa-onnx.a (Sherpa-ONNX for STT/TTS/VAD)
+#
+# For Android, we statically link these into librac_backend_onnx_jni.so
+# using --whole-archive to ensure all symbols are included.
+#
+# ONNX Runtime (libonnxruntime.so) remains a separate runtime dependency.
 
 # Only build JNI if we have JNI and building for Android
 if(RAC_BUILD_JNI AND ANDROID)
@@ -145,18 +157,44 @@ if(RAC_BUILD_JNI AND ANDROID)
             ${JNI_INCLUDE_DIRS}
             ${CMAKE_CURRENT_SOURCE_DIR}/include
             ${CMAKE_SOURCE_DIR}/include
+            ${RUNANYWHERE_CORE_DIR}/src
+            ${RUNANYWHERE_CORE_DIR}/src/capabilities
+            ${RUNANYWHERE_CORE_DIR}/src/backends/onnx
         )
 
-        target_link_libraries(rac_backend_onnx_jni PRIVATE
-            rac_backend_onnx
-            rac_commons
-            ${JNI_LIBRARIES}
-        )
+        # Use --whole-archive to statically link all symbols from static libraries
+        # This matches iOS's libtool approach that combines all .a files
+        if(TARGET runanywhere_onnx)
+            # Get the static library file path
+            target_link_libraries(rac_backend_onnx_jni PRIVATE
+                -Wl,--whole-archive
+                rac_backend_onnx
+                runanywhere_onnx
+                -Wl,--no-whole-archive
+                rac_commons
+                ${JNI_LIBRARIES}
+            )
+        else()
+            target_link_libraries(rac_backend_onnx_jni PRIVATE
+                -Wl,--whole-archive
+                rac_backend_onnx
+                -Wl,--no-whole-archive
+                rac_commons
+                ${JNI_LIBRARIES}
+            )
+        endif()
+
+        # Link against ONNX Runtime and Sherpa-ONNX shared libraries
+        # These are runtime dependencies (not statically linked)
+        if(DEFINED ONNXRUNTIME_LIB)
+            target_link_libraries(rac_backend_onnx_jni PRIVATE ${ONNXRUNTIME_LIB})
+        endif()
+        if(DEFINED SHERPA_ONNX_LIB)
+            target_link_libraries(rac_backend_onnx_jni PRIVATE ${SHERPA_ONNX_LIB})
+        endif()
 
         # Android-specific logging
-        if(ANDROID)
-            target_link_libraries(rac_backend_onnx_jni PRIVATE log)
-        endif()
+        target_link_libraries(rac_backend_onnx_jni PRIVATE log)
 
         # Install JNI library
         install(TARGETS rac_backend_onnx_jni

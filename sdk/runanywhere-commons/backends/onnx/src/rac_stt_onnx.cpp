@@ -13,7 +13,19 @@
 #include <string>
 
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
 #include "rac/infrastructure/events/rac_events.h"
+
+// Android logging for debugging
+#ifdef __ANDROID__
+#include <android/log.h>
+#define LOG_TAG "RAC_STT_ONNX"
+#define LOGi(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGe(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#else
+#define LOGi(...) do {} while(0)
+#define LOGe(...) do {} while(0)
+#endif
 
 // Forward declarations for runanywhere-core C API
 extern "C" {
@@ -101,23 +113,41 @@ extern "C" {
 
 rac_result_t rac_stt_onnx_create(const char* model_path, const rac_stt_onnx_config_t* config,
                                  rac_handle_t* out_handle) {
+    LOGi("rac_stt_onnx_create called with model_path=%s", model_path ? model_path : "(null)");
+    RAC_LOG_INFO("STT.ONNX", "rac_stt_onnx_create called with model_path=%s",
+                 model_path ? model_path : "(null)");
+
     if (out_handle == nullptr) {
+        LOGe("out_handle is null");
+        RAC_LOG_ERROR("STT.ONNX", "out_handle is null");
         return RAC_ERROR_NULL_POINTER;
     }
 
     // Create ONNX backend
+    LOGi("Creating ONNX backend via ra_create_backend(\"onnx\")...");
+    RAC_LOG_INFO("STT.ONNX", "Creating ONNX backend via ra_create_backend...");
     ra_backend_handle backend = ra_create_backend("onnx");
     if (backend == nullptr) {
+        LOGe("ra_create_backend(\"onnx\") returned nullptr!");
+        RAC_LOG_ERROR("STT.ONNX", "ra_create_backend(\"onnx\") returned nullptr!");
         rac_error_set_details("Failed to create ONNX backend");
         return RAC_ERROR_BACKEND_INIT_FAILED;
     }
+    LOGi("ONNX backend created: %p", backend);
+    RAC_LOG_INFO("STT.ONNX", "ONNX backend created: %p", backend);
 
     // Initialize backend
+    LOGi("Initializing ONNX backend...");
+    RAC_LOG_INFO("STT.ONNX", "Initializing ONNX backend...");
     ra_result_code result = ra_initialize(backend, nullptr);
     if (result != RA_SUCCESS) {
+        LOGe("ra_initialize failed with result=%d", result);
+        RAC_LOG_ERROR("STT.ONNX", "ra_initialize failed with result=%d", result);
         ra_destroy(backend);
         return from_core_result(result);
     }
+    LOGi("ONNX backend initialized successfully");
+    RAC_LOG_INFO("STT.ONNX", "ONNX backend initialized successfully");
 
     // Load model if path provided
     if (model_path != nullptr) {
@@ -126,12 +156,18 @@ rac_result_t rac_stt_onnx_create(const char* model_path, const rac_stt_onnx_conf
             model_type = model_type_to_string(config->model_type);
         }
 
+        LOGi("Loading model: %s (type=%s)", model_path, model_type);
+        RAC_LOG_INFO("STT.ONNX", "Loading model: %s (type=%s)", model_path, model_type);
         result = ra_stt_load_model(backend, model_path, model_type, nullptr);
         if (result != RA_SUCCESS) {
+            LOGe("ra_stt_load_model failed with result=%d", result);
+            RAC_LOG_ERROR("STT.ONNX", "ra_stt_load_model failed with result=%d", result);
             ra_destroy(backend);
             rac_error_set_details("Failed to load STT model");
             return from_core_result(result);
         }
+        LOGi("Model loaded successfully");
+        RAC_LOG_INFO("STT.ONNX", "Model loaded successfully");
     }
 
     *out_handle = static_cast<rac_handle_t>(backend);
@@ -139,6 +175,8 @@ rac_result_t rac_stt_onnx_create(const char* model_path, const rac_stt_onnx_conf
     rac_event_track("stt.backend.created", RAC_EVENT_CATEGORY_STT, RAC_EVENT_DESTINATION_ALL,
                     R"({"backend":"onnx"})");
 
+    LOGi("rac_stt_onnx_create completed successfully");
+    RAC_LOG_INFO("STT.ONNX", "rac_stt_onnx_create completed successfully");
     return RAC_SUCCESS;
 }
 

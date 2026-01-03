@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 import java.io.BufferedInputStream
 import java.io.File
@@ -438,9 +439,9 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> = 
 
         downloadLogger.info("Downloaded file: $downloadedPath (exists: ${downloadedFile.exists()}, size: ${result.fileSize})")
 
-        // 11. Handle extraction if needed (for .tar.gz or .zip archives)
+        // 11. Handle extraction if needed (for .tar.gz, .tar.bz2, or .zip archives)
         val finalModelPath = if (requiresExtraction(downloadUrl)) {
-            downloadLogger.info("Extracting archive...")
+            downloadLogger.info("Archive detected in URL, extracting...")
             trySend(DownloadProgress(
                 modelId = modelId,
                 progress = 0.95f,
@@ -449,7 +450,8 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> = 
                 state = DownloadState.EXTRACTING
             ))
 
-            val extractedPath = extractArchive(downloadedFile, modelId, modelType, downloadLogger)
+            // Pass the URL to determine archive type (file may be saved without extension)
+            val extractedPath = extractArchive(downloadedFile, modelId, modelType, downloadUrl, downloadLogger)
             downloadLogger.info("Extraction complete: $extractedPath")
             extractedPath
         } else {
@@ -494,11 +496,14 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> = 
 
 /**
  * Check if URL requires extraction (is an archive).
+ * Supports: .tar.gz, .tgz, .tar.bz2, .tbz2, .zip
  */
 private fun requiresExtraction(url: String): Boolean {
     val lowercaseUrl = url.lowercase()
     return lowercaseUrl.endsWith(".tar.gz") ||
            lowercaseUrl.endsWith(".tgz") ||
+           lowercaseUrl.endsWith(".tar.bz2") ||
+           lowercaseUrl.endsWith(".tbz2") ||
            lowercaseUrl.endsWith(".zip")
 }
 
@@ -507,49 +512,103 @@ private fun requiresExtraction(url: String): Boolean {
  *
  * Supports:
  * - .tar.gz / .tgz → Uses Apache Commons Compress
+ * - .tar.bz2 / .tbz2 → Uses Apache Commons Compress
  * - .zip → Uses java.util.zip
+ *
+ * Archives typically contain a root folder (e.g., sherpa-onnx-whisper-tiny.en/)
+ * so we extract to the parent directory and the archive structure creates the model folder.
+ *
+ * @param archiveFile The downloaded archive file (may not have extension in filename)
+ * @param modelId The model ID
+ * @param modelType The model type
+ * @param originalUrl The original download URL (used to determine archive type)
+ * @param logger Logger for debug output
  */
 private suspend fun extractArchive(
     archiveFile: File,
     modelId: String,
     modelType: Int,
+    originalUrl: String,
     logger: SDKLogger
 ): String = withContext(Dispatchers.IO) {
-    // Get destination directory
-    val destDir = File(CppBridgeModelPaths.getModelPath(modelId, modelType))
-    if (!destDir.exists()) {
-        destDir.mkdirs()
+    // Extract to parent directory - the archive typically contains a root folder
+    // e.g., archive contains: sherpa-onnx-whisper-tiny.en/tiny.en-decoder.onnx
+    // So we extract to /models/stt/ and get /models/stt/sherpa-onnx-whisper-tiny.en/
+    val parentDir = archiveFile.parentFile
+    if (parentDir == null || !parentDir.exists()) {
+        throw SDKError.download("Cannot determine extraction directory for: ${archiveFile.absolutePath}")
     }
 
-    logger.info("Extracting to: ${destDir.absolutePath}")
+    logger.info("Extracting to parent: ${parentDir.absolutePath}")
+    logger.debug("Archive file: ${archiveFile.absolutePath}")
+    logger.debug("Original URL: $originalUrl")
 
-    val archiveName = archiveFile.name.lowercase()
+    // Use the URL to determine archive type (file may be saved without extension)
+    val lowercaseUrl = originalUrl.lowercase()
 
-    when {
-        archiveName.endsWith(".tar.gz") || archiveName.endsWith(".tgz") -> {
-            extractTarGz(archiveFile, destDir, logger)
-        }
-        archiveName.endsWith(".zip") -> {
-            extractZip(archiveFile, destDir, logger)
-        }
-        else -> {
-            // Not an archive, just return the file path
-            archiveFile.absolutePath
-        }
-    }
-
-    // Clean up archive file after extraction
+    // IMPORTANT: The archive file name might conflict with the folder inside the archive
+    // (e.g., file "sherpa-onnx-whisper-tiny.en" and archive contains folder "sherpa-onnx-whisper-tiny.en/")
+    // We need to rename/move the archive before extracting to avoid ENOTDIR errors
+    val tempArchiveFile = File(parentDir, "${archiveFile.name}.tmp_archive")
     try {
-        if (archiveFile.name != destDir.name) {
+        if (!archiveFile.renameTo(tempArchiveFile)) {
+            // If rename fails, copy and delete
+            archiveFile.copyTo(tempArchiveFile, overwrite = true)
             archiveFile.delete()
-            logger.debug("Cleaned up archive: ${archiveFile.absolutePath}")
         }
+        logger.debug("Moved archive to temp: ${tempArchiveFile.absolutePath}")
     } catch (e: Exception) {
-        logger.warn("Failed to clean up archive: ${e.message}")
+        logger.error("Failed to move archive to temp location: ${e.message}")
+        throw SDKError.download("Failed to prepare archive for extraction: ${e.message}")
     }
 
-    // Return the model directory path
-    destDir.absolutePath
+    try {
+        when {
+            lowercaseUrl.endsWith(".tar.gz") || lowercaseUrl.endsWith(".tgz") -> {
+                logger.info("Extracting tar.gz archive...")
+                extractTarGz(tempArchiveFile, parentDir, logger)
+            }
+            lowercaseUrl.endsWith(".tar.bz2") || lowercaseUrl.endsWith(".tbz2") -> {
+                logger.info("Extracting tar.bz2 archive...")
+                extractTarBz2(tempArchiveFile, parentDir, logger)
+            }
+            lowercaseUrl.endsWith(".zip") -> {
+                logger.info("Extracting zip archive...")
+                extractZip(tempArchiveFile, parentDir, logger)
+            }
+            else -> {
+                logger.warn("Unknown archive type for URL: $originalUrl")
+                // Restore the original file
+                tempArchiveFile.renameTo(archiveFile)
+                return@withContext archiveFile.absolutePath
+            }
+        }
+    } finally {
+        // Always clean up the temp archive file
+        try {
+            if (tempArchiveFile.exists()) {
+                tempArchiveFile.delete()
+                logger.debug("Cleaned up temp archive: ${tempArchiveFile.absolutePath}")
+            }
+        } catch (e: Exception) {
+            logger.warn("Failed to clean up temp archive: ${e.message}")
+        }
+    }
+
+    // Find the extracted model directory
+    // The archive should have created a folder with the model ID name
+    val expectedModelDir = File(parentDir, modelId)
+    val finalPath = if (expectedModelDir.exists() && expectedModelDir.isDirectory) {
+        expectedModelDir.absolutePath
+    } else {
+        // Fallback: look for any new directory created
+        parentDir.listFiles()?.firstOrNull {
+            it.isDirectory && it.name.contains(modelId.substringBefore("-"))
+        }?.absolutePath ?: parentDir.absolutePath
+    }
+
+    logger.info("Model extracted to: $finalPath")
+    finalPath
 }
 
 /**
@@ -587,6 +646,47 @@ private fun extractTarGz(archiveFile: File, destDir: File, logger: SDKLogger) {
                     }
 
                     logger.info("Extracted $fileCount files from tar.gz")
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Extract a .tar.bz2 archive.
+ */
+private fun extractTarBz2(archiveFile: File, destDir: File, logger: SDKLogger) {
+    logger.debug("Extracting tar.bz2: ${archiveFile.absolutePath}")
+
+    FileInputStream(archiveFile).use { fis ->
+        BufferedInputStream(fis).use { bis ->
+            BZip2CompressorInputStream(bis).use { bzis ->
+                TarArchiveInputStream(bzis).use { tais ->
+                    var entry = tais.nextEntry
+                    var fileCount = 0
+
+                    while (entry != null) {
+                        val destFile = File(destDir, entry.name)
+
+                        // Security check - prevent path traversal
+                        if (!destFile.canonicalPath.startsWith(destDir.canonicalPath)) {
+                            throw SecurityException("Tar entry outside destination: ${entry.name}")
+                        }
+
+                        if (entry.isDirectory) {
+                            destFile.mkdirs()
+                        } else {
+                            destFile.parentFile?.mkdirs()
+                            FileOutputStream(destFile).use { fos ->
+                                tais.copyTo(fos)
+                            }
+                            fileCount++
+                        }
+
+                        entry = tais.nextEntry
+                    }
+
+                    logger.info("Extracted $fileCount files from tar.bz2")
                 }
             }
         }
