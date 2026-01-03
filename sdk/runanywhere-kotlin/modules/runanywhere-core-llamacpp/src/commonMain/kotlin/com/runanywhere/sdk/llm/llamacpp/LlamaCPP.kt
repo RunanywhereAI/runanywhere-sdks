@@ -1,66 +1,55 @@
 package com.runanywhere.sdk.llm.llamacpp
 
-import com.runanywhere.sdk.core.CapabilityType
-import com.runanywhere.sdk.core.ModuleDiscovery
-import com.runanywhere.sdk.core.ModuleRegistry
-import com.runanywhere.sdk.core.RunAnywhereModule
-import com.runanywhere.sdk.features.llm.LLMConfiguration
-import com.runanywhere.sdk.features.llm.LLMService
+import com.runanywhere.sdk.core.module.RunAnywhereModule
+import com.runanywhere.sdk.core.types.InferenceFramework
+import com.runanywhere.sdk.core.types.SDKComponent
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.foundation.ServiceContainer
-import com.runanywhere.sdk.infrastructure.download.DownloadStrategy
-import com.runanywhere.sdk.models.enums.InferenceFramework
-import com.runanywhere.sdk.storage.ModelStorageStrategy
 
 /**
  * LlamaCPP module for LLM text generation.
  *
  * Provides large language model capabilities using llama.cpp
- * with GGUF/GGML models and Metal/GPU acceleration.
+ * with GGUF models and Metal/GPU acceleration.
  *
- * Matches iOS LlamaCPP enum exactly.
+ * This is a thin wrapper that calls C++ backend registration.
+ * All business logic is handled by the C++ commons layer.
  *
  * ## Registration
  *
  * ```kotlin
  * import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
  *
- * // Direct registration (recommended)
+ * // Register the backend (done automatically if auto-registration is enabled)
  * LlamaCPP.register()
- *
- * // With custom priority
- * LlamaCPP.register(priority = 200)
- * ```
- *
- * ## Adding Models
- *
- * ```kotlin
- * LlamaCPP.register()
- *
- * // Add models using the module's addModel extension
- * LlamaCPP.addModel(
- *     name = "Llama 2 7B Chat",
- *     url = "https://example.com/llama-2-7b-chat.Q4_K_M.gguf",
- *     memoryRequirement = 4_000_000_000L
- * )
  * ```
  *
  * ## Usage
  *
+ * LLM services are accessed through the main SDK APIs - the C++ backend handles
+ * service creation and lifecycle internally:
+ *
  * ```kotlin
- * // After registration and model download
- * RunAnywhere.loadModel("my-model-id")
- * val result = RunAnywhere.generate("Hello!")
+ * // Generate text via public API
+ * val response = RunAnywhere.chat("Hello!")
+ *
+ * // Stream text via public API
+ * RunAnywhere.streamChat("Tell me a story").collect { token ->
+ *     print(token)
+ * }
  * ```
  *
- * Reference: sdk/runanywhere-swift/Sources/LlamaCPPRuntime/LlamaCPPServiceProvider.swift
+ * Matches iOS LlamaCPP.swift exactly.
  */
 object LlamaCPP : RunAnywhereModule {
     private val logger = SDKLogger("LlamaCPP")
 
-    // Track if we're already registered to avoid duplicate work
-    @Volatile
-    private var servicesRegistered = false
+    // MARK: - Module Info
+
+    /** Current version of the LlamaCPP Runtime module */
+    const val version = "2.0.0"
+
+    /** LlamaCPP library version (underlying C++ library) */
+    const val llamaCppVersion = "b7199"
 
     // MARK: - RunAnywhereModule Conformance
 
@@ -68,102 +57,94 @@ object LlamaCPP : RunAnywhereModule {
 
     override val moduleName: String = "LlamaCPP"
 
-    override val capabilities: Set<CapabilityType> = setOf(CapabilityType.LLM)
+    override val capabilities: Set<SDKComponent> = setOf(SDKComponent.LLM)
 
     override val defaultPriority: Int = 100
 
-    /**
-     * LlamaCPP uses the llama.cpp inference framework
-     */
+    /** LlamaCPP uses the llama.cpp inference framework */
     override val inferenceFramework: InferenceFramework = InferenceFramework.LLAMA_CPP
 
-    /**
-     * Download strategy for GGUF models - handles direct file downloads
-     */
-    override val downloadStrategy: DownloadStrategy = LlamaCppDownloadStrategy.shared
+    // MARK: - Registration State
+
+    @Volatile
+    private var isRegistered = false
+
+    // MARK: - Registration
 
     /**
-     * Storage strategy for detecting GGUF models on disk
-     */
-    override val storageStrategy: ModelStorageStrategy = LlamaCppDownloadStrategy.shared
-
-    /**
-     * Register LlamaCPP module with the SDK.
-     * This is what app code should call: LlamaCPP.register()
+     * Register LlamaCPP backend with the C++ service registry.
      *
-     * Matches iOS: LlamaCPP.register()
+     * This calls `rac_backend_llamacpp_register()` to register the
+     * LlamaCPP service provider with the C++ commons layer.
      *
-     * @param priority Registration priority (higher values are preferred)
+     * Safe to call multiple times - subsequent calls are no-ops.
+     *
+     * @param priority Ignored (C++ uses its own priority system)
      */
     @JvmStatic
     @JvmOverloads
     fun register(priority: Int = defaultPriority) {
-        // Register through ModuleRegistry which stores metadata and calls registerServices
-        ModuleRegistry.shared.register(this, priority)
-    }
-
-    /**
-     * Internal: Register only the services (called by ModuleRegistry)
-     * Matches iOS register(priority:) which only registers with ServiceRegistry
-     */
-    override fun registerServices(priority: Int) {
-        if (servicesRegistered) {
-            logger.info("LlamaCPP services already registered")
+        if (isRegistered) {
+            logger.debug("LlamaCPP already registered, returning")
             return
         }
 
-        ModuleRegistry.shared.registerLLM(moduleName) { config -> createLLMService(config) }
+        logger.info("Registering LlamaCPP backend with C++ registry...")
 
-        servicesRegistered = true
-        logger.info("LlamaCPP LLM service registered with priority $priority")
-    }
+        val result = registerNative()
 
-    // MARK: - Private Helpers
-
-    /**
-     * Create an LLM service with the given configuration
-     * Matches iOS createService(config:) implementation
-     */
-    private suspend fun createLLMService(config: LLMConfiguration): LLMService {
-        logger.info("Creating LlamaCpp service for model: ${config.modelId}")
-
-        // Get the actual model file path from the model registry
-        val modelId = config.modelId
-        val modelInfo = modelId?.let { ServiceContainer.shared.modelRegistry.getModel(it) }
-        val modelPath = modelInfo?.localPath
-
-        if (modelPath != null) {
-            logger.info("Found local model path: $modelPath")
-        } else if (modelId != null) {
-            logger.warning("Model '$modelId' is not downloaded - service will need path at initialize()")
+        // Success or already registered is OK
+        if (result != 0 && result != -4) { // RAC_ERROR_MODULE_ALREADY_REGISTERED = -4
+            logger.error("LlamaCPP registration failed with code: $result")
+            // Don't throw - registration failure shouldn't crash the app
+            return
         }
 
-        // Create the service - model loading happens when initialize(modelPath) is called
-        val service = createLlamaCppService(config)
-
-        logger.info("LlamaCpp service created - waiting for initialize() with model path")
-        return service
+        isRegistered = true
+        logger.info("LlamaCPP backend registered successfully")
     }
-
-    // MARK: - Auto-Discovery Registration
 
     /**
-     * Enable auto-discovery for this module.
-     * Access this property to trigger registration.
-     * Matches iOS: public static let autoRegister: Void
+     * Unregister the LlamaCPP backend from C++ registry.
      */
-    val autoRegister: Unit by lazy {
-        ModuleDiscovery.register(this)
+    fun unregister() {
+        if (!isRegistered) return
+
+        unregisterNative()
+        isRegistered = false
+        logger.info("LlamaCPP backend unregistered")
     }
 
-    // Force initialization of auto-register when the object is accessed
-    init {
-        ModuleDiscovery.register(this)
+    // MARK: - Model Handling
+
+    /**
+     * Check if LlamaCPP can handle a given model.
+     * Uses file extension pattern matching - actual framework info is in C++ registry.
+     */
+    fun canHandle(modelId: String?): Boolean {
+        if (modelId == null) return false
+        return modelId.lowercase().endsWith(".gguf")
+    }
+
+    // MARK: - Auto-Registration
+
+    /**
+     * Enable auto-registration for this module.
+     * Access this property to trigger C++ backend registration.
+     */
+    val autoRegister: Unit by lazy {
+        register()
     }
 }
 
 /**
- * Platform-specific LlamaCpp service creation
- * Defined in jvmAndroidMain source set
+ * Platform-specific native registration.
+ * Calls rac_backend_llamacpp_register() via JNI.
  */
-internal expect suspend fun createLlamaCppService(config: LLMConfiguration): LLMService
+internal expect fun LlamaCPP.registerNative(): Int
+
+/**
+ * Platform-specific native unregistration.
+ * Calls rac_backend_llamacpp_unregister() via JNI.
+ */
+internal expect fun LlamaCPP.unregisterNative(): Int

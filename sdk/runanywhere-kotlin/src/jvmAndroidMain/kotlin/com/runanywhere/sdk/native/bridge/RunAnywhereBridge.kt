@@ -914,6 +914,54 @@ object RunAnywhereBridge {
     // AI COMPONENT STATE CONSTANTS
     // ========================================================================
 
+    // ========================================================================
+    // BACKEND REGISTRATION JNI BINDINGS
+    // ========================================================================
+
+    /**
+     * Register the LlamaCPP backend with the C++ service registry.
+     *
+     * @return RAC_SUCCESS (0) on success, error code otherwise
+     *
+     * C API: rac_backend_llamacpp_register()
+     */
+    @JvmStatic
+    external fun racBackendLlamacppRegister(): Int
+
+    /**
+     * Unregister the LlamaCPP backend from the C++ service registry.
+     *
+     * @return RAC_SUCCESS (0) on success, error code otherwise
+     *
+     * C API: rac_backend_llamacpp_unregister()
+     */
+    @JvmStatic
+    external fun racBackendLlamacppUnregister(): Int
+
+    /**
+     * Register the ONNX backend with the C++ service registry.
+     *
+     * @return RAC_SUCCESS (0) on success, error code otherwise
+     *
+     * C API: rac_backend_onnx_register()
+     */
+    @JvmStatic
+    external fun racBackendOnnxRegister(): Int
+
+    /**
+     * Unregister the ONNX backend from the C++ service registry.
+     *
+     * @return RAC_SUCCESS (0) on success, error code otherwise
+     *
+     * C API: rac_backend_onnx_unregister()
+     */
+    @JvmStatic
+    external fun racBackendOnnxUnregister(): Int
+
+    // ========================================================================
+    // AI COMPONENT STATE CONSTANTS
+    // ========================================================================
+
     /**
      * AI component state constants matching C++ RAC_COMPONENT_STATE_* values.
      * Used for LLM, STT, TTS, and VAD components.

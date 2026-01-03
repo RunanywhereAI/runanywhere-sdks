@@ -1,0 +1,105 @@
+/*
+ * Copyright 2024 RunAnywhere SDK
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Public API for VoiceAgent operations.
+ * Provides voice conversation capabilities combining STT, LLM, and TTS.
+ *
+ * Mirrors Swift RunAnywhere+VoiceAgent.swift pattern.
+ */
+
+package com.runanywhere.sdk.public.extensions
+
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceAgentComponentStates
+import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceAgentConfiguration
+import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceAgentResult
+import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceSessionConfig
+import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceSessionEvent
+import kotlinx.coroutines.flow.Flow
+
+// MARK: - Voice Agent Configuration
+
+/**
+ * Configure the voice agent.
+ *
+ * @param configuration Voice agent configuration
+ */
+expect suspend fun RunAnywhere.configureVoiceAgent(configuration: VoiceAgentConfiguration)
+
+/**
+ * Get current voice agent component states.
+ *
+ * @return Current state of all voice agent components
+ */
+expect suspend fun RunAnywhere.voiceAgentComponentStates(): VoiceAgentComponentStates
+
+/**
+ * Check if the voice agent is fully ready (all components loaded).
+ *
+ * @return True if ready
+ */
+expect suspend fun RunAnywhere.isVoiceAgentReady(): Boolean
+
+// MARK: - Voice Processing
+
+/**
+ * Process audio through the voice pipeline (VAD -> STT -> LLM -> TTS).
+ *
+ * @param audioData Audio data to process
+ * @return Voice agent result with transcription, response, and synthesized audio
+ */
+expect suspend fun RunAnywhere.processVoice(audioData: ByteArray): VoiceAgentResult
+
+// MARK: - Voice Session
+
+/**
+ * Start a voice session.
+ *
+ * Returns a Flow of voice session events.
+ *
+ * Example:
+ * ```kotlin
+ * RunAnywhere.startVoiceSession()
+ *     .collect { event ->
+ *         when (event) {
+ *             is VoiceSessionEvent.Listening -> // Show listening UI
+ *             is VoiceSessionEvent.Transcribed -> println(event.text)
+ *             is VoiceSessionEvent.Responded -> println(event.text)
+ *             // ...
+ *         }
+ *     }
+ * ```
+ *
+ * @param config Session configuration
+ * @return Flow of voice session events
+ */
+expect fun RunAnywhere.startVoiceSession(
+    config: VoiceSessionConfig = VoiceSessionConfig.DEFAULT
+): Flow<VoiceSessionEvent>
+
+/**
+ * Stop the current voice session.
+ */
+expect suspend fun RunAnywhere.stopVoiceSession()
+
+/**
+ * Check if a voice session is active.
+ *
+ * @return True if a session is running
+ */
+expect suspend fun RunAnywhere.isVoiceSessionActive(): Boolean
+
+// MARK: - Conversation History
+
+/**
+ * Clear the voice agent conversation history.
+ */
+expect suspend fun RunAnywhere.clearVoiceConversation()
+
+/**
+ * Set the system prompt for LLM responses.
+ *
+ * @param prompt System prompt text
+ */
+expect suspend fun RunAnywhere.setVoiceSystemPrompt(prompt: String)

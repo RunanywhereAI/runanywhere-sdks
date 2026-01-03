@@ -44,6 +44,7 @@ ABIS="${ABIS:-arm64-v8a armeabi-v7a x86_64}"
 BUILD_LLAMACPP="${BUILD_LLAMACPP:-ON}"
 BUILD_ONNX="${BUILD_ONNX:-ON}"
 BUILD_WHISPERCPP="${BUILD_WHISPERCPP:-OFF}"
+BUILD_JNI="${BUILD_JNI:-ON}"
 
 # Colors
 RED='\033[0;31m'
@@ -61,6 +62,7 @@ echo "Build type: ${BUILD_TYPE}"
 echo "LlamaCpp: ${BUILD_LLAMACPP}"
 echo "ONNX: ${BUILD_ONNX}"
 echo "WhisperCpp: ${BUILD_WHISPERCPP}"
+echo "JNI: ${BUILD_JNI}"
 echo ""
 
 # Clean previous build
@@ -90,6 +92,7 @@ build_abi() {
         -DRAC_BUILD_LLAMACPP="${BUILD_LLAMACPP}" \
         -DRAC_BUILD_ONNX="${BUILD_ONNX}" \
         -DRAC_BUILD_WHISPERCPP="${BUILD_WHISPERCPP}" \
+        -DRAC_BUILD_JNI="${BUILD_JNI}" \
         -DRAC_BUILD_SHARED=ON
 
     cmake --build . --config "${BUILD_TYPE}" -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
@@ -131,6 +134,15 @@ copy_libraries() {
             [ -n "${STRIP}" ] && "${STRIP}" "${ABI_DIST_DIR}/lib${lib}.so"
         fi
     done
+
+    # Copy JNI library (runanywhere_jni.so)
+    if [ -f "${ABI_BUILD_DIR}/src/jni/librunanywhere_jni.so" ]; then
+        cp "${ABI_BUILD_DIR}/src/jni/librunanywhere_jni.so" "${ABI_DIST_DIR}/"
+        [ -n "${STRIP}" ] && "${STRIP}" "${ABI_DIST_DIR}/librunanywhere_jni.so"
+    elif [ -f "${ABI_BUILD_DIR}/librunanywhere_jni.so" ]; then
+        cp "${ABI_BUILD_DIR}/librunanywhere_jni.so" "${ABI_DIST_DIR}/"
+        [ -n "${STRIP}" ] && "${STRIP}" "${ABI_DIST_DIR}/librunanywhere_jni.so"
+    fi
 
     # Copy STL library (required for c++_shared)
     local STL_DIR="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/*/sysroot/usr/lib"

@@ -11,6 +11,7 @@
 package com.runanywhere.sdk.public
 
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.utils.SDKConstants
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -132,9 +133,18 @@ object RunAnywhere {
     // MARK: - Event Access
     // ═══════════════════════════════════════════════════════════════════════════
 
-    // Events will be accessed through CppBridgeEvents when implemented
-    // val events: EventBus
-    //     get() = EventBus.shared
+    /**
+     * Event bus for SDK event subscriptions.
+     *
+     * Example usage:
+     * ```kotlin
+     * RunAnywhere.events.llmEvents.collect { event ->
+     *     println("LLM event: ${event.type}")
+     * }
+     * ```
+     */
+    val events: EventBus
+        get() = EventBus
 
     // ═══════════════════════════════════════════════════════════════════════════
     // MARK: - Phase 1: Core Initialization (Synchronous)

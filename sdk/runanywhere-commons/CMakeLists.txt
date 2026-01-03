@@ -19,6 +19,7 @@ option(RAC_BUILD_LLAMACPP "Build LlamaCpp backend module" ON)
 option(RAC_BUILD_ONNX "Build ONNX backend module (STT, TTS, VAD)" ON)
 option(RAC_BUILD_WHISPERCPP "Build WhisperCpp backend module (STT)" OFF)
 option(RAC_BUILD_PLATFORM "Build Platform backend module (Apple Foundation Models, System TTS)" ON)
+option(RAC_BUILD_JNI "Build JNI bridge for Android/JVM" OFF)
 
 # Feature options
 option(RAC_BUILD_TESTS "Build unit tests" OFF)
@@ -296,6 +297,17 @@ if(RAC_BUILD_PLATFORM)
 endif()
 
 # =============================================================================
+# JNI BRIDGE (Android/JVM)
+# =============================================================================
+
+if(RAC_BUILD_JNI)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/jni/CMakeLists.txt")
+        message(STATUS "Building JNI bridge for Android/JVM")
+        add_subdirectory(src/jni)
+    endif()
+endif()
+
+# =============================================================================
 # TESTS
 # =============================================================================
 
@@ -336,5 +348,7 @@ message(STATUS "  LlamaCpp:     ${RAC_BUILD_LLAMACPP}")
 message(STATUS "  ONNX:         ${RAC_BUILD_ONNX}")
 message(STATUS "  WhisperCpp:   ${RAC_BUILD_WHISPERCPP}")
 message(STATUS "  Platform:     ${RAC_BUILD_PLATFORM}")
+message(STATUS "")
+message(STATUS "JNI bridge:     ${RAC_BUILD_JNI}")
 message(STATUS "====================================")
 message(STATUS "")
