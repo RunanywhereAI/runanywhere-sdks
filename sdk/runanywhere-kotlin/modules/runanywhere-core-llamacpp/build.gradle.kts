@@ -26,8 +26,13 @@ plugins {
 // =============================================================================
 // Local vs Remote JNI Library Configuration (mirrors main SDK)
 // =============================================================================
-val testLocal: Boolean = project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean() ?: false
-val coreVersion: String = project.findProperty("runanywhere.coreVersion")?.toString() ?: "0.1.1-dev.03aacf9"
+// Read from root project to ensure consistency with main SDK
+val testLocal: Boolean = rootProject.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
+    ?: project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
+    ?: false
+val coreVersion: String = rootProject.findProperty("runanywhere.coreVersion")?.toString()
+    ?: project.findProperty("runanywhere.coreVersion")?.toString()
+    ?: "0.1.1-dev.03aacf9"
 
 logger.lifecycle("LlamaCPP Module: testLocal=$testLocal, coreVersion=$coreVersion")
 

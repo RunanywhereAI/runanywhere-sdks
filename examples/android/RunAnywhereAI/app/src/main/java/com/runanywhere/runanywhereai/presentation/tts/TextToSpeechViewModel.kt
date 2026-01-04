@@ -270,6 +270,34 @@ class TextToSpeechViewModel : ViewModel() {
     }
 
     /**
+     * Called when a model is loaded from the ModelSelectionBottomSheet
+     * This explicitly updates the ViewModel state when a model is selected and loaded
+     */
+    fun onModelLoaded(
+        modelName: String,
+        modelId: String,
+        framework: InferenceFramework?,
+    ) {
+        Log.i(TAG, "Model loaded notification: $modelName (id: $modelId, framework: ${framework?.displayName})")
+
+        val isSystem = modelId == "system" || framework == null
+
+        _uiState.update {
+            it.copy(
+                isModelLoaded = true,
+                selectedModelName = modelName,
+                selectedModelId = modelId,
+                selectedFramework = framework,
+                isSystemTTS = isSystem,
+                errorMessage = null,
+            )
+        }
+
+        // Shuffle sample text when model is loaded
+        shuffleSampleText()
+    }
+
+    /**
      * Initialize the TTS ViewModel
      * iOS Reference: initialize() in TTSViewModel
      */

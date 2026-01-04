@@ -269,6 +269,24 @@ class SpeechToTextViewModel : ViewModel() {
     }
 
     /**
+     * Called when a model has been loaded (e.g., by ModelSelectionViewModel)
+     * This updates the UI state to reflect the loaded model
+     */
+    fun onModelLoaded(modelName: String, modelId: String, framework: InferenceFramework?) {
+        Log.i(TAG, "Model loaded notification: $modelName (id: $modelId, framework: ${framework?.displayName})")
+        _uiState.update {
+            it.copy(
+                isModelLoaded = true,
+                selectedModelName = modelName,
+                selectedModelId = modelId,
+                selectedFramework = framework,
+                isProcessing = false,
+                errorMessage = null,
+            )
+        }
+    }
+
+    /**
      * Load a STT model via SDK
      * iOS Reference: loadModelFromSelection() in STTViewModel.swift
      *

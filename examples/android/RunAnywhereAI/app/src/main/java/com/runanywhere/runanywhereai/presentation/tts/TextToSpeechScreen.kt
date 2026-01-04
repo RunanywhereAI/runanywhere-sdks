@@ -158,9 +158,14 @@ fun TextToSpeechScreen(viewModel: TextToSpeechViewModel = viewModel()) {
                 onDismiss = { showModelPicker = false },
                 onModelSelected = { model ->
                     scope.launch {
-                        // Model loaded via ModelSelectionBottomSheet,
-                        // ViewModel will update via lifecycle tracker
                         android.util.Log.d("TextToSpeechScreen", "TTS model selected: ${model.name}")
+                        // Notify ViewModel that model is loaded
+                        viewModel.onModelLoaded(
+                            modelName = model.name,
+                            modelId = model.id,
+                            framework = model.framework,
+                        )
+                        showModelPicker = false
                     }
                 },
             )
