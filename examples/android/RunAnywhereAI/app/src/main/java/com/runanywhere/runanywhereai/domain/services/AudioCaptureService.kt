@@ -9,13 +9,14 @@ import android.media.MediaRecorder
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.sqrt
@@ -70,34 +71,37 @@ class AudioCaptureService(
      * Start capturing audio and emit audio chunks as a Flow
      * Returns PCM audio data at 16kHz, mono, 16-bit
      */
-    fun startCapture(): Flow<ByteArray> = flow {
+    fun startCapture(): Flow<ByteArray> = callbackFlow {
         if (!hasRecordPermission()) {
             Log.e(TAG, "No RECORD_AUDIO permission")
-            throw SecurityException("RECORD_AUDIO permission not granted")
+            close(SecurityException("RECORD_AUDIO permission not granted"))
+            return@callbackFlow
         }
 
         val bufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
         val chunkSize = (SAMPLE_RATE * 2 * CHUNK_SIZE_MS) / 1000 // bytes per chunk
 
-        withContext(Dispatchers.IO) {
-            try {
-                audioRecord = AudioRecord(
-                    MediaRecorder.AudioSource.MIC,
-                    SAMPLE_RATE,
-                    CHANNEL_CONFIG,
-                    AUDIO_FORMAT,
-                    bufferSize.coerceAtLeast(chunkSize * 2)
-                )
+        try {
+            audioRecord = AudioRecord(
+                MediaRecorder.AudioSource.MIC,
+                SAMPLE_RATE,
+                CHANNEL_CONFIG,
+                AUDIO_FORMAT,
+                bufferSize.coerceAtLeast(chunkSize * 2)
+            )
 
-                if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
-                    Log.e(TAG, "AudioRecord failed to initialize")
-                    throw IllegalStateException("AudioRecord initialization failed")
-                }
+            if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
+                Log.e(TAG, "AudioRecord failed to initialize")
+                close(IllegalStateException("AudioRecord initialization failed"))
+                return@callbackFlow
+            }
 
-                audioRecord?.startRecording()
-                _isRecording.value = true
-                Log.i(TAG, "Audio capture started (${SAMPLE_RATE}Hz, chunk size: ${chunkSize})")
+            audioRecord?.startRecording()
+            _isRecording.value = true
+            Log.i(TAG, "Audio capture started (${SAMPLE_RATE}Hz, chunk size: ${chunkSize})")
 
+            // Launch a coroutine on IO dispatcher to read audio
+            val readJob = launch(Dispatchers.IO) {
                 val buffer = ByteArray(chunkSize)
 
                 while (isActive && _isRecording.value) {
@@ -110,15 +114,25 @@ class AudioCaptureService(
                         val rms = calculateRMS(chunk)
                         _audioLevel.value = rms
 
-                        emit(chunk)
+                        // trySend is safe to call from any context in callbackFlow
+                        trySend(chunk)
                     } else if (bytesRead < 0) {
                         Log.w(TAG, "AudioRecord read error: $bytesRead")
                         break
                     }
                 }
-            } finally {
+            }
+
+            // Wait for cancellation
+            awaitClose {
+                Log.d(TAG, "Flow closing, stopping audio capture")
+                readJob.cancel()
                 stopCaptureInternal()
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in audio capture: ${e.message}")
+            stopCaptureInternal()
+            close(e)
         }
     }
 
