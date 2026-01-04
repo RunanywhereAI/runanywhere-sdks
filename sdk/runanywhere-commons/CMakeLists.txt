@@ -87,6 +87,26 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 endif()
 
 # =============================================================================
+# AUTO-GENERATE DEVELOPMENT CONFIG IF MISSING
+# =============================================================================
+# development_config.cpp is git-ignored because it can contain secrets.
+# For CI builds or fresh checkouts, we auto-generate a stub from the template.
+
+set(DEV_CONFIG_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/infrastructure/network/development_config.cpp")
+set(DEV_CONFIG_TEMPLATE "${CMAKE_CURRENT_SOURCE_DIR}/src/infrastructure/network/development_config.cpp.template")
+
+if(NOT EXISTS "${DEV_CONFIG_FILE}")
+    if(EXISTS "${DEV_CONFIG_TEMPLATE}")
+        message(STATUS "development_config.cpp not found, generating stub from template...")
+        file(READ "${DEV_CONFIG_TEMPLATE}" DEV_CONFIG_CONTENT)
+        file(WRITE "${DEV_CONFIG_FILE}" "${DEV_CONFIG_CONTENT}")
+        message(STATUS "Generated: ${DEV_CONFIG_FILE}")
+    else()
+        message(FATAL_ERROR "Neither development_config.cpp nor .template found!")
+    endif()
+endif()
+
+# =============================================================================
 # SOURCE FILES
 # =============================================================================
 
