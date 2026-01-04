@@ -14,11 +14,9 @@ project(RunAnywhereCommons
 # OPTIONS
 # =============================================================================
 
-# Backend build options
-option(RAC_BUILD_LLAMACPP "Build LlamaCpp backend module" ON)
-option(RAC_BUILD_ONNX "Build ONNX backend module (STT, TTS, VAD)" ON)
-option(RAC_BUILD_WHISPERCPP "Build WhisperCpp backend module (STT)" OFF)
-option(RAC_BUILD_PLATFORM "Build Platform backend module (Apple Foundation Models, System TTS)" ON)
+# NOTE: LlamaCpp, ONNX, and WhisperCpp backends have been moved to runanywhere-core.
+# The SDKs consume RAC APIs directly from runanywhere-core's build artifacts.
+# Platform services (Apple Foundation Models, System TTS) are built into rac_commons.
 option(RAC_BUILD_JNI "Build JNI bridge for Android/JVM" OFF)
 
 # Feature options
@@ -128,9 +126,6 @@ else()
     # This matches iOS where we combine static .a files into xcframeworks
     set(RA_BUILD_MODULAR ON CACHE BOOL "" FORCE)
     set(RA_BUILD_SHARED OFF CACHE BOOL "" FORCE)  # Force static libs for static linking
-    set(RA_BUILD_LLAMACPP ${RAC_BUILD_LLAMACPP} CACHE BOOL "" FORCE)
-    set(RA_BUILD_ONNX ${RAC_BUILD_ONNX} CACHE BOOL "" FORCE)
-    set(RA_BUILD_WHISPERCPP ${RAC_BUILD_WHISPERCPP} CACHE BOOL "" FORCE)
 
     add_subdirectory(${RUNANYWHERE_CORE_DIR} ${CMAKE_BINARY_DIR}/runanywhere-core)
 endif()
@@ -210,13 +205,13 @@ set(RAC_FEATURES_SOURCES
     src/features/result_free.cpp
 )
 
-# Platform backend sources (Apple Foundation Models + System TTS)
+# Platform services (Apple Foundation Models + System TTS)
 # These are always included on Apple platforms since they're required for platform services
 if(APPLE)
     set(RAC_PLATFORM_SOURCES
-        backends/platform/src/rac_llm_platform.cpp
-        backends/platform/src/rac_tts_platform.cpp
-        backends/platform/src/rac_backend_platform_register.cpp
+        src/features/platform/rac_llm_platform.cpp
+        src/features/platform/rac_tts_platform.cpp
+        src/features/platform/rac_backend_platform_register.cpp
     )
 else()
     set(RAC_PLATFORM_SOURCES "")
@@ -270,23 +265,8 @@ elseif(NOT USE_PREBUILT_CORE AND DEFINED RUNANYWHERE_CORE_INCLUDE_DIRS)
 endif()
 
 # Backend headers - needed for vtable dispatch in service files
-# These headers define backend-specific functions called through vtables
-if(RAC_BUILD_LLAMACPP)
-    target_include_directories(rac_commons PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/backends/llamacpp/include>
-    )
-endif()
-if(RAC_BUILD_ONNX)
-    target_include_directories(rac_commons PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/backends/onnx/include>
-    )
-endif()
-# Platform backend headers (always on Apple)
-if(APPLE)
-    target_include_directories(rac_commons PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/backends/platform/include>
-    )
-endif()
+# NOTE: LlamaCpp, ONNX, and WhisperCpp backend headers are now in runanywhere-core.
+# Platform headers are now in include/rac/features/platform/ (included via main include dir)
 
 # Link against runanywhere-core bridge
 # Note: In source compilation mode, we do NOT link rac_commons against runanywhere_bridge directly.
@@ -311,49 +291,6 @@ if(RAC_BUILD_SHARED)
         CXX_VISIBILITY_PRESET hidden
         VISIBILITY_INLINES_HIDDEN ON
     )
-endif()
-
-# =============================================================================
-# BACKEND MODULES
-# =============================================================================
-#
-# Backend libraries provide specific ML inference implementations:
-# - llamacpp: LLM text generation (GGUF models via llama.cpp)
-# - onnx: STT, TTS, VAD (ONNX Runtime models)
-# - whispercpp: STT (Whisper.cpp models)
-#
-# Each backend:
-# 1. Links against rac_commons for service registration
-# 2. Links against runanywhere-core for low-level inference
-# 3. Builds into a static library (.a) or xcframework
-#
-
-if(RAC_BUILD_LLAMACPP)
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/backends/llamacpp/CMakeLists.txt")
-        message(STATUS "Building LlamaCpp backend")
-        add_subdirectory(backends/llamacpp)
-    endif()
-endif()
-
-if(RAC_BUILD_ONNX)
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/backends/onnx/CMakeLists.txt")
-        message(STATUS "Building ONNX backend")
-        add_subdirectory(backends/onnx)
-    endif()
-endif()
-
-if(RAC_BUILD_WHISPERCPP)
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/backends/whispercpp/CMakeLists.txt")
-        message(STATUS "Building WhisperCpp backend")
-        add_subdirectory(backends/whispercpp)
-    endif()
-endif()
-
-if(RAC_BUILD_PLATFORM)
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/backends/platform/CMakeLists.txt")
-        message(STATUS "Building Platform backend (Apple Foundation Models, System TTS)")
-        add_subdirectory(backends/platform)
-    endif()
 endif()
 
 # =============================================================================
@@ -403,11 +340,10 @@ message(STATUS "Build type:     ${CMAKE_BUILD_TYPE}")
 message(STATUS "Compiler:       ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "Shared libs:    ${RAC_BUILD_SHARED}")
 message(STATUS "")
-message(STATUS "Backend modules:")
-message(STATUS "  LlamaCpp:     ${RAC_BUILD_LLAMACPP}")
-message(STATUS "  ONNX:         ${RAC_BUILD_ONNX}")
-message(STATUS "  WhisperCpp:   ${RAC_BUILD_WHISPERCPP}")
-message(STATUS "  Platform:     ${RAC_BUILD_PLATFORM}")
+if(APPLE)
+    message(STATUS "Platform services: Apple Foundation Models, System TTS (built into rac_commons)")
+endif()
+message(STATUS "NOTE: LlamaCpp, ONNX, WhisperCpp backends moved to runanywhere-core")
 message(STATUS "")
 message(STATUS "JNI bridge:     ${RAC_BUILD_JNI}")
 message(STATUS "====================================")

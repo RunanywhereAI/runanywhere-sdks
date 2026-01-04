@@ -7,8 +7,8 @@
  * the generic service APIs.
  */
 
-#include "rac_llm_platform.h"
-#include "rac_tts_platform.h"
+#include "rac/features/platform/rac_llm_platform.h"
+#include "rac/features/platform/rac_tts_platform.h"
 
 #include <cstdlib>
 #include <cstring>

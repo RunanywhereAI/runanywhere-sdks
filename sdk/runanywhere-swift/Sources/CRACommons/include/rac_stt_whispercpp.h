@@ -1,9 +1,9 @@
 /**
  * @file rac_stt_whispercpp.h
- * @brief RunAnywhere Commons - WhisperCPP Backend for STT
+ * @brief RunAnywhere Core - WhisperCPP Backend for STT
  *
- * C wrapper around runanywhere-core's WhisperCPP backend.
- * Provides high-quality speech-to-text using whisper.cpp.
+ * RAC API for WhisperCPP-based speech-to-text.
+ * Provides high-quality transcription using whisper.cpp.
  *
  * NOTE: WhisperCPP and LlamaCPP both use GGML, which can cause symbol
  * conflicts if linked together. Use ONNX Whisper for STT when also
@@ -13,9 +13,9 @@
 #ifndef RAC_STT_WHISPERCPP_H
 #define RAC_STT_WHISPERCPP_H
 
-#include "rac/core/rac_error.h"
-#include "rac/core/rac_types.h"
-#include "rac/features/stt/rac_stt.h"
+#include "rac_error.h"
+#include "rac_types.h"
+#include "rac_stt.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -134,11 +134,6 @@ RAC_WHISPERCPP_API void rac_stt_whispercpp_destroy(rac_handle_t handle);
 
 /**
  * Registers the WhisperCPP backend with the commons module and service registries.
- *
- * Should be called once during SDK initialization.
- * This registers:
- * - Module: "whispercpp" with STT capability
- * - Service provider: WhisperCPP STT provider
  *
  * @return RAC_SUCCESS or error code
  */

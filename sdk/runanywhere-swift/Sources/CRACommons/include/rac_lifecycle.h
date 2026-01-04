@@ -204,6 +204,14 @@ RAC_API rac_bool_t rac_lifecycle_is_loaded(rac_handle_t handle);
 RAC_API const char* rac_lifecycle_get_model_id(rac_handle_t handle);
 
 /**
+ * @brief Get current model name (human-readable)
+ *
+ * @param handle Lifecycle manager handle
+ * @return Current model name (may be NULL if not loaded)
+ */
+RAC_API const char* rac_lifecycle_get_model_name(rac_handle_t handle);
+
+/**
  * @brief Get current service handle
  *
  * Mirrors Swift's ManagedLifecycle.currentService
