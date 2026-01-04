@@ -189,27 +189,24 @@ jobs:
           VERSION="${{ needs.build-ios.outputs.version }}"
           mkdir -p release-assets
 
-          # iOS assets
-          if [ -d dist/ios/packages ]; then
-            cp dist/ios/packages/*.zip release-assets/ 2>/dev/null || true
-            cp dist/ios/packages/*.sha256 release-assets/ 2>/dev/null || true
-          fi
-
-          # Package iOS XCFramework if not already packaged
-          if [ -d dist/ios/RACommons.xcframework ] && [ ! -f release-assets/*ios*.zip ]; then
+          # iOS: Always create package with correct version from release tag
+          if [ -d dist/ios/RACommons.xcframework ]; then
             cd dist/ios
             zip -r "../../release-assets/RACommons-ios-v${VERSION}.zip" RACommons.xcframework
             cd ../../release-assets
             shasum -a 256 "RACommons-ios-v${VERSION}.zip" > "RACommons-ios-v${VERSION}.zip.sha256"
+            cd ..
           fi
 
           # Combine Android ABIs
+          # Note: artifact structure is dist/android-artifacts/racommons-android-{abi}-{ver}/jniLibs/{abi}/
           mkdir -p android-combined/jniLibs
-          for dir in dist/android-artifacts/racommons-android-*/android/jniLibs/*/; do
+          for dir in dist/android-artifacts/racommons-android-*/jniLibs/*/; do
             if [ -d "$dir" ]; then
               abi=$(basename "$dir")
               mkdir -p "android-combined/jniLibs/${abi}"
               cp -r "${dir}"* "android-combined/jniLibs/${abi}/" 2>/dev/null || true
+              echo "Copied libs for ${abi}: $(ls android-combined/jniLibs/${abi}/ 2>/dev/null | wc -l) files"
             fi
           done
 
@@ -221,6 +218,8 @@ jobs:
 
           # Package Android
           cd android-combined
+          echo "=== Android Combined Contents ==="
+          find . -type f | head -20
           zip -r "../release-assets/RACommons-android-v${VERSION}.zip" .
           cd ../release-assets
           shasum -a 256 "RACommons-android-v${VERSION}.zip" > "RACommons-android-v${VERSION}.zip.sha256"
@@ -253,7 +252,8 @@ jobs:
 
             ### Android
             `RACommons-android-v${{ needs.build-ios.outputs.version }}.zip`
-            - Contains `jniLibs/{abi}/librac_commons.so`
+            - Contains `jniLibs/{abi}/librac_commons.so` (core library)
+            - Contains `jniLibs/{abi}/librunanywhere_jni.so` (JNI bridge for Kotlin SDK)
             - Contains `include/` headers
 
             ### Note
