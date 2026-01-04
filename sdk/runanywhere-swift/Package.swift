@@ -239,7 +239,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "ONNXRuntimeBinary",
                 url: "https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.17.1.zip",
-                checksum: "3c71a9065616371bdbd095ba8d7a10d86f474dd09a825c11b62efd92c58a0e47"
+                checksum: "9a2d54d4f503fbb82d2f86361a1d22d4fe015e2b5e9fb419767209cc9ab6372c"
             ),
         ]
     } else {
@@ -282,7 +282,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "ONNXRuntimeBinary",
                 url: "https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.17.1.zip",
-                checksum: "3c71a9065616371bdbd095ba8d7a10d86f474dd09a825c11b62efd92c58a0e47"
+                checksum: "9a2d54d4f503fbb82d2f86361a1d22d4fe015e2b5e9fb419767209cc9ab6372c"
             ),
         ]
     }
