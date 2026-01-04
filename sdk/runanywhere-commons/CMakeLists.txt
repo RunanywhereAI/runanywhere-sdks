@@ -86,26 +86,54 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 endif()
 
 # =============================================================================
-# FIND RUNANYWHERE-CORE
+# FIND RUNANYWHERE-CORE (Pre-built or Source)
 # =============================================================================
 
-include(FindRunAnywhereCore)
+# Option to use pre-built core libraries instead of compiling from source
+option(USE_PREBUILT_CORE "Use pre-built runanywhere-core libraries instead of compiling from source" OFF)
 
-if(NOT RUNANYWHERE_CORE_FOUND)
-    message(FATAL_ERROR "runanywhere-core not found at ${RUNANYWHERE_CORE_DIR}")
+if(USE_PREBUILT_CORE)
+    # Use pre-built core libraries (downloaded from remote releases)
+    include(FindRunAnywhereCorePrebuilt)
+
+    if(NOT RUNANYWHERE_CORE_PREBUILT_FOUND)
+        message(FATAL_ERROR "Pre-built runanywhere-core not found. Run: ./scripts/download-core-prebuilt.sh")
+    endif()
+
+    message(STATUS "Using PRE-BUILT runanywhere-core libraries")
+    message(STATUS "  Bridge: ${RUNANYWHERE_CORE_BRIDGE_LIB}")
+    if(RUNANYWHERE_CORE_HAS_LLAMACPP)
+        message(STATUS "  LlamaCPP: ${RUNANYWHERE_CORE_LLAMACPP_LIB}")
+    endif()
+    if(RUNANYWHERE_CORE_HAS_ONNX)
+        message(STATUS "  ONNX: ${RUNANYWHERE_CORE_ONNX_LIB}")
+    endif()
+
+    # Set variables for compatibility with existing code
+    set(RUNANYWHERE_CORE_INCLUDE_DIRS ${RUNANYWHERE_CORE_PREBUILT_INCLUDE_DIRS})
+    set(RUNANYWHERE_CORE_HAS_LLAMACPP ${RUNANYWHERE_CORE_HAS_LLAMACPP})
+    set(RUNANYWHERE_CORE_HAS_ONNX ${RUNANYWHERE_CORE_HAS_ONNX})
+else()
+    # Use source code and compile locally
+    include(FindRunAnywhereCore)
+
+    if(NOT RUNANYWHERE_CORE_FOUND)
+        message(FATAL_ERROR "runanywhere-core not found at ${RUNANYWHERE_CORE_DIR}")
+    endif()
+
+    message(STATUS "Found runanywhere-core source at: ${RUNANYWHERE_CORE_DIR}")
+    message(STATUS "Compiling runanywhere-core from source")
+
+    # Build runanywhere-core in modular mode with STATIC libraries
+    # This matches iOS where we combine static .a files into xcframeworks
+    set(RA_BUILD_MODULAR ON CACHE BOOL "" FORCE)
+    set(RA_BUILD_SHARED OFF CACHE BOOL "" FORCE)  # Force static libs for static linking
+    set(RA_BUILD_LLAMACPP ${RAC_BUILD_LLAMACPP} CACHE BOOL "" FORCE)
+    set(RA_BUILD_ONNX ${RAC_BUILD_ONNX} CACHE BOOL "" FORCE)
+    set(RA_BUILD_WHISPERCPP ${RAC_BUILD_WHISPERCPP} CACHE BOOL "" FORCE)
+
+    add_subdirectory(${RUNANYWHERE_CORE_DIR} ${CMAKE_BINARY_DIR}/runanywhere-core)
 endif()
-
-message(STATUS "Found runanywhere-core at: ${RUNANYWHERE_CORE_DIR}")
-
-# Build runanywhere-core in modular mode with STATIC libraries
-# This matches iOS where we combine static .a files into xcframeworks
-set(RA_BUILD_MODULAR ON CACHE BOOL "" FORCE)
-set(RA_BUILD_SHARED OFF CACHE BOOL "" FORCE)  # Force static libs for static linking
-set(RA_BUILD_LLAMACPP ${RAC_BUILD_LLAMACPP} CACHE BOOL "" FORCE)
-set(RA_BUILD_ONNX ${RAC_BUILD_ONNX} CACHE BOOL "" FORCE)
-set(RA_BUILD_WHISPERCPP ${RAC_BUILD_WHISPERCPP} CACHE BOOL "" FORCE)
-
-add_subdirectory(${RUNANYWHERE_CORE_DIR} ${CMAKE_BINARY_DIR}/runanywhere-core)
 
 # =============================================================================
 # RAC COMMONS CORE LIBRARY
@@ -218,9 +246,28 @@ target_include_directories(rac_commons PUBLIC
 # Private includes for implementation
 target_include_directories(rac_commons PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${RUNANYWHERE_CORE_DIR}/src
-    ${RUNANYWHERE_CORE_DIR}/src/capabilities
 )
+# Core includes (pre-built or source)
+if(USE_PREBUILT_CORE AND DEFINED RUNANYWHERE_CORE_PREBUILT_INCLUDE_DIRS)
+    target_include_directories(rac_commons PRIVATE
+        ${RUNANYWHERE_CORE_PREBUILT_INCLUDE_DIRS}
+    )
+elseif(NOT USE_PREBUILT_CORE AND DEFINED RUNANYWHERE_CORE_INCLUDE_DIRS)
+    target_include_directories(rac_commons PRIVATE
+        ${RUNANYWHERE_CORE_INCLUDE_DIRS}
+    )
+endif()
+
+# Include runanywhere-core headers (for pre-built or source mode)
+if(USE_PREBUILT_CORE AND DEFINED RUNANYWHERE_CORE_PREBUILT_INCLUDE_DIRS)
+    target_include_directories(rac_commons PUBLIC
+        ${RUNANYWHERE_CORE_PREBUILT_INCLUDE_DIRS}
+    )
+elseif(NOT USE_PREBUILT_CORE AND DEFINED RUNANYWHERE_CORE_INCLUDE_DIRS)
+    target_include_directories(rac_commons PUBLIC
+        ${RUNANYWHERE_CORE_INCLUDE_DIRS}
+    )
+endif()
 
 # Backend headers - needed for vtable dispatch in service files
 # These headers define backend-specific functions called through vtables
@@ -241,14 +288,20 @@ if(APPLE)
     )
 endif()
 
-# Note: rac_commons does NOT link against runanywhere_bridge directly.
+# Link against runanywhere-core bridge
+# Note: In source compilation mode, we do NOT link rac_commons against runanywhere_bridge directly.
 # The backends (llamacpp, onnx, etc.) link against their respective core libraries.
 # This avoids duplicate symbol issues when both bridge and backend libs have
 # implementations of the same functions (ra_stt_*, ra_tts_*, ra_vad_*).
-# target_link_libraries(rac_commons PUBLIC runanywhere_bridge)
-
-# Instead, backends link against their specific runanywhere-core backend libraries
-# (runanywhere_llamacpp, runanywhere_onnx, etc.) via their own CMakeLists.txt
+if(DEFINED RUNANYWHERE_CORE_BRIDGE_LIB)
+    # Pre-built library mode (USE_PREBUILT_CORE=ON) - link the pre-built bridge
+    target_link_libraries(rac_commons PUBLIC ${RUNANYWHERE_CORE_BRIDGE_LIB})
+else()
+    # Source compilation mode - backends link against their specific runanywhere-core backend libraries
+    # (runanywhere_llamacpp, runanywhere_onnx, etc.) via their own CMakeLists.txt
+    # Do NOT link against runanywhere_bridge here to avoid duplicate symbols
+    message(STATUS "Source mode: rac_commons will NOT link runanywhere_bridge (backends handle their own linking)")
+endif()
 
 # Symbol visibility for shared builds
 if(RAC_BUILD_SHARED)

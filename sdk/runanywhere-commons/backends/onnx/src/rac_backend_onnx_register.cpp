@@ -23,6 +23,13 @@
 #include "rac/infrastructure/model_management/rac_model_strategy.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 
+// Forward declaration for runanywhere-core ONNX backend registration
+// This registers the ONNX backend in runanywhere-core's BackendRegistry
+// so that ra_create_backend("onnx") can work
+namespace runanywhere {
+    void register_onnx_backend();
+}
+
 // =============================================================================
 // STT VTABLE IMPLEMENTATION
 // =============================================================================
@@ -496,6 +503,18 @@ extern "C" {
 rac_result_t rac_backend_onnx_register(void) {
     if (g_registered) {
         return RAC_ERROR_MODULE_ALREADY_REGISTERED;
+    }
+
+    // Register ONNX backend in runanywhere-core's BackendRegistry
+    // This must be called before ra_create_backend("onnx") can work
+    // NOTE: ensure_backends_registered() in runanywhere_bridge.cpp also registers
+    // backends, but we call this explicitly to ensure it happens early
+    try {
+        runanywhere::register_onnx_backend();
+        RAC_LOG_INFO(LOG_CAT, "ONNX backend registered in runanywhere-core BackendRegistry");
+    } catch (const std::exception& e) {
+        RAC_LOG_ERROR(LOG_CAT, "Failed to register ONNX backend in core: %s", e.what());
+        // Continue anyway - ensure_backends_registered() might handle it
     }
 
     // Register module

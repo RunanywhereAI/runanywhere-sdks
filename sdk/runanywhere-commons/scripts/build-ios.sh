@@ -80,16 +80,35 @@ build_platform() {
     mkdir -p "${PLATFORM_DIR}"
     cd "${PLATFORM_DIR}"
 
-    cmake "${PROJECT_ROOT}" \
-        -DCMAKE_TOOLCHAIN_FILE="${PROJECT_ROOT}/cmake/ios.toolchain.cmake" \
-        -DIOS_PLATFORM="${PLATFORM}" \
-        -DIOS_DEPLOYMENT_TARGET="${IOS_DEPLOYMENT_TARGET}" \
-        -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-        -DRAC_BUILD_LLAMACPP="${BUILD_LLAMACPP}" \
-        -DRAC_BUILD_ONNX="${BUILD_ONNX}" \
-        -DRAC_BUILD_WHISPERCPP="${BUILD_WHISPERCPP}" \
-        -DRAC_BUILD_SHARED=OFF \
-        -DRUNANYWHERE_CORE_DIR="${RUNANYWHERE_CORE_DIR}"
+    # Check if pre-built core libraries are available
+    local USE_PREBUILT="${USE_PREBUILT_CORE:-OFF}"
+    if [[ "${USE_PREBUILT}" == "OFF" ]] && [[ -d "${PROJECT_ROOT}/third_party/runanywhere-core-prebuilt" ]]; then
+        # Auto-detect pre-built libraries if available
+        if [[ -f "${PROJECT_ROOT}/third_party/runanywhere-core-prebuilt/lib/librunanywhere_bridge.a" ]] || \
+           [[ -f "${PROJECT_ROOT}/third_party/runanywhere-core-prebuilt/librunanywhere_bridge.a" ]]; then
+            USE_PREBUILT="ON"
+            echo "Auto-detected pre-built core libraries, using USE_PREBUILT_CORE=ON"
+        fi
+    fi
+
+    local CMAKE_ARGS=(
+        -DCMAKE_TOOLCHAIN_FILE="${PROJECT_ROOT}/cmake/ios.toolchain.cmake"
+        -DIOS_PLATFORM="${PLATFORM}"
+        -DIOS_DEPLOYMENT_TARGET="${IOS_DEPLOYMENT_TARGET}"
+        -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
+        -DRAC_BUILD_LLAMACPP="${BUILD_LLAMACPP}"
+        -DRAC_BUILD_ONNX="${BUILD_ONNX}"
+        -DRAC_BUILD_WHISPERCPP="${BUILD_WHISPERCPP}"
+        -DRAC_BUILD_SHARED=OFF
+        -DUSE_PREBUILT_CORE="${USE_PREBUILT}"
+    )
+
+    # Only set RUNANYWHERE_CORE_DIR if not using pre-built
+    if [[ "${USE_PREBUILT}" == "OFF" ]]; then
+        CMAKE_ARGS+=(-DRUNANYWHERE_CORE_DIR="${RUNANYWHERE_CORE_DIR}")
+    fi
+
+    cmake "${PROJECT_ROOT}" "${CMAKE_ARGS[@]}"
 
     cmake --build . --config "${BUILD_TYPE}" -j$(sysctl -n hw.ncpu)
 
@@ -314,8 +333,14 @@ combine_llamacpp_libs() {
     # Our wrapper library
     [ -f "${PLATFORM_DIR}/backends/llamacpp/librac_backend_llamacpp.a" ] && LIBS="$LIBS ${PLATFORM_DIR}/backends/llamacpp/librac_backend_llamacpp.a"
 
-    # runanywhere-core LlamaCPP backend
-    [ -f "${PLATFORM_DIR}/runanywhere-core/src/backends/llamacpp/librunanywhere_llamacpp.a" ] && LIBS="$LIBS ${PLATFORM_DIR}/runanywhere-core/src/backends/llamacpp/librunanywhere_llamacpp.a"
+    # runanywhere-core LlamaCPP backend (pre-built or compiled)
+    if [ -f "${PROJECT_ROOT}/third_party/runanywhere-core-prebuilt/lib/librunanywhere_llamacpp.a" ]; then
+        LIBS="$LIBS ${PROJECT_ROOT}/third_party/runanywhere-core-prebuilt/lib/librunanywhere_llamacpp.a"
+    elif [ -f "${PROJECT_ROOT}/third_party/runanywhere-core-prebuilt/librunanywhere_llamacpp.a" ]; then
+        LIBS="$LIBS ${PROJECT_ROOT}/third_party/runanywhere-core-prebuilt/librunanywhere_llamacpp.a"
+    elif [ -f "${PLATFORM_DIR}/runanywhere-core/src/backends/llamacpp/librunanywhere_llamacpp.a" ]; then
+        LIBS="$LIBS ${PLATFORM_DIR}/runanywhere-core/src/backends/llamacpp/librunanywhere_llamacpp.a"
+    fi
 
     # llama.cpp libraries
     [ -f "${PLATFORM_DIR}/_deps/llamacpp-build/src/libllama.a" ] && LIBS="$LIBS ${PLATFORM_DIR}/_deps/llamacpp-build/src/libllama.a"
@@ -353,8 +378,23 @@ combine_onnx_libs() {
     # Our wrapper library
     [ -f "${PLATFORM_DIR}/backends/onnx/librac_backend_onnx.a" ] && LIBS="$LIBS ${PLATFORM_DIR}/backends/onnx/librac_backend_onnx.a"
 
-    # runanywhere-core ONNX backend
-    [ -f "${PLATFORM_DIR}/runanywhere-core/src/backends/onnx/librunanywhere_onnx.a" ] && LIBS="$LIBS ${PLATFORM_DIR}/runanywhere-core/src/backends/onnx/librunanywhere_onnx.a"
+    # runanywhere-core ONNX backend (pre-built or compiled)
+    if [ -f "${PROJECT_ROOT}/third_party/runanywhere-core-prebuilt/lib/librunanywhere_onnx.a" ]; then
+        LIBS="$LIBS ${PROJECT_ROOT}/third_party/runanywhere-core-prebuilt/lib/librunanywhere_onnx.a"
+    elif [ -f "${PROJECT_ROOT}/third_party/runanywhere-core-prebuilt/librunanywhere_onnx.a" ]; then
+        LIBS="$LIBS ${PROJECT_ROOT}/third_party/runanywhere-core-prebuilt/librunanywhere_onnx.a"
+    elif [ -f "${PLATFORM_DIR}/runanywhere-core/src/backends/onnx/librunanywhere_onnx.a" ]; then
+        LIBS="$LIBS ${PLATFORM_DIR}/runanywhere-core/src/backends/onnx/librunanywhere_onnx.a"
+    fi
+
+    # runanywhere-core bridge (provides ra_create_backend, ra_initialize) (pre-built or compiled)
+    if [ -f "${PROJECT_ROOT}/third_party/runanywhere-core-prebuilt/lib/librunanywhere_bridge.a" ]; then
+        LIBS="$LIBS ${PROJECT_ROOT}/third_party/runanywhere-core-prebuilt/lib/librunanywhere_bridge.a"
+    elif [ -f "${PROJECT_ROOT}/third_party/runanywhere-core-prebuilt/librunanywhere_bridge.a" ]; then
+        LIBS="$LIBS ${PROJECT_ROOT}/third_party/runanywhere-core-prebuilt/librunanywhere_bridge.a"
+    elif [ -f "${PLATFORM_DIR}/runanywhere-core/librunanywhere_bridge.a" ]; then
+        LIBS="$LIBS ${PLATFORM_DIR}/runanywhere-core/librunanywhere_bridge.a"
+    fi
 
     # Sherpa-ONNX static library (provides STT/TTS/VAD implementations)
     # Uses global SHERPA_ONNX_XCFW set at script start based on BUILD_MODE

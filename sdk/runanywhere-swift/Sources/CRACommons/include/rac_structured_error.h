@@ -495,9 +495,9 @@ RAC_API rac_result_t rac_error_log_and_track_model(rac_result_t code, rac_error_
 /**
  * @brief Convenience macro with model context.
  */
-#define RAC_RETURN_TRACKED_ERROR_MODEL(code, category, msg, model_id, framework)    \
-    return rac_error_log_and_track_model(code, category, msg, model_id, framework,  \
-                                         __FILE__, __LINE__, __func__)
+#define RAC_RETURN_TRACKED_ERROR_MODEL(code, category, msg, model_id, framework)             \
+    return rac_error_log_and_track_model(code, category, msg, model_id, framework, __FILE__, \
+                                         __LINE__, __func__)
 
 #ifdef __cplusplus
 }

@@ -227,16 +227,17 @@ extern "C" void rac_llm_component_destroy(rac_handle_t handle) {
 // MODEL LIFECYCLE
 // =============================================================================
 
-extern "C" rac_result_t rac_llm_component_load_model(rac_handle_t handle, const char* model_id) {
+extern "C" rac_result_t rac_llm_component_load_model(rac_handle_t handle, const char* model_path,
+                                                     const char* model_id, const char* model_name) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
 
     auto* component = reinterpret_cast<rac_llm_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
 
-    // Delegate to lifecycle manager
+    // Delegate to lifecycle manager with separate path, model_id, and model_name
     rac_handle_t service = nullptr;
-    return rac_lifecycle_load(component->lifecycle, model_id, &service);
+    return rac_lifecycle_load(component->lifecycle, model_path, model_id, model_name, &service);
 }
 
 extern "C" rac_result_t rac_llm_component_unload(rac_handle_t handle) {
@@ -280,8 +281,9 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
     // Generate unique ID for this generation
     std::string generation_id = generate_unique_id();
 
-    // Get model ID from lifecycle manager
+    // Get model ID and name from lifecycle manager
     const char* model_id = rac_lifecycle_get_model_id(component->lifecycle);
+    const char* model_name = rac_lifecycle_get_model_name(component->lifecycle);
 
     // Get service from lifecycle manager
     rac_handle_t service = nullptr;
@@ -295,14 +297,13 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
         event.data.llm_generation = RAC_ANALYTICS_LLM_GENERATION_DEFAULT;
         event.data.llm_generation.generation_id = generation_id.c_str();
         event.data.llm_generation.model_id = model_id;
+        event.data.llm_generation.model_name = model_name;
         event.data.llm_generation.error_code = result;
         event.data.llm_generation.error_message = "No model loaded";
         rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_FAILED, &event);
 
         return result;
     }
-
-    log_info("LLM.Component", "Generating (non-streaming)");
 
     // Use provided options or defaults
     const rac_llm_options_t* effective_options = options ? options : &component->default_options;
@@ -314,6 +315,7 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
         event.data.llm_generation = RAC_ANALYTICS_LLM_GENERATION_DEFAULT;
         event.data.llm_generation.generation_id = generation_id.c_str();
         event.data.llm_generation.model_id = model_id;
+        event.data.llm_generation.model_name = model_name;
         event.data.llm_generation.is_streaming = RAC_FALSE;
         event.data.llm_generation.framework =
             static_cast<rac_inference_framework_t>(component->config.preferred_framework);
@@ -337,6 +339,7 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
         event.data.llm_generation = RAC_ANALYTICS_LLM_GENERATION_DEFAULT;
         event.data.llm_generation.generation_id = generation_id.c_str();
         event.data.llm_generation.model_id = model_id;
+        event.data.llm_generation.model_name = model_name;
         event.data.llm_generation.error_code = result;
         event.data.llm_generation.error_message = "Generation failed";
         rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_FAILED, &event);
@@ -349,8 +352,18 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
     int64_t total_time_ms = duration.count();
 
     // Update result metrics
-    out_result->prompt_tokens = estimate_tokens(prompt);
-    out_result->completion_tokens = estimate_tokens(out_result->text);
+    // Use actual token counts from backend if available, otherwise estimate
+    log_debug("LLM.Component", "Backend returned prompt_tokens=%d, completion_tokens=%d",
+              out_result->prompt_tokens, out_result->completion_tokens);
+
+    if (out_result->prompt_tokens <= 0) {
+        out_result->prompt_tokens = estimate_tokens(prompt);
+        log_debug("LLM.Component", "Using estimated prompt_tokens=%d", out_result->prompt_tokens);
+    }
+    if (out_result->completion_tokens <= 0) {
+        out_result->completion_tokens = estimate_tokens(out_result->text);
+        log_debug("LLM.Component", "Using estimated completion_tokens=%d", out_result->completion_tokens);
+    }
     out_result->total_tokens = out_result->prompt_tokens + out_result->completion_tokens;
     out_result->total_time_ms = total_time_ms;
     out_result->time_to_first_token_ms = 0;  // Non-streaming: no TTFT
@@ -370,6 +383,7 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
         event.type = RAC_EVENT_LLM_GENERATION_COMPLETED;
         event.data.llm_generation.generation_id = generation_id.c_str();
         event.data.llm_generation.model_id = model_id;
+        event.data.llm_generation.model_name = model_name;
         event.data.llm_generation.input_tokens = out_result->prompt_tokens;
         event.data.llm_generation.output_tokens = out_result->completion_tokens;
         event.data.llm_generation.duration_ms = static_cast<double>(total_time_ms);
@@ -427,6 +441,7 @@ struct llm_stream_context {
     // Analytics event data
     std::string generation_id;
     const char* model_id;
+    const char* model_name;
     rac_inference_framework_t framework;
     float temperature;
     int32_t max_tokens;
@@ -455,6 +470,7 @@ static rac_bool_t llm_stream_token_callback(const char* token, void* user_data) 
         event.data.llm_generation = RAC_ANALYTICS_LLM_GENERATION_DEFAULT;
         event.data.llm_generation.generation_id = ctx->generation_id.c_str();
         event.data.llm_generation.model_id = ctx->model_id;
+        event.data.llm_generation.model_name = ctx->model_name;
         event.data.llm_generation.time_to_first_token_ms = ttft_ms;
         event.data.llm_generation.framework = ctx->framework;
         rac_analytics_event_emit(RAC_EVENT_LLM_FIRST_TOKEN, &event);
@@ -500,6 +516,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     // Generate unique ID for this generation
     std::string generation_id = generate_unique_id();
     const char* model_id = rac_lifecycle_get_model_id(component->lifecycle);
+    const char* model_name = rac_lifecycle_get_model_name(component->lifecycle);
 
     // Get service from lifecycle manager
     rac_handle_t service = nullptr;
@@ -513,6 +530,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         event.data.llm_generation = RAC_ANALYTICS_LLM_GENERATION_DEFAULT;
         event.data.llm_generation.generation_id = generation_id.c_str();
         event.data.llm_generation.model_id = model_id;
+        event.data.llm_generation.model_name = model_name;
         event.data.llm_generation.error_code = result;
         event.data.llm_generation.error_message = "No model loaded";
         rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_FAILED, &event);
@@ -535,6 +553,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         event.data.llm_generation = RAC_ANALYTICS_LLM_GENERATION_DEFAULT;
         event.data.llm_generation.generation_id = generation_id.c_str();
         event.data.llm_generation.model_id = model_id;
+        event.data.llm_generation.model_name = model_name;
         event.data.llm_generation.error_code = RAC_ERROR_NOT_SUPPORTED;
         event.data.llm_generation.error_message = "Streaming not supported";
         rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_FAILED, &event);
@@ -557,6 +576,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         event.data.llm_generation = RAC_ANALYTICS_LLM_GENERATION_DEFAULT;
         event.data.llm_generation.generation_id = generation_id.c_str();
         event.data.llm_generation.model_id = model_id;
+        event.data.llm_generation.model_name = model_name;
         event.data.llm_generation.is_streaming = RAC_TRUE;
         event.data.llm_generation.framework =
             static_cast<rac_inference_framework_t>(component->config.preferred_framework);
@@ -576,6 +596,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     ctx.prompt_tokens = estimate_tokens(prompt);
     ctx.generation_id = generation_id;
     ctx.model_id = model_id;
+    ctx.model_name = model_name;
     ctx.framework = static_cast<rac_inference_framework_t>(component->config.preferred_framework);
     ctx.temperature = effective_options->temperature;
     ctx.max_tokens = effective_options->max_tokens;
@@ -595,6 +616,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         event.data.llm_generation = RAC_ANALYTICS_LLM_GENERATION_DEFAULT;
         event.data.llm_generation.generation_id = generation_id.c_str();
         event.data.llm_generation.model_id = model_id;
+        event.data.llm_generation.model_name = model_name;
         event.data.llm_generation.error_code = result;
         event.data.llm_generation.error_message = "Streaming generation failed";
         rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_FAILED, &event);
@@ -645,6 +667,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         event.type = RAC_EVENT_LLM_GENERATION_COMPLETED;
         event.data.llm_generation.generation_id = generation_id.c_str();
         event.data.llm_generation.model_id = model_id;
+        event.data.llm_generation.model_name = model_name;
         event.data.llm_generation.input_tokens = final_result.prompt_tokens;
         event.data.llm_generation.output_tokens = final_result.completion_tokens;
         event.data.llm_generation.duration_ms = static_cast<double>(total_time_ms);

@@ -323,6 +323,11 @@ public enum RunAnywhere {
 
             // Step 1: Configure HTTP transport
             try await setupHTTP(params: params, environment: environment, logger: logger)
+            
+            // Step 1.5: Flush any queued telemetry events now that HTTP is configured
+            // This ensures events queued during initialization are sent
+            CppBridge.Telemetry.flush()
+            logger.debug("Flushed queued telemetry events after HTTP configuration")
         }
 
         // Step 2: Initialize C++ state
