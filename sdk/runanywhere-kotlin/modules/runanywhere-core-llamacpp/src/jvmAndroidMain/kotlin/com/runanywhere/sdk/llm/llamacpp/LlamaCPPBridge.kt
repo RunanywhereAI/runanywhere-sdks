@@ -7,9 +7,7 @@
  * Self-contained JNI bridge for the LlamaCPP backend module.
  * This mirrors the Swift LlamaCPPBackend XCFramework architecture.
  *
- * The native library (librac_backend_llamacpp_jni.so) contains:
- * - rac_backend_llamacpp_register()
- * - rac_backend_llamacpp_unregister()
+ * The native library (librunanywhere_llamacpp.so) contains LLM inference capabilities.
  */
 
 package com.runanywhere.sdk.llm.llamacpp
@@ -23,9 +21,9 @@ import android.util.Log
  * JNI methods for backend registration with the C++ service registry.
  *
  * Architecture:
- * - librac_backend_llamacpp_jni.so - LlamaCPP JNI (this bridge)
- * - Links to librac_backend_llamacpp.so - LlamaCPP C++ backend
- * - Links to librac_commons.so - Commons library with service registry
+ * - librunanywhere_llamacpp.so - LlamaCPP backend with JNI
+ * - Links to librunanywhere_jni.so - Main JNI bridge
+ * - Links to libc++_shared.so, libomp.so - Runtime dependencies
  */
 internal object LlamaCPPBridge {
 
@@ -39,10 +37,9 @@ internal object LlamaCPPBridge {
     /**
      * Ensure the LlamaCPP JNI library is loaded.
      *
-     * Loads librac_backend_llamacpp_jni.so and its dependencies:
-     * - librac_backend_llamacpp.so (LlamaCPP C++ backend)
-     * - librac_commons.so (commons library - must be loaded first)
-     * - librunanywhere_llamacpp.so (from runanywhere-core)
+     * Loads librunanywhere_llamacpp.so and its dependencies:
+     * - librunanywhere_jni.so (main JNI bridge - must be loaded first)
+     * - libc++_shared.so, libomp.so (runtime dependencies)
      *
      * @return true if loaded successfully, false otherwise
      */
@@ -55,12 +52,14 @@ internal object LlamaCPPBridge {
             Log.i(TAG, "Loading LlamaCPP native library...")
 
             try {
-                // The main SDK's librunanywhere_jni.so must be loaded first
-                // (provides librac_commons.so with service registry).
-                // The LlamaCPP JNI provides backend registration functions.
+                // Load the LlamaCPP backend library first (contains the LLM implementation)
+                System.loadLibrary("runanywhere_llamacpp")
+                Log.i(TAG, "✅ runanywhere_llamacpp loaded")
+                
+                // Load the JNI bridge which contains nativeRegister, nativeGenerate, etc.
                 System.loadLibrary("rac_backend_llamacpp_jni")
                 nativeLibraryLoaded = true
-                Log.i(TAG, "✅ LlamaCPP native library loaded successfully")
+                Log.i(TAG, "✅ LlamaCPP JNI bridge loaded successfully")
                 return true
             } catch (e: UnsatisfiedLinkError) {
                 Log.e(TAG, "❌ Failed to load LlamaCPP native library: ${e.message}", e)

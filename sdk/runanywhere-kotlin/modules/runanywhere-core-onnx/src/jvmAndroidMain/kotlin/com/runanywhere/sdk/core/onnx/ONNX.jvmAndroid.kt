@@ -9,10 +9,10 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
  * mirroring the Swift ONNXBackend XCFramework architecture.
  *
  * The ONNX module has its own JNI library (librac_backend_onnx_jni.so)
- * that provides backend registration, separate from the main commons JNI.
+ * that provides backend registration via rac_backend_onnx_jni.cpp.
  */
 internal actual fun ONNX.registerNative(): Int {
-    // Ensure commons JNI is loaded first (provides service registry)
+    // Ensure main JNI is loaded first (provides core infrastructure)
     RunAnywhereBridge.ensureNativeLibraryLoaded()
 
     // Load and use the dedicated ONNX JNI
@@ -20,6 +20,7 @@ internal actual fun ONNX.registerNative(): Int {
         throw UnsatisfiedLinkError("Failed to load ONNX native library")
     }
 
+    // Call the actual JNI method
     return ONNXBridge.nativeRegister()
 }
 

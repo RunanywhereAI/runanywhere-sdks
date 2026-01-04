@@ -56,12 +56,14 @@ internal object ONNXBridge {
             Log.i(TAG, "Loading ONNX native library...")
 
             try {
-                // The main SDK's librunanywhere_jni.so must be loaded first
-                // (provides librac_commons.so with service registry).
-                // The ONNX JNI provides backend registration functions.
+                // Load the ONNX backend library first (contains STT/TTS/VAD)
+                System.loadLibrary("runanywhere_onnx")
+                Log.i(TAG, "✅ runanywhere_onnx loaded")
+                
+                // Load the JNI bridge which contains nativeRegister, etc.
                 System.loadLibrary("rac_backend_onnx_jni")
                 nativeLibraryLoaded = true
-                Log.i(TAG, "✅ ONNX native library loaded successfully")
+                Log.i(TAG, "✅ ONNX JNI bridge loaded successfully")
                 return true
             } catch (e: UnsatisfiedLinkError) {
                 Log.e(TAG, "❌ Failed to load ONNX native library: ${e.message}", e)

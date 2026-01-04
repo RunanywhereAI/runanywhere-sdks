@@ -36,6 +36,10 @@ object RunAnywhereBridge {
 
     /**
      * Load the native commons library if not already loaded.
+     * 
+     * In the modular architecture, each backend has its own JNI (librac_backend_*_jni.so).
+     * This method loads librac_commons.so which is a shared dependency for all backends.
+     * 
      * @return true if the library is loaded, false otherwise
      */
     fun ensureNativeLibraryLoaded(): Boolean {
@@ -44,15 +48,21 @@ object RunAnywhereBridge {
         synchronized(loadLock) {
             if (nativeLibraryLoaded) return true
 
-            android.util.Log.i(TAG, "Loading native library 'runanywhere_jni'...")
+            android.util.Log.i(TAG, "Loading native commons library...")
 
             try {
+                // Load the commons library first (required by JNI)
+                System.loadLibrary("rac_commons")
+                android.util.Log.i(TAG, "✅ rac_commons loaded")
+                
+                // Load the commons JNI bridge (provides model registry etc.)
+                // The JNI is built by runanywhere-commons/src/jni/CMakeLists.txt as librunanywhere_jni.so
                 System.loadLibrary("runanywhere_jni")
                 nativeLibraryLoaded = true
-                android.util.Log.i(TAG, "✅ Native library loaded successfully")
+                android.util.Log.i(TAG, "✅ runanywhere_jni loaded")
                 return true
             } catch (e: UnsatisfiedLinkError) {
-                android.util.Log.e(TAG, "❌ Failed to load native library: ${e.message}", e)
+                android.util.Log.e(TAG, "❌ Failed to load native commons library: ${e.message}", e)
                 return false
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "❌ Unexpected error: ${e.message}", e)
