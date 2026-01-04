@@ -444,9 +444,12 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentLoadMode
         LOGw("NO providers registered for TEXT_GENERATION!");
     }
 
+    // model_path, model_id (use path as id), model_name (optional)
     rac_result_t result = rac_llm_component_load_model(
         reinterpret_cast<rac_handle_t>(handle),
-        path.c_str()
+        path.c_str(),   // model_path
+        path.c_str(),   // model_id (use path as id)
+        nullptr         // model_name (optional)
     );
     LOGi("rac_llm_component_load_model returned: %d", result);
 
@@ -980,9 +983,16 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentLoadMode
         LOGw("NO providers registered for STT!");
     }
 
+    // Parse configJson to extract model_id and model_name
+    std::string config_str = getCString(env, configJson);
+    std::string model_id = path;  // Use path as model_id by default
+    std::string model_name = "";  // Optional model name
+
     rac_result_t result = rac_stt_component_load_model(
         reinterpret_cast<rac_handle_t>(handle),
-        path.c_str()
+        path.c_str(),      // model_path
+        model_id.c_str(),  // model_id
+        model_name.empty() ? nullptr : model_name.c_str()  // model_name (optional)
     );
     LOGi("rac_stt_component_load_model returned: %d", result);
 
@@ -1003,13 +1013,38 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentTranscri
     jsize len = env->GetArrayLength(audioData);
     jbyte* data = env->GetByteArrayElements(audioData, nullptr);
 
-    rac_stt_options_t options = {};
+    // Use default options which properly initializes sample_rate to 16000
+    rac_stt_options_t options = RAC_STT_OPTIONS_DEFAULT;
+
+    // Parse configJson to override sample_rate if provided
+    if (configJson != nullptr) {
+        const char* json = env->GetStringUTFChars(configJson, nullptr);
+        if (json != nullptr) {
+            // Simple JSON parsing for sample_rate
+            const char* sample_rate_key = "\"sample_rate\":";
+            const char* pos = strstr(json, sample_rate_key);
+            if (pos != nullptr) {
+                pos += strlen(sample_rate_key);
+                int sample_rate = atoi(pos);
+                if (sample_rate > 0) {
+                    options.sample_rate = sample_rate;
+                    LOGd("Using sample_rate from config: %d", sample_rate);
+                }
+            }
+            env->ReleaseStringUTFChars(configJson, json);
+        }
+    }
+
+    LOGd("STT transcribe: %d bytes, sample_rate=%d", (int)len, options.sample_rate);
+
     rac_stt_result_t result = {};
 
+    // Audio data is 16-bit PCM (ByteArray from Android AudioRecord)
+    // Pass the raw bytes - the audio_format in options tells C++ how to interpret it
     rac_result_t status = rac_stt_component_transcribe(
         reinterpret_cast<rac_handle_t>(handle),
-        reinterpret_cast<const float*>(data),
-        static_cast<size_t>(len / sizeof(float)),
+        data,                        // Pass raw bytes (void*)
+        static_cast<size_t>(len),    // Size in bytes
         &options,
         &result
     );
@@ -1017,16 +1052,37 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentTranscri
     env->ReleaseByteArrayElements(audioData, data, JNI_ABORT);
 
     if (status != RAC_SUCCESS) {
+        LOGe("STT transcribe failed with status: %d", status);
         return nullptr;
     }
 
+    // Build JSON result
+    std::string json_result = "{";
+    json_result += "\"text\":\"";
     if (result.text != nullptr) {
-        jstring jResult = env->NewStringUTF(result.text);
-        rac_stt_result_free(&result);
-        return jResult;
+        // Escape special characters in text
+        for (const char* p = result.text; *p; ++p) {
+            switch (*p) {
+                case '"': json_result += "\\\""; break;
+                case '\\': json_result += "\\\\"; break;
+                case '\n': json_result += "\\n"; break;
+                case '\r': json_result += "\\r"; break;
+                case '\t': json_result += "\\t"; break;
+                default: json_result += *p; break;
+            }
+        }
     }
+    json_result += "\",";
+    json_result += "\"language\":\"" + std::string(result.detected_language ? result.detected_language : "en") + "\",";
+    json_result += "\"duration_ms\":" + std::to_string(result.processing_time_ms) + ",";
+    json_result += "\"completion_reason\":1,";  // END_OF_AUDIO
+    json_result += "\"confidence\":" + std::to_string(result.confidence);
+    json_result += "}";
 
-    return env->NewStringUTF("{}");
+    rac_stt_result_free(&result);
+
+    LOGd("STT transcribe result: %s", json_result.c_str());
+    return env->NewStringUTF(json_result.c_str());
 }
 
 JNIEXPORT jstring JNICALL
@@ -1105,12 +1161,15 @@ JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentLoadModel(JNIEnv* env, jclass clazz, jlong handle, jstring modelPath, jstring configJson) {
     if (handle == 0) return RAC_ERROR_INVALID_HANDLE;
 
-    std::string voiceId = getCString(env, modelPath);  // modelPath is actually voiceId for TTS
+    std::string voicePath = getCString(env, modelPath);  // modelPath is actually voice path for TTS
 
     // TTS component uses load_voice instead of load_model
+    // voice_path, voice_id (use path as id), voice_name (optional)
     return static_cast<jint>(rac_tts_component_load_voice(
         reinterpret_cast<rac_handle_t>(handle),
-        voiceId.c_str()
+        voicePath.c_str(),  // voice_path
+        voicePath.c_str(),  // voice_id (use path as id)
+        nullptr             // voice_name (optional)
     ));
 }
 
@@ -1204,9 +1263,12 @@ JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentSetVoice(JNIEnv* env, jclass clazz, jlong handle, jstring voiceId) {
     if (handle == 0) return RAC_ERROR_INVALID_HANDLE;
     std::string voice = getCString(env, voiceId);
+    // voice_path, voice_id (use path as id), voice_name (optional)
     return static_cast<jint>(rac_tts_component_load_voice(
         reinterpret_cast<rac_handle_t>(handle),
-        voice.c_str()
+        voice.c_str(),  // voice_path
+        voice.c_str(),  // voice_id
+        nullptr         // voice_name (optional)
     ));
 }
 
