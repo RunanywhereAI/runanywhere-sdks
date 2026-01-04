@@ -32,7 +32,7 @@ val testLocal: Boolean = rootProject.findProperty("runanywhere.testLocal")?.toSt
     ?: false
 val coreVersion: String = rootProject.findProperty("runanywhere.coreVersion")?.toString()
     ?: project.findProperty("runanywhere.coreVersion")?.toString()
-    ?: "0.1.1-dev.03aacf9"
+    ?: "0.1.1"
 
 logger.lifecycle("LlamaCPP Module: testLocal=$testLocal, coreVersion=$coreVersion")
 

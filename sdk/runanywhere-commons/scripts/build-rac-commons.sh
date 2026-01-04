@@ -1,19 +1,14 @@
 #!/bin/bash
 # =============================================================================
-# RunAnywhere Commons - Build RACommons Release Artifacts
+# RunAnywhere Commons - Unified Build Script
 # =============================================================================
 #
-# Builds RACommons release artifacts for iOS and Android:
+# Builds RACommons for iOS (xcframework) and Android (JNI shared libraries).
 #
-# iOS:
-#   - RACommons.xcframework (static library with headers)
-#
-# Android:
-#   - librac_commons.so (shared library per ABI)
-#   - librac_commons_jni.so (JNI bridge per ABI)
-#   - Headers for NDK consumption
-#
-# NOTE: LlamaCPP, ONNX, and WhisperCPP backends are now built from runanywhere-core.
+# Outputs:
+#   iOS:     dist/RACommons.xcframework
+#   Android: dist/android/jniLibs/{abi}/librac_commons.so
+#            dist/android/include/
 #
 # Usage:
 #   ./scripts/build-rac-commons.sh [options]
@@ -25,13 +20,14 @@
 #   --clean        Clean build directories first
 #   --release      Release build (default)
 #   --debug        Debug build
+#   --package      Create release packages (ZIP files)
 #   --abi ABI      Android: specific ABI (arm64-v8a, armeabi-v7a, x86_64, x86)
 #   --help         Show this help
 #
 # Examples:
 #   ./scripts/build-rac-commons.sh --ios --release
 #   ./scripts/build-rac-commons.sh --android --abi arm64-v8a
-#   ./scripts/build-rac-commons.sh --all --clean
+#   ./scripts/build-rac-commons.sh --all --clean --package
 #
 # =============================================================================
 
@@ -44,6 +40,9 @@ DIST_DIR="${PROJECT_ROOT}/dist"
 
 # Load versions
 source "${SCRIPT_DIR}/load-versions.sh"
+
+# Get version from VERSION file
+VERSION=$(cat "${PROJECT_ROOT}/VERSION" 2>/dev/null | head -1 || echo "0.1.0")
 
 # Colors
 RED='\033[0;31m'
@@ -67,10 +66,11 @@ BUILD_ANDROID=false
 BUILD_ALL=true
 CLEAN_BUILD=false
 BUILD_TYPE="Release"
+CREATE_PACKAGE=false
 ANDROID_ABIS=("arm64-v8a" "armeabi-v7a" "x86_64")
 
 show_help() {
-    head -35 "$0" | tail -30
+    head -30 "$0" | tail -25
     exit 0
 }
 
@@ -102,6 +102,10 @@ while [[ $# -gt 0 ]]; do
             BUILD_TYPE="Debug"
             shift
             ;;
+        --package)
+            CREATE_PACKAGE=true
+            shift
+            ;;
         --abi)
             ANDROID_ABIS=("$2")
             shift 2
@@ -124,14 +128,22 @@ fi
 # Configuration
 # =============================================================================
 
-IOS_DEPLOYMENT_TARGET="${IOS_DEPLOYMENT_TARGET:-13.0}"
+IOS_DEPLOYMENT_TARGET="${IOS_DEPLOYMENT_TARGET:-14.0}"
 ANDROID_MIN_SDK="${ANDROID_MIN_SDK:-24}"
 ANDROID_NDK="${ANDROID_NDK_HOME:-$ANDROID_NDK}"
 
-log_header "RACommons Build Configuration"
+# Auto-detect NDK on macOS
+if [ -z "${ANDROID_NDK}" ] && [ "$BUILD_ANDROID" = true ]; then
+    if [ -d "$HOME/Library/Android/sdk/ndk" ]; then
+        ANDROID_NDK=$(ls -d "$HOME/Library/Android/sdk/ndk"/*/ 2>/dev/null | sort -V | tail -1 | sed 's:/$::')
+    fi
+fi
+
+log_header "RACommons Build v${VERSION}"
 echo "Build type:     ${BUILD_TYPE}"
 echo "Build iOS:      ${BUILD_IOS}"
 echo "Build Android:  ${BUILD_ANDROID}"
+echo "Package:        ${CREATE_PACKAGE}"
 if [ "$BUILD_IOS" = true ]; then
     echo "iOS target:     ${IOS_DEPLOYMENT_TARGET}"
 fi
@@ -148,8 +160,9 @@ echo ""
 
 if [ "$CLEAN_BUILD" = true ]; then
     log_step "Cleaning previous build..."
-    [ "$BUILD_IOS" = true ] && rm -rf "${BUILD_DIR}/ios-commons"
-    [ "$BUILD_ANDROID" = true ] && rm -rf "${BUILD_DIR}/android-commons"
+    [ "$BUILD_IOS" = true ] && rm -rf "${BUILD_DIR}/ios"
+    [ "$BUILD_ANDROID" = true ] && rm -rf "${BUILD_DIR}/android"
+    rm -rf "${DIST_DIR}"
 fi
 
 mkdir -p "${DIST_DIR}"
@@ -161,7 +174,7 @@ mkdir -p "${DIST_DIR}"
 build_ios() {
     log_header "Building RACommons for iOS"
 
-    local IOS_BUILD_DIR="${BUILD_DIR}/ios-commons"
+    local IOS_BUILD_DIR="${BUILD_DIR}/ios"
     mkdir -p "${IOS_BUILD_DIR}"
 
     # Build for each platform
@@ -219,17 +232,6 @@ build_ios() {
         done
         cd "${PROJECT_ROOT}"
 
-        # Platform backend headers
-        if [ -d "${PROJECT_ROOT}/backends/platform/include" ]; then
-            for header in "${PROJECT_ROOT}/backends/platform/include/"*.h; do
-                [ -f "$header" ] && {
-                    filename=$(basename "$header")
-                    sed -e 's|#include "rac/[^"]*\/\([^"]*\)"|#include <RACommons/\1>|g' \
-                        "$header" > "${FRAMEWORK_DIR}/Headers/${filename}"
-                }
-            done
-        fi
-
         # Module map
         cat > "${FRAMEWORK_DIR}/Modules/module.modulemap" << EOF
 framework module RACommons {
@@ -241,7 +243,7 @@ EOF
 
         # Umbrella header
         cat > "${FRAMEWORK_DIR}/Headers/RACommons.h" << EOF
-// RACommons Umbrella Header
+// RACommons Umbrella Header - v${VERSION}
 #ifndef RACommons_h
 #define RACommons_h
 
@@ -261,7 +263,8 @@ EOF
     <key>CFBundleExecutable</key><string>RACommons</string>
     <key>CFBundleIdentifier</key><string>ai.runanywhere.RACommons</string>
     <key>CFBundlePackageType</key><string>FMWK</string>
-    <key>CFBundleShortVersionString</key><string>${RAC_VERSION:-1.0.0}</string>
+    <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+    <key>CFBundleVersion</key><string>1</string>
     <key>MinimumOSVersion</key><string>${IOS_DEPLOYMENT_TARGET}</string>
 </dict>
 </plist>
@@ -306,11 +309,11 @@ build_android() {
 
     # Validate NDK
     if [ -z "${ANDROID_NDK}" ] || [ ! -d "${ANDROID_NDK}" ]; then
-        log_error "ANDROID_NDK not set or not found. Set ANDROID_NDK_HOME or ANDROID_NDK."
+        log_error "ANDROID_NDK not set or not found. Set ANDROID_NDK_HOME."
     fi
 
-    local ANDROID_BUILD_DIR="${BUILD_DIR}/android-commons"
-    local ANDROID_DIST="${DIST_DIR}/android/rac-commons"
+    local ANDROID_BUILD_DIR="${BUILD_DIR}/android"
+    local ANDROID_DIST="${DIST_DIR}/android"
     mkdir -p "${ANDROID_BUILD_DIR}"
     mkdir -p "${ANDROID_DIST}"
 
@@ -330,7 +333,8 @@ build_android() {
             -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
             -DRAC_BUILD_PLATFORM=OFF \
             -DRAC_BUILD_SHARED=ON \
-            -DRAC_BUILD_JNI=ON
+            -DRAC_BUILD_JNI=ON \
+            -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-z,max-page-size=16384"
 
         cmake --build . --config "${BUILD_TYPE}" -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
 
@@ -340,13 +344,26 @@ build_android() {
 
         # Copy shared libraries
         [ -f "${ABI_BUILD}/librac_commons.so" ] && cp "${ABI_BUILD}/librac_commons.so" "${ABI_DIST}/"
-        [ -f "${ABI_BUILD}/librac_commons_jni.so" ] && cp "${ABI_BUILD}/librac_commons_jni.so" "${ABI_DIST}/"
 
-        # Copy STL if needed
-        local STL_LIB="${ANDROID_NDK}/toolchains/llvm/prebuilt/*/sysroot/usr/lib/${ABI}/libc++_shared.so"
+        # Copy JNI library if built
+        if [ -f "${ABI_BUILD}/src/jni/librac_commons_jni.so" ]; then
+            cp "${ABI_BUILD}/src/jni/librac_commons_jni.so" "${ABI_DIST}/"
+        elif [ -f "${ABI_BUILD}/librac_commons_jni.so" ]; then
+            cp "${ABI_BUILD}/librac_commons_jni.so" "${ABI_DIST}/"
+        fi
+
+        # Copy STL
+        local STL_PATH=""
+        case "${ABI}" in
+            arm64-v8a) STL_PATH="aarch64-linux-android" ;;
+            armeabi-v7a) STL_PATH="arm-linux-androideabi" ;;
+            x86_64) STL_PATH="x86_64-linux-android" ;;
+            x86) STL_PATH="i686-linux-android" ;;
+        esac
+
+        local STL_LIB="${ANDROID_NDK}/toolchains/llvm/prebuilt/*/sysroot/usr/lib/${STL_PATH}/libc++_shared.so"
         for stl in $STL_LIB; do
-            [ -f "$stl" ] && cp "$stl" "${ABI_DIST}/"
-            break
+            [ -f "$stl" ] && cp "$stl" "${ABI_DIST}/" && break
         done
 
         cd "${PROJECT_ROOT}"
@@ -368,11 +385,50 @@ build_android() {
 }
 
 # =============================================================================
+# Package for Release
+# =============================================================================
+
+create_packages() {
+    log_header "Creating Release Packages"
+
+    local PACKAGE_DIR="${DIST_DIR}/packages"
+    mkdir -p "${PACKAGE_DIR}"
+
+    # iOS package
+    if [ -d "${DIST_DIR}/RACommons.xcframework" ]; then
+        log_step "Packaging iOS..."
+        local IOS_PKG="RACommons-ios-v${VERSION}.zip"
+        cd "${DIST_DIR}"
+        zip -r "packages/${IOS_PKG}" "RACommons.xcframework"
+        cd "${PACKAGE_DIR}"
+        shasum -a 256 "${IOS_PKG}" > "${IOS_PKG}.sha256"
+        cd "${PROJECT_ROOT}"
+        log_info "Created: ${IOS_PKG}"
+    fi
+
+    # Android package
+    if [ -d "${DIST_DIR}/android/jniLibs" ]; then
+        log_step "Packaging Android..."
+        local ANDROID_PKG="RACommons-android-v${VERSION}.zip"
+        cd "${DIST_DIR}/android"
+        zip -r "../packages/${ANDROID_PKG}" jniLibs include
+        cd "${PACKAGE_DIR}"
+        shasum -a 256 "${ANDROID_PKG}" > "${ANDROID_PKG}.sha256"
+        cd "${PROJECT_ROOT}"
+        log_info "Created: ${ANDROID_PKG}"
+    fi
+
+    log_info "Packages created in: ${PACKAGE_DIR}"
+    ls -la "${PACKAGE_DIR}/"
+}
+
+# =============================================================================
 # Main
 # =============================================================================
 
 [ "$BUILD_IOS" = true ] && build_ios
 [ "$BUILD_ANDROID" = true ] && build_android
+[ "$CREATE_PACKAGE" = true ] && create_packages
 
 # =============================================================================
 # Summary
@@ -380,7 +436,8 @@ build_android() {
 
 log_header "Build Complete!"
 
-echo "Output directory: ${DIST_DIR}"
+echo "Version: ${VERSION}"
+echo "Output:  ${DIST_DIR}"
 echo ""
 
 if [ "$BUILD_IOS" = true ]; then
@@ -392,13 +449,20 @@ fi
 
 if [ "$BUILD_ANDROID" = true ]; then
     echo "Android:"
-    if [ -d "${DIST_DIR}/android/rac-commons/jniLibs" ]; then
-        for abi_dir in "${DIST_DIR}/android/rac-commons/jniLibs/"*/; do
+    if [ -d "${DIST_DIR}/android/jniLibs" ]; then
+        for abi_dir in "${DIST_DIR}/android/jniLibs/"*/; do
             [ -d "$abi_dir" ] && echo "  $(basename "$abi_dir"): $(ls "$abi_dir"/*.so 2>/dev/null | wc -l | tr -d ' ') libraries"
         done
     fi
     echo ""
 fi
 
-echo "NOTE: Backend libraries (LlamaCPP, ONNX, WhisperCPP) are built from runanywhere-core."
-echo "      Use: runanywhere-core/scripts/build-rac-backends.sh"
+if [ "$CREATE_PACKAGE" = true ] && [ -d "${DIST_DIR}/packages" ]; then
+    echo "Packages:"
+    ls -1 "${DIST_DIR}/packages/"*.zip 2>/dev/null | while read pkg; do
+        echo "  $(du -h "$pkg" | cut -f1)  $(basename "$pkg")"
+    done
+fi
+
+echo ""
+log_info "Done!"
