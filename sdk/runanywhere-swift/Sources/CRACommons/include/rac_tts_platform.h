@@ -78,7 +78,7 @@ typedef rac_bool_t (*rac_platform_tts_can_handle_fn)(const char* voice_id, void*
  * @return Handle to created service (Swift object pointer), or NULL on failure
  */
 typedef rac_handle_t (*rac_platform_tts_create_fn)(const rac_tts_platform_config_t* config,
-                                                    void* user_data);
+                                                   void* user_data);
 
 /**
  * Callback to synthesize speech.
@@ -90,10 +90,9 @@ typedef rac_handle_t (*rac_platform_tts_create_fn)(const rac_tts_platform_config
  * @param user_data User-provided context
  * @return RAC_SUCCESS or error code
  */
-typedef rac_result_t (*rac_platform_tts_synthesize_fn)(rac_handle_t handle,
-                                                        const char* text,
-                                                        const rac_tts_platform_options_t* options,
-                                                        void* user_data);
+typedef rac_result_t (*rac_platform_tts_synthesize_fn)(rac_handle_t handle, const char* text,
+                                                       const rac_tts_platform_options_t* options,
+                                                       void* user_data);
 
 /**
  * Callback to stop speech.
@@ -164,7 +163,7 @@ RAC_API rac_bool_t rac_platform_tts_is_available(void);
  * @return RAC_SUCCESS on success, or error code
  */
 RAC_API rac_result_t rac_tts_platform_create(const rac_tts_platform_config_t* config,
-                                              rac_tts_platform_handle_t* out_handle);
+                                             rac_tts_platform_handle_t* out_handle);
 
 /**
  * Destroys a platform TTS service.
@@ -181,9 +180,8 @@ RAC_API void rac_tts_platform_destroy(rac_tts_platform_handle_t handle);
  * @param options Synthesis options (can be NULL for defaults)
  * @return RAC_SUCCESS on success, or error code
  */
-RAC_API rac_result_t rac_tts_platform_synthesize(rac_tts_platform_handle_t handle,
-                                                  const char* text,
-                                                  const rac_tts_platform_options_t* options);
+RAC_API rac_result_t rac_tts_platform_synthesize(rac_tts_platform_handle_t handle, const char* text,
+                                                 const rac_tts_platform_options_t* options);
 
 /**
  * Stops current speech synthesis.

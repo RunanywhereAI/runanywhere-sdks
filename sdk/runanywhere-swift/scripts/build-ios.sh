@@ -17,9 +17,12 @@
 #
 # PREREQUISITES:
 #   - XCFrameworks must exist in:
-#     - ../runanywhere-commons/dist/ (RACommons, RABackendLlamaCPP, RABackendONNX)
-#     - ../../runanywhere-core/dist/ (RunAnywhereCore)
+#     - ../runanywhere-commons/dist/ (RACommons)
+#     - ../../runanywhere-core/dist/ (RunAnywhereCore, RABackendLlamaCPP, RABackendONNX, RABackendWhisperCPP)
 #     - ../../runanywhere-core/third_party/onnxruntime-ios/ (onnxruntime)
+#
+# NOTE: LlamaCPP, ONNX, and WhisperCPP backends are now built from runanywhere-core,
+# not from runanywhere-commons. The backends directly export RAC APIs.
 #
 # =============================================================================
 
@@ -94,20 +97,19 @@ install_frameworks() {
 
     mkdir -p "$BINARIES_DIR"
 
-    # From runanywhere-commons
-    for framework in RACommons RABackendLlamaCPP RABackendONNX; do
-        local src="$COMMONS_DIR/dist/${framework}.xcframework"
-        if [[ -d "$src" ]]; then
-            log_step "Installing ${framework}.xcframework"
-            rm -rf "$BINARIES_DIR/${framework}.xcframework"
-            cp -r "$src" "$BINARIES_DIR/"
-            log_info "  ${framework}.xcframework"
-        else
-            log_warn "  ${framework}.xcframework not found at $src"
-        fi
-    done
+    # From runanywhere-commons (RACommons only - backends moved to core)
+    local commons_src="$COMMONS_DIR/dist/RACommons.xcframework"
+    if [[ -d "$commons_src" ]]; then
+        log_step "Installing RACommons.xcframework"
+        rm -rf "$BINARIES_DIR/RACommons.xcframework"
+        cp -r "$commons_src" "$BINARIES_DIR/"
+        log_info "  RACommons.xcframework"
+    else
+        log_warn "  RACommons.xcframework not found at $commons_src"
+    fi
 
-    # From runanywhere-core
+    # From runanywhere-core (core + RAC backends)
+    # NOTE: LlamaCPP, ONNX, and WhisperCPP backends are now built as part of core
     local core_src="$CORE_DIR/dist/RunAnywhereCore.xcframework"
     if [[ -d "$core_src" ]]; then
         log_step "Installing RunAnywhereCore.xcframework"
@@ -117,6 +119,19 @@ install_frameworks() {
     else
         log_warn "  RunAnywhereCore.xcframework not found at $core_src"
     fi
+
+    # RAC Backend frameworks from runanywhere-core
+    for framework in RABackendLlamaCPP RABackendONNX RABackendWhisperCPP; do
+        local src="$CORE_DIR/dist/${framework}.xcframework"
+        if [[ -d "$src" ]]; then
+            log_step "Installing ${framework}.xcframework"
+            rm -rf "$BINARIES_DIR/${framework}.xcframework"
+            cp -r "$src" "$BINARIES_DIR/"
+            log_info "  ${framework}.xcframework"
+        else
+            log_warn "  ${framework}.xcframework not found at $src (optional)"
+        fi
+    done
 
     # onnxruntime (vendored dependency)
     local onnx_src="$CORE_DIR/third_party/onnxruntime-ios/onnxruntime.xcframework"
@@ -139,23 +154,33 @@ install_frameworks() {
 sync_headers() {
     log_header "Syncing Headers"
 
-    local headers_src="$COMMONS_DIR/include/rac"
-
-    if [[ ! -d "$headers_src" ]]; then
-        log_error "Headers not found at: $headers_src"
-        return 1
-    fi
-
     mkdir -p "$HEADERS_DIR"
 
-    log_step "Copying headers from $headers_src"
+    # Sync RAC type headers from runanywhere-commons
+    local commons_headers="$COMMONS_DIR/include/rac"
+    if [[ -d "$commons_headers" ]]; then
+        log_step "Copying RAC type headers from commons"
+        find "$commons_headers" -name "*.h" -type f | while read -r header; do
+            local filename=$(basename "$header")
+            # Convert nested includes to flat includes
+            sed 's|#include "rac/.*/\([^/"]*\)"|#include "\1"|g' "$header" > "$HEADERS_DIR/$filename"
+        done
+    else
+        log_warn "Commons headers not found at: $commons_headers"
+    fi
 
-    # Flatten headers and fix includes for Swift module map compatibility
-    find "$headers_src" -name "*.h" -type f | while read -r header; do
-        local filename=$(basename "$header")
-        # Convert nested includes to flat includes
-        sed 's|#include "rac/.*/\([^/"]*\)"|#include "\1"|g' "$header" > "$HEADERS_DIR/$filename"
-    done
+    # Sync RAC backend API headers from runanywhere-core
+    local core_headers="$CORE_DIR/include"
+    if [[ -d "$core_headers" ]]; then
+        log_step "Copying RAC backend headers from core"
+        find "$core_headers" -name "rac_*.h" -type f | while read -r header; do
+            local filename=$(basename "$header")
+            # Convert nested includes to flat includes
+            sed 's|#include "rac/.*/\([^/"]*\)"|#include "\1"|g' "$header" > "$HEADERS_DIR/$filename"
+        done
+    else
+        log_warn "Core headers not found at: $core_headers"
+    fi
 
     local count=$(find "$HEADERS_DIR" -name "*.h" | wc -l | tr -d ' ')
     log_info "Synced $count headers to: $HEADERS_DIR"

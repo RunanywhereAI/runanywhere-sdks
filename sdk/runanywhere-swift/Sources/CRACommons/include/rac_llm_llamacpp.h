@@ -1,19 +1,19 @@
 /**
  * @file rac_llm_llamacpp.h
- * @brief RunAnywhere Commons - LlamaCPP Backend for LLM
+ * @brief RunAnywhere Core - LlamaCPP Backend RAC API
  *
- * C wrapper around runanywhere-core's LlamaCPP backend.
- * Mirrors Swift's LlamaCPPService implementation.
+ * Direct RAC API export from runanywhere-core's LlamaCPP backend.
+ * This header defines the public C API for LLM inference using llama.cpp.
  *
- * See: Sources/LlamaCPPRuntime/LlamaCPPService.swift
+ * Mirrors Swift's LlamaCPPService implementation pattern.
  */
 
 #ifndef RAC_LLM_LLAMACPP_H
 #define RAC_LLM_LLAMACPP_H
 
-#include "rac/core/rac_error.h"
-#include "rac/core/rac_types.h"
-#include "rac/features/llm/rac_llm.h"
+#include "rac_error.h"
+#include "rac_types.h"
+#include "rac_llm.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,7 +42,7 @@ extern "C" {
 /**
  * LlamaCPP-specific configuration.
  *
- * Mirrors Swift's LlamaCPPGenerationConfig and ra_llamacpp_config_t from core.
+ * Mirrors Swift's LlamaCPPGenerationConfig.
  */
 typedef struct rac_llm_llamacpp_config {
     /** Context size (0 = auto-detect from model) */
