@@ -17,7 +17,7 @@ DIST_DIR="${PROJECT_ROOT}/dist/android"
 # Load versions from VERSIONS file (single source of truth)
 source "${SCRIPT_DIR}/load-versions.sh"
 
-# Configuration
+# Configuration - uses ANDROID_MIN_SDK from VERSIONS file (loaded above)
 ANDROID_MIN_SDK="${ANDROID_MIN_SDK:-24}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 

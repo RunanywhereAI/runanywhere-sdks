@@ -25,10 +25,11 @@ jobs:
         with:
           submodules: recursive
 
+      # Xcode version should match XCODE_VERSION in VERSIONS file
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '15.2'
+          xcode-version: '15.4'
 
       - name: Install CMake
         run: brew install cmake ninja

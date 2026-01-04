@@ -66,6 +66,7 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
+      # Xcode version should match XCODE_VERSION in VERSIONS file
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
