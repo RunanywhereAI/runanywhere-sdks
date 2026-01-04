@@ -45,7 +45,7 @@ if [ ! -d "${RUNANYWHERE_CORE_DIR}" ]; then
     exit 1
 fi
 
-# Configuration
+# Configuration - uses IOS_DEPLOYMENT_TARGET from VERSIONS file (loaded above)
 IOS_DEPLOYMENT_TARGET="${IOS_DEPLOYMENT_TARGET:-13.0}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 
