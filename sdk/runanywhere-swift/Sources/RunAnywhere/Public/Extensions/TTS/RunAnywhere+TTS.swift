@@ -34,7 +34,7 @@ public extension RunAnywhere {
             throw SDKError.tts(.modelNotFound, "Voice '\(voiceId)' is not downloaded")
         }
 
-        try await CppBridge.TTS.shared.loadVoice(localPath.path, voiceId: voiceId)
+        try await CppBridge.TTS.shared.loadVoice(localPath.path, voiceId: voiceId, voiceName: modelInfo.name)
     }
 
     /// Unload the currently loaded TTS voice

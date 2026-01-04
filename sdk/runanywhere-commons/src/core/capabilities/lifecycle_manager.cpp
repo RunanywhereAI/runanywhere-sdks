@@ -42,7 +42,9 @@ struct LifecycleManager {
 
     // State (mirrors Swift's lifecycle properties)
     std::atomic<rac_lifecycle_state_t> state{RAC_LIFECYCLE_STATE_IDLE};
-    std::string current_model_id{};
+    std::string current_model_path{};  // File path used for loading
+    std::string current_model_id{};    // Model identifier for telemetry (e.g., "sherpa-onnx-whisper-tiny.en")
+    std::string current_model_name{};  // Human-readable name (e.g., "Sherpa Whisper Tiny (ONNX)")
     rac_handle_t current_service{nullptr};
 
     // Metrics (mirrors Swift's ManagedLifecycle metrics)
@@ -142,18 +144,28 @@ rac_result_t rac_lifecycle_create(const rac_lifecycle_config_t* config,
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_id,
+rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_path,
+                                const char* model_id, const char* model_name,
                                 rac_handle_t* out_service) {
-    if (handle == nullptr || model_id == nullptr || out_service == nullptr) {
+    if (handle == nullptr || model_path == nullptr || out_service == nullptr) {
         return RAC_ERROR_NULL_POINTER;
+    }
+
+    // If model_id is null, use model_path as model_id
+    if (model_id == nullptr) {
+        model_id = model_path;
+    }
+    // If model_name is null, use model_id as model_name
+    if (model_name == nullptr) {
+        model_name = model_id;
     }
 
     auto* mgr = static_cast<LifecycleManager*>(handle);
     std::lock_guard<std::mutex> lock(mgr->mutex);
 
-    // Check if already loaded with same ID - skip duplicate events
+    // Check if already loaded with same path - skip duplicate events
     // Mirrors Swift: if await lifecycle.currentResourceId == modelId
-    if (mgr->state.load() == RAC_LIFECYCLE_STATE_LOADED && mgr->current_model_id == model_id &&
+    if (mgr->state.load() == RAC_LIFECYCLE_STATE_LOADED && mgr->current_model_path == model_path &&
         mgr->current_service != nullptr) {
         // Mirrors Swift: logger.info("Model already loaded, skipping duplicate load")
         RAC_LOG_INFO(mgr->logger_category.c_str(), "Model already loaded, skipping duplicate load");
@@ -166,17 +178,19 @@ rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_id,
     mgr->state.store(RAC_LIFECYCLE_STATE_LOADING);
     track_lifecycle_event(mgr, "load.started", model_id, 0.0, RAC_SUCCESS);
 
-    RAC_LOG_INFO(mgr->logger_category.c_str(), "Loading model: %s", model_id);
+    RAC_LOG_INFO(mgr->logger_category.c_str(), "Loading model: %s (path: %s)", model_id, model_path);
 
-    // Create service via callback
+    // Create service via callback - pass the PATH for loading
     rac_handle_t service = nullptr;
-    rac_result_t result = mgr->create_fn(model_id, mgr->user_data, &service);
+    rac_result_t result = mgr->create_fn(model_path, mgr->user_data, &service);
 
     auto load_time_ms = static_cast<double>(current_time_ms() - start_time);
 
     if (result == RAC_SUCCESS && service != nullptr) {
-        // Success - mirrors Swift success path
-        mgr->current_model_id = model_id;
+        // Success - store path, model_id, and model_name separately
+        mgr->current_model_path = model_path;
+        mgr->current_model_id = model_id;      // Model identifier for telemetry
+        mgr->current_model_name = model_name;  // Human-readable name for telemetry
         mgr->current_service = service;
         mgr->state.store(RAC_LIFECYCLE_STATE_LOADED);
 
@@ -231,7 +245,9 @@ rac_result_t rac_lifecycle_unload(rac_handle_t handle) {
     }
 
     // Reset state
+    mgr->current_model_path.clear();
     mgr->current_model_id.clear();
+    mgr->current_model_name.clear();
     mgr->current_service = nullptr;
     mgr->state.store(RAC_LIFECYCLE_STATE_IDLE);
 
@@ -257,7 +273,9 @@ rac_result_t rac_lifecycle_reset(rac_handle_t handle) {
     }
 
     // Reset all state
+    mgr->current_model_path.clear();
     mgr->current_model_id.clear();
+    mgr->current_model_name.clear();
     mgr->current_service = nullptr;
     mgr->state.store(RAC_LIFECYCLE_STATE_IDLE);
 
@@ -294,6 +312,20 @@ const char* rac_lifecycle_get_model_id(rac_handle_t handle) {
         return nullptr;
     }
     return mgr->current_model_id.c_str();
+}
+
+const char* rac_lifecycle_get_model_name(rac_handle_t handle) {
+    if (handle == nullptr) {
+        return nullptr;
+    }
+
+    auto* mgr = static_cast<LifecycleManager*>(handle);
+    std::lock_guard<std::mutex> lock(mgr->mutex);
+
+    if (mgr->current_model_name.empty()) {
+        return nullptr;
+    }
+    return mgr->current_model_name.c_str();
 }
 
 rac_handle_t rac_lifecycle_get_service(rac_handle_t handle) {

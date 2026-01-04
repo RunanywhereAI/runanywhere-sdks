@@ -141,11 +141,16 @@ RAC_API rac_result_t rac_lifecycle_create(const rac_lifecycle_config_t* config,
  * If already loaded with same ID, skips duplicate load.
  *
  * @param handle Lifecycle manager handle
- * @param model_id Model ID to load
+ * @param model_path File path to the model (used for loading) - REQUIRED
+ * @param model_id Model identifier for telemetry (e.g., "sherpa-onnx-whisper-tiny.en")
+ *                 Optional: if NULL, defaults to model_path
+ * @param model_name Human-readable model name (e.g., "Sherpa Whisper Tiny (ONNX)")
+ *                   Optional: if NULL, defaults to model_id
  * @param out_service Output: Handle to the loaded service
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_id,
+RAC_API rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_path,
+                                        const char* model_id, const char* model_name,
                                         rac_handle_t* out_service);
 
 /**

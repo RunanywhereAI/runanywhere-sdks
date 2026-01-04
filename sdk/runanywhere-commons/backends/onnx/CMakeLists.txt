@@ -70,8 +70,19 @@ target_compile_features(rac_backend_onnx PUBLIC cxx_std_17)
 # =============================================================================
 
 # Link against rac_commons (parent project provides this)
+# rac_commons links runanywhere_bridge which provides ra_create_backend
 if(TARGET rac_commons)
     target_link_libraries(rac_backend_onnx PUBLIC rac_commons)
+endif()
+
+# Link runanywhere_bridge directly to ensure ra_create_backend symbols are available
+# Use pre-built library if available, otherwise use compiled target
+if(DEFINED RUNANYWHERE_CORE_BRIDGE_LIB)
+    # Pre-built library mode (USE_PREBUILT_CORE=ON)
+    target_link_libraries(rac_backend_onnx PRIVATE ${RUNANYWHERE_CORE_BRIDGE_LIB})
+elseif(TARGET runanywhere_bridge)
+    # Source compilation mode (legacy)
+    target_link_libraries(rac_backend_onnx PRIVATE runanywhere_bridge)
 endif()
 
 # Include runanywhere-commons public headers
@@ -81,8 +92,14 @@ target_include_directories(rac_backend_onnx PUBLIC
 
 # Link against runanywhere-core's onnx backend
 # Note: runanywhere_onnx includes standalone ra_* functions (ra_create_backend, ra_stt_*, etc.)
-# Do NOT link against runanywhere_bridge as it has conflicting symbols
-if(TARGET runanywhere_onnx)
+# Do NOT link against runanywhere_bridge separately as it has conflicting symbols
+# Use pre-built library if available, otherwise use compiled target
+if(DEFINED RUNANYWHERE_CORE_ONNX_LIB)
+    # Pre-built library mode (USE_PREBUILT_CORE=ON)
+    target_link_libraries(rac_backend_onnx PRIVATE ${RUNANYWHERE_CORE_ONNX_LIB})
+    # Include directories are set globally via RUNANYWHERE_CORE_INCLUDE_DIRS
+elseif(TARGET runanywhere_onnx)
+    # Source compilation mode - runanywhere_onnx already includes ra_* symbols
     target_link_libraries(rac_backend_onnx PRIVATE runanywhere_onnx)
     # Include runanywhere-core headers for backend APIs
     target_include_directories(rac_backend_onnx PRIVATE
@@ -90,8 +107,6 @@ if(TARGET runanywhere_onnx)
         ${RUNANYWHERE_CORE_DIR}/src/capabilities
         ${RUNANYWHERE_CORE_DIR}/src/backends/onnx
     )
-elseif(DEFINED RUNANYWHERE_CORE_ONNX_LIB)
-    target_link_libraries(rac_backend_onnx PRIVATE ${RUNANYWHERE_CORE_ONNX_LIB})
 endif()
 
 # =============================================================================

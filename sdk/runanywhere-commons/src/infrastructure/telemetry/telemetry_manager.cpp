@@ -41,6 +41,11 @@ struct rac_telemetry_manager {
 
     // V2 modalities for grouping
     std::set<std::string> v2_modalities = {"llm", "stt", "tts", "model"};
+
+    // Batching configuration
+    static constexpr size_t BATCH_SIZE_PRODUCTION = 10;  // Flush after 10 events in production
+    static constexpr int64_t BATCH_TIMEOUT_MS = 5000;    // Flush after 5 seconds in production
+    int64_t last_flush_time_ms = 0;                      // Track last flush time for timeout
 };
 
 // =============================================================================
@@ -56,8 +61,25 @@ int64_t get_current_timestamp_ms() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
 }
 
+// Thread-safe seeding flag
+std::once_flag rand_seed_flag;
+
+// Ensure random number generator is seeded exactly once (thread-safe)
+void ensure_rand_seeded() {
+    std::call_once(rand_seed_flag, []() {
+        // Seed with combination of time and memory address for better entropy
+        auto now = std::chrono::high_resolution_clock::now();
+        auto nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
+        unsigned int seed = static_cast<unsigned int>(nanos ^ reinterpret_cast<uintptr_t>(&rand_seed_flag));
+        srand(seed);
+    });
+}
+
 // Generate UUID
 std::string generate_uuid() {
+    // Ensure random number generator is seeded
+    ensure_rand_seeded();
+    
     // Simple UUID generation (not RFC4122 compliant, but sufficient for event IDs)
     static const char hex[] = "0123456789abcdef";
     std::string uuid = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx";
@@ -98,7 +120,27 @@ const char* event_type_to_modality(rac_event_type_t type) {
     if (type >= RAC_EVENT_VAD_STARTED && type <= RAC_EVENT_VAD_RESUMED) {
         return "system";  // VAD goes to system
     }
+    // Model download/extraction/deletion events go to "model" modality (V2 base table only)
+    if (type >= RAC_EVENT_MODEL_DOWNLOAD_STARTED && type <= RAC_EVENT_MODEL_DELETED) {
+        return "model";
+    }
+    // SDK lifecycle, storage, device, network events go to system (V1 table)
     return "system";
+}
+
+// Check if event type is a completion/failure event that should flush immediately
+bool is_completion_event(rac_event_type_t type) {
+    switch (type) {
+        case RAC_EVENT_LLM_GENERATION_COMPLETED:
+        case RAC_EVENT_LLM_GENERATION_FAILED:
+        case RAC_EVENT_STT_TRANSCRIPTION_COMPLETED:
+        case RAC_EVENT_STT_TRANSCRIPTION_FAILED:
+        case RAC_EVENT_TTS_SYNTHESIS_COMPLETED:
+        case RAC_EVENT_TTS_SYNTHESIS_FAILED:
+            return true;
+        default:
+            return false;
+    }
 }
 
 // Convert analytics event type to event type string
@@ -182,6 +224,70 @@ const char* event_type_to_string(rac_event_type_t type) {
         case RAC_EVENT_VOICE_AGENT_TURN_FAILED:
             return "voice_agent.turn.failed";
 
+        // SDK Lifecycle Events (600-699)
+        case RAC_EVENT_SDK_INIT_STARTED:
+            return "sdk.init.started";
+        case RAC_EVENT_SDK_INIT_COMPLETED:
+            return "sdk.init.completed";
+        case RAC_EVENT_SDK_INIT_FAILED:
+            return "sdk.init.failed";
+        case RAC_EVENT_SDK_MODELS_LOADED:
+            return "sdk.models.loaded";
+
+        // Model Download Events (700-719)
+        case RAC_EVENT_MODEL_DOWNLOAD_STARTED:
+            return "model.download.started";
+        case RAC_EVENT_MODEL_DOWNLOAD_PROGRESS:
+            return "model.download.progress";
+        case RAC_EVENT_MODEL_DOWNLOAD_COMPLETED:
+            return "model.download.completed";
+        case RAC_EVENT_MODEL_DOWNLOAD_FAILED:
+            return "model.download.failed";
+        case RAC_EVENT_MODEL_DOWNLOAD_CANCELLED:
+            return "model.download.cancelled";
+
+        // Model Extraction Events (710-719)
+        case RAC_EVENT_MODEL_EXTRACTION_STARTED:
+            return "model.extraction.started";
+        case RAC_EVENT_MODEL_EXTRACTION_PROGRESS:
+            return "model.extraction.progress";
+        case RAC_EVENT_MODEL_EXTRACTION_COMPLETED:
+            return "model.extraction.completed";
+        case RAC_EVENT_MODEL_EXTRACTION_FAILED:
+            return "model.extraction.failed";
+
+        // Model Deletion Events (720-729)
+        case RAC_EVENT_MODEL_DELETED:
+            return "model.deleted";
+
+        // Storage Events (800-899)
+        case RAC_EVENT_STORAGE_CACHE_CLEARED:
+            return "storage.cache.cleared";
+        case RAC_EVENT_STORAGE_CACHE_CLEAR_FAILED:
+            return "storage.cache.clear_failed";
+        case RAC_EVENT_STORAGE_TEMP_CLEANED:
+            return "storage.temp.cleaned";
+
+        // Device Events (900-999)
+        case RAC_EVENT_DEVICE_REGISTERED:
+            return "device.registered";
+        case RAC_EVENT_DEVICE_REGISTRATION_FAILED:
+            return "device.registration.failed";
+
+        // Network Events (1000-1099)
+        case RAC_EVENT_NETWORK_CONNECTIVITY_CHANGED:
+            return "network.connectivity.changed";
+
+        // Error Events (1100-1199)
+        case RAC_EVENT_SDK_ERROR:
+            return "sdk.error";
+
+        // Framework Events (1200-1299)
+        case RAC_EVENT_FRAMEWORK_MODELS_REQUESTED:
+            return "framework.models.requested";
+        case RAC_EVENT_FRAMEWORK_MODELS_RETRIEVED:
+            return "framework.models.retrieved";
+
         default:
             return "unknown";
     }
@@ -229,6 +335,7 @@ rac_telemetry_manager_t* rac_telemetry_manager_create(rac_environment_t env, con
     manager->sdk_version = sdk_version ? sdk_version : "";
     manager->http_callback = nullptr;
     manager->http_user_data = nullptr;
+    manager->last_flush_time_ms = 0;  // Initialize to 0 (will be set on first flush)
 
     log_debug("Telemetry", "Telemetry manager created for environment %d", env);
 
@@ -300,7 +407,56 @@ rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
         manager->queue.push_back(copy);
     }
 
+    // Use WARN level for production visibility (INFO is filtered in production)
     log_debug("Telemetry", "Telemetry event queued: %s", payload->event_type);
+
+    // Auto-flush logic
+    if (!manager->http_callback) {
+        log_debug("Telemetry", "HTTP callback not set, skipping auto-flush");
+        return RAC_SUCCESS;
+    }
+
+    bool should_flush = false;
+    size_t queue_size = 0;
+    int64_t current_time = get_current_timestamp_ms();
+
+    {
+        std::lock_guard<std::mutex> lock(manager->queue_mutex);
+        queue_size = manager->queue.size();
+    }
+
+    if (manager->environment == RAC_ENV_DEVELOPMENT) {
+        // Development: Immediate flush for real-time debugging
+        should_flush = true;
+        log_debug("Telemetry", "Development mode: auto-flushing immediately (queue size: %zu)", queue_size);
+    } else {
+        // Production: Flush based on batch size or timeout
+        // (completion events are handled in rac_telemetry_manager_track_analytics)
+        // Flush if queue reaches batch size
+        if (queue_size >= manager->BATCH_SIZE_PRODUCTION) {
+            should_flush = true;
+            log_debug("Telemetry", "Auto-flushing: queue size (%zu) >= batch size (%zu)",
+                        queue_size, manager->BATCH_SIZE_PRODUCTION);
+        }
+        // Flush if timeout reached (5 seconds since last flush)
+        else if (manager->last_flush_time_ms > 0 &&
+                 (current_time - manager->last_flush_time_ms) >= manager->BATCH_TIMEOUT_MS) {
+            should_flush = true;
+            log_debug("Telemetry", "Auto-flushing: timeout reached (%lld ms since last flush)",
+                        current_time - manager->last_flush_time_ms);
+        }
+        // First flush: start the timer by flushing immediately if we have events
+        else if (manager->last_flush_time_ms == 0 && queue_size > 0) {
+            should_flush = true;
+            log_debug("Telemetry", "Production: first flush to start timer (queue size: %zu)", queue_size);
+        }
+    }
+
+    if (should_flush) {
+        log_debug("Telemetry", "Triggering auto-flush (queue size: %zu)", queue_size);
+        rac_telemetry_manager_flush(manager);
+        // Note: last_flush_time_ms is updated inside flush()
+    }
 
     return RAC_SUCCESS;
 }
@@ -334,7 +490,9 @@ rac_result_t rac_telemetry_manager_track_analytics(rac_telemetry_manager_t* mana
             case RAC_EVENT_LLM_FIRST_TOKEN:
             case RAC_EVENT_LLM_STREAMING_UPDATE: {
                 const auto& llm = data->data.llm_generation;
+                // model_id and model_name come directly from the event (set by component from lifecycle)
                 payload.model_id = llm.model_id;
+                payload.model_name = llm.model_name ? llm.model_name : llm.model_id;
                 payload.session_id = llm.generation_id;
                 payload.input_tokens = llm.input_tokens;
                 payload.output_tokens = llm.output_tokens;
@@ -365,7 +523,9 @@ rac_result_t rac_telemetry_manager_track_analytics(rac_telemetry_manager_t* mana
             case RAC_EVENT_LLM_MODEL_LOAD_FAILED:
             case RAC_EVENT_LLM_MODEL_UNLOADED: {
                 const auto& model = data->data.llm_model;
+                // model_id and model_name come directly from the event
                 payload.model_id = model.model_id;
+                payload.model_name = model.model_name ? model.model_name : model.model_id;
                 payload.model_size_bytes = model.model_size_bytes;
                 payload.processing_time_ms = model.duration_ms;
                 payload.framework = framework_to_string(model.framework);
@@ -386,7 +546,9 @@ rac_result_t rac_telemetry_manager_track_analytics(rac_telemetry_manager_t* mana
             case RAC_EVENT_STT_TRANSCRIPTION_FAILED:
             case RAC_EVENT_STT_PARTIAL_TRANSCRIPT: {
                 const auto& stt = data->data.stt_transcription;
+                // model_id and model_name come directly from the event
                 payload.model_id = stt.model_id;
+                payload.model_name = stt.model_name ? stt.model_name : stt.model_id;
                 payload.session_id = stt.transcription_id;
                 payload.processing_time_ms = stt.duration_ms;
                 payload.audio_duration_ms = stt.audio_length_ms;
@@ -416,7 +578,10 @@ rac_result_t rac_telemetry_manager_track_analytics(rac_telemetry_manager_t* mana
             case RAC_EVENT_TTS_SYNTHESIS_FAILED:
             case RAC_EVENT_TTS_SYNTHESIS_CHUNK: {
                 const auto& tts = data->data.tts_synthesis;
+                // model_id and model_name come directly from the event
                 payload.model_id = tts.model_id;
+                payload.model_name = tts.model_name ? tts.model_name : tts.model_id;
+                payload.voice = tts.model_id; // Voice is the same as model_id for TTS
                 payload.session_id = tts.synthesis_id;
                 payload.character_count = tts.character_count;
                 payload.output_duration_ms = tts.audio_duration_ms;
@@ -432,6 +597,12 @@ rac_result_t rac_telemetry_manager_track_analytics(rac_telemetry_manager_t* mana
                 } else if (event_type == RAC_EVENT_TTS_SYNTHESIS_COMPLETED) {
                     payload.success = RAC_TRUE;
                     payload.has_success = RAC_TRUE;
+                }
+                // Debug: Log if voice/model_id is null
+                if (!payload.voice || !payload.model_id) {
+                    log_debug("Telemetry", "TTS event has null voice/model_id (voice_id from lifecycle may be null)");
+                } else {
+                    log_debug("Telemetry", "TTS event voice: %s", payload.voice);
                 }
                 break;
             }
@@ -453,7 +624,19 @@ rac_result_t rac_telemetry_manager_track_analytics(rac_telemetry_manager_t* mana
         }
     }
 
-    return rac_telemetry_manager_track(manager, &payload);
+    rac_result_t result = rac_telemetry_manager_track(manager, &payload);
+
+    // For completion/failure events in production, trigger immediate flush
+    // This ensures important terminal events are captured before app exits
+    if (result == RAC_SUCCESS && 
+        manager->environment != RAC_ENV_DEVELOPMENT &&
+        is_completion_event(event_type) &&
+        manager->http_callback) {
+        log_debug("Telemetry", "Completion event detected, triggering immediate flush");
+        rac_telemetry_manager_flush(manager);
+    }
+
+    return result;
 }
 
 // =============================================================================
@@ -466,7 +649,7 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
     }
 
     if (!manager->http_callback) {
-        log_warning("Telemetry", "No HTTP callback registered, cannot flush telemetry");
+        log_debug("Telemetry", "No HTTP callback registered, cannot flush telemetry");
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
@@ -483,6 +666,9 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
     }
 
     log_debug("Telemetry", "Flushing %zu telemetry events", events.size());
+
+    // Update last flush time
+    manager->last_flush_time_ms = get_current_timestamp_ms();
 
     // Get endpoint
     const char* endpoint = rac_endpoint_telemetry(manager->environment);
@@ -537,6 +723,9 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
                 rac_telemetry_manager_batch_to_json(&batch, manager->environment, &json, &json_len);
 
             if (result == RAC_SUCCESS && json) {
+                // WARN: Log production telemetry payload for debugging (first 500 chars)
+                log_debug("Telemetry", "Sending production telemetry (modality=%s, %zu bytes): %.500s",
+                            modality.c_str(), json_len, json);
                 manager->http_callback(manager->http_user_data, endpoint, json, json_len,
                                        RAC_TRUE  // Production always requires auth
                 );

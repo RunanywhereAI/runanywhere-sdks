@@ -45,6 +45,31 @@ extension CppBridge {
                 }
             }
 
+            // Initialize SDK config with version (required for device registration)
+            // This populates rac_sdk_get_config() which device registration uses
+            let sdkVersion = SDKConstants.version
+            let platform = SDKConstants.platform
+            
+            // Use withCString to ensure strings remain valid during the call
+            sdkVersion.withCString { sdkVer in
+                platform.withCString { plat in
+                    apiKey.withCString { key in
+                        baseURL.absoluteString.withCString { url in
+                            deviceId.withCString { did in
+                                var sdkConfig = rac_sdk_config_t()
+                                sdkConfig.environment = Environment.toC(environment)
+                                sdkConfig.api_key = apiKey.isEmpty ? nil : key
+                                sdkConfig.base_url = baseURL.absoluteString.isEmpty ? nil : url
+                                sdkConfig.device_id = deviceId.isEmpty ? nil : did
+                                sdkConfig.platform = plat
+                                sdkConfig.sdk_version = sdkVer
+                                _ = rac_sdk_init(&sdkConfig)
+                            }
+                        }
+                    }
+                }
+            }
+
             // Register Keychain persistence callbacks
             registerPersistenceCallbacks()
 
@@ -222,16 +247,31 @@ extension CppBridge {
 
         /// Load stored auth from Keychain into C++ state
         private static func loadStoredAuth() {
-            // Load tokens from Keychain
-            guard let accessToken = try? KeychainManager.shared.retrieve(for: "com.runanywhere.sdk.accessToken"),
-                  let refreshToken = try? KeychainManager.shared.retrieve(for: "com.runanywhere.sdk.refreshToken") else {
+            // Load tokens from Keychain (use retrieveIfExists to avoid logging errors for missing items)
+            // retrieveIfExists returns String? and can throw
+            let accessToken: String?
+            let refreshToken: String?
+            
+            do {
+                accessToken = try KeychainManager.shared.retrieveIfExists(for: "com.runanywhere.sdk.accessToken")
+                refreshToken = try KeychainManager.shared.retrieveIfExists(for: "com.runanywhere.sdk.refreshToken")
+            } catch {
+                // Keychain error (not just missing item) - log but don't fail
+                SDKLogger(category: "CppBridge.State").debug("Keychain error loading auth: \(error.localizedDescription)")
+                return
+            }
+            
+            guard let accessToken = accessToken,
+                  let refreshToken = refreshToken else {
+                // No stored auth tokens found - this is normal on first launch
+                SDKLogger(category: "CppBridge.State").debug("No stored auth data found in Keychain (expected on first launch)")
                 return
             }
 
-            // Load additional fields
-            let userId = try? KeychainManager.shared.retrieve(for: "com.runanywhere.sdk.userId")
-            let orgId = try? KeychainManager.shared.retrieve(for: "com.runanywhere.sdk.organizationId")
-            let deviceIdStored = try? KeychainManager.shared.retrieve(for: "com.runanywhere.sdk.deviceId")
+            // Load additional fields (optional - these may not exist)
+            let userId = try? KeychainManager.shared.retrieveIfExists(for: "com.runanywhere.sdk.userId")
+            let orgId = try? KeychainManager.shared.retrieveIfExists(for: "com.runanywhere.sdk.organizationId")
+            let deviceIdStored = try? KeychainManager.shared.retrieveIfExists(for: "com.runanywhere.sdk.deviceId")
 
             // Set in C++ state (use a far-future expiry for loaded tokens - they'll be refreshed if needed)
             accessToken.withCString { access in
