@@ -53,14 +53,23 @@ version = "0.1.3"
 //
 // Mirrors Swift SDK's Package.swift testLocal pattern
 // =============================================================================
-val testLocal: Boolean = project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean() ?: false
+// IMPORTANT: Check rootProject first to support composite builds (e.g., when SDK is included from example app)
+// This ensures the app's gradle.properties takes precedence over the SDK's default
+val testLocal: Boolean = rootProject.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
+    ?: project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
+    ?: false
 
 // Version constants for remote downloads (mirrors Swift's Package.swift)
 // These should match the releases at:
 // - https://github.com/RunanywhereAI/runanywhere-binaries/releases (Android JNI libs for backends)
 // - https://github.com/RunanywhereAI/runanywhere-sdks/releases (Android JNI libs for commons)
-val coreVersion: String = project.findProperty("runanywhere.coreVersion")?.toString() ?: "0.2.0"
-val commonsVersion: String = project.findProperty("runanywhere.commonsVersion")?.toString() ?: "0.1.1"
+// IMPORTANT: Check rootProject first to support composite builds
+val coreVersion: String = rootProject.findProperty("runanywhere.coreVersion")?.toString()
+    ?: project.findProperty("runanywhere.coreVersion")?.toString()
+    ?: "0.2.4"
+val commonsVersion: String = rootProject.findProperty("runanywhere.commonsVersion")?.toString()
+    ?: project.findProperty("runanywhere.commonsVersion")?.toString()
+    ?: "0.1.1"
 
 // Log the build mode
 logger.lifecycle("RunAnywhere SDK: testLocal=$testLocal, coreVersion=$coreVersion")

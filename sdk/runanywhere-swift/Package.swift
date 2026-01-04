@@ -26,7 +26,7 @@ let testLocal = false  // PRODUCTION: download XCFrameworks from GitHub releases
 
 // Version constants for remote XCFrameworks (must be defined before package)
 let commonsVersion = "0.1.1"
-let coreVersion = "0.2.3"
+let coreVersion = "0.2.4"
 // =============================================================================
 
 let package = Package(
@@ -263,7 +263,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v\(coreVersion)/RABackendLlamaCPP-ios-v\(coreVersion).zip",
-                checksum: "3607518a08e307ddf1752a255e480244b51dad9ee1fe428f64c3f75fcb74bcd4"
+                checksum: "31a8b7e129ad6197e898d538a4c882a9f4717bad8a9694b842e49a676efd6142"
             ),
             // =================================================================
             // RABackendONNX - STT/TTS/VAD backend (includes Sherpa-ONNX)
@@ -272,7 +272,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v\(coreVersion)/RABackendONNX-ios-v\(coreVersion).zip",
-                checksum: "fa7660bb6b15d0d4aa1685dbe74491afaee1a8a5ec893abe93ded2554c0bc742"
+                checksum: "a2ada60f35c4a318d852ef04e08a1e5fdfbd646bcaf6058929203ced8ac98815"
             ),
             // =================================================================
             // ONNX Runtime - Required by RABackendONNX
