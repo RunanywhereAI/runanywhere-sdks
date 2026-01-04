@@ -10,6 +10,7 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import com.runanywhere.sdk.data.network.HTTPService
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
@@ -41,6 +42,36 @@ import java.util.concurrent.TimeUnit
  * - Callbacks from C++ are thread-safe
  */
 object CppBridgeHTTP {
+
+    // ========================================================================
+    // SHARED HTTP SERVICE (mirrors Swift CppBridge.HTTP.shared)
+    // ========================================================================
+
+    /**
+     * Shared HTTP service instance.
+     * Mirrors Swift: CppBridge.HTTP.shared -> HTTPService.shared
+     */
+    val shared: HTTPService
+        get() = HTTPService
+
+    /**
+     * Configure HTTP service with base URL and API key.
+     * Mirrors Swift: CppBridge.HTTP.configure(baseURL:apiKey:)
+     */
+    fun configure(baseURL: String, apiKey: String) {
+        HTTPService.configure(baseURL, apiKey)
+    }
+
+    /**
+     * Check if HTTP is configured.
+     * Mirrors Swift: CppBridge.HTTP.isConfigured
+     */
+    val isConfigured: Boolean
+        get() = HTTPService.isConfigured
+
+    // ========================================================================
+    // HTTP METHOD CONSTANTS
+    // ========================================================================
 
     /**
      * HTTP method constants matching C++ RAC_HTTP_METHOD_* values.

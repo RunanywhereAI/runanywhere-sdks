@@ -8,6 +8,8 @@
 
 package com.runanywhere.sdk.foundation.bridge
 
+import com.runanywhere.sdk.data.network.HTTPService
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeEvents
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelAssignment
@@ -15,6 +17,7 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatform
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.SDKEnvironment
 
 /**
  * CppBridge is the central coordinator for all C++ interop via JNI.
@@ -30,7 +33,7 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
  */
 object CppBridge {
 
-    private const val TAG = "CppBridge"
+    private val logger = SDKLogger("CppBridge")
 
     /**
      * SDK environment configuration.
@@ -92,7 +95,7 @@ object CppBridge {
      * Initializes the core SDK components in this order:
      * 1. Native Library Loading - Load core JNI library (if available)
      * 2. Platform Adapter - MUST be before C++ calls
-     * 3. Logging configuration
+     * 3. HTTP Service configuration
      * 4. Events registration
      * 5. Telemetry initialization
      * 6. Device registration
@@ -102,8 +105,14 @@ object CppBridge {
      * from the respective backend modules.
      *
      * @param environment The SDK environment to use
+     * @param apiKey Optional API key for authentication (required for production/staging)
+     * @param baseURL Optional backend API base URL (required for production/staging)
      */
-    fun initialize(environment: Environment = Environment.DEVELOPMENT) {
+    fun initialize(
+        environment: Environment = Environment.DEVELOPMENT,
+        apiKey: String? = null,
+        baseURL: String? = null
+    ) {
         synchronized(lock) {
             if (_isInitialized) {
                 return
@@ -117,18 +126,33 @@ object CppBridge {
             // CRITICAL: Register platform adapter FIRST before any C++ calls
             CppBridgePlatformAdapter.register()
 
-            // Configure logging (handled by platform adapter)
+            // Configure HTTP service (mirrors Swift HTTPService.configure)
+            if (baseURL != null && apiKey != null) {
+                HTTPService.configure(baseURL, apiKey)
+            }
 
             // Register events callback for analytics
             CppBridgeEvents.register()
 
-            // Initialize telemetry HTTP callback
+            // Initialize telemetry with environment (mirrors Swift CppBridge.Telemetry.initialize)
             CppBridgeTelemetry.register()
+            CppBridgeTelemetry.initialize(environment.toSDKEnvironment())
 
             // Register device callbacks
             CppBridgeDevice.register()
 
             _isInitialized = true
+        }
+    }
+
+    /**
+     * Convert CppBridge.Environment to SDKEnvironment
+     */
+    private fun Environment.toSDKEnvironment(): SDKEnvironment {
+        return when (this) {
+            Environment.DEVELOPMENT -> SDKEnvironment.DEVELOPMENT
+            Environment.STAGING -> SDKEnvironment.STAGING
+            Environment.PRODUCTION -> SDKEnvironment.PRODUCTION
         }
     }
 
@@ -141,17 +165,17 @@ object CppBridge {
      * respective backend modules to enable AI inference.
      */
     private fun tryLoadNativeLibrary() {
-        android.util.Log.i(TAG, "Starting native library loading sequence...")
+        logger.info("Starting native library loading sequence...")
 
         _nativeLibraryLoaded = RunAnywhereBridge.ensureNativeLibraryLoaded()
 
         if (_nativeLibraryLoaded) {
-            android.util.Log.i(TAG, "✅ Native commons library loaded successfully")
-            android.util.Log.i(TAG, "AI inference features are AVAILABLE")
+            logger.info("✅ Native commons library loaded successfully")
+            logger.info("AI inference features are AVAILABLE")
         } else {
-            android.util.Log.w(TAG, "❌ Native commons library not available.")
-            android.util.Log.w(TAG, "AI inference features are DISABLED.")
-            android.util.Log.w(TAG, "Ensure librunanywhere_jni.so is in your APK's lib/ folder.")
+            logger.warning("❌ Native commons library not available.")
+            logger.warning("AI inference features are DISABLED.")
+            logger.warning("Ensure librunanywhere_jni.so is in your APK's lib/ folder.")
         }
     }
 

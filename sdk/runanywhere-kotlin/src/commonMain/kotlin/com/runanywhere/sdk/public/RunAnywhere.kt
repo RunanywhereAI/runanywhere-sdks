@@ -197,7 +197,7 @@ object RunAnywhere {
 
                 // Initialize CppBridge (Phase 1)
                 // Note: CppBridge is in jvmAndroidMain, we call it via expect/actual
-                initializeCppBridge(environment)
+                initializeCppBridge(environment, apiKey, baseURL)
 
                 // Mark Phase 1 complete
                 _isInitialized = true
@@ -321,9 +321,13 @@ object RunAnywhere {
      * Initialize CppBridge (Phase 1)
      * Implementation is in jvmAndroidMain via expect/actual
      */
-    private fun initializeCppBridge(environment: SDKEnvironment) {
+    private fun initializeCppBridge(
+        environment: SDKEnvironment,
+        apiKey: String? = null,
+        baseURL: String? = null
+    ) {
         logger.debug("CppBridge initialization requested for $environment")
-        initializePlatformBridge(environment)
+        initializePlatformBridge(environment, apiKey, baseURL)
     }
 
     /**
@@ -352,8 +356,16 @@ object RunAnywhere {
 /**
  * Initialize platform-specific bridge (Phase 1).
  * On JVM/Android, this calls CppBridge.initialize() to load native libraries.
+ *
+ * @param environment SDK environment
+ * @param apiKey Optional API key for authentication
+ * @param baseURL Optional backend API base URL
  */
-internal expect fun initializePlatformBridge(environment: SDKEnvironment)
+internal expect fun initializePlatformBridge(
+    environment: SDKEnvironment,
+    apiKey: String?,
+    baseURL: String?
+)
 
 /**
  * Initialize platform-specific bridge services (Phase 2).

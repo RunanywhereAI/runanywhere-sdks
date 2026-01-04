@@ -8,17 +8,25 @@
 
 package com.runanywhere.sdk.public
 
-import android.util.Log
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.CppBridge
 
-private const val TAG = "PlatformBridge"
+private val logger = SDKLogger("PlatformBridge")
 
 /**
  * Initialize the CppBridge with the given environment.
  * This loads the native libraries and registers platform adapters.
+ *
+ * @param environment SDK environment
+ * @param apiKey Optional API key for authentication
+ * @param baseURL Optional backend API base URL
  */
-internal actual fun initializePlatformBridge(environment: SDKEnvironment) {
-    Log.i(TAG, "Initializing CppBridge for environment: $environment")
+internal actual fun initializePlatformBridge(
+    environment: SDKEnvironment,
+    apiKey: String?,
+    baseURL: String?
+) {
+    logger.info("Initializing CppBridge for environment: $environment")
 
     val cppEnvironment = when (environment) {
         SDKEnvironment.DEVELOPMENT -> CppBridge.Environment.DEVELOPMENT
@@ -26,26 +34,26 @@ internal actual fun initializePlatformBridge(environment: SDKEnvironment) {
         SDKEnvironment.PRODUCTION -> CppBridge.Environment.PRODUCTION
     }
 
-    CppBridge.initialize(cppEnvironment)
+    CppBridge.initialize(cppEnvironment, apiKey, baseURL)
 
-    Log.i(TAG, "CppBridge initialization complete. Native library loaded: ${CppBridge.isNativeLibraryLoaded}")
+    logger.info("CppBridge initialization complete. Native library loaded: ${CppBridge.isNativeLibraryLoaded}")
 }
 
 /**
  * Initialize CppBridge services (Phase 2).
  */
 internal actual fun initializePlatformBridgeServices() {
-    Log.i(TAG, "Initializing CppBridge services...")
+    logger.info("Initializing CppBridge services...")
     // Note: initializeServices is suspend, but we're in non-suspend context
     // For now, we skip the services initialization as it's called separately
-    Log.i(TAG, "CppBridge services initialization deferred")
+    logger.info("CppBridge services initialization deferred")
 }
 
 /**
  * Shutdown CppBridge and release resources.
  */
 internal actual fun shutdownPlatformBridge() {
-    Log.i(TAG, "Shutting down CppBridge...")
+    logger.info("Shutting down CppBridge...")
     CppBridge.shutdown()
-    Log.i(TAG, "CppBridge shutdown complete")
+    logger.info("CppBridge shutdown complete")
 }

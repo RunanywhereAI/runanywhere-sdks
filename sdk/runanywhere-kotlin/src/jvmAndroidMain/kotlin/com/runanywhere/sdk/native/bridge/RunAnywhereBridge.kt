@@ -14,6 +14,8 @@
 
 package com.runanywhere.sdk.native.bridge
 
+import com.runanywhere.sdk.foundation.SDKLogger
+
 /**
  * RunAnywhereBridge provides low-level JNI bindings for the runanywhere-commons C API.
  *
@@ -24,7 +26,7 @@ package com.runanywhere.sdk.native.bridge
  */
 object RunAnywhereBridge {
 
-    private const val TAG = "RunAnywhereBridge"
+    private val logger = SDKLogger("RunAnywhereBridge")
 
     // ========================================================================
     // NATIVE LIBRARY LOADING
@@ -44,18 +46,18 @@ object RunAnywhereBridge {
         synchronized(loadLock) {
             if (nativeLibraryLoaded) return true
 
-            android.util.Log.i(TAG, "Loading native library 'runanywhere_jni'...")
+            logger.info("Loading native library 'runanywhere_jni'...")
 
             try {
                 System.loadLibrary("runanywhere_jni")
                 nativeLibraryLoaded = true
-                android.util.Log.i(TAG, "✅ Native library loaded successfully")
+                logger.info("✅ Native library loaded successfully")
                 return true
             } catch (e: UnsatisfiedLinkError) {
-                android.util.Log.e(TAG, "❌ Failed to load native library: ${e.message}", e)
+                logger.error("❌ Failed to load native library: ${e.message}")
                 return false
             } catch (e: Exception) {
-                android.util.Log.e(TAG, "❌ Unexpected error: ${e.message}", e)
+                logger.error("❌ Unexpected error: ${e.message}")
                 return false
             }
         }
