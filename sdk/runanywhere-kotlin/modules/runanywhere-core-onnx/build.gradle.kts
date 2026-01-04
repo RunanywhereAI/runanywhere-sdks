@@ -36,7 +36,7 @@ val testLocal: Boolean = rootProject.findProperty("runanywhere.testLocal")?.toSt
     ?: false
 val coreVersion: String = rootProject.findProperty("runanywhere.coreVersion")?.toString()
     ?: project.findProperty("runanywhere.coreVersion")?.toString()
-    ?: "0.1.1"
+    ?: "0.2.0"
 
 logger.lifecycle("ONNX Module: testLocal=$testLocal, coreVersion=$coreVersion")
 
@@ -199,7 +199,7 @@ tasks.register("downloadJniLibs") {
     val outputDir = file("build/jniLibs")
     val tempDir = file("${layout.buildDirectory.get()}/jni-temp")
     val releaseBaseUrl = "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v$coreVersion"
-    val packageName = "RunAnywhereONNX-android-v$coreVersion.zip"
+    val packageName = "RABackendONNX-android-v$coreVersion.zip"
 
     outputs.dir(outputDir)
 
@@ -232,7 +232,8 @@ tasks.register("downloadJniLibs") {
             }
 
             // Copy .so files to output (excluding common libs that are in main SDK)
-            val commonLibs = setOf("libc++_shared.so", "librunanywhere_jni.so", "librunanywhere_bridge.so", "librunanywhere_loader.so")
+            // In the new RAC architecture, the common libs are from RACommons
+            val commonLibs = setOf("libc++_shared.so", "librac_commons.so", "librac_commons_jni.so")
 
             extractDir.walkTopDown()
                 .filter { it.isDirectory && it.name in listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86") }

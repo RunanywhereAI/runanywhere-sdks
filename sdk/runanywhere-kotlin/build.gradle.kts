@@ -57,8 +57,10 @@ val testLocal: Boolean = project.findProperty("runanywhere.testLocal")?.toString
 
 // Version constants for remote downloads (mirrors Swift's Package.swift)
 // These should match the releases at:
-// - https://github.com/RunanywhereAI/runanywhere-binaries/releases (Android JNI libs)
-val coreVersion: String = project.findProperty("runanywhere.coreVersion")?.toString() ?: "0.1.1"
+// - https://github.com/RunanywhereAI/runanywhere-binaries/releases (Android JNI libs for backends)
+// - https://github.com/RunanywhereAI/runanywhere-sdks/releases (Android JNI libs for commons)
+val coreVersion: String = project.findProperty("runanywhere.coreVersion")?.toString() ?: "0.2.0"
+val commonsVersion: String = project.findProperty("runanywhere.commonsVersion")?.toString() ?: "0.1.1"
 
 // Log the build mode
 logger.lifecycle("RunAnywhere SDK: testLocal=$testLocal, coreVersion=$coreVersion")
@@ -236,19 +238,25 @@ android {
     }
 
     // ==========================================================================
-    // JNI Libraries Configuration - COMMON/CORE ONLY
+    // JNI Libraries Configuration - ALL LIBS (Commons + Backends)
     // ==========================================================================
-    // This main SDK only includes COMMON JNI libraries (mirrors iOS RACommons.xcframework):
-    //   - librunanywhere_jni.so - JNI entry point
-    //   - librunanywhere_bridge.so - C++ bridge layer
-    //   - librunanywhere_loader.so - Dynamic backend loader
+    // This SDK downloads and bundles all JNI libraries:
+    //
+    // From RACommons (commons-v{commonsVersion}):
+    //   - librac_commons.so - RAC Commons infrastructure
+    //   - librac_commons_jni.so - RAC Commons JNI bridge
     //   - libc++_shared.so - C++ STL (shared by all backends)
     //
-    // Backend-specific libs are in their own modules:
-    //   - runanywhere-core-llamacpp: librunanywhere_llamacpp.so (~34MB)
-    //   - runanywhere-core-onnx: libonnxruntime.so, libsherpa-*.so (~25MB)
+    // From RABackendLlamaCPP (core-v{coreVersion}):
+    //   - librac_backend_llamacpp_jni.so - LlamaCPP JNI bridge
+    //   - librunanywhere_llamacpp.so - LlamaCPP backend
+    //   - libllama.so, libcommon.so - llama.cpp core
     //
-    // This allows apps to only include the backends they need!
+    // From RABackendONNX (core-v{coreVersion}):
+    //   - librac_backend_onnx_jni.so - ONNX JNI bridge
+    //   - librunanywhere_onnx.so - ONNX backend
+    //   - libonnxruntime.so - ONNX Runtime
+    //   - libsherpa-onnx-*.so - Sherpa ONNX (STT/TTS/VAD)
     // ==========================================================================
     sourceSets {
         getByName("main") {
@@ -334,20 +342,15 @@ tasks.register<Exec>("buildLocalJniLibs") {
 // =============================================================================
 // Downloads ALL JNI libraries from GitHub releases:
 //   - Commons: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/commons-v{version}
-//   - Core binaries: https://github.com/RunanywhereAI/runanywhere-binaries/releases/tag/core-v{version}
-//
-// Libraries downloaded:
-//   - librunanywhere_jni.so - JNI entry point
-//   - librunanywhere_bridge.so - C++ bridge layer
-//   - librunanywhere_loader.so - Dynamic backend loader
-//   - librunanywhere_llamacpp.so - LLM inference (llama.cpp)
-//   - librunanywhere_onnx.so - ONNX backend wrapper
-//   - libonnxruntime.so - ONNX Runtime
-//   - libsherpa-onnx-*.so - STT/TTS/VAD (Sherpa ONNX)
-//   - libc++_shared.so, libomp.so - Runtime dependencies
+//     - librac_commons.so - RAC Commons infrastructure
+//     - librac_commons_jni.so - RAC Commons JNI bridge
+//   - Core backends: https://github.com/RunanywhereAI/runanywhere-binaries/releases/tag/core-v{version}
+//     - librac_backend_llamacpp_jni.so - LLM inference (llama.cpp)
+//     - librac_backend_onnx_jni.so - STT/TTS/VAD (Sherpa ONNX)
+//     - libonnxruntime.so - ONNX Runtime
+//     - libsherpa-onnx-*.so - Sherpa ONNX components
+//   - libc++_shared.so - C++ STL (shared)
 // =============================================================================
-val commonsVersion: String = project.findProperty("runanywhere.commonsVersion")?.toString() ?: "0.1.1"
-
 tasks.register("downloadJniLibs") {
     group = "runanywhere"
     description = "Download JNI libraries from GitHub releases (when testLocal=false)"
@@ -362,12 +365,14 @@ tasks.register("downloadJniLibs") {
     val binariesBaseUrl = "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v$coreVersion"
     val commonsBaseUrl = "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v$commonsVersion"
 
-    // Packages to download
+    // Packages to download - ORDER MATTERS: Commons first, then backends
     val packages = listOf(
+        // Commons (RAC infrastructure - must be downloaded first)
+        "$commonsBaseUrl/RACommons-android-v$commonsVersion.zip",
         // LlamaCPP backend (LLM inference)
-        "$binariesBaseUrl/RunAnywhereLlamaCPP-android-v$coreVersion.zip",
+        "$binariesBaseUrl/RABackendLlamaCPP-android-v$coreVersion.zip",
         // ONNX backend (STT/TTS/VAD)
-        "$binariesBaseUrl/RunAnywhereONNX-android-v$coreVersion.zip"
+        "$binariesBaseUrl/RABackendONNX-android-v$coreVersion.zip"
     )
 
     outputs.dir(outputDir)
