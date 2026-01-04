@@ -346,10 +346,15 @@ build_android() {
         [ -f "${ABI_BUILD}/librac_commons.so" ] && cp "${ABI_BUILD}/librac_commons.so" "${ABI_DIST}/"
 
         # Copy JNI library if built
-        if [ -f "${ABI_BUILD}/src/jni/librac_commons_jni.so" ]; then
-            cp "${ABI_BUILD}/src/jni/librac_commons_jni.so" "${ABI_DIST}/"
-        elif [ -f "${ABI_BUILD}/librac_commons_jni.so" ]; then
-            cp "${ABI_BUILD}/librac_commons_jni.so" "${ABI_DIST}/"
+        # CMakeLists.txt sets OUTPUT_NAME="runanywhere_jni" producing librunanywhere_jni.so
+        if [ -f "${ABI_BUILD}/src/jni/librunanywhere_jni.so" ]; then
+            cp "${ABI_BUILD}/src/jni/librunanywhere_jni.so" "${ABI_DIST}/"
+            log_info "Copied librunanywhere_jni.so"
+        elif [ -f "${ABI_BUILD}/librunanywhere_jni.so" ]; then
+            cp "${ABI_BUILD}/librunanywhere_jni.so" "${ABI_DIST}/"
+            log_info "Copied librunanywhere_jni.so"
+        else
+            log_warning "JNI library not found - was RAC_BUILD_JNI=ON set?"
         fi
 
         # Copy STL
