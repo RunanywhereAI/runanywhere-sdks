@@ -32,7 +32,7 @@ val testLocal: Boolean = rootProject.findProperty("runanywhere.testLocal")?.toSt
     ?: false
 val coreVersion: String = rootProject.findProperty("runanywhere.coreVersion")?.toString()
     ?: project.findProperty("runanywhere.coreVersion")?.toString()
-    ?: "0.1.1"
+    ?: "0.2.0"
 
 logger.lifecycle("LlamaCPP Module: testLocal=$testLocal, coreVersion=$coreVersion")
 
@@ -186,7 +186,7 @@ tasks.register("downloadJniLibs") {
     val outputDir = file("build/jniLibs")
     val tempDir = file("${layout.buildDirectory.get()}/jni-temp")
     val releaseBaseUrl = "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v$coreVersion"
-    val packageName = "RunAnywhereLlamaCPP-android-v$coreVersion.zip"
+    val packageName = "RABackendLlamaCPP-android-v$coreVersion.zip"
 
     outputs.dir(outputDir)
 
@@ -218,8 +218,9 @@ tasks.register("downloadJniLibs") {
                 "unzip"("src" to tempZip, "dest" to extractDir)
             }
 
-            // Copy ONLY LlamaCPP-specific .so files (exclude common libs that are in main SDK)
-            val llamacppLibs = setOf("librunanywhere_llamacpp.so")
+            // Copy all backend .so files except common libs that are in main SDK
+            // Common libs (from RACommons) are: libc++_shared.so, librac_commons*.so
+            val commonLibs = setOf("libc++_shared.so", "librac_commons.so", "librac_commons_jni.so")
 
             extractDir.walkTopDown()
                 .filter { it.isDirectory && it.name in listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86") }
@@ -227,7 +228,7 @@ tasks.register("downloadJniLibs") {
                     val targetAbiDir = file("$outputDir/${abiDir.name}")
                     targetAbiDir.mkdirs()
 
-                    abiDir.listFiles()?.filter { it.extension == "so" && it.name in llamacppLibs }?.forEach { soFile ->
+                    abiDir.listFiles()?.filter { it.extension == "so" && it.name !in commonLibs }?.forEach { soFile ->
                         val targetFile = file("$targetAbiDir/${soFile.name}")
                         soFile.copyTo(targetFile, overwrite = true)
                         logger.lifecycle("  Copied: ${abiDir.name}/${soFile.name}")
