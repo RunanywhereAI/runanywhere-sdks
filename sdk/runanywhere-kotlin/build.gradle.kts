@@ -58,7 +58,7 @@ val testLocal: Boolean = project.findProperty("runanywhere.testLocal")?.toString
 // Version constants for remote downloads (mirrors Swift's Package.swift)
 // These should match the releases at:
 // - https://github.com/RunanywhereAI/runanywhere-binaries/releases (Android JNI libs)
-val coreVersion: String = project.findProperty("runanywhere.coreVersion")?.toString() ?: "0.1.1-dev.03aacf9"
+val coreVersion: String = project.findProperty("runanywhere.coreVersion")?.toString() ?: "0.1.1"
 
 // Log the build mode
 logger.lifecycle("RunAnywhere SDK: testLocal=$testLocal, coreVersion=$coreVersion")
@@ -346,7 +346,7 @@ tasks.register<Exec>("buildLocalJniLibs") {
 //   - libsherpa-onnx-*.so - STT/TTS/VAD (Sherpa ONNX)
 //   - libc++_shared.so, libomp.so - Runtime dependencies
 // =============================================================================
-val commonsVersion: String = project.findProperty("runanywhere.commonsVersion")?.toString() ?: "0.1.0"
+val commonsVersion: String = project.findProperty("runanywhere.commonsVersion")?.toString() ?: "0.1.1"
 
 tasks.register("downloadJniLibs") {
     group = "runanywhere"
