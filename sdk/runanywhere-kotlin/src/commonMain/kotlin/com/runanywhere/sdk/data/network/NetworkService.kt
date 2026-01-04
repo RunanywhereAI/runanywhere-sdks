@@ -7,7 +7,6 @@ import com.runanywhere.sdk.data.network.models.APIEndpoint
  * Enhanced with generic POST/GET methods and proper authentication support
  */
 interface NetworkService {
-
     /**
      * POST request with JSON payload and typed response
      * Equivalent to iOS: func post<T: Encodable, R: Decodable>(_ endpoint: APIEndpoint, _ payload: T, requiresAuth: Bool) async throws -> R
@@ -15,7 +14,7 @@ interface NetworkService {
     suspend fun <T : Any, R : Any> post(
         endpoint: APIEndpoint,
         payload: T,
-        requiresAuth: Boolean = true
+        requiresAuth: Boolean = true,
     ): R
 
     /**
@@ -24,7 +23,7 @@ interface NetworkService {
      */
     suspend fun <R : Any> get(
         endpoint: APIEndpoint,
-        requiresAuth: Boolean = true
+        requiresAuth: Boolean = true,
     ): R
 
     /**
@@ -34,7 +33,7 @@ interface NetworkService {
     suspend fun postRaw(
         endpoint: APIEndpoint,
         payload: ByteArray,
-        requiresAuth: Boolean = true
+        requiresAuth: Boolean = true,
     ): ByteArray
 
     /**
@@ -43,6 +42,6 @@ interface NetworkService {
      */
     suspend fun getRaw(
         endpoint: APIEndpoint,
-        requiresAuth: Boolean = true
+        requiresAuth: Boolean = true,
     ): ByteArray
 }

@@ -44,6 +44,7 @@ ABIS="${ABIS:-arm64-v8a armeabi-v7a x86_64}"
 BUILD_LLAMACPP="${BUILD_LLAMACPP:-ON}"
 BUILD_ONNX="${BUILD_ONNX:-ON}"
 BUILD_WHISPERCPP="${BUILD_WHISPERCPP:-OFF}"
+BUILD_JNI="${BUILD_JNI:-ON}"
 
 # Colors
 RED='\033[0;31m'
@@ -61,6 +62,7 @@ echo "Build type: ${BUILD_TYPE}"
 echo "LlamaCpp: ${BUILD_LLAMACPP}"
 echo "ONNX: ${BUILD_ONNX}"
 echo "WhisperCpp: ${BUILD_WHISPERCPP}"
+echo "JNI: ${BUILD_JNI}"
 echo ""
 
 # Clean previous build
@@ -90,6 +92,7 @@ build_abi() {
         -DRAC_BUILD_LLAMACPP="${BUILD_LLAMACPP}" \
         -DRAC_BUILD_ONNX="${BUILD_ONNX}" \
         -DRAC_BUILD_WHISPERCPP="${BUILD_WHISPERCPP}" \
+        -DRAC_BUILD_JNI="${BUILD_JNI}" \
         -DRAC_BUILD_SHARED=ON
 
     cmake --build . --config "${BUILD_TYPE}" -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
@@ -129,6 +132,36 @@ copy_libraries() {
         elif [ -f "${ABI_BUILD_DIR}/lib${lib}.so" ]; then
             cp "${ABI_BUILD_DIR}/lib${lib}.so" "${ABI_DIST_DIR}/"
             [ -n "${STRIP}" ] && "${STRIP}" "${ABI_DIST_DIR}/lib${lib}.so"
+        fi
+    done
+
+    # Copy main JNI library (runanywhere_jni.so - commons JNI)
+    if [ -f "${ABI_BUILD_DIR}/src/jni/librunanywhere_jni.so" ]; then
+        cp "${ABI_BUILD_DIR}/src/jni/librunanywhere_jni.so" "${ABI_DIST_DIR}/"
+        [ -n "${STRIP}" ] && "${STRIP}" "${ABI_DIST_DIR}/librunanywhere_jni.so"
+    elif [ -f "${ABI_BUILD_DIR}/librunanywhere_jni.so" ]; then
+        cp "${ABI_BUILD_DIR}/librunanywhere_jni.so" "${ABI_DIST_DIR}/"
+        [ -n "${STRIP}" ] && "${STRIP}" "${ABI_DIST_DIR}/librunanywhere_jni.so"
+    fi
+
+    # Copy backend-specific JNI libraries (for modular backend loading)
+    # LlamaCPP JNI
+    for loc in "${ABI_BUILD_DIR}/backends/llamacpp/src/jni" "${ABI_BUILD_DIR}/backends/llamacpp"; do
+        if [ -f "${loc}/librac_backend_llamacpp_jni.so" ]; then
+            cp "${loc}/librac_backend_llamacpp_jni.so" "${ABI_DIST_DIR}/"
+            [ -n "${STRIP}" ] && "${STRIP}" "${ABI_DIST_DIR}/librac_backend_llamacpp_jni.so"
+            echo "  ✓ librac_backend_llamacpp_jni.so"
+            break
+        fi
+    done
+
+    # ONNX JNI
+    for loc in "${ABI_BUILD_DIR}/backends/onnx/src/jni" "${ABI_BUILD_DIR}/backends/onnx"; do
+        if [ -f "${loc}/librac_backend_onnx_jni.so" ]; then
+            cp "${loc}/librac_backend_onnx_jni.so" "${ABI_DIST_DIR}/"
+            [ -n "${STRIP}" ] && "${STRIP}" "${ABI_DIST_DIR}/librac_backend_onnx_jni.so"
+            echo "  ✓ librac_backend_onnx_jni.so"
+            break
         fi
     done
 

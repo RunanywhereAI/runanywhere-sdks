@@ -44,6 +44,11 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
     if (result == RAC_SUCCESS && model_info) {
         framework = model_info->framework;
         model_path = model_info->local_path ? model_info->local_path : model_id;
+        RAC_LOG_INFO(LOG_CAT, "Found model in registry: framework=%d, local_path=%s",
+                     static_cast<int>(framework), model_path ? model_path : "NULL");
+    } else {
+        RAC_LOG_WARNING(LOG_CAT, "Model NOT found in registry (result=%d), using default framework=%d",
+                     result, static_cast<int>(framework));
     }
 
     // Build service request
@@ -53,6 +58,9 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
     request.framework = framework;
     request.model_path = model_path;
 
+    RAC_LOG_INFO(LOG_CAT, "Service request: framework=%d, model_path=%s",
+                 static_cast<int>(request.framework), request.model_path ? request.model_path : "NULL");
+
     // Service registry returns an rac_llm_service_t* with vtable already set
     result = rac_service_create(RAC_CAPABILITY_TEXT_GENERATION, &request, out_handle);
 
@@ -61,7 +69,7 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
     }
 
     if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to create service via registry");
+        RAC_LOG_ERROR(LOG_CAT, "Failed to create service via registry: %d", result);
         return result;
     }
 

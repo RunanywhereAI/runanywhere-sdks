@@ -16,41 +16,45 @@ data class StorageInfo(
     val appStorage: AppStorageInfo,
     val deviceStorage: DeviceStorageInfo,
     val modelStorage: ModelStorageInfo,
-    val cacheSize: Long,                    // bytes - matches iOS
-    val storedModels: List<StoredModel>,    // Matches iOS - direct access to stored models
+    val cacheSize: Long, // bytes - matches iOS
+    val storedModels: List<StoredModel>, // Matches iOS - direct access to stored models
     val availability: StorageAvailability,
     val recommendations: List<StorageRecommendation>,
-    @Contextual val lastUpdated: Instant
+    @Contextual val lastUpdated: Instant,
 ) {
     companion object {
         /**
          * Empty storage info for initialization
          * Matches iOS StorageInfo.empty
          */
-        val empty = StorageInfo(
-            appStorage = AppStorageInfo(
-                documentsSize = 0,
+        val empty =
+            StorageInfo(
+                appStorage =
+                    AppStorageInfo(
+                        documentsSize = 0,
+                        cacheSize = 0,
+                        appSupportSize = 0,
+                        totalSize = 0,
+                    ),
+                deviceStorage =
+                    DeviceStorageInfo(
+                        totalSpace = 0,
+                        freeSpace = 0,
+                        usedSpace = 0,
+                    ),
+                modelStorage =
+                    ModelStorageInfo(
+                        totalSize = 0,
+                        modelCount = 0,
+                        largestModel = null,
+                        models = emptyList(),
+                    ),
                 cacheSize = 0,
-                appSupportSize = 0,
-                totalSize = 0
-            ),
-            deviceStorage = DeviceStorageInfo(
-                totalSpace = 0,
-                freeSpace = 0,
-                usedSpace = 0
-            ),
-            modelStorage = ModelStorageInfo(
-                totalSize = 0,
-                modelCount = 0,
-                largestModel = null,
-                models = emptyList()
-            ),
-            cacheSize = 0,
-            storedModels = emptyList(),
-            availability = StorageAvailability.HEALTHY,
-            recommendations = emptyList(),
-            lastUpdated = Instant.fromEpochMilliseconds(0)
-        )
+                storedModels = emptyList(),
+                availability = StorageAvailability.HEALTHY,
+                recommendations = emptyList(),
+                lastUpdated = Instant.fromEpochMilliseconds(0),
+            )
     }
 }
 
@@ -62,10 +66,10 @@ data class StorageInfo(
  */
 @Serializable
 data class AppStorageInfo(
-    val documentsSize: Long,    // bytes - app documents size
-    val cacheSize: Long,        // bytes - cache size
-    val appSupportSize: Long,   // bytes - app support size
-    val totalSize: Long         // bytes - total app storage size
+    val documentsSize: Long, // bytes - app documents size
+    val cacheSize: Long, // bytes - cache size
+    val appSupportSize: Long, // bytes - app support size
+    val totalSize: Long, // bytes - total app storage size
 )
 
 /**
@@ -76,20 +80,21 @@ data class AppStorageInfo(
  */
 @Serializable
 data class DeviceStorageInfo(
-    val totalSpace: Long,       // bytes - total device storage
-    val freeSpace: Long,        // bytes - available space
-    val usedSpace: Long         // bytes - used space
+    val totalSpace: Long, // bytes - total device storage
+    val freeSpace: Long, // bytes - available space
+    val usedSpace: Long, // bytes - used space
 ) {
     /**
      * Usage percentage (0-100)
      * Matches iOS usagePercentage computed property
      */
     val usagePercentage: Double
-        get() = if (totalSpace > 0) {
-            (usedSpace.toDouble() / totalSpace.toDouble()) * 100.0
-        } else {
-            0.0
-        }
+        get() =
+            if (totalSpace > 0) {
+                (usedSpace.toDouble() / totalSpace.toDouble()) * 100.0
+            } else {
+                0.0
+            }
 }
 
 /**
@@ -100,10 +105,10 @@ data class DeviceStorageInfo(
  */
 @Serializable
 data class ModelStorageInfo(
-    val totalSize: Long,              // bytes - total size of all models
-    val modelCount: Int,              // number of stored models
-    val largestModel: StoredModel?,   // largest model by size
-    val models: List<StoredModel>     // all stored models
+    val totalSize: Long, // bytes - total size of all models
+    val modelCount: Int, // number of stored models
+    val largestModel: StoredModel?, // largest model by size
+    val models: List<StoredModel>, // all stored models
 )
 
 /**
@@ -115,16 +120,16 @@ data class ModelStorageInfo(
 @OptIn(kotlin.time.ExperimentalTime::class)
 @Serializable
 data class StoredModel(
-    val id: String,                     // Model ID used for operations like deletion
-    val name: String,                   // Display name
-    val path: String,                   // File path (iOS uses URL)
-    val size: Long,                     // bytes
-    val format: String,                 // Model format (e.g., "gguf", "onnx")
-    val framework: String?,             // Framework name (e.g., "LlamaCpp", "ONNX")
-    @Contextual val createdDate: Instant,           // When the model was downloaded
-    @Contextual val lastUsed: Instant?,             // Last time model was used
-    val contextLength: Int?,            // Context window size if applicable
-    val checksum: String? = null        // Model checksum for verification
+    val id: String, // Model ID used for operations like deletion
+    val name: String, // Display name
+    val path: String, // File path (iOS uses URL)
+    val size: Long, // bytes
+    val format: String, // Model format (e.g., "gguf", "onnx")
+    val framework: String?, // Framework name (e.g., "LlamaCpp", "ONNX")
+    @Contextual val createdDate: Instant, // When the model was downloaded
+    @Contextual val lastUsed: Instant?, // Last time model was used
+    val contextLength: Int?, // Context window size if applicable
+    val checksum: String? = null, // Model checksum for verification
 )
 
 /**
@@ -133,10 +138,10 @@ data class StoredModel(
  */
 @Serializable
 enum class StorageAvailability {
-    HEALTHY,        // > 20% available
-    LOW,            // 10-20% available
-    CRITICAL,       // 5-10% available
-    FULL            // < 5% available
+    HEALTHY, // > 20% available
+    LOW, // 10-20% available
+    CRITICAL, // 5-10% available
+    FULL, // < 5% available
 }
 
 /**
@@ -146,8 +151,8 @@ enum class StorageAvailability {
 @Serializable
 data class StorageRecommendation(
     val type: RecommendationType,
-    val message: String,            // matches iOS 'message' field
-    val action: String              // e.g., "Clear Cache", "Delete Models"
+    val message: String, // matches iOS 'message' field
+    val action: String, // e.g., "Clear Cache", "Delete Models"
 )
 
 /**
@@ -156,7 +161,7 @@ data class StorageRecommendation(
  */
 @Serializable
 enum class RecommendationType {
-    WARNING,        // Low storage warning
-    CRITICAL,       // Critical storage shortage
-    SUGGESTION      // Optimization suggestion
+    WARNING, // Low storage warning
+    CRITICAL, // Critical storage shortage
+    SUGGESTION, // Optimization suggestion
 }

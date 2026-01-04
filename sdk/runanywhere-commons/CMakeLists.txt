@@ -19,6 +19,7 @@ option(RAC_BUILD_LLAMACPP "Build LlamaCpp backend module" ON)
 option(RAC_BUILD_ONNX "Build ONNX backend module (STT, TTS, VAD)" ON)
 option(RAC_BUILD_WHISPERCPP "Build WhisperCpp backend module (STT)" OFF)
 option(RAC_BUILD_PLATFORM "Build Platform backend module (Apple Foundation Models, System TTS)" ON)
+option(RAC_BUILD_JNI "Build JNI bridge for Android/JVM" OFF)
 
 # Feature options
 option(RAC_BUILD_TESTS "Build unit tests" OFF)
@@ -94,11 +95,11 @@ option(USE_PREBUILT_CORE "Use pre-built runanywhere-core libraries instead of co
 if(USE_PREBUILT_CORE)
     # Use pre-built core libraries (downloaded from remote releases)
     include(FindRunAnywhereCorePrebuilt)
-    
+
     if(NOT RUNANYWHERE_CORE_PREBUILT_FOUND)
         message(FATAL_ERROR "Pre-built runanywhere-core not found. Run: ./scripts/download-core-prebuilt.sh")
     endif()
-    
+
     message(STATUS "Using PRE-BUILT runanywhere-core libraries")
     message(STATUS "  Bridge: ${RUNANYWHERE_CORE_BRIDGE_LIB}")
     if(RUNANYWHERE_CORE_HAS_LLAMACPP)
@@ -107,28 +108,30 @@ if(USE_PREBUILT_CORE)
     if(RUNANYWHERE_CORE_HAS_ONNX)
         message(STATUS "  ONNX: ${RUNANYWHERE_CORE_ONNX_LIB}")
     endif()
-    
+
     # Set variables for compatibility with existing code
     set(RUNANYWHERE_CORE_INCLUDE_DIRS ${RUNANYWHERE_CORE_PREBUILT_INCLUDE_DIRS})
     set(RUNANYWHERE_CORE_HAS_LLAMACPP ${RUNANYWHERE_CORE_HAS_LLAMACPP})
     set(RUNANYWHERE_CORE_HAS_ONNX ${RUNANYWHERE_CORE_HAS_ONNX})
 else()
-    # Use source code and compile locally (legacy mode)
+    # Use source code and compile locally
     include(FindRunAnywhereCore)
-    
+
     if(NOT RUNANYWHERE_CORE_FOUND)
         message(FATAL_ERROR "runanywhere-core not found at ${RUNANYWHERE_CORE_DIR}")
     endif()
-    
+
     message(STATUS "Found runanywhere-core source at: ${RUNANYWHERE_CORE_DIR}")
-    message(STATUS "Compiling runanywhere-core from source (legacy mode)")
-    
-    # Build runanywhere-core in modular mode
+    message(STATUS "Compiling runanywhere-core from source")
+
+    # Build runanywhere-core in modular mode with STATIC libraries
+    # This matches iOS where we combine static .a files into xcframeworks
     set(RA_BUILD_MODULAR ON CACHE BOOL "" FORCE)
+    set(RA_BUILD_SHARED OFF CACHE BOOL "" FORCE)  # Force static libs for static linking
     set(RA_BUILD_LLAMACPP ${RAC_BUILD_LLAMACPP} CACHE BOOL "" FORCE)
     set(RA_BUILD_ONNX ${RAC_BUILD_ONNX} CACHE BOOL "" FORCE)
     set(RA_BUILD_WHISPERCPP ${RAC_BUILD_WHISPERCPP} CACHE BOOL "" FORCE)
-    
+
     add_subdirectory(${RUNANYWHERE_CORE_DIR} ${CMAKE_BINARY_DIR}/runanywhere-core)
 endif()
 
@@ -286,15 +289,18 @@ if(APPLE)
 endif()
 
 # Link against runanywhere-core bridge
-# Use pre-built library if available, otherwise use compiled target
+# Note: In source compilation mode, we do NOT link rac_commons against runanywhere_bridge directly.
+# The backends (llamacpp, onnx, etc.) link against their respective core libraries.
+# This avoids duplicate symbol issues when both bridge and backend libs have
+# implementations of the same functions (ra_stt_*, ra_tts_*, ra_vad_*).
 if(DEFINED RUNANYWHERE_CORE_BRIDGE_LIB)
-    # Pre-built library mode (USE_PREBUILT_CORE=ON)
+    # Pre-built library mode (USE_PREBUILT_CORE=ON) - link the pre-built bridge
     target_link_libraries(rac_commons PUBLIC ${RUNANYWHERE_CORE_BRIDGE_LIB})
-elseif(TARGET runanywhere_bridge)
-    # Source compilation mode (legacy)
-    target_link_libraries(rac_commons PUBLIC runanywhere_bridge)
 else()
-    message(FATAL_ERROR "runanywhere-core bridge library not found. Either set USE_PREBUILT_CORE=ON and run download-core-prebuilt.sh, or provide core source.")
+    # Source compilation mode - backends link against their specific runanywhere-core backend libraries
+    # (runanywhere_llamacpp, runanywhere_onnx, etc.) via their own CMakeLists.txt
+    # Do NOT link against runanywhere_bridge here to avoid duplicate symbols
+    message(STATUS "Source mode: rac_commons will NOT link runanywhere_bridge (backends handle their own linking)")
 endif()
 
 # Symbol visibility for shared builds
@@ -351,6 +357,17 @@ if(RAC_BUILD_PLATFORM)
 endif()
 
 # =============================================================================
+# JNI BRIDGE (Android/JVM)
+# =============================================================================
+
+if(RAC_BUILD_JNI)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/jni/CMakeLists.txt")
+        message(STATUS "Building JNI bridge for Android/JVM")
+        add_subdirectory(src/jni)
+    endif()
+endif()
+
+# =============================================================================
 # TESTS
 # =============================================================================
 
@@ -391,5 +408,7 @@ message(STATUS "  LlamaCpp:     ${RAC_BUILD_LLAMACPP}")
 message(STATUS "  ONNX:         ${RAC_BUILD_ONNX}")
 message(STATUS "  WhisperCpp:   ${RAC_BUILD_WHISPERCPP}")
 message(STATUS "  Platform:     ${RAC_BUILD_PLATFORM}")
+message(STATUS "")
+message(STATUS "JNI bridge:     ${RAC_BUILD_JNI}")
 message(STATUS "====================================")
 message(STATUS "")

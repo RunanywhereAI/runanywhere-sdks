@@ -47,10 +47,11 @@ fun InitializationLoadingView() {
     var isAnimating by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         targetValue = if (isAnimating) 1.2f else 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1000),
-        ),
-        label = "brain_pulse"
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(durationMillis = 1000),
+            ),
+        label = "brain_pulse",
     )
 
     LaunchedEffect(Unit) {
@@ -59,21 +60,22 @@ fun InitializationLoadingView() {
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+        color = MaterialTheme.colorScheme.background,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(40.dp),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(40.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
         ) {
             // Brain icon with pulsing animation - matches iOS Image(systemName: "brain")
             Icon(
                 imageVector = Icons.Outlined.Psychology,
                 contentDescription = "AI Brain",
                 modifier = Modifier.scale(scale),
-                tint = AppColors.primaryAccent
+                tint = AppColors.primaryAccent,
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -82,7 +84,7 @@ fun InitializationLoadingView() {
             Text(
                 text = "Initializing RunAnywhere AI",
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onBackground
+                color = MaterialTheme.colorScheme.onBackground,
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -91,14 +93,14 @@ fun InitializationLoadingView() {
             Text(
                 text = "Setting up AI models and services...",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
             // Progress indicator - matches iOS ProgressView()
             CircularProgressIndicator(
-                color = AppColors.primaryAccent
+                color = AppColors.primaryAccent,
             )
         }
     }
@@ -117,24 +119,25 @@ fun InitializationLoadingView() {
 @Composable
 fun InitializationErrorView(
     error: Throwable,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
 ) {
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+        color = MaterialTheme.colorScheme.background,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(40.dp),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(40.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
         ) {
             // Warning icon - matches iOS Image(systemName: "exclamationmark.triangle")
             Icon(
                 imageVector = Icons.Outlined.Warning,
                 contentDescription = "Error",
-                tint = AppColors.warningOrange
+                tint = AppColors.warningOrange,
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -143,7 +146,7 @@ fun InitializationErrorView(
             Text(
                 text = "Initialization Failed",
                 style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onBackground
+                color = MaterialTheme.colorScheme.onBackground,
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -153,7 +156,7 @@ fun InitializationErrorView(
                 text = error.localizedMessage ?: error.message ?: "Unknown error",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
 
             Spacer(modifier = Modifier.height(24.dp))

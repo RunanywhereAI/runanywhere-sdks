@@ -124,22 +124,32 @@ rac_bool_t llamacpp_can_handle(const rac_service_request_t* request, void* user_
     (void)user_data;
 
     if (request == nullptr) {
+        RAC_LOG_DEBUG(LOG_CAT, "can_handle: request is NULL");
         return RAC_FALSE;
     }
 
+    RAC_LOG_DEBUG(LOG_CAT, "can_handle: framework=%d, model_path=%s, identifier=%s",
+                  static_cast<int>(request->framework),
+                  request->model_path ? request->model_path : "NULL",
+                  request->identifier ? request->identifier : "NULL");
+
     // Framework hint from model registry
     if (request->framework == RAC_FRAMEWORK_LLAMACPP) {
+        RAC_LOG_DEBUG(LOG_CAT, "can_handle: YES (framework match)");
         return RAC_TRUE;
     }
 
     // If framework is explicitly set to something else, don't handle
     if (request->framework != RAC_FRAMEWORK_UNKNOWN) {
+        RAC_LOG_DEBUG(LOG_CAT, "can_handle: NO (framework mismatch, expected LLAMACPP=%d or UNKNOWN=%d, got %d)",
+                      RAC_FRAMEWORK_LLAMACPP, RAC_FRAMEWORK_UNKNOWN, static_cast<int>(request->framework));
         return RAC_FALSE;
     }
 
     // Framework unknown - check file extension
     const char* path = request->model_path ? request->model_path : request->identifier;
     if (path == nullptr || path[0] == '\0') {
+        RAC_LOG_DEBUG(LOG_CAT, "can_handle: NO (no path)");
         return RAC_FALSE;
     }
 
@@ -147,10 +157,12 @@ rac_bool_t llamacpp_can_handle(const rac_service_request_t* request, void* user_
     if (len >= 5) {
         const char* ext = path + len - 5;
         if (strcmp(ext, ".gguf") == 0 || strcmp(ext, ".GGUF") == 0) {
+            RAC_LOG_DEBUG(LOG_CAT, "can_handle: YES (gguf extension)");
             return RAC_TRUE;
         }
     }
 
+    RAC_LOG_DEBUG(LOG_CAT, "can_handle: NO (no gguf extension in path: %s)", path);
     return RAC_FALSE;
 }
 

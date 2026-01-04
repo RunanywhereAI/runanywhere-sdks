@@ -8,7 +8,10 @@ interface PlatformStorage {
     /**
      * Save a string value
      */
-    suspend fun putString(key: String, value: String)
+    suspend fun putString(
+        key: String,
+        value: String,
+    )
 
     /**
      * Get a string value
@@ -18,32 +21,50 @@ interface PlatformStorage {
     /**
      * Save a boolean value
      */
-    suspend fun putBoolean(key: String, value: Boolean)
+    suspend fun putBoolean(
+        key: String,
+        value: Boolean,
+    )
 
     /**
      * Get a boolean value
      */
-    suspend fun getBoolean(key: String, defaultValue: Boolean = false): Boolean
+    suspend fun getBoolean(
+        key: String,
+        defaultValue: Boolean = false,
+    ): Boolean
 
     /**
      * Save a long value
      */
-    suspend fun putLong(key: String, value: Long)
+    suspend fun putLong(
+        key: String,
+        value: Long,
+    )
 
     /**
      * Get a long value
      */
-    suspend fun getLong(key: String, defaultValue: Long = 0L): Long
+    suspend fun getLong(
+        key: String,
+        defaultValue: Long = 0L,
+    ): Long
 
     /**
      * Save an integer value
      */
-    suspend fun putInt(key: String, value: Int)
+    suspend fun putInt(
+        key: String,
+        value: Int,
+    )
 
     /**
      * Get an integer value
      */
-    suspend fun getInt(key: String, defaultValue: Int = 0): Int
+    suspend fun getInt(
+        key: String,
+        defaultValue: Int = 0,
+    ): Int
 
     /**
      * Remove a value

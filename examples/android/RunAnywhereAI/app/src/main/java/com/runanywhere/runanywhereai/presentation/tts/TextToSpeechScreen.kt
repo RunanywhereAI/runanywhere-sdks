@@ -1,11 +1,8 @@
 package com.runanywhere.runanywhereai.presentation.tts
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -15,16 +12,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
-import com.runanywhere.sdk.models.enums.ModelSelectionContext
+import com.runanywhere.runanywhereai.ui.theme.AppColors
+import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
 import kotlinx.coroutines.launch
 
 /**
@@ -42,40 +38,40 @@ import kotlinx.coroutines.launch
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TextToSpeechScreen(
-    viewModel: TextToSpeechViewModel = viewModel()
-) {
+fun TextToSpeechScreen(viewModel: TextToSpeechViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showModelPicker by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background),
         ) {
             // Header with title
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = "Text to Speech",
                     style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
             }
 
             // Model Status Banner - Always visible
             // iOS Reference: ModelStatusBanner component
             ModelStatusBannerTTS(
-                framework = uiState.selectedFramework,
+                framework = uiState.selectedFramework?.displayName,
                 modelName = uiState.selectedModelName,
                 isLoading = uiState.isGenerating && uiState.selectedModelName == null,
-                onSelectModel = { showModelPicker = true }
+                onSelectModel = { showModelPicker = true },
             )
 
             HorizontalDivider()
@@ -84,12 +80,13 @@ fun TextToSpeechScreen(
             if (uiState.isModelLoaded) {
                 // Scrollable content area
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState())
+                            .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
                     // Text input section
                     // iOS Reference: TextEditor in TextToSpeechView
@@ -98,7 +95,7 @@ fun TextToSpeechScreen(
                         onTextChange = { viewModel.updateInputText(it) },
                         characterCount = uiState.characterCount,
                         maxCharacters = uiState.maxCharacters,
-                        onShuffle = { viewModel.shuffleSampleText() }
+                        onShuffle = { viewModel.shuffleSampleText() },
                     )
 
                     // Voice settings section
@@ -107,7 +104,7 @@ fun TextToSpeechScreen(
                         speed = uiState.speed,
                         pitch = uiState.pitch,
                         onSpeedChange = { viewModel.updateSpeed(it) },
-                        onPitchChange = { viewModel.updatePitch(it) }
+                        onPitchChange = { viewModel.updatePitch(it) },
                     )
 
                     // Audio info section (shown after generation)
@@ -116,7 +113,7 @@ fun TextToSpeechScreen(
                         AudioInfoSection(
                             duration = uiState.audioDuration!!,
                             audioSize = uiState.audioSize,
-                            sampleRate = uiState.sampleRate
+                            sampleRate = uiState.sampleRate,
                         )
                     }
                 }
@@ -137,7 +134,7 @@ fun TextToSpeechScreen(
                     duration = uiState.audioDuration ?: 0.0,
                     errorMessage = uiState.errorMessage,
                     onGenerate = { viewModel.generateSpeech() },
-                    onTogglePlayback = { viewModel.togglePlayback() }
+                    onTogglePlayback = { viewModel.togglePlayback() },
                 )
             } else {
                 // No model selected - show spacer
@@ -149,7 +146,7 @@ fun TextToSpeechScreen(
         // iOS Reference: ModelRequiredOverlay component
         if (!uiState.isModelLoaded && !uiState.isGenerating) {
             ModelRequiredOverlayTTS(
-                onSelectModel = { showModelPicker = true }
+                onSelectModel = { showModelPicker = true },
             )
         }
 
@@ -161,11 +158,16 @@ fun TextToSpeechScreen(
                 onDismiss = { showModelPicker = false },
                 onModelSelected = { model ->
                     scope.launch {
-                        // Model loaded via ModelSelectionBottomSheet,
-                        // ViewModel will update via lifecycle tracker
                         android.util.Log.d("TextToSpeechScreen", "TTS model selected: ${model.name}")
+                        // Notify ViewModel that model is loaded
+                        viewModel.onModelLoaded(
+                            modelName = model.name,
+                            modelId = model.id,
+                            framework = model.framework,
+                        )
+                        showModelPicker = false
                     }
-                }
+                },
             )
         }
     }
@@ -180,52 +182,53 @@ private fun ModelStatusBannerTTS(
     framework: String?,
     modelName: String?,
     isLoading: Boolean,
-    onSelectModel: () -> Unit
+    onSelectModel: () -> Unit,
 ) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant
+        color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp
+                    strokeWidth = 2.dp,
                 )
                 Text(
                     text = "Loading voice...",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else if (framework != null && modelName != null) {
                 Icon(
                     imageVector = Icons.Filled.VolumeUp,
                     contentDescription = null,
                     tint = AppColors.primaryAccent,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(18.dp),
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = framework,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
                         text = modelName,
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
                     )
                 }
                 OutlinedButton(
                     onClick = onSelectModel,
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                 ) {
                     Text("Change", style = MaterialTheme.typography.labelMedium)
                 }
@@ -233,31 +236,32 @@ private fun ModelStatusBannerTTS(
                 Icon(
                     imageVector = Icons.Filled.Warning,
                     contentDescription = null,
-                    tint = AppColors.primaryOrange
+                    tint = AppColors.primaryOrange,
                 )
                 Text(
                     text = "No voice selected",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 )
                 Button(
                     onClick = onSelectModel,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = AppColors.primaryAccent,
-                        contentColor = Color.White
-                    )
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = AppColors.primaryAccent,
+                            contentColor = Color.White,
+                        ),
                 ) {
                     Icon(
                         Icons.Filled.Apps,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
-                        tint = Color.White
+                        tint = Color.White,
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         "Select Voice",
-                        color = Color.White
+                        color = Color.White,
                     )
                 }
             }
@@ -274,26 +278,27 @@ private fun TextInputSection(
     text: String,
     onTextChange: (String) -> Unit,
     characterCount: Int,
-    maxCharacters: Int,
-    onShuffle: () -> Unit
+    @Suppress("UNUSED_PARAMETER") maxCharacters: Int,
+    onShuffle: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
             text = "Enter Text",
             style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.SemiBold,
         )
 
         OutlinedTextField(
             value = text,
             onValueChange = onTextChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 120.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 120.dp),
             placeholder = {
                 Text("Type or paste text to convert to speech...")
             },
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(12.dp),
         )
 
         // Character count and Surprise me! button row
@@ -301,29 +306,29 @@ private fun TextInputSection(
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = "$characterCount characters",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             TextButton(
                 onClick = onShuffle,
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
             ) {
                 Icon(
                     imageVector = Icons.Filled.Casino,
                     contentDescription = "Shuffle",
                     modifier = Modifier.size(16.dp),
-                    tint = AppColors.primaryAccent
+                    tint = AppColors.primaryAccent,
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = "Surprise me!",
                     style = MaterialTheme.typography.labelSmall,
-                    color = AppColors.primaryAccent
+                    color = AppColors.primaryAccent,
                 )
             }
         }
@@ -339,47 +344,49 @@ private fun VoiceSettingsSection(
     speed: Float,
     pitch: Float,
     onSpeedChange: (Float) -> Unit,
-    onPitchChange: (Float) -> Unit
+    onPitchChange: (Float) -> Unit,
 ) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant
+        color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
                 text = "Voice Settings",
                 style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
             )
 
             // Speed slider
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
                         text = "Speed",
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                     Text(
                         text = String.format("%.1fx", speed),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                // 0.1 increments
                 Slider(
                     value = speed,
                     onValueChange = onSpeedChange,
                     valueRange = 0.5f..2.0f,
-                    steps = 14, // 0.1 increments
-                    colors = SliderDefaults.colors(
-                        thumbColor = AppColors.primaryAccent,
-                        activeTrackColor = AppColors.primaryAccent
-                    )
+                    steps = 14,
+                    colors =
+                        SliderDefaults.colors(
+                            thumbColor = AppColors.primaryAccent,
+                            activeTrackColor = AppColors.primaryAccent,
+                        ),
                 )
             }
 
@@ -387,16 +394,16 @@ private fun VoiceSettingsSection(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
                         text = "Pitch",
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                     Text(
                         text = String.format("%.1fx", pitch),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Slider(
@@ -404,10 +411,11 @@ private fun VoiceSettingsSection(
                     onValueChange = onPitchChange,
                     valueRange = 0.5f..2.0f,
                     steps = 14,
-                    colors = SliderDefaults.colors(
-                        thumbColor = AppColors.primaryAccent,
-                        activeTrackColor = AppColors.primaryAccent
-                    )
+                    colors =
+                        SliderDefaults.colors(
+                            thumbColor = AppColors.primaryAccent,
+                            activeTrackColor = AppColors.primaryAccent,
+                        ),
                 )
             }
         }
@@ -422,33 +430,33 @@ private fun VoiceSettingsSection(
 private fun AudioInfoSection(
     duration: Double,
     audioSize: Int?,
-    sampleRate: Int?
+    sampleRate: Int?,
 ) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant
+        color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
                 text = "Audio Info",
                 style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
             )
 
             AudioInfoRow(
                 icon = Icons.Outlined.GraphicEq,
                 label = "Duration",
-                value = String.format("%.2fs", duration)
+                value = String.format("%.2fs", duration),
             )
 
             audioSize?.let {
                 AudioInfoRow(
                     icon = Icons.Outlined.Description,
                     label = "Size",
-                    value = formatBytes(it)
+                    value = formatBytes(it),
                 )
             }
 
@@ -456,7 +464,7 @@ private fun AudioInfoSection(
                 AudioInfoRow(
                     icon = Icons.Outlined.VolumeUp,
                     label = "Sample Rate",
-                    value = "$it Hz"
+                    value = "$it Hz",
                 )
             }
         }
@@ -467,29 +475,29 @@ private fun AudioInfoSection(
 private fun AudioInfoRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
-    value: String
+    value: String,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             modifier = Modifier.size(16.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = "$label:",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.weight(1f))
         Text(
             text = value,
             style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.Medium
+            fontWeight = FontWeight.Medium,
         )
     }
 }
@@ -511,15 +519,16 @@ private fun ControlsSection(
     duration: Double,
     errorMessage: String?,
     onGenerate: () -> Unit,
-    onTogglePlayback: () -> Unit
+    onTogglePlayback: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(16.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         // Error message
         errorMessage?.let { error ->
@@ -527,7 +536,7 @@ private fun ControlsSection(
                 text = error,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
         }
 
@@ -536,63 +545,65 @@ private fun ControlsSection(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
                     text = formatTime(currentTime),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 LinearProgressIndicator(
                     progress = { playbackProgress.toFloat() },
                     modifier = Modifier.weight(1f),
-                    color = AppColors.primaryAccent
+                    color = AppColors.primaryAccent,
                 )
                 Text(
                     text = formatTime(duration),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
 
         // Action buttons
         Row(
-            horizontalArrangement = Arrangement.spacedBy(20.dp)
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             // Generate/Speak button
             Button(
                 onClick = onGenerate,
                 enabled = !isTextEmpty && isModelSelected && !isGenerating,
-                modifier = Modifier
-                    .width(140.dp)
-                    .height(50.dp),
+                modifier =
+                    Modifier
+                        .width(140.dp)
+                        .height(50.dp),
                 shape = RoundedCornerShape(25.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = AppColors.primaryAccent,
-                    contentColor = Color.White,
-                    disabledContainerColor = Color.Gray
-                )
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = AppColors.primaryAccent,
+                        contentColor = Color.White,
+                        disabledContainerColor = Color.Gray,
+                    ),
             ) {
                 if (isGenerating) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(20.dp),
                         color = Color.White,
-                        strokeWidth = 2.dp
+                        strokeWidth = 2.dp,
                     )
                 } else {
                     Icon(
                         imageVector = if (isSystemTTS) Icons.Filled.VolumeUp else Icons.Filled.GraphicEq,
                         contentDescription = null,
                         modifier = Modifier.size(20.dp),
-                        tint = Color.White
+                        tint = Color.White,
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = if (isSystemTTS) "Speak" else "Generate",
                     fontWeight = FontWeight.SemiBold,
-                    color = Color.White
+                    color = Color.White,
                 )
             }
 
@@ -600,39 +611,42 @@ private fun ControlsSection(
             Button(
                 onClick = onTogglePlayback,
                 enabled = hasGeneratedAudio && !isSystemTTS,
-                modifier = Modifier
-                    .width(140.dp)
-                    .height(50.dp),
+                modifier =
+                    Modifier
+                        .width(140.dp)
+                        .height(50.dp),
                 shape = RoundedCornerShape(25.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (hasGeneratedAudio) AppColors.primaryGreen else Color.Gray,
-                    disabledContainerColor = Color.Gray
-                )
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = if (hasGeneratedAudio) AppColors.primaryGreen else Color.Gray,
+                        disabledContainerColor = Color.Gray,
+                    ),
             ) {
                 Icon(
                     imageVector = if (isPlaying) Icons.Filled.Stop else Icons.Filled.PlayArrow,
                     contentDescription = null,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(20.dp),
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = if (isPlaying) "Stop" else "Play",
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
         }
 
         // Status text
         Text(
-            text = when {
-                isSystemTTS && isGenerating -> "Speaking..."
-                isSystemTTS -> "System TTS plays directly"
-                isGenerating -> "Generating speech..."
-                isPlaying -> "Playing..."
-                else -> "Ready"
-            },
+            text =
+                when {
+                    isSystemTTS && isGenerating -> "Speaking..."
+                    isSystemTTS -> "System TTS plays directly"
+                    isGenerating -> "Generating speech..."
+                    isPlaying -> "Playing..."
+                    else -> "Ready"
+                },
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -642,62 +656,63 @@ private fun ControlsSection(
  * iOS Reference: ModelRequiredOverlay in ModelStatusComponents.swift
  */
 @Composable
-private fun ModelRequiredOverlayTTS(
-    onSelectModel: () -> Unit
-) {
+private fun ModelRequiredOverlayTTS(onSelectModel: () -> Unit) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.95f)),
-        contentAlignment = Alignment.Center
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.95f)),
+        contentAlignment = Alignment.Center,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(24.dp),
-            modifier = Modifier.padding(40.dp)
+            modifier = Modifier.padding(40.dp),
         ) {
             Icon(
                 imageVector = Icons.Outlined.VolumeUp,
                 contentDescription = null,
                 modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
             )
 
             Text(
                 text = "Text to Speech",
                 style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             )
 
             Text(
                 text = "Select a text-to-speech voice to generate audio. Choose from System TTS or Piper models.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
 
             Button(
                 onClick = onSelectModel,
-                modifier = Modifier
-                    .fillMaxWidth(0.7f)
-                    .height(50.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth(0.7f)
+                        .height(50.dp),
                 shape = RoundedCornerShape(25.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = AppColors.primaryAccent,
-                    contentColor = Color.White
-                )
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = AppColors.primaryAccent,
+                        contentColor = Color.White,
+                    ),
             ) {
                 Icon(
                     Icons.Filled.Apps,
                     contentDescription = null,
                     modifier = Modifier.size(20.dp),
-                    tint = Color.White
+                    tint = Color.White,
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     "Select a Voice",
                     fontWeight = FontWeight.SemiBold,
-                    color = Color.White
+                    color = Color.White,
                 )
             }
         }

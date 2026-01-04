@@ -6,7 +6,7 @@ package com.runanywhere.sdk.foundation
 data class HostAppInfo(
     val identifier: String?,
     val name: String?,
-    val version: String?
+    val version: String?,
 )
 
 /**

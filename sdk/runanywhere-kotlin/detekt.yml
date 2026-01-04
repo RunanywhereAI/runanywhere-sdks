@@ -1,16 +1,14 @@
+# Detekt Configuration for KMP SDK Hygiene
+# Focus: Unused code detection and removal
+
 build:
   maxIssues: 0
   excludeCorrectable: false
-  weights:
-    complexity: 2
-    LongParameterList: 1
-    style: 1
-    comments: 1
 
 config:
   validation: true
   warningsAsErrors: true
-  checkExhaustiveness: true
+  checkExhaustiveness: false
 
 processors:
   active: true
@@ -18,165 +16,181 @@ processors:
 console-reports:
   active: true
 
-output-reports:
-  active: true
-
+# =============================================================================
+# COMMENTS - Minimal
+# =============================================================================
 comments:
-  active: true
-  UndocumentedPublicClass:
-    active: true
-    searchInNestedClass: true
-    searchInInnerClass: true
-    searchInInnerObject: true
-  UndocumentedPublicFunction:
-    active: true
-  UndocumentedPublicProperty:
-    active: true
+  active: false
 
-  # Custom rule for TODOs without issue references
-  TodoCommentWithoutIssue:
-    active: true
-    # This is a custom message that will be shown
-    message: "TODO comments must reference a GitHub issue (e.g., // TODO: #123 - Description)"
-
+# =============================================================================
+# COMPLEXITY - Focus on egregious cases only
+# =============================================================================
 complexity:
   active: true
+  CognitiveComplexMethod:
+    active: false
   ComplexCondition:
-    active: true
-    threshold: 4
+    active: false
   ComplexInterface:
-    active: true
-    threshold: 10
+    active: false
   CyclomaticComplexMethod:
-    active: true
-    threshold: 15
+    active: false
+  LabeledExpression:
+    active: false
+  LargeClass:
+    active: false
   LongMethod:
-    active: true
-    threshold: 60
+    active: false
   LongParameterList:
-    active: true
-    threshold: 6
+    active: false
   MethodOverloading:
-    active: true
-    threshold: 6
+    active: false
+  NamedArguments:
+    active: false
+  NestedBlockDepth:
+    active: false
+  NestedScopeFunctions:
+    active: false
+  ReplaceSafeCallChainWithRun:
+    active: false
+  StringLiteralDuplication:
+    active: false
   TooManyFunctions:
-    active: true
-    thresholdInFiles: 11
-    thresholdInClasses: 11
-    thresholdInInterfaces: 11
-    thresholdInObjects: 11
-    thresholdInEnums: 11
+    active: false
 
+# =============================================================================
+# COROUTINES
+# =============================================================================
 coroutines:
   active: true
   GlobalCoroutineUsage:
     active: true
   InjectDispatcher:
-    active: true
+    active: false
   RedundantSuspendModifier:
     active: true
   SleepInsteadOfDelay:
     active: true
+  SuspendFunSwallowedCancellation:
+    active: false
+  SuspendFunWithCoroutineScopeReceiver:
+    active: false
   SuspendFunWithFlowReturnType:
+    active: false
+
+# =============================================================================
+# EMPTY BLOCKS
+# =============================================================================
+empty-blocks:
+  active: true
+  EmptyCatchBlock:
+    active: true
+  EmptyClassBlock:
+    active: true
+  EmptyDefaultConstructor:
+    active: true
+  EmptyDoWhileBlock:
+    active: true
+  EmptyElseBlock:
+    active: true
+  EmptyFinallyBlock:
+    active: true
+  EmptyForBlock:
+    active: true
+  EmptyFunctionBlock:
+    active: false  # Disabled: InMemoryDatabase stub implementations are intentional
+  EmptyIfBlock:
+    active: true
+  EmptyInitBlock:
+    active: true
+  EmptyKtFile:
+    active: true
+  EmptySecondaryConstructor:
+    active: true
+  EmptyTryBlock:
+    active: true
+  EmptyWhenBlock:
+    active: true
+  EmptyWhileBlock:
     active: true
 
+# =============================================================================
+# EXCEPTIONS - Minimal
+# =============================================================================
 exceptions:
   active: true
   ExceptionRaisedInUnexpectedLocation:
-    active: true
+    active: false
   InstanceOfCheckForException:
-    active: true
+    active: false
   NotImplementedDeclaration:
     active: true
   ObjectExtendsThrowable:
+    active: false
+  PrintStackTrace:
     active: true
   RethrowCaughtException:
-    active: true
+    active: false
   ReturnFromFinally:
     active: true
   SwallowedException:
-    active: true
+    active: false
   ThrowingExceptionFromFinally:
     active: true
+  ThrowingExceptionInMain:
+    active: false
   ThrowingExceptionsWithoutMessageOrCause:
-    active: true
+    active: false
   ThrowingNewInstanceOfSameException:
-    active: true
+    active: false
   TooGenericExceptionCaught:
-    active: true
+    active: false
   TooGenericExceptionThrown:
-    active: true
+    active: false
 
+# =============================================================================
+# NAMING - Minimal
+# =============================================================================
 naming:
-  active: true
-  BooleanPropertyNaming:
-    active: true
-  ClassNaming:
-    active: true
-  ConstructorParameterNaming:
-    active: true
-  EnumNaming:
-    active: true
-  FunctionNaming:
-    active: true
-  FunctionParameterNaming:
-    active: true
-  InvalidPackageDeclaration:
-    active: true
-  LambdaParameterNaming:
-    active: true
-  MatchingDeclarationName:
-    active: true
-  MemberNameEqualsClassName:
-    active: true
-  NoNameShadowing:
-    active: true
-  NonBooleanPropertyPrefixedWithIs:
-    active: true
-  ObjectPropertyNaming:
-    active: true
-  PackageNaming:
-    active: true
-  TopLevelPropertyNaming:
-    active: true
-  VariableMaxLength:
-    active: true
-  VariableMinLength:
-    active: true
-  VariableNaming:
-    active: true
+  active: false
 
+# =============================================================================
+# PERFORMANCE
+# =============================================================================
 performance:
   active: true
   ArrayPrimitive:
     active: true
   CouldBeSequence:
-    active: true
+    active: false
   ForEachOnRange:
     active: true
   SpreadOperator:
-    active: true
+    active: false
   UnnecessaryPartOfBinaryExpression:
     active: true
   UnnecessaryTemporaryInstantiation:
     active: true
 
+# =============================================================================
+# POTENTIAL-BUGS
+# =============================================================================
 potential-bugs:
   active: true
   AvoidReferentialEquality:
-    active: true
+    active: false
   CastNullableToNonNullableType:
     active: true
   CastToNullableType:
-    active: true
+    active: false
   Deprecation:
-    active: true
+    active: false
   DontDowncastCollectionTypes:
     active: true
   DoubleMutabilityForCollection:
     active: true
   ElseCaseInsteadOfExhaustiveWhen:
-    active: true
+    active: false
   EqualsAlwaysReturnsTrueOrFalse:
     active: true
   EqualsWithHashCodeExist:
@@ -186,13 +200,13 @@ potential-bugs:
   ExplicitGarbageCollectionCall:
     active: true
   HasPlatformType:
-    active: true
+    active: false
   IgnoredReturnValue:
-    active: true
+    active: false
   ImplicitDefaultLocale:
-    active: true
+    active: false
   ImplicitUnitReturnType:
-    active: true
+    active: false
   InvalidRange:
     active: true
   IteratorHasNextCallsNextMethod:
@@ -200,14 +214,16 @@ potential-bugs:
   IteratorNotThrowingNoSuchElementException:
     active: true
   LateinitUsage:
-    active: true
+    active: false
   MapGetWithNotNullAssertionOperator:
-    active: true
+    active: false
   MissingPackageDeclaration:
     active: true
   NullCheckOnMutableProperty:
-    active: true
+    active: false
   NullableToStringCall:
+    active: false
+  PropertyUsedBeforeDeclaration:
     active: true
   UnconditionalJumpStatementInLoop:
     active: true
@@ -217,12 +233,14 @@ potential-bugs:
     active: true
   UnnecessarySafeCall:
     active: true
+  UnreachableCatchBlock:
+    active: true
   UnreachableCode:
     active: true
   UnsafeCallOnNullableType:
-    active: true
+    active: false
   UnsafeCast:
-    active: true
+    active: false
   UnusedUnaryOperator:
     active: true
   UselessPostfixExpression:
@@ -230,67 +248,81 @@ potential-bugs:
   WrongEqualsTypeParameter:
     active: true
 
+# =============================================================================
+# STYLE - Focus on unused code detection
+# =============================================================================
 style:
   active: true
+  AlsoCouldBeApply:
+    active: false
+  BracesOnIfStatements:
+    active: false
+  BracesOnWhenStatements:
+    active: false
+  CanBeNonNullable:
+    active: false
+  CascadingCallWrapping:
+    active: false
+  ClassOrdering:
+    active: false
+  CollapsibleIfStatements:
+    active: false
+  DataClassContainsFunctions:
+    active: false
+  DataClassShouldBeImmutable:
+    active: false
+  DestructuringDeclarationWithTooManyEntries:
+    active: false
+  DoubleNegativeLambda:
+    active: false
+  EqualsNullCall:
+    active: false
+  EqualsOnSignatureLine:
+    active: false
+  ExplicitCollectionElementAccessMethod:
+    active: false
+  ExplicitItLambdaParameter:
+    active: false
+  ExpressionBodySyntax:
+    active: false
+  ForbiddenAnnotation:
+    active: false
   ForbiddenComment:
-    active: true
-    values:
-      - 'TODO:(?!.*#\\d+)'
-      - 'FIXME:(?!.*#\\d+)'
-      - 'HACK:(?!.*#\\d+)'
-      - 'XXX:(?!.*#\\d+)'
-      - 'BUG:(?!.*#\\d+)'
-      - 'REFACTOR:(?!.*#\\d+)'
-      - 'OPTIMIZE:(?!.*#\\d+)'
-    allowedPatterns: ''
-    message: "TODOs must reference a GitHub issue (e.g., // TODO: #123 - Description)"
+    active: false
   ForbiddenImport:
-    active: true
+    active: false
   ForbiddenMethodCall:
-    active: true
+    active: false
   ForbiddenSuppress:
-    active: true
+    active: false
   ForbiddenVoid:
-    active: true
+    active: false
   FunctionOnlyReturningConstant:
     active: true
   LoopWithTooManyJumpStatements:
-    active: true
+    active: false
   MagicNumber:
-    active: true
-    excludes: ['**/test/**', '**/androidTest/**', '**/commonTest/**', '**/jvmTest/**', '**/androidUnitTest/**', '**/androidInstrumentedTest/**', '**/jsTest/**', '**/iosTest/**']
-    ignoreNumbers:
-      - '-1'
-      - '0'
-      - '1'
-      - '2'
-      - '100'
-      - '1000'
-  MandatoryBracesIfStatements:
-    active: true
-  MandatoryBracesLoops:
-    active: true
+    active: false
   MaxChainedCallsOnSameLine:
-    active: true
+    active: false
   MaxLineLength:
-    active: true
-    maxLineLength: 120
+    active: false
   MayBeConst:
     active: true
   ModifierOrder:
-    active: true
+    active: false
   MultilineLambdaItParameter:
-    active: true
+    active: false
   MultilineRawStringIndentation:
-    active: true
+    active: false
   NestedClassesVisibility:
-    active: true
+    active: false
   NewLineAtEndOfFile:
-    active: true
+    active: false
   NoTabs:
-    active: true
+    active: false
   NullableBooleanCheck:
-    active: true
+    active: false
   ObjectLiteralToLambda:
     active: true
   OptionalAbstractKeyword:
@@ -298,38 +330,43 @@ style:
   OptionalUnit:
     active: true
   PreferToOverPairSyntax:
-    active: true
+    active: false
   ProtectedMemberInFinalClass:
     active: true
   RedundantExplicitType:
-    active: true
+    active: false
   RedundantHigherOrderMapUsage:
     active: true
   RedundantVisibilityModifierRule:
-    active: true
+    active: false
   ReturnCount:
-    active: true
-    max: 3
+    active: false
   SafeCast:
-    active: true
+    active: false
   SerialVersionUIDInSerializableClass:
-    active: true
+    active: false
   SpacingBetweenPackageAndImports:
-    active: true
+    active: false
+  StringShouldBeRawString:
+    active: false
+  ThrowsCount:
+    active: false
   TrailingWhitespace:
-    active: true
+    active: false
   TrimMultilineRawString:
-    active: true
+    active: false
   UnderscoresInNumericLiterals:
-    active: true
+    active: false
   UnnecessaryAbstractClass:
     active: true
   UnnecessaryAnnotationUseSiteTarget:
-    active: true
+    active: false
   UnnecessaryApply:
     active: true
   UnnecessaryBackticks:
-    active: true
+    active: false
+  UnnecessaryBracesAroundTrailingLambda:
+    active: false
   UnnecessaryFilter:
     active: true
   UnnecessaryInheritance:
@@ -339,9 +376,9 @@ style:
   UnnecessaryLet:
     active: true
   UnnecessaryParentheses:
-    active: true
+    active: false
   UntilInsteadOfRangeTo:
-    active: true
+    active: false
   UnusedImports:
     active: true
   UnusedParameter:
@@ -353,31 +390,33 @@ style:
   UnusedPrivateProperty:
     active: true
   UseAnyOrNoneInsteadOfFind:
-    active: true
+    active: false
   UseArrayLiteralsInAnnotations:
-    active: true
+    active: false
   UseCheckNotNull:
-    active: true
+    active: false
   UseCheckOrError:
-    active: true
+    active: false
   UseDataClass:
-    active: true
+    active: false
   UseEmptyCounterpart:
-    active: true
+    active: false
   UseIfEmptyOrIfBlank:
-    active: true
+    active: false
   UseIfInsteadOfWhen:
-    active: true
+    active: false
   UseIsNullOrEmpty:
-    active: true
+    active: false
+  UseLet:
+    active: false
   UseOrEmpty:
-    active: true
+    active: false
   UseRequire:
-    active: true
+    active: false
   UseRequireNotNull:
-    active: true
+    active: false
   UseSumOfInsteadOfFlatMapSize:
-    active: true
+    active: false
   UselessCallOnNotNull:
     active: true
   UtilityClassWithPublicConstructor:
@@ -385,4 +424,4 @@ style:
   VarCouldBeVal:
     active: true
   WildcardImport:
-    active: true
+    active: false

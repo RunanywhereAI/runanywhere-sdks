@@ -150,7 +150,11 @@ rac_result_t rac_service_unregister_provider(const char* name, rac_capability_t 
 
 rac_result_t rac_service_create(rac_capability_t capability, const rac_service_request_t* request,
                                 rac_handle_t* out_handle) {
+    RAC_LOG_INFO(LOG_CAT, "rac_service_create called for capability=%d, identifier=%s",
+                 static_cast<int>(capability), request ? (request->identifier ? request->identifier : "(null)") : "(null request)");
+
     if (request == nullptr || out_handle == nullptr) {
+        RAC_LOG_ERROR(LOG_CAT, "rac_service_create: null pointer");
         return RAC_ERROR_NULL_POINTER;
     }
 
@@ -159,24 +163,42 @@ rac_result_t rac_service_create(rac_capability_t capability, const rac_service_r
 
     auto it = state.providers.find(capability);
     if (it == state.providers.end() || it->second.empty()) {
+        RAC_LOG_ERROR(LOG_CAT, "rac_service_create: No providers registered for capability %d",
+                      static_cast<int>(capability));
         rac_error_set_details("No providers registered for capability");
         return RAC_ERROR_NO_CAPABLE_PROVIDER;
     }
 
+    RAC_LOG_INFO(LOG_CAT, "rac_service_create: Found %zu providers for capability %d",
+                 it->second.size(), static_cast<int>(capability));
+
     // Find first provider that can handle the request (already sorted by priority)
     // This matches Swift's pattern: registrations.sorted(by:).first(where: canHandle)
     for (const auto& provider : it->second) {
-        if (provider.can_handle(request, provider.user_data)) {
+        RAC_LOG_INFO(LOG_CAT, "rac_service_create: Checking provider '%s' (priority=%d)",
+                     provider.name.c_str(), provider.priority);
+
+        bool can_handle = provider.can_handle(request, provider.user_data);
+        RAC_LOG_INFO(LOG_CAT, "rac_service_create: Provider '%s' can_handle=%s",
+                     provider.name.c_str(), can_handle ? "TRUE" : "FALSE");
+
+        if (can_handle) {
+            RAC_LOG_INFO(LOG_CAT, "rac_service_create: Calling create for provider '%s'",
+                         provider.name.c_str());
             rac_handle_t handle = provider.create(request, provider.user_data);
             if (handle != nullptr) {
                 *out_handle = handle;
-                RAC_LOG_DEBUG("ServiceRegistry",
-                              ("Service created by provider: " + provider.name).c_str());
+                RAC_LOG_INFO(LOG_CAT, "rac_service_create: Service created by provider '%s', handle=%p",
+                             provider.name.c_str(), handle);
                 return RAC_SUCCESS;
+            } else {
+                RAC_LOG_ERROR(LOG_CAT, "rac_service_create: Provider '%s' create returned nullptr",
+                              provider.name.c_str());
             }
         }
     }
 
+    RAC_LOG_ERROR(LOG_CAT, "rac_service_create: No provider could handle the request");
     rac_error_set_details("No provider could handle the request");
     return RAC_ERROR_NO_CAPABLE_PROVIDER;
 }
