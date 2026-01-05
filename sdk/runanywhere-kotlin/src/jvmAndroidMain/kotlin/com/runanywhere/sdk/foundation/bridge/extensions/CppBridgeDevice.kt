@@ -186,17 +186,55 @@ object CppBridgeDevice {
             // Initialize device ID if not already set
             initializeDeviceId()
 
-            // Register the device callbacks with C++ via JNI
-            // TODO: Call native registration
-            // nativeSetDeviceCallbacks()
+            // Create device callbacks object for JNI
+            val callbacks = object {
+                @Suppress("unused")
+                fun getDeviceInfo(): String = getDeviceInfoCallback()
 
-            isRegistered = true
+                @Suppress("unused")
+                fun getDeviceId(): String = getDeviceIdCallback()
 
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                TAG,
-                "Device callbacks registered. Device ID: ${deviceId ?: "unknown"}"
-            )
+                @Suppress("unused")
+                fun isRegistered(): Boolean = isDeviceRegisteredCallback()
+
+                @Suppress("unused")
+                fun setRegistered(registered: Boolean) {
+                    setRegistrationStatusCallback(
+                        if (registered) RegistrationStatus.REGISTERED else RegistrationStatus.NOT_REGISTERED,
+                        null
+                    )
+                }
+
+                @Suppress("unused")
+                fun httpPost(endpoint: String, body: String, requiresAuth: Boolean): Int {
+                    // Delegate to telemetry HTTP
+                    val (statusCode, _) = CppBridgeTelemetry.sendTelemetry(
+                        endpoint,
+                        CppBridgeTelemetry.HttpMethod.POST,
+                        mapOf("Content-Type" to "application/json"),
+                        body
+                    )
+                    return statusCode
+                }
+            }
+
+            // Register with native
+            val result = com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racDeviceManagerSetCallbacks(callbacks)
+
+            if (result == 0) {
+                isRegistered = true
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.DEBUG,
+                    TAG,
+                    "Device callbacks registered. Device ID: ${deviceId ?: "unknown"}"
+                )
+            } else {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.ERROR,
+                    TAG,
+                    "Failed to register device callbacks: $result"
+                )
+            }
         }
     }
 
@@ -433,12 +471,18 @@ object CppBridgeDevice {
                 return
             }
 
-            // TODO: Call native unregistration
-            // nativeUnsetDeviceCallbacks()
+            // Clear native callbacks by setting null
+            // This is handled by the JNI layer
 
             deviceListener = null
             registrationStatus = RegistrationStatus.NOT_REGISTERED
             isRegistered = false
+
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.DEBUG,
+                TAG,
+                "Device callbacks unregistered"
+            )
         }
     }
 
@@ -511,9 +555,11 @@ object CppBridgeDevice {
      * This should be called after SDK initialization when the app is ready
      * to register the device.
      *
+     * @param environment SDK environment (0=DEVELOPMENT, 1=STAGING, 2=PRODUCTION)
+     * @param buildToken Optional build token for development mode
      * @return true if registration was triggered, false if already registered or failed
      */
-    fun triggerRegistration(): Boolean {
+    fun triggerRegistration(environment: Int = 0, buildToken: String? = null): Boolean {
         if (!isRegistered) {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
@@ -541,11 +587,42 @@ object CppBridgeDevice {
             return true
         }
 
-        // TODO: Call native registration
-        // val result = nativeRegisterDevice()
-        // return result == 0
+        // Call native registration
+        val result = com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racDeviceManagerRegisterIfNeeded(
+            environment,
+            buildToken
+        )
 
-        return true
+        CppBridgePlatformAdapter.logCallback(
+            CppBridgePlatformAdapter.LogLevel.INFO,
+            TAG,
+            "Device registration result: $result"
+        )
+
+        return result == 0
+    }
+
+    /**
+     * Check if device is registered with backend.
+     * Calls native method to get current status.
+     */
+    fun checkIsRegistered(): Boolean {
+        return com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racDeviceManagerIsRegistered()
+    }
+
+    /**
+     * Clear device registration status.
+     */
+    fun clearRegistration() {
+        com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racDeviceManagerClearRegistration()
+        registrationStatus = RegistrationStatus.NOT_REGISTERED
+    }
+
+    /**
+     * Get native device ID from C++ device manager.
+     */
+    fun getNativeDeviceId(): String? {
+        return com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racDeviceManagerGetDeviceId()
     }
 
     /**

@@ -478,6 +478,114 @@ object RunAnywhereBridge {
     external fun racAudioWavHeaderSize(): Int
 
     // ========================================================================
+    // DEVICE MANAGER (rac_device_manager.h)
+    // Mirrors Swift SDK's CppBridge+Device.swift
+    // ========================================================================
+
+    /**
+     * Set device manager callbacks.
+     * The callback object must implement:
+     * - getDeviceInfo(): String (returns JSON)
+     * - getDeviceId(): String
+     * - isRegistered(): Boolean
+     * - setRegistered(registered: Boolean)
+     * - httpPost(endpoint: String, body: String, requiresAuth: Boolean): Int (status code)
+     */
+    @JvmStatic
+    external fun racDeviceManagerSetCallbacks(callbacks: Any): Int
+
+    /**
+     * Register device with backend if not already registered.
+     * @param environment SDK environment (0=DEVELOPMENT, 1=STAGING, 2=PRODUCTION)
+     * @param buildToken Optional build token for development mode
+     */
+    @JvmStatic
+    external fun racDeviceManagerRegisterIfNeeded(environment: Int, buildToken: String?): Int
+
+    /**
+     * Check if device is registered.
+     */
+    @JvmStatic
+    external fun racDeviceManagerIsRegistered(): Boolean
+
+    /**
+     * Clear device registration status.
+     */
+    @JvmStatic
+    external fun racDeviceManagerClearRegistration()
+
+    /**
+     * Get the current device ID.
+     */
+    @JvmStatic
+    external fun racDeviceManagerGetDeviceId(): String?
+
+    // ========================================================================
+    // TELEMETRY MANAGER (rac_telemetry_manager.h)
+    // Mirrors Swift SDK's CppBridge+Telemetry.swift
+    // ========================================================================
+
+    /**
+     * Create telemetry manager.
+     * @param environment SDK environment
+     * @param deviceId Persistent device UUID
+     * @param platform Platform string ("android")
+     * @param sdkVersion SDK version string
+     * @return Handle to telemetry manager, or 0 on failure
+     */
+    @JvmStatic
+    external fun racTelemetryManagerCreate(
+        environment: Int,
+        deviceId: String,
+        platform: String,
+        sdkVersion: String
+    ): Long
+
+    /**
+     * Destroy telemetry manager.
+     */
+    @JvmStatic
+    external fun racTelemetryManagerDestroy(handle: Long)
+
+    /**
+     * Set device info for telemetry payloads.
+     */
+    @JvmStatic
+    external fun racTelemetryManagerSetDeviceInfo(handle: Long, deviceModel: String, osVersion: String)
+
+    /**
+     * Set HTTP callback for telemetry.
+     * The callback object must implement:
+     * - onHttpRequest(endpoint: String, body: String, bodyLength: Int, requiresAuth: Boolean)
+     */
+    @JvmStatic
+    external fun racTelemetryManagerSetHttpCallback(handle: Long, callback: Any)
+
+    /**
+     * Flush pending telemetry events.
+     */
+    @JvmStatic
+    external fun racTelemetryManagerFlush(handle: Long): Int
+
+    // ========================================================================
+    // ANALYTICS EVENTS (rac_analytics_events.h)
+    // ========================================================================
+
+    /**
+     * Set analytics events callback.
+     */
+    /**
+     * Register analytics events callback with telemetry manager.
+     * Events from C++ will be routed to the telemetry manager for batching and HTTP transport.
+     * 
+     * @param telemetryHandle Handle to the telemetry manager (from racTelemetryManagerCreate)
+     *                        Pass 0 to unregister the callback
+     * @return RAC_SUCCESS or error code
+     */
+    @JvmStatic
+    external fun racAnalyticsEventsSetCallback(telemetryHandle: Long): Int
+
+    // ========================================================================
     // CONSTANTS
     // ========================================================================
 

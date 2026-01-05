@@ -26,12 +26,16 @@
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_audio_utils.h"
+#include "rac/core/rac_analytics_events.h"
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
+#include "rac/infrastructure/device/rac_device_manager.h"
+#include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
+#include "rac/infrastructure/telemetry/rac_telemetry_types.h"
 
 // NOTE: Backend headers are NOT included here.
 // Backend registration is handled by their respective JNI libraries:
@@ -1811,6 +1815,444 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAudioInt16ToWav(JNIE
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAudioWavHeaderSize(JNIEnv* env, jclass clazz) {
     return static_cast<jint>(rac_audio_wav_header_size());
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Device Manager (rac_device_manager.h)
+// =============================================================================
+// Mirrors Swift SDK's CppBridge+Device.swift
+
+// Global state for device callbacks
+static struct {
+    jobject callback_obj;
+    jmethodID get_device_info_method;
+    jmethodID get_device_id_method;
+    jmethodID is_registered_method;
+    jmethodID set_registered_method;
+    jmethodID http_post_method;
+    std::mutex mtx;
+} g_device_jni_state = {};
+
+// Forward declarations for device C callbacks
+static void jni_device_get_info(rac_device_registration_info_t* out_info, void* user_data);
+static const char* jni_device_get_id(void* user_data);
+static rac_bool_t jni_device_is_registered(void* user_data);
+static void jni_device_set_registered(rac_bool_t registered, void* user_data);
+static rac_result_t jni_device_http_post(const char* endpoint, const char* json_body,
+                                         rac_bool_t requires_auth,
+                                         rac_device_http_response_t* out_response,
+                                         void* user_data);
+
+// Static storage for device ID string (needs to persist across calls)
+static std::string g_cached_device_id;
+
+// Device callback implementations
+static void jni_device_get_info(rac_device_registration_info_t* out_info, void* user_data) {
+    JNIEnv* env = getJNIEnv();
+    if (!env || !g_device_jni_state.callback_obj || !g_device_jni_state.get_device_info_method) {
+        LOGe("jni_device_get_info: JNI not ready");
+        return;
+    }
+    
+    // Call Java getDeviceInfo() which returns a JSON string
+    jstring jResult = (jstring)env->CallObjectMethod(
+        g_device_jni_state.callback_obj,
+        g_device_jni_state.get_device_info_method
+    );
+    
+    if (jResult && out_info) {
+        const char* json = env->GetStringUTFChars(jResult, nullptr);
+        // Parse JSON to fill out_info (simplified - just set device_id for now)
+        // In a full implementation, you'd parse the JSON
+        out_info->platform = "android";
+        env->ReleaseStringUTFChars(jResult, json);
+        env->DeleteLocalRef(jResult);
+    }
+}
+
+static const char* jni_device_get_id(void* user_data) {
+    JNIEnv* env = getJNIEnv();
+    if (!env || !g_device_jni_state.callback_obj || !g_device_jni_state.get_device_id_method) {
+        LOGe("jni_device_get_id: JNI not ready");
+        return "";
+    }
+    
+    jstring jResult = (jstring)env->CallObjectMethod(
+        g_device_jni_state.callback_obj,
+        g_device_jni_state.get_device_id_method
+    );
+    
+    if (jResult) {
+        const char* str = env->GetStringUTFChars(jResult, nullptr);
+        g_cached_device_id = str;
+        env->ReleaseStringUTFChars(jResult, str);
+        env->DeleteLocalRef(jResult);
+        return g_cached_device_id.c_str();
+    }
+    return "";
+}
+
+static rac_bool_t jni_device_is_registered(void* user_data) {
+    JNIEnv* env = getJNIEnv();
+    if (!env || !g_device_jni_state.callback_obj || !g_device_jni_state.is_registered_method) {
+        return RAC_FALSE;
+    }
+    
+    jboolean result = env->CallBooleanMethod(
+        g_device_jni_state.callback_obj,
+        g_device_jni_state.is_registered_method
+    );
+    
+    return result ? RAC_TRUE : RAC_FALSE;
+}
+
+static void jni_device_set_registered(rac_bool_t registered, void* user_data) {
+    JNIEnv* env = getJNIEnv();
+    if (!env || !g_device_jni_state.callback_obj || !g_device_jni_state.set_registered_method) {
+        return;
+    }
+    
+    env->CallVoidMethod(
+        g_device_jni_state.callback_obj,
+        g_device_jni_state.set_registered_method,
+        registered == RAC_TRUE ? JNI_TRUE : JNI_FALSE
+    );
+}
+
+static rac_result_t jni_device_http_post(const char* endpoint, const char* json_body,
+                                         rac_bool_t requires_auth,
+                                         rac_device_http_response_t* out_response,
+                                         void* user_data) {
+    JNIEnv* env = getJNIEnv();
+    if (!env || !g_device_jni_state.callback_obj || !g_device_jni_state.http_post_method) {
+        LOGe("jni_device_http_post: JNI not ready");
+        if (out_response) {
+            out_response->result = RAC_ERROR_ADAPTER_NOT_SET;
+            out_response->status_code = -1;
+        }
+        return RAC_ERROR_ADAPTER_NOT_SET;
+    }
+    
+    jstring jEndpoint = env->NewStringUTF(endpoint ? endpoint : "");
+    jstring jBody = env->NewStringUTF(json_body ? json_body : "");
+    
+    jint statusCode = env->CallIntMethod(
+        g_device_jni_state.callback_obj,
+        g_device_jni_state.http_post_method,
+        jEndpoint, jBody, requires_auth == RAC_TRUE ? JNI_TRUE : JNI_FALSE
+    );
+    
+    env->DeleteLocalRef(jEndpoint);
+    env->DeleteLocalRef(jBody);
+    
+    if (out_response) {
+        out_response->status_code = statusCode;
+        out_response->result = (statusCode >= 200 && statusCode < 300) ? RAC_SUCCESS : RAC_ERROR_NETWORK_ERROR;
+    }
+    
+    return (statusCode >= 200 && statusCode < 300) ? RAC_SUCCESS : RAC_ERROR_NETWORK_ERROR;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDeviceManagerSetCallbacks(
+    JNIEnv* env, jclass clazz, jobject callbacks) {
+    
+    LOGi("racDeviceManagerSetCallbacks called");
+    
+    std::lock_guard<std::mutex> lock(g_device_jni_state.mtx);
+    
+    // Clean up previous callback
+    if (g_device_jni_state.callback_obj != nullptr) {
+        env->DeleteGlobalRef(g_device_jni_state.callback_obj);
+        g_device_jni_state.callback_obj = nullptr;
+    }
+    
+    if (callbacks == nullptr) {
+        LOGw("racDeviceManagerSetCallbacks: null callbacks");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    
+    // Create global reference
+    g_device_jni_state.callback_obj = env->NewGlobalRef(callbacks);
+    
+    // Cache method IDs
+    jclass cls = env->GetObjectClass(callbacks);
+    g_device_jni_state.get_device_info_method = env->GetMethodID(cls, "getDeviceInfo", "()Ljava/lang/String;");
+    g_device_jni_state.get_device_id_method = env->GetMethodID(cls, "getDeviceId", "()Ljava/lang/String;");
+    g_device_jni_state.is_registered_method = env->GetMethodID(cls, "isRegistered", "()Z");
+    g_device_jni_state.set_registered_method = env->GetMethodID(cls, "setRegistered", "(Z)V");
+    g_device_jni_state.http_post_method = env->GetMethodID(cls, "httpPost", "(Ljava/lang/String;Ljava/lang/String;Z)I");
+    env->DeleteLocalRef(cls);
+    
+    // Verify methods found
+    if (!g_device_jni_state.get_device_id_method || !g_device_jni_state.is_registered_method) {
+        LOGe("racDeviceManagerSetCallbacks: required methods not found");
+        env->DeleteGlobalRef(g_device_jni_state.callback_obj);
+        g_device_jni_state.callback_obj = nullptr;
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    
+    // Set up C callbacks
+    rac_device_callbacks_t c_callbacks = {};
+    c_callbacks.get_device_info = jni_device_get_info;
+    c_callbacks.get_device_id = jni_device_get_id;
+    c_callbacks.is_registered = jni_device_is_registered;
+    c_callbacks.set_registered = jni_device_set_registered;
+    c_callbacks.http_post = jni_device_http_post;
+    c_callbacks.user_data = nullptr;
+    
+    rac_result_t result = rac_device_manager_set_callbacks(&c_callbacks);
+    
+    LOGi("racDeviceManagerSetCallbacks result: %d", result);
+    return static_cast<jint>(result);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDeviceManagerRegisterIfNeeded(
+    JNIEnv* env, jclass clazz, jint environment, jstring buildToken) {
+    
+    LOGi("racDeviceManagerRegisterIfNeeded called (env=%d)", environment);
+    
+    std::string tokenStorage;
+    const char* token = getNullableCString(env, buildToken, tokenStorage);
+    
+    rac_result_t result = rac_device_manager_register_if_needed(
+        static_cast<rac_environment_t>(environment),
+        token
+    );
+    
+    LOGi("racDeviceManagerRegisterIfNeeded result: %d", result);
+    return static_cast<jint>(result);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDeviceManagerIsRegistered(
+    JNIEnv* env, jclass clazz) {
+    
+    return rac_device_manager_is_registered() == RAC_TRUE ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDeviceManagerClearRegistration(
+    JNIEnv* env, jclass clazz) {
+    
+    LOGi("racDeviceManagerClearRegistration called");
+    rac_device_manager_clear_registration();
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDeviceManagerGetDeviceId(
+    JNIEnv* env, jclass clazz) {
+    
+    const char* deviceId = rac_device_manager_get_device_id();
+    if (deviceId) {
+        return env->NewStringUTF(deviceId);
+    }
+    return nullptr;
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Telemetry Manager (rac_telemetry_manager.h)
+// =============================================================================
+// Mirrors Swift SDK's CppBridge+Telemetry.swift
+
+// Global state for telemetry
+static struct {
+    rac_telemetry_manager_t* manager;
+    jobject http_callback_obj;
+    jmethodID http_callback_method;
+    std::mutex mtx;
+} g_telemetry_jni_state = {};
+
+// Telemetry HTTP callback from C++ to Java
+static void jni_telemetry_http_callback(void* user_data, const char* endpoint,
+                                        const char* json_body, size_t json_length,
+                                        rac_bool_t requires_auth) {
+    JNIEnv* env = getJNIEnv();
+    if (!env || !g_telemetry_jni_state.http_callback_obj || !g_telemetry_jni_state.http_callback_method) {
+        LOGw("jni_telemetry_http_callback: JNI not ready");
+        return;
+    }
+    
+    jstring jEndpoint = env->NewStringUTF(endpoint ? endpoint : "");
+    jstring jBody = env->NewStringUTF(json_body ? json_body : "");
+    
+    env->CallVoidMethod(
+        g_telemetry_jni_state.http_callback_obj,
+        g_telemetry_jni_state.http_callback_method,
+        jEndpoint, jBody, static_cast<jint>(json_length), requires_auth == RAC_TRUE ? JNI_TRUE : JNI_FALSE
+    );
+    
+    env->DeleteLocalRef(jEndpoint);
+    env->DeleteLocalRef(jBody);
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTelemetryManagerCreate(
+    JNIEnv* env, jclass clazz, jint environment, jstring deviceId, 
+    jstring platform, jstring sdkVersion) {
+    
+    LOGi("racTelemetryManagerCreate called (env=%d)", environment);
+    
+    std::string deviceIdStr = getCString(env, deviceId);
+    std::string platformStr = getCString(env, platform);
+    std::string versionStr = getCString(env, sdkVersion);
+    
+    std::lock_guard<std::mutex> lock(g_telemetry_jni_state.mtx);
+    
+    // Destroy existing manager if any
+    if (g_telemetry_jni_state.manager) {
+        rac_telemetry_manager_destroy(g_telemetry_jni_state.manager);
+    }
+    
+    g_telemetry_jni_state.manager = rac_telemetry_manager_create(
+        static_cast<rac_environment_t>(environment),
+        deviceIdStr.c_str(),
+        platformStr.c_str(),
+        versionStr.c_str()
+    );
+    
+    LOGi("racTelemetryManagerCreate: manager=%p", (void*)g_telemetry_jni_state.manager);
+    return reinterpret_cast<jlong>(g_telemetry_jni_state.manager);
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTelemetryManagerDestroy(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    
+    LOGi("racTelemetryManagerDestroy called");
+    
+    std::lock_guard<std::mutex> lock(g_telemetry_jni_state.mtx);
+    
+    if (handle != 0 && reinterpret_cast<rac_telemetry_manager_t*>(handle) == g_telemetry_jni_state.manager) {
+        // Flush before destroying
+        rac_telemetry_manager_flush(g_telemetry_jni_state.manager);
+        rac_telemetry_manager_destroy(g_telemetry_jni_state.manager);
+        g_telemetry_jni_state.manager = nullptr;
+        
+        // Clean up callback
+        if (g_telemetry_jni_state.http_callback_obj) {
+            env->DeleteGlobalRef(g_telemetry_jni_state.http_callback_obj);
+            g_telemetry_jni_state.http_callback_obj = nullptr;
+        }
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTelemetryManagerSetDeviceInfo(
+    JNIEnv* env, jclass clazz, jlong handle, jstring deviceModel, jstring osVersion) {
+    
+    if (handle == 0) return;
+    
+    std::string modelStr = getCString(env, deviceModel);
+    std::string osStr = getCString(env, osVersion);
+    
+    rac_telemetry_manager_set_device_info(
+        reinterpret_cast<rac_telemetry_manager_t*>(handle),
+        modelStr.c_str(),
+        osStr.c_str()
+    );
+    
+    LOGi("racTelemetryManagerSetDeviceInfo: model=%s, os=%s", modelStr.c_str(), osStr.c_str());
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTelemetryManagerSetHttpCallback(
+    JNIEnv* env, jclass clazz, jlong handle, jobject callback) {
+    
+    LOGi("racTelemetryManagerSetHttpCallback called");
+    
+    if (handle == 0) return;
+    
+    std::lock_guard<std::mutex> lock(g_telemetry_jni_state.mtx);
+    
+    // Clean up previous callback
+    if (g_telemetry_jni_state.http_callback_obj) {
+        env->DeleteGlobalRef(g_telemetry_jni_state.http_callback_obj);
+        g_telemetry_jni_state.http_callback_obj = nullptr;
+    }
+    
+    if (callback) {
+        g_telemetry_jni_state.http_callback_obj = env->NewGlobalRef(callback);
+        
+        // Cache method ID
+        jclass cls = env->GetObjectClass(callback);
+        g_telemetry_jni_state.http_callback_method = env->GetMethodID(
+            cls, "onHttpRequest", "(Ljava/lang/String;Ljava/lang/String;IZ)V"
+        );
+        env->DeleteLocalRef(cls);
+        
+        // Register C callback with telemetry manager
+        rac_telemetry_manager_set_http_callback(
+            reinterpret_cast<rac_telemetry_manager_t*>(handle),
+            jni_telemetry_http_callback,
+            nullptr
+        );
+    }
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTelemetryManagerFlush(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    
+    LOGi("racTelemetryManagerFlush called");
+    
+    if (handle == 0) return RAC_ERROR_INVALID_HANDLE;
+    
+    return static_cast<jint>(rac_telemetry_manager_flush(
+        reinterpret_cast<rac_telemetry_manager_t*>(handle)
+    ));
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Analytics Events (rac_analytics_events.h)
+// =============================================================================
+
+// Global telemetry manager pointer for analytics callback routing
+// The C callback routes events directly to the telemetry manager (same as Swift)
+static rac_telemetry_manager_t* g_analytics_telemetry_manager = nullptr;
+static std::mutex g_analytics_telemetry_mutex;
+
+// C callback that routes analytics events to telemetry manager
+// This mirrors Swift's analyticsEventCallback -> Telemetry.trackAnalyticsEvent()
+static void jni_analytics_event_callback(
+    rac_event_type_t type,
+    const rac_analytics_event_data_t* data,
+    void* user_data
+) {
+    LOGi("jni_analytics_event_callback called: event_type=%d", type);
+    
+    std::lock_guard<std::mutex> lock(g_analytics_telemetry_mutex);
+    if (g_analytics_telemetry_manager && data) {
+        LOGi("jni_analytics_event_callback: routing to telemetry manager");
+        rac_telemetry_manager_track_analytics(g_analytics_telemetry_manager, type, data);
+    } else {
+        LOGw("jni_analytics_event_callback: manager=%p, data=%p", 
+             (void*)g_analytics_telemetry_manager, (void*)data);
+    }
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventsSetCallback(
+    JNIEnv* env, jclass clazz, jlong telemetryHandle) {
+    
+    LOGi("racAnalyticsEventsSetCallback called (telemetryHandle=%lld)", (long long)telemetryHandle);
+    
+    std::lock_guard<std::mutex> lock(g_analytics_telemetry_mutex);
+    
+    if (telemetryHandle != 0) {
+        // Store telemetry manager and register C callback
+        g_analytics_telemetry_manager = reinterpret_cast<rac_telemetry_manager_t*>(telemetryHandle);
+        rac_result_t result = rac_analytics_events_set_callback(jni_analytics_event_callback, nullptr);
+        LOGi("Analytics callback registered, result=%d", result);
+        return static_cast<jint>(result);
+    } else {
+        // Unregister callback
+        g_analytics_telemetry_manager = nullptr;
+        rac_result_t result = rac_analytics_events_set_callback(nullptr, nullptr);
+        LOGi("Analytics callback unregistered, result=%d", result);
+        return static_cast<jint>(result);
+    }
 }
 
 } // extern "C"
