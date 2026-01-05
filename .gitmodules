@@ -1,3 +1,0 @@
-[submodule "sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm"]
-	path = sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm
-	url = https://github.com/mlc-ai/mlc-llm.git
