@@ -27,7 +27,10 @@ actual suspend fun RunAnywhere.loadTTSVoice(voiceId: String) {
     val localPath = modelInfo.localPath
         ?: throw SDKError.tts("Voice '$voiceId' is not downloaded")
 
-    CppBridgeTTS.loadModel(localPath, voiceId)
+    val result = CppBridgeTTS.loadModel(localPath, voiceId)
+    if (result != 0) {
+        throw SDKError.tts("Failed to load TTS voice '$voiceId' (error code: $result)")
+    }
 }
 
 actual suspend fun RunAnywhere.unloadTTSVoice() {
