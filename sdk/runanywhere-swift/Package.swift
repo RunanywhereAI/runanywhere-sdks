@@ -25,8 +25,8 @@ let onnxRuntimeMacOSPath = "\(packageDir)/Binaries/onnxruntime-macos"
 let testLocal = false  // PRODUCTION: download XCFrameworks from GitHub releases
 
 // Version constants for remote XCFrameworks (must be defined before package)
-let commonsVersion = "0.1.1"
-let coreVersion = "0.2.4"
+let commonsVersion = "0.1.2"
+let coreVersion = "0.2.6"
 // =============================================================================
 
 let package = Package(
@@ -254,7 +254,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v\(commonsVersion)/RACommons-ios-v\(commonsVersion).zip",
-                checksum: "f515b4711d5e42003deb6dedbf969f437186945ec188e794c21a4b9e266b2780"
+                checksum: "3b977fbe794d561582b9639ab7b84fad450854935d1a5a3458f7b611794025ed"
             ),
             // =================================================================
             // RABackendLlamaCPP - LLM text generation backend
@@ -263,7 +263,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v\(coreVersion)/RABackendLlamaCPP-ios-v\(coreVersion).zip",
-                checksum: "31a8b7e129ad6197e898d538a4c882a9f4717bad8a9694b842e49a676efd6142"
+                checksum: "a887ed95b503ba1daeecbb678c27f41b017358ee51a2373c13df1df43b8afebf"
             ),
             // =================================================================
             // RABackendONNX - STT/TTS/VAD backend (includes Sherpa-ONNX)
@@ -272,7 +272,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v\(coreVersion)/RABackendONNX-ios-v\(coreVersion).zip",
-                checksum: "a2ada60f35c4a318d852ef04e08a1e5fdfbd646bcaf6058929203ced8ac98815"
+                checksum: "055f2f076291475d0f58b1695411240807d1db006bb5d557e1733e0b655055eb"
             ),
             // =================================================================
             // ONNX Runtime - Required by RABackendONNX
