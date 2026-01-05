@@ -41,6 +41,12 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
     val context = LocalContext.current
     var showDeleteConfirmDialog by remember { mutableStateOf<StoredModelInfo?>(null) }
 
+    // Refresh storage data when the screen appears
+    // This ensures downloaded models and storage metrics are up-to-date
+    LaunchedEffect(Unit) {
+        viewModel.refreshStorage()
+    }
+
     Column(
         modifier =
             Modifier

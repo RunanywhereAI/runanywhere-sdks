@@ -778,7 +778,10 @@ actual suspend fun RunAnywhere.loadLLMModel(modelId: String) {
     val localPath = model.localPath
         ?: throw SDKError.model("Model '$modelId' is not downloaded")
 
-    CppBridgeLLM.loadModel(localPath, modelId)
+    val result = CppBridgeLLM.loadModel(localPath, modelId)
+    if (result != 0) {
+        throw SDKError.llm("Failed to load LLM model '$modelId' (error code: $result)")
+    }
 }
 
 actual suspend fun RunAnywhere.unloadLLMModel() {
@@ -824,5 +827,8 @@ actual suspend fun RunAnywhere.loadSTTModel(modelId: String) {
     val localPath = model.localPath
         ?: throw SDKError.model("Model '$modelId' is not downloaded")
 
-    CppBridgeSTT.loadModel(localPath, modelId)
+    val result = CppBridgeSTT.loadModel(localPath, modelId)
+    if (result != 0) {
+        throw SDKError.stt("Failed to load STT model '$modelId' (error code: $result)")
+    }
 }
