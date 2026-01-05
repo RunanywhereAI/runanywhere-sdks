@@ -275,12 +275,11 @@ if [ "${SKIP_CORE}" = "false" ]; then
     fi
 
     export ANDROID_NDK_HOME="${ANDROID_NDK_HOME}"
-    export BUILD_LLAMACPP="${BUILD_LLAMACPP}"
-    export BUILD_ONNX="${BUILD_ONNX}"
-    export BUILD_WHISPERCPP="${BUILD_WHISPERCPP}"
     export ABIS="${ABIS}"
 
-    ${CORE_BUILD_SCRIPT}
+    # Pass backends as first argument to build.sh (e.g., "llamacpp,onnx")
+    # The core build.sh takes: backends abis (defaults to "all" if not specified)
+    ${CORE_BUILD_SCRIPT} "${BACKENDS}" "${ABIS}"
 
     print_success "runanywhere-core built successfully"
 else
@@ -353,6 +352,8 @@ LLAMACPP_LIBS=(
 ONNX_LIBS=(
     "librac_backend_onnx_jni.so"
     "librunanywhere_onnx.so"
+    "librac_commons.so"           # CRITICAL: Required by librac_backend_onnx_jni.so for service registry
+    "libc++_shared.so"            # C++ standard library (shared by all C++ libs)
     "libonnxruntime.so"
     "libsherpa-onnx-c-api.so"
     "libsherpa-onnx-cxx-api.so"

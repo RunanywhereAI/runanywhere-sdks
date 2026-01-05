@@ -119,16 +119,62 @@ object CppBridge {
 
             // Configure logging (handled by platform adapter)
 
-            // Register events callback for analytics
-            CppBridgeEvents.register()
-
-            // Initialize telemetry HTTP callback
+            // Register telemetry HTTP callback (just sets isRegistered flag)
             CppBridgeTelemetry.register()
 
-            // Register device callbacks
+            // Register device callbacks (sets up JNI callbacks for C++ to call)
             CppBridgeDevice.register()
 
+            // Initialize telemetry manager with device info
+            // This creates the C++ telemetry manager and sets up HTTP callback
+            initializeTelemetryManager(environment)
+
+            // Register analytics events callback AFTER telemetry manager is initialized
+            // This routes C++ events (LLM/STT/TTS) to telemetry for batching and HTTP transport
+            val telemetryHandle = CppBridgeTelemetry.getTelemetryHandle()
+            if (telemetryHandle != 0L) {
+                CppBridgeEvents.register(telemetryHandle)
+            } else {
+                android.util.Log.w(TAG, "Telemetry handle not available, analytics events will not be tracked")
+            }
+
             _isInitialized = true
+        }
+    }
+
+    /**
+     * Initialize the C++ telemetry manager with device info.
+     * Mirrors Swift SDK's CppBridge.Telemetry.initialize(environment:)
+     */
+    private fun initializeTelemetryManager(environment: Environment) {
+        try {
+            // Get device ID (persistent UUID) - this may initialize it if not already done
+            val deviceId = CppBridgeDevice.getDeviceIdCallback()
+            if (deviceId.isEmpty()) {
+                android.util.Log.w(TAG, "Device ID not available for telemetry initialization")
+                return
+            }
+
+            // Get device info from provider or defaults
+            val provider = CppBridgeDevice.deviceInfoProvider
+            val deviceModel = provider?.getDeviceModel() ?: android.os.Build.MODEL ?: "unknown"
+            val osVersion = provider?.getOSVersion() ?: android.os.Build.VERSION.RELEASE ?: "unknown"
+            val sdkVersion = com.runanywhere.sdk.utils.SDKConstants.VERSION
+
+            android.util.Log.i(TAG, "Initializing telemetry manager: device=$deviceId, model=$deviceModel, os=$osVersion")
+
+            // Initialize telemetry manager with C++ via JNI
+            CppBridgeTelemetry.initialize(
+                environment = environment.cValue,
+                deviceId = deviceId,
+                deviceModel = deviceModel,
+                osVersion = osVersion,
+                sdkVersion = sdkVersion
+            )
+
+            android.util.Log.i(TAG, "✅ Telemetry manager initialized")
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "Failed to initialize telemetry manager: ${e.message}")
         }
     }
 
@@ -161,8 +207,10 @@ object CppBridge {
      * Initializes the service components:
      * 1. Model Assignment registration
      * 2. Platform services registration
+     * 3. Device registration (triggers backend call)
      *
      * Must be called after [initialize] completes.
+     * Mirrors Swift SDK's CppBridge.initializeServices() + completeServicesInitialization()
      */
     suspend fun initializeServices() {
         synchronized(lock) {
@@ -179,6 +227,27 @@ object CppBridge {
 
             // Register platform services callbacks
             CppBridgePlatform.register()
+
+            // Flush any queued telemetry events
+            CppBridgeTelemetry.flush()
+            android.util.Log.d(TAG, "Flushed queued telemetry events")
+
+            // Trigger device registration with backend (non-blocking, best-effort)
+            // Mirrors Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
+            try {
+                val success = CppBridgeDevice.triggerRegistration(
+                    environment = _environment.cValue,
+                    buildToken = null // TODO: Get build token for development mode
+                )
+                if (success) {
+                    android.util.Log.i(TAG, "✅ Device registration triggered")
+                } else {
+                    android.util.Log.w(TAG, "Device registration not triggered (may already be registered)")
+                }
+            } catch (e: Exception) {
+                // Non-critical failure - device registration is best-effort
+                android.util.Log.w(TAG, "Device registration failed (non-critical): ${e.message}")
+            }
 
             _servicesInitialized = true
         }

@@ -71,6 +71,9 @@ rac_result_t rac_analytics_events_set_callback(rac_analytics_callback_fn callbac
     state.analytics_callback = callback;
     state.analytics_user_data = user_data;
 
+    log_info("Events", "rac_analytics_events_set_callback: callback=%p, user_data=%p", 
+             (void*)callback, user_data);
+
     return RAC_SUCCESS;
 }
 
@@ -93,12 +96,16 @@ void rac_analytics_event_emit(rac_event_type_t type, const rac_analytics_event_d
     auto& state = get_callback_state();
     std::lock_guard<std::mutex> lock(state.mutex);
 
+    log_debug("Events", "rac_analytics_event_emit: type=%d, has_callback=%d", 
+              type, (state.analytics_callback != nullptr ? 1 : 0));
+
     // Get the destination for this event type
     rac_event_destination_t dest = rac_event_get_destination(type);
 
     // Route to analytics callback (telemetry)
     if (dest == RAC_EVENT_DESTINATION_ANALYTICS_ONLY || dest == RAC_EVENT_DESTINATION_ALL) {
         if (state.analytics_callback != nullptr) {
+            log_debug("Events", "Invoking analytics callback for event type %d", type);
             state.analytics_callback(type, data, state.analytics_user_data);
         }
     }

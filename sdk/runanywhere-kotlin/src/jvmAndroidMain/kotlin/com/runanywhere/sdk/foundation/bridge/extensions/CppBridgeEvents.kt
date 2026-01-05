@@ -10,6 +10,8 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+
 /**
  * Events bridge that registers analytics event callbacks with C++ core.
  *
@@ -142,21 +144,66 @@ object CppBridgeEvents {
     /**
      * Register the analytics event callback with C++ core.
      *
-     * This must be called during SDK initialization, after [CppBridgePlatformAdapter.register].
-     * It is safe to call multiple times; subsequent calls are no-ops.
+     * This connects C++ analytics events to the telemetry manager for batching and HTTP transport.
+     * Events from LLM/STT/TTS operations flow: C++ emit → callback → telemetry manager → HTTP
+     *
+     * @param telemetryHandle Handle to the telemetry manager (from racTelemetryManagerCreate)
+     * @return true if registration succeeded, false otherwise
      */
-    fun register() {
+    fun register(telemetryHandle: Long): Boolean {
         synchronized(lock) {
             if (isRegistered) {
-                return
+                return true
             }
 
-            // Register the event callback with C++ via JNI
-            // The callback will be invoked by C++ when analytics events occur
-            // TODO: Call native registration
-            // nativeSetEventCallback()
+            if (telemetryHandle == 0L) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.WARN,
+                    TAG,
+                    "Cannot register analytics callback: telemetry handle is null"
+                )
+                return false
+            }
 
-            isRegistered = true
+            // Register C++ analytics callback that routes to telemetry manager
+            // This mirrors Swift's Events.register() -> rac_analytics_events_set_callback()
+            val result = RunAnywhereBridge.racAnalyticsEventsSetCallback(telemetryHandle)
+            if (result == 0) { // RAC_SUCCESS
+                isRegistered = true
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.DEBUG,
+                    TAG,
+                    "Analytics events callback registered with telemetry manager"
+                )
+                return true
+            } else {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.WARN,
+                    TAG,
+                    "Failed to register analytics callback: error $result"
+                )
+                return false
+            }
+        }
+    }
+
+    /**
+     * Unregister the analytics event callback.
+     * Called during SDK shutdown.
+     */
+    fun unregister() {
+        synchronized(lock) {
+            if (!isRegistered) {
+                return
+            }
+            // Unregister by passing 0 (null handle)
+            RunAnywhereBridge.racAnalyticsEventsSetCallback(0L)
+            isRegistered = false
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.DEBUG,
+                TAG,
+                "Analytics events callback unregistered"
+            )
         }
     }
 
@@ -199,53 +246,6 @@ object CppBridgeEvents {
                 TAG,
                 "Error in event listener: ${e.message}"
             )
-        }
-    }
-
-    // ========================================================================
-    // JNI NATIVE DECLARATIONS
-    // ========================================================================
-
-    /**
-     * Native method to set the analytics event callback with C++ core.
-     *
-     * This registers [eventCallback] with the C++ rac_analytics_events_set_callback function.
-     *
-     * C API: rac_analytics_events_set_callback(rac_analytics_event_callback_t callback)
-     */
-    @JvmStatic
-    private external fun nativeSetEventCallback()
-
-    /**
-     * Native method to unset the analytics event callback.
-     *
-     * Called during shutdown to clean up native resources.
-     *
-     * C API: rac_analytics_events_set_callback(nullptr)
-     */
-    @JvmStatic
-    private external fun nativeUnsetEventCallback()
-
-    // ========================================================================
-    // LIFECYCLE MANAGEMENT
-    // ========================================================================
-
-    /**
-     * Unregister the analytics event callback and clean up resources.
-     *
-     * Called during SDK shutdown.
-     */
-    fun unregister() {
-        synchronized(lock) {
-            if (!isRegistered) {
-                return
-            }
-
-            // TODO: Call native unregistration
-            // nativeUnsetEventCallback()
-
-            eventListener = null
-            isRegistered = false
         }
     }
 

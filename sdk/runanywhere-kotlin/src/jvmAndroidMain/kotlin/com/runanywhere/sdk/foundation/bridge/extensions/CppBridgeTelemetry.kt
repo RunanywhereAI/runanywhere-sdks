@@ -159,6 +159,12 @@ object CppBridgeTelemetry {
     }
 
     /**
+     * Telemetry manager handle (from C++).
+     */
+    @Volatile
+    private var telemetryManagerHandle: Long = 0
+
+    /**
      * Register the telemetry HTTP callback with C++ core.
      *
      * This must be called during SDK initialization, after [CppBridgePlatformAdapter.register].
@@ -170,12 +176,128 @@ object CppBridgeTelemetry {
                 return
             }
 
-            // Register the HTTP callback with C++ via JNI
-            // The callback will be invoked by C++ when telemetry needs to be sent
-            // TODO: Call native registration
-            // nativeSetHttpCallback()
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.DEBUG,
+                TAG,
+                "Registering telemetry callbacks..."
+            )
 
             isRegistered = true
+        }
+    }
+
+    /**
+     * Initialize the telemetry manager with device and SDK info.
+     * Called during SDK initialization after register().
+     *
+     * @param environment SDK environment (0=DEVELOPMENT, 1=STAGING, 2=PRODUCTION)
+     * @param deviceId Persistent device UUID
+     * @param deviceModel Device model (e.g., "Pixel 8 Pro")
+     * @param osVersion OS version (e.g., "14")
+     * @param sdkVersion SDK version string
+     */
+    fun initialize(
+        environment: Int,
+        deviceId: String,
+        deviceModel: String,
+        osVersion: String,
+        sdkVersion: String
+    ) {
+        synchronized(lock) {
+            // Create telemetry manager
+            telemetryManagerHandle = com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racTelemetryManagerCreate(
+                environment,
+                deviceId,
+                "android",
+                sdkVersion
+            )
+
+            if (telemetryManagerHandle != 0L) {
+                // Set device info
+                com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racTelemetryManagerSetDeviceInfo(
+                    telemetryManagerHandle,
+                    deviceModel,
+                    osVersion
+                )
+
+                // Set HTTP callback
+                val httpCallback = object {
+                    @Suppress("unused")
+                    fun onHttpRequest(endpoint: String, body: String, bodyLength: Int, requiresAuth: Boolean) {
+                        // Execute HTTP request on background thread
+                        httpExecutor.execute {
+                            performTelemetryHttp(endpoint, body, requiresAuth)
+                        }
+                    }
+                }
+                com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racTelemetryManagerSetHttpCallback(
+                    telemetryManagerHandle,
+                    httpCallback
+                )
+
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.INFO,
+                    TAG,
+                    "Telemetry manager initialized (handle=$telemetryManagerHandle)"
+                )
+            } else {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.WARN,
+                    TAG,
+                    "Failed to create telemetry manager"
+                )
+            }
+        }
+    }
+
+    /**
+     * Perform HTTP request for telemetry.
+     */
+    private fun performTelemetryHttp(endpoint: String, body: String, requiresAuth: Boolean) {
+        try {
+            // Build full URL - endpoint is relative path like "/api/v1/sdk/telemetry"
+            // TODO: Get base URL from configuration
+            val baseUrl = "https://api.runanywhere.ai" // Default production URL
+            val fullUrl = "$baseUrl$endpoint"
+
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.DEBUG,
+                TAG,
+                "Telemetry HTTP POST to: $fullUrl"
+            )
+
+            val (statusCode, response) = sendTelemetry(fullUrl, HttpMethod.POST, mapOf("Content-Type" to "application/json"), body)
+
+            if (HttpStatus.isSuccess(statusCode)) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.DEBUG,
+                    TAG,
+                    "✅ Telemetry sent successfully (status=$statusCode)"
+                )
+            } else {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.WARN,
+                    TAG,
+                    "Telemetry HTTP failed: status=$statusCode"
+                )
+            }
+        } catch (e: Exception) {
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.ERROR,
+                TAG,
+                "Telemetry HTTP error: ${e.message}"
+            )
+        }
+    }
+
+    /**
+     * Flush pending telemetry events.
+     */
+    fun flush() {
+        synchronized(lock) {
+            if (telemetryManagerHandle != 0L) {
+                com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racTelemetryManagerFlush(telemetryManagerHandle)
+            }
         }
     }
 
@@ -183,6 +305,12 @@ object CppBridgeTelemetry {
      * Check if the telemetry callback is registered.
      */
     fun isRegistered(): Boolean = isRegistered
+
+    /**
+     * Get the telemetry manager handle for analytics events callback registration.
+     * Returns 0 if telemetry manager is not initialized.
+     */
+    fun getTelemetryHandle(): Long = telemetryManagerHandle
 
     // ========================================================================
     // HTTP CALLBACK
@@ -340,21 +468,13 @@ object CppBridgeTelemetry {
             )
         }
 
-        // Invoke C++ completion callback
-        try {
-            nativeInvokeCompletionCallback(
-                completionCallbackId,
-                statusCode,
-                responseBody,
-                errorMessage
-            )
-        } catch (e: Exception) {
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.ERROR,
-                TAG,
-                "Error invoking completion callback: ${e.message}"
-            )
-        }
+        // Note: The new telemetry manager handles completion internally
+        // via the HTTP callback mechanism. No explicit completion callback needed.
+        CppBridgePlatformAdapter.logCallback(
+            CppBridgePlatformAdapter.LogLevel.DEBUG,
+            TAG,
+            "HTTP request completed with status: $statusCode"
+        )
     }
 
     /**
@@ -421,48 +541,6 @@ object CppBridgeTelemetry {
     }
 
     // ========================================================================
-    // JNI NATIVE DECLARATIONS
-    // ========================================================================
-
-    /**
-     * Native method to set the HTTP callback with C++ core.
-     *
-     * This registers [httpCallback] with the C++ rac_telemetry_set_http_callback function.
-     *
-     * C API: rac_telemetry_set_http_callback(rac_telemetry_http_callback_t callback)
-     */
-    @JvmStatic
-    private external fun nativeSetHttpCallback()
-
-    /**
-     * Native method to unset the HTTP callback.
-     *
-     * Called during shutdown to clean up native resources.
-     *
-     * C API: rac_telemetry_set_http_callback(nullptr)
-     */
-    @JvmStatic
-    private external fun nativeUnsetHttpCallback()
-
-    /**
-     * Native method to invoke the C++ completion callback with HTTP response.
-     *
-     * @param callbackId The completion callback ID from the original request
-     * @param statusCode The HTTP status code (-1 if request failed)
-     * @param responseBody The response body, or null if no body
-     * @param errorMessage Error message if the request failed, null otherwise
-     *
-     * C API: rac_telemetry_invoke_http_completion(callback_id, status_code, response_body, error_message)
-     */
-    @JvmStatic
-    private external fun nativeInvokeCompletionCallback(
-        callbackId: Long,
-        statusCode: Int,
-        responseBody: String?,
-        errorMessage: String?
-    )
-
-    // ========================================================================
     // LIFECYCLE MANAGEMENT
     // ========================================================================
 
@@ -477,12 +555,21 @@ object CppBridgeTelemetry {
                 return
             }
 
-            // TODO: Call native unregistration
-            // nativeUnsetHttpCallback()
+            // Destroy telemetry manager
+            if (telemetryManagerHandle != 0L) {
+                com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racTelemetryManagerDestroy(telemetryManagerHandle)
+                telemetryManagerHandle = 0
+            }
 
             requestInterceptor = null
             telemetryListener = null
             isRegistered = false
+
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.DEBUG,
+                TAG,
+                "Telemetry unregistered"
+            )
         }
     }
 
