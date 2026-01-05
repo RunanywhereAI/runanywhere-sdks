@@ -725,13 +725,24 @@ object CppBridgeTTS {
             val startTime = System.currentTimeMillis()
 
             try {
-                val audioData = RunAnywhereBridge.racTtsComponentSynthesize(handle, text, config.toJson())
+                val rawAudioData = RunAnywhereBridge.racTtsComponentSynthesize(handle, text, config.toJson())
                     ?: throw SDKError.tts("Synthesis failed: null result")
+
+                // TTS backends output Float32 PCM - convert to WAV for playback compatibility
+                val audioData = RunAnywhereBridge.racAudioFloat32ToWav(rawAudioData, config.sampleRate)
+                    ?: throw SDKError.tts("Failed to convert audio to WAV format")
 
                 val processingTimeMs = System.currentTimeMillis() - startTime
 
-                // Calculate approximate duration based on audio data size and sample rate
-                val durationMs = calculateAudioDuration(audioData.size, config.sampleRate, config.audioFormat)
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.DEBUG,
+                    TAG,
+                    "Converted ${rawAudioData.size} bytes Float32 PCM to ${audioData.size} bytes WAV"
+                )
+
+                // Calculate approximate duration based on WAV data size (minus 44-byte header) and sample rate
+                // WAV is Int16 (2 bytes per sample) mono, so samples = (size - 44) / 2
+                val durationMs = calculateWavDuration(audioData.size, config.sampleRate)
 
                 val result = SynthesisResult(
                     audioData = audioData,
@@ -739,7 +750,7 @@ object CppBridgeTTS {
                     durationMs = durationMs,
                     completionReason = CompletionReason.END_OF_TEXT,
                     sampleRate = config.sampleRate,
-                    audioFormat = config.audioFormat,
+                    audioFormat = AudioFormat.WAV,  // Output is now WAV format
                     processingTimeMs = processingTimeMs
                 )
 
@@ -748,7 +759,7 @@ object CppBridgeTTS {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Synthesis completed: ${audioData.size} bytes, ${result.durationMs}ms audio"
+                    "Synthesis completed: ${audioData.size} bytes WAV, ${result.durationMs}ms audio"
                 )
 
                 try {
@@ -805,11 +816,22 @@ object CppBridgeTTS {
             val startTime = System.currentTimeMillis()
 
             try {
-                val audioData = RunAnywhereBridge.racTtsComponentSynthesizeStream(handle, text, config.toJson())
+                val rawAudioData = RunAnywhereBridge.racTtsComponentSynthesizeStream(handle, text, config.toJson())
                     ?: throw SDKError.tts("Streaming synthesis failed: null result")
 
+                // TTS backends output Float32 PCM - convert to WAV for playback compatibility
+                val audioData = RunAnywhereBridge.racAudioFloat32ToWav(rawAudioData, config.sampleRate)
+                    ?: throw SDKError.tts("Failed to convert streaming audio to WAV format")
+
                 val processingTimeMs = System.currentTimeMillis() - startTime
-                val durationMs = calculateAudioDuration(audioData.size, config.sampleRate, config.audioFormat)
+
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.DEBUG,
+                    TAG,
+                    "Converted ${rawAudioData.size} bytes Float32 PCM to ${audioData.size} bytes WAV (streaming)"
+                )
+
+                val durationMs = calculateWavDuration(audioData.size, config.sampleRate)
 
                 val result = SynthesisResult(
                     audioData = audioData,
@@ -817,7 +839,7 @@ object CppBridgeTTS {
                     durationMs = durationMs,
                     completionReason = if (isCancelled) CompletionReason.CANCELLED else CompletionReason.END_OF_TEXT,
                     sampleRate = config.sampleRate,
-                    audioFormat = config.audioFormat,
+                    audioFormat = AudioFormat.WAV,  // Output is now WAV format
                     processingTimeMs = processingTimeMs
                 )
 
@@ -827,7 +849,7 @@ object CppBridgeTTS {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Streaming synthesis completed: ${audioData.size} bytes"
+                    "Streaming synthesis completed: ${audioData.size} bytes WAV"
                 )
 
                 try {
@@ -1347,6 +1369,19 @@ object CppBridgeTTS {
 
         // Assuming mono audio
         val samples = dataSize / bytesPerSample
+        return (samples * 1000L) / sampleRate
+    }
+
+    /**
+     * Calculate audio duration from WAV file data.
+     * WAV format: 44-byte header + Int16 PCM samples (2 bytes per sample, mono)
+     */
+    private fun calculateWavDuration(wavSize: Int, sampleRate: Int): Long {
+        // WAV header is 44 bytes, data is Int16 (2 bytes per sample), mono
+        val headerSize = 44
+        val bytesPerSample = 2
+        val pcmSize = (wavSize - headerSize).coerceAtLeast(0)
+        val samples = pcmSize / bytesPerSample
         return (samples * 1000L) / sampleRate
     }
 

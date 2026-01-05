@@ -442,6 +442,42 @@ object RunAnywhereBridge {
     external fun racModelRegistryUpdateDownloadStatus(modelId: String, localPath: String?): Int
 
     // ========================================================================
+    // AUDIO UTILS (rac_audio_utils.h)
+    // ========================================================================
+
+    /**
+     * Convert Float32 PCM audio data to WAV format.
+     *
+     * TTS backends typically output raw Float32 PCM samples in range [-1.0, 1.0].
+     * This function converts them to a complete WAV file that can be played by
+     * standard audio players (MediaPlayer on Android, etc.).
+     *
+     * @param pcmData Float32 PCM audio data (raw bytes)
+     * @param sampleRate Sample rate in Hz (e.g., 22050 for Piper TTS)
+     * @return WAV file data as ByteArray, or null on error
+     */
+    @JvmStatic
+    external fun racAudioFloat32ToWav(pcmData: ByteArray, sampleRate: Int): ByteArray?
+
+    /**
+     * Convert Int16 PCM audio data to WAV format.
+     *
+     * @param pcmData Int16 PCM audio data (raw bytes)
+     * @param sampleRate Sample rate in Hz
+     * @return WAV file data as ByteArray, or null on error
+     */
+    @JvmStatic
+    external fun racAudioInt16ToWav(pcmData: ByteArray, sampleRate: Int): ByteArray?
+
+    /**
+     * Get the WAV header size in bytes.
+     *
+     * @return WAV header size (always 44 bytes for standard PCM WAV)
+     */
+    @JvmStatic
+    external fun racAudioWavHeaderSize(): Int
+
+    // ========================================================================
     // CONSTANTS
     // ========================================================================
 

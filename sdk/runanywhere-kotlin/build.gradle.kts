@@ -297,20 +297,41 @@ tasks.register<Exec>("buildLocalJniLibs") {
     description = "Build JNI libraries locally from runanywhere-commons (when testLocal=true)"
 
     val jniLibsDir = file("src/androidMain/jniLibs")
+    val llamaCppJniLibsDir = file("modules/runanywhere-core-llamacpp/src/androidMain/jniLibs")
+    val onnxJniLibsDir = file("modules/runanywhere-core-onnx/src/androidMain/jniLibs")
     val buildScript = file("scripts/build-local.sh")
 
     // Only enable this task when testLocal=true
     onlyIf { testLocal }
 
-    // Check if libs already exist
+    // Check if ALL required libs exist (main SDK + modules)
     onlyIf {
-        val hasLibs = jniLibsDir.exists() &&
-            jniLibsDir.walkTopDown().any { it.extension == "so" }
-        if (hasLibs) {
-            logger.lifecycle("Local JNI libs already exist at: $jniLibsDir")
-            logger.lifecycle("To rebuild, delete jniLibs/ or run: ./scripts/build-local.sh --clean")
+        // Main SDK needs commons libs
+        val hasMainLibs = jniLibsDir.exists() &&
+            jniLibsDir.walkTopDown().any { it.name == "librunanywhere_jni.so" }
+
+        // LlamaCPP module needs backend libs
+        val hasLlamaCppLibs = llamaCppJniLibsDir.exists() &&
+            llamaCppJniLibsDir.walkTopDown().any { it.name == "librac_backend_llamacpp_jni.so" }
+
+        // ONNX module needs backend libs
+        val hasOnnxLibs = onnxJniLibsDir.exists() &&
+            onnxJniLibsDir.walkTopDown().any { it.name == "librac_backend_onnx_jni.so" }
+
+        val allLibsPresent = hasMainLibs && hasLlamaCppLibs && hasOnnxLibs
+
+        if (allLibsPresent) {
+            logger.lifecycle("Local JNI libs already exist at:")
+            logger.lifecycle("  Main SDK: $jniLibsDir")
+            logger.lifecycle("  LlamaCPP: $llamaCppJniLibsDir")
+            logger.lifecycle("  ONNX: $onnxJniLibsDir")
+            logger.lifecycle("To rebuild, delete jniLibs/ directories or run: ./scripts/build-local.sh --clean")
+        } else {
+            if (!hasMainLibs) logger.lifecycle("Missing main SDK libs: $jniLibsDir")
+            if (!hasLlamaCppLibs) logger.lifecycle("Missing LlamaCPP libs: $llamaCppJniLibsDir")
+            if (!hasOnnxLibs) logger.lifecycle("Missing ONNX libs: $onnxJniLibsDir")
         }
-        !hasLibs
+        !allLibsPresent
     }
 
     workingDir = projectDir
@@ -333,16 +354,27 @@ tasks.register<Exec>("buildLocalJniLibs") {
     }
 
     doLast {
-        // Verify the build succeeded
-        val soFiles = jniLibsDir.walkTopDown().filter { it.extension == "so" }.toList()
-        if (soFiles.isEmpty()) {
+        // Verify the build succeeded for all modules
+        fun countLibs(dir: java.io.File, moduleName: String): Int {
+            val soFiles = dir.walkTopDown().filter { it.extension == "so" }.toList()
+            logger.lifecycle("")
+            logger.lifecycle("✓ $moduleName: ${soFiles.size} .so files")
+            soFiles.groupBy { it.parentFile.name }.forEach { (abi, files) ->
+                logger.lifecycle("  $abi: ${files.map { it.name }.joinToString(", ")}")
+            }
+            return soFiles.size
+        }
+
+        val mainCount = countLibs(jniLibsDir, "Main SDK (Commons)")
+        val llamaCppCount = countLibs(llamaCppJniLibsDir, "LlamaCPP Module")
+        val onnxCount = countLibs(onnxJniLibsDir, "ONNX Module")
+
+        if (mainCount == 0) {
             throw GradleException("Local JNI build failed: No .so files found in $jniLibsDir")
         }
+
         logger.lifecycle("")
-        logger.lifecycle("✓ Local JNI build complete: ${soFiles.size} .so files")
-        soFiles.groupBy { it.parentFile.name }.forEach { (abi, files) ->
-            logger.lifecycle("  $abi: ${files.map { it.name }.joinToString(", ")}")
-        }
+        logger.lifecycle("Total: ${mainCount + llamaCppCount + onnxCount} native libraries across all modules")
     }
 }
 
