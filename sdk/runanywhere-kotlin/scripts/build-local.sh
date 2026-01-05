@@ -159,9 +159,75 @@ if [ ! -d "${COMMONS_DIR}" ]; then
     exit 1
 fi
 
-if [ ! -d "${CORE_DIR}" ] && [ "${SKIP_CORE}" = "false" ]; then
-    print_error "runanywhere-core not found at ${CORE_DIR}"
-    exit 1
+# Auto-detect if runanywhere-core exists
+# If it doesn't exist, auto-skip core build and use downloaded backend libraries
+USE_DOWNLOADED_BACKENDS=false
+if [ ! -d "${CORE_DIR}" ]; then
+    if [ "${SKIP_CORE}" = "false" ]; then
+        print_info "runanywhere-core not found at ${CORE_DIR}"
+        print_info "Will use downloaded backend libraries from build/jniLibs instead"
+    fi
+    SKIP_CORE=true
+    USE_DOWNLOADED_BACKENDS=true
+fi
+
+# Downloaded libraries locations (from gradle downloadJniLibs tasks)
+# Main SDK downloads commons, modules download their respective backends
+DOWNLOADED_MAIN_JNILIBS="${KOTLIN_SDK_DIR}/build/jniLibs"
+DOWNLOADED_LLAMACPP_JNILIBS="${KOTLIN_SDK_DIR}/modules/runanywhere-core-llamacpp/build/jniLibs"
+DOWNLOADED_ONNX_JNILIBS="${KOTLIN_SDK_DIR}/modules/runanywhere-core-onnx/build/jniLibs"
+
+# If using downloaded backends, ensure ALL module libraries are downloaded
+if [ "${USE_DOWNLOADED_BACKENDS}" = "true" ]; then
+    print_step "Checking downloaded backend libraries..."
+
+    # Check if we need to download LlamaCPP libs
+    NEED_DOWNLOAD_LLAMACPP=false
+    if [[ "${BACKENDS}" == *"llamacpp"* ]]; then
+        if [ ! -d "${DOWNLOADED_LLAMACPP_JNILIBS}" ] || [ -z "$(ls -A ${DOWNLOADED_LLAMACPP_JNILIBS} 2>/dev/null)" ]; then
+            NEED_DOWNLOAD_LLAMACPP=true
+        fi
+    fi
+
+    # Check if we need to download ONNX libs
+    NEED_DOWNLOAD_ONNX=false
+    if [[ "${BACKENDS}" == *"onnx"* ]]; then
+        if [ ! -d "${DOWNLOADED_ONNX_JNILIBS}" ] || [ -z "$(ls -A ${DOWNLOADED_ONNX_JNILIBS} 2>/dev/null)" ]; then
+            NEED_DOWNLOAD_ONNX=true
+        fi
+    fi
+
+    # Download missing libraries
+    if [ "${NEED_DOWNLOAD_LLAMACPP}" = "true" ] || [ "${NEED_DOWNLOAD_ONNX}" = "true" ]; then
+        print_step "Downloading backend libraries from GitHub releases..."
+        cd "${KOTLIN_SDK_DIR}"
+
+        # Run all module downloadJniLibs tasks with testLocal=false
+        # This downloads backend-specific libraries to each module's build/jniLibs/
+        ./gradlew \
+            :modules:runanywhere-core-llamacpp:downloadJniLibs \
+            :modules:runanywhere-core-onnx:downloadJniLibs \
+            -Prunanywhere.testLocal=false \
+            --no-daemon -q 2>/dev/null || true
+
+        # Verify downloads
+        if [[ "${BACKENDS}" == *"llamacpp"* ]] && [ ! -d "${DOWNLOADED_LLAMACPP_JNILIBS}/arm64-v8a" ]; then
+            print_error "Failed to download LlamaCPP backend libraries"
+            print_info "Check: https://github.com/RunanywhereAI/runanywhere-binaries/releases"
+            exit 1
+        fi
+
+        if [[ "${BACKENDS}" == *"onnx"* ]] && [ ! -d "${DOWNLOADED_ONNX_JNILIBS}/arm64-v8a" ]; then
+            print_error "Failed to download ONNX backend libraries"
+            print_info "Check: https://github.com/RunanywhereAI/runanywhere-binaries/releases"
+            exit 1
+        fi
+
+        print_success "Backend libraries downloaded"
+        cd "${COMMONS_DIR}"
+    else
+        print_info "Using existing downloaded backend libraries"
+    fi
 fi
 
 # Clean if requested
@@ -229,34 +295,22 @@ print_header "Step 2: Build runanywhere-commons with JNI"
 
 cd "${COMMONS_DIR}"
 
-if [ ! -f "./scripts/build-android.sh" ]; then
-    print_error "runanywhere-commons/scripts/build-android.sh not found"
+# Find the build script (either build-rac-commons.sh or build-android.sh)
+if [ -f "./scripts/build-rac-commons.sh" ]; then
+    COMMONS_BUILD_SCRIPT="./scripts/build-rac-commons.sh"
+elif [ -f "./scripts/build-android.sh" ]; then
+    COMMONS_BUILD_SCRIPT="./scripts/build-android.sh"
+else
+    print_error "runanywhere-commons build script not found"
+    print_info "Looked for: scripts/build-rac-commons.sh or scripts/build-android.sh"
     exit 1
 fi
 
 print_step "Building runanywhere-commons with JNI for ${ABIS}..."
+print_info "Using: ${COMMONS_BUILD_SCRIPT}"
 
-# Set backend options
-BUILD_LLAMACPP="OFF"
-BUILD_ONNX="OFF"
-BUILD_WHISPERCPP="OFF"
-
-if [[ "${BACKENDS}" == *"llamacpp"* ]]; then
-    BUILD_LLAMACPP="ON"
-fi
-if [[ "${BACKENDS}" == *"onnx"* ]]; then
-    BUILD_ONNX="ON"
-fi
-
-export ANDROID_NDK_HOME="${ANDROID_NDK_HOME}"
-export BUILD_LLAMACPP="${BUILD_LLAMACPP}"
-export BUILD_ONNX="${BUILD_ONNX}"
-export BUILD_WHISPERCPP="${BUILD_WHISPERCPP}"
-export BUILD_JNI="ON"
-export ABIS="${ABIS}"
-export BUILD_TYPE="${BUILD_TYPE:-Release}"
-
-./scripts/build-android.sh
+# Build for Android with specified ABIs
+${COMMONS_BUILD_SCRIPT} --android --abi ${ABIS}
 
 print_success "runanywhere-commons built successfully"
 
@@ -277,7 +331,7 @@ fi
 CORE_DIST="${CORE_DIR}/dist/android"
 CORE_ONNX_DIST="${CORE_DIR}/dist/android/onnx"
 CORE_LLAMACPP_DIST="${CORE_DIR}/dist/android/llamacpp"
-COMMONS_DIST="${COMMONS_DIR}/dist/android/aar/jniLibs"
+COMMONS_DIST="${COMMONS_DIR}/dist/android/jniLibs"
 COMMONS_BUILD="${COMMONS_DIR}/build/android"
 
 # Define which libraries go where
@@ -291,11 +345,14 @@ MAIN_LIBS=(
 # LlamaCPP Module: Self-contained LlamaCPP backend
 LLAMACPP_LIBS=(
     "librac_backend_llamacpp_jni.so"
+    "librunanywhere_llamacpp.so"
+    "libomp.so"
 )
 
 # ONNX Module: ONNX backend with dependencies
 ONNX_LIBS=(
     "librac_backend_onnx_jni.so"
+    "librunanywhere_onnx.so"
     "libonnxruntime.so"
     "libsherpa-onnx-c-api.so"
     "libsherpa-onnx-cxx-api.so"
@@ -336,6 +393,10 @@ for ABI in ${ABI_LIST}; do
     CORE_ONNX_ABI="${CORE_ONNX_DIST}/${ABI}"
     CORE_LLAMACPP_ABI="${CORE_LLAMACPP_DIST}/${ABI}"
     CORE_JNI_ABI="${CORE_DIST}/jni/${ABI}"
+    # Fallback: downloaded libraries from gradle downloadJniLibs tasks (module-specific)
+    DOWNLOADED_MAIN_ABI="${DOWNLOADED_MAIN_JNILIBS}/${ABI}"
+    DOWNLOADED_LLAMACPP_ABI="${DOWNLOADED_LLAMACPP_JNILIBS}/${ABI}"
+    DOWNLOADED_ONNX_ABI="${DOWNLOADED_ONNX_JNILIBS}/${ABI}"
 
     # =========================================================================
     # Main SDK Libraries (Commons only)
@@ -348,7 +409,9 @@ for ABI in ${ABI_LIST}; do
             "${COMMONS_DIST_ABI}" \
             "${COMMONS_BUILD_ABI}" \
             "${CORE_LLAMACPP_ABI}" \
-            "${CORE_JNI_ABI}")
+            "${CORE_JNI_ABI}" \
+            "${DOWNLOADED_MAIN_ABI}" \
+            "${DOWNLOADED_LLAMACPP_ABI}")
         if [ $? -eq 0 ]; then
             print_success "${lib}"
             MAIN_COUNT=$((MAIN_COUNT + 1))
@@ -369,7 +432,8 @@ for ABI in ${ABI_LIST}; do
             found_dir=$(find_and_copy_lib "${lib}" "${LLAMACPP_JNILIBS_DIR}/${ABI}" \
                 "${COMMONS_BUILD_ABI}/backends/llamacpp" \
                 "${COMMONS_DIST_ABI}" \
-                "${CORE_LLAMACPP_ABI}")
+                "${CORE_LLAMACPP_ABI}" \
+                "${DOWNLOADED_LLAMACPP_ABI}")
             if [ $? -eq 0 ]; then
                 print_success "${lib}"
                 LLAMACPP_COUNT=$((LLAMACPP_COUNT + 1))
@@ -392,7 +456,9 @@ for ABI in ${ABI_LIST}; do
                 "${COMMONS_BUILD_ABI}/backends/onnx" \
                 "${COMMONS_DIST_ABI}" \
                 "${CORE_ONNX_ABI}" \
-                "${CORE_LLAMACPP_ABI}")
+                "${CORE_LLAMACPP_ABI}" \
+                "${DOWNLOADED_ONNX_ABI}" \
+                "${DOWNLOADED_LLAMACPP_ABI}")
             if [ $? -eq 0 ]; then
                 print_success "${lib}"
                 ONNX_COUNT=$((ONNX_COUNT + 1))

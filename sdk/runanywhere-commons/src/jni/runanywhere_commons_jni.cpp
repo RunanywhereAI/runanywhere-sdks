@@ -25,6 +25,7 @@
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_audio_utils.h"
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/tts/rac_tts_component.h"
@@ -1683,6 +1684,133 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryUpdateD
     if (path_str) env->ReleaseStringUTFChars(localPath, path_str);
 
     return static_cast<jint>(result);
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Audio Utils (rac_audio_utils.h)
+// =============================================================================
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAudioFloat32ToWav(JNIEnv* env, jclass clazz, jbyteArray pcmData, jint sampleRate) {
+    if (pcmData == nullptr) {
+        LOGe("racAudioFloat32ToWav: null input data");
+        return nullptr;
+    }
+
+    jsize pcmSize = env->GetArrayLength(pcmData);
+    if (pcmSize == 0) {
+        LOGe("racAudioFloat32ToWav: empty input data");
+        return nullptr;
+    }
+
+    LOGi("racAudioFloat32ToWav: converting %d bytes at %d Hz", (int)pcmSize, sampleRate);
+
+    // Get the input data
+    jbyte* pcmBytes = env->GetByteArrayElements(pcmData, nullptr);
+    if (pcmBytes == nullptr) {
+        LOGe("racAudioFloat32ToWav: failed to get byte array elements");
+        return nullptr;
+    }
+
+    // Convert Float32 PCM to WAV format
+    void* wavData = nullptr;
+    size_t wavSize = 0;
+
+    rac_result_t result = rac_audio_float32_to_wav(
+        pcmBytes,
+        static_cast<size_t>(pcmSize),
+        sampleRate,
+        &wavData,
+        &wavSize
+    );
+
+    env->ReleaseByteArrayElements(pcmData, pcmBytes, JNI_ABORT);
+
+    if (result != RAC_SUCCESS || wavData == nullptr) {
+        LOGe("racAudioFloat32ToWav: conversion failed with code %d", result);
+        return nullptr;
+    }
+
+    LOGi("racAudioFloat32ToWav: conversion successful, output %zu bytes", wavSize);
+
+    // Create Java byte array for output
+    jbyteArray jWavData = env->NewByteArray(static_cast<jsize>(wavSize));
+    if (jWavData == nullptr) {
+        LOGe("racAudioFloat32ToWav: failed to create output byte array");
+        rac_free(wavData);
+        return nullptr;
+    }
+
+    env->SetByteArrayRegion(jWavData, 0, static_cast<jsize>(wavSize), reinterpret_cast<const jbyte*>(wavData));
+
+    // Free the C-allocated memory
+    rac_free(wavData);
+
+    return jWavData;
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAudioInt16ToWav(JNIEnv* env, jclass clazz, jbyteArray pcmData, jint sampleRate) {
+    if (pcmData == nullptr) {
+        LOGe("racAudioInt16ToWav: null input data");
+        return nullptr;
+    }
+
+    jsize pcmSize = env->GetArrayLength(pcmData);
+    if (pcmSize == 0) {
+        LOGe("racAudioInt16ToWav: empty input data");
+        return nullptr;
+    }
+
+    LOGi("racAudioInt16ToWav: converting %d bytes at %d Hz", (int)pcmSize, sampleRate);
+
+    // Get the input data
+    jbyte* pcmBytes = env->GetByteArrayElements(pcmData, nullptr);
+    if (pcmBytes == nullptr) {
+        LOGe("racAudioInt16ToWav: failed to get byte array elements");
+        return nullptr;
+    }
+
+    // Convert Int16 PCM to WAV format
+    void* wavData = nullptr;
+    size_t wavSize = 0;
+
+    rac_result_t result = rac_audio_int16_to_wav(
+        pcmBytes,
+        static_cast<size_t>(pcmSize),
+        sampleRate,
+        &wavData,
+        &wavSize
+    );
+
+    env->ReleaseByteArrayElements(pcmData, pcmBytes, JNI_ABORT);
+
+    if (result != RAC_SUCCESS || wavData == nullptr) {
+        LOGe("racAudioInt16ToWav: conversion failed with code %d", result);
+        return nullptr;
+    }
+
+    LOGi("racAudioInt16ToWav: conversion successful, output %zu bytes", wavSize);
+
+    // Create Java byte array for output
+    jbyteArray jWavData = env->NewByteArray(static_cast<jsize>(wavSize));
+    if (jWavData == nullptr) {
+        LOGe("racAudioInt16ToWav: failed to create output byte array");
+        rac_free(wavData);
+        return nullptr;
+    }
+
+    env->SetByteArrayRegion(jWavData, 0, static_cast<jsize>(wavSize), reinterpret_cast<const jbyte*>(wavData));
+
+    // Free the C-allocated memory
+    rac_free(wavData);
+
+    return jWavData;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAudioWavHeaderSize(JNIEnv* env, jclass clazz) {
+    return static_cast<jint>(rac_audio_wav_header_size());
 }
 
 } // extern "C"

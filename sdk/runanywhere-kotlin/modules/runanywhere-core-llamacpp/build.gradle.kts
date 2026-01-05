@@ -169,8 +169,9 @@ android {
     // ==========================================================================
     sourceSets {
         getByName("main") {
-            jniLibs.srcDirs(
-                if (testLocal) "src/androidMain/jniLibs" else "build/jniLibs"
+            // IMPORTANT: Use setSrcDirs to REPLACE (not add to) default jniLibs locations
+            jniLibs.setSrcDirs(
+                listOf(if (testLocal) "src/androidMain/jniLibs" else "build/jniLibs")
             )
         }
     }
@@ -245,7 +246,14 @@ tasks.register("downloadJniLibs") {
 
 // Ensure JNI libs are available before Android build
 tasks.matching { it.name.contains("merge") && it.name.contains("JniLibFolders") }.configureEach {
-    if (!testLocal) {
+    if (testLocal) {
+        // When using local libs, depend on the main SDK's buildLocalJniLibs task
+        // which runs build-local.sh and populates all module jniLibs directories
+        val mainSdkProject = project.parent?.parent
+        mainSdkProject?.tasks?.findByName("buildLocalJniLibs")?.let { buildTask ->
+            dependsOn(buildTask)
+        }
+    } else {
         dependsOn("downloadJniLibs")
     }
 }
