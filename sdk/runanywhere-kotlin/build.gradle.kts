@@ -291,6 +291,7 @@ android {
 // =============================================================================
 // Runs scripts/build-local.sh to build native libraries from source when testLocal=true.
 // This mirrors the Swift SDK's testLocal pattern.
+// ALWAYS cleans and rebuilds to ensure fresh libraries are used.
 // =============================================================================
 tasks.register<Exec>("buildLocalJniLibs") {
     group = "runanywhere"
@@ -304,38 +305,9 @@ tasks.register<Exec>("buildLocalJniLibs") {
     // Only enable this task when testLocal=true
     onlyIf { testLocal }
 
-    // Check if ALL required libs exist (main SDK + modules)
-    onlyIf {
-        // Main SDK needs commons libs
-        val hasMainLibs = jniLibsDir.exists() &&
-            jniLibsDir.walkTopDown().any { it.name == "librunanywhere_jni.so" }
-
-        // LlamaCPP module needs backend libs
-        val hasLlamaCppLibs = llamaCppJniLibsDir.exists() &&
-            llamaCppJniLibsDir.walkTopDown().any { it.name == "librac_backend_llamacpp_jni.so" }
-
-        // ONNX module needs backend libs
-        val hasOnnxLibs = onnxJniLibsDir.exists() &&
-            onnxJniLibsDir.walkTopDown().any { it.name == "librac_backend_onnx_jni.so" }
-
-        val allLibsPresent = hasMainLibs && hasLlamaCppLibs && hasOnnxLibs
-
-        if (allLibsPresent) {
-            logger.lifecycle("Local JNI libs already exist at:")
-            logger.lifecycle("  Main SDK: $jniLibsDir")
-            logger.lifecycle("  LlamaCPP: $llamaCppJniLibsDir")
-            logger.lifecycle("  ONNX: $onnxJniLibsDir")
-            logger.lifecycle("To rebuild, delete jniLibs/ directories or run: ./scripts/build-local.sh --clean")
-        } else {
-            if (!hasMainLibs) logger.lifecycle("Missing main SDK libs: $jniLibsDir")
-            if (!hasLlamaCppLibs) logger.lifecycle("Missing LlamaCPP libs: $llamaCppJniLibsDir")
-            if (!hasOnnxLibs) logger.lifecycle("Missing ONNX libs: $onnxJniLibsDir")
-        }
-        !allLibsPresent
-    }
-
     workingDir = projectDir
-    commandLine("bash", buildScript.absolutePath)
+    // Pass --clean flag to ensure fresh build every time
+    commandLine("bash", buildScript.absolutePath, "--clean")
 
     // Set environment
     environment("ANDROID_NDK_HOME",
@@ -348,8 +320,25 @@ tasks.register<Exec>("buildLocalJniLibs") {
         logger.lifecycle(" Building JNI libraries locally (testLocal=true)")
         logger.lifecycle("═══════════════════════════════════════════════════════════════")
         logger.lifecycle("")
-        logger.lifecycle("This may take several minutes on first build...")
-        logger.lifecycle("Output will be in: $jniLibsDir")
+
+        // Clean old JNI libraries before building
+        logger.lifecycle("🧹 Cleaning old JNI libraries...")
+        if (jniLibsDir.exists()) {
+            jniLibsDir.deleteRecursively()
+            logger.lifecycle("  Deleted: $jniLibsDir")
+        }
+        if (llamaCppJniLibsDir.exists()) {
+            llamaCppJniLibsDir.deleteRecursively()
+            logger.lifecycle("  Deleted: $llamaCppJniLibsDir")
+        }
+        if (onnxJniLibsDir.exists()) {
+            onnxJniLibsDir.deleteRecursively()
+            logger.lifecycle("  Deleted: $onnxJniLibsDir")
+        }
+
+        logger.lifecycle("")
+        logger.lifecycle("🔨 Building fresh JNI libraries...")
+        logger.lifecycle("This may take several minutes...")
         logger.lifecycle("")
     }
 

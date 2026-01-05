@@ -275,12 +275,19 @@ if [ "${SKIP_CORE}" = "false" ]; then
     fi
 
     export ANDROID_NDK_HOME="${ANDROID_NDK_HOME}"
-    export BUILD_LLAMACPP="${BUILD_LLAMACPP}"
-    export BUILD_ONNX="${BUILD_ONNX}"
-    export BUILD_WHISPERCPP="${BUILD_WHISPERCPP}"
-    export ABIS="${ABIS}"
 
-    ${CORE_BUILD_SCRIPT}
+    # Build backend list for the core build script (positional arg format)
+    # WhisperCPP is explicitly excluded - we only support llamacpp and onnx
+    CORE_BACKENDS=""
+    if [[ "${BACKENDS}" == *"llamacpp"* ]] && [[ "${BACKENDS}" == *"onnx"* ]]; then
+        CORE_BACKENDS="llamacpp,onnx"
+    elif [[ "${BACKENDS}" == *"llamacpp"* ]]; then
+        CORE_BACKENDS="llamacpp"
+    elif [[ "${BACKENDS}" == *"onnx"* ]]; then
+        CORE_BACKENDS="onnx"
+    fi
+
+    ${CORE_BUILD_SCRIPT} "${CORE_BACKENDS}" "${ABIS}"
 
     print_success "runanywhere-core built successfully"
 else
@@ -331,6 +338,7 @@ fi
 CORE_DIST="${CORE_DIR}/dist/android"
 CORE_ONNX_DIST="${CORE_DIR}/dist/android/onnx"
 CORE_LLAMACPP_DIST="${CORE_DIR}/dist/android/llamacpp"
+CORE_SHERPA_ONNX="${CORE_DIR}/third_party/sherpa-onnx-android/jniLibs"
 COMMONS_DIST="${COMMONS_DIR}/dist/android/jniLibs"
 COMMONS_BUILD="${COMMONS_DIR}/build/android"
 
@@ -393,6 +401,7 @@ for ABI in ${ABI_LIST}; do
     CORE_ONNX_ABI="${CORE_ONNX_DIST}/${ABI}"
     CORE_LLAMACPP_ABI="${CORE_LLAMACPP_DIST}/${ABI}"
     CORE_JNI_ABI="${CORE_DIST}/jni/${ABI}"
+    CORE_SHERPA_ONNX_ABI="${CORE_SHERPA_ONNX}/${ABI}"
     # Fallback: downloaded libraries from gradle downloadJniLibs tasks (module-specific)
     DOWNLOADED_MAIN_ABI="${DOWNLOADED_MAIN_JNILIBS}/${ABI}"
     DOWNLOADED_LLAMACPP_ABI="${DOWNLOADED_LLAMACPP_JNILIBS}/${ABI}"
@@ -405,14 +414,14 @@ for ABI in ${ABI_LIST}; do
 
     MAIN_COUNT=0
     for lib in "${MAIN_LIBS[@]}"; do
-        found_dir=$(find_and_copy_lib "${lib}" "${MAIN_JNILIBS_DIR}/${ABI}" \
+        # Use if-statement to avoid set -e exit on missing libs
+        if find_and_copy_lib "${lib}" "${MAIN_JNILIBS_DIR}/${ABI}" \
             "${COMMONS_DIST_ABI}" \
             "${COMMONS_BUILD_ABI}" \
             "${CORE_LLAMACPP_ABI}" \
             "${CORE_JNI_ABI}" \
             "${DOWNLOADED_MAIN_ABI}" \
-            "${DOWNLOADED_LLAMACPP_ABI}")
-        if [ $? -eq 0 ]; then
+            "${DOWNLOADED_LLAMACPP_ABI}" > /dev/null; then
             print_success "${lib}"
             MAIN_COUNT=$((MAIN_COUNT + 1))
         else
@@ -429,12 +438,12 @@ for ABI in ${ABI_LIST}; do
 
         LLAMACPP_COUNT=0
         for lib in "${LLAMACPP_LIBS[@]}"; do
-            found_dir=$(find_and_copy_lib "${lib}" "${LLAMACPP_JNILIBS_DIR}/${ABI}" \
+            # Use if-statement to avoid set -e exit on missing libs
+            if find_and_copy_lib "${lib}" "${LLAMACPP_JNILIBS_DIR}/${ABI}" \
                 "${COMMONS_BUILD_ABI}/backends/llamacpp" \
                 "${COMMONS_DIST_ABI}" \
                 "${CORE_LLAMACPP_ABI}" \
-                "${DOWNLOADED_LLAMACPP_ABI}")
-            if [ $? -eq 0 ]; then
+                "${DOWNLOADED_LLAMACPP_ABI}" > /dev/null; then
                 print_success "${lib}"
                 LLAMACPP_COUNT=$((LLAMACPP_COUNT + 1))
             else
@@ -452,14 +461,16 @@ for ABI in ${ABI_LIST}; do
 
         ONNX_COUNT=0
         for lib in "${ONNX_LIBS[@]}"; do
-            found_dir=$(find_and_copy_lib "${lib}" "${ONNX_JNILIBS_DIR}/${ABI}" \
+            # Use if-statement to avoid set -e exit on missing libs
+            # Search paths include sherpa-onnx third_party for libonnxruntime.so and sherpa libs
+            if find_and_copy_lib "${lib}" "${ONNX_JNILIBS_DIR}/${ABI}" \
                 "${COMMONS_BUILD_ABI}/backends/onnx" \
                 "${COMMONS_DIST_ABI}" \
                 "${CORE_ONNX_ABI}" \
+                "${CORE_SHERPA_ONNX_ABI}" \
                 "${CORE_LLAMACPP_ABI}" \
                 "${DOWNLOADED_ONNX_ABI}" \
-                "${DOWNLOADED_LLAMACPP_ABI}")
-            if [ $? -eq 0 ]; then
+                "${DOWNLOADED_LLAMACPP_ABI}" > /dev/null; then
                 print_success "${lib}"
                 ONNX_COUNT=$((ONNX_COUNT + 1))
             else
