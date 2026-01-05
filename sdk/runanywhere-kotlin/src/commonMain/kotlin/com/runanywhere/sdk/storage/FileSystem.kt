@@ -12,19 +12,28 @@ interface FileSystem {
     /**
      * Write bytes to a file
      */
-    suspend fun writeBytes(path: String, data: ByteArray)
+    suspend fun writeBytes(
+        path: String,
+        data: ByteArray,
+    )
 
     /**
      * Append bytes to an existing file
      * If file doesn't exist, creates it and writes the data
      */
-    suspend fun appendBytes(path: String, data: ByteArray)
+    suspend fun appendBytes(
+        path: String,
+        data: ByteArray,
+    )
 
     /**
      * Write to a file using an output stream (for efficient streaming)
      * The output stream is automatically closed when the block completes
      */
-    suspend fun <T> writeStream(path: String, block: suspend (java.io.OutputStream) -> T): T
+    suspend fun <T> writeStream(
+        path: String,
+        block: suspend (java.io.OutputStream) -> T,
+    ): T
 
     /**
      * Read bytes from a file
@@ -79,12 +88,18 @@ interface FileSystem {
     /**
      * Move/rename a file
      */
-    suspend fun move(from: String, to: String): Boolean
+    suspend fun move(
+        from: String,
+        to: String,
+    ): Boolean
 
     /**
      * Copy a file
      */
-    suspend fun copy(from: String, to: String): Boolean
+    suspend fun copy(
+        from: String,
+        to: String,
+    ): Boolean
 
     /**
      * Check if path is a directory

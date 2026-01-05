@@ -7,25 +7,28 @@ string(STRIP "${VERSION_CONTENT}" RAC_VERSION)
 project(RunAnywhereCommons
     VERSION ${RAC_VERSION}
     LANGUAGES CXX C
-    DESCRIPTION "RunAnywhere Commons - Modular C++ layer for capability-based ML inference"
+    DESCRIPTION "RunAnywhere Commons - Standalone infrastructure library for ML inference SDKs"
 )
+
+# =============================================================================
+# ABOUT THIS LIBRARY
+# =============================================================================
+#
+# rac_commons is a STANDALONE library that provides:
+#   - Logging, error handling, and event tracking
+#   - Service registry and provider infrastructure
+#   - Model management (download strategies, storage)
+#   - Platform backend (Apple Foundation Models, System TTS) on Apple platforms
+# =============================================================================
 
 # =============================================================================
 # OPTIONS
 # =============================================================================
 
-# Backend build options
-option(RAC_BUILD_LLAMACPP "Build LlamaCpp backend module" ON)
-option(RAC_BUILD_ONNX "Build ONNX backend module (STT, TTS, VAD)" ON)
-option(RAC_BUILD_WHISPERCPP "Build WhisperCpp backend module (STT)" OFF)
-option(RAC_BUILD_PLATFORM "Build Platform backend module (Apple Foundation Models, System TTS)" ON)
-
-# Feature options
+option(RAC_BUILD_JNI "Build JNI bridge for Android/JVM" OFF)
 option(RAC_BUILD_TESTS "Build unit tests" OFF)
 option(RAC_BUILD_SHARED "Build shared libraries" OFF)
-
-# Path to runanywhere-core (can be overridden)
-set(RUNANYWHERE_CORE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../runanywhere-core" CACHE PATH "Path to runanywhere-core")
+option(RAC_BUILD_PLATFORM "Build platform backend (Apple Foundation Models, System TTS)" ON)
 
 # =============================================================================
 # C++ CONFIGURATION
@@ -45,8 +48,8 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 # Load versions from VERSIONS file (single source of truth)
 include(LoadVersions)
 
-# Make project version available to subdirectories (for backend CMakeLists.txt)
-set(RAC_PROJECT_VERSION "${RAC_VERSION}" CACHE STRING "Project version for subdirectories" FORCE)
+# Make project version available to subdirectories
+set(RAC_PROJECT_VERSION "${RAC_VERSION}" CACHE STRING "Project version" FORCE)
 
 # =============================================================================
 # PLATFORM DETECTION
@@ -78,41 +81,36 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     add_compile_options(-Wall -Wextra -Wpedantic -Wno-unused-parameter)
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
         add_compile_options(-O3 -DNDEBUG)
-        # Hidden visibility by default for size optimization
         add_compile_options(-fvisibility=hidden)
         add_compile_options(-ffunction-sections -fdata-sections)
     endif()
 endif()
 
 # =============================================================================
-# FIND RUNANYWHERE-CORE
+# AUTO-GENERATE DEVELOPMENT CONFIG IF MISSING
 # =============================================================================
+# development_config.cpp is git-ignored because it can contain secrets.
+# For CI builds or fresh checkouts, we auto-generate a stub from the template.
 
-include(FindRunAnywhereCore)
+set(DEV_CONFIG_FILE "${CMAKE_CURRENT_SOURCE_DIR}/src/infrastructure/network/development_config.cpp")
+set(DEV_CONFIG_TEMPLATE "${CMAKE_CURRENT_SOURCE_DIR}/src/infrastructure/network/development_config.cpp.template")
 
-if(NOT RUNANYWHERE_CORE_FOUND)
-    message(FATAL_ERROR "runanywhere-core not found at ${RUNANYWHERE_CORE_DIR}")
+if(NOT EXISTS "${DEV_CONFIG_FILE}")
+    if(EXISTS "${DEV_CONFIG_TEMPLATE}")
+        message(STATUS "development_config.cpp not found, generating stub from template...")
+        file(READ "${DEV_CONFIG_TEMPLATE}" DEV_CONFIG_CONTENT)
+        file(WRITE "${DEV_CONFIG_FILE}" "${DEV_CONFIG_CONTENT}")
+        message(STATUS "Generated: ${DEV_CONFIG_FILE}")
+    else()
+        message(FATAL_ERROR "Neither development_config.cpp nor .template found!")
+    endif()
 endif()
 
-message(STATUS "Found runanywhere-core at: ${RUNANYWHERE_CORE_DIR}")
-
-# Build runanywhere-core in modular mode
-set(RA_BUILD_MODULAR ON CACHE BOOL "" FORCE)
-set(RA_BUILD_LLAMACPP ${RAC_BUILD_LLAMACPP} CACHE BOOL "" FORCE)
-set(RA_BUILD_ONNX ${RAC_BUILD_ONNX} CACHE BOOL "" FORCE)
-set(RA_BUILD_WHISPERCPP ${RAC_BUILD_WHISPERCPP} CACHE BOOL "" FORCE)
-
-add_subdirectory(${RUNANYWHERE_CORE_DIR} ${CMAKE_BINARY_DIR}/runanywhere-core)
-
 # =============================================================================
-# RAC COMMONS CORE LIBRARY
+# SOURCE FILES
 # =============================================================================
 
-# =============================================================================
-# SOURCE FILES (Organized by Swift SDK structure)
-# =============================================================================
-
-# Core sources (maps to Swift Core/)
+# Core sources - logging, errors, time, memory, events
 set(RAC_CORE_SOURCES
     src/core/rac_core.cpp
     src/core/rac_error.cpp
@@ -123,10 +121,11 @@ set(RAC_CORE_SOURCES
     src/core/component_types.cpp
     src/core/events.cpp
     src/core/sdk_state.cpp
+    src/core/rac_structured_error.cpp
     src/core/capabilities/lifecycle_manager.cpp
 )
 
-# Infrastructure sources (maps to Swift Infrastructure/)
+# Infrastructure sources - registry, model management, network, telemetry
 set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/events/event_publisher.cpp
     src/infrastructure/registry/module_registry.cpp
@@ -138,22 +137,19 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/model_management/model_strategy.cpp
     src/infrastructure/model_management/model_assignment.cpp
     src/infrastructure/storage/storage_analyzer.cpp
-    # Network / Data layer (maps to Swift Data/)
     src/infrastructure/network/environment.cpp
     src/infrastructure/network/endpoints.cpp
     src/infrastructure/network/api_types.cpp
     src/infrastructure/network/http_client.cpp
     src/infrastructure/network/auth_manager.cpp
     src/infrastructure/network/development_config.cpp
-    # Telemetry (maps to Swift Analytics/)
     src/infrastructure/telemetry/telemetry_types.cpp
     src/infrastructure/telemetry/telemetry_json.cpp
     src/infrastructure/telemetry/telemetry_manager.cpp
-    # Device (device registration manager)
     src/infrastructure/device/rac_device_manager.cpp
 )
 
-# Feature sources (maps to Swift Features/)
+# Feature sources - LLM, STT, TTS, VAD service interfaces
 set(RAC_FEATURES_SOURCES
     # LLM
     src/features/llm/llm_component.cpp
@@ -175,18 +171,18 @@ set(RAC_FEATURES_SOURCES
     src/features/vad/vad_analytics.cpp
     # Voice Agent
     src/features/voice_agent/voice_agent.cpp
-    # Result memory management (weak symbols, can be overridden by backends)
+    # Result memory management
     src/features/result_free.cpp
 )
 
-# Platform backend sources (Apple Foundation Models + System TTS)
-# These are always included on Apple platforms since they're required for platform services
-if(APPLE)
+# Platform services (Apple Foundation Models + System TTS)
+if(APPLE AND RAC_BUILD_PLATFORM)
     set(RAC_PLATFORM_SOURCES
-        backends/platform/src/rac_llm_platform.cpp
-        backends/platform/src/rac_tts_platform.cpp
-        backends/platform/src/rac_backend_platform_register.cpp
+        src/features/platform/rac_llm_platform.cpp
+        src/features/platform/rac_tts_platform.cpp
+        src/features/platform/rac_backend_platform_register.cpp
     )
+    message(STATUS "Building platform services: Apple Foundation Models, System TTS")
 else()
     set(RAC_PLATFORM_SOURCES "")
 endif()
@@ -199,14 +195,17 @@ set(RAC_COMMONS_SOURCES
     ${RAC_PLATFORM_SOURCES}
 )
 
+# =============================================================================
+# RAC COMMONS LIBRARY
+# =============================================================================
+
 if(RAC_BUILD_SHARED)
     add_library(rac_commons SHARED ${RAC_COMMONS_SOURCES})
 else()
     add_library(rac_commons STATIC ${RAC_COMMONS_SOURCES})
 endif()
 
-# Public headers (available to consumers)
-# Headers are now under include/rac/{core,features,infrastructure}/
+# Public headers
 target_include_directories(rac_commons PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
@@ -215,31 +214,6 @@ target_include_directories(rac_commons PUBLIC
 # Private includes for implementation
 target_include_directories(rac_commons PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${RUNANYWHERE_CORE_DIR}/src
-    ${RUNANYWHERE_CORE_DIR}/src/capabilities
-)
-
-# Backend headers - needed for vtable dispatch in service files
-# These headers define backend-specific functions called through vtables
-if(RAC_BUILD_LLAMACPP)
-    target_include_directories(rac_commons PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/backends/llamacpp/include>
-    )
-endif()
-if(RAC_BUILD_ONNX)
-    target_include_directories(rac_commons PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/backends/onnx/include>
-    )
-endif()
-# Platform backend headers (always on Apple)
-if(APPLE)
-    target_include_directories(rac_commons PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/backends/platform/include>
-    )
-endif()
-
-target_link_libraries(rac_commons PUBLIC
-    runanywhere_bridge
 )
 
 # Symbol visibility for shared builds
@@ -252,46 +226,32 @@ if(RAC_BUILD_SHARED)
     )
 endif()
 
+# Platform-specific linking
+if(APPLE)
+    target_link_libraries(rac_commons PUBLIC
+        "-framework Foundation"
+    )
+    if(RAC_BUILD_PLATFORM)
+        target_link_libraries(rac_commons PUBLIC
+            "-framework AVFoundation"
+        )
+    endif()
+endif()
+
+if(RAC_PLATFORM_ANDROID)
+    target_link_libraries(rac_commons PUBLIC log)
+endif()
+
+target_compile_features(rac_commons PUBLIC cxx_std_17)
+
 # =============================================================================
-# BACKEND MODULES
+# JNI BRIDGE (Android/JVM)
 # =============================================================================
-#
-# Backend libraries provide specific ML inference implementations:
-# - llamacpp: LLM text generation (GGUF models via llama.cpp)
-# - onnx: STT, TTS, VAD (ONNX Runtime models)
-# - whispercpp: STT (Whisper.cpp models)
-#
-# Each backend:
-# 1. Links against rac_commons for service registration
-# 2. Links against runanywhere-core for low-level inference
-# 3. Builds into a static library (.a) or xcframework
-#
 
-if(RAC_BUILD_LLAMACPP)
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/backends/llamacpp/CMakeLists.txt")
-        message(STATUS "Building LlamaCpp backend")
-        add_subdirectory(backends/llamacpp)
-    endif()
-endif()
-
-if(RAC_BUILD_ONNX)
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/backends/onnx/CMakeLists.txt")
-        message(STATUS "Building ONNX backend")
-        add_subdirectory(backends/onnx)
-    endif()
-endif()
-
-if(RAC_BUILD_WHISPERCPP)
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/backends/whispercpp/CMakeLists.txt")
-        message(STATUS "Building WhisperCpp backend")
-        add_subdirectory(backends/whispercpp)
-    endif()
-endif()
-
-if(RAC_BUILD_PLATFORM)
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/backends/platform/CMakeLists.txt")
-        message(STATUS "Building Platform backend (Apple Foundation Models, System TTS)")
-        add_subdirectory(backends/platform)
+if(RAC_BUILD_JNI)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/jni/CMakeLists.txt")
+        message(STATUS "Building JNI bridge for Android/JVM")
+        add_subdirectory(src/jni)
     endif()
 endif()
 
@@ -331,10 +291,15 @@ message(STATUS "Build type:     ${CMAKE_BUILD_TYPE}")
 message(STATUS "Compiler:       ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "Shared libs:    ${RAC_BUILD_SHARED}")
 message(STATUS "")
-message(STATUS "Backend modules:")
-message(STATUS "  LlamaCpp:     ${RAC_BUILD_LLAMACPP}")
-message(STATUS "  ONNX:         ${RAC_BUILD_ONNX}")
-message(STATUS "  WhisperCpp:   ${RAC_BUILD_WHISPERCPP}")
-message(STATUS "  Platform:     ${RAC_BUILD_PLATFORM}")
+message(STATUS "Components:")
+message(STATUS "  Core:         Logging, errors, events, memory")
+message(STATUS "  Registry:     Service & module registration")
+message(STATUS "  Models:       Download strategies, storage")
+message(STATUS "  Services:     LLM, STT, TTS, VAD interfaces")
+if(APPLE AND RAC_BUILD_PLATFORM)
+    message(STATUS "  Platform:     Apple Foundation Models, System TTS")
+endif()
+message(STATUS "")
+message(STATUS "JNI bridge:     ${RAC_BUILD_JNI}")
 message(STATUS "====================================")
 message(STATUS "")

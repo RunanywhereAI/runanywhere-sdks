@@ -19,19 +19,28 @@
 
 ## Project Overview
 
-`runanywhere-commons` is a C/C++ library that provides shared infrastructure for the RunAnywhere SDK. It bridges `runanywhere-core` (the AI inference engine) with platform SDKs (Swift, Kotlin).
+`runanywhere-commons` is a **standalone** C/C++ infrastructure library for the RunAnywhere SDK.
+
+It provides:
+- Logging, error handling, and event tracking
+- Service registry and provider infrastructure
+- Model management (download strategies, storage)
+- Platform backend (Apple Foundation Models, System TTS) - iOS/macOS only
+
+**IMPORTANT**: Backends (LlamaCPP, ONNX, WhisperCPP) are in `runanywhere-core`, not here.
+The dependency direction is: `runanywhere-core` → `runanywhere-commons` (not the other way around).
 
 ## Key Concepts
-
-### Module Registry
-- Central registry for AI backend modules (LlamaCPP, ONNX, WhisperCPP)
-- Modules declare capabilities (LLM, STT, TTS, VAD)
-- Thread-safe singleton pattern
 
 ### Service Registry
 - Priority-based provider selection
 - `canHandle` pattern: providers declare what requests they can serve
 - Factory functions create service instances on demand
+
+### Module Registry
+- Central registry for AI backend modules
+- Modules declare capabilities (LLM, STT, TTS, VAD)
+- Thread-safe singleton pattern
 
 ### Event System
 - Category-based subscription (SDK, Model, LLM, STT, TTS, Voice, etc.)
@@ -47,18 +56,17 @@
 
 ```
 runanywhere-commons/
-├── include/              # Public C headers (rac_*.h)
+├── include/rac/         # Public C headers
+│   ├── core/           # Error handling, logging, types
+│   ├── features/       # LLM, STT, TTS, VAD interfaces
+│   └── infrastructure/ # Registry, events, model management
 ├── src/
-│   ├── core/            # Initialization, error handling, memory
-│   ├── registry/        # Module and service registries
-│   └── events/          # Event publisher
-├── backends/
-│   ├── llamacpp/        # LLM backend wrapper
-│   ├── onnx/            # STT/TTS/VAD backend wrapper
-│   └── whispercpp/      # STT backend wrapper
-├── exports/             # Symbol visibility lists
-├── cmake/               # CMake modules
-└── scripts/             # Build scripts
+│   ├── core/           # Initialization, error handling, memory
+│   ├── features/       # Service implementations
+│   └── infrastructure/ # Registry, events, download, telemetry
+├── cmake/              # CMake modules
+├── scripts/            # Build scripts
+└── exports/            # Symbol visibility lists
 ```
 
 ## API Naming Convention
@@ -71,47 +79,61 @@ runanywhere-commons/
 ## Building
 
 ```bash
-# iOS XCFrameworks
-./scripts/build-ios.sh
+# Build for both iOS and Android
+./scripts/build-rac-commons.sh --all
 
-# Android .so files
-./scripts/build-android.sh
+# iOS only
+./scripts/build-rac-commons.sh --ios
+
+# Android only
+./scripts/build-rac-commons.sh --android --abi arm64-v8a
+
+# Create release packages
+./scripts/build-rac-commons.sh --all --package
 ```
 
-## Integration with Swift SDK
+## Outputs
 
-1. Swift imports C bridge modules (`CRACommons`, `CRABackendLlamaCPP`, etc.)
+- **iOS**: `dist/RACommons.xcframework`
+- **Android**: `dist/android/jniLibs/{abi}/librac_commons.so`
+- **Packages**: `dist/packages/RACommons-{platform}-v{version}.zip`
+
+## Integration with SDKs
+
+### Swift SDK
+1. Swift imports `CRACommons` module
 2. `SwiftPlatformAdapter` provides platform callbacks to C++
 3. `CommonsErrorMapping` converts `rac_result_t` to `SDKError`
 4. `EventBridge` subscribes to C++ events, republishes to Swift `EventBus`
 
+### Kotlin SDK
+1. JNI bridge: `librac_commons_jni.so`
+2. Platform adapter via JNI callbacks
+
 ## Common Tasks
-
-### Adding a new backend
-1. Create `backends/<name>/CMakeLists.txt`
-2. Create header `backends/<name>/include/rac_<cap>_<name>.h`
-3. Implement wrapper in `backends/<name>/src/`
-4. Add registration function `rac_backend_<name>_register()`
-5. Add exports file `exports/RABackend<Name>.exports`
-
-### Adding a new capability
-1. Add enum value to `rac_capability_t` in `rac_types.h`
-2. Create generic capability header `include/rac_<cap>.h`
-3. Update backend wrappers to expose the capability
 
 ### Adding a new error code
 1. Add `#define RAC_ERROR_*` to `rac_error.h` (within -100 to -999)
 2. Add case to `rac_error_message()` in `rac_error.cpp`
-3. Add mapping in `CommonsErrorMapping.swift`
+3. Add mapping in platform SDK error converters
 
-## Testing Considerations
+### Adding a new event category
+1. Add enum value to `rac_event_category_t`
+2. Update event publisher and subscribers
 
-- Unit tests in `tests/` (currently skipped)
-- Swift E2E tests verify full stack integration
+### Adding a new capability interface
+1. Add enum value to `rac_capability_t` in `rac_types.h`
+2. Create interface header `include/rac/features/<cap>/<cap>_types.h`
+3. Create service header `include/rac/features/<cap>/rac_<cap>_service.h`
+
+## Testing
+
 - Binary size checks in CI (see `size-check.yml`)
+- Integration tests via platform SDKs
+- Swift E2E tests verify full stack integration
 
-## Known Limitations
+## CI/CD
 
-- WhisperCPP + LlamaCPP: GGML symbol conflicts if linked together
-- HTTP not supported in platform adapter (by design)
-- Android support is scaffolded but not fully tested
+- **Build**: `.github/workflows/build-commons.yml`
+- **Release**: `.github/workflows/release.yml` (triggered by `commons-v*` tags)
+- **Size Check**: `.github/workflows/size-check.yml`
