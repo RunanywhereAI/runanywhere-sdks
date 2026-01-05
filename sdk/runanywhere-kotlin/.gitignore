@@ -1,0 +1,44 @@
+# =============================================================================
+# RunAnywhere Kotlin SDK - Git Ignore
+# =============================================================================
+
+# Build outputs
+build/
+.gradle/
+*.aar
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Kotlin
+*.class
+
+# =============================================================================
+# JNI Libraries (should NOT be committed)
+# =============================================================================
+# Local builds: ./scripts/build-local.sh copies libs here
+src/androidMain/jniLibs/
+
+# Remote downloads: ./gradlew downloadJniLibs downloads libs here
+build/jniLibs/
+
+# =============================================================================
+# How JNI libs work:
+# =============================================================================
+# testLocal=true  → Build locally: ./scripts/build-local.sh
+#                   Libs go to: src/androidMain/jniLibs/
+#
+# testLocal=false → Download from GitHub releases (default)
+#                   Libs go to: build/jniLibs/
+#                   Source: https://github.com/RunanywhereAI/runanywhere-binaries
+# =============================================================================
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Local environment
+local.properties

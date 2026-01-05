@@ -86,6 +86,7 @@ _rac_lifecycle_create
 _rac_lifecycle_destroy
 _rac_lifecycle_get_metrics
 _rac_lifecycle_get_model_id
+_rac_lifecycle_get_model_name
 _rac_lifecycle_get_service
 _rac_lifecycle_get_state
 _rac_lifecycle_is_loaded
@@ -220,6 +221,7 @@ _rac_streaming_metrics_mark_complete
 _rac_streaming_metrics_mark_failed
 _rac_streaming_metrics_mark_start
 _rac_streaming_metrics_record_token
+_rac_streaming_metrics_set_token_counts
 _rac_streaming_result_free
 
 # STT Component

@@ -222,7 +222,8 @@ extern "C" void rac_stt_component_destroy(rac_handle_t handle) {
 // MODEL LIFECYCLE
 // =============================================================================
 
-extern "C" rac_result_t rac_stt_component_load_model(rac_handle_t handle, const char* model_id) {
+extern "C" rac_result_t rac_stt_component_load_model(rac_handle_t handle, const char* model_path,
+                                                     const char* model_id, const char* model_name) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
 
@@ -230,7 +231,7 @@ extern "C" rac_result_t rac_stt_component_load_model(rac_handle_t handle, const 
     std::lock_guard<std::mutex> lock(component->mtx);
 
     rac_handle_t service = nullptr;
-    return rac_lifecycle_load(component->lifecycle, model_id, &service);
+    return rac_lifecycle_load(component->lifecycle, model_path, model_id, model_name, &service);
 }
 
 extern "C" rac_result_t rac_stt_component_unload(rac_handle_t handle) {
@@ -274,6 +275,14 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
     // Generate unique ID for this transcription
     std::string transcription_id = generate_unique_id();
     const char* model_id = rac_lifecycle_get_model_id(component->lifecycle);
+    const char* model_name = rac_lifecycle_get_model_name(component->lifecycle);
+    
+    // Debug: Log if model_id is null
+    if (!model_id) {
+        log_warning("STT.Component", "rac_lifecycle_get_model_id returned null - model_id may not be set in telemetry");
+    } else {
+        log_debug("STT.Component", "STT transcription using model_id: %s", model_id);
+    }
 
     // Estimate audio length (assuming 16kHz mono 16-bit audio)
     double audio_length_ms = (audio_size / 2.0 / 16000.0) * 1000.0;
@@ -289,6 +298,7 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
         event.data.stt_transcription = RAC_ANALYTICS_STT_TRANSCRIPTION_DEFAULT;
         event.data.stt_transcription.transcription_id = transcription_id.c_str();
         event.data.stt_transcription.model_id = model_id;
+        event.data.stt_transcription.model_name = model_name;
         event.data.stt_transcription.error_code = result;
         event.data.stt_transcription.error_message = "No model loaded";
         rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_FAILED, &event);
@@ -307,6 +317,7 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
         event.data.stt_transcription = RAC_ANALYTICS_STT_TRANSCRIPTION_DEFAULT;
         event.data.stt_transcription.transcription_id = transcription_id.c_str();
         event.data.stt_transcription.model_id = model_id;
+        event.data.stt_transcription.model_name = model_name;
         event.data.stt_transcription.audio_length_ms = audio_length_ms;
         event.data.stt_transcription.audio_size_bytes = static_cast<int32_t>(audio_size);
         event.data.stt_transcription.language = effective_options->language;
@@ -331,6 +342,7 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
         event.data.stt_transcription = RAC_ANALYTICS_STT_TRANSCRIPTION_DEFAULT;
         event.data.stt_transcription.transcription_id = transcription_id.c_str();
         event.data.stt_transcription.model_id = model_id;
+        event.data.stt_transcription.model_name = model_name;
         event.data.stt_transcription.error_code = result;
         event.data.stt_transcription.error_message = "Transcription failed";
         rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_FAILED, &event);
@@ -360,6 +372,7 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
         event.type = RAC_EVENT_STT_TRANSCRIPTION_COMPLETED;
         event.data.stt_transcription.transcription_id = transcription_id.c_str();
         event.data.stt_transcription.model_id = model_id;
+        event.data.stt_transcription.model_name = model_name;
         event.data.stt_transcription.text = out_result->text;
         event.data.stt_transcription.confidence = out_result->confidence;
         event.data.stt_transcription.duration_ms = duration_ms;

@@ -26,13 +26,16 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.runanywhere.runanywhereai.domain.models.SessionState
+import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
 import com.runanywhere.runanywhereai.ui.theme.AppColors
+import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
 
 /**
  * Voice Assistant screen matching iOS VoiceAssistantView
@@ -47,10 +50,9 @@ import com.runanywhere.runanywhereai.ui.theme.AppColors
  */
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun VoiceAssistantScreen(
-    viewModel: VoiceAssistantViewModel = viewModel()
-) {
+fun VoiceAssistantScreen(viewModel: VoiceAssistantViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     var showModelInfo by remember { mutableStateOf(false) }
 
     // Model selection dialog states
@@ -59,14 +61,32 @@ fun VoiceAssistantScreen(
     var showTTSModelSelection by remember { mutableStateOf(false) }
 
     // Permission handling
-    val microphonePermissionState = rememberPermissionState(
-        Manifest.permission.RECORD_AUDIO
-    )
+    val microphonePermissionState =
+        rememberPermissionState(
+            Manifest.permission.RECORD_AUDIO,
+        )
+
+    // Initialize audio capture service and refresh model states when the screen appears
+    // This ensures that:
+    // 1. Audio capture is ready when user starts the session
+    // 2. Models loaded from other screens (e.g., Chat) are reflected here
+    LaunchedEffect(Unit) {
+        viewModel.initialize(context)
+        viewModel.refreshComponentStatesFromSDK()
+    }
+
+    // Re-initialize when permission is granted
+    LaunchedEffect(microphonePermissionState.status.isGranted) {
+        if (microphonePermissionState.status.isGranted) {
+            viewModel.initialize(context)
+        }
+    }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
     ) {
         // Show setup view when not all models are loaded
         // iOS Reference: if !viewModel.allModelsLoaded { VoicePipelineSetupView(...) }
@@ -84,7 +104,7 @@ fun VoiceAssistantScreen(
                 onStartVoice = {
                     // All models loaded, nothing to do here
                     // The view will automatically switch to main voice UI
-                }
+                },
             )
         } else {
             // Main voice assistant UI (only shown when all models are ready)
@@ -96,46 +116,46 @@ fun VoiceAssistantScreen(
                 onRequestPermission = { microphonePermissionState.launchPermissionRequest() },
                 onStartSession = { viewModel.startSession() },
                 onStopSession = { viewModel.stopSession() },
-                onClearConversation = { viewModel.clearConversation() }
+                onClearConversation = { viewModel.clearConversation() },
             )
         }
     }
 
-    // Model selection dialogs
-    // TODO: Replace with actual model selection sheets matching iOS ModelSelectionSheet
+    // Model selection bottom sheets - uses real SDK models
+    // iOS Reference: ModelSelectionSheet(context: .stt/.llm/.tts)
     if (showSTTModelSelection) {
-        MockModelSelectionDialog(
-            title = "Select Speech Recognition Model",
-            modelType = "STT",
+        ModelSelectionBottomSheet(
+            context = ModelSelectionContext.STT,
             onDismiss = { showSTTModelSelection = false },
-            onSelectModel = { framework, name, modelId ->
-                viewModel.setSTTModel(framework, name, modelId)
+            onModelSelected = { model ->
+                val framework = model.framework.displayName
+                viewModel.setSTTModel(framework, model.name, model.id)
                 showSTTModelSelection = false
-            }
+            },
         )
     }
 
     if (showLLMModelSelection) {
-        MockModelSelectionDialog(
-            title = "Select Language Model",
-            modelType = "LLM",
+        ModelSelectionBottomSheet(
+            context = ModelSelectionContext.LLM,
             onDismiss = { showLLMModelSelection = false },
-            onSelectModel = { framework, name, modelId ->
-                viewModel.setLLMModel(framework, name, modelId)
+            onModelSelected = { model ->
+                val framework = model.framework.displayName
+                viewModel.setLLMModel(framework, model.name, model.id)
                 showLLMModelSelection = false
-            }
+            },
         )
     }
 
     if (showTTSModelSelection) {
-        MockModelSelectionDialog(
-            title = "Select Text to Speech Model",
-            modelType = "TTS",
+        ModelSelectionBottomSheet(
+            context = ModelSelectionContext.TTS,
             onDismiss = { showTTSModelSelection = false },
-            onSelectModel = { framework, name, modelId ->
-                viewModel.setTTSModel(framework, name, modelId)
+            onModelSelected = { model ->
+                val framework = model.framework.displayName
+                viewModel.setTTSModel(framework, model.name, model.id)
                 showTTSModelSelection = false
-            }
+            },
         )
     }
 }
@@ -161,16 +181,17 @@ private fun VoicePipelineSetupView(
     onSelectSTT: () -> Unit,
     onSelectLLM: () -> Unit,
     onSelectTTS: () -> Unit,
-    onStartVoice: () -> Unit
+    onStartVoice: () -> Unit,
 ) {
     val allModelsReady = sttModel != null && llmModel != null && ttsModel != null
     val allModelsLoaded = sttLoadState.isLoaded && llmLoadState.isLoaded && ttsLoadState.isLoaded
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // Header
         // iOS Reference: VoicePipelineSetupView header
@@ -180,7 +201,7 @@ private fun VoicePipelineSetupView(
             imageVector = Icons.Default.Mic,
             contentDescription = "Voice Assistant",
             modifier = Modifier.size(48.dp),
-            tint = AppColors.primaryAccent
+            tint = AppColors.primaryAccent,
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -188,7 +209,7 @@ private fun VoicePipelineSetupView(
         Text(
             text = "Voice Assistant Setup",
             style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -196,7 +217,7 @@ private fun VoicePipelineSetupView(
         Text(
             text = "Voice requires 3 models to work together",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -204,17 +225,17 @@ private fun VoicePipelineSetupView(
         // Model cards with load state
         // iOS Reference: VStack with ModelSetupCard components
 
-        // STT Model
+        // STT Model (Green)
         ModelSetupCard(
             step = 1,
             title = "Speech Recognition",
             subtitle = "Converts your voice to text",
             icon = Icons.Default.GraphicEq,
-            color = Color(0xFF4CAF50), // Green
+            color = Color(0xFF4CAF50),
             selectedFramework = sttModel?.framework,
             selectedModel = sttModel?.name,
             loadState = sttLoadState,
-            onSelect = onSelectSTT
+            onSelect = onSelectSTT,
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -229,22 +250,22 @@ private fun VoicePipelineSetupView(
             selectedFramework = llmModel?.framework,
             selectedModel = llmModel?.name,
             loadState = llmLoadState,
-            onSelect = onSelectLLM
+            onSelect = onSelectLLM,
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // TTS Model
+        // TTS Model (Purple)
         ModelSetupCard(
             step = 3,
             title = "Text to Speech",
             subtitle = "Converts responses to audio",
             icon = Icons.Default.VolumeUp,
-            color = Color(0xFF9C27B0), // Purple
+            color = Color(0xFF9C27B0),
             selectedFramework = ttsModel?.framework,
             selectedModel = ttsModel?.name,
             loadState = ttsLoadState,
-            onSelect = onSelectTTS
+            onSelect = onSelectTTS,
         )
 
         Spacer(modifier = Modifier.weight(1f))
@@ -253,23 +274,25 @@ private fun VoicePipelineSetupView(
         Button(
             onClick = onStartVoice,
             enabled = allModelsLoaded,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = AppColors.primaryAccent
-            )
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+            colors =
+                ButtonDefaults.buttonColors(
+                    containerColor = AppColors.primaryAccent,
+                ),
         ) {
             Icon(
                 imageVector = Icons.Default.Mic,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(20.dp),
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = "Start Voice Assistant",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
             )
         }
 
@@ -277,17 +300,19 @@ private fun VoicePipelineSetupView(
 
         // Status message
         Text(
-            text = when {
-                !allModelsReady -> "Select all 3 models to continue"
-                !allModelsLoaded -> "Waiting for models to load..."
-                else -> "All models loaded and ready!"
-            },
+            text =
+                when {
+                    !allModelsReady -> "Select all 3 models to continue"
+                    !allModelsLoaded -> "Waiting for models to load..."
+                    else -> "All models loaded and ready!"
+                },
             style = MaterialTheme.typography.bodySmall,
-            color = when {
-                !allModelsReady -> MaterialTheme.colorScheme.onSurfaceVariant
-                !allModelsLoaded -> Color(0xFFFFA000) // Orange
-                else -> Color(0xFF4CAF50) // Green
-            }
+            color =
+                when {
+                    !allModelsReady -> MaterialTheme.colorScheme.onSurfaceVariant
+                    !allModelsLoaded -> Color(0xFFFFA000) // Orange
+                    else -> Color(0xFF4CAF50) // Green
+                },
         )
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -311,59 +336,63 @@ private fun ModelSetupCard(
     selectedFramework: String?,
     selectedModel: String?,
     loadState: ModelLoadState,
-    onSelect: () -> Unit
+    onSelect: () -> Unit,
 ) {
     val isConfigured = selectedFramework != null && selectedModel != null
     val isLoaded = loadState.isLoaded
     val isLoading = loadState.isLoading
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onSelect)
-            .then(
-                if (isLoaded) {
-                    Modifier.border(2.dp, Color(0xFF4CAF50).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                } else if (isLoading) {
-                    Modifier.border(2.dp, Color(0xFFFFA000).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                } else if (isConfigured) {
-                    Modifier.border(2.dp, color.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                } else {
-                    Modifier
-                }
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onSelect)
+                .then(
+                    if (isLoaded) {
+                        Modifier.border(2.dp, Color(0xFF4CAF50).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                    } else if (isLoading) {
+                        Modifier.border(2.dp, Color(0xFFFFA000).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                    } else if (isConfigured) {
+                        Modifier.border(2.dp, color.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                    } else {
+                        Modifier
+                    },
+                ),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
             ),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        ),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(12.dp),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             // Step indicator with loading/loaded state
             Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(
-                        when {
-                            isLoading -> Color(0xFFFFA000) // Orange
-                            isLoaded -> Color(0xFF4CAF50) // Green
-                            isConfigured -> color
-                            else -> Color.Gray.copy(alpha = 0.2f)
-                        }
-                    ),
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(
+                            when {
+                                isLoading -> Color(0xFFFFA000) // Orange
+                                isLoaded -> Color(0xFF4CAF50) // Green
+                                isConfigured -> color
+                                else -> Color.Gray.copy(alpha = 0.2f)
+                            },
+                        ),
+                contentAlignment = Alignment.Center,
             ) {
                 when {
                     isLoading -> {
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
                             color = Color.White,
-                            strokeWidth = 2.dp
+                            strokeWidth = 2.dp,
                         )
                     }
                     isLoaded -> {
@@ -371,7 +400,7 @@ private fun ModelSetupCard(
                             imageVector = Icons.Default.CheckCircle,
                             contentDescription = "Loaded",
                             modifier = Modifier.size(18.dp),
-                            tint = Color.White
+                            tint = Color.White,
                         )
                     }
                     isConfigured -> {
@@ -379,14 +408,14 @@ private fun ModelSetupCard(
                             imageVector = Icons.Default.Check,
                             contentDescription = "Configured",
                             modifier = Modifier.size(18.dp),
-                            tint = Color.White
+                            tint = Color.White,
                         )
                     }
                     else -> {
                         Text(
                             text = "$step",
                             fontWeight = FontWeight.Bold,
-                            color = Color.Gray
+                            color = Color.Gray,
                         )
                     }
                 }
@@ -401,13 +430,13 @@ private fun ModelSetupCard(
                         imageVector = icon,
                         contentDescription = title,
                         modifier = Modifier.size(18.dp),
-                        tint = color
+                        tint = color,
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = title,
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
                     )
                 }
 
@@ -418,7 +447,7 @@ private fun ModelSetupCard(
                         Text(
                             text = "$selectedFramework • $selectedModel",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         if (isLoaded) {
                             Spacer(modifier = Modifier.width(4.dp))
@@ -426,14 +455,14 @@ private fun ModelSetupCard(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = "Loaded",
                                 modifier = Modifier.size(12.dp),
-                                tint = Color(0xFF4CAF50)
+                                tint = Color(0xFF4CAF50),
                             )
                         } else if (isLoading) {
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = "Loading...",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color(0xFFFFA000)
+                                color = Color(0xFFFFA000),
                             )
                         }
                     }
@@ -441,7 +470,7 @@ private fun ModelSetupCard(
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -451,7 +480,7 @@ private fun ModelSetupCard(
                 isLoading -> {
                     CircularProgressIndicator(
                         modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp
+                        strokeWidth = 2.dp,
                     )
                 }
                 isLoaded -> {
@@ -460,13 +489,13 @@ private fun ModelSetupCard(
                             imageVector = Icons.Default.CheckCircle,
                             contentDescription = "Loaded",
                             modifier = Modifier.size(16.dp),
-                            tint = Color(0xFF4CAF50)
+                            tint = Color(0xFF4CAF50),
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "Loaded",
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF4CAF50)
+                            color = Color(0xFF4CAF50),
                         )
                     }
                 }
@@ -474,7 +503,7 @@ private fun ModelSetupCard(
                     Text(
                         text = "Change",
                         style = MaterialTheme.typography.labelSmall,
-                        color = AppColors.primaryAccent
+                        color = AppColors.primaryAccent,
                     )
                 }
                 else -> {
@@ -483,14 +512,14 @@ private fun ModelSetupCard(
                             text = "Select",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Medium,
-                            color = AppColors.primaryAccent
+                            color = AppColors.primaryAccent,
                         )
                         Spacer(modifier = Modifier.width(2.dp))
                         Icon(
                             imageVector = Icons.Default.ChevronRight,
                             contentDescription = null,
                             modifier = Modifier.size(16.dp),
-                            tint = AppColors.primaryAccent
+                            tint = AppColors.primaryAccent,
                         )
                     }
                 }
@@ -514,33 +543,35 @@ private fun MainVoiceAssistantUI(
     onRequestPermission: () -> Unit,
     onStartSession: () -> Unit,
     onStopSession: () -> Unit,
-    onClearConversation: () -> Unit
+    @Suppress("UNUSED_PARAMETER") onClearConversation: () -> Unit,
 ) {
     val scrollState = rememberScrollState()
 
     Column(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
     ) {
         // Minimal header with subtle controls
         // iOS Reference: HStack with model selection button, status indicator, info toggle
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             // Model selection button - subtle, top left
             IconButton(
                 onClick = { /* TODO: Show model selection */ },
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                modifier =
+                    Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
             ) {
                 Icon(
                     imageVector = Icons.Default.ViewInAr,
                     contentDescription = "Models",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -549,13 +580,13 @@ private fun MainVoiceAssistantUI(
             // Status indicator - minimal
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 StatusIndicator(sessionState = uiState.sessionState)
                 Text(
                     text = getStatusText(uiState.sessionState),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -564,15 +595,16 @@ private fun MainVoiceAssistantUI(
             // Model info toggle - subtle, top right
             IconButton(
                 onClick = onToggleModelInfo,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                modifier =
+                    Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
             ) {
                 Icon(
                     imageVector = if (showModelInfo) Icons.Filled.Info else Icons.Outlined.Info,
                     contentDescription = if (showModelInfo) "Hide Models" else "Show Models",
-                    tint = if (showModelInfo) AppColors.primaryAccent else MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = if (showModelInfo) AppColors.primaryAccent else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -581,35 +613,36 @@ private fun MainVoiceAssistantUI(
         AnimatedVisibility(
             visible = showModelInfo,
             enter = slideInVertically() + fadeIn(),
-            exit = slideOutVertically() + fadeOut()
+            exit = slideOutVertically() + fadeOut(),
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                    horizontalArrangement = Arrangement.SpaceEvenly,
                 ) {
                     ModelBadge(
                         icon = Icons.Default.Psychology,
                         label = "LLM",
                         value = uiState.llmModel?.name ?: "Not set",
-                        color = AppColors.primaryAccent
+                        color = AppColors.primaryAccent,
                     )
                     ModelBadge(
                         icon = Icons.Default.GraphicEq,
                         label = "STT",
                         value = uiState.sttModel?.name ?: "Not set",
-                        color = Color(0xFF4CAF50)
+                        color = Color(0xFF4CAF50),
                     )
                     ModelBadge(
                         icon = Icons.Default.VolumeUp,
                         label = "TTS",
                         value = uiState.ttsModel?.name ?: "Not set",
-                        color = Color(0xFF9C27B0)
+                        color = Color(0xFF9C27B0),
                     )
                 }
 
@@ -619,12 +652,13 @@ private fun MainVoiceAssistantUI(
                     text = "Experimental Feature",
                     style = MaterialTheme.typography.labelSmall,
                     color = Color(0xFFFFA000),
-                    modifier = Modifier
-                        .background(
-                            Color(0xFFFFA000).copy(alpha = 0.1f),
-                            RoundedCornerShape(8.dp)
-                        )
-                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                    modifier =
+                        Modifier
+                            .background(
+                                Color(0xFFFFA000).copy(alpha = 0.1f),
+                                RoundedCornerShape(8.dp),
+                            )
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
                 )
 
                 Spacer(modifier = Modifier.height(15.dp))
@@ -633,27 +667,29 @@ private fun MainVoiceAssistantUI(
 
         // Main conversation area
         Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
-                    .padding(horizontal = 20.dp, vertical = 20.dp)
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scrollState)
+                        .padding(horizontal = 20.dp, vertical = 20.dp),
             ) {
                 // User transcript
                 AnimatedVisibility(
                     visible = uiState.currentTranscript.isNotEmpty(),
                     enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
+                    exit = fadeOut() + shrinkVertically(),
                 ) {
                     ConversationBubble(
                         speaker = "You",
                         message = uiState.currentTranscript,
                         isUser = true,
-                        modifier = Modifier.padding(bottom = 20.dp)
+                        modifier = Modifier.padding(bottom = 20.dp),
                     )
                 }
 
@@ -661,38 +697,39 @@ private fun MainVoiceAssistantUI(
                 AnimatedVisibility(
                     visible = uiState.assistantResponse.isNotEmpty(),
                     enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
+                    exit = fadeOut() + shrinkVertically(),
                 ) {
                     ConversationBubble(
                         speaker = "Assistant",
                         message = uiState.assistantResponse,
                         isUser = false,
-                        modifier = Modifier.padding(bottom = 20.dp)
+                        modifier = Modifier.padding(bottom = 20.dp),
                     )
                 }
 
                 // Placeholder when empty
                 if (uiState.currentTranscript.isEmpty() && uiState.assistantResponse.isEmpty()) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 100.dp),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(top = 100.dp),
+                        contentAlignment = Alignment.Center,
                     ) {
                         Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
+                            horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Mic,
                                 contentDescription = "Microphone",
                                 modifier = Modifier.size(48.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                             )
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
                                 text = "Tap the microphone to start",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -702,10 +739,11 @@ private fun MainVoiceAssistantUI(
 
         // Minimal control area
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 30.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 30.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Error message (if any)
             uiState.errorMessage?.let { error ->
@@ -714,7 +752,7 @@ private fun MainVoiceAssistantUI(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                 )
             }
 
@@ -723,11 +761,11 @@ private fun MainVoiceAssistantUI(
             AnimatedVisibility(
                 visible = uiState.sessionState == SessionState.LISTENING || uiState.isListening,
                 enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
+                exit = fadeOut() + shrinkVertically(),
             ) {
                 AudioLevelIndicator(
                     audioLevel = uiState.audioLevel,
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    modifier = Modifier.padding(bottom = 16.dp),
                 )
             }
 
@@ -752,7 +790,7 @@ private fun MainVoiceAssistantUI(
                             onStartSession()
                         }
                     }
-                }
+                },
             )
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -762,7 +800,7 @@ private fun MainVoiceAssistantUI(
                 text = getInstructionText(uiState.sessionState),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -772,7 +810,7 @@ private fun MainVoiceAssistantUI(
                 style = MaterialTheme.typography.labelSmall,
                 color = Color(0xFFFFA000),
                 fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                modifier = Modifier.padding(horizontal = 40.dp)
+                modifier = Modifier.padding(horizontal = 40.dp),
             )
         }
     }
@@ -780,31 +818,34 @@ private fun MainVoiceAssistantUI(
 
 @Composable
 private fun StatusIndicator(sessionState: SessionState) {
-    val color = when (sessionState) {
-        SessionState.CONNECTED -> Color.Green
-        SessionState.LISTENING -> Color.Red
-        SessionState.PROCESSING -> Color.Blue
-        SessionState.SPEAKING -> Color.Green
-        SessionState.ERROR -> Color.Red
-        SessionState.DISCONNECTED -> Color.Gray
-        SessionState.CONNECTING -> Color(0xFFFFA000) // Orange
-    }
+    val color =
+        when (sessionState) {
+            SessionState.CONNECTED -> Color.Green
+            SessionState.LISTENING -> Color.Red
+            SessionState.PROCESSING -> Color.Blue
+            SessionState.SPEAKING -> Color.Green
+            SessionState.ERROR -> Color.Red
+            SessionState.DISCONNECTED -> Color.Gray
+            SessionState.CONNECTING -> Color(0xFFFFA000) // Orange
+        }
 
     val animatedScale by animateFloatAsState(
         targetValue = if (sessionState == SessionState.LISTENING) 1.2f else 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "statusScale"
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(1000),
+                repeatMode = RepeatMode.Reverse,
+            ),
+        label = "statusScale",
     )
 
     Box(
-        modifier = Modifier
-            .size(8.dp)
-            .scale(if (sessionState == SessionState.LISTENING) animatedScale else 1f)
-            .clip(CircleShape)
-            .background(color)
+        modifier =
+            Modifier
+                .size(8.dp)
+                .scale(if (sessionState == SessionState.LISTENING) animatedScale else 1f)
+                .clip(CircleShape)
+                .background(color),
     )
 }
 
@@ -813,33 +854,34 @@ private fun ModelBadge(
     icon: ImageVector,
     label: String,
     value: String,
-    color: Color
+    color: Color,
 ) {
     Row(
-        modifier = Modifier
-            .background(color.copy(alpha = 0.1f), RoundedCornerShape(6.dp))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+        modifier =
+            Modifier
+                .background(color.copy(alpha = 0.1f), RoundedCornerShape(6.dp))
+                .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Icon(
             imageVector = icon,
             contentDescription = label,
             modifier = Modifier.size(12.dp),
-            tint = color
+            tint = color,
         )
         Column {
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
                 fontSize = 9.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 text = value,
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Medium,
-                maxLines = 1
+                maxLines = 1,
             )
         }
     }
@@ -850,17 +892,17 @@ private fun ConversationBubble(
     speaker: String,
     message: String,
     isUser: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.Start
+        horizontalAlignment = Alignment.Start,
     ) {
         Text(
             text = speaker,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         Spacer(modifier = Modifier.height(6.dp))
@@ -868,14 +910,18 @@ private fun ConversationBubble(
         Text(
             text = message,
             style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier
-                .background(
-                    if (isUser) MaterialTheme.colorScheme.surfaceVariant
-                    else AppColors.primaryAccent.copy(alpha = 0.08f),
-                    RoundedCornerShape(16.dp)
-                )
-                .padding(12.dp)
-                .fillMaxWidth()
+            modifier =
+                Modifier
+                    .background(
+                        if (isUser) {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        } else {
+                            AppColors.primaryAccent.copy(alpha = 0.08f)
+                        },
+                        RoundedCornerShape(16.dp),
+                    )
+                    .padding(12.dp)
+                    .fillMaxWidth(),
         )
     }
 }
@@ -889,47 +935,50 @@ private fun ConversationBubble(
 @Composable
 private fun AudioLevelIndicator(
     audioLevel: Float,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // Recording status badge
         // iOS Reference: HStack with red circle + "RECORDING" text
         Row(
-            modifier = Modifier
-                .background(
-                    Color.Red.copy(alpha = 0.1f),
-                    RoundedCornerShape(4.dp)
-                )
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier =
+                Modifier
+                    .background(
+                        Color.Red.copy(alpha = 0.1f),
+                        RoundedCornerShape(4.dp),
+                    )
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             // Pulsing red dot
             val infiniteTransition = rememberInfiniteTransition(label = "recording_pulse")
             val pulseAlpha by infiniteTransition.animateFloat(
                 initialValue = 1f,
                 targetValue = 0.5f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(500),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "recordingDotPulse"
+                animationSpec =
+                    infiniteRepeatable(
+                        animation = tween(500),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
+                label = "recordingDotPulse",
             )
             Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(Color.Red.copy(alpha = pulseAlpha))
+                modifier =
+                    Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(Color.Red.copy(alpha = pulseAlpha)),
             )
             Text(
                 text = "RECORDING",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 fontSize = 10.sp,
-                color = Color.Red
+                color = Color.Red,
             )
         }
 
@@ -938,22 +987,26 @@ private fun AudioLevelIndicator(
         // Audio level bars (10 bars matching iOS)
         // iOS Reference: HStack with 10 RoundedRectangles
         Row(
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             repeat(10) { index ->
                 val isActive = index < (audioLevel * 10).toInt()
                 Box(
-                    modifier = Modifier
-                        .width(25.dp)
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(
-                            if (isActive) Color(0xFF4CAF50) // Green
-                            else Color.Gray.copy(alpha = 0.3f)
-                        )
-                        .animateContentSize(
-                            animationSpec = tween(200, easing = EaseInOut)
-                        )
+                    modifier =
+                        Modifier
+                            .width(25.dp)
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(
+                                if (isActive) {
+                                    Color(0xFF4CAF50) // Green
+                                } else {
+                                    Color.Gray.copy(alpha = 0.3f)
+                                },
+                            )
+                            .animateContentSize(
+                                animationSpec = tween(200, easing = EaseInOut),
+                            ),
                 )
             }
         }
@@ -966,24 +1019,26 @@ private fun MicrophoneButton(
     sessionState: SessionState,
     isSpeechDetected: Boolean,
     hasPermission: Boolean,
-    onToggle: () -> Unit
+    onToggle: () -> Unit,
 ) {
-    val backgroundColor = when {
-        !hasPermission -> MaterialTheme.colorScheme.error
-        sessionState == SessionState.CONNECTING -> Color(0xFFFFA000) // Orange
-        sessionState == SessionState.LISTENING -> Color.Red
-        sessionState == SessionState.PROCESSING -> AppColors.primaryAccent
-        sessionState == SessionState.SPEAKING -> Color.Green
-        else -> AppColors.primaryAccent
-    }
+    val backgroundColor =
+        when {
+            !hasPermission -> MaterialTheme.colorScheme.error
+            sessionState == SessionState.CONNECTING -> Color(0xFFFFA000) // Orange
+            sessionState == SessionState.LISTENING -> Color.Red
+            sessionState == SessionState.PROCESSING -> AppColors.primaryAccent
+            sessionState == SessionState.SPEAKING -> Color.Green
+            else -> AppColors.primaryAccent
+        }
 
     val animatedScale by animateFloatAsState(
         targetValue = if (isSpeechDetected) 1.1f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "micScale"
+        animationSpec =
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessLow,
+            ),
+        label = "micScale",
     )
 
     Box(contentAlignment = Alignment.Center) {
@@ -993,123 +1048,57 @@ private fun MicrophoneButton(
             val pulseScale by infiniteTransition.animateFloat(
                 initialValue = 1f,
                 targetValue = 1.3f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(1000),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "pulse"
+                animationSpec =
+                    infiniteRepeatable(
+                        animation = tween(1000),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
+                label = "pulse",
             )
             Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .scale(pulseScale)
-                    .clip(CircleShape)
-                    .border(2.dp, Color.White.copy(alpha = 0.4f), CircleShape)
+                modifier =
+                    Modifier
+                        .size(72.dp)
+                        .scale(pulseScale)
+                        .clip(CircleShape)
+                        .border(2.dp, Color.White.copy(alpha = 0.4f), CircleShape),
             )
         }
 
         FloatingActionButton(
             onClick = onToggle,
-            modifier = Modifier
-                .size(72.dp)
-                .scale(animatedScale),
-            containerColor = backgroundColor
+            modifier =
+                Modifier
+                    .size(72.dp)
+                    .scale(animatedScale),
+            containerColor = backgroundColor,
         ) {
             when {
                 sessionState == SessionState.CONNECTING ||
-                        (sessionState == SessionState.PROCESSING && !isListening) -> {
+                    (sessionState == SessionState.PROCESSING && !isListening) -> {
                     CircularProgressIndicator(
                         modifier = Modifier.size(28.dp),
                         color = Color.White,
-                        strokeWidth = 2.dp
+                        strokeWidth = 2.dp,
                     )
                 }
                 else -> {
                     Icon(
-                        imageVector = when {
-                            !hasPermission -> Icons.Default.MicOff
-                            sessionState == SessionState.LISTENING -> Icons.Default.Mic
-                            sessionState == SessionState.SPEAKING -> Icons.Default.VolumeUp
-                            else -> Icons.Default.Mic
-                        },
+                        imageVector =
+                            when {
+                                !hasPermission -> Icons.Default.MicOff
+                                sessionState == SessionState.LISTENING -> Icons.Default.Mic
+                                sessionState == SessionState.SPEAKING -> Icons.Default.VolumeUp
+                                else -> Icons.Default.Mic
+                            },
                         contentDescription = "Microphone",
                         modifier = Modifier.size(28.dp),
-                        tint = Color.White
+                        tint = Color.White,
                     )
                 }
             }
         }
     }
-}
-
-/**
- * Mock Model Selection Dialog
- *
- * TODO: Replace with actual ModelSelectionSheet matching iOS
- * iOS equivalent: ModelSelectionSheet(context: .stt/.llm/.tts)
- */
-@Composable
-private fun MockModelSelectionDialog(
-    title: String,
-    modelType: String,
-    onDismiss: () -> Unit,
-    onSelectModel: (framework: String, name: String, modelId: String) -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column {
-                Text("Select a model for $modelType")
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Mock model options
-                val models = when (modelType) {
-                    "STT" -> listOf(
-                        Triple("WhisperKit", "Whisper Base", "whisper-base"),
-                        Triple("WhisperKit", "Whisper Small", "whisper-small"),
-                        Triple("ONNX", "Whisper Tiny", "whisper-tiny-onnx")
-                    )
-                    "LLM" -> listOf(
-                        Triple("LlamaCpp", "SmolLM2 135M", "smollm2-135m"),
-                        Triple("LlamaCpp", "Llama 3.2 1B", "llama3.2-1b"),
-                        Triple("FoundationModels", "Apple FM", "apple-fm")
-                    )
-                    "TTS" -> listOf(
-                        Triple("System", "System Voice", "system-tts"),
-                        Triple("Piper", "Jenny", "piper-jenny"),
-                        Triple("Piper", "Amy", "piper-amy")
-                    )
-                    else -> emptyList()
-                }
-
-                models.forEach { (framework, name, modelId) ->
-                    TextButton(
-                        onClick = { onSelectModel(framework, name, modelId) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(name)
-                            Text(
-                                framework,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
 }
 
 private fun getStatusText(sessionState: SessionState): String {
@@ -1130,10 +1119,10 @@ private fun getStatusText(sessionState: SessionState): String {
  */
 private fun getInstructionText(sessionState: SessionState): String {
     return when (sessionState) {
-        SessionState.LISTENING -> "Listening... Pause to send"  // iOS: "Listening... Pause to send"
+        SessionState.LISTENING -> "Listening... Pause to send" // iOS: "Listening... Pause to send"
         SessionState.PROCESSING -> "Processing your message..." // iOS: "Processing your message..."
-        SessionState.SPEAKING -> "Speaking..."                   // iOS: "Speaking..."
-        SessionState.CONNECTING -> "Connecting..."               // iOS: "Connecting..."
-        else -> "Tap to start conversation"                      // iOS: "Tap to start conversation"
+        SessionState.SPEAKING -> "Speaking..." // iOS: "Speaking..."
+        SessionState.CONNECTING -> "Connecting..." // iOS: "Connecting..."
+        else -> "Tap to start conversation" // iOS: "Tap to start conversation"
     }
 }

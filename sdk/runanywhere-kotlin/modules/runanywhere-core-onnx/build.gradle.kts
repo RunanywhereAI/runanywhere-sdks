@@ -1,27 +1,73 @@
 /**
  * RunAnywhere Core ONNX Module
  *
- * This module provides the ONNX Runtime backend adapter for RunAnywhere Core.
- * It is PURE KOTLIN - no native libraries are bundled here.
+ * This module provides the ONNX Runtime backend for STT, TTS, and VAD.
+ * It is SELF-CONTAINED with its own native libraries.
  *
- * Architecture (mirrors iOS ONNXRuntime):
- *   iOS:     ONNXRuntime.swift -> CRunAnywhereCore -> RunAnywhereCoreBinary.xcframework
- *   Android: ONNXAdapter.kt -> RunAnywhereBridge.kt -> runanywhere-core-native AAR
+ * Architecture (mirrors iOS RABackendONNX.xcframework):
+ *   iOS:     ONNXRuntime.swift -> RABackendONNX.xcframework + onnxruntime.xcframework
+ *   Android: ONNX.kt -> librunanywhere_onnx.so + libonnxruntime.so + libsherpa-onnx-*.so
  *
- * This module provides:
- *   - ONNXAdapter - High-level adapter for STT/TTS/VAD capabilities
- *   - ONNXServiceProvider - Service provider implementation
- *   - ONNXCoreService - Core service bridging to native code
+ * Native Libraries Included (~25MB total):
+ *   - librunanywhere_onnx.so - ONNX backend wrapper
+ *   - libonnxruntime.so (~15MB) - ONNX Runtime
+ *   - libsherpa-onnx-c-api.so - Sherpa-ONNX C API
+ *   - libsherpa-onnx-cxx-api.so - Sherpa-ONNX C++ API
+ *   - libsherpa-onnx-jni.so - Sherpa-ONNX JNI (STT/TTS/VAD)
  *
- * Native libraries are provided transitively via:
- *   runanywhere-core-onnx -> main SDK -> runanywhere-core-native
+ * This module is OPTIONAL - only include it if your app needs STT/TTS/VAD capabilities.
  */
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.detekt)
+    alias(libs.plugins.ktlint)
     `maven-publish`
+}
+
+// =============================================================================
+// Local vs Remote JNI Library Configuration (mirrors main SDK)
+// =============================================================================
+// Read from root project to ensure consistency with main SDK
+val testLocal: Boolean = rootProject.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
+    ?: project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
+    ?: false
+val coreVersion: String = rootProject.findProperty("runanywhere.coreVersion")?.toString()
+    ?: project.findProperty("runanywhere.coreVersion")?.toString()
+    ?: "0.2.6"
+
+logger.lifecycle("ONNX Module: testLocal=$testLocal, coreVersion=$coreVersion")
+
+// =============================================================================
+// Detekt Configuration
+// =============================================================================
+detekt {
+    buildUponDefaultConfig = true
+    allRules = false
+    config.setFrom(files("../../detekt.yml"))
+    source.setFrom(
+        "src/commonMain/kotlin",
+        "src/jvmMain/kotlin",
+        "src/jvmAndroidMain/kotlin",
+        "src/androidMain/kotlin",
+    )
+}
+
+// =============================================================================
+// ktlint Configuration
+// =============================================================================
+ktlint {
+    version.set("1.5.0")
+    android.set(true)
+    verbose.set(true)
+    outputToConsole.set(true)
+    enableExperimentalRules.set(false)
+    filter {
+        exclude("**/generated/**")
+        include("**/kotlin/**")
+    }
 }
 
 // =============================================================================
@@ -61,7 +107,6 @@ kotlin {
         // Shared JVM/Android code
         val jvmAndroidMain by creating {
             dependsOn(commonMain)
-            // NOTE: The main SDK (parent) includes RunAnywhereBridge and native libs transitively
             dependencies {
                 // Apache Commons Compress for tar.bz2 extraction on Android
                 // (native libarchive is not available on Android)
@@ -106,7 +151,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }
@@ -122,7 +167,108 @@ android {
         }
     }
 
-    // NOTE: No jniLibs configuration needed - native libs come from runanywhere-core-native
+    // ==========================================================================
+    // JNI Libraries Configuration - ONNX Backend
+    // ==========================================================================
+    // This module bundles ONNX-specific native libraries (~25MB total):
+    //   - librunanywhere_onnx.so - ONNX backend wrapper
+    //   - libonnxruntime.so (~15MB) - ONNX Runtime
+    //   - libsherpa-onnx-c-api.so - Sherpa C API
+    //   - libsherpa-onnx-cxx-api.so - Sherpa C++ API
+    //   - libsherpa-onnx-jni.so - Sherpa JNI (STT/TTS/VAD)
+    //
+    // When testLocal=true: Use libs from src/androidMain/jniLibs/
+    // When testLocal=false: Use libs from build/jniLibs/ (downloaded)
+    // ==========================================================================
+    sourceSets {
+        getByName("main") {
+            // IMPORTANT: Use setSrcDirs to REPLACE (not add to) default jniLibs locations
+            jniLibs.setSrcDirs(
+                listOf(if (testLocal) "src/androidMain/jniLibs" else "build/jniLibs")
+            )
+        }
+    }
+}
+
+// =============================================================================
+// JNI Library Download Task (for testLocal=false mode)
+// =============================================================================
+tasks.register("downloadJniLibs") {
+    group = "runanywhere"
+    description = "Download ONNX JNI libraries from GitHub releases"
+
+    val outputDir = file("build/jniLibs")
+    val tempDir = file("${layout.buildDirectory.get()}/jni-temp")
+    val releaseBaseUrl = "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v$coreVersion"
+    val packageName = "RABackendONNX-android-v$coreVersion.zip"
+
+    outputs.dir(outputDir)
+
+    doLast {
+        if (testLocal) {
+            logger.lifecycle("Skipping JNI download: testLocal=true")
+            return@doLast
+        }
+
+        outputDir.deleteRecursively()
+        tempDir.deleteRecursively()
+        outputDir.mkdirs()
+        tempDir.mkdirs()
+
+        val zipUrl = "$releaseBaseUrl/$packageName"
+        val tempZip = file("$tempDir/$packageName")
+
+        logger.lifecycle("Downloading ONNX JNI libraries...")
+        logger.lifecycle("  URL: $zipUrl")
+
+        try {
+            ant.withGroovyBuilder {
+                "get"("src" to zipUrl, "dest" to tempZip, "verbose" to false)
+            }
+
+            val extractDir = file("$tempDir/extracted")
+            extractDir.mkdirs()
+            ant.withGroovyBuilder {
+                "unzip"("src" to tempZip, "dest" to extractDir)
+            }
+
+            // Copy .so files to output (excluding common libs that are in main SDK)
+            // In the new RAC architecture, the common libs are from RACommons
+            val commonLibs = setOf("libc++_shared.so", "librac_commons.so", "librac_commons_jni.so")
+
+            extractDir.walkTopDown()
+                .filter { it.isDirectory && it.name in listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86") }
+                .forEach { abiDir ->
+                    val targetAbiDir = file("$outputDir/${abiDir.name}")
+                    targetAbiDir.mkdirs()
+
+                    abiDir.listFiles()?.filter { it.extension == "so" && it.name !in commonLibs }?.forEach { soFile ->
+                        val targetFile = file("$targetAbiDir/${soFile.name}")
+                        soFile.copyTo(targetFile, overwrite = true)
+                        logger.lifecycle("  Copied: ${abiDir.name}/${soFile.name}")
+                    }
+                }
+
+            tempDir.deleteRecursively()
+            logger.lifecycle("✓ ONNX JNI libraries ready")
+        } catch (e: Exception) {
+            logger.error("✗ Failed to download ONNX libs: ${e.message}")
+        }
+    }
+}
+
+// Ensure JNI libs are available before Android build
+tasks.matching { it.name.contains("merge") && it.name.contains("JniLibFolders") }.configureEach {
+    if (testLocal) {
+        // When using local libs, depend on the main SDK's buildLocalJniLibs task
+        // which runs build-local.sh and populates all module jniLibs directories
+        val mainSdkProject = project.parent?.parent
+        mainSdkProject?.tasks?.findByName("buildLocalJniLibs")?.let { buildTask ->
+            dependsOn(buildTask)
+        }
+    } else {
+        dependsOn("downloadJniLibs")
+    }
 }
 
 // =============================================================================
@@ -143,7 +289,7 @@ publishing {
     publications.withType<MavenPublication> {
         pom {
             name.set("RunAnywhere Core ONNX Module")
-            description.set("ONNX Runtime backend adapter for RunAnywhere SDK (pure Kotlin)")
+            description.set("ONNX Runtime backend for RunAnywhere SDK - STT, TTS, VAD (~25MB native libs)")
             url.set("https://github.com/RunanywhereAI/runanywhere-sdks")
 
             licenses {

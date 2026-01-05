@@ -72,8 +72,8 @@ typedef rac_bool_t (*rac_platform_llm_can_handle_fn)(const char* model_id, void*
  * @return Handle to created service (Swift object pointer), or NULL on failure
  */
 typedef rac_handle_t (*rac_platform_llm_create_fn)(const char* model_path,
-                                                    const rac_llm_platform_config_t* config,
-                                                    void* user_data);
+                                                   const rac_llm_platform_config_t* config,
+                                                   void* user_data);
 
 /**
  * Callback to generate text.
@@ -86,11 +86,9 @@ typedef rac_handle_t (*rac_platform_llm_create_fn)(const char* model_path,
  * @param user_data User-provided context
  * @return RAC_SUCCESS or error code
  */
-typedef rac_result_t (*rac_platform_llm_generate_fn)(rac_handle_t handle,
-                                                      const char* prompt,
-                                                      const rac_llm_platform_options_t* options,
-                                                      char** out_response,
-                                                      void* user_data);
+typedef rac_result_t (*rac_platform_llm_generate_fn)(rac_handle_t handle, const char* prompt,
+                                                     const rac_llm_platform_options_t* options,
+                                                     char** out_response, void* user_data);
 
 /**
  * Callback to destroy platform LLM service.
@@ -152,8 +150,8 @@ RAC_API rac_bool_t rac_platform_llm_is_available(void);
  * @return RAC_SUCCESS on success, or error code
  */
 RAC_API rac_result_t rac_llm_platform_create(const char* model_path,
-                                              const rac_llm_platform_config_t* config,
-                                              rac_llm_platform_handle_t* out_handle);
+                                             const rac_llm_platform_config_t* config,
+                                             rac_llm_platform_handle_t* out_handle);
 
 /**
  * Destroys a platform LLM service.
@@ -171,10 +169,9 @@ RAC_API void rac_llm_platform_destroy(rac_llm_platform_handle_t handle);
  * @param out_response Output: Generated text (caller must free with free())
  * @return RAC_SUCCESS on success, or error code
  */
-RAC_API rac_result_t rac_llm_platform_generate(rac_llm_platform_handle_t handle,
-                                                const char* prompt,
-                                                const rac_llm_platform_options_t* options,
-                                                char** out_response);
+RAC_API rac_result_t rac_llm_platform_generate(rac_llm_platform_handle_t handle, const char* prompt,
+                                               const rac_llm_platform_options_t* options,
+                                               char** out_response);
 
 // =============================================================================
 // BACKEND REGISTRATION

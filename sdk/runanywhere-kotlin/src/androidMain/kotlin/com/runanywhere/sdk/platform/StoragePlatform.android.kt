@@ -2,7 +2,6 @@ package com.runanywhere.sdk.platform
 
 import android.os.Build
 import android.os.StatFs
-import android.os.Environment
 import com.runanywhere.sdk.storage.AndroidPlatformContext
 
 /**
@@ -15,26 +14,28 @@ import com.runanywhere.sdk.storage.AndroidPlatformContext
 actual suspend fun getPlatformStorageInfo(path: String): PlatformStorageInfo {
     val statFs = StatFs(path)
 
-    val totalSpace = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
-        statFs.totalBytes
-    } else {
-        @Suppress("DEPRECATION")
-        statFs.blockCount.toLong() * statFs.blockSize.toLong()
-    }
+    val totalSpace =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+            statFs.totalBytes
+        } else {
+            @Suppress("DEPRECATION")
+            statFs.blockCount.toLong() * statFs.blockSize.toLong()
+        }
 
-    val availableSpace = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
-        statFs.availableBytes
-    } else {
-        @Suppress("DEPRECATION")
-        statFs.availableBlocks.toLong() * statFs.blockSize.toLong()
-    }
+    val availableSpace =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+            statFs.availableBytes
+        } else {
+            @Suppress("DEPRECATION")
+            statFs.availableBlocks.toLong() * statFs.blockSize.toLong()
+        }
 
     val usedSpace = totalSpace - availableSpace
 
     return PlatformStorageInfo(
         totalSpace = totalSpace,
         availableSpace = availableSpace,
-        usedSpace = usedSpace
+        usedSpace = usedSpace,
     )
 }
 

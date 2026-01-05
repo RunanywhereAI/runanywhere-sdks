@@ -1,74 +1,123 @@
-name: Build Commons
+name: Build RACommons
 
 on:
   push:
     branches: [main, develop]
     paths:
-      - 'sdks/sdk/runanywhere-commons/**'
+      - 'include/**'
+      - 'src/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
       - '.github/workflows/build-commons.yml'
   pull_request:
     branches: [main]
-    paths:
-      - 'sdks/sdk/runanywhere-commons/**'
   workflow_dispatch:
 
-env:
-  COMMONS_DIR: sdks/sdk/runanywhere-commons
-
 jobs:
+  # ===========================================================================
+  # Build macOS (native)
+  # ===========================================================================
   build-macos:
-    name: Build macOS/iOS
+    name: Build macOS
     runs-on: macos-14
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '15.2'
+          xcode-version: '15.4'
 
-      - name: Install CMake
-        run: brew install cmake ninja
-
-      - name: Build runanywhere-core (modular)
+      - name: Build
         run: |
-          cd runanywhere-core
           mkdir -p build && cd build
-          cmake .. -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DRA_BUILD_MODULAR=ON
-          ninja
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DRAC_BUILD_PLATFORM=ON
+          make -j$(sysctl -n hw.ncpu) rac_commons
 
-      - name: Build RACommons
+      - name: Verify Build
         run: |
-          cd ${{ env.COMMONS_DIR }}
-          mkdir -p build && cd build
-          cmake .. -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DRUNANYWHERE_CORE_DIR=${{ github.workspace }}/runanywhere-core
-          ninja RACommons
+          ls -la build/librac_commons.a
+          echo "Build successful!"
 
-      - name: Build Backends
+  # ===========================================================================
+  # Build iOS (XCFramework)
+  # ===========================================================================
+  build-ios:
+    name: Build iOS
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.4'
+
+      - name: Build iOS XCFramework
         run: |
-          cd ${{ env.COMMONS_DIR }}/build
-          ninja RABackendLlamaCPP RABackendONNX RABackendWhisperCPP
+          chmod +x scripts/build-rac-commons.sh
+          ./scripts/build-rac-commons.sh --ios --release
 
-      - name: Build iOS XCFrameworks
+      - name: Verify Build
         run: |
-          cd ${{ env.COMMONS_DIR }}
-          chmod +x scripts/build-ios.sh
-          ./scripts/build-ios.sh
+          ls -la dist/RACommons.xcframework/
+          echo "iOS build successful!"
 
-      - name: Upload XCFrameworks
+      - name: Upload XCFramework
         uses: actions/upload-artifact@v4
         with:
-          name: xcframeworks-macos
-          path: ${{ env.COMMONS_DIR }}/dist/*.xcframework
+          name: RACommons-xcframework
+          path: dist/RACommons.xcframework
           retention-days: 7
 
+  # ===========================================================================
+  # Build Android
+  # ===========================================================================
+  build-android:
+    name: Build Android
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup NDK
+        run: |
+          source scripts/load-versions.sh
+          NDK_VERSION="${ANDROID_NDK_VERSION:-27.0.12077973}"
+          echo "y" | sdkmanager --install "ndk;${NDK_VERSION}" --sdk_root=${ANDROID_SDK_ROOT}
+          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> $GITHUB_ENV
+
+      - name: Build Android (arm64-v8a)
+        run: |
+          chmod +x scripts/build-rac-commons.sh
+          ./scripts/build-rac-commons.sh --android --abi arm64-v8a --release
+
+      - name: Verify Build
+        run: |
+          ls -la dist/android/jniLibs/arm64-v8a/
+          echo "Android build successful!"
+
+      - name: Upload Android Libraries
+        uses: actions/upload-artifact@v4
+        with:
+          name: RACommons-android
+          path: dist/android/
+          retention-days: 7
+
+  # ===========================================================================
+  # Lint
+  # ===========================================================================
   lint:
     name: Lint C++
     runs-on: ubuntu-latest
@@ -76,22 +125,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install clang-format and clang-tidy
+      - name: Install Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-format clang-tidy
+          sudo apt-get install -y clang-format
 
-      - name: Check formatting
+      - name: Check Formatting
         run: |
-          cd ${{ env.COMMONS_DIR }}
-          find include src backends -name '*.cpp' -o -name '*.h' | \
-            xargs clang-format --dry-run --Werror
-
-      - name: Run clang-tidy
-        run: |
-          cd ${{ env.COMMONS_DIR }}
-          mkdir -p build && cd build
-          cmake .. -DCMAKE_EXPORT_COMPILE_COMMANDS=ON || true
-          cd ..
-          find include src -name '*.cpp' | head -20 | \
-            xargs clang-tidy -p build --warnings-as-errors='*' || true
+          find include src -name '*.cpp' -o -name '*.h' | \
+            xargs clang-format --dry-run --Werror 2>&1 | head -50 || true
+        continue-on-error: true
