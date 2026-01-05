@@ -352,8 +352,7 @@ LLAMACPP_LIBS=(
 ONNX_LIBS=(
     "librac_backend_onnx_jni.so"
     "librunanywhere_onnx.so"
-    "librac_commons.so"           # CRITICAL: Required by librac_backend_onnx_jni.so for service registry
-    "libc++_shared.so"            # C++ standard library (shared by all C++ libs)
+    # NOTE: librac_commons.so and libc++_shared.so come from main SDK (no duplicates)
     "libonnxruntime.so"
     "libsherpa-onnx-c-api.so"
     "libsherpa-onnx-cxx-api.so"
