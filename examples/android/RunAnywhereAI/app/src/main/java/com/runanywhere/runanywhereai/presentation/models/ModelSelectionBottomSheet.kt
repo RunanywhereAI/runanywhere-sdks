@@ -57,6 +57,10 @@ fun ModelSelectionBottomSheet(
     onModelSelected: suspend (ModelInfo) -> Unit,
     viewModel: ModelSelectionViewModel =
         viewModel(
+            // CRITICAL: Use context-specific key to prevent ViewModel caching across contexts
+            // Without this key, Compose reuses the same ViewModel instance for STT, LLM, and TTS
+            // which causes the wrong models to appear when switching between modalities
+            key = "ModelSelectionViewModel_${context.name}",
             factory = ModelSelectionViewModel.Factory(context),
         ),
 ) {

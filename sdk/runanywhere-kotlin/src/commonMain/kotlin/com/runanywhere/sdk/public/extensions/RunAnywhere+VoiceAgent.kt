@@ -41,6 +41,21 @@ expect suspend fun RunAnywhere.voiceAgentComponentStates(): VoiceAgentComponentS
  */
 expect suspend fun RunAnywhere.isVoiceAgentReady(): Boolean
 
+/**
+ * Initialize the voice agent with currently loaded models.
+ *
+ * This function checks that STT, LLM, and TTS models are loaded,
+ * then initializes the VoiceAgent orchestration component with those models.
+ *
+ * This is automatically called by startVoiceSession() if needed,
+ * but can be called explicitly for more control.
+ *
+ * @throws SDKError if SDK is not initialized
+ * @throws SDKError if any component models are not loaded
+ * @throws SDKError if VoiceAgent initialization fails
+ */
+expect suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels()
+
 // MARK: - Voice Processing
 
 /**

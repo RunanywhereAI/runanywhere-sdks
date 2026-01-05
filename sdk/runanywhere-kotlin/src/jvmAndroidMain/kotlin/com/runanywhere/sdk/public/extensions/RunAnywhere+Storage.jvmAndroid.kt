@@ -7,12 +7,19 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStorage
 import com.runanywhere.sdk.foundation.errors.SDKError
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.Models.ModelArtifactType
+import com.runanywhere.sdk.public.extensions.Models.ModelCategory
+import com.runanywhere.sdk.public.extensions.Models.ModelFormat
+import com.runanywhere.sdk.public.extensions.Models.ModelInfo
 import com.runanywhere.sdk.public.extensions.Storage.AppStorageInfo
 import com.runanywhere.sdk.public.extensions.Storage.DeviceStorageInfo
+import com.runanywhere.sdk.public.extensions.Storage.ModelStorageMetrics
 import com.runanywhere.sdk.public.extensions.Storage.StorageAvailability
 import com.runanywhere.sdk.public.extensions.Storage.StorageInfo
 import java.io.File
@@ -54,10 +61,16 @@ actual suspend fun RunAnywhere.storageInfo(): StorageInfo {
         usedSpace = usedSpace
     )
 
+    // Get downloaded models from C++ registry and convert to storage metrics
+    val downloadedModels = CppBridgeModelRegistry.getDownloaded()
+    val modelMetrics = downloadedModels.mapNotNull { registryModel ->
+        convertToModelStorageMetrics(registryModel)
+    }
+
     return StorageInfo(
         appStorage = appStorage,
         deviceStorage = deviceStorage,
-        models = emptyList() // Model metrics would come from model registry
+        models = modelMetrics
     )
 }
 
@@ -156,4 +169,72 @@ private fun formatBytes(bytes: Long): String {
     if (mb < 1024) return "%.1f MB".format(mb)
     val gb = mb / 1024.0
     return "%.2f GB".format(gb)
+}
+
+/**
+ * Convert a CppBridgeModelRegistry.ModelInfo to ModelStorageMetrics.
+ * Calculates actual size on disk from the model's local path.
+ */
+private fun convertToModelStorageMetrics(
+    registryModel: CppBridgeModelRegistry.ModelInfo
+): ModelStorageMetrics? {
+    val localPath = registryModel.localPath ?: return null
+
+    // Calculate size on disk
+    val modelFile = File(localPath)
+    val sizeOnDisk = calculateDirectorySize(modelFile)
+
+    // Convert framework int to InferenceFramework enum
+    val framework = when (registryModel.framework) {
+        CppBridgeModelRegistry.Framework.ONNX -> InferenceFramework.ONNX
+        CppBridgeModelRegistry.Framework.LLAMACPP -> InferenceFramework.LLAMA_CPP
+        CppBridgeModelRegistry.Framework.FOUNDATION_MODELS -> InferenceFramework.FOUNDATION_MODELS
+        CppBridgeModelRegistry.Framework.SYSTEM_TTS -> InferenceFramework.SYSTEM_TTS
+        CppBridgeModelRegistry.Framework.FLUID_AUDIO -> InferenceFramework.FLUID_AUDIO
+        CppBridgeModelRegistry.Framework.BUILTIN -> InferenceFramework.BUILT_IN
+        CppBridgeModelRegistry.Framework.NONE -> InferenceFramework.NONE
+        else -> InferenceFramework.UNKNOWN
+    }
+
+    // Convert category int to ModelCategory enum
+    val category = when (registryModel.category) {
+        CppBridgeModelRegistry.ModelCategory.LANGUAGE -> ModelCategory.LANGUAGE
+        CppBridgeModelRegistry.ModelCategory.SPEECH_RECOGNITION -> ModelCategory.SPEECH_RECOGNITION
+        CppBridgeModelRegistry.ModelCategory.SPEECH_SYNTHESIS -> ModelCategory.SPEECH_SYNTHESIS
+        CppBridgeModelRegistry.ModelCategory.AUDIO -> ModelCategory.AUDIO
+        CppBridgeModelRegistry.ModelCategory.VISION -> ModelCategory.VISION
+        CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION -> ModelCategory.IMAGE_GENERATION
+        CppBridgeModelRegistry.ModelCategory.MULTIMODAL -> ModelCategory.MULTIMODAL
+        else -> ModelCategory.LANGUAGE
+    }
+
+    // Convert format int to ModelFormat enum
+    val format = when (registryModel.format) {
+        CppBridgeModelRegistry.ModelFormat.GGUF -> ModelFormat.GGUF
+        CppBridgeModelRegistry.ModelFormat.ONNX -> ModelFormat.ONNX
+        CppBridgeModelRegistry.ModelFormat.ORT -> ModelFormat.ORT
+        CppBridgeModelRegistry.ModelFormat.BIN -> ModelFormat.BIN
+        else -> ModelFormat.UNKNOWN
+    }
+
+    // Create public ModelInfo from registry model
+    val modelInfo = ModelInfo(
+        id = registryModel.modelId,
+        name = registryModel.name,
+        category = category,
+        format = format,
+        downloadURL = registryModel.downloadUrl,
+        localPath = localPath,
+        artifactType = ModelArtifactType.SingleFile(),
+        downloadSize = registryModel.downloadSize.takeIf { it > 0 },
+        framework = framework,
+        contextLength = registryModel.contextLength.takeIf { it > 0 },
+        supportsThinking = registryModel.supportsThinking,
+        description = registryModel.description
+    )
+
+    return ModelStorageMetrics(
+        model = modelInfo,
+        sizeOnDisk = sizeOnDisk
+    )
 }

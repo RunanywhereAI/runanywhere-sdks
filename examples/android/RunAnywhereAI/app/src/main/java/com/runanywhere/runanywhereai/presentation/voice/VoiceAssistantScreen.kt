@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -51,6 +52,7 @@ import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
 @Composable
 fun VoiceAssistantScreen(viewModel: VoiceAssistantViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     var showModelInfo by remember { mutableStateOf(false) }
 
     // Model selection dialog states
@@ -63,6 +65,22 @@ fun VoiceAssistantScreen(viewModel: VoiceAssistantViewModel = viewModel()) {
         rememberPermissionState(
             Manifest.permission.RECORD_AUDIO,
         )
+
+    // Initialize audio capture service and refresh model states when the screen appears
+    // This ensures that:
+    // 1. Audio capture is ready when user starts the session
+    // 2. Models loaded from other screens (e.g., Chat) are reflected here
+    LaunchedEffect(Unit) {
+        viewModel.initialize(context)
+        viewModel.refreshComponentStatesFromSDK()
+    }
+
+    // Re-initialize when permission is granted
+    LaunchedEffect(microphonePermissionState.status.isGranted) {
+        if (microphonePermissionState.status.isGranted) {
+            viewModel.initialize(context)
+        }
+    }
 
     Box(
         modifier =

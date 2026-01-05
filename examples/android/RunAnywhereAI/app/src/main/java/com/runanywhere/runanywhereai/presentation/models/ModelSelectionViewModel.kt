@@ -14,6 +14,9 @@ import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.Models.ModelInfo
 import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
 import com.runanywhere.sdk.public.extensions.availableModels
+import com.runanywhere.sdk.public.extensions.currentLLMModelId
+import com.runanywhere.sdk.public.extensions.currentSTTModelId
+import com.runanywhere.sdk.public.extensions.currentTTSVoiceId
 import com.runanywhere.sdk.public.extensions.downloadModel
 import com.runanywhere.sdk.public.extensions.loadLLMModel
 import com.runanywhere.sdk.public.extensions.loadSTTModel
@@ -126,12 +129,26 @@ class ModelSelectionViewModel(
                     Log.d(TAG, "   Framework: ${fw.displayName}")
                 }
 
+                // Sync with currently loaded model from SDK
+                // This ensures already-loaded models show as "Loaded" in the sheet
+                val currentLoadedModelId = getCurrentLoadedModelIdForContext()
+                val currentLoadedModel = if (currentLoadedModelId != null) {
+                    filteredModels.find { it.id == currentLoadedModelId }
+                } else {
+                    null
+                }
+
+                if (currentLoadedModel != null) {
+                    Log.d(TAG, "✅ Found currently loaded model for context $context: ${currentLoadedModel.id}")
+                }
+
                 _uiState.update {
                     it.copy(
                         models = filteredModels,
                         frameworks = relevantFrameworks,
                         isLoading = false,
                         error = null,
+                        currentModel = currentLoadedModel,
                     )
                 }
             } catch (e: Exception) {
@@ -142,6 +159,24 @@ class ModelSelectionViewModel(
                         error = e.message ?: "Failed to load models",
                     )
                 }
+            }
+        }
+    }
+
+    /**
+     * Get the currently loaded model ID for this context from the SDK.
+     * This syncs the selection sheet with what's actually loaded in memory.
+     * Matches iOS's pattern of querying currentModelId from CppBridge.
+     */
+    private fun getCurrentLoadedModelIdForContext(): String? {
+        return when (context) {
+            ModelSelectionContext.LLM -> RunAnywhere.currentLLMModelId
+            ModelSelectionContext.STT -> RunAnywhere.currentSTTModelId
+            ModelSelectionContext.TTS -> RunAnywhere.currentTTSVoiceId
+            ModelSelectionContext.VOICE -> {
+                // For voice context, we could return any of the three
+                // but typically the voice sheet doesn't auto-select
+                null
             }
         }
     }
