@@ -209,13 +209,23 @@ object CppBridge {
     /**
      * Initialize the C++ telemetry manager with device info.
      * Mirrors Swift SDK's CppBridge.Telemetry.initialize(environment:)
+     * 
+     * Note: If device ID is unavailable (secure storage failure), telemetry is skipped
+     * to avoid creating orphaned/duplicate device records. The app continues to function.
      */
     private fun initializeTelemetryManager(environment: Environment) {
         try {
             // Get device ID (persistent UUID) - this may initialize it if not already done
             val deviceId = CppBridgeDevice.getDeviceIdCallback()
+            
             if (deviceId.isEmpty()) {
-                logger.warn("Device ID not available for telemetry initialization")
+                // Device ID unavailable - likely secure storage issue
+                // Skip telemetry to avoid creating orphaned records with temporary IDs
+                logger.error(
+                    "Device ID unavailable - telemetry will be disabled for this session. " +
+                    "This usually indicates secure storage is not properly initialized. " +
+                    "Ensure AndroidPlatformContext.initialize() is called before SDK initialization."
+                )
                 return
             }
 
