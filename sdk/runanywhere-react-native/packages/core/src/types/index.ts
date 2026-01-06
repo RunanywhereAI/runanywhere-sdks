@@ -73,40 +73,74 @@ export type {
   UnsubscribeFunction,
 } from './events';
 
-// Analytics
-export {
-  AnalyticsContext,
-  GenerationEventType,
-  STTEventType,
-  TTSEventType,
-} from './analytics';
-
+// Voice Agent Types
 export type {
-  AnalyticsEvent,
-  AnalyticsEventData,
-  AnalyticsMetrics,
-  DeviceInfo,
-  ErrorEventData,
-  FinalTranscriptData,
-  FirstTokenData,
-  GenerationCompletionData,
-  GenerationMetrics,
-  GenerationStartData,
-  LanguageDetectionData,
-  ModelLoadingData,
-  ModelUnloadingData,
-  PartialTranscriptData,
-  SessionEndedData,
-  SessionMetadata,
-  SessionStartedData,
-  SpeakerChangeData,
-  SpeakerDetectionData,
-  STTMetrics,
-  STTTranscriptionData,
-  StreamingUpdateData,
-  TelemetryData,
-  TranscriptionStartData,
-  TTSMetrics,
-  TTSSynthesisCompletionData,
-  TTSSynthesisStartData,
-} from './analytics';
+  ComponentLoadState,
+  ComponentState as VoiceAgentComponentState,
+  VoiceAgentComponentStates,
+  VoiceAgentConfig,
+  VoiceTurnResult,
+  VoiceSessionEventType,
+  VoiceSessionEvent,
+  VoiceSessionCallback,
+  VoiceAgentMetrics,
+} from './VoiceAgentTypes';
+
+// Structured Output Types
+export type {
+  JSONSchemaType,
+  JSONSchemaProperty,
+  JSONSchema,
+  StructuredOutputOptions,
+  StructuredOutputResult,
+  EntityExtractionResult,
+  ClassificationResult,
+  SentimentResult,
+  NamedEntity,
+  NERResult,
+} from './StructuredOutputTypes';
+
+// VAD Types
+export type {
+  VADConfiguration as VADConfig,
+  VADResult,
+  SpeechActivityEvent,
+  VADSpeechActivityCallback,
+  VADAudioBufferCallback,
+  VADState,
+} from './VADTypes';
+
+// TTS Types
+export type {
+  TTSOptions as TTSOpts,
+  AudioFormat,
+  TTSOutput,
+  PhonemeTimestamp,
+  TTSSynthesisMetadata,
+  TTSSpeakResult,
+  TTSVoiceInfo,
+  TTSStreamChunkCallback,
+} from './TTSTypes';
+
+// STT Types
+export type {
+  STTOptions as STTOpts,
+  STTOutput,
+  WordTimestamp,
+  STTAlternative as STTAlt,
+  TranscriptionMetadata,
+  STTPartialResult,
+  STTStreamCallback,
+  STTStreamOptions,
+} from './STTTypes';
+
+// LLM Types
+export type {
+  LLMGenerationOptions as LLMGenOptions,
+  LLMGenerationResult as LLMGenResult,
+  LLMStreamingResult,
+  LLMStreamingMetrics,
+  LLMTokenCallback,
+  LLMStreamCompleteCallback,
+  LLMStreamErrorCallback,
+} from './LLMTypes';

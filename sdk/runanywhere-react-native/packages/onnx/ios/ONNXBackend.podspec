@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name         = "ONNXBackend"
-  s.version      = "0.1.0"
+  s.version      = "0.2.6"
   s.summary      = "ONNX backend for RunAnywhere SDK (STT/TTS/VAD)"
   s.description  = <<-DESC
     ONNX backend module for RunAnywhere SDK (React Native).
@@ -11,16 +11,17 @@ Pod::Spec.new do |s|
   s.homepage     = "https://github.com/RunanywhereAI/runanywhere-sdks"
   s.license      = { :type => "MIT", :file => "../../../LICENSE" }
   s.author       = { "RunAnywhere" => "info@runanywhere.ai" }
-  s.source       = { :git => "https://github.com/RunanywhereAI/runanywhere-sdks.git", :tag => "commons-v#{s.version}" }
+  s.source       = { :git => "https://github.com/RunanywhereAI/runanywhere-sdks.git", :tag => "v#{s.version}" }
   s.platform     = :ios, "15.1"
 
   # =============================================================================
   # Version Constants (MUST match Swift Package.swift)
+  # Backend frameworks come from runanywhere-binaries (core-v*)
+  # ONNX Runtime comes from official onnxruntime.ai releases
   # =============================================================================
-  COMMONS_VERSION = "0.1.0"
-  CORE_VERSION = "0.1.1-dev.03aacf9"
+  CORE_VERSION = "0.2.6"
+  ONNXRUNTIME_VERSION = "1.17.1"
   GITHUB_ORG = "RunanywhereAI"
-  COMMONS_REPO = "runanywhere-sdks"
   CORE_REPO = "runanywhere-binaries"
 
   # =============================================================================
@@ -35,6 +36,8 @@ Pod::Spec.new do |s|
 
   # =============================================================================
   # Binary Frameworks - RABackendONNX + onnxruntime
+  # RABackendONNX: runanywhere-binaries/releases (core-v*)
+  # onnxruntime: Official ONNX Runtime from onnxruntime.ai
   # =============================================================================
   if TEST_LOCAL
     puts "[ONNXBackend] Using LOCAL binaries from Frameworks/"
@@ -47,13 +50,13 @@ Pod::Spec.new do |s|
       set -e
 
       FRAMEWORK_DIR="Frameworks"
-      VERSION="#{COMMONS_VERSION}"
       CORE_VER="#{CORE_VERSION}"
+      ONNX_VER="#{ONNXRUNTIME_VERSION}"
       VERSION_FILE="$FRAMEWORK_DIR/.version-onnx"
 
       if [ -f "$VERSION_FILE" ] && [ -d "$FRAMEWORK_DIR/RABackendONNX.xcframework" ] && [ -d "$FRAMEWORK_DIR/onnxruntime.xcframework" ]; then
         CURRENT_VERSION=$(cat "$VERSION_FILE")
-        if [ "$CURRENT_VERSION" = "$VERSION-$CORE_VER" ]; then
+        if [ "$CURRENT_VERSION" = "$CORE_VER-$ONNX_VER" ]; then
           echo "✅ ONNX frameworks already downloaded"
           exit 0
         fi
@@ -63,9 +66,10 @@ Pod::Spec.new do |s|
 
       mkdir -p "$FRAMEWORK_DIR"
 
-      # Download RABackendONNX from runanywhere-sdks
+      # Download RABackendONNX from runanywhere-binaries (core-v*)
       echo "📦 Downloading RABackendONNX.xcframework..."
-      ONNX_BACKEND_URL="https://github.com/#{GITHUB_ORG}/#{COMMONS_REPO}/releases/download/commons-v$VERSION/RABackendONNX-$VERSION.zip"
+      ONNX_BACKEND_URL="https://github.com/#{GITHUB_ORG}/#{CORE_REPO}/releases/download/core-v$CORE_VER/RABackendONNX-ios-v$CORE_VER.zip"
+      echo "   URL: $ONNX_BACKEND_URL"
       curl -L -f -o /tmp/RABackendONNX.zip "$ONNX_BACKEND_URL" || {
         echo "❌ Failed to download RABackendONNX"
         exit 1
@@ -75,9 +79,10 @@ Pod::Spec.new do |s|
       rm -f /tmp/RABackendONNX.zip
       echo "✅ RABackendONNX.xcframework installed"
 
-      # Download onnxruntime from runanywhere-binaries
+      # Download onnxruntime from official onnxruntime.ai releases
       echo "📦 Downloading onnxruntime.xcframework..."
-      ONNXRUNTIME_URL="https://github.com/#{GITHUB_ORG}/#{CORE_REPO}/releases/download/core-v$CORE_VER/onnxruntime-ios-v$CORE_VER.zip"
+      ONNXRUNTIME_URL="https://download.onnxruntime.ai/pod-archive-onnxruntime-c-$ONNX_VER.zip"
+      echo "   URL: $ONNXRUNTIME_URL"
       curl -L -f -o /tmp/onnxruntime.zip "$ONNXRUNTIME_URL" || {
         echo "❌ Failed to download onnxruntime"
         exit 1
@@ -87,7 +92,7 @@ Pod::Spec.new do |s|
       rm -f /tmp/onnxruntime.zip
       echo "✅ onnxruntime.xcframework installed"
 
-      echo "$VERSION-$CORE_VER" > "$VERSION_FILE"
+      echo "$CORE_VER-$ONNX_VER" > "$VERSION_FILE"
 
       echo "✅ All ONNX frameworks installed successfully"
     CMD

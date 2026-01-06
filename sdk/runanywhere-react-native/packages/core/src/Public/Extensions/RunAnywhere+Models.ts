@@ -103,16 +103,22 @@ export async function getModelInfo(modelId: string): Promise<ModelInfo | null> {
  * Check if a model is downloaded
  */
 export async function isModelDownloaded(modelId: string): Promise<boolean> {
-  const { JSDownloadService } = require('../../services/JSDownloadService');
-  return JSDownloadService.isModelDownloaded(modelId);
+  if (!isNativeModuleAvailable()) {
+    return false;
+  }
+  const native = requireNativeModule();
+  return native.isModelDownloaded(modelId);
 }
 
 /**
  * Get local path for a downloaded model
  */
 export async function getModelPath(modelId: string): Promise<string | null> {
-  const { JSDownloadService } = require('../../services/JSDownloadService');
-  return JSDownloadService.getModelPath(modelId);
+  if (!isNativeModuleAvailable()) {
+    return null;
+  }
+  const native = requireNativeModule();
+  return native.getModelPath(modelId);
 }
 
 /**

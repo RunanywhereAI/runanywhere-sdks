@@ -5,8 +5,5 @@
  * Most logic is in native commons.
  */
 
-// Device
-export * from './Device';
-
 // Events
 export * from './Events';

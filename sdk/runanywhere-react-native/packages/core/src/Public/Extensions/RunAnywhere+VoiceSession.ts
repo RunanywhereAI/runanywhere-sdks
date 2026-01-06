@@ -1,93 +1,155 @@
 /**
  * RunAnywhere+VoiceSession.ts
  *
- * Voice session extension.
- * Delegates to native commons.
+ * High-level voice session API for simplified voice assistant integration.
+ * Handles audio capture, VAD, and processing internally.
  *
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VoiceAgent/RunAnywhere+VoiceSession.swift
+ *
+ * Usage:
+ * ```typescript
+ * // Start a voice session with async iterator
+ * const session = await startVoiceSession();
+ *
+ * for await (const event of session.events()) {
+ *   switch (event.type) {
+ *     case 'listening':
+ *       updateAudioMeter(event.audioLevel);
+ *       break;
+ *     case 'processing':
+ *       showProcessingIndicator();
+ *       break;
+ *     case 'turnCompleted':
+ *       updateUI(event.transcription, event.response);
+ *       break;
+ *   }
+ * }
+ *
+ * // Or use callbacks
+ * const session = await startVoiceSessionWithCallback({}, (event) => {
+ *   // Handle event
+ * });
+ *
+ * // Stop the session
+ * session.stop();
+ * ```
  */
 
-import { requireNativeModule, isNativeModuleAvailable } from '@runanywhere/native';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
+import {
+  VoiceSessionHandle,
+  DEFAULT_VOICE_SESSION_CONFIG,
+  type VoiceSessionConfig,
+  type VoiceSessionEvent,
+  type VoiceSessionEventCallback,
+} from '../../Features/VoiceSession';
 
 const logger = new SDKLogger('RunAnywhere.VoiceSession');
 
-/**
- * Voice session config
- */
-export interface VoiceSessionConfig {
-  sttModelId?: string;
-  ttsModelId?: string;
-  llmModelId?: string;
-  sampleRate?: number;
-  language?: string;
-}
+// Re-export types for convenience
+export type {
+  VoiceSessionConfig,
+  VoiceSessionEvent,
+  VoiceSessionEventCallback
+};
+export { DEFAULT_VOICE_SESSION_CONFIG };
 
 /**
- * Voice turn result
+ * Start a voice session with async event iteration
+ *
+ * This is the simplest way to integrate voice assistant.
+ * The session handles audio capture, VAD, and processing internally.
+ *
+ * Example:
+ * ```typescript
+ * const session = await startVoiceSession();
+ *
+ * // Consume events using async iteration
+ * for await (const event of session.events()) {
+ *   switch (event.type) {
+ *     case 'listening':
+ *       audioMeter = event.audioLevel ?? 0;
+ *       break;
+ *     case 'processing':
+ *       status = 'Processing...';
+ *       break;
+ *     case 'turnCompleted':
+ *       userText = event.transcription ?? '';
+ *       assistantText = event.response ?? '';
+ *       break;
+ *     case 'stopped':
+ *       // Session ended
+ *       break;
+ *   }
+ * }
+ * ```
+ *
+ * @param config Session configuration (optional)
+ * @returns Session handle with events iterator
  */
-export interface VoiceTurnResult {
-  transcription: string;
-  response: string;
-  audioData?: string; // base64
-}
+export async function startVoiceSession(
+  config: VoiceSessionConfig = {}
+): Promise<VoiceSessionHandle> {
+  logger.info('Starting voice session...');
 
-/**
- * Process a voice turn (STT -> LLM -> TTS)
- */
-export async function processVoiceTurn(
-  audioData: ArrayBuffer,
-  config?: VoiceSessionConfig
-): Promise<VoiceTurnResult> {
-  if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
-  }
+  const session = new VoiceSessionHandle(config);
+  await session.start();
 
-  const native = requireNativeModule();
-  const sampleRate = config?.sampleRate ?? 16000;
-
-  try {
-    // Step 1: Transcribe audio
-    const base64Audio = Buffer.from(audioData).toString('base64');
-    const transcription = await native.transcribe(base64Audio, sampleRate, config?.language);
-
-    // Step 2: Generate response
-    const response = await native.generate(transcription);
-
-    // Step 3: Synthesize response (if TTS model loaded)
-    let audioResponse: string | undefined;
-    try {
-      const synthesized = await native.synthesize(response, '', 1.0, 1.0);
-      audioResponse = synthesized;
-    } catch {
-      // TTS optional
-    }
-
-    return {
-      transcription,
-      response,
-      audioData: audioResponse,
-    };
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    logger.error(`Voice turn failed: ${msg}`);
-    throw error;
-  }
-}
-
-/**
- * Start a voice session (placeholder)
- */
-export function startVoiceSession(_config?: VoiceSessionConfig): void {
   logger.info('Voice session started');
+  return session;
 }
 
 /**
- * Start voice session with callback (placeholder)
+ * Start a voice session with callback-based event handling
+ *
+ * Alternative API using callbacks instead of async iterator.
+ *
+ * Example:
+ * ```typescript
+ * const session = await startVoiceSessionWithCallback({}, (event) => {
+ *   switch (event.type) {
+ *     case 'listening':
+ *       setAudioLevel(event.audioLevel ?? 0);
+ *       break;
+ *     case 'turnCompleted':
+ *       setUserText(event.transcription ?? '');
+ *       setAssistantText(event.response ?? '');
+ *       break;
+ *   }
+ * });
+ *
+ * // Later...
+ * session.stop();
+ * ```
+ *
+ * @param config Session configuration
+ * @param onEvent Callback for each event
+ * @returns Session handle for control
  */
-export function startVoiceSessionWithCallback(
-  _config: VoiceSessionConfig,
-  _callback: (event: unknown) => void
-): void {
+export async function startVoiceSessionWithCallback(
+  config: VoiceSessionConfig = {},
+  onEvent: VoiceSessionEventCallback
+): Promise<VoiceSessionHandle> {
+  logger.info('Starting voice session with callback...');
+
+  const session = new VoiceSessionHandle(config);
+  session.setEventCallback(onEvent);
+  await session.start();
+
   logger.info('Voice session with callback started');
+  return session;
+}
+
+/**
+ * Create a voice session handle without starting it
+ *
+ * Useful when you want to configure the session before starting.
+ *
+ * @param config Session configuration
+ * @returns Session handle (not started)
+ */
+export function createVoiceSession(
+  config: VoiceSessionConfig = {}
+): VoiceSessionHandle {
+  return new VoiceSessionHandle(config);
 }

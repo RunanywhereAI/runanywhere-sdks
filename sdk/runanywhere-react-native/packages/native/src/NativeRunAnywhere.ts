@@ -107,14 +107,89 @@ export interface NativeRunAnywhereModule {
   cancelTTS(): Promise<boolean>;
 
   // ============================================================================
+  // Structured Output
+  // ============================================================================
+
+  generateStructured(
+    prompt: string,
+    schema: string,
+    optionsJson?: string
+  ): Promise<string>;
+
+  // ============================================================================
   // Voice Activity Detection (VAD)
   // ============================================================================
 
-  loadVADModel(modelId: string, configJson?: string): Promise<boolean>;
+  loadVADModel(path: string, configJson?: string): Promise<boolean>;
   isVADModelLoaded(): Promise<boolean>;
+  unloadVADModel(): Promise<boolean>;
+  processVAD(audioBase64: string, optionsJson?: string): Promise<string>;
   resetVAD(): Promise<void>;
-  processVAD(audioData: string, sampleRate: number): Promise<string>;
-  detectVADSegments(audioData: string, sampleRate: number): Promise<string>;
+
+  // ============================================================================
+  // Voice Agent
+  // ============================================================================
+
+  initializeVoiceAgent(configJson: string): Promise<boolean>;
+  initializeVoiceAgentWithLoadedModels(): Promise<boolean>;
+  isVoiceAgentReady(): Promise<boolean>;
+  getVoiceAgentComponentStates(): Promise<string>;
+  processVoiceTurn(audioBase64: string): Promise<string>;
+  voiceAgentTranscribe(audioBase64: string): Promise<string>;
+  voiceAgentGenerateResponse(prompt: string): Promise<string>;
+  voiceAgentSynthesizeSpeech(text: string): Promise<string>;
+  cleanupVoiceAgent(): Promise<void>;
+
+  // ============================================================================
+  // Model Assignment
+  // ============================================================================
+
+  assignModel(modelId: string, framework: string): Promise<boolean>;
+  getModelAssignment(modelId: string): Promise<string>;
+  clearModelAssignments(): Promise<void>;
+
+  // ============================================================================
+  // Model Registry (Additional)
+  // ============================================================================
+
+  getAvailableModels(): Promise<string>;
+  isModelDownloaded(modelId: string): Promise<boolean>;
+  getModelPath(modelId: string): Promise<string>;
+
+  // ============================================================================
+  // Download Service (Additional)
+  // ============================================================================
+
+  downloadModel(modelId: string, url: string, destPath: string): Promise<boolean>;
+
+  // ============================================================================
+  // Device Registration
+  // ============================================================================
+
+  registerDevice(environmentJson: string): Promise<boolean>;
+  isDeviceRegistered(): Promise<boolean>;
+
+  // ============================================================================
+  // HTTP Client
+  // ============================================================================
+
+  configureHttp(baseUrl: string, apiKey: string): Promise<boolean>;
+  httpPost(path: string, bodyJson: string): Promise<string>;
+  httpGet(path: string): Promise<string>;
+
+  // ============================================================================
+  // Events
+  // ============================================================================
+
+  emitEvent(eventJson: string): Promise<void>;
+
+  // ============================================================================
+  // Storage
+  // ============================================================================
+
+  getStorageInfo(): Promise<string>;
+  clearCache(): Promise<boolean>;
+  deleteModel(modelId: string): Promise<boolean>;
 
   // ============================================================================
   // Secure Storage
@@ -206,6 +281,32 @@ export interface NativeRunAnywhereModule {
   extractArchive(archivePath: string, destPath: string): Promise<boolean>;
   getDeviceCapabilities(): Promise<string>;
   getMemoryUsage(): Promise<number>;
+
+  // ============================================================================
+  // Backend Registration
+  // ============================================================================
+
+  /**
+   * Register the LlamaCPP backend with the C++ service registry.
+   * Calls rac_backend_llamacpp_register() from runanywhere-core.
+   */
+  registerLlamaCppBackend(): Promise<boolean>;
+
+  /**
+   * Unregister the LlamaCPP backend from the C++ service registry.
+   */
+  unregisterLlamaCppBackend(): Promise<boolean>;
+
+  /**
+   * Register the ONNX backend with the C++ service registry.
+   * Calls rac_backend_onnx_register() from runanywhere-core.
+   */
+  registerONNXBackend(): Promise<boolean>;
+
+  /**
+   * Unregister the ONNX backend from the C++ service registry.
+   */
+  unregisterONNXBackend(): Promise<boolean>;
 }
 
 /**

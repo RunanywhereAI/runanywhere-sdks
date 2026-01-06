@@ -45,8 +45,4 @@
  */
 
 export { ONNX, ModelArtifactType, type ONNXModelOptions } from './ONNX';
-export {
-  ONNXSTTProvider,
-  ONNXTTSProvider,
-  registerONNXProviders,
-} from './ONNXProvider';
+export { ONNXProvider, autoRegister } from './ONNXProvider';

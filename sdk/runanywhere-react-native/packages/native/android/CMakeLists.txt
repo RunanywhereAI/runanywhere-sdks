@@ -8,46 +8,53 @@ set(CMAKE_CXX_STANDARD 17)
 # Path to pre-built native libraries (downloaded from runanywhere-sdks/runanywhere-binaries)
 set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
 
+# Path to RAC headers (downloaded with native libraries)
+set(RAC_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/src/main/include)
+
 # =============================================================================
 # RACommons - Core SDK functionality (rac_* API)
 # =============================================================================
-if(EXISTS "${JNILIB_DIR}/libracommons.so")
-    add_library(racommons SHARED IMPORTED)
-    set_target_properties(racommons PROPERTIES
-        IMPORTED_LOCATION "${JNILIB_DIR}/libracommons.so"
+if(EXISTS "${JNILIB_DIR}/librac_commons.so")
+    add_library(rac_commons SHARED IMPORTED)
+    set_target_properties(rac_commons PROPERTIES
+        IMPORTED_LOCATION "${JNILIB_DIR}/librac_commons.so"
         IMPORTED_NO_SONAME TRUE
     )
     set(HAS_RACOMMONS ON)
-    message(STATUS "Found RACommons at ${JNILIB_DIR}/libracommons.so")
+    message(STATUS "Found RACommons at ${JNILIB_DIR}/librac_commons.so")
 else()
-    message(WARNING "RACommons not found at ${JNILIB_DIR}/libracommons.so")
+    message(WARNING "RACommons not found at ${JNILIB_DIR}/librac_commons.so")
     message(WARNING "Run: ./gradlew downloadNativeLibs")
 endif()
 
 # =============================================================================
 # RABackendLlamaCPP - LLM backend
+# Note: librunanywhere_llamacpp.so contains the LLM logic
+#       librac_backend_llamacpp_jni.so contains the JNI bridge for Kotlin SDK
 # =============================================================================
-if(EXISTS "${JNILIB_DIR}/librabackend_llamacpp.so")
-    add_library(rabackend_llamacpp SHARED IMPORTED)
-    set_target_properties(rabackend_llamacpp PROPERTIES
-        IMPORTED_LOCATION "${JNILIB_DIR}/librabackend_llamacpp.so"
+if(EXISTS "${JNILIB_DIR}/librunanywhere_llamacpp.so")
+    add_library(runanywhere_llamacpp SHARED IMPORTED)
+    set_target_properties(runanywhere_llamacpp PROPERTIES
+        IMPORTED_LOCATION "${JNILIB_DIR}/librunanywhere_llamacpp.so"
         IMPORTED_NO_SONAME TRUE
     )
     set(HAS_LLAMACPP ON)
-    message(STATUS "Found RABackendLlamaCPP at ${JNILIB_DIR}/librabackend_llamacpp.so")
+    message(STATUS "Found RABackendLlamaCPP at ${JNILIB_DIR}/librunanywhere_llamacpp.so")
 endif()
 
 # =============================================================================
 # RABackendONNX - STT/TTS/VAD backend
+# Note: librunanywhere_onnx.so contains the STT/TTS/VAD logic
+#       librac_backend_onnx_jni.so contains the JNI bridge for Kotlin SDK
 # =============================================================================
-if(EXISTS "${JNILIB_DIR}/librabackend_onnx.so")
-    add_library(rabackend_onnx SHARED IMPORTED)
-    set_target_properties(rabackend_onnx PROPERTIES
-        IMPORTED_LOCATION "${JNILIB_DIR}/librabackend_onnx.so"
+if(EXISTS "${JNILIB_DIR}/librunanywhere_onnx.so")
+    add_library(runanywhere_onnx SHARED IMPORTED)
+    set_target_properties(runanywhere_onnx PROPERTIES
+        IMPORTED_LOCATION "${JNILIB_DIR}/librunanywhere_onnx.so"
         IMPORTED_NO_SONAME TRUE
     )
     set(HAS_ONNX ON)
-    message(STATUS "Found RABackendONNX at ${JNILIB_DIR}/librabackend_onnx.so")
+    message(STATUS "Found RABackendONNX at ${JNILIB_DIR}/librunanywhere_onnx.so")
 endif()
 
 # =============================================================================
@@ -96,6 +103,12 @@ include_directories(
     "../cpp"
     "../cpp/bridges"
     "${CMAKE_SOURCE_DIR}/include"
+    # RAC API headers from runanywhere-commons
+    "${RAC_INCLUDE_DIR}"
+    "${RAC_INCLUDE_DIR}/rac"
+    "${RAC_INCLUDE_DIR}/rac/core"
+    "${RAC_INCLUDE_DIR}/rac/features"
+    "${RAC_INCLUDE_DIR}/rac/infrastructure"
 )
 
 # =============================================================================
@@ -111,18 +124,18 @@ target_link_libraries(
 
 # Link RACommons if available
 if(HAS_RACOMMONS)
-    target_link_libraries(${PACKAGE_NAME} racommons)
+    target_link_libraries(${PACKAGE_NAME} rac_commons)
     target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_RACOMMONS=1)
 endif()
 
 # Link LlamaCPP backend if available
 if(HAS_LLAMACPP)
-    target_link_libraries(${PACKAGE_NAME} rabackend_llamacpp)
+    target_link_libraries(${PACKAGE_NAME} runanywhere_llamacpp)
     target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_LLAMACPP=1)
 endif()
 
 # Link ONNX backend if available
 if(HAS_ONNX)
-    target_link_libraries(${PACKAGE_NAME} rabackend_onnx onnxruntime)
+    target_link_libraries(${PACKAGE_NAME} runanywhere_onnx onnxruntime)
     target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_ONNX=1)
 endif()

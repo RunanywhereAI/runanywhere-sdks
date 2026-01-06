@@ -29,13 +29,15 @@ def getExtOrIntegerDefault(name) {
 // =============================================================================
 // Version Constants (MUST match Swift Package.swift and iOS Podspec)
 // =============================================================================
-def commonsVersion = "0.1.0"
+def commonsVersion = "0.1.2"
+def coreVersion = "0.2.6"
 
 // =============================================================================
 // Binary Source
 // =============================================================================
 def githubOrg = "RunanywhereAI"
 def commonsRepo = "runanywhere-sdks"
+def coreRepo = "runanywhere-binaries"
 
 // =============================================================================
 // testLocal Toggle
@@ -46,6 +48,7 @@ def useLocalBuild = project.findProperty("runanywhere.testLocal")?.toBoolean() ?
 // Native libraries directory
 def jniLibsDir = file("src/main/jniLibs")
 def downloadedLibsDir = file("build/downloaded-libs")
+def includeDir = file("src/main/include")
 
 // Local runanywhere-commons path (for local builds)
 def runAnywhereCommonsDir = file("../../../../runanywhere-commons")
@@ -141,18 +144,19 @@ android {
 }
 
 // =============================================================================
-// Download RACommons Only (Backend modules are in separate packages)
+// Download Native Libraries (RACommons + Backend modules)
 // =============================================================================
 
 task downloadNativeLibs {
-    description = "Downloads RACommons from GitHub releases (runanywhere-sdks)"
+    description = "Downloads RACommons and backend libraries from GitHub releases"
     group = "build setup"
 
     def versionFile = file("${jniLibsDir}/.version")
+    def expectedVersion = "${commonsVersion}-${coreVersion}"
 
     outputs.dir(jniLibsDir)
     outputs.upToDateWhen {
-        versionFile.exists() && versionFile.text.trim() == commonsVersion
+        versionFile.exists() && versionFile.text.trim() == expectedVersion
     }
 
     doLast {
@@ -162,55 +166,157 @@ task downloadNativeLibs {
         }
 
         def currentVersion = versionFile.exists() ? versionFile.text.trim() : ""
-        if (currentVersion == commonsVersion) {
-            logger.lifecycle("[RunAnywhereNative] RACommons version $commonsVersion already downloaded")
+        if (currentVersion == expectedVersion) {
+            logger.lifecycle("[RunAnywhereNative] All libraries version $expectedVersion already downloaded")
             return
         }
 
-        logger.lifecycle("[RunAnywhereNative] Downloading RACommons...")
-        logger.lifecycle("  Version: $commonsVersion")
+        logger.lifecycle("[RunAnywhereNative] Downloading native libraries...")
+        logger.lifecycle("  Commons Version: $commonsVersion")
+        logger.lifecycle("  Core Version: $coreVersion")
 
         downloadedLibsDir.mkdirs()
         jniLibsDir.deleteDir()
         jniLibsDir.mkdirs()
+        includeDir.mkdirs()
 
-        // Download RACommons only - backend modules are separate
-        def downloadUrl = "https://github.com/${githubOrg}/${commonsRepo}/releases/download/commons-v${commonsVersion}/RACommons-android-${commonsVersion}.zip"
-        def zipFile = file("${downloadedLibsDir}/RACommons.zip")
+        // =============================================================================
+        // 1. Download RACommons from runanywhere-sdks
+        // =============================================================================
+        def commonsUrl = "https://github.com/${githubOrg}/${commonsRepo}/releases/download/commons-v${commonsVersion}/RACommons-android-v${commonsVersion}.zip"
+        def commonsZip = file("${downloadedLibsDir}/RACommons.zip")
 
-        logger.lifecycle("📦 Downloading RACommons...")
-        logger.lifecycle("   URL: $downloadUrl")
+        logger.lifecycle("\n📦 Downloading RACommons...")
+        logger.lifecycle("   URL: $commonsUrl")
 
         try {
-            new URL(downloadUrl).withInputStream { input ->
-                zipFile.withOutputStream { output ->
+            new URL(commonsUrl).withInputStream { input ->
+                commonsZip.withOutputStream { output ->
                     output << input
                 }
             }
-            logger.lifecycle("   Downloaded: ${zipFile.length() / 1024}KB")
+            logger.lifecycle("   Downloaded: ${commonsZip.length() / 1024}KB")
 
             copy {
-                from zipTree(zipFile)
+                from zipTree(commonsZip)
                 into jniLibsDir
             }
 
-            logger.lifecycle("✅ RACommons installed")
+            // Copy headers if present in the archive
+            def tempExtract = file("${downloadedLibsDir}/temp-commons")
+            tempExtract.deleteDir()
+            copy {
+                from zipTree(commonsZip)
+                into tempExtract
+            }
+            def headersDir = new File(tempExtract, "include")
+            if (headersDir.exists()) {
+                copy {
+                    from headersDir
+                    into includeDir
+                }
+                logger.lifecycle("   ✅ RACommons headers installed")
+            }
+            tempExtract.deleteDir()
+
+            logger.lifecycle("   ✅ RACommons installed")
         } catch (Exception e) {
             logger.error("❌ Failed to download RACommons: ${e.message}")
             throw new GradleException("Failed to download RACommons", e)
         }
 
+        // =============================================================================
+        // 2. Download RABackendLlamaCPP from runanywhere-binaries
+        // =============================================================================
+        def llamacppUrl = "https://github.com/${githubOrg}/${coreRepo}/releases/download/core-v${coreVersion}/RABackendLlamaCPP-android-v${coreVersion}.zip"
+        def llamacppZip = file("${downloadedLibsDir}/RABackendLlamaCPP.zip")
+
+        logger.lifecycle("\n📦 Downloading RABackendLlamaCPP...")
+        logger.lifecycle("   URL: $llamacppUrl")
+
+        try {
+            new URL(llamacppUrl).withInputStream { input ->
+                llamacppZip.withOutputStream { output ->
+                    output << input
+                }
+            }
+            logger.lifecycle("   Downloaded: ${llamacppZip.length() / 1024}KB")
+
+            copy {
+                from zipTree(llamacppZip)
+                into jniLibsDir
+                eachFile { fileCopyDetails ->
+                    // Flatten the archive structure if needed
+                    if (fileCopyDetails.relativePath.pathString.contains("jniLibs/")) {
+                        fileCopyDetails.relativePath = new RelativePath(true, fileCopyDetails.relativePath.pathString.replace("jniLibs/", ""))
+                    }
+                }
+                includeEmptyDirs = false
+            }
+
+            logger.lifecycle("   ✅ RABackendLlamaCPP installed")
+        } catch (Exception e) {
+            logger.warn("⚠️ Failed to download RABackendLlamaCPP: ${e.message}")
+            logger.warn("   LLM features may not be available")
+        }
+
+        // =============================================================================
+        // 3. Download RABackendONNX from runanywhere-binaries
+        // =============================================================================
+        def onnxUrl = "https://github.com/${githubOrg}/${coreRepo}/releases/download/core-v${coreVersion}/RABackendONNX-android-v${coreVersion}.zip"
+        def onnxZip = file("${downloadedLibsDir}/RABackendONNX.zip")
+
+        logger.lifecycle("\n📦 Downloading RABackendONNX...")
+        logger.lifecycle("   URL: $onnxUrl")
+
+        try {
+            new URL(onnxUrl).withInputStream { input ->
+                onnxZip.withOutputStream { output ->
+                    output << input
+                }
+            }
+            logger.lifecycle("   Downloaded: ${onnxZip.length() / 1024}KB")
+
+            copy {
+                from zipTree(onnxZip)
+                into jniLibsDir
+                eachFile { fileCopyDetails ->
+                    // Flatten the archive structure if needed
+                    if (fileCopyDetails.relativePath.pathString.contains("jniLibs/")) {
+                        fileCopyDetails.relativePath = new RelativePath(true, fileCopyDetails.relativePath.pathString.replace("jniLibs/", ""))
+                    }
+                }
+                includeEmptyDirs = false
+            }
+
+            logger.lifecycle("   ✅ RABackendONNX installed")
+        } catch (Exception e) {
+            logger.warn("⚠️ Failed to download RABackendONNX: ${e.message}")
+            logger.warn("   STT/TTS/VAD features may not be available")
+        }
+
+        // =============================================================================
         // List installed files
-        logger.lifecycle("\nInstalled native libraries:")
+        // =============================================================================
+        logger.lifecycle("\n📋 Installed native libraries:")
         jniLibsDir.listFiles()?.findAll { it.isDirectory() }?.each { abiDir ->
             logger.lifecycle("  ${abiDir.name}/")
-            abiDir.listFiles()?.findAll { it.name.endsWith(".so") }?.each { soFile ->
+            abiDir.listFiles()?.findAll { it.name.endsWith(".so") }?.sort()?.each { soFile ->
                 logger.lifecycle("    ${soFile.name} (${soFile.length() / 1024}KB)")
             }
         }
 
-        versionFile.text = commonsVersion
-        logger.lifecycle("\n✅ RACommons version $commonsVersion installed")
+        if (includeDir.exists() && includeDir.listFiles()?.size() > 0) {
+            logger.lifecycle("\n📋 Installed headers:")
+            includeDir.eachFileRecurse { file ->
+                if (file.isFile() && file.name.endsWith(".h")) {
+                    logger.lifecycle("  ${file.relativePath(includeDir)}")
+                }
+            }
+        }
+
+        versionFile.text = expectedVersion
+        logger.lifecycle("\n✅ All native libraries version $expectedVersion installed")
     }
 }
 
@@ -231,6 +337,7 @@ task cleanNativeLibs(type: Delete) {
     group = "build"
     delete jniLibsDir
     delete downloadedLibsDir
+    delete includeDir
 }
 
 clean.dependsOn cleanNativeLibs

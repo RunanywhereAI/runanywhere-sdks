@@ -152,7 +152,39 @@ export type SDKVoiceEvent =
   | { type: 'vadEnded' }
   | { type: 'sttProcessing' }
   | { type: 'llmProcessing' }
-  | { type: 'ttsProcessing' };
+  | { type: 'ttsProcessing' }
+  // Recording events
+  | { type: 'recordingStarted' }
+  | { type: 'recordingStopped'; duration?: number }
+  // Playback events
+  | { type: 'playbackStarted'; duration?: number }
+  | { type: 'playbackCompleted'; duration?: number }
+  | { type: 'playbackStopped' }
+  | { type: 'playbackPaused' }
+  | { type: 'playbackResumed' }
+  | { type: 'playbackFailed'; error: string }
+  // VAD events
+  | { type: 'vadInitialized' }
+  | { type: 'vadStopped' }
+  | { type: 'vadCleanedUp' }
+  | { type: 'speechStarted' }
+  | { type: 'speechEnded' }
+  // STT partial result events
+  | { type: 'sttPartialResult'; text?: string; confidence?: number }
+  | { type: 'sttCompleted'; text?: string; confidence?: number }
+  | { type: 'sttFailed'; error?: string }
+  // Voice session events
+  | { type: 'voiceSession_started' }
+  | { type: 'voiceSession_listening'; audioLevel?: number }
+  | { type: 'voiceSession_speechStarted' }
+  | { type: 'voiceSession_speechEnded' }
+  | { type: 'voiceSession_processing' }
+  | { type: 'voiceSession_transcribed'; transcription?: string }
+  | { type: 'voiceSession_responded'; response?: string }
+  | { type: 'voiceSession_speaking' }
+  | { type: 'voiceSession_turnCompleted'; transcription?: string; response?: string; audio?: string }
+  | { type: 'voiceSession_stopped' }
+  | { type: 'voiceSession_error'; error?: string };
 
 // ============================================================================
 // Performance Events

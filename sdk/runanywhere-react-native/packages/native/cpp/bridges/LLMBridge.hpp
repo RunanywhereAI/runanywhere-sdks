@@ -70,7 +70,16 @@ public:
     // Lifecycle
     bool isLoaded() const;
     std::string currentModelId() const;
-    rac_result_t loadModel(const std::string& modelId);
+    /**
+     * Load an LLM model
+     * @param modelPath Path to the model file (.gguf)
+     * @param modelId Model identifier for telemetry (e.g., "smollm2-360m-q8_0")
+     * @param modelName Human-readable model name (e.g., "SmolLM2 360M Q8_0")
+     * @return RAC_SUCCESS or error code
+     */
+    rac_result_t loadModel(const std::string& modelPath,
+                           const std::string& modelId = "",
+                           const std::string& modelName = "");
     rac_result_t unload();
     void cleanup();
     void cancel();

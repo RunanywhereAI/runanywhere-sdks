@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name         = "LlamaCPPBackend"
-  s.version      = "0.1.0"
+  s.version      = "0.2.6"
   s.summary      = "LlamaCPP backend for RunAnywhere SDK"
   s.description  = <<-DESC
     LlamaCPP backend module for RunAnywhere SDK (React Native).
@@ -10,15 +10,16 @@ Pod::Spec.new do |s|
   s.homepage     = "https://github.com/RunanywhereAI/runanywhere-sdks"
   s.license      = { :type => "MIT", :file => "../../../LICENSE" }
   s.author       = { "RunAnywhere" => "info@runanywhere.ai" }
-  s.source       = { :git => "https://github.com/RunanywhereAI/runanywhere-sdks.git", :tag => "commons-v#{s.version}" }
+  s.source       = { :git => "https://github.com/RunanywhereAI/runanywhere-sdks.git", :tag => "v#{s.version}" }
   s.platform     = :ios, "15.1"
 
   # =============================================================================
   # Version Constants (MUST match Swift Package.swift)
+  # Backend frameworks come from runanywhere-binaries (core-v*)
   # =============================================================================
-  COMMONS_VERSION = "0.1.0"
+  CORE_VERSION = "0.2.6"
   GITHUB_ORG = "RunanywhereAI"
-  COMMONS_REPO = "runanywhere-sdks"
+  CORE_REPO = "runanywhere-binaries"
 
   # =============================================================================
   # testLocal Toggle
@@ -32,6 +33,7 @@ Pod::Spec.new do |s|
 
   # =============================================================================
   # Binary Framework - RABackendLlamaCPP
+  # Source: runanywhere-binaries/releases (core-v*)
   # =============================================================================
   if TEST_LOCAL
     puts "[LlamaCPPBackend] Using LOCAL binaries from Frameworks/"
@@ -41,7 +43,7 @@ Pod::Spec.new do |s|
       set -e
 
       FRAMEWORK_DIR="Frameworks"
-      VERSION="#{COMMONS_VERSION}"
+      VERSION="#{CORE_VERSION}"
       VERSION_FILE="$FRAMEWORK_DIR/.version-llamacpp"
 
       if [ -f "$VERSION_FILE" ] && [ -d "$FRAMEWORK_DIR/RABackendLlamaCPP.xcframework" ]; then
@@ -56,8 +58,8 @@ Pod::Spec.new do |s|
 
       mkdir -p "$FRAMEWORK_DIR"
 
-      # Download from runanywhere-sdks releases
-      DOWNLOAD_URL="https://github.com/#{GITHUB_ORG}/#{COMMONS_REPO}/releases/download/commons-v$VERSION/RABackendLlamaCPP-$VERSION.zip"
+      # Download from runanywhere-binaries releases (core-v*)
+      DOWNLOAD_URL="https://github.com/#{GITHUB_ORG}/#{CORE_REPO}/releases/download/core-v$VERSION/RABackendLlamaCPP-ios-v$VERSION.zip"
       ZIP_FILE="/tmp/RABackendLlamaCPP.zip"
 
       echo "   URL: $DOWNLOAD_URL"

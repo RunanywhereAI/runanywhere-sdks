@@ -5,7 +5,7 @@ package = JSON.parse(File.read(File.join(__dir__, "package.json")))
 # =============================================================================
 # Version Constants (MUST match Swift Package.swift)
 # =============================================================================
-COMMONS_VERSION = "0.1.0"
+COMMONS_VERSION = "0.1.2"
 
 # =============================================================================
 # Binary Source
@@ -62,7 +62,7 @@ Pod::Spec.new do |s|
       rm -rf "$FRAMEWORK_DIR/RunAnywhereCore.xcframework"  # Clean up old framework
 
       # Download RACommons from runanywhere-sdks
-      DOWNLOAD_URL="https://github.com/#{GITHUB_ORG}/#{COMMONS_REPO}/releases/download/commons-v$VERSION/RACommons-$VERSION.zip"
+      DOWNLOAD_URL="https://github.com/#{GITHUB_ORG}/#{COMMONS_REPO}/releases/download/commons-v$VERSION/RACommons-ios-v$VERSION.zip"
       ZIP_FILE="/tmp/RACommons.zip"
 
       echo "   URL: $DOWNLOAD_URL"
