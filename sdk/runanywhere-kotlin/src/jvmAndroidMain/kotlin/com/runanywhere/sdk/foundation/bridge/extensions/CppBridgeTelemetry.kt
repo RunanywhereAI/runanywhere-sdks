@@ -204,6 +204,9 @@ object CppBridgeTelemetry {
         sdkVersion: String
     ) {
         synchronized(lock) {
+            // Store environment for HTTP base URL resolution
+            currentEnvironment = environment
+
             // Create telemetry manager
             telemetryManagerHandle = com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racTelemetryManagerCreate(
                 environment,
@@ -238,7 +241,7 @@ object CppBridgeTelemetry {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.INFO,
                     TAG,
-                    "Telemetry manager initialized (handle=$telemetryManagerHandle)"
+                    "Telemetry manager initialized (handle=$telemetryManagerHandle, env=$environment)"
                 )
             } else {
                 CppBridgePlatformAdapter.logCallback(
@@ -251,42 +254,356 @@ object CppBridgeTelemetry {
     }
 
     /**
+     * Base URL for telemetry HTTP requests.
+     * Set this via [configureBaseUrl] before SDK initialization, or it will use environment defaults.
+     */
+    @Volatile
+    private var _baseUrl: String? = null
+
+    /**
+     * API key for authentication (used in production/staging mode).
+     * Set this via [setApiKey] during SDK initialization.
+     */
+    @Volatile
+    private var _apiKey: String? = null
+
+    /**
+     * Set the base URL for telemetry HTTP requests.
+     * Should be called before SDK initialization if using a custom URL.
+     */
+    fun setBaseUrl(url: String) {
+        _baseUrl = url
+    }
+
+    /**
+     * Set the API key for authentication.
+     * In production/staging mode, this will be used as Bearer token.
+     */
+    fun setApiKey(key: String) {
+        _apiKey = key
+    }
+
+    /**
+     * Get the base URL for device registration.
+     * Exposed for CppBridgeDevice to use in production mode.
+     */
+    fun getBaseUrl(): String? = _baseUrl
+
+    /**
+     * Get the API key for authentication.
+     * Exposed for CppBridgeDevice to use in production mode.
+     */
+    fun getApiKey(): String? = _apiKey
+
+    /**
+     * Get the effective base URL for the current environment.
+     * Checks multiple sources in order of priority:
+     * 1. Explicitly configured _baseUrl (via setBaseUrl)
+     * 2. SDKConstants.TELEMETRY_URL (from SDK config)
+     * 3. C++ dev config Supabase URL (for development mode)
+     * 4. Environment-specific defaults
+     */
+    private fun getEffectiveBaseUrl(environment: Int): String {
+        CppBridgePlatformAdapter.logCallback(
+            CppBridgePlatformAdapter.LogLevel.DEBUG,
+            TAG,
+            "🔍 getEffectiveBaseUrl: env=$environment, _baseUrl=$_baseUrl"
+        )
+
+        // 1. Use explicitly configured _baseUrl if available
+        _baseUrl?.let {
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.DEBUG,
+                TAG,
+                "Using explicitly configured _baseUrl: $it"
+            )
+            return it
+        }
+
+        // 2. Try SDKConstants.TELEMETRY_URL from SDK config
+        try {
+            val sdkTelemetryUrl = com.runanywhere.sdk.utils.SDKConstants.TELEMETRY_URL
+            if (sdkTelemetryUrl.isNotEmpty()) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.DEBUG,
+                    TAG,
+                    "Using telemetry URL from SDKConstants: $sdkTelemetryUrl"
+                )
+                return sdkTelemetryUrl
+            }
+        } catch (e: Exception) {
+            // SDKConstants might not be initialized yet
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.DEBUG,
+                TAG,
+                "SDKConstants.TELEMETRY_URL not available: ${e.message}"
+            )
+        }
+
+        // 3. For development mode, try to get Supabase URL from C++ dev config
+        // This mirrors Swift SDK's CppBridge.DevConfig.supabaseURL behavior
+        if (environment == 0) { // DEVELOPMENT
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.DEBUG,
+                TAG,
+                "🔍 Attempting to get Supabase URL from C++ dev config..."
+            )
+            try {
+                val supabaseUrl = com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racDevConfigGetSupabaseUrl()
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.DEBUG,
+                    TAG,
+                    "C++ dev config returned supabaseUrl: '$supabaseUrl'"
+                )
+                if (!supabaseUrl.isNullOrEmpty()) {
+                    CppBridgePlatformAdapter.logCallback(
+                        CppBridgePlatformAdapter.LogLevel.INFO,
+                        TAG,
+                        "✅ Using Supabase URL from C++ dev config: $supabaseUrl"
+                    )
+                    return supabaseUrl
+                } else {
+                    CppBridgePlatformAdapter.logCallback(
+                        CppBridgePlatformAdapter.LogLevel.WARN,
+                        TAG,
+                        "⚠️ C++ dev config returned null/empty Supabase URL"
+                    )
+                }
+            } catch (e: Exception) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.ERROR,
+                    TAG,
+                    "❌ Failed to get Supabase URL from dev config: ${e.message}"
+                )
+            }
+        }
+
+        // 4. Environment-specific defaults
+        // Note: Production URL should be provided via configuration, not hardcoded
+        return when (environment) {
+            0 -> {
+                // DEVELOPMENT - no dev config available, warn user
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.WARN,
+                    TAG,
+                    "⚠️ Development mode but Supabase URL not configured. Set via SDK config, setBaseUrl(), or dev_config."
+                )
+                "" // Return empty to indicate not configured
+            }
+            1 -> {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.DEBUG,
+                    TAG,
+                    "Using staging API URL"
+                )
+                "https://staging-api.runanywhere.ai" // STAGING
+            }
+            2 -> {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.DEBUG,
+                    TAG,
+                    "Using production API URL"
+                )
+                "https://api.runanywhere.ai" // PRODUCTION
+            }
+            else -> "https://api.runanywhere.ai"
+        }
+    }
+
+    /**
+     * Current SDK environment (0=DEV, 1=STAGING, 2=PRODUCTION).
+     * Exposed for CppBridgeDevice to determine which URL and auth to use.
+     * 
+     * IMPORTANT: This MUST be set early in initialization (before device registration)
+     * so that CppBridgeDevice.isDeviceRegisteredCallback() can determine the correct
+     * behavior for production/staging modes.
+     */
+    @Volatile
+    var currentEnvironment: Int = 0
+        private set
+    
+    /**
+     * Set the current environment early in initialization.
+     * This must be called before CppBridgeDevice.register() so that device registration
+     * callbacks can determine the correct behavior for production/staging modes.
+     */
+    fun setEnvironment(environment: Int) {
+        currentEnvironment = environment
+        CppBridgePlatformAdapter.logCallback(
+            CppBridgePlatformAdapter.LogLevel.DEBUG,
+            TAG,
+            "Environment set to: $environment (${when(environment) { 0 -> "DEVELOPMENT" 1 -> "STAGING" else -> "PRODUCTION" }})"
+        )
+    }
+
+    /**
+     * Whether HTTP is configured (base URL available).
+     */
+    val isHttpConfigured: Boolean
+        get() = _baseUrl != null || currentEnvironment > 0 // STAGING or PRODUCTION have defaults
+
+    /**
+     * Cached API key for Supabase authentication.
+     */
+    @Volatile
+    private var cachedApiKey: String? = null
+
+    /**
+     * Get the Supabase API key (anon key) for authentication.
+     * Required for all Supabase API calls.
+     */
+    private fun getSupabaseApiKey(): String? {
+        cachedApiKey?.let { return it }
+        
+        return try {
+            val apiKey = com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racDevConfigGetSupabaseKey()
+            if (!apiKey.isNullOrEmpty()) {
+                cachedApiKey = apiKey
+                apiKey
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.WARN,
+                TAG,
+                "Failed to get Supabase API key from dev config: ${e.message}"
+            )
+            null
+        }
+    }
+
+    /**
      * Perform HTTP request for telemetry.
      */
     private fun performTelemetryHttp(endpoint: String, body: String, requiresAuth: Boolean) {
         try {
             // Build full URL - endpoint is relative path like "/api/v1/sdk/telemetry"
-            // TODO: Get base URL from configuration
-            val baseUrl = "https://api.runanywhere.ai" // Default production URL
-            val fullUrl = "$baseUrl$endpoint"
-
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                TAG,
-                "Telemetry HTTP POST to: $fullUrl"
-            )
-
-            val (statusCode, response) = sendTelemetry(fullUrl, HttpMethod.POST, mapOf("Content-Type" to "application/json"), body)
-
-            if (HttpStatus.isSuccess(statusCode)) {
+            val effectiveBaseUrl = getEffectiveBaseUrl(currentEnvironment)
+            
+            // Check if base URL is configured
+            if (effectiveBaseUrl.isEmpty()) {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
+                    "Telemetry base URL not configured, skipping HTTP request to $endpoint. Events will be queued."
+                )
+                return
+            }
+            
+            val fullUrl = "$effectiveBaseUrl$endpoint"
+
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.INFO,
+                TAG,
+                "📤 Telemetry HTTP POST to: $fullUrl"
+            )
+
+            // Build headers
+            val headers = mutableMapOf(
+                "Content-Type" to "application/json",
+                "Accept" to "application/json",
+                "X-SDK-Client" to "RunAnywhereSDK",
+                "X-SDK-Version" to "1.0.0",
+                "X-Platform" to "Android"
+            )
+
+            // Environment 0=DEV, 1=STAGING, 2=PRODUCTION
+            // In production/staging: Use Authorization: Bearer {apiKey}
+            // In development: Use apikey header for Supabase
+            if (currentEnvironment == 0) {
+                // DEVELOPMENT mode - use Supabase apikey header
+                headers["Prefer"] = "return=representation"
+                val supabaseKey = getSupabaseApiKey()
+                if (supabaseKey != null) {
+                    headers["apikey"] = supabaseKey
+                    CppBridgePlatformAdapter.logCallback(
+                        CppBridgePlatformAdapter.LogLevel.DEBUG,
+                        TAG,
+                        "Added Supabase apikey header (dev mode)"
+                    )
+                } else {
+                    CppBridgePlatformAdapter.logCallback(
+                        CppBridgePlatformAdapter.LogLevel.WARN,
+                        TAG,
+                        "⚠️ No Supabase API key available - request may fail!"
+                    )
+                }
+            } else {
+                // PRODUCTION/STAGING mode - use Authorization: Bearer {accessToken}
+                // The accessToken is a JWT obtained from CppBridgeAuth.authenticate()
+                // Use getValidToken() which automatically refreshes if needed
+                val accessToken = CppBridgeAuth.getValidToken()
+                if (accessToken != null) {
+                    headers["Authorization"] = "Bearer $accessToken"
+                    CppBridgePlatformAdapter.logCallback(
+                        CppBridgePlatformAdapter.LogLevel.DEBUG,
+                        TAG,
+                        "Added Authorization Bearer header with JWT (prod/staging mode)"
+                    )
+                } else {
+                    // Fallback to API key if no JWT available
+                    // This can happen if authenticate() hasn't been called yet
+                    val apiKey = _apiKey
+                    if (apiKey != null) {
+                        headers["Authorization"] = "Bearer $apiKey"
+                        CppBridgePlatformAdapter.logCallback(
+                            CppBridgePlatformAdapter.LogLevel.WARN,
+                            TAG,
+                            "⚠️ No JWT token - using API key directly (may fail if backend requires JWT)"
+                        )
+                    } else {
+                        CppBridgePlatformAdapter.logCallback(
+                            CppBridgePlatformAdapter.LogLevel.WARN,
+                            TAG,
+                            "⚠️ No access token or API key available - request may fail!"
+                        )
+                    }
+                }
+            }
+
+            // Allow interceptor to add auth headers if required
+            if (requiresAuth) {
+                requestInterceptor?.onBeforeRequest(fullUrl, HttpMethod.POST, headers)
+            }
+
+            // Log request body for debugging (truncated)
+            val bodyPreview = if (body.length > 200) body.substring(0, 200) + "..." else body
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.DEBUG,
+                TAG,
+                "Request body: $bodyPreview"
+            )
+
+            val (statusCode, response) = sendTelemetry(fullUrl, HttpMethod.POST, headers, body)
+
+            if (HttpStatus.isSuccess(statusCode)) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.INFO,
+                    TAG,
                     "✅ Telemetry sent successfully (status=$statusCode)"
                 )
+                if (response != null) {
+                    CppBridgePlatformAdapter.logCallback(
+                        CppBridgePlatformAdapter.LogLevel.DEBUG,
+                        TAG,
+                        "Response: $response"
+                    )
+                }
             } else {
                 CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.WARN,
+                    CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Telemetry HTTP failed: status=$statusCode"
+                    "❌ Telemetry HTTP failed: status=$statusCode, response=$response"
                 )
             }
         } catch (e: Exception) {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Telemetry HTTP error: ${e.message}"
+                "❌ Telemetry HTTP error: ${e.message}"
             )
+            e.printStackTrace()
         }
     }
 
@@ -675,3 +992,4 @@ object CppBridgeTelemetry {
         return sendTelemetry(url, HttpMethod.POST, headers, jsonBody)
     }
 }
+

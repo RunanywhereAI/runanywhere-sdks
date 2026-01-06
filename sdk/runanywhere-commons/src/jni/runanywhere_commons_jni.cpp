@@ -36,6 +36,8 @@
 #include "rac/infrastructure/device/rac_device_manager.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_types.h"
+#include "rac/infrastructure/network/rac_dev_config.h"
+#include "rac/infrastructure/network/rac_environment.h"
 
 // NOTE: Backend headers are NOT included here.
 // Backend registration is handled by their respective JNI libraries:
@@ -429,12 +431,14 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentDestroy(
 }
 
 JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentLoadModel(JNIEnv* env, jclass clazz, jlong handle, jstring modelPath, jstring configJson) {
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentLoadModel(JNIEnv* env, jclass clazz, jlong handle, jstring modelPath, jstring modelId, jstring modelName) {
     LOGi("racLlmComponentLoadModel called with handle=%lld", (long long)handle);
     if (handle == 0) return RAC_ERROR_INVALID_HANDLE;
 
     std::string path = getCString(env, modelPath);
-    LOGi("racLlmComponentLoadModel model_id=%s", path.c_str());
+    std::string id = getCString(env, modelId);
+    std::string name = getCString(env, modelName);
+    LOGi("racLlmComponentLoadModel path=%s, id=%s, name=%s", path.c_str(), id.c_str(), name.c_str());
 
     // Debug: List registered providers BEFORE loading
     const char** provider_names = nullptr;
@@ -449,12 +453,12 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentLoadMode
         LOGw("NO providers registered for TEXT_GENERATION!");
     }
 
-    // model_path, model_id (use path as id), model_name (optional)
+    // Pass model_path, model_id, and model_name separately to C++ lifecycle
     rac_result_t result = rac_llm_component_load_model(
         reinterpret_cast<rac_handle_t>(handle),
-        path.c_str(),   // model_path
-        path.c_str(),   // model_id (use path as id)
-        nullptr         // model_name (optional)
+        path.c_str(),                                    // model_path
+        id.c_str(),                                      // model_id (for telemetry)
+        name.empty() ? nullptr : name.c_str()            // model_name (optional, for telemetry)
     );
     LOGi("rac_llm_component_load_model returned: %d", result);
 
@@ -968,12 +972,14 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentDestroy(
 }
 
 JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentLoadModel(JNIEnv* env, jclass clazz, jlong handle, jstring modelPath, jstring configJson) {
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentLoadModel(JNIEnv* env, jclass clazz, jlong handle, jstring modelPath, jstring modelId, jstring modelName) {
     LOGi("racSttComponentLoadModel called with handle=%lld", (long long)handle);
     if (handle == 0) return RAC_ERROR_INVALID_HANDLE;
 
     std::string path = getCString(env, modelPath);
-    LOGi("racSttComponentLoadModel model_id=%s", path.c_str());
+    std::string id = getCString(env, modelId);
+    std::string name = getCString(env, modelName);
+    LOGi("racSttComponentLoadModel path=%s, id=%s, name=%s", path.c_str(), id.c_str(), name.c_str());
 
     // Debug: List registered providers BEFORE loading
     const char** provider_names = nullptr;
@@ -988,16 +994,12 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentLoadMode
         LOGw("NO providers registered for STT!");
     }
 
-    // Parse configJson to extract model_id and model_name
-    std::string config_str = getCString(env, configJson);
-    std::string model_id = path;  // Use path as model_id by default
-    std::string model_name = "";  // Optional model name
-
+    // Pass model_path, model_id, and model_name separately to C++ lifecycle
     rac_result_t result = rac_stt_component_load_model(
         reinterpret_cast<rac_handle_t>(handle),
-        path.c_str(),      // model_path
-        model_id.c_str(),  // model_id
-        model_name.empty() ? nullptr : model_name.c_str()  // model_name (optional)
+        path.c_str(),                                    // model_path
+        id.c_str(),                                      // model_id (for telemetry)
+        name.empty() ? nullptr : name.c_str()            // model_name (optional, for telemetry)
     );
     LOGi("rac_stt_component_load_model returned: %d", result);
 
@@ -1163,18 +1165,21 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentDestroy(
 }
 
 JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentLoadModel(JNIEnv* env, jclass clazz, jlong handle, jstring modelPath, jstring configJson) {
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentLoadModel(JNIEnv* env, jclass clazz, jlong handle, jstring modelPath, jstring modelId, jstring modelName) {
     if (handle == 0) return RAC_ERROR_INVALID_HANDLE;
 
-    std::string voicePath = getCString(env, modelPath);  // modelPath is actually voice path for TTS
+    std::string voicePath = getCString(env, modelPath);
+    std::string voiceId = getCString(env, modelId);
+    std::string voiceName = getCString(env, modelName);
+    LOGi("racTtsComponentLoadModel path=%s, id=%s, name=%s", voicePath.c_str(), voiceId.c_str(), voiceName.c_str());
 
     // TTS component uses load_voice instead of load_model
-    // voice_path, voice_id (use path as id), voice_name (optional)
+    // Pass voice_path, voice_id, and voice_name separately to C++ lifecycle
     return static_cast<jint>(rac_tts_component_load_voice(
         reinterpret_cast<rac_handle_t>(handle),
-        voicePath.c_str(),  // voice_path
-        voicePath.c_str(),  // voice_id (use path as id)
-        nullptr             // voice_name (optional)
+        voicePath.c_str(),                                    // voice_path
+        voiceId.c_str(),                                      // voice_id (for telemetry)
+        voiceName.empty() ? nullptr : voiceName.c_str()       // voice_name (optional, for telemetry)
     ));
 }
 
@@ -1846,6 +1851,76 @@ static rac_result_t jni_device_http_post(const char* endpoint, const char* json_
 // Static storage for device ID string (needs to persist across calls)
 static std::string g_cached_device_id;
 
+// Helper to extract a string value from JSON (simple parser for known keys)
+// Returns allocated string that must be stored persistently, or nullptr
+static std::string extract_json_string(const char* json, const char* key) {
+    if (!json || !key) return "";
+    
+    std::string search_key = "\"" + std::string(key) + "\":";
+    const char* pos = strstr(json, search_key.c_str());
+    if (!pos) return "";
+    
+    pos += search_key.length();
+    while (*pos == ' ') pos++;
+    
+    if (*pos == 'n' && strncmp(pos, "null", 4) == 0) {
+        return "";
+    }
+    
+    if (*pos != '"') return "";
+    pos++;
+    
+    const char* end = strchr(pos, '"');
+    if (!end) return "";
+    
+    return std::string(pos, end - pos);
+}
+
+// Helper to extract an integer value from JSON
+static int64_t extract_json_int(const char* json, const char* key) {
+    if (!json || !key) return 0;
+    
+    std::string search_key = "\"" + std::string(key) + "\":";
+    const char* pos = strstr(json, search_key.c_str());
+    if (!pos) return 0;
+    
+    pos += search_key.length();
+    while (*pos == ' ') pos++;
+    
+    return strtoll(pos, nullptr, 10);
+}
+
+// Helper to extract a boolean value from JSON
+static bool extract_json_bool(const char* json, const char* key) {
+    if (!json || !key) return false;
+    
+    std::string search_key = "\"" + std::string(key) + "\":";
+    const char* pos = strstr(json, search_key.c_str());
+    if (!pos) return false;
+    
+    pos += search_key.length();
+    while (*pos == ' ') pos++;
+    
+    return strncmp(pos, "true", 4) == 0;
+}
+
+// Static storage for device info strings (need to persist for C callbacks)
+static struct {
+    std::string device_id;
+    std::string device_model;
+    std::string device_name;
+    std::string platform;
+    std::string os_version;
+    std::string form_factor;
+    std::string architecture;
+    std::string chip_name;
+    std::string gpu_family;
+    std::string battery_state;
+    std::string device_fingerprint;
+    std::string manufacturer;
+    std::mutex mtx;
+} g_device_info_strings = {};
+
 // Device callback implementations
 static void jni_device_get_info(rac_device_registration_info_t* out_info, void* user_data) {
     JNIEnv* env = getJNIEnv();
@@ -1862,9 +1937,58 @@ static void jni_device_get_info(rac_device_registration_info_t* out_info, void* 
     
     if (jResult && out_info) {
         const char* json = env->GetStringUTFChars(jResult, nullptr);
-        // Parse JSON to fill out_info (simplified - just set device_id for now)
-        // In a full implementation, you'd parse the JSON
-        out_info->platform = "android";
+        LOGd("jni_device_get_info: parsing JSON: %.200s...", json);
+        
+        // Parse JSON and extract all fields
+        std::lock_guard<std::mutex> lock(g_device_info_strings.mtx);
+        
+        // Extract all string fields from Kotlin's getDeviceInfoCallback() JSON
+        g_device_info_strings.device_id = extract_json_string(json, "device_id");
+        g_device_info_strings.device_model = extract_json_string(json, "device_model");
+        g_device_info_strings.device_name = extract_json_string(json, "device_name");
+        g_device_info_strings.platform = extract_json_string(json, "platform");
+        g_device_info_strings.os_version = extract_json_string(json, "os_version");
+        g_device_info_strings.form_factor = extract_json_string(json, "form_factor");
+        g_device_info_strings.architecture = extract_json_string(json, "architecture");
+        g_device_info_strings.chip_name = extract_json_string(json, "chip_name");
+        g_device_info_strings.gpu_family = extract_json_string(json, "gpu_family");
+        g_device_info_strings.battery_state = extract_json_string(json, "battery_state");
+        g_device_info_strings.device_fingerprint = extract_json_string(json, "device_fingerprint");
+        g_device_info_strings.manufacturer = extract_json_string(json, "manufacturer");
+        
+        // Assign pointers to out_info (C struct uses const char*)
+        out_info->device_id = g_device_info_strings.device_id.empty() ? nullptr : g_device_info_strings.device_id.c_str();
+        out_info->device_model = g_device_info_strings.device_model.empty() ? nullptr : g_device_info_strings.device_model.c_str();
+        out_info->device_name = g_device_info_strings.device_name.empty() ? nullptr : g_device_info_strings.device_name.c_str();
+        out_info->platform = g_device_info_strings.platform.empty() ? "android" : g_device_info_strings.platform.c_str();
+        out_info->os_version = g_device_info_strings.os_version.empty() ? nullptr : g_device_info_strings.os_version.c_str();
+        out_info->form_factor = g_device_info_strings.form_factor.empty() ? nullptr : g_device_info_strings.form_factor.c_str();
+        out_info->architecture = g_device_info_strings.architecture.empty() ? nullptr : g_device_info_strings.architecture.c_str();
+        out_info->chip_name = g_device_info_strings.chip_name.empty() ? nullptr : g_device_info_strings.chip_name.c_str();
+        out_info->gpu_family = g_device_info_strings.gpu_family.empty() ? nullptr : g_device_info_strings.gpu_family.c_str();
+        out_info->battery_state = g_device_info_strings.battery_state.empty() ? nullptr : g_device_info_strings.battery_state.c_str();
+        out_info->device_fingerprint = g_device_info_strings.device_fingerprint.empty() ? nullptr : g_device_info_strings.device_fingerprint.c_str();
+        
+        // Extract integer fields
+        out_info->total_memory = extract_json_int(json, "total_memory");
+        out_info->available_memory = extract_json_int(json, "available_memory");
+        out_info->neural_engine_cores = static_cast<int32_t>(extract_json_int(json, "neural_engine_cores"));
+        out_info->core_count = static_cast<int32_t>(extract_json_int(json, "core_count"));
+        out_info->performance_cores = static_cast<int32_t>(extract_json_int(json, "performance_cores"));
+        out_info->efficiency_cores = static_cast<int32_t>(extract_json_int(json, "efficiency_cores"));
+        
+        // Extract boolean fields
+        out_info->has_neural_engine = extract_json_bool(json, "has_neural_engine") ? RAC_TRUE : RAC_FALSE;
+        out_info->is_low_power_mode = extract_json_bool(json, "is_low_power_mode") ? RAC_TRUE : RAC_FALSE;
+        
+        // Extract float field for battery
+        out_info->battery_level = static_cast<float>(extract_json_int(json, "battery_level"));
+        
+        LOGi("jni_device_get_info: parsed device_model=%s, os_version=%s, architecture=%s",
+             out_info->device_model ? out_info->device_model : "(null)",
+             out_info->os_version ? out_info->os_version : "(null)",
+             out_info->architecture ? out_info->architecture : "(null)");
+        
         env->ReleaseStringUTFChars(jResult, json);
         env->DeleteLocalRef(jResult);
     }
@@ -2253,6 +2377,409 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventsSetCa
         LOGi("Analytics callback unregistered, result=%d", result);
         return static_cast<jint>(result);
     }
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Analytics Event Emission
+// =============================================================================
+// These functions allow Kotlin to emit analytics events (e.g., SDK lifecycle events
+// that originate from Kotlin code). They call rac_analytics_event_emit() which
+// routes events through the registered callback to the telemetry manager.
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitDownload(
+    JNIEnv* env, jclass clazz, jint eventType, jstring modelId, jdouble progress,
+    jlong bytesDownloaded, jlong totalBytes, jdouble durationMs, jlong sizeBytes,
+    jstring archiveType, jint errorCode, jstring errorMessage) {
+    
+    std::string modelIdStr = getCString(env, modelId);
+    std::string archiveTypeStorage;
+    std::string errorMsgStorage;
+    const char* archiveTypePtr = getNullableCString(env, archiveType, archiveTypeStorage);
+    const char* errorMsgPtr = getNullableCString(env, errorMessage, errorMsgStorage);
+    
+    rac_analytics_event_data_t event_data = {};
+    event_data.type = static_cast<rac_event_type_t>(eventType);
+    event_data.data.model_download.model_id = modelIdStr.c_str();
+    event_data.data.model_download.progress = progress;
+    event_data.data.model_download.bytes_downloaded = bytesDownloaded;
+    event_data.data.model_download.total_bytes = totalBytes;
+    event_data.data.model_download.duration_ms = durationMs;
+    event_data.data.model_download.size_bytes = sizeBytes;
+    event_data.data.model_download.archive_type = archiveTypePtr;
+    event_data.data.model_download.error_code = static_cast<rac_result_t>(errorCode);
+    event_data.data.model_download.error_message = errorMsgPtr;
+    
+    rac_analytics_event_emit(event_data.type, &event_data);
+    return RAC_SUCCESS;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitSdkLifecycle(
+    JNIEnv* env, jclass clazz, jint eventType, jdouble durationMs, jint count,
+    jint errorCode, jstring errorMessage) {
+    
+    std::string errorMsgStorage;
+    const char* errorMsgPtr = getNullableCString(env, errorMessage, errorMsgStorage);
+    
+    rac_analytics_event_data_t event_data = {};
+    event_data.type = static_cast<rac_event_type_t>(eventType);
+    event_data.data.sdk_lifecycle.duration_ms = durationMs;
+    event_data.data.sdk_lifecycle.count = count;
+    event_data.data.sdk_lifecycle.error_code = static_cast<rac_result_t>(errorCode);
+    event_data.data.sdk_lifecycle.error_message = errorMsgPtr;
+    
+    rac_analytics_event_emit(event_data.type, &event_data);
+    return RAC_SUCCESS;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitStorage(
+    JNIEnv* env, jclass clazz, jint eventType, jlong freedBytes, jint errorCode, jstring errorMessage) {
+    
+    std::string errorMsgStorage;
+    const char* errorMsgPtr = getNullableCString(env, errorMessage, errorMsgStorage);
+    
+    rac_analytics_event_data_t event_data = {};
+    event_data.type = static_cast<rac_event_type_t>(eventType);
+    event_data.data.storage.freed_bytes = freedBytes;
+    event_data.data.storage.error_code = static_cast<rac_result_t>(errorCode);
+    event_data.data.storage.error_message = errorMsgPtr;
+    
+    rac_analytics_event_emit(event_data.type, &event_data);
+    return RAC_SUCCESS;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitDevice(
+    JNIEnv* env, jclass clazz, jint eventType, jstring deviceId, jint errorCode, jstring errorMessage) {
+    
+    std::string deviceIdStr = getCString(env, deviceId);
+    std::string errorMsgStorage;
+    const char* errorMsgPtr = getNullableCString(env, errorMessage, errorMsgStorage);
+    
+    rac_analytics_event_data_t event_data = {};
+    event_data.type = static_cast<rac_event_type_t>(eventType);
+    event_data.data.device.device_id = deviceIdStr.c_str();
+    event_data.data.device.error_code = static_cast<rac_result_t>(errorCode);
+    event_data.data.device.error_message = errorMsgPtr;
+    
+    rac_analytics_event_emit(event_data.type, &event_data);
+    return RAC_SUCCESS;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitSdkError(
+    JNIEnv* env, jclass clazz, jint eventType, jint errorCode, jstring errorMessage,
+    jstring operation, jstring context) {
+    
+    std::string errorMsgStorage, opStorage, ctxStorage;
+    const char* errorMsgPtr = getNullableCString(env, errorMessage, errorMsgStorage);
+    const char* opPtr = getNullableCString(env, operation, opStorage);
+    const char* ctxPtr = getNullableCString(env, context, ctxStorage);
+    
+    rac_analytics_event_data_t event_data = {};
+    event_data.type = static_cast<rac_event_type_t>(eventType);
+    event_data.data.sdk_error.error_code = static_cast<rac_result_t>(errorCode);
+    event_data.data.sdk_error.error_message = errorMsgPtr;
+    event_data.data.sdk_error.operation = opPtr;
+    event_data.data.sdk_error.context = ctxPtr;
+    
+    rac_analytics_event_emit(event_data.type, &event_data);
+    return RAC_SUCCESS;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitNetwork(
+    JNIEnv* env, jclass clazz, jint eventType, jboolean isOnline) {
+    
+    rac_analytics_event_data_t event_data = {};
+    event_data.type = static_cast<rac_event_type_t>(eventType);
+    event_data.data.network.is_online = isOnline ? RAC_TRUE : RAC_FALSE;
+    
+    rac_analytics_event_emit(event_data.type, &event_data);
+    return RAC_SUCCESS;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitLlmGeneration(
+    JNIEnv* env, jclass clazz, jint eventType, jstring generationId, jstring modelId,
+    jstring modelName, jint inputTokens, jint outputTokens, jdouble durationMs,
+    jdouble tokensPerSecond, jboolean isStreaming, jdouble timeToFirstTokenMs,
+    jint framework, jfloat temperature, jint maxTokens, jint contextLength,
+    jint errorCode, jstring errorMessage) {
+    
+    std::string genIdStr = getCString(env, generationId);
+    std::string modelIdStr = getCString(env, modelId);
+    std::string modelNameStorage;
+    std::string errorMsgStorage;
+    const char* modelNamePtr = getNullableCString(env, modelName, modelNameStorage);
+    const char* errorMsgPtr = getNullableCString(env, errorMessage, errorMsgStorage);
+    
+    rac_analytics_event_data_t event_data = {};
+    event_data.type = static_cast<rac_event_type_t>(eventType);
+    event_data.data.llm_generation.generation_id = genIdStr.c_str();
+    event_data.data.llm_generation.model_id = modelIdStr.c_str();
+    event_data.data.llm_generation.model_name = modelNamePtr;
+    event_data.data.llm_generation.input_tokens = inputTokens;
+    event_data.data.llm_generation.output_tokens = outputTokens;
+    event_data.data.llm_generation.duration_ms = durationMs;
+    event_data.data.llm_generation.tokens_per_second = tokensPerSecond;
+    event_data.data.llm_generation.is_streaming = isStreaming ? RAC_TRUE : RAC_FALSE;
+    event_data.data.llm_generation.time_to_first_token_ms = timeToFirstTokenMs;
+    event_data.data.llm_generation.framework = static_cast<rac_inference_framework_t>(framework);
+    event_data.data.llm_generation.temperature = temperature;
+    event_data.data.llm_generation.max_tokens = maxTokens;
+    event_data.data.llm_generation.context_length = contextLength;
+    event_data.data.llm_generation.error_code = static_cast<rac_result_t>(errorCode);
+    event_data.data.llm_generation.error_message = errorMsgPtr;
+    
+    rac_analytics_event_emit(event_data.type, &event_data);
+    return RAC_SUCCESS;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitLlmModel(
+    JNIEnv* env, jclass clazz, jint eventType, jstring modelId, jstring modelName,
+    jlong modelSizeBytes, jdouble durationMs, jint framework, jint errorCode, jstring errorMessage) {
+    
+    std::string modelIdStr = getCString(env, modelId);
+    std::string modelNameStorage;
+    std::string errorMsgStorage;
+    const char* modelNamePtr = getNullableCString(env, modelName, modelNameStorage);
+    const char* errorMsgPtr = getNullableCString(env, errorMessage, errorMsgStorage);
+    
+    rac_analytics_event_data_t event_data = {};
+    event_data.type = static_cast<rac_event_type_t>(eventType);
+    event_data.data.llm_model.model_id = modelIdStr.c_str();
+    event_data.data.llm_model.model_name = modelNamePtr;
+    event_data.data.llm_model.model_size_bytes = modelSizeBytes;
+    event_data.data.llm_model.duration_ms = durationMs;
+    event_data.data.llm_model.framework = static_cast<rac_inference_framework_t>(framework);
+    event_data.data.llm_model.error_code = static_cast<rac_result_t>(errorCode);
+    event_data.data.llm_model.error_message = errorMsgPtr;
+    
+    rac_analytics_event_emit(event_data.type, &event_data);
+    return RAC_SUCCESS;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitSttTranscription(
+    JNIEnv* env, jclass clazz, jint eventType, jstring transcriptionId, jstring modelId,
+    jstring modelName, jstring text, jfloat confidence, jdouble durationMs,
+    jdouble audioLengthMs, jint audioSizeBytes, jint wordCount, jdouble realTimeFactor,
+    jstring language, jint sampleRate, jboolean isStreaming, jint framework,
+    jint errorCode, jstring errorMessage) {
+    
+    std::string transIdStr = getCString(env, transcriptionId);
+    std::string modelIdStr = getCString(env, modelId);
+    std::string modelNameStorage, textStorage, langStorage, errorMsgStorage;
+    const char* modelNamePtr = getNullableCString(env, modelName, modelNameStorage);
+    const char* textPtr = getNullableCString(env, text, textStorage);
+    const char* langPtr = getNullableCString(env, language, langStorage);
+    const char* errorMsgPtr = getNullableCString(env, errorMessage, errorMsgStorage);
+    
+    rac_analytics_event_data_t event_data = {};
+    event_data.type = static_cast<rac_event_type_t>(eventType);
+    event_data.data.stt_transcription.transcription_id = transIdStr.c_str();
+    event_data.data.stt_transcription.model_id = modelIdStr.c_str();
+    event_data.data.stt_transcription.model_name = modelNamePtr;
+    event_data.data.stt_transcription.text = textPtr;
+    event_data.data.stt_transcription.confidence = confidence;
+    event_data.data.stt_transcription.duration_ms = durationMs;
+    event_data.data.stt_transcription.audio_length_ms = audioLengthMs;
+    event_data.data.stt_transcription.audio_size_bytes = audioSizeBytes;
+    event_data.data.stt_transcription.word_count = wordCount;
+    event_data.data.stt_transcription.real_time_factor = realTimeFactor;
+    event_data.data.stt_transcription.language = langPtr;
+    event_data.data.stt_transcription.sample_rate = sampleRate;
+    event_data.data.stt_transcription.is_streaming = isStreaming ? RAC_TRUE : RAC_FALSE;
+    event_data.data.stt_transcription.framework = static_cast<rac_inference_framework_t>(framework);
+    event_data.data.stt_transcription.error_code = static_cast<rac_result_t>(errorCode);
+    event_data.data.stt_transcription.error_message = errorMsgPtr;
+    
+    rac_analytics_event_emit(event_data.type, &event_data);
+    return RAC_SUCCESS;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitTtsSynthesis(
+    JNIEnv* env, jclass clazz, jint eventType, jstring synthesisId, jstring modelId,
+    jstring modelName, jint characterCount, jdouble audioDurationMs, jint audioSizeBytes,
+    jdouble processingDurationMs, jdouble charactersPerSecond, jint sampleRate, jint framework,
+    jint errorCode, jstring errorMessage) {
+    
+    std::string synthIdStr = getCString(env, synthesisId);
+    std::string modelIdStr = getCString(env, modelId);
+    std::string modelNameStorage, errorMsgStorage;
+    const char* modelNamePtr = getNullableCString(env, modelName, modelNameStorage);
+    const char* errorMsgPtr = getNullableCString(env, errorMessage, errorMsgStorage);
+    
+    rac_analytics_event_data_t event_data = {};
+    event_data.type = static_cast<rac_event_type_t>(eventType);
+    event_data.data.tts_synthesis.synthesis_id = synthIdStr.c_str();
+    event_data.data.tts_synthesis.model_id = modelIdStr.c_str();
+    event_data.data.tts_synthesis.model_name = modelNamePtr;
+    event_data.data.tts_synthesis.character_count = characterCount;
+    event_data.data.tts_synthesis.audio_duration_ms = audioDurationMs;
+    event_data.data.tts_synthesis.audio_size_bytes = audioSizeBytes;
+    event_data.data.tts_synthesis.processing_duration_ms = processingDurationMs;
+    event_data.data.tts_synthesis.characters_per_second = charactersPerSecond;
+    event_data.data.tts_synthesis.sample_rate = sampleRate;
+    event_data.data.tts_synthesis.framework = static_cast<rac_inference_framework_t>(framework);
+    event_data.data.tts_synthesis.error_code = static_cast<rac_result_t>(errorCode);
+    event_data.data.tts_synthesis.error_message = errorMsgPtr;
+    
+    rac_analytics_event_emit(event_data.type, &event_data);
+    return RAC_SUCCESS;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitVad(
+    JNIEnv* env, jclass clazz, jint eventType, jdouble speechDurationMs, jfloat energyLevel) {
+    
+    rac_analytics_event_data_t event_data = {};
+    event_data.type = static_cast<rac_event_type_t>(eventType);
+    event_data.data.vad.speech_duration_ms = speechDurationMs;
+    event_data.data.vad.energy_level = energyLevel;
+    
+    rac_analytics_event_emit(event_data.type, &event_data);
+    return RAC_SUCCESS;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitVoiceAgentState(
+    JNIEnv* env, jclass clazz, jint eventType, jstring component, jint state,
+    jstring modelId, jstring errorMessage) {
+    
+    std::string componentStr = getCString(env, component);
+    std::string modelIdStorage, errorMsgStorage;
+    const char* modelIdPtr = getNullableCString(env, modelId, modelIdStorage);
+    const char* errorMsgPtr = getNullableCString(env, errorMessage, errorMsgStorage);
+    
+    rac_analytics_event_data_t event_data = {};
+    event_data.type = static_cast<rac_event_type_t>(eventType);
+    event_data.data.voice_agent_state.component = componentStr.c_str();
+    event_data.data.voice_agent_state.state = static_cast<rac_voice_agent_component_state_t>(state);
+    event_data.data.voice_agent_state.model_id = modelIdPtr;
+    event_data.data.voice_agent_state.error_message = errorMsgPtr;
+    
+    rac_analytics_event_emit(event_data.type, &event_data);
+    return RAC_SUCCESS;
+}
+
+// =============================================================================
+// DEV CONFIG API (rac_dev_config.h)
+// Mirrors Swift SDK's CppBridge+Environment.swift DevConfig
+// =============================================================================
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigIsAvailable(
+    JNIEnv* env, jclass clazz) {
+    
+    return rac_dev_config_is_available() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigGetSupabaseUrl(
+    JNIEnv* env, jclass clazz) {
+    
+    const char* url = rac_dev_config_get_supabase_url();
+    if (url == nullptr || strlen(url) == 0) {
+        return nullptr;
+    }
+    return env->NewStringUTF(url);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigGetSupabaseKey(
+    JNIEnv* env, jclass clazz) {
+    
+    const char* key = rac_dev_config_get_supabase_key();
+    if (key == nullptr || strlen(key) == 0) {
+        return nullptr;
+    }
+    return env->NewStringUTF(key);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigGetBuildToken(
+    JNIEnv* env, jclass clazz) {
+    
+    const char* token = rac_dev_config_get_build_token();
+    if (token == nullptr || strlen(token) == 0) {
+        return nullptr;
+    }
+    return env->NewStringUTF(token);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigGetSentryDsn(
+    JNIEnv* env, jclass clazz) {
+    
+    const char* dsn = rac_dev_config_get_sentry_dsn();
+    if (dsn == nullptr || strlen(dsn) == 0) {
+        return nullptr;
+    }
+    return env->NewStringUTF(dsn);
+}
+
+// =============================================================================
+// SDK Configuration Initialization
+// =============================================================================
+
+/**
+ * Initialize SDK configuration with version and platform info.
+ * This must be called during SDK initialization for device registration
+ * to include the correct sdk_version (instead of "unknown").
+ *
+ * @param environment Environment (0=development, 1=staging, 2=production)
+ * @param deviceId Device ID string
+ * @param platform Platform string (e.g., "android")
+ * @param sdkVersion SDK version string (e.g., "0.1.0")
+ * @param apiKey API key (can be empty for development)
+ * @param baseUrl Base URL (can be empty for development)
+ * @return 0 on success, error code on failure
+ */
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkInit(
+    JNIEnv* env, jclass clazz, 
+    jint environment, 
+    jstring deviceId,
+    jstring platform, 
+    jstring sdkVersion,
+    jstring apiKey,
+    jstring baseUrl) {
+    
+    rac_sdk_config_t config = {};
+    config.environment = static_cast<rac_environment_t>(environment);
+    
+    std::string deviceIdStr = getCString(env, deviceId);
+    std::string platformStr = getCString(env, platform);
+    std::string sdkVersionStr = getCString(env, sdkVersion);
+    std::string apiKeyStr = getCString(env, apiKey);
+    std::string baseUrlStr = getCString(env, baseUrl);
+    
+    config.device_id = deviceIdStr.empty() ? nullptr : deviceIdStr.c_str();
+    config.platform = platformStr.empty() ? "android" : platformStr.c_str();
+    config.sdk_version = sdkVersionStr.empty() ? nullptr : sdkVersionStr.c_str();
+    config.api_key = apiKeyStr.empty() ? nullptr : apiKeyStr.c_str();
+    config.base_url = baseUrlStr.empty() ? nullptr : baseUrlStr.c_str();
+    
+    LOGi("racSdkInit: env=%d, platform=%s, sdk_version=%s", 
+         environment, 
+         config.platform ? config.platform : "(null)",
+         config.sdk_version ? config.sdk_version : "(null)");
+    
+    rac_validation_result_t result = rac_sdk_init(&config);
+    
+    if (result == RAC_VALIDATION_OK) {
+        LOGi("racSdkInit: SDK config initialized successfully");
+    } else {
+        LOGe("racSdkInit: Failed with result %d", result);
+    }
+    
+    return static_cast<jint>(result);
 }
 
 } // extern "C"

@@ -114,7 +114,7 @@ class RunAnywhereApplication : Application() {
             } else {
                 SDKEnvironment.PRODUCTION
             }
-        Log.w("RunAnywhereApp", "🚀 SELECTED ENVIRONMENT: $environment (based on BuildConfig.DEBUG_MODE=${BuildConfig.DEBUG_MODE})")
+        Log.i("RunAnywhereApp", "🚀 SELECTED ENVIRONMENT: $environment (based on BuildConfig.DEBUG_MODE=${BuildConfig.DEBUG_MODE})")
 
         // Initialize platform context first
         AndroidPlatformContext.initialize(this@RunAnywhereApplication)
@@ -129,21 +129,25 @@ class RunAnywhereApplication : Application() {
                 )
                 Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode")
             } else {
-                val apiKey = "talk_to_runanywhere_team"
-                val baseURL = "talk_to_runanywhere_team"
-
-                Log.w("RunAnywhereApp", "🔐 PRODUCTION INIT PARAMS:")
-                Log.w("RunAnywhereApp", "   apiKey = [REDACTED]")
-                Log.w("RunAnywhereApp", "   baseURL = $baseURL")
-                Log.w("RunAnywhereApp", "   environment = PRODUCTION")
-
+                // PRODUCTION mode - requires valid API key and base URL
+                // These should be provided via BuildConfig or secure configuration
+                // For now, fall back to development mode if not configured
+                Log.w("RunAnywhereApp", "⚠️ PRODUCTION mode requires API key configuration")
+                Log.w("RunAnywhereApp", "   Falling back to DEVELOPMENT mode")
                 RunAnywhere.initialize(
-                    apiKey = apiKey,
-                    baseURL = baseURL,
-                    environment = SDKEnvironment.PRODUCTION,
+                    apiKey = "dev",
+                    baseURL = "localhost",
+                    environment = SDKEnvironment.DEVELOPMENT,
                 )
-                Log.w("RunAnywhereApp", "✅ SDK initialized in PRODUCTION mode - analytics SHOULD be enabled")
+                Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode (production config not set)")
             }
+            
+            // Phase 2: Complete services initialization (device registration, etc.)
+            // This triggers device registration with the backend
+            kotlinx.coroutines.runBlocking {
+                RunAnywhere.completeServicesInitialization()
+            }
+            Log.i("RunAnywhereApp", "✅ SDK services initialization complete (device registered)")
         } catch (e: Exception) {
             // Log the failure but continue
             Log.w("RunAnywhereApp", "⚠️ SDK initialization failed (backend may be unavailable): ${e.message}")
@@ -157,6 +161,11 @@ class RunAnywhereApplication : Application() {
                     environment = SDKEnvironment.DEVELOPMENT,
                 )
                 Log.i("RunAnywhereApp", "✅ SDK initialized in OFFLINE mode (local models only)")
+                
+                // Still try Phase 2 in offline mode
+                kotlinx.coroutines.runBlocking {
+                    RunAnywhere.completeServicesInitialization()
+                }
             } catch (fallbackError: Exception) {
                 Log.e("RunAnywhereApp", "❌ Fallback initialization also failed: ${fallbackError.message}")
             }
