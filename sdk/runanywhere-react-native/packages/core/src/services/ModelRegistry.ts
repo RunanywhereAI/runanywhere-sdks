@@ -55,8 +55,8 @@ class ModelRegistryImpl {
     }
 
     try {
-      const native = requireNativeModule();
-      await native.discoverModels();
+      // Just get available models to verify registry is working
+      await this.getAllModels();
       this.initialized = true;
       logger.info('Model registry initialized via native');
     } catch (error) {
@@ -66,14 +66,19 @@ class ModelRegistryImpl {
   }
 
   /**
-   * Discover available models (native)
+   * Get all models (native)
    */
-  async discoverModels(): Promise<ModelInfo[]> {
+  async getAllModels(): Promise<ModelInfo[]> {
     if (!isNativeModuleAvailable()) return [];
 
-    const native = requireNativeModule();
-    const json = await native.discoverModels();
-    return JSON.parse(json);
+    try {
+      const native = requireNativeModule();
+      const json = await native.getAvailableModels();
+      return JSON.parse(json);
+    } catch (error) {
+      logger.error('Failed to get available models:', { error });
+      return [];
+    }
   }
 
   /**
@@ -82,25 +87,19 @@ class ModelRegistryImpl {
   async getModel(id: string): Promise<ModelInfo | null> {
     if (!isNativeModuleAvailable()) return null;
 
-    const native = requireNativeModule();
-    const json = await native.getModel(id);
-    if (!json) return null;
-    return JSON.parse(json);
+    try {
+      const native = requireNativeModule();
+      const json = await native.getModelInfo(id);
+      if (!json || json === '{}') return null;
+      return JSON.parse(json);
+    } catch (error) {
+      logger.error('Failed to get model info:', { error });
+      return null;
+    }
   }
 
   /**
-   * Get all models (native)
-   */
-  async getAllModels(): Promise<ModelInfo[]> {
-    if (!isNativeModuleAvailable()) return [];
-
-    const native = requireNativeModule();
-    const json = await native.availableModels();
-    return JSON.parse(json);
-  }
-
-  /**
-   * Filter models by criteria (native handles filtering)
+   * Filter models by criteria
    */
   async filterModels(criteria: ModelCriteria): Promise<ModelInfo[]> {
     const allModels = await this.getAllModels();
@@ -131,11 +130,11 @@ class ModelRegistryImpl {
     if (!isNativeModuleAvailable()) return;
 
     const native = requireNativeModule();
-    await native.updateModel(model.id, JSON.stringify(model));
+    await native.registerModel(JSON.stringify(model));
   }
 
   /**
-   * Update model info (native)
+   * Update model info (alias for registerModel)
    */
   async updateModel(model: ModelInfo): Promise<void> {
     return this.registerModel(model);
@@ -148,20 +147,32 @@ class ModelRegistryImpl {
     if (!isNativeModuleAvailable()) return;
 
     const native = requireNativeModule();
-    await native.removeModel(id);
+    await native.deleteModel(id);
   }
 
   /**
-   * Add model from URL (native)
+   * Add model from URL - registers a model with a download URL
    */
   async addModelFromURL(options: AddModelFromURLOptions): Promise<ModelInfo> {
     if (!isNativeModuleAvailable()) {
       throw new Error('Native module not available');
     }
 
-    const native = requireNativeModule();
-    const json = await native.addModelFromURL(options.url, JSON.stringify(options));
-    return JSON.parse(json);
+    // Create a ModelInfo from the options and register it
+    const model: Partial<ModelInfo> = {
+      id: options.name.toLowerCase().replace(/\s+/g, '-'),
+      name: options.name,
+      downloadURL: options.url,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      compatibleFrameworks: [options.framework] as any,
+      downloadSize: options.estimatedSize ?? 0,
+      supportsThinking: options.supportsThinking ?? false,
+      isDownloaded: false,
+      isAvailable: true,
+    };
+
+    await this.registerModel(model as ModelInfo);
+    return model as ModelInfo;
   }
 
   /**
@@ -193,11 +204,17 @@ class ModelRegistryImpl {
   }
 
   /**
-   * Check if model is downloaded
+   * Check if model is downloaded (native)
    */
   async isModelDownloaded(modelId: string): Promise<boolean> {
-    const model = await this.getModel(modelId);
-    return model?.isDownloaded ?? false;
+    if (!isNativeModuleAvailable()) return false;
+
+    try {
+      const native = requireNativeModule();
+      return native.isModelDownloaded(modelId);
+    } catch {
+      return false;
+    }
   }
 
   /**

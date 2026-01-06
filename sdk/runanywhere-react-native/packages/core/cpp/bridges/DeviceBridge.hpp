@@ -1,8 +1,9 @@
 /**
- * DeviceBridge.hpp
+ * @file DeviceBridge.hpp
+ * @brief C++ bridge for device operations.
  *
- * C++ bridge for device operations.
- * Calls rac_device_* API from runanywhere-commons.
+ * Mirrors Swift's CppBridge+Device.swift pattern.
+ * Registers callbacks with rac_device_manager and delegates to platform.
  *
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/CppBridge+Device.swift
  */
@@ -12,32 +13,80 @@
 #include <string>
 #include <functional>
 
+#include "rac/core/rac_types.h"
+#include "rac/infrastructure/device/rac_device_manager.h"
+#include "rac/infrastructure/network/rac_environment.h"
+
 namespace runanywhere {
 namespace bridges {
 
 /**
- * Device info
+ * Device info structure
  */
 struct DeviceInfo {
     std::string deviceId;
+    std::string deviceModel;
+    std::string deviceName;
     std::string platform;
-    std::string model;
     std::string osVersion;
+    std::string formFactor;
+    std::string architecture;
+    std::string chipName;
+    int64_t totalMemory = 0;
+    int64_t availableMemory = 0;
+    bool hasNeuralEngine = false;
+    int32_t neuralEngineCores = 0;
+    std::string gpuFamily;
+    float batteryLevel = -1.0f;
+    std::string batteryState;
+    bool isLowPowerMode = false;
+    int32_t coreCount = 0;
+    int32_t performanceCores = 0;
+    int32_t efficiencyCores = 0;
+    bool isSimulator = false;
     std::string sdkVersion;
-    bool isRegistered;
 };
 
 /**
  * Device registration result
  */
 struct DeviceRegistrationResult {
-    bool success;
+    bool success = false;
     std::string deviceId;
     std::string error;
 };
 
 /**
- * DeviceBridge - Device operations via rac_device_* API
+ * Platform callbacks for device operations
+ */
+struct DevicePlatformCallbacks {
+    // Get device hardware/OS info
+    std::function<DeviceInfo()> getDeviceInfo;
+
+    // Get persistent device ID (from keychain/keystore)
+    std::function<std::string()> getDeviceId;
+
+    // Check if device is registered (from UserDefaults/SharedPrefs)
+    std::function<bool()> isRegistered;
+
+    // Set registration status
+    std::function<void(bool)> setRegistered;
+
+    // Make HTTP POST for device registration
+    // Returns: (success, statusCode, responseBody, errorMessage)
+    std::function<std::tuple<bool, int, std::string, std::string>(
+        const std::string& endpoint,
+        const std::string& jsonBody,
+        bool requiresAuth
+    )> httpPost;
+};
+
+/**
+ * DeviceBridge - Device registration and info via rac_device_manager_* API
+ *
+ * Mirrors Swift's CppBridge.Device pattern:
+ * - Platform provides callbacks
+ * - C++ handles business logic via RACommons
  */
 class DeviceBridge {
 public:
@@ -47,39 +96,46 @@ public:
     static DeviceBridge& shared();
 
     /**
-     * Get device ID
-     * @return Device ID (persisted in secure storage)
+     * Set platform callbacks
+     * Must be called during SDK initialization BEFORE registerCallbacks()
      */
-    std::string getDeviceId();
+    void setPlatformCallbacks(const DevicePlatformCallbacks& callbacks);
 
     /**
-     * Register device with backend
-     * @return Registration result
+     * Register callbacks with RACommons device manager
+     * Must be called during SDK initialization after setPlatformCallbacks()
      */
-    DeviceRegistrationResult registerDevice();
+    rac_result_t registerCallbacks();
+
+    /**
+     * Register device with backend if not already registered
+     * Delegates to rac_device_manager_register_if_needed()
+     *
+     * @param environment SDK environment
+     * @param buildToken Optional build token for development mode
+     * @return RAC_SUCCESS if registered or already registered
+     */
+    rac_result_t registerIfNeeded(rac_environment_t environment, const std::string& buildToken = "");
 
     /**
      * Check if device is registered
-     * @return true if registered
      */
     bool isRegistered() const;
 
     /**
-     * Get device info
-     * @return Device information
+     * Clear device registration status
      */
-    DeviceInfo getDeviceInfo() const;
+    void clearRegistration();
 
     /**
-     * Set device ID (typically called by platform adapter)
-     * @param deviceId Device ID
+     * Get the device ID
      */
-    void setDeviceId(const std::string& deviceId);
+    std::string getDeviceId() const;
 
     /**
-     * Initialize device registration callbacks
+     * Check if callbacks are registered
      */
-    void initialize();
+    bool isCallbacksRegistered() const { return callbacksRegistered_; }
 
 private:
     DeviceBridge() = default;
@@ -87,8 +143,11 @@ private:
     DeviceBridge(const DeviceBridge&) = delete;
     DeviceBridge& operator=(const DeviceBridge&) = delete;
 
-    std::string deviceId_;
-    bool isRegistered_ = false;
+    bool callbacksRegistered_ = false;
+    DevicePlatformCallbacks platformCallbacks_{};
+
+    // Callbacks struct for RACommons (must persist)
+    rac_device_callbacks_t racCallbacks_{};
 };
 
 } // namespace bridges

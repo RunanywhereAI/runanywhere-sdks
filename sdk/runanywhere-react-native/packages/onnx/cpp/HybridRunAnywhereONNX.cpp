@@ -15,16 +15,15 @@
 #include "bridges/VADBridge.hpp"
 #include "bridges/VoiceAgentBridge.hpp"
 
-// Backend registration header (conditionally included)
-#ifdef HAS_ONNX
+// Backend registration header - always available
 extern "C" {
 #include "rac_vad_onnx.h"
 }
-#endif
 
 #include <sstream>
 #include <chrono>
 #include <vector>
+#include <stdexcept>
 
 // Platform-specific logging
 #if defined(ANDROID) || defined(__ANDROID__)
@@ -161,7 +160,7 @@ HybridRunAnywhereONNX::~HybridRunAnywhereONNX() {
 std::shared_ptr<Promise<bool>> HybridRunAnywhereONNX::registerBackend() {
   return Promise<bool>::async([this]() {
     LOGI("Registering ONNX backend with C++ registry...");
-#ifdef HAS_ONNX
+
     rac_result_t result = rac_backend_onnx_register();
     // RAC_SUCCESS (0) or RAC_ERROR_MODULE_ALREADY_REGISTERED (-4) are both OK
     if (result == RAC_SUCCESS || result == -4) {
@@ -170,27 +169,23 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereONNX::registerBackend() {
       return true;
     } else {
       LOGE("❌ ONNX registration failed with code: %d", result);
-      setLastError("ONNX registration failed");
-      return false;
+      setLastError("ONNX registration failed with error: " + std::to_string(result));
+      throw std::runtime_error("ONNX registration failed with error: " + std::to_string(result));
     }
-#else
-    LOGE("ONNX backend not available (HAS_ONNX not defined)");
-    setLastError("ONNX backend not compiled in");
-    return false;
-#endif
   });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereONNX::unregisterBackend() {
   return Promise<bool>::async([this]() {
     LOGI("Unregistering ONNX backend...");
-#ifdef HAS_ONNX
+
     rac_result_t result = rac_backend_onnx_unregister();
     isRegistered_ = false;
-    return result == RAC_SUCCESS;
-#else
-    return false;
-#endif
+    if (result != RAC_SUCCESS) {
+      LOGE("❌ ONNX unregistration failed with code: %d", result);
+      throw std::runtime_error("ONNX unregistration failed with error: " + std::to_string(result));
+    }
+    return true;
   });
 }
 

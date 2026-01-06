@@ -1,9 +1,26 @@
 /**
  * @file ModelRegistryBridge.cpp
- * @brief Model registry bridge implementation
+ * @brief C++ bridge for model registry operations.
+ *
+ * Mirrors Swift's CppBridge+ModelRegistry.swift pattern.
  */
 
 #include "ModelRegistryBridge.hpp"
+#include <cstring>
+
+// Platform-specific logging
+#if defined(ANDROID) || defined(__ANDROID__)
+#include <android/log.h>
+#define LOG_TAG "ModelRegistryBridge"
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#else
+#include <cstdio>
+#define LOGI(...) printf("[ModelRegistryBridge] "); printf(__VA_ARGS__); printf("\n")
+#define LOGD(...) printf("[ModelRegistryBridge DEBUG] "); printf(__VA_ARGS__); printf("\n")
+#define LOGE(...) printf("[ModelRegistryBridge ERROR] "); printf(__VA_ARGS__); printf("\n")
+#endif
 
 namespace runanywhere {
 namespace bridges {
@@ -13,132 +30,353 @@ ModelRegistryBridge& ModelRegistryBridge::shared() {
     return instance;
 }
 
-rac_result_t ModelRegistryBridge::save(const ModelInfo& model) {
-#ifdef HAS_RACOMMONS
-    rac_model_registry_t* registry = rac_get_model_registry();
-    if (!registry) {
-        return -1;
-    }
-
-    rac_model_info_t info = {};
-    info.id = model.id.c_str();
-    info.name = model.name.c_str();
-    info.path = model.path.c_str();
-    info.capability = model.capability.c_str();
-    info.framework = model.framework.c_str();
-    info.size_bytes = model.sizeBytes;
-    info.is_downloaded = model.isDownloaded ? RAC_TRUE : RAC_FALSE;
-
-    return rac_model_registry_save(registry, &info);
-#else
-    return RAC_SUCCESS;
-#endif
+ModelRegistryBridge::~ModelRegistryBridge() {
+    shutdown();
 }
 
-ModelInfo ModelRegistryBridge::get(const std::string& modelId) {
-    ModelInfo result;
-    result.id = modelId;
-
-#ifdef HAS_RACOMMONS
-    rac_model_registry_t* registry = rac_get_model_registry();
-    if (!registry) {
-        return result;
+rac_result_t ModelRegistryBridge::initialize() {
+    if (handle_) {
+        LOGD("Model registry already initialized");
+        return RAC_SUCCESS;
     }
 
-    rac_model_info_t info = {};
-    rac_result_t status = rac_model_registry_get(registry, modelId.c_str(), &info);
+    rac_result_t result = rac_model_registry_create(&handle_);
 
-    if (status == RAC_SUCCESS) {
-        if (info.id) result.id = info.id;
-        if (info.name) result.name = info.name;
-        if (info.path) result.path = info.path;
-        if (info.capability) result.capability = info.capability;
-        if (info.framework) result.framework = info.framework;
-        result.sizeBytes = info.size_bytes;
-        result.isDownloaded = info.is_downloaded == RAC_TRUE;
+    if (result == RAC_SUCCESS) {
+        LOGI("Model registry created successfully");
+    } else {
+        LOGE("Failed to create model registry: %d", result);
+        handle_ = nullptr;
     }
-#endif
 
     return result;
 }
 
-std::vector<ModelInfo> ModelRegistryBridge::getAll() {
-    std::vector<ModelInfo> results;
-
-#ifdef HAS_RACOMMONS
-    rac_model_registry_t* registry = rac_get_model_registry();
-    if (!registry) {
-        return results;
+void ModelRegistryBridge::shutdown() {
+    if (handle_) {
+        rac_model_registry_destroy(handle_);
+        handle_ = nullptr;
+        LOGI("Model registry destroyed");
     }
-
-    rac_model_info_t* models = nullptr;
-    int count = 0;
-    rac_result_t status = rac_model_registry_get_all(registry, &models, &count);
-
-    if (status == RAC_SUCCESS && models) {
-        for (int i = 0; i < count; i++) {
-            ModelInfo info;
-            if (models[i].id) info.id = models[i].id;
-            if (models[i].name) info.name = models[i].name;
-            if (models[i].path) info.path = models[i].path;
-            if (models[i].capability) info.capability = models[i].capability;
-            if (models[i].framework) info.framework = models[i].framework;
-            info.sizeBytes = models[i].size_bytes;
-            info.isDownloaded = models[i].is_downloaded == RAC_TRUE;
-            results.push_back(info);
-        }
-        // Free the models array
-        rac_model_registry_free_models(models, count);
-    }
-#endif
-
-    return results;
 }
 
-rac_result_t ModelRegistryBridge::remove(const std::string& modelId) {
-#ifdef HAS_RACOMMONS
-    rac_model_registry_t* registry = rac_get_model_registry();
-    if (!registry) {
-        return -1;
+ModelInfo ModelRegistryBridge::fromRac(const rac_model_info_t& cModel) {
+    ModelInfo model;
+
+    model.id = cModel.id ? cModel.id : "";
+    model.name = cModel.name ? cModel.name : "";
+    model.description = cModel.description ? cModel.description : "";
+    model.category = cModel.category;
+    model.format = cModel.format;
+    model.framework = cModel.framework;
+    model.downloadUrl = cModel.download_url ? cModel.download_url : "";
+    model.localPath = cModel.local_path ? cModel.local_path : "";
+    model.downloadSize = cModel.download_size;
+    model.memoryRequired = cModel.memory_required;
+    model.contextLength = cModel.context_length;
+    model.supportsThinking = cModel.supports_thinking == RAC_TRUE;
+    model.source = cModel.source;
+
+    // Copy tags
+    if (cModel.tags && cModel.tag_count > 0) {
+        for (size_t i = 0; i < cModel.tag_count; i++) {
+            if (cModel.tags[i]) {
+                model.tags.push_back(cModel.tags[i]);
+            }
+        }
     }
 
-    return rac_model_registry_remove(registry, modelId.c_str());
-#else
-    return RAC_SUCCESS;
-#endif
+    // Check if downloaded
+    model.isDownloaded = !model.localPath.empty() && model.localPath[0] != '\0';
+
+    return model;
 }
 
-std::vector<ModelInfo> ModelRegistryBridge::discoverDownloadedModels(const std::string& directory) {
-    std::vector<ModelInfo> results;
+void ModelRegistryBridge::toRac(const ModelInfo& model, rac_model_info_t& cModel) {
+    // Note: This allocates strings that must be freed
+    // For now we use static storage for simplicity
+    static std::string s_id, s_name, s_desc, s_url, s_path;
+    static std::vector<std::string> s_tags;
+    static std::vector<const char*> s_tagPtrs;
 
-#ifdef HAS_RACOMMONS
-    rac_model_registry_t* registry = rac_get_model_registry();
-    if (!registry) {
-        return results;
+    s_id = model.id;
+    s_name = model.name;
+    s_desc = model.description;
+    s_url = model.downloadUrl;
+    s_path = model.localPath;
+
+    memset(&cModel, 0, sizeof(cModel));
+
+    cModel.id = const_cast<char*>(s_id.c_str());
+    cModel.name = const_cast<char*>(s_name.c_str());
+    cModel.description = s_desc.empty() ? nullptr : const_cast<char*>(s_desc.c_str());
+    cModel.category = model.category;
+    cModel.format = model.format;
+    cModel.framework = model.framework;
+    cModel.download_url = s_url.empty() ? nullptr : const_cast<char*>(s_url.c_str());
+    cModel.local_path = s_path.empty() ? nullptr : const_cast<char*>(s_path.c_str());
+    cModel.download_size = model.downloadSize;
+    cModel.memory_required = model.memoryRequired;
+    cModel.context_length = model.contextLength;
+    cModel.supports_thinking = model.supportsThinking ? RAC_TRUE : RAC_FALSE;
+    cModel.source = model.source;
+
+    // Setup tags
+    s_tags = model.tags;
+    s_tagPtrs.clear();
+    for (const auto& tag : s_tags) {
+        s_tagPtrs.push_back(tag.c_str());
+    }
+    if (!s_tagPtrs.empty()) {
+        cModel.tags = const_cast<char**>(s_tagPtrs.data());
+        cModel.tag_count = s_tagPtrs.size();
+    }
+}
+
+rac_result_t ModelRegistryBridge::addModel(const ModelInfo& model) {
+    if (!handle_) {
+        return RAC_ERROR_NOT_INITIALIZED;
     }
 
-    rac_model_info_t* models = nullptr;
-    int count = 0;
-    rac_result_t status = rac_model_registry_discover_downloaded(registry, directory.c_str(),
-                                                                   &models, &count);
+    rac_model_info_t cModel;
+    toRac(model, cModel);
 
-    if (status == RAC_SUCCESS && models) {
-        for (int i = 0; i < count; i++) {
-            ModelInfo info;
-            if (models[i].id) info.id = models[i].id;
-            if (models[i].name) info.name = models[i].name;
-            if (models[i].path) info.path = models[i].path;
-            if (models[i].capability) info.capability = models[i].capability;
-            if (models[i].framework) info.framework = models[i].framework;
-            info.sizeBytes = models[i].size_bytes;
-            info.isDownloaded = true;
-            results.push_back(info);
+    // Use rac_model_registry_save to add/update a model
+    rac_result_t result = rac_model_registry_save(handle_, &cModel);
+
+    if (result == RAC_SUCCESS) {
+        LOGI("Added model: %s", model.id.c_str());
+    } else {
+        LOGE("Failed to add model %s: %d", model.id.c_str(), result);
+    }
+
+    return result;
+}
+
+rac_result_t ModelRegistryBridge::removeModel(const std::string& modelId) {
+    if (!handle_) {
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    rac_result_t result = rac_model_registry_remove(handle_, modelId.c_str());
+
+    if (result == RAC_SUCCESS) {
+        LOGI("Removed model: %s", modelId.c_str());
+    } else {
+        LOGE("Failed to remove model %s: %d", modelId.c_str(), result);
+    }
+
+    return result;
+}
+
+rac_result_t ModelRegistryBridge::updateModelPath(const std::string& modelId, const std::string& localPath) {
+    if (!handle_) {
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    // Use rac_model_registry_update_download_status to update the model's local path
+    rac_result_t result = rac_model_registry_update_download_status(handle_, modelId.c_str(), localPath.c_str());
+
+    if (result == RAC_SUCCESS) {
+        LOGI("Updated model path: %s -> %s", modelId.c_str(), localPath.c_str());
+    } else {
+        LOGE("Failed to update model path %s: %d", modelId.c_str(), result);
+    }
+
+    return result;
+}
+
+std::optional<ModelInfo> ModelRegistryBridge::getModel(const std::string& modelId) {
+    if (!handle_) {
+        return std::nullopt;
+    }
+
+    rac_model_info_t* cModel = nullptr;
+    rac_result_t result = rac_model_registry_get(handle_, modelId.c_str(), &cModel);
+
+    if (result != RAC_SUCCESS || !cModel) {
+        return std::nullopt;
+    }
+
+    ModelInfo model = fromRac(*cModel);
+    rac_model_info_free(cModel);
+
+    return model;
+}
+
+std::vector<ModelInfo> ModelRegistryBridge::getAllModels() {
+    std::vector<ModelInfo> models;
+
+    if (!handle_) {
+        return models;
+    }
+
+    rac_model_info_t** cModels = nullptr;
+    size_t count = 0;
+
+    rac_result_t result = rac_model_registry_get_all(handle_, &cModels, &count);
+
+    if (result != RAC_SUCCESS || !cModels) {
+        return models;
+    }
+
+    for (size_t i = 0; i < count; i++) {
+        if (cModels[i]) {
+            models.push_back(fromRac(*cModels[i]));
         }
-        rac_model_registry_free_models(models, count);
     }
-#endif
 
-    return results;
+    rac_model_info_array_free(cModels, count);
+
+    return models;
+}
+
+std::vector<ModelInfo> ModelRegistryBridge::getModels(const ModelFilter& filter) {
+    std::vector<ModelInfo> models;
+
+    if (!handle_) {
+        return models;
+    }
+
+    // Get all models first
+    rac_model_info_t** cModels = nullptr;
+    size_t count = 0;
+
+    rac_result_t result = rac_model_registry_get_all(handle_, &cModels, &count);
+
+    if (result != RAC_SUCCESS || !cModels) {
+        return models;
+    }
+
+    // Setup filter
+    rac_model_filter_t cFilter = {};
+    cFilter.framework = filter.framework;
+    cFilter.format = filter.format;
+    cFilter.max_size = filter.maxSize;
+    cFilter.search_query = filter.searchQuery.empty() ? nullptr : filter.searchQuery.c_str();
+
+    // Apply filter using rac_model_matches_filter helper
+    for (size_t i = 0; i < count; i++) {
+        if (cModels[i]) {
+            if (rac_model_matches_filter(cModels[i], &cFilter) == RAC_TRUE) {
+                models.push_back(fromRac(*cModels[i]));
+            }
+        }
+    }
+
+    rac_model_info_array_free(cModels, count);
+
+    return models;
+}
+
+std::vector<ModelInfo> ModelRegistryBridge::getModelsByFramework(rac_inference_framework_t framework) {
+    ModelFilter filter;
+    filter.framework = framework;
+    return getModels(filter);
+}
+
+std::vector<ModelInfo> ModelRegistryBridge::getDownloadedModels() {
+    std::vector<ModelInfo> models;
+
+    if (!handle_) {
+        return models;
+    }
+
+    rac_model_info_t** cModels = nullptr;
+    size_t count = 0;
+
+    rac_result_t result = rac_model_registry_get_downloaded(handle_, &cModels, &count);
+
+    if (result != RAC_SUCCESS || !cModels) {
+        return models;
+    }
+
+    for (size_t i = 0; i < count; i++) {
+        if (cModels[i]) {
+            models.push_back(fromRac(*cModels[i]));
+        }
+    }
+
+    rac_model_info_array_free(cModels, count);
+
+    return models;
+}
+
+bool ModelRegistryBridge::modelExists(const std::string& modelId) {
+    if (!handle_) {
+        return false;
+    }
+
+    // Check existence by trying to get the model
+    rac_model_info_t* cModel = nullptr;
+    rac_result_t result = rac_model_registry_get(handle_, modelId.c_str(), &cModel);
+
+    if (result == RAC_SUCCESS && cModel) {
+        rac_model_info_free(cModel);
+        return true;
+    }
+
+    return false;
+}
+
+bool ModelRegistryBridge::isModelDownloaded(const std::string& modelId) {
+    if (!handle_) {
+        return false;
+    }
+
+    // Get the model and check its download status
+    rac_model_info_t* cModel = nullptr;
+    rac_result_t result = rac_model_registry_get(handle_, modelId.c_str(), &cModel);
+
+    if (result != RAC_SUCCESS || !cModel) {
+        return false;
+    }
+
+    rac_bool_t downloaded = rac_model_info_is_downloaded(cModel);
+    rac_model_info_free(cModel);
+
+    return downloaded == RAC_TRUE;
+}
+
+std::optional<std::string> ModelRegistryBridge::getModelPath(const std::string& modelId) {
+    if (!handle_) {
+        return std::nullopt;
+    }
+
+    // Get the model and extract its local_path
+    rac_model_info_t* cModel = nullptr;
+    rac_result_t result = rac_model_registry_get(handle_, modelId.c_str(), &cModel);
+
+    if (result != RAC_SUCCESS || !cModel) {
+        return std::nullopt;
+    }
+
+    std::string pathStr;
+    if (cModel->local_path && cModel->local_path[0] != '\0') {
+        pathStr = cModel->local_path;
+    }
+
+    rac_model_info_free(cModel);
+
+    return pathStr.empty() ? std::nullopt : std::make_optional(pathStr);
+}
+
+size_t ModelRegistryBridge::getModelCount() {
+    if (!handle_) {
+        return 0;
+    }
+
+    // Get count by getting all models
+    rac_model_info_t** cModels = nullptr;
+    size_t count = 0;
+
+    rac_result_t result = rac_model_registry_get_all(handle_, &cModels, &count);
+
+    if (result == RAC_SUCCESS && cModels) {
+        rac_model_info_array_free(cModels, count);
+    }
+
+    return count;
 }
 
 } // namespace bridges

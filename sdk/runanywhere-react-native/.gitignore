@@ -23,7 +23,9 @@ android/build/
 android/.gradle/
 android/.cxx/
 android/libs/
-android/src/main/jniLibs/
+# Downloaded native libraries and headers (from runanywhere-sdks/runanywhere-binaries)
+**/android/src/main/jniLibs/
+**/android/src/main/include/
 *.aar
 
 # TypeScript

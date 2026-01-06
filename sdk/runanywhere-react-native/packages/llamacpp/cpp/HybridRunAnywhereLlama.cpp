@@ -4,6 +4,8 @@
  * Nitrogen HybridObject implementation for RunAnywhere Llama backend.
  *
  * Llama-specific implementation for text generation using LlamaCPP.
+ *
+ * NOTE: LlamaCPP backend is REQUIRED and always linked via the build system.
  */
 
 #include "HybridRunAnywhereLlama.hpp"
@@ -12,16 +14,15 @@
 #include "bridges/LLMBridge.hpp"
 #include "bridges/StructuredOutputBridge.hpp"
 
-// Backend registration header (conditionally included)
-#ifdef HAS_LLAMACPP
+// Backend registration header - always available
 extern "C" {
 #include "rac_llm_llamacpp.h"
 }
-#endif
 
 #include <sstream>
 #include <chrono>
 #include <vector>
+#include <stdexcept>
 
 // Platform-specific logging
 #if defined(ANDROID) || defined(__ANDROID__)
@@ -122,7 +123,7 @@ HybridRunAnywhereLlama::~HybridRunAnywhereLlama() {
 std::shared_ptr<Promise<bool>> HybridRunAnywhereLlama::registerBackend() {
   return Promise<bool>::async([this]() {
     LOGI("Registering LlamaCPP backend with C++ registry...");
-#ifdef HAS_LLAMACPP
+
     rac_result_t result = rac_backend_llamacpp_register();
     // RAC_SUCCESS (0) or RAC_ERROR_MODULE_ALREADY_REGISTERED (-4) are both OK
     if (result == RAC_SUCCESS || result == -4) {
@@ -131,27 +132,23 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereLlama::registerBackend() {
       return true;
     } else {
       LOGE("❌ LlamaCPP registration failed with code: %d", result);
-      setLastError("LlamaCPP registration failed");
-      return false;
+      setLastError("LlamaCPP registration failed with error: " + std::to_string(result));
+      throw std::runtime_error("LlamaCPP registration failed with error: " + std::to_string(result));
     }
-#else
-    LOGE("LlamaCPP backend not available (HAS_LLAMACPP not defined)");
-    setLastError("LlamaCPP backend not compiled in");
-    return false;
-#endif
   });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereLlama::unregisterBackend() {
   return Promise<bool>::async([this]() {
     LOGI("Unregistering LlamaCPP backend...");
-#ifdef HAS_LLAMACPP
+
     rac_result_t result = rac_backend_llamacpp_unregister();
     isRegistered_ = false;
-    return result == RAC_SUCCESS;
-#else
-    return false;
-#endif
+    if (result != RAC_SUCCESS) {
+      LOGE("❌ LlamaCPP unregistration failed with code: %d", result);
+      throw std::runtime_error("LlamaCPP unregistration failed with error: " + std::to_string(result));
+    }
+    return true;
   });
 }
 
@@ -179,10 +176,12 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereLlama::loadModel(
     std::string name = modelName.value_or("");
 
     // Call with correct 4-arg signature (path, modelId, modelName)
+    // LLMBridge::loadModel will throw on error
     auto result = LLMBridge::shared().loadModel(path, id, name);
     if (result != 0) {
-      setLastError("Failed to load Llama model");
-      return false;
+      std::string error = "Failed to load Llama model: " + path + " (error: " + std::to_string(result) + ")";
+      setLastError(error);
+      throw std::runtime_error(error);
     }
     return true;
   });
@@ -224,7 +223,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereLlama::generate(
   return Promise<std::string>::async([this, prompt, optionsJson]() {
     if (!LLMBridge::shared().isLoaded()) {
       setLastError("Model not loaded");
-      return buildJsonObject({{"error", jsonString("Model not loaded")}});
+      throw std::runtime_error("LLMBridge: Model not loaded. Call loadModel() first.");
     }
 
     LLMOptions options;
@@ -238,6 +237,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereLlama::generate(
     LOGI("Generating with prompt: %.50s...", prompt.c_str());
 
     auto startTime = std::chrono::high_resolution_clock::now();
+    // LLMBridge::generate will throw on error
     auto result = LLMBridge::shared().generate(prompt, options);
     auto endTime = std::chrono::high_resolution_clock::now();
     auto durationMs = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -259,7 +259,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereLlama::generateStream(
   return Promise<std::string>::async([this, prompt, optionsJson, callback]() {
     if (!LLMBridge::shared().isLoaded()) {
       setLastError("Model not loaded");
-      return std::string("");
+      throw std::runtime_error("LLMBridge: Model not loaded. Call loadModel() first.");
     }
 
     LLMOptions options;
@@ -267,6 +267,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereLlama::generateStream(
     options.temperature = extractFloatValue(optionsJson, "temperature", 0.7f);
 
     std::string fullResponse;
+    std::string streamError;
 
     LLMStreamCallbacks streamCallbacks;
     streamCallbacks.onToken = [&callback, &fullResponse](const std::string& token) -> bool {
@@ -281,11 +282,16 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereLlama::generateStream(
         callback("", true);
       }
     };
-    streamCallbacks.onError = [this](int code, const std::string& message) {
+    streamCallbacks.onError = [this, &streamError](int code, const std::string& message) {
       setLastError(message);
+      streamError = message;
     };
 
     LLMBridge::shared().generateStream(prompt, options, streamCallbacks);
+
+    if (!streamError.empty()) {
+      throw std::runtime_error("LLMBridge: Stream generation failed: " + streamError);
+    }
 
     return fullResponse;
   });

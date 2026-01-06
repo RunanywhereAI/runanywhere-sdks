@@ -1,10 +1,12 @@
 /**
- * AuthBridge.hpp
+ * @file AuthBridge.hpp
+ * @brief C++ bridge for authentication operations.
  *
- * C++ bridge for authentication operations.
- * Calls rac_auth_* API from runanywhere-commons.
+ * NOTE: The RACommons library (librac_commons.so) does NOT export auth state
+ * management functions. Authentication must be handled at the platform level
+ * (TypeScript/Kotlin/Swift) with tokens managed outside of C++.
  *
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/CppBridge+Auth.swift
+ * This bridge provides a passthrough interface that delegates to platform.
  */
 
 #pragma once
@@ -16,21 +18,50 @@ namespace runanywhere {
 namespace bridges {
 
 /**
- * Authentication result
+ * Auth response structure
  */
-struct AuthResult {
-    bool success;
+struct AuthResponse {
+    bool success = false;
     std::string accessToken;
     std::string refreshToken;
-    int64_t expiresIn;
     std::string deviceId;
     std::string userId;
     std::string organizationId;
+    int64_t expiresIn = 0;
     std::string error;
 };
 
 /**
- * AuthBridge - Authentication operations via rac_auth_* API
+ * Platform callbacks for auth operations
+ *
+ * Platform (TypeScript/Kotlin/Swift) implements secure storage
+ * and HTTP operations, this C++ layer just provides the interface.
+ */
+struct AuthPlatformCallbacks {
+    // Get tokens from platform secure storage
+    std::function<std::string()> getAccessToken;
+    std::function<std::string()> getRefreshToken;
+
+    // Query auth state
+    std::function<bool()> isAuthenticated;
+    std::function<bool()> tokenNeedsRefresh;
+
+    // Get user info
+    std::function<std::string()> getUserId;
+    std::function<std::string()> getOrganizationId;
+
+    // Clear auth (logout)
+    std::function<void()> clearAuth;
+
+    // Notify platform of auth state changes
+    std::function<void(bool authenticated)> onAuthStateChanged;
+};
+
+/**
+ * AuthBridge - Authentication state management
+ *
+ * Provides JSON building/parsing utilities and state access.
+ * Actual HTTP calls and secure storage are done by platform.
  */
 class AuthBridge {
 public:
@@ -40,58 +71,76 @@ public:
     static AuthBridge& shared();
 
     /**
-     * Authenticate with API key
-     * @param apiKey API key for authentication
-     * @return Authentication result
+     * Set platform callbacks
+     * Must be called during SDK initialization
      */
-    AuthResult authenticate(const std::string& apiKey);
+    void setPlatformCallbacks(const AuthPlatformCallbacks& callbacks);
 
     /**
-     * Refresh access token
-     * @return New access token or empty string on failure
+     * Build authenticate request JSON
+     * Platform uses this to make HTTP POST to /api/v1/auth/sdk/authenticate
      */
-    std::string refreshAccessToken();
+    std::string buildAuthenticateRequestJSON(
+        const std::string& apiKey,
+        const std::string& deviceId,
+        const std::string& platform,
+        const std::string& sdkVersion
+    );
+
+    /**
+     * Build refresh request JSON
+     * Platform uses this to make HTTP POST to /api/v1/auth/sdk/refresh
+     */
+    std::string buildRefreshRequestJSON(
+        const std::string& refreshToken,
+        const std::string& deviceId
+    );
+
+    /**
+     * Handle authentication response JSON
+     * Returns parsed AuthResponse
+     */
+    AuthResponse handleAuthResponse(const std::string& jsonResponse);
+
+    /**
+     * Set auth state (called by platform after successful auth)
+     */
+    void setAuth(const AuthResponse& auth);
 
     /**
      * Get current access token
-     * @return Access token or empty string
      */
     std::string getAccessToken() const;
 
     /**
-     * Get current user ID
-     * @return User ID or empty string
+     * Get current refresh token
      */
-    std::string getUserId() const;
+    std::string getRefreshToken() const;
 
     /**
-     * Get current organization ID
-     * @return Organization ID or empty string
-     */
-    std::string getOrganizationId() const;
-
-    /**
-     * Get current device ID
-     * @return Device ID or empty string
-     */
-    std::string getDeviceId() const;
-
-    /**
-     * Check if authenticated
-     * @return true if authenticated
+     * Check if currently authenticated
      */
     bool isAuthenticated() const;
 
     /**
-     * Clear authentication state
+     * Check if token needs refresh
      */
-    void clearAuthentication();
+    bool tokenNeedsRefresh() const;
 
     /**
-     * Load stored tokens from secure storage
-     * @return true if tokens loaded successfully
+     * Get user ID
      */
-    bool loadStoredTokens();
+    std::string getUserId() const;
+
+    /**
+     * Get organization ID
+     */
+    std::string getOrganizationId() const;
+
+    /**
+     * Clear authentication state
+     */
+    void clearAuth();
 
 private:
     AuthBridge() = default;
@@ -99,12 +148,8 @@ private:
     AuthBridge(const AuthBridge&) = delete;
     AuthBridge& operator=(const AuthBridge&) = delete;
 
-    // State
-    std::string accessToken_;
-    std::string refreshToken_;
-    std::string userId_;
-    std::string organizationId_;
-    std::string deviceId_;
+    AuthPlatformCallbacks platformCallbacks_{};
+    AuthResponse currentAuth_{};
     bool isAuthenticated_ = false;
 };
 

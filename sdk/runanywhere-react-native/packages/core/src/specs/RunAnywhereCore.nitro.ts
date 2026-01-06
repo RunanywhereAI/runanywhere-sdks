@@ -1,7 +1,7 @@
 /**
  * RunAnywhereCore Nitrogen Spec
  *
- * Core SDK interface - includes only core functionality:
+ * Core SDK interface - includes:
  * - SDK Lifecycle (init, destroy)
  * - Authentication
  * - Device Registration
@@ -11,20 +11,25 @@
  * - Events
  * - HTTP Client
  * - Utilities
+ * - LLM/STT/TTS/VAD capabilities (backend-agnostic via rac_*_component_* APIs)
  *
- * NO LLM/STT/TTS/VAD/VoiceAgent methods - those are in separate packages.
+ * The capability methods (LLM, STT, TTS, VAD) are BACKEND-AGNOSTIC.
+ * They call the C++ rac_*_component_* APIs which work with any registered backend.
+ * Apps must install a backend package to register the actual implementation:
+ * - @runanywhere/llamacpp registers the LLM backend
+ * - @runanywhere/onnx registers the STT/TTS/VAD backends
  *
- * Matches Swift SDK: RunAnywhere.swift + CppBridge core extensions
+ * Matches Swift SDK: RunAnywhere.swift + CppBridge extensions
  */
 import type { HybridObject } from 'react-native-nitro-modules';
 
 /**
  * Core RunAnywhere native interface
  *
- * This interface provides core SDK functionality without any inference backends.
- * For LLM, STT, TTS, VAD capabilities, use the separate packages:
- * - @runanywhere/llamacpp for text generation
- * - @runanywhere/onnx for speech processing
+ * This interface provides all SDK functionality using backend-agnostic C++ APIs.
+ * Install backend packages to enable specific capabilities:
+ * - @runanywhere/llamacpp for text generation (LLM)
+ * - @runanywhere/onnx for speech processing (STT, TTS, VAD)
  */
 export interface RunAnywhereCore
   extends HybridObject<{
@@ -277,4 +282,272 @@ export interface RunAnywhereCore
    * @returns Current memory usage in bytes
    */
   getMemoryUsage(): Promise<number>;
+
+  // ============================================================================
+  // LLM Capability (Backend-Agnostic)
+  // Matches Swift: CppBridge+LLM.swift - calls rac_llm_component_* APIs
+  // Requires a backend (e.g., @runanywhere/llamacpp) to be registered
+  // ============================================================================
+
+  /**
+   * Load a text generation model
+   * @param modelPath Path to the model file
+   * @param configJson Optional configuration JSON
+   * @returns true if model loaded successfully
+   */
+  loadTextModel(modelPath: string, configJson?: string): Promise<boolean>;
+
+  /**
+   * Check if a text model is loaded
+   */
+  isTextModelLoaded(): Promise<boolean>;
+
+  /**
+   * Unload the current text model
+   */
+  unloadTextModel(): Promise<boolean>;
+
+  /**
+   * Generate text from a prompt
+   * @param prompt Input prompt
+   * @param optionsJson Generation options JSON
+   * @returns Generated text result as JSON
+   */
+  generate(prompt: string, optionsJson?: string): Promise<string>;
+
+  /**
+   * Generate text with streaming (callback-based)
+   * @param prompt Input prompt
+   * @param optionsJson Generation options JSON
+   * @param callback Token callback (token: string, isComplete: boolean) => void
+   * @returns Final result as JSON
+   */
+  generateStream(
+    prompt: string,
+    optionsJson: string,
+    callback: (token: string, isComplete: boolean) => void
+  ): Promise<string>;
+
+  /**
+   * Cancel ongoing text generation
+   */
+  cancelGeneration(): Promise<boolean>;
+
+  /**
+   * Generate structured output (JSON) from a prompt
+   * @param prompt Input prompt
+   * @param schema JSON schema for output
+   * @param optionsJson Generation options JSON
+   * @returns Structured output as JSON
+   */
+  generateStructured(
+    prompt: string,
+    schema: string,
+    optionsJson?: string
+  ): Promise<string>;
+
+  // ============================================================================
+  // STT Capability (Backend-Agnostic)
+  // Matches Swift: CppBridge+STT.swift - calls rac_stt_component_* APIs
+  // Requires a backend (e.g., @runanywhere/onnx) to be registered
+  // ============================================================================
+
+  /**
+   * Load a speech-to-text model
+   * @param modelPath Path to the model file
+   * @param modelType Model type identifier
+   * @param configJson Optional configuration JSON
+   * @returns true if model loaded successfully
+   */
+  loadSTTModel(
+    modelPath: string,
+    modelType: string,
+    configJson?: string
+  ): Promise<boolean>;
+
+  /**
+   * Check if an STT model is loaded
+   */
+  isSTTModelLoaded(): Promise<boolean>;
+
+  /**
+   * Unload the current STT model
+   */
+  unloadSTTModel(): Promise<boolean>;
+
+  /**
+   * Transcribe audio data
+   * @param audioBase64 Base64 encoded audio data
+   * @param sampleRate Audio sample rate
+   * @param language Language code (optional)
+   * @returns Transcription result as JSON
+   */
+  transcribe(
+    audioBase64: string,
+    sampleRate: number,
+    language?: string
+  ): Promise<string>;
+
+  /**
+   * Transcribe an audio file
+   * @param filePath Path to the audio file
+   * @param language Language code (optional)
+   * @returns Transcription result as JSON
+   */
+  transcribeFile(filePath: string, language?: string): Promise<string>;
+
+  // ============================================================================
+  // TTS Capability (Backend-Agnostic)
+  // Matches Swift: CppBridge+TTS.swift - calls rac_tts_component_* APIs
+  // Requires a backend (e.g., @runanywhere/onnx) to be registered
+  // ============================================================================
+
+  /**
+   * Load a text-to-speech model/voice
+   * @param modelPath Path to the model file
+   * @param modelType Model type identifier
+   * @param configJson Optional configuration JSON
+   * @returns true if model loaded successfully
+   */
+  loadTTSModel(
+    modelPath: string,
+    modelType: string,
+    configJson?: string
+  ): Promise<boolean>;
+
+  /**
+   * Check if a TTS model is loaded
+   */
+  isTTSModelLoaded(): Promise<boolean>;
+
+  /**
+   * Unload the current TTS model
+   */
+  unloadTTSModel(): Promise<boolean>;
+
+  /**
+   * Synthesize speech from text
+   * @param text Text to synthesize
+   * @param voiceId Voice ID to use
+   * @param speedRate Speech speed rate (1.0 = normal)
+   * @param pitchShift Pitch shift (-1.0 to 1.0)
+   * @returns Synthesized audio as base64 encoded JSON
+   */
+  synthesize(
+    text: string,
+    voiceId: string,
+    speedRate: number,
+    pitchShift: number
+  ): Promise<string>;
+
+  /**
+   * Get available TTS voices
+   * @returns JSON array of voice info
+   */
+  getTTSVoices(): Promise<string>;
+
+  /**
+   * Cancel ongoing TTS synthesis
+   */
+  cancelTTS(): Promise<boolean>;
+
+  // ============================================================================
+  // VAD Capability (Backend-Agnostic)
+  // Matches Swift: CppBridge+VAD.swift - calls rac_vad_component_* APIs
+  // Requires a backend (e.g., @runanywhere/onnx) to be registered
+  // ============================================================================
+
+  /**
+   * Load a voice activity detection model
+   * @param modelPath Path to the model file
+   * @param configJson Optional configuration JSON
+   * @returns true if model loaded successfully
+   */
+  loadVADModel(modelPath: string, configJson?: string): Promise<boolean>;
+
+  /**
+   * Check if a VAD model is loaded
+   */
+  isVADModelLoaded(): Promise<boolean>;
+
+  /**
+   * Unload the current VAD model
+   */
+  unloadVADModel(): Promise<boolean>;
+
+  /**
+   * Process audio for voice activity detection
+   * @param audioBase64 Base64 encoded audio data
+   * @param optionsJson VAD options JSON
+   * @returns VAD result as JSON
+   */
+  processVAD(audioBase64: string, optionsJson?: string): Promise<string>;
+
+  /**
+   * Reset VAD state
+   */
+  resetVAD(): Promise<void>;
+
+  // ============================================================================
+  // Voice Agent Capability (Backend-Agnostic)
+  // Matches Swift: CppBridge+VoiceAgent.swift - calls rac_voice_agent_* APIs
+  // Requires STT, LLM, and TTS backends to be registered
+  // ============================================================================
+
+  /**
+   * Initialize voice agent with configuration
+   * @param configJson Configuration JSON
+   * @returns true if initialized successfully
+   */
+  initializeVoiceAgent(configJson: string): Promise<boolean>;
+
+  /**
+   * Initialize voice agent using already loaded models
+   * @returns true if initialized successfully
+   */
+  initializeVoiceAgentWithLoadedModels(): Promise<boolean>;
+
+  /**
+   * Check if voice agent is ready
+   */
+  isVoiceAgentReady(): Promise<boolean>;
+
+  /**
+   * Get voice agent component states
+   * @returns JSON with component states
+   */
+  getVoiceAgentComponentStates(): Promise<string>;
+
+  /**
+   * Process a voice turn (STT -> LLM -> TTS)
+   * @param audioBase64 Base64 encoded audio input
+   * @returns Voice agent result as JSON
+   */
+  processVoiceTurn(audioBase64: string): Promise<string>;
+
+  /**
+   * Transcribe audio using voice agent
+   * @param audioBase64 Base64 encoded audio data
+   * @returns Transcription text
+   */
+  voiceAgentTranscribe(audioBase64: string): Promise<string>;
+
+  /**
+   * Generate response using voice agent
+   * @param prompt Text prompt
+   * @returns Generated response text
+   */
+  voiceAgentGenerateResponse(prompt: string): Promise<string>;
+
+  /**
+   * Synthesize speech using voice agent
+   * @param text Text to synthesize
+   * @returns Synthesized audio as base64
+   */
+  voiceAgentSynthesizeSpeech(text: string): Promise<string>;
+
+  /**
+   * Cleanup voice agent resources
+   */
+  cleanupVoiceAgent(): Promise<void>;
 }

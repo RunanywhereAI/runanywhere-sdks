@@ -45,6 +45,38 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("extractArchive", &HybridRunAnywhereCoreSpec::extractArchive);
       prototype.registerHybridMethod("getDeviceCapabilities", &HybridRunAnywhereCoreSpec::getDeviceCapabilities);
       prototype.registerHybridMethod("getMemoryUsage", &HybridRunAnywhereCoreSpec::getMemoryUsage);
+      prototype.registerHybridMethod("loadTextModel", &HybridRunAnywhereCoreSpec::loadTextModel);
+      prototype.registerHybridMethod("isTextModelLoaded", &HybridRunAnywhereCoreSpec::isTextModelLoaded);
+      prototype.registerHybridMethod("unloadTextModel", &HybridRunAnywhereCoreSpec::unloadTextModel);
+      prototype.registerHybridMethod("generate", &HybridRunAnywhereCoreSpec::generate);
+      prototype.registerHybridMethod("generateStream", &HybridRunAnywhereCoreSpec::generateStream);
+      prototype.registerHybridMethod("cancelGeneration", &HybridRunAnywhereCoreSpec::cancelGeneration);
+      prototype.registerHybridMethod("generateStructured", &HybridRunAnywhereCoreSpec::generateStructured);
+      prototype.registerHybridMethod("loadSTTModel", &HybridRunAnywhereCoreSpec::loadSTTModel);
+      prototype.registerHybridMethod("isSTTModelLoaded", &HybridRunAnywhereCoreSpec::isSTTModelLoaded);
+      prototype.registerHybridMethod("unloadSTTModel", &HybridRunAnywhereCoreSpec::unloadSTTModel);
+      prototype.registerHybridMethod("transcribe", &HybridRunAnywhereCoreSpec::transcribe);
+      prototype.registerHybridMethod("transcribeFile", &HybridRunAnywhereCoreSpec::transcribeFile);
+      prototype.registerHybridMethod("loadTTSModel", &HybridRunAnywhereCoreSpec::loadTTSModel);
+      prototype.registerHybridMethod("isTTSModelLoaded", &HybridRunAnywhereCoreSpec::isTTSModelLoaded);
+      prototype.registerHybridMethod("unloadTTSModel", &HybridRunAnywhereCoreSpec::unloadTTSModel);
+      prototype.registerHybridMethod("synthesize", &HybridRunAnywhereCoreSpec::synthesize);
+      prototype.registerHybridMethod("getTTSVoices", &HybridRunAnywhereCoreSpec::getTTSVoices);
+      prototype.registerHybridMethod("cancelTTS", &HybridRunAnywhereCoreSpec::cancelTTS);
+      prototype.registerHybridMethod("loadVADModel", &HybridRunAnywhereCoreSpec::loadVADModel);
+      prototype.registerHybridMethod("isVADModelLoaded", &HybridRunAnywhereCoreSpec::isVADModelLoaded);
+      prototype.registerHybridMethod("unloadVADModel", &HybridRunAnywhereCoreSpec::unloadVADModel);
+      prototype.registerHybridMethod("processVAD", &HybridRunAnywhereCoreSpec::processVAD);
+      prototype.registerHybridMethod("resetVAD", &HybridRunAnywhereCoreSpec::resetVAD);
+      prototype.registerHybridMethod("initializeVoiceAgent", &HybridRunAnywhereCoreSpec::initializeVoiceAgent);
+      prototype.registerHybridMethod("initializeVoiceAgentWithLoadedModels", &HybridRunAnywhereCoreSpec::initializeVoiceAgentWithLoadedModels);
+      prototype.registerHybridMethod("isVoiceAgentReady", &HybridRunAnywhereCoreSpec::isVoiceAgentReady);
+      prototype.registerHybridMethod("getVoiceAgentComponentStates", &HybridRunAnywhereCoreSpec::getVoiceAgentComponentStates);
+      prototype.registerHybridMethod("processVoiceTurn", &HybridRunAnywhereCoreSpec::processVoiceTurn);
+      prototype.registerHybridMethod("voiceAgentTranscribe", &HybridRunAnywhereCoreSpec::voiceAgentTranscribe);
+      prototype.registerHybridMethod("voiceAgentGenerateResponse", &HybridRunAnywhereCoreSpec::voiceAgentGenerateResponse);
+      prototype.registerHybridMethod("voiceAgentSynthesizeSpeech", &HybridRunAnywhereCoreSpec::voiceAgentSynthesizeSpeech);
+      prototype.registerHybridMethod("cleanupVoiceAgent", &HybridRunAnywhereCoreSpec::cleanupVoiceAgent);
     });
   }
 

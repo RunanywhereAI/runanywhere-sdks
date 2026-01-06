@@ -5,6 +5,9 @@
  * Matches Swift's CppBridge+VAD.swift pattern, providing:
  * - Model lifecycle (load/unload)
  * - Voice activity detection
+ *
+ * Aligned with rac_vad_component.h and rac_vad_types.h API.
+ * RACommons is REQUIRED - no stub implementations.
  */
 
 #pragma once
@@ -14,14 +17,9 @@
 #include <string>
 #include <vector>
 
-#ifdef HAS_RACOMMONS
+// RACommons VAD headers - REQUIRED
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vad/rac_vad_types.h"
-#else
-typedef void* rac_handle_t;
-typedef int rac_result_t;
-#define RAC_SUCCESS 0
-#endif
 
 namespace runanywhere {
 namespace bridges {
@@ -32,7 +30,10 @@ namespace bridges {
 struct VADResult {
     bool isSpeech = false;
     float probability = 0.0f;
+    float speechProbability = 0.0f;  // Alias for probability (for API compatibility)
     double durationMs = 0.0;
+    double startTime = 0.0;          // Start time of speech segment (ms)
+    double endTime = 0.0;            // End time of speech segment (ms)
 };
 
 /**
@@ -48,6 +49,8 @@ struct VADOptions {
  * @brief VAD capability bridge singleton
  *
  * Matches CppBridge+VAD.swift API.
+ * NOTE: RACommons is REQUIRED. All methods will throw std::runtime_error if
+ * the underlying C API calls fail.
  */
 class VADBridge {
 public:
@@ -59,6 +62,7 @@ public:
     rac_result_t loadModel(const std::string& modelId);
     rac_result_t unload();
     void cleanup();
+    void reset();  // Reset VAD state without unloading model
 
     // Detection
     VADResult process(const void* audioData, size_t audioSize, const VADOptions& options);

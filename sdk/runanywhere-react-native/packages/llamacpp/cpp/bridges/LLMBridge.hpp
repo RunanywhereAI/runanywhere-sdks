@@ -6,6 +6,9 @@
  * - Model lifecycle (load/unload)
  * - Text generation (sync and streaming)
  * - Cancellation support
+ *
+ * Aligned with rac_llm_component.h and rac_llm_types.h API.
+ * RACommons is REQUIRED - no stub implementations.
  */
 
 #pragma once
@@ -14,15 +17,9 @@
 #include <memory>
 #include <string>
 
-#ifdef HAS_RACOMMONS
+// RACommons LLM headers - REQUIRED
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/llm/rac_llm_types.h"
-#else
-typedef void* rac_handle_t;
-typedef int rac_result_t;
-typedef int rac_lifecycle_state_t;
-#define RAC_SUCCESS 0
-#endif
 
 namespace runanywhere {
 namespace bridges {
@@ -62,6 +59,8 @@ struct LLMResult {
  * @brief LLM capability bridge singleton
  *
  * Matches CppBridge+LLM.swift API.
+ * NOTE: RACommons is REQUIRED. All methods will throw std::runtime_error if
+ * the underlying C API calls fail.
  */
 class LLMBridge {
 public:

@@ -196,9 +196,31 @@ task downloadNativeLibs {
             }
             logger.lifecycle("   Downloaded: ${commonsZip.length() / 1024}KB")
 
+            // Extract and flatten the archive structure
+            // Archive structure: jniLibs/arm64-v8a/*.so
+            // Target structure: arm64-v8a/*.so (directly in jniLibsDir)
             copy {
                 from zipTree(commonsZip)
                 into jniLibsDir
+                // IMPORTANT: Exclude libc++_shared.so - React Native provides its own
+                // Using a different version causes ABI compatibility issues
+                exclude "**/libc++_shared.so"
+                eachFile { fileCopyDetails ->
+                    def pathString = fileCopyDetails.relativePath.pathString
+                    // Handle jniLibs/ABI/*.so structure -> flatten to ABI/*.so
+                    if (pathString.startsWith("jniLibs/") && pathString.endsWith(".so")) {
+                        def newPath = pathString.replaceFirst("^jniLibs/", "")
+                        fileCopyDetails.relativePath = new RelativePath(true, newPath.split("/"))
+                    } else if (pathString.endsWith(".so")) {
+                        // Keep .so files as-is if already in correct structure
+                    } else {
+                        // Exclude non-so files from jniLibs
+                        if (!pathString.contains("include/")) {
+                            fileCopyDetails.exclude()
+                        }
+                    }
+                }
+                includeEmptyDirs = false
             }
 
             // Copy headers if present in the archive
@@ -215,6 +237,15 @@ task downloadNativeLibs {
                     into includeDir
                 }
                 logger.lifecycle("   ✅ RACommons headers installed")
+            }
+            // Also check for nested jniLibs/include structure
+            def nestedHeadersDir = new File(tempExtract, "jniLibs/include")
+            if (nestedHeadersDir.exists()) {
+                copy {
+                    from nestedHeadersDir
+                    into includeDir
+                }
+                logger.lifecycle("   ✅ RACommons headers installed (from nested path)")
             }
             tempExtract.deleteDir()
 
@@ -279,4 +310,7 @@ repositories {
 dependencies {
     implementation "com.facebook.react:react-android"
     implementation project(":react-native-nitro-modules")
+
+    // Apache Commons Compress for tar.gz/tar.bz2 archive extraction
+    implementation "org.apache.commons:commons-compress:1.26.0"
 }

@@ -6,7 +6,9 @@
  */
 
 #include <jni.h>
+#include "runanywhereonnxOnLoad.hpp"
 
 extern "C" JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
-    return JNI_VERSION_1_6;
+    // Initialize nitrogen module and register HybridObjects
+    return margelo::nitro::runanywhere::onnx::initialize(vm);
 }

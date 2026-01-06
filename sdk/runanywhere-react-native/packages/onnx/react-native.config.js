@@ -3,7 +3,8 @@ module.exports = {
     platforms: {
       android: {
         sourceDir: './android',
-        packageImportPath: 'import com.margelo.nitro.runanywhere.onnx.*;',
+        packageImportPath: 'import com.margelo.nitro.runanywhere.onnx.RunAnywhereONNXPackage;',
+        packageInstance: 'new RunAnywhereONNXPackage()',
       },
       ios: {
         podspecPath: './ios/ONNXBackend.podspec',

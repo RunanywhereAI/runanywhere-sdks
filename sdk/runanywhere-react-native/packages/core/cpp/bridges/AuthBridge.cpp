@@ -1,141 +1,208 @@
 /**
- * AuthBridge.cpp
+ * @file AuthBridge.cpp
+ * @brief C++ bridge for authentication operations.
  *
- * C++ bridge for authentication operations.
- * Calls rac_auth_* API from runanywhere-commons.
+ * NOTE: The RACommons library (librac_commons.so) does NOT export auth state
+ * management functions. Authentication must be handled at the platform level
+ * (TypeScript/Kotlin/Swift) with tokens managed outside of C++.
+ *
+ * This bridge provides a passthrough interface that delegates to platform.
  */
 
 #include "AuthBridge.hpp"
+#include "rac/core/rac_error.h"
+#include <stdexcept>
 
 // Platform-specific logging
 #if defined(ANDROID) || defined(__ANDROID__)
 #include <android/log.h>
 #define LOG_TAG "AuthBridge"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 #else
 #include <cstdio>
 #define LOGI(...) printf("[AuthBridge] "); printf(__VA_ARGS__); printf("\n")
+#define LOGD(...) printf("[AuthBridge DEBUG] "); printf(__VA_ARGS__); printf("\n")
 #define LOGE(...) printf("[AuthBridge ERROR] "); printf(__VA_ARGS__); printf("\n")
+#define LOGW(...) printf("[AuthBridge WARN] "); printf(__VA_ARGS__); printf("\n")
 #endif
-
-// TODO: Include RACommons headers when available
-// #include <rac_auth.h>
 
 namespace runanywhere {
 namespace bridges {
+
+// =============================================================================
+// Singleton Implementation
+// =============================================================================
 
 AuthBridge& AuthBridge::shared() {
     static AuthBridge instance;
     return instance;
 }
 
-AuthResult AuthBridge::authenticate(const std::string& apiKey) {
-    LOGI("Authenticating with API key...");
+// =============================================================================
+// Platform Callbacks
+// =============================================================================
 
-    AuthResult result;
-
-    // TODO: Call rac_auth_authenticate when RACommons is linked
-    // For now, store the API key and mark as authenticated for development
-    #if 0
-    rac_auth_request_t request;
-    request.api_key = apiKey.c_str();
-    request.device_id = deviceId_.c_str();
-
-    rac_auth_response_t response;
-    auto status = rac_auth_authenticate(&request, &response);
-
-    if (status == RAC_SUCCESS) {
-        accessToken_ = response.access_token ? response.access_token : "";
-        refreshToken_ = response.refresh_token ? response.refresh_token : "";
-        userId_ = response.user_id ? response.user_id : "";
-        organizationId_ = response.organization_id ? response.organization_id : "";
-        isAuthenticated_ = true;
-
-        result.success = true;
-        result.accessToken = accessToken_;
-        result.refreshToken = refreshToken_;
-        result.expiresIn = response.expires_in;
-        result.deviceId = deviceId_;
-        result.userId = userId_;
-        result.organizationId = organizationId_;
-    } else {
-        result.success = false;
-        result.error = "Authentication failed";
-    }
-    #else
-    // Development stub
-    isAuthenticated_ = true;
-    result.success = true;
-    result.accessToken = "dev_token";
-    result.deviceId = deviceId_;
-    LOGI("Authentication stub - development mode");
-    #endif
-
-    return result;
+void AuthBridge::setPlatformCallbacks(const AuthPlatformCallbacks& callbacks) {
+    platformCallbacks_ = callbacks;
+    LOGI("Platform callbacks set for AuthBridge");
 }
 
-std::string AuthBridge::refreshAccessToken() {
-    LOGI("Refreshing access token...");
+// =============================================================================
+// JSON Building (Platform calls HTTP, we just format)
+// =============================================================================
 
-    // TODO: Call rac_auth_refresh when RACommons is linked
-    #if 0
-    rac_auth_refresh_request_t request;
-    request.refresh_token = refreshToken_.c_str();
-    request.device_id = deviceId_.c_str();
+std::string AuthBridge::buildAuthenticateRequestJSON(
+    const std::string& apiKey,
+    const std::string& deviceId,
+    const std::string& platform,
+    const std::string& sdkVersion
+) {
+    // Simple JSON building without external dependencies
+    std::string json = "{";
+    json += "\"api_key\":\"" + apiKey + "\",";
+    json += "\"device_id\":\"" + deviceId + "\",";
+    json += "\"platform\":\"" + platform + "\",";
+    json += "\"sdk_version\":\"" + sdkVersion + "\"";
+    json += "}";
+    return json;
+}
 
-    rac_auth_response_t response;
-    auto status = rac_auth_refresh(&request, &response);
+std::string AuthBridge::buildRefreshRequestJSON(
+    const std::string& refreshToken,
+    const std::string& deviceId
+) {
+    std::string json = "{";
+    json += "\"refresh_token\":\"" + refreshToken + "\",";
+    json += "\"device_id\":\"" + deviceId + "\"";
+    json += "}";
+    return json;
+}
 
-    if (status == RAC_SUCCESS) {
-        accessToken_ = response.access_token ? response.access_token : "";
-        refreshToken_ = response.refresh_token ? response.refresh_token : "";
-        return accessToken_;
+// =============================================================================
+// Response Handling (Parse JSON and extract fields)
+// =============================================================================
+
+AuthResponse AuthBridge::handleAuthResponse(const std::string& jsonResponse) {
+    AuthResponse response;
+
+    // Simple JSON parsing (extract key fields)
+    // In production, use a proper JSON library
+    auto extractString = [&](const std::string& key) -> std::string {
+        std::string searchKey = "\"" + key + "\":\"";
+        size_t pos = jsonResponse.find(searchKey);
+        if (pos == std::string::npos) return "";
+        pos += searchKey.length();
+        size_t endPos = jsonResponse.find("\"", pos);
+        if (endPos == std::string::npos) return "";
+        return jsonResponse.substr(pos, endPos - pos);
+    };
+
+    auto extractInt = [&](const std::string& key) -> int64_t {
+        std::string searchKey = "\"" + key + "\":";
+        size_t pos = jsonResponse.find(searchKey);
+        if (pos == std::string::npos) return 0;
+        pos += searchKey.length();
+        try {
+            return std::stoll(jsonResponse.substr(pos));
+        } catch (...) {
+            return 0;
+        }
+    };
+
+    response.accessToken = extractString("access_token");
+    response.refreshToken = extractString("refresh_token");
+    response.deviceId = extractString("device_id");
+    response.userId = extractString("user_id");
+    response.organizationId = extractString("organization_id");
+    response.expiresIn = extractInt("expires_in");
+    response.success = !response.accessToken.empty();
+
+    if (!response.success) {
+        response.error = extractString("error");
+        if (response.error.empty()) {
+            response.error = extractString("message");
+        }
     }
-    #endif
 
-    return accessToken_;
+    return response;
+}
+
+// =============================================================================
+// State Management (Delegated to platform via callbacks)
+// =============================================================================
+
+void AuthBridge::setAuth(const AuthResponse& auth) {
+    // Store locally for C++ access
+    currentAuth_ = auth;
+    isAuthenticated_ = auth.success && !auth.accessToken.empty();
+
+    // Notify platform
+    if (platformCallbacks_.onAuthStateChanged) {
+        platformCallbacks_.onAuthStateChanged(isAuthenticated_);
+    }
+
+    LOGI("Auth state updated: authenticated=%d", isAuthenticated_ ? 1 : 0);
 }
 
 std::string AuthBridge::getAccessToken() const {
-    return accessToken_;
+    if (platformCallbacks_.getAccessToken) {
+        return platformCallbacks_.getAccessToken();
+    }
+    return currentAuth_.accessToken;
 }
 
-std::string AuthBridge::getUserId() const {
-    return userId_;
-}
-
-std::string AuthBridge::getOrganizationId() const {
-    return organizationId_;
-}
-
-std::string AuthBridge::getDeviceId() const {
-    return deviceId_;
+std::string AuthBridge::getRefreshToken() const {
+    if (platformCallbacks_.getRefreshToken) {
+        return platformCallbacks_.getRefreshToken();
+    }
+    return currentAuth_.refreshToken;
 }
 
 bool AuthBridge::isAuthenticated() const {
+    if (platformCallbacks_.isAuthenticated) {
+        return platformCallbacks_.isAuthenticated();
+    }
     return isAuthenticated_;
 }
 
-void AuthBridge::clearAuthentication() {
-    LOGI("Clearing authentication state");
-
-    accessToken_.clear();
-    refreshToken_.clear();
-    userId_.clear();
-    organizationId_.clear();
-    isAuthenticated_ = false;
-
-    // TODO: Call rac_auth_clear when RACommons is linked
+bool AuthBridge::tokenNeedsRefresh() const {
+    if (platformCallbacks_.tokenNeedsRefresh) {
+        return platformCallbacks_.tokenNeedsRefresh();
+    }
+    // Default: check if we have refresh token but no valid access token
+    return !currentAuth_.refreshToken.empty() && currentAuth_.accessToken.empty();
 }
 
-bool AuthBridge::loadStoredTokens() {
-    LOGI("Loading stored tokens...");
+std::string AuthBridge::getUserId() const {
+    if (platformCallbacks_.getUserId) {
+        return platformCallbacks_.getUserId();
+    }
+    return currentAuth_.userId;
+}
 
-    // TODO: Call rac_auth_load_stored when RACommons is linked
-    // This will read from secure storage via platform adapter
+std::string AuthBridge::getOrganizationId() const {
+    if (platformCallbacks_.getOrganizationId) {
+        return platformCallbacks_.getOrganizationId();
+    }
+    return currentAuth_.organizationId;
+}
 
-    return false;
+void AuthBridge::clearAuth() {
+    currentAuth_ = AuthResponse();
+    isAuthenticated_ = false;
+
+    if (platformCallbacks_.clearAuth) {
+        platformCallbacks_.clearAuth();
+    }
+
+    if (platformCallbacks_.onAuthStateChanged) {
+        platformCallbacks_.onAuthStateChanged(false);
+    }
+
+    LOGI("Auth state cleared");
 }
 
 } // namespace bridges
