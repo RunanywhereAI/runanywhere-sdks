@@ -334,30 +334,30 @@ COMMONS_DIST="${COMMONS_DIR}/dist/android/jniLibs"
 COMMONS_BUILD="${COMMONS_DIR}/build/android"
 
 # Define which libraries go where
-# Main SDK: Commons-only libraries
+# Main SDK: Commons-only libraries + common runtimes
 MAIN_LIBS=(
     "librunanywhere_jni.so"
     "librac_commons.so"
     "libc++_shared.so"
+    "libomp.so"  # OpenMP runtime - shared by LlamaCPP and ONNX backends
 )
 
 # LlamaCPP Module: Self-contained LlamaCPP backend
+# NOTE: libomp.so is in main SDK (no duplicates)
 LLAMACPP_LIBS=(
     "librac_backend_llamacpp_jni.so"
     "librunanywhere_llamacpp.so"
-    "libomp.so"
 )
 
 # ONNX Module: ONNX backend with dependencies
+# NOTE: libomp.so, librac_commons.so and libc++_shared.so come from main SDK (no duplicates)
 ONNX_LIBS=(
     "librac_backend_onnx_jni.so"
     "librunanywhere_onnx.so"
-    # NOTE: librac_commons.so and libc++_shared.so come from main SDK (no duplicates)
     "libonnxruntime.so"
     "libsherpa-onnx-c-api.so"
     "libsherpa-onnx-cxx-api.so"
     "libsherpa-onnx-jni.so"
-    "libomp.so"
 )
 
 # Helper function to find and copy a library from multiple source locations

@@ -1,870 +1,486 @@
-/*
- * Copyright 2026 RunAnywhere SDK
- * SPDX-License-Identifier: Apache-2.0
+/**
+ * CppBridge+Auth.kt
+ * RunAnywhere SDK
  *
- * Auth extension for CppBridge.
- * Provides authentication flow callbacks for C++ core.
+ * Authentication bridge extension for production/staging mode.
+ * Handles full auth flow: JSON building, HTTP, parsing, state storage.
  *
- * Follows iOS CppBridge+Auth.swift architecture.
+ * Mirrors Swift SDK's CppBridge+Auth.swift implementation.
  */
-
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.OutputStreamWriter
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.concurrent.atomic.AtomicReference
+
 /**
- * Authentication bridge that provides authentication flow callbacks for C++ core.
- *
- * The C++ core needs authentication state and credentials for:
- * - API key validation
- * - Token-based authentication
- * - Access control for model downloads
- * - Service authorization
- *
- * Usage:
- * - Called during Phase 1 initialization in [CppBridge.initialize]
- * - Must be registered after [CppBridgePlatformAdapter] is registered
- *
- * Thread Safety:
- * - Registration is thread-safe via synchronized block
- * - All callbacks are thread-safe
+ * Authentication response from the backend
+ */
+@Serializable
+data class AuthenticationResponse(
+    @SerialName("access_token") val accessToken: String,
+    @SerialName("device_id") val deviceId: String,
+    @SerialName("expires_in") val expiresIn: Int,
+    @SerialName("organization_id") val organizationId: String,
+    @SerialName("refresh_token") val refreshToken: String,
+    @SerialName("token_type") val tokenType: String,
+    @SerialName("user_id") val userId: String? = null
+)
+
+/**
+ * Authentication request body
+ */
+@Serializable
+data class AuthenticationRequest(
+    @SerialName("api_key") val apiKey: String,
+    @SerialName("device_id") val deviceId: String,
+    val platform: String,
+    @SerialName("sdk_version") val sdkVersion: String
+)
+
+/**
+ * Refresh token request body
+ */
+@Serializable
+data class RefreshTokenRequest(
+    @SerialName("device_id") val deviceId: String,
+    @SerialName("refresh_token") val refreshToken: String
+)
+
+/**
+ * Authentication bridge for production/staging mode.
+ * Handles JWT token acquisition and management.
  */
 object CppBridgeAuth {
-
+    private const val TAG = "CppBridge/Auth"
+    private const val ENDPOINT_AUTHENTICATE = "/api/v1/auth/sdk/authenticate"
+    private const val ENDPOINT_REFRESH = "/api/v1/auth/sdk/refresh"
+    
+    // Authentication state
+    private val _accessToken = AtomicReference<String?>(null)
+    private val _refreshToken = AtomicReference<String?>(null)
+    private val _deviceId = AtomicReference<String?>(null)
+    private val _organizationId = AtomicReference<String?>(null)
+    private val _userId = AtomicReference<String?>(null)
+    private val _expiresAt = AtomicReference<Long?>(null)
+    private val _baseUrl = AtomicReference<String?>(null)
+    private val _apiKey = AtomicReference<String?>(null)
+    
+    private val json = Json { 
+        ignoreUnknownKeys = true 
+        isLenient = true
+    }
+    
     /**
-     * Authentication status constants matching C++ RAC_AUTH_STATUS_* values.
+     * Current access token (JWT) for Bearer authentication.
+     * Use getValidToken() instead for automatic refresh handling.
      */
-    object AuthStatus {
-        /** Not authenticated */
-        const val NOT_AUTHENTICATED = 0
-
-        /** Authentication in progress */
-        const val AUTHENTICATING = 1
-
-        /** Successfully authenticated */
-        const val AUTHENTICATED = 2
-
-        /** Authentication failed */
-        const val FAILED = 3
-
-        /** Authentication expired (token expired) */
-        const val EXPIRED = 4
-
-        /**
-         * Get a human-readable name for the auth status.
-         */
-        fun getName(status: Int): String = when (status) {
-            NOT_AUTHENTICATED -> "NOT_AUTHENTICATED"
-            AUTHENTICATING -> "AUTHENTICATING"
-            AUTHENTICATED -> "AUTHENTICATED"
-            FAILED -> "FAILED"
-            EXPIRED -> "EXPIRED"
-            else -> "UNKNOWN($status)"
+    val accessToken: String?
+        get() = _accessToken.get()
+    
+    /**
+     * Check if token needs refresh (expires within 5 minutes)
+     */
+    val tokenNeedsRefresh: Boolean
+        get() {
+            val expiresAt = _expiresAt.get() ?: return true
+            val nowMs = System.currentTimeMillis()
+            val fiveMinutesMs = 5 * 60 * 1000
+            return nowMs >= (expiresAt - fiveMinutesMs)
         }
-    }
-
+    
     /**
-     * Authentication error codes matching C++ RAC_AUTH_ERROR_* values.
+     * Check if currently authenticated
      */
-    object AuthErrorCode {
-        /** No error */
-        const val NONE = 0
-
-        /** Invalid API key */
-        const val INVALID_API_KEY = 1
-
-        /** API key expired */
-        const val API_KEY_EXPIRED = 2
-
-        /** Invalid token */
-        const val INVALID_TOKEN = 3
-
-        /** Token expired */
-        const val TOKEN_EXPIRED = 4
-
-        /** Unauthorized access */
-        const val UNAUTHORIZED = 5
-
-        /** Network error during authentication */
-        const val NETWORK_ERROR = 6
-
-        /** Server error during authentication */
-        const val SERVER_ERROR = 7
-
-        /** Unknown error */
-        const val UNKNOWN = 99
-
-        /**
-         * Get a human-readable name for the error code.
-         */
-        fun getName(code: Int): String = when (code) {
-            NONE -> "NONE"
-            INVALID_API_KEY -> "INVALID_API_KEY"
-            API_KEY_EXPIRED -> "API_KEY_EXPIRED"
-            INVALID_TOKEN -> "INVALID_TOKEN"
-            TOKEN_EXPIRED -> "TOKEN_EXPIRED"
-            UNAUTHORIZED -> "UNAUTHORIZED"
-            NETWORK_ERROR -> "NETWORK_ERROR"
-            SERVER_ERROR -> "SERVER_ERROR"
-            UNKNOWN -> "UNKNOWN"
-            else -> "UNKNOWN($code)"
+    val isAuthenticated: Boolean
+        get() = _accessToken.get() != null && !tokenNeedsRefresh
+    
+    /**
+     * Get a valid access token, automatically refreshing if needed.
+     * This is the preferred way to get the token for requests.
+     * 
+     * @return Valid access token, or null if not authenticated and can't refresh
+     */
+    fun getValidToken(): String? {
+        val currentToken = _accessToken.get()
+        
+        // If we have a valid token, return it
+        if (currentToken != null && !tokenNeedsRefresh) {
+            return currentToken
         }
-    }
-
-    /**
-     * Token type constants.
-     */
-    object TokenType {
-        /** Access token for API calls */
-        const val ACCESS = 0
-
-        /** Refresh token for obtaining new access tokens */
-        const val REFRESH = 1
-
-        /** ID token for user identification */
-        const val ID = 2
-    }
-
-    @Volatile
-    private var isRegistered: Boolean = false
-
-    @Volatile
-    private var authStatus: Int = AuthStatus.NOT_AUTHENTICATED
-
-    @Volatile
-    private var apiKey: String? = null
-
-    @Volatile
-    private var accessToken: String? = null
-
-    @Volatile
-    private var refreshToken: String? = null
-
-    @Volatile
-    private var tokenExpirationMs: Long = 0
-
-    private val lock = Any()
-
-    /**
-     * Tag for logging.
-     */
-    private const val TAG = "CppBridgeAuth"
-
-    /**
-     * Secure storage keys for auth credentials.
-     */
-    private const val API_KEY_STORAGE_KEY = "runanywhere_api_key"
-    private const val ACCESS_TOKEN_STORAGE_KEY = "runanywhere_access_token"
-    private const val REFRESH_TOKEN_STORAGE_KEY = "runanywhere_refresh_token"
-    private const val TOKEN_EXPIRATION_STORAGE_KEY = "runanywhere_token_expiration"
-
-    /**
-     * Optional listener for authentication events.
-     * Set this before calling [register] to receive events.
-     */
-    @Volatile
-    var authListener: AuthListener? = null
-
-    /**
-     * Optional provider for custom authentication logic.
-     * Set this to implement custom authentication flows.
-     */
-    @Volatile
-    var authProvider: AuthProvider? = null
-
-    /**
-     * Listener interface for authentication events.
-     */
-    interface AuthListener {
-        /**
-         * Called when authentication status changes.
-         *
-         * @param previousStatus The previous auth status
-         * @param newStatus The new auth status
-         */
-        fun onAuthStatusChanged(previousStatus: Int, newStatus: Int)
-
-        /**
-         * Called when authentication succeeds.
-         */
-        fun onAuthSuccess()
-
-        /**
-         * Called when authentication fails.
-         *
-         * @param errorCode The error code (see [AuthErrorCode])
-         * @param errorMessage The error message
-         */
-        fun onAuthFailure(errorCode: Int, errorMessage: String)
-
-        /**
-         * Called when a token is refreshed.
-         *
-         * @param tokenType The type of token (see [TokenType])
-         */
-        fun onTokenRefreshed(tokenType: Int)
-
-        /**
-         * Called when a token expires.
-         *
-         * @param tokenType The type of token (see [TokenType])
-         */
-        fun onTokenExpired(tokenType: Int)
-    }
-
-    /**
-     * Provider interface for custom authentication logic.
-     *
-     * Implement this to provide custom API key validation or token refresh logic.
-     */
-    interface AuthProvider {
-        /**
-         * Validate an API key.
-         *
-         * @param apiKey The API key to validate
-         * @return true if the API key is valid, false otherwise
-         */
-        fun validateApiKey(apiKey: String): Boolean
-
-        /**
-         * Refresh the access token using the refresh token.
-         *
-         * @param refreshToken The refresh token
-         * @return The new access token, or null if refresh failed
-         */
-        fun refreshAccessToken(refreshToken: String): String?
-
-        /**
-         * Get the token expiration time in milliseconds.
-         *
-         * @param token The token to check
-         * @return The expiration time in milliseconds since epoch, or 0 if unknown
-         */
-        fun getTokenExpirationMs(token: String): Long
-    }
-
-    /**
-     * Register the auth callbacks with C++ core.
-     *
-     * This must be called during SDK initialization, after [CppBridgePlatformAdapter.register].
-     * It is safe to call multiple times; subsequent calls are no-ops.
-     */
-    fun register() {
-        synchronized(lock) {
-            if (isRegistered) {
-                return
-            }
-
-            // Load saved credentials from secure storage
-            loadSavedCredentials()
-
-            // Register the auth callbacks with C++ via JNI
-            // TODO: Call native registration
-            // nativeSetAuthCallbacks()
-
-            isRegistered = true
-
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                TAG,
-                "Auth callbacks registered. Status: ${AuthStatus.getName(authStatus)}"
-            )
-        }
-    }
-
-    /**
-     * Check if the auth callbacks are registered.
-     */
-    fun isRegistered(): Boolean = isRegistered
-
-    /**
-     * Get the current authentication status.
-     */
-    fun getStatus(): Int = authStatus
-
-    /**
-     * Check if the SDK is authenticated.
-     */
-    fun isAuthenticated(): Boolean = authStatus == AuthStatus.AUTHENTICATED
-
-    // ========================================================================
-    // AUTH CALLBACKS
-    // ========================================================================
-
-    /**
-     * Get the API key callback.
-     *
-     * Returns the currently configured API key for authentication.
-     *
-     * @return The API key, or null if not set
-     *
-     * NOTE: This function is called from JNI. Do not capture any state.
-     */
-    @JvmStatic
-    fun getApiKeyCallback(): String? {
-        return apiKey
-    }
-
-    /**
-     * Get the access token callback.
-     *
-     * Returns the current access token for API authorization.
-     *
-     * @return The access token, or null if not authenticated
-     *
-     * NOTE: This function is called from JNI. Do not capture any state.
-     */
-    @JvmStatic
-    fun getAccessTokenCallback(): String? {
-        // Check if token is expired
-        if (accessToken != null && tokenExpirationMs > 0) {
-            val now = System.currentTimeMillis()
-            if (now >= tokenExpirationMs) {
+        
+        // Try to refresh if we have refresh token and base URL
+        val refreshToken = _refreshToken.get()
+        val baseUrl = _baseUrl.get()
+        
+        if (refreshToken != null && baseUrl != null) {
+            try {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Access token expired, attempting refresh"
+                    "🔄 Token expired or expiring soon, refreshing..."
                 )
-                // Try to refresh the token
-                refreshTokenIfNeeded()
-            }
-        }
-        return accessToken
-    }
-
-    /**
-     * Get the refresh token callback.
-     *
-     * Returns the refresh token for obtaining new access tokens.
-     *
-     * @return The refresh token, or null if not available
-     *
-     * NOTE: This function is called from JNI. Do not capture any state.
-     */
-    @JvmStatic
-    fun getRefreshTokenCallback(): String? {
-        return refreshToken
-    }
-
-    /**
-     * Get the authentication status callback.
-     *
-     * @return The current auth status (see [AuthStatus])
-     *
-     * NOTE: This function is called from JNI. Do not capture any state.
-     */
-    @JvmStatic
-    fun getAuthStatusCallback(): Int {
-        return authStatus
-    }
-
-    /**
-     * Check if authenticated callback.
-     *
-     * @return true if currently authenticated, false otherwise
-     *
-     * NOTE: This function is called from JNI. Do not capture any state.
-     */
-    @JvmStatic
-    fun isAuthenticatedCallback(): Boolean {
-        return authStatus == AuthStatus.AUTHENTICATED
-    }
-
-    /**
-     * Set authentication status callback.
-     *
-     * Called by C++ core when authentication status changes.
-     *
-     * @param status The new auth status (see [AuthStatus])
-     * @param errorCode Error code if status is FAILED (see [AuthErrorCode])
-     * @param errorMessage Error message if status is FAILED
-     *
-     * NOTE: This function is called from JNI. Do not capture any state.
-     */
-    @JvmStatic
-    fun setAuthStatusCallback(status: Int, errorCode: Int, errorMessage: String?) {
-        val previousStatus = authStatus
-        authStatus = status
-
-        CppBridgePlatformAdapter.logCallback(
-            CppBridgePlatformAdapter.LogLevel.DEBUG,
-            TAG,
-            "Auth status changed: ${AuthStatus.getName(previousStatus)} -> ${AuthStatus.getName(status)}"
-        )
-
-        // Notify listener
-        try {
-            authListener?.onAuthStatusChanged(previousStatus, status)
-
-            when (status) {
-                AuthStatus.AUTHENTICATED -> {
-                    authListener?.onAuthSuccess()
-                }
-                AuthStatus.FAILED -> {
-                    authListener?.onAuthFailure(
-                        errorCode,
-                        errorMessage ?: "Authentication failed"
-                    )
-                }
-                AuthStatus.EXPIRED -> {
-                    authListener?.onTokenExpired(TokenType.ACCESS)
-                }
-            }
-        } catch (e: Exception) {
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.WARN,
-                TAG,
-                "Error in auth listener: ${e.message}"
-            )
-        }
-    }
-
-    /**
-     * Set token callback.
-     *
-     * Called by C++ core when a token is received or refreshed.
-     *
-     * @param tokenType The type of token (see [TokenType])
-     * @param token The token value
-     * @param expirationMs Token expiration in milliseconds since epoch
-     *
-     * NOTE: This function is called from JNI. Do not capture any state.
-     */
-    @JvmStatic
-    fun setTokenCallback(tokenType: Int, token: String, expirationMs: Long) {
-        synchronized(lock) {
-            when (tokenType) {
-                TokenType.ACCESS -> {
-                    accessToken = token
-                    tokenExpirationMs = expirationMs
-                    saveToSecureStorage(ACCESS_TOKEN_STORAGE_KEY, token)
-                    saveToSecureStorage(TOKEN_EXPIRATION_STORAGE_KEY, expirationMs.toString())
-                }
-                TokenType.REFRESH -> {
-                    refreshToken = token
-                    saveToSecureStorage(REFRESH_TOKEN_STORAGE_KEY, token)
-                }
-            }
-        }
-
-        CppBridgePlatformAdapter.logCallback(
-            CppBridgePlatformAdapter.LogLevel.DEBUG,
-            TAG,
-            "Token set: type=${tokenType}, expires=${expirationMs}"
-        )
-
-        // Notify listener
-        try {
-            authListener?.onTokenRefreshed(tokenType)
-        } catch (e: Exception) {
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.WARN,
-                TAG,
-                "Error in auth listener onTokenRefreshed: ${e.message}"
-            )
-        }
-    }
-
-    /**
-     * Validate API key callback.
-     *
-     * Called by C++ core to validate an API key.
-     *
-     * @param key The API key to validate
-     * @return true if the API key is valid, false otherwise
-     *
-     * NOTE: This function is called from JNI. Do not capture any state.
-     */
-    @JvmStatic
-    fun validateApiKeyCallback(key: String): Boolean {
-        CppBridgePlatformAdapter.logCallback(
-            CppBridgePlatformAdapter.LogLevel.DEBUG,
-            TAG,
-            "Validating API key"
-        )
-
-        // Use custom provider if available
-        val provider = authProvider
-        if (provider != null) {
-            return try {
-                provider.validateApiKey(key)
+                return refreshAccessToken(baseUrl)
             } catch (e: Exception) {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Error validating API key: ${e.message}"
+                    "❌ Token refresh failed: ${e.message}"
                 )
-                false
-            }
-        }
-
-        // Default validation: non-empty key with minimum length
-        return key.isNotBlank() && key.length >= 8
-    }
-
-    /**
-     * Clear credentials callback.
-     *
-     * Called by C++ core to clear all stored credentials.
-     *
-     * NOTE: This function is called from JNI. Do not capture any state.
-     */
-    @JvmStatic
-    fun clearCredentialsCallback() {
-        synchronized(lock) {
-            apiKey = null
-            accessToken = null
-            refreshToken = null
-            tokenExpirationMs = 0
-            authStatus = AuthStatus.NOT_AUTHENTICATED
-
-            // Clear from secure storage
-            CppBridgePlatformAdapter.secureDeleteCallback(API_KEY_STORAGE_KEY)
-            CppBridgePlatformAdapter.secureDeleteCallback(ACCESS_TOKEN_STORAGE_KEY)
-            CppBridgePlatformAdapter.secureDeleteCallback(REFRESH_TOKEN_STORAGE_KEY)
-            CppBridgePlatformAdapter.secureDeleteCallback(TOKEN_EXPIRATION_STORAGE_KEY)
-        }
-
-        CppBridgePlatformAdapter.logCallback(
-            CppBridgePlatformAdapter.LogLevel.INFO,
-            TAG,
-            "Credentials cleared"
-        )
-    }
-
-    // ========================================================================
-    // JNI NATIVE DECLARATIONS
-    // ========================================================================
-
-    /**
-     * Native method to set the auth callbacks with C++ core.
-     *
-     * Registers [getApiKeyCallback], [getAccessTokenCallback],
-     * [getAuthStatusCallback], [setAuthStatusCallback], [setTokenCallback],
-     * [validateApiKeyCallback], and [clearCredentialsCallback] with C++ core.
-     *
-     * C API: rac_auth_set_callbacks(...)
-     */
-    @JvmStatic
-    private external fun nativeSetAuthCallbacks()
-
-    /**
-     * Native method to unset the auth callbacks.
-     *
-     * Called during shutdown to clean up native resources.
-     *
-     * C API: rac_auth_set_callbacks(nullptr)
-     */
-    @JvmStatic
-    private external fun nativeUnsetAuthCallbacks()
-
-    /**
-     * Native method to authenticate with API key.
-     *
-     * @param apiKey The API key to authenticate with
-     * @return 0 on success, error code on failure
-     *
-     * C API: rac_auth_authenticate_api_key(api_key)
-     */
-    @JvmStatic
-    external fun nativeAuthenticateApiKey(apiKey: String): Int
-
-    /**
-     * Native method to refresh the access token.
-     *
-     * @return 0 on success, error code on failure
-     *
-     * C API: rac_auth_refresh_token()
-     */
-    @JvmStatic
-    external fun nativeRefreshToken(): Int
-
-    /**
-     * Native method to logout and clear credentials.
-     *
-     * @return 0 on success, error code on failure
-     *
-     * C API: rac_auth_logout()
-     */
-    @JvmStatic
-    external fun nativeLogout(): Int
-
-    // ========================================================================
-    // LIFECYCLE MANAGEMENT
-    // ========================================================================
-
-    /**
-     * Unregister the auth callbacks and clean up resources.
-     *
-     * Called during SDK shutdown.
-     */
-    fun unregister() {
-        synchronized(lock) {
-            if (!isRegistered) {
-                return
-            }
-
-            // TODO: Call native unregistration
-            // nativeUnsetAuthCallbacks()
-
-            authListener = null
-            authProvider = null
-            isRegistered = false
-        }
-    }
-
-    // ========================================================================
-    // UTILITY FUNCTIONS
-    // ========================================================================
-
-    /**
-     * Set the API key for authentication.
-     *
-     * This stores the API key and triggers authentication.
-     *
-     * @param key The API key to use
-     */
-    fun setApiKey(key: String) {
-        synchronized(lock) {
-            apiKey = key
-            saveToSecureStorage(API_KEY_STORAGE_KEY, key)
-        }
-
-        CppBridgePlatformAdapter.logCallback(
-            CppBridgePlatformAdapter.LogLevel.INFO,
-            TAG,
-            "API key set"
-        )
-    }
-
-    /**
-     * Authenticate with the configured API key.
-     *
-     * @return true if authentication was triggered, false if no API key is set
-     */
-    fun authenticate(): Boolean {
-        val key = apiKey ?: return false
-
-        CppBridgePlatformAdapter.logCallback(
-            CppBridgePlatformAdapter.LogLevel.DEBUG,
-            TAG,
-            "Starting authentication"
-        )
-
-        authStatus = AuthStatus.AUTHENTICATING
-
-        // Notify listener
-        try {
-            authListener?.onAuthStatusChanged(AuthStatus.NOT_AUTHENTICATED, AuthStatus.AUTHENTICATING)
-        } catch (e: Exception) {
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.WARN,
-                TAG,
-                "Error in auth listener: ${e.message}"
-            )
-        }
-
-        // TODO: Call native authentication
-        // val result = nativeAuthenticateApiKey(key)
-        // return result == 0
-
-        // For now, simulate successful authentication if API key is valid
-        val isValid = validateApiKeyCallback(key)
-        if (isValid) {
-            setAuthStatusCallback(AuthStatus.AUTHENTICATED, AuthErrorCode.NONE, null)
-        } else {
-            setAuthStatusCallback(AuthStatus.FAILED, AuthErrorCode.INVALID_API_KEY, "Invalid API key")
-        }
-
-        return isValid
-    }
-
-    /**
-     * Logout and clear all credentials.
-     */
-    fun logout() {
-        CppBridgePlatformAdapter.logCallback(
-            CppBridgePlatformAdapter.LogLevel.INFO,
-            TAG,
-            "Logging out"
-        )
-
-        // TODO: Call native logout
-        // nativeLogout()
-
-        clearCredentialsCallback()
-    }
-
-    /**
-     * Refresh the access token if needed.
-     *
-     * @return true if token was refreshed or still valid, false if refresh failed
-     */
-    fun refreshTokenIfNeeded(): Boolean {
-        val refresh = refreshToken ?: return false
-
-        // Check if token is expired
-        val now = System.currentTimeMillis()
-        if (tokenExpirationMs > 0 && now < tokenExpirationMs) {
-            // Token is still valid
-            return true
-        }
-
-        CppBridgePlatformAdapter.logCallback(
-            CppBridgePlatformAdapter.LogLevel.DEBUG,
-            TAG,
-            "Refreshing access token"
-        )
-
-        // Use custom provider if available
-        val provider = authProvider
-        if (provider != null) {
-            return try {
-                val newToken = provider.refreshAccessToken(refresh)
-                if (newToken != null) {
-                    val expiration = provider.getTokenExpirationMs(newToken)
-                    setTokenCallback(TokenType.ACCESS, newToken, expiration)
-                    true
-                } else {
-                    setAuthStatusCallback(
-                        AuthStatus.EXPIRED,
-                        AuthErrorCode.TOKEN_EXPIRED,
-                        "Failed to refresh token"
-                    )
-                    false
+                
+                // Try re-authenticating if we have API key
+                val apiKey = _apiKey.get()
+                val deviceId = _deviceId.get()
+                if (apiKey != null && deviceId != null) {
+                    try {
+                        CppBridgePlatformAdapter.logCallback(
+                            CppBridgePlatformAdapter.LogLevel.INFO,
+                            TAG,
+                            "🔐 Refresh failed, re-authenticating..."
+                        )
+                        authenticate(apiKey, baseUrl, deviceId)
+                        return _accessToken.get()
+                    } catch (authE: Exception) {
+                        CppBridgePlatformAdapter.logCallback(
+                            CppBridgePlatformAdapter.LogLevel.ERROR,
+                            TAG,
+                            "❌ Re-authentication failed: ${authE.message}"
+                        )
+                    }
                 }
-            } catch (e: Exception) {
+            }
+        }
+        
+        // Return current token even if expired (caller will get 401)
+        return currentToken
+    }
+    
+    /**
+     * Authenticate with the backend using API key.
+     * Gets a JWT access token for subsequent requests.
+     *
+     * @param apiKey The API key for authentication
+     * @param baseUrl The backend base URL
+     * @param deviceId The device ID
+     * @param platform Platform string (e.g., "android")
+     * @param sdkVersion SDK version string
+     * @return AuthenticationResponse on success
+     * @throws Exception on failure
+     */
+    fun authenticate(
+        apiKey: String,
+        baseUrl: String,
+        deviceId: String,
+        platform: String = "android",
+        sdkVersion: String = "0.1.0"
+    ): AuthenticationResponse {
+        // Store config for future refresh/re-auth
+        _baseUrl.set(baseUrl)
+        _apiKey.set(apiKey)
+        
+        CppBridgePlatformAdapter.logCallback(
+            CppBridgePlatformAdapter.LogLevel.INFO,
+            TAG,
+            "🔐 Starting authentication with backend..."
+        )
+        
+        // Build request body
+        val request = AuthenticationRequest(
+            apiKey = apiKey,
+            deviceId = deviceId,
+            platform = platform,
+            sdkVersion = sdkVersion
+        )
+        val requestJson = json.encodeToString(AuthenticationRequest.serializer(), request)
+        
+        // Build full URL
+        val fullUrl = baseUrl.trimEnd('/') + ENDPOINT_AUTHENTICATE
+
+        CppBridgePlatformAdapter.logCallback(
+            CppBridgePlatformAdapter.LogLevel.DEBUG,
+            TAG,
+            "Auth request to: $fullUrl"
+        )
+        
+        // Make HTTP request
+        val connection = URL(fullUrl).openConnection() as HttpURLConnection
+        try {
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Accept", "application/json")
+            connection.doOutput = true
+            connection.connectTimeout = 30000
+            connection.readTimeout = 30000
+            
+            // Write request body
+            OutputStreamWriter(connection.outputStream).use { writer ->
+                writer.write(requestJson)
+                writer.flush()
+            }
+            
+            val responseCode = connection.responseCode
+            
+            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED) {
+                // Read response
+                val responseBody = BufferedReader(InputStreamReader(connection.inputStream)).use { reader ->
+                    reader.readText()
+                }
+                
+                // Parse response
+                val response = json.decodeFromString(AuthenticationResponse.serializer(), responseBody)
+                
+                // Store in state
+                storeAuthState(response)
+                
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.INFO,
+                    TAG,
+                    "✅ Authentication successful! Token expires in ${response.expiresIn}s"
+                )
+                
+                return response
+            } else {
+                // Read error response
+                val errorBody = try {
+                    BufferedReader(InputStreamReader(connection.errorStream)).use { reader ->
+                        reader.readText()
+                    }
+                } catch (e: Exception) {
+                    "No error body"
+                }
+                
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Error refreshing token: ${e.message}"
+                    "❌ Authentication failed: HTTP $responseCode - $errorBody"
                 )
-                false
+                
+                throw Exception("Authentication failed: HTTP $responseCode - $errorBody")
             }
+        } finally {
+            connection.disconnect()
         }
-
-        // TODO: Call native token refresh
-        // val result = nativeRefreshToken()
-        // return result == 0
-
-        return false
     }
 
     /**
-     * Get the token expiration time.
+     * Refresh the access token using the refresh token.
      *
-     * @return Token expiration time in milliseconds since epoch, or 0 if unknown
+     * @param baseUrl The backend base URL
+     * @return New access token
+     * @throws Exception on failure
      */
-    fun getTokenExpirationMs(): Long = tokenExpirationMs
-
-    /**
-     * Check if the access token is expired.
-     *
-     * @return true if token is expired or not set, false if valid
-     */
-    fun isTokenExpired(): Boolean {
-        if (accessToken == null) return true
-        if (tokenExpirationMs <= 0) return false
-        return System.currentTimeMillis() >= tokenExpirationMs
-    }
-
-    /**
-     * Load saved credentials from secure storage.
-     */
-    private fun loadSavedCredentials() {
-        synchronized(lock) {
-            // Load API key
-            val savedApiKey = loadFromSecureStorage(API_KEY_STORAGE_KEY)
-            if (savedApiKey != null) {
-                apiKey = savedApiKey
-            }
-
-            // Load access token
-            val savedAccessToken = loadFromSecureStorage(ACCESS_TOKEN_STORAGE_KEY)
-            if (savedAccessToken != null) {
-                accessToken = savedAccessToken
-            }
-
-            // Load refresh token
-            val savedRefreshToken = loadFromSecureStorage(REFRESH_TOKEN_STORAGE_KEY)
-            if (savedRefreshToken != null) {
-                refreshToken = savedRefreshToken
-            }
-
-            // Load token expiration
-            val savedExpiration = loadFromSecureStorage(TOKEN_EXPIRATION_STORAGE_KEY)
-            if (savedExpiration != null) {
-                try {
-                    tokenExpirationMs = savedExpiration.toLong()
-                } catch (e: NumberFormatException) {
-                    tokenExpirationMs = 0
-                }
-            }
-
-            // Set initial status based on saved credentials
-            if (accessToken != null && !isTokenExpired()) {
-                authStatus = AuthStatus.AUTHENTICATED
-            } else if (apiKey != null) {
-                authStatus = AuthStatus.NOT_AUTHENTICATED
-            }
-        }
+    fun refreshAccessToken(baseUrl: String): String {
+        val refreshToken = _refreshToken.get()
+            ?: throw Exception("No refresh token available")
+        val deviceId = _deviceId.get()
+            ?: throw Exception("No device ID available")
 
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Loaded saved credentials. HasApiKey=${apiKey != null}, HasToken=${accessToken != null}"
+            "🔄 Refreshing access token..."
+        )
+        
+        // Build request body
+        val request = RefreshTokenRequest(
+            deviceId = deviceId,
+            refreshToken = refreshToken
+        )
+        val requestJson = json.encodeToString(RefreshTokenRequest.serializer(), request)
+        
+        // Build full URL
+        val fullUrl = baseUrl.trimEnd('/') + ENDPOINT_REFRESH
+        
+        // Make HTTP request
+        val connection = URL(fullUrl).openConnection() as HttpURLConnection
+        try {
+            connection.requestMethod = "POST"
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Accept", "application/json")
+            connection.doOutput = true
+            connection.connectTimeout = 30000
+            connection.readTimeout = 30000
+            
+            // Write request body
+            OutputStreamWriter(connection.outputStream).use { writer ->
+                writer.write(requestJson)
+                writer.flush()
+            }
+            
+            val responseCode = connection.responseCode
+            
+            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED) {
+                // Read response
+                val responseBody = BufferedReader(InputStreamReader(connection.inputStream)).use { reader ->
+                    reader.readText()
+                }
+                
+                // Parse response
+                val response = json.decodeFromString(AuthenticationResponse.serializer(), responseBody)
+                
+                // Store in state
+                storeAuthState(response)
+                
+        CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.INFO,
+                    TAG,
+                    "✅ Token refresh successful!"
+                )
+                
+                return response.accessToken
+            } else {
+                val errorBody = try {
+                    BufferedReader(InputStreamReader(connection.errorStream)).use { reader ->
+                        reader.readText()
+                    }
+            } catch (e: Exception) {
+                    "No error body"
+                }
+                
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.ERROR,
+                    TAG,
+                    "❌ Token refresh failed: HTTP $responseCode - $errorBody"
+                )
+                
+                throw Exception("Token refresh failed: HTTP $responseCode - $errorBody")
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }
+    
+    /**
+     * Get a valid access token, refreshing if needed.
+     *
+     * @param baseUrl The backend base URL (needed for refresh)
+     * @return Valid access token
+     * @throws Exception if no valid token available
+     */
+    fun getValidAccessToken(baseUrl: String): String {
+        // Check if current token is valid
+        val currentToken = _accessToken.get()
+        if (currentToken != null && !tokenNeedsRefresh) {
+            return currentToken
+        }
+        
+        // Try to refresh
+        if (_refreshToken.get() != null) {
+            return refreshAccessToken(baseUrl)
+        }
+        
+        throw Exception("No valid access token - authentication required")
+    }
+    
+    /**
+     * Clear authentication state
+     */
+    fun clearAuth() {
+        _accessToken.set(null)
+        _refreshToken.set(null)
+        _deviceId.set(null)
+        _organizationId.set(null)
+        _userId.set(null)
+        _expiresAt.set(null)
+        
+        // Also clear from secure storage
+        try {
+            CppBridgePlatformAdapter.secureSetCallback("com.runanywhere.sdk.accessToken", ByteArray(0))
+            CppBridgePlatformAdapter.secureSetCallback("com.runanywhere.sdk.refreshToken", ByteArray(0))
+        } catch (e: Exception) {
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.WARN,
+                TAG,
+                "Failed to clear tokens from secure storage: ${e.message}"
+            )
+        }
+        
+        CppBridgePlatformAdapter.logCallback(
+            CppBridgePlatformAdapter.LogLevel.INFO,
+            TAG,
+            "Authentication state cleared"
         )
     }
 
     /**
-     * Save a value to secure storage.
+     * Store authentication state from response
      */
-    private fun saveToSecureStorage(key: String, value: String) {
+    private fun storeAuthState(response: AuthenticationResponse) {
+        _accessToken.set(response.accessToken)
+        _refreshToken.set(response.refreshToken)
+        _deviceId.set(response.deviceId)
+        _organizationId.set(response.organizationId)
+        _userId.set(response.userId)
+        
+        // Calculate expiration time
+        val expiresAt = System.currentTimeMillis() + (response.expiresIn * 1000L)
+        _expiresAt.set(expiresAt)
+        
+        // Store in secure storage for persistence across app restarts
         try {
-            CppBridgePlatformAdapter.secureSetCallback(key, value.toByteArray(Charsets.UTF_8))
+            CppBridgePlatformAdapter.secureSetCallback("com.runanywhere.sdk.accessToken", response.accessToken.toByteArray(Charsets.UTF_8))
+            CppBridgePlatformAdapter.secureSetCallback("com.runanywhere.sdk.refreshToken", response.refreshToken.toByteArray(Charsets.UTF_8))
+            CppBridgePlatformAdapter.secureSetCallback("com.runanywhere.sdk.deviceId", response.deviceId.toByteArray(Charsets.UTF_8))
+            response.userId?.let { 
+                CppBridgePlatformAdapter.secureSetCallback("com.runanywhere.sdk.userId", it.toByteArray(Charsets.UTF_8))
+            }
+            CppBridgePlatformAdapter.secureSetCallback("com.runanywhere.sdk.organizationId", response.organizationId.toByteArray(Charsets.UTF_8))
+            CppBridgePlatformAdapter.secureSetCallback("com.runanywhere.sdk.expiresAt", expiresAt.toString().toByteArray(Charsets.UTF_8))
         } catch (e: Exception) {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Failed to save to secure storage: ${e.message}"
+                "Failed to store tokens in secure storage: ${e.message}"
             )
         }
     }
 
     /**
-     * Load a value from secure storage.
+     * Restore authentication state from secure storage
      */
-    private fun loadFromSecureStorage(key: String): String? {
-        return try {
-            val bytes = CppBridgePlatformAdapter.secureGetCallback(key)
-            bytes?.let { String(it, Charsets.UTF_8) }
+    fun restoreAuthState() {
+        try {
+            // Convert ByteArray to String for each stored value
+            val accessTokenBytes = CppBridgePlatformAdapter.secureGetCallback("com.runanywhere.sdk.accessToken")
+            val refreshTokenBytes = CppBridgePlatformAdapter.secureGetCallback("com.runanywhere.sdk.refreshToken")
+            val deviceIdBytes = CppBridgePlatformAdapter.secureGetCallback("com.runanywhere.sdk.deviceId")
+            val userIdBytes = CppBridgePlatformAdapter.secureGetCallback("com.runanywhere.sdk.userId")
+            val organizationIdBytes = CppBridgePlatformAdapter.secureGetCallback("com.runanywhere.sdk.organizationId")
+            val expiresAtBytes = CppBridgePlatformAdapter.secureGetCallback("com.runanywhere.sdk.expiresAt")
+            
+            val accessToken = accessTokenBytes?.toString(Charsets.UTF_8)?.takeIf { it.isNotEmpty() }
+            val refreshToken = refreshTokenBytes?.toString(Charsets.UTF_8)?.takeIf { it.isNotEmpty() }
+            val deviceId = deviceIdBytes?.toString(Charsets.UTF_8)?.takeIf { it.isNotEmpty() }
+            val userId = userIdBytes?.toString(Charsets.UTF_8)?.takeIf { it.isNotEmpty() }
+            val organizationId = organizationIdBytes?.toString(Charsets.UTF_8)?.takeIf { it.isNotEmpty() }
+            val expiresAtStr = expiresAtBytes?.toString(Charsets.UTF_8)?.takeIf { it.isNotEmpty() }
+            
+            if (accessToken != null && refreshToken != null) {
+                _accessToken.set(accessToken)
+                _refreshToken.set(refreshToken)
+                _deviceId.set(deviceId)
+                _userId.set(userId)
+                _organizationId.set(organizationId)
+                expiresAtStr?.toLongOrNull()?.let { _expiresAt.set(it) }
+                
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.INFO,
+                    TAG,
+                    "Restored authentication state from secure storage"
+                )
+            }
         } catch (e: Exception) {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Failed to load from secure storage: ${e.message}"
+                "Failed to restore auth state: ${e.message}"
             )
-            null
         }
-    }
-
-    /**
-     * Get authorization header value for HTTP requests.
-     *
-     * Returns "Bearer <token>" if authenticated with access token,
-     * or "ApiKey <key>" if using API key authentication.
-     *
-     * @return The authorization header value, or null if not authenticated
-     */
-    fun getAuthorizationHeader(): String? {
-        val token = accessToken
-        if (token != null) {
-            return "Bearer $token"
-        }
-
-        val key = apiKey
-        if (key != null) {
-            return "ApiKey $key"
-        }
-
-        return null
     }
 }

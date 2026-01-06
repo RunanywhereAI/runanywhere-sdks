@@ -3,6 +3,7 @@ package com.runanywhere.sdk.storage
 import android.content.Context
 import com.runanywhere.sdk.security.AndroidSecureStorage
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
 
 /**
  * Android-specific context holder - should be initialized by the app
@@ -21,6 +22,10 @@ object AndroidPlatformContext {
         _applicationContext = context.applicationContext
         // Also initialize secure storage so DeviceIdentity can access it
         AndroidSecureStorage.initialize(context.applicationContext)
+        
+        // Initialize CppBridgePlatformAdapter with context for persistent secure storage
+        // This ensures device ID and registration status persist across app restarts
+        CppBridgePlatformAdapter.setContext(context.applicationContext)
 
         // Set up the model path provider for CppBridgeModelPaths
         // This ensures models are stored in the app's internal storage on Android

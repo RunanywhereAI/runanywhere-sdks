@@ -536,11 +536,12 @@ object CppBridgeLLM {
      * Load a model.
      *
      * @param modelPath Path to the model file
-     * @param modelId Unique identifier for the model
+     * @param modelId Unique identifier for the model (for telemetry)
+     * @param modelName Human-readable name for the model (for telemetry)
      * @param config Model configuration (optional)
      * @return 0 on success, error code on failure
      */
-    fun loadModel(modelPath: String, modelId: String, config: ModelConfig = ModelConfig.DEFAULT): Int {
+    fun loadModel(modelPath: String, modelId: String, modelName: String? = null, config: ModelConfig = ModelConfig.DEFAULT): Int {
         synchronized(lock) {
             if (handle == 0L) {
                 // Auto-create component if needed
@@ -567,10 +568,9 @@ object CppBridgeLLM {
                 "Loading model: $modelId from $modelPath"
             )
 
-            // The rac_llm_component_load_model API takes a model_id, not model_path.
-            // The model registry resolves the model_id to a path internally.
-            // For compatibility, we pass modelId here.
-            val result = RunAnywhereBridge.racLlmComponentLoadModel(handle, modelId)
+            // Pass modelPath, modelId, and modelName separately to C++ lifecycle
+            // This ensures correct telemetry - model_id should be the registered ID, not the file path
+            val result = RunAnywhereBridge.racLlmComponentLoadModel(handle, modelPath, modelId, modelName)
             if (result != 0) {
                 setState(LLMState.ERROR)
                 CppBridgePlatformAdapter.logCallback(
