@@ -7,7 +7,7 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/CppBridge+Download.swift
  */
 
-import { requireNativeModule, isNativeModuleAvailable } from '@runanywhere/native';
+import { requireNativeModule, isNativeModuleAvailable } from '../native';
 import { EventBus } from '../Public/Events';
 import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
 

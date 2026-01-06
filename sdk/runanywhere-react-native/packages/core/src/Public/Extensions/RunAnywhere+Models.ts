@@ -9,7 +9,7 @@ import {
   requireNativeModule,
   isNativeModuleAvailable,
   requireFileSystemModule,
-} from '@runanywhere/native';
+} from '../../native';
 import { ModelRegistry } from '../../services/ModelRegistry';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import type { ModelInfo, LLMFramework } from '../../types';

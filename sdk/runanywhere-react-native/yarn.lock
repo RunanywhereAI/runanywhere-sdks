@@ -2405,14 +2405,16 @@ __metadata:
   resolution: "@runanywhere/core@workspace:packages/core"
   dependencies:
     "@types/react": ^18.2.44
+    nitrogen: ^0.31.10
+    react-native-nitro-modules: ^0.31.10
     typescript: ^5.2.2
   peerDependencies:
-    "@runanywhere/native": ^0.2.0
     react: "*"
     react-native: "*"
     react-native-blob-util: ^0.19.0
     react-native-device-info: ^11.0.0
     react-native-fs: ^2.20.0
+    react-native-nitro-modules: ^0.31.3
     react-native-zip-archive: ^6.1.0
   peerDependenciesMeta:
     react-native-blob-util:
@@ -2430,23 +2432,11 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@runanywhere/llamacpp@workspace:packages/llamacpp"
   dependencies:
-    typescript: ^5.2.2
-  peerDependencies:
-    "@runanywhere/core": ^0.2.0
-    "@runanywhere/native": ^0.2.0
-    react: "*"
-    react-native: "*"
-  languageName: unknown
-  linkType: soft
-
-"@runanywhere/native@workspace:packages/native":
-  version: 0.0.0-use.local
-  resolution: "@runanywhere/native@workspace:packages/native"
-  dependencies:
     nitrogen: ^0.31.10
     react-native-nitro-modules: ^0.31.10
     typescript: ^5.2.2
   peerDependencies:
+    "@runanywhere/core": ^0.2.0
     react: "*"
     react-native: "*"
     react-native-nitro-modules: ^0.31.3
@@ -2457,12 +2447,14 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@runanywhere/onnx@workspace:packages/onnx"
   dependencies:
+    nitrogen: ^0.31.10
+    react-native-nitro-modules: ^0.31.10
     typescript: ^5.2.2
   peerDependencies:
     "@runanywhere/core": ^0.2.0
-    "@runanywhere/native": ^0.2.0
     react: "*"
     react-native: "*"
+    react-native-nitro-modules: ^0.31.3
   languageName: unknown
   linkType: soft
 

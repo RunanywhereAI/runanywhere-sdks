@@ -7,7 +7,7 @@
  * Reference: sdk/runanywhere-swift/Sources/ONNXRuntime/ONNX.swift
  */
 
-import { requireNativeModule, isNativeModuleAvailable } from '@runanywhere/native';
+import { requireNativeModule, isNativeModuleAvailable } from '@runanywhere/core';
 
 // Simple logger for this package
 const DEBUG = typeof __DEV__ !== 'undefined' ? __DEV__ : false;

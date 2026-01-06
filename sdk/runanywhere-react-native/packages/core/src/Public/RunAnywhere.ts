@@ -8,7 +8,7 @@
  */
 
 import { EventBus } from './Events';
-import { requireNativeModule, isNativeModuleAvailable, requireDeviceInfoModule } from '@runanywhere/native';
+import { requireNativeModule, isNativeModuleAvailable, requireDeviceInfoModule } from '../native';
 import { SDKEnvironment } from '../types';
 import { ModelRegistry } from '../services/ModelRegistry';
 import { ServiceContainer } from '../Foundation/DependencyInjection/ServiceContainer';

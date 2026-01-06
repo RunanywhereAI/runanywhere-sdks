@@ -13,7 +13,7 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Security/KeychainManager.swift
  */
 
-import { requireNativeModule } from '@runanywhere/native';
+import { requireNativeModule } from '../../native';
 import { SDKLogger } from '../Logging/Logger/SDKLogger';
 import { SecureStorageError, isItemNotFoundError } from './SecureStorageError';
 import { SecureStorageKeys, type SecureStorageKey } from './SecureStorageKeys';

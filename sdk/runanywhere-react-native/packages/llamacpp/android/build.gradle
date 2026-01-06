@@ -1,8 +1,22 @@
+def getExtOrDefault(name) {
+    return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties['RunAnywhereLlama_' + name]
+}
+
+// Only arm64-v8a is supported
+def reactNativeArchitectures() {
+    return ["arm64-v8a"]
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+apply from: '../nitrogen/generated/android/runanywherellama+autolinking.gradle'
+apply plugin: 'com.facebook.react'
+
 def getExtOrIntegerDefault(name) {
     if (rootProject.ext.has(name)) {
         return rootProject.ext.get(name)
-    } else if (project.properties.containsKey('LlamaCPP_' + name)) {
-        return (project.properties['LlamaCPP_' + name]).toInteger()
+    } else if (project.properties.containsKey('RunAnywhereLlama_' + name)) {
+        return (project.properties['RunAnywhereLlama_' + name]).toInteger()
     }
     def defaults = [
         'compileSdkVersion': 36,
@@ -14,14 +28,15 @@ def getExtOrIntegerDefault(name) {
 
 // =============================================================================
 // Version Constants (MUST match Swift Package.swift and iOS Podspec)
+// RABackendLlamaCPP from runanywhere-binaries
 // =============================================================================
-def commonsVersion = "0.1.0"
+def coreVersion = "0.2.6"
 
 // =============================================================================
-// Binary Source
+// Binary Source - RABackendLlamaCPP from runanywhere-binaries
 // =============================================================================
 def githubOrg = "RunanywhereAI"
-def commonsRepo = "runanywhere-sdks"
+def coreRepo = "runanywhere-binaries"
 
 // =============================================================================
 // testLocal Toggle
@@ -33,11 +48,8 @@ def useLocalBuild = project.findProperty("runanywhere.testLocal")?.toBoolean() ?
 def jniLibsDir = file("src/main/jniLibs")
 def downloadedLibsDir = file("build/downloaded-libs")
 
-apply plugin: 'com.android.library'
-apply plugin: 'kotlin-android'
-
 android {
-    namespace "com.runanywhere.llamacpp"
+    namespace "com.margelo.nitro.runanywhere.llama"
 
     compileSdkVersion getExtOrIntegerDefault('compileSdkVersion')
 
@@ -48,9 +60,33 @@ android {
         ndk {
             abiFilters 'arm64-v8a'
         }
+
+        externalNativeBuild {
+            cmake {
+                cppFlags "-frtti -fexceptions -Wall -fstack-protector-all"
+                arguments "-DANDROID_STL=c++_shared"
+                abiFilters 'arm64-v8a'
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "CMakeLists.txt"
+        }
     }
 
     packagingOptions {
+        excludes = [
+            "META-INF",
+            "META-INF/**"
+        ]
+        pickFirsts = [
+            "**/libc++_shared.so",
+            "**/libjsi.so",
+            "**/libfbjni.so",
+            "**/libfolly_runtime.so"
+        ]
         jniLibs {
             useLegacyPackaging = true
         }
@@ -58,12 +94,17 @@ android {
 
     buildFeatures {
         buildConfig true
+        prefab true
     }
 
     buildTypes {
         release {
             minifyEnabled false
         }
+    }
+
+    lint {
+        disable 'GradleCompatible'
     }
 
     compileOptions {
@@ -77,13 +118,17 @@ android {
 
     sourceSets {
         main {
+            java.srcDirs += [
+                "generated/java",
+                "generated/jni"
+            ]
             jniLibs.srcDirs = [jniLibsDir]
         }
     }
 }
 
 // =============================================================================
-// Download RABackendLlamaCPP
+// Download Native Libraries (RABackendLlamaCPP ONLY)
 // =============================================================================
 
 task downloadNativeLibs {
@@ -91,62 +136,93 @@ task downloadNativeLibs {
     group = "build setup"
 
     def versionFile = file("${jniLibsDir}/.version")
+    def expectedVersion = coreVersion
 
     outputs.dir(jniLibsDir)
     outputs.upToDateWhen {
-        versionFile.exists() && versionFile.text.trim() == commonsVersion
+        versionFile.exists() && versionFile.text.trim() == expectedVersion
     }
 
     doLast {
         if (useLocalBuild) {
-            logger.lifecycle("[LlamaCPPBackend] Skipping download - using local build mode")
+            logger.lifecycle("[RunAnywhereLlama] Skipping download - using local build mode")
             return
         }
 
         def currentVersion = versionFile.exists() ? versionFile.text.trim() : ""
-        if (currentVersion == commonsVersion) {
-            logger.lifecycle("[LlamaCPPBackend] RABackendLlamaCPP version $commonsVersion already downloaded")
+        if (currentVersion == expectedVersion) {
+            logger.lifecycle("[RunAnywhereLlama] RABackendLlamaCPP version $expectedVersion already downloaded")
             return
         }
 
-        logger.lifecycle("[LlamaCPPBackend] Downloading RABackendLlamaCPP...")
+        logger.lifecycle("[RunAnywhereLlama] Downloading RABackendLlamaCPP...")
+        logger.lifecycle("  Core Version: $coreVersion")
 
         downloadedLibsDir.mkdirs()
         jniLibsDir.deleteDir()
         jniLibsDir.mkdirs()
 
-        def downloadUrl = "https://github.com/${githubOrg}/${commonsRepo}/releases/download/commons-v${commonsVersion}/RABackendLlamaCPP-android-${commonsVersion}.zip"
-        def zipFile = file("${downloadedLibsDir}/RABackendLlamaCPP.zip")
+        // =============================================================================
+        // Download RABackendLlamaCPP from runanywhere-binaries
+        // =============================================================================
+        def llamacppUrl = "https://github.com/${githubOrg}/${coreRepo}/releases/download/core-v${coreVersion}/RABackendLlamaCPP-android-v${coreVersion}.zip"
+        def llamacppZip = file("${downloadedLibsDir}/RABackendLlamaCPP.zip")
 
-        logger.lifecycle("📦 Downloading RABackendLlamaCPP...")
-        logger.lifecycle("   URL: $downloadUrl")
+        logger.lifecycle("\n📦 Downloading RABackendLlamaCPP...")
+        logger.lifecycle("   URL: $llamacppUrl")
 
         try {
-            new URL(downloadUrl).withInputStream { input ->
-                zipFile.withOutputStream { output ->
+            new URL(llamacppUrl).withInputStream { input ->
+                llamacppZip.withOutputStream { output ->
                     output << input
                 }
             }
-            logger.lifecycle("   Downloaded: ${zipFile.length() / 1024}KB")
+            logger.lifecycle("   Downloaded: ${llamacppZip.length() / 1024}KB")
 
             copy {
-                from zipTree(zipFile)
+                from zipTree(llamacppZip)
                 into jniLibsDir
+                eachFile { fileCopyDetails ->
+                    // Flatten the archive structure if needed
+                    if (fileCopyDetails.relativePath.pathString.contains("jniLibs/")) {
+                        fileCopyDetails.relativePath = new RelativePath(true, fileCopyDetails.relativePath.pathString.replace("jniLibs/", ""))
+                    }
+                }
+                includeEmptyDirs = false
             }
 
-            logger.lifecycle("✅ RABackendLlamaCPP installed")
+            logger.lifecycle("   ✅ RABackendLlamaCPP installed")
         } catch (Exception e) {
             logger.error("❌ Failed to download RABackendLlamaCPP: ${e.message}")
             throw new GradleException("Failed to download RABackendLlamaCPP", e)
         }
 
-        versionFile.text = commonsVersion
-        logger.lifecycle("\n✅ RABackendLlamaCPP version $commonsVersion installed")
+        // =============================================================================
+        // List installed files
+        // =============================================================================
+        logger.lifecycle("\n📋 Installed native libraries:")
+        jniLibsDir.listFiles()?.findAll { it.isDirectory() }?.each { abiDir ->
+            logger.lifecycle("  ${abiDir.name}/")
+            abiDir.listFiles()?.findAll { it.name.endsWith(".so") }?.sort()?.each { soFile ->
+                logger.lifecycle("    ${soFile.name} (${soFile.length() / 1024}KB)")
+            }
+        }
+
+        versionFile.text = expectedVersion
+        logger.lifecycle("\n✅ RABackendLlamaCPP version $expectedVersion installed")
     }
 }
 
 if (!useLocalBuild) {
     preBuild.dependsOn downloadNativeLibs
+
+    afterEvaluate {
+        tasks.matching {
+            it.name.contains("generateCodegen") || it.name.contains("Codegen")
+        }.configureEach {
+            mustRunAfter downloadNativeLibs
+        }
+    }
 }
 
 task cleanNativeLibs(type: Delete) {
@@ -165,6 +241,6 @@ repositories {
 
 dependencies {
     implementation "com.facebook.react:react-android"
-    // Depends on core native module
-    implementation project(":runanywhere-native")
+    implementation project(":react-native-nitro-modules")
+    implementation project(":runanywhere-core")
 }

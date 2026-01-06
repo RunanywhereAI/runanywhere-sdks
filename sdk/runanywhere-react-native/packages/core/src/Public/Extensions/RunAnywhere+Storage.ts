@@ -7,7 +7,7 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Storage/RunAnywhere+Storage.swift
  */
 
-import { requireFileSystemModule, isNativeModuleAvailable } from '@runanywhere/native';
+import { requireFileSystemModule, isNativeModuleAvailable } from '../../native';
 import { ModelRegistry } from '../../services/ModelRegistry';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 

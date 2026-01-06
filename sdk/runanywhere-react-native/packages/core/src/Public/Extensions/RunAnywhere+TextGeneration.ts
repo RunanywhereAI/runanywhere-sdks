@@ -9,7 +9,7 @@ import { EventBus } from '../Events';
 import {
   requireNativeModule,
   isNativeModuleAvailable,
-} from '@runanywhere/native';
+} from '../../native';
 import type { GenerationOptions, GenerationResult } from '../../types';
 import { ExecutionTarget, HardwareAcceleration } from '../../types';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
