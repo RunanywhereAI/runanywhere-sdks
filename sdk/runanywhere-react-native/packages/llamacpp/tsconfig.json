@@ -15,7 +15,6 @@
   "include": ["src/**/*"],
   "exclude": ["node_modules", "lib"],
   "references": [
-    { "path": "../core" },
-    { "path": "../native" }
+    { "path": "../core" }
   ]
 }

@@ -1,55 +1,56 @@
+require "json"
+
+package = JSON.parse(File.read(File.join(__dir__, "..", "package.json")))
+
+# =============================================================================
+# Version Constants (MUST match Swift Package.swift)
+# =============================================================================
+CORE_VERSION = "0.2.6"
+
+# =============================================================================
+# Binary Source - RABackendLlamaCPP from runanywhere-binaries
+# =============================================================================
+GITHUB_ORG = "RunanywhereAI"
+CORE_REPO = "runanywhere-binaries"
+
+# =============================================================================
+# testLocal Toggle
+# Set RA_TEST_LOCAL=1 or create .testlocal file to use local binaries
+# =============================================================================
+TEST_LOCAL = ENV['RA_TEST_LOCAL'] == '1' || File.exist?(File.join(__dir__, '.testlocal'))
+
 Pod::Spec.new do |s|
   s.name         = "LlamaCPPBackend"
-  s.version      = "0.2.6"
-  s.summary      = "LlamaCPP backend for RunAnywhere SDK"
-  s.description  = <<-DESC
-    LlamaCPP backend module for RunAnywhere SDK (React Native).
-    Provides LLM text generation capabilities using llama.cpp.
-    This is an optional module - only include if you need LLM features.
-  DESC
-  s.homepage     = "https://github.com/RunanywhereAI/runanywhere-sdks"
-  s.license      = { :type => "MIT", :file => "../../../LICENSE" }
-  s.author       = { "RunAnywhere" => "info@runanywhere.ai" }
-  s.source       = { :git => "https://github.com/RunanywhereAI/runanywhere-sdks.git", :tag => "v#{s.version}" }
-  s.platform     = :ios, "15.1"
+  s.module_name  = "RunAnywhereLlama"
+  s.version      = package["version"]
+  s.summary      = package["description"]
+  s.homepage     = "https://runanywhere.com"
+  s.license      = package["license"]
+  s.authors      = "RunAnywhere AI"
+
+  s.platforms    = { :ios => "15.1" }
+  s.source       = { :git => "https://github.com/RunanywhereAI/sdks.git", :tag => "#{s.version}" }
 
   # =============================================================================
-  # Version Constants (MUST match Swift Package.swift)
-  # Backend frameworks come from runanywhere-binaries (core-v*)
-  # =============================================================================
-  CORE_VERSION = "0.2.6"
-  GITHUB_ORG = "RunanywhereAI"
-  CORE_REPO = "runanywhere-binaries"
-
-  # =============================================================================
-  # testLocal Toggle
-  # =============================================================================
-  TEST_LOCAL = ENV['RA_TEST_LOCAL'] == '1' || File.exist?(File.join(__dir__, '../../native/.testlocal'))
-
-  # =============================================================================
-  # Dependencies - Requires core RunAnywhereNative
-  # =============================================================================
-  s.dependency "RunAnywhereNative"
-
-  # =============================================================================
-  # Binary Framework - RABackendLlamaCPP
-  # Source: runanywhere-binaries/releases (core-v*)
+  # Llama Backend - RABackendLlamaCPP
+  # Downloads from runanywhere-binaries (NOT runanywhere-sdks)
   # =============================================================================
   if TEST_LOCAL
-    puts "[LlamaCPPBackend] Using LOCAL binaries from Frameworks/"
-    s.vendored_frameworks = "Frameworks/RABackendLlamaCPP.xcframework"
+    puts "[LlamaCPPBackend] Using LOCAL RABackendLlamaCPP from Frameworks/"
+    s.vendored_frameworks = "Frameworks/RABackendLLAMACPP.xcframework"
   else
     s.prepare_command = <<-CMD
       set -e
 
       FRAMEWORK_DIR="Frameworks"
       VERSION="#{CORE_VERSION}"
-      VERSION_FILE="$FRAMEWORK_DIR/.version-llamacpp"
+      VERSION_FILE="$FRAMEWORK_DIR/.llamacpp_version"
 
-      if [ -f "$VERSION_FILE" ] && [ -d "$FRAMEWORK_DIR/RABackendLlamaCPP.xcframework" ]; then
+      # Check if already downloaded with correct version
+      if [ -f "$VERSION_FILE" ] && [ -d "$FRAMEWORK_DIR/RABackendLLAMACPP.xcframework" ]; then
         CURRENT_VERSION=$(cat "$VERSION_FILE")
         if [ "$CURRENT_VERSION" = "$VERSION" ]; then
-          echo "✅ RABackendLlamaCPP.xcframework version $VERSION already downloaded"
+          echo "✅ RABackendLLAMACPP.xcframework version $VERSION already downloaded"
           exit 0
         fi
       fi
@@ -57,39 +58,70 @@ Pod::Spec.new do |s|
       echo "📦 Downloading RABackendLlamaCPP.xcframework version $VERSION..."
 
       mkdir -p "$FRAMEWORK_DIR"
+      rm -rf "$FRAMEWORK_DIR/RABackendLLAMACPP.xcframework"
 
-      # Download from runanywhere-binaries releases (core-v*)
+      # Download from runanywhere-binaries
       DOWNLOAD_URL="https://github.com/#{GITHUB_ORG}/#{CORE_REPO}/releases/download/core-v$VERSION/RABackendLlamaCPP-ios-v$VERSION.zip"
       ZIP_FILE="/tmp/RABackendLlamaCPP.zip"
 
       echo "   URL: $DOWNLOAD_URL"
 
       curl -L -f -o "$ZIP_FILE" "$DOWNLOAD_URL" || {
-        echo "❌ Failed to download RABackendLlamaCPP"
+        echo "❌ Failed to download RABackendLlamaCPP from $DOWNLOAD_URL"
         exit 1
       }
 
-      rm -rf "$FRAMEWORK_DIR/RABackendLlamaCPP.xcframework"
-
-      echo "📂 Extracting RABackendLlamaCPP.xcframework..."
+      echo "📂 Extracting RABackendLLAMACPP.xcframework..."
       unzip -q -o "$ZIP_FILE" -d "$FRAMEWORK_DIR/"
-
       rm -f "$ZIP_FILE"
+
       echo "$VERSION" > "$VERSION_FILE"
 
-      echo "✅ RABackendLlamaCPP.xcframework installed successfully"
+      if [ -d "$FRAMEWORK_DIR/RABackendLLAMACPP.xcframework" ]; then
+        echo "✅ RABackendLLAMACPP.xcframework installed successfully"
+      else
+        echo "❌ RABackendLLAMACPP.xcframework extraction failed"
+        exit 1
+      fi
     CMD
 
-    s.vendored_frameworks = "Frameworks/RABackendLlamaCPP.xcframework"
+    s.vendored_frameworks = "Frameworks/RABackendLLAMACPP.xcframework"
   end
+
+  # Source files - Llama C++ implementation
+  s.source_files = [
+    "../cpp/HybridRunAnywhereLlama.cpp",
+    "../cpp/HybridRunAnywhereLlama.hpp",
+    "../cpp/bridges/**/*.{cpp,hpp}",
+  ]
 
   # Build settings
   s.pod_target_xcconfig = {
+    "CLANG_CXX_LANGUAGE_STANDARD" => "c++17",
+    "HEADER_SEARCH_PATHS" => [
+      "$(PODS_TARGET_SRCROOT)/../cpp",
+      "$(PODS_TARGET_SRCROOT)/../cpp/bridges",
+      "$(PODS_TARGET_SRCROOT)/Frameworks/RABackendLLAMACPP.xcframework/ios-arm64/Headers",
+      "$(PODS_TARGET_SRCROOT)/Frameworks/RABackendLLAMACPP.xcframework/ios-arm64_x86_64-simulator/Headers",
+      "$(PODS_ROOT)/Headers/Public",
+    ].join(" "),
+    "GCC_PREPROCESSOR_DEFINITIONS" => "$(inherited) HAS_LLAMACPP=1",
     "DEFINES_MODULE" => "YES",
-    "CLANG_CXX_LANGUAGE_STANDARD" => "c++17"
+    "SWIFT_OBJC_INTEROP_MODE" => "objcxx",
   }
 
-  # Required frameworks for LlamaCPP (Metal for GPU acceleration)
-  s.frameworks = "Accelerate", "Metal", "MetalKit"
+  # Required system libraries
   s.libraries = "c++"
+  s.frameworks = "Accelerate", "Foundation", "CoreML"
+
+  # Dependencies
+  s.dependency 'RunAnywhereCore'
+  s.dependency 'React-jsi'
+  s.dependency 'React-callinvoker'
+
+  # Load Nitrogen-generated autolinking
+  load '../nitrogen/generated/ios/RunAnywhereLlama+autolinking.rb'
+  add_nitrogen_files(s)
+
+  install_modules_dependencies(s)
 end

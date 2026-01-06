@@ -7,7 +7,7 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/CppBridge+ModelRegistry.swift
  */
 
-import { requireNativeModule, isNativeModuleAvailable } from '@runanywhere/native';
+import { requireNativeModule, isNativeModuleAvailable } from '../native';
 import type { LLMFramework, ModelCategory, ModelInfo } from '../types';
 import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
 

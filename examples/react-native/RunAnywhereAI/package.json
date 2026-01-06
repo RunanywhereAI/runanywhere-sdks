@@ -34,7 +34,6 @@
     "react-native-vector-icons": "^10.1.0",
     "rn-fetch-blob": "^0.12.0",
     "@runanywhere/core": "file:../../../sdk/runanywhere-react-native/packages/core",
-    "@runanywhere/native": "file:../../../sdk/runanywhere-react-native/packages/native",
     "@runanywhere/llamacpp": "file:../../../sdk/runanywhere-react-native/packages/llamacpp",
     "@runanywhere/onnx": "file:../../../sdk/runanywhere-react-native/packages/onnx",
     "zustand": "^5.0.0"

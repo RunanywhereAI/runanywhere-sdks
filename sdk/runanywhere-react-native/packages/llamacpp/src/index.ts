@@ -8,13 +8,13 @@
  *
  * ```typescript
  * import { RunAnywhere } from '@runanywhere/core';
- * import { LlamaCPP } from '@runanywhere/llamacpp';
+ * import { LlamaCPP, LlamaCppProvider } from '@runanywhere/llamacpp';
  *
- * // Initialize SDK
+ * // Initialize core SDK
  * await RunAnywhere.initialize({ apiKey: 'your-key' });
  *
- * // Register LlamaCPP module
- * LlamaCPP.register();
+ * // Register LlamaCPP backend (calls native rac_backend_llamacpp_register)
+ * await LlamaCppProvider.register();
  *
  * // Add a model
  * LlamaCPP.addModel({
@@ -33,5 +33,27 @@
  * @packageDocumentation
  */
 
+// =============================================================================
+// Main API
+// =============================================================================
+
 export { LlamaCPP, type LlamaCPPModelOptions } from './LlamaCPP';
 export { LlamaCppProvider, autoRegister } from './LlamaCppProvider';
+
+// =============================================================================
+// Native Module
+// =============================================================================
+
+export {
+  NativeRunAnywhereLlama,
+  getNativeLlamaModule,
+  requireNativeLlamaModule,
+  isNativeLlamaModuleAvailable,
+} from './native/NativeRunAnywhereLlama';
+export type { NativeRunAnywhereLlamaModule } from './native/NativeRunAnywhereLlama';
+
+// =============================================================================
+// Nitrogen Spec Types
+// =============================================================================
+
+export type { RunAnywhereLlama } from './specs/RunAnywhereLlama.nitro';

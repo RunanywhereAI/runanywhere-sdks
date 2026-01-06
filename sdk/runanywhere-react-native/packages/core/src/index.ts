@@ -1,8 +1,15 @@
 /**
  * @runanywhere/core - Core SDK for RunAnywhere React Native
  *
- * Thin TypeScript wrapper over native commons.
- * All business logic is in native C++ (runanywhere-commons).
+ * Core SDK that includes:
+ * - RACommons bindings via Nitrogen HybridObject
+ * - Authentication, Device Registration
+ * - Model Registry, Download Service
+ * - Storage, Events, HTTP Client
+ *
+ * NO LLM/STT/TTS/VAD functionality - use:
+ * - @runanywhere/llamacpp for text generation
+ * - @runanywhere/onnx for speech processing
  *
  * @packageDocumentation
  */
@@ -169,14 +176,24 @@ export type {
 } from './Features';
 
 // =============================================================================
-// Native Module (re-export for convenience)
+// Native Module (now part of core)
 // =============================================================================
 
 export {
-  NativeRunAnywhere,
-  isNativeModuleAvailable,
+  NativeRunAnywhereCore,
+  getNativeCoreModule,
+  requireNativeCoreModule,
+  isNativeCoreModuleAvailable,
+  // Backwards compatibility exports (match old @runanywhere/native)
   requireNativeModule,
+  isNativeModuleAvailable,
   requireDeviceInfoModule,
   requireFileSystemModule,
-} from '@runanywhere/native';
-export type { NativeRunAnywhereModule } from '@runanywhere/native';
+} from './native/NativeRunAnywhereCore';
+export type { NativeRunAnywhereCoreModule, FileSystemModule } from './native/NativeRunAnywhereCore';
+
+// =============================================================================
+// Nitrogen Spec Types
+// =============================================================================
+
+export type { RunAnywhereCore } from './specs/RunAnywhereCore.nitro';

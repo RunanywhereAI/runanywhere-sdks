@@ -6,7 +6,7 @@
  */
 
 import { EventBus } from '../Events';
-import { requireNativeModule, isNativeModuleAvailable } from '@runanywhere/native';
+import { requireNativeModule, isNativeModuleAvailable } from '../../native';
 import type { STTOptions, STTResult } from '../../types';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import type {

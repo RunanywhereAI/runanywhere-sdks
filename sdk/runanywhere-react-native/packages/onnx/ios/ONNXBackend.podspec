@@ -1,46 +1,43 @@
+require "json"
+
+package = JSON.parse(File.read(File.join(__dir__, "..", "package.json")))
+
+# =============================================================================
+# Version Constants (MUST match Swift Package.swift)
+# =============================================================================
+CORE_VERSION = "0.2.6"
+ONNXRUNTIME_VERSION = "1.17.1"
+
+# =============================================================================
+# Binary Source - RABackendONNX from runanywhere-binaries
+# =============================================================================
+GITHUB_ORG = "RunanywhereAI"
+CORE_REPO = "runanywhere-binaries"
+
+# =============================================================================
+# testLocal Toggle
+# Set RA_TEST_LOCAL=1 or create .testlocal file to use local binaries
+# =============================================================================
+TEST_LOCAL = ENV['RA_TEST_LOCAL'] == '1' || File.exist?(File.join(__dir__, '.testlocal'))
+
 Pod::Spec.new do |s|
   s.name         = "ONNXBackend"
-  s.version      = "0.2.6"
-  s.summary      = "ONNX backend for RunAnywhere SDK (STT/TTS/VAD)"
-  s.description  = <<-DESC
-    ONNX backend module for RunAnywhere SDK (React Native).
-    Provides STT (Speech-to-Text), TTS (Text-to-Speech), and VAD (Voice Activity Detection)
-    capabilities using ONNX Runtime.
-    This is an optional module - only include if you need STT/TTS/VAD features.
-  DESC
-  s.homepage     = "https://github.com/RunanywhereAI/runanywhere-sdks"
-  s.license      = { :type => "MIT", :file => "../../../LICENSE" }
-  s.author       = { "RunAnywhere" => "info@runanywhere.ai" }
-  s.source       = { :git => "https://github.com/RunanywhereAI/runanywhere-sdks.git", :tag => "v#{s.version}" }
-  s.platform     = :ios, "15.1"
+  s.module_name  = "RunAnywhereONNX"
+  s.version      = package["version"]
+  s.summary      = package["description"]
+  s.homepage     = "https://runanywhere.com"
+  s.license      = package["license"]
+  s.authors      = "RunAnywhere AI"
+
+  s.platforms    = { :ios => "15.1" }
+  s.source       = { :git => "https://github.com/RunanywhereAI/sdks.git", :tag => "#{s.version}" }
 
   # =============================================================================
-  # Version Constants (MUST match Swift Package.swift)
-  # Backend frameworks come from runanywhere-binaries (core-v*)
-  # ONNX Runtime comes from official onnxruntime.ai releases
-  # =============================================================================
-  CORE_VERSION = "0.2.6"
-  ONNXRUNTIME_VERSION = "1.17.1"
-  GITHUB_ORG = "RunanywhereAI"
-  CORE_REPO = "runanywhere-binaries"
-
-  # =============================================================================
-  # testLocal Toggle
-  # =============================================================================
-  TEST_LOCAL = ENV['RA_TEST_LOCAL'] == '1' || File.exist?(File.join(__dir__, '../../native/.testlocal'))
-
-  # =============================================================================
-  # Dependencies - Requires core RunAnywhereNative
-  # =============================================================================
-  s.dependency "RunAnywhereNative"
-
-  # =============================================================================
-  # Binary Frameworks - RABackendONNX + onnxruntime
-  # RABackendONNX: runanywhere-binaries/releases (core-v*)
-  # onnxruntime: Official ONNX Runtime from onnxruntime.ai
+  # ONNX Backend - RABackendONNX + ONNX Runtime
+  # Downloads from runanywhere-binaries (NOT runanywhere-sdks)
   # =============================================================================
   if TEST_LOCAL
-    puts "[ONNXBackend] Using LOCAL binaries from Frameworks/"
+    puts "[ONNXBackend] Using LOCAL RABackendONNX from Frameworks/"
     s.vendored_frameworks = [
       "Frameworks/RABackendONNX.xcframework",
       "Frameworks/onnxruntime.xcframework"
@@ -50,51 +47,66 @@ Pod::Spec.new do |s|
       set -e
 
       FRAMEWORK_DIR="Frameworks"
-      CORE_VER="#{CORE_VERSION}"
-      ONNX_VER="#{ONNXRUNTIME_VERSION}"
-      VERSION_FILE="$FRAMEWORK_DIR/.version-onnx"
+      VERSION="#{CORE_VERSION}"
+      ONNX_VERSION="#{ONNXRUNTIME_VERSION}"
+      VERSION_FILE="$FRAMEWORK_DIR/.onnx_version"
 
-      if [ -f "$VERSION_FILE" ] && [ -d "$FRAMEWORK_DIR/RABackendONNX.xcframework" ] && [ -d "$FRAMEWORK_DIR/onnxruntime.xcframework" ]; then
+      # Check if already downloaded with correct version
+      if [ -f "$VERSION_FILE" ] && [ -d "$FRAMEWORK_DIR/RABackendONNX.xcframework" ]; then
         CURRENT_VERSION=$(cat "$VERSION_FILE")
-        if [ "$CURRENT_VERSION" = "$CORE_VER-$ONNX_VER" ]; then
-          echo "✅ ONNX frameworks already downloaded"
-          exit 0
+        if [ "$CURRENT_VERSION" = "$VERSION" ]; then
+          echo "✅ RABackendONNX.xcframework version $VERSION already downloaded"
+          # Still need to check onnxruntime
+          if [ -d "$FRAMEWORK_DIR/onnxruntime.xcframework" ]; then
+            exit 0
+          fi
         fi
       fi
 
-      echo "📦 Downloading ONNX backend frameworks..."
+      echo "📦 Downloading RABackendONNX.xcframework version $VERSION..."
 
       mkdir -p "$FRAMEWORK_DIR"
-
-      # Download RABackendONNX from runanywhere-binaries (core-v*)
-      echo "📦 Downloading RABackendONNX.xcframework..."
-      ONNX_BACKEND_URL="https://github.com/#{GITHUB_ORG}/#{CORE_REPO}/releases/download/core-v$CORE_VER/RABackendONNX-ios-v$CORE_VER.zip"
-      echo "   URL: $ONNX_BACKEND_URL"
-      curl -L -f -o /tmp/RABackendONNX.zip "$ONNX_BACKEND_URL" || {
-        echo "❌ Failed to download RABackendONNX"
-        exit 1
-      }
       rm -rf "$FRAMEWORK_DIR/RABackendONNX.xcframework"
-      unzip -q -o /tmp/RABackendONNX.zip -d "$FRAMEWORK_DIR/"
-      rm -f /tmp/RABackendONNX.zip
-      echo "✅ RABackendONNX.xcframework installed"
 
-      # Download onnxruntime from official onnxruntime.ai releases
-      echo "📦 Downloading onnxruntime.xcframework..."
-      ONNXRUNTIME_URL="https://download.onnxruntime.ai/pod-archive-onnxruntime-c-$ONNX_VER.zip"
-      echo "   URL: $ONNXRUNTIME_URL"
-      curl -L -f -o /tmp/onnxruntime.zip "$ONNXRUNTIME_URL" || {
-        echo "❌ Failed to download onnxruntime"
+      # Download RABackendONNX from runanywhere-binaries
+      DOWNLOAD_URL="https://github.com/#{GITHUB_ORG}/#{CORE_REPO}/releases/download/core-v$VERSION/RABackendONNX-ios-v$VERSION.zip"
+      ZIP_FILE="/tmp/RABackendONNX.zip"
+
+      echo "   URL: $DOWNLOAD_URL"
+
+      curl -L -f -o "$ZIP_FILE" "$DOWNLOAD_URL" || {
+        echo "❌ Failed to download RABackendONNX from $DOWNLOAD_URL"
         exit 1
       }
-      rm -rf "$FRAMEWORK_DIR/onnxruntime.xcframework"
-      unzip -q -o /tmp/onnxruntime.zip -d "$FRAMEWORK_DIR/"
-      rm -f /tmp/onnxruntime.zip
-      echo "✅ onnxruntime.xcframework installed"
 
-      echo "$CORE_VER-$ONNX_VER" > "$VERSION_FILE"
+      echo "📂 Extracting RABackendONNX.xcframework..."
+      unzip -q -o "$ZIP_FILE" -d "$FRAMEWORK_DIR/"
+      rm -f "$ZIP_FILE"
 
-      echo "✅ All ONNX frameworks installed successfully"
+      # Download ONNX Runtime if not present
+      if [ ! -d "$FRAMEWORK_DIR/onnxruntime.xcframework" ]; then
+        echo "📦 Downloading ONNX Runtime version $ONNX_VERSION..."
+        ONNX_URL="https://download.onnxruntime.ai/pod-archive-onnxruntime-c-$ONNX_VERSION.zip"
+        ONNX_ZIP="/tmp/onnxruntime.zip"
+
+        curl -L -f -o "$ONNX_ZIP" "$ONNX_URL" || {
+          echo "❌ Failed to download ONNX Runtime from $ONNX_URL"
+          exit 1
+        }
+
+        echo "📂 Extracting onnxruntime.xcframework..."
+        unzip -q -o "$ONNX_ZIP" -d "$FRAMEWORK_DIR/"
+        rm -f "$ONNX_ZIP"
+      fi
+
+      echo "$VERSION" > "$VERSION_FILE"
+
+      if [ -d "$FRAMEWORK_DIR/RABackendONNX.xcframework" ] && [ -d "$FRAMEWORK_DIR/onnxruntime.xcframework" ]; then
+        echo "✅ ONNX frameworks installed successfully"
+      else
+        echo "❌ ONNX framework extraction failed"
+        exit 1
+      fi
     CMD
 
     s.vendored_frameworks = [
@@ -103,13 +115,42 @@ Pod::Spec.new do |s|
     ]
   end
 
+  # Source files - ONNX C++ implementation
+  s.source_files = [
+    "../cpp/HybridRunAnywhereONNX.cpp",
+    "../cpp/HybridRunAnywhereONNX.hpp",
+    "../cpp/bridges/**/*.{cpp,hpp}",
+  ]
+
   # Build settings
   s.pod_target_xcconfig = {
+    "CLANG_CXX_LANGUAGE_STANDARD" => "c++17",
+    "HEADER_SEARCH_PATHS" => [
+      "$(PODS_TARGET_SRCROOT)/../cpp",
+      "$(PODS_TARGET_SRCROOT)/../cpp/bridges",
+      "$(PODS_TARGET_SRCROOT)/Frameworks/RABackendONNX.xcframework/ios-arm64/Headers",
+      "$(PODS_TARGET_SRCROOT)/Frameworks/RABackendONNX.xcframework/ios-arm64_x86_64-simulator/Headers",
+      "$(PODS_TARGET_SRCROOT)/Frameworks/onnxruntime.xcframework/ios-arm64/Headers",
+      "$(PODS_TARGET_SRCROOT)/Frameworks/onnxruntime.xcframework/ios-arm64_x86_64-simulator/Headers",
+      "$(PODS_ROOT)/Headers/Public",
+    ].join(" "),
+    "GCC_PREPROCESSOR_DEFINITIONS" => "$(inherited) HAS_ONNX=1",
     "DEFINES_MODULE" => "YES",
-    "CLANG_CXX_LANGUAGE_STANDARD" => "c++17"
+    "SWIFT_OBJC_INTEROP_MODE" => "objcxx",
   }
 
-  # Required frameworks for ONNX
-  s.frameworks = "Accelerate", "CoreML"
-  s.libraries = "c++", "archive", "bz2"
+  # Required system libraries
+  s.libraries = "c++"
+  s.frameworks = "Accelerate", "Foundation", "CoreML", "AudioToolbox"
+
+  # Dependencies
+  s.dependency 'RunAnywhereCore'
+  s.dependency 'React-jsi'
+  s.dependency 'React-callinvoker'
+
+  # Load Nitrogen-generated autolinking
+  load '../nitrogen/generated/ios/RunAnywhereONNX+autolinking.rb'
+  add_nitrogen_files(s)
+
+  install_modules_dependencies(s)
 end

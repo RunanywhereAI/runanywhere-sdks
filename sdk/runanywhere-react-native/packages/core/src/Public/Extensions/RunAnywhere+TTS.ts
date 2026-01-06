@@ -5,7 +5,7 @@
  * Matches iOS: RunAnywhere+TTS.swift
  */
 
-import { requireNativeModule, isNativeModuleAvailable } from '@runanywhere/native';
+import { requireNativeModule, isNativeModuleAvailable } from '../../native';
 import type { TTSConfiguration, TTSResult } from '../../types';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import { AudioPlaybackManager } from '../../Features/VoiceSession/AudioPlaybackManager';

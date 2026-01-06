@@ -7,7 +7,7 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Features/TTS/System/SystemTTSService.swift
  */
 
-import { requireNativeModule, isNativeModuleAvailable } from '@runanywhere/native';
+import { requireNativeModule, isNativeModuleAvailable } from '../native';
 import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
 
 const logger = new SDKLogger('SystemTTSService');

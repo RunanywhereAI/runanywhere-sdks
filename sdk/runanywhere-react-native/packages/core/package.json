@@ -1,7 +1,7 @@
 {
   "name": "@runanywhere/core",
   "version": "0.2.0",
-  "description": "Core SDK for RunAnywhere React Native - interfaces, infrastructure, and public API",
+  "description": "Core SDK for RunAnywhere React Native - includes RACommons bindings, native bridges, and public API",
   "main": "src/index.ts",
   "types": "src/index.ts",
   "exports": {
@@ -15,29 +15,38 @@
   "react-native": "src/index",
   "source": "src/index",
   "files": [
-    "src"
+    "src",
+    "cpp",
+    "ios",
+    "android",
+    "nitrogen",
+    "nitro.json",
+    "react-native.config.js",
+    "*.podspec"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"src/**/*.ts\"",
-    "lint:fix": "eslint \"src/**/*.ts\" --fix"
+    "lint:fix": "eslint \"src/**/*.ts\" --fix",
+    "nitrogen": "nitrogen",
+    "prepare": "nitrogen"
   },
   "keywords": [
     "react-native",
     "runanywhere",
     "ai",
-    "llm",
     "on-device",
-    "machine-learning"
+    "machine-learning",
+    "nitro"
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@runanywhere/native": "^0.2.0",
     "react": "*",
     "react-native": "*",
     "react-native-blob-util": "^0.19.0",
     "react-native-device-info": "^11.0.0",
     "react-native-fs": "^2.20.0",
+    "react-native-nitro-modules": "^0.31.3",
     "react-native-zip-archive": "^6.1.0"
   },
   "peerDependenciesMeta": {
@@ -56,6 +65,12 @@
   },
   "devDependencies": {
     "@types/react": "^18.2.44",
+    "nitrogen": "^0.31.10",
+    "react-native-nitro-modules": "^0.31.10",
     "typescript": "^5.2.2"
+  },
+  "create-react-native-library": {
+    "languages": "kotlin-swift",
+    "type": "nitro-module"
   }
 }

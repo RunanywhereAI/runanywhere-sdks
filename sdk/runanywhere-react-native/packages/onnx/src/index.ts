@@ -1,20 +1,20 @@
 /**
  * @runanywhere/onnx - ONNX Runtime Backend for RunAnywhere React Native SDK
  *
- * This package provides the ONNX Runtime backend for Speech-to-Text (STT)
- * and Text-to-Speech (TTS) using Sherpa-ONNX.
+ * This package provides the ONNX Runtime backend for Speech-to-Text (STT),
+ * Text-to-Speech (TTS), and Voice Activity Detection (VAD) using ONNX Runtime.
  *
  * ## Usage
  *
  * ```typescript
  * import { RunAnywhere, ModelCategory } from '@runanywhere/core';
- * import { ONNX, ModelArtifactType } from '@runanywhere/onnx';
+ * import { ONNX, ONNXProvider, ModelArtifactType } from '@runanywhere/onnx';
  *
- * // Initialize SDK
+ * // Initialize core SDK
  * await RunAnywhere.initialize({ apiKey: 'your-key' });
  *
- * // Register ONNX module (STT + TTS)
- * ONNX.register();
+ * // Register ONNX backend (calls native rac_backend_onnx_register)
+ * await ONNXProvider.register();
  *
  * // Add STT model
  * ONNX.addModel({
@@ -44,5 +44,27 @@
  * @packageDocumentation
  */
 
+// =============================================================================
+// Main API
+// =============================================================================
+
 export { ONNX, ModelArtifactType, type ONNXModelOptions } from './ONNX';
 export { ONNXProvider, autoRegister } from './ONNXProvider';
+
+// =============================================================================
+// Native Module
+// =============================================================================
+
+export {
+  NativeRunAnywhereONNX,
+  getNativeONNXModule,
+  requireNativeONNXModule,
+  isNativeONNXModuleAvailable,
+} from './native/NativeRunAnywhereONNX';
+export type { NativeRunAnywhereONNXModule } from './native/NativeRunAnywhereONNX';
+
+// =============================================================================
+// Nitrogen Spec Types
+// =============================================================================
+
+export type { RunAnywhereONNX } from './specs/RunAnywhereONNX.nitro';

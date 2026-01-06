@@ -5,7 +5,7 @@
  * Matches iOS: RunAnywhere+VAD.swift
  */
 
-import { requireNativeModule, isNativeModuleAvailable } from '@runanywhere/native';
+import { requireNativeModule, isNativeModuleAvailable } from '../../native';
 import { EventBus } from '../Events';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import type {
