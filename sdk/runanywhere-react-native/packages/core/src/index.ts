@@ -143,6 +143,32 @@ export {
 } from './services';
 
 // =============================================================================
+// Features
+// =============================================================================
+
+export {
+  AudioCaptureManager,
+  AudioPlaybackManager,
+  VoiceSessionHandle,
+  DEFAULT_VOICE_SESSION_CONFIG,
+} from './Features';
+export type {
+  AudioDataCallback,
+  AudioLevelCallback,
+  AudioCaptureConfig,
+  AudioCaptureState,
+  PlaybackState,
+  PlaybackCompletionCallback,
+  PlaybackErrorCallback,
+  PlaybackConfig,
+  VoiceSessionConfig,
+  VoiceSessionEvent,
+  VoiceSessionEventType,
+  VoiceSessionEventCallback,
+  VoiceSessionState,
+} from './Features';
+
+// =============================================================================
 // Native Module (re-export for convenience)
 // =============================================================================
 

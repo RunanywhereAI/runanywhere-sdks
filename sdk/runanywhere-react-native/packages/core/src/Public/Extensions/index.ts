@@ -1,33 +1,130 @@
 /**
  * RunAnywhere Extensions
  *
- * Modular extensions for the RunAnywhere SDK, following the iOS pattern.
- * Each extension provides a specific capability domain.
+ * Re-exports all extension modules for convenient importing.
  */
 
 // Text Generation (LLM)
-export * as TextGeneration from './RunAnywhere+TextGeneration';
+export {
+  loadModel,
+  loadTextModel,
+  isModelLoaded,
+  isTextModelLoaded,
+  unloadModel,
+  unloadTextModel,
+  chat,
+  generate,
+  generateStream,
+  generateStreamWithCallback,
+  cancelGeneration,
+} from './RunAnywhere+TextGeneration';
 
 // Speech-to-Text
-export * as STT from './RunAnywhere+STT';
+export {
+  loadSTTModel,
+  isSTTModelLoaded,
+  unloadSTTModel,
+  transcribe,
+  transcribeSimple,
+  transcribeBuffer,
+  transcribeStream,
+  transcribeFile,
+  startStreamingSTT,
+  stopStreamingSTT,
+  isStreamingSTT,
+} from './RunAnywhere+STT';
 
 // Text-to-Speech
-export * as TTS from './RunAnywhere+TTS';
+export {
+  loadTTSModel,
+  loadTTSVoice,
+  unloadTTSVoice,
+  isTTSModelLoaded,
+  isTTSVoiceLoaded,
+  unloadTTSModel,
+  synthesize,
+  synthesizeStream,
+  speak,
+  isSpeaking,
+  stopSpeaking,
+  availableTTSVoices,
+  getTTSVoices,
+  getTTSVoiceInfo,
+  stopSynthesis,
+  cancelTTS,
+  cleanupTTS,
+} from './RunAnywhere+TTS';
 
 // Voice Activity Detection
-export * as VAD from './RunAnywhere+VAD';
+export {
+  initializeVAD,
+  isVADReady,
+  loadVADModel,
+  isVADModelLoaded,
+  unloadVADModel,
+  detectSpeech,
+  processVAD,
+  startVAD,
+  stopVAD,
+  resetVAD,
+  setVADSpeechActivityCallback,
+  setVADAudioBufferCallback,
+  cleanupVAD,
+  getVADState,
+} from './RunAnywhere+VAD';
 
-// Voice Session & Voice Agent
-export * as VoiceSession from './RunAnywhere+VoiceSession';
+// Voice Agent
+export {
+  initializeVoiceAgent,
+  initializeVoiceAgentWithLoadedModels,
+  isVoiceAgentReady,
+  getVoiceAgentComponentStates,
+  areAllVoiceComponentsReady,
+  processVoiceTurn,
+  voiceAgentTranscribe,
+  voiceAgentGenerateResponse,
+  voiceAgentSynthesizeSpeech,
+  cleanupVoiceAgent,
+} from './RunAnywhere+VoiceAgent';
 
-// Storage Management
-export * as Storage from './RunAnywhere+Storage';
-
-// Model Management
-export * as Models from './RunAnywhere+Models';
+// Voice Session
+export {
+  startVoiceSession,
+  startVoiceSessionWithCallback,
+  createVoiceSession,
+  DEFAULT_VOICE_SESSION_CONFIG,
+} from './RunAnywhere+VoiceSession';
+export type {
+  VoiceSessionConfig,
+  VoiceSessionEvent,
+  VoiceSessionEventCallback
+} from './RunAnywhere+VoiceSession';
 
 // Structured Output
-export * as StructuredOutput from './RunAnywhere+StructuredOutput';
+export {
+  generateStructured,
+  generateStructuredStream,
+  generate as generateStructuredType,
+  extractEntities,
+  classify,
+} from './RunAnywhere+StructuredOutput';
+export type {
+  StreamToken,
+  StructuredOutputStreamResult
+} from './RunAnywhere+StructuredOutput';
 
 // Logging
-export * as Logging from './RunAnywhere+Logging';
+export { setLogLevel } from './RunAnywhere+Logging';
+
+// Storage
+export { getStorageInfo, clearCache } from './RunAnywhere+Storage';
+
+// Models
+export {
+  getAvailableModels,
+  getModelInfo,
+  isModelDownloaded,
+  downloadModel,
+  cancelDownload,
+  deleteModel,
+} from './RunAnywhere+Models';

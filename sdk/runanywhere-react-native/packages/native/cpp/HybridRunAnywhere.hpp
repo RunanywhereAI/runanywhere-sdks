@@ -66,6 +66,15 @@ public:
   std::shared_ptr<Promise<bool>> cancelGeneration() override;
 
   // ============================================================================
+  // Structured Output - Delegates to StructuredOutputBridge
+  // ============================================================================
+
+  std::shared_ptr<Promise<std::string>> generateStructured(
+    const std::string& prompt,
+    const std::string& schema,
+    const std::optional<std::string>& optionsJson) override;
+
+  // ============================================================================
   // Speech-to-Text (STT) - Delegates to STTBridge
   // ============================================================================
 
@@ -102,6 +111,123 @@ public:
   std::shared_ptr<Promise<std::string>> getTTSVoices() override;
 
   // ============================================================================
+  // Voice Activity Detection (VAD) - Delegates to VADBridge
+  // ============================================================================
+
+  std::shared_ptr<Promise<bool>> loadVADModel(
+    const std::string& path,
+    const std::optional<std::string>& configJson) override;
+  std::shared_ptr<Promise<bool>> isVADModelLoaded() override;
+  std::shared_ptr<Promise<bool>> unloadVADModel() override;
+  std::shared_ptr<Promise<std::string>> processVAD(
+    const std::string& audioBase64,
+    const std::optional<std::string>& optionsJson) override;
+  std::shared_ptr<Promise<void>> resetVAD() override;
+
+  // ============================================================================
+  // Voice Agent - Delegates to VoiceAgentBridge
+  // ============================================================================
+
+  std::shared_ptr<Promise<bool>> initializeVoiceAgent(
+    const std::string& configJson) override;
+  std::shared_ptr<Promise<bool>> initializeVoiceAgentWithLoadedModels() override;
+  std::shared_ptr<Promise<bool>> isVoiceAgentReady() override;
+  std::shared_ptr<Promise<std::string>> getVoiceAgentComponentStates() override;
+  std::shared_ptr<Promise<std::string>> processVoiceTurn(
+    const std::string& audioBase64) override;
+  std::shared_ptr<Promise<std::string>> voiceAgentTranscribe(
+    const std::string& audioBase64) override;
+  std::shared_ptr<Promise<std::string>> voiceAgentGenerateResponse(
+    const std::string& prompt) override;
+  std::shared_ptr<Promise<std::string>> voiceAgentSynthesizeSpeech(
+    const std::string& text) override;
+  std::shared_ptr<Promise<void>> cleanupVoiceAgent() override;
+
+  // ============================================================================
+  // Model Assignment - Delegates to ModelRegistryBridge
+  // ============================================================================
+
+  std::shared_ptr<Promise<bool>> assignModel(
+    const std::string& modelId,
+    const std::string& framework) override;
+  std::shared_ptr<Promise<std::string>> getModelAssignment(
+    const std::string& modelId) override;
+  std::shared_ptr<Promise<void>> clearModelAssignments() override;
+
+  // ============================================================================
+  // Model Registry - Delegates to ModelRegistryBridge
+  // ============================================================================
+
+  std::shared_ptr<Promise<std::string>> getAvailableModels() override;
+  std::shared_ptr<Promise<std::string>> getModelInfo(
+    const std::string& modelId) override;
+  std::shared_ptr<Promise<bool>> isModelDownloaded(
+    const std::string& modelId) override;
+  std::shared_ptr<Promise<std::string>> getModelPath(
+    const std::string& modelId) override;
+
+  // ============================================================================
+  // Download Service - Delegates to DownloadBridge
+  // ============================================================================
+
+  std::shared_ptr<Promise<bool>> downloadModel(
+    const std::string& modelId,
+    const std::string& url,
+    const std::string& destPath) override;
+  std::shared_ptr<Promise<bool>> cancelDownload(
+    const std::string& modelId) override;
+  std::shared_ptr<Promise<std::string>> getDownloadProgress(
+    const std::string& modelId) override;
+
+  // ============================================================================
+  // Authentication - Delegates to AuthBridge
+  // ============================================================================
+
+  std::shared_ptr<Promise<bool>> authenticate(
+    const std::string& apiKey) override;
+  std::shared_ptr<Promise<bool>> isAuthenticated() override;
+  std::shared_ptr<Promise<std::string>> getUserId() override;
+  std::shared_ptr<Promise<std::string>> getOrganizationId() override;
+
+  // ============================================================================
+  // Device Registration - Delegates to DeviceBridge
+  // ============================================================================
+
+  std::shared_ptr<Promise<bool>> registerDevice(
+    const std::string& environmentJson) override;
+  std::shared_ptr<Promise<bool>> isDeviceRegistered() override;
+
+  // ============================================================================
+  // HTTP Client - Delegates to HTTPBridge
+  // ============================================================================
+
+  std::shared_ptr<Promise<bool>> configureHttp(
+    const std::string& baseUrl,
+    const std::string& apiKey) override;
+  std::shared_ptr<Promise<std::string>> httpPost(
+    const std::string& path,
+    const std::string& bodyJson) override;
+  std::shared_ptr<Promise<std::string>> httpGet(
+    const std::string& path) override;
+
+  // ============================================================================
+  // Events - Delegates to EventBridge
+  // ============================================================================
+
+  std::shared_ptr<Promise<void>> emitEvent(
+    const std::string& eventJson) override;
+  std::shared_ptr<Promise<std::string>> pollEvents() override;
+
+  // ============================================================================
+  // Storage - Delegates to StorageBridge
+  // ============================================================================
+
+  std::shared_ptr<Promise<std::string>> getStorageInfo() override;
+  std::shared_ptr<Promise<bool>> clearCache() override;
+  std::shared_ptr<Promise<bool>> deleteModel(
+    const std::string& modelId) override;
+
+  // ============================================================================
   // Utility Functions
   // ============================================================================
 
@@ -111,6 +237,15 @@ public:
     const std::string& destPath) override;
   std::shared_ptr<Promise<std::string>> getDeviceCapabilities() override;
   std::shared_ptr<Promise<double>> getMemoryUsage() override;
+
+  // ============================================================================
+  // Backend Registration - Matches Swift LlamaCPP.register(), ONNX.register()
+  // ============================================================================
+
+  std::shared_ptr<Promise<bool>> registerLlamaCppBackend() override;
+  std::shared_ptr<Promise<bool>> unregisterLlamaCppBackend() override;
+  std::shared_ptr<Promise<bool>> registerONNXBackend() override;
+  std::shared_ptr<Promise<bool>> unregisterONNXBackend() override;
 
 private:
   // Thread safety

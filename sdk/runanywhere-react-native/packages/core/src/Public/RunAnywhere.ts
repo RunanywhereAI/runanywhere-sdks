@@ -8,7 +8,7 @@
  */
 
 import { EventBus } from './Events';
-import { requireNativeModule, isNativeModuleAvailable } from '@runanywhere/native';
+import { requireNativeModule, isNativeModuleAvailable, requireDeviceInfoModule } from '@runanywhere/native';
 import { SDKEnvironment } from '../types';
 import { ModelRegistry } from '../services/ModelRegistry';
 import { ServiceContainer } from '../Foundation/DependencyInjection/ServiceContainer';
@@ -35,6 +35,9 @@ import * as VAD from './Extensions/RunAnywhere+VAD';
 import * as Storage from './Extensions/RunAnywhere+Storage';
 import * as Models from './Extensions/RunAnywhere+Models';
 import * as Logging from './Extensions/RunAnywhere+Logging';
+import * as VoiceAgent from './Extensions/RunAnywhere+VoiceAgent';
+import * as VoiceSession from './Extensions/RunAnywhere+VoiceSession';
+import * as StructuredOutput from './Extensions/RunAnywhere+StructuredOutput';
 
 const logger = new SDKLogger('RunAnywhere');
 
@@ -187,6 +190,67 @@ export const RunAnywhere = {
   },
 
   // ============================================================================
+  // Authentication Info (Production/Staging only)
+  // Matches Swift SDK: RunAnywhere.getUserId(), getOrganizationId(), etc.
+  // ============================================================================
+
+  /**
+   * Get current user ID from authentication
+   * @returns User ID if authenticated, empty string otherwise
+   */
+  async getUserId(): Promise<string> {
+    if (!isNativeModuleAvailable()) return '';
+    const native = requireNativeModule();
+    const userId = await native.getUserId();
+    return userId ?? '';
+  },
+
+  /**
+   * Get current organization ID from authentication
+   * @returns Organization ID if authenticated, empty string otherwise
+   */
+  async getOrganizationId(): Promise<string> {
+    if (!isNativeModuleAvailable()) return '';
+    const native = requireNativeModule();
+    const orgId = await native.getOrganizationId();
+    return orgId ?? '';
+  },
+
+  /**
+   * Check if currently authenticated
+   * @returns true if authenticated with valid token
+   */
+  async isAuthenticated(): Promise<boolean> {
+    if (!isNativeModuleAvailable()) return false;
+    const native = requireNativeModule();
+    return native.isAuthenticated();
+  },
+
+  /**
+   * Check if device is registered with backend
+   */
+  async isDeviceRegistered(): Promise<boolean> {
+    if (!isNativeModuleAvailable()) return false;
+    const native = requireNativeModule();
+    return native.isDeviceRegistered();
+  },
+
+  /**
+   * Get device ID (Keychain-persisted, survives reinstalls)
+   */
+  get deviceId(): string {
+    try {
+      const deviceInfo = requireDeviceInfoModule();
+      // Device info module returns an object with getDeviceIdSync or similar
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const info = deviceInfo as any;
+      return info.deviceId ?? info.getDeviceIdSync?.() ?? info.uniqueId ?? '';
+    } catch {
+      return '';
+    }
+  },
+
+  // ============================================================================
   // Logging (Delegated to Extension)
   // ============================================================================
 
@@ -212,23 +276,79 @@ export const RunAnywhere = {
   isSTTModelLoaded: STT.isSTTModelLoaded,
   unloadSTTModel: STT.unloadSTTModel,
   transcribe: STT.transcribe,
+  transcribeSimple: STT.transcribeSimple,
+  transcribeBuffer: STT.transcribeBuffer,
+  transcribeStream: STT.transcribeStream,
+  transcribeFile: STT.transcribeFile,
 
   // ============================================================================
   // Text-to-Speech (Delegated to Extension)
   // ============================================================================
 
   loadTTSModel: TTS.loadTTSModel,
+  loadTTSVoice: TTS.loadTTSVoice,
+  unloadTTSVoice: TTS.unloadTTSVoice,
   isTTSModelLoaded: TTS.isTTSModelLoaded,
+  isTTSVoiceLoaded: TTS.isTTSVoiceLoaded,
   unloadTTSModel: TTS.unloadTTSModel,
   synthesize: TTS.synthesize,
+  synthesizeStream: TTS.synthesizeStream,
+  speak: TTS.speak,
+  isSpeaking: TTS.isSpeaking,
+  stopSpeaking: TTS.stopSpeaking,
+  availableTTSVoices: TTS.availableTTSVoices,
+  stopSynthesis: TTS.stopSynthesis,
 
   // ============================================================================
   // Voice Activity Detection (Delegated to Extension)
   // ============================================================================
 
+  initializeVAD: VAD.initializeVAD,
+  isVADReady: VAD.isVADReady,
   loadVADModel: VAD.loadVADModel,
   isVADModelLoaded: VAD.isVADModelLoaded,
+  unloadVADModel: VAD.unloadVADModel,
+  detectSpeech: VAD.detectSpeech,
   processVAD: VAD.processVAD,
+  startVAD: VAD.startVAD,
+  stopVAD: VAD.stopVAD,
+  resetVAD: VAD.resetVAD,
+  setVADSpeechActivityCallback: VAD.setVADSpeechActivityCallback,
+  setVADAudioBufferCallback: VAD.setVADAudioBufferCallback,
+  cleanupVAD: VAD.cleanupVAD,
+  getVADState: VAD.getVADState,
+
+  // ============================================================================
+  // Voice Agent (Delegated to Extension)
+  // ============================================================================
+
+  initializeVoiceAgent: VoiceAgent.initializeVoiceAgent,
+  initializeVoiceAgentWithLoadedModels: VoiceAgent.initializeVoiceAgentWithLoadedModels,
+  isVoiceAgentReady: VoiceAgent.isVoiceAgentReady,
+  getVoiceAgentComponentStates: VoiceAgent.getVoiceAgentComponentStates,
+  areAllVoiceComponentsReady: VoiceAgent.areAllVoiceComponentsReady,
+  processVoiceTurn: VoiceAgent.processVoiceTurn,
+  voiceAgentTranscribe: VoiceAgent.voiceAgentTranscribe,
+  voiceAgentGenerateResponse: VoiceAgent.voiceAgentGenerateResponse,
+  voiceAgentSynthesizeSpeech: VoiceAgent.voiceAgentSynthesizeSpeech,
+  cleanupVoiceAgent: VoiceAgent.cleanupVoiceAgent,
+
+  // ============================================================================
+  // Voice Session (Delegated to Extension)
+  // ============================================================================
+
+  startVoiceSession: VoiceSession.startVoiceSession,
+  startVoiceSessionWithCallback: VoiceSession.startVoiceSessionWithCallback,
+  createVoiceSession: VoiceSession.createVoiceSession,
+
+  // ============================================================================
+  // Structured Output (Delegated to Extension)
+  // ============================================================================
+
+  generateStructured: StructuredOutput.generateStructured,
+  generateStructuredStream: StructuredOutput.generateStructuredStream,
+  extractEntities: StructuredOutput.extractEntities,
+  classify: StructuredOutput.classify,
 
   // ============================================================================
   // Storage Management (Delegated to Extension)

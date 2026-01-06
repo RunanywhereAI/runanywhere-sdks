@@ -1,246 +1,174 @@
 /**
- * @runanywhere/onnx - ONNX Providers
+ * @runanywhere/onnx - ONNX Provider
  *
- * ONNX Runtime service providers for React Native SDK.
- * Handles STT (Speech-to-Text) and TTS (Text-to-Speech) models via Sherpa-ONNX.
+ * ONNX Runtime module registration for React Native SDK.
+ * Thin wrapper that triggers C++ backend registration for STT/TTS/VAD.
  *
- * Reference: sdk/runanywhere-swift/Sources/ONNXRuntime/ONNXServiceProvider.swift
+ * Reference: sdk/runanywhere-swift/Sources/ONNXRuntime/ONNX.swift
  */
 
-import {
-  type ModelInfo,
-  LLMFramework,
-  ModelCategory,
-  ServiceRegistry,
-  type STTServiceProvider,
-  type TTSServiceProvider,
-  type STTService,
-  type TTSService,
-  type STTConfiguration,
-  type TTSConfig as TTSConfiguration,
-  SDKError,
-  SDKErrorCode,
-} from '@runanywhere/core';
+import { requireNativeModule, isNativeModuleAvailable } from '@runanywhere/native';
 
 // Simple logger for this package
 const DEBUG = typeof __DEV__ !== 'undefined' ? __DEV__ : false;
 const log = {
-  stt: {
-    info: (msg: string) => DEBUG && console.log(`[ONNXSTTProvider] ${msg}`),
-    debug: (msg: string) => DEBUG && console.log(`[ONNXSTTProvider] ${msg}`),
-  },
-  tts: {
-    info: (msg: string) => DEBUG && console.log(`[ONNXTTSProvider] ${msg}`),
-    debug: (msg: string) => DEBUG && console.log(`[ONNXTTSProvider] ${msg}`),
-  },
-  main: {
-    info: (msg: string) => DEBUG && console.log(`[ONNXProvider] ${msg}`),
-  },
+  info: (msg: string) => DEBUG && console.log(`[ONNXProvider] ${msg}`),
+  debug: (msg: string) => DEBUG && console.log(`[ONNXProvider] ${msg}`),
+  warning: (msg: string) => console.warn(`[ONNXProvider] ${msg}`),
 };
 
 /**
- * ONNX STT Service Provider
+ * ONNX Module
  *
- * This provider handles Speech-to-Text models through the Sherpa-ONNX backend.
- * Mirrors Swift SDK's ONNXSTTServiceProvider pattern.
+ * Provides STT (Speech-to-Text), TTS (Text-to-Speech), and VAD capabilities
+ * using ONNX Runtime / Sherpa-ONNX.
+ * The actual services are provided by the C++ backend.
+ *
+ * ## Registration
+ *
+ * ```typescript
+ * import { ONNXProvider } from '@runanywhere/onnx';
+ *
+ * // Register the backend
+ * await ONNXProvider.register();
+ * ```
  */
-export class ONNXSTTProvider implements STTServiceProvider {
-  readonly name = 'ONNX Runtime STT';
-  readonly version = '1.23.2';
+export class ONNXProvider {
+  static readonly moduleId = 'onnx';
+  static readonly moduleName = 'ONNX Runtime';
+  static readonly version = '1.23.2';
 
-  private static _instance: ONNXSTTProvider | null = null;
+  private static isRegistered = false;
 
-  static get shared(): ONNXSTTProvider {
-    if (!ONNXSTTProvider._instance) {
-      ONNXSTTProvider._instance = new ONNXSTTProvider();
+  /**
+   * Register ONNX backend with the C++ service registry.
+   * Calls rac_backend_onnx_register() to register all ONNX
+   * service providers (STT, TTS, VAD) with the C++ commons layer.
+   * Safe to call multiple times - subsequent calls are no-ops.
+   * @returns Promise<boolean> true if registered successfully
+   */
+  static async register(): Promise<boolean> {
+    if (this.isRegistered) {
+      log.debug('ONNX already registered, returning');
+      return true;
     }
-    return ONNXSTTProvider._instance;
+
+    if (!isNativeModuleAvailable()) {
+      log.warning('Native module not available');
+      return false;
+    }
+
+    log.info('Registering ONNX backend with C++ registry...');
+
+    try {
+      const native = requireNativeModule();
+      // Call native registration function (matches Swift pattern)
+      const success = await native.registerONNXBackend();
+      if (success) {
+        this.isRegistered = true;
+        log.info('✅ ONNX backend registered successfully (STT + TTS + VAD)');
+      }
+      return success;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      log.warning(`ONNX registration failed: ${msg}`);
+      return false;
+    }
   }
 
   /**
-   * Register the ONNX STT provider with ServiceRegistry
+   * Unregister the ONNX backend from C++ registry.
+   * @returns Promise<boolean> true if unregistered successfully
    */
-  static register(): void {
-    log.stt.info('Registering ONNX STT service provider');
+  static async unregister(): Promise<boolean> {
+    if (!this.isRegistered) {
+      return true;
+    }
 
-    // Register with priority 90 (slightly lower than LlamaCpp)
-    ServiceRegistry.shared.registerSTTProvider(ONNXSTTProvider.shared, 90);
+    if (!isNativeModuleAvailable()) {
+      return false;
+    }
 
-    log.stt.info('ONNX STT service provider registered successfully');
+    try {
+      const native = requireNativeModule();
+      const success = await native.unregisterONNXBackend();
+      if (success) {
+        this.isRegistered = false;
+        log.info('ONNX backend unregistered');
+      }
+      return success;
+    } catch (error) {
+      return false;
+    }
   }
 
   /**
-   * Create an STT service for the given configuration
+   * Check if ONNX can handle STT models
    */
-  async createSTTService(_configuration: STTConfiguration): Promise<STTService> {
-    throw new SDKError(
-      SDKErrorCode.NotImplemented,
-      'ONNX STT service creation not yet implemented. Use RunAnywhere.loadSTTModel() instead.'
+  static canHandleSTT(modelId: string | null | undefined): boolean {
+    if (!modelId) return false;
+    const lowercased = modelId.toLowerCase();
+    return (
+      lowercased.includes('whisper') ||
+      lowercased.includes('zipformer') ||
+      lowercased.includes('paraformer')
     );
   }
 
   /**
-   * Check if this provider can handle the given model
+   * Check if ONNX can handle TTS models
    */
-  canHandle(modelId: string | null | undefined): boolean {
+  static canHandleTTS(modelId: string | null | undefined): boolean {
+    if (!modelId) return false;
+    const lowercased = modelId.toLowerCase();
+    return lowercased.includes('piper') || lowercased.includes('vits');
+  }
+
+  /**
+   * Check if ONNX can handle VAD (always true for Silero VAD)
+   */
+  static canHandleVAD(_modelId: string | null | undefined): boolean {
+    return true; // ONNX Silero VAD is the default
+  }
+
+  /**
+   * Check if ONNX can handle a given model (STT/TTS/VAD)
+   */
+  static canHandle(modelId: string | null | undefined): boolean {
     if (!modelId) {
       return false;
     }
-
     const lowercased = modelId.toLowerCase();
 
-    // Whisper models (ONNX format)
+    // STT: Whisper models (ONNX format)
     if (lowercased.includes('whisper') && !lowercased.includes('whisperkit')) {
       return true;
     }
 
-    // Sherpa-ONNX models
-    if (
-      lowercased.includes('sherpa-onnx') ||
-      lowercased.includes('sherpa_onnx')
-    ) {
+    // STT/TTS/VAD: Sherpa-ONNX models
+    if (lowercased.includes('sherpa-onnx') || lowercased.includes('sherpa_onnx')) {
       return true;
     }
 
-    // ONNX format explicitly
-    if (lowercased.includes('.onnx') || lowercased.includes('onnx')) {
-      const speechKeywords = [
-        'whisper',
-        'stt',
-        'asr',
-        'speech',
-        'transcription',
-      ];
-      if (speechKeywords.some((kw) => lowercased.includes(kw))) {
-        return true;
-      }
+    // TTS: Piper models
+    if (lowercased.includes('piper')) {
+      return true;
+    }
+
+    // VAD: Silero VAD
+    if (lowercased.includes('silero') && lowercased.includes('vad')) {
+      return true;
     }
 
     return false;
   }
-
-  /**
-   * Get models provided by this provider
-   */
-  getProvidedModels(): ModelInfo[] {
-    // For now, return empty array - models are registered via ONNX.addModel()
-    log.stt.debug('Providing registered STT models');
-    return [];
-  }
-
-  /**
-   * Lifecycle hook called when provider is registered
-   */
-  onRegistration(): void {
-    log.stt.debug('onRegistration() called');
-    const models = this.getProvidedModels();
-    log.stt.info(`Registered ${models.length} STT models through provider`);
-  }
 }
 
 /**
- * ONNX TTS Service Provider
- *
- * This provider handles Text-to-Speech models through the Sherpa-ONNX backend.
- * Mirrors Swift SDK's ONNXTTSServiceProvider pattern.
+ * Auto-register when module is imported
  */
-export class ONNXTTSProvider implements TTSServiceProvider {
-  readonly name = 'ONNX Runtime TTS';
-  readonly version = '1.23.2';
-
-  private static _instance: ONNXTTSProvider | null = null;
-
-  static get shared(): ONNXTTSProvider {
-    if (!ONNXTTSProvider._instance) {
-      ONNXTTSProvider._instance = new ONNXTTSProvider();
-    }
-    return ONNXTTSProvider._instance;
-  }
-
-  /**
-   * Register the ONNX TTS provider with ServiceRegistry
-   */
-  static register(): void {
-    log.tts.info('Registering ONNX TTS service provider');
-
-    // Register with priority 90 (slightly lower than system TTS)
-    ServiceRegistry.shared.registerTTSProvider(ONNXTTSProvider.shared, 90);
-
-    log.tts.info('ONNX TTS service provider registered successfully');
-  }
-
-  /**
-   * Create a TTS service for the given configuration
-   */
-  async createTTSService(_configuration: TTSConfiguration): Promise<TTSService> {
-    throw new SDKError(
-      SDKErrorCode.NotImplemented,
-      'ONNX TTS service creation not yet implemented. Use RunAnywhere.loadTTSModel() instead.'
-    );
-  }
-
-  /**
-   * Check if this provider can handle the given model
-   */
-  canHandle(modelId: string | null | undefined): boolean {
-    if (!modelId) {
-      return false;
-    }
-
-    const lowercased = modelId.toLowerCase();
-
-    // Piper TTS models
-    if (lowercased.includes('piper') || lowercased.includes('vits')) {
-      return true;
-    }
-
-    // Sherpa-ONNX TTS models
-    if (
-      lowercased.includes('sherpa-onnx') ||
-      lowercased.includes('sherpa_onnx')
-    ) {
-      return true;
-    }
-
-    // ONNX format explicitly for TTS
-    if (lowercased.includes('.onnx') || lowercased.includes('onnx')) {
-      const ttsKeywords = ['tts', 'speech', 'synthesis', 'voice'];
-      if (ttsKeywords.some((kw) => lowercased.includes(kw))) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * Get models provided by this provider
-   */
-  getProvidedModels(): ModelInfo[] {
-    // For now, return empty array - models are registered via ONNX.addModel()
-    log.tts.debug('Providing registered TTS models');
-    return [];
-  }
-
-  /**
-   * Lifecycle hook called when provider is registered
-   */
-  onRegistration(): void {
-    log.tts.debug('onRegistration() called');
-    const models = this.getProvidedModels();
-    log.tts.info(`Registered ${models.length} TTS models through provider`);
-  }
-}
-
-/**
- * Register all ONNX providers
- * Called during SDK initialization to register both STT and TTS providers.
- *
- * Mirrors Swift SDK's ONNXAdapter.register() pattern.
- */
-export function registerONNXProviders(): void {
-  log.main.info('Registering all ONNX providers...');
-  ONNXSTTProvider.register();
-  ONNXTTSProvider.register();
-  log.main.info('All ONNX providers registered');
+export function autoRegister(): void {
+  ONNXProvider.register().catch(() => {
+    // Silently handle registration failure during auto-registration
+  });
 }

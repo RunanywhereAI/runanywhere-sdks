@@ -34,4 +34,4 @@
  */
 
 export { LlamaCPP, type LlamaCPPModelOptions } from './LlamaCPP';
-export { LlamaCppProvider, type LlamaCppConfiguration } from './LlamaCppProvider';
+export { LlamaCppProvider, autoRegister } from './LlamaCppProvider';

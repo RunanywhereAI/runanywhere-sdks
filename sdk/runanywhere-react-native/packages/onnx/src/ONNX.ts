@@ -11,7 +11,7 @@
  * Reference: sdk/runanywhere-swift/Sources/ONNXRuntime/ONNXServiceProvider.swift
  */
 
-import { registerONNXProviders } from './ONNXProvider';
+import { ONNXProvider } from './ONNXProvider';
 import {
   ModelRegistry,
   LLMFramework,
@@ -126,7 +126,7 @@ export const ONNX = {
    */
   register(): void {
     log.info('Registering ONNX module (STT + TTS)');
-    registerONNXProviders();
+    ONNXProvider.register();
     log.info('✅ ONNX module registered (STT + TTS)');
   },
 

@@ -32,7 +32,9 @@ std::string LLMBridge::currentModelId() const {
     return loadedModelId_;
 }
 
-rac_result_t LLMBridge::loadModel(const std::string& modelId) {
+rac_result_t LLMBridge::loadModel(const std::string& modelPath,
+                                  const std::string& modelId,
+                                  const std::string& modelName) {
 #ifdef HAS_RACOMMONS
     // Create component if needed
     if (!handle_) {
@@ -42,19 +44,29 @@ rac_result_t LLMBridge::loadModel(const std::string& modelId) {
         }
     }
 
+    // Use modelPath as modelId if not provided
+    std::string effectiveModelId = modelId.empty() ? modelPath : modelId;
+    std::string effectiveModelName = modelName.empty() ? effectiveModelId : modelName;
+
     // Unload existing model if different
-    if (isLoaded() && loadedModelId_ != modelId) {
+    if (isLoaded() && loadedModelId_ != effectiveModelId) {
         rac_llm_component_unload(handle_);
     }
 
-    // Load new model
-    rac_result_t result = rac_llm_component_load_model(handle_, modelId.c_str());
+    // Load new model with correct 4-arg signature
+    // rac_llm_component_load_model(handle, model_path, model_id, model_name)
+    rac_result_t result = rac_llm_component_load_model(
+        handle_,
+        modelPath.c_str(),
+        effectiveModelId.c_str(),
+        effectiveModelName.c_str()
+    );
     if (result == RAC_SUCCESS) {
-        loadedModelId_ = modelId;
+        loadedModelId_ = effectiveModelId;
     }
     return result;
 #else
-    loadedModelId_ = modelId;
+    loadedModelId_ = modelId.empty() ? modelPath : modelId;
     return RAC_SUCCESS;
 #endif
 }
