@@ -179,19 +179,61 @@ task downloadNativeLibs {
             }
             logger.lifecycle("   Downloaded: ${llamacppZip.length() / 1024}KB")
 
+            // Extract and flatten the archive structure
+            // Archive structure: RABackendLlamaCPP-android-v0.2.6/llamacpp/arm64-v8a/*.so
+            // Target structure: arm64-v8a/*.so
             copy {
                 from zipTree(llamacppZip)
                 into jniLibsDir
+                // IMPORTANT: Exclude libc++_shared.so - React Native provides its own
+                // Using a different version causes ABI compatibility issues
+                exclude "**/libc++_shared.so"
                 eachFile { fileCopyDetails ->
-                    // Flatten the archive structure if needed
-                    if (fileCopyDetails.relativePath.pathString.contains("jniLibs/")) {
-                        fileCopyDetails.relativePath = new RelativePath(true, fileCopyDetails.relativePath.pathString.replace("jniLibs/", ""))
+                    def pathString = fileCopyDetails.relativePath.pathString
+                    // Handle RABackendLlamaCPP-android-vX.Y.Z/llamacpp/ABI/*.so structure
+                    def match = pathString =~ /.*\/(arm64-v8a|armeabi-v7a|x86|x86_64)\/(.+\.so)$/
+                    if (match) {
+                        def abi = match[0][1]
+                        def filename = match[0][2]
+                        fileCopyDetails.relativePath = new RelativePath(true, abi, filename)
+                    } else if (pathString.endsWith(".so")) {
+                        // Fallback: just use the last two segments (abi/file.so)
+                        def segments = pathString.split("/")
+                        if (segments.length >= 2) {
+                            fileCopyDetails.relativePath = new RelativePath(true, segments[-2], segments[-1])
+                        }
+                    } else {
+                        // Exclude non-so files
+                        fileCopyDetails.exclude()
                     }
                 }
                 includeEmptyDirs = false
             }
 
-            logger.lifecycle("   ✅ RABackendLlamaCPP installed")
+            logger.lifecycle("   ✅ RABackendLlamaCPP native libraries installed")
+
+            // Extract header files
+            def includeDir = file("include")
+            includeDir.deleteDir()
+            includeDir.mkdirs()
+
+            copy {
+                from zipTree(llamacppZip)
+                into includeDir
+                eachFile { fileCopyDetails ->
+                    def pathString = fileCopyDetails.relativePath.pathString
+                    // Handle RABackendLlamaCPP-android-vX.Y.Z/include/*.h structure
+                    if (pathString.contains("/include/") && pathString.endsWith(".h")) {
+                        def filename = pathString.substring(pathString.lastIndexOf("/") + 1)
+                        fileCopyDetails.relativePath = new RelativePath(true, filename)
+                    } else {
+                        fileCopyDetails.exclude()
+                    }
+                }
+                includeEmptyDirs = false
+            }
+            logger.lifecycle("   ✅ RABackendLlamaCPP headers installed")
+
         } catch (Exception e) {
             logger.error("❌ Failed to download RABackendLlamaCPP: ${e.message}")
             throw new GradleException("Failed to download RABackendLlamaCPP", e)
@@ -242,5 +284,5 @@ repositories {
 dependencies {
     implementation "com.facebook.react:react-android"
     implementation project(":react-native-nitro-modules")
-    implementation project(":runanywhere-core")
+    implementation project(":runanywhere_core")
 }

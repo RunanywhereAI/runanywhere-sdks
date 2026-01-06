@@ -7,7 +7,7 @@
  * Reference: sdk/runanywhere-swift/Sources/ONNXRuntime/ONNX.swift
  */
 
-import { requireNativeModule, isNativeModuleAvailable } from '@runanywhere/core';
+import { requireNativeONNXModule, isNativeONNXModuleAvailable } from './native/NativeRunAnywhereONNX';
 
 // Simple logger for this package
 const DEBUG = typeof __DEV__ !== 'undefined' ? __DEV__ : false;
@@ -53,17 +53,17 @@ export class ONNXProvider {
       return true;
     }
 
-    if (!isNativeModuleAvailable()) {
-      log.warning('Native module not available');
+    if (!isNativeONNXModuleAvailable()) {
+      log.warning('ONNX native module not available');
       return false;
     }
 
     log.info('Registering ONNX backend with C++ registry...');
 
     try {
-      const native = requireNativeModule();
-      // Call native registration function (matches Swift pattern)
-      const success = await native.registerONNXBackend();
+      const native = requireNativeONNXModule();
+      // Call the native registration method from the ONNX module
+      const success = await native.registerBackend();
       if (success) {
         this.isRegistered = true;
         log.info('✅ ONNX backend registered successfully (STT + TTS + VAD)');
@@ -85,13 +85,13 @@ export class ONNXProvider {
       return true;
     }
 
-    if (!isNativeModuleAvailable()) {
+    if (!isNativeONNXModuleAvailable()) {
       return false;
     }
 
     try {
-      const native = requireNativeModule();
-      const success = await native.unregisterONNXBackend();
+      const native = requireNativeONNXModule();
+      const success = await native.unregisterBackend();
       if (success) {
         this.isRegistered = false;
         log.info('ONNX backend unregistered');

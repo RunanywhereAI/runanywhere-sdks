@@ -17,6 +17,8 @@
 
 #include <NitroModules/Promise.hpp>
 #include <string>
+#include <optional>
+#include <functional>
 
 namespace margelo::nitro::runanywhere {
 
@@ -80,6 +82,38 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> extractArchive(const std::string& archivePath, const std::string& destPath) = 0;
       virtual std::shared_ptr<Promise<std::string>> getDeviceCapabilities() = 0;
       virtual std::shared_ptr<Promise<double>> getMemoryUsage() = 0;
+      virtual std::shared_ptr<Promise<bool>> loadTextModel(const std::string& modelPath, const std::optional<std::string>& configJson) = 0;
+      virtual std::shared_ptr<Promise<bool>> isTextModelLoaded() = 0;
+      virtual std::shared_ptr<Promise<bool>> unloadTextModel() = 0;
+      virtual std::shared_ptr<Promise<std::string>> generate(const std::string& prompt, const std::optional<std::string>& optionsJson) = 0;
+      virtual std::shared_ptr<Promise<std::string>> generateStream(const std::string& prompt, const std::string& optionsJson, const std::function<void(const std::string& /* token */, bool /* isComplete */)>& callback) = 0;
+      virtual std::shared_ptr<Promise<bool>> cancelGeneration() = 0;
+      virtual std::shared_ptr<Promise<std::string>> generateStructured(const std::string& prompt, const std::string& schema, const std::optional<std::string>& optionsJson) = 0;
+      virtual std::shared_ptr<Promise<bool>> loadSTTModel(const std::string& modelPath, const std::string& modelType, const std::optional<std::string>& configJson) = 0;
+      virtual std::shared_ptr<Promise<bool>> isSTTModelLoaded() = 0;
+      virtual std::shared_ptr<Promise<bool>> unloadSTTModel() = 0;
+      virtual std::shared_ptr<Promise<std::string>> transcribe(const std::string& audioBase64, double sampleRate, const std::optional<std::string>& language) = 0;
+      virtual std::shared_ptr<Promise<std::string>> transcribeFile(const std::string& filePath, const std::optional<std::string>& language) = 0;
+      virtual std::shared_ptr<Promise<bool>> loadTTSModel(const std::string& modelPath, const std::string& modelType, const std::optional<std::string>& configJson) = 0;
+      virtual std::shared_ptr<Promise<bool>> isTTSModelLoaded() = 0;
+      virtual std::shared_ptr<Promise<bool>> unloadTTSModel() = 0;
+      virtual std::shared_ptr<Promise<std::string>> synthesize(const std::string& text, const std::string& voiceId, double speedRate, double pitchShift) = 0;
+      virtual std::shared_ptr<Promise<std::string>> getTTSVoices() = 0;
+      virtual std::shared_ptr<Promise<bool>> cancelTTS() = 0;
+      virtual std::shared_ptr<Promise<bool>> loadVADModel(const std::string& modelPath, const std::optional<std::string>& configJson) = 0;
+      virtual std::shared_ptr<Promise<bool>> isVADModelLoaded() = 0;
+      virtual std::shared_ptr<Promise<bool>> unloadVADModel() = 0;
+      virtual std::shared_ptr<Promise<std::string>> processVAD(const std::string& audioBase64, const std::optional<std::string>& optionsJson) = 0;
+      virtual std::shared_ptr<Promise<void>> resetVAD() = 0;
+      virtual std::shared_ptr<Promise<bool>> initializeVoiceAgent(const std::string& configJson) = 0;
+      virtual std::shared_ptr<Promise<bool>> initializeVoiceAgentWithLoadedModels() = 0;
+      virtual std::shared_ptr<Promise<bool>> isVoiceAgentReady() = 0;
+      virtual std::shared_ptr<Promise<std::string>> getVoiceAgentComponentStates() = 0;
+      virtual std::shared_ptr<Promise<std::string>> processVoiceTurn(const std::string& audioBase64) = 0;
+      virtual std::shared_ptr<Promise<std::string>> voiceAgentTranscribe(const std::string& audioBase64) = 0;
+      virtual std::shared_ptr<Promise<std::string>> voiceAgentGenerateResponse(const std::string& prompt) = 0;
+      virtual std::shared_ptr<Promise<std::string>> voiceAgentSynthesizeSpeech(const std::string& text) = 0;
+      virtual std::shared_ptr<Promise<void>> cleanupVoiceAgent() = 0;
 
     protected:
       // Hybrid Setup

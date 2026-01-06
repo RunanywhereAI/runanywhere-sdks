@@ -2,6 +2,10 @@
  * RunAnywhere+TextGeneration.ts
  *
  * Text generation (LLM) extension for RunAnywhere SDK.
+ * Uses backend-agnostic rac_llm_component_* C++ APIs via the core native module.
+ * The actual backend (LlamaCPP, etc.) must be registered by installing
+ * and importing the appropriate backend package (e.g., @runanywhere/llamacpp).
+ *
  * Matches iOS: RunAnywhere+TextGeneration.swift
  */
 
@@ -22,13 +26,14 @@ import type {
 const logger = new SDKLogger('RunAnywhere.TextGeneration');
 
 // ============================================================================
-// Text Generation (LLM) Extension
+// Text Generation (LLM) Extension - Backend Agnostic
 // ============================================================================
 
 /**
  * Load an LLM model by ID or path
  *
  * Matches iOS: `RunAnywhere.loadModel(_:)`
+ * @throws Error if no LLM backend is registered
  */
 export async function loadModel(
   modelPathOrId: string,
@@ -269,7 +274,7 @@ export async function generateStream(
             tokensUsed: tokenCount,
             modelUsed: 'unknown',
             latencyMs,
-            framework: 'llamacpp',
+            framework: 'unknown', // Backend-agnostic
             tokensPerSecond,
             timeToFirstTokenMs,
             thinkingTokens: 0,

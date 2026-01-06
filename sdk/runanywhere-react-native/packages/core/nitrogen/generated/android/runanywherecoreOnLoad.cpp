@@ -15,10 +15,11 @@
 #include <fbjni/fbjni.h>
 #include <NitroModules/HybridObjectRegistry.hpp>
 
-#include "HybridRunAnywhereCore.hpp"
-#include "JHybridRunAnywhereFileSystemSpec.hpp"
-#include <NitroModules/DefaultConstructableObject.hpp>
 #include "JHybridRunAnywhereDeviceInfoSpec.hpp"
+#include "JHybridRunAnywhereFileSystemSpec.hpp"
+#include "JFunc_void_double.hpp"
+#include "HybridRunAnywhereCore.hpp"
+#include <NitroModules/DefaultConstructableObject.hpp>
 
 namespace margelo::nitro::runanywhere {
 
@@ -29,7 +30,9 @@ int initialize(JavaVM* vm) {
 
   return facebook::jni::initialize(vm, [] {
     // Register native JNI methods
-
+    margelo::nitro::runanywhere::JHybridRunAnywhereDeviceInfoSpec::registerNatives();
+    margelo::nitro::runanywhere::JHybridRunAnywhereFileSystemSpec::registerNatives();
+    margelo::nitro::runanywhere::JFunc_void_double_cxx::registerNatives();
 
     // Register Nitro Hybrid Objects
     HybridObjectRegistry::registerHybridObjectConstructor(

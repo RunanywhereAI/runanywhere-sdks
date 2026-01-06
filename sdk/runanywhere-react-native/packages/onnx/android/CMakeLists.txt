@@ -3,37 +3,80 @@ cmake_minimum_required(VERSION 3.9.0)
 
 set(PACKAGE_NAME runanywhereonnx)
 set(CMAKE_VERBOSE_MAKEFILE ON)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 # Path to pre-built native libraries (downloaded from runanywhere-binaries)
 set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
 
 # =============================================================================
-# RABackendONNX - STT/TTS/VAD backend
+# RABackendONNX - STT/TTS/VAD backend (REQUIRED)
+# Downloaded via Gradle downloadNativeLibs task
 # =============================================================================
-if(EXISTS "${JNILIB_DIR}/librunanywhere_onnx.so")
-    add_library(runanywhere_onnx SHARED IMPORTED)
-    set_target_properties(runanywhere_onnx PROPERTIES
-        IMPORTED_LOCATION "${JNILIB_DIR}/librunanywhere_onnx.so"
-        IMPORTED_NO_SONAME TRUE
-    )
-    set(HAS_ONNX ON)
-    message(STATUS "[RunAnywhereONNX] Found RABackendONNX at ${JNILIB_DIR}/librunanywhere_onnx.so")
-else()
-    message(WARNING "[RunAnywhereONNX] RABackendONNX not found at ${JNILIB_DIR}/librunanywhere_onnx.so")
-    message(WARNING "Run: ./gradlew :onnx:downloadNativeLibs")
+if(NOT EXISTS "${JNILIB_DIR}/librunanywhere_onnx.so")
+    message(FATAL_ERROR "[RunAnywhereONNX] RABackendONNX not found at ${JNILIB_DIR}/librunanywhere_onnx.so\n"
+                        "Run: ./gradlew :runanywhere_onnx:downloadNativeLibs")
 endif()
 
+add_library(runanywhere_onnx SHARED IMPORTED)
+set_target_properties(runanywhere_onnx PROPERTIES
+    IMPORTED_LOCATION "${JNILIB_DIR}/librunanywhere_onnx.so"
+    IMPORTED_NO_SONAME TRUE
+)
+message(STATUS "[RunAnywhereONNX] Found RABackendONNX at ${JNILIB_DIR}/librunanywhere_onnx.so")
+
 # =============================================================================
-# ONNX Runtime
+# RABackendONNX JNI - contains rac_backend_onnx_register/unregister (REQUIRED)
 # =============================================================================
-if(EXISTS "${JNILIB_DIR}/libonnxruntime.so")
-    add_library(onnxruntime SHARED IMPORTED)
-    set_target_properties(onnxruntime PROPERTIES
-        IMPORTED_LOCATION "${JNILIB_DIR}/libonnxruntime.so"
+if(NOT EXISTS "${JNILIB_DIR}/librac_backend_onnx_jni.so")
+    message(FATAL_ERROR "[RunAnywhereONNX] RABackendONNX JNI not found at ${JNILIB_DIR}/librac_backend_onnx_jni.so\n"
+                        "Run: ./gradlew :runanywhere_onnx:downloadNativeLibs")
+endif()
+
+add_library(rac_backend_onnx_jni SHARED IMPORTED)
+set_target_properties(rac_backend_onnx_jni PROPERTIES
+    IMPORTED_LOCATION "${JNILIB_DIR}/librac_backend_onnx_jni.so"
+    IMPORTED_NO_SONAME TRUE
+)
+message(STATUS "[RunAnywhereONNX] Found RABackendONNX JNI at ${JNILIB_DIR}/librac_backend_onnx_jni.so")
+
+# =============================================================================
+# ONNX Runtime (REQUIRED)
+# =============================================================================
+if(NOT EXISTS "${JNILIB_DIR}/libonnxruntime.so")
+    message(FATAL_ERROR "[RunAnywhereONNX] ONNX Runtime not found at ${JNILIB_DIR}/libonnxruntime.so\n"
+                        "Run: ./gradlew :runanywhere_onnx:downloadNativeLibs")
+endif()
+
+add_library(onnxruntime SHARED IMPORTED)
+set_target_properties(onnxruntime PROPERTIES
+    IMPORTED_LOCATION "${JNILIB_DIR}/libonnxruntime.so"
+    IMPORTED_NO_SONAME TRUE
+)
+message(STATUS "[RunAnywhereONNX] Found ONNX Runtime at ${JNILIB_DIR}/libonnxruntime.so")
+
+# =============================================================================
+# Sherpa ONNX libraries (optional but typically present)
+# =============================================================================
+if(EXISTS "${JNILIB_DIR}/libsherpa-onnx-c-api.so")
+    add_library(sherpa_onnx_c_api SHARED IMPORTED)
+    set_target_properties(sherpa_onnx_c_api PROPERTIES
+        IMPORTED_LOCATION "${JNILIB_DIR}/libsherpa-onnx-c-api.so"
         IMPORTED_NO_SONAME TRUE
     )
-    message(STATUS "[RunAnywhereONNX] Found ONNX Runtime at ${JNILIB_DIR}/libonnxruntime.so")
+endif()
+if(EXISTS "${JNILIB_DIR}/libsherpa-onnx-cxx-api.so")
+    add_library(sherpa_onnx_cxx_api SHARED IMPORTED)
+    set_target_properties(sherpa_onnx_cxx_api PROPERTIES
+        IMPORTED_LOCATION "${JNILIB_DIR}/libsherpa-onnx-cxx-api.so"
+        IMPORTED_NO_SONAME TRUE
+    )
+endif()
+if(EXISTS "${JNILIB_DIR}/libsherpa-onnx-jni.so")
+    add_library(sherpa_onnx_jni SHARED IMPORTED)
+    set_target_properties(sherpa_onnx_jni PROPERTIES
+        IMPORTED_LOCATION "${JNILIB_DIR}/libsherpa-onnx-jni.so"
+        IMPORTED_NO_SONAME TRUE
+    )
 endif()
 
 # =============================================================================
@@ -53,15 +96,38 @@ include(${CMAKE_SOURCE_DIR}/../nitrogen/generated/android/runanywhereonnx+autoli
 # =============================================================================
 # Include directories
 # =============================================================================
+# Get core package include dir (for rac/*.h headers)
+get_filename_component(RN_NODE_MODULES "${CMAKE_SOURCE_DIR}/../../.." ABSOLUTE)
+set(CORE_INCLUDE_DIR "${RN_NODE_MODULES}/@runanywhere/core/android/src/main/include")
+set(CORE_JNILIB_DIR "${RN_NODE_MODULES}/@runanywhere/core/android/src/main/jniLibs/${ANDROID_ABI}")
+
 include_directories(
     "src/main/cpp"
     "../cpp"
     "../cpp/bridges"
     "${CMAKE_SOURCE_DIR}/include"
+    "${CORE_INCLUDE_DIR}"
+    "${CORE_INCLUDE_DIR}/rac"
+    "${CORE_INCLUDE_DIR}/rac/core"
 )
 
 # =============================================================================
-# Linking
+# RACommons - Core SDK functionality (from core package)
+# =============================================================================
+if(NOT EXISTS "${CORE_JNILIB_DIR}/librac_commons.so")
+    message(FATAL_ERROR "[RunAnywhereONNX] RACommons not found at ${CORE_JNILIB_DIR}/librac_commons.so\n"
+                        "Run: ./gradlew :runanywhere_core:downloadNativeLibs")
+endif()
+
+add_library(rac_commons SHARED IMPORTED)
+set_target_properties(rac_commons PROPERTIES
+    IMPORTED_LOCATION "${CORE_JNILIB_DIR}/librac_commons.so"
+    IMPORTED_NO_SONAME TRUE
+)
+message(STATUS "[RunAnywhereONNX] Found RACommons at ${CORE_JNILIB_DIR}/librac_commons.so")
+
+# =============================================================================
+# Linking - ONNX backend and RACommons are REQUIRED
 # =============================================================================
 find_library(LOG_LIB log)
 
@@ -69,10 +135,22 @@ target_link_libraries(
     ${PACKAGE_NAME}
     ${LOG_LIB}
     android
+    rac_commons
+    runanywhere_onnx
+    rac_backend_onnx_jni
+    onnxruntime
 )
 
-# Link ONNX backend if available
-if(HAS_ONNX)
-    target_link_libraries(${PACKAGE_NAME} runanywhere_onnx onnxruntime)
-    target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_ONNX=1)
+# Also link sherpa-onnx libraries if available
+if(TARGET sherpa_onnx_c_api)
+    target_link_libraries(${PACKAGE_NAME} sherpa_onnx_c_api)
 endif()
+if(TARGET sherpa_onnx_cxx_api)
+    target_link_libraries(${PACKAGE_NAME} sherpa_onnx_cxx_api)
+endif()
+if(TARGET sherpa_onnx_jni)
+    target_link_libraries(${PACKAGE_NAME} sherpa_onnx_jni)
+endif()
+
+# HAS_ONNX is always defined since ONNX backend is required
+target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_ONNX=1 HAS_RACOMMONS=1)

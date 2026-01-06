@@ -15,15 +15,6 @@ import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import type { ModelInfo, LLMFramework } from '../../types';
 import { ModelCategory } from '../../types';
 
-/**
- * Interface for model assignment service methods used in this file
- */
-interface ModelAssignmentServiceLike {
-  fetchModelAssignments(forceRefresh?: boolean): Promise<ModelInfo[]>;
-  getModelsForCategory(category: ModelCategory): Promise<ModelInfo[]>;
-  clearCache(): void;
-}
-
 const logger = new SDKLogger('RunAnywhere.Models');
 
 // Track active downloads for cancellation
@@ -128,10 +119,12 @@ export async function getDownloadedModels(): Promise<ModelInfo[]> {
   if (!isNativeModuleAvailable()) {
     return [];
   }
+  // Get all models and filter for downloaded ones
   const native = requireNativeModule();
-  const modelsJson = await native.getDownloadedModels();
+  const modelsJson = await native.getAvailableModels();
   try {
-    return JSON.parse(modelsJson);
+    const allModels: ModelInfo[] = JSON.parse(modelsJson);
+    return allModels.filter(m => m.isDownloaded);
   } catch {
     return [];
   }

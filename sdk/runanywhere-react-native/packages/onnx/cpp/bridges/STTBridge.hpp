@@ -5,6 +5,9 @@
  * Matches Swift's CppBridge+STT.swift pattern, providing:
  * - Model lifecycle (load/unload)
  * - Transcription (batch and streaming)
+ *
+ * Aligned with rac_stt_component.h and rac_stt_types.h API.
+ * RACommons is REQUIRED - no stub implementations.
  */
 
 #pragma once
@@ -14,14 +17,9 @@
 #include <string>
 #include <vector>
 
-#ifdef HAS_RACOMMONS
+// RACommons STT headers - REQUIRED
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/stt/rac_stt_types.h"
-#else
-typedef void* rac_handle_t;
-typedef int rac_result_t;
-#define RAC_SUCCESS 0
-#endif
 
 namespace runanywhere {
 namespace bridges {
@@ -43,6 +41,7 @@ struct STTOptions {
     std::string language = "en";
     bool enableTimestamps = false;
     bool enablePunctuation = true;
+    int sampleRate = 16000;
 };
 
 /**
@@ -58,6 +57,8 @@ struct STTStreamCallbacks {
  * @brief STT capability bridge singleton
  *
  * Matches CppBridge+STT.swift API.
+ * NOTE: RACommons is REQUIRED. All methods will throw std::runtime_error if
+ * the underlying C API calls fail.
  */
 class STTBridge {
 public:
@@ -66,7 +67,9 @@ public:
     // Lifecycle
     bool isLoaded() const;
     std::string currentModelId() const;
-    rac_result_t loadModel(const std::string& modelId);
+    rac_result_t loadModel(const std::string& modelPath,
+                           const std::string& modelId = "",
+                           const std::string& modelName = "");
     rac_result_t unload();
     void cleanup();
 

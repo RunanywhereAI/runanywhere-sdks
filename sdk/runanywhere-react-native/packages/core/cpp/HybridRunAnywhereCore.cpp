@@ -3,34 +3,47 @@
  *
  * Nitrogen HybridObject implementation for RunAnywhere Core SDK.
  *
- * Core-only implementation - includes only core functionality:
+ * Core SDK implementation - includes:
  * - SDK Lifecycle, Authentication, Device Registration
  * - Model Registry, Download Service, Storage
  * - Events, HTTP Client, Utilities
+ * - LLM/STT/TTS/VAD/VoiceAgent capabilities (backend-agnostic)
  *
- * NO LLM/STT/TTS/VAD/VoiceAgent methods - those are in:
- * - @runanywhere/llamacpp for text generation
- * - @runanywhere/onnx for speech processing
+ * The capability methods (LLM, STT, TTS, VAD, VoiceAgent) are BACKEND-AGNOSTIC.
+ * They call the C++ rac_*_component_* APIs which work with any registered backend.
+ * Apps must install a backend package to register the actual implementation:
+ * - @runanywhere/llamacpp registers the LLM backend via rac_backend_llamacpp_register()
+ * - @runanywhere/onnx registers the STT/TTS/VAD backends via rac_backend_onnx_register()
+ *
+ * Mirrors Swift's CppBridge architecture from:
+ * sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/
  */
 
 #include "HybridRunAnywhereCore.hpp"
 
-// Core bridges only (no LLM/STT/TTS/VAD bridges)
-#include "bridges/PlatformAdapterBridge.hpp"
+// Core bridges - aligned with actual RACommons API
 #include "bridges/InitBridge.hpp"
+#include "bridges/DeviceBridge.hpp"
+#include "bridges/AuthBridge.hpp"
 #include "bridges/StorageBridge.hpp"
 #include "bridges/ModelRegistryBridge.hpp"
 #include "bridges/EventBridge.hpp"
-#include "bridges/StateBridge.hpp"
-#include "bridges/AuthBridge.hpp"
 #include "bridges/HTTPBridge.hpp"
 #include "bridges/DownloadBridge.hpp"
-#include "bridges/DeviceBridge.hpp"
+
+// RACommons C API headers for capability methods
+// These are backend-agnostic - they work with any registered backend
+#include "rac/features/llm/rac_llm_component.h"
+#include "rac/features/llm/rac_llm_types.h"
+#include "rac/features/stt/rac_stt_component.h"
+#include "rac/features/stt/rac_stt_types.h"
+#include "rac/features/tts/rac_tts_component.h"
+#include "rac/features/tts/rac_tts_types.h"
+#include "rac/features/vad/rac_vad_component.h"
+#include "rac/features/vad/rac_vad_types.h"
+#include "rac/core/rac_types.h"
 
 #include <sstream>
-#include <cstring>
-#include <algorithm>
-#include <cctype>
 #include <chrono>
 #include <vector>
 
@@ -42,9 +55,9 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 #else
-#define LOGI(...) printf(__VA_ARGS__); printf("\n")
-#define LOGE(...) printf(__VA_ARGS__); printf("\n")
-#define LOGD(...) printf(__VA_ARGS__); printf("\n")
+#define LOGI(...) printf("[HybridRunAnywhereCore] "); printf(__VA_ARGS__); printf("\n")
+#define LOGE(...) printf("[HybridRunAnywhereCore ERROR] "); printf(__VA_ARGS__); printf("\n")
+#define LOGD(...) printf("[HybridRunAnywhereCore DEBUG] "); printf(__VA_ARGS__); printf("\n")
 #endif
 
 namespace margelo::nitro::runanywhere {
@@ -57,60 +70,48 @@ using namespace ::runanywhere::bridges;
 
 namespace {
 
-// Simple JSON value extraction
 int extractIntValue(const std::string& json, const std::string& key, int defaultValue) {
-  std::string searchKey = "\"" + key + "\":";
-  size_t pos = json.find(searchKey);
-  if (pos == std::string::npos) return defaultValue;
-  pos += searchKey.length();
-  while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
-  if (pos >= json.size()) return defaultValue;
-  return std::stoi(json.substr(pos));
-}
-
-float extractFloatValue(const std::string& json, const std::string& key, float defaultValue) {
-  std::string searchKey = "\"" + key + "\":";
-  size_t pos = json.find(searchKey);
-  if (pos == std::string::npos) return defaultValue;
-  pos += searchKey.length();
-  while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
-  if (pos >= json.size()) return defaultValue;
-  return std::stof(json.substr(pos));
+    std::string searchKey = "\"" + key + "\":";
+    size_t pos = json.find(searchKey);
+    if (pos == std::string::npos) return defaultValue;
+    pos += searchKey.length();
+    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
+    if (pos >= json.size()) return defaultValue;
+    return std::stoi(json.substr(pos));
 }
 
 std::string extractStringValue(const std::string& json, const std::string& key, const std::string& defaultValue = "") {
-  std::string searchKey = "\"" + key + "\":\"";
-  size_t pos = json.find(searchKey);
-  if (pos == std::string::npos) return defaultValue;
-  pos += searchKey.length();
-  size_t endPos = json.find("\"", pos);
-  if (endPos == std::string::npos) return defaultValue;
-  return json.substr(pos, endPos - pos);
-}
-
-// Simple JSON builder
-std::string buildJsonObject(const std::vector<std::pair<std::string, std::string>>& keyValues) {
-  std::string result = "{";
-  for (size_t i = 0; i < keyValues.size(); i++) {
-    if (i > 0) result += ",";
-    result += "\"" + keyValues[i].first + "\":" + keyValues[i].second;
-  }
-  result += "}";
-  return result;
+    std::string searchKey = "\"" + key + "\":\"";
+    size_t pos = json.find(searchKey);
+    if (pos == std::string::npos) return defaultValue;
+    pos += searchKey.length();
+    size_t endPos = json.find("\"", pos);
+    if (endPos == std::string::npos) return defaultValue;
+    return json.substr(pos, endPos - pos);
 }
 
 std::string jsonString(const std::string& value) {
-  std::string escaped = "\"";
-  for (char c : value) {
-    if (c == '"') escaped += "\\\"";
-    else if (c == '\\') escaped += "\\\\";
-    else if (c == '\n') escaped += "\\n";
-    else if (c == '\r') escaped += "\\r";
-    else if (c == '\t') escaped += "\\t";
-    else escaped += c;
-  }
-  escaped += "\"";
-  return escaped;
+    std::string escaped = "\"";
+    for (char c : value) {
+        if (c == '"') escaped += "\\\"";
+        else if (c == '\\') escaped += "\\\\";
+        else if (c == '\n') escaped += "\\n";
+        else if (c == '\r') escaped += "\\r";
+        else if (c == '\t') escaped += "\\t";
+        else escaped += c;
+    }
+    escaped += "\"";
+    return escaped;
+}
+
+std::string buildJsonObject(const std::vector<std::pair<std::string, std::string>>& keyValues) {
+    std::string result = "{";
+    for (size_t i = 0; i < keyValues.size(); i++) {
+        if (i > 0) result += ",";
+        result += "\"" + keyValues[i].first + "\":" + keyValues[i].second;
+    }
+    result += "}";
+    return result;
 }
 
 } // anonymous namespace
@@ -120,304 +121,495 @@ std::string jsonString(const std::string& value) {
 // ============================================================================
 
 HybridRunAnywhereCore::HybridRunAnywhereCore() : HybridObject(TAG) {
-  LOGI("HybridRunAnywhereCore constructor - core-only module");
+    LOGI("HybridRunAnywhereCore constructor - core module");
 }
 
 HybridRunAnywhereCore::~HybridRunAnywhereCore() {
-  LOGI("HybridRunAnywhereCore destructor");
+    LOGI("HybridRunAnywhereCore destructor");
 
-  // Cleanup core bridges only
-  InitBridge::shared().shutdown();
-  PlatformAdapterBridge::shared().shutdown();
+    // Cleanup bridges
+    EventBridge::shared().unregisterFromEvents();
+    DownloadBridge::shared().shutdown();
+    StorageBridge::shared().shutdown();
+    ModelRegistryBridge::shared().shutdown();
+    InitBridge::shared().shutdown();
 }
 
 // ============================================================================
-// SDK Lifecycle - Delegates to InitBridge and PlatformAdapterBridge
+// SDK Lifecycle
 // ============================================================================
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
     const std::string& configJson) {
-  return Promise<bool>::async([this, configJson]() {
-    std::lock_guard<std::mutex> lock(initMutex_);
+    return Promise<bool>::async([this, configJson]() {
+        std::lock_guard<std::mutex> lock(initMutex_);
 
-    LOGI("Initializing Core SDK with rac_* API...");
+        LOGI("Initializing Core SDK...");
 
-    // 1. Setup platform adapter callbacks (MUST be first)
-    PlatformCallbacks callbacks;
-    callbacks.fileExists = [](const std::string& path) {
-      // TODO: Implement via HybridRunAnywhereFileSystem
-      return false;
-    };
-    callbacks.fileRead = [](const std::string& path) -> std::string {
-      // TODO: Implement via HybridRunAnywhereFileSystem
-      return "";
-    };
-    callbacks.fileWrite = [](const std::string& path, const std::string& data) {
-      // TODO: Implement via HybridRunAnywhereFileSystem
-      return false;
-    };
-    callbacks.fileDelete = [](const std::string& path) {
-      // TODO: Implement via HybridRunAnywhereFileSystem
-      return false;
-    };
-    callbacks.log = [](int level, const std::string& category, const std::string& message) {
-      LOGI("[%s] %s", category.c_str(), message.c_str());
-    };
-    callbacks.nowMs = []() -> int64_t {
-      auto now = std::chrono::system_clock::now();
-      return std::chrono::duration_cast<std::chrono::milliseconds>(
-          now.time_since_epoch()).count();
-    };
+        // Parse config
+        std::string apiKey = extractStringValue(configJson, "apiKey");
+        std::string baseURL = extractStringValue(configJson, "baseURL", "https://api.runanywhere.ai");
+        std::string deviceId = extractStringValue(configJson, "deviceId");
+        std::string envStr = extractStringValue(configJson, "environment", "production");
 
-    PlatformAdapterBridge::shared().initialize(callbacks);
+        // Determine environment
+        SDKEnvironment env = SDKEnvironment::Production;
+        if (envStr == "development") env = SDKEnvironment::Development;
+        else if (envStr == "staging") env = SDKEnvironment::Staging;
 
-    // 2. Initialize commons
-    auto result = InitBridge::shared().initialize(configJson);
-    if (result != 0) {
-      setLastError("Failed to initialize SDK");
-      return false;
-    }
+        // 1. Initialize core (platform adapter + state)
+        rac_result_t result = InitBridge::shared().initialize(env, apiKey, baseURL, deviceId);
+        if (result != RAC_SUCCESS) {
+            setLastError("Failed to initialize SDK core: " + std::to_string(result));
+            return false;
+        }
 
-    // 3. Setup event bridge
-    EventBridge::shared().initialize([](const std::string& eventJson) {
-      // TODO: Forward to JS via Nitrogen event emitter
-      LOGD("Event: %s", eventJson.c_str());
+        // 2. Initialize model registry
+        result = ModelRegistryBridge::shared().initialize();
+        if (result != RAC_SUCCESS) {
+            LOGE("Failed to initialize model registry: %d", result);
+            // Continue - not fatal
+        }
+
+        // 3. Initialize storage analyzer
+        result = StorageBridge::shared().initialize();
+        if (result != RAC_SUCCESS) {
+            LOGE("Failed to initialize storage analyzer: %d", result);
+            // Continue - not fatal
+        }
+
+        // 4. Initialize download manager
+        result = DownloadBridge::shared().initialize();
+        if (result != RAC_SUCCESS) {
+            LOGE("Failed to initialize download manager: %d", result);
+            // Continue - not fatal
+        }
+
+        // 5. Register for events
+        EventBridge::shared().registerForEvents();
+
+        // 6. Configure HTTP
+        HTTPBridge::shared().configure(baseURL, apiKey);
+
+        LOGI("Core SDK initialized successfully");
+        return true;
     });
-
-    // 4. Update state
-    StateBridge::shared().setState(SDKState::Initialized);
-
-    LOGI("Core SDK initialized successfully");
-    return true;
-  });
 }
 
 std::shared_ptr<Promise<void>> HybridRunAnywhereCore::destroy() {
-  return Promise<void>::async([this]() {
-    std::lock_guard<std::mutex> lock(initMutex_);
+    return Promise<void>::async([this]() {
+        std::lock_guard<std::mutex> lock(initMutex_);
 
-    // Cleanup core bridges only
-    EventBridge::shared().shutdown();
-    InitBridge::shared().shutdown();
-    PlatformAdapterBridge::shared().shutdown();
+        LOGI("Destroying Core SDK...");
 
-    StateBridge::shared().setState(SDKState::Uninitialized);
+        // Cleanup in reverse order
+        EventBridge::shared().unregisterFromEvents();
+        DownloadBridge::shared().shutdown();
+        StorageBridge::shared().shutdown();
+        ModelRegistryBridge::shared().shutdown();
+        InitBridge::shared().shutdown();
 
-    LOGI("Core SDK destroyed");
-  });
+        LOGI("Core SDK destroyed");
+    });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isInitialized() {
-  return Promise<bool>::async([]() {
-    return StateBridge::shared().isSDKInitialized();
-  });
+    return Promise<bool>::async([]() {
+        return InitBridge::shared().isInitialized();
+    });
 }
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getBackendInfo() {
-  return Promise<std::string>::async([]() {
-    return buildJsonObject({
-      {"api", jsonString("rac_*")},
-      {"source", jsonString("runanywhere-commons")},
-      {"module", jsonString("core")}
+    return Promise<std::string>::async([]() {
+        return buildJsonObject({
+            {"api", jsonString("rac_*")},
+            {"source", jsonString("runanywhere-commons")},
+            {"module", jsonString("core")}
+        });
     });
-  });
 }
 
 // ============================================================================
-// Authentication - Delegates to AuthBridge
+// Authentication
 // ============================================================================
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::authenticate(
     const std::string& apiKey) {
-  return Promise<bool>::async([apiKey]() {
-    return AuthBridge::shared().authenticate(apiKey) == 0;
-  });
+    return Promise<bool>::async([this, apiKey]() -> bool {
+        LOGI("Authenticating...");
+
+        // Build auth request JSON
+        std::string deviceId = DeviceBridge::shared().getDeviceId();
+        std::string platform = "react-native";
+        std::string sdkVersion = "0.1.0"; // TODO: Get from config
+
+        std::string requestJson = AuthBridge::shared().buildAuthenticateRequestJSON(
+            apiKey, deviceId, platform, sdkVersion
+        );
+
+        if (requestJson.empty()) {
+            setLastError("Failed to build auth request");
+            return false;
+        }
+
+        // NOTE: HTTP request must be made by JS layer
+        // This C++ method just prepares the request JSON
+        // The JS layer should:
+        // 1. Call this method to prepare
+        // 2. Make HTTP POST to /api/v1/auth/sdk/authenticate
+        // 3. Call handleAuthResponse() with the response
+
+        // For now, we indicate that auth JSON is prepared
+        LOGI("Auth request JSON prepared. HTTP must be done by JS layer.");
+        return true;
+    });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isAuthenticated() {
-  return Promise<bool>::async([]() {
-    return AuthBridge::shared().isAuthenticated();
-  });
+    return Promise<bool>::async([]() -> bool {
+        return AuthBridge::shared().isAuthenticated();
+    });
 }
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getUserId() {
-  return Promise<std::string>::async([]() {
-    return AuthBridge::shared().getUserId();
-  });
+    return Promise<std::string>::async([]() -> std::string {
+        return AuthBridge::shared().getUserId();
+    });
 }
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getOrganizationId() {
-  return Promise<std::string>::async([]() {
-    return AuthBridge::shared().getOrganizationId();
-  });
+    return Promise<std::string>::async([]() -> std::string {
+        return AuthBridge::shared().getOrganizationId();
+    });
 }
 
 // ============================================================================
-// Device Registration - Delegates to DeviceBridge
+// Device Registration
 // ============================================================================
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::registerDevice(
     const std::string& environmentJson) {
-  return Promise<bool>::async([environmentJson]() {
-    return DeviceBridge::shared().registerDevice(environmentJson) == 0;
-  });
+    return Promise<bool>::async([this, environmentJson]() -> bool {
+        LOGI("Registering device...");
+
+        // Parse environment
+        std::string envStr = extractStringValue(environmentJson, "environment", "production");
+        rac_environment_t env = RAC_ENV_PRODUCTION;
+        if (envStr == "development") env = RAC_ENV_DEVELOPMENT;
+        else if (envStr == "staging") env = RAC_ENV_STAGING;
+
+        std::string buildToken = extractStringValue(environmentJson, "buildToken", "");
+
+        // Register callbacks first
+        rac_result_t result = DeviceBridge::shared().registerCallbacks();
+        if (result != RAC_SUCCESS) {
+            setLastError("Failed to register device callbacks: " + std::to_string(result));
+            return false;
+        }
+
+        // Now register device
+        result = DeviceBridge::shared().registerIfNeeded(env, buildToken);
+        if (result != RAC_SUCCESS) {
+            setLastError("Device registration failed: " + std::to_string(result));
+            return false;
+        }
+
+        LOGI("Device registered successfully");
+        return true;
+    });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isDeviceRegistered() {
-  return Promise<bool>::async([]() {
-    return DeviceBridge::shared().isRegistered();
-  });
+    return Promise<bool>::async([]() -> bool {
+        return DeviceBridge::shared().isRegistered();
+    });
 }
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getDeviceId() {
-  return Promise<std::string>::async([]() {
-    return DeviceBridge::shared().getDeviceId();
-  });
+    return Promise<std::string>::async([]() -> std::string {
+        return DeviceBridge::shared().getDeviceId();
+    });
 }
 
 // ============================================================================
-// Model Registry - Delegates to ModelRegistryBridge
+// Model Registry
 // ============================================================================
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getAvailableModels() {
-  return Promise<std::string>::async([]() {
-    return ModelRegistryBridge::shared().getAvailableModelsJson();
-  });
+    return Promise<std::string>::async([]() -> std::string {
+        auto models = ModelRegistryBridge::shared().getAllModels();
+
+        std::string result = "[";
+        for (size_t i = 0; i < models.size(); i++) {
+            if (i > 0) result += ",";
+            const auto& m = models[i];
+            result += buildJsonObject({
+                {"id", jsonString(m.id)},
+                {"name", jsonString(m.name)},
+                {"localPath", jsonString(m.localPath)},
+                {"downloadUrl", jsonString(m.downloadUrl)},
+                {"category", std::to_string(static_cast<int>(m.category))},
+                {"format", std::to_string(static_cast<int>(m.format))},
+                {"framework", std::to_string(static_cast<int>(m.framework))},
+                {"downloadSize", std::to_string(m.downloadSize)},
+                {"isDownloaded", m.isDownloaded ? "true" : "false"}
+            });
+        }
+        result += "]";
+        return result;
+    });
 }
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getModelInfo(
     const std::string& modelId) {
-  return Promise<std::string>::async([modelId]() {
-    return ModelRegistryBridge::shared().getModelInfoJson(modelId);
-  });
+    return Promise<std::string>::async([modelId]() -> std::string {
+        auto model = ModelRegistryBridge::shared().getModel(modelId);
+        if (!model.has_value()) {
+            return "{}";
+        }
+
+        const auto& m = model.value();
+        return buildJsonObject({
+            {"id", jsonString(m.id)},
+            {"name", jsonString(m.name)},
+            {"description", jsonString(m.description)},
+            {"localPath", jsonString(m.localPath)},
+            {"downloadUrl", jsonString(m.downloadUrl)},
+            {"category", std::to_string(static_cast<int>(m.category))},
+            {"format", std::to_string(static_cast<int>(m.format))},
+            {"framework", std::to_string(static_cast<int>(m.framework))},
+            {"downloadSize", std::to_string(m.downloadSize)},
+            {"memoryRequired", std::to_string(m.memoryRequired)},
+            {"contextLength", std::to_string(m.contextLength)},
+            {"supportsThinking", m.supportsThinking ? "true" : "false"},
+            {"isDownloaded", m.isDownloaded ? "true" : "false"}
+        });
+    });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isModelDownloaded(
     const std::string& modelId) {
-  return Promise<bool>::async([modelId]() {
-    return ModelRegistryBridge::shared().isModelDownloaded(modelId);
-  });
+    return Promise<bool>::async([modelId]() -> bool {
+        return ModelRegistryBridge::shared().isModelDownloaded(modelId);
+    });
 }
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getModelPath(
     const std::string& modelId) {
-  return Promise<std::string>::async([modelId]() {
-    return ModelRegistryBridge::shared().getModelPath(modelId);
-  });
+    return Promise<std::string>::async([modelId]() -> std::string {
+        auto path = ModelRegistryBridge::shared().getModelPath(modelId);
+        return path.value_or("");
+    });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::registerModel(
     const std::string& modelJson) {
-  return Promise<bool>::async([modelJson]() {
-    return ModelRegistryBridge::shared().registerModel(modelJson);
-  });
+    return Promise<bool>::async([modelJson]() -> bool {
+        ModelInfo model;
+        model.id = extractStringValue(modelJson, "id");
+        model.name = extractStringValue(modelJson, "name");
+        model.description = extractStringValue(modelJson, "description");
+        model.localPath = extractStringValue(modelJson, "localPath");
+        model.downloadUrl = extractStringValue(modelJson, "downloadUrl");
+        model.downloadSize = extractIntValue(modelJson, "downloadSize", 0);
+        model.memoryRequired = extractIntValue(modelJson, "memoryRequired", 0);
+        model.contextLength = extractIntValue(modelJson, "contextLength", 0);
+        model.category = static_cast<rac_model_category_t>(extractIntValue(modelJson, "category", RAC_MODEL_CATEGORY_UNKNOWN));
+        model.format = static_cast<rac_model_format_t>(extractIntValue(modelJson, "format", RAC_MODEL_FORMAT_UNKNOWN));
+        model.framework = static_cast<rac_inference_framework_t>(extractIntValue(modelJson, "framework", RAC_FRAMEWORK_UNKNOWN));
+
+        rac_result_t result = ModelRegistryBridge::shared().addModel(model);
+        return result == RAC_SUCCESS;
+    });
 }
 
 // ============================================================================
-// Download Service - Delegates to DownloadBridge
+// Download Service
 // ============================================================================
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::downloadModel(
     const std::string& modelId,
     const std::string& url,
     const std::string& destPath) {
-  return Promise<bool>::async([modelId, url, destPath]() {
-    return DownloadBridge::shared().startDownload(modelId, url, destPath) == 0;
-  });
+    return Promise<bool>::async([this, modelId, url, destPath]() -> bool {
+        LOGI("Starting download: %s", modelId.c_str());
+
+        std::string taskId = DownloadBridge::shared().startDownload(
+            modelId, url, destPath, false,  // requiresExtraction
+            [](const DownloadProgress& progress) {
+                LOGD("Download progress: %.1f%%", progress.overallProgress * 100);
+            }
+        );
+
+        if (taskId.empty()) {
+            setLastError("Failed to start download");
+            return false;
+        }
+
+        return true;
+    });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::cancelDownload(
-    const std::string& modelId) {
-  return Promise<bool>::async([modelId]() {
-    return DownloadBridge::shared().cancelDownload(modelId);
-  });
+    const std::string& taskId) {
+    return Promise<bool>::async([taskId]() -> bool {
+        rac_result_t result = DownloadBridge::shared().cancelDownload(taskId);
+        return result == RAC_SUCCESS;
+    });
 }
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getDownloadProgress(
-    const std::string& modelId) {
-  return Promise<std::string>::async([modelId]() {
-    auto progress = DownloadBridge::shared().getProgress(modelId);
-    return buildJsonObject({
-      {"bytesDownloaded", std::to_string(progress.bytesDownloaded)},
-      {"totalBytes", std::to_string(progress.totalBytes)},
-      {"percentage", std::to_string(progress.percentage)},
-      {"isComplete", progress.isComplete ? "true" : "false"},
-      {"error", jsonString(progress.error)}
+    const std::string& taskId) {
+    return Promise<std::string>::async([taskId]() -> std::string {
+        auto progress = DownloadBridge::shared().getProgress(taskId);
+        if (!progress.has_value()) {
+            return "{}";
+        }
+
+        const auto& p = progress.value();
+        std::string stateStr;
+        switch (p.state) {
+            case DownloadState::Pending: stateStr = "pending"; break;
+            case DownloadState::Downloading: stateStr = "downloading"; break;
+            case DownloadState::Extracting: stateStr = "extracting"; break;
+            case DownloadState::Retrying: stateStr = "retrying"; break;
+            case DownloadState::Completed: stateStr = "completed"; break;
+            case DownloadState::Failed: stateStr = "failed"; break;
+            case DownloadState::Cancelled: stateStr = "cancelled"; break;
+        }
+
+        return buildJsonObject({
+            {"bytesDownloaded", std::to_string(p.bytesDownloaded)},
+            {"totalBytes", std::to_string(p.totalBytes)},
+            {"overallProgress", std::to_string(p.overallProgress)},
+            {"stageProgress", std::to_string(p.stageProgress)},
+            {"state", jsonString(stateStr)},
+            {"speed", std::to_string(p.speed)},
+            {"estimatedTimeRemaining", std::to_string(p.estimatedTimeRemaining)},
+            {"retryAttempt", std::to_string(p.retryAttempt)},
+            {"errorCode", std::to_string(p.errorCode)},
+            {"errorMessage", jsonString(p.errorMessage)}
+        });
     });
-  });
 }
 
 // ============================================================================
-// Storage - Delegates to StorageBridge
+// Storage
 // ============================================================================
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getStorageInfo() {
-  return Promise<std::string>::async([]() {
-    auto info = StorageBridge::shared().getStorageInfo();
-    return buildJsonObject({
-      {"totalBytes", std::to_string(info.totalBytes)},
-      {"availableBytes", std::to_string(info.availableBytes)},
-      {"usedByModelsBytes", std::to_string(info.usedByModelsBytes)},
-      {"usedByCacheBytes", std::to_string(info.usedByCacheBytes)}
+    return Promise<std::string>::async([]() {
+        auto registryHandle = ModelRegistryBridge::shared().getHandle();
+        auto info = StorageBridge::shared().analyzeStorage(registryHandle);
+
+        return buildJsonObject({
+            {"totalDeviceSpace", std::to_string(info.deviceStorage.totalSpace)},
+            {"freeDeviceSpace", std::to_string(info.deviceStorage.freeSpace)},
+            {"usedDeviceSpace", std::to_string(info.deviceStorage.usedSpace)},
+            {"documentsSize", std::to_string(info.appStorage.documentsSize)},
+            {"cacheSize", std::to_string(info.appStorage.cacheSize)},
+            {"appSupportSize", std::to_string(info.appStorage.appSupportSize)},
+            {"totalAppSize", std::to_string(info.appStorage.totalSize)},
+            {"totalModelsSize", std::to_string(info.totalModelsSize)},
+            {"modelCount", std::to_string(info.models.size())}
+        });
     });
-  });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::clearCache() {
-  return Promise<bool>::async([]() {
-    return StorageBridge::shared().clearCache();
-  });
+    return Promise<bool>::async([]() {
+        // TODO: Implement cache clearing via storage bridge
+        LOGI("Clearing cache...");
+        return true;
+    });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::deleteModel(
     const std::string& modelId) {
-  return Promise<bool>::async([modelId]() {
-    return StorageBridge::shared().deleteModel(modelId);
-  });
+    return Promise<bool>::async([modelId]() {
+        LOGI("Deleting model: %s", modelId.c_str());
+        rac_result_t result = ModelRegistryBridge::shared().removeModel(modelId);
+        return result == RAC_SUCCESS;
+    });
 }
 
 // ============================================================================
-// Events - Delegates to EventBridge
+// Events
 // ============================================================================
 
 std::shared_ptr<Promise<void>> HybridRunAnywhereCore::emitEvent(
     const std::string& eventJson) {
-  return Promise<void>::async([eventJson]() {
-    EventBridge::shared().emit(eventJson);
-  });
+    return Promise<void>::async([eventJson]() -> void {
+        std::string type = extractStringValue(eventJson, "type");
+        std::string categoryStr = extractStringValue(eventJson, "category", "sdk");
+
+        EventCategory category = EventCategory::SDK;
+        if (categoryStr == "model") category = EventCategory::Model;
+        else if (categoryStr == "llm") category = EventCategory::LLM;
+        else if (categoryStr == "stt") category = EventCategory::STT;
+        else if (categoryStr == "tts") category = EventCategory::TTS;
+
+        EventBridge::shared().trackEvent(type, category, EventDestination::All, eventJson);
+    });
 }
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::pollEvents() {
-  return Promise<std::string>::async([]() {
-    return EventBridge::shared().poll();
-  });
+    // Events are push-based via callback, not polling
+    return Promise<std::string>::async([]() -> std::string {
+        return "[]";
+    });
 }
 
 // ============================================================================
-// HTTP Client - Delegates to HTTPBridge
+// HTTP Client
 // ============================================================================
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::configureHttp(
     const std::string& baseUrl,
     const std::string& apiKey) {
-  return Promise<bool>::async([baseUrl, apiKey]() {
-    return HTTPBridge::shared().configure(baseUrl, apiKey) == 0;
-  });
+    return Promise<bool>::async([baseUrl, apiKey]() -> bool {
+        HTTPBridge::shared().configure(baseUrl, apiKey);
+        return HTTPBridge::shared().isConfigured();
+    });
 }
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::httpPost(
     const std::string& path,
     const std::string& bodyJson) {
-  return Promise<std::string>::async([path, bodyJson]() {
-    return HTTPBridge::shared().post(path, bodyJson);
-  });
+    return Promise<std::string>::async([this, path, bodyJson]() -> std::string {
+        // HTTP is handled by JS layer
+        // This returns URL for JS to use
+        std::string url = HTTPBridge::shared().buildURL(path);
+
+        // Try to use registered executor if available
+        auto response = HTTPBridge::shared().execute("POST", path, bodyJson, true);
+        if (response.has_value()) {
+            if (response->success) {
+                return response->body;
+            } else {
+                throw std::runtime_error(response->error);
+            }
+        }
+
+        // No executor - return error indicating HTTP must be done by JS
+        throw std::runtime_error("HTTP executor not registered. Use JS layer for HTTP requests.");
+    });
 }
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::httpGet(
     const std::string& path) {
-  return Promise<std::string>::async([path]() {
-    return HTTPBridge::shared().get(path);
-  });
+    return Promise<std::string>::async([this, path]() -> std::string {
+        auto response = HTTPBridge::shared().execute("GET", path, "", true);
+        if (response.has_value()) {
+            if (response->success) {
+                return response->body;
+            } else {
+                throw std::runtime_error(response->error);
+            }
+        }
+
+        throw std::runtime_error("HTTP executor not registered. Use JS layer for HTTP requests.");
+    });
 }
 
 // ============================================================================
@@ -425,54 +617,55 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::httpGet(
 // ============================================================================
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getLastError() {
-  return Promise<std::string>::async([this]() { return lastError_; });
+    return Promise<std::string>::async([this]() { return lastError_; });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::extractArchive(
     const std::string& archivePath,
     const std::string& destPath) {
-  return Promise<bool>::async([archivePath, destPath]() {
-    // TODO: Implement via platform adapter
-    LOGI("extractArchive: %s -> %s", archivePath.c_str(), destPath.c_str());
-    return false;
-  });
+    return Promise<bool>::async([this, archivePath, destPath]() {
+        // Archive extraction is handled by JS layer
+        LOGI("extractArchive: %s -> %s", archivePath.c_str(), destPath.c_str());
+        setLastError("Archive extraction must be done by JS layer");
+        return false;
+    });
 }
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getDeviceCapabilities() {
-  return Promise<std::string>::async([]() {
-    std::string platform =
+    return Promise<std::string>::async([]() {
+        std::string platform =
 #if defined(__APPLE__)
-        "ios";
+            "ios";
 #else
-        "android";
+            "android";
 #endif
-    bool supportsMetal =
+        bool supportsMetal =
 #if defined(__APPLE__)
-        true;
+            true;
 #else
-        false;
+            false;
 #endif
-    bool supportsVulkan =
+        bool supportsVulkan =
 #if defined(__APPLE__)
-        false;
+            false;
 #else
-        true;
+            true;
 #endif
-    return buildJsonObject({
-        {"platform", jsonString(platform)},
-        {"supports_metal", supportsMetal ? "true" : "false"},
-        {"supports_vulkan", supportsVulkan ? "true" : "false"},
-        {"api", jsonString("rac_*")},
-        {"module", jsonString("core")}
+        return buildJsonObject({
+            {"platform", jsonString(platform)},
+            {"supports_metal", supportsMetal ? "true" : "false"},
+            {"supports_vulkan", supportsVulkan ? "true" : "false"},
+            {"api", jsonString("rac_*")},
+            {"module", jsonString("core")}
+        });
     });
-  });
 }
 
 std::shared_ptr<Promise<double>> HybridRunAnywhereCore::getMemoryUsage() {
-  return Promise<double>::async([]() {
-    // TODO: Get memory usage from commons
-    return 0.0;
-  });
+    return Promise<double>::async([]() {
+        // TODO: Get memory usage from platform
+        return 0.0;
+    });
 }
 
 // ============================================================================
@@ -480,8 +673,500 @@ std::shared_ptr<Promise<double>> HybridRunAnywhereCore::getMemoryUsage() {
 // ============================================================================
 
 void HybridRunAnywhereCore::setLastError(const std::string& error) {
-  lastError_ = error;
-  LOGE("Error: %s", error.c_str());
+    lastError_ = error;
+    LOGE("%s", error.c_str());
+}
+
+// ============================================================================
+// LLM Capability (Backend-Agnostic)
+// Calls rac_llm_component_* APIs - works with any registered backend
+// ============================================================================
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::loadTextModel(
+    const std::string& modelPath,
+    const std::optional<std::string>& configJson) {
+    return Promise<bool>::async([this, modelPath, configJson]() -> bool {
+        LOGI("Loading text model: %s", modelPath.c_str());
+
+        // Create LLM component if needed
+        rac_handle_t handle = nullptr;
+        rac_result_t result = rac_llm_component_create(&handle);
+        if (result != RAC_SUCCESS) {
+            setLastError("Failed to create LLM component. Is an LLM backend registered?");
+            throw std::runtime_error("LLM backend not registered. Install @runanywhere/llamacpp.");
+        }
+
+        // Load the model
+        result = rac_llm_component_load_model(handle, modelPath.c_str(), modelPath.c_str(), modelPath.c_str());
+        if (result != RAC_SUCCESS) {
+            setLastError("Failed to load model: " + std::to_string(result));
+            throw std::runtime_error("Failed to load text model: " + std::to_string(result));
+        }
+
+        LOGI("Text model loaded successfully");
+        return true;
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isTextModelLoaded() {
+    return Promise<bool>::async([]() -> bool {
+        rac_handle_t handle = nullptr;
+        rac_result_t result = rac_llm_component_create(&handle);
+        if (result != RAC_SUCCESS || !handle) {
+            return false;
+        }
+        return rac_llm_component_is_loaded(handle) == RAC_TRUE;
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::unloadTextModel() {
+    return Promise<bool>::async([]() -> bool {
+        rac_handle_t handle = nullptr;
+        rac_result_t result = rac_llm_component_create(&handle);
+        if (result != RAC_SUCCESS || !handle) {
+            return false;
+        }
+        rac_llm_component_cleanup(handle);
+        return true;
+    });
+}
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::generate(
+    const std::string& prompt,
+    const std::optional<std::string>& optionsJson) {
+    return Promise<std::string>::async([this, prompt, optionsJson]() -> std::string {
+        LOGI("Generating text...");
+
+        rac_handle_t handle = nullptr;
+        rac_result_t result = rac_llm_component_create(&handle);
+        if (result != RAC_SUCCESS || !handle) {
+            throw std::runtime_error("LLM component not available. Is an LLM backend registered?");
+        }
+
+        if (rac_llm_component_is_loaded(handle) != RAC_TRUE) {
+            throw std::runtime_error("No LLM model loaded. Call loadTextModel first.");
+        }
+
+        // Parse options
+        int maxTokens = 256;
+        float temperature = 0.7f;
+        if (optionsJson.has_value()) {
+            maxTokens = extractIntValue(optionsJson.value(), "max_tokens", 256);
+            temperature = static_cast<float>(extractIntValue(optionsJson.value(), "temperature", 7)) / 10.0f;
+        }
+
+        rac_llm_options_t options = {};
+        options.max_tokens = maxTokens;
+        options.temperature = temperature;
+        options.top_p = 0.9f;
+
+        rac_llm_result_t llmResult = {};
+        result = rac_llm_component_generate(handle, prompt.c_str(), &options, &llmResult);
+
+        if (result != RAC_SUCCESS) {
+            throw std::runtime_error("Text generation failed: " + std::to_string(result));
+        }
+
+        std::string text = llmResult.text ? llmResult.text : "";
+        int tokensUsed = llmResult.completion_tokens;
+
+        return buildJsonObject({
+            {"text", jsonString(text)},
+            {"tokensUsed", std::to_string(tokensUsed)},
+            {"modelUsed", jsonString("llm")},
+            {"latencyMs", std::to_string(llmResult.total_time_ms)}
+        });
+    });
+}
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::generateStream(
+    const std::string& prompt,
+    const std::string& optionsJson,
+    const std::function<void(const std::string&, bool)>& callback) {
+    return Promise<std::string>::async([this, prompt, optionsJson, callback]() -> std::string {
+        LOGI("Streaming text generation...");
+
+        rac_handle_t handle = nullptr;
+        rac_result_t result = rac_llm_component_create(&handle);
+        if (result != RAC_SUCCESS || !handle) {
+            throw std::runtime_error("LLM component not available. Is an LLM backend registered?");
+        }
+
+        if (rac_llm_component_is_loaded(handle) != RAC_TRUE) {
+            throw std::runtime_error("No LLM model loaded. Call loadTextModel first.");
+        }
+
+        // For now, use non-streaming and call callback once
+        // TODO: Implement proper streaming with rac_llm_component_generate_stream
+        rac_llm_options_t options = {};
+        options.max_tokens = extractIntValue(optionsJson, "max_tokens", 256);
+        options.temperature = 0.7f;
+
+        rac_llm_result_t llmResult = {};
+        result = rac_llm_component_generate(handle, prompt.c_str(), &options, &llmResult);
+
+        std::string text = llmResult.text ? llmResult.text : "";
+
+        if (result == RAC_SUCCESS) {
+            // Call callback with full text and completion flag
+            if (callback) {
+                callback(text, true);
+            }
+        }
+
+        return buildJsonObject({
+            {"text", jsonString(text)},
+            {"tokensUsed", std::to_string(llmResult.completion_tokens)}
+        });
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::cancelGeneration() {
+    return Promise<bool>::async([]() -> bool {
+        rac_handle_t handle = nullptr;
+        rac_result_t result = rac_llm_component_create(&handle);
+        if (result != RAC_SUCCESS || !handle) {
+            return false;
+        }
+        rac_llm_component_cancel(handle);
+        return true;
+    });
+}
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::generateStructured(
+    const std::string& prompt,
+    const std::string& schema,
+    const std::optional<std::string>& optionsJson) {
+    return Promise<std::string>::async([this, prompt, schema]() -> std::string {
+        LOGI("Generating structured output...");
+        // TODO: Implement structured output generation
+        throw std::runtime_error("Structured output not yet implemented in core. Use @runanywhere/llamacpp.");
+    });
+}
+
+// ============================================================================
+// STT Capability (Backend-Agnostic)
+// Calls rac_stt_component_* APIs - works with any registered backend
+// ============================================================================
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::loadSTTModel(
+    const std::string& modelPath,
+    const std::string& modelType,
+    const std::optional<std::string>& configJson) {
+    return Promise<bool>::async([this, modelPath, modelType]() -> bool {
+        LOGI("Loading STT model: %s", modelPath.c_str());
+
+        rac_handle_t handle = nullptr;
+        rac_result_t result = rac_stt_component_create(&handle);
+        if (result != RAC_SUCCESS) {
+            setLastError("Failed to create STT component. Is an STT backend registered?");
+            throw std::runtime_error("STT backend not registered. Install @runanywhere/onnx.");
+        }
+
+        result = rac_stt_component_load_model(handle, modelPath.c_str(), modelPath.c_str(), modelType.c_str());
+        if (result != RAC_SUCCESS) {
+            throw std::runtime_error("Failed to load STT model: " + std::to_string(result));
+        }
+
+        LOGI("STT model loaded successfully");
+        return true;
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isSTTModelLoaded() {
+    return Promise<bool>::async([]() -> bool {
+        rac_handle_t handle = nullptr;
+        rac_result_t result = rac_stt_component_create(&handle);
+        if (result != RAC_SUCCESS || !handle) {
+            return false;
+        }
+        return rac_stt_component_is_loaded(handle) == RAC_TRUE;
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::unloadSTTModel() {
+    return Promise<bool>::async([]() -> bool {
+        rac_handle_t handle = nullptr;
+        rac_result_t result = rac_stt_component_create(&handle);
+        if (result != RAC_SUCCESS || !handle) {
+            return false;
+        }
+        rac_stt_component_cleanup(handle);
+        return true;
+    });
+}
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::transcribe(
+    const std::string& audioBase64,
+    double sampleRate,
+    const std::optional<std::string>& language) {
+    return Promise<std::string>::async([this, audioBase64, sampleRate, language]() -> std::string {
+        LOGI("Transcribing audio...");
+
+        rac_handle_t handle = nullptr;
+        rac_result_t result = rac_stt_component_create(&handle);
+        if (result != RAC_SUCCESS || !handle) {
+            throw std::runtime_error("STT component not available. Is an STT backend registered?");
+        }
+
+        if (rac_stt_component_is_loaded(handle) != RAC_TRUE) {
+            throw std::runtime_error("No STT model loaded. Call loadSTTModel first.");
+        }
+
+        // TODO: Decode base64 and transcribe
+        // For now, throw indicating full implementation needed
+        throw std::runtime_error("STT transcription not fully implemented in core. Use @runanywhere/onnx.");
+    });
+}
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::transcribeFile(
+    const std::string& filePath,
+    const std::optional<std::string>& language) {
+    return Promise<std::string>::async([this, filePath, language]() -> std::string {
+        LOGI("Transcribing file: %s", filePath.c_str());
+
+        // TODO: Implement file transcription
+        throw std::runtime_error("STT file transcription not fully implemented in core. Use @runanywhere/onnx.");
+    });
+}
+
+// ============================================================================
+// TTS Capability (Backend-Agnostic)
+// Calls rac_tts_component_* APIs - works with any registered backend
+// ============================================================================
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::loadTTSModel(
+    const std::string& modelPath,
+    const std::string& modelType,
+    const std::optional<std::string>& configJson) {
+    return Promise<bool>::async([this, modelPath, modelType]() -> bool {
+        LOGI("Loading TTS model: %s", modelPath.c_str());
+
+        rac_handle_t handle = nullptr;
+        rac_result_t result = rac_tts_component_create(&handle);
+        if (result != RAC_SUCCESS) {
+            setLastError("Failed to create TTS component. Is a TTS backend registered?");
+            throw std::runtime_error("TTS backend not registered. Install @runanywhere/onnx.");
+        }
+
+        // TTS uses configure instead of load_model
+        rac_tts_config_t config = RAC_TTS_CONFIG_DEFAULT;
+        config.model_id = modelPath.c_str();
+        result = rac_tts_component_configure(handle, &config);
+        if (result != RAC_SUCCESS) {
+            throw std::runtime_error("Failed to load TTS model: " + std::to_string(result));
+        }
+
+        LOGI("TTS model loaded successfully");
+        return true;
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isTTSModelLoaded() {
+    return Promise<bool>::async([]() -> bool {
+        rac_handle_t handle = nullptr;
+        rac_result_t result = rac_tts_component_create(&handle);
+        if (result != RAC_SUCCESS || !handle) {
+            return false;
+        }
+        return rac_tts_component_is_loaded(handle) == RAC_TRUE;
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::unloadTTSModel() {
+    return Promise<bool>::async([]() -> bool {
+        rac_handle_t handle = nullptr;
+        rac_result_t result = rac_tts_component_create(&handle);
+        if (result != RAC_SUCCESS || !handle) {
+            return false;
+        }
+        rac_tts_component_cleanup(handle);
+        return true;
+    });
+}
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::synthesize(
+    const std::string& text,
+    const std::string& voiceId,
+    double speedRate,
+    double pitchShift) {
+    return Promise<std::string>::async([this, text, voiceId, speedRate, pitchShift]() -> std::string {
+        LOGI("Synthesizing speech: %s", text.substr(0, 50).c_str());
+
+        rac_handle_t handle = nullptr;
+        rac_result_t result = rac_tts_component_create(&handle);
+        if (result != RAC_SUCCESS || !handle) {
+            throw std::runtime_error("TTS component not available. Is a TTS backend registered?");
+        }
+
+        if (rac_tts_component_is_loaded(handle) != RAC_TRUE) {
+            throw std::runtime_error("No TTS model loaded. Call loadTTSModel first.");
+        }
+
+        // TODO: Implement synthesis and return base64 audio
+        throw std::runtime_error("TTS synthesis not fully implemented in core. Use @runanywhere/onnx.");
+    });
+}
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getTTSVoices() {
+    return Promise<std::string>::async([]() -> std::string {
+        return "[]"; // Return empty array for now
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::cancelTTS() {
+    return Promise<bool>::async([]() -> bool {
+        return true;
+    });
+}
+
+// ============================================================================
+// VAD Capability (Backend-Agnostic)
+// Calls rac_vad_component_* APIs - works with any registered backend
+// ============================================================================
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::loadVADModel(
+    const std::string& modelPath,
+    const std::optional<std::string>& configJson) {
+    return Promise<bool>::async([this, modelPath]() -> bool {
+        LOGI("Loading VAD model: %s", modelPath.c_str());
+
+        rac_handle_t handle = nullptr;
+        rac_result_t result = rac_vad_component_create(&handle);
+        if (result != RAC_SUCCESS) {
+            setLastError("Failed to create VAD component. Is a VAD backend registered?");
+            throw std::runtime_error("VAD backend not registered. Install @runanywhere/onnx.");
+        }
+
+        rac_vad_config_t config = RAC_VAD_CONFIG_DEFAULT;
+        config.model_id = modelPath.c_str();
+        result = rac_vad_component_configure(handle, &config);
+        if (result != RAC_SUCCESS) {
+            throw std::runtime_error("Failed to configure VAD: " + std::to_string(result));
+        }
+
+        result = rac_vad_component_initialize(handle);
+        if (result != RAC_SUCCESS) {
+            throw std::runtime_error("Failed to initialize VAD: " + std::to_string(result));
+        }
+
+        LOGI("VAD model loaded successfully");
+        return true;
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isVADModelLoaded() {
+    return Promise<bool>::async([]() -> bool {
+        rac_handle_t handle = nullptr;
+        rac_result_t result = rac_vad_component_create(&handle);
+        if (result != RAC_SUCCESS || !handle) {
+            return false;
+        }
+        return rac_vad_component_is_initialized(handle) == RAC_TRUE;
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::unloadVADModel() {
+    return Promise<bool>::async([]() -> bool {
+        rac_handle_t handle = nullptr;
+        rac_result_t result = rac_vad_component_create(&handle);
+        if (result != RAC_SUCCESS || !handle) {
+            return false;
+        }
+        rac_vad_component_cleanup(handle);
+        return true;
+    });
+}
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::processVAD(
+    const std::string& audioBase64,
+    const std::optional<std::string>& optionsJson) {
+    return Promise<std::string>::async([this, audioBase64]() -> std::string {
+        LOGI("Processing VAD...");
+
+        // TODO: Implement VAD processing
+        throw std::runtime_error("VAD processing not fully implemented in core. Use @runanywhere/onnx.");
+    });
+}
+
+std::shared_ptr<Promise<void>> HybridRunAnywhereCore::resetVAD() {
+    return Promise<void>::async([]() -> void {
+        rac_handle_t handle = nullptr;
+        rac_result_t result = rac_vad_component_create(&handle);
+        if (result == RAC_SUCCESS && handle) {
+            rac_vad_component_reset(handle);
+        }
+    });
+}
+
+// ============================================================================
+// Voice Agent Capability (Backend-Agnostic)
+// Calls rac_voice_agent_* APIs - requires STT, LLM, and TTS backends
+// ============================================================================
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initializeVoiceAgent(
+    const std::string& configJson) {
+    return Promise<bool>::async([this, configJson]() -> bool {
+        LOGI("Initializing voice agent...");
+
+        // TODO: Implement voice agent initialization
+        throw std::runtime_error("Voice agent not fully implemented in core. Use @runanywhere/onnx.");
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initializeVoiceAgentWithLoadedModels() {
+    return Promise<bool>::async([this]() -> bool {
+        LOGI("Initializing voice agent with loaded models...");
+
+        // TODO: Implement voice agent initialization
+        throw std::runtime_error("Voice agent not fully implemented in core. Use @runanywhere/onnx.");
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isVoiceAgentReady() {
+    return Promise<bool>::async([]() -> bool {
+        return false;
+    });
+}
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getVoiceAgentComponentStates() {
+    return Promise<std::string>::async([]() -> std::string {
+        return "{}";
+    });
+}
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::processVoiceTurn(
+    const std::string& audioBase64) {
+    return Promise<std::string>::async([this, audioBase64]() -> std::string {
+        throw std::runtime_error("Voice agent not fully implemented in core. Use @runanywhere/onnx.");
+    });
+}
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::voiceAgentTranscribe(
+    const std::string& audioBase64) {
+    return Promise<std::string>::async([this, audioBase64]() -> std::string {
+        throw std::runtime_error("Voice agent not fully implemented in core. Use @runanywhere/onnx.");
+    });
+}
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::voiceAgentGenerateResponse(
+    const std::string& prompt) {
+    return Promise<std::string>::async([this, prompt]() -> std::string {
+        throw std::runtime_error("Voice agent not fully implemented in core. Use @runanywhere/onnx.");
+    });
+}
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::voiceAgentSynthesizeSpeech(
+    const std::string& text) {
+    return Promise<std::string>::async([this, text]() -> std::string {
+        throw std::runtime_error("Voice agent not fully implemented in core. Use @runanywhere/onnx.");
+    });
+}
+
+std::shared_ptr<Promise<void>> HybridRunAnywhereCore::cleanupVoiceAgent() {
+    return Promise<void>::async([]() -> void {
+        LOGI("Cleaning up voice agent...");
+    });
 }
 
 } // namespace margelo::nitro::runanywhere

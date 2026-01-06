@@ -1,71 +1,136 @@
 /**
  * @file EventBridge.hpp
- * @brief Event bridge for React Native
+ * @brief C++ bridge for event operations.
  *
- * Routes native events from runanywhere-commons to JavaScript/React Native.
- * Matches Swift's CppBridge+Events.swift pattern.
+ * Mirrors Swift's event handling pattern:
+ * - Subscribe to events via rac_event_subscribe()
+ * - Forward events to JS layer
+ *
+ * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/Events/
  */
 
 #pragma once
 
-#include <functional>
-#include <memory>
 #include <string>
+#include <functional>
+#include <vector>
+#include <cstdint>
 
-#ifdef HAS_RACOMMONS
+#include "rac/core/rac_types.h"
 #include "rac/infrastructure/events/rac_events.h"
-#endif
 
 namespace runanywhere {
 namespace bridges {
 
 /**
- * @brief Event callback type
+ * Event category enum matching RAC
  */
-using EventCallback = std::function<void(const std::string& eventJson)>;
+enum class EventCategory {
+    SDK = 0,
+    Model = 1,
+    LLM = 2,
+    STT = 3,
+    TTS = 4,
+    Voice = 5,
+    Storage = 6,
+    Device = 7,
+    Network = 8,
+    Error = 9
+};
 
 /**
- * @brief Event bridge singleton
+ * Event destination enum matching RAC
+ */
+enum class EventDestination {
+    PublicOnly = 0,
+    AnalyticsOnly = 1,
+    All = 2
+};
+
+/**
+ * Event data structure
+ */
+struct SDKEvent {
+    std::string id;
+    std::string type;
+    EventCategory category = EventCategory::SDK;
+    int64_t timestampMs = 0;
+    std::string sessionId;
+    EventDestination destination = EventDestination::All;
+    std::string propertiesJson;
+};
+
+/**
+ * Event callback type
+ */
+using EventCallback = std::function<void(const SDKEvent&)>;
+
+/**
+ * EventBridge - Event subscription and publishing
  *
- * Routes events from commons to React Native.
+ * Mirrors Swift's EventBridge pattern:
+ * - Subscribe to C++ events
+ * - Forward to JS layer
+ * - Track events via rac_event_track()
  */
 class EventBridge {
 public:
+    /**
+     * Get shared instance
+     */
     static EventBridge& shared();
 
     /**
-     * @brief Initialize with JavaScript callback
-     *
-     * @param callback Function to call when events are received
+     * Register event callback for JS layer
+     * Events will be forwarded to this callback
      */
-    void initialize(EventCallback callback);
+    void setEventCallback(EventCallback callback);
 
     /**
-     * @brief Shutdown event bridge
+     * Register with RACommons to receive events
+     * Must be called during SDK initialization
      */
-    void shutdown();
+    void registerForEvents();
 
     /**
-     * @brief Emit an event to JavaScript
-     *
-     * @param eventJson JSON-encoded event
+     * Unregister from RACommons events
      */
-    void emit(const std::string& eventJson);
+    void unregisterFromEvents();
+
+    /**
+     * Track an event
+     *
+     * @param type Event type string
+     * @param category Event category
+     * @param destination Where to route this event
+     * @param propertiesJson Event properties as JSON
+     */
+    rac_result_t trackEvent(
+        const std::string& type,
+        EventCategory category,
+        EventDestination destination,
+        const std::string& propertiesJson
+    );
+
+    /**
+     * Publish an event
+     */
+    rac_result_t publishEvent(const SDKEvent& event);
+
+    /**
+     * Get category name
+     */
+    static std::string getCategoryName(EventCategory category);
 
 private:
     EventBridge() = default;
     ~EventBridge();
-
-    // Disable copy/move
     EventBridge(const EventBridge&) = delete;
     EventBridge& operator=(const EventBridge&) = delete;
 
-    EventCallback callback_;
-    bool initialized_ = false;
-
-#ifdef HAS_RACOMMONS
-    static void onEvent(const char* event_json, void* user_data);
-#endif
+    EventCallback eventCallback_;
+    uint64_t subscriptionId_ = 0;
+    bool isRegistered_ = false;
 };
 
 } // namespace bridges

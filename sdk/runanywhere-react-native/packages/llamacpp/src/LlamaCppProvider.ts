@@ -7,7 +7,7 @@
  * Reference: sdk/runanywhere-swift/Sources/LlamaCPPRuntime/LlamaCPP.swift
  */
 
-import { requireNativeModule, isNativeModuleAvailable } from '@runanywhere/core';
+import { requireNativeLlamaModule, isNativeLlamaModuleAvailable } from './native/NativeRunAnywhereLlama';
 
 // Simple logger for this package
 const DEBUG = typeof __DEV__ !== 'undefined' ? __DEV__ : false;
@@ -52,17 +52,17 @@ export class LlamaCppProvider {
       return true;
     }
 
-    if (!isNativeModuleAvailable()) {
-      log.warning('Native module not available');
+    if (!isNativeLlamaModuleAvailable()) {
+      log.warning('LlamaCPP native module not available');
       return false;
     }
 
     log.info('Registering LlamaCPP backend with C++ registry...');
 
     try {
-      const native = requireNativeModule();
-      // Call native registration function (matches Swift pattern)
-      const success = await native.registerLlamaCppBackend();
+      const native = requireNativeLlamaModule();
+      // Call the native registration method from the Llama module
+      const success = await native.registerBackend();
       if (success) {
         this.isRegistered = true;
         log.info('✅ LlamaCPP backend registered successfully');
@@ -84,13 +84,13 @@ export class LlamaCppProvider {
       return true;
     }
 
-    if (!isNativeModuleAvailable()) {
+    if (!isNativeLlamaModuleAvailable()) {
       return false;
     }
 
     try {
-      const native = requireNativeModule();
-      const success = await native.unregisterLlamaCppBackend();
+      const native = requireNativeLlamaModule();
+      const success = await native.unregisterBackend();
       if (success) {
         this.isRegistered = false;
         log.info('LlamaCPP backend unregistered');

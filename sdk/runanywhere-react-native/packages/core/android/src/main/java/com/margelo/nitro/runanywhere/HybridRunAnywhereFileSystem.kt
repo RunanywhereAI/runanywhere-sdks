@@ -247,12 +247,13 @@ class HybridRunAnywhereFileSystem : HybridRunAnywhereFileSystemSpec() {
         }
     }
 
-    override fun deleteModel(modelId: String): Promise<Unit> = Promise.async {
+    override fun deleteModel(modelId: String): Promise<Boolean> = Promise.async {
         val modelFile = modelFile(modelId)
         if (!modelFile.exists()) {
-            throw Error("No such model: $modelId")
+            false
+        } else {
+            modelFile.deleteRecursively()
         }
-        modelFile.deleteRecursively()
     }
 
     override fun readFile(path: String): Promise<String> = Promise.async {
@@ -271,13 +272,14 @@ class HybridRunAnywhereFileSystem : HybridRunAnywhereFileSystemSpec() {
         file.writeText(content)
     }
 
-    override fun deleteFile(path: String): Promise<Unit> = Promise.async {
+    override fun deleteFile(path: String): Promise<Boolean> = Promise.async {
         val runanywhereDir = runanywhereFile()
         val file = File(runanywhereDir, path)
         if (!file.exists()) {
-            throw Error("No such file: $path")
+            false
+        } else {
+            file.deleteRecursively()
         }
-        file.deleteRecursively()
     }
 
     override fun getAvailableDiskSpace(): Promise<Double> = Promise.async {

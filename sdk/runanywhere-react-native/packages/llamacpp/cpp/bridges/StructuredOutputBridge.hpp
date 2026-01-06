@@ -5,18 +5,18 @@
  * Matches Swift's RunAnywhere+StructuredOutput.swift pattern, providing:
  * - JSON schema-guided generation
  * - Structured output extraction
+ *
+ * Aligned with rac_llm_structured_output.h API.
+ * RACommons is REQUIRED - no stub implementations.
  */
 
 #pragma once
 
 #include <string>
 
-#ifdef HAS_RACOMMONS
+// RACommons structured output header - REQUIRED
 #include "rac/features/llm/rac_llm_structured_output.h"
-#else
-typedef int rac_result_t;
-#define RAC_SUCCESS 0
-#endif
+#include "rac/features/llm/rac_llm_types.h"
 
 namespace runanywhere {
 namespace bridges {
@@ -34,6 +34,8 @@ struct StructuredOutputResult {
  * @brief Structured Output bridge singleton
  *
  * Generates LLM output following a JSON schema.
+ * NOTE: RACommons is REQUIRED. All methods will throw std::runtime_error if
+ * the underlying C API calls fail.
  */
 class StructuredOutputBridge {
 public:

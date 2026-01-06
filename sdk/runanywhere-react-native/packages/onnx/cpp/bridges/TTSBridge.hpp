@@ -5,6 +5,9 @@
  * Matches Swift's CppBridge+TTS.swift pattern, providing:
  * - Model lifecycle (load/unload)
  * - Speech synthesis
+ *
+ * Aligned with rac_tts_component.h and rac_tts_types.h API.
+ * RACommons is REQUIRED - no stub implementations.
  */
 
 #pragma once
@@ -14,14 +17,9 @@
 #include <string>
 #include <vector>
 
-#ifdef HAS_RACOMMONS
+// RACommons TTS headers - REQUIRED
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/tts/rac_tts_types.h"
-#else
-typedef void* rac_handle_t;
-typedef int rac_result_t;
-#define RAC_SUCCESS 0
-#endif
 
 namespace runanywhere {
 namespace bridges {
@@ -49,6 +47,8 @@ struct TTSOptions {
  * @brief TTS capability bridge singleton
  *
  * Matches CppBridge+TTS.swift API.
+ * NOTE: RACommons is REQUIRED. All methods will throw std::runtime_error if
+ * the underlying C API calls fail.
  */
 class TTSBridge {
 public:

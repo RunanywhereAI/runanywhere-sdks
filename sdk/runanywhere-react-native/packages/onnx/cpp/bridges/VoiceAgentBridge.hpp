@@ -6,6 +6,9 @@
  * - Full voice pipeline orchestration (STT -> LLM -> TTS)
  * - Component state management
  * - Audio processing for voice turns
+ *
+ * Aligned with rac_voice_agent.h API.
+ * RACommons is REQUIRED - no stub implementations.
  */
 
 #pragma once
@@ -15,16 +18,8 @@
 #include <string>
 #include <vector>
 
-#ifdef HAS_RACOMMONS
+// RACommons voice agent header - REQUIRED
 #include "rac/features/voice_agent/rac_voice_agent.h"
-#else
-typedef void* rac_handle_t;
-typedef int rac_result_t;
-typedef int rac_bool_t;
-#define RAC_SUCCESS 0
-#define RAC_TRUE 1
-#define RAC_FALSE 0
-#endif
 
 namespace runanywhere {
 namespace bridges {
@@ -85,6 +80,9 @@ struct VoiceAgentConfig {
  *
  * Matches CppBridge+VoiceAgent.swift API.
  * Orchestrates the full voice pipeline using shared STT, LLM, and TTS components.
+ *
+ * NOTE: RACommons is REQUIRED. All methods will throw std::runtime_error if
+ * the underlying C API calls fail.
  */
 class VoiceAgentBridge {
 public:
@@ -97,11 +95,23 @@ public:
     VoiceAgentComponentStates getComponentStates() const;
     void cleanup();
 
+    // Model Loading (for standalone voice agent)
+    rac_result_t loadSTTModel(const std::string& modelPath,
+                              const std::string& modelId = "",
+                              const std::string& modelName = "");
+    rac_result_t loadLLMModel(const std::string& modelPath,
+                              const std::string& modelId = "",
+                              const std::string& modelName = "");
+    rac_result_t loadTTSVoice(const std::string& voicePath,
+                              const std::string& voiceId = "",
+                              const std::string& voiceName = "");
+
     // Voice Processing
     VoiceAgentResult processVoiceTurn(const void* audioData, size_t audioSize);
     std::string transcribe(const void* audioData, size_t audioSize);
     std::string generateResponse(const std::string& prompt);
     std::vector<uint8_t> synthesizeSpeech(const std::string& text);
+    bool detectSpeech(const float* samples, size_t sampleCount);
 
 private:
     VoiceAgentBridge();
@@ -111,7 +121,7 @@ private:
     VoiceAgentBridge(const VoiceAgentBridge&) = delete;
     VoiceAgentBridge& operator=(const VoiceAgentBridge&) = delete;
 
-    rac_handle_t handle_ = nullptr;
+    rac_voice_agent_handle_t handle_ = nullptr;
     bool initialized_ = false;
     VoiceAgentConfig config_;
 };

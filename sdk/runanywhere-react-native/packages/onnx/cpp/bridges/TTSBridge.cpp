@@ -1,9 +1,28 @@
 /**
  * @file TTSBridge.cpp
  * @brief TTS capability bridge implementation
+ *
+ * Aligned with rac_tts_component.h and rac_tts_types.h API.
+ * RACommons and ONNX backend are REQUIRED - no stub implementations.
  */
 
 #include "TTSBridge.hpp"
+#include <stdexcept>
+#include <cstring>
+
+// Platform-specific logging
+#if defined(ANDROID) || defined(__ANDROID__)
+#include <android/log.h>
+#define LOG_TAG "TTSBridge"
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#else
+#include <cstdio>
+#define LOGI(...) printf("[TTSBridge] "); printf(__VA_ARGS__); printf("\n")
+#define LOGD(...) printf("[TTSBridge DEBUG] "); printf(__VA_ARGS__); printf("\n")
+#define LOGE(...) printf("[TTSBridge ERROR] "); printf(__VA_ARGS__); printf("\n")
+#endif
 
 namespace runanywhere {
 namespace bridges {
@@ -17,20 +36,16 @@ TTSBridge::TTSBridge() = default;
 
 TTSBridge::~TTSBridge() {
     cleanup();
-#ifdef HAS_RACOMMONS
     if (handle_) {
         rac_tts_component_destroy(handle_);
         handle_ = nullptr;
     }
-#endif
 }
 
 bool TTSBridge::isLoaded() const {
-#ifdef HAS_RACOMMONS
     if (handle_) {
         return rac_tts_component_is_loaded(handle_) == RAC_TRUE;
     }
-#endif
     return false;
 }
 
@@ -39,12 +54,11 @@ std::string TTSBridge::currentModelId() const {
 }
 
 rac_result_t TTSBridge::loadModel(const std::string& modelId) {
-#ifdef HAS_RACOMMONS
     // Create component if needed
     if (!handle_) {
         rac_result_t result = rac_tts_component_create(&handle_);
         if (result != RAC_SUCCESS) {
-            return result;
+            throw std::runtime_error("TTSBridge: Failed to create TTS component. Error: " + std::to_string(result));
         }
     }
 
@@ -53,53 +67,59 @@ rac_result_t TTSBridge::loadModel(const std::string& modelId) {
         rac_tts_component_unload(handle_);
     }
 
-    // Load new model
-    rac_result_t result = rac_tts_component_load_model(handle_, modelId.c_str());
+    // Load new voice using rac_tts_component_load_voice(handle, voice_path, voice_id, voice_name)
+    // For TTS, modelId is the voice path/id
+    rac_result_t result = rac_tts_component_load_voice(
+        handle_,
+        modelId.c_str(),  // voice_path
+        modelId.c_str(),  // voice_id
+        modelId.c_str()   // voice_name
+    );
+
     if (result == RAC_SUCCESS) {
         loadedModelId_ = modelId;
+        LOGI("TTS voice loaded: %s", modelId.c_str());
+    } else {
+        throw std::runtime_error("TTSBridge: Failed to load TTS voice '" + modelId + "'. Error: " + std::to_string(result));
     }
     return result;
-#else
-    loadedModelId_ = modelId;
-    return RAC_SUCCESS;
-#endif
 }
 
 rac_result_t TTSBridge::unload() {
-#ifdef HAS_RACOMMONS
     if (handle_) {
         rac_result_t result = rac_tts_component_unload(handle_);
         if (result == RAC_SUCCESS) {
             loadedModelId_.clear();
+        } else {
+            throw std::runtime_error("TTSBridge: Failed to unload TTS voice. Error: " + std::to_string(result));
         }
         return result;
     }
-#endif
     loadedModelId_.clear();
     return RAC_SUCCESS;
 }
 
 void TTSBridge::cleanup() {
-#ifdef HAS_RACOMMONS
     if (handle_) {
         rac_tts_component_cleanup(handle_);
     }
-#endif
     loadedModelId_.clear();
 }
 
 TTSResult TTSBridge::synthesize(const std::string& text, const TTSOptions& options) {
     TTSResult result;
 
-#ifdef HAS_RACOMMONS
     if (!handle_ || !isLoaded()) {
-        return result;
+        throw std::runtime_error("TTSBridge: TTS voice not loaded. Call loadModel() first.");
     }
 
-    rac_tts_options_t racOptions = {};
-    racOptions.speed = options.speed;
-    racOptions.pitch = options.pitch;
-    racOptions.sample_rate = options.sampleRate;
+    rac_tts_options_t racOptions = RAC_TTS_OPTIONS_DEFAULT;
+    racOptions.rate = options.speed > 0 ? options.speed : 1.0f;
+    racOptions.pitch = options.pitch > 0 ? options.pitch : 1.0f;
+    racOptions.sample_rate = options.sampleRate > 0 ? options.sampleRate : RAC_TTS_DEFAULT_SAMPLE_RATE;
+    if (!options.voiceId.empty()) {
+        racOptions.voice = options.voiceId.c_str();
+    }
 
     rac_tts_result_t racResult = {};
     rac_result_t status = rac_tts_component_synthesize(handle_, text.c_str(),
@@ -113,9 +133,13 @@ TTSResult TTSBridge::synthesize(const std::string& text, const TTSOptions& optio
             std::memcpy(result.audioData.data(), racResult.audio_data, racResult.audio_size);
         }
         result.sampleRate = racResult.sample_rate;
-        result.durationMs = racResult.duration_ms;
+        result.durationMs = static_cast<double>(racResult.duration_ms);
+
+        // Free the C result
+        rac_tts_result_free(&racResult);
+    } else {
+        throw std::runtime_error("TTSBridge: Speech synthesis failed with error code: " + std::to_string(status));
     }
-#endif
 
     return result;
 }

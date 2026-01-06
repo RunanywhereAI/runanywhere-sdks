@@ -135,20 +135,15 @@ export const RunAnywhere = {
     const native = requireNativeModule();
 
     try {
-      // Create backend
-      const backendCreated = native.createBackend('llamacpp');
-      if (!backendCreated) {
-        logger.warning('Failed to create backend');
-      }
-
       // Initialize with config
+      // Note: Backend registration (llamacpp, onnx) is done by their respective packages
       const configJson = JSON.stringify({
         apiKey: options.apiKey,
         baseURL: options.baseURL,
         environment: environment,
       });
 
-      native.initialize(configJson);
+      await native.initialize(configJson);
 
       // Store API config
       ServiceContainer.shared.setAPIConfig(options.apiKey, environment);
@@ -156,7 +151,7 @@ export const RunAnywhere = {
       // Initialize model registry
       await ModelRegistry.initialize();
 
-      initState = markCoreInitialized(initState, initParams, 'llamacpp');
+      initState = markCoreInitialized(initState, initParams, 'core');
       initState = markServicesInitialized(initState);
 
       logger.info('SDK initialized successfully');
@@ -388,6 +383,53 @@ export const RunAnywhere = {
       return {};
     }
   },
+
+  /**
+   * Get SDK version
+   * @returns Version string
+   */
+  async getVersion(): Promise<string> {
+    // Return package version - this is a TypeScript-only method
+    return '0.2.0';
+  },
+
+  /**
+   * Get available capabilities
+   * @returns Array of capability strings (llm, stt, tts, vad)
+   */
+  async getCapabilities(): Promise<string[]> {
+    const caps: string[] = ['core'];
+    // Check which backends are available
+    try {
+      if (await this.isTextModelLoaded()) caps.push('llm');
+      if (await this.isSTTModelLoaded()) caps.push('stt');
+      if (await this.isTTSModelLoaded()) caps.push('tts');
+      if (await this.isVADModelLoaded()) caps.push('vad');
+    } catch {
+      // Ignore errors - these methods may not be available
+    }
+    return caps;
+  },
+
+  /**
+   * Get downloaded models
+   * @returns Array of model IDs
+   */
+  getDownloadedModels: Models.getDownloadedModels,
+
+  /**
+   * Clean temporary files
+   */
+  async cleanTempFiles(): Promise<boolean> {
+    // Delegate to storage clearCache for now
+    return this.clearCache();
+  },
+
+  /**
+   * Alias for text model operations
+   */
+  isTextModelLoaded: TextGeneration.isModelLoaded,
+  unloadTextModel: TextGeneration.unloadModel,
 
   // ============================================================================
   // Factory Methods

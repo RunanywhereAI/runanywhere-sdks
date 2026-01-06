@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.9.0)
 
 set(PACKAGE_NAME runanywherecore)
 set(CMAKE_VERBOSE_MAKEFILE ON)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 # Path to pre-built native libraries (downloaded from runanywhere-sdks)
 set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
@@ -14,19 +14,19 @@ set(RAC_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/src/main/include)
 # =============================================================================
 # RACommons - Core SDK functionality (rac_* API)
 # This is the ONLY native library in the core package
+# RACommons is REQUIRED - it's downloaded via Gradle downloadNativeLibs task
 # =============================================================================
-if(EXISTS "${JNILIB_DIR}/librac_commons.so")
-    add_library(rac_commons SHARED IMPORTED)
-    set_target_properties(rac_commons PROPERTIES
-        IMPORTED_LOCATION "${JNILIB_DIR}/librac_commons.so"
-        IMPORTED_NO_SONAME TRUE
-    )
-    set(HAS_RACOMMONS ON)
-    message(STATUS "[RunAnywhereCore] Found RACommons at ${JNILIB_DIR}/librac_commons.so")
-else()
-    message(WARNING "[RunAnywhereCore] RACommons not found at ${JNILIB_DIR}/librac_commons.so")
-    message(WARNING "Run: ./gradlew :core:downloadNativeLibs")
+if(NOT EXISTS "${JNILIB_DIR}/librac_commons.so")
+    message(FATAL_ERROR "[RunAnywhereCore] RACommons not found at ${JNILIB_DIR}/librac_commons.so\n"
+                        "Run: ./gradlew :runanywhere_core:downloadNativeLibs")
 endif()
+
+add_library(rac_commons SHARED IMPORTED)
+set_target_properties(rac_commons PROPERTIES
+    IMPORTED_LOCATION "${JNILIB_DIR}/librac_commons.so"
+    IMPORTED_NO_SONAME TRUE
+)
+message(STATUS "[RunAnywhereCore] Found RACommons at ${JNILIB_DIR}/librac_commons.so")
 
 # =============================================================================
 # Source files - Core bridges only (no LLM/STT/TTS/VAD)
@@ -70,11 +70,9 @@ target_link_libraries(
     android
 )
 
-# Link RACommons if available
-if(HAS_RACOMMONS)
-    target_link_libraries(${PACKAGE_NAME} rac_commons)
-    target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_RACOMMONS=1)
-endif()
+# Link RACommons - REQUIRED for core functionality
+target_link_libraries(${PACKAGE_NAME} rac_commons)
+target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_RACOMMONS=1)
 
 # NOTE: No LlamaCPP or ONNX linking here
 # Those are in @runanywhere/llamacpp and @runanywhere/onnx packages respectively
