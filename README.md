@@ -547,7 +547,7 @@ and acknowledgments, including:
 
 ## 💬 Community & Support
 
-- **Discord**: [Join our community](https://discord.gg/pxRkYmWh)
+- **Discord**: [Join our community](https://discord.gg/N359FBbDVd)
 - **GitHub Issues**: [Report bugs or request features](https://github.com/RunanywhereAI/runanywhere-sdks/issues)
 - **Email**: founders@runanywhere.ai
 - **Twitter**: [@RunanywhereAI](https://twitter.com/RunanywhereAI)
