@@ -114,7 +114,6 @@ class RunAnywhereApplication : Application() {
             } else {
                 SDKEnvironment.PRODUCTION
             }
-        Log.i("RunAnywhereApp", "🚀 SELECTED ENVIRONMENT: $environment (based on BuildConfig.DEBUG_MODE=${BuildConfig.DEBUG_MODE})")
 
         // Initialize platform context first
         AndroidPlatformContext.initialize(this@RunAnywhereApplication)
