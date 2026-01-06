@@ -56,6 +56,19 @@ data class RefreshTokenRequest(
 /**
  * Authentication bridge for production/staging mode.
  * Handles JWT token acquisition and management.
+ * 
+ * **Threading Requirements:**
+ * All network operations (authenticate, refreshToken, getValidAccessToken) perform
+ * blocking HTTP calls and MUST be called from a background thread. Calling from the
+ * main/UI thread will throw [IllegalStateException] on Android to prevent ANR.
+ * 
+ * Example:
+ * ```kotlin
+ * // Correct - call from background thread
+ * withContext(Dispatchers.IO) {
+ *     CppBridgeAuth.authenticate(apiKey, baseUrl, deviceId)
+ * }
+ * ```
  */
 object CppBridgeAuth {
     private const val TAG = "CppBridge/Auth"
@@ -75,6 +88,24 @@ object CppBridgeAuth {
     private val json = Json { 
         ignoreUnknownKeys = true 
         isLenient = true
+    }
+    
+    /**
+     * Check if we're on the main thread and throw if so.
+     * Prevents ANR by failing fast when network operations are called from UI thread.
+     */
+    private fun ensureNotMainThread(operation: String) {
+        try {
+            val mainLooper = android.os.Looper.getMainLooper()
+            if (android.os.Looper.myLooper() == mainLooper) {
+                throw IllegalStateException(
+                    "CppBridgeAuth.$operation() must not be called from the main thread. " +
+                    "Use withContext(Dispatchers.IO) or call from a background thread."
+                )
+            }
+        } catch (e: NoClassDefFoundError) {
+            // Not on Android (e.g., JVM tests) - skip check
+        }
     }
     
     /**
@@ -164,6 +195,9 @@ object CppBridgeAuth {
     /**
      * Authenticate with the backend using API key.
      * Gets a JWT access token for subsequent requests.
+     * 
+     * **Must be called from a background thread.** Will throw [IllegalStateException]
+     * if called from the main/UI thread on Android.
      *
      * @param apiKey The API key for authentication
      * @param baseUrl The backend base URL
@@ -172,6 +206,7 @@ object CppBridgeAuth {
      * @param sdkVersion SDK version string
      * @return AuthenticationResponse on success
      * @throws Exception on failure
+     * @throws IllegalStateException if called from main thread
      */
     fun authenticate(
         apiKey: String,
@@ -180,6 +215,9 @@ object CppBridgeAuth {
         platform: String = "android",
         sdkVersion: String = "0.1.0"
     ): AuthenticationResponse {
+        // Fail fast if called from main thread to prevent ANR
+        ensureNotMainThread("authenticate")
+        
         // Store config for future refresh/re-auth
         _baseUrl.set(baseUrl)
         _apiKey.set(apiKey)
@@ -270,12 +308,19 @@ object CppBridgeAuth {
 
     /**
      * Refresh the access token using the refresh token.
+     * 
+     * **Must be called from a background thread.** Will throw [IllegalStateException]
+     * if called from the main/UI thread on Android.
      *
      * @param baseUrl The backend base URL
      * @return New access token
      * @throws Exception on failure
+     * @throws IllegalStateException if called from main thread
      */
     fun refreshAccessToken(baseUrl: String): String {
+        // Fail fast if called from main thread to prevent ANR
+        ensureNotMainThread("refreshAccessToken")
+        
         val refreshToken = _refreshToken.get()
             ?: throw Exception("No refresh token available")
         val deviceId = _deviceId.get()
@@ -358,17 +403,24 @@ object CppBridgeAuth {
     
     /**
      * Get a valid access token, refreshing if needed.
+     * 
+     * **Must be called from a background thread** when token refresh is needed.
+     * Will throw [IllegalStateException] if called from the main/UI thread on Android.
      *
      * @param baseUrl The backend base URL (needed for refresh)
      * @return Valid access token
      * @throws Exception if no valid token available
+     * @throws IllegalStateException if called from main thread and refresh is needed
      */
     fun getValidAccessToken(baseUrl: String): String {
-        // Check if current token is valid
+        // Check if current token is valid (no network call needed)
         val currentToken = _accessToken.get()
         if (currentToken != null && !tokenNeedsRefresh) {
             return currentToken
         }
+        
+        // Token needs refresh - ensure we're not on main thread
+        ensureNotMainThread("getValidAccessToken")
         
         // Try to refresh
         if (_refreshToken.get() != null) {

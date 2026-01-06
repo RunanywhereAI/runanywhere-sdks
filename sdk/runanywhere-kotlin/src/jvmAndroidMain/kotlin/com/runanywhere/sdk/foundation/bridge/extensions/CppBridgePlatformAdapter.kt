@@ -57,7 +57,11 @@ object CppBridgePlatformAdapter {
     /**
      * SharedPreferences for persistent secure storage on Android.
      * Initialized when context is set.
+     * 
+     * @Volatile ensures visibility across threads - reads will see the latest
+     * value written by setContext() even without explicit synchronization.
      */
+    @Volatile
     private var sharedPreferences: SharedPreferences? = null
 
     /**
@@ -276,8 +280,11 @@ object CppBridgePlatformAdapter {
     @JvmStatic
     fun secureGetCallback(key: String): ByteArray? {
         return try {
+            // Take a thread-safe local copy of the volatile reference
+            val prefs = sharedPreferences
+            
             // Try SharedPreferences first (persistent storage)
-            sharedPreferences?.let { prefs ->
+            if (prefs != null) {
                 val base64Value = prefs.getString(key, null)
                 if (base64Value != null) {
                     return Base64.decode(base64Value, Base64.NO_WRAP)
@@ -306,8 +313,11 @@ object CppBridgePlatformAdapter {
     @JvmStatic
     fun secureSetCallback(key: String, value: ByteArray): Boolean {
         return try {
+            // Take a thread-safe local copy of the volatile reference
+            val prefs = sharedPreferences
+            
             // Try SharedPreferences first (persistent storage)
-            sharedPreferences?.let { prefs ->
+            if (prefs != null) {
                 val base64Value = Base64.encodeToString(value, Base64.NO_WRAP)
                 prefs.edit().putString(key, base64Value).apply()
                 logCallback(LogLevel.DEBUG, "SecureStorage", "Persisted key '$key' to SharedPreferences")
@@ -334,8 +344,11 @@ object CppBridgePlatformAdapter {
     @JvmStatic
     fun secureDeleteCallback(key: String): Boolean {
         return try {
-            // Remove from SharedPreferences
-            sharedPreferences?.edit()?.remove(key)?.apply()
+            // Take a thread-safe local copy of the volatile reference
+            val prefs = sharedPreferences
+            
+            // Remove from SharedPreferences if available
+            prefs?.edit()?.remove(key)?.apply()
             // Also remove from in-memory
             inMemoryStorage.remove(key)
             true

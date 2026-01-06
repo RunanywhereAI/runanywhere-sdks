@@ -1935,6 +1935,14 @@ static void jni_device_get_info(rac_device_registration_info_t* out_info, void* 
         g_device_jni_state.get_device_info_method
     );
     
+    // Check for Java exception after CallObjectMethod
+    if (env->ExceptionCheck()) {
+        LOGe("jni_device_get_info: Java exception occurred in getDeviceInfo()");
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+        return;
+    }
+    
     if (jResult && out_info) {
         const char* json = env->GetStringUTFChars(jResult, nullptr);
         LOGd("jni_device_get_info: parsing JSON: %.200s...", json);
@@ -2006,6 +2014,14 @@ static const char* jni_device_get_id(void* user_data) {
         g_device_jni_state.get_device_id_method
     );
     
+    // Check for Java exception after CallObjectMethod
+    if (env->ExceptionCheck()) {
+        LOGe("jni_device_get_id: Java exception occurred in getDeviceId()");
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+        return "";
+    }
+    
     if (jResult) {
         const char* str = env->GetStringUTFChars(jResult, nullptr);
         g_cached_device_id = str;
@@ -2027,6 +2043,14 @@ static rac_bool_t jni_device_is_registered(void* user_data) {
         g_device_jni_state.is_registered_method
     );
     
+    // Check for Java exception after CallBooleanMethod
+    if (env->ExceptionCheck()) {
+        LOGe("jni_device_is_registered: Java exception occurred in isRegistered()");
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+        return RAC_FALSE;
+    }
+    
     return result ? RAC_TRUE : RAC_FALSE;
 }
 
@@ -2041,6 +2065,13 @@ static void jni_device_set_registered(rac_bool_t registered, void* user_data) {
         g_device_jni_state.set_registered_method,
         registered == RAC_TRUE ? JNI_TRUE : JNI_FALSE
     );
+    
+    // Check for Java exception after CallVoidMethod
+    if (env->ExceptionCheck()) {
+        LOGe("jni_device_set_registered: Java exception occurred in setRegistered()");
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+    }
 }
 
 static rac_result_t jni_device_http_post(const char* endpoint, const char* json_body,
@@ -2060,11 +2091,41 @@ static rac_result_t jni_device_http_post(const char* endpoint, const char* json_
     jstring jEndpoint = env->NewStringUTF(endpoint ? endpoint : "");
     jstring jBody = env->NewStringUTF(json_body ? json_body : "");
     
+    // Check for allocation failures (can throw OutOfMemoryError)
+    if (env->ExceptionCheck() || !jEndpoint || !jBody) {
+        LOGe("jni_device_http_post: Failed to create JNI strings");
+        if (env->ExceptionCheck()) {
+            env->ExceptionDescribe();
+            env->ExceptionClear();
+        }
+        if (jEndpoint) env->DeleteLocalRef(jEndpoint);
+        if (jBody) env->DeleteLocalRef(jBody);
+        if (out_response) {
+            out_response->result = RAC_ERROR_OUT_OF_MEMORY;
+            out_response->status_code = -1;
+        }
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    
     jint statusCode = env->CallIntMethod(
         g_device_jni_state.callback_obj,
         g_device_jni_state.http_post_method,
         jEndpoint, jBody, requires_auth == RAC_TRUE ? JNI_TRUE : JNI_FALSE
     );
+    
+    // Check for Java exception after CallIntMethod
+    if (env->ExceptionCheck()) {
+        LOGe("jni_device_http_post: Java exception occurred in httpPost()");
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+        env->DeleteLocalRef(jEndpoint);
+        env->DeleteLocalRef(jBody);
+        if (out_response) {
+            out_response->result = RAC_ERROR_NETWORK_ERROR;
+            out_response->status_code = -1;
+        }
+        return RAC_ERROR_NETWORK_ERROR;
+    }
     
     env->DeleteLocalRef(jEndpoint);
     env->DeleteLocalRef(jBody);
