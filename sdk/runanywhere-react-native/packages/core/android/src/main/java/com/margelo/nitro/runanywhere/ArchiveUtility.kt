@@ -2,8 +2,8 @@
  * ArchiveUtility.kt
  *
  * Native archive extraction utility for Android.
- * Uses Java's native GZIPInputStream for gzip decompression
- * and pure Kotlin tar extraction.
+ * Uses Apache Commons Compress for robust tar.gz extraction (streaming, memory-efficient).
+ * Uses Java's native ZipInputStream for zip extraction.
  *
  * Mirrors the implementation from:
  * sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/Download/Utilities/ArchiveUtility.swift
@@ -14,12 +14,13 @@
 package com.margelo.nitro.runanywhere
 
 import android.util.Log
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
+import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 import java.io.BufferedInputStream
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.util.zip.GZIPInputStream
 import java.util.zip.ZipInputStream
 
 /**
@@ -27,7 +28,6 @@ import java.util.zip.ZipInputStream
  */
 object ArchiveUtility {
     private const val TAG = "ArchiveUtility"
-    private const val TAR_BLOCK_SIZE = 512
 
     /**
      * Extract an archive to a destination directory
@@ -37,11 +37,14 @@ object ArchiveUtility {
      */
     @JvmStatic
     fun extract(archivePath: String, destinationPath: String): Boolean {
+        Log.i(TAG, "extract() called: $archivePath -> $destinationPath")
         return try {
             extractArchive(archivePath, destinationPath)
+            Log.i(TAG, "extract() succeeded")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Extraction failed: ${e.message}", e)
+            Log.e(TAG, "Extraction failed: ${e.message}")
+            Log.e(TAG, "Stack trace:", e)
             false
         }
     }
@@ -74,10 +77,12 @@ object ArchiveUtility {
                 extractZip(archiveFile, destinationDir, progressHandler)
             }
             ArchiveType.BZIP2 -> {
-                throw Exception("tar.bz2 format requires Apache Commons Compress. Use tar.gz instead.")
+                // tar.bz2 not commonly used for ML models, recommend tar.gz
+                throw Exception("tar.bz2 format not currently supported. Please use tar.gz format.")
             }
             ArchiveType.XZ -> {
-                throw Exception("tar.xz format requires Apache Commons Compress. Use tar.gz instead.")
+                // tar.xz not commonly used for ML models, recommend tar.gz
+                throw Exception("tar.xz format not currently supported. Please use tar.gz format.")
             }
             ArchiveType.UNKNOWN -> {
                 // Fallback to file extension check
@@ -150,7 +155,8 @@ object ArchiveUtility {
     // MARK: - tar.gz Extraction
 
     /**
-     * Extract a tar.gz archive using Java's native GZIPInputStream
+     * Extract a tar.gz archive using Apache Commons Compress (streaming, memory-efficient)
+     * This approach doesn't load the entire file into memory.
      */
     private fun extractTarGz(
         sourceFile: File,
@@ -158,42 +164,83 @@ object ArchiveUtility {
         progressHandler: ((Double) -> Unit)?
     ) {
         val startTime = System.currentTimeMillis()
-        Log.i(TAG, "Extracting tar.gz: ${sourceFile.name}")
+        Log.i(TAG, "Extracting tar.gz: ${sourceFile.name} (size: ${formatBytes(sourceFile.length())})")
         progressHandler?.invoke(0.0)
 
-        // Step 1: Decompress gzip to get tar data
-        Log.i(TAG, "Starting native gzip decompression...")
-        val tarData = decompressGzip(sourceFile)
-        val decompressTime = System.currentTimeMillis()
-        Log.i(TAG, "Decompressed to ${formatBytes(tarData.size.toLong())} in ${decompressTime - startTime}ms")
-        progressHandler?.invoke(0.3)
+        destinationDir.mkdirs()
+        var fileCount = 0
+        val totalSize = sourceFile.length()
+        var bytesRead = 0L
 
-        // Step 2: Extract tar archive
-        Log.i(TAG, "Extracting tar data...")
-        extractTarData(tarData, destinationDir) { progress ->
-            progressHandler?.invoke(0.3 + progress * 0.7)
-        }
+        try {
+            // Use Apache Commons Compress for streaming tar.gz extraction
+            FileInputStream(sourceFile).use { fis ->
+                BufferedInputStream(fis).use { bis ->
+                    GzipCompressorInputStream(bis).use { gzis ->
+                        TarArchiveInputStream(gzis).use { tarIn ->
+                            var entry: TarArchiveEntry? = tarIn.nextTarEntry
+                            while (entry != null) {
+                                val name = entry.name
 
-        val totalTime = System.currentTimeMillis() - startTime
-        Log.i(TAG, "Total extraction time: ${totalTime}ms")
-        progressHandler?.invoke(1.0)
-    }
+                                // Skip macOS resource forks and empty names
+                                if (name.isEmpty() || name.startsWith("._") || name.startsWith("./._")) {
+                                    entry = tarIn.nextTarEntry
+                                    continue
+                                }
 
-    /**
-     * Decompress gzip data using Java's native GZIPInputStream
-     */
-    private fun decompressGzip(sourceFile: File): ByteArray {
-        val outputStream = ByteArrayOutputStream()
+                                val outputFile = File(destinationDir, name)
 
-        GZIPInputStream(BufferedInputStream(FileInputStream(sourceFile))).use { gzip ->
-            val buffer = ByteArray(8192)
-            var len: Int
-            while (gzip.read(buffer).also { len = it } != -1) {
-                outputStream.write(buffer, 0, len)
+                                // Security check - prevent zip slip attack
+                                val destDirPath = destinationDir.canonicalPath
+                                val outputFilePath = outputFile.canonicalPath
+                                if (!outputFilePath.startsWith(destDirPath + File.separator) &&
+                                    outputFilePath != destDirPath) {
+                                    Log.w(TAG, "Skipping entry outside destination: $name")
+                                    entry = tarIn.nextTarEntry
+                                    continue
+                                }
+
+                                if (entry.isDirectory) {
+                                    outputFile.mkdirs()
+                                } else {
+                                    // Create parent directories
+                                    outputFile.parentFile?.mkdirs()
+
+                                    // Extract file
+                                    FileOutputStream(outputFile).use { fos ->
+                                        val buffer = ByteArray(8192)
+                                        var len: Int
+                                        while (tarIn.read(buffer).also { len = it } != -1) {
+                                            fos.write(buffer, 0, len)
+                                            bytesRead += len
+                                        }
+                                    }
+                                    fileCount++
+
+                                    // Log progress for large files
+                                    if (fileCount % 10 == 0) {
+                                        Log.d(TAG, "Extracted $fileCount files...")
+                                    }
+                                }
+
+                                // Report progress (estimate based on compressed bytes)
+                                val progress = (bytesRead.toDouble() / (totalSize * 3)).coerceAtMost(0.95)
+                                progressHandler?.invoke(progress)
+
+                                entry = tarIn.nextTarEntry
+                            }
+                        }
+                    }
+                }
             }
-        }
 
-        return outputStream.toByteArray()
+            val totalTime = System.currentTimeMillis() - startTime
+            Log.i(TAG, "Extracted $fileCount files in ${totalTime}ms")
+            progressHandler?.invoke(1.0)
+        } catch (e: Exception) {
+            Log.e(TAG, "tar.gz extraction failed: ${e.message}", e)
+            throw e
+        }
     }
 
     // MARK: - ZIP Extraction
@@ -251,101 +298,7 @@ object ArchiveUtility {
         progressHandler?.invoke(1.0)
     }
 
-    // MARK: - TAR Extraction (Pure Kotlin)
-
-    /**
-     * Extract tar data to destination directory
-     */
-    private fun extractTarData(
-        tarData: ByteArray,
-        destinationDir: File,
-        progressHandler: ((Double) -> Unit)?
-    ) {
-        destinationDir.mkdirs()
-
-        var offset = 0
-        val totalSize = tarData.size
-        var fileCount = 0
-
-        while (offset + TAR_BLOCK_SIZE <= tarData.size) {
-            // Read tar header (512 bytes)
-            val headerData = tarData.copyOfRange(offset, offset + TAR_BLOCK_SIZE)
-
-            // Check for end of archive (all zeros)
-            if (headerData.all { it.toInt() == 0 }) {
-                break
-            }
-
-            // Parse header
-            val name = extractNullTerminatedString(headerData, 0, 100)
-            val sizeStr = extractNullTerminatedString(headerData, 124, 12).trim()
-            val typeFlag = headerData[156]
-            val prefix = extractNullTerminatedString(headerData, 345, 155)
-
-            // Get full name
-            val fullName = if (prefix.isEmpty()) name else "$prefix/$name"
-
-            // Skip if name is empty or is macOS resource fork
-            if (fullName.isEmpty() || fullName.startsWith("._")) {
-                offset += TAR_BLOCK_SIZE
-                continue
-            }
-
-            // Parse file size (octal)
-            val fileSize = sizeStr.toIntOrNull(8) ?: 0
-
-            offset += TAR_BLOCK_SIZE // Move past header
-
-            val file = File(destinationDir, fullName)
-
-            // Handle different entry types
-            when {
-                typeFlag.toInt() == 0x35 || (typeFlag.toInt() == 0x30 && fullName.endsWith("/")) -> {
-                    // Directory
-                    file.mkdirs()
-                }
-                typeFlag.toInt() == 0x30 || typeFlag.toInt() == 0 -> {
-                    // Regular file
-                    file.parentFile?.mkdirs()
-
-                    if (fileSize > 0 && offset + fileSize <= tarData.size) {
-                        val fileData = tarData.copyOfRange(offset, offset + fileSize)
-                        FileOutputStream(file).use { fos ->
-                            fos.write(fileData)
-                        }
-                    } else {
-                        file.createNewFile()
-                    }
-                    fileCount++
-                }
-                // Skip symbolic links and other types on Android
-            }
-
-            // Move to next entry (file data + padding to 512-byte boundary)
-            offset += fileSize
-            val padding = (TAR_BLOCK_SIZE - (fileSize % TAR_BLOCK_SIZE)) % TAR_BLOCK_SIZE
-            offset += padding
-
-            // Report progress
-            progressHandler?.invoke(offset.toDouble() / totalSize.toDouble())
-        }
-
-        Log.i(TAG, "Extracted $fileCount files from tar")
-    }
-
     // MARK: - Helpers
-
-    private fun extractNullTerminatedString(data: ByteArray, start: Int, maxLength: Int): String {
-        val end = minOf(start + maxLength, data.size)
-        var nullIndex = end
-        for (i in start until end) {
-            if (data[i].toInt() == 0) {
-                nullIndex = i
-                break
-            }
-        }
-        return String(data, start, nullIndex - start, Charsets.UTF_8)
-    }
 
     private fun formatBytes(bytes: Long): String {
         return when {
