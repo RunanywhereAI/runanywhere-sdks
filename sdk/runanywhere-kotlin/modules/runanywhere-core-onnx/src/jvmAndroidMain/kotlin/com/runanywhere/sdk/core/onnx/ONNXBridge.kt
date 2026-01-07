@@ -14,7 +14,7 @@
 
 package com.runanywhere.sdk.core.onnx
 
-import com.runanywhere.sdk.foundation.SDKLogger
+import android.util.Log
 
 /**
  * Native bridge for ONNX backend registration.
@@ -30,7 +30,6 @@ import com.runanywhere.sdk.foundation.SDKLogger
 internal object ONNXBridge {
 
     private const val TAG = "ONNXBridge"
-    private val logger = SDKLogger(TAG)
 
     @Volatile
     private var nativeLibraryLoaded = false
@@ -54,7 +53,7 @@ internal object ONNXBridge {
         synchronized(loadLock) {
             if (nativeLibraryLoaded) return true
 
-            logger.info("Loading ONNX native library...")
+            Log.i(TAG, "Loading ONNX native library...")
 
             try {
                 // The main SDK's librunanywhere_jni.so must be loaded first
@@ -62,13 +61,13 @@ internal object ONNXBridge {
                 // The ONNX JNI provides backend registration functions.
                 System.loadLibrary("rac_backend_onnx_jni")
                 nativeLibraryLoaded = true
-                logger.info("✅ ONNX native library loaded successfully")
+                Log.i(TAG, "✅ ONNX native library loaded successfully")
                 return true
             } catch (e: UnsatisfiedLinkError) {
-                logger.error("❌ Failed to load ONNX native library: ${e.message}", e)
+                Log.e(TAG, "❌ Failed to load ONNX native library: ${e.message}", e)
                 return false
             } catch (e: Exception) {
-                logger.error("❌ Unexpected error loading ONNX native library: ${e.message}", e)
+                Log.e(TAG, "❌ Unexpected error loading ONNX native library: ${e.message}", e)
                 return false
             }
         }

@@ -99,7 +99,6 @@ void rac_analytics_event_emit(rac_event_type_t type, const rac_analytics_event_d
     // Route to analytics callback (telemetry)
     if (dest == RAC_EVENT_DESTINATION_ANALYTICS_ONLY || dest == RAC_EVENT_DESTINATION_ALL) {
         if (state.analytics_callback != nullptr) {
-            log_debug("Events", "Invoking analytics callback for event type %d", type);
             state.analytics_callback(type, data, state.analytics_user_data);
         }
     }

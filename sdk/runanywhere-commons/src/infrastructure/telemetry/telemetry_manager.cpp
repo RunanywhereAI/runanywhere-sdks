@@ -498,7 +498,6 @@ rac_result_t rac_telemetry_manager_track_analytics(rac_telemetry_manager_t* mana
                 payload.output_tokens = llm.output_tokens;
                 payload.total_tokens = llm.input_tokens + llm.output_tokens;
                 payload.processing_time_ms = llm.duration_ms;
-                payload.generation_time_ms = llm.duration_ms;  // Also set generation_time_ms for LLM events
                 payload.tokens_per_second = llm.tokens_per_second;
                 payload.time_to_first_token_ms = llm.time_to_first_token_ms;
                 payload.is_streaming = llm.is_streaming;
