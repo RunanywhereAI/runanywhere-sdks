@@ -186,13 +186,25 @@ export async function getTTSVoiceInfo(): Promise<TTSVoiceInfo[]> {
 // ============================================================================
 
 /**
+ * Extended TTS output with additional fields for backward compatibility
+ */
+export interface TTSOutputExtended extends TTSOutput {
+  /** Base64 encoded audio (alias for audioData) */
+  audio: string;
+  /** Sample rate in Hz */
+  sampleRate: number;
+  /** Number of audio samples */
+  numSamples: number;
+}
+
+/**
  * Synthesize text to speech
  * Matches Swift SDK: RunAnywhere.synthesize(_:options:)
  */
 export async function synthesize(
   text: string,
   options?: TTSOptions
-): Promise<TTSOutput> {
+): Promise<TTSOutputExtended> {
   if (!isNativeModuleAvailable()) {
     throw new Error('Native module not available');
   }
@@ -211,9 +223,17 @@ export async function synthesize(
   try {
     const result = JSON.parse(resultJson);
 
+    // C++ returns: audioBase64, sampleRate, durationMs, audioSize
     const sampleRate = result.sampleRate ?? 22050;
-    const numSamples = result.numSamples ?? 0;
-    const duration = numSamples > 0 ? numSamples / sampleRate : 0;
+    const audioSize = result.audioSize ?? 0;
+    // audioSize is in bytes, Float32 PCM = 4 bytes per sample
+    const numSamples = Math.floor(audioSize / 4);
+    // Use durationMs from native if available, otherwise calculate from samples
+    const duration = result.durationMs
+      ? result.durationMs / 1000
+      : (numSamples > 0 ? numSamples / sampleRate : 0);
+
+    const audioData = result.audioBase64 ?? result.audio ?? '';
 
     const metadata: TTSSynthesisMetadata = {
       voice: voiceId || 'default',
@@ -223,10 +243,15 @@ export async function synthesize(
     };
 
     return {
-      audioData: result.audio ?? '',
+      // TTSOutput fields
+      audioData,
       format: 'pcm',
       duration,
       metadata,
+      // Extended fields for backward compatibility
+      audio: audioData,
+      sampleRate,
+      numSamples,
     };
   } catch {
     if (resultJson.includes('error')) {
@@ -241,6 +266,9 @@ export async function synthesize(
         processingTime,
         characterCount: text.length,
       },
+      audio: resultJson,
+      sampleRate: 22050,
+      numSamples: 0,
     };
   }
 }
