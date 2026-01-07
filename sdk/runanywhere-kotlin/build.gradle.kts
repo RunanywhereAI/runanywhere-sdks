@@ -40,7 +40,7 @@ ktlint {
 }
 
 group = "com.runanywhere.sdk"
-version = "0.1.3"
+version = "0.1.4"
 
 // =============================================================================
 // Local vs Remote JNI Library Configuration
