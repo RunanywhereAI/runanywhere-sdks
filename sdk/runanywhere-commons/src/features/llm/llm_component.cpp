@@ -308,13 +308,6 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
     // Use provided options or defaults
     const rac_llm_options_t* effective_options = options ? options : &component->default_options;
 
-    // Get service info for context_length
-    rac_llm_info_t service_info = {};
-    int32_t context_length = 0;
-    if (rac_llm_get_info(service, &service_info) == RAC_SUCCESS) {
-        context_length = service_info.context_length;
-    }
-
     // Emit generation started event
     {
         rac_analytics_event_data_t event = {};
@@ -328,7 +321,6 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
             static_cast<rac_inference_framework_t>(component->config.preferred_framework);
         event.data.llm_generation.temperature = effective_options->temperature;
         event.data.llm_generation.max_tokens = effective_options->max_tokens;
-        event.data.llm_generation.context_length = context_length;
         rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_STARTED, &event);
     }
 
@@ -402,7 +394,6 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
             static_cast<rac_inference_framework_t>(component->config.preferred_framework);
         event.data.llm_generation.temperature = effective_options->temperature;
         event.data.llm_generation.max_tokens = effective_options->max_tokens;
-        event.data.llm_generation.context_length = context_length;
         event.data.llm_generation.error_code = RAC_SUCCESS;
         rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_COMPLETED, &event);
     }
@@ -575,9 +566,6 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
 
     log_info("LLM.Component", "Starting streaming generation");
 
-    // Get context_length from service info
-    int32_t context_length = info.context_length;
-
     // Use provided options or defaults
     const rac_llm_options_t* effective_options = options ? options : &component->default_options;
 
@@ -594,7 +582,6 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
             static_cast<rac_inference_framework_t>(component->config.preferred_framework);
         event.data.llm_generation.temperature = effective_options->temperature;
         event.data.llm_generation.max_tokens = effective_options->max_tokens;
-        event.data.llm_generation.context_length = context_length;
         rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_STARTED, &event);
     }
 
@@ -691,7 +678,6 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
             static_cast<rac_inference_framework_t>(component->config.preferred_framework);
         event.data.llm_generation.temperature = effective_options->temperature;
         event.data.llm_generation.max_tokens = effective_options->max_tokens;
-        event.data.llm_generation.context_length = context_length;
         event.data.llm_generation.error_code = RAC_SUCCESS;
         rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_COMPLETED, &event);
     }

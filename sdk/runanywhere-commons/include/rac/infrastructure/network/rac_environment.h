@@ -188,30 +188,30 @@ const char* rac_validation_error_message(rac_validation_result_t result);
  * @param config The SDK configuration
  * @return RAC_VALIDATION_OK on success, error code on validation failure
  */
-RAC_API rac_validation_result_t rac_sdk_init(const rac_sdk_config_t* config);
+rac_validation_result_t rac_sdk_init(const rac_sdk_config_t* config);
 
 /**
  * @brief Get current SDK configuration
  * @return Pointer to current config, or NULL if not initialized
  */
-RAC_API const rac_sdk_config_t* rac_sdk_get_config(void);
+const rac_sdk_config_t* rac_sdk_get_config(void);
 
 /**
  * @brief Get current environment
  * @return Current environment, or RAC_ENV_DEVELOPMENT if not initialized
  */
-RAC_API rac_environment_t rac_sdk_get_environment(void);
+rac_environment_t rac_sdk_get_environment(void);
 
 /**
  * @brief Check if SDK is initialized
  * @return true if rac_sdk_init has been called successfully
  */
-RAC_API bool rac_sdk_is_initialized(void);
+bool rac_sdk_is_initialized(void);
 
 /**
  * @brief Reset SDK state (for testing)
  */
-RAC_API void rac_sdk_reset(void);
+void rac_sdk_reset(void);
 
 #ifdef __cplusplus
 }

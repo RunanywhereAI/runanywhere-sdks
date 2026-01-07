@@ -14,7 +14,7 @@
 
 package com.runanywhere.sdk.llm.llamacpp
 
-import com.runanywhere.sdk.foundation.SDKLogger
+import android.util.Log
 
 /**
  * Native bridge for LlamaCPP backend registration.
@@ -30,7 +30,6 @@ import com.runanywhere.sdk.foundation.SDKLogger
 internal object LlamaCPPBridge {
 
     private const val TAG = "LlamaCPPBridge"
-    private val logger = SDKLogger(TAG)
 
     @Volatile
     private var nativeLibraryLoaded = false
@@ -53,7 +52,7 @@ internal object LlamaCPPBridge {
         synchronized(loadLock) {
             if (nativeLibraryLoaded) return true
 
-            logger.info("Loading LlamaCPP native library...")
+            Log.i(TAG, "Loading LlamaCPP native library...")
 
             try {
                 // The main SDK's librunanywhere_jni.so must be loaded first
@@ -61,13 +60,13 @@ internal object LlamaCPPBridge {
                 // The LlamaCPP JNI provides backend registration functions.
                 System.loadLibrary("rac_backend_llamacpp_jni")
                 nativeLibraryLoaded = true
-                logger.info("✅ LlamaCPP native library loaded successfully")
+                Log.i(TAG, "✅ LlamaCPP native library loaded successfully")
                 return true
             } catch (e: UnsatisfiedLinkError) {
-                logger.error("❌ Failed to load LlamaCPP native library: ${e.message}", e)
+                Log.e(TAG, "❌ Failed to load LlamaCPP native library: ${e.message}", e)
                 return false
             } catch (e: Exception) {
-                logger.error("❌ Unexpected error loading LlamaCPP native library: ${e.message}", e)
+                Log.e(TAG, "❌ Unexpected error loading LlamaCPP native library: ${e.message}", e)
                 return false
             }
         }

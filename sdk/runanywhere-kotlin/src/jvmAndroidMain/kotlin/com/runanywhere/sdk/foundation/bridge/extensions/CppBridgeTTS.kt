@@ -606,12 +606,11 @@ object CppBridgeTTS {
      * Load a model.
      *
      * @param modelPath Path to the model file
-     * @param modelId Unique identifier for the model (for telemetry)
-     * @param modelName Human-readable name for the model (for telemetry)
+     * @param modelId Unique identifier for the model
      * @param config Model configuration (optional)
      * @return 0 on success, error code on failure
      */
-    fun loadModel(modelPath: String, modelId: String, modelName: String? = null, config: ModelConfig = ModelConfig.DEFAULT): Int {
+    fun loadModel(modelPath: String, modelId: String, config: ModelConfig = ModelConfig.DEFAULT): Int {
         synchronized(lock) {
             if (handle == 0L) {
                 // Auto-create component if needed
@@ -638,7 +637,7 @@ object CppBridgeTTS {
                 "Loading model: $modelId from $modelPath"
             )
 
-            val result = RunAnywhereBridge.racTtsComponentLoadModel(handle, modelPath, modelId, modelName)
+            val result = RunAnywhereBridge.racTtsComponentLoadModel(handle, modelPath, config.toJson())
             if (result != 0) {
                 setState(TTSState.ERROR)
                 CppBridgePlatformAdapter.logCallback(

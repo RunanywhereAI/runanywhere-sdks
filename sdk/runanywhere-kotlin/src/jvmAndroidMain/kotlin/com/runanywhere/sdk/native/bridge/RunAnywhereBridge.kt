@@ -14,8 +14,6 @@
 
 package com.runanywhere.sdk.native.bridge
 
-import com.runanywhere.sdk.foundation.SDKLogger
-
 /**
  * RunAnywhereBridge provides low-level JNI bindings for the runanywhere-commons C API.
  *
@@ -36,8 +34,6 @@ object RunAnywhereBridge {
     private var nativeLibraryLoaded = false
     private val loadLock = Any()
 
-    private val logger = SDKLogger(TAG)
-
     /**
      * Load the native commons library if not already loaded.
      * @return true if the library is loaded, false otherwise
@@ -48,18 +44,18 @@ object RunAnywhereBridge {
         synchronized(loadLock) {
             if (nativeLibraryLoaded) return true
 
-            logger.info("Loading native library 'runanywhere_jni'...")
+            android.util.Log.i(TAG, "Loading native library 'runanywhere_jni'...")
 
             try {
                 System.loadLibrary("runanywhere_jni")
                 nativeLibraryLoaded = true
-                logger.info("✅ Native library loaded successfully")
+                android.util.Log.i(TAG, "✅ Native library loaded successfully")
                 return true
             } catch (e: UnsatisfiedLinkError) {
-                logger.error("❌ Failed to load native library: ${e.message}", e)
+                android.util.Log.e(TAG, "❌ Failed to load native library: ${e.message}", e)
                 return false
             } catch (e: Exception) {
-                logger.error("❌ Unexpected error: ${e.message}", e)
+                android.util.Log.e(TAG, "❌ Unexpected error: ${e.message}", e)
                 return false
             }
         }
@@ -123,7 +119,7 @@ object RunAnywhereBridge {
      * Load a model. Takes model path (or ID) and optional config JSON.
      */
     @JvmStatic
-    external fun racLlmComponentLoadModel(handle: Long, modelPath: String, modelId: String, modelName: String?): Int
+    external fun racLlmComponentLoadModel(handle: Long, modelId: String): Int
 
     @JvmStatic
     external fun racLlmComponentUnload(handle: Long): Int
@@ -205,7 +201,7 @@ object RunAnywhereBridge {
     external fun racSttComponentIsLoaded(handle: Long): Boolean
 
     @JvmStatic
-    external fun racSttComponentLoadModel(handle: Long, modelPath: String, modelId: String, modelName: String?): Int
+    external fun racSttComponentLoadModel(handle: Long, modelId: String, configJson: String?): Int
 
     @JvmStatic
     external fun racSttComponentUnload(handle: Long): Int
@@ -251,7 +247,7 @@ object RunAnywhereBridge {
     external fun racTtsComponentIsLoaded(handle: Long): Boolean
 
     @JvmStatic
-    external fun racTtsComponentLoadModel(handle: Long, modelPath: String, modelId: String, modelName: String?): Int
+    external fun racTtsComponentLoadModel(handle: Long, modelId: String, configJson: String?): Int
 
     @JvmStatic
     external fun racTtsComponentUnload(handle: Long): Int
@@ -480,353 +476,6 @@ object RunAnywhereBridge {
      */
     @JvmStatic
     external fun racAudioWavHeaderSize(): Int
-
-    // ========================================================================
-    // DEVICE MANAGER (rac_device_manager.h)
-    // Mirrors Swift SDK's CppBridge+Device.swift
-    // ========================================================================
-
-    /**
-     * Set device manager callbacks.
-     * The callback object must implement:
-     * - getDeviceInfo(): String (returns JSON)
-     * - getDeviceId(): String
-     * - isRegistered(): Boolean
-     * - setRegistered(registered: Boolean)
-     * - httpPost(endpoint: String, body: String, requiresAuth: Boolean): Int (status code)
-     */
-    @JvmStatic
-    external fun racDeviceManagerSetCallbacks(callbacks: Any): Int
-
-    /**
-     * Register device with backend if not already registered.
-     * @param environment SDK environment (0=DEVELOPMENT, 1=STAGING, 2=PRODUCTION)
-     * @param buildToken Optional build token for development mode
-     */
-    @JvmStatic
-    external fun racDeviceManagerRegisterIfNeeded(environment: Int, buildToken: String?): Int
-
-    /**
-     * Check if device is registered.
-     */
-    @JvmStatic
-    external fun racDeviceManagerIsRegistered(): Boolean
-
-    /**
-     * Clear device registration status.
-     */
-    @JvmStatic
-    external fun racDeviceManagerClearRegistration()
-
-    /**
-     * Get the current device ID.
-     */
-    @JvmStatic
-    external fun racDeviceManagerGetDeviceId(): String?
-
-    // ========================================================================
-    // TELEMETRY MANAGER (rac_telemetry_manager.h)
-    // Mirrors Swift SDK's CppBridge+Telemetry.swift
-    // ========================================================================
-
-    /**
-     * Create telemetry manager.
-     * @param environment SDK environment
-     * @param deviceId Persistent device UUID
-     * @param platform Platform string ("android")
-     * @param sdkVersion SDK version string
-     * @return Handle to telemetry manager, or 0 on failure
-     */
-    @JvmStatic
-    external fun racTelemetryManagerCreate(
-        environment: Int,
-        deviceId: String,
-        platform: String,
-        sdkVersion: String
-    ): Long
-
-    /**
-     * Destroy telemetry manager.
-     */
-    @JvmStatic
-    external fun racTelemetryManagerDestroy(handle: Long)
-
-    /**
-     * Set device info for telemetry payloads.
-     */
-    @JvmStatic
-    external fun racTelemetryManagerSetDeviceInfo(handle: Long, deviceModel: String, osVersion: String)
-
-    /**
-     * Set HTTP callback for telemetry.
-     * The callback object must implement:
-     * - onHttpRequest(endpoint: String, body: String, bodyLength: Int, requiresAuth: Boolean)
-     */
-    @JvmStatic
-    external fun racTelemetryManagerSetHttpCallback(handle: Long, callback: Any)
-
-    /**
-     * Flush pending telemetry events.
-     */
-    @JvmStatic
-    external fun racTelemetryManagerFlush(handle: Long): Int
-
-    // ========================================================================
-    // ANALYTICS EVENTS (rac_analytics_events.h)
-    // ========================================================================
-
-    /**
-     * Register analytics events callback with telemetry manager.
-     * Events from C++ will be routed to the telemetry manager for batching and HTTP transport.
-     * 
-     * @param telemetryHandle Handle to the telemetry manager (from racTelemetryManagerCreate)
-     *                        Pass 0 to unregister the callback
-     * @return RAC_SUCCESS or error code
-     */
-    @JvmStatic
-    external fun racAnalyticsEventsSetCallback(telemetryHandle: Long): Int
-
-    /**
-     * Emit a download/extraction event.
-     * Maps to rac_analytics_model_download_t struct in C++.
-     */
-    @JvmStatic
-    external fun racAnalyticsEventEmitDownload(
-        eventType: Int,
-        modelId: String?,
-        progress: Double,
-        bytesDownloaded: Long,
-        totalBytes: Long,
-        durationMs: Double,
-        sizeBytes: Long,
-        archiveType: String?,
-        errorCode: Int,
-        errorMessage: String?
-    ): Int
-
-    /**
-     * Emit an SDK lifecycle event.
-     * Maps to rac_analytics_sdk_lifecycle_t struct in C++.
-     */
-    @JvmStatic
-    external fun racAnalyticsEventEmitSdkLifecycle(
-        eventType: Int,
-        durationMs: Double,
-        count: Int,
-        errorCode: Int,
-        errorMessage: String?
-    ): Int
-
-    /**
-     * Emit a storage event.
-     * Maps to rac_analytics_storage_t struct in C++.
-     */
-    @JvmStatic
-    external fun racAnalyticsEventEmitStorage(
-        eventType: Int,
-        freedBytes: Long,
-        errorCode: Int,
-        errorMessage: String?
-    ): Int
-
-    /**
-     * Emit a device event.
-     * Maps to rac_analytics_device_t struct in C++.
-     */
-    @JvmStatic
-    external fun racAnalyticsEventEmitDevice(
-        eventType: Int,
-        deviceId: String?,
-        errorCode: Int,
-        errorMessage: String?
-    ): Int
-
-    /**
-     * Emit an SDK error event.
-     * Maps to rac_analytics_sdk_error_t struct in C++.
-     */
-    @JvmStatic
-    external fun racAnalyticsEventEmitSdkError(
-        eventType: Int,
-        errorCode: Int,
-        errorMessage: String?,
-        operation: String?,
-        context: String?
-    ): Int
-
-    /**
-     * Emit a network event.
-     * Maps to rac_analytics_network_t struct in C++.
-     */
-    @JvmStatic
-    external fun racAnalyticsEventEmitNetwork(
-        eventType: Int,
-        isOnline: Boolean
-    ): Int
-
-    /**
-     * Emit an LLM generation event.
-     * Maps to rac_analytics_llm_generation_t struct in C++.
-     */
-    @JvmStatic
-    external fun racAnalyticsEventEmitLlmGeneration(
-        eventType: Int,
-        generationId: String?,
-        modelId: String?,
-        modelName: String?,
-        inputTokens: Int,
-        outputTokens: Int,
-        durationMs: Double,
-        tokensPerSecond: Double,
-        isStreaming: Boolean,
-        timeToFirstTokenMs: Double,
-        framework: Int,
-        temperature: Float,
-        maxTokens: Int,
-        contextLength: Int,
-        errorCode: Int,
-        errorMessage: String?
-    ): Int
-
-    /**
-     * Emit an LLM model event.
-     * Maps to rac_analytics_llm_model_t struct in C++.
-     */
-    @JvmStatic
-    external fun racAnalyticsEventEmitLlmModel(
-        eventType: Int,
-        modelId: String?,
-        modelName: String?,
-        modelSizeBytes: Long,
-        durationMs: Double,
-        framework: Int,
-        errorCode: Int,
-        errorMessage: String?
-    ): Int
-
-    /**
-     * Emit an STT transcription event.
-     * Maps to rac_analytics_stt_transcription_t struct in C++.
-     */
-    @JvmStatic
-    external fun racAnalyticsEventEmitSttTranscription(
-        eventType: Int,
-        transcriptionId: String?,
-        modelId: String?,
-        modelName: String?,
-        text: String?,
-        confidence: Float,
-        durationMs: Double,
-        audioLengthMs: Double,
-        audioSizeBytes: Int,
-        wordCount: Int,
-        realTimeFactor: Double,
-        language: String?,
-        sampleRate: Int,
-        isStreaming: Boolean,
-        framework: Int,
-        errorCode: Int,
-        errorMessage: String?
-    ): Int
-
-    /**
-     * Emit a TTS synthesis event.
-     * Maps to rac_analytics_tts_synthesis_t struct in C++.
-     */
-    @JvmStatic
-    external fun racAnalyticsEventEmitTtsSynthesis(
-        eventType: Int,
-        synthesisId: String?,
-        modelId: String?,
-        modelName: String?,
-        characterCount: Int,
-        audioDurationMs: Double,
-        audioSizeBytes: Int,
-        processingDurationMs: Double,
-        charactersPerSecond: Double,
-        sampleRate: Int,
-        framework: Int,
-        errorCode: Int,
-        errorMessage: String?
-    ): Int
-
-    /**
-     * Emit a VAD event.
-     * Maps to rac_analytics_vad_t struct in C++.
-     */
-    @JvmStatic
-    external fun racAnalyticsEventEmitVad(
-        eventType: Int,
-        speechDurationMs: Double,
-        energyLevel: Float
-    ): Int
-
-    // ========================================================================
-    // DEVELOPMENT CONFIG (rac_dev_config.h)
-    // Mirrors Swift SDK's CppBridge+Environment.swift DevConfig
-    // ========================================================================
-
-    /**
-     * Check if development config is available (has Supabase credentials configured).
-     * @return true if dev config is available
-     */
-    @JvmStatic
-    external fun racDevConfigIsAvailable(): Boolean
-
-    /**
-     * Get Supabase URL for development mode.
-     * @return Supabase URL or null if not configured
-     */
-    @JvmStatic
-    external fun racDevConfigGetSupabaseUrl(): String?
-
-    /**
-     * Get Supabase anon key for development mode.
-     * @return Supabase anon key or null if not configured
-     */
-    @JvmStatic
-    external fun racDevConfigGetSupabaseKey(): String?
-
-    /**
-     * Get build token for development mode.
-     * @return Build token or null if not configured
-     */
-    @JvmStatic
-    external fun racDevConfigGetBuildToken(): String?
-
-    /**
-     * Get Sentry DSN for crash reporting.
-     * @return Sentry DSN or null if not configured
-     */
-    @JvmStatic
-    external fun racDevConfigGetSentryDsn(): String?
-
-    // ========================================================================
-    // SDK CONFIGURATION INITIALIZATION
-    // ========================================================================
-
-    /**
-     * Initialize SDK configuration with version and platform info.
-     * This must be called during SDK initialization for device registration
-     * to include the correct sdk_version (instead of "unknown").
-     *
-     * @param environment Environment (0=development, 1=staging, 2=production)
-     * @param deviceId Device ID string
-     * @param platform Platform string (e.g., "android")
-     * @param sdkVersion SDK version string (e.g., "0.1.0")
-     * @param apiKey API key (can be empty for development)
-     * @param baseUrl Base URL (can be empty for development)
-     * @return 0 on success, error code on failure
-     */
-    @JvmStatic
-    external fun racSdkInit(
-        environment: Int,
-        deviceId: String?,
-        platform: String,
-        sdkVersion: String,
-        apiKey: String?,
-        baseUrl: String?
-    ): Int
 
     // ========================================================================
     // CONSTANTS
