@@ -308,7 +308,8 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> = 
         else -> CppBridgeModelRegistry.ModelType.LLM
     }
 
-    // 4. Emit download started event
+    // 4. Emit download started event and record start time
+    val downloadStartTime = System.currentTimeMillis()
     CppBridgeEvents.emitDownloadStarted(modelId, modelInfo.downloadSize ?: 0)
 
     // 5. Create a CompletableDeferred to wait for download completion
@@ -340,7 +341,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> = 
 
             // Emit progress event every 5%
             if (progress % 5 == 0) {
-                CppBridgeEvents.emitDownloadProgress(modelId, progressFraction, downloadedBytes, totalBytes)
+                CppBridgeEvents.emitDownloadProgress(modelId, progressFraction.toDouble(), downloadedBytes, totalBytes)
             }
 
             trySend(DownloadProgress(
@@ -466,7 +467,8 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> = 
         downloadLogger.info("Model ready at: $finalModelPath")
 
         // 13. Emit completion events
-        CppBridgeEvents.emitDownloadCompleted(modelId, result.fileSize, result.fileSize)
+        val downloadDurationMs = System.currentTimeMillis() - downloadStartTime
+        CppBridgeEvents.emitDownloadCompleted(modelId, downloadDurationMs.toDouble(), result.fileSize)
 
         trySend(DownloadProgress(
             modelId = modelId,
@@ -778,7 +780,8 @@ actual suspend fun RunAnywhere.loadLLMModel(modelId: String) {
     val localPath = model.localPath
         ?: throw SDKError.model("Model '$modelId' is not downloaded")
 
-    val result = CppBridgeLLM.loadModel(localPath, modelId)
+    // Pass modelPath, modelId, and modelName separately for correct telemetry
+    val result = CppBridgeLLM.loadModel(localPath, modelId, model.name)
     if (result != 0) {
         throw SDKError.llm("Failed to load LLM model '$modelId' (error code: $result)")
     }
@@ -827,7 +830,8 @@ actual suspend fun RunAnywhere.loadSTTModel(modelId: String) {
     val localPath = model.localPath
         ?: throw SDKError.model("Model '$modelId' is not downloaded")
 
-    val result = CppBridgeSTT.loadModel(localPath, modelId)
+    // Pass modelPath, modelId, and modelName separately for correct telemetry
+    val result = CppBridgeSTT.loadModel(localPath, modelId, model.name)
     if (result != 0) {
         throw SDKError.stt("Failed to load STT model '$modelId' (error code: $result)")
     }
