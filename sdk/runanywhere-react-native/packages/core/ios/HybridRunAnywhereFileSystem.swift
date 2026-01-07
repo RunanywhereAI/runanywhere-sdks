@@ -75,14 +75,16 @@ class HybridRunAnywhereFileSystem: HybridRunAnywhereFileSystemSpec {
         }
     }
 
-    func deleteModel(modelId: String) throws -> Promise<Void> {
+    func deleteModel(modelId: String) throws -> Promise<Bool> {
         return Promise.async {
             let modelsDir = self.getDocumentsDirectory().appendingPathComponent("runanywhere-models")
             let modelPath = modelsDir.appendingPathComponent(modelId)
 
             if self.fileManager.fileExists(atPath: modelPath.path) {
                 try self.fileManager.removeItem(at: modelPath)
+                return true
             }
+            return false
         }
     }
 
@@ -92,17 +94,19 @@ class HybridRunAnywhereFileSystem: HybridRunAnywhereFileSystemSpec {
         }
     }
 
-    func writeFile(path: String, content: String) throws -> Promise<Void> {
+    func writeFile(path: String, contents: String) throws -> Promise<Void> {
         return Promise.async {
-            try content.write(toFile: path, atomically: true, encoding: .utf8)
+            try contents.write(toFile: path, atomically: true, encoding: .utf8)
         }
     }
 
-    func deleteFile(path: String) throws -> Promise<Void> {
+    func deleteFile(path: String) throws -> Promise<Bool> {
         return Promise.async {
             if self.fileManager.fileExists(atPath: path) {
                 try self.fileManager.removeItem(atPath: path)
+                return true
             }
+            return false
         }
     }
 

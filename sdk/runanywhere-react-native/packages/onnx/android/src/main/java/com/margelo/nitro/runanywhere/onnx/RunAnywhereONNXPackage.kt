@@ -21,11 +21,12 @@ class RunAnywhereONNXPackage : BaseReactPackage() {
     companion object {
         init {
             // Load the native library which registers the HybridObject factory
+            // The library name must match CMakeLists.txt PACKAGE_NAME: "runanywhereonnx"
             try {
-                System.loadLibrary("runanywhere_onnx")
+                System.loadLibrary("runanywhereonnx")
             } catch (e: UnsatisfiedLinkError) {
                 // Native library may already be loaded or bundled differently
-                android.util.Log.e("RunAnywhereONNXPackage", "Failed to load runanywhere_onnx: ${e.message}")
+                android.util.Log.e("RunAnywhereONNXPackage", "Failed to load runanywhereonnx: ${e.message}")
             }
         }
     }

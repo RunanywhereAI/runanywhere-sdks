@@ -27,8 +27,8 @@
 #include <functional>
 #include <optional>
 
-#include "rac/core/rac_types.h"
-#include "rac/infrastructure/network/rac_http_client.h"
+#include "rac_types.h"
+#include "rac_http_client.h"
 
 namespace runanywhere {
 namespace bridges {

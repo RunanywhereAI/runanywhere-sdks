@@ -33,15 +33,15 @@
 
 // RACommons C API headers for capability methods
 // These are backend-agnostic - they work with any registered backend
-#include "rac/features/llm/rac_llm_component.h"
-#include "rac/features/llm/rac_llm_types.h"
-#include "rac/features/stt/rac_stt_component.h"
-#include "rac/features/stt/rac_stt_types.h"
-#include "rac/features/tts/rac_tts_component.h"
-#include "rac/features/tts/rac_tts_types.h"
-#include "rac/features/vad/rac_vad_component.h"
-#include "rac/features/vad/rac_vad_types.h"
-#include "rac/core/rac_types.h"
+#include "rac_llm_component.h"
+#include "rac_llm_types.h"
+#include "rac_stt_component.h"
+#include "rac_stt_types.h"
+#include "rac_tts_component.h"
+#include "rac_tts_types.h"
+#include "rac_vad_component.h"
+#include "rac_vad_types.h"
+#include "rac_types.h"
 
 #include <sstream>
 #include <chrono>
@@ -77,7 +77,14 @@ int extractIntValue(const std::string& json, const std::string& key, int default
     pos += searchKey.length();
     while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
     if (pos >= json.size()) return defaultValue;
-    return std::stoi(json.substr(pos));
+    // Skip if this is a string value (starts with quote)
+    if (json[pos] == '"') return defaultValue;
+    // Try to parse as integer, return default on failure
+    try {
+        return std::stoi(json.substr(pos));
+    } catch (...) {
+        return defaultValue;
+    }
 }
 
 std::string extractStringValue(const std::string& json, const std::string& key, const std::string& defaultValue = "") {
@@ -88,6 +95,51 @@ std::string extractStringValue(const std::string& json, const std::string& key, 
     size_t endPos = json.find("\"", pos);
     if (endPos == std::string::npos) return defaultValue;
     return json.substr(pos, endPos - pos);
+}
+
+bool extractBoolValue(const std::string& json, const std::string& key, bool defaultValue = false) {
+    std::string searchKey = "\"" + key + "\":";
+    size_t pos = json.find(searchKey);
+    if (pos == std::string::npos) return defaultValue;
+    pos += searchKey.length();
+    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
+    if (pos >= json.size()) return defaultValue;
+    if (json.substr(pos, 4) == "true") return true;
+    if (json.substr(pos, 5) == "false") return false;
+    return defaultValue;
+}
+
+// Convert TypeScript framework string to C++ enum
+rac_inference_framework_t frameworkFromString(const std::string& framework) {
+    if (framework == "LlamaCpp" || framework == "llamacpp") return RAC_FRAMEWORK_LLAMACPP;
+    if (framework == "ONNX" || framework == "onnx") return RAC_FRAMEWORK_ONNX;
+    if (framework == "FoundationModels") return RAC_FRAMEWORK_FOUNDATION_MODELS;
+    if (framework == "SystemTTS") return RAC_FRAMEWORK_SYSTEM_TTS;
+    return RAC_FRAMEWORK_UNKNOWN;
+}
+
+// Convert TypeScript category string to C++ enum
+rac_model_category_t categoryFromString(const std::string& category) {
+    if (category == "Language" || category == "language") return RAC_MODEL_CATEGORY_LANGUAGE;
+    // Handle both hyphen and underscore variants
+    if (category == "SpeechRecognition" || category == "speech-recognition" || category == "speech_recognition") return RAC_MODEL_CATEGORY_SPEECH_RECOGNITION;
+    if (category == "SpeechSynthesis" || category == "speech-synthesis" || category == "speech_synthesis") return RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS;
+    if (category == "VoiceActivity" || category == "voice-activity" || category == "voice_activity") return RAC_MODEL_CATEGORY_AUDIO;
+    if (category == "Vision" || category == "vision") return RAC_MODEL_CATEGORY_VISION;
+    if (category == "ImageGeneration" || category == "image-generation" || category == "image_generation") return RAC_MODEL_CATEGORY_IMAGE_GENERATION;
+    if (category == "Multimodal" || category == "multimodal") return RAC_MODEL_CATEGORY_MULTIMODAL;
+    if (category == "Audio" || category == "audio") return RAC_MODEL_CATEGORY_AUDIO;
+    return RAC_MODEL_CATEGORY_UNKNOWN;
+}
+
+// Convert TypeScript format string to C++ enum
+rac_model_format_t formatFromString(const std::string& format) {
+    if (format == "GGUF" || format == "gguf") return RAC_MODEL_FORMAT_GGUF;
+    if (format == "GGML" || format == "ggml") return RAC_MODEL_FORMAT_BIN;  // GGML -> BIN as fallback
+    if (format == "ONNX" || format == "onnx") return RAC_MODEL_FORMAT_ONNX;
+    if (format == "ORT" || format == "ort") return RAC_MODEL_FORMAT_ORT;
+    if (format == "BIN" || format == "bin") return RAC_MODEL_FORMAT_BIN;
+    return RAC_MODEL_FORMAT_UNKNOWN;
 }
 
 std::string jsonString(const std::string& value) {
@@ -339,23 +391,59 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getAvailableModels(
     return Promise<std::string>::async([]() -> std::string {
         auto models = ModelRegistryBridge::shared().getAllModels();
 
+        LOGI("getAvailableModels: Building JSON for %zu models", models.size());
+
         std::string result = "[";
         for (size_t i = 0; i < models.size(); i++) {
             if (i > 0) result += ",";
             const auto& m = models[i];
+            // Convert C++ enum values to TypeScript string values for compatibility
+            std::string categoryStr = "unknown";
+            switch (m.category) {
+                case RAC_MODEL_CATEGORY_LANGUAGE: categoryStr = "language"; break;
+                case RAC_MODEL_CATEGORY_SPEECH_RECOGNITION: categoryStr = "speech-recognition"; break;
+                case RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS: categoryStr = "speech-synthesis"; break;
+                case RAC_MODEL_CATEGORY_VISION: categoryStr = "vision"; break;
+                case RAC_MODEL_CATEGORY_AUDIO: categoryStr = "audio"; break;
+                case RAC_MODEL_CATEGORY_MULTIMODAL: categoryStr = "multimodal"; break;
+                default: categoryStr = "unknown"; break;
+            }
+            std::string formatStr = "unknown";
+            switch (m.format) {
+                case RAC_MODEL_FORMAT_GGUF: formatStr = "gguf"; break;
+                case RAC_MODEL_FORMAT_ONNX: formatStr = "onnx"; break;
+                case RAC_MODEL_FORMAT_ORT: formatStr = "ort"; break;
+                case RAC_MODEL_FORMAT_BIN: formatStr = "bin"; break;
+                default: formatStr = "unknown"; break;
+            }
+            std::string frameworkStr = "unknown";
+            switch (m.framework) {
+                case RAC_FRAMEWORK_LLAMACPP: frameworkStr = "LlamaCpp"; break;
+                case RAC_FRAMEWORK_ONNX: frameworkStr = "ONNX"; break;
+                case RAC_FRAMEWORK_FOUNDATION_MODELS: frameworkStr = "FoundationModels"; break;
+                case RAC_FRAMEWORK_SYSTEM_TTS: frameworkStr = "SystemTTS"; break;
+                default: frameworkStr = "unknown"; break;
+            }
+
             result += buildJsonObject({
                 {"id", jsonString(m.id)},
                 {"name", jsonString(m.name)},
                 {"localPath", jsonString(m.localPath)},
-                {"downloadUrl", jsonString(m.downloadUrl)},
-                {"category", std::to_string(static_cast<int>(m.category))},
-                {"format", std::to_string(static_cast<int>(m.format))},
-                {"framework", std::to_string(static_cast<int>(m.framework))},
+                {"downloadURL", jsonString(m.downloadUrl)},  // TypeScript uses capital U
+                {"category", jsonString(categoryStr)},       // String for TypeScript
+                {"format", jsonString(formatStr)},           // String for TypeScript
+                {"preferredFramework", jsonString(frameworkStr)}, // String for TypeScript
                 {"downloadSize", std::to_string(m.downloadSize)},
-                {"isDownloaded", m.isDownloaded ? "true" : "false"}
+                {"memoryRequired", std::to_string(m.memoryRequired)},
+                {"supportsThinking", m.supportsThinking ? "true" : "false"},
+                {"isDownloaded", m.isDownloaded ? "true" : "false"},
+                {"isAvailable", "true"}  // Models in registry are available
             });
         }
         result += "]";
+
+        LOGD("getAvailableModels: JSON length=%zu", result.length());
+
         return result;
     });
 }
@@ -405,20 +493,65 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getModelPath(
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::registerModel(
     const std::string& modelJson) {
     return Promise<bool>::async([modelJson]() -> bool {
+        LOGI("Registering model from JSON: %.200s", modelJson.c_str());
+
         ModelInfo model;
         model.id = extractStringValue(modelJson, "id");
         model.name = extractStringValue(modelJson, "name");
         model.description = extractStringValue(modelJson, "description");
         model.localPath = extractStringValue(modelJson, "localPath");
-        model.downloadUrl = extractStringValue(modelJson, "downloadUrl");
+
+        // Support both TypeScript naming (downloadURL) and C++ naming (downloadUrl)
+        model.downloadUrl = extractStringValue(modelJson, "downloadURL");
+        if (model.downloadUrl.empty()) {
+            model.downloadUrl = extractStringValue(modelJson, "downloadUrl");
+        }
+
         model.downloadSize = extractIntValue(modelJson, "downloadSize", 0);
         model.memoryRequired = extractIntValue(modelJson, "memoryRequired", 0);
         model.contextLength = extractIntValue(modelJson, "contextLength", 0);
-        model.category = static_cast<rac_model_category_t>(extractIntValue(modelJson, "category", RAC_MODEL_CATEGORY_UNKNOWN));
-        model.format = static_cast<rac_model_format_t>(extractIntValue(modelJson, "format", RAC_MODEL_FORMAT_UNKNOWN));
-        model.framework = static_cast<rac_inference_framework_t>(extractIntValue(modelJson, "framework", RAC_FRAMEWORK_UNKNOWN));
+        model.supportsThinking = extractBoolValue(modelJson, "supportsThinking", false);
+
+        // Handle category - could be string (TypeScript) or int
+        std::string categoryStr = extractStringValue(modelJson, "category");
+        if (!categoryStr.empty()) {
+            model.category = categoryFromString(categoryStr);
+        } else {
+            model.category = static_cast<rac_model_category_t>(extractIntValue(modelJson, "category", RAC_MODEL_CATEGORY_UNKNOWN));
+        }
+
+        // Handle format - could be string (TypeScript) or int
+        std::string formatStr = extractStringValue(modelJson, "format");
+        if (!formatStr.empty()) {
+            model.format = formatFromString(formatStr);
+        } else {
+            model.format = static_cast<rac_model_format_t>(extractIntValue(modelJson, "format", RAC_MODEL_FORMAT_UNKNOWN));
+        }
+
+        // Handle framework - prefer string extraction for TypeScript compatibility
+        std::string frameworkStr = extractStringValue(modelJson, "preferredFramework");
+        if (!frameworkStr.empty()) {
+            model.framework = frameworkFromString(frameworkStr);
+        } else {
+            frameworkStr = extractStringValue(modelJson, "framework");
+            if (!frameworkStr.empty()) {
+                model.framework = frameworkFromString(frameworkStr);
+            } else {
+                model.framework = static_cast<rac_inference_framework_t>(extractIntValue(modelJson, "preferredFramework", RAC_FRAMEWORK_UNKNOWN));
+            }
+        }
+
+        LOGI("Registering model: id=%s, name=%s, framework=%d, category=%d",
+             model.id.c_str(), model.name.c_str(), model.framework, model.category);
 
         rac_result_t result = ModelRegistryBridge::shared().addModel(model);
+
+        if (result == RAC_SUCCESS) {
+            LOGI("✅ Model registered successfully: %s", model.id.c_str());
+        } else {
+            LOGE("❌ Model registration failed: %s, result=%d", model.id.c_str(), result);
+        }
+
         return result == RAC_SUCCESS;
     });
 }
