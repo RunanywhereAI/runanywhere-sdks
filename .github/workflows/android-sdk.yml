@@ -1,0 +1,108 @@
+name: Android SDK CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'sdk/runanywhere-kotlin/**'
+      - '.github/workflows/android-sdk.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'sdk/runanywhere-kotlin/**'
+      - '.github/workflows/android-sdk.yml'
+
+jobs:
+  lint-and-build:
+    name: Lint, Test and Build Android SDK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./sdk/runanywhere-kotlin/gradlew
+
+      - name: Run Detekt
+        working-directory: ./sdk/runanywhere-kotlin
+        run: ./gradlew detekt --no-daemon
+
+      - name: Run Android Lint
+        working-directory: ./sdk/runanywhere-kotlin
+        run: ./gradlew lint --no-daemon
+
+      - name: Build JVM target
+        working-directory: ./sdk/runanywhere-kotlin
+        run: ./gradlew jvmJar --no-daemon
+
+      - name: Build Android target
+        working-directory: ./sdk/runanywhere-kotlin
+        run: ./gradlew assemble --no-daemon
+
+      - name: Run JVM tests
+        working-directory: ./sdk/runanywhere-kotlin
+        run: ./gradlew jvmTest --no-daemon
+
+      - name: Run Android unit tests
+        working-directory: ./sdk/runanywhere-kotlin
+        run: ./gradlew testDebugUnitTest --no-daemon
+
+      - name: Generate code coverage (JaCoCo)
+        working-directory: ./sdk/runanywhere-kotlin
+        run: ./gradlew jacocoTestReport --no-daemon
+        continue-on-error: true
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          file: ./sdk/runanywhere-kotlin/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml
+          flags: android-sdk
+          name: android-sdk-coverage
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload lint results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-sdk-lint-results
+          path: sdk/runanywhere-kotlin/build/reports/lint-results-*.html
+
+      - name: Upload Detekt results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-sdk-detekt-results
+          path: sdk/runanywhere-kotlin/build/reports/detekt/
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-sdk-test-results
+          path: sdk/runanywhere-kotlin/build/test-results/
+
+      - name: Upload code coverage reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-sdk-coverage-reports
+          path: sdk/runanywhere-kotlin/build/reports/jacoco/
