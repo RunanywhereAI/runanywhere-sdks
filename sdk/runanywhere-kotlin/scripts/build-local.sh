@@ -275,11 +275,21 @@ if [ "${SKIP_CORE}" = "false" ]; then
     fi
 
     export ANDROID_NDK_HOME="${ANDROID_NDK_HOME}"
+    # ABIS is set earlier in the script (defaults to "arm64-v8a", supports multiple like "arm64-v8a,x86_64")
     export ABIS="${ABIS}"
 
-    # Pass backends as first argument to build.sh (e.g., "llamacpp,onnx")
-    # The core build.sh takes: backends abis (defaults to "all" if not specified)
-    ${CORE_BUILD_SCRIPT} "${BACKENDS}" "${ABIS}"
+    # Build backend list for the core build script (positional arg format)
+    # WhisperCPP is explicitly excluded - we only support llamacpp and onnx
+    CORE_BACKENDS=""
+    if [[ "${BACKENDS}" == *"llamacpp"* ]] && [[ "${BACKENDS}" == *"onnx"* ]]; then
+        CORE_BACKENDS="llamacpp,onnx"
+    elif [[ "${BACKENDS}" == *"llamacpp"* ]]; then
+        CORE_BACKENDS="llamacpp"
+    elif [[ "${BACKENDS}" == *"onnx"* ]]; then
+        CORE_BACKENDS="onnx"
+    fi
+
+    ${CORE_BUILD_SCRIPT} "${CORE_BACKENDS}" "${ABIS}"
 
     print_success "runanywhere-core built successfully"
 else
