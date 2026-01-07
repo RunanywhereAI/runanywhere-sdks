@@ -297,11 +297,10 @@ object CppBridgeTelemetry {
 
     /**
      * Get the effective base URL for the current environment.
-     * Checks multiple sources in order of priority:
-     * 1. Explicitly configured _baseUrl (via setBaseUrl)
-     * 2. SDKConstants.TELEMETRY_URL (from SDK config)
-     * 3. C++ dev config Supabase URL (for development mode)
-     * 4. Environment-specific defaults
+     * 
+     * Priority by environment:
+     * - DEVELOPMENT (env=0): Always use Supabase URL from C++ dev config (ignores _baseUrl)
+     * - STAGING/PRODUCTION: Use _baseUrl if available, otherwise environment defaults
      */
     private fun getEffectiveBaseUrl(environment: Int): String {
         CppBridgePlatformAdapter.logCallback(
@@ -310,38 +309,8 @@ object CppBridgeTelemetry {
             "🔍 getEffectiveBaseUrl: env=$environment, _baseUrl=$_baseUrl"
         )
 
-        // 1. Use explicitly configured _baseUrl if available
-        _baseUrl?.let {
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                TAG,
-                "Using explicitly configured _baseUrl: $it"
-            )
-            return it
-        }
-
-        // 2. Try SDKConstants.TELEMETRY_URL from SDK config
-        try {
-            val sdkTelemetryUrl = com.runanywhere.sdk.utils.SDKConstants.TELEMETRY_URL
-            if (sdkTelemetryUrl.isNotEmpty()) {
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.DEBUG,
-                    TAG,
-                    "Using telemetry URL from SDKConstants: $sdkTelemetryUrl"
-                )
-                return sdkTelemetryUrl
-            }
-        } catch (e: Exception) {
-            // SDKConstants might not be initialized yet
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                TAG,
-                "SDKConstants.TELEMETRY_URL not available: ${e.message}"
-            )
-        }
-
-        // 3. For development mode, try to get Supabase URL from C++ dev config
-        // This mirrors Swift SDK's CppBridge.DevConfig.supabaseURL behavior
+        // DEVELOPMENT mode: Always use Supabase from C++ dev config, ignore any passed baseUrl
+        // This ensures telemetry always goes to Supabase in dev mode regardless of what app passes
         if (environment == 0) { // DEVELOPMENT
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
@@ -376,9 +345,19 @@ object CppBridgeTelemetry {
                     "❌ Failed to get Supabase URL from dev config: ${e.message}"
                 )
             }
+        } else {
+            // STAGING/PRODUCTION: Use explicitly configured _baseUrl if available
+            _baseUrl?.let {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.DEBUG,
+                    TAG,
+                    "Using explicitly configured _baseUrl for env=$environment: $it"
+                )
+                return it
+            }
         }
 
-        // 4. Environment-specific defaults
+        // Environment-specific defaults (fallback)
         // Note: Production URL should be provided via configuration, not hardcoded
         return when (environment) {
             0 -> {
@@ -386,7 +365,8 @@ object CppBridgeTelemetry {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "⚠️ Development mode but Supabase URL not configured. Set via SDK config, setBaseUrl(), or dev_config."
+                    "⚠️ Development mode but Supabase URL not configured in C++ dev_config. " +
+                    "Please fill in development_config.cpp with your Supabase credentials."
                 )
                 "" // Return empty to indicate not configured
             }

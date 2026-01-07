@@ -121,12 +121,11 @@ class RunAnywhereApplication : Application() {
         // Try to initialize SDK - log failures but continue regardless
         try {
             if (environment == SDKEnvironment.DEVELOPMENT) {
+                // DEVELOPMENT mode: Don't pass baseURL - SDK uses Supabase URL from C++ dev config
                 RunAnywhere.initialize(
-                    apiKey = "dev",
-                    baseURL = "localhost",
                     environment = SDKEnvironment.DEVELOPMENT,
                 )
-                Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode")
+                Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode (using Supabase from dev config)")
             } else {
                 // PRODUCTION mode - requires valid API key and base URL
                 // These should be provided via BuildConfig or secure configuration
@@ -134,8 +133,6 @@ class RunAnywhereApplication : Application() {
                 Log.w("RunAnywhereApp", "⚠️ PRODUCTION mode requires API key configuration")
                 Log.w("RunAnywhereApp", "   Falling back to DEVELOPMENT mode")
                 RunAnywhere.initialize(
-                    apiKey = "dev",
-                    baseURL = "localhost",
                     environment = SDKEnvironment.DEVELOPMENT,
                 )
                 Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode (production config not set)")
@@ -154,9 +151,8 @@ class RunAnywhereApplication : Application() {
 
             // Fall back to development mode
             try {
+                // Don't pass baseURL - SDK uses Supabase URL from C++ dev config
                 RunAnywhere.initialize(
-                    apiKey = "offline",
-                    baseURL = "localhost",
                     environment = SDKEnvironment.DEVELOPMENT,
                 )
                 Log.i("RunAnywhereApp", "✅ SDK initialized in OFFLINE mode (local models only)")
