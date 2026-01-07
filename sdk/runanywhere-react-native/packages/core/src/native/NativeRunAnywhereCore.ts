@@ -81,14 +81,141 @@ export function isNativeModuleAvailable(): boolean {
 }
 
 /**
- * Device info module stub - returns empty device info
- * @deprecated Device info is now available via native.getDeviceCapabilities()
+ * Device info module interface
  */
-export function requireDeviceInfoModule(): Record<string, unknown> {
+export interface DeviceInfoModule {
+  deviceId: string;
+  getDeviceIdSync: () => string;
+  uniqueId: string;
+  getDeviceModel: () => Promise<string>;
+  getChipName: () => Promise<string>;
+  getTotalRAM: () => Promise<number>;
+  getAvailableRAM: () => Promise<number>;
+  hasNPU: () => Promise<boolean>;
+  getOSVersion: () => Promise<string>;
+  hasGPU: () => Promise<boolean>;
+  getCPUCores: () => Promise<number>;
+}
+
+/**
+ * Device info module - provides device information
+ *
+ * Note: Full device info requires platform-specific APIs.
+ * This provides basic info from native.getDeviceCapabilities() and
+ * platform defaults for values not yet implemented in C++.
+ */
+export function requireDeviceInfoModule(): DeviceInfoModule {
+  const native = isNativeCoreModuleAvailable() ? getNativeCoreModule() : null;
+
   return {
     deviceId: '',
     getDeviceIdSync: () => '',
     uniqueId: '',
+
+    getDeviceModel: async () => {
+      // Try to get from native capabilities
+      if (native) {
+        try {
+          const capsJson = await native.getDeviceCapabilities();
+          const caps = JSON.parse(capsJson);
+          return caps.device_model || caps.platform || 'Unknown Device';
+        } catch {
+          // Fallback
+        }
+      }
+      return 'Unknown Device';
+    },
+
+    getChipName: async () => {
+      if (native) {
+        try {
+          const capsJson = await native.getDeviceCapabilities();
+          const caps = JSON.parse(capsJson);
+          return caps.chip_name || caps.processor || 'Unknown';
+        } catch {
+          // Fallback
+        }
+      }
+      return 'Unknown';
+    },
+
+    getTotalRAM: async () => {
+      if (native) {
+        try {
+          const capsJson = await native.getDeviceCapabilities();
+          const caps = JSON.parse(capsJson);
+          return caps.total_memory || 0;
+        } catch {
+          // Fallback
+        }
+      }
+      return 0;
+    },
+
+    getAvailableRAM: async () => {
+      if (native) {
+        try {
+          const capsJson = await native.getDeviceCapabilities();
+          const caps = JSON.parse(capsJson);
+          return caps.available_memory || 0;
+        } catch {
+          // Fallback
+        }
+      }
+      return 0;
+    },
+
+    hasNPU: async () => {
+      if (native) {
+        try {
+          const capsJson = await native.getDeviceCapabilities();
+          const caps = JSON.parse(capsJson);
+          return caps.has_npu || caps.supports_metal || false;
+        } catch {
+          // Fallback
+        }
+      }
+      return false;
+    },
+
+    getOSVersion: async () => {
+      if (native) {
+        try {
+          const capsJson = await native.getDeviceCapabilities();
+          const caps = JSON.parse(capsJson);
+          return caps.os_version || caps.platform || 'Unknown';
+        } catch {
+          // Fallback
+        }
+      }
+      return 'Unknown';
+    },
+
+    hasGPU: async () => {
+      if (native) {
+        try {
+          const capsJson = await native.getDeviceCapabilities();
+          const caps = JSON.parse(capsJson);
+          return caps.has_gpu || caps.supports_vulkan || caps.supports_metal || false;
+        } catch {
+          // Fallback
+        }
+      }
+      return false;
+    },
+
+    getCPUCores: async () => {
+      if (native) {
+        try {
+          const capsJson = await native.getDeviceCapabilities();
+          const caps = JSON.parse(capsJson);
+          return caps.cpu_cores || caps.core_count || 0;
+        } catch {
+          // Fallback
+        }
+      }
+      return 0;
+    },
   };
 }
 

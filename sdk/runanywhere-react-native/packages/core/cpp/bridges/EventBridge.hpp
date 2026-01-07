@@ -16,8 +16,8 @@
 #include <vector>
 #include <cstdint>
 
-#include "rac/core/rac_types.h"
-#include "rac/infrastructure/events/rac_events.h"
+#include "rac_types.h"
+#include "rac_events.h"
 
 namespace runanywhere {
 namespace bridges {

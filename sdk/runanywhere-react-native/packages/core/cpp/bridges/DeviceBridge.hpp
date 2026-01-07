@@ -13,9 +13,9 @@
 #include <string>
 #include <functional>
 
-#include "rac/core/rac_types.h"
-#include "rac/infrastructure/device/rac_device_manager.h"
-#include "rac/infrastructure/network/rac_environment.h"
+#include "rac_types.h"
+#include "rac_device_manager.h"
+#include "rac_environment.h"
 
 namespace runanywhere {
 namespace bridges {

@@ -15,11 +15,11 @@
 #include <memory>
 
 // RACommons headers
-#include "rac/core/rac_core.h"
-#include "rac/core/rac_types.h"
-#include "rac/core/rac_platform_adapter.h"
-#include "rac/core/rac_sdk_state.h"
-#include "rac/infrastructure/network/rac_environment.h"
+#include "rac_core.h"
+#include "rac_types.h"
+#include "rac_platform_adapter.h"
+#include "rac_sdk_state.h"
+#include "rac_environment.h"
 
 namespace runanywhere {
 namespace bridges {

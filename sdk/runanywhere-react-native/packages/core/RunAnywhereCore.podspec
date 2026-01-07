@@ -103,13 +103,13 @@ Pod::Spec.new do |s|
     "HEADER_SEARCH_PATHS" => [
       "$(PODS_TARGET_SRCROOT)/cpp",
       "$(PODS_TARGET_SRCROOT)/cpp/bridges",
-      "$(PODS_TARGET_SRCROOT)/ios/Frameworks/RACommons.xcframework/ios-arm64/Headers",
-      "$(PODS_TARGET_SRCROOT)/ios/Frameworks/RACommons.xcframework/ios-arm64_x86_64-simulator/Headers",
-      "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64/Headers",
-      "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64_x86_64-simulator/Headers",
+      "$(PODS_TARGET_SRCROOT)/ios/Frameworks/RACommons.xcframework/ios-arm64/RACommons.framework/Headers",
+      "$(PODS_TARGET_SRCROOT)/ios/Frameworks/RACommons.xcframework/ios-arm64_x86_64-simulator/RACommons.framework/Headers",
+      "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64/RACommons.framework/Headers",
+      "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64_x86_64-simulator/RACommons.framework/Headers",
       "$(PODS_ROOT)/Headers/Public",
     ].join(" "),
-    "GCC_PREPROCESSOR_DEFINITIONS" => "$(inherited)",
+    "GCC_PREPROCESSOR_DEFINITIONS" => "$(inherited) HAS_RACOMMONS=1",
     "DEFINES_MODULE" => "YES",
     "SWIFT_OBJC_INTEROP_MODE" => "objcxx",
   }

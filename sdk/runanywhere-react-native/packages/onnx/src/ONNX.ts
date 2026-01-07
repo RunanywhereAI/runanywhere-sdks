@@ -139,12 +139,12 @@ export const ONNX = {
    * Matches iOS: static func addModel(id:name:url:modality:artifactType:memoryRequirement:)
    *
    * @param options - Model registration options
-   * @returns The created ModelInfo
+   * @returns Promise resolving to the created ModelInfo
    *
    * @example
    * ```typescript
    * // STT Model
-   * ONNX.addModel({
+   * await ONNX.addModel({
    *   id: 'sherpa-onnx-whisper-small.en',
    *   name: 'Sherpa Whisper Small (ONNX)',
    *   url: 'https://github.com/k2-fsa/sherpa-onnx/releases/.../sherpa-onnx-whisper-small.en.tar.bz2',
@@ -154,7 +154,7 @@ export const ONNX = {
    * });
    * ```
    */
-  addModel(options: ONNXModelOptions): ModelInfo {
+  async addModel(options: ONNXModelOptions): Promise<ModelInfo> {
     // Generate stable ID from URL if not provided
     const modelId = options.id ?? this._generateModelId(options.url);
 
@@ -187,8 +187,8 @@ export const ONNX = {
       isAvailable: true,
     };
 
-    // Register with ModelRegistry (synchronous - queues async registration)
-    ModelRegistry.registerModel(modelInfo);
+    // Register with ModelRegistry and wait for completion
+    await ModelRegistry.registerModel(modelInfo);
 
     log.info(`Added model: ${modelId} (${options.name})`);
 

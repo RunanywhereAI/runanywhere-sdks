@@ -6,6 +6,7 @@
  */
 
 #include "ModelRegistryBridge.hpp"
+#include "rac_core.h"  // For rac_get_model_registry()
 #include <cstring>
 
 // Platform-specific logging
@@ -40,24 +41,25 @@ rac_result_t ModelRegistryBridge::initialize() {
         return RAC_SUCCESS;
     }
 
-    rac_result_t result = rac_model_registry_create(&handle_);
+    // Use the GLOBAL model registry (same as Swift SDK)
+    // This ensures models registered by backends are visible to the SDK
+    handle_ = rac_get_model_registry();
 
-    if (result == RAC_SUCCESS) {
-        LOGI("Model registry created successfully");
+    if (handle_) {
+        LOGI("Using global C++ model registry");
+        return RAC_SUCCESS;
     } else {
-        LOGE("Failed to create model registry: %d", result);
-        handle_ = nullptr;
+        LOGE("Failed to get global model registry");
+        return RAC_ERROR_NOT_INITIALIZED;
     }
-
-    return result;
 }
 
 void ModelRegistryBridge::shutdown() {
-    if (handle_) {
-        rac_model_registry_destroy(handle_);
-        handle_ = nullptr;
-        LOGI("Model registry destroyed");
-    }
+    // NOTE: We're using the GLOBAL registry - DO NOT clear the handle
+    // The global registry persists for the lifetime of the app
+    // Just log that shutdown was called, but don't actually release the handle
+    LOGI("Model registry shutdown called (global registry handle retained)");
+    // DO NOT: handle_ = nullptr;
 }
 
 ModelInfo ModelRegistryBridge::fromRac(const rac_model_info_t& cModel) {
@@ -208,25 +210,34 @@ std::vector<ModelInfo> ModelRegistryBridge::getAllModels() {
     std::vector<ModelInfo> models;
 
     if (!handle_) {
+        LOGE("getAllModels: Registry not initialized!");
         return models;
     }
 
     rac_model_info_t** cModels = nullptr;
     size_t count = 0;
 
+    LOGD("getAllModels: Calling rac_model_registry_get_all with handle=%p", handle_);
+
     rac_result_t result = rac_model_registry_get_all(handle_, &cModels, &count);
 
+    LOGI("getAllModels: result=%d, count=%zu", result, count);
+
     if (result != RAC_SUCCESS || !cModels) {
+        LOGE("getAllModels: Failed with result=%d, cModels=%p", result, (void*)cModels);
         return models;
     }
 
     for (size_t i = 0; i < count; i++) {
         if (cModels[i]) {
             models.push_back(fromRac(*cModels[i]));
+            LOGD("getAllModels: Added model %s", cModels[i]->id);
         }
     }
 
     rac_model_info_array_free(cModels, count);
+
+    LOGI("getAllModels: Returning %zu models", models.size());
 
     return models;
 }

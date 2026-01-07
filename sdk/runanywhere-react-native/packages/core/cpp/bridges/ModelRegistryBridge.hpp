@@ -16,9 +16,9 @@
 #include <optional>
 #include <cstdint>
 
-#include "rac/core/rac_types.h"
-#include "rac/infrastructure/model_management/rac_model_registry.h"
-#include "rac/infrastructure/model_management/rac_model_types.h"
+#include "rac_types.h"
+#include "rac_model_registry.h"
+#include "rac_model_types.h"
 
 namespace runanywhere {
 namespace bridges {

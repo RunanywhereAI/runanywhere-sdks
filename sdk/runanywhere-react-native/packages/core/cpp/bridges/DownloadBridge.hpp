@@ -17,8 +17,8 @@
 #include <unordered_map>
 #include <cstdint>
 
-#include "rac/core/rac_types.h"
-#include "rac/infrastructure/download/rac_download.h"
+#include "rac_types.h"
+#include "rac_download.h"
 
 namespace runanywhere {
 namespace bridges {

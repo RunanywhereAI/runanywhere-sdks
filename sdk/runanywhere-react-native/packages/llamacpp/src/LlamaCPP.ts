@@ -111,11 +111,11 @@ export const LlamaCPP = {
    * Matches iOS: static func addModel(id:name:url:modality:memoryRequirement:supportsThinking:)
    *
    * @param options - Model registration options
-   * @returns The created ModelInfo
+   * @returns Promise resolving to the created ModelInfo
    *
    * @example
    * ```typescript
-   * LlamaCPP.addModel({
+   * await LlamaCPP.addModel({
    *   id: 'llama-2-7b-chat-q4_k_m',
    *   name: 'Llama 2 7B Chat Q4_K_M',
    *   url: 'https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf',
@@ -123,7 +123,7 @@ export const LlamaCPP = {
    * });
    * ```
    */
-  addModel(options: LlamaCPPModelOptions): ModelInfo {
+  async addModel(options: LlamaCPPModelOptions): Promise<ModelInfo> {
     // Generate stable ID from URL if not provided
     const modelId = options.id ?? this._generateModelId(options.url);
 
@@ -159,8 +159,8 @@ export const LlamaCPP = {
       isAvailable: true,
     };
 
-    // Register with ModelRegistry (synchronous - queues async registration)
-    ModelRegistry.registerModel(modelInfo);
+    // Register with ModelRegistry and wait for completion
+    await ModelRegistry.registerModel(modelInfo);
 
     log.info(`Added model: ${modelId} (${options.name})`);
 

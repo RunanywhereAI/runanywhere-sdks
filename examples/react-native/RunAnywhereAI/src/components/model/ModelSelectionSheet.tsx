@@ -335,7 +335,13 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     }
   }, [context]);
 
-  // Load data when visible
+  // Load data when visible or on mount
+  // This ensures models are loaded even if the sheet renders before becoming visible
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Reload data when visibility changes to ensure fresh data
   useEffect(() => {
     if (visible) {
       loadData();

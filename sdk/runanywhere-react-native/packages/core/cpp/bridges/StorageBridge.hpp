@@ -16,9 +16,9 @@
 #include <functional>
 #include <cstdint>
 
-#include "rac/core/rac_types.h"
-#include "rac/infrastructure/storage/rac_storage_analyzer.h"
-#include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "rac_types.h"
+#include "rac_storage_analyzer.h"
+#include "rac_model_registry.h"
 
 namespace runanywhere {
 namespace bridges {

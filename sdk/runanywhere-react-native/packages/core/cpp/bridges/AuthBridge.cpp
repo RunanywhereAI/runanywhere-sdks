@@ -10,7 +10,7 @@
  */
 
 #include "AuthBridge.hpp"
-#include "rac/core/rac_error.h"
+#include "rac_error.h"
 #include <stdexcept>
 
 // Platform-specific logging
