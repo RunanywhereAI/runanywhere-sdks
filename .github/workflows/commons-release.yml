@@ -69,12 +69,78 @@ jobs:
 
       - name: Setup Development Config
         working-directory: ${{ env.COMMONS_DIR }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          BUILD_TOKEN: ${{ secrets.BUILD_TOKEN }}
         run: |
-          # Create development_config.cpp from template (gitignored)
-          if [ -f src/infrastructure/network/development_config.cpp.template ]; then
-            cp src/infrastructure/network/development_config.cpp.template \
-               src/infrastructure/network/development_config.cpp
-          fi
+          # Generate development_config.cpp with real credentials from secrets
+          cat > src/infrastructure/network/development_config.cpp << 'DEVCONFIG_EOF'
+          /**
+           * @file development_config.cpp
+           * @brief Development mode configuration with credentials from CI secrets
+           */
+
+          #include <cstring>
+
+          #include "rac/core/rac_logger.h"
+          #include "rac/infrastructure/network/rac_dev_config.h"
+
+          namespace {
+
+          DEVCONFIG_EOF
+
+          # Inject secrets (avoiding heredoc variable expansion issues)
+          echo "constexpr const char* SUPABASE_URL = \"${SUPABASE_URL}\";" >> src/infrastructure/network/development_config.cpp
+          echo "constexpr const char* SUPABASE_ANON_KEY = \"${SUPABASE_ANON_KEY}\";" >> src/infrastructure/network/development_config.cpp
+          echo "constexpr const char* BUILD_TOKEN = \"${BUILD_TOKEN:-bt_release_build}\";" >> src/infrastructure/network/development_config.cpp
+          echo "constexpr const char* SENTRY_DSN = nullptr;" >> src/infrastructure/network/development_config.cpp
+
+          cat >> src/infrastructure/network/development_config.cpp << 'DEVCONFIG_EOF'
+
+          }  // anonymous namespace
+
+          extern "C" {
+
+          bool rac_dev_config_is_available(void) {
+              if (SUPABASE_URL == nullptr || SUPABASE_ANON_KEY == nullptr) return false;
+              if (std::strlen(SUPABASE_URL) == 0 || std::strlen(SUPABASE_ANON_KEY) == 0) return false;
+              if (std::strstr(SUPABASE_URL, "YOUR_") != nullptr) return false;
+              if (std::strstr(SUPABASE_ANON_KEY, "YOUR_") != nullptr) return false;
+              return true;
+          }
+
+          const char* rac_dev_config_get_supabase_url(void) {
+              return SUPABASE_URL;
+          }
+
+          const char* rac_dev_config_get_supabase_key(void) {
+              return SUPABASE_ANON_KEY;
+          }
+
+          const char* rac_dev_config_get_build_token(void) {
+              return BUILD_TOKEN;
+          }
+
+          const char* rac_dev_config_get_sentry_dsn(void) {
+              return SENTRY_DSN;
+          }
+
+          bool rac_dev_config_has_supabase(void) {
+              return rac_dev_config_is_available();
+          }
+
+          bool rac_dev_config_has_build_token(void) {
+              return BUILD_TOKEN != nullptr && std::strlen(BUILD_TOKEN) > 0;
+          }
+
+          }  // extern "C"
+          DEVCONFIG_EOF
+
+          echo "=== Generated development_config.cpp ==="
+          head -30 src/infrastructure/network/development_config.cpp
+          echo "..."
+          echo "(credentials redacted)"
 
       - name: Build RACommons XCFramework
         working-directory: ${{ env.COMMONS_DIR }}
@@ -144,6 +210,78 @@ jobs:
           NDK_VERSION="27.0.12077973"
           echo "y" | sdkmanager --install "ndk;${NDK_VERSION}" --sdk_root=${ANDROID_SDK_ROOT}
           echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> $GITHUB_ENV
+
+      - name: Setup Development Config
+        working-directory: ${{ env.COMMONS_DIR }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          BUILD_TOKEN: ${{ secrets.BUILD_TOKEN }}
+        run: |
+          # Generate development_config.cpp with real credentials from secrets
+          cat > src/infrastructure/network/development_config.cpp << 'DEVCONFIG_EOF'
+          /**
+           * @file development_config.cpp
+           * @brief Development mode configuration with credentials from CI secrets
+           */
+
+          #include <cstring>
+
+          #include "rac/core/rac_logger.h"
+          #include "rac/infrastructure/network/rac_dev_config.h"
+
+          namespace {
+
+          DEVCONFIG_EOF
+
+          # Inject secrets
+          echo "constexpr const char* SUPABASE_URL = \"${SUPABASE_URL}\";" >> src/infrastructure/network/development_config.cpp
+          echo "constexpr const char* SUPABASE_ANON_KEY = \"${SUPABASE_ANON_KEY}\";" >> src/infrastructure/network/development_config.cpp
+          echo "constexpr const char* BUILD_TOKEN = \"${BUILD_TOKEN:-bt_release_build}\";" >> src/infrastructure/network/development_config.cpp
+          echo "constexpr const char* SENTRY_DSN = nullptr;" >> src/infrastructure/network/development_config.cpp
+
+          cat >> src/infrastructure/network/development_config.cpp << 'DEVCONFIG_EOF'
+
+          }  // anonymous namespace
+
+          extern "C" {
+
+          bool rac_dev_config_is_available(void) {
+              if (SUPABASE_URL == nullptr || SUPABASE_ANON_KEY == nullptr) return false;
+              if (std::strlen(SUPABASE_URL) == 0 || std::strlen(SUPABASE_ANON_KEY) == 0) return false;
+              if (std::strstr(SUPABASE_URL, "YOUR_") != nullptr) return false;
+              if (std::strstr(SUPABASE_ANON_KEY, "YOUR_") != nullptr) return false;
+              return true;
+          }
+
+          const char* rac_dev_config_get_supabase_url(void) {
+              return SUPABASE_URL;
+          }
+
+          const char* rac_dev_config_get_supabase_key(void) {
+              return SUPABASE_ANON_KEY;
+          }
+
+          const char* rac_dev_config_get_build_token(void) {
+              return BUILD_TOKEN;
+          }
+
+          const char* rac_dev_config_get_sentry_dsn(void) {
+              return SENTRY_DSN;
+          }
+
+          bool rac_dev_config_has_supabase(void) {
+              return rac_dev_config_is_available();
+          }
+
+          bool rac_dev_config_has_build_token(void) {
+              return BUILD_TOKEN != nullptr && std::strlen(BUILD_TOKEN) > 0;
+          }
+
+          }  // extern "C"
+          DEVCONFIG_EOF
+
+          echo "=== Generated development_config.cpp for Android ==="
 
       - name: Build Android ${{ matrix.abi }}
         working-directory: ${{ env.COMMONS_DIR }}
