@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -57,6 +58,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     var showApiKeyDialog by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf<StoredModel?>(null) }
+    val uriHandler = LocalUriHandler.current
 
     Column(
         modifier = Modifier
@@ -324,8 +326,9 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
-                        // TODO: Open documentation URL
-                        // iOS equivalent: Link(destination: URL(string: "https://docs.runanywhere.ai")!)
+                        // TODO: Update to Android-specific documentation when available
+                        // Currently links to general SDK docs (Swift-focused) as placeholder
+                        uriHandler.openUri("https://docs.runanywhere.ai")
                     }
                     .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
