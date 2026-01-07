@@ -556,7 +556,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
             </Text>
           </View>
 
-          {deviceInfo.cpuCores && (
+          {deviceInfo.cpuCores != null && deviceInfo.cpuCores > 0 && (
             <View style={styles.infoRow}>
               <View style={styles.infoLabel}>
                 <Icon
