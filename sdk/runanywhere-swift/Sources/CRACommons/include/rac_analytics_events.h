@@ -154,6 +154,8 @@ typedef struct rac_analytics_llm_generation {
     const char* generation_id;
     /** Model ID used for generation */
     const char* model_id;
+    /** Human-readable model name */
+    const char* model_name;
     /** Number of input/prompt tokens */
     int32_t input_tokens;
     /** Number of output/completion tokens */
@@ -187,6 +189,8 @@ typedef struct rac_analytics_llm_generation {
 typedef struct rac_analytics_llm_model {
     /** Model ID */
     const char* model_id;
+    /** Human-readable model name */
+    const char* model_name;
     /** Model size in bytes (0 if unknown) */
     int64_t model_size_bytes;
     /** Load duration in milliseconds (for completed event) */
@@ -208,6 +212,8 @@ typedef struct rac_analytics_stt_transcription {
     const char* transcription_id;
     /** Model ID used */
     const char* model_id;
+    /** Human-readable model name */
+    const char* model_name;
     /** Transcribed text (for completed event) */
     const char* text;
     /** Confidence score (0.0 - 1.0) */
@@ -245,6 +251,8 @@ typedef struct rac_analytics_tts_synthesis {
     const char* synthesis_id;
     /** Voice/Model ID used */
     const char* model_id;
+    /** Human-readable voice/model name */
+    const char* model_name;
     /** Character count of input text */
     int32_t character_count;
     /** Audio duration in milliseconds */
@@ -510,6 +518,7 @@ RAC_API rac_bool_t rac_analytics_events_has_public_callback(void);
 static const rac_analytics_llm_generation_t RAC_ANALYTICS_LLM_GENERATION_DEFAULT = {
     .generation_id = RAC_NULL,
     .model_id = RAC_NULL,
+    .model_name = RAC_NULL,
     .input_tokens = 0,
     .output_tokens = 0,
     .duration_ms = 0.0,
@@ -527,6 +536,7 @@ static const rac_analytics_llm_generation_t RAC_ANALYTICS_LLM_GENERATION_DEFAULT
 static const rac_analytics_stt_transcription_t RAC_ANALYTICS_STT_TRANSCRIPTION_DEFAULT = {
     .transcription_id = RAC_NULL,
     .model_id = RAC_NULL,
+    .model_name = RAC_NULL,
     .text = RAC_NULL,
     .confidence = 0.0f,
     .duration_ms = 0.0,
@@ -545,6 +555,7 @@ static const rac_analytics_stt_transcription_t RAC_ANALYTICS_STT_TRANSCRIPTION_D
 static const rac_analytics_tts_synthesis_t RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT = {
     .synthesis_id = RAC_NULL,
     .model_id = RAC_NULL,
+    .model_name = RAC_NULL,
     .character_count = 0,
     .audio_duration_ms = 0.0,
     .audio_size_bytes = 0,

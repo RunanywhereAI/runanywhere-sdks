@@ -97,7 +97,12 @@ public actor HTTPService: NetworkService {
         if path.contains(RAC_ENDPOINT_DEV_DEVICE_REGISTER) {
             // Add on_conflict query parameter to the path
             let upsertPath = path.contains("?") ? "\(path)&on_conflict=device_id" : "\(path)?on_conflict=device_id"
-            return try await postRawWithHeaders(upsertPath, payload, requiresAuth: requiresAuth, additionalHeaders: ["Prefer": "resolution=merge-duplicates"])
+            return try await postRawWithHeaders(
+                upsertPath,
+                payload,
+                requiresAuth: requiresAuth,
+                additionalHeaders: ["Prefer": "resolution=merge-duplicates"]
+            )
         }
         return try await postRawWithHeaders(path, payload, requiresAuth: requiresAuth)
     }
@@ -189,14 +194,14 @@ public actor HTTPService: NetworkService {
         if path.hasPrefix("http://") || path.hasPrefix("https://") {
             return URL(string: path) ?? base.appendingPathComponent(path)
         }
-        
+
         // Check if path contains query parameters
         if path.contains("?") {
             // Split path and query parameters
             let components = path.split(separator: "?", maxSplits: 1)
             let pathPart = String(components[0])
             let queryPart = String(components[1])
-            
+
             // Build URL with query parameters using URLComponents
             guard var urlComponents = URLComponents(url: base, resolvingAgainstBaseURL: true) else {
                 return base.appendingPathComponent(path)
@@ -204,10 +209,10 @@ public actor HTTPService: NetworkService {
             let existingPath = urlComponents.path
             urlComponents.path = existingPath + pathPart
             urlComponents.query = queryPart
-            
+
             return urlComponents.url ?? base.appendingPathComponent(path)
         }
-        
+
         return base.appendingPathComponent(path)
     }
 
@@ -237,7 +242,7 @@ public actor HTTPService: NetworkService {
         // For device registration, 409 (Conflict) means device already exists, which is fine
         let isDeviceRegistration = request.url?.absoluteString.contains(RAC_ENDPOINT_DEV_DEVICE_REGISTER) ?? false
         let isSuccess = (200...299).contains(httpResponse.statusCode) || (isDeviceRegistration && httpResponse.statusCode == 409)
-        
+
         guard isSuccess else {
             let error = parseHTTPError(
                 statusCode: httpResponse.statusCode,
@@ -247,7 +252,7 @@ public actor HTTPService: NetworkService {
             logger.error("HTTP \(httpResponse.statusCode): \(request.url?.absoluteString ?? "unknown")")
             throw error
         }
-        
+
         // Log 409 as info for device registration (device already exists)
         if isDeviceRegistration && httpResponse.statusCode == 409 {
             logger.info("Device already registered (409) - treating as success")

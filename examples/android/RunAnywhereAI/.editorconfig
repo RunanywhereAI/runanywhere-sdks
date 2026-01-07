@@ -1,0 +1,24 @@
+[*.{kt,kts}]
+# Disable function-naming rule for Compose @Composable functions
+# Compose convention uses PascalCase for @Composable functions
+ktlint_function_naming = disabled
+ktlint_standard_function-naming = disabled
+
+# Allow wildcard imports for Compose
+ktlint_no-wildcard-imports = disabled
+ktlint_standard_no-wildcard-imports = disabled
+
+# Property naming - allow camelCase for constants in objects
+ktlint_standard_property-naming = disabled
+
+# Allow inline comments in argument lists (common in Compose code)
+ktlint_standard_comment-wrapping = disabled
+ktlint_standard_value-argument-comment = disabled
+ktlint_standard_value-parameter-comment = disabled
+
+# Max line length - allow longer lines for Compose modifiers
+max_line_length = 200
+
+# Allow consecutive KDoc comments
+ktlint_standard_kdoc-wrapping = disabled
+ktlint_standard_kdoc = disabled
