@@ -5,7 +5,7 @@ package = JSON.parse(File.read(File.join(__dir__, "package.json")))
 # =============================================================================
 # Version Constants (MUST match Swift Package.swift)
 # =============================================================================
-LLAMACPP_VERSION = "0.2.6"
+LLAMACPP_VERSION = "0.1.4"
 
 # =============================================================================
 # Binary Source - RABackendLlamaCPP from runanywhere-binaries

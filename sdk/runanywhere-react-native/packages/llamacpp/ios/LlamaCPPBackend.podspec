@@ -5,7 +5,7 @@ package = JSON.parse(File.read(File.join(__dir__, "..", "package.json")))
 # =============================================================================
 # Version Constants (MUST match Swift Package.swift)
 # =============================================================================
-CORE_VERSION = "0.2.6"
+CORE_VERSION = "0.1.4"
 
 # =============================================================================
 # Binary Source - RABackendLlamaCPP from runanywhere-binaries
