@@ -12,5 +12,5 @@ enum class SessionState {
     LISTENING,
     PROCESSING,
     SPEAKING,
-    ERROR
+    ERROR,
 }

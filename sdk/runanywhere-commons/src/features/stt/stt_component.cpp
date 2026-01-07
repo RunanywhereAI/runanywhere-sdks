@@ -443,12 +443,90 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
 
     const rac_stt_options_t* effective_options = options ? options : &component->default_options;
 
+    // Get model info for telemetry - use lifecycle methods for consistency with non-streaming path
+    const char* model_id = rac_lifecycle_get_model_id(component->lifecycle);
+    const char* model_name = rac_lifecycle_get_model_name(component->lifecycle);
+    
+    // Debug: Log if model_id is null
+    if (!model_id) {
+        log_warning("STT.Component", "rac_lifecycle_get_model_id returned null - model_id may not be set in telemetry");
+    } else {
+        log_debug("STT.Component", "STT streaming transcription using model_id: %s", model_id);
+    }
+
+    // Calculate audio length in ms (assume 16kHz, 16-bit mono)
+    double audio_length_ms = (audio_size * 1000.0) / (component->config.sample_rate * 2);
+    
+    // Generate transcription ID for tracking
+    std::string transcription_id = generate_unique_id();
+
+    // Emit STT_TRANSCRIPTION_STARTED event with is_streaming = RAC_TRUE
+    {
+        rac_analytics_event_data_t event = {};
+        event.type = RAC_EVENT_STT_TRANSCRIPTION_STARTED;
+        event.data.stt_transcription = RAC_ANALYTICS_STT_TRANSCRIPTION_DEFAULT;
+        event.data.stt_transcription.transcription_id = transcription_id.c_str();
+        event.data.stt_transcription.model_id = model_id;
+        event.data.stt_transcription.model_name = model_name;
+        event.data.stt_transcription.audio_length_ms = audio_length_ms;
+        event.data.stt_transcription.audio_size_bytes = static_cast<int32_t>(audio_size);
+        event.data.stt_transcription.language = effective_options->language;
+        event.data.stt_transcription.is_streaming = RAC_TRUE;  // Streaming mode!
+        event.data.stt_transcription.sample_rate = component->config.sample_rate;
+        event.data.stt_transcription.framework =
+            static_cast<rac_inference_framework_t>(component->config.preferred_framework);
+        rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_STARTED, &event);
+    }
+
+    auto start_time = std::chrono::steady_clock::now();
+
     result = rac_stt_transcribe_stream(service, audio_data, audio_size, effective_options, callback,
                                        user_data);
+
+    auto end_time = std::chrono::steady_clock::now();
+    double duration_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 
     if (result != RAC_SUCCESS) {
         log_error("STT.Component", "Streaming transcription failed");
         rac_lifecycle_track_error(component->lifecycle, result, "transcribeStream");
+        
+        // Emit STT_TRANSCRIPTION_FAILED event
+        rac_analytics_event_data_t event = {};
+        event.type = RAC_EVENT_STT_TRANSCRIPTION_FAILED;
+        event.data.stt_transcription = RAC_ANALYTICS_STT_TRANSCRIPTION_DEFAULT;
+        event.data.stt_transcription.transcription_id = transcription_id.c_str();
+        event.data.stt_transcription.model_id = model_id;
+        event.data.stt_transcription.model_name = model_name;
+        event.data.stt_transcription.is_streaming = RAC_TRUE;
+        event.data.stt_transcription.duration_ms = duration_ms;
+        event.data.stt_transcription.error_code = result;
+        rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_FAILED, &event);
+    } else {
+        // Emit STT_TRANSCRIPTION_COMPLETED event with is_streaming = RAC_TRUE
+        // Note: For streaming, we don't have final consolidated text, so word_count is not available.
+        // We can still compute real_time_factor from audio_length_ms and duration_ms.
+        double real_time_factor =
+            (audio_length_ms > 0 && duration_ms > 0) ? (audio_length_ms / duration_ms) : 0.0;
+
+        rac_analytics_event_data_t event = {};
+        event.type = RAC_EVENT_STT_TRANSCRIPTION_COMPLETED;
+        event.data.stt_transcription = RAC_ANALYTICS_STT_TRANSCRIPTION_DEFAULT;
+        event.data.stt_transcription.transcription_id = transcription_id.c_str();
+        event.data.stt_transcription.model_id = model_id;
+        event.data.stt_transcription.model_name = model_name;
+        event.data.stt_transcription.audio_length_ms = audio_length_ms;
+        event.data.stt_transcription.audio_size_bytes = static_cast<int32_t>(audio_size);
+        event.data.stt_transcription.language = effective_options->language;
+        event.data.stt_transcription.is_streaming = RAC_TRUE;  // Streaming mode!
+        event.data.stt_transcription.duration_ms = duration_ms;
+        event.data.stt_transcription.real_time_factor = real_time_factor;
+        // word_count not available for streaming - text is delivered via callbacks
+        event.data.stt_transcription.sample_rate = component->config.sample_rate;
+        event.data.stt_transcription.framework =
+            static_cast<rac_inference_framework_t>(component->config.preferred_framework);
+        event.data.stt_transcription.error_code = RAC_SUCCESS;
+        rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_COMPLETED, &event);
     }
 
     return result;

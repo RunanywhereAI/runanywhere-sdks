@@ -25,8 +25,11 @@ let onnxRuntimeMacOSPath = "\(packageDir)/Binaries/onnxruntime-macos"
 let testLocal = false  // PRODUCTION: download XCFrameworks from GitHub releases
 
 // Version constants for remote XCFrameworks (must be defined before package)
-let commonsVersion = "0.1.0"
-let coreVersion = "0.1.1-dev.03aacf9"
+// These versions must match the GitHub releases:
+// - Commons: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/commons-v{commonsVersion}
+// - Backends: https://github.com/RunanywhereAI/runanywhere-binaries/releases/tag/core-v{coreVersion}
+let commonsVersion = "0.1.4"
+let coreVersion = "0.1.4"
 // =============================================================================
 
 let package = Package(
@@ -217,59 +220,72 @@ func onnxBackendDependencies() -> [Target.Dependency] {
 //       RunAnywhereCore and onnxruntime always come from remote releases.
 func binaryTargets() -> [Target] {
     if testLocal {
-        // Local development mode: All runanywhere-commons frameworks are local
-        // Only onnxruntime comes from remote releases
+        // Local development mode: All runanywhere frameworks are local
+        // Only ONNX Runtime comes from official source
         return [
-            // Local commons frameworks (built locally from runanywhere-commons)
+            // Local commons framework (built locally from runanywhere-commons)
             .binaryTarget(
                 name: "RACommonsBinary",
                 path: "Binaries/RACommons.xcframework"
             ),
-            // LlamaCPP backend (built locally from runanywhere-commons)
+            // LlamaCPP backend (built locally from runanywhere-core)
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
-                path: "Binaries/RABackendLlamaCPP.xcframework"
+                path: "Binaries/RABackendLLAMACPP.xcframework"
             ),
-            // ONNX backend wrapper (built locally from runanywhere-commons)
+            // ONNX backend (built locally from runanywhere-core)
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 path: "Binaries/RABackendONNX.xcframework"
             ),
-            // ONNX Runtime from remote (from runanywhere-binaries releases)
+            // ONNX Runtime from official source
             .binaryTarget(
                 name: "ONNXRuntimeBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v\(coreVersion)/onnxruntime-ios-v\(coreVersion).zip",
-                checksum: "3c71a9065616371bdbd095ba8d7a10d86f474dd09a825c11b62efd92c58a0e47"
+                url: "https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.17.1.zip",
+                checksum: "9a2d54d4f503fbb82d2f86361a1d22d4fe015e2b5e9fb419767209cc9ab6372c"
             ),
         ]
     } else {
         // Production mode (default): Download from GitHub releases
-        // Commons frameworks from runanywhere-sdks releases
-        // ONNX Runtime from runanywhere-binaries releases (core dependency)
+        // Commons from runanywhere-sdks releases
+        // Backend frameworks from runanywhere-binaries releases
         return [
-            // Core commons library (~2MB)
+            // =================================================================
+            // RACommons - Core infrastructure library
+            // Source: runanywhere-sdks/releases (commons-v*)
+            // =================================================================
             .binaryTarget(
                 name: "RACommonsBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v\(commonsVersion)/RACommons-\(commonsVersion).zip",
-                checksum: "9a0149da28fe348f6b9843ccb98d75a0046180a4471b887702d54ca60150a3d9"
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v\(commonsVersion)/RACommons-ios-v\(commonsVersion).zip",
+                checksum: "5841cc914ae3041a2c26fd18e09fccb523295fbba12c03605d9bff86fec1a276"
             ),
-            // LlamaCPP backend (~30MB with Metal)
+            // =================================================================
+            // RABackendLlamaCPP - LLM text generation backend
+            // Source: runanywhere-binaries/releases (core-v*)
+            // =================================================================
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v\(commonsVersion)/RABackendLlamaCPP-\(commonsVersion).zip",
-                checksum: "352774858112b97a41eacff2bf8c425b8ee3d135620af6673282777fc5626845"
+                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v\(coreVersion)/RABackendLlamaCPP-ios-v\(coreVersion).zip",
+                checksum: "d53bc8b34c23c87385c1b38ae556a487317ae88ffda47fe6860ac893548dad00"
             ),
-            // ONNX backend wrapper (~12MB with Sherpa-ONNX)
+            // =================================================================
+            // RABackendONNX - STT/TTS/VAD backend (includes Sherpa-ONNX)
+            // Source: runanywhere-binaries/releases (core-v*)
+            // =================================================================
             .binaryTarget(
                 name: "RABackendONNXBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v\(commonsVersion)/RABackendONNX-\(commonsVersion).zip",
-                checksum: "af91e45667c1a1786f124daf2be8790d48fa055027b62e018765d954afed84a6"
+                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v\(coreVersion)/RABackendONNX-ios-v\(coreVersion).zip",
+                checksum: "467ce647745f8bb913d4daf70c0c7f86f77ba6e444eaf697cba09c40d75220a0"
             ),
-            // ONNX Runtime (~48MB - from runanywhere-binaries/core releases)
+            // =================================================================
+            // ONNX Runtime - Required by RABackendONNX
+            // Source: Official ONNX Runtime releases from onnxruntime.ai
+            // Contains xcframework with CoreML support
+            // =================================================================
             .binaryTarget(
                 name: "ONNXRuntimeBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v\(coreVersion)/onnxruntime-ios-v\(coreVersion).zip",
-                checksum: "3c71a9065616371bdbd095ba8d7a10d86f474dd09a825c11b62efd92c58a0e47"
+                url: "https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.17.1.zip",
+                checksum: "9a2d54d4f503fbb82d2f86361a1d22d4fe015e2b5e9fb419767209cc9ab6372c"
             ),
         ]
     }

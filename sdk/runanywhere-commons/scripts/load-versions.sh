@@ -47,9 +47,15 @@ done < "${VERSIONS_FILE}"
 # Print loaded versions if VERBOSE is set
 if [ "${VERBOSE:-}" = "1" ]; then
     echo "Loaded versions from ${VERSIONS_FILE}:"
-    echo "  ONNX_VERSION_IOS=${ONNX_VERSION_IOS}"
-    echo "  ONNX_VERSION_MACOS=${ONNX_VERSION_MACOS}"
-    echo "  SHERPA_ONNX_VERSION_IOS=${SHERPA_ONNX_VERSION_IOS}"
+    echo "  Platform targets:"
+    echo "    IOS_DEPLOYMENT_TARGET=${IOS_DEPLOYMENT_TARGET}"
+    echo "    ANDROID_MIN_SDK=${ANDROID_MIN_SDK}"
+    echo "    XCODE_VERSION=${XCODE_VERSION}"
+    echo "  Dependencies:"
+    echo "    ONNX_VERSION_IOS=${ONNX_VERSION_IOS}"
+    echo "    ONNX_VERSION_MACOS=${ONNX_VERSION_MACOS}"
+    echo "    SHERPA_ONNX_VERSION_IOS=${SHERPA_ONNX_VERSION_IOS}"
+    echo "    LLAMACPP_VERSION=${LLAMACPP_VERSION}"
 fi
 
 # Clean up temporary variables

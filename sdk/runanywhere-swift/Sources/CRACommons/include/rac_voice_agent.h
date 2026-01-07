@@ -141,7 +141,7 @@ typedef struct rac_voice_agent_tts_config {
     const char* voice_path;
     /** Voice ID - identifier for telemetry (e.g., "vits-piper-en_GB-alba-medium") */
     const char* voice_id;
-    /** Voice name - human-readable voice name (e.g., "Piper TTS (British English)") */
+    /** Voice name - human-readable name (e.g., "Piper TTS (British English)") */
     const char* voice_name;
 } rac_voice_agent_tts_config_t;
 

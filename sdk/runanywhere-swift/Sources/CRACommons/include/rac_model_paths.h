@@ -241,13 +241,7 @@ RAC_API rac_bool_t rac_model_paths_is_model_path(const char* path);
 // PATH UTILITIES
 // =============================================================================
 
-/**
- * @brief Get file extension string for a model format.
- *
- * @param format Model format
- * @return File extension string (e.g., "gguf", "onnx")
- */
-RAC_API const char* rac_model_format_extension(rac_model_format_t format);
+// NOTE: rac_model_format_extension is declared in rac_model_types.h
 
 /**
  * @brief Get raw value string for a framework.
