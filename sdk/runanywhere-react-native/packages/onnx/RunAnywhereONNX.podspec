@@ -5,7 +5,7 @@ package = JSON.parse(File.read(File.join(__dir__, "package.json")))
 # =============================================================================
 # Version Constants (MUST match Swift Package.swift)
 # =============================================================================
-ONNX_BACKEND_VERSION = "0.2.6"
+ONNX_BACKEND_VERSION = "0.1.4"
 ONNXRUNTIME_VERSION = "1.17.1"
 
 # =============================================================================

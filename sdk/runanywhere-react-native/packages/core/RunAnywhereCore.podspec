@@ -5,7 +5,7 @@ package = JSON.parse(File.read(File.join(__dir__, "package.json")))
 # =============================================================================
 # Version Constants (MUST match Swift Package.swift)
 # =============================================================================
-COMMONS_VERSION = "0.1.2"
+COMMONS_VERSION = "0.1.4"
 
 # =============================================================================
 # Binary Source - RACommons from runanywhere-sdks

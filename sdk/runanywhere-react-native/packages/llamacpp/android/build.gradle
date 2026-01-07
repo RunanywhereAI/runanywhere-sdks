@@ -30,7 +30,7 @@ def getExtOrIntegerDefault(name) {
 // Version Constants (MUST match Swift Package.swift and iOS Podspec)
 // RABackendLlamaCPP from runanywhere-binaries
 // =============================================================================
-def coreVersion = "0.2.6"
+def coreVersion = "0.1.4"
 
 // =============================================================================
 // Binary Source - RABackendLlamaCPP from runanywhere-binaries
@@ -180,7 +180,7 @@ task downloadNativeLibs {
             logger.lifecycle("   Downloaded: ${llamacppZip.length() / 1024}KB")
 
             // Extract and flatten the archive structure
-            // Archive structure: RABackendLlamaCPP-android-v0.2.6/llamacpp/arm64-v8a/*.so
+            // Archive structure: RABackendLlamaCPP-android-v0.1.4/llamacpp/arm64-v8a/*.so
             // Target structure: arm64-v8a/*.so
             copy {
                 from zipTree(llamacppZip)

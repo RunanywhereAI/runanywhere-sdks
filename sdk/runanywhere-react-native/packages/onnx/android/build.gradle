@@ -30,7 +30,7 @@ def getExtOrIntegerDefault(name) {
 // Version Constants (MUST match Swift Package.swift and iOS Podspec)
 // RABackendONNX from runanywhere-binaries
 // =============================================================================
-def coreVersion = "0.2.6"
+def coreVersion = "0.1.4"
 
 // =============================================================================
 // Binary Source - RABackendONNX from runanywhere-binaries

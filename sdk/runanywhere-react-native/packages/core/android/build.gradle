@@ -30,7 +30,7 @@ def getExtOrIntegerDefault(name) {
 // Version Constants (MUST match Swift Package.swift and iOS Podspec)
 // RACommons ONLY - no backend binaries
 // =============================================================================
-def commonsVersion = "0.1.2"
+def commonsVersion = "0.1.4"
 
 // =============================================================================
 // Binary Source - RACommons from runanywhere-sdks
