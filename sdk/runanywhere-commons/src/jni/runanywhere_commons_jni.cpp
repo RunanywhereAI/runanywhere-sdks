@@ -1849,6 +1849,7 @@ static rac_result_t jni_device_http_post(const char* endpoint, const char* json_
                                          void* user_data);
 
 // Static storage for device ID string (needs to persist across calls)
+// Protected by g_device_jni_state.mtx for thread safety
 static std::string g_cached_device_id;
 
 // Helper to extract a string value from JSON (simple parser for known keys)
@@ -2024,6 +2025,9 @@ static const char* jni_device_get_id(void* user_data) {
     
     if (jResult) {
         const char* str = env->GetStringUTFChars(jResult, nullptr);
+        
+        // Lock mutex to protect g_cached_device_id from concurrent access
+        std::lock_guard<std::mutex> lock(g_device_jni_state.mtx);
         g_cached_device_id = str;
         env->ReleaseStringUTFChars(jResult, str);
         env->DeleteLocalRef(jResult);
@@ -2262,12 +2266,28 @@ static void jni_telemetry_http_callback(void* user_data, const char* endpoint,
     jstring jEndpoint = env->NewStringUTF(endpoint ? endpoint : "");
     jstring jBody = env->NewStringUTF(json_body ? json_body : "");
     
+    // Check for NewStringUTF allocation failures
+    if (!jEndpoint || !jBody) {
+        LOGe("jni_telemetry_http_callback: failed to allocate JNI strings");
+        if (jEndpoint) env->DeleteLocalRef(jEndpoint);
+        if (jBody) env->DeleteLocalRef(jBody);
+        return;
+    }
+    
     env->CallVoidMethod(
         g_telemetry_jni_state.http_callback_obj,
         g_telemetry_jni_state.http_callback_method,
         jEndpoint, jBody, static_cast<jint>(json_length), requires_auth == RAC_TRUE ? JNI_TRUE : JNI_FALSE
     );
     
+    // Check for Java exception after CallVoidMethod
+    if (env->ExceptionCheck()) {
+        LOGe("jni_telemetry_http_callback: Java exception occurred in HTTP callback");
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+    }
+    
+    // Always clean up local references
     env->DeleteLocalRef(jEndpoint);
     env->DeleteLocalRef(jBody);
 }
