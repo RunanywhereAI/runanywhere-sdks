@@ -25,8 +25,11 @@ let onnxRuntimeMacOSPath = "\(packageDir)/Binaries/onnxruntime-macos"
 let testLocal = false  // PRODUCTION: download XCFrameworks from GitHub releases
 
 // Version constants for remote XCFrameworks (must be defined before package)
-let commonsVersion = "0.1.2"
-let coreVersion = "0.2.6"
+// These versions must match the GitHub releases:
+// - Commons: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/commons-v{commonsVersion}
+// - Backends: https://github.com/RunanywhereAI/runanywhere-binaries/releases/tag/core-v{coreVersion}
+let commonsVersion = "0.1.3"
+let coreVersion = "0.1.3"
 // =============================================================================
 
 let package = Package(
@@ -254,7 +257,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v\(commonsVersion)/RACommons-ios-v\(commonsVersion).zip",
-                checksum: "3b977fbe794d561582b9639ab7b84fad450854935d1a5a3458f7b611794025ed"
+                checksum: "0f58150966f9d37b15734206fff8467461454c84ffdcece6971f5f3cbe863120"
             ),
             // =================================================================
             // RABackendLlamaCPP - LLM text generation backend
@@ -263,7 +266,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v\(coreVersion)/RABackendLlamaCPP-ios-v\(coreVersion).zip",
-                checksum: "a887ed95b503ba1daeecbb678c27f41b017358ee51a2373c13df1df43b8afebf"
+                checksum: "03cc71969c7974ef904c2caa4c4ed3734e9fce1ae2cb9c758760595e2574091e"
             ),
             // =================================================================
             // RABackendONNX - STT/TTS/VAD backend (includes Sherpa-ONNX)
@@ -272,7 +275,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v\(coreVersion)/RABackendONNX-ios-v\(coreVersion).zip",
-                checksum: "055f2f076291475d0f58b1695411240807d1db006bb5d557e1733e0b655055eb"
+                checksum: "c59431dd66e1db7344318a2cd0cca8cb310efc389c22ee5b91c1d6f937b57061"
             ),
             // =================================================================
             // ONNX Runtime - Required by RABackendONNX
