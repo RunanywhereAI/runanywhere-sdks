@@ -7,7 +7,7 @@ module.exports = {
         packageInstance: 'new RunAnywhereLlamaPackage()',
       },
       ios: {
-        podspecPath: './ios/LlamaCPPBackend.podspec',
+        podspecPath: './RunAnywhereLlama.podspec',
       },
     },
   },

@@ -11,7 +11,6 @@
 #import <type_traits>
 
 #include "HybridRunAnywhereCore.hpp"
-#include "HybridRunAnywhereFileSystemSpecSwift.hpp"
 #include "HybridRunAnywhereDeviceInfoSpecSwift.hpp"
 
 @interface RunAnywhereCoreAutolinking : NSObject
@@ -30,13 +29,6 @@
                     "The HybridObject \"HybridRunAnywhereCore\" is not default-constructible! "
                     "Create a public constructor that takes zero arguments to be able to autolink this HybridObject.");
       return std::make_shared<HybridRunAnywhereCore>();
-    }
-  );
-  HybridObjectRegistry::registerHybridObjectConstructor(
-    "RunAnywhereFileSystem",
-    []() -> std::shared_ptr<HybridObject> {
-      std::shared_ptr<HybridRunAnywhereFileSystemSpec> hybridObject = RunAnywhereCore::RunAnywhereCoreAutolinking::createRunAnywhereFileSystem();
-      return hybridObject;
     }
   );
   HybridObjectRegistry::registerHybridObjectConstructor(

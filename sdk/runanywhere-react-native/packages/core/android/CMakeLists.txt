@@ -51,12 +51,26 @@ include_directories(
     "../cpp"
     "../cpp/bridges"
     "${CMAKE_SOURCE_DIR}/include"
-    # RAC API headers from runanywhere-commons
+    # RAC API headers from runanywhere-commons (flat access)
     "${RAC_INCLUDE_DIR}"
     "${RAC_INCLUDE_DIR}/rac"
     "${RAC_INCLUDE_DIR}/rac/core"
+    "${RAC_INCLUDE_DIR}/rac/core/capabilities"
     "${RAC_INCLUDE_DIR}/rac/features"
+    "${RAC_INCLUDE_DIR}/rac/features/llm"
+    "${RAC_INCLUDE_DIR}/rac/features/stt"
+    "${RAC_INCLUDE_DIR}/rac/features/tts"
+    "${RAC_INCLUDE_DIR}/rac/features/vad"
+    "${RAC_INCLUDE_DIR}/rac/features/voice_agent"
+    "${RAC_INCLUDE_DIR}/rac/features/platform"
     "${RAC_INCLUDE_DIR}/rac/infrastructure"
+    "${RAC_INCLUDE_DIR}/rac/infrastructure/device"
+    "${RAC_INCLUDE_DIR}/rac/infrastructure/download"
+    "${RAC_INCLUDE_DIR}/rac/infrastructure/events"
+    "${RAC_INCLUDE_DIR}/rac/infrastructure/model_management"
+    "${RAC_INCLUDE_DIR}/rac/infrastructure/network"
+    "${RAC_INCLUDE_DIR}/rac/infrastructure/storage"
+    "${RAC_INCLUDE_DIR}/rac/infrastructure/telemetry"
 )
 
 # =============================================================================

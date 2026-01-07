@@ -33,6 +33,7 @@
 
 // RACommons C API headers for capability methods
 // These are backend-agnostic - they work with any registered backend
+#include "rac_core.h"
 #include "rac_llm_component.h"
 #include "rac_llm_types.h"
 #include "rac_stt_component.h"
@@ -216,31 +217,44 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
             return false;
         }
 
-        // 2. Initialize model registry
+        // 2. Set base directory for model paths (mirrors Swift's CppBridge.ModelPaths.setBaseDirectory)
+        // This must be called before using model path utilities
+        std::string documentsPath = extractStringValue(configJson, "documentsPath");
+        if (!documentsPath.empty()) {
+            result = InitBridge::shared().setBaseDirectory(documentsPath);
+            if (result != RAC_SUCCESS) {
+                LOGE("Failed to set base directory: %d", result);
+                // Continue - not fatal, but model paths may not work correctly
+            }
+        } else {
+            LOGE("documentsPath not provided in config - model paths may not work correctly!");
+        }
+
+        // 3. Initialize model registry
         result = ModelRegistryBridge::shared().initialize();
         if (result != RAC_SUCCESS) {
             LOGE("Failed to initialize model registry: %d", result);
             // Continue - not fatal
         }
 
-        // 3. Initialize storage analyzer
+        // 4. Initialize storage analyzer
         result = StorageBridge::shared().initialize();
         if (result != RAC_SUCCESS) {
             LOGE("Failed to initialize storage analyzer: %d", result);
             // Continue - not fatal
         }
 
-        // 4. Initialize download manager
+        // 5. Initialize download manager
         result = DownloadBridge::shared().initialize();
         if (result != RAC_SUCCESS) {
             LOGE("Failed to initialize download manager: %d", result);
             // Continue - not fatal
         }
 
-        // 5. Register for events
+        // 6. Register for events
         EventBridge::shared().registerForEvents();
 
-        // 6. Configure HTTP
+        // 7. Configure HTTP
         HTTPBridge::shared().configure(baseURL, apiKey);
 
         LOGI("Core SDK initialized successfully");
@@ -457,20 +471,51 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getModelInfo(
         }
 
         const auto& m = model.value();
+
+        // Convert enums to strings (same as getAvailableModels)
+        std::string categoryStr = "unknown";
+        switch (m.category) {
+            case RAC_MODEL_CATEGORY_LANGUAGE: categoryStr = "language"; break;
+            case RAC_MODEL_CATEGORY_SPEECH_RECOGNITION: categoryStr = "speech-recognition"; break;
+            case RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS: categoryStr = "speech-synthesis"; break;
+            case RAC_MODEL_CATEGORY_AUDIO: categoryStr = "audio"; break;
+            case RAC_MODEL_CATEGORY_VISION: categoryStr = "vision"; break;
+            case RAC_MODEL_CATEGORY_IMAGE_GENERATION: categoryStr = "image-generation"; break;
+            case RAC_MODEL_CATEGORY_MULTIMODAL: categoryStr = "multimodal"; break;
+            default: categoryStr = "unknown"; break;
+        }
+        std::string formatStr = "unknown";
+        switch (m.format) {
+            case RAC_MODEL_FORMAT_GGUF: formatStr = "gguf"; break;
+            case RAC_MODEL_FORMAT_ONNX: formatStr = "onnx"; break;
+            case RAC_MODEL_FORMAT_ORT: formatStr = "ort"; break;
+            case RAC_MODEL_FORMAT_BIN: formatStr = "bin"; break;
+            default: formatStr = "unknown"; break;
+        }
+        std::string frameworkStr = "unknown";
+        switch (m.framework) {
+            case RAC_FRAMEWORK_LLAMACPP: frameworkStr = "LlamaCpp"; break;
+            case RAC_FRAMEWORK_ONNX: frameworkStr = "ONNX"; break;
+            case RAC_FRAMEWORK_FOUNDATION_MODELS: frameworkStr = "FoundationModels"; break;
+            case RAC_FRAMEWORK_SYSTEM_TTS: frameworkStr = "SystemTTS"; break;
+            default: frameworkStr = "unknown"; break;
+        }
+
         return buildJsonObject({
             {"id", jsonString(m.id)},
             {"name", jsonString(m.name)},
             {"description", jsonString(m.description)},
             {"localPath", jsonString(m.localPath)},
-            {"downloadUrl", jsonString(m.downloadUrl)},
-            {"category", std::to_string(static_cast<int>(m.category))},
-            {"format", std::to_string(static_cast<int>(m.format))},
-            {"framework", std::to_string(static_cast<int>(m.framework))},
+            {"downloadURL", jsonString(m.downloadUrl)},  // Fixed: downloadURL (capital URL) to match TypeScript
+            {"category", jsonString(categoryStr)},       // String for TypeScript
+            {"format", jsonString(formatStr)},           // String for TypeScript
+            {"preferredFramework", jsonString(frameworkStr)}, // String for TypeScript (preferredFramework key)
             {"downloadSize", std::to_string(m.downloadSize)},
             {"memoryRequired", std::to_string(m.memoryRequired)},
             {"contextLength", std::to_string(m.contextLength)},
             {"supportsThinking", m.supportsThinking ? "true" : "false"},
-            {"isDownloaded", m.isDownloaded ? "true" : "false"}
+            {"isDownloaded", m.isDownloaded ? "true" : "false"},
+            {"isAvailable", "true"}  // Added isAvailable field
         });
     });
 }
@@ -753,14 +798,47 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getLastError() {
     return Promise<std::string>::async([this]() { return lastError_; });
 }
 
+// Forward declaration for platform-specific archive extraction
+#if defined(__APPLE__)
+extern "C" bool ArchiveUtility_extract(const char* archivePath, const char* destinationPath);
+#elif defined(__ANDROID__)
+// On Android, we'll call the Kotlin ArchiveUtility via JNI in a separate helper
+extern "C" bool ArchiveUtility_extractAndroid(const char* archivePath, const char* destinationPath);
+#endif
+
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::extractArchive(
     const std::string& archivePath,
     const std::string& destPath) {
     return Promise<bool>::async([this, archivePath, destPath]() {
-        // Archive extraction is handled by JS layer
         LOGI("extractArchive: %s -> %s", archivePath.c_str(), destPath.c_str());
-        setLastError("Archive extraction must be done by JS layer");
+
+#if defined(__APPLE__)
+        // iOS: Call Swift ArchiveUtility
+        bool success = ArchiveUtility_extract(archivePath.c_str(), destPath.c_str());
+        if (success) {
+            LOGI("iOS archive extraction succeeded");
+            return true;
+        } else {
+            LOGE("iOS archive extraction failed");
+            setLastError("Archive extraction failed");
+            return false;
+        }
+#elif defined(__ANDROID__)
+        // Android: Call Kotlin ArchiveUtility via JNI
+        bool success = ArchiveUtility_extractAndroid(archivePath.c_str(), destPath.c_str());
+        if (success) {
+            LOGI("Android archive extraction succeeded");
+            return true;
+        } else {
+            LOGE("Android archive extraction failed");
+            setLastError("Archive extraction failed");
+            return false;
+        }
+#else
+        LOGW("Archive extraction not supported on this platform");
+        setLastError("Archive extraction not supported");
         return false;
+#endif
     });
 }
 

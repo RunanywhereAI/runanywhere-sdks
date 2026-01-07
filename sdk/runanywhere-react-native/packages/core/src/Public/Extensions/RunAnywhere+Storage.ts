@@ -2,13 +2,13 @@
  * RunAnywhere+Storage.ts
  *
  * Storage management extension.
- * Delegates to native commons.
+ * Uses react-native-fs via FileSystem service.
  *
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Storage/RunAnywhere+Storage.swift
  */
 
-import { requireFileSystemModule, isNativeModuleAvailable } from '../../native';
 import { ModelRegistry } from '../../services/ModelRegistry';
+import { FileSystem } from '../../services/FileSystem';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 
 const logger = new SDKLogger('RunAnywhere.Storage');
@@ -27,14 +27,13 @@ export interface StorageInfo {
  * Get storage information
  */
 export async function getStorageInfo(): Promise<StorageInfo> {
-  if (!isNativeModuleAvailable()) {
+  if (!FileSystem.isAvailable()) {
     return { totalSpace: 0, freeSpace: 0, usedSpace: 0, modelsSize: 0 };
   }
 
   try {
-    const fs = requireFileSystemModule();
-    const freeSpace = await fs.getAvailableDiskSpace();
-    const totalSpace = await fs.getTotalDiskSpace();
+    const freeSpace = await FileSystem.getAvailableDiskSpace();
+    const totalSpace = await FileSystem.getTotalDiskSpace();
 
     return {
       totalSpace,

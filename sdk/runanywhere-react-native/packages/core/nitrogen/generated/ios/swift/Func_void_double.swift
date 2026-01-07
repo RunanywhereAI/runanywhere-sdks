@@ -9,21 +9,21 @@ import Foundation
 import NitroModules
 
 /**
- * Wraps a Swift `(_ progress: Double) -> Void` as a class.
+ * Wraps a Swift `(_ value: Double) -> Void` as a class.
  * This class can be used from C++, e.g. to wrap the Swift closure as a `std::function`.
  */
 public final class Func_void_double {
   public typealias bridge = margelo.nitro.runanywhere.bridge.swift
 
-  private let closure: (_ progress: Double) -> Void
+  private let closure: (_ value: Double) -> Void
 
-  public init(_ closure: @escaping (_ progress: Double) -> Void) {
+  public init(_ closure: @escaping (_ value: Double) -> Void) {
     self.closure = closure
   }
 
   @inline(__always)
-  public func call(progress: Double) -> Void {
-    self.closure(progress)
+  public func call(value: Double) -> Void {
+    self.closure(value)
   }
 
   /**

@@ -17,7 +17,6 @@
 #include <cstdint>
 
 #include "rac_types.h"
-#include "rac_events.h"
 
 namespace runanywhere {
 namespace bridges {
@@ -35,7 +34,10 @@ enum class EventCategory {
     Storage = 6,
     Device = 7,
     Network = 8,
-    Error = 9
+    Error = 9,
+    Analytics = 10,
+    Performance = 11,
+    User = 12
 };
 
 /**

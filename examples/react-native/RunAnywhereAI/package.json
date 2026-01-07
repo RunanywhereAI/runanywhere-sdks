@@ -20,6 +20,9 @@
     "@react-navigation/bottom-tabs": "^7.8.11",
     "@react-navigation/native": "^7.1.24",
     "@react-navigation/native-stack": "^7.8.5",
+    "@runanywhere/core": "file:../../../sdk/runanywhere-react-native/packages/core",
+    "@runanywhere/llamacpp": "file:../../../sdk/runanywhere-react-native/packages/llamacpp",
+    "@runanywhere/onnx": "file:../../../sdk/runanywhere-react-native/packages/onnx",
     "react": "19.1.0",
     "react-native": "0.81.1",
     "react-native-audio-recorder-player": "^3.6.14",
@@ -32,10 +35,8 @@
     "react-native-sound": "^0.13.0",
     "react-native-tts": "^4.1.1",
     "react-native-vector-icons": "^10.1.0",
+    "react-native-zip-archive": "^6.1.0",
     "rn-fetch-blob": "^0.12.0",
-    "@runanywhere/core": "file:../../../sdk/runanywhere-react-native/packages/core",
-    "@runanywhere/llamacpp": "file:../../../sdk/runanywhere-react-native/packages/llamacpp",
-    "@runanywhere/onnx": "file:../../../sdk/runanywhere-react-native/packages/onnx",
     "zustand": "^5.0.0"
   },
   "devDependencies": {

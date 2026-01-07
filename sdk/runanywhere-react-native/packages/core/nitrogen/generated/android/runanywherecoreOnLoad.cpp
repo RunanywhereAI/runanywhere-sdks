@@ -16,8 +16,6 @@
 #include <NitroModules/HybridObjectRegistry.hpp>
 
 #include "JHybridRunAnywhereDeviceInfoSpec.hpp"
-#include "JHybridRunAnywhereFileSystemSpec.hpp"
-#include "JFunc_void_double.hpp"
 #include "HybridRunAnywhereCore.hpp"
 #include <NitroModules/DefaultConstructableObject.hpp>
 
@@ -31,8 +29,6 @@ int initialize(JavaVM* vm) {
   return facebook::jni::initialize(vm, [] {
     // Register native JNI methods
     margelo::nitro::runanywhere::JHybridRunAnywhereDeviceInfoSpec::registerNatives();
-    margelo::nitro::runanywhere::JHybridRunAnywhereFileSystemSpec::registerNatives();
-    margelo::nitro::runanywhere::JFunc_void_double_cxx::registerNatives();
 
     // Register Nitro Hybrid Objects
     HybridObjectRegistry::registerHybridObjectConstructor(
@@ -42,14 +38,6 @@ int initialize(JavaVM* vm) {
                       "The HybridObject \"HybridRunAnywhereCore\" is not default-constructible! "
                       "Create a public constructor that takes zero arguments to be able to autolink this HybridObject.");
         return std::make_shared<HybridRunAnywhereCore>();
-      }
-    );
-    HybridObjectRegistry::registerHybridObjectConstructor(
-      "RunAnywhereFileSystem",
-      []() -> std::shared_ptr<HybridObject> {
-        static DefaultConstructableObject<JHybridRunAnywhereFileSystemSpec::javaobject> object("com/margelo/nitro/runanywhere/HybridRunAnywhereFileSystem");
-        auto instance = object.create();
-        return instance->cthis()->shared();
       }
     );
     HybridObjectRegistry::registerHybridObjectConstructor(

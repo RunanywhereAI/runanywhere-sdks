@@ -20,7 +20,6 @@ import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import type {
   LLMStreamingResult,
   LLMGenerationResult,
-  LLMTokenCallback,
 } from '../../types/LLMTypes';
 
 const logger = new SDKLogger('RunAnywhere.TextGeneration');
@@ -51,17 +50,6 @@ export async function loadModel(
 }
 
 /**
- * Load a text generation model
- * @deprecated Use `loadModel()` instead for iOS API parity
- */
-export async function loadTextModel(
-  modelPath: string,
-  config?: Record<string, unknown>
-): Promise<boolean> {
-  return loadModel(modelPath, config);
-}
-
-/**
  * Check if an LLM model is loaded
  * Matches iOS: `RunAnywhere.isModelLoaded`
  */
@@ -74,14 +62,6 @@ export async function isModelLoaded(): Promise<boolean> {
 }
 
 /**
- * Check if a text model is loaded
- * @deprecated Use `isModelLoaded()` instead for iOS API parity
- */
-export async function isTextModelLoaded(): Promise<boolean> {
-  return isModelLoaded();
-}
-
-/**
  * Unload the currently loaded LLM model
  * Matches iOS: `RunAnywhere.unloadModel()`
  */
@@ -91,14 +71,6 @@ export async function unloadModel(): Promise<boolean> {
   }
   const native = requireNativeModule();
   return native.unloadTextModel();
-}
-
-/**
- * Unload the current text model
- * @deprecated Use `unloadModel()` instead for iOS API parity
- */
-export async function unloadTextModel(): Promise<boolean> {
-  return unloadModel();
 }
 
 /**
@@ -334,57 +306,6 @@ export async function generateStream(
     result: resultPromise,
     cancel,
   };
-}
-
-/**
- * Streaming text generation with callback (legacy API)
- *
- * @deprecated Use generateStream() which returns an async iterator
- */
-export function generateStreamWithCallback(
-  prompt: string,
-  options?: GenerationOptions,
-  onToken?: LLMTokenCallback
-): void {
-  if (!isNativeModuleAvailable()) {
-    EventBus.publish('Generation', {
-      type: 'failed',
-      error: 'Native module not available',
-    });
-    return;
-  }
-  const native = requireNativeModule();
-
-  const optionsJson = JSON.stringify({
-    max_tokens: options?.maxTokens ?? 256,
-    temperature: options?.temperature ?? 0.7,
-    system_prompt: options?.systemPrompt ?? null,
-  });
-
-  if (onToken) {
-    const unsubscribe = EventBus.onGeneration((event) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const evt = event as any;
-      if (evt.type === 'tokenGenerated' && evt.token) {
-        onToken(evt.token);
-      } else if (evt.type === 'completed' || evt.type === 'failed') {
-        unsubscribe();
-      }
-    });
-  }
-
-  native.generateStream(
-    prompt,
-    optionsJson,
-    (token: string, isComplete: boolean) => {
-      if (onToken && !isComplete) {
-        onToken(token);
-      }
-      if (isComplete) {
-        EventBus.publish('Generation', { type: 'completed' });
-      }
-    }
-  );
 }
 
 /**

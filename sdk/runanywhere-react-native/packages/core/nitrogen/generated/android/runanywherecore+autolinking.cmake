@@ -35,10 +35,8 @@ target_sources(
   # Shared Nitrogen C++ sources
   ../nitrogen/generated/shared/c++/HybridRunAnywhereCoreSpec.cpp
   ../nitrogen/generated/shared/c++/HybridRunAnywhereDeviceInfoSpec.cpp
-  ../nitrogen/generated/shared/c++/HybridRunAnywhereFileSystemSpec.cpp
   # Android-specific Nitrogen C++ sources
   ../nitrogen/generated/android/c++/JHybridRunAnywhereDeviceInfoSpec.cpp
-  ../nitrogen/generated/android/c++/JHybridRunAnywhereFileSystemSpec.cpp
 )
 
 # From node_modules/react-native/ReactAndroid/cmake-utils/folly-flags.cmake

@@ -17,9 +17,9 @@
 #include <memory>
 #include <string>
 
-// RACommons LLM headers - REQUIRED
-#include "rac/features/llm/rac_llm_component.h"
-#include "rac/features/llm/rac_llm_types.h"
+// RACommons LLM headers - REQUIRED (flat include paths)
+#include "rac_llm_component.h"
+#include "rac_llm_types.h"
 
 namespace runanywhere {
 namespace bridges {
