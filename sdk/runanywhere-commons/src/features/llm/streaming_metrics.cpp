@@ -44,6 +44,10 @@ struct rac_streaming_metrics_collector {
     bool is_complete{false};
     rac_result_t error_code{RAC_SUCCESS};
 
+    // Actual token counts from backend (0 = use estimation)
+    int32_t actual_input_tokens{0};
+    int32_t actual_output_tokens{0};
+
     // Thread safety
     std::mutex mutex{};
 
@@ -189,14 +193,27 @@ rac_result_t rac_streaming_metrics_get_result(rac_streaming_metrics_handle_t han
         ttft_ms = static_cast<double>(handle->first_token_time_ms - handle->start_time_ms);
     }
 
-    // Token estimation (~4 chars per token, matching Swift)
-    int32_t input_tokens = handle->prompt_length > 0 ? (handle->prompt_length / 4) : 1;
-    if (input_tokens < 1)
-        input_tokens = 1;
+    // Use actual token counts from backend if available, otherwise estimate
+    int32_t input_tokens;
+    int32_t output_tokens;
 
-    int32_t output_tokens = static_cast<int32_t>(handle->full_text.length() / 4);
-    if (output_tokens < 1)
-        output_tokens = 1;
+    if (handle->actual_input_tokens > 0) {
+        input_tokens = handle->actual_input_tokens;
+    } else {
+        // Fallback: estimate ~4 chars per token
+        input_tokens = handle->prompt_length > 0 ? (handle->prompt_length / 4) : 1;
+        if (input_tokens < 1)
+            input_tokens = 1;
+    }
+
+    if (handle->actual_output_tokens > 0) {
+        output_tokens = handle->actual_output_tokens;
+    } else {
+        // Fallback: estimate ~4 chars per token
+        output_tokens = static_cast<int32_t>(handle->full_text.length() / 4);
+        if (output_tokens < 1)
+            output_tokens = 1;
+    }
 
     // Tokens per second
     double tokens_per_second = 0.0;
@@ -256,6 +273,19 @@ rac_result_t rac_streaming_metrics_get_text(rac_streaming_metrics_handle_t handl
     std::lock_guard<std::mutex> lock(handle->mutex);
     *out_text = rac_strdup(handle->full_text.c_str());
     return *out_text ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
+}
+
+rac_result_t rac_streaming_metrics_set_token_counts(rac_streaming_metrics_handle_t handle,
+                                                    int32_t input_tokens,
+                                                    int32_t output_tokens) {
+    if (!handle) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    std::lock_guard<std::mutex> lock(handle->mutex);
+    handle->actual_input_tokens = input_tokens;
+    handle->actual_output_tokens = output_tokens;
+    return RAC_SUCCESS;
 }
 
 // =============================================================================

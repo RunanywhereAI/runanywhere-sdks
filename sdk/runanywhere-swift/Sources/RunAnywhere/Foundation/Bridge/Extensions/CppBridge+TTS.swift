@@ -58,10 +58,14 @@ extension CppBridge {
         // MARK: - Voice Lifecycle
 
         /// Load a TTS voice
-        public func loadVoice(_ voicePath: String, voiceId: String) throws {
+        public func loadVoice(_ voicePath: String, voiceId: String, voiceName: String) throws {
             let handle = try getHandle()
             let result = voicePath.withCString { pathPtr in
-                rac_tts_component_load_voice(handle, pathPtr)
+                voiceId.withCString { idPtr in
+                    voiceName.withCString { namePtr in
+                        rac_tts_component_load_voice(handle, pathPtr, idPtr, namePtr)
+                    }
+                }
             }
             guard result == RAC_SUCCESS else {
                 throw SDKError.tts(.modelLoadFailed, "Failed to load voice: \(result)")

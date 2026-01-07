@@ -18,7 +18,13 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
-import { Spacing, BorderRadius, Padding, ButtonHeight, Layout } from '../../theme/spacing';
+import {
+  Spacing,
+  BorderRadius,
+  Padding,
+  ButtonHeight,
+  Layout,
+} from '../../theme/spacing';
 
 interface ChatInputProps {
   /** Current input value */
@@ -51,7 +57,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   }) => {
     const height = event.nativeEvent.contentSize.height;
     // Clamp between min and max (4 lines max)
-    const clampedHeight = Math.min(Math.max(height, Layout.inputMinHeight), 120);
+    const clampedHeight = Math.min(
+      Math.max(height, Layout.inputMinHeight),
+      120
+    );
     setInputHeight(clampedHeight);
   };
 
@@ -69,7 +78,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       <View style={styles.container}>
         <View style={styles.inputContainer}>
           <TextInput
-            style={[styles.input, { height: Math.max(inputHeight, Layout.inputMinHeight) }]}
+            style={[
+              styles.input,
+              { height: Math.max(inputHeight, Layout.inputMinHeight) },
+            ]}
             value={value}
             onChangeText={onChangeText}
             placeholder={placeholder}
@@ -109,7 +121,8 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.borderLight,
     paddingHorizontal: Padding.padding16,
     paddingVertical: Padding.padding10,
-    paddingBottom: Platform.OS === 'ios' ? Padding.padding20 : Padding.padding10,
+    paddingBottom:
+      Platform.OS === 'ios' ? Padding.padding20 : Padding.padding10,
   },
   inputContainer: {
     flexDirection: 'row',

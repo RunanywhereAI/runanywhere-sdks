@@ -1,7 +1,24 @@
 /**
  * SettingsScreen - Tab 4: Settings & Storage
  *
- * Reference: iOS Features/Settings/CombinedSettingsView.swift
+ * Provides SDK configuration, model management, and storage overview.
+ * Matches iOS CombinedSettingsView architecture and patterns.
+ *
+ * Features:
+ * - Generation settings (temperature, max tokens)
+ * - API configuration
+ * - Storage overview (total usage, available space, models storage)
+ * - Downloaded models list with delete functionality
+ * - Storage management (clear cache, clean temp files)
+ * - SDK info (version, capabilities, loaded models)
+ *
+ * Architecture:
+ * - Fetches SDK state via RunAnywhere methods
+ * - Shows available vs downloaded models
+ * - Manages model downloads and deletions
+ * - Displays backend info and capabilities
+ *
+ * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Settings/CombinedSettingsView.swift
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -18,16 +35,17 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';
+import type { StorageInfo } from '../types/settings';
 import {
   RoutingPolicy,
   RoutingPolicyDisplayNames,
-  StorageInfo,
   SETTINGS_CONSTRAINTS,
 } from '../types/settings';
-import { StoredModel, LLMFramework, FrameworkDisplayNames } from '../types/model';
+import type { StoredModel } from '../types/model';
+import { LLMFramework, FrameworkDisplayNames } from '../types/model';
 
-// Import actual RunAnywhere SDK
-import { RunAnywhere, type ModelInfo } from 'runanywhere-react-native';
+// Import RunAnywhere SDK (Multi-Package Architecture)
+import { RunAnywhere, type ModelInfo } from '@runanywhere/core';
 
 // Default storage info
 const DEFAULT_STORAGE_INFO: StorageInfo = {
@@ -51,29 +69,36 @@ const formatBytes = (bytes: number): string => {
 
 export const SettingsScreen: React.FC = () => {
   // Settings state
-  const [routingPolicy, setRoutingPolicy] = useState<RoutingPolicy>(RoutingPolicy.Automatic);
+  const [routingPolicy, setRoutingPolicy] = useState<RoutingPolicy>(
+    RoutingPolicy.Automatic
+  );
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(10000);
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
 
   // Storage state
-  const [storageInfo, setStorageInfo] = useState<StorageInfo>(DEFAULT_STORAGE_INFO);
+  const [storageInfo, setStorageInfo] =
+    useState<StorageInfo>(DEFAULT_STORAGE_INFO);
   const [storedModels, setStoredModels] = useState<StoredModel[]>([]);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [_isRefreshing, setIsRefreshing] = useState(false);
   const [sdkVersion, setSdkVersion] = useState('0.1.0');
 
   // SDK State
   const [capabilities, setCapabilities] = useState<number[]>([]);
-  const [backendInfoData, setBackendInfoData] = useState<Record<string, unknown>>({});
+  const [backendInfoData, setBackendInfoData] = useState<
+    Record<string, unknown>
+  >({});
   const [isSTTLoaded, setIsSTTLoaded] = useState(false);
   const [isTTSLoaded, setIsTTSLoaded] = useState(false);
   const [isTextLoaded, setIsTextLoaded] = useState(false);
   const [isVADLoaded, setIsVADLoaded] = useState(false);
-  const [memoryUsage, setMemoryUsage] = useState(0);
+  const [_memoryUsage, _setMemoryUsage] = useState(0);
 
   // Model catalog state
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
-  const [downloadingModels, setDownloadingModels] = useState<Record<string, number>>({});
+  const [downloadingModels, setDownloadingModels] = useState<
+    Record<string, number>
+  >({});
   const [downloadedModels, setDownloadedModels] = useState<ModelInfo[]>([]);
 
   // Capability names mapping
@@ -103,15 +128,17 @@ export const SettingsScreen: React.FC = () => {
       console.log('[Settings] Backend info:', backendInfo);
       setBackendInfoData(backendInfo);
 
-      // Get capabilities
+      // Get capabilities (returns string[], not number[])
       const caps = await RunAnywhere.getCapabilities();
       console.log('[Settings] Capabilities:', caps);
-      setCapabilities(caps);
+      // Convert string capabilities to numbers for display mapping
+      const capNumbers = caps.map((cap, index) => index);
+      setCapabilities(capNumbers);
 
       // Check loaded models
       const sttLoaded = await RunAnywhere.isSTTModelLoaded();
       const ttsLoaded = await RunAnywhere.isTTSModelLoaded();
-      const textLoaded = await RunAnywhere.isTextModelLoaded();
+      const textLoaded = await RunAnywhere.isModelLoaded();
       const vadLoaded = await RunAnywhere.isVADModelLoaded();
 
       setIsSTTLoaded(sttLoaded);
@@ -119,7 +146,16 @@ export const SettingsScreen: React.FC = () => {
       setIsTextLoaded(textLoaded);
       setIsVADLoaded(vadLoaded);
 
-      console.log('[Settings] Models loaded - STT:', sttLoaded, 'TTS:', ttsLoaded, 'Text:', textLoaded, 'VAD:', vadLoaded);
+      console.log(
+        '[Settings] Models loaded - STT:',
+        sttLoaded,
+        'TTS:',
+        ttsLoaded,
+        'Text:',
+        textLoaded,
+        'VAD:',
+        vadLoaded
+      );
 
       // Get available models from catalog
       try {
@@ -139,6 +175,34 @@ export const SettingsScreen: React.FC = () => {
         console.warn('[Settings] Failed to get downloaded models:', err);
       }
 
+      // Get storage info using new SDK API
+      try {
+        const storage = await RunAnywhere.getStorageInfo();
+        console.log('[Settings] Storage info:', storage);
+        setStorageInfo({
+          totalStorage: storage.deviceStorage.totalSpace,
+          appStorage: storage.appStorage.totalSize,
+          modelsStorage: storage.modelStorage.totalSize || 0,
+          cacheSize: storage.cacheSize || 0,
+          freeSpace: storage.deviceStorage.freeSpace,
+        });
+        // Update storedModels from downloaded models
+        const models = await RunAnywhere.getAvailableModels();
+        const downloaded = models.filter((m) => m.isDownloaded);
+        setStoredModels(
+          downloaded.map((m) => ({
+            id: m.id,
+            name: m.name,
+            framework:
+              (m.compatibleFrameworks?.[0] as unknown as LLMFramework) ||
+              LLMFramework.LlamaCpp,
+            sizeOnDisk: m.downloadSize || 0,
+            downloadedAt: new Date(),
+          }))
+        );
+      } catch (err) {
+        console.warn('[Settings] Failed to get storage info:', err);
+      }
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -174,7 +238,7 @@ export const SettingsScreen: React.FC = () => {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Save',
-          onPress: (key) => {
+          onPress: (key?: string) => {
             if (key && key.trim()) {
               setApiKeyConfigured(true);
               // In a real implementation, reinitialize SDK with the new key
@@ -201,7 +265,7 @@ export const SettingsScreen: React.FC = () => {
           onPress: async () => {
             try {
               // Unload models if they're loaded
-              await RunAnywhere.unloadTextModel();
+              await RunAnywhere.unloadModel();
               await RunAnywhere.unloadSTTModel();
               await RunAnywhere.unloadTTSModel();
               setStoredModels((prev) => prev.filter((m) => m.id !== model.id));
@@ -227,9 +291,16 @@ export const SettingsScreen: React.FC = () => {
           text: 'Clear',
           style: 'destructive',
           onPress: async () => {
-            // In a real implementation, call SDK cache clear method
-            Alert.alert('Success', 'Cache cleared');
-            loadData();
+            try {
+              // Clear SDK cache using new Storage API
+              await RunAnywhere.clearCache();
+              await RunAnywhere.cleanTempFiles();
+              Alert.alert('Success', 'Cache cleared successfully');
+              loadData();
+            } catch (err) {
+              console.error('[Settings] Failed to clear cache:', err);
+              Alert.alert('Error', `Failed to clear cache: ${err}`);
+            }
           },
         },
       ]
@@ -239,52 +310,60 @@ export const SettingsScreen: React.FC = () => {
   /**
    * Handle model download
    */
-  const handleDownloadModel = useCallback(async (model: ModelInfo) => {
-    if (downloadingModels[model.id] !== undefined) {
-      // Already downloading, cancel it
+  const handleDownloadModel = useCallback(
+    async (model: ModelInfo) => {
+      if (downloadingModels[model.id] !== undefined) {
+        // Already downloading, cancel it
+        try {
+          await RunAnywhere.cancelDownload(model.id);
+          setDownloadingModels((prev) => {
+            const updated = { ...prev };
+            delete updated[model.id];
+            return updated;
+          });
+        } catch (err) {
+          console.error('Failed to cancel download:', err);
+        }
+        return;
+      }
+
+      // Start download with progress tracking
+      setDownloadingModels((prev) => ({ ...prev, [model.id]: 0 }));
+
       try {
-        await RunAnywhere.cancelDownload(model.id);
+        await RunAnywhere.downloadModel(model.id, (progress) => {
+          console.log(
+            `[Settings] Download progress for ${model.id}: ${(progress.progress * 100).toFixed(1)}%`
+          );
+          setDownloadingModels((prev) => ({
+            ...prev,
+            [model.id]: progress.progress,
+          }));
+        });
+
+        // Download complete
         setDownloadingModels((prev) => {
           const updated = { ...prev };
           delete updated[model.id];
           return updated;
         });
+
+        Alert.alert('Success', `${model.name} downloaded successfully!`);
+        loadData(); // Refresh to show downloaded model
       } catch (err) {
-        console.error('Failed to cancel download:', err);
+        setDownloadingModels((prev) => {
+          const updated = { ...prev };
+          delete updated[model.id];
+          return updated;
+        });
+        Alert.alert(
+          'Download Failed',
+          `Failed to download ${model.name}: ${err}`
+        );
       }
-      return;
-    }
-
-    // Start download with progress tracking
-    setDownloadingModels((prev) => ({ ...prev, [model.id]: 0 }));
-
-    try {
-      await RunAnywhere.downloadModel(model.id, (progress) => {
-        console.log(`[Settings] Download progress for ${model.id}: ${(progress.progress * 100).toFixed(1)}%`);
-        setDownloadingModels((prev) => ({
-          ...prev,
-          [model.id]: progress.progress,
-        }));
-      });
-
-      // Download complete
-      setDownloadingModels((prev) => {
-        const updated = { ...prev };
-        delete updated[model.id];
-        return updated;
-      });
-
-      Alert.alert('Success', `${model.name} downloaded successfully!`);
-      loadData(); // Refresh to show downloaded model
-    } catch (err) {
-      setDownloadingModels((prev) => {
-        const updated = { ...prev };
-        delete updated[model.id];
-        return updated;
-      });
-      Alert.alert('Download Failed', `Failed to download ${model.name}: ${err}`);
-    }
-  }, [downloadingModels]);
+    },
+    [downloadingModels]
+  );
 
   /**
    * Handle delete downloaded model
@@ -292,7 +371,7 @@ export const SettingsScreen: React.FC = () => {
   const handleDeleteDownloadedModel = useCallback(async (model: ModelInfo) => {
     Alert.alert(
       'Delete Model',
-      `Are you sure you want to delete ${model.name}? This will free up ${formatBytes(model.size)}.`,
+      `Are you sure you want to delete ${model.name}? This will free up ${formatBytes(model.downloadSize || 0)}.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -327,7 +406,7 @@ export const SettingsScreen: React.FC = () => {
           onPress: async () => {
             try {
               // Unload all models
-              await RunAnywhere.unloadTextModel();
+              await RunAnywhere.unloadModel();
               await RunAnywhere.unloadSTTModel();
               await RunAnywhere.unloadTTSModel();
               // Destroy SDK
@@ -426,16 +505,21 @@ export const SettingsScreen: React.FC = () => {
    * Render storage bar
    */
   const renderStorageBar = () => {
-    const usedPercent = (storageInfo.appStorage / storageInfo.totalStorage) * 100;
+    const usedPercent =
+      (storageInfo.appStorage / storageInfo.totalStorage) * 100;
     return (
       <View style={styles.storageBar}>
         <View style={styles.storageBarTrack}>
           <View
-            style={[styles.storageBarFill, { width: `${Math.min(usedPercent, 100)}%` }]}
+            style={[
+              styles.storageBarFill,
+              { width: `${Math.min(usedPercent, 100)}%` },
+            ]}
           />
         </View>
         <Text style={styles.storageText}>
-          {formatBytes(storageInfo.appStorage)} of {formatBytes(storageInfo.totalStorage)} used
+          {formatBytes(storageInfo.appStorage)} of{' '}
+          {formatBytes(storageInfo.totalStorage)} used
         </Text>
       </View>
     );
@@ -480,16 +564,18 @@ export const SettingsScreen: React.FC = () => {
           <View style={styles.catalogModelHeader}>
             <Text style={styles.catalogModelName}>{model.name}</Text>
             <View style={styles.catalogModelBadge}>
-              <Text style={styles.catalogModelBadgeText}>{model.modality}</Text>
+              <Text style={styles.catalogModelBadgeText}>{model.category}</Text>
             </View>
           </View>
-          {model.description && (
+          {model.metadata?.description && (
             <Text style={styles.catalogModelDescription} numberOfLines={2}>
-              {model.description}
+              {model.metadata.description}
             </Text>
           )}
           <View style={styles.catalogModelMeta}>
-            <Text style={styles.catalogModelSize}>{formatBytes(model.size)}</Text>
+            <Text style={styles.catalogModelSize}>
+              {formatBytes(model.downloadSize || 0)}
+            </Text>
             <Text style={styles.catalogModelFormat}>{model.format}</Text>
           </View>
           {isDownloading && (
@@ -515,7 +601,9 @@ export const SettingsScreen: React.FC = () => {
             isDownloading && styles.catalogModelButtonDownloading,
           ]}
           onPress={() =>
-            isDownloaded ? handleDeleteDownloadedModel(model) : handleDownloadModel(model)
+            isDownloaded
+              ? handleDeleteDownloadedModel(model)
+              : handleDownloadModel(model)
           }
         >
           <Icon
@@ -570,12 +658,18 @@ export const SettingsScreen: React.FC = () => {
 
           {/* Capabilities */}
           <View style={styles.capabilitiesContainer}>
-            <Text style={styles.capabilitiesLabel}>Supported Capabilities:</Text>
+            <Text style={styles.capabilitiesLabel}>
+              Supported Capabilities:
+            </Text>
             {capabilities.length > 0 ? (
               <View style={styles.capabilitiesList}>
                 {capabilities.map((cap) => (
                   <View key={cap} style={styles.capabilityBadge}>
-                    <Icon name="checkmark-circle" size={14} color={Colors.primaryGreen} />
+                    <Icon
+                      name="checkmark-circle"
+                      size={14}
+                      color={Colors.primaryGreen}
+                    />
                     <Text style={styles.capabilityText}>
                       {capabilityNames[cap] || `Capability ${cap}`}
                     </Text>
@@ -583,7 +677,9 @@ export const SettingsScreen: React.FC = () => {
                 ))}
               </View>
             ) : (
-              <Text style={styles.noCapabilities}>No capabilities reported</Text>
+              <Text style={styles.noCapabilities}>
+                No capabilities reported
+              </Text>
             )}
           </View>
 
@@ -591,35 +687,63 @@ export const SettingsScreen: React.FC = () => {
           <View style={styles.modelStatusContainer}>
             <Text style={styles.capabilitiesLabel}>Loaded Models:</Text>
             <View style={styles.modelStatusGrid}>
-              <View style={[styles.modelStatusItem, isSTTLoaded && styles.modelStatusItemLoaded]}>
+              <View
+                style={[
+                  styles.modelStatusItem,
+                  isSTTLoaded && styles.modelStatusItemLoaded,
+                ]}
+              >
                 <Icon
                   name={isSTTLoaded ? 'checkmark-circle' : 'close-circle'}
                   size={16}
-                  color={isSTTLoaded ? Colors.primaryGreen : Colors.textTertiary}
+                  color={
+                    isSTTLoaded ? Colors.primaryGreen : Colors.textTertiary
+                  }
                 />
                 <Text style={styles.modelStatusText}>STT</Text>
               </View>
-              <View style={[styles.modelStatusItem, isTTSLoaded && styles.modelStatusItemLoaded]}>
+              <View
+                style={[
+                  styles.modelStatusItem,
+                  isTTSLoaded && styles.modelStatusItemLoaded,
+                ]}
+              >
                 <Icon
                   name={isTTSLoaded ? 'checkmark-circle' : 'close-circle'}
                   size={16}
-                  color={isTTSLoaded ? Colors.primaryGreen : Colors.textTertiary}
+                  color={
+                    isTTSLoaded ? Colors.primaryGreen : Colors.textTertiary
+                  }
                 />
                 <Text style={styles.modelStatusText}>TTS</Text>
               </View>
-              <View style={[styles.modelStatusItem, isTextLoaded && styles.modelStatusItemLoaded]}>
+              <View
+                style={[
+                  styles.modelStatusItem,
+                  isTextLoaded && styles.modelStatusItemLoaded,
+                ]}
+              >
                 <Icon
                   name={isTextLoaded ? 'checkmark-circle' : 'close-circle'}
                   size={16}
-                  color={isTextLoaded ? Colors.primaryGreen : Colors.textTertiary}
+                  color={
+                    isTextLoaded ? Colors.primaryGreen : Colors.textTertiary
+                  }
                 />
                 <Text style={styles.modelStatusText}>LLM</Text>
               </View>
-              <View style={[styles.modelStatusItem, isVADLoaded && styles.modelStatusItemLoaded]}>
+              <View
+                style={[
+                  styles.modelStatusItem,
+                  isVADLoaded && styles.modelStatusItemLoaded,
+                ]}
+              >
                 <Icon
                   name={isVADLoaded ? 'checkmark-circle' : 'close-circle'}
                   size={16}
-                  color={isVADLoaded ? Colors.primaryGreen : Colors.textTertiary}
+                  color={
+                    isVADLoaded ? Colors.primaryGreen : Colors.textTertiary
+                  }
                 />
                 <Text style={styles.modelStatusText}>VAD</Text>
               </View>
@@ -721,7 +845,10 @@ export const SettingsScreen: React.FC = () => {
         {/* Storage Management */}
         {renderSectionHeader('Storage Management')}
         <View style={styles.section}>
-          <TouchableOpacity style={styles.dangerButton} onPress={handleClearCache}>
+          <TouchableOpacity
+            style={styles.dangerButton}
+            onPress={handleClearCache}
+          >
             <Icon name="trash-outline" size={20} color={Colors.primaryOrange} />
             <Text style={styles.dangerButtonText}>Clear Cache</Text>
           </TouchableOpacity>
@@ -738,8 +865,8 @@ export const SettingsScreen: React.FC = () => {
 
         {/* Version Info */}
         <View style={styles.versionContainer}>
-          <Text style={styles.versionText}>RunAnywhere AI Demo v1.0.0</Text>
-          <Text style={styles.versionSubtext}>SDK v{sdkVersion} (React Native)</Text>
+          <Text style={styles.versionText}>RunAnywhere AI</Text>
+          <Text style={styles.versionSubtext}>SDK v{sdkVersion}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

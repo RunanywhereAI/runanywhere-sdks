@@ -193,7 +193,8 @@ int32_t rac_error_capture_stack_trace(rac_error_t* error) {
     if (!error)
         return 0;
 
-#if defined(__APPLE__) || defined(__linux__)
+// Note: Android defines __linux__ but doesn't have execinfo.h/backtrace
+#if (defined(__APPLE__) || defined(__linux__)) && !defined(__ANDROID__)
     void* buffer[RAC_MAX_STACK_FRAMES];
     int frame_count = backtrace(buffer, RAC_MAX_STACK_FRAMES);
 
@@ -221,7 +222,7 @@ int32_t rac_error_capture_stack_trace(rac_error_t* error) {
 
     return captured;
 #else
-    // Platform doesn't support backtrace
+    // Platform doesn't support backtrace (Android, Windows, etc.)
     error->stack_frame_count = 0;
     return 0;
 #endif

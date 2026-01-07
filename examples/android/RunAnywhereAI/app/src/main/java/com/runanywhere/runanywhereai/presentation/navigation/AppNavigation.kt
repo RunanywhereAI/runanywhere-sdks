@@ -20,9 +20,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.runanywhere.runanywhereai.presentation.chat.ChatScreen
+import com.runanywhere.runanywhereai.presentation.settings.SettingsScreen
 import com.runanywhere.runanywhereai.presentation.stt.SpeechToTextScreen
 import com.runanywhere.runanywhereai.presentation.tts.TextToSpeechScreen
-import com.runanywhere.runanywhereai.presentation.settings.SettingsScreen
 import com.runanywhere.runanywhereai.presentation.voice.VoiceAssistantScreen
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 
@@ -40,12 +40,12 @@ fun AppNavigation() {
     Scaffold(
         bottomBar = {
             RunAnywhereBottomNav(navController = navController)
-        }
+        },
     ) { paddingValues ->
         NavHost(
             navController = navController,
             startDestination = NavigationRoute.CHAT,
-            modifier = Modifier.padding(paddingValues)
+            modifier = Modifier.padding(paddingValues),
         ) {
             composable(NavigationRoute.CHAT) {
                 ChatScreen()
@@ -86,44 +86,46 @@ fun RunAnywhereBottomNav(navController: NavController) {
     val currentDestination = navBackStackEntry?.destination
 
     // Match iOS tab order and icons exactly: Chat, STT, TTS, Voice, Settings
-    val items = listOf(
-        BottomNavItem(
-            route = NavigationRoute.CHAT,
-            label = "Chat",
-            icon = Icons.Outlined.Chat,
-            selectedIcon = Icons.Filled.Chat
-        ),
-        BottomNavItem(
-            route = NavigationRoute.STT,
-            label = "STT",
-            icon = Icons.Outlined.GraphicEq,
-            selectedIcon = Icons.Filled.GraphicEq
-        ),
-        BottomNavItem(
-            route = NavigationRoute.TTS,
-            label = "TTS",
-            icon = Icons.Outlined.VolumeUp,
-            selectedIcon = Icons.Filled.VolumeUp
-        ),
-        BottomNavItem(
-            route = NavigationRoute.VOICE,
-            label = "Voice",
-            icon = Icons.Outlined.Mic,
-            selectedIcon = Icons.Filled.Mic
-        ),
-        BottomNavItem(
-            route = NavigationRoute.SETTINGS,
-            label = "Settings",
-            icon = Icons.Outlined.Settings,
-            selectedIcon = Icons.Filled.Settings
+    val items =
+        listOf(
+            BottomNavItem(
+                route = NavigationRoute.CHAT,
+                label = "Chat",
+                icon = Icons.Outlined.Chat,
+                selectedIcon = Icons.Filled.Chat,
+            ),
+            BottomNavItem(
+                route = NavigationRoute.STT,
+                label = "STT",
+                icon = Icons.Outlined.GraphicEq,
+                selectedIcon = Icons.Filled.GraphicEq,
+            ),
+            BottomNavItem(
+                route = NavigationRoute.TTS,
+                label = "TTS",
+                icon = Icons.Outlined.VolumeUp,
+                selectedIcon = Icons.Filled.VolumeUp,
+            ),
+            BottomNavItem(
+                route = NavigationRoute.VOICE,
+                label = "Voice",
+                icon = Icons.Outlined.Mic,
+                selectedIcon = Icons.Filled.Mic,
+            ),
+            BottomNavItem(
+                route = NavigationRoute.SETTINGS,
+                label = "Settings",
+                icon = Icons.Outlined.Settings,
+                selectedIcon = Icons.Filled.Settings,
+            ),
         )
-    )
 
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(24.dp))
+        modifier =
+            Modifier
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .clip(RoundedCornerShape(24.dp)),
     ) {
         items.forEach { item ->
             val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
@@ -132,18 +134,19 @@ fun RunAnywhereBottomNav(navController: NavController) {
                 icon = {
                     Icon(
                         imageVector = if (selected) item.selectedIcon else item.icon,
-                        contentDescription = item.label
+                        contentDescription = item.label,
                     )
                 },
                 label = { Text(item.label) },
                 selected = selected,
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = AppColors.primaryAccent,
-                    selectedTextColor = AppColors.primaryAccent,
-                    indicatorColor = AppColors.primaryAccent.copy(alpha = 0.1f),
-                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                ),
+                colors =
+                    NavigationBarItemDefaults.colors(
+                        selectedIconColor = AppColors.primaryAccent,
+                        selectedTextColor = AppColors.primaryAccent,
+                        indicatorColor = AppColors.primaryAccent.copy(alpha = 0.1f),
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
                 onClick = {
                     navController.navigate(item.route) {
                         // Pop up to the start destination to avoid building up a large stack
@@ -155,7 +158,7 @@ fun RunAnywhereBottomNav(navController: NavController) {
                         // Restore state when reselecting a previously selected item
                         restoreState = true
                     }
-                }
+                },
             )
         }
     }
@@ -181,5 +184,5 @@ data class BottomNavItem(
     val route: String,
     val label: String,
     val icon: ImageVector,
-    val selectedIcon: ImageVector = icon
+    val selectedIcon: ImageVector = icon,
 )

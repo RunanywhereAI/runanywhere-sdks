@@ -13,8 +13,16 @@ if(NOT DEFINED IOS_PLATFORM)
 endif()
 
 # Deployment target
+# This can be set via:
+#   1. CMake variable: -DIOS_DEPLOYMENT_TARGET=13.0
+#   2. Environment variable (set by build scripts from VERSIONS file)
+# Default matches VERSIONS file - keep in sync!
 if(NOT DEFINED IOS_DEPLOYMENT_TARGET)
-    set(IOS_DEPLOYMENT_TARGET "13.0" CACHE STRING "iOS deployment target version")
+    if(DEFINED ENV{IOS_DEPLOYMENT_TARGET})
+        set(IOS_DEPLOYMENT_TARGET "$ENV{IOS_DEPLOYMENT_TARGET}" CACHE STRING "iOS deployment target version")
+    else()
+        set(IOS_DEPLOYMENT_TARGET "13.0" CACHE STRING "iOS deployment target version")
+    endif()
 endif()
 
 # Enable bitcode (deprecated in iOS 16, but still needed for older targets)

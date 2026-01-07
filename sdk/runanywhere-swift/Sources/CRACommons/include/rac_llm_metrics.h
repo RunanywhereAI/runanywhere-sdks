@@ -247,6 +247,21 @@ RAC_API rac_result_t rac_streaming_metrics_get_token_count(rac_streaming_metrics
 RAC_API rac_result_t rac_streaming_metrics_get_text(rac_streaming_metrics_handle_t handle,
                                                     char** out_text);
 
+/**
+ * @brief Set actual token counts from backend.
+ *
+ * Call this with actual token counts from the LLM backend's tokenizer
+ * to get accurate telemetry instead of character-based estimation.
+ *
+ * @param handle Collector handle
+ * @param input_tokens Actual input/prompt token count (0 to use estimation)
+ * @param output_tokens Actual output/completion token count (0 to use estimation)
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_streaming_metrics_set_token_counts(rac_streaming_metrics_handle_t handle,
+                                                            int32_t input_tokens,
+                                                            int32_t output_tokens);
+
 // =============================================================================
 // GENERATION ANALYTICS SERVICE API - Mirrors Swift's GenerationAnalyticsService
 // =============================================================================

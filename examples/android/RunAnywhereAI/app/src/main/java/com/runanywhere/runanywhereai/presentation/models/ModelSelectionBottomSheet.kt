@@ -16,15 +16,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppTypography
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.launch
+import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.models.DeviceInfo
-import com.runanywhere.sdk.models.enums.LLMFramework
-import com.runanywhere.sdk.models.enums.ModelSelectionContext
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.Models.ModelCategory
+import com.runanywhere.sdk.public.extensions.Models.ModelFormat
+import com.runanywhere.sdk.public.extensions.Models.ModelInfo
+import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
+import com.runanywhere.sdk.public.extensions.loadTTSVoice
+import kotlinx.coroutines.launch
 
 /**
  * Model Selection Bottom Sheet - Context-Aware Implementation
@@ -49,42 +54,49 @@ import com.runanywhere.sdk.models.enums.ModelSelectionContext
 fun ModelSelectionBottomSheet(
     context: ModelSelectionContext = ModelSelectionContext.LLM,
     onDismiss: () -> Unit,
-    onModelSelected: suspend (com.runanywhere.sdk.models.ModelInfo) -> Unit,
-    viewModel: ModelSelectionViewModel = viewModel(
-        factory = ModelSelectionViewModel.Factory(context)
-    )
+    onModelSelected: suspend (ModelInfo) -> Unit,
+    viewModel: ModelSelectionViewModel =
+        viewModel(
+            // CRITICAL: Use context-specific key to prevent ViewModel caching across contexts
+            // Without this key, Compose reuses the same ViewModel instance for STT, LLM, and TTS
+            // which causes the wrong models to appear when switching between modalities
+            key = "ModelSelectionViewModel_${context.name}",
+            factory = ModelSelectionViewModel.Factory(context),
+        ),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true
-    )
+    val sheetState =
+        rememberModalBottomSheetState(
+            skipPartiallyExpanded = true,
+        )
 
     ModalBottomSheet(
         onDismissRequest = { if (!uiState.isLoadingModel) onDismiss() },
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface
+        containerColor = MaterialTheme.colorScheme.surface,
     ) {
         Box {
             // Main Content
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = Dimensions.large),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = Dimensions.large),
                 contentPadding = PaddingValues(Dimensions.large),
-                verticalArrangement = Arrangement.spacedBy(Dimensions.large)
+                verticalArrangement = Arrangement.spacedBy(Dimensions.large),
             ) {
                 // HEADER - Context-aware title
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         // Cancel button
                         TextButton(
                             onClick = { if (!uiState.isLoadingModel) onDismiss() },
-                            enabled = !uiState.isLoadingModel
+                            enabled = !uiState.isLoadingModel,
                         ) {
                             Text("Cancel")
                         }
@@ -93,13 +105,13 @@ fun ModelSelectionBottomSheet(
                         Text(
                             text = uiState.context.title,
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
                         )
 
                         // Add Model button (placeholder for future)
                         TextButton(
                             onClick = { /* TODO: Add model from URL */ },
-                            enabled = false
+                            enabled = false,
                         ) {
                             Text("Add Model")
                         }
@@ -117,7 +129,7 @@ fun ModelSelectionBottomSheet(
                         frameworks = uiState.frameworks,
                         expandedFramework = uiState.expandedFramework,
                         isLoading = uiState.isLoading,
-                        onToggleFramework = { viewModel.toggleFramework(it) }
+                        onToggleFramework = { viewModel.toggleFramework(it) },
                     )
                 }
 
@@ -127,15 +139,15 @@ fun ModelSelectionBottomSheet(
 
                     item {
                         Text(
-                            text = if (expandedFw == LLMFramework.SYSTEM_TTS) "System TTS" else "Models for ${expandedFw.displayName}",
+                            text = if (expandedFw == InferenceFramework.SYSTEM_TTS) "System TTS" else "Models for ${expandedFw.displayName}",
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(top = Dimensions.small)
+                            modifier = Modifier.padding(top = Dimensions.small),
                         )
                     }
 
                     // Special handling for System TTS (matches iOS ModelSelectionSheet.swift)
-                    if (expandedFw == LLMFramework.SYSTEM_TTS) {
+                    if (expandedFw == InferenceFramework.SYSTEM_TTS) {
                         item {
                             SystemTTSRow(
                                 isLoading = uiState.isLoadingModel,
@@ -144,17 +156,16 @@ fun ModelSelectionBottomSheet(
                                         viewModel.setLoadingModel(true)
                                         try {
                                             // Load System TTS via SDK to trigger lifecycle tracker
-                                            com.runanywhere.sdk.public.RunAnywhere.loadTTSModel("system-tts")
+                                            RunAnywhere.loadTTSVoice("system-tts")
 
                                             // Create pseudo ModelInfo for System TTS (matches iOS)
-                                            val systemTTSModel = com.runanywhere.sdk.models.ModelInfo(
+                                            val systemTTSModel = ModelInfo(
                                                 id = "system-tts",
                                                 name = "System TTS",
                                                 downloadURL = null,
-                                                format = com.runanywhere.sdk.models.enums.ModelFormat.UNKNOWN,
-                                                category = com.runanywhere.sdk.models.enums.ModelCategory.SPEECH_SYNTHESIS,
-                                                compatibleFrameworks = listOf(LLMFramework.SYSTEM_TTS),
-                                                preferredFramework = LLMFramework.SYSTEM_TTS
+                                                format = ModelFormat.UNKNOWN,
+                                                category = ModelCategory.SPEECH_SYNTHESIS,
+                                                framework = InferenceFramework.SYSTEM_TTS,
                                             )
 
                                             kotlinx.coroutines.delay(300)
@@ -166,7 +177,7 @@ fun ModelSelectionBottomSheet(
                                             viewModel.setLoadingModel(false)
                                         }
                                     }
-                                }
+                                },
                             )
                         }
                     } else {
@@ -191,7 +202,7 @@ fun ModelSelectionBottomSheet(
                                     isSelected = uiState.currentModel?.id == model.id,
                                     isLoading = uiState.isLoadingModel && uiState.selectedModelId == model.id,
                                     onDownloadModel = {
-                                        viewModel.downloadModel(model.id)
+                                        viewModel.startDownload(model.id)
                                     },
                                     onSelectModel = {
                                         scope.launch {
@@ -200,7 +211,7 @@ fun ModelSelectionBottomSheet(
                                             onModelSelected(model)
                                             onDismiss()
                                         }
-                                    }
+                                    },
                                 )
                             }
                         }
@@ -212,7 +223,7 @@ fun ModelSelectionBottomSheet(
             if (uiState.isLoadingModel) {
                 LoadingOverlay(
                     modelName = uiState.models.find { it.id == uiState.selectedModelId }?.name ?: "Model",
-                    progress = uiState.loadingProgress
+                    progress = uiState.loadingProgress,
                 )
             }
         }
@@ -228,53 +239,53 @@ private fun DeviceStatusSection(deviceInfo: DeviceInfo?) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(Dimensions.mediumLarge),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(
             modifier = Modifier.padding(Dimensions.large),
-            verticalArrangement = Arrangement.spacedBy(Dimensions.smallMedium)
+            verticalArrangement = Arrangement.spacedBy(Dimensions.smallMedium),
         ) {
             Text(
                 text = "Device Status",
                 style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
             )
 
             if (deviceInfo != null) {
                 DeviceInfoRowItem(
                     label = "Model",
                     icon = Icons.Default.PhoneAndroid,
-                    value = deviceInfo.deviceModel
+                    value = deviceInfo.modelName,
                 )
                 DeviceInfoRowItem(
                     label = "Platform",
                     icon = Icons.Default.Memory,
-                    value = "${deviceInfo.platformName} ${deviceInfo.platformVersion}"
+                    value = "${deviceInfo.platform} ${deviceInfo.osVersion}",
                 )
                 DeviceInfoRowItem(
-                    label = "OS Version",
+                    label = "Architecture",
                     icon = Icons.Default.Android,
-                    value = deviceInfo.osVersion
+                    value = deviceInfo.architecture,
                 )
                 DeviceInfoRowItem(
                     label = "CPU Cores",
                     icon = Icons.Default.Settings,
-                    value = deviceInfo.cpuCores.toString()
+                    value = deviceInfo.processorCount.toString(),
                 )
                 DeviceInfoRowItem(
                     label = "Memory",
                     icon = Icons.Default.Memory,
-                    value = "${deviceInfo.totalMemoryMB} MB"
+                    value = "${deviceInfo.totalMemoryMB} MB",
                 )
             } else {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(Dimensions.small),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     CircularProgressIndicator(modifier = Modifier.size(16.dp))
                     Text(
                         text = "Loading device info...",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -286,25 +297,25 @@ private fun DeviceStatusSection(deviceInfo: DeviceInfo?) {
 private fun DeviceInfoRowItem(
     label: String,
     icon: ImageVector,
-    value: String
+    value: String,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(Dimensions.small)) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
                 modifier = Modifier.size(Dimensions.iconSmall),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(label, style = MaterialTheme.typography.bodyLarge)
         }
         Text(
             value,
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -315,36 +326,36 @@ private fun DeviceInfoRowItem(
 
 @Composable
 private fun AvailableFrameworksSection(
-    frameworks: List<LLMFramework>,
-    expandedFramework: LLMFramework?,
+    frameworks: List<InferenceFramework>,
+    expandedFramework: InferenceFramework?,
     isLoading: Boolean,
-    onToggleFramework: (LLMFramework) -> Unit
+    onToggleFramework: (InferenceFramework) -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(Dimensions.mediumLarge),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(
             modifier = Modifier.padding(Dimensions.large),
-            verticalArrangement = Arrangement.spacedBy(Dimensions.smallMedium)
+            verticalArrangement = Arrangement.spacedBy(Dimensions.smallMedium),
         ) {
             Text(
                 text = "Available Frameworks",
                 style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
             )
 
             when {
                 isLoading -> {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(Dimensions.small),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp))
                         Text(
                             text = "Loading frameworks...",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -353,12 +364,12 @@ private fun AvailableFrameworksSection(
                         Text(
                             text = "No framework adapters are currently registered.",
                             style = AppTypography.caption2,
-                            color = MaterialTheme.colorScheme.error
+                            color = MaterialTheme.colorScheme.error,
                         )
                         Text(
                             text = "Register framework adapters to see available frameworks.",
                             style = AppTypography.caption2,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -367,7 +378,7 @@ private fun AvailableFrameworksSection(
                         FrameworkRow(
                             framework = framework,
                             isExpanded = expandedFramework == framework,
-                            onTap = { onToggleFramework(framework) }
+                            onTap = { onToggleFramework(framework) },
                         )
                     }
                 }
@@ -378,40 +389,41 @@ private fun AvailableFrameworksSection(
 
 @Composable
 private fun FrameworkRow(
-    framework: LLMFramework,
+    framework: InferenceFramework,
     isExpanded: Boolean,
-    onTap: () -> Unit
+    onTap: () -> Unit,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onTap)
-            .padding(vertical = Dimensions.small),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onTap)
+                .padding(vertical = Dimensions.small),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(Dimensions.small),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             // Framework icon - context-aware
             Icon(
                 imageVector = getFrameworkIcon(framework),
                 contentDescription = null,
                 modifier = Modifier.size(Dimensions.iconRegular),
-                tint = MaterialTheme.colorScheme.primary
+                tint = MaterialTheme.colorScheme.primary,
             )
 
             Column {
                 Text(
                     framework.displayName,
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
                 )
                 Text(
                     getFrameworkDescription(framework),
                     style = AppTypography.caption2,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -419,7 +431,7 @@ private fun FrameworkRow(
         Icon(
             imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
             contentDescription = if (isExpanded) "Collapse" else "Expand",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -427,17 +439,14 @@ private fun FrameworkRow(
 /**
  * Get icon for framework - matches iOS iconForFramework
  */
-private fun getFrameworkIcon(framework: LLMFramework): ImageVector {
+private fun getFrameworkIcon(framework: InferenceFramework): ImageVector {
     return when (framework) {
-        LLMFramework.LLAMA_CPP, LLMFramework.LLAMACPP -> Icons.Default.Memory
-        LLMFramework.MEDIA_PIPE -> Icons.Default.Psychology
-        LLMFramework.WHISPER_KIT, LLMFramework.WHISPER_CPP, LLMFramework.OPEN_AI_WHISPER -> Icons.Default.Mic
-        LLMFramework.SYSTEM_TTS -> Icons.Default.VolumeUp
-        LLMFramework.FOUNDATION_MODELS -> Icons.Default.AutoAwesome
-        LLMFramework.CORE_ML -> Icons.Default.Memory
-        LLMFramework.TENSOR_FLOW_LITE -> Icons.Default.Analytics
-        LLMFramework.ONNX -> Icons.Default.Hub
-        LLMFramework.MLX, LLMFramework.MLC -> Icons.Default.Speed
+        InferenceFramework.LLAMA_CPP -> Icons.Default.Memory
+        InferenceFramework.ONNX -> Icons.Default.Hub
+        InferenceFramework.SYSTEM_TTS -> Icons.Default.VolumeUp
+        InferenceFramework.FOUNDATION_MODELS -> Icons.Default.AutoAwesome
+        InferenceFramework.FLUID_AUDIO -> Icons.Default.Mic
+        InferenceFramework.BUILT_IN -> Icons.Default.Settings
         else -> Icons.Default.Settings
     }
 }
@@ -445,23 +454,16 @@ private fun getFrameworkIcon(framework: LLMFramework): ImageVector {
 /**
  * Get description for framework - matches iOS
  */
-private fun getFrameworkDescription(framework: LLMFramework): String {
+private fun getFrameworkDescription(framework: InferenceFramework): String {
     return when (framework) {
-        LLMFramework.LLAMA_CPP, LLMFramework.LLAMACPP -> "High-performance LLM inference"
-        LLMFramework.MEDIA_PIPE -> "Multi-task AI inference"
-        LLMFramework.WHISPER_KIT -> "Optimized speech recognition"
-        LLMFramework.WHISPER_CPP -> "C++ speech recognition"
-        LLMFramework.OPEN_AI_WHISPER -> "OpenAI Whisper models"
-        LLMFramework.SYSTEM_TTS -> "Built-in text-to-speech"
-        LLMFramework.FOUNDATION_MODELS -> "Apple Intelligence models"
-        LLMFramework.CORE_ML -> "Apple Neural Engine"
-        LLMFramework.TENSOR_FLOW_LITE -> "TensorFlow Lite models"
-        LLMFramework.ONNX -> "ONNX Runtime inference"
-        LLMFramework.MLX -> "Apple Silicon optimized"
-        LLMFramework.MLC -> "Machine Learning Compilation"
-        LLMFramework.EXECU_TORCH -> "PyTorch mobile inference"
-        LLMFramework.PICO_LLM -> "Embedded LLM inference"
-        LLMFramework.SWIFT_TRANSFORMERS -> "HuggingFace Transformers"
+        InferenceFramework.LLAMA_CPP -> "High-performance LLM inference"
+        InferenceFramework.ONNX -> "ONNX Runtime inference"
+        InferenceFramework.SYSTEM_TTS -> "Built-in text-to-speech"
+        InferenceFramework.FOUNDATION_MODELS -> "Foundation models"
+        InferenceFramework.FLUID_AUDIO -> "FluidAudio synthesis"
+        InferenceFramework.BUILT_IN -> "Built-in algorithms"
+        InferenceFramework.NONE -> "No framework"
+        InferenceFramework.UNKNOWN -> "Unknown framework"
     }
 }
 
@@ -470,72 +472,74 @@ private fun getFrameworkDescription(framework: LLMFramework): String {
 // ====================
 
 @Composable
-private fun EmptyModelsMessage(framework: LLMFramework) {
+private fun EmptyModelsMessage(framework: InferenceFramework) {
     Column(
         verticalArrangement = Arrangement.spacedBy(Dimensions.small),
-        modifier = Modifier.padding(vertical = Dimensions.small)
+        modifier = Modifier.padding(vertical = Dimensions.small),
     ) {
         Text(
             text = "No models available for ${framework.displayName}",
             style = AppTypography.caption,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
             text = "Tap 'Add Model' to add a model from URL",
             style = AppTypography.caption2,
-            color = MaterialTheme.colorScheme.primary
+            color = MaterialTheme.colorScheme.primary,
         )
     }
 }
 
 @Composable
 private fun SelectableModelRow(
-    model: com.runanywhere.sdk.models.ModelInfo,
+    model: ModelInfo,
     isSelected: Boolean,
     isLoading: Boolean,
     onDownloadModel: () -> Unit,
-    onSelectModel: () -> Unit
+    onSelectModel: () -> Unit,
 ) {
     // State detection - matches iOS logic
-    val isDownloaded = model.localPath != null
+    val isDownloaded = model.isDownloaded
     val canDownload = model.downloadURL != null
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(Dimensions.medium),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+            ),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Dimensions.large),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(Dimensions.large),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             // LEFT: Model Info
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(Dimensions.xSmall)
+                verticalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
             ) {
                 // Model name
                 Text(
                     text = model.name,
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (isSelected || isLoading) FontWeight.SemiBold else FontWeight.Normal
+                    fontWeight = if (isSelected || isLoading) FontWeight.SemiBold else FontWeight.Normal,
                 )
 
                 // Badges row
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(Dimensions.smallMedium)
+                    horizontalArrangement = Arrangement.spacedBy(Dimensions.smallMedium),
                 ) {
                     // Size badge
-                    val memReq = model.memoryRequired ?: 0L
-                    if (memReq > 0) {
+                    val downloadSize = model.downloadSize ?: 0L
+                    if (downloadSize > 0) {
                         ModelBadge(
-                            text = formatBytes(memReq),
-                            icon = Icons.Default.Memory
+                            text = formatBytes(downloadSize),
+                            icon = Icons.Default.Memory,
                         )
                     }
 
@@ -548,7 +552,7 @@ private fun SelectableModelRow(
                             text = "THINKING",
                             icon = Icons.Default.Psychology,
                             backgroundColor = MaterialTheme.colorScheme.secondaryContainer,
-                            textColor = MaterialTheme.colorScheme.secondary
+                            textColor = MaterialTheme.colorScheme.secondary,
                         )
                     }
                 }
@@ -556,7 +560,7 @@ private fun SelectableModelRow(
                 // Status indicator
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     when {
                         isSelected -> {
@@ -564,12 +568,12 @@ private fun SelectableModelRow(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = "Loaded",
                                 modifier = Modifier.size(12.dp),
-                                tint = Color(0xFF4CAF50)
+                                tint = Color(0xFF4CAF50),
                             )
                             Text(
                                 text = "Loaded",
                                 style = AppTypography.caption2,
-                                color = Color(0xFF4CAF50)
+                                color = Color(0xFF4CAF50),
                             )
                         }
                         isDownloaded -> {
@@ -577,19 +581,19 @@ private fun SelectableModelRow(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = "Downloaded",
                                 modifier = Modifier.size(12.dp),
-                                tint = MaterialTheme.colorScheme.tertiary
+                                tint = MaterialTheme.colorScheme.tertiary,
                             )
                             Text(
                                 text = "Downloaded",
                                 style = AppTypography.caption2,
-                                color = MaterialTheme.colorScheme.tertiary
+                                color = MaterialTheme.colorScheme.tertiary,
                             )
                         }
                         canDownload -> {
                             Text(
                                 text = "Available for download",
                                 style = AppTypography.caption2,
-                                color = MaterialTheme.colorScheme.primary
+                                color = MaterialTheme.colorScheme.primary,
                             )
                         }
                     }
@@ -606,19 +610,19 @@ private fun SelectableModelRow(
                 isSelected -> {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
                             imageVector = Icons.Default.CheckCircle,
                             contentDescription = "Loaded",
                             tint = Color(0xFF4CAF50),
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(20.dp),
                         )
                         Text(
                             text = "Loaded",
                             style = MaterialTheme.typography.bodyMedium,
                             color = Color(0xFF4CAF50),
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Medium,
                         )
                     }
                 }
@@ -626,9 +630,10 @@ private fun SelectableModelRow(
                     Button(
                         onClick = onSelectModel,
                         enabled = !isLoading,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        )
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                            ),
                     ) {
                         Text("Load")
                     }
@@ -637,9 +642,10 @@ private fun SelectableModelRow(
                     Button(
                         onClick = onDownloadModel,
                         enabled = !isLoading,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        )
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                            ),
                     ) {
                         Text("Download")
                     }
@@ -654,27 +660,28 @@ private fun ModelBadge(
     text: String,
     icon: ImageVector? = null,
     backgroundColor: Color = MaterialTheme.colorScheme.surfaceVariant,
-    textColor: Color = MaterialTheme.colorScheme.onSurface
+    textColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     Row(
-        modifier = Modifier
-            .background(backgroundColor, RoundedCornerShape(Dimensions.cornerRadiusSmall))
-            .padding(horizontal = Dimensions.small, vertical = Dimensions.xxSmall),
+        modifier =
+            Modifier
+                .background(backgroundColor, RoundedCornerShape(Dimensions.cornerRadiusSmall))
+                .padding(horizontal = Dimensions.small, vertical = Dimensions.xxSmall),
         horizontalArrangement = Arrangement.spacedBy(Dimensions.xxSmall),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         icon?.let {
             Icon(
                 imageVector = it,
                 contentDescription = null,
                 modifier = Modifier.size(10.dp),
-                tint = textColor
+                tint = textColor,
             )
         }
         Text(
             text = text,
             style = AppTypography.caption2,
-            color = textColor
+            color = textColor,
         )
     }
 }
@@ -685,39 +692,41 @@ private fun ModelBadge(
 
 @Composable
 private fun LoadingOverlay(
-    modelName: String,
-    progress: String
+    @Suppress("UNUSED_PARAMETER") modelName: String,
+    progress: String,
 ) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.5f)),
-        contentAlignment = Alignment.Center
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.5f)),
+        contentAlignment = Alignment.Center,
     ) {
         Card(
             modifier = Modifier.padding(Dimensions.xxLarge),
             shape = RoundedCornerShape(Dimensions.cornerRadiusXLarge),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
+            colors =
+                CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
         ) {
             Column(
                 modifier = Modifier.padding(Dimensions.xxLarge),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(Dimensions.xLarge)
+                verticalArrangement = Arrangement.spacedBy(Dimensions.xLarge),
             ) {
                 CircularProgressIndicator()
 
                 Text(
                     text = "Loading Model",
                     style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
                 )
 
                 Text(
                     text = progress,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -735,72 +744,73 @@ private fun LoadingOverlay(
 @Composable
 private fun SystemTTSRow(
     isLoading: Boolean,
-    onSelect: () -> Unit
+    onSelect: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(Dimensions.mediumLarge),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Dimensions.large),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(Dimensions.large),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             ) {
                 Text(
                     text = "Default System Voice",
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
                 )
 
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(Dimensions.small),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
                         imageVector = Icons.Default.VolumeUp,
                         contentDescription = null,
                         modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
                         text = "Built-in",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
 
                     Surface(
                         shape = RoundedCornerShape(4.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
                     ) {
                         Text(
                             text = "Android TTS",
                             style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                         )
                     }
                 }
 
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(Dimensions.small),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
                         imageVector = Icons.Default.CheckCircle,
                         contentDescription = null,
                         modifier = Modifier.size(14.dp),
-                        tint = AppColors.primaryGreen
+                        tint = AppColors.primaryGreen,
                     )
                     Text(
                         text = "Always available",
                         style = MaterialTheme.typography.labelSmall,
-                        color = AppColors.primaryGreen
+                        color = AppColors.primaryGreen,
                     )
                 }
             }
@@ -808,14 +818,15 @@ private fun SystemTTSRow(
             Button(
                 onClick = onSelect,
                 enabled = !isLoading,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = AppColors.primaryPurple
-                ),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = AppColors.primaryPurple,
+                    ),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             ) {
                 Text(
                     text = "Select",
-                    style = MaterialTheme.typography.labelMedium
+                    style = MaterialTheme.typography.labelMedium,
                 )
             }
         }

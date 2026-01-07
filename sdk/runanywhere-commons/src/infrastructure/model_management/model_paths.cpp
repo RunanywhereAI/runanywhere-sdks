@@ -92,21 +92,7 @@ static std::vector<std::string> split_path(const std::string& path) {
 // FORMAT AND FRAMEWORK UTILITIES
 // =============================================================================
 
-const char* rac_model_format_extension(rac_model_format_t format) {
-    // Mirrors Swift's ModelFormat.rawValue
-    switch (format) {
-        case RAC_MODEL_FORMAT_ONNX:
-            return "onnx";
-        case RAC_MODEL_FORMAT_ORT:
-            return "ort";
-        case RAC_MODEL_FORMAT_GGUF:
-            return "gguf";
-        case RAC_MODEL_FORMAT_BIN:
-            return "bin";
-        default:
-            return "unknown";
-    }
-}
+// NOTE: rac_model_format_extension is defined in model_types.cpp
 
 const char* rac_framework_raw_value(rac_inference_framework_t framework) {
     // Mirrors Swift's InferenceFramework.rawValue

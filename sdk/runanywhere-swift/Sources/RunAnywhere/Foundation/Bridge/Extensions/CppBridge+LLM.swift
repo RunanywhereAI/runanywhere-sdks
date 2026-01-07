@@ -58,10 +58,14 @@ extension CppBridge {
         // MARK: - Model Lifecycle
 
         /// Load an LLM model
-        public func loadModel(_ modelPath: String, modelId: String) throws {
+        public func loadModel(_ modelPath: String, modelId: String, modelName: String) throws {
             let handle = try getHandle()
             let result = modelPath.withCString { pathPtr in
-                rac_llm_component_load_model(handle, pathPtr)
+                modelId.withCString { idPtr in
+                    modelName.withCString { namePtr in
+                        rac_llm_component_load_model(handle, pathPtr, idPtr, namePtr)
+                    }
+                }
             }
             guard result == RAC_SUCCESS else {
                 throw SDKError.llm(.modelLoadFailed, "Failed to load model: \(result)")

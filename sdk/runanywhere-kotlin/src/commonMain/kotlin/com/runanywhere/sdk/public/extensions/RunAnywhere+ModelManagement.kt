@@ -1,271 +1,258 @@
+/*
+ * Copyright 2026 RunAnywhere SDK
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Public API for model management operations.
+ * Calls C++ directly via CppBridge.ModelRegistry for all operations.
+ *
+ * Mirrors Swift RunAnywhere+ModelManagement.swift pattern.
+ */
+
 package com.runanywhere.sdk.public.extensions
 
-import com.runanywhere.sdk.data.models.SDKError
-import com.runanywhere.sdk.events.EventBus
-import com.runanywhere.sdk.events.SDKModelEvent
-import com.runanywhere.sdk.foundation.ServiceContainer
-import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.models.ModelInfo
-import com.runanywhere.sdk.models.LoadedModelWithService
-import kotlin.random.Random
-import kotlin.uuid.Uuid
-import kotlin.uuid.ExperimentalUuidApi
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.runanywhere.sdk.core.types.InferenceFramework
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.Models.ArchiveStructure
+import com.runanywhere.sdk.public.extensions.Models.ArchiveType
+import com.runanywhere.sdk.public.extensions.Models.DownloadProgress
+import com.runanywhere.sdk.public.extensions.Models.ModelArtifactType
+import com.runanywhere.sdk.public.extensions.Models.ModelCategory
+import com.runanywhere.sdk.public.extensions.Models.ModelInfo
+import kotlinx.coroutines.flow.Flow
+
+// MARK: - Model Registration
 
 /**
- * Model Management Extensions for RunAnywhere SDK - EXACT copy of iOS implementation
- * This provides the public API for model management operations
- */
-
-private val logger = SDKLogger("ModelManagement")
-
-/**
- * Load a model by identifier and return model info
- * @param modelIdentifier The model to load
- * @return Information about the loaded model
- */
-suspend fun loadModelWithInfo(modelIdentifier: String): ModelInfo = withContext(Dispatchers.IO) {
-    EventBus.publish(SDKModelEvent.LoadStarted(modelIdentifier))
-
-    try {
-        // Use existing service logic directly
-        val loadedModel = ServiceContainer.shared.modelLoadingService.loadModel(modelIdentifier)
-
-        // IMPORTANT: Set the loaded model in the generation service
-        ServiceContainer.shared.generationService.setCurrentModel(loadedModel)
-
-        EventBus.publish(SDKModelEvent.LoadCompleted(modelIdentifier))
-        return@withContext loadedModel.model
-    } catch (error: Throwable) {
-        EventBus.publish(SDKModelEvent.LoadFailed(modelIdentifier, error))
-        throw error
-    }
-}
-
-/**
- * Unload the currently loaded model
- */
-suspend fun unloadModel() = withContext(Dispatchers.IO) {
-    EventBus.publish(SDKModelEvent.UnloadStarted)
-
-    try {
-        // Get the current model ID from generation service
-        val currentModel = ServiceContainer.shared.generationService.getCurrentModel()
-        if (currentModel != null) {
-            val modelId = currentModel.model.id
-
-            // Unload through model loading service
-            ServiceContainer.shared.modelLoadingService.unloadModel(modelId)
-
-            // Clear from generation service
-            ServiceContainer.shared.generationService.setCurrentModel(null)
-        }
-
-        EventBus.publish(SDKModelEvent.UnloadCompleted)
-    } catch (error: Throwable) {
-        EventBus.publish(SDKModelEvent.UnloadFailed(error))
-        throw error
-    }
-}
-
-/**
- * List all available models
- * @return Array of available models
- */
-suspend fun listAvailableModels(): List<ModelInfo> = withContext(Dispatchers.IO) {
-    EventBus.publish(SDKModelEvent.ListRequested)
-
-    // Use model registry to discover models
-    val models = ServiceContainer.shared.modelRegistry.discoverModels()
-    EventBus.publish(SDKModelEvent.ListCompleted(models))
-    return@withContext models
-}
-
-/**
- * Download a model
- * @param modelIdentifier The model to download
- */
-suspend fun downloadModel(modelIdentifier: String) = withContext(Dispatchers.IO) {
-    EventBus.publish(SDKModelEvent.DownloadStarted(modelIdentifier))
-
-    try {
-        // Get the model info first
-        val modelService = ServiceContainer.shared.modelInfoService
-
-        // Log available models for debugging
-        val allModels = modelService.loadStoredModels()
-        logger.debug("Available models in database: ${allModels.map { it.id }}")
-        logger.debug("Looking for model: $modelIdentifier")
-
-        var modelInfo = modelService.getModel(modelIdentifier)
-        if (modelInfo == null) {
-            logger.error("Model not found in database: $modelIdentifier")
-            // Try to find in registry as fallback
-            val registryModel = ServiceContainer.shared.modelRegistry.getModel(modelIdentifier)
-            if (registryModel != null) {
-                logger.debug("Found model in registry, saving to database")
-                modelService.saveModel(registryModel)
-                // Now try again
-                modelInfo = modelService.getModel(modelIdentifier)
-                    ?: throw SDKError.ModelNotFound(modelIdentifier)
-            } else {
-                throw SDKError.ModelNotFound(modelIdentifier)
-            }
-        }
-
-        // Use the download service through model manager
-        val downloadedPath = ServiceContainer.shared.modelManager.ensureModel(modelInfo)
-
-        // Update model info with local path after successful download
-        modelService.updateDownloadStatus(modelIdentifier, isDownloaded = true, localPath = downloadedPath)
-
-        // Also update the model in the registry with the new local path
-        val updatedModel = modelService.getModel(modelIdentifier)
-        if (updatedModel != null) {
-            ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
-        }
-
-        EventBus.publish(SDKModelEvent.DownloadCompleted(modelIdentifier))
-    } catch (error: Throwable) {
-        EventBus.publish(SDKModelEvent.DownloadFailed(modelIdentifier, error))
-        throw error
-    }
-}
-
-/**
- * Delete a model
- * @param modelIdentifier The model to delete
- */
-suspend fun deleteModel(modelIdentifier: String) = withContext(Dispatchers.IO) {
-    EventBus.publish(SDKModelEvent.DeleteStarted(modelIdentifier))
-
-    try {
-        // Use model manager to delete model
-        ServiceContainer.shared.modelManager.deleteModel(modelIdentifier)
-        EventBus.publish(SDKModelEvent.DeleteCompleted(modelIdentifier))
-    } catch (error: Throwable) {
-        EventBus.publish(SDKModelEvent.DeleteFailed(modelIdentifier, error))
-        throw error
-    }
-}
-
-/**
- * Add a custom model from URL - Complete implementation matching iOS functionality
- * @param url URL to the model
+ * Register a model from a download URL.
+ * Use this to add models for development or offline use.
+ *
+ * Mirrors Swift RunAnywhere.registerModel() exactly.
+ *
+ * @param id Explicit model ID. If null, a stable ID is generated from the URL filename.
  * @param name Display name for the model
- * @param type Model type
- * @return Model information
+ * @param url Download URL for the model (e.g., HuggingFace)
+ * @param framework Target inference framework
+ * @param modality Model category (default: LANGUAGE for LLMs)
+ * @param artifactType How the model is packaged (archive, single file, etc.). If null, inferred from URL.
+ * @param memoryRequirement Estimated memory usage in bytes
+ * @param supportsThinking Whether the model supports reasoning/thinking
+ * @return The created ModelInfo
  */
-@OptIn(ExperimentalUuidApi::class)
-suspend fun addModelFromURL(
-    url: String,
+fun RunAnywhere.registerModel(
+    id: String? = null,
     name: String,
-    type: String
-): ModelInfo = withContext(Dispatchers.IO) {
-    logger.info("Adding custom model from URL: $url")
-    EventBus.publish(SDKModelEvent.CustomModelAdded(name, url))
+    url: String,
+    framework: InferenceFramework,
+    modality: ModelCategory = ModelCategory.LANGUAGE,
+    artifactType: ModelArtifactType? = null,
+    memoryRequirement: Long? = null,
+    supportsThinking: Boolean = false
+): ModelInfo {
+    // Generate model ID from URL filename if not provided
+    val modelId = id ?: generateModelIdFromUrl(url)
 
-    try {
-        // Parse model category from type string
-        val modelCategory = when (type.lowercase()) {
-            "llm", "language", "text" -> com.runanywhere.sdk.models.enums.ModelCategory.LANGUAGE
-            "stt", "speech", "transcription" -> com.runanywhere.sdk.models.enums.ModelCategory.SPEECH_RECOGNITION
-            "tts", "voice", "synthesis" -> com.runanywhere.sdk.models.enums.ModelCategory.SPEECH_SYNTHESIS
-            else -> com.runanywhere.sdk.models.enums.ModelCategory.LANGUAGE // Default
+    // Detect format from URL extension
+    val format = detectFormatFromUrl(url)
+
+    // Infer artifact type if not provided
+    val effectiveArtifactType = artifactType ?: inferArtifactType(url)
+
+    // Create ModelInfo
+    val modelInfo = ModelInfo(
+        id = modelId,
+        name = name,
+        category = modality,
+        format = format,
+        downloadURL = url,
+        localPath = null,
+        artifactType = effectiveArtifactType,
+        downloadSize = memoryRequirement,
+        framework = framework,
+        contextLength = if (modality.requiresContextLength) 2048 else null,
+        supportsThinking = supportsThinking,
+        description = "User-added model",
+        source = com.runanywhere.sdk.public.extensions.Models.ModelSource.LOCAL
+    )
+
+    // Save to registry (fire-and-forget)
+    registerModelInternal(modelInfo)
+
+    return modelInfo
+}
+
+/**
+ * Internal implementation to save model to registry.
+ * Implemented via expect/actual for platform-specific behavior.
+ */
+internal expect fun registerModelInternal(modelInfo: ModelInfo)
+
+// MARK: - Helper Functions
+
+private fun generateModelIdFromUrl(url: String): String {
+    var filename = url.substringAfterLast('/')
+    val knownExtensions = listOf("gz", "bz2", "tar", "zip", "gguf", "onnx", "ort", "bin")
+    while (true) {
+        val ext = filename.substringAfterLast('.', "")
+        if (ext.isNotEmpty() && knownExtensions.contains(ext.lowercase())) {
+            filename = filename.dropLast(ext.length + 1)
+        } else {
+            break
         }
+    }
+    return filename
+}
 
-        // Create model info with comprehensive details
-        // Use URL hash as deterministic ID so the same URL always generates the same ID
-        val modelId = url.hashCode().toString()
-
-        val modelInfo = ModelInfo(
-            id = modelId,
-            name = name,
-            category = modelCategory,
-            format = com.runanywhere.sdk.models.enums.ModelFormat.GGUF, // Default to GGUF
-            downloadURL = url,
-            localPath = null,
-            downloadSize = null,
-            memoryRequired = 1024 * 1024 * 1024L, // Default 1GB
-            compatibleFrameworks = listOf(com.runanywhere.sdk.models.enums.LLMFramework.LLAMA_CPP),
-            preferredFramework = com.runanywhere.sdk.models.enums.LLMFramework.LLAMA_CPP,
-            contextLength = 4096,
-            supportsThinking = false,
-            metadata = com.runanywhere.sdk.models.ModelInfoMetadata(
-                tags = listOf("custom", "url-added"),
-                description = "Model added from URL: $url"
-            )
-        )
-
-        // Register in model registry (in-memory)
-        ServiceContainer.shared.modelRegistry.registerModel(modelInfo)
-        logger.info("Model registered in registry: ${modelInfo.id}")
-
-        // Save to persistent database via ModelInfoService
-        try {
-            ServiceContainer.shared.modelInfoService.saveModel(modelInfo)
-            logger.info("Model saved to database: ${modelInfo.id}")
-        } catch (dbError: Exception) {
-            logger.warn("Failed to save model to database: ${dbError.message}")
-            // Continue anyway - model is still in registry for this session
-        }
-
-        // Publish success event
-        EventBus.publish(SDKModelEvent.CustomModelRegistered(modelInfo.id, url))
-
-        logger.info("Successfully added custom model: ${modelInfo.name} (${modelInfo.id})")
-        return@withContext modelInfo
-
-    } catch (error: Exception) {
-        logger.error("Failed to add model from URL: ${error.message}")
-        EventBus.publish(SDKModelEvent.CustomModelFailed(name, url, error.message ?: "Unknown error"))
-        throw SDKError.ModelRegistrationFailed("Failed to add model from URL: ${error.message}")
+private fun detectFormatFromUrl(url: String): com.runanywhere.sdk.public.extensions.Models.ModelFormat {
+    val ext = url.substringAfterLast('.').lowercase()
+    return when (ext) {
+        "onnx" -> com.runanywhere.sdk.public.extensions.Models.ModelFormat.ONNX
+        "ort" -> com.runanywhere.sdk.public.extensions.Models.ModelFormat.ORT
+        "gguf" -> com.runanywhere.sdk.public.extensions.Models.ModelFormat.GGUF
+        "bin" -> com.runanywhere.sdk.public.extensions.Models.ModelFormat.BIN
+        else -> com.runanywhere.sdk.public.extensions.Models.ModelFormat.UNKNOWN
     }
 }
 
-/**
- * Register a built-in model
- * @param model The model to register
- */
-suspend fun registerBuiltInModel(model: ModelInfo) = withContext(Dispatchers.IO) {
-    // Register the model in the model registry
-    ServiceContainer.shared.modelRegistry.registerModel(model)
-
-    EventBus.publish(SDKModelEvent.BuiltInModelRegistered(model.id))
+private fun inferArtifactType(url: String): ModelArtifactType {
+    val lowercased = url.lowercase()
+    return when {
+        lowercased.endsWith(".tar.gz") || lowercased.endsWith(".tgz") ->
+            ModelArtifactType.Archive(ArchiveType.TAR_GZ, ArchiveStructure.NESTED_DIRECTORY)
+        lowercased.endsWith(".tar.bz2") || lowercased.endsWith(".tbz2") ->
+            ModelArtifactType.Archive(ArchiveType.TAR_BZ2, ArchiveStructure.NESTED_DIRECTORY)
+        lowercased.endsWith(".tar.xz") || lowercased.endsWith(".txz") ->
+            ModelArtifactType.Archive(ArchiveType.TAR_XZ, ArchiveStructure.NESTED_DIRECTORY)
+        lowercased.endsWith(".zip") ->
+            ModelArtifactType.Archive(ArchiveType.ZIP, ArchiveStructure.NESTED_DIRECTORY)
+        else -> ModelArtifactType.SingleFile()
+    }
 }
 
-/**
- * Get currently loaded model from generation service
- */
-fun getCurrentModel(): ModelInfo? {
-    return ServiceContainer.shared.generationService.getCurrentModel()?.model
-}
+// MARK: - Model Discovery
 
 /**
- * Check if a model is currently loaded
+ * Get all available models (both downloaded and remote).
+ *
+ * @return List of all model info
  */
-fun isModelLoaded(modelId: String): Boolean {
-    return ServiceContainer.shared.modelLoadingService.isModelLoaded(modelId)
-}
+expect suspend fun RunAnywhere.availableModels(): List<ModelInfo>
 
 /**
- * Get total storage used by all models
+ * Get models by category.
+ *
+ * @param category Model category to filter by
+ * @return List of models in the specified category
  */
-suspend fun getTotalModelsSize(): Long = withContext(Dispatchers.IO) {
-    return@withContext ServiceContainer.shared.modelManager.getTotalModelsSize()
-}
+expect suspend fun RunAnywhere.models(category: ModelCategory): List<ModelInfo>
 
 /**
- * Clear all models from storage
+ * Get downloaded models.
+ *
+ * @return List of downloaded model info
  */
-suspend fun clearAllModels() = withContext(Dispatchers.IO) {
-    ServiceContainer.shared.modelManager.clearAllModels()
-}
+expect suspend fun RunAnywhere.downloadedModels(): List<ModelInfo>
 
 /**
- * Check if a model is available locally
+ * Get model info by ID.
+ *
+ * @param modelId Model identifier
+ * @return Model info or null if not found
  */
-fun isModelAvailable(modelId: String): Boolean {
-    return ServiceContainer.shared.modelManager.isModelAvailable(modelId)
-}
+expect suspend fun RunAnywhere.model(modelId: String): ModelInfo?
+
+// MARK: - Model Downloads
+
+/**
+ * Download a model.
+ *
+ * @param modelId Model identifier to download
+ * @return Flow of download progress
+ */
+expect fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress>
+
+/**
+ * Cancel a model download.
+ *
+ * @param modelId Model identifier
+ */
+expect suspend fun RunAnywhere.cancelDownload(modelId: String)
+
+/**
+ * Check if a model is downloaded.
+ *
+ * @param modelId Model identifier
+ * @return True if the model is downloaded
+ */
+expect suspend fun RunAnywhere.isModelDownloaded(modelId: String): Boolean
+
+// MARK: - Model Management
+
+/**
+ * Delete a downloaded model.
+ *
+ * @param modelId Model identifier
+ */
+expect suspend fun RunAnywhere.deleteModel(modelId: String)
+
+/**
+ * Delete all downloaded models.
+ */
+expect suspend fun RunAnywhere.deleteAllModels()
+
+/**
+ * Refresh the model registry from remote.
+ */
+expect suspend fun RunAnywhere.refreshModelRegistry()
+
+// MARK: - Model Loading
+
+/**
+ * Load an LLM model.
+ *
+ * @param modelId Model identifier
+ */
+expect suspend fun RunAnywhere.loadLLMModel(modelId: String)
+
+/**
+ * Unload the currently loaded LLM model.
+ */
+expect suspend fun RunAnywhere.unloadLLMModel()
+
+/**
+ * Check if an LLM model is loaded.
+ *
+ * @return True if a model is loaded
+ */
+expect suspend fun RunAnywhere.isLLMModelLoaded(): Boolean
+
+/**
+ * Get the currently loaded LLM model ID.
+ *
+ * This is a synchronous property that returns the ID of the currently loaded model,
+ * or null if no model is loaded. Mirrors iOS RunAnywhere.getCurrentModelId().
+ */
+expect val RunAnywhere.currentLLMModelId: String?
+
+/**
+ * Get the currently loaded LLM model info.
+ *
+ * This is a convenience property that combines currentLLMModelId with
+ * a lookup in the available models registry.
+ *
+ * @return The currently loaded ModelInfo, or null if no model is loaded
+ */
+expect suspend fun RunAnywhere.currentLLMModel(): ModelInfo?
+
+/**
+ * Get the currently loaded STT model info.
+ *
+ * @return The currently loaded STT ModelInfo, or null if no model is loaded
+ */
+expect suspend fun RunAnywhere.currentSTTModel(): ModelInfo?
+
+/**
+ * Load an STT model.
+ *
+ * @param modelId Model identifier
+ */
+expect suspend fun RunAnywhere.loadSTTModel(modelId: String)
