@@ -8,17 +8,24 @@
 
 package com.runanywhere.sdk.public
 
-import android.util.Log
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.CppBridge
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
+import kotlinx.coroutines.runBlocking
 
 private const val TAG = "PlatformBridge"
+private val logger = SDKLogger(TAG)
 
 /**
  * Initialize the CppBridge with the given environment.
  * This loads the native libraries and registers platform adapters.
+ *
+ * @param environment SDK environment
+ * @param apiKey API key for authentication (required for production/staging)
+ * @param baseURL Backend API base URL (required for production/staging)
  */
-internal actual fun initializePlatformBridge(environment: SDKEnvironment) {
-    Log.i(TAG, "Initializing CppBridge for environment: $environment")
+internal actual fun initializePlatformBridge(environment: SDKEnvironment, apiKey: String?, baseURL: String?) {
+    logger.info("Initializing CppBridge for environment: $environment")
 
     val cppEnvironment = when (environment) {
         SDKEnvironment.DEVELOPMENT -> CppBridge.Environment.DEVELOPMENT
@@ -26,26 +33,46 @@ internal actual fun initializePlatformBridge(environment: SDKEnvironment) {
         SDKEnvironment.PRODUCTION -> CppBridge.Environment.PRODUCTION
     }
 
-    CppBridge.initialize(cppEnvironment)
+    // Configure telemetry base URL if provided
+    if (!baseURL.isNullOrEmpty()) {
+        CppBridgeTelemetry.setBaseUrl(baseURL)
+        logger.info("Telemetry base URL configured: $baseURL")
+    }
 
-    Log.i(TAG, "CppBridge initialization complete. Native library loaded: ${CppBridge.isNativeLibraryLoaded}")
+    CppBridge.initialize(cppEnvironment, apiKey, baseURL)
+
+    logger.info("CppBridge initialization complete. Native library loaded: ${CppBridge.isNativeLibraryLoaded}")
 }
 
 /**
  * Initialize CppBridge services (Phase 2).
+ * This includes model assignment, platform services, and device registration.
  */
 internal actual fun initializePlatformBridgeServices() {
-    Log.i(TAG, "Initializing CppBridge services...")
-    // Note: initializeServices is suspend, but we're in non-suspend context
-    // For now, we skip the services initialization as it's called separately
-    Log.i(TAG, "CppBridge services initialization deferred")
+    logger.info("Initializing CppBridge services...")
+
+    // Use runBlocking to call the suspend function
+    // This is safe because services initialization is typically called once
+    runBlocking {
+        CppBridge.initializeServices()
+    }
+
+    logger.info("CppBridge services initialization complete")
 }
 
 /**
  * Shutdown CppBridge and release resources.
  */
 internal actual fun shutdownPlatformBridge() {
-    Log.i(TAG, "Shutting down CppBridge...")
+    logger.info("Shutting down CppBridge...")
     CppBridge.shutdown()
-    Log.i(TAG, "CppBridge shutdown complete")
+    logger.info("CppBridge shutdown complete")
+}
+
+/**
+ * Configure telemetry base URL.
+ * This should be called before SDK initialization if using a custom backend URL.
+ */
+fun configureTelemetryBaseUrl(baseUrl: String) {
+    CppBridgeTelemetry.setBaseUrl(baseUrl)
 }

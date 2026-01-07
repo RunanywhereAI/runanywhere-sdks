@@ -372,3 +372,4 @@ dependencies {
 detekt {
     config.setFrom("${project.rootDir}/detekt.yml")
 }
+
