@@ -20,6 +20,7 @@
 #include "rac_platform_adapter.h"
 #include "rac_sdk_state.h"
 #include "rac_environment.h"
+#include "rac_model_paths.h"
 
 namespace runanywhere {
 namespace bridges {
@@ -93,6 +94,17 @@ public:
                            const std::string& apiKey,
                            const std::string& baseURL,
                            const std::string& deviceId);
+
+    /**
+     * @brief Set base directory for model paths
+     *
+     * Must be called after initialize() and before using model path utilities.
+     * Mirrors Swift's CppBridge.ModelPaths.setBaseDirectory().
+     *
+     * @param documentsPath Path to Documents directory
+     * @return RAC_SUCCESS or error code
+     */
+    rac_result_t setBaseDirectory(const std::string& documentsPath);
 
     /**
      * @brief Shutdown the SDK

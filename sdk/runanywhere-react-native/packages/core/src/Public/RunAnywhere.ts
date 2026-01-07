@@ -13,6 +13,7 @@ import { SDKEnvironment } from '../types';
 import { ModelRegistry } from '../services/ModelRegistry';
 import { ServiceContainer } from '../Foundation/DependencyInjection/ServiceContainer';
 import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
+import { FileSystem } from '../services/FileSystem';
 
 import type {
   InitializationState,
@@ -135,12 +136,19 @@ export const RunAnywhere = {
     const native = requireNativeModule();
 
     try {
+      // Get documents path for model storage (matches Swift SDK's base directory setup)
+      // Uses react-native-fs for the documents directory
+      const documentsPath = FileSystem.isAvailable()
+        ? FileSystem.getDocumentsDirectory()
+        : '';
+
       // Initialize with config
       // Note: Backend registration (llamacpp, onnx) is done by their respective packages
       const configJson = JSON.stringify({
         apiKey: options.apiKey,
         baseURL: options.baseURL,
         environment: environment,
+        documentsPath: documentsPath, // Required for model paths (mirrors Swift SDK)
       });
 
       await native.initialize(configJson);
@@ -401,7 +409,7 @@ export const RunAnywhere = {
     const caps: string[] = ['core'];
     // Check which backends are available
     try {
-      if (await this.isTextModelLoaded()) caps.push('llm');
+      if (await this.isModelLoaded()) caps.push('llm');
       if (await this.isSTTModelLoaded()) caps.push('stt');
       if (await this.isTTSModelLoaded()) caps.push('tts');
       if (await this.isVADModelLoaded()) caps.push('vad');
@@ -422,14 +430,9 @@ export const RunAnywhere = {
    */
   async cleanTempFiles(): Promise<boolean> {
     // Delegate to storage clearCache for now
-    return this.clearCache();
+    await this.clearCache();
+    return true;
   },
-
-  /**
-   * Alias for text model operations
-   */
-  isTextModelLoaded: TextGeneration.isModelLoaded,
-  unloadTextModel: TextGeneration.unloadModel,
 
   // ============================================================================
   // Factory Methods

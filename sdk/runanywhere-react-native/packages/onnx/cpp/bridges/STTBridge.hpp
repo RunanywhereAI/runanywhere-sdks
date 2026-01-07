@@ -17,9 +17,9 @@
 #include <string>
 #include <vector>
 
-// RACommons STT headers - REQUIRED
-#include "rac/features/stt/rac_stt_component.h"
-#include "rac/features/stt/rac_stt_types.h"
+// RACommons STT headers - REQUIRED (flat include paths)
+#include "rac_stt_component.h"
+#include "rac_stt_types.h"
 
 namespace runanywhere {
 namespace bridges {

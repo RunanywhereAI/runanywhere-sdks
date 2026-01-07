@@ -10,25 +10,19 @@
 // Forward declarations of C++ defined types
 // Forward declaration of `HybridRunAnywhereDeviceInfoSpec` to properly resolve imports.
 namespace margelo::nitro::runanywhere { class HybridRunAnywhereDeviceInfoSpec; }
-// Forward declaration of `HybridRunAnywhereFileSystemSpec` to properly resolve imports.
-namespace margelo::nitro::runanywhere { class HybridRunAnywhereFileSystemSpec; }
 
 // Forward declarations of Swift defined types
 // Forward declaration of `HybridRunAnywhereDeviceInfoSpec_cxx` to properly resolve imports.
 namespace RunAnywhereCore { class HybridRunAnywhereDeviceInfoSpec_cxx; }
-// Forward declaration of `HybridRunAnywhereFileSystemSpec_cxx` to properly resolve imports.
-namespace RunAnywhereCore { class HybridRunAnywhereFileSystemSpec_cxx; }
 
 // Include C++ defined types
 #include "HybridRunAnywhereDeviceInfoSpec.hpp"
-#include "HybridRunAnywhereFileSystemSpec.hpp"
 #include <NitroModules/Promise.hpp>
 #include <NitroModules/PromiseHolder.hpp>
 #include <NitroModules/Result.hpp>
 #include <exception>
 #include <functional>
 #include <memory>
-#include <optional>
 #include <string>
 
 /**
@@ -198,76 +192,6 @@ namespace margelo::nitro::runanywhere::bridge::swift {
   }
   inline Result_std__shared_ptr_Promise_bool___ create_Result_std__shared_ptr_Promise_bool___(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<Promise<bool>>>::withError(error);
-  }
-
-  // pragma MARK: std::shared_ptr<Promise<void>>
-  /**
-   * Specialized version of `std::shared_ptr<Promise<void>>`.
-   */
-  using std__shared_ptr_Promise_void__ = std::shared_ptr<Promise<void>>;
-  inline std::shared_ptr<Promise<void>> create_std__shared_ptr_Promise_void__() noexcept {
-    return Promise<void>::create();
-  }
-  inline PromiseHolder<void> wrap_std__shared_ptr_Promise_void__(std::shared_ptr<Promise<void>> promise) noexcept {
-    return PromiseHolder<void>(std::move(promise));
-  }
-
-  // pragma MARK: std::function<void()>
-  /**
-   * Specialized version of `std::function<void()>`.
-   */
-  using Func_void = std::function<void()>;
-  /**
-   * Wrapper class for a `std::function<void()>`, this can be used from Swift.
-   */
-  class Func_void_Wrapper final {
-  public:
-    explicit Func_void_Wrapper(std::function<void()>&& func): _function(std::make_unique<std::function<void()>>(std::move(func))) {}
-    inline void call() const noexcept {
-      _function->operator()();
-    }
-  private:
-    std::unique_ptr<std::function<void()>> _function;
-  } SWIFT_NONCOPYABLE;
-  Func_void create_Func_void(void* NON_NULL swiftClosureWrapper) noexcept;
-  inline Func_void_Wrapper wrap_Func_void(Func_void value) noexcept {
-    return Func_void_Wrapper(std::move(value));
-  }
-
-  // pragma MARK: std::optional<std::function<void(double /* progress */)>>
-  /**
-   * Specialized version of `std::optional<std::function<void(double / * progress * /)>>`.
-   */
-  using std__optional_std__function_void_double____progress______ = std::optional<std::function<void(double /* progress */)>>;
-  inline std::optional<std::function<void(double /* progress */)>> create_std__optional_std__function_void_double____progress______(const std::function<void(double /* progress */)>& value) noexcept {
-    return std::optional<std::function<void(double /* progress */)>>(value);
-  }
-  inline bool has_value_std__optional_std__function_void_double____progress______(const std::optional<std::function<void(double /* progress */)>>& optional) noexcept {
-    return optional.has_value();
-  }
-  inline std::function<void(double /* progress */)> get_std__optional_std__function_void_double____progress______(const std::optional<std::function<void(double /* progress */)>>& optional) noexcept {
-    return *optional;
-  }
-
-  // pragma MARK: std::shared_ptr<HybridRunAnywhereFileSystemSpec>
-  /**
-   * Specialized version of `std::shared_ptr<HybridRunAnywhereFileSystemSpec>`.
-   */
-  using std__shared_ptr_HybridRunAnywhereFileSystemSpec_ = std::shared_ptr<HybridRunAnywhereFileSystemSpec>;
-  std::shared_ptr<HybridRunAnywhereFileSystemSpec> create_std__shared_ptr_HybridRunAnywhereFileSystemSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
-  void* NON_NULL get_std__shared_ptr_HybridRunAnywhereFileSystemSpec_(std__shared_ptr_HybridRunAnywhereFileSystemSpec_ cppType);
-
-  // pragma MARK: std::weak_ptr<HybridRunAnywhereFileSystemSpec>
-  using std__weak_ptr_HybridRunAnywhereFileSystemSpec_ = std::weak_ptr<HybridRunAnywhereFileSystemSpec>;
-  inline std__weak_ptr_HybridRunAnywhereFileSystemSpec_ weakify_std__shared_ptr_HybridRunAnywhereFileSystemSpec_(const std::shared_ptr<HybridRunAnywhereFileSystemSpec>& strong) noexcept { return strong; }
-
-  // pragma MARK: Result<std::shared_ptr<Promise<void>>>
-  using Result_std__shared_ptr_Promise_void___ = Result<std::shared_ptr<Promise<void>>>;
-  inline Result_std__shared_ptr_Promise_void___ create_Result_std__shared_ptr_Promise_void___(const std::shared_ptr<Promise<void>>& value) noexcept {
-    return Result<std::shared_ptr<Promise<void>>>::withValue(value);
-  }
-  inline Result_std__shared_ptr_Promise_void___ create_Result_std__shared_ptr_Promise_void___(const std::exception_ptr& error) noexcept {
-    return Result<std::shared_ptr<Promise<void>>>::withError(error);
   }
 
 } // namespace margelo::nitro::runanywhere::bridge::swift

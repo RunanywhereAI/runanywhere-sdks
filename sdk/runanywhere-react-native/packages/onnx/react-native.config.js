@@ -7,7 +7,7 @@ module.exports = {
         packageInstance: 'new RunAnywhereONNXPackage()',
       },
       ios: {
-        podspecPath: './ios/ONNXBackend.podspec',
+        podspecPath: './RunAnywhereONNX.podspec',
       },
     },
   },

@@ -7,6 +7,7 @@
  */
 
 #include "InitBridge.hpp"
+#include "rac_model_paths.h"
 #include <cstring>
 #include <cstdlib>
 #include <chrono>
@@ -387,6 +388,22 @@ rac_result_t InitBridge::initialize(
     LOGI("SDK initialized successfully for environment %d", static_cast<int>(environment));
 
     return RAC_SUCCESS;
+}
+
+rac_result_t InitBridge::setBaseDirectory(const std::string& documentsPath) {
+    if (documentsPath.empty()) {
+        LOGE("Base directory path is empty");
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    rac_result_t result = rac_model_paths_set_base_dir(documentsPath.c_str());
+    if (result == RAC_SUCCESS) {
+        LOGI("Model paths base directory set to: %s", documentsPath.c_str());
+    } else {
+        LOGE("Failed to set model paths base directory: %d", result);
+    }
+
+    return result;
 }
 
 void InitBridge::shutdown() {

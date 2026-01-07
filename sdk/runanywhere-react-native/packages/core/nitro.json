@@ -11,10 +11,6 @@
     "RunAnywhereCore": {
       "cpp": "HybridRunAnywhereCore"
     },
-    "RunAnywhereFileSystem": {
-      "kotlin": "HybridRunAnywhereFileSystem",
-      "swift": "HybridRunAnywhereFileSystem"
-    },
     "RunAnywhereDeviceInfo": {
       "kotlin": "HybridRunAnywhereDeviceInfo",
       "swift": "HybridRunAnywhereDeviceInfo"

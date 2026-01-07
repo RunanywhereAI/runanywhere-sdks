@@ -17,9 +17,9 @@
 #include <string>
 #include <vector>
 
-// RACommons VAD headers - REQUIRED
-#include "rac/features/vad/rac_vad_component.h"
-#include "rac/features/vad/rac_vad_types.h"
+// RACommons VAD headers - REQUIRED (flat include paths)
+#include "rac_vad_component.h"
+#include "rac_vad_types.h"
 
 namespace runanywhere {
 namespace bridges {

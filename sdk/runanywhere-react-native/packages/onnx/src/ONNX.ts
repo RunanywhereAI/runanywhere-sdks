@@ -14,6 +14,7 @@
 import { ONNXProvider } from './ONNXProvider';
 import {
   ModelRegistry,
+  FileSystem,
   LLMFramework,
   ModelCategory,
   ModelFormat,
@@ -163,13 +164,31 @@ export const ONNX = {
 
     const now = new Date().toISOString();
 
+    // Check if model already exists on disk (persistence across sessions)
+    let isDownloaded = false;
+    let localPath: string | undefined;
+
+    if (FileSystem.isAvailable()) {
+      try {
+        const exists = await FileSystem.modelExists(modelId, 'ONNX');
+        if (exists) {
+          localPath = await FileSystem.getModelPath(modelId, 'ONNX');
+          isDownloaded = true;
+          log.info(`Model ${modelId} found on disk: ${localPath}`);
+        }
+      } catch (error) {
+        // Ignore errors checking for existing model
+        log.info(`Could not check for existing model ${modelId}: ${error}`);
+      }
+    }
+
     const modelInfo: ModelInfo = {
       id: modelId,
       name: options.name,
       category: options.modality,
       format,
       downloadURL: options.url,
-      localPath: undefined,
+      localPath,
       downloadSize: undefined,
       memoryRequired: options.memoryRequirement,
       compatibleFrameworks: [LLMFramework.ONNX],
@@ -183,14 +202,14 @@ export const ONNX = {
       updatedAt: now,
       syncPending: false,
       usageCount: 0,
-      isDownloaded: false,
+      isDownloaded,
       isAvailable: true,
     };
 
     // Register with ModelRegistry and wait for completion
     await ModelRegistry.registerModel(modelInfo);
 
-    log.info(`Added model: ${modelId} (${options.name})`);
+    log.info(`Added model: ${modelId} (${options.name})${isDownloaded ? ' [already downloaded]' : ''}`);
 
     return modelInfo;
   },

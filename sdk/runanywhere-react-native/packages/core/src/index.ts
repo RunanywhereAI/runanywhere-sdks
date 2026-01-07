@@ -134,6 +134,7 @@ export {
 
 export {
   ModelRegistry,
+  FileSystem,
   DownloadService,
   DownloadState,
   SystemTTSService,

@@ -138,7 +138,7 @@ export const SettingsScreen: React.FC = () => {
       // Check loaded models
       const sttLoaded = await RunAnywhere.isSTTModelLoaded();
       const ttsLoaded = await RunAnywhere.isTTSModelLoaded();
-      const textLoaded = await RunAnywhere.isTextModelLoaded();
+      const textLoaded = await RunAnywhere.isModelLoaded();
       const vadLoaded = await RunAnywhere.isVADModelLoaded();
 
       setIsSTTLoaded(sttLoaded);
@@ -265,7 +265,7 @@ export const SettingsScreen: React.FC = () => {
           onPress: async () => {
             try {
               // Unload models if they're loaded
-              await RunAnywhere.unloadTextModel();
+              await RunAnywhere.unloadModel();
               await RunAnywhere.unloadSTTModel();
               await RunAnywhere.unloadTTSModel();
               setStoredModels((prev) => prev.filter((m) => m.id !== model.id));
@@ -406,7 +406,7 @@ export const SettingsScreen: React.FC = () => {
           onPress: async () => {
             try {
               // Unload all models
-              await RunAnywhere.unloadTextModel();
+              await RunAnywhere.unloadModel();
               await RunAnywhere.unloadSTTModel();
               await RunAnywhere.unloadTTSModel();
               // Destroy SDK

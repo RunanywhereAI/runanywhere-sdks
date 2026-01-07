@@ -10,18 +10,13 @@
 // Forward declarations of C++ defined types
 // Forward declaration of `HybridRunAnywhereDeviceInfoSpec` to properly resolve imports.
 namespace margelo::nitro::runanywhere { class HybridRunAnywhereDeviceInfoSpec; }
-// Forward declaration of `HybridRunAnywhereFileSystemSpec` to properly resolve imports.
-namespace margelo::nitro::runanywhere { class HybridRunAnywhereFileSystemSpec; }
 
 // Include C++ defined types
 #include "HybridRunAnywhereDeviceInfoSpec.hpp"
-#include "HybridRunAnywhereFileSystemSpec.hpp"
 #include <NitroModules/Promise.hpp>
 #include <NitroModules/Result.hpp>
 #include <exception>
-#include <functional>
 #include <memory>
-#include <optional>
 #include <string>
 
 // C++ helpers for Swift
@@ -36,8 +31,6 @@ namespace margelo::nitro::runanywhere { class HybridRunAnywhereFileSystemSpec; }
 // Forward declarations of Swift defined types
 // Forward declaration of `HybridRunAnywhereDeviceInfoSpec_cxx` to properly resolve imports.
 namespace RunAnywhereCore { class HybridRunAnywhereDeviceInfoSpec_cxx; }
-// Forward declaration of `HybridRunAnywhereFileSystemSpec_cxx` to properly resolve imports.
-namespace RunAnywhereCore { class HybridRunAnywhereFileSystemSpec_cxx; }
 
 // Include Swift defined types
 #if __has_include("RunAnywhereCore-Swift.h")

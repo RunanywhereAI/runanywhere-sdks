@@ -14,9 +14,9 @@
 
 #include <string>
 
-// RACommons structured output header - REQUIRED
-#include "rac/features/llm/rac_llm_structured_output.h"
-#include "rac/features/llm/rac_llm_types.h"
+// RACommons structured output header - REQUIRED (flat include paths)
+#include "rac_llm_structured_output.h"
+#include "rac_llm_types.h"
 
 namespace runanywhere {
 namespace bridges {

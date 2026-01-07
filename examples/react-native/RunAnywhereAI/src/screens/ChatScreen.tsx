@@ -14,7 +14,7 @@
  * Architecture:
  * - Uses ConversationStore for state management (matches iOS)
  * - Separates UI from business logic (View + ViewModel pattern)
- * - Model loading via RunAnywhere.loadTextModel()
+ * - Model loading via RunAnywhere.loadModel()
  * - Text generation via RunAnywhere.generate()
  *
  * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Chat/Views/ChatInterfaceView.swift
@@ -145,7 +145,7 @@ export const ChatScreen: React.FC = () => {
    */
   const checkModelStatus = async () => {
     try {
-      const isLoaded = await RunAnywhere.isTextModelLoaded();
+      const isLoaded = await RunAnywhere.isModelLoaded();
       console.log('[ChatScreen] Text model loaded:', isLoaded);
       if (isLoaded) {
         setCurrentModel({
@@ -199,7 +199,7 @@ export const ChatScreen: React.FC = () => {
         return;
       }
 
-      const success = await RunAnywhere.loadTextModel(model.localPath);
+      const success = await RunAnywhere.loadModel(model.localPath);
 
       if (success) {
         setCurrentModel({

@@ -233,21 +233,44 @@ export interface FileSystemModule {
   getModelPath(fileName: string): Promise<string>;
   modelExists(fileName: string): Promise<boolean>;
   deleteModel(fileName: string): Promise<boolean>;
+  getDataDirectory(): Promise<string>;
+  getModelsDirectory(): Promise<string>;
 }
 
 /**
- * File system module stub
- * @deprecated File operations should use native.extractArchive() or platform APIs
+ * Get the file system module for model downloads and file operations
+ * Uses react-native-fs for cross-platform file operations
  */
 export function requireFileSystemModule(): FileSystemModule {
+  // Import the FileSystem service
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { FileSystem } = require('../services/FileSystem');
+
   return {
-    // Stub implementations that will be called by extensions
-    getAvailableDiskSpace: async () => 0,
-    getTotalDiskSpace: async () => 0,
-    downloadModel: async () => false,
-    getModelPath: async () => '',
-    modelExists: async () => false,
-    deleteModel: async () => false,
+    getAvailableDiskSpace: () => FileSystem.getAvailableDiskSpace(),
+    getTotalDiskSpace: () => FileSystem.getTotalDiskSpace(),
+    downloadModel: async (
+      fileName: string,
+      url: string,
+      onProgress?: (progress: number) => void
+    ): Promise<boolean> => {
+      try {
+        await FileSystem.downloadModel(fileName, url, (progress: { progress: number }) => {
+          if (onProgress) {
+            onProgress(progress.progress);
+          }
+        });
+        return true;
+      } catch (error) {
+        console.error('[RunAnywhere] Download failed:', error);
+        return false;
+      }
+    },
+    getModelPath: (fileName: string) => FileSystem.getModelPath(fileName),
+    modelExists: (fileName: string) => FileSystem.modelExists(fileName),
+    deleteModel: (fileName: string) => FileSystem.deleteModel(fileName),
+    getDataDirectory: () => Promise.resolve(FileSystem.getRunAnywhereDirectory()),
+    getModelsDirectory: () => Promise.resolve(FileSystem.getModelsDirectory()),
   };
 }
 

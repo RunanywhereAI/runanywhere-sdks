@@ -8,9 +8,9 @@
 import {
   requireNativeModule,
   isNativeModuleAvailable,
-  requireFileSystemModule,
 } from '../../native';
 import { ModelRegistry } from '../../services/ModelRegistry';
+import { FileSystem } from '../../services/FileSystem';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import type { ModelInfo, LLMFramework } from '../../types';
 import { ModelCategory } from '../../types';
@@ -261,6 +261,7 @@ export interface DownloadProgress {
 
 /**
  * Download a model
+ * Uses react-native-fs for cross-platform downloads with progress tracking
  */
 export async function downloadModel(
   modelId: string,
@@ -275,8 +276,11 @@ export async function downloadModel(
     throw new Error(`Model has no download URL: ${modelId}`);
   }
 
-  const fs = requireFileSystemModule();
+  if (!FileSystem.isAvailable()) {
+    throw new Error('react-native-fs not installed - cannot download models');
+  }
 
+  // Determine file name with extension
   let extension = '';
   if (modelInfo.downloadURL.includes('.gguf')) {
     extension = '.gguf';
@@ -289,7 +293,7 @@ export async function downloadModel(
   }
   const fileName = `${modelId}${extension}`;
 
-  logger.info(' Starting native download (OkHttp/URLSession):', {
+  logger.info('Starting download (react-native-fs):', {
     modelId,
     url: modelInfo.downloadURL,
   });
@@ -298,11 +302,11 @@ export async function downloadModel(
   let lastLoggedProgress = -1;
 
   try {
-    await fs.downloadModel(
+    const destPath = await FileSystem.downloadModel(
       fileName,
       modelInfo.downloadURL,
-      (progress: number) => {
-        const progressPct = Math.round(progress * 100);
+      (progress) => {
+        const progressPct = Math.round(progress.progress * 100);
         if (progressPct - lastLoggedProgress >= 10) {
           logger.debug(`Download progress: ${progressPct}%`);
           lastLoggedProgress = progressPct;
@@ -311,23 +315,20 @@ export async function downloadModel(
         if (onProgress) {
           onProgress({
             modelId,
-            bytesDownloaded: Math.round(
-              progress * (modelInfo.downloadSize || 0)
-            ),
-            totalBytes: modelInfo.downloadSize || 0,
-            progress,
+            bytesDownloaded: progress.bytesWritten,
+            totalBytes: progress.contentLength || modelInfo.downloadSize || 0,
+            progress: progress.progress,
           });
         }
       }
     );
 
-    const destPath = await fs.getModelPath(fileName);
-
-    logger.info(' Download completed:', {
+    logger.info('Download completed:', {
       modelId,
       destPath,
     });
 
+    // Update model in registry with local path
     const updatedModel: ModelInfo = {
       ...modelInfo,
       localPath: destPath,
@@ -358,25 +359,22 @@ export async function cancelDownload(modelId: string): Promise<boolean> {
  */
 export async function deleteModel(modelId: string): Promise<boolean> {
   try {
-    const fs = requireFileSystemModule();
-
     const modelInfo = await ModelRegistry.getModel(modelId);
     const extension = modelInfo?.downloadURL?.includes('.gguf')
       ? '.gguf'
       : '';
     const fileName = `${modelId}${extension}`;
 
-    const exists = await fs.modelExists(fileName);
-    if (exists) {
-      await fs.deleteModel(fileName);
+    // Delete using FileSystem service
+    const deleted = await FileSystem.deleteModel(fileName);
+    if (deleted) {
       logger.info(`Deleted model: ${modelId}`);
     }
 
-    const existsPlain = await fs.modelExists(modelId);
-    if (existsPlain) {
-      await fs.deleteModel(modelId);
-    }
+    // Also try plain model ID in case of different naming
+    await FileSystem.deleteModel(modelId);
 
+    // Update model in registry
     if (modelInfo) {
       const updatedModel: ModelInfo = {
         ...modelInfo,

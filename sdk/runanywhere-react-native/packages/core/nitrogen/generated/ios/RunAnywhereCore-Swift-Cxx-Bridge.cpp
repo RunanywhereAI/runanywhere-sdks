@@ -9,7 +9,6 @@
 
 // Include C++ implementation defined types
 #include "HybridRunAnywhereDeviceInfoSpecSwift.hpp"
-#include "HybridRunAnywhereFileSystemSpecSwift.hpp"
 #include "RunAnywhereCore-Swift-Cxx-Umbrella.hpp"
 #include <NitroModules/NitroDefines.hpp>
 
@@ -60,30 +59,6 @@ namespace margelo::nitro::runanywhere::bridge::swift {
     }
     #endif
     RunAnywhereCore::HybridRunAnywhereDeviceInfoSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
-    return swiftPart.toUnsafe();
-  }
-
-  // pragma MARK: std::function<void()>
-  Func_void create_Func_void(void* NON_NULL swiftClosureWrapper) noexcept {
-    auto swiftClosure = RunAnywhereCore::Func_void::fromUnsafe(swiftClosureWrapper);
-    return [swiftClosure = std::move(swiftClosure)]() mutable -> void {
-      swiftClosure.call();
-    };
-  }
-
-  // pragma MARK: std::shared_ptr<HybridRunAnywhereFileSystemSpec>
-  std::shared_ptr<HybridRunAnywhereFileSystemSpec> create_std__shared_ptr_HybridRunAnywhereFileSystemSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
-    RunAnywhereCore::HybridRunAnywhereFileSystemSpec_cxx swiftPart = RunAnywhereCore::HybridRunAnywhereFileSystemSpec_cxx::fromUnsafe(swiftUnsafePointer);
-    return std::make_shared<margelo::nitro::runanywhere::HybridRunAnywhereFileSystemSpecSwift>(swiftPart);
-  }
-  void* NON_NULL get_std__shared_ptr_HybridRunAnywhereFileSystemSpec_(std__shared_ptr_HybridRunAnywhereFileSystemSpec_ cppType) {
-    std::shared_ptr<margelo::nitro::runanywhere::HybridRunAnywhereFileSystemSpecSwift> swiftWrapper = std::dynamic_pointer_cast<margelo::nitro::runanywhere::HybridRunAnywhereFileSystemSpecSwift>(cppType);
-    #ifdef NITRO_DEBUG
-    if (swiftWrapper == nullptr) [[unlikely]] {
-      throw std::runtime_error("Class \"HybridRunAnywhereFileSystemSpec\" is not implemented in Swift!");
-    }
-    #endif
-    RunAnywhereCore::HybridRunAnywhereFileSystemSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
     return swiftPart.toUnsafe();
   }
 

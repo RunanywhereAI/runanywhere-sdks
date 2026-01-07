@@ -125,7 +125,7 @@ export const VoiceAssistantScreen: React.FC = () => {
   const checkModelStatus = async () => {
     try {
       const sttLoaded = await RunAnywhere.isSTTModelLoaded();
-      const llmLoaded = await RunAnywhere.isTextModelLoaded();
+      const llmLoaded = await RunAnywhere.isModelLoaded();
       const ttsLoaded = await RunAnywhere.isTTSModelLoaded();
 
       console.log(
@@ -217,7 +217,7 @@ export const VoiceAssistantScreen: React.FC = () => {
             break;
           case 'llm':
             if (model.localPath) {
-              const llmSuccess = await RunAnywhere.loadTextModel(
+              const llmSuccess = await RunAnywhere.loadModel(
                 model.localPath
               );
               if (llmSuccess) {

@@ -18,8 +18,8 @@
 #include <string>
 #include <vector>
 
-// RACommons voice agent header - REQUIRED
-#include "rac/features/voice_agent/rac_voice_agent.h"
+// RACommons voice agent header - REQUIRED (flat include paths)
+#include "rac_voice_agent.h"
 
 namespace runanywhere {
 namespace bridges {

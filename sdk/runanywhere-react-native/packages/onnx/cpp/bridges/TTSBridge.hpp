@@ -17,9 +17,9 @@
 #include <string>
 #include <vector>
 
-// RACommons TTS headers - REQUIRED
-#include "rac/features/tts/rac_tts_component.h"
-#include "rac/features/tts/rac_tts_types.h"
+// RACommons TTS headers - REQUIRED (flat include paths)
+#include "rac_tts_component.h"
+#include "rac_tts_types.h"
 
 namespace runanywhere {
 namespace bridges {
