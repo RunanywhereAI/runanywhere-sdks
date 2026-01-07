@@ -74,84 +74,71 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           BUILD_TOKEN: ${{ secrets.BUILD_TOKEN }}
         run: |
-          # Generate development_config.cpp with real credentials from secrets
-          # Use printf with %s to safely handle secret values (no newline interpretation)
-          
           CONFIG_FILE="src/infrastructure/network/development_config.cpp"
           
-          # Write the file header and includes
-          cat > "$CONFIG_FILE" << 'EOF'
-/**
- * @file development_config.cpp
- * @brief Development mode configuration with credentials from CI secrets
- */
-
-#include <cstring>
-
-#include "rac/core/rac_logger.h"
-#include "rac/infrastructure/network/rac_dev_config.h"
-
-namespace {
-
-EOF
-
-          # Inject secrets using printf (safer than echo for special chars)
-          # Remove any trailing newlines/whitespace from secrets
           CLEAN_URL=$(printf '%s' "$SUPABASE_URL" | tr -d '\n\r')
           CLEAN_KEY=$(printf '%s' "$SUPABASE_ANON_KEY" | tr -d '\n\r')
           CLEAN_TOKEN=$(printf '%s' "${BUILD_TOKEN:-bt_release_build}" | tr -d '\n\r')
           
-          printf 'constexpr const char* SUPABASE_URL = "%s";\n' "$CLEAN_URL" >> "$CONFIG_FILE"
-          printf 'constexpr const char* SUPABASE_ANON_KEY = "%s";\n' "$CLEAN_KEY" >> "$CONFIG_FILE"
-          printf 'constexpr const char* BUILD_TOKEN = "%s";\n' "$CLEAN_TOKEN" >> "$CONFIG_FILE"
-          printf 'constexpr const char* SENTRY_DSN = nullptr;\n' >> "$CONFIG_FILE"
-
-          # Write the rest of the file
-          cat >> "$CONFIG_FILE" << 'EOF'
-
-}  // anonymous namespace
-
-extern "C" {
-
-bool rac_dev_config_is_available(void) {
-    if (SUPABASE_URL == nullptr || SUPABASE_ANON_KEY == nullptr) return false;
-    if (std::strlen(SUPABASE_URL) == 0 || std::strlen(SUPABASE_ANON_KEY) == 0) return false;
-    if (std::strstr(SUPABASE_URL, "YOUR_") != nullptr) return false;
-    if (std::strstr(SUPABASE_ANON_KEY, "YOUR_") != nullptr) return false;
-    return true;
-}
-
-const char* rac_dev_config_get_supabase_url(void) {
-    return SUPABASE_URL;
-}
-
-const char* rac_dev_config_get_supabase_key(void) {
-    return SUPABASE_ANON_KEY;
-}
-
-const char* rac_dev_config_get_build_token(void) {
-    return BUILD_TOKEN;
-}
-
-const char* rac_dev_config_get_sentry_dsn(void) {
-    return SENTRY_DSN;
-}
-
-bool rac_dev_config_has_supabase(void) {
-    return rac_dev_config_is_available();
-}
-
-bool rac_dev_config_has_build_token(void) {
-    return BUILD_TOKEN != nullptr && std::strlen(BUILD_TOKEN) > 0;
-}
-
-}  // extern "C"
-EOF
-
+          cat > "$CONFIG_FILE" << CONFIGEOF
+          /**
+           * @file development_config.cpp
+           * @brief Development mode configuration with credentials from CI secrets
+           */
+          
+          #include <cstring>
+          
+          #include "rac/core/rac_logger.h"
+          #include "rac/infrastructure/network/rac_dev_config.h"
+          
+          namespace {
+          
+          constexpr const char* SUPABASE_URL = "${CLEAN_URL}";
+          constexpr const char* SUPABASE_ANON_KEY = "${CLEAN_KEY}";
+          constexpr const char* BUILD_TOKEN = "${CLEAN_TOKEN}";
+          constexpr const char* SENTRY_DSN = nullptr;
+          
+          }  // anonymous namespace
+          
+          extern "C" {
+          
+          bool rac_dev_config_is_available(void) {
+              if (SUPABASE_URL == nullptr || SUPABASE_ANON_KEY == nullptr) return false;
+              if (std::strlen(SUPABASE_URL) == 0 || std::strlen(SUPABASE_ANON_KEY) == 0) return false;
+              if (std::strstr(SUPABASE_URL, "YOUR_") != nullptr) return false;
+              if (std::strstr(SUPABASE_ANON_KEY, "YOUR_") != nullptr) return false;
+              return true;
+          }
+          
+          const char* rac_dev_config_get_supabase_url(void) {
+              return SUPABASE_URL;
+          }
+          
+          const char* rac_dev_config_get_supabase_key(void) {
+              return SUPABASE_ANON_KEY;
+          }
+          
+          const char* rac_dev_config_get_build_token(void) {
+              return BUILD_TOKEN;
+          }
+          
+          const char* rac_dev_config_get_sentry_dsn(void) {
+              return SENTRY_DSN;
+          }
+          
+          bool rac_dev_config_has_supabase(void) {
+              return rac_dev_config_is_available();
+          }
+          
+          bool rac_dev_config_has_build_token(void) {
+              return BUILD_TOKEN != nullptr && std::strlen(BUILD_TOKEN) > 0;
+          }
+          
+          }  // extern "C"
+          CONFIGEOF
+          
           echo "=== Generated development_config.cpp ==="
-          head -30 "$CONFIG_FILE"
-          echo "..."
-          echo "(credentials redacted)"
+          head -20 "$CONFIG_FILE"
 
       - name: Build RACommons XCFramework
         working-directory: ${{ env.COMMONS_DIR }}
@@ -229,80 +216,69 @@ EOF
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           BUILD_TOKEN: ${{ secrets.BUILD_TOKEN }}
         run: |
-          # Generate development_config.cpp with real credentials from secrets
-          # Use printf with %s to safely handle secret values (no newline interpretation)
-          
           CONFIG_FILE="src/infrastructure/network/development_config.cpp"
           
-          # Write the file header and includes
-          cat > "$CONFIG_FILE" << 'EOF'
-/**
- * @file development_config.cpp
- * @brief Development mode configuration with credentials from CI secrets
- */
-
-#include <cstring>
-
-#include "rac/core/rac_logger.h"
-#include "rac/infrastructure/network/rac_dev_config.h"
-
-namespace {
-
-EOF
-
-          # Inject secrets using printf (safer than echo for special chars)
-          # Remove any trailing newlines/whitespace from secrets
           CLEAN_URL=$(printf '%s' "$SUPABASE_URL" | tr -d '\n\r')
           CLEAN_KEY=$(printf '%s' "$SUPABASE_ANON_KEY" | tr -d '\n\r')
           CLEAN_TOKEN=$(printf '%s' "${BUILD_TOKEN:-bt_release_build}" | tr -d '\n\r')
           
-          printf 'constexpr const char* SUPABASE_URL = "%s";\n' "$CLEAN_URL" >> "$CONFIG_FILE"
-          printf 'constexpr const char* SUPABASE_ANON_KEY = "%s";\n' "$CLEAN_KEY" >> "$CONFIG_FILE"
-          printf 'constexpr const char* BUILD_TOKEN = "%s";\n' "$CLEAN_TOKEN" >> "$CONFIG_FILE"
-          printf 'constexpr const char* SENTRY_DSN = nullptr;\n' >> "$CONFIG_FILE"
-
-          # Write the rest of the file
-          cat >> "$CONFIG_FILE" << 'EOF'
-
-}  // anonymous namespace
-
-extern "C" {
-
-bool rac_dev_config_is_available(void) {
-    if (SUPABASE_URL == nullptr || SUPABASE_ANON_KEY == nullptr) return false;
-    if (std::strlen(SUPABASE_URL) == 0 || std::strlen(SUPABASE_ANON_KEY) == 0) return false;
-    if (std::strstr(SUPABASE_URL, "YOUR_") != nullptr) return false;
-    if (std::strstr(SUPABASE_ANON_KEY, "YOUR_") != nullptr) return false;
-    return true;
-}
-
-const char* rac_dev_config_get_supabase_url(void) {
-    return SUPABASE_URL;
-}
-
-const char* rac_dev_config_get_supabase_key(void) {
-    return SUPABASE_ANON_KEY;
-}
-
-const char* rac_dev_config_get_build_token(void) {
-    return BUILD_TOKEN;
-}
-
-const char* rac_dev_config_get_sentry_dsn(void) {
-    return SENTRY_DSN;
-}
-
-bool rac_dev_config_has_supabase(void) {
-    return rac_dev_config_is_available();
-}
-
-bool rac_dev_config_has_build_token(void) {
-    return BUILD_TOKEN != nullptr && std::strlen(BUILD_TOKEN) > 0;
-}
-
-}  // extern "C"
-EOF
-
+          cat > "$CONFIG_FILE" << CONFIGEOF
+          /**
+           * @file development_config.cpp
+           * @brief Development mode configuration with credentials from CI secrets
+           */
+          
+          #include <cstring>
+          
+          #include "rac/core/rac_logger.h"
+          #include "rac/infrastructure/network/rac_dev_config.h"
+          
+          namespace {
+          
+          constexpr const char* SUPABASE_URL = "${CLEAN_URL}";
+          constexpr const char* SUPABASE_ANON_KEY = "${CLEAN_KEY}";
+          constexpr const char* BUILD_TOKEN = "${CLEAN_TOKEN}";
+          constexpr const char* SENTRY_DSN = nullptr;
+          
+          }  // anonymous namespace
+          
+          extern "C" {
+          
+          bool rac_dev_config_is_available(void) {
+              if (SUPABASE_URL == nullptr || SUPABASE_ANON_KEY == nullptr) return false;
+              if (std::strlen(SUPABASE_URL) == 0 || std::strlen(SUPABASE_ANON_KEY) == 0) return false;
+              if (std::strstr(SUPABASE_URL, "YOUR_") != nullptr) return false;
+              if (std::strstr(SUPABASE_ANON_KEY, "YOUR_") != nullptr) return false;
+              return true;
+          }
+          
+          const char* rac_dev_config_get_supabase_url(void) {
+              return SUPABASE_URL;
+          }
+          
+          const char* rac_dev_config_get_supabase_key(void) {
+              return SUPABASE_ANON_KEY;
+          }
+          
+          const char* rac_dev_config_get_build_token(void) {
+              return BUILD_TOKEN;
+          }
+          
+          const char* rac_dev_config_get_sentry_dsn(void) {
+              return SENTRY_DSN;
+          }
+          
+          bool rac_dev_config_has_supabase(void) {
+              return rac_dev_config_is_available();
+          }
+          
+          bool rac_dev_config_has_build_token(void) {
+              return BUILD_TOKEN != nullptr && std::strlen(BUILD_TOKEN) > 0;
+          }
+          
+          }  // extern "C"
+          CONFIGEOF
+          
           echo "=== Generated development_config.cpp for Android ==="
 
       - name: Build Android ${{ matrix.abi }}
@@ -349,7 +325,6 @@ EOF
           VERSION="${{ needs.build-ios.outputs.version }}"
           mkdir -p release-assets
 
-          # iOS: Always create package with correct version from release tag
           if [ -d dist/ios/RACommons.xcframework ]; then
             cd dist/ios
             zip -r "../../release-assets/RACommons-ios-v${VERSION}.zip" RACommons.xcframework
@@ -358,8 +333,6 @@ EOF
             cd ..
           fi
 
-          # Combine Android ABIs
-          # Note: artifact structure is dist/android-artifacts/racommons-android-{abi}-{ver}/jniLibs/{abi}/
           mkdir -p android-combined/jniLibs
           for dir in dist/android-artifacts/racommons-android-*/jniLibs/*/; do
             if [ -d "$dir" ]; then
@@ -370,13 +343,11 @@ EOF
             fi
           done
 
-          # Copy headers
           HEADER_DIR=$(find dist/android-artifacts -name "include" -type d | head -1)
           if [ -n "$HEADER_DIR" ]; then
             cp -r "$HEADER_DIR" android-combined/
           fi
 
-          # Package Android
           cd android-combined
           echo "=== Android Combined Contents ==="
           find . -type f | head -20
