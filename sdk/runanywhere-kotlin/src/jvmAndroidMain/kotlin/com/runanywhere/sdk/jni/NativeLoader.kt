@@ -16,19 +16,20 @@ object NativeLoader {
         if (libName in loadedLibraries) return
 
         val os = System.getProperty("os.name").lowercase()
-        val arch = System.getProperty("os.arch").lowercase()
 
-        val libFileName = when {
-            os.contains("win") -> "$libName.dll"
-            os.contains("mac") -> "lib$libName.dylib"
-            else -> "lib$libName.so"
-        }
+        val libFileName =
+            when {
+                os.contains("win") -> "$libName.dll"
+                os.contains("mac") -> "lib$libName.dylib"
+                else -> "lib$libName.so"
+            }
 
-        val platformDir = when {
-            os.contains("win") -> "win"
-            os.contains("mac") -> "mac"
-            else -> "linux"
-        }
+        val platformDir =
+            when {
+                os.contains("win") -> "win"
+                os.contains("mac") -> "mac"
+                else -> "linux"
+            }
 
         val resourcePath = "/native/$platformDir/$libFileName"
 
@@ -61,7 +62,5 @@ object NativeLoader {
     /**
      * Check if a library is already loaded
      */
-    fun isLibraryLoaded(libName: String): Boolean {
-        return libName in loadedLibraries
-    }
+    fun isLibraryLoaded(libName: String): Boolean = libName in loadedLibraries
 }

@@ -9,15 +9,18 @@
 
 import { create } from 'zustand';
 import RNFS from 'react-native-fs';
-import { Conversation, Message, MessageRole } from '../types/chat';
+import type { Conversation, Message } from '../types/chat';
+import { MessageRole } from '../types/chat';
 
 // Generate unique ID matching iOS UUID approach
+/* eslint-disable no-bitwise */
 const generateId = (): string =>
   'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
     const v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
+/* eslint-enable no-bitwise */
 
 // Directory for storing conversations
 const CONVERSATIONS_DIR = `${RNFS.DocumentDirectoryPath}/Conversations`;
@@ -94,7 +97,9 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
 
       // Load all conversation files
       const files = await RNFS.readDir(CONVERSATIONS_DIR);
-      const jsonFiles = files.filter((f: { name: string; path: string }) => f.name.endsWith('.json'));
+      const jsonFiles = files.filter((f: { name: string; path: string }) =>
+        f.name.endsWith('.json')
+      );
 
       const loadedConversations: Conversation[] = [];
 
@@ -104,7 +109,10 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
           const conversation = deserializeConversation(content);
           loadedConversations.push(conversation);
         } catch (error) {
-          console.warn(`[ConversationStore] Failed to load ${file.name}:`, error);
+          console.warn(
+            `[ConversationStore] Failed to load ${file.name}:`,
+            error
+          );
         }
       }
 
@@ -200,7 +208,9 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
 
     // Remove from state and handle current conversation
     set((state) => {
-      const filtered = state.conversations.filter((c) => c.id !== conversationId);
+      const filtered = state.conversations.filter(
+        (c) => c.id !== conversationId
+      );
       const newCurrent =
         state.currentConversation?.id === conversationId
           ? filtered[0] || null
@@ -268,7 +278,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       return;
     }
 
-    let conversation = conversations.find((c) => c.id === targetId);
+    const conversation = conversations.find((c) => c.id === targetId);
     if (!conversation) {
       console.warn(`[ConversationStore] Conversation not found: ${targetId}`);
       return;
@@ -350,7 +360,10 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       set({ conversations: [], currentConversation: null });
       console.log('[ConversationStore] Cleared all conversations');
     } catch (error) {
-      console.error('[ConversationStore] Failed to clear conversations:', error);
+      console.error(
+        '[ConversationStore] Failed to clear conversations:',
+        error
+      );
     }
   },
 }));

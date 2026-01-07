@@ -95,7 +95,8 @@ export const ModelStatusBanner: React.FC<ModelStatusBannerProps> = ({
           <ActivityIndicator size="small" color={Colors.primaryBlue} />
           <Text style={styles.loadingText}>
             Loading model...
-            {loadProgress !== undefined && ` ${Math.round(loadProgress * 100)}%`}
+            {loadProgress !== undefined &&
+              ` ${Math.round(loadProgress * 100)}%`}
           </Text>
         </View>
         {loadProgress !== undefined && (
@@ -142,7 +143,12 @@ export const ModelStatusBanner: React.FC<ModelStatusBannerProps> = ({
     <View style={styles.container}>
       <View style={styles.loadedContent}>
         {/* Framework Badge */}
-        <View style={[styles.frameworkBadge, { backgroundColor: `${frameworkColor}20` }]}>
+        <View
+          style={[
+            styles.frameworkBadge,
+            { backgroundColor: `${frameworkColor}20` },
+          ]}
+        >
           <Icon name={frameworkIcon} size={14} color={frameworkColor} />
           <Text style={[styles.frameworkText, { color: frameworkColor }]}>
             {frameworkName}

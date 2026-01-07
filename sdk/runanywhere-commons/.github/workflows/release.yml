@@ -1,18 +1,15 @@
-name: Build and Release XCFrameworks
+name: Release RACommons
 
 # =============================================================================
-# This workflow builds modular XCFrameworks for iOS/macOS:
-#   - RACommons.xcframework (core commons library)
-#   - RABackendLlamaCPP.xcframework (LLM backend)
-#   - RABackendONNX.xcframework (STT/TTS/VAD backend)
+# RACommons Release Workflow
 #
-# It downloads runanywhere-core source from the public runanywhere-binaries
-# repository, builds the XCFrameworks, and publishes them.
+# Builds and publishes:
+#   iOS:     RACommons.xcframework
+#   Android: librac_commons.so (per ABI)
 #
-# Trigger:
-#   - Tag push: commons-v*
-#   - Manual workflow_dispatch
-#
+# Triggered by:
+#   - Push tag: commons-v*
+#   - Manual dispatch
 # =============================================================================
 
 on:
@@ -22,12 +19,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., 2.0.0)'
+        description: 'Version to release (e.g., 0.2.0)'
         required: true
-        type: string
-      core_version:
-        description: 'runanywhere-core version to use (leave empty for latest)'
-        required: false
         type: string
       dry_run:
         description: 'Dry run (build only, do not publish)'
@@ -36,25 +29,18 @@ on:
         type: boolean
 
 env:
-  # Public binaries repository for publishing XCFrameworks
-  PUBLIC_REPO_OWNER: 'RunanywhereAI'
-  PUBLIC_REPO_NAME: 'runanywhere-binaries'
+  PUBLIC_REPO: 'RunanywhereAI/runanywhere-binaries'
 
 jobs:
   # ===========================================================================
-  # Build iOS XCFrameworks
+  # Prepare
   # ===========================================================================
-  build-ios:
-    name: Build iOS XCFrameworks
-    runs-on: macos-14
+  prepare:
+    runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
-      core_version: ${{ steps.core.outputs.core_version }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Determine Version
         id: version
         run: |
@@ -64,148 +50,199 @@ jobs:
             VERSION="${GITHUB_REF#refs/tags/commons-v}"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Building version: $VERSION"
+          echo "Building RACommons v$VERSION"
+
+  # ===========================================================================
+  # Build iOS
+  # ===========================================================================
+  build-ios:
+    name: Build iOS
+    needs: prepare
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: '15.4'
 
-      - name: Install Dependencies
-        run: brew install cmake ninja
-
-      - name: Download runanywhere-core Source
-        id: core
+      - name: Build iOS
         run: |
-          chmod +x scripts/download-core.sh
+          chmod +x scripts/build-rac-commons.sh
+          ./scripts/build-rac-commons.sh --ios --release --package
 
-          # Determine core version
-          if [ -n "${{ github.event.inputs.core_version }}" ]; then
-            CORE_VERSION="${{ github.event.inputs.core_version }}"
-          else
-            # Fetch latest from runanywhere-binaries
-            CORE_VERSION=$(curl -sL "https://raw.githubusercontent.com/${{ env.PUBLIC_REPO_OWNER }}/${{ env.PUBLIC_REPO_NAME }}/main/LATEST_CORE_VERSION" || echo "")
-            if [ -z "$CORE_VERSION" ]; then
-              echo "Failed to fetch latest core version, using 'latest'"
-              CORE_VERSION="latest"
-            fi
-          fi
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-${{ needs.prepare.outputs.version }}
+          path: dist/packages/*ios*.zip*
+          retention-days: 7
 
-          echo "Using runanywhere-core version: $CORE_VERSION"
-          echo "core_version=$CORE_VERSION" >> $GITHUB_OUTPUT
+  # ===========================================================================
+  # Build Android
+  # ===========================================================================
+  build-android:
+    name: Build Android (${{ matrix.abi }})
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86_64]
 
-          # Download core source and dependencies
-          RUNANYWHERE_CORE_VERSION="$CORE_VERSION" ./scripts/download-core.sh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Verify Core Downloaded
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup NDK
         run: |
-          if [ ! -d "third_party/runanywhere-core" ]; then
-            echo "ERROR: runanywhere-core not downloaded"
-            exit 1
-          fi
-          echo "Core version: $(cat third_party/runanywhere-core/DOWNLOADED_VERSION 2>/dev/null || echo 'unknown')"
-          ls -la third_party/runanywhere-core/
+          source scripts/load-versions.sh
+          NDK_VERSION="${ANDROID_NDK_VERSION:-27.0.12077973}"
+          echo "y" | sdkmanager --install "ndk;${NDK_VERSION}" --sdk_root=${ANDROID_SDK_ROOT}
+          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> $GITHUB_ENV
 
-      - name: Build iOS XCFrameworks
+      - name: Build Android ${{ matrix.abi }}
         run: |
-          chmod +x scripts/build-ios.sh
-          ./scripts/build-ios.sh
+          chmod +x scripts/build-rac-commons.sh
+          ./scripts/build-rac-commons.sh --android --abi ${{ matrix.abi }} --release
 
-      - name: Package Release
+      - name: Package ABI
         run: |
-          chmod +x scripts/package-release.sh
-          ./scripts/package-release.sh ${{ steps.version.outputs.version }}
+          VERSION="${{ needs.prepare.outputs.version }}"
+          ABI="${{ matrix.abi }}"
+          mkdir -p dist/packages
+          cd dist/android
+          zip -r "../packages/RACommons-android-${ABI}-v${VERSION}.zip" jniLibs/${ABI} include
+          cd ../packages
+          shasum -a 256 "RACommons-android-${ABI}-v${VERSION}.zip" > "RACommons-android-${ABI}-v${VERSION}.zip.sha256"
 
-      - name: List Artifacts
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ matrix.abi }}-${{ needs.prepare.outputs.version }}
+          path: dist/packages/*
+          retention-days: 7
+
+  # ===========================================================================
+  # Combine Android ABIs
+  # ===========================================================================
+  combine-android:
+    name: Combine Android
+    needs: [prepare, build-android]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download All Android Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: android-*
+          path: artifacts
+          merge-multiple: false
+
+      - name: Create Combined Package
         run: |
-          echo "=== Build Artifacts ==="
-          ls -la dist/
-          echo ""
-          echo "=== XCFramework Sizes ==="
-          for xcf in dist/*.xcframework; do
-            if [ -d "$xcf" ]; then
-              size=$(du -sh "$xcf" | cut -f1)
-              echo "  $(basename "$xcf"): $size"
+          VERSION="${{ needs.prepare.outputs.version }}"
+          COMBINED="RACommons-android-v${VERSION}"
+
+          mkdir -p "${COMBINED}/jniLibs"
+          mkdir -p output
+
+          # Extract each ABI
+          for dir in artifacts/android-*/; do
+            if [ -d "$dir" ]; then
+              for zip in "${dir}"*.zip; do
+                if [ -f "$zip" ] && [[ ! "$zip" == *.sha256 ]]; then
+                  unzip -o "$zip" -d "${COMBINED}/"
+                fi
+              done
             fi
           done
 
-      - name: Upload Artifacts
+          # Create combined package
+          zip -r "output/${COMBINED}.zip" "${COMBINED}"
+          cd output
+          shasum -a 256 "${COMBINED}.zip" > "${COMBINED}.zip.sha256"
+
+          ls -la
+
+      - name: Upload Combined Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: xcframeworks-${{ steps.version.outputs.version }}
-          path: |
-            dist/*.xcframework.zip
-            dist/*.zip
-            dist/*.sha256
-            dist/MANIFEST.md
-          retention-days: 30
+          name: android-combined-${{ needs.prepare.outputs.version }}
+          path: output/*
+          retention-days: 7
 
   # ===========================================================================
-  # Publish to runanywhere-binaries
+  # Publish
   # ===========================================================================
   publish:
-    name: Publish to runanywhere-binaries
-    needs: build-ios
+    name: Publish Release
+    needs: [prepare, build-ios, combine-android]
     if: github.event.inputs.dry_run != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      - name: Download Artifacts
+      - name: Download iOS Artifact
         uses: actions/download-artifact@v4
         with:
-          name: xcframeworks-${{ needs.build-ios.outputs.version }}
-          path: dist
+          name: ios-${{ needs.prepare.outputs.version }}
+          path: release-assets
 
-      - name: List Downloaded Artifacts
+      - name: Download Android Combined Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-combined-${{ needs.prepare.outputs.version }}
+          path: release-assets
+
+      - name: List Release Assets
         run: |
-          echo "=== Downloaded Artifacts ==="
-          ls -la dist/
+          echo "Release assets:"
+          ls -la release-assets/
 
-      - name: Checkout Public Binaries Repo
+      - name: Create Checksums File
+        run: |
+          cd release-assets
+          cat *.sha256 > checksums.txt
+          cat checksums.txt
+
+      - name: Checkout Public Repository
         uses: actions/checkout@v4
         with:
-          repository: ${{ env.PUBLIC_REPO_OWNER }}/${{ env.PUBLIC_REPO_NAME }}
+          repository: ${{ env.PUBLIC_REPO }}
           token: ${{ secrets.BINARY_REPO_PAT }}
           path: public-repo
-          fetch-depth: 0
 
       - name: Update Public Repository
         run: |
-          VERSION="${{ needs.build-ios.outputs.version }}"
-          CORE_VERSION="${{ needs.build-ios.outputs.core_version }}"
-
+          VERSION="${{ needs.prepare.outputs.version }}"
           cd public-repo
 
-          # Create releases directory
           mkdir -p releases/commons-v${VERSION}
+          cp ../release-assets/*.zip releases/commons-v${VERSION}/
+          cp ../release-assets/*.sha256 releases/commons-v${VERSION}/
+          cp ../release-assets/checksums.txt releases/commons-v${VERSION}/
 
-          # Copy all XCFramework ZIPs
-          cp ../dist/*.zip releases/commons-v${VERSION}/ 2>/dev/null || true
-          cp ../dist/*.sha256 releases/commons-v${VERSION}/ 2>/dev/null || true
-
-          # Update version files
           echo "${VERSION}" > LATEST_COMMONS_VERSION
 
-          # Git operations
-          git config user.name "GitHub Actions Bot"
+          git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-
           git add -A
-          git commit -m "Release runanywhere-commons v${VERSION}
-
-          Built with runanywhere-core: ${CORE_VERSION}
-
-          XCFrameworks:
-          $(ls -1 releases/commons-v${VERSION}/*.zip 2>/dev/null | xargs -I {} basename {} || echo 'None')
-          " || echo "No changes to commit"
-
-      - name: Create Git Tag
-        run: |
-          VERSION="${{ needs.build-ios.outputs.version }}"
-          cd public-repo
-          git tag -a "commons-v${VERSION}" -m "runanywhere-commons v${VERSION}" 2>/dev/null || echo "Tag already exists"
+          git commit -m "Release RACommons v${VERSION}" || echo "No changes"
+          git tag -a "commons-v${VERSION}" -m "RACommons v${VERSION}" 2>/dev/null || true
 
       - name: Push to Public Repository
         run: |
@@ -217,50 +254,38 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          repository: ${{ env.PUBLIC_REPO_OWNER }}/${{ env.PUBLIC_REPO_NAME }}
-          tag_name: commons-v${{ needs.build-ios.outputs.version }}
-          name: RunAnywhere Commons v${{ needs.build-ios.outputs.version }}
+          repository: ${{ env.PUBLIC_REPO }}
+          tag_name: commons-v${{ needs.prepare.outputs.version }}
+          name: RACommons v${{ needs.prepare.outputs.version }}
           files: |
-            dist/*.zip
-            dist/*.sha256
+            release-assets/*.zip
+            release-assets/*.sha256
+            release-assets/checksums.txt
           body: |
-            ## RunAnywhere Commons v${{ needs.build-ios.outputs.version }}
+            ## RACommons v${{ needs.prepare.outputs.version }}
 
-            Modular XCFrameworks for iOS/macOS.
+            Standalone infrastructure library for RunAnywhere SDKs.
 
-            ### XCFrameworks
+            ### Contents
+            - Logging, error handling, and event tracking
+            - Service registry and provider infrastructure
+            - Model management (download strategies, storage)
+            - Platform backend (Apple Foundation Models, System TTS) - iOS/macOS only
 
-            | Framework | Description |
-            |-----------|-------------|
-            | `RACommons.xcframework` | Core commons library (service registry, model management) |
-            | `RABackendLlamaCPP.xcframework` | LLM backend (llama.cpp + Metal) |
-            | `RABackendONNX.xcframework` | STT/TTS/VAD backend (Sherpa-ONNX) |
+            ### iOS/macOS
+            `RACommons-ios-v${{ needs.prepare.outputs.version }}.zip`
+            - Contains `RACommons.xcframework`
 
-            ### Swift Package Manager
+            ### Android
+            `RACommons-android-v${{ needs.prepare.outputs.version }}.zip`
+            - Contains `jniLibs/{abi}/librac_commons.so`
+            - Contains `include/` headers
 
-            Update your `Package.swift`:
-
-            ```swift
-            .binaryTarget(
-                name: "RACommonsBinary",
-                url: "https://github.com/${{ env.PUBLIC_REPO_OWNER }}/${{ env.PUBLIC_REPO_NAME }}/releases/download/commons-v${{ needs.build-ios.outputs.version }}/RACommons-${{ needs.build-ios.outputs.version }}.zip",
-                checksum: "..."
-            ),
-            ```
-
-            ### Requirements
-
-            - **ONNX Runtime**: `RABackendONNX` requires `onnxruntime.xcframework` (download separately)
-            - **Platforms**: iOS 17+, macOS 14+
-
-            ### Verification
-
-            ```bash
-            shasum -a 256 -c *.sha256
-            ```
+            ### Note
+            Backend libraries (LlamaCPP, ONNX, WhisperCPP) are released from `runanywhere-core`.
 
             ---
-            Built with runanywhere-core: ${{ needs.build-ios.outputs.core_version }}
+            Built from runanywhere-commons @ ${{ github.sha }}
           draft: false
           prerelease: false
         env:

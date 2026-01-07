@@ -110,10 +110,15 @@ RAC_API const char* rac_llm_component_get_model_id(rac_handle_t handle);
  * Mirrors Swift's LLMCapability.loadModel(_:)
  *
  * @param handle Component handle
- * @param model_id Model ID to load
+ * @param model_path File path to the model (used for loading) - REQUIRED
+ * @param model_id Model identifier for telemetry (e.g., "smollm2-360m-q8_0")
+ *                 Optional: if NULL, defaults to model_path
+ * @param model_name Human-readable model name (e.g., "SmolLM2 360M Q8_0")
+ *                   Optional: if NULL, defaults to model_id
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_component_load_model(rac_handle_t handle, const char* model_id);
+RAC_API rac_result_t rac_llm_component_load_model(rac_handle_t handle, const char* model_path,
+                                                  const char* model_id, const char* model_name);
 
 /**
  * @brief Unload the current model

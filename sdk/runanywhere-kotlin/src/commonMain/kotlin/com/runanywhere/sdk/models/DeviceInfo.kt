@@ -1,93 +1,80 @@
 package com.runanywhere.sdk.models
 
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
- * Simplified DeviceInfo model matching iOS initialization requirements
- * This is separate from the more detailed DeviceInfoData model for basic initialization needs
+ * Core device hardware information for telemetry, logging, and API requests.
+ * Matches iOS DeviceInfo.swift exactly.
+ *
+ * This is embedded in DeviceRegistrationRequest and also available standalone.
  */
 @Serializable
 data class DeviceInfo(
-    // Platform identification
-    @SerialName("platform_name")
-    val platformName: String, // "Android", "JVM", "Native"
-
-    @SerialName("platform_version")
-    val platformVersion: String, // Android API level, JVM version, etc.
-
-    @SerialName("device_model")
-    val deviceModel: String, // Device model name
-
-    // Operating System
+    // MARK: - Device Identity
+    /** Persistent device UUID (survives app reinstalls via Keychain/SharedPreferences) */
+    @SerialName("device_id")
+    val deviceId: String,
+    // MARK: - Device Hardware
+    /** Device model identifier (e.g., "iPhone16,2" for iPhone 15 Pro Max, "Pixel 8 Pro" for Android) */
+    @SerialName("model_identifier")
+    val modelIdentifier: String,
+    /** User-friendly device name (e.g., "iPhone 15 Pro Max", "Google Pixel 8 Pro") */
+    @SerialName("model_name")
+    val modelName: String,
+    /** CPU architecture (e.g., "arm64", "x86_64") */
+    @SerialName("architecture")
+    val architecture: String,
+    // MARK: - Operating System
+    /** Operating system version string (e.g., "17.2", "14") */
     @SerialName("os_version")
-    val osVersion: String, // OS version string
-
-    @SerialName("sdk_version")
-    val sdkVersion: String, // RunAnywhere SDK version
-
-    // Hardware basics
-    @SerialName("cpu_cores")
-    val cpuCores: Int, // Number of CPU cores
-
-    @SerialName("total_memory_mb")
-    val totalMemoryMB: Long, // Total RAM in MB
-
-    // App information
-    @SerialName("app_bundle_id")
-    val appBundleId: String?, // Application bundle identifier
-
-    @SerialName("app_version")
-    val appVersion: String?, // Application version
-
-    // Collection timestamp
-    @SerialName("collected_at")
-    val collectedAt: Long = System.currentTimeMillis()
+    val osVersion: String,
+    /** Platform identifier (e.g., "iOS", "Android", "JVM", "macOS") */
+    @SerialName("platform")
+    val platform: String,
+    // MARK: - Device Classification
+    /** Device type for API requests (mobile, tablet, desktop, tv, watch, vr) */
+    @SerialName("device_type")
+    val deviceType: String,
+    /** Form factor (phone, tablet, laptop, desktop, tv, watch, headset) */
+    @SerialName("form_factor")
+    val formFactor: String,
+    // MARK: - Hardware Specs
+    /** Total physical memory in bytes */
+    @SerialName("total_memory")
+    val totalMemory: Long,
+    /** Number of processor cores */
+    @SerialName("processor_count")
+    val processorCount: Int,
 ) {
-    companion object {
-        /**
-         * Create DeviceInfo from platform-specific implementations
-         */
-        fun create(
-            platformName: String,
-            platformVersion: String,
-            deviceModel: String,
-            osVersion: String,
-            sdkVersion: String = "0.1.0",
-            cpuCores: Int,
-            totalMemoryMB: Long,
-            appBundleId: String? = null,
-            appVersion: String? = null
-        ): DeviceInfo {
-            return DeviceInfo(
-                platformName = platformName,
-                platformVersion = platformVersion,
-                deviceModel = deviceModel,
-                osVersion = osVersion,
-                sdkVersion = sdkVersion,
-                cpuCores = cpuCores,
-                totalMemoryMB = totalMemoryMB,
-                appBundleId = appBundleId,
-                appVersion = appVersion
-            )
-        }
-    }
-
     /**
-     * Get a human-readable description of the device
+     * Human-readable description of the device
      */
     val description: String
-        get() = "$platformName $platformVersion on $deviceModel (${cpuCores} cores, ${totalMemoryMB}MB RAM)"
+        get() = "$modelName ($platform $osVersion) - $processorCount cores, ${totalMemory / (1024 * 1024)}MB RAM"
 
     /**
-     * Check if device meets minimum requirements
+     * Total memory in MB (convenience property)
      */
-    fun meetsMinimumRequirements(): Boolean {
-        return cpuCores >= 2 && totalMemoryMB >= 1024
+    val totalMemoryMB: Long
+        get() = totalMemory / (1024 * 1024)
+
+    /**
+     * Check if device meets minimum requirements for on-device AI
+     */
+    fun meetsMinimumRequirements(): Boolean = processorCount >= 2 && totalMemoryMB >= 1024
+
+    companion object {
+        /**
+         * Get current device info - delegates to platform-specific implementation
+         */
+        val current: DeviceInfo
+            get() = collectDeviceInfo()
     }
 }
 
 /**
- * Platform-specific device info collection
+ * Platform-specific device info collection.
+ * Implemented in jvmMain, androidMain, iosMain, etc.
  */
 expect fun collectDeviceInfo(): DeviceInfo
