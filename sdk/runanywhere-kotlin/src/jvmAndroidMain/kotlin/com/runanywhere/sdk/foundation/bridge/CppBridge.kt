@@ -90,19 +90,26 @@ object CppBridge {
         get() = _nativeLibraryLoaded
 
     /**
-     * Phase 1: Core Initialization (Synchronous)
+     * Phase 1: Core Initialization (Synchronous, ~1-5ms, NO network calls)
+     *
+     * This is a fast, synchronous initialization that can be safely called from any thread,
+     * including the main/UI thread. It does NOT make any network calls.
      *
      * Initializes the core SDK components in this order:
      * 1. Native Library Loading - Load core JNI library (if available)
      * 2. Platform Adapter - MUST be before C++ calls
      * 3. Logging configuration
      * 4. Events registration
-     * 5. Telemetry initialization
-     * 6. Device registration
+     * 5. Telemetry configuration (stores credentials, no network)
+     *
+     * **Important:** Authentication and device registration happen in Phase 2 ([initializeServices]),
+     * which MUST be called from a background thread (e.g., `Dispatchers.IO`).
      *
      * NOTE: Backend registration (LlamaCPP, ONNX) is NOT done here.
      * Backends are registered by the app calling LlamaCPP.register() and ONNX.register()
      * from the respective backend modules.
+     *
+     * Mirrors Swift SDK's initialize() which is also synchronous with no network calls.
      *
      * @param environment The SDK environment to use
      * @param apiKey API key for authentication (required for production/staging)
@@ -139,7 +146,8 @@ object CppBridge {
 
             // Configure telemetry base URL and API key ONLY for production/staging mode
             // In development mode, we use Supabase URL from C++ dev config
-            // This MUST be done before any HTTP requests are made
+            // NOTE: Authentication is deferred to Phase 2 (initializeServices) to avoid blocking
+            // This matches Swift SDK where authentication is done in completeServicesInitialization()
             if (environment != Environment.DEVELOPMENT) {
                 if (!baseURL.isNullOrEmpty()) {
                     CppBridgeTelemetry.setBaseUrl(baseURL)
@@ -149,27 +157,9 @@ object CppBridge {
                     CppBridgeTelemetry.setApiKey(apiKey)
                     logger.info("Telemetry API key configured")
                 }
-                
-                // Authenticate with backend to get JWT access token
-                // This is required for production/staging mode
-                // Mirrors Swift SDK's CppBridge.Auth.authenticate() call
-                if (!apiKey.isNullOrEmpty() && !baseURL.isNullOrEmpty()) {
-                    try {
-                        logger.info("🔐 Authenticating with backend...")
-                        val deviceId = CppBridgeDevice.getDeviceId() ?: CppBridgeDevice.getDeviceIdCallback()
-                        CppBridgeAuth.authenticate(
-                            apiKey = apiKey,
-                            baseUrl = baseURL,
-                            deviceId = deviceId,
-                            platform = "android",
-                            sdkVersion = com.runanywhere.sdk.utils.SDKConstants.SDK_VERSION
-                        )
-                        logger.info("✅ Authentication successful!")
-                    } catch (e: Exception) {
-                        logger.error("❌ Authentication failed: ${e.message}")
-                        logger.warn("SDK will continue but API requests may fail")
-                    }
-                }
+                // Store credentials for Phase 2 authentication
+                // Authentication is deferred to initializeServices() which runs on background thread
+                logger.debug("Production/staging mode: authentication will occur in Phase 2 (initializeServices)")
             } else {
                 logger.debug("Development mode: using Supabase URL from C++ dev config")
             }
@@ -348,12 +338,14 @@ object CppBridge {
      * Phase 2: Services Initialization (Asynchronous)
      *
      * Initializes the service components:
-     * 1. Model Assignment registration
-     * 2. Platform services registration
-     * 3. Device registration (triggers backend call)
+     * 1. Authentication with backend (production/staging only, makes HTTP calls)
+     * 2. Model Assignment registration
+     * 3. Platform services registration
+     * 4. Device registration (triggers backend call)
      *
      * Must be called after [initialize] completes.
-     * Mirrors Swift SDK's CppBridge.initializeServices() + completeServicesInitialization()
+     * Must be called from a background thread (e.g., Dispatchers.IO) as it makes network calls.
+     * Mirrors Swift SDK's completeServicesInitialization()
      */
     suspend fun initializeServices() {
         synchronized(lock) {
@@ -365,7 +357,36 @@ object CppBridge {
                 return
             }
 
-            // Register model assignment callbacks
+            // Step 1: Authenticate with backend for production/staging mode
+            // This is done in Phase 2 (not Phase 1) to avoid blocking main thread
+            // Mirrors Swift SDK's CppBridge.Auth.authenticate() in completeServicesInitialization()
+            if (_environment != Environment.DEVELOPMENT) {
+                val baseUrl = CppBridgeTelemetry.getBaseUrl()
+                val apiKey = CppBridgeTelemetry.getApiKey()
+                
+                if (!apiKey.isNullOrEmpty() && !baseUrl.isNullOrEmpty()) {
+                    try {
+                        logger.info("🔐 Authenticating with backend...")
+                        val deviceId = CppBridgeDevice.getDeviceId() ?: CppBridgeDevice.getDeviceIdCallback()
+                        CppBridgeAuth.authenticate(
+                            apiKey = apiKey,
+                            baseUrl = baseUrl,
+                            deviceId = deviceId,
+                            platform = "android",
+                            sdkVersion = com.runanywhere.sdk.utils.SDKConstants.SDK_VERSION
+                        )
+                        logger.info("✅ Authentication successful!")
+                    } catch (e: Exception) {
+                        logger.error("❌ Authentication failed: ${e.message}")
+                        logger.warn("SDK will continue but API requests may fail")
+                        // Non-fatal: continue with services initialization
+                    }
+                } else {
+                    logger.warn("Missing API key or base URL for authentication")
+                }
+            }
+
+            // Step 2: Register model assignment callbacks
             CppBridgeModelAssignment.register()
 
             // Register platform services callbacks
