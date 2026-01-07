@@ -10,6 +10,29 @@ import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
 
 const logger = new SDKLogger('FileSystem');
 
+// Lazy-loaded native module getter to avoid initialization order issues
+let _nativeModuleGetter: (() => { extractArchive: (archivePath: string, destPath: string) => Promise<boolean> }) | null = null;
+
+function getNativeModule(): { extractArchive: (archivePath: string, destPath: string) => Promise<boolean> } | null {
+  if (_nativeModuleGetter === null) {
+    try {
+      // Dynamic require to avoid circular dependency and initialization order issues
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { requireNativeModule, isNativeModuleAvailable } = require('../native/NativeRunAnywhereCore');
+      if (isNativeModuleAvailable()) {
+        _nativeModuleGetter = () => requireNativeModule();
+      } else {
+        logger.warning('Native module not available for archive extraction');
+        return null;
+      }
+    } catch (e) {
+      logger.error('Failed to load native module:', e);
+      return null;
+    }
+  }
+  return _nativeModuleGetter ? _nativeModuleGetter() : null;
+}
+
 // Try to import react-native-fs
 let RNFS: typeof import('react-native-fs') | null = null;
 try {
@@ -446,8 +469,10 @@ export const FileSystem = {
 
     // Try native extraction first (supports tar.gz, tar.bz2, zip)
     try {
-      const { requireNativeModule } = await import('../native/NativeRunAnywhereCore');
-      const native = requireNativeModule();
+      const native = getNativeModule();
+      if (!native) {
+        throw new Error('Native module not available');
+      }
 
       logger.info('Using native archive extraction...');
       const success = await native.extractArchive(archivePath, destinationFolder);
