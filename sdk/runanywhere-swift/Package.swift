@@ -28,8 +28,8 @@ let testLocal = false  // PRODUCTION: download XCFrameworks from GitHub releases
 // These versions must match the GitHub releases:
 // - Commons: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/commons-v{commonsVersion}
 // - Backends: https://github.com/RunanywhereAI/runanywhere-binaries/releases/tag/core-v{coreVersion}
-let commonsVersion = "0.1.3"
-let coreVersion = "0.1.3"
+let commonsVersion = "0.1.4"
+let coreVersion = "0.1.4"
 // =============================================================================
 
 let package = Package(
@@ -257,7 +257,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v\(commonsVersion)/RACommons-ios-v\(commonsVersion).zip",
-                checksum: "0f58150966f9d37b15734206fff8467461454c84ffdcece6971f5f3cbe863120"
+                checksum: "5841cc914ae3041a2c26fd18e09fccb523295fbba12c03605d9bff86fec1a276"
             ),
             // =================================================================
             // RABackendLlamaCPP - LLM text generation backend
