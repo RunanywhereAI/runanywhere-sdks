@@ -4,13 +4,10 @@ import android.app.Application
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.runanywhere.runanywhereai.config.AppModelRegistry
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.public.extensions.registerFramework
-import com.runanywhere.sdk.public.models.ModelRegistration
-import com.runanywhere.sdk.models.enums.LLMFramework
-import com.runanywhere.sdk.models.enums.FrameworkModality
-import com.runanywhere.sdk.models.enums.ModelFormat
 import com.runanywhere.sdk.llm.llamacpp.LlamaCppAdapter
 import com.runanywhere.sdk.core.onnx.ONNXAdapter
 import kotlinx.coroutines.CoroutineScope
@@ -227,41 +224,7 @@ class RunAnywhereApplication : Application() {
 
         RunAnywhere.registerFramework(
             adapter = LlamaCppAdapter.shared,
-            models = listOf(
-                // Qwen 2.5 0.5B Instruct Q6_K - Small but capable (~600MB)
-                // Matches iOS: qwen-2.5-0.5b-instruct-q6-k
-                ModelRegistration(
-                    id = "qwen-2.5-0.5b-instruct-q6-k",
-                    name = "Qwen 2.5 0.5B Instruct Q6_K",
-                    url = "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
-                    framework = LLMFramework.LLAMA_CPP,
-                    modality = FrameworkModality.TEXT_TO_TEXT,
-                    format = ModelFormat.GGUF,
-                    memoryRequirement = 600_000_000L
-                ),
-                // LiquidAI LFM2 350M Q4_K_M - Smallest and fastest (~250MB)
-                // Matches iOS: lfm2-350m-q4-k-m
-                ModelRegistration(
-                    id = "lfm2-350m-q4-k-m",
-                    name = "LiquidAI LFM2 350M Q4_K_M",
-                    url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
-                    framework = LLMFramework.LLAMA_CPP,
-                    modality = FrameworkModality.TEXT_TO_TEXT,
-                    format = ModelFormat.GGUF,
-                    memoryRequirement = 250_000_000L
-                ),
-                // LiquidAI LFM2 350M Q8_0 - Highest quality small model (~400MB)
-                // Matches iOS: lfm2-350m-q8-0
-                ModelRegistration(
-                    id = "lfm2-350m-q8-0",
-                    name = "LiquidAI LFM2 350M Q8_0",
-                    url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
-                    framework = LLMFramework.LLAMA_CPP,
-                    modality = FrameworkModality.TEXT_TO_TEXT,
-                    format = ModelFormat.GGUF,
-                    memoryRequirement = 400_000_000L
-                )
-            )
+            models = AppModelRegistry.getLlamaCppModels()
         )
         Log.i("RunAnywhereApp", "✅ LlamaCPP Core registered (runanywhere-core backend)")
 
@@ -274,57 +237,7 @@ class RunAnywhereApplication : Application() {
 
         RunAnywhere.registerFramework(
             adapter = ONNXAdapter.shared,
-            models = listOf(
-                // STT Models (VOICE_TO_TEXT modality)
-                // NOTE: tar.bz2 extraction is supported on Android via Commons Compress
-                // Sherpa ONNX Whisper Tiny English (~75MB)
-                // Matches iOS: sherpa-whisper-tiny-onnx
-                ModelRegistration(
-                    id = "sherpa-whisper-tiny-onnx",
-                    name = "Sherpa Whisper Tiny (ONNX)",
-                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.en.tar.bz2",
-                    framework = LLMFramework.ONNX,
-                    modality = FrameworkModality.VOICE_TO_TEXT,
-                    format = ModelFormat.ONNX,
-                    memoryRequirement = 75_000_000L
-                ),
-                // Sherpa ONNX Whisper Small (~250MB)
-                // Matches iOS: sherpa-whisper-small-onnx
-                ModelRegistration(
-                    id = "sherpa-whisper-small-onnx",
-                    name = "Sherpa Whisper Small (ONNX)",
-                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2",
-                    framework = LLMFramework.ONNX,
-                    modality = FrameworkModality.VOICE_TO_TEXT,
-                    format = ModelFormat.ONNX,
-                    memoryRequirement = 250_000_000L
-                ),
-
-                // TTS Models (TEXT_TO_VOICE modality)
-                // Using sherpa-onnx tar.bz2 packages (includes model, tokens, and espeak-ng-data)
-                // Piper TTS - US English Lessac Medium (~65MB)
-                // Matches iOS: piper-en-us-lessac-medium
-                ModelRegistration(
-                    id = "piper-en-us-lessac-medium",
-                    name = "Piper TTS (US English - Medium)",
-                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium.tar.bz2",
-                    framework = LLMFramework.ONNX,
-                    modality = FrameworkModality.TEXT_TO_VOICE,
-                    format = ModelFormat.ONNX,
-                    memoryRequirement = 65_000_000L
-                ),
-                // Piper TTS - British English Alba Medium (~65MB)
-                // Matches iOS: piper-en-gb-alba-medium
-                ModelRegistration(
-                    id = "piper-en-gb-alba-medium",
-                    name = "Piper TTS (British English)",
-                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_GB-alba-medium.tar.bz2",
-                    framework = LLMFramework.ONNX,
-                    modality = FrameworkModality.TEXT_TO_VOICE,
-                    format = ModelFormat.ONNX,
-                    memoryRequirement = 65_000_000L
-                )
-            )
+            models = AppModelRegistry.getOnnxModels()
         )
         Log.i("RunAnywhereApp", "✅ ONNX Runtime registered (includes STT and TTS providers)")
 
@@ -357,38 +270,7 @@ class RunAnywhereApplication : Application() {
 
         RunAnywhere.registerFramework(
             adapter = LlamaCppAdapter.shared,
-            models = listOf(
-                // Qwen 2.5 0.5B Instruct Q6_K - Small but capable (~600MB)
-                ModelRegistration(
-                    id = "qwen-2.5-0.5b-instruct-q6-k",
-                    name = "Qwen 2.5 0.5B Instruct Q6_K",
-                    url = "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
-                    framework = LLMFramework.LLAMA_CPP,
-                    modality = FrameworkModality.TEXT_TO_TEXT,
-                    format = ModelFormat.GGUF,
-                    memoryRequirement = 600_000_000L
-                ),
-                // LiquidAI LFM2 350M Q4_K_M - Smallest and fastest (~250MB)
-                ModelRegistration(
-                    id = "lfm2-350m-q4-k-m",
-                    name = "LiquidAI LFM2 350M Q4_K_M",
-                    url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
-                    framework = LLMFramework.LLAMA_CPP,
-                    modality = FrameworkModality.TEXT_TO_TEXT,
-                    format = ModelFormat.GGUF,
-                    memoryRequirement = 250_000_000L
-                ),
-                // LiquidAI LFM2 350M Q8_0 - Highest quality small model (~400MB)
-                ModelRegistration(
-                    id = "lfm2-350m-q8-0",
-                    name = "LiquidAI LFM2 350M Q8_0",
-                    url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
-                    framework = LLMFramework.LLAMA_CPP,
-                    modality = FrameworkModality.TEXT_TO_TEXT,
-                    format = ModelFormat.GGUF,
-                    memoryRequirement = 400_000_000L
-                )
-            )
+            models = AppModelRegistry.getLlamaCppModels()
         )
         Log.i("RunAnywhereApp", "✅ LlamaCPP adapter registered with hardcoded models")
 
@@ -400,51 +282,7 @@ class RunAnywhereApplication : Application() {
 
         RunAnywhere.registerFramework(
             adapter = ONNXAdapter.shared,
-            models = listOf(
-                // STT Models (VOICE_TO_TEXT modality)
-                // Sherpa ONNX Whisper Tiny English (~75MB)
-                ModelRegistration(
-                    id = "sherpa-whisper-tiny-onnx",
-                    name = "Sherpa Whisper Tiny (ONNX)",
-                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.en.tar.bz2",
-                    framework = LLMFramework.ONNX,
-                    modality = FrameworkModality.VOICE_TO_TEXT,
-                    format = ModelFormat.ONNX,
-                    memoryRequirement = 75_000_000L
-                ),
-                // Sherpa ONNX Whisper Small (~250MB)
-                ModelRegistration(
-                    id = "sherpa-whisper-small-onnx",
-                    name = "Sherpa Whisper Small (ONNX)",
-                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2",
-                    framework = LLMFramework.ONNX,
-                    modality = FrameworkModality.VOICE_TO_TEXT,
-                    format = ModelFormat.ONNX,
-                    memoryRequirement = 250_000_000L
-                ),
-
-                // TTS Models (TEXT_TO_VOICE modality)
-                // Piper TTS - US English Lessac Medium (~65MB)
-                ModelRegistration(
-                    id = "piper-en-us-lessac-medium",
-                    name = "Piper TTS (US English - Medium)",
-                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium.tar.bz2",
-                    framework = LLMFramework.ONNX,
-                    modality = FrameworkModality.TEXT_TO_VOICE,
-                    format = ModelFormat.ONNX,
-                    memoryRequirement = 65_000_000L
-                ),
-                // Piper TTS - British English Alba Medium (~65MB)
-                ModelRegistration(
-                    id = "piper-en-gb-alba-medium",
-                    name = "Piper TTS (British English)",
-                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_GB-alba-medium.tar.bz2",
-                    framework = LLMFramework.ONNX,
-                    modality = FrameworkModality.TEXT_TO_VOICE,
-                    format = ModelFormat.ONNX,
-                    memoryRequirement = 65_000_000L
-                )
-            )
+            models = AppModelRegistry.getOnnxModels()
         )
         Log.i("RunAnywhereApp", "✅ ONNX adapter registered with hardcoded models")
 
