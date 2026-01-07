@@ -29,5 +29,5 @@ object BuildToken {
      * This is a PLACEHOLDER token for development.
      * Real tokens are injected during SDK releases via release scripts
      */
-    const val token = "bt_2fc7892f-53e8-46df-9e93-319b98c81757_1761197540"
+    const val token = "bt_placeholder_for_development"
 }
