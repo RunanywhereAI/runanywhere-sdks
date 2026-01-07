@@ -266,7 +266,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v\(coreVersion)/RABackendLlamaCPP-ios-v\(coreVersion).zip",
-                checksum: "03cc71969c7974ef904c2caa4c4ed3734e9fce1ae2cb9c758760595e2574091e"
+                checksum: "d53bc8b34c23c87385c1b38ae556a487317ae88ffda47fe6860ac893548dad00"
             ),
             // =================================================================
             // RABackendONNX - STT/TTS/VAD backend (includes Sherpa-ONNX)
@@ -275,7 +275,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v\(coreVersion)/RABackendONNX-ios-v\(coreVersion).zip",
-                checksum: "c59431dd66e1db7344318a2cd0cca8cb310efc389c22ee5b91c1d6f937b57061"
+                checksum: "467ce647745f8bb913d4daf70c0c7f86f77ba6e444eaf697cba09c40d75220a0"
             ),
             // =================================================================
             // ONNX Runtime - Required by RABackendONNX
