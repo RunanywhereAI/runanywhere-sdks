@@ -204,21 +204,34 @@ class RunAnywhereApplication : Application() {
     }
 
     /**
-     * Register framework adapters with models for DEVELOPMENT mode.
-     * Matches iOS RunAnywhereAIApp.swift registerAdaptersForDevelopment() exactly.
+     * Register framework adapters with models.
+     *
+     * Uses the same hardcoded models for both DEVELOPMENT and PRODUCTION modes
+     * to ensure consistent user experience across environments.
+     *
+     * Matches iOS RunAnywhereAIApp.swift registerAdaptersForDevelopment/Production() pattern exactly.
      *
      * All parameters use strongly-typed enums:
      * - LLMFramework.LLAMA_CPP, LLMFramework.ONNX
      * - FrameworkModality.TEXT_TO_TEXT, VOICE_TO_TEXT, TEXT_TO_VOICE
      * - ModelFormat.GGUF, ModelFormat.ONNX
+     *
+     * @param mode The environment mode (DEVELOPMENT or PRODUCTION)
      */
-    private suspend fun registerAdaptersForDevelopment() {
-        Log.i("RunAnywhereApp", "📦 Registering adapters with custom models for DEVELOPMENT mode")
+    private suspend fun registerAdapters(mode: String) {
+        require(mode in setOf("DEVELOPMENT", "PRODUCTION")) { "Invalid mode: $mode" }
+
+        Log.i("RunAnywhereApp", "📦 Registering adapters with custom models for $mode mode")
+
+        if (mode == "PRODUCTION") {
+            Log.i("RunAnywhereApp", "💡 Hardcoded models provide immediate user access, backend can add more dynamically")
+        }
 
         // =====================================================
         // 1. LlamaCPP Framework (TEXT_TO_TEXT modality)
         // Matches iOS: RunAnywhere.registerFramework(LlamaCPPCoreAdapter(), models: [...])
         // This provides native C++ llama.cpp performance
+        // Models are the same across Dev/Prod for consistent user experience
         // =====================================================
         Log.i("RunAnywhereApp", "📝 Registering LlamaCPP adapter with LLM models...")
 
@@ -226,12 +239,13 @@ class RunAnywhereApplication : Application() {
             adapter = LlamaCppAdapter.shared,
             models = AppModelRegistry.getLlamaCppModels()
         )
-        Log.i("RunAnywhereApp", "✅ LlamaCPP Core registered (runanywhere-core backend)")
+        Log.i("RunAnywhereApp", "✅ LlamaCPP adapter registered")
 
         // =====================================================
         // 2. ONNX Runtime Framework (VOICE_TO_TEXT, TEXT_TO_VOICE modalities)
         // Matches iOS: RunAnywhere.registerFramework(ONNXAdapter.shared, models: [...])
         // Note: WhisperKit models are iOS-only (CoreML), we use ONNX Sherpa models on Android
+        // Models are the same across Dev/Prod for consistent user experience
         // =====================================================
         Log.i("RunAnywhereApp", "🎤🔊 Registering ONNX adapter with STT and TTS models...")
 
@@ -239,52 +253,11 @@ class RunAnywhereApplication : Application() {
             adapter = ONNXAdapter.shared,
             models = AppModelRegistry.getOnnxModels()
         )
-        Log.i("RunAnywhereApp", "✅ ONNX Runtime registered (includes STT and TTS providers)")
+        Log.i("RunAnywhereApp", "✅ ONNX adapter registered (includes STT and TTS providers)")
 
         // Note: WhisperKit is iOS-only (uses CoreML), ONNX Sherpa serves the same purpose on Android
         // Note: FluidAudioDiarization is iOS-only, can be added when Android module is available
         // Note: FoundationModels requires iOS 26+ / macOS 26+, not applicable to Android
-
-        // Scan file system for already downloaded models
-        Log.i("RunAnywhereApp", "🔍 Scanning for previously downloaded models...")
-        RunAnywhere.scanForDownloadedModels()
-        Log.i("RunAnywhereApp", "✅ File system scan complete")
-
-        Log.i("RunAnywhereApp", "🎉 All adapters registered for development")
-    }
-
-    /**
-     * Register framework adapters with custom models for PRODUCTION mode.
-     * Hardcoded models provide immediate user access, backend can add more dynamically.
-     * Matches iOS registerAdaptersForProduction() pattern exactly.
-     */
-    private suspend fun registerAdaptersForProduction() {
-        Log.i("RunAnywhereApp", "📦 Registering adapters with custom models for PRODUCTION mode")
-        Log.i("RunAnywhereApp", "💡 Hardcoded models provide immediate user access, backend can add more dynamically")
-
-        // =====================================================
-        // 1. LlamaCPP Framework (TEXT_TO_TEXT modality)
-        // Same models as development mode for consistent user experience
-        // =====================================================
-        Log.i("RunAnywhereApp", "📝 Registering LlamaCPP adapter with LLM models...")
-
-        RunAnywhere.registerFramework(
-            adapter = LlamaCppAdapter.shared,
-            models = AppModelRegistry.getLlamaCppModels()
-        )
-        Log.i("RunAnywhereApp", "✅ LlamaCPP adapter registered with hardcoded models")
-
-        // =====================================================
-        // 2. ONNX Runtime Framework (VOICE_TO_TEXT, TEXT_TO_VOICE modalities)
-        // Same models as development mode for consistent user experience
-        // =====================================================
-        Log.i("RunAnywhereApp", "🎤🔊 Registering ONNX adapter with STT and TTS models...")
-
-        RunAnywhere.registerFramework(
-            adapter = ONNXAdapter.shared,
-            models = AppModelRegistry.getOnnxModels()
-        )
-        Log.i("RunAnywhereApp", "✅ ONNX adapter registered with hardcoded models")
 
         // Scan file system for already downloaded models
         // This allows models downloaded previously to be discovered
@@ -292,9 +265,24 @@ class RunAnywhereApplication : Application() {
         RunAnywhere.scanForDownloadedModels()
         Log.i("RunAnywhereApp", "✅ File system scan complete")
 
-        Log.i("RunAnywhereApp", "🎉 All adapters registered for production with hardcoded models")
-        Log.i("RunAnywhereApp", "📡 Backend can dynamically add more models via console API")
+        Log.i("RunAnywhereApp", "🎉 All adapters registered for $mode")
+
+        if (mode == "PRODUCTION") {
+            Log.i("RunAnywhereApp", "📡 Backend can dynamically add more models via console API")
+        }
     }
+
+    /**
+     * Register framework adapters with models for DEVELOPMENT mode.
+     * Delegates to registerAdapters() with mode parameter.
+     */
+    private suspend fun registerAdaptersForDevelopment() = registerAdapters("DEVELOPMENT")
+
+    /**
+     * Register framework adapters with models for PRODUCTION mode.
+     * Delegates to registerAdapters() with mode parameter.
+     */
+    private suspend fun registerAdaptersForProduction() = registerAdapters("PRODUCTION")
 
     /**
      * Retrieves API key from secure storage.
