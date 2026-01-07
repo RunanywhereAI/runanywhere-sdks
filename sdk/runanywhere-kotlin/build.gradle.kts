@@ -69,10 +69,10 @@ val testLocal: Boolean = rootProject.findProperty("runanywhere.testLocal")?.toSt
 // - Backends: https://github.com/RunanywhereAI/runanywhere-binaries/releases/tag/core-v{coreVersion}
 val coreVersion: String = rootProject.findProperty("runanywhere.coreVersion")?.toString()
     ?: project.findProperty("runanywhere.coreVersion")?.toString()
-    ?: "0.1.3"
+    ?: "0.1.4"
 val commonsVersion: String = rootProject.findProperty("runanywhere.commonsVersion")?.toString()
     ?: project.findProperty("runanywhere.commonsVersion")?.toString()
-    ?: "0.1.3"
+    ?: "0.1.4"
 
 // Log the build mode
 logger.lifecycle("RunAnywhere SDK: testLocal=$testLocal, coreVersion=$coreVersion")
