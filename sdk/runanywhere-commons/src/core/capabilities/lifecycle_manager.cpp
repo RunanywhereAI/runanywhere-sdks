@@ -43,7 +43,8 @@ struct LifecycleManager {
     // State (mirrors Swift's lifecycle properties)
     std::atomic<rac_lifecycle_state_t> state{RAC_LIFECYCLE_STATE_IDLE};
     std::string current_model_path{};  // File path used for loading
-    std::string current_model_id{};    // Model identifier for telemetry (e.g., "sherpa-onnx-whisper-tiny.en")
+    std::string
+        current_model_id{};  // Model identifier for telemetry (e.g., "sherpa-onnx-whisper-tiny.en")
     std::string current_model_name{};  // Human-readable name (e.g., "Sherpa Whisper Tiny (ONNX)")
     rac_handle_t current_service{nullptr};
 
@@ -144,9 +145,8 @@ rac_result_t rac_lifecycle_create(const rac_lifecycle_config_t* config,
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_path,
-                                const char* model_id, const char* model_name,
-                                rac_handle_t* out_service) {
+rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_path, const char* model_id,
+                                const char* model_name, rac_handle_t* out_service) {
     if (handle == nullptr || model_path == nullptr || out_service == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -178,7 +178,8 @@ rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_path,
     mgr->state.store(RAC_LIFECYCLE_STATE_LOADING);
     track_lifecycle_event(mgr, "load.started", model_id, 0.0, RAC_SUCCESS);
 
-    RAC_LOG_INFO(mgr->logger_category.c_str(), "Loading model: %s (path: %s)", model_id, model_path);
+    RAC_LOG_INFO(mgr->logger_category.c_str(), "Loading model: %s (path: %s)", model_id,
+                 model_path);
 
     // Create service via callback - pass the PATH for loading
     rac_handle_t service = nullptr;

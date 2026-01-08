@@ -276,10 +276,12 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
     std::string transcription_id = generate_unique_id();
     const char* model_id = rac_lifecycle_get_model_id(component->lifecycle);
     const char* model_name = rac_lifecycle_get_model_name(component->lifecycle);
-    
+
     // Debug: Log if model_id is null
     if (!model_id) {
-        log_warning("STT.Component", "rac_lifecycle_get_model_id returned null - model_id may not be set in telemetry");
+        log_warning(
+            "STT.Component",
+            "rac_lifecycle_get_model_id returned null - model_id may not be set in telemetry");
     } else {
         log_debug("STT.Component", "STT transcription using model_id: %s", model_id);
     }
@@ -446,17 +448,19 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
     // Get model info for telemetry - use lifecycle methods for consistency with non-streaming path
     const char* model_id = rac_lifecycle_get_model_id(component->lifecycle);
     const char* model_name = rac_lifecycle_get_model_name(component->lifecycle);
-    
+
     // Debug: Log if model_id is null
     if (!model_id) {
-        log_warning("STT.Component", "rac_lifecycle_get_model_id returned null - model_id may not be set in telemetry");
+        log_warning(
+            "STT.Component",
+            "rac_lifecycle_get_model_id returned null - model_id may not be set in telemetry");
     } else {
         log_debug("STT.Component", "STT streaming transcription using model_id: %s", model_id);
     }
 
     // Calculate audio length in ms (assume 16kHz, 16-bit mono)
     double audio_length_ms = (audio_size * 1000.0) / (component->config.sample_rate * 2);
-    
+
     // Generate transcription ID for tracking
     std::string transcription_id = generate_unique_id();
 
@@ -490,7 +494,7 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
     if (result != RAC_SUCCESS) {
         log_error("STT.Component", "Streaming transcription failed");
         rac_lifecycle_track_error(component->lifecycle, result, "transcribeStream");
-        
+
         // Emit STT_TRANSCRIPTION_FAILED event
         rac_analytics_event_data_t event = {};
         event.type = RAC_EVENT_STT_TRANSCRIPTION_FAILED;
@@ -504,8 +508,8 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
         rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_FAILED, &event);
     } else {
         // Emit STT_TRANSCRIPTION_COMPLETED event with is_streaming = RAC_TRUE
-        // Note: For streaming, we don't have final consolidated text, so word_count is not available.
-        // We can still compute real_time_factor from audio_length_ms and duration_ms.
+        // Note: For streaming, we don't have final consolidated text, so word_count is not
+        // available. We can still compute real_time_factor from audio_length_ms and duration_ms.
         double real_time_factor =
             (audio_length_ms > 0 && duration_ms > 0) ? (audio_length_ms / duration_ms) : 0.0;
 
