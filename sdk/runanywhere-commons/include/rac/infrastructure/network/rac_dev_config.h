@@ -21,6 +21,7 @@
 #define RAC_DEV_CONFIG_H
 
 #include <stdbool.h>
+
 #include "rac/core/rac_types.h"
 
 #ifdef __cplusplus

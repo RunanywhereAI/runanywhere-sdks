@@ -386,7 +386,7 @@ rac_result_t rac_device_registration_to_json(const rac_device_registration_reque
     if (env == RAC_ENV_DEVELOPMENT) {
         // Flattened structure for Supabase (matches Kotlin SDK DevDeviceRegistrationRequest)
         const rac_device_registration_info_t* info = &request->device_info;
-        
+
         // Required fields (matching Supabase schema)
         if (info->device_id) {
             json.add_string("device_id", info->device_id);
@@ -403,7 +403,7 @@ rac_result_t rac_device_registration_to_json(const rac_device_registration_reque
         if (request->sdk_version) {
             json.add_string("sdk_version", request->sdk_version);
         }
-        
+
         // Optional fields
         if (request->build_token) {
             json.add_string("build_token", request->build_token);
@@ -465,8 +465,9 @@ rac_result_t rac_device_registration_to_json(const rac_device_registration_reque
         json.add_int_always("efficiency_cores", info->efficiency_cores);
 
         // Device fingerprint (fallback to device_id if not set)
-        const char* fingerprint = info->device_fingerprint ? info->device_fingerprint
-                                                           : (info->device_id ? info->device_id : "");
+        const char* fingerprint = info->device_fingerprint
+                                      ? info->device_fingerprint
+                                      : (info->device_id ? info->device_id : "");
         json.add_string_always("device_fingerprint", fingerprint);
 
         json.end_object();  // Close device_info

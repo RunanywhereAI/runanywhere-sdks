@@ -370,7 +370,8 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
     }
     if (out_result->completion_tokens <= 0) {
         out_result->completion_tokens = estimate_tokens(out_result->text);
-        log_debug("LLM.Component", "Using estimated completion_tokens=%d", out_result->completion_tokens);
+        log_debug("LLM.Component", "Using estimated completion_tokens=%d",
+                  out_result->completion_tokens);
     }
     out_result->total_tokens = out_result->prompt_tokens + out_result->completion_tokens;
     out_result->total_time_ms = total_time_ms;
