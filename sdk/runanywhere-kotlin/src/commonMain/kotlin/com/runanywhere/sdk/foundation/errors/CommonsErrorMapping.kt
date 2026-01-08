@@ -131,7 +131,6 @@ object CommonsErrorCode {
  * ```
  */
 object CommonsErrorMapping {
-
     /**
      * Convert a C++ error code to the corresponding Kotlin ErrorCode enum.
      *
@@ -180,7 +179,7 @@ object CommonsErrorMapping {
     fun toSDKError(
         rawValue: Int,
         message: String? = null,
-        cause: Throwable? = null
+        cause: Throwable? = null,
     ): SDKError {
         val errorCode = toErrorCode(rawValue)
         val errorCategory = ErrorCategory.fromErrorCode(errorCode)
@@ -189,7 +188,7 @@ object CommonsErrorMapping {
             code = errorCode,
             category = errorCategory,
             message = errorMessage,
-            cause = cause
+            cause = cause,
         )
     }
 
@@ -206,24 +205,25 @@ object CommonsErrorMapping {
         rawValue: Int,
         operation: String,
         details: String? = null,
-        cause: Throwable? = null
+        cause: Throwable? = null,
     ): SDKError {
         val errorCode = toErrorCode(rawValue)
         val errorCategory = ErrorCategory.fromErrorCode(errorCode)
 
-        val message = buildString {
-            append("$operation failed")
-            if (details != null) {
-                append(": $details")
+        val message =
+            buildString {
+                append("$operation failed")
+                if (details != null) {
+                    append(": $details")
+                }
+                append(" (error code: $rawValue - ${errorCode.description})")
             }
-            append(" (error code: $rawValue - ${errorCode.description})")
-        }
 
         return SDKError(
             code = errorCode,
             category = errorCategory,
             message = message,
-            cause = cause
+            cause = cause,
         )
     }
 
@@ -321,7 +321,7 @@ object CommonsErrorMapping {
     fun <T : Any> toResultFromNullable(
         value: T?,
         errorCode: Int,
-        operation: String
+        operation: String,
     ): Result<T> {
         return if (value != null) {
             Result.success(value)

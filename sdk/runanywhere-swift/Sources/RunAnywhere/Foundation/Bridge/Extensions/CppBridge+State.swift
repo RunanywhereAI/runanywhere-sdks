@@ -49,7 +49,7 @@ extension CppBridge {
             // This populates rac_sdk_get_config() which device registration uses
             let sdkVersion = SDKConstants.version
             let platform = SDKConstants.platform
-            
+
             // Use withCString to ensure strings remain valid during the call
             sdkVersion.withCString { sdkVer in
                 platform.withCString { plat in
@@ -251,7 +251,7 @@ extension CppBridge {
             // retrieveIfExists returns String? and can throw
             let accessToken: String?
             let refreshToken: String?
-            
+
             do {
                 accessToken = try KeychainManager.shared.retrieveIfExists(for: "com.runanywhere.sdk.accessToken")
                 refreshToken = try KeychainManager.shared.retrieveIfExists(for: "com.runanywhere.sdk.refreshToken")
@@ -260,7 +260,7 @@ extension CppBridge {
                 SDKLogger(category: "CppBridge.State").debug("Keychain error loading auth: \(error.localizedDescription)")
                 return
             }
-            
+
             guard let accessToken = accessToken,
                   let refreshToken = refreshToken else {
                 // No stored auth tokens found - this is normal on first launch
@@ -311,7 +311,7 @@ extension CppBridge {
 private func keychainPersistCallback(
     key: UnsafePointer<CChar>?,
     value: UnsafePointer<CChar>?,
-    userData: UnsafeMutableRawPointer?
+    userData _: UnsafeMutableRawPointer?
 ) {
     guard let key = key else { return }
     let keyString = String(cString: key)
@@ -340,7 +340,7 @@ private func keychainPersistCallback(
 /// C callback for loading state from Keychain
 private func keychainLoadCallback(
     key: UnsafePointer<CChar>?,
-    userData: UnsafeMutableRawPointer?
+    userData _: UnsafeMutableRawPointer?
 ) -> UnsafePointer<CChar>? {
     guard let key = key else { return nil }
     let keyString = String(cString: key)

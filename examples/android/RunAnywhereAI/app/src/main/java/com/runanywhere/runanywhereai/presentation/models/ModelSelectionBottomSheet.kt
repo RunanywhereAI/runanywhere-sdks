@@ -159,14 +159,15 @@ fun ModelSelectionBottomSheet(
                                             RunAnywhere.loadTTSVoice("system-tts")
 
                                             // Create pseudo ModelInfo for System TTS (matches iOS)
-                                            val systemTTSModel = ModelInfo(
-                                                id = "system-tts",
-                                                name = "System TTS",
-                                                downloadURL = null,
-                                                format = ModelFormat.UNKNOWN,
-                                                category = ModelCategory.SPEECH_SYNTHESIS,
-                                                framework = InferenceFramework.SYSTEM_TTS,
-                                            )
+                                            val systemTTSModel =
+                                                ModelInfo(
+                                                    id = "system-tts",
+                                                    name = "System TTS",
+                                                    downloadURL = null,
+                                                    format = ModelFormat.UNKNOWN,
+                                                    category = ModelCategory.SPEECH_SYNTHESIS,
+                                                    framework = InferenceFramework.SYSTEM_TTS,
+                                                )
 
                                             kotlinx.coroutines.delay(300)
                                             onModelSelected(systemTTSModel)

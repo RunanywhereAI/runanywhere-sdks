@@ -131,79 +131,97 @@ struct RunAnywhereAIApp: App {
 
         // Register LLM models using the new RunAnywhere.registerModel API
         // Using explicit IDs ensures models are recognized after download across app restarts
-        RunAnywhere.registerModel(
-            id: "smollm2-360m-q8_0",
-            name: "SmolLM2 360M Q8_0",
-            url: URL(string: "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf")!,
-            framework: .llamaCpp,
-            memoryRequirement: 500_000_000
-        )
-        RunAnywhere.registerModel(
-            id: "llama-2-7b-chat-q4_k_m",
-            name: "Llama 2 7B Chat Q4_K_M",
-            url: URL(string: "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf")!,
-            framework: .llamaCpp,
-            memoryRequirement: 4_000_000_000
-        )
-        RunAnywhere.registerModel(
-            id: "mistral-7b-instruct-q4_k_m",
-            name: "Mistral 7B Instruct Q4_K_M",
-            url: URL(string: "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf")!,
-            framework: .llamaCpp,
-            memoryRequirement: 4_000_000_000
-        )
-        RunAnywhere.registerModel(
-            id: "qwen2.5-0.5b-instruct-q6_k",
-            name: "Qwen 2.5 0.5B Instruct Q6_K",
-            url: URL(string: "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf")!,
-            framework: .llamaCpp,
-            memoryRequirement: 600_000_000
-        )
-        RunAnywhere.registerModel(
-            id: "lfm2-350m-q4_k_m",
-            name: "LiquidAI LFM2 350M Q4_K_M",
-            url: URL(string: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf")!,
-            framework: .llamaCpp,
-            memoryRequirement: 250_000_000
-        )
-        RunAnywhere.registerModel(
-            id: "lfm2-350m-q8_0",
-            name: "LiquidAI LFM2 350M Q8_0",
-            url: URL(string: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf")!,
-            framework: .llamaCpp,
-            memoryRequirement: 400_000_000
-        )
+        if let smolLM2URL = URL(string: "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf") {
+            RunAnywhere.registerModel(
+                id: "smollm2-360m-q8_0",
+                name: "SmolLM2 360M Q8_0",
+                url: smolLM2URL,
+                framework: .llamaCpp,
+                memoryRequirement: 500_000_000
+            )
+        }
+        if let llama2URL = URL(string: "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf") {
+            RunAnywhere.registerModel(
+                id: "llama-2-7b-chat-q4_k_m",
+                name: "Llama 2 7B Chat Q4_K_M",
+                url: llama2URL,
+                framework: .llamaCpp,
+                memoryRequirement: 4_000_000_000
+            )
+        }
+        if let mistralURL = URL(string: "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf") {
+            RunAnywhere.registerModel(
+                id: "mistral-7b-instruct-q4_k_m",
+                name: "Mistral 7B Instruct Q4_K_M",
+                url: mistralURL,
+                framework: .llamaCpp,
+                memoryRequirement: 4_000_000_000
+            )
+        }
+        if let qwenURL = URL(string: "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf") {
+            RunAnywhere.registerModel(
+                id: "qwen2.5-0.5b-instruct-q6_k",
+                name: "Qwen 2.5 0.5B Instruct Q6_K",
+                url: qwenURL,
+                framework: .llamaCpp,
+                memoryRequirement: 600_000_000
+            )
+        }
+        if let lfm2Q4URL = URL(string: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf") {
+            RunAnywhere.registerModel(
+                id: "lfm2-350m-q4_k_m",
+                name: "LiquidAI LFM2 350M Q4_K_M",
+                url: lfm2Q4URL,
+                framework: .llamaCpp,
+                memoryRequirement: 250_000_000
+            )
+        }
+        if let lfm2Q8URL = URL(string: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf") {
+            RunAnywhere.registerModel(
+                id: "lfm2-350m-q8_0",
+                name: "LiquidAI LFM2 350M Q8_0",
+                url: lfm2Q8URL,
+                framework: .llamaCpp,
+                memoryRequirement: 400_000_000
+            )
+        }
         logger.info("✅ LLM models registered")
 
         // Register ONNX STT and TTS models
         // Using tar.gz format hosted on RunanywhereAI/sherpa-onnx for fast native extraction
-        RunAnywhere.registerModel(
-            id: "sherpa-onnx-whisper-tiny.en",
-            name: "Sherpa Whisper Tiny (ONNX)",
-            url: URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz")!,
-            framework: .onnx,
-            modality: .speechRecognition,
-            artifactType: .archive(.tarGz, structure: .nestedDirectory),
-            memoryRequirement: 75_000_000
-        )
-        RunAnywhere.registerModel(
-            id: "vits-piper-en_US-lessac-medium",
-            name: "Piper TTS (US English - Medium)",
-            url: URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz")!,
-            framework: .onnx,
-            modality: .speechSynthesis,
-            artifactType: .archive(.tarGz, structure: .nestedDirectory),
-            memoryRequirement: 65_000_000
-        )
-        RunAnywhere.registerModel(
-            id: "vits-piper-en_GB-alba-medium",
-            name: "Piper TTS (British English)",
-            url: URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz")!,
-            framework: .onnx,
-            modality: .speechSynthesis,
-            artifactType: .archive(.tarGz, structure: .nestedDirectory),
-            memoryRequirement: 65_000_000
-        )
+        if let whisperURL = URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz") {
+            RunAnywhere.registerModel(
+                id: "sherpa-onnx-whisper-tiny.en",
+                name: "Sherpa Whisper Tiny (ONNX)",
+                url: whisperURL,
+                framework: .onnx,
+                modality: .speechRecognition,
+                artifactType: .archive(.tarGz, structure: .nestedDirectory),
+                memoryRequirement: 75_000_000
+            )
+        }
+        if let piperUSURL = URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz") {
+            RunAnywhere.registerModel(
+                id: "vits-piper-en_US-lessac-medium",
+                name: "Piper TTS (US English - Medium)",
+                url: piperUSURL,
+                framework: .onnx,
+                modality: .speechSynthesis,
+                artifactType: .archive(.tarGz, structure: .nestedDirectory),
+                memoryRequirement: 65_000_000
+            )
+        }
+        if let piperGBURL = URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz") {
+            RunAnywhere.registerModel(
+                id: "vits-piper-en_GB-alba-medium",
+                name: "Piper TTS (British English)",
+                url: piperGBURL,
+                framework: .onnx,
+                modality: .speechSynthesis,
+                artifactType: .archive(.tarGz, structure: .nestedDirectory),
+                memoryRequirement: 65_000_000
+            )
+        }
         logger.info("✅ ONNX STT/TTS models registered")
         logger.info("🎉 All modules and models registered")
     }

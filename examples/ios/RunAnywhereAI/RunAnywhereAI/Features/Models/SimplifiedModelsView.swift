@@ -20,8 +20,12 @@ struct SimplifiedModelsView: View {
     /// All available models sorted by availability (downloaded first)
     private var sortedModels: [ModelInfo] {
         viewModel.availableModels.sorted { model1, model2 in
-            let m1BuiltIn = model1.framework == .foundationModels || model1.framework == .systemTTS || model1.artifactType == .builtIn
-            let m2BuiltIn = model2.framework == .foundationModels || model2.framework == .systemTTS || model2.artifactType == .builtIn
+            let m1BuiltIn = model1.framework == .foundationModels
+                || model1.framework == .systemTTS
+                || model1.artifactType == .builtIn
+            let m2BuiltIn = model2.framework == .foundationModels
+                || model2.framework == .systemTTS
+                || model2.artifactType == .builtIn
             let m1Priority = m1BuiltIn ? 0 : (model1.localPath != nil ? 1 : 2)
             let m2Priority = m2BuiltIn ? 0 : (model2.localPath != nil ? 1 : 2)
             if m1Priority != m2Priority {

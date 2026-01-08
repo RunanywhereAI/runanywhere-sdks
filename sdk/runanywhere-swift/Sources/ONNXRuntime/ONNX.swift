@@ -76,7 +76,7 @@ public enum ONNX: RunAnywhereModule {
     /// - Parameter priority: Ignored (C++ uses its own priority system)
     /// - Throws: SDKError if registration fails
     @MainActor
-    public static func register(priority: Int = 100) {
+    public static func register(priority _: Int = 100) {
         guard !isRegistered else {
             logger.debug("ONNX already registered, returning")
             return
@@ -128,7 +128,7 @@ public enum ONNX: RunAnywhereModule {
     }
 
     /// Check if ONNX can handle VAD (always true for Silero VAD)
-    public static func canHandleVAD(modelId: String?) -> Bool {
+    public static func canHandleVAD(modelId _: String?) -> Bool {
         return true  // ONNX Silero VAD is the default
     }
 }

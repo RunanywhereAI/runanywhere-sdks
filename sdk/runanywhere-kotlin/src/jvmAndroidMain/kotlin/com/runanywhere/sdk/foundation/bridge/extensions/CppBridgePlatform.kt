@@ -38,7 +38,6 @@ import com.runanywhere.sdk.foundation.errors.SDKError
  * - All callbacks are thread-safe
  */
 object CppBridgePlatform {
-
     /**
      * Platform service type constants matching C++ RAC_PLATFORM_SERVICE_* values.
      */
@@ -67,16 +66,17 @@ object CppBridgePlatform {
         /**
          * Get a human-readable name for the service type.
          */
-        fun getName(type: Int): String = when (type) {
-            NONE -> "NONE"
-            LLM -> "LLM"
-            TTS -> "TTS"
-            STT -> "STT"
-            EMBEDDING -> "EMBEDDING"
-            IMAGE_GENERATION -> "IMAGE_GENERATION"
-            VISION -> "VISION"
-            else -> "UNKNOWN($type)"
-        }
+        fun getName(type: Int): String =
+            when (type) {
+                NONE -> "NONE"
+                LLM -> "LLM"
+                TTS -> "TTS"
+                STT -> "STT"
+                EMBEDDING -> "EMBEDDING"
+                IMAGE_GENERATION -> "IMAGE_GENERATION"
+                VISION -> "VISION"
+                else -> "UNKNOWN($type)"
+            }
     }
 
     /**
@@ -107,16 +107,17 @@ object CppBridgePlatform {
         /**
          * Get a human-readable name for the availability status.
          */
-        fun getName(status: Int): String = when (status) {
-            UNKNOWN -> "UNKNOWN"
-            AVAILABLE -> "AVAILABLE"
-            NOT_AVAILABLE -> "NOT_AVAILABLE"
-            REQUIRES_DOWNLOAD -> "REQUIRES_DOWNLOAD"
-            DOWNLOADING -> "DOWNLOADING"
-            REQUIRES_AUTH -> "REQUIRES_AUTH"
-            TEMPORARILY_UNAVAILABLE -> "TEMPORARILY_UNAVAILABLE"
-            else -> "UNKNOWN($status)"
-        }
+        fun getName(status: Int): String =
+            when (status) {
+                UNKNOWN -> "UNKNOWN"
+                AVAILABLE -> "AVAILABLE"
+                NOT_AVAILABLE -> "NOT_AVAILABLE"
+                REQUIRES_DOWNLOAD -> "REQUIRES_DOWNLOAD"
+                DOWNLOADING -> "DOWNLOADING"
+                REQUIRES_AUTH -> "REQUIRES_AUTH"
+                TEMPORARILY_UNAVAILABLE -> "TEMPORARILY_UNAVAILABLE"
+                else -> "UNKNOWN($status)"
+            }
 
         /**
          * Check if the status indicates the service is usable.
@@ -164,20 +165,21 @@ object CppBridgePlatform {
         /**
          * Get a human-readable name for the error code.
          */
-        fun getName(code: Int): String = when (code) {
-            SUCCESS -> "SUCCESS"
-            SERVICE_NOT_AVAILABLE -> "SERVICE_NOT_AVAILABLE"
-            NOT_INITIALIZED -> "NOT_INITIALIZED"
-            INVALID_REQUEST -> "INVALID_REQUEST"
-            TIMEOUT -> "TIMEOUT"
-            CANCELLED -> "CANCELLED"
-            RATE_LIMITED -> "RATE_LIMITED"
-            AUTH_REQUIRED -> "AUTH_REQUIRED"
-            MODEL_NOT_AVAILABLE -> "MODEL_NOT_AVAILABLE"
-            CONTENT_FILTERED -> "CONTENT_FILTERED"
-            INTERNAL_ERROR -> "INTERNAL_ERROR"
-            else -> "UNKNOWN($code)"
-        }
+        fun getName(code: Int): String =
+            when (code) {
+                SUCCESS -> "SUCCESS"
+                SERVICE_NOT_AVAILABLE -> "SERVICE_NOT_AVAILABLE"
+                NOT_INITIALIZED -> "NOT_INITIALIZED"
+                INVALID_REQUEST -> "INVALID_REQUEST"
+                TIMEOUT -> "TIMEOUT"
+                CANCELLED -> "CANCELLED"
+                RATE_LIMITED -> "RATE_LIMITED"
+                AUTH_REQUIRED -> "AUTH_REQUIRED"
+                MODEL_NOT_AVAILABLE -> "MODEL_NOT_AVAILABLE"
+                CONTENT_FILTERED -> "CONTENT_FILTERED"
+                INTERNAL_ERROR -> "INTERNAL_ERROR"
+                else -> "UNKNOWN($code)"
+            }
     }
 
     /**
@@ -199,13 +201,14 @@ object CppBridgePlatform {
         /**
          * Get a human-readable name for the model type.
          */
-        fun getName(type: Int): String = when (type) {
-            DEFAULT -> "DEFAULT"
-            SMALL -> "SMALL"
-            MEDIUM -> "MEDIUM"
-            LARGE -> "LARGE"
-            else -> "UNKNOWN($type)"
-        }
+        fun getName(type: Int): String =
+            when (type) {
+                DEFAULT -> "DEFAULT"
+                SMALL -> "SMALL"
+                MEDIUM -> "MEDIUM"
+                LARGE -> "LARGE"
+                else -> "UNKNOWN($type)"
+            }
     }
 
     @Volatile
@@ -256,7 +259,7 @@ object CppBridgePlatform {
         val maxTokens: Int = 512,
         val temperature: Float = 0.7f,
         val modelType: Int = ModelType.DEFAULT,
-        val streaming: Boolean = false
+        val streaming: Boolean = false,
     ) {
         /**
          * Convert to JSON string for C++ interop.
@@ -289,7 +292,7 @@ object CppBridgePlatform {
         val tokensGenerated: Int,
         val finishReason: String,
         val modelUsed: String?,
-        val latencyMs: Long
+        val latencyMs: Long,
     )
 
     /**
@@ -306,7 +309,7 @@ object CppBridgePlatform {
         val language: String = "en-US",
         val voiceId: String? = null,
         val speakingRate: Float = 1.0f,
-        val pitch: Float = 1.0f
+        val pitch: Float = 1.0f,
     ) {
         /**
          * Convert to JSON string for C++ interop.
@@ -336,7 +339,7 @@ object CppBridgePlatform {
         val audioData: ByteArray,
         val durationMs: Long,
         val sampleRate: Int,
-        val format: String
+        val format: String,
     ) {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -373,7 +376,7 @@ object CppBridgePlatform {
         val language: String = "en-US",
         val sampleRate: Int = 16000,
         val format: String = "PCM_16",
-        val enablePunctuation: Boolean = true
+        val enablePunctuation: Boolean = true,
     ) {
         /**
          * Convert to JSON string for C++ interop (excluding audio data).
@@ -424,7 +427,7 @@ object CppBridgePlatform {
         val text: String,
         val confidence: Float,
         val language: String,
-        val isFinal: Boolean
+        val isFinal: Boolean,
     )
 
     /**
@@ -445,7 +448,7 @@ object CppBridgePlatform {
         val supportedModels: List<String>,
         val maxInputLength: Int,
         val supportsStreaming: Boolean,
-        val requiresNetwork: Boolean
+        val requiresNetwork: Boolean,
     )
 
     /**
@@ -593,7 +596,7 @@ object CppBridgePlatform {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Platform callbacks registered"
+                "Platform callbacks registered",
             )
         }
     }
@@ -616,7 +619,7 @@ object CppBridgePlatform {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Cannot initialize: not registered"
+                    "Cannot initialize: not registered",
                 )
                 return ErrorCode.NOT_INITIALIZED
             }
@@ -628,7 +631,7 @@ object CppBridgePlatform {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Initializing platform services"
+                "Initializing platform services",
             )
 
             // Check availability of all services
@@ -639,7 +642,7 @@ object CppBridgePlatform {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Platform services initialized"
+                "Platform services initialized",
             )
 
             return ErrorCode.SUCCESS
@@ -665,8 +668,9 @@ object CppBridgePlatform {
         return synchronized(lock) {
             serviceAvailability[serviceType] ?: run {
                 // Query provider if available
-                val status = platformProvider?.checkServiceAvailability(serviceType)
-                    ?: AvailabilityStatus.NOT_AVAILABLE
+                val status =
+                    platformProvider?.checkServiceAvailability(serviceType)
+                        ?: AvailabilityStatus.NOT_AVAILABLE
                 serviceAvailability[serviceType] = status
                 status
             }
@@ -734,7 +738,7 @@ object CppBridgePlatform {
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
                 "Service ${ServiceType.getName(serviceType)} availability changed: " +
-                    "${AvailabilityStatus.getName(previousStatus)} -> ${AvailabilityStatus.getName(status)}"
+                    "${AvailabilityStatus.getName(previousStatus)} -> ${AvailabilityStatus.getName(status)}",
             )
 
             try {
@@ -743,7 +747,7 @@ object CppBridgePlatform {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in platform listener onServiceAvailabilityChanged: ${e.message}"
+                    "Error in platform listener onServiceAvailabilityChanged: ${e.message}",
                 )
             }
         }
@@ -770,7 +774,7 @@ object CppBridgePlatform {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Platform LLM generate: no provider set"
+                "Platform LLM generate: no provider set",
             )
             return null
         }
@@ -780,12 +784,13 @@ object CppBridgePlatform {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Platform LLM generate: ${request.prompt.take(50)}..."
+            "Platform LLM generate: ${request.prompt.take(50)}...",
         )
 
         try {
-            val response = provider.executeLLMRequest(request, null)
-                ?: return null
+            val response =
+                provider.executeLLMRequest(request, null)
+                    ?: return null
 
             try {
                 platformListener?.onLLMComplete(response, ErrorCode.SUCCESS)
@@ -806,7 +811,7 @@ object CppBridgePlatform {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Platform LLM generate failed: ${e.message}"
+                "Platform LLM generate failed: ${e.message}",
             )
 
             try {
@@ -836,7 +841,7 @@ object CppBridgePlatform {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Platform LLM stream generate: no provider set"
+                "Platform LLM stream generate: no provider set",
             )
             return null
         }
@@ -846,21 +851,23 @@ object CppBridgePlatform {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Platform LLM stream generate: ${request.prompt.take(50)}..."
+            "Platform LLM stream generate: ${request.prompt.take(50)}...",
         )
 
         try {
-            val streamCallback = StreamCallback { token, isFinal ->
-                try {
-                    platformListener?.onStreamingToken(token, isFinal)
-                } catch (e: Exception) {
-                    // Ignore listener errors
+            val streamCallback =
+                StreamCallback { token, isFinal ->
+                    try {
+                        platformListener?.onStreamingToken(token, isFinal)
+                    } catch (e: Exception) {
+                        // Ignore listener errors
+                    }
+                    streamingTokenCallback(token, isFinal)
                 }
-                streamingTokenCallback(token, isFinal)
-            }
 
-            val response = provider.executeLLMRequest(request.copy(streaming = true), streamCallback)
-                ?: return null
+            val response =
+                provider.executeLLMRequest(request.copy(streaming = true), streamCallback)
+                    ?: return null
 
             try {
                 platformListener?.onLLMComplete(response, ErrorCode.SUCCESS)
@@ -881,7 +888,7 @@ object CppBridgePlatform {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Platform LLM stream generate failed: ${e.message}"
+                "Platform LLM stream generate failed: ${e.message}",
             )
 
             try {
@@ -915,7 +922,7 @@ object CppBridgePlatform {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Platform TTS synthesize: no provider set"
+                "Platform TTS synthesize: no provider set",
             )
             return null
         }
@@ -925,12 +932,13 @@ object CppBridgePlatform {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Platform TTS synthesize: ${request.text.take(50)}..."
+            "Platform TTS synthesize: ${request.text.take(50)}...",
         )
 
         try {
-            val response = provider.executeTTSRequest(request)
-                ?: return null
+            val response =
+                provider.executeTTSRequest(request)
+                    ?: return null
 
             try {
                 platformListener?.onTTSComplete(response, ErrorCode.SUCCESS)
@@ -943,7 +951,7 @@ object CppBridgePlatform {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Platform TTS synthesize failed: ${e.message}"
+                "Platform TTS synthesize failed: ${e.message}",
             )
 
             try {
@@ -978,7 +986,7 @@ object CppBridgePlatform {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Platform STT transcribe: no provider set"
+                "Platform STT transcribe: no provider set",
             )
             return null
         }
@@ -988,12 +996,13 @@ object CppBridgePlatform {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Platform STT transcribe: ${audioData.size} bytes"
+            "Platform STT transcribe: ${audioData.size} bytes",
         )
 
         try {
-            val response = provider.executeSTTRequest(request)
-                ?: return null
+            val response =
+                provider.executeSTTRequest(request)
+                    ?: return null
 
             try {
                 platformListener?.onSTTComplete(response, ErrorCode.SUCCESS)
@@ -1013,7 +1022,7 @@ object CppBridgePlatform {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Platform STT transcribe failed: ${e.message}"
+                "Platform STT transcribe failed: ${e.message}",
             )
 
             try {
@@ -1044,7 +1053,7 @@ object CppBridgePlatform {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Cancelling platform request: ${ServiceType.getName(serviceType)}"
+            "Cancelling platform request: ${ServiceType.getName(serviceType)}",
         )
 
         try {
@@ -1053,7 +1062,7 @@ object CppBridgePlatform {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error cancelling platform request: ${e.message}"
+                "Error cancelling platform request: ${e.message}",
             )
         }
     }
@@ -1081,7 +1090,7 @@ object CppBridgePlatform {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in streaming token callback: ${e.message}"
+                "Error in streaming token callback: ${e.message}",
             )
             true // Continue on error
         }
@@ -1093,17 +1102,21 @@ object CppBridgePlatform {
 
     /**
      * Native method to set the platform callbacks with C++ core.
+     * Reserved for future native callback integration.
      *
      * C API: rac_platform_set_callbacks(...)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeSetPlatformCallbacks()
 
     /**
      * Native method to unset the platform callbacks.
+     * Reserved for future native callback integration.
      *
      * C API: rac_platform_set_callbacks(nullptr)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeUnsetPlatformCallbacks()
 
@@ -1233,8 +1246,9 @@ object CppBridgePlatform {
      */
     @Throws(SDKError::class)
     fun executeLLM(request: LLMRequest, callback: StreamCallback? = null): LLMResponse {
-        val provider = platformProvider
-            ?: throw SDKError.platform("Platform provider not set")
+        val provider =
+            platformProvider
+                ?: throw SDKError.platform("Platform provider not set")
 
         if (!isServiceAvailable(ServiceType.LLM)) {
             throw SDKError.platform("Platform LLM service not available")
@@ -1253,8 +1267,9 @@ object CppBridgePlatform {
      */
     @Throws(SDKError::class)
     fun executeTTS(request: TTSRequest): TTSResponse {
-        val provider = platformProvider
-            ?: throw SDKError.platform("Platform provider not set")
+        val provider =
+            platformProvider
+                ?: throw SDKError.platform("Platform provider not set")
 
         if (!isServiceAvailable(ServiceType.TTS)) {
             throw SDKError.platform("Platform TTS service not available")
@@ -1273,8 +1288,9 @@ object CppBridgePlatform {
      */
     @Throws(SDKError::class)
     fun executeSTT(request: STTRequest): STTResponse {
-        val provider = platformProvider
-            ?: throw SDKError.platform("Platform provider not set")
+        val provider =
+            platformProvider
+                ?: throw SDKError.platform("Platform provider not set")
 
         if (!isServiceAvailable(ServiceType.STT)) {
             throw SDKError.platform("Platform STT service not available")
@@ -1340,19 +1356,31 @@ object CppBridgePlatform {
             fun extractInt(key: String): Int? {
                 val pattern = "\"$key\"\\s*:\\s*(-?\\d+)"
                 val regex = Regex(pattern)
-                return regex.find(json)?.groupValues?.get(1)?.toIntOrNull()
+                return regex
+                    .find(json)
+                    ?.groupValues
+                    ?.get(1)
+                    ?.toIntOrNull()
             }
 
             fun extractFloat(key: String): Float? {
                 val pattern = "\"$key\"\\s*:\\s*(-?[\\d.]+)"
                 val regex = Regex(pattern)
-                return regex.find(json)?.groupValues?.get(1)?.toFloatOrNull()
+                return regex
+                    .find(json)
+                    ?.groupValues
+                    ?.get(1)
+                    ?.toFloatOrNull()
             }
 
             fun extractBoolean(key: String): Boolean? {
                 val pattern = "\"$key\"\\s*:\\s*(true|false)"
                 val regex = Regex(pattern)
-                return regex.find(json)?.groupValues?.get(1)?.toBooleanStrictOrNull()
+                return regex
+                    .find(json)
+                    ?.groupValues
+                    ?.get(1)
+                    ?.toBooleanStrictOrNull()
             }
 
             val prompt = extractString("prompt") ?: return null
@@ -1363,13 +1391,13 @@ object CppBridgePlatform {
                 maxTokens = extractInt("max_tokens") ?: 512,
                 temperature = extractFloat("temperature") ?: 0.7f,
                 modelType = extractInt("model_type") ?: ModelType.DEFAULT,
-                streaming = extractBoolean("streaming") ?: false
+                streaming = extractBoolean("streaming") ?: false,
             )
         } catch (e: Exception) {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Failed to parse LLM request: ${e.message}"
+                "Failed to parse LLM request: ${e.message}",
             )
             null
         }
@@ -1389,7 +1417,11 @@ object CppBridgePlatform {
             fun extractFloat(key: String): Float? {
                 val pattern = "\"$key\"\\s*:\\s*(-?[\\d.]+)"
                 val regex = Regex(pattern)
-                return regex.find(json)?.groupValues?.get(1)?.toFloatOrNull()
+                return regex
+                    .find(json)
+                    ?.groupValues
+                    ?.get(1)
+                    ?.toFloatOrNull()
             }
 
             val text = extractString("text") ?: return null
@@ -1399,13 +1431,13 @@ object CppBridgePlatform {
                 language = extractString("language") ?: "en-US",
                 voiceId = extractString("voice_id"),
                 speakingRate = extractFloat("speaking_rate") ?: 1.0f,
-                pitch = extractFloat("pitch") ?: 1.0f
+                pitch = extractFloat("pitch") ?: 1.0f,
             )
         } catch (e: Exception) {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Failed to parse TTS request: ${e.message}"
+                "Failed to parse TTS request: ${e.message}",
             )
             null
         }
@@ -1425,13 +1457,21 @@ object CppBridgePlatform {
             fun extractInt(key: String): Int? {
                 val pattern = "\"$key\"\\s*:\\s*(-?\\d+)"
                 val regex = Regex(pattern)
-                return regex.find(json)?.groupValues?.get(1)?.toIntOrNull()
+                return regex
+                    .find(json)
+                    ?.groupValues
+                    ?.get(1)
+                    ?.toIntOrNull()
             }
 
             fun extractBoolean(key: String): Boolean? {
                 val pattern = "\"$key\"\\s*:\\s*(true|false)"
                 val regex = Regex(pattern)
-                return regex.find(json)?.groupValues?.get(1)?.toBooleanStrictOrNull()
+                return regex
+                    .find(json)
+                    ?.groupValues
+                    ?.get(1)
+                    ?.toBooleanStrictOrNull()
             }
 
             STTRequest(
@@ -1439,13 +1479,13 @@ object CppBridgePlatform {
                 language = extractString("language") ?: "en-US",
                 sampleRate = extractInt("sample_rate") ?: 16000,
                 format = extractString("format") ?: "PCM_16",
-                enablePunctuation = extractBoolean("enable_punctuation") ?: true
+                enablePunctuation = extractBoolean("enable_punctuation") ?: true,
             )
         } catch (e: Exception) {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Failed to parse STT request: ${e.message}"
+                "Failed to parse STT request: ${e.message}",
             )
             null
         }

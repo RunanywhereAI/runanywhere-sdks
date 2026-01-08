@@ -30,7 +30,7 @@ data class AuthenticationResponse(
     @SerialName("organization_id") val organizationId: String,
     @SerialName("refresh_token") val refreshToken: String,
     @SerialName("token_type") val tokenType: String,
-    @SerialName("user_id") val userId: String? = null
+    @SerialName("user_id") val userId: String? = null,
 )
 
 /**
@@ -41,7 +41,7 @@ data class AuthenticationRequest(
     @SerialName("api_key") val apiKey: String,
     @SerialName("device_id") val deviceId: String,
     val platform: String,
-    @SerialName("sdk_version") val sdkVersion: String
+    @SerialName("sdk_version") val sdkVersion: String,
 )
 
 /**
@@ -50,18 +50,18 @@ data class AuthenticationRequest(
 @Serializable
 data class RefreshTokenRequest(
     @SerialName("device_id") val deviceId: String,
-    @SerialName("refresh_token") val refreshToken: String
+    @SerialName("refresh_token") val refreshToken: String,
 )
 
 /**
  * Authentication bridge for production/staging mode.
  * Handles JWT token acquisition and management.
- * 
+ *
  * **Threading Requirements:**
  * All network operations (authenticate, refreshToken, getValidAccessToken) perform
  * blocking HTTP calls and MUST be called from a background thread. Calling from the
  * main/UI thread will throw [IllegalStateException] on Android to prevent ANR.
- * 
+ *
  * Example:
  * ```kotlin
  * // Correct - call from background thread
@@ -74,7 +74,7 @@ object CppBridgeAuth {
     private const val TAG = "CppBridge/Auth"
     private const val ENDPOINT_AUTHENTICATE = "/api/v1/auth/sdk/authenticate"
     private const val ENDPOINT_REFRESH = "/api/v1/auth/sdk/refresh"
-    
+
     // Authentication state
     private val _accessToken = AtomicReference<String?>(null)
     private val _refreshToken = AtomicReference<String?>(null)
@@ -84,12 +84,13 @@ object CppBridgeAuth {
     private val _expiresAt = AtomicReference<Long?>(null)
     private val _baseUrl = AtomicReference<String?>(null)
     private val _apiKey = AtomicReference<String?>(null)
-    
-    private val json = Json { 
-        ignoreUnknownKeys = true 
-        isLenient = true
-    }
-    
+
+    private val json =
+        Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+        }
+
     /**
      * Check if we're on the main thread and throw if so.
      * Prevents ANR by failing fast when network operations are called from UI thread.
@@ -100,21 +101,21 @@ object CppBridgeAuth {
             if (android.os.Looper.myLooper() == mainLooper) {
                 throw IllegalStateException(
                     "CppBridgeAuth.$operation() must not be called from the main thread. " +
-                    "Use withContext(Dispatchers.IO) or call from a background thread."
+                        "Use withContext(Dispatchers.IO) or call from a background thread.",
                 )
             }
         } catch (e: NoClassDefFoundError) {
             // Not on Android (e.g., JVM tests) - skip check
         }
     }
-    
+
     /**
      * Current access token (JWT) for Bearer authentication.
      * Use getValidToken() instead for automatic refresh handling.
      */
     val accessToken: String?
         get() = _accessToken.get()
-    
+
     /**
      * Check if token needs refresh (expires within 5 minutes)
      */
@@ -125,46 +126,46 @@ object CppBridgeAuth {
             val fiveMinutesMs = 5 * 60 * 1000
             return nowMs >= (expiresAt - fiveMinutesMs)
         }
-    
+
     /**
      * Check if currently authenticated
      */
     val isAuthenticated: Boolean
         get() = _accessToken.get() != null && !tokenNeedsRefresh
-    
+
     /**
      * Get a valid access token, automatically refreshing if needed.
      * This is the preferred way to get the token for requests.
-     * 
+     *
      * @return Valid access token, or null if not authenticated and can't refresh
      */
     fun getValidToken(): String? {
         val currentToken = _accessToken.get()
-        
+
         // If we have a valid token, return it
         if (currentToken != null && !tokenNeedsRefresh) {
             return currentToken
         }
-        
+
         // Try to refresh if we have refresh token and base URL
         val refreshToken = _refreshToken.get()
         val baseUrl = _baseUrl.get()
-        
+
         if (refreshToken != null && baseUrl != null) {
             try {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "🔄 Token expired or expiring soon, refreshing..."
+                    "🔄 Token expired or expiring soon, refreshing...",
                 )
                 return refreshAccessToken(baseUrl)
             } catch (e: Exception) {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "❌ Token refresh failed: ${e.message}"
+                    "❌ Token refresh failed: ${e.message}",
                 )
-                
+
                 // Try re-authenticating if we have API key
                 val apiKey = _apiKey.get()
                 val deviceId = _deviceId.get()
@@ -173,7 +174,7 @@ object CppBridgeAuth {
                         CppBridgePlatformAdapter.logCallback(
                             CppBridgePlatformAdapter.LogLevel.INFO,
                             TAG,
-                            "🔐 Refresh failed, re-authenticating..."
+                            "🔐 Refresh failed, re-authenticating...",
                         )
                         authenticate(apiKey, baseUrl, deviceId)
                         return _accessToken.get()
@@ -181,21 +182,21 @@ object CppBridgeAuth {
                         CppBridgePlatformAdapter.logCallback(
                             CppBridgePlatformAdapter.LogLevel.ERROR,
                             TAG,
-                            "❌ Re-authentication failed: ${authE.message}"
+                            "❌ Re-authentication failed: ${authE.message}",
                         )
                     }
                 }
             }
         }
-        
+
         // Return current token even if expired (caller will get 401)
         return currentToken
     }
-    
+
     /**
      * Authenticate with the backend using API key.
      * Gets a JWT access token for subsequent requests.
-     * 
+     *
      * **Must be called from a background thread.** Will throw [IllegalStateException]
      * if called from the main/UI thread on Android.
      *
@@ -213,39 +214,40 @@ object CppBridgeAuth {
         baseUrl: String,
         deviceId: String,
         platform: String = "android",
-        sdkVersion: String = "0.1.0"
+        sdkVersion: String = "0.1.0",
     ): AuthenticationResponse {
         // Fail fast if called from main thread to prevent ANR
         ensureNotMainThread("authenticate")
-        
+
         // Store config for future refresh/re-auth
         _baseUrl.set(baseUrl)
         _apiKey.set(apiKey)
-        
+
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.INFO,
             TAG,
-            "🔐 Starting authentication with backend..."
+            "🔐 Starting authentication with backend...",
         )
-        
+
         // Build request body
-        val request = AuthenticationRequest(
-            apiKey = apiKey,
-            deviceId = deviceId,
-            platform = platform,
-            sdkVersion = sdkVersion
-        )
+        val request =
+            AuthenticationRequest(
+                apiKey = apiKey,
+                deviceId = deviceId,
+                platform = platform,
+                sdkVersion = sdkVersion,
+            )
         val requestJson = json.encodeToString(AuthenticationRequest.serializer(), request)
-        
+
         // Build full URL
         val fullUrl = baseUrl.trimEnd('/') + ENDPOINT_AUTHENTICATE
 
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Auth request to: $fullUrl"
+            "Auth request to: $fullUrl",
         )
-        
+
         // Make HTTP request
         val connection = URL(fullUrl).openConnection() as HttpURLConnection
         try {
@@ -255,50 +257,52 @@ object CppBridgeAuth {
             connection.doOutput = true
             connection.connectTimeout = 30000
             connection.readTimeout = 30000
-            
+
             // Write request body
             OutputStreamWriter(connection.outputStream).use { writer ->
                 writer.write(requestJson)
                 writer.flush()
             }
-            
+
             val responseCode = connection.responseCode
-            
+
             if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED) {
                 // Read response
-                val responseBody = BufferedReader(InputStreamReader(connection.inputStream)).use { reader ->
-                    reader.readText()
-                }
-                
+                val responseBody =
+                    BufferedReader(InputStreamReader(connection.inputStream)).use { reader ->
+                        reader.readText()
+                    }
+
                 // Parse response
                 val response = json.decodeFromString(AuthenticationResponse.serializer(), responseBody)
-                
+
                 // Store in state
                 storeAuthState(response)
-                
+
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.INFO,
                     TAG,
-                    "✅ Authentication successful! Token expires in ${response.expiresIn}s"
+                    "✅ Authentication successful! Token expires in ${response.expiresIn}s",
                 )
-                
+
                 return response
             } else {
                 // Read error response
-                val errorBody = try {
-                    BufferedReader(InputStreamReader(connection.errorStream)).use { reader ->
-                        reader.readText()
+                val errorBody =
+                    try {
+                        BufferedReader(InputStreamReader(connection.errorStream)).use { reader ->
+                            reader.readText()
+                        }
+                    } catch (e: Exception) {
+                        "No error body"
                     }
-                } catch (e: Exception) {
-                    "No error body"
-                }
-                
+
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "❌ Authentication failed: HTTP $responseCode - $errorBody"
+                    "❌ Authentication failed: HTTP $responseCode - $errorBody",
                 )
-                
+
                 throw Exception("Authentication failed: HTTP $responseCode - $errorBody")
             }
         } finally {
@@ -308,7 +312,7 @@ object CppBridgeAuth {
 
     /**
      * Refresh the access token using the refresh token.
-     * 
+     *
      * **Must be called from a background thread.** Will throw [IllegalStateException]
      * if called from the main/UI thread on Android.
      *
@@ -320,28 +324,31 @@ object CppBridgeAuth {
     fun refreshAccessToken(baseUrl: String): String {
         // Fail fast if called from main thread to prevent ANR
         ensureNotMainThread("refreshAccessToken")
-        
-        val refreshToken = _refreshToken.get()
-            ?: throw Exception("No refresh token available")
-        val deviceId = _deviceId.get()
-            ?: throw Exception("No device ID available")
+
+        val refreshToken =
+            _refreshToken.get()
+                ?: throw Exception("No refresh token available")
+        val deviceId =
+            _deviceId.get()
+                ?: throw Exception("No device ID available")
 
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "🔄 Refreshing access token..."
+            "🔄 Refreshing access token...",
         )
-        
+
         // Build request body
-        val request = RefreshTokenRequest(
-            deviceId = deviceId,
-            refreshToken = refreshToken
-        )
+        val request =
+            RefreshTokenRequest(
+                deviceId = deviceId,
+                refreshToken = refreshToken,
+            )
         val requestJson = json.encodeToString(RefreshTokenRequest.serializer(), request)
-        
+
         // Build full URL
         val fullUrl = baseUrl.trimEnd('/') + ENDPOINT_REFRESH
-        
+
         // Make HTTP request
         val connection = URL(fullUrl).openConnection() as HttpURLConnection
         try {
@@ -351,59 +358,61 @@ object CppBridgeAuth {
             connection.doOutput = true
             connection.connectTimeout = 30000
             connection.readTimeout = 30000
-            
+
             // Write request body
             OutputStreamWriter(connection.outputStream).use { writer ->
                 writer.write(requestJson)
                 writer.flush()
             }
-            
+
             val responseCode = connection.responseCode
-            
+
             if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED) {
                 // Read response
-                val responseBody = BufferedReader(InputStreamReader(connection.inputStream)).use { reader ->
-                    reader.readText()
-                }
-                
-                // Parse response
-                val response = json.decodeFromString(AuthenticationResponse.serializer(), responseBody)
-                
-                // Store in state
-                storeAuthState(response)
-                
-        CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.INFO,
-                    TAG,
-                    "✅ Token refresh successful!"
-                )
-                
-                return response.accessToken
-            } else {
-                val errorBody = try {
-                    BufferedReader(InputStreamReader(connection.errorStream)).use { reader ->
+                val responseBody =
+                    BufferedReader(InputStreamReader(connection.inputStream)).use { reader ->
                         reader.readText()
                     }
-            } catch (e: Exception) {
-                    "No error body"
-                }
-                
+
+                // Parse response
+                val response = json.decodeFromString(AuthenticationResponse.serializer(), responseBody)
+
+                // Store in state
+                storeAuthState(response)
+
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.INFO,
+                    TAG,
+                    "✅ Token refresh successful!",
+                )
+
+                return response.accessToken
+            } else {
+                val errorBody =
+                    try {
+                        BufferedReader(InputStreamReader(connection.errorStream)).use { reader ->
+                            reader.readText()
+                        }
+                    } catch (e: Exception) {
+                        "No error body"
+                    }
+
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "❌ Token refresh failed: HTTP $responseCode - $errorBody"
+                    "❌ Token refresh failed: HTTP $responseCode - $errorBody",
                 )
-                
+
                 throw Exception("Token refresh failed: HTTP $responseCode - $errorBody")
             }
         } finally {
             connection.disconnect()
         }
     }
-    
+
     /**
      * Get a valid access token, refreshing if needed.
-     * 
+     *
      * **Must be called from a background thread** when token refresh is needed.
      * Will throw [IllegalStateException] if called from the main/UI thread on Android.
      *
@@ -418,18 +427,18 @@ object CppBridgeAuth {
         if (currentToken != null && !tokenNeedsRefresh) {
             return currentToken
         }
-        
+
         // Token needs refresh - ensure we're not on main thread
         ensureNotMainThread("getValidAccessToken")
-        
+
         // Try to refresh
         if (_refreshToken.get() != null) {
             return refreshAccessToken(baseUrl)
         }
-        
+
         throw Exception("No valid access token - authentication required")
     }
-    
+
     /**
      * Clear authentication state
      */
@@ -440,7 +449,7 @@ object CppBridgeAuth {
         _organizationId.set(null)
         _userId.set(null)
         _expiresAt.set(null)
-        
+
         // Also clear from secure storage
         try {
             CppBridgePlatformAdapter.secureSetCallback("com.runanywhere.sdk.accessToken", ByteArray(0))
@@ -449,14 +458,14 @@ object CppBridgeAuth {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Failed to clear tokens from secure storage: ${e.message}"
+                "Failed to clear tokens from secure storage: ${e.message}",
             )
         }
-        
+
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.INFO,
             TAG,
-            "Authentication state cleared"
+            "Authentication state cleared",
         )
     }
 
@@ -469,17 +478,17 @@ object CppBridgeAuth {
         _deviceId.set(response.deviceId)
         _organizationId.set(response.organizationId)
         _userId.set(response.userId)
-        
+
         // Calculate expiration time
         val expiresAt = System.currentTimeMillis() + (response.expiresIn * 1000L)
         _expiresAt.set(expiresAt)
-        
+
         // Store in secure storage for persistence across app restarts
         try {
             CppBridgePlatformAdapter.secureSetCallback("com.runanywhere.sdk.accessToken", response.accessToken.toByteArray(Charsets.UTF_8))
             CppBridgePlatformAdapter.secureSetCallback("com.runanywhere.sdk.refreshToken", response.refreshToken.toByteArray(Charsets.UTF_8))
             CppBridgePlatformAdapter.secureSetCallback("com.runanywhere.sdk.deviceId", response.deviceId.toByteArray(Charsets.UTF_8))
-            response.userId?.let { 
+            response.userId?.let {
                 CppBridgePlatformAdapter.secureSetCallback("com.runanywhere.sdk.userId", it.toByteArray(Charsets.UTF_8))
             }
             CppBridgePlatformAdapter.secureSetCallback("com.runanywhere.sdk.organizationId", response.organizationId.toByteArray(Charsets.UTF_8))
@@ -488,7 +497,7 @@ object CppBridgeAuth {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Failed to store tokens in secure storage: ${e.message}"
+                "Failed to store tokens in secure storage: ${e.message}",
             )
         }
     }
@@ -505,14 +514,14 @@ object CppBridgeAuth {
             val userIdBytes = CppBridgePlatformAdapter.secureGetCallback("com.runanywhere.sdk.userId")
             val organizationIdBytes = CppBridgePlatformAdapter.secureGetCallback("com.runanywhere.sdk.organizationId")
             val expiresAtBytes = CppBridgePlatformAdapter.secureGetCallback("com.runanywhere.sdk.expiresAt")
-            
+
             val accessToken = accessTokenBytes?.toString(Charsets.UTF_8)?.takeIf { it.isNotEmpty() }
             val refreshToken = refreshTokenBytes?.toString(Charsets.UTF_8)?.takeIf { it.isNotEmpty() }
             val deviceId = deviceIdBytes?.toString(Charsets.UTF_8)?.takeIf { it.isNotEmpty() }
             val userId = userIdBytes?.toString(Charsets.UTF_8)?.takeIf { it.isNotEmpty() }
             val organizationId = organizationIdBytes?.toString(Charsets.UTF_8)?.takeIf { it.isNotEmpty() }
             val expiresAtStr = expiresAtBytes?.toString(Charsets.UTF_8)?.takeIf { it.isNotEmpty() }
-            
+
             if (accessToken != null && refreshToken != null) {
                 _accessToken.set(accessToken)
                 _refreshToken.set(refreshToken)
@@ -520,18 +529,18 @@ object CppBridgeAuth {
                 _userId.set(userId)
                 _organizationId.set(organizationId)
                 expiresAtStr?.toLongOrNull()?.let { _expiresAt.set(it) }
-                
+
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.INFO,
                     TAG,
-                    "Restored authentication state from secure storage"
+                    "Restored authentication state from secure storage",
                 )
             }
         } catch (e: Exception) {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Failed to restore auth state: ${e.message}"
+                "Failed to restore auth state: ${e.message}",
             )
         }
     }

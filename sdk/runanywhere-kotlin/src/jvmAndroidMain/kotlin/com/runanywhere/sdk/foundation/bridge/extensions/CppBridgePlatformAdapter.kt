@@ -29,7 +29,6 @@ import java.util.concurrent.ConcurrentHashMap
  * - Clock: nowMs (current timestamp in milliseconds)
  */
 object CppBridgePlatformAdapter {
-
     /**
      * Log level constants matching C++ RAC_LOG_LEVEL_* values.
      */
@@ -57,7 +56,7 @@ object CppBridgePlatformAdapter {
     /**
      * SharedPreferences for persistent secure storage on Android.
      * Initialized when context is set.
-     * 
+     *
      * @Volatile ensures visibility across threads - reads will see the latest
      * value written by setContext() even without explicit synchronization.
      */
@@ -282,7 +281,7 @@ object CppBridgePlatformAdapter {
         return try {
             // Take a thread-safe local copy of the volatile reference
             val prefs = sharedPreferences
-            
+
             // Try SharedPreferences first (persistent storage)
             if (prefs != null) {
                 val base64Value = prefs.getString(key, null)
@@ -315,7 +314,7 @@ object CppBridgePlatformAdapter {
         return try {
             // Take a thread-safe local copy of the volatile reference
             val prefs = sharedPreferences
-            
+
             // Try SharedPreferences first (persistent storage)
             if (prefs != null) {
                 val base64Value = Base64.encodeToString(value, Base64.NO_WRAP)
@@ -346,7 +345,7 @@ object CppBridgePlatformAdapter {
         return try {
             // Take a thread-safe local copy of the volatile reference
             val prefs = sharedPreferences
-            
+
             // Remove from SharedPreferences if available
             prefs?.edit()?.remove(key)?.apply()
             // Also remove from in-memory
@@ -382,7 +381,9 @@ object CppBridgePlatformAdapter {
      * Native method to register the platform adapter with C++ core.
      *
      * This is called during [register] to pass callback references to native code.
+     * Reserved for future native callback integration.
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeRegisterPlatformAdapter()
 
@@ -390,7 +391,9 @@ object CppBridgePlatformAdapter {
      * Native method to unregister the platform adapter.
      *
      * Called during shutdown to clean up native resources.
+     * Reserved for future native callback integration.
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeUnregisterPlatformAdapter()
 

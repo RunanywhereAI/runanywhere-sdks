@@ -34,7 +34,6 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
  * - Matches iOS Actor-based pattern using Kotlin synchronized
  */
 object CppBridgeSTT {
-
     /**
      * STT component state constants matching C++ RAC_STT_STATE_* values.
      */
@@ -63,16 +62,17 @@ object CppBridgeSTT {
         /**
          * Get a human-readable name for the STT state.
          */
-        fun getName(state: Int): String = when (state) {
-            NOT_CREATED -> "NOT_CREATED"
-            CREATED -> "CREATED"
-            LOADING -> "LOADING"
-            READY -> "READY"
-            TRANSCRIBING -> "TRANSCRIBING"
-            UNLOADING -> "UNLOADING"
-            ERROR -> "ERROR"
-            else -> "UNKNOWN($state)"
-        }
+        fun getName(state: Int): String =
+            when (state) {
+                NOT_CREATED -> "NOT_CREATED"
+                CREATED -> "CREATED"
+                LOADING -> "LOADING"
+                READY -> "READY"
+                TRANSCRIBING -> "TRANSCRIBING"
+                UNLOADING -> "UNLOADING"
+                ERROR -> "ERROR"
+                else -> "UNKNOWN($state)"
+            }
 
         /**
          * Check if the state indicates the component is usable.
@@ -147,15 +147,16 @@ object CppBridgeSTT {
         /**
          * Get a human-readable name for the completion reason.
          */
-        fun getName(reason: Int): String = when (reason) {
-            NOT_COMPLETED -> "NOT_COMPLETED"
-            END_OF_AUDIO -> "END_OF_AUDIO"
-            SILENCE_DETECTED -> "SILENCE_DETECTED"
-            CANCELLED -> "CANCELLED"
-            MAX_DURATION -> "MAX_DURATION"
-            ERROR -> "ERROR"
-            else -> "UNKNOWN($reason)"
-        }
+        fun getName(reason: Int): String =
+            when (reason) {
+                NOT_COMPLETED -> "NOT_COMPLETED"
+                END_OF_AUDIO -> "END_OF_AUDIO"
+                SILENCE_DETECTED -> "SILENCE_DETECTED"
+                CANCELLED -> "CANCELLED"
+                MAX_DURATION -> "MAX_DURATION"
+                ERROR -> "ERROR"
+                else -> "UNKNOWN($reason)"
+            }
     }
 
     @Volatile
@@ -225,7 +226,7 @@ object CppBridgeSTT {
         val enablePunctuation: Boolean = true,
         val maxDurationMs: Long = 0,
         val vadEnabled: Boolean = true,
-        val vadSilenceMs: Int = 1000
+        val vadSilenceMs: Int = 1000,
     ) {
         /**
          * Convert to JSON string for C++ interop.
@@ -264,7 +265,7 @@ object CppBridgeSTT {
         val threads: Int = -1,
         val gpuEnabled: Boolean = false,
         val beamSize: Int = 5,
-        val useFlashAttention: Boolean = true
+        val useFlashAttention: Boolean = true,
     ) {
         /**
          * Convert to JSON string for C++ interop.
@@ -298,7 +299,7 @@ object CppBridgeSTT {
         val word: String,
         val startMs: Long,
         val endMs: Long,
-        val confidence: Float
+        val confidence: Float,
     )
 
     /**
@@ -319,7 +320,7 @@ object CppBridgeSTT {
         val completionReason: Int,
         val confidence: Float,
         val processingTimeMs: Long,
-        val wordTimestamps: List<WordTimestamp> = emptyList()
+        val wordTimestamps: List<WordTimestamp> = emptyList(),
     ) {
         /**
          * Get the completion reason name.
@@ -329,7 +330,8 @@ object CppBridgeSTT {
         /**
          * Check if transcription completed successfully.
          */
-        fun isComplete(): Boolean = completionReason == CompletionReason.END_OF_AUDIO ||
+        fun isComplete(): Boolean =
+            completionReason == CompletionReason.END_OF_AUDIO ||
                 completionReason == CompletionReason.SILENCE_DETECTED
 
         /**
@@ -348,7 +350,7 @@ object CppBridgeSTT {
     data class PartialResult(
         val text: String,
         val isFinal: Boolean,
-        val confidence: Float
+        val confidence: Float,
     )
 
     /**
@@ -440,7 +442,7 @@ object CppBridgeSTT {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "STT callbacks registered"
+                "STT callbacks registered",
             )
         }
     }
@@ -508,7 +510,7 @@ object CppBridgeSTT {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "STT component already created"
+                    "STT component already created",
                 )
                 return 0
             }
@@ -518,28 +520,29 @@ object CppBridgeSTT {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Native library not loaded. STT inference requires native libraries to be bundled."
+                    "Native library not loaded. STT inference requires native libraries to be bundled.",
                 )
                 throw SDKError.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
             }
 
             // Create STT component via RunAnywhereBridge
-            val result = try {
-                RunAnywhereBridge.racSttComponentCreate()
-            } catch (e: UnsatisfiedLinkError) {
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.ERROR,
-                    TAG,
-                    "STT component creation failed. Native method not available: ${e.message}"
-                )
-                throw SDKError.notInitialized("STT native library not available. Please ensure the STT backend is bundled in your APK.")
-            }
+            val result =
+                try {
+                    RunAnywhereBridge.racSttComponentCreate()
+                } catch (e: UnsatisfiedLinkError) {
+                    CppBridgePlatformAdapter.logCallback(
+                        CppBridgePlatformAdapter.LogLevel.ERROR,
+                        TAG,
+                        "STT component creation failed. Native method not available: ${e.message}",
+                    )
+                    throw SDKError.notInitialized("STT native library not available. Please ensure the STT backend is bundled in your APK.")
+                }
 
             if (result == 0L) {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Failed to create STT component"
+                    "Failed to create STT component",
                 )
                 return -1
             }
@@ -550,7 +553,7 @@ object CppBridgeSTT {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "STT component created"
+                "STT component created",
             )
 
             return 0
@@ -563,9 +566,10 @@ object CppBridgeSTT {
      * @param modelPath Path to the model file
      * @param modelId Unique identifier for the model (for telemetry)
      * @param modelName Human-readable name for the model (for telemetry)
-     * @param config Model configuration (optional)
+     * @param config Model configuration (reserved for future use)
      * @return 0 on success, error code on failure
      */
+    @Suppress("UNUSED_PARAMETER")
     fun loadModel(modelPath: String, modelId: String, modelName: String? = null, config: ModelConfig = ModelConfig.DEFAULT): Int {
         synchronized(lock) {
             if (handle == 0L) {
@@ -580,7 +584,7 @@ object CppBridgeSTT {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Unloading current model before loading new one: $loadedModelId"
+                    "Unloading current model before loading new one: $loadedModelId",
                 )
                 unload()
             }
@@ -590,7 +594,7 @@ object CppBridgeSTT {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Loading model: $modelId from $modelPath"
+                "Loading model: $modelId from $modelPath",
             )
 
             val result = RunAnywhereBridge.racSttComponentLoadModel(handle, modelPath, modelId, modelName)
@@ -599,7 +603,7 @@ object CppBridgeSTT {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Failed to load model: $modelId (error: $result)"
+                    "Failed to load model: $modelId (error: $result)",
                 )
 
                 try {
@@ -618,20 +622,20 @@ object CppBridgeSTT {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Model loaded successfully: $modelId"
+                "Model loaded successfully: $modelId",
             )
 
             // Update model assignment status
             CppBridgeModelAssignment.setAssignmentStatusCallback(
                 CppBridgeModelRegistry.ModelType.STT,
                 CppBridgeModelAssignment.AssignmentStatus.READY,
-                CppBridgeModelAssignment.FailureReason.NONE
+                CppBridgeModelAssignment.FailureReason.NONE,
             )
 
             // Update component state
             CppBridgeState.setComponentStateCallback(
                 CppBridgeState.ComponentType.STT,
-                CppBridgeState.ComponentState.READY
+                CppBridgeState.ComponentState.READY,
             )
 
             try {
@@ -640,7 +644,7 @@ object CppBridgeSTT {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in STT listener onModelLoaded: ${e.message}"
+                    "Error in STT listener onModelLoaded: ${e.message}",
                 )
             }
 
@@ -669,7 +673,7 @@ object CppBridgeSTT {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Starting transcription (audio size: ${audioData.size} bytes)"
+                "Starting transcription (audio size: ${audioData.size} bytes)",
             )
 
             try {
@@ -681,8 +685,9 @@ object CppBridgeSTT {
             val startTime = System.currentTimeMillis()
 
             try {
-                val resultJson = RunAnywhereBridge.racSttComponentTranscribe(handle, audioData, config.toJson())
-                    ?: throw SDKError.stt("Transcription failed: null result")
+                val resultJson =
+                    RunAnywhereBridge.racSttComponentTranscribe(handle, audioData, config.toJson())
+                        ?: throw SDKError.stt("Transcription failed: null result")
 
                 val result = parseTranscriptionResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -691,7 +696,7 @@ object CppBridgeSTT {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Transcription completed: ${result.text.length} chars, ${result.processingTimeMs}ms"
+                    "Transcription completed: ${result.text.length} chars, ${result.processingTimeMs}ms",
                 )
 
                 try {
@@ -701,7 +706,6 @@ object CppBridgeSTT {
                 }
 
                 return result
-
             } catch (e: Exception) {
                 setState(STTState.READY) // Reset to ready, not error
                 throw if (e is SDKError) e else SDKError.stt("Transcription failed: ${e.message}")
@@ -730,7 +734,7 @@ object CppBridgeSTT {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Starting file transcription: $audioPath"
+                "Starting file transcription: $audioPath",
             )
 
             try {
@@ -742,8 +746,9 @@ object CppBridgeSTT {
             val startTime = System.currentTimeMillis()
 
             try {
-                val resultJson = RunAnywhereBridge.racSttComponentTranscribeFile(handle, audioPath, config.toJson())
-                    ?: throw SDKError.stt("Transcription failed: null result")
+                val resultJson =
+                    RunAnywhereBridge.racSttComponentTranscribeFile(handle, audioPath, config.toJson())
+                        ?: throw SDKError.stt("Transcription failed: null result")
 
                 val result = parseTranscriptionResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -752,7 +757,7 @@ object CppBridgeSTT {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "File transcription completed: ${result.text.length} chars"
+                    "File transcription completed: ${result.text.length} chars",
                 )
 
                 try {
@@ -762,7 +767,6 @@ object CppBridgeSTT {
                 }
 
                 return result
-
             } catch (e: Exception) {
                 setState(STTState.READY) // Reset to ready, not error
                 throw if (e is SDKError) e else SDKError.stt("File transcription failed: ${e.message}")
@@ -783,7 +787,7 @@ object CppBridgeSTT {
     fun transcribeStream(
         audioData: ByteArray,
         config: TranscriptionConfig = TranscriptionConfig.DEFAULT,
-        callback: StreamCallback
+        callback: StreamCallback,
     ): TranscriptionResult {
         synchronized(lock) {
             if (handle == 0L || state != STTState.READY) {
@@ -797,7 +801,7 @@ object CppBridgeSTT {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Starting streaming transcription (audio size: ${audioData.size} bytes)"
+                "Starting streaming transcription (audio size: ${audioData.size} bytes)",
             )
 
             try {
@@ -809,8 +813,9 @@ object CppBridgeSTT {
             val startTime = System.currentTimeMillis()
 
             try {
-                val resultJson = RunAnywhereBridge.racSttComponentTranscribeStream(handle, audioData, config.toJson())
-                    ?: throw SDKError.stt("Streaming transcription failed: null result")
+                val resultJson =
+                    RunAnywhereBridge.racSttComponentTranscribeStream(handle, audioData, config.toJson())
+                        ?: throw SDKError.stt("Streaming transcription failed: null result")
 
                 val result = parseTranscriptionResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -820,7 +825,7 @@ object CppBridgeSTT {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Streaming transcription completed: ${result.text.length} chars"
+                    "Streaming transcription completed: ${result.text.length} chars",
                 )
 
                 try {
@@ -830,7 +835,6 @@ object CppBridgeSTT {
                 }
 
                 return result
-
             } catch (e: Exception) {
                 setState(STTState.READY) // Reset to ready, not error
                 streamCallback = null
@@ -853,7 +857,7 @@ object CppBridgeSTT {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Cancelling transcription"
+                "Cancelling transcription",
             )
 
             RunAnywhereBridge.racSttComponentCancel(handle)
@@ -876,7 +880,7 @@ object CppBridgeSTT {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Unloading model: $previousModelId"
+                "Unloading model: $previousModelId",
             )
 
             RunAnywhereBridge.racSttComponentUnload(handle)
@@ -889,13 +893,13 @@ object CppBridgeSTT {
             CppBridgeModelAssignment.setAssignmentStatusCallback(
                 CppBridgeModelRegistry.ModelType.STT,
                 CppBridgeModelAssignment.AssignmentStatus.NOT_ASSIGNED,
-                CppBridgeModelAssignment.FailureReason.NONE
+                CppBridgeModelAssignment.FailureReason.NONE,
             )
 
             // Update component state
             CppBridgeState.setComponentStateCallback(
                 CppBridgeState.ComponentType.STT,
-                CppBridgeState.ComponentState.CREATED
+                CppBridgeState.ComponentState.CREATED,
             )
 
             try {
@@ -904,7 +908,7 @@ object CppBridgeSTT {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in STT listener onModelUnloaded: ${e.message}"
+                    "Error in STT listener onModelUnloaded: ${e.message}",
                 )
             }
         }
@@ -927,7 +931,7 @@ object CppBridgeSTT {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Destroying STT component"
+                "Destroying STT component",
             )
 
             RunAnywhereBridge.racSttComponentDestroy(handle)
@@ -938,7 +942,7 @@ object CppBridgeSTT {
             // Update component state
             CppBridgeState.setComponentStateCallback(
                 CppBridgeState.ComponentType.STT,
-                CppBridgeState.ComponentState.NOT_CREATED
+                CppBridgeState.ComponentState.NOT_CREATED,
             )
         }
     }
@@ -979,7 +983,7 @@ object CppBridgeSTT {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in stream callback: ${e.message}"
+                "Error in stream callback: ${e.message}",
             )
             true // Continue on error
         }
@@ -999,7 +1003,7 @@ object CppBridgeSTT {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Progress: ${(progress * 100).toInt()}%"
+            "Progress: ${(progress * 100).toInt()}%",
         )
     }
 
@@ -1047,9 +1051,11 @@ object CppBridgeSTT {
      * Native method to set the STT callbacks with C++ core.
      *
      * Registers [streamPartialCallback], [progressCallback], etc. with C++ core.
+     * Reserved for future native callback integration.
      *
      * C API: rac_stt_set_callbacks(...)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeSetSTTCallbacks()
 
@@ -1057,9 +1063,11 @@ object CppBridgeSTT {
      * Native method to unset the STT callbacks.
      *
      * Called during shutdown to clean up native resources.
+     * Reserved for future native callback integration.
      *
      * C API: rac_stt_set_callbacks(nullptr)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeUnsetSTTCallbacks()
 
@@ -1222,7 +1230,7 @@ object CppBridgeSTT {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "State changed: ${STTState.getName(previousState)} -> ${STTState.getName(newState)}"
+                "State changed: ${STTState.getName(previousState)} -> ${STTState.getName(newState)}",
             )
 
             try {
@@ -1231,7 +1239,7 @@ object CppBridgeSTT {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in STT listener onStateChanged: ${e.message}"
+                    "Error in STT listener onStateChanged: ${e.message}",
                 )
             }
         }
@@ -1244,25 +1252,41 @@ object CppBridgeSTT {
         fun extractString(key: String): String {
             val pattern = "\"$key\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\""
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.let { unescapeJson(it) } ?: ""
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.let { unescapeJson(it) } ?: ""
         }
 
         fun extractInt(key: String): Int {
             val pattern = "\"$key\"\\s*:\\s*(-?\\d+)"
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.toIntOrNull() ?: 0
         }
 
         fun extractLong(key: String): Long {
             val pattern = "\"$key\"\\s*:\\s*(-?\\d+)"
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.toLongOrNull() ?: 0L
         }
 
         fun extractFloat(key: String): Float {
             val pattern = "\"$key\"\\s*:\\s*(-?[\\d.]+)"
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.toFloatOrNull() ?: 0f
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.toFloatOrNull() ?: 0f
         }
 
         val text = extractString("text")
@@ -1278,7 +1302,7 @@ object CppBridgeSTT {
             completionReason = completionReason,
             confidence = confidence,
             processingTimeMs = elapsedMs,
-            wordTimestamps = emptyList() // TODO: Parse word timestamps if present
+            wordTimestamps = emptyList(), // TODO: Parse word timestamps if present
         )
     }
 

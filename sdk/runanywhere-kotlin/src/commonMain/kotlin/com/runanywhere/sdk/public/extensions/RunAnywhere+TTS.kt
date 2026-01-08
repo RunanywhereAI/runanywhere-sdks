@@ -67,7 +67,7 @@ expect suspend fun RunAnywhere.availableTTSVoices(): List<String>
  */
 expect suspend fun RunAnywhere.synthesize(
     text: String,
-    options: TTSOptions = TTSOptions()
+    options: TTSOptions = TTSOptions(),
 ): TTSOutput
 
 /**
@@ -81,7 +81,7 @@ expect suspend fun RunAnywhere.synthesize(
 expect suspend fun RunAnywhere.synthesizeStream(
     text: String,
     options: TTSOptions = TTSOptions(),
-    onAudioChunk: (ByteArray) -> Unit
+    onAudioChunk: (ByteArray) -> Unit,
 ): TTSOutput
 
 /**
@@ -114,7 +114,7 @@ expect suspend fun RunAnywhere.stopSynthesis()
  */
 expect suspend fun RunAnywhere.speak(
     text: String,
-    options: TTSOptions = TTSOptions()
+    options: TTSOptions = TTSOptions(),
 ): TTSSpeakResult
 
 /**

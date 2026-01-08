@@ -75,7 +75,7 @@ class ModelSelectionViewModel(
                                 it.copy(
                                     isLoadingModel = false,
                                     loadingProgress = "",
-                                    error = event.error ?: "Download failed"
+                                    error = event.error ?: "Download failed",
                                 )
                             }
                         }
@@ -106,17 +106,19 @@ class ModelSelectionViewModel(
                 Log.d(TAG, "📦 Fetched ${allModels.size} total models from SDK")
 
                 // Filter models by context - matches iOS relevantCategories filtering
-                val filteredModels = allModels.filter { model ->
-                    isModelRelevantForContext(model.category, context)
-                }
+                val filteredModels =
+                    allModels.filter { model ->
+                        isModelRelevantForContext(model.category, context)
+                    }
                 Log.d(TAG, "📦 Filtered to ${filteredModels.size} models for context $context")
 
                 // Extract unique frameworks from filtered models
-                val relevantFrameworks = filteredModels
-                    .map { it.framework }
-                    .toSet()
-                    .sortedBy { it.displayName }
-                    .toMutableList()
+                val relevantFrameworks =
+                    filteredModels
+                        .map { it.framework }
+                        .toSet()
+                        .sortedBy { it.displayName }
+                        .toMutableList()
 
                 // For TTS context, ensure System TTS is included (matches iOS behavior)
                 if (context == ModelSelectionContext.TTS && !relevantFrameworks.contains(InferenceFramework.SYSTEM_TTS)) {
@@ -132,11 +134,12 @@ class ModelSelectionViewModel(
                 // Sync with currently loaded model from SDK
                 // This ensures already-loaded models show as "Loaded" in the sheet
                 val currentLoadedModelId = getCurrentLoadedModelIdForContext()
-                val currentLoadedModel = if (currentLoadedModelId != null) {
-                    filteredModels.find { it.id == currentLoadedModelId }
-                } else {
-                    null
-                }
+                val currentLoadedModel =
+                    if (currentLoadedModelId != null) {
+                        filteredModels.find { it.id == currentLoadedModelId }
+                    } else {
+                        null
+                    }
 
                 if (currentLoadedModel != null) {
                     Log.d(TAG, "✅ Found currently loaded model for context $context: ${currentLoadedModel.id}")
@@ -184,16 +187,21 @@ class ModelSelectionViewModel(
     /**
      * Check if a model category is relevant for the current selection context
      */
-    private fun isModelRelevantForContext(category: ModelCategory, ctx: ModelSelectionContext): Boolean {
+    private fun isModelRelevantForContext(
+        category: ModelCategory,
+        ctx: ModelSelectionContext,
+    ): Boolean {
         return when (ctx) {
             ModelSelectionContext.LLM -> category == ModelCategory.LANGUAGE
             ModelSelectionContext.STT -> category == ModelCategory.SPEECH_RECOGNITION
             ModelSelectionContext.TTS -> category == ModelCategory.SPEECH_SYNTHESIS
-            ModelSelectionContext.VOICE -> category in listOf(
-                ModelCategory.LANGUAGE,
-                ModelCategory.SPEECH_RECOGNITION,
-                ModelCategory.SPEECH_SYNTHESIS
-            )
+            ModelSelectionContext.VOICE ->
+                category in
+                    listOf(
+                        ModelCategory.LANGUAGE,
+                        ModelCategory.SPEECH_RECOGNITION,
+                        ModelCategory.SPEECH_SYNTHESIS,
+                    )
         }
     }
 

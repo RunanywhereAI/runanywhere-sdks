@@ -28,7 +28,6 @@ import com.runanywhere.sdk.foundation.SDKLogger
  * - Links to librac_commons.so - Commons library with service registry
  */
 internal object ONNXBridge {
-
     private const val TAG = "ONNXBridge"
     private val logger = SDKLogger(TAG)
 

@@ -32,7 +32,6 @@ import java.util.concurrent.ConcurrentHashMap
  * - All callbacks are thread-safe
  */
 object CppBridgeStorage {
-
     /**
      * Storage type constants matching C++ RAC_STORAGE_TYPE_* values.
      */
@@ -55,14 +54,15 @@ object CppBridgeStorage {
         /**
          * Get a human-readable name for the storage type.
          */
-        fun getName(type: Int): String = when (type) {
-            MEMORY -> "MEMORY"
-            DISK -> "DISK"
-            CACHE -> "CACHE"
-            SECURE -> "SECURE"
-            TEMPORARY -> "TEMPORARY"
-            else -> "UNKNOWN($type)"
-        }
+        fun getName(type: Int): String =
+            when (type) {
+                MEMORY -> "MEMORY"
+                DISK -> "DISK"
+                CACHE -> "CACHE"
+                SECURE -> "SECURE"
+                TEMPORARY -> "TEMPORARY"
+                else -> "UNKNOWN($type)"
+            }
     }
 
     /**
@@ -131,20 +131,21 @@ object CppBridgeStorage {
         /**
          * Get a human-readable name for the error code.
          */
-        fun getName(error: Int): String = when (error) {
-            NONE -> "NONE"
-            NOT_INITIALIZED -> "NOT_INITIALIZED"
-            KEY_NOT_FOUND -> "KEY_NOT_FOUND"
-            WRITE_FAILED -> "WRITE_FAILED"
-            READ_FAILED -> "READ_FAILED"
-            DELETE_FAILED -> "DELETE_FAILED"
-            STORAGE_FULL -> "STORAGE_FULL"
-            INVALID_NAMESPACE -> "INVALID_NAMESPACE"
-            PERMISSION_DENIED -> "PERMISSION_DENIED"
-            SERIALIZATION_ERROR -> "SERIALIZATION_ERROR"
-            UNKNOWN -> "UNKNOWN"
-            else -> "UNKNOWN($error)"
-        }
+        fun getName(error: Int): String =
+            when (error) {
+                NONE -> "NONE"
+                NOT_INITIALIZED -> "NOT_INITIALIZED"
+                KEY_NOT_FOUND -> "KEY_NOT_FOUND"
+                WRITE_FAILED -> "WRITE_FAILED"
+                READ_FAILED -> "READ_FAILED"
+                DELETE_FAILED -> "DELETE_FAILED"
+                STORAGE_FULL -> "STORAGE_FULL"
+                INVALID_NAMESPACE -> "INVALID_NAMESPACE"
+                PERMISSION_DENIED -> "PERMISSION_DENIED"
+                SERIALIZATION_ERROR -> "SERIALIZATION_ERROR"
+                UNKNOWN -> "UNKNOWN"
+                else -> "UNKNOWN($error)"
+            }
     }
 
     @Volatile
@@ -286,7 +287,7 @@ object CppBridgeStorage {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Storage callbacks registered"
+                "Storage callbacks registered",
             )
         }
     }
@@ -326,7 +327,7 @@ object CppBridgeStorage {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Storage quota exceeded for namespace '$namespace'"
+                    "Storage quota exceeded for namespace '$namespace'",
                 )
 
                 try {
@@ -362,7 +363,7 @@ object CppBridgeStorage {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Data stored: $namespace/$key (${data.size} bytes)"
+                "Data stored: $namespace/$key (${data.size} bytes)",
             )
 
             // Notify listener
@@ -377,7 +378,7 @@ object CppBridgeStorage {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Failed to store data: ${e.message}"
+                "Failed to store data: ${e.message}",
             )
             StorageError.WRITE_FAILED
         }
@@ -417,7 +418,7 @@ object CppBridgeStorage {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Failed to retrieve data: ${e.message}"
+                "Failed to retrieve data: ${e.message}",
             )
             null
         }
@@ -466,7 +467,7 @@ object CppBridgeStorage {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Data deleted: $namespace/$key"
+                "Data deleted: $namespace/$key",
             )
 
             // Notify listener
@@ -481,7 +482,7 @@ object CppBridgeStorage {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Failed to delete data: ${e.message}"
+                "Failed to delete data: ${e.message}",
             )
             StorageError.DELETE_FAILED
         }
@@ -533,19 +534,20 @@ object CppBridgeStorage {
     @JvmStatic
     fun listKeysCallback(namespace: String, storageType: Int): String {
         return try {
-            val keys = when (storageType) {
-                StorageType.MEMORY -> {
-                    val prefix = "$namespace:"
-                    memoryStorage.keys
-                        .filter { it.startsWith(prefix) }
-                        .map { it.removePrefix(prefix) }
+            val keys =
+                when (storageType) {
+                    StorageType.MEMORY -> {
+                        val prefix = "$namespace:"
+                        memoryStorage.keys
+                            .filter { it.startsWith(prefix) }
+                            .map { it.removePrefix(prefix) }
+                    }
+                    StorageType.DISK, StorageType.CACHE, StorageType.TEMPORARY -> {
+                        val dir = getStorageDirectory(namespace, storageType)
+                        dir.listFiles()?.map { it.name } ?: emptyList()
+                    }
+                    else -> emptyList()
                 }
-                StorageType.DISK, StorageType.CACHE, StorageType.TEMPORARY -> {
-                    val dir = getStorageDirectory(namespace, storageType)
-                    dir.listFiles()?.map { it.name } ?: emptyList()
-                }
-                else -> emptyList()
-            }
 
             buildString {
                 append("[")
@@ -559,7 +561,7 @@ object CppBridgeStorage {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Failed to list keys: ${e.message}"
+                "Failed to list keys: ${e.message}",
             )
             "[]"
         }
@@ -602,7 +604,7 @@ object CppBridgeStorage {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Namespace cleared: $namespace"
+                "Namespace cleared: $namespace",
             )
 
             // Notify listener
@@ -617,7 +619,7 @@ object CppBridgeStorage {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Failed to clear namespace: ${e.message}"
+                "Failed to clear namespace: ${e.message}",
             )
             StorageError.DELETE_FAILED
         }
@@ -670,7 +672,7 @@ object CppBridgeStorage {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Storage quota set: $namespace = ${quotaBytes / (1024 * 1024)}MB"
+            "Storage quota set: $namespace = ${quotaBytes / (1024 * 1024)}MB",
         )
     }
 
@@ -707,7 +709,7 @@ object CppBridgeStorage {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Cleaned up $cleanedCount expired cache entries"
+                "Cleaned up $cleanedCount expired cache entries",
             )
 
             cleanedCount
@@ -715,7 +717,7 @@ object CppBridgeStorage {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Failed to cleanup expired cache: ${e.message}"
+                "Failed to cleanup expired cache: ${e.message}",
             )
             0
         }
@@ -727,17 +729,21 @@ object CppBridgeStorage {
 
     /**
      * Native method to set the storage callbacks with C++ core.
+     * Reserved for future native callback integration.
      *
      * C API: rac_storage_set_callbacks(...)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeSetStorageCallbacks()
 
     /**
      * Native method to unset the storage callbacks.
+     * Reserved for future native callback integration.
      *
      * C API: rac_storage_set_callbacks(nullptr)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeUnsetStorageCallbacks()
 
@@ -817,7 +823,7 @@ object CppBridgeStorage {
         namespace: String,
         key: String,
         data: ByteArray,
-        storageType: Int = StorageType.DISK
+        storageType: Int = StorageType.DISK,
     ): Boolean {
         return storeDataCallback(namespace, key, data, storageType) == StorageError.NONE
     }
@@ -835,7 +841,7 @@ object CppBridgeStorage {
         namespace: String,
         key: String,
         value: String,
-        storageType: Int = StorageType.DISK
+        storageType: Int = StorageType.DISK,
     ): Boolean {
         return store(namespace, key, value.toByteArray(Charsets.UTF_8), storageType)
     }
@@ -851,7 +857,7 @@ object CppBridgeStorage {
     fun retrieve(
         namespace: String,
         key: String,
-        storageType: Int = StorageType.DISK
+        storageType: Int = StorageType.DISK,
     ): ByteArray? {
         return retrieveDataCallback(namespace, key, storageType)
     }
@@ -867,7 +873,7 @@ object CppBridgeStorage {
     fun retrieveString(
         namespace: String,
         key: String,
-        storageType: Int = StorageType.DISK
+        storageType: Int = StorageType.DISK,
     ): String? {
         return retrieve(namespace, key, storageType)?.toString(Charsets.UTF_8)
     }
@@ -883,7 +889,7 @@ object CppBridgeStorage {
     fun delete(
         namespace: String,
         key: String,
-        storageType: Int = StorageType.DISK
+        storageType: Int = StorageType.DISK,
     ): Boolean {
         return deleteDataCallback(namespace, key, storageType) == StorageError.NONE
     }
@@ -899,7 +905,7 @@ object CppBridgeStorage {
     fun has(
         namespace: String,
         key: String,
-        storageType: Int = StorageType.DISK
+        storageType: Int = StorageType.DISK,
     ): Boolean {
         return hasDataCallback(namespace, key, storageType)
     }
@@ -913,11 +919,12 @@ object CppBridgeStorage {
      */
     fun listKeys(
         namespace: String,
-        storageType: Int = StorageType.DISK
+        storageType: Int = StorageType.DISK,
     ): List<String> {
         val json = listKeysCallback(namespace, storageType)
         // Simple JSON array parsing
-        return json.trim()
+        return json
+            .trim()
             .removePrefix("[")
             .removeSuffix("]")
             .split(",")
@@ -934,7 +941,7 @@ object CppBridgeStorage {
      */
     fun clear(
         namespace: String,
-        storageType: Int = StorageType.DISK
+        storageType: Int = StorageType.DISK,
     ): Boolean {
         return clearNamespaceCallback(namespace, storageType) == StorageError.NONE
     }
@@ -1004,11 +1011,12 @@ object CppBridgeStorage {
         }
 
         val baseDir = CppBridgeModelPaths.getBaseDirectory()
-        val typeDir = when (storageType) {
-            StorageType.CACHE -> "cache"
-            StorageType.TEMPORARY -> "temp"
-            else -> "data"
-        }
+        val typeDir =
+            when (storageType) {
+                StorageType.CACHE -> "cache"
+                StorageType.TEMPORARY -> "temp"
+                else -> "data"
+            }
 
         return File(File(baseDir, typeDir), namespace)
     }
@@ -1017,13 +1025,13 @@ object CppBridgeStorage {
      * Initialize default storage quotas.
      */
     private fun initializeDefaultQuotas() {
-        namespaceQuotas[StorageNamespace.CONFIG] = 10L * 1024 * 1024      // 10 MB
-        namespaceQuotas[StorageNamespace.MODELS] = 50L * 1024 * 1024      // 50 MB
+        namespaceQuotas[StorageNamespace.CONFIG] = 10L * 1024 * 1024 // 10 MB
+        namespaceQuotas[StorageNamespace.MODELS] = 50L * 1024 * 1024 // 50 MB
         namespaceQuotas[StorageNamespace.INFERENCE_CACHE] = 100L * 1024 * 1024 // 100 MB
-        namespaceQuotas[StorageNamespace.PREFERENCES] = 1L * 1024 * 1024  // 1 MB
-        namespaceQuotas[StorageNamespace.SESSION] = 10L * 1024 * 1024     // 10 MB
-        namespaceQuotas[StorageNamespace.ANALYTICS] = 20L * 1024 * 1024   // 20 MB
-        namespaceQuotas[StorageNamespace.DOWNLOADS] = 10L * 1024 * 1024   // 10 MB
+        namespaceQuotas[StorageNamespace.PREFERENCES] = 1L * 1024 * 1024 // 1 MB
+        namespaceQuotas[StorageNamespace.SESSION] = 10L * 1024 * 1024 // 10 MB
+        namespaceQuotas[StorageNamespace.ANALYTICS] = 20L * 1024 * 1024 // 20 MB
+        namespaceQuotas[StorageNamespace.DOWNLOADS] = 10L * 1024 * 1024 // 10 MB
     }
 
     /**

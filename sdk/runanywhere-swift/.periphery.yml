@@ -11,8 +11,6 @@ targets:
   - RunAnywhere
   - ONNXRuntime
   - LlamaCPPRuntime
-  - FoundationModelsAdapter
-  - FluidAudioDiarization
 
 # Retain patterns - don't flag these as unused
 retain_public: true

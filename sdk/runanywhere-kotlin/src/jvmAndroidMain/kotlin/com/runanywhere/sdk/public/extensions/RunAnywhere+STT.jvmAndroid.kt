@@ -39,7 +39,7 @@ actual val RunAnywhere.isSTTModelLoadedSync: Boolean
 
 actual suspend fun RunAnywhere.transcribeWithOptions(
     audioData: ByteArray,
-    options: STTOptions
+    options: STTOptions,
 ): STTOutput {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
@@ -48,18 +48,20 @@ actual suspend fun RunAnywhere.transcribeWithOptions(
     val audioLengthSec = estimateAudioLength(audioData.size)
 
     // Convert to CppBridgeSTT config
-    val config = CppBridgeSTT.TranscriptionConfig(
-        language = options.language ?: CppBridgeSTT.Language.AUTO,
-        sampleRate = options.sampleRate
-    )
+    val config =
+        CppBridgeSTT.TranscriptionConfig(
+            language = options.language ?: CppBridgeSTT.Language.AUTO,
+            sampleRate = options.sampleRate,
+        )
 
     val result = CppBridgeSTT.transcribe(audioData, config)
 
-    val metadata = TranscriptionMetadata(
-        modelId = CppBridgeSTT.getLoadedModelId() ?: "unknown",
-        processingTime = result.processingTimeMs / 1000.0,
-        audioLength = audioLengthSec
-    )
+    val metadata =
+        TranscriptionMetadata(
+            modelId = CppBridgeSTT.getLoadedModelId() ?: "unknown",
+            processingTime = result.processingTimeMs / 1000.0,
+            audioLength = audioLengthSec,
+        )
 
     return STTOutput(
         text = result.text,
@@ -67,14 +69,14 @@ actual suspend fun RunAnywhere.transcribeWithOptions(
         wordTimestamps = null,
         detectedLanguage = result.language,
         alternatives = null,
-        metadata = metadata
+        metadata = metadata,
     )
 }
 
 actual suspend fun RunAnywhere.transcribeStream(
     audioData: ByteArray,
     options: STTOptions,
-    onPartialResult: (STTTranscriptionResult) -> Unit
+    onPartialResult: (STTTranscriptionResult) -> Unit,
 ): STTOutput {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
@@ -82,21 +84,24 @@ actual suspend fun RunAnywhere.transcribeStream(
 
     val audioLengthSec = estimateAudioLength(audioData.size)
 
-    val config = CppBridgeSTT.TranscriptionConfig(
-        language = options.language ?: CppBridgeSTT.Language.AUTO,
-        sampleRate = options.sampleRate
-    )
+    val config =
+        CppBridgeSTT.TranscriptionConfig(
+            language = options.language ?: CppBridgeSTT.Language.AUTO,
+            sampleRate = options.sampleRate,
+        )
 
-    val result = CppBridgeSTT.transcribeStream(audioData, config) { partialText, isFinal ->
-        onPartialResult(STTTranscriptionResult(transcript = partialText))
-        true // Continue processing
-    }
+    val result =
+        CppBridgeSTT.transcribeStream(audioData, config) { partialText, isFinal ->
+            onPartialResult(STTTranscriptionResult(transcript = partialText))
+            true // Continue processing
+        }
 
-    val metadata = TranscriptionMetadata(
-        modelId = CppBridgeSTT.getLoadedModelId() ?: "unknown",
-        processingTime = result.processingTimeMs / 1000.0,
-        audioLength = audioLengthSec
-    )
+    val metadata =
+        TranscriptionMetadata(
+            modelId = CppBridgeSTT.getLoadedModelId() ?: "unknown",
+            processingTime = result.processingTimeMs / 1000.0,
+            audioLength = audioLengthSec,
+        )
 
     return STTOutput(
         text = result.text,
@@ -104,7 +109,7 @@ actual suspend fun RunAnywhere.transcribeStream(
         wordTimestamps = null,
         detectedLanguage = result.language,
         alternatives = null,
-        metadata = metadata
+        metadata = metadata,
     )
 }
 
@@ -124,7 +129,7 @@ actual suspend fun RunAnywhere.stopStreamingTranscription() {
 
 // Private helper
 private fun estimateAudioLength(dataSize: Int): Double {
-    val bytesPerSample = 2  // 16-bit
+    val bytesPerSample = 2 // 16-bit
     val sampleRate = 16000.0
     val samples = dataSize.toDouble() / bytesPerSample.toDouble()
     return samples / sampleRate

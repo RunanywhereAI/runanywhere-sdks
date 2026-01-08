@@ -144,12 +144,9 @@ extension CppBridge {
         /// Internal for callback access (C callbacks are outside the extension)
         class PlatformServiceContext { // swiftlint:disable:this nesting
             let canHandle: (String?) -> Bool
-            let create: () async throws -> Any // swiftlint:disable:this avoid_any_type
-            var instances: [rac_handle_t: Any] = [:] // swiftlint:disable:this avoid_any_type
 
-            init(canHandle: @escaping (String?) -> Bool, create: @escaping () async throws -> Any) {
+            init(canHandle: @escaping (String?) -> Bool) {
                 self.canHandle = canHandle
-                self.create = create
             }
         }
 
@@ -167,7 +164,7 @@ extension CppBridge {
         ///   - capability: Capability this provider offers
         ///   - priority: Priority (higher = preferred)
         ///   - canHandle: Closure to check if provider can handle a request
-        ///   - create: Factory closure to create the service
+        ///   - create: Factory closure to create the service (reserved for future use)
         /// - Returns: true if registration succeeded
         @discardableResult
         public static func registerPlatformService(
@@ -175,13 +172,13 @@ extension CppBridge {
             capability: SDKComponent,
             priority: Int,
             canHandle: @escaping (String?) -> Bool,
-            create: @escaping () async throws -> Any
+            create _: @escaping () async throws -> Any
         ) -> Bool {
             platformLock.lock()
             defer { platformLock.unlock() }
 
             // Store context for callbacks
-            let context = PlatformServiceContext(canHandle: canHandle, create: create)
+            let context = PlatformServiceContext(canHandle: canHandle)
             platformContexts[name] = context
 
             // Create C provider struct
@@ -251,7 +248,7 @@ private func platformCanHandleCallback(
 
 /// Callback for creating platform service
 private func platformCreateCallback(
-    request: UnsafePointer<rac_service_request_t>?,
+    request _: UnsafePointer<rac_service_request_t>?,
     userData: UnsafeMutableRawPointer?
 ) -> rac_handle_t? {
     guard let userData = userData else { return nil }

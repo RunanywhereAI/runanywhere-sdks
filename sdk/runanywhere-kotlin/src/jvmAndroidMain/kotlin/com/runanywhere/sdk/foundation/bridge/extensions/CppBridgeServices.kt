@@ -10,8 +10,6 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
-import com.runanywhere.sdk.foundation.errors.SDKError
-
 /**
  * Services bridge that provides service registry integration for C++ core.
  *
@@ -37,7 +35,6 @@ import com.runanywhere.sdk.foundation.errors.SDKError
  * - All callbacks are thread-safe
  */
 object CppBridgeServices {
-
     /**
      * Service type constants matching C++ RAC_SERVICE_TYPE_* values.
      */
@@ -78,20 +75,21 @@ object CppBridgeServices {
         /**
          * Get a human-readable name for the service type.
          */
-        fun getName(type: Int): String = when (type) {
-            UNKNOWN -> "UNKNOWN"
-            LLM -> "LLM"
-            STT -> "STT"
-            TTS -> "TTS"
-            VAD -> "VAD"
-            VOICE_AGENT -> "VOICE_AGENT"
-            MODEL_REGISTRY -> "MODEL_REGISTRY"
-            DOWNLOAD_MANAGER -> "DOWNLOAD_MANAGER"
-            PLATFORM -> "PLATFORM"
-            TELEMETRY -> "TELEMETRY"
-            AUTH -> "AUTH"
-            else -> "UNKNOWN($type)"
-        }
+        fun getName(type: Int): String =
+            when (type) {
+                UNKNOWN -> "UNKNOWN"
+                LLM -> "LLM"
+                STT -> "STT"
+                TTS -> "TTS"
+                VAD -> "VAD"
+                VOICE_AGENT -> "VOICE_AGENT"
+                MODEL_REGISTRY -> "MODEL_REGISTRY"
+                DOWNLOAD_MANAGER -> "DOWNLOAD_MANAGER"
+                PLATFORM -> "PLATFORM"
+                TELEMETRY -> "TELEMETRY"
+                AUTH -> "AUTH"
+                else -> "UNKNOWN($type)"
+            }
 
         /**
          * Get all AI service types (components that process models).
@@ -101,17 +99,31 @@ object CppBridgeServices {
         /**
          * Get all infrastructure service types.
          */
-        fun getInfrastructureServiceTypes(): List<Int> = listOf(
-            MODEL_REGISTRY, DOWNLOAD_MANAGER, PLATFORM, TELEMETRY, AUTH
-        )
+        fun getInfrastructureServiceTypes(): List<Int> =
+            listOf(
+                MODEL_REGISTRY,
+                DOWNLOAD_MANAGER,
+                PLATFORM,
+                TELEMETRY,
+                AUTH,
+            )
 
         /**
          * Get all service types.
          */
-        fun getAllServiceTypes(): List<Int> = listOf(
-            LLM, STT, TTS, VAD, VOICE_AGENT,
-            MODEL_REGISTRY, DOWNLOAD_MANAGER, PLATFORM, TELEMETRY, AUTH
-        )
+        fun getAllServiceTypes(): List<Int> =
+            listOf(
+                LLM,
+                STT,
+                TTS,
+                VAD,
+                VOICE_AGENT,
+                MODEL_REGISTRY,
+                DOWNLOAD_MANAGER,
+                PLATFORM,
+                TELEMETRY,
+                AUTH,
+            )
     }
 
     /**
@@ -148,18 +160,19 @@ object CppBridgeServices {
         /**
          * Get a human-readable name for the service state.
          */
-        fun getName(state: Int): String = when (state) {
-            NOT_REGISTERED -> "NOT_REGISTERED"
-            REGISTERED -> "REGISTERED"
-            INITIALIZING -> "INITIALIZING"
-            READY -> "READY"
-            BUSY -> "BUSY"
-            PAUSED -> "PAUSED"
-            ERROR -> "ERROR"
-            SHUTTING_DOWN -> "SHUTTING_DOWN"
-            DESTROYED -> "DESTROYED"
-            else -> "UNKNOWN($state)"
-        }
+        fun getName(state: Int): String =
+            when (state) {
+                NOT_REGISTERED -> "NOT_REGISTERED"
+                REGISTERED -> "REGISTERED"
+                INITIALIZING -> "INITIALIZING"
+                READY -> "READY"
+                BUSY -> "BUSY"
+                PAUSED -> "PAUSED"
+                ERROR -> "ERROR"
+                SHUTTING_DOWN -> "SHUTTING_DOWN"
+                DESTROYED -> "DESTROYED"
+                else -> "UNKNOWN($state)"
+            }
 
         /**
          * Check if the state indicates the service is usable.
@@ -265,7 +278,7 @@ object CppBridgeServices {
         val version: String,
         val lastError: String?,
         val lastErrorCode: Int,
-        val metadata: Map<String, String>
+        val metadata: Map<String, String>,
     ) {
         /**
          * Check if the service is ready for use.
@@ -332,7 +345,7 @@ object CppBridgeServices {
     data class ServiceDependency(
         val serviceType: Int,
         val dependsOn: List<Int>,
-        val optional: Boolean = false
+        val optional: Boolean = false,
     )
 
     /**
@@ -402,7 +415,7 @@ object CppBridgeServices {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Services callbacks registered"
+                "Services callbacks registered",
             )
         }
     }
@@ -425,7 +438,7 @@ object CppBridgeServices {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Cannot initialize: not registered"
+                    "Cannot initialize: not registered",
                 )
                 return -1
             }
@@ -437,7 +450,7 @@ object CppBridgeServices {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Initializing service registry"
+                "Initializing service registry",
             )
 
             isInitialized = true
@@ -445,7 +458,7 @@ object CppBridgeServices {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Service registry initialized with ${serviceRegistry.size} services"
+                "Service registry initialized with ${serviceRegistry.size} services",
             )
 
             return 0
@@ -468,9 +481,10 @@ object CppBridgeServices {
      */
     @JvmStatic
     fun getServiceInfoCallback(serviceType: Int): String? {
-        val service = synchronized(lock) {
-            serviceRegistry[serviceType]
-        } ?: return null
+        val service =
+            synchronized(lock) {
+                serviceRegistry[serviceType]
+            } ?: return null
 
         return service.toJson()
     }
@@ -500,7 +514,7 @@ object CppBridgeServices {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Service registered: ${serviceInfo.getTypeName()} (${serviceInfo.getStateName()})"
+                "Service registered: ${serviceInfo.getTypeName()} (${serviceInfo.getStateName()})",
             )
 
             // Notify listener
@@ -511,7 +525,7 @@ object CppBridgeServices {
                     servicesListener?.onServiceStateChanged(
                         serviceType,
                         previousService.state,
-                        serviceInfo.state
+                        serviceInfo.state,
                     )
                 }
 
@@ -521,7 +535,7 @@ object CppBridgeServices {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in services listener: ${e.message}"
+                    "Error in services listener: ${e.message}",
                 )
             }
 
@@ -530,7 +544,7 @@ object CppBridgeServices {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Failed to register service: ${e.message}"
+                "Failed to register service: ${e.message}",
             )
             false
         }
@@ -548,15 +562,16 @@ object CppBridgeServices {
      */
     @JvmStatic
     fun unregisterServiceCallback(serviceType: Int): Boolean {
-        val removed = synchronized(lock) {
-            serviceRegistry.remove(serviceType)
-        }
+        val removed =
+            synchronized(lock) {
+                serviceRegistry.remove(serviceType)
+            }
 
         if (removed != null) {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Service unregistered: ${ServiceType.getName(serviceType)}"
+                "Service unregistered: ${ServiceType.getName(serviceType)}",
             )
 
             // Notify listener
@@ -566,7 +581,7 @@ object CppBridgeServices {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in services listener onServiceUnregistered: ${e.message}"
+                    "Error in services listener onServiceUnregistered: ${e.message}",
                 )
             }
 
@@ -629,7 +644,7 @@ object CppBridgeServices {
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
                 "Service state updated: ${ServiceType.getName(serviceType)} " +
-                    "${ServiceState.getName(previousState)} -> ${ServiceState.getName(state)}"
+                    "${ServiceState.getName(previousState)} -> ${ServiceState.getName(state)}",
             )
 
             // Notify listener
@@ -644,7 +659,7 @@ object CppBridgeServices {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in services listener onServiceStateChanged: ${e.message}"
+                    "Error in services listener onServiceStateChanged: ${e.message}",
                 )
             }
         }
@@ -667,17 +682,18 @@ object CppBridgeServices {
     fun setServiceErrorCallback(serviceType: Int, errorCode: Int, errorMessage: String) {
         synchronized(lock) {
             val service = serviceRegistry[serviceType] ?: return
-            serviceRegistry[serviceType] = service.copy(
-                state = ServiceState.ERROR,
-                lastError = errorMessage,
-                lastErrorCode = errorCode
-            )
+            serviceRegistry[serviceType] =
+                service.copy(
+                    state = ServiceState.ERROR,
+                    lastError = errorMessage,
+                    lastErrorCode = errorCode,
+                )
         }
 
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.ERROR,
             TAG,
-            "Service error: ${ServiceType.getName(serviceType)} (code: $errorCode): $errorMessage"
+            "Service error: ${ServiceType.getName(serviceType)} (code: $errorCode): $errorMessage",
         )
 
         // Notify listener
@@ -686,13 +702,13 @@ object CppBridgeServices {
             servicesListener?.onServiceStateChanged(
                 serviceType,
                 ServiceState.READY,
-                ServiceState.ERROR
+                ServiceState.ERROR,
             )
         } catch (e: Exception) {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in services listener: ${e.message}"
+                "Error in services listener: ${e.message}",
             )
         }
     }
@@ -708,9 +724,10 @@ object CppBridgeServices {
      */
     @JvmStatic
     fun getAllServicesCallback(): String {
-        val services = synchronized(lock) {
-            serviceRegistry.values.toList()
-        }
+        val services =
+            synchronized(lock) {
+                serviceRegistry.values.toList()
+            }
 
         return buildString {
             append("[")
@@ -733,9 +750,10 @@ object CppBridgeServices {
      */
     @JvmStatic
     fun getReadyServicesCallback(): String {
-        val services = synchronized(lock) {
-            serviceRegistry.values.filter { it.isReady() }
-        }
+        val services =
+            synchronized(lock) {
+                serviceRegistry.values.filter { it.isReady() }
+            }
 
         return buildString {
             append("[")
@@ -814,9 +832,11 @@ object CppBridgeServices {
      * Native method to set the services callbacks with C++ core.
      *
      * Registers all service registry callbacks with C++ core.
+     * Reserved for future native callback integration.
      *
      * C API: rac_services_set_callbacks(...)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeSetServicesCallbacks()
 
@@ -824,9 +844,11 @@ object CppBridgeServices {
      * Native method to unset the services callbacks.
      *
      * Called during shutdown to clean up native resources.
+     * Reserved for future native callback integration.
      *
      * C API: rac_services_set_callbacks(nullptr)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeUnsetServicesCallbacks()
 
@@ -1059,26 +1081,31 @@ object CppBridgeServices {
      */
     fun getServiceDependencies(): Map<Int, ServiceDependency> {
         return mapOf(
-            ServiceType.VOICE_AGENT to ServiceDependency(
-                serviceType = ServiceType.VOICE_AGENT,
-                dependsOn = listOf(ServiceType.LLM, ServiceType.STT, ServiceType.TTS, ServiceType.VAD)
-            ),
-            ServiceType.LLM to ServiceDependency(
-                serviceType = ServiceType.LLM,
-                dependsOn = listOf(ServiceType.MODEL_REGISTRY)
-            ),
-            ServiceType.STT to ServiceDependency(
-                serviceType = ServiceType.STT,
-                dependsOn = listOf(ServiceType.MODEL_REGISTRY)
-            ),
-            ServiceType.TTS to ServiceDependency(
-                serviceType = ServiceType.TTS,
-                dependsOn = listOf(ServiceType.MODEL_REGISTRY)
-            ),
-            ServiceType.VAD to ServiceDependency(
-                serviceType = ServiceType.VAD,
-                dependsOn = listOf(ServiceType.MODEL_REGISTRY)
-            )
+            ServiceType.VOICE_AGENT to
+                ServiceDependency(
+                    serviceType = ServiceType.VOICE_AGENT,
+                    dependsOn = listOf(ServiceType.LLM, ServiceType.STT, ServiceType.TTS, ServiceType.VAD),
+                ),
+            ServiceType.LLM to
+                ServiceDependency(
+                    serviceType = ServiceType.LLM,
+                    dependsOn = listOf(ServiceType.MODEL_REGISTRY),
+                ),
+            ServiceType.STT to
+                ServiceDependency(
+                    serviceType = ServiceType.STT,
+                    dependsOn = listOf(ServiceType.MODEL_REGISTRY),
+                ),
+            ServiceType.TTS to
+                ServiceDependency(
+                    serviceType = ServiceType.TTS,
+                    dependsOn = listOf(ServiceType.MODEL_REGISTRY),
+                ),
+            ServiceType.VAD to
+                ServiceDependency(
+                    serviceType = ServiceType.VAD,
+                    dependsOn = listOf(ServiceType.MODEL_REGISTRY),
+                ),
         )
     }
 
@@ -1134,15 +1161,16 @@ object CppBridgeServices {
     private fun initializeServiceRegistry() {
         // Register all known service types with NOT_REGISTERED state
         ServiceType.getAllServiceTypes().forEach { serviceType ->
-            serviceRegistry[serviceType] = ServiceInfo(
-                serviceType = serviceType,
-                state = ServiceState.NOT_REGISTERED,
-                capabilities = getDefaultCapabilities(serviceType),
-                version = "1.0.0",
-                lastError = null,
-                lastErrorCode = 0,
-                metadata = emptyMap()
-            )
+            serviceRegistry[serviceType] =
+                ServiceInfo(
+                    serviceType = serviceType,
+                    state = ServiceState.NOT_REGISTERED,
+                    capabilities = getDefaultCapabilities(serviceType),
+                    version = "1.0.0",
+                    lastError = null,
+                    lastErrorCode = 0,
+                    metadata = emptyMap(),
+                )
         }
     }
 
@@ -1189,12 +1217,13 @@ object CppBridgeServices {
      * Check if all required services are ready and notify listener.
      */
     private fun checkAllServicesReady() {
-        val allReady = synchronized(lock) {
-            ServiceType.getAIServiceTypes().all { type ->
-                val service = serviceRegistry[type]
-                service == null || service.isReady()
+        val allReady =
+            synchronized(lock) {
+                ServiceType.getAIServiceTypes().all { type ->
+                    val service = serviceRegistry[type]
+                    service == null || service.isReady()
+                }
             }
-        }
 
         if (allReady) {
             try {
@@ -1203,7 +1232,7 @@ object CppBridgeServices {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in services listener onAllServicesReady: ${e.message}"
+                    "Error in services listener onAllServicesReady: ${e.message}",
                 )
             }
         }
@@ -1224,7 +1253,11 @@ object CppBridgeServices {
         fun extractInt(key: String): Int {
             val pattern = "\"$key\"\\s*:\\s*(-?\\d+)"
             val regex = Regex(pattern)
-            return regex.find(cleanJson)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            return regex
+                .find(cleanJson)
+                ?.groupValues
+                ?.get(1)
+                ?.toIntOrNull() ?: 0
         }
 
         return ServiceInfo(
@@ -1234,7 +1267,7 @@ object CppBridgeServices {
             version = extractString("version") ?: "1.0.0",
             lastError = extractString("last_error"),
             lastErrorCode = extractInt("last_error_code"),
-            metadata = emptyMap() // Simplified - full implementation would parse nested object
+            metadata = emptyMap(), // Simplified - full implementation would parse nested object
         )
     }
 

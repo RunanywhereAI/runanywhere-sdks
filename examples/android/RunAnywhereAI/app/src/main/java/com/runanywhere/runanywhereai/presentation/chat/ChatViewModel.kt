@@ -9,8 +9,6 @@ import com.runanywhere.runanywhereai.data.ConversationStore
 import com.runanywhere.runanywhereai.domain.models.ChatMessage
 import com.runanywhere.runanywhereai.domain.models.CompletionStatus
 import com.runanywhere.runanywhereai.domain.models.Conversation
-import com.runanywhere.runanywhereai.domain.models.GenerationMode
-import com.runanywhere.runanywhereai.domain.models.GenerationParameters
 import com.runanywhere.runanywhereai.domain.models.MessageAnalytics
 import com.runanywhere.runanywhereai.domain.models.MessageModelInfo
 import com.runanywhere.runanywhereai.domain.models.MessageRole
@@ -108,10 +106,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
             LLMEvent.LLMEventType.GENERATION_FAILED -> {
                 Log.e(TAG, "Generation failed: ${event.error}")
-                _uiState.value = _uiState.value.copy(
-                    isGenerating = false,
-                    error = Exception(event.error ?: "Generation failed"),
-                )
+                _uiState.value =
+                    _uiState.value.copy(
+                        isGenerating = false,
+                        error = Exception(event.error ?: "Generation failed"),
+                    )
             }
             LLMEvent.LLMEventType.STREAM_TOKEN -> {
                 // Token received during streaming - handled by flow collection
@@ -163,18 +162,20 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         Log.i(TAG, "🎯 Sending message: ${prompt.take(50)}...")
 
         // Clear input and set generating state
-        _uiState.value = currentState.copy(
-            currentInput = "",
-            isGenerating = true,
-            error = null,
-        )
+        _uiState.value =
+            currentState.copy(
+                currentInput = "",
+                isGenerating = true,
+                error = null,
+            )
 
         // Add user message
         val userMessage = ChatMessage.user(prompt)
 
-        _uiState.value = _uiState.value.copy(
-            messages = _uiState.value.messages + userMessage,
-        )
+        _uiState.value =
+            _uiState.value.copy(
+                messages = _uiState.value.messages + userMessage,
+            )
 
         // Save user message to conversation
         _uiState.value.currentConversation?.let { conversation ->
@@ -183,30 +184,33 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         // Create assistant message that will be updated with streaming tokens
         val currentModelInfo = createCurrentModelInfo()
-        val assistantMessage = ChatMessage.assistant(
-            content = "",
-            modelInfo = currentModelInfo,
-        )
+        val assistantMessage =
+            ChatMessage.assistant(
+                content = "",
+                modelInfo = currentModelInfo,
+            )
 
-        _uiState.value = _uiState.value.copy(
-            messages = _uiState.value.messages + assistantMessage,
-        )
+        _uiState.value =
+            _uiState.value.copy(
+                messages = _uiState.value.messages + assistantMessage,
+            )
 
         // Start generation
-        generationJob = viewModelScope.launch {
-            try {
-                // Clear metrics from previous generation
-                tokensPerSecondHistory.clear()
+        generationJob =
+            viewModelScope.launch {
+                try {
+                    // Clear metrics from previous generation
+                    tokensPerSecondHistory.clear()
 
-                if (currentState.useStreaming) {
-                    generateWithStreaming(prompt, assistantMessage.id)
-                } else {
-                    generateWithoutStreaming(prompt, assistantMessage.id)
+                    if (currentState.useStreaming) {
+                        generateWithStreaming(prompt, assistantMessage.id)
+                    } else {
+                        generateWithoutStreaming(prompt, assistantMessage.id)
+                    }
+                } catch (e: Exception) {
+                    handleGenerationError(e, assistantMessage.id)
                 }
-            } catch (e: Exception) {
-                handleGenerationError(e, assistantMessage.id)
             }
-        }
     }
 
     /**
@@ -304,16 +308,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             wasInterrupted = true
 
             if (thinkingContent.isNotEmpty()) {
-                val remainingContent = fullResponse
-                    .replace("<think>", "")
-                    .replace(thinkingContent, "")
-                    .trim()
+                val remainingContent =
+                    fullResponse
+                        .replace("<think>", "")
+                        .replace(thinkingContent, "")
+                        .trim()
 
-                val intelligentResponse = if (remainingContent.isEmpty()) {
-                    generateThinkingSummaryResponse(thinkingContent)
-                } else {
-                    remainingContent
-                }
+                val intelligentResponse =
+                    if (remainingContent.isEmpty()) {
+                        generateThinkingSummaryResponse(thinkingContent)
+                    } else {
+                        remainingContent
+                    }
 
                 updateAssistantMessage(
                     messageId = messageId,
@@ -324,17 +330,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         // Create analytics
-        val analytics = createMessageAnalytics(
-            startTime = startTime,
-            endTime = endTime,
-            firstTokenTime = firstTokenTime,
-            thinkingStartTime = thinkingStartTime,
-            thinkingEndTime = thinkingEndTime,
-            inputText = prompt,
-            outputText = responseContent,
-            thinkingText = thinkingContent.takeIf { it.isNotEmpty() },
-            wasInterrupted = wasInterrupted,
-        )
+        val analytics =
+            createMessageAnalytics(
+                startTime = startTime,
+                endTime = endTime,
+                firstTokenTime = firstTokenTime,
+                thinkingStartTime = thinkingStartTime,
+                thinkingEndTime = thinkingEndTime,
+                inputText = prompt,
+                outputText = responseContent,
+                thinkingText = thinkingContent.takeIf { it.isNotEmpty() },
+                wasInterrupted = wasInterrupted,
+            )
 
         // Update message with analytics
         updateAssistantMessageWithAnalytics(messageId, analytics)
@@ -360,17 +367,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
             updateAssistantMessage(messageId, response, null)
 
-            val analytics = createMessageAnalytics(
-                startTime = startTime,
-                endTime = endTime,
-                firstTokenTime = null,
-                thinkingStartTime = null,
-                thinkingEndTime = null,
-                inputText = prompt,
-                outputText = response,
-                thinkingText = null,
-                wasInterrupted = false,
-            )
+            val analytics =
+                createMessageAnalytics(
+                    startTime = startTime,
+                    endTime = endTime,
+                    firstTokenTime = null,
+                    thinkingStartTime = null,
+                    thinkingEndTime = null,
+                    inputText = prompt,
+                    outputText = response,
+                    thinkingText = null,
+                    wasInterrupted = false,
+                )
 
             updateAssistantMessageWithAnalytics(messageId, analytics)
         } catch (e: Exception) {
@@ -383,20 +391,25 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Handle generation errors
      */
-    private fun handleGenerationError(error: Exception, messageId: String) {
+    private fun handleGenerationError(
+        error: Exception,
+        messageId: String,
+    ) {
         Log.e(TAG, "❌ Generation failed", error)
 
-        val errorMessage = when {
-            !_uiState.value.isModelLoaded -> "❌ No model is loaded. Please select and load a model first."
-            else -> "❌ Generation failed: ${error.message}"
-        }
+        val errorMessage =
+            when {
+                !_uiState.value.isModelLoaded -> "❌ No model is loaded. Please select and load a model first."
+                else -> "❌ Generation failed: ${error.message}"
+            }
 
         updateAssistantMessage(messageId, errorMessage, null)
 
-        _uiState.value = _uiState.value.copy(
-            isGenerating = false,
-            error = error,
-        )
+        _uiState.value =
+            _uiState.value.copy(
+                isGenerating = false,
+                error = error,
+            )
     }
 
     /**
@@ -408,16 +421,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         thinkingContent: String?,
     ) {
         val currentMessages = _uiState.value.messages
-        val updatedMessages = currentMessages.map { message ->
-            if (message.id == messageId) {
-                message.copy(
-                    content = content,
-                    thinkingContent = thinkingContent,
-                )
-            } else {
-                message
+        val updatedMessages =
+            currentMessages.map { message ->
+                if (message.id == messageId) {
+                    message.copy(
+                        content = content,
+                        thinkingContent = thinkingContent,
+                    )
+                } else {
+                    message
+                }
             }
-        }
 
         _uiState.value = _uiState.value.copy(messages = updatedMessages)
     }
@@ -430,13 +444,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         analytics: MessageAnalytics,
     ) {
         val currentMessages = _uiState.value.messages
-        val updatedMessages = currentMessages.map { message ->
-            if (message.id == messageId) {
-                message.copy(analytics = analytics)
-            } else {
-                message
+        val updatedMessages =
+            currentMessages.map { message ->
+                if (message.id == messageId) {
+                    message.copy(analytics = analytics)
+                } else {
+                    message
+                }
             }
-        }
 
         _uiState.value = _uiState.value.copy(messages = updatedMessages)
     }
@@ -444,6 +459,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Create message analytics using app-local types
      */
+    @Suppress("UnusedParameter")
     private fun createMessageAnalytics(
         startTime: Long,
         endTime: Long,
@@ -462,17 +478,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val inputTokens = estimateTokenCount(inputText)
         val outputTokens = estimateTokenCount(outputText)
 
-        val averageTokensPerSecond = if (totalGenerationTime > 0) {
-            outputTokens.toDouble() / (totalGenerationTime / 1000.0)
-        } else {
-            0.0
-        }
+        val averageTokensPerSecond =
+            if (totalGenerationTime > 0) {
+                outputTokens.toDouble() / (totalGenerationTime / 1000.0)
+            } else {
+                0.0
+            }
 
-        val completionStatus = if (wasInterrupted) {
-            CompletionStatus.INTERRUPTED
-        } else {
-            CompletionStatus.COMPLETE
-        }
+        val completionStatus =
+            if (wasInterrupted) {
+                CompletionStatus.INTERRUPTED
+            } else {
+                CompletionStatus.COMPLETE
+            }
 
         return MessageAnalytics(
             inputTokens = inputTokens,
@@ -543,12 +561,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun clearChat() {
         generationJob?.cancel()
 
-        _uiState.value = _uiState.value.copy(
-            messages = emptyList(),
-            currentInput = "",
-            isGenerating = false,
-            error = null,
-        )
+        _uiState.value =
+            _uiState.value.copy(
+                messages = emptyList(),
+                currentInput = "",
+                isGenerating = false,
+                error = null,
+            )
 
         // Create new conversation
         val conversation = conversationStore.createConversation()
@@ -579,19 +598,21 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 if (RunAnywhere.isLLMModelLoaded()) {
                     val loadedModelId = RunAnywhere.currentLLMModelId
                     Log.i(TAG, "✅ LLM model already loaded: $loadedModelId")
-                    _uiState.value = _uiState.value.copy(
-                        isModelLoaded = true,
-                        loadedModelName = loadedModelId,
-                    )
+                    _uiState.value =
+                        _uiState.value.copy(
+                            isModelLoaded = true,
+                            loadedModelName = loadedModelId,
+                        )
                     addSystemMessageIfNeeded()
                     return
                 }
 
                 // Use SDK's model listing API to find chat models
                 val allModels = RunAnywhere.availableModels()
-                val chatModel = allModels.firstOrNull { model ->
-                    model.category == ModelCategory.LANGUAGE && model.isDownloaded
-                }
+                val chatModel =
+                    allModels.firstOrNull { model ->
+                        model.category == ModelCategory.LANGUAGE && model.isDownloaded
+                    }
 
                 if (chatModel != null) {
                     Log.i(TAG, "📦 Found downloaded chat model: ${chatModel.name}, loading...")
@@ -600,44 +621,49 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         // Load the chat model into memory
                         RunAnywhere.loadLLMModel(chatModel.id)
 
-                        _uiState.value = _uiState.value.copy(
-                            isModelLoaded = true,
-                            loadedModelName = chatModel.name,
-                        )
+                        _uiState.value =
+                            _uiState.value.copy(
+                                isModelLoaded = true,
+                                loadedModelName = chatModel.name,
+                            )
                         Log.i(TAG, "✅ Chat model loaded successfully: ${chatModel.name}")
                     } catch (e: Throwable) {
                         // Catch Throwable to handle both Exception and Error (e.g., UnsatisfiedLinkError)
                         Log.e(TAG, "❌ Failed to load chat model: ${e.message}", e)
-                        _uiState.value = _uiState.value.copy(
-                            isModelLoaded = false,
-                            loadedModelName = null,
-                            error = if (e is Exception) e else Exception("Native library not available: ${e.message}", e),
-                        )
+                        _uiState.value =
+                            _uiState.value.copy(
+                                isModelLoaded = false,
+                                loadedModelName = null,
+                                error = if (e is Exception) e else Exception("Native library not available: ${e.message}", e),
+                            )
                     }
                 } else {
-                    _uiState.value = _uiState.value.copy(
-                        isModelLoaded = false,
-                        loadedModelName = null,
-                    )
+                    _uiState.value =
+                        _uiState.value.copy(
+                            isModelLoaded = false,
+                            loadedModelName = null,
+                        )
                     Log.i(TAG, "ℹ️ No downloaded chat models found.")
                 }
 
                 addSystemMessageIfNeeded()
             } else {
-                _uiState.value = _uiState.value.copy(
-                    isModelLoaded = false,
-                    loadedModelName = null,
-                )
+                _uiState.value =
+                    _uiState.value.copy(
+                        isModelLoaded = false,
+                        loadedModelName = null,
+                    )
                 Log.i(TAG, "❌ SDK not ready")
             }
         } catch (e: Throwable) {
             // Catch Throwable to handle both Exception and Error (e.g., UnsatisfiedLinkError)
             Log.e(TAG, "Failed to check model status: ${e.message}", e)
-            _uiState.value = _uiState.value.copy(
-                isModelLoaded = false,
-                loadedModelName = null,
-                error = if (e is Exception) e else Exception("Failed to check model status: ${e.message}", e),
-            )
+            _uiState.value =
+                _uiState.value.copy(
+                    isModelLoaded = false,
+                    loadedModelName = null,
+                    error = if (e is Exception) e else Exception("Failed to check model status: ${e.message}", e),
+                )
         }
     }
 

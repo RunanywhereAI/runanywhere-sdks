@@ -47,7 +47,7 @@ class MarkdownDetector {
                 let trimmed = line.trimmingCharacters(in: .whitespaces)
                 // Must start with 1-6 # characters followed by a space
                 guard trimmed.hasPrefix("#") else { return false }
-                let hashes = trimmed.prefix(while: { $0 == "#" })
+                let hashes = trimmed.prefix { $0 == "#" }
                 return hashes.count >= 1 && hashes.count <= 6
                     && trimmed.count > hashes.count
                     && trimmed[trimmed.index(trimmed.startIndex, offsetBy: hashes.count)] == " "
@@ -113,14 +113,14 @@ enum RenderingStrategy {
     case plain      // No markdown processing
 
     var shouldExtractCodeBlocks: Bool {
-        return self == .rich
+        self == .rich
     }
 
     var shouldParseMarkdown: Bool {
-        return self != .plain
+        self != .plain
     }
 
     var shouldStyleHeadings: Bool {
-        return self == .rich || self == .basic
+        self == .rich || self == .basic
     }
 }

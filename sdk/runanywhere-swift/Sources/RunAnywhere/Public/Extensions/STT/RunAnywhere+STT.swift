@@ -173,10 +173,10 @@ public extension RunAnywhere {
     ///   - onError: Callback for errors
     @available(*, deprecated, message: "Use transcribeStream(audioData:options:onPartialResult:) instead")
     static func startStreamingTranscription(
-        options: STTOptions = STTOptions(),
-        onPartialResult: @escaping (STTTranscriptionResult) -> Void,
-        onFinalResult: @escaping (STTOutput) -> Void,
-        onError: @escaping (Error) -> Void
+        options _: STTOptions = STTOptions(),
+        onPartialResult _: @escaping (STTTranscriptionResult) -> Void,
+        onFinalResult _: @escaping (STTOutput) -> Void,
+        onError _: @escaping (Error) -> Void
     ) async throws {
         throw SDKError.stt(.streamingNotSupported, "Use transcribeStream(audioData:options:onPartialResult:) instead")
     }

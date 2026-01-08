@@ -338,14 +338,6 @@ public class AlamofireDownloadService: @unchecked Sendable {
         ])
     }
 
-    /// Get archive extension from artifact type
-    func getArchiveExtension(for artifactType: ModelArtifactType) -> String {
-        guard case .archive(let archiveType, _, _) = artifactType else {
-            return "archive"
-        }
-        return archiveType.fileExtension
-    }
-
     // MARK: - Helper Methods
 
     func mapAlamofireError(_ error: AFError) -> SDKError {

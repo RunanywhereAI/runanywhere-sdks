@@ -11,14 +11,16 @@ import java.util.UUID
 enum class MessageRole {
     USER,
     ASSISTANT,
-    SYSTEM;
+    SYSTEM,
+    ;
 
     val displayName: String
-        get() = when (this) {
-            USER -> "User"
-            ASSISTANT -> "Assistant"
-            SYSTEM -> "System"
-        }
+        get() =
+            when (this) {
+                USER -> "User"
+                ASSISTANT -> "Assistant"
+                SYSTEM -> "System"
+            }
 }
 
 /**
@@ -30,7 +32,7 @@ enum class CompletionStatus {
     COMPLETE,
     STREAMING,
     INTERRUPTED,
-    ERROR;
+    ERROR,
 }
 
 /**
@@ -40,7 +42,7 @@ enum class CompletionStatus {
 @Serializable
 enum class GenerationMode {
     STREAMING,
-    NON_STREAMING;
+    NON_STREAMING,
 }
 
 /**
@@ -73,11 +75,14 @@ data class MessageModelInfo(
  */
 @Serializable
 data class MessageAnalytics(
-    val timestamp: Long = System.currentTimeMillis(), // When the message was generated
+    /** When the message was generated */
+    val timestamp: Long = System.currentTimeMillis(),
     val inputTokens: Int = 0,
     val outputTokens: Int = 0,
-    val totalGenerationTime: Long = 0, // milliseconds
-    val timeToFirstToken: Long? = null, // milliseconds (nullable since not always available)
+    /** Total generation time in milliseconds */
+    val totalGenerationTime: Long = 0,
+    /** Time to first token in milliseconds (nullable since not always available) */
+    val timeToFirstToken: Long? = null,
     val averageTokensPerSecond: Double = 0.0,
     val wasThinkingMode: Boolean = false,
     val completionStatus: CompletionStatus = CompletionStatus.COMPLETE,
@@ -91,7 +96,8 @@ data class MessageAnalytics(
 data class ConversationAnalytics(
     val totalMessages: Int = 0,
     val totalTokens: Int = 0,
-    val totalDuration: Long = 0, // milliseconds
+    /** Total duration in milliseconds */
+    val totalDuration: Long = 0,
 )
 
 /**
@@ -101,11 +107,14 @@ data class ConversationAnalytics(
 @Serializable
 data class PerformanceSummary(
     val totalMessages: Int = 0,
-    val averageResponseTime: Double = 0.0, // seconds
+    /** Average response time in seconds */
+    val averageResponseTime: Double = 0.0,
     val averageTokensPerSecond: Double = 0.0,
     val totalTokensProcessed: Int = 0,
-    val thinkingModeUsage: Double = 0.0, // ratio 0-1
-    val successRate: Double = 1.0, // ratio 0-1
+    /** Thinking mode usage ratio (0-1) */
+    val thinkingModeUsage: Double = 0.0,
+    /** Success rate ratio (0-1) */
+    val successRate: Double = 1.0,
 )
 
 /**
@@ -131,7 +140,10 @@ data class ChatMessage(
         /**
          * Create a user message
          */
-        fun user(content: String, metadata: Map<String, String>? = null): ChatMessage =
+        fun user(
+            content: String,
+            metadata: Map<String, String>? = null,
+        ): ChatMessage =
             ChatMessage(
                 role = MessageRole.USER,
                 content = content,

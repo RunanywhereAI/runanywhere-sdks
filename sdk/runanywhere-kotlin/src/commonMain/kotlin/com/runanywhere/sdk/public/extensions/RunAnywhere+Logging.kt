@@ -16,7 +16,9 @@ import com.runanywhere.sdk.public.RunAnywhere
 /**
  * Log level for SDK logging.
  */
-enum class LogLevel(val value: Int) {
+enum class LogLevel(
+    val value: Int,
+) {
     /** No logging */
     NONE(0),
 
@@ -33,7 +35,7 @@ enum class LogLevel(val value: Int) {
     DEBUG(4),
 
     /** Verbose level logging (all messages) */
-    VERBOSE(5)
+    VERBOSE(5),
 }
 
 // MARK: - Logging Configuration

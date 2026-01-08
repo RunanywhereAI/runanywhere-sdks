@@ -17,13 +17,9 @@ import Foundation
 private actor VADStateManager {
     static let shared = VADStateManager()
 
-    var onSpeechActivity: ((SpeechActivityEvent) -> Void)?
     var onAudioBuffer: (([Float]) -> Void)?
+    // periphery:ignore - Retained to prevent deallocation while C callback is active
     var callbackContext: VADCallbackContext?
-
-    func setOnSpeechActivity(_ callback: ((SpeechActivityEvent) -> Void)?) {
-        onSpeechActivity = callback
-    }
 
     func setOnAudioBuffer(_ callback: (([Float]) -> Void)?) {
         onAudioBuffer = callback
@@ -159,8 +155,6 @@ public extension RunAnywhere {
     /// Set VAD speech activity callback
     /// - Parameter callback: Callback invoked when speech state changes
     static func setVADSpeechActivityCallback(_ callback: @escaping (SpeechActivityEvent) -> Void) async {
-        await VADStateManager.shared.setOnSpeechActivity(callback)
-
         guard let handle = try? await CppBridge.VAD.shared.getHandle() else { return }
 
         // Create callback context
@@ -191,7 +185,6 @@ public extension RunAnywhere {
     /// Cleanup VAD resources
     static func cleanupVAD() async {
         await CppBridge.VAD.shared.cleanup()
-        await VADStateManager.shared.setOnSpeechActivity(nil)
         await VADStateManager.shared.setOnAudioBuffer(nil)
         await VADStateManager.shared.setCallbackContext(nil)
     }

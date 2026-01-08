@@ -21,12 +21,14 @@ import kotlinx.serialization.Serializable
  * Mirrors Swift ModelSource exactly.
  */
 @Serializable
-enum class ModelSource(val value: String) {
+enum class ModelSource(
+    val value: String,
+) {
     /** Model info came from remote API (backend model catalog) */
     REMOTE("remote"),
 
     /** Model info was provided locally via SDK input (addModel calls) */
-    LOCAL("local")
+    LOCAL("local"),
 }
 
 // MARK: - Model Format
@@ -36,12 +38,14 @@ enum class ModelSource(val value: String) {
  * Mirrors Swift ModelFormat exactly.
  */
 @Serializable
-enum class ModelFormat(val value: String) {
+enum class ModelFormat(
+    val value: String,
+) {
     ONNX("onnx"),
     ORT("ort"),
     GGUF("gguf"),
     BIN("bin"),
-    UNKNOWN("unknown")
+    UNKNOWN("unknown"),
 }
 
 // MARK: - Model Selection Context
@@ -51,7 +55,9 @@ enum class ModelFormat(val value: String) {
  * Mirrors Swift ModelSelectionContext exactly.
  */
 @Serializable
-enum class ModelSelectionContext(val value: String) {
+enum class ModelSelectionContext(
+    val value: String,
+) {
     /** Select a language model (LLM) */
     LLM("llm"),
 
@@ -62,39 +68,47 @@ enum class ModelSelectionContext(val value: String) {
     TTS("tts"),
 
     /** Select models for voice agent (all 3 types) */
-    VOICE("voice");
+    VOICE("voice"),
+    ;
 
     /** Human-readable title for the selection context */
     val title: String
-        get() = when (this) {
-            LLM -> "Select LLM Model"
-            STT -> "Select STT Model"
-            TTS -> "Select TTS Voice"
-            VOICE -> "Select Voice Models"
-        }
+        get() =
+            when (this) {
+                LLM -> "Select LLM Model"
+                STT -> "Select STT Model"
+                TTS -> "Select TTS Voice"
+                VOICE -> "Select Voice Models"
+            }
 
     /** Check if a category is relevant for this selection context */
-    fun isCategoryRelevant(category: ModelCategory): Boolean = when (this) {
-        LLM -> category == ModelCategory.LANGUAGE
-        STT -> category == ModelCategory.SPEECH_RECOGNITION
-        TTS -> category == ModelCategory.SPEECH_SYNTHESIS
-        VOICE -> category == ModelCategory.LANGUAGE ||
-                 category == ModelCategory.SPEECH_RECOGNITION ||
-                 category == ModelCategory.SPEECH_SYNTHESIS
-    }
+    fun isCategoryRelevant(category: ModelCategory): Boolean =
+        when (this) {
+            LLM -> category == ModelCategory.LANGUAGE
+            STT -> category == ModelCategory.SPEECH_RECOGNITION
+            TTS -> category == ModelCategory.SPEECH_SYNTHESIS
+            VOICE ->
+                category == ModelCategory.LANGUAGE ||
+                    category == ModelCategory.SPEECH_RECOGNITION ||
+                    category == ModelCategory.SPEECH_SYNTHESIS
+        }
 
     /** Check if a framework is relevant for this selection context */
-    fun isFrameworkRelevant(framework: com.runanywhere.sdk.core.types.InferenceFramework): Boolean = when (this) {
-        LLM -> framework == com.runanywhere.sdk.core.types.InferenceFramework.LLAMA_CPP ||
-               framework == com.runanywhere.sdk.core.types.InferenceFramework.FOUNDATION_MODELS
-        STT -> framework == com.runanywhere.sdk.core.types.InferenceFramework.ONNX
-        TTS -> framework == com.runanywhere.sdk.core.types.InferenceFramework.ONNX ||
-               framework == com.runanywhere.sdk.core.types.InferenceFramework.SYSTEM_TTS ||
-               framework == com.runanywhere.sdk.core.types.InferenceFramework.FLUID_AUDIO
-        VOICE -> LLM.isFrameworkRelevant(framework) ||
-                 STT.isFrameworkRelevant(framework) ||
-                 TTS.isFrameworkRelevant(framework)
-    }
+    fun isFrameworkRelevant(framework: com.runanywhere.sdk.core.types.InferenceFramework): Boolean =
+        when (this) {
+            LLM ->
+                framework == com.runanywhere.sdk.core.types.InferenceFramework.LLAMA_CPP ||
+                    framework == com.runanywhere.sdk.core.types.InferenceFramework.FOUNDATION_MODELS
+            STT -> framework == com.runanywhere.sdk.core.types.InferenceFramework.ONNX
+            TTS ->
+                framework == com.runanywhere.sdk.core.types.InferenceFramework.ONNX ||
+                    framework == com.runanywhere.sdk.core.types.InferenceFramework.SYSTEM_TTS ||
+                    framework == com.runanywhere.sdk.core.types.InferenceFramework.FLUID_AUDIO
+            VOICE ->
+                LLM.isFrameworkRelevant(framework) ||
+                    STT.isFrameworkRelevant(framework) ||
+                    TTS.isFrameworkRelevant(framework)
+        }
 }
 
 // MARK: - Model Category
@@ -104,14 +118,17 @@ enum class ModelSelectionContext(val value: String) {
  * Mirrors Swift ModelCategory exactly.
  */
 @Serializable
-enum class ModelCategory(val value: String) {
-    LANGUAGE("language"),                   // Text-to-text models (LLMs)
+enum class ModelCategory(
+    val value: String,
+) {
+    LANGUAGE("language"), // Text-to-text models (LLMs)
     SPEECH_RECOGNITION("speech-recognition"), // Voice-to-text models (ASR)
-    SPEECH_SYNTHESIS("speech-synthesis"),     // Text-to-voice models (TTS)
-    VISION("vision"),                         // Image understanding models
-    IMAGE_GENERATION("image-generation"),     // Text-to-image models
-    MULTIMODAL("multimodal"),                 // Models that handle multiple modalities
-    AUDIO("audio");                           // Audio processing (diarization, etc.)
+    SPEECH_SYNTHESIS("speech-synthesis"), // Text-to-voice models (TTS)
+    VISION("vision"), // Image understanding models
+    IMAGE_GENERATION("image-generation"), // Text-to-image models
+    MULTIMODAL("multimodal"), // Models that handle multiple modalities
+    AUDIO("audio"), // Audio processing (diarization, etc.)
+    ;
 
     /** Whether this category typically requires context length */
     val requiresContextLength: Boolean
@@ -129,11 +146,14 @@ enum class ModelCategory(val value: String) {
  * Mirrors Swift ArchiveType exactly.
  */
 @Serializable
-enum class ArchiveType(val value: String) {
+enum class ArchiveType(
+    val value: String,
+) {
     ZIP("zip"),
     TAR_BZ2("tar.bz2"),
     TAR_GZ("tar.gz"),
-    TAR_XZ("tar.xz");
+    TAR_XZ("tar.xz"),
+    ;
 
     /** File extension for this archive type */
     val fileExtension: String get() = value
@@ -158,11 +178,13 @@ enum class ArchiveType(val value: String) {
  * Mirrors Swift ArchiveStructure exactly.
  */
 @Serializable
-enum class ArchiveStructure(val value: String) {
+enum class ArchiveStructure(
+    val value: String,
+) {
     SINGLE_FILE_NESTED("singleFileNested"),
     DIRECTORY_BASED("directoryBased"),
     NESTED_DIRECTORY("nestedDirectory"),
-    UNKNOWN("unknown")
+    UNKNOWN("unknown"),
 }
 
 // MARK: - Expected Model Files
@@ -175,7 +197,7 @@ enum class ArchiveStructure(val value: String) {
 data class ExpectedModelFiles(
     val requiredPatterns: List<String> = emptyList(),
     val optionalPatterns: List<String> = emptyList(),
-    val description: String? = null
+    val description: String? = null,
 ) {
     companion object {
         val NONE = ExpectedModelFiles()
@@ -190,7 +212,7 @@ data class ExpectedModelFiles(
 data class ModelFileDescriptor(
     val relativePath: String,
     val destinationPath: String,
-    val isRequired: Boolean = true
+    val isRequired: Boolean = true,
 )
 
 // MARK: - Model Artifact Type
@@ -202,20 +224,26 @@ data class ModelFileDescriptor(
 @Serializable
 sealed class ModelArtifactType {
     @Serializable
-    data class SingleFile(val expectedFiles: ExpectedModelFiles = ExpectedModelFiles.NONE) : ModelArtifactType()
+    data class SingleFile(
+        val expectedFiles: ExpectedModelFiles = ExpectedModelFiles.NONE,
+    ) : ModelArtifactType()
 
     @Serializable
     data class Archive(
         val archiveType: ArchiveType,
         val structure: ArchiveStructure,
-        val expectedFiles: ExpectedModelFiles = ExpectedModelFiles.NONE
+        val expectedFiles: ExpectedModelFiles = ExpectedModelFiles.NONE,
     ) : ModelArtifactType()
 
     @Serializable
-    data class MultiFile(val files: List<ModelFileDescriptor>) : ModelArtifactType()
+    data class MultiFile(
+        val files: List<ModelFileDescriptor>,
+    ) : ModelArtifactType()
 
     @Serializable
-    data class Custom(val strategyId: String) : ModelArtifactType()
+    data class Custom(
+        val strategyId: String,
+    ) : ModelArtifactType()
 
     @Serializable
     data object BuiltIn : ModelArtifactType()
@@ -227,24 +255,28 @@ sealed class ModelArtifactType {
         get() = this !is BuiltIn
 
     val expectedFilesValue: ExpectedModelFiles
-        get() = when (this) {
-            is SingleFile -> expectedFiles
-            is Archive -> expectedFiles
-            else -> ExpectedModelFiles.NONE
-        }
+        get() =
+            when (this) {
+                is SingleFile -> expectedFiles
+                is Archive -> expectedFiles
+                else -> ExpectedModelFiles.NONE
+            }
 
     val displayName: String
-        get() = when (this) {
-            is SingleFile -> "Single File"
-            is Archive -> "${archiveType.value.uppercase()} Archive"
-            is MultiFile -> "Multi-File (${files.size} files)"
-            is Custom -> "Custom ($strategyId)"
-            is BuiltIn -> "Built-in"
-        }
+        get() =
+            when (this) {
+                is SingleFile -> "Single File"
+                is Archive -> "${archiveType.value.uppercase()} Archive"
+                is MultiFile -> "Multi-File (${files.size} files)"
+                is Custom -> "Custom ($strategyId)"
+                is BuiltIn -> "Built-in"
+            }
 
     companion object {
         /** Infer artifact type from download URL */
+        @Suppress("UNUSED_PARAMETER")
         fun infer(url: String?, format: ModelFormat): ModelArtifactType {
+            // format parameter reserved for future use when format-specific inference is needed
             if (url == null) return SingleFile()
             val archiveType = ArchiveType.from(url)
             return if (archiveType != null) {
@@ -268,33 +300,26 @@ data class ModelInfo(
     val id: String,
     val name: String,
     val category: ModelCategory,
-
     // Format and location
     val format: ModelFormat,
     val downloadURL: String? = null,
     var localPath: String? = null,
-
     // Artifact type
     val artifactType: ModelArtifactType = ModelArtifactType.SingleFile(),
-
     // Size information
     val downloadSize: Long? = null,
-
     // Framework
     val framework: com.runanywhere.sdk.core.types.InferenceFramework,
-
     // Model-specific capabilities
     val contextLength: Int? = null,
     val supportsThinking: Boolean = false,
     val thinkingPattern: ThinkingTagPattern? = null,
-
     // Optional metadata
     val description: String? = null,
-
     // Tracking fields
     val source: ModelSource = ModelSource.REMOTE,
     val createdAt: Long = System.currentTimeMillis(),
-    var updatedAt: Long = System.currentTimeMillis()
+    var updatedAt: Long = System.currentTimeMillis(),
 ) {
     /** Whether this model is downloaded and available locally */
     val isDownloaded: Boolean
@@ -315,7 +340,7 @@ data class ModelInfo(
             val path = localPath
             if (path != null && path.startsWith("builtin://")) return true
             return framework == com.runanywhere.sdk.core.types.InferenceFramework.FOUNDATION_MODELS ||
-                    framework == com.runanywhere.sdk.core.types.InferenceFramework.SYSTEM_TTS
+                framework == com.runanywhere.sdk.core.types.InferenceFramework.SYSTEM_TTS
         }
 }
 
@@ -328,21 +353,16 @@ data class ModelInfo(
 data class DownloadProgress(
     /** Model ID being downloaded */
     val modelId: String,
-
     /** Progress percentage (0.0 to 1.0) */
     val progress: Float,
-
     /** Bytes downloaded so far */
     val bytesDownloaded: Long,
-
     /** Total bytes to download (null if unknown) */
     val totalBytes: Long?,
-
     /** Download state */
     val state: DownloadState,
-
     /** Error message if state is ERROR */
-    val error: String? = null
+    val error: String? = null,
 )
 
 /**
@@ -355,5 +375,5 @@ enum class DownloadState {
     EXTRACTING,
     COMPLETED,
     ERROR,
-    CANCELLED
+    CANCELLED,
 }

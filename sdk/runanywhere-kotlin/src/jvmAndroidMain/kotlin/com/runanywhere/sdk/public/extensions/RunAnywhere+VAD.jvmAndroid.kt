@@ -28,7 +28,7 @@ actual suspend fun RunAnywhere.detectVoiceActivity(audioData: ByteArray): VADRes
         isSpeech = frameResult.isSpeech,
         confidence = frameResult.probability,
         energyLevel = 0f, // Not directly available from frame result
-        statistics = null
+        statistics = null,
     )
 }
 
@@ -52,7 +52,7 @@ actual suspend fun RunAnywhere.getVADStatistics(): VADStatistics {
         threshold = 0.5f,
         ambient = 0f,
         recentAvg = 0f,
-        recentMax = 0f
+        recentMax = 0f,
     )
 }
 
@@ -65,7 +65,7 @@ actual fun RunAnywhere.streamVAD(audioSamples: Flow<FloatArray>): Flow<VADResult
             isSpeech = frameResult.isSpeech,
             confidence = frameResult.probability,
             energyLevel = 0f,
-            statistics = null
+            statistics = null,
         )
     }
 }

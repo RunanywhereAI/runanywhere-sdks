@@ -81,6 +81,7 @@ object LlamaCPP : RunAnywhereModule {
      *
      * @param priority Ignored (C++ uses its own priority system)
      */
+    @Suppress("UNUSED_PARAMETER")
     @JvmStatic
     @JvmOverloads
     fun register(priority: Int = defaultPriority) {

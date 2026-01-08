@@ -177,22 +177,6 @@ extension ModelArtifactType {
         return info
     }
 
-    /// Convert to C++ artifact type kind (legacy - use toCInfo() for full conversion)
-    func toC() -> rac_artifact_type_kind_t {
-        switch self {
-        case .singleFile:
-            return RAC_ARTIFACT_KIND_SINGLE_FILE
-        case .archive:
-            return RAC_ARTIFACT_KIND_ARCHIVE
-        case .multiFile:
-            return RAC_ARTIFACT_KIND_MULTI_FILE
-        case .custom:
-            return RAC_ARTIFACT_KIND_CUSTOM
-        case .builtIn:
-            return RAC_ARTIFACT_KIND_BUILT_IN
-        }
-    }
-
     /// Initialize from C++ artifact info
     init(from cArtifact: rac_model_artifact_info_t) {
         switch cArtifact.kind {

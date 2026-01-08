@@ -42,8 +42,6 @@ import Foundation
 /// let response = try await RunAnywhere.chat("Hello!")
 /// ```
 public enum SystemFoundationModels: RunAnywhereModule {
-    private static let logger = SDKLogger(category: "SystemFoundationModels")
-
     // MARK: - RunAnywhereModule Conformance
 
     public static let moduleId = "system-foundation-models"

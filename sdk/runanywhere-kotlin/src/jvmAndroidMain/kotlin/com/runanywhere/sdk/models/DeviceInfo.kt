@@ -23,9 +23,9 @@ private fun isAndroid(): Boolean {
     val javaVmName = System.getProperty("java.vm.name") ?: ""
     val javaVendor = System.getProperty("java.vendor") ?: ""
     return javaVmName.contains("Dalvik", ignoreCase = true) ||
-            javaVmName.contains("Art", ignoreCase = true) ||
-            javaVendor.contains("Android", ignoreCase = true) ||
-            System.getProperty("java.specification.vendor")?.contains("Android", ignoreCase = true) == true
+        javaVmName.contains("Art", ignoreCase = true) ||
+        javaVendor.contains("Android", ignoreCase = true) ||
+        System.getProperty("java.specification.vendor")?.contains("Android", ignoreCase = true) == true
 }
 
 /**
@@ -45,13 +45,14 @@ private fun collectAndroidDeviceInfo(): DeviceInfo {
         val release = versionClass.getField("RELEASE").get(null) as? String ?: "Unknown"
 
         // Get supported ABIs
-        val supportedAbis = try {
-            @Suppress("UNCHECKED_CAST")
-            val abis = buildClass.getField("SUPPORTED_ABIS").get(null) as? Array<String>
-            abis?.firstOrNull() ?: "unknown"
-        } catch (e: Exception) {
-            "unknown"
-        }
+        val supportedAbis =
+            try {
+                @Suppress("UNCHECKED_CAST")
+                val abis = buildClass.getField("SUPPORTED_ABIS").get(null) as? Array<String>
+                abis?.firstOrNull() ?: "unknown"
+            } catch (e: Exception) {
+                "unknown"
+            }
 
         val runtime = Runtime.getRuntime()
         val totalMemory = runtime.maxMemory()
@@ -67,7 +68,7 @@ private fun collectAndroidDeviceInfo(): DeviceInfo {
             deviceType = "mobile",
             formFactor = "phone",
             totalMemory = totalMemory,
-            processorCount = processorCount
+            processorCount = processorCount,
         )
     } catch (e: Exception) {
         // Fallback to basic JVM detection if reflection fails
@@ -83,12 +84,13 @@ private fun collectJvmDeviceInfo(): DeviceInfo {
     val osVersion = System.getProperty("os.version") ?: "Unknown"
     val osArch = System.getProperty("os.arch") ?: "Unknown"
 
-    val platform = when {
-        osName.contains("Mac", ignoreCase = true) -> "macOS"
-        osName.contains("Windows", ignoreCase = true) -> "Windows"
-        osName.contains("Linux", ignoreCase = true) -> "Linux"
-        else -> "JVM"
-    }
+    val platform =
+        when {
+            osName.contains("Mac", ignoreCase = true) -> "macOS"
+            osName.contains("Windows", ignoreCase = true) -> "Windows"
+            osName.contains("Linux", ignoreCase = true) -> "Linux"
+            else -> "JVM"
+        }
 
     val runtime = Runtime.getRuntime()
     val totalMemory = runtime.maxMemory()
@@ -104,7 +106,7 @@ private fun collectJvmDeviceInfo(): DeviceInfo {
         deviceType = "desktop",
         formFactor = "desktop",
         totalMemory = totalMemory,
-        processorCount = processorCount
+        processorCount = processorCount,
     )
 }
 
@@ -115,23 +117,26 @@ private fun generateDeviceId(): String {
     return try {
         // Try to use MAC address for stable device ID (works on JVM, may fail on Android)
         val networkInterfaces = NetworkInterface.getNetworkInterfaces()
-        val macAddresses = networkInterfaces?.asSequence()
-            ?.mapNotNull { it.hardwareAddress }
-            ?.filter { it.isNotEmpty() }
-            ?.map { it.joinToString(":") { byte -> "%02X".format(byte) } }
-            ?.toList() ?: emptyList()
+        val macAddresses =
+            networkInterfaces
+                ?.asSequence()
+                ?.mapNotNull { it.hardwareAddress }
+                ?.filter { it.isNotEmpty() }
+                ?.map { it.joinToString(":") { byte -> "%02X".format(byte) } }
+                ?.toList() ?: emptyList()
 
         if (macAddresses.isNotEmpty()) {
             val combinedMac = macAddresses.sorted().joinToString("-")
             hashString(combinedMac)
         } else {
             // Fallback to system properties
-            val systemInfo = listOf(
-                System.getProperty("os.name"),
-                System.getProperty("os.arch"),
-                System.getProperty("user.name"),
-                System.getProperty("user.home")
-            ).filterNotNull().joinToString("-")
+            val systemInfo =
+                listOf(
+                    System.getProperty("os.name"),
+                    System.getProperty("os.arch"),
+                    System.getProperty("user.name"),
+                    System.getProperty("user.home"),
+                ).filterNotNull().joinToString("-")
             if (systemInfo.isNotEmpty()) {
                 hashString(systemInfo)
             } else {

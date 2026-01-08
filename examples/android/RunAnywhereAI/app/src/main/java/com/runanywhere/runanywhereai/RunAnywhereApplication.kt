@@ -137,7 +137,7 @@ class RunAnywhereApplication : Application() {
                 )
                 Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode (production config not set)")
             }
-            
+
             // Phase 2: Complete services initialization (device registration, etc.)
             // This triggers device registration with the backend
             kotlinx.coroutines.runBlocking {
@@ -156,7 +156,7 @@ class RunAnywhereApplication : Application() {
                     environment = SDKEnvironment.DEVELOPMENT,
                 )
                 Log.i("RunAnywhereApp", "✅ SDK initialized in OFFLINE mode (local models only)")
-                
+
                 // Still try Phase 2 in offline mode
                 kotlinx.coroutines.runBlocking {
                     RunAnywhere.completeServicesInitialization()
@@ -240,42 +240,42 @@ class RunAnywhereApplication : Application() {
             name = "SmolLM2 360M Q8_0",
             url = "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
             framework = InferenceFramework.LLAMA_CPP,
-            memoryRequirement = 500_000_000
+            memoryRequirement = 500_000_000,
         )
         RunAnywhere.registerModel(
             id = "llama-2-7b-chat-q4_k_m",
             name = "Llama 2 7B Chat Q4_K_M",
             url = "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf",
             framework = InferenceFramework.LLAMA_CPP,
-            memoryRequirement = 4_000_000_000
+            memoryRequirement = 4_000_000_000,
         )
         RunAnywhere.registerModel(
             id = "mistral-7b-instruct-q4_k_m",
             name = "Mistral 7B Instruct Q4_K_M",
             url = "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf",
             framework = InferenceFramework.LLAMA_CPP,
-            memoryRequirement = 4_000_000_000
+            memoryRequirement = 4_000_000_000,
         )
         RunAnywhere.registerModel(
             id = "qwen2.5-0.5b-instruct-q6_k",
             name = "Qwen 2.5 0.5B Instruct Q6_K",
             url = "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
             framework = InferenceFramework.LLAMA_CPP,
-            memoryRequirement = 600_000_000
+            memoryRequirement = 600_000_000,
         )
         RunAnywhere.registerModel(
             id = "lfm2-350m-q4_k_m",
             name = "LiquidAI LFM2 350M Q4_K_M",
             url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
             framework = InferenceFramework.LLAMA_CPP,
-            memoryRequirement = 250_000_000
+            memoryRequirement = 250_000_000,
         )
         RunAnywhere.registerModel(
             id = "lfm2-350m-q8_0",
             name = "LiquidAI LFM2 350M Q8_0",
             url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
             framework = InferenceFramework.LLAMA_CPP,
-            memoryRequirement = 400_000_000
+            memoryRequirement = 400_000_000,
         )
         Log.i("RunAnywhereApp", "✅ LLM models registered")
 
@@ -287,7 +287,7 @@ class RunAnywhereApplication : Application() {
             url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz",
             framework = InferenceFramework.ONNX,
             modality = ModelCategory.SPEECH_RECOGNITION,
-            memoryRequirement = 75_000_000
+            memoryRequirement = 75_000_000,
         )
         RunAnywhere.registerModel(
             id = "vits-piper-en_US-lessac-medium",
@@ -295,7 +295,7 @@ class RunAnywhereApplication : Application() {
             url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz",
             framework = InferenceFramework.ONNX,
             modality = ModelCategory.SPEECH_SYNTHESIS,
-            memoryRequirement = 65_000_000
+            memoryRequirement = 65_000_000,
         )
         RunAnywhere.registerModel(
             id = "vits-piper-en_GB-alba-medium",
@@ -303,7 +303,7 @@ class RunAnywhereApplication : Application() {
             url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz",
             framework = InferenceFramework.ONNX,
             modality = ModelCategory.SPEECH_SYNTHESIS,
-            memoryRequirement = 65_000_000
+            memoryRequirement = 65_000_000,
         )
         Log.i("RunAnywhereApp", "✅ ONNX STT/TTS models registered")
 

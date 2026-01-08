@@ -55,9 +55,10 @@ version = "0.1.4"
 // =============================================================================
 // IMPORTANT: Check rootProject first to support composite builds (e.g., when SDK is included from example app)
 // This ensures the app's gradle.properties takes precedence over the SDK's default
-val testLocal: Boolean = rootProject.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
-    ?: project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
-    ?: false
+val testLocal: Boolean =
+    rootProject.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
+        ?: project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
+        ?: false
 
 // Version constants for remote downloads (mirrors Swift's Package.swift)
 // These should match the releases at:
@@ -67,12 +68,14 @@ val testLocal: Boolean = rootProject.findProperty("runanywhere.testLocal")?.toSt
 // Version defaults must match GitHub releases:
 // - Commons: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/commons-v{commonsVersion}
 // - Backends: https://github.com/RunanywhereAI/runanywhere-binaries/releases/tag/core-v{coreVersion}
-val coreVersion: String = rootProject.findProperty("runanywhere.coreVersion")?.toString()
-    ?: project.findProperty("runanywhere.coreVersion")?.toString()
-    ?: "0.1.4"
-val commonsVersion: String = rootProject.findProperty("runanywhere.commonsVersion")?.toString()
-    ?: project.findProperty("runanywhere.commonsVersion")?.toString()
-    ?: "0.1.4"
+val coreVersion: String =
+    rootProject.findProperty("runanywhere.coreVersion")?.toString()
+        ?: project.findProperty("runanywhere.coreVersion")?.toString()
+        ?: "0.1.4"
+val commonsVersion: String =
+    rootProject.findProperty("runanywhere.commonsVersion")?.toString()
+        ?: project.findProperty("runanywhere.commonsVersion")?.toString()
+        ?: "0.1.4"
 
 // Log the build mode
 logger.lifecycle("RunAnywhere SDK: testLocal=$testLocal, coreVersion=$coreVersion")
@@ -275,7 +278,7 @@ android {
             // IMPORTANT: Use only ONE jniLibs directory to avoid duplicates
             // Clear any default directories and set only the one we want
             jniLibs.setSrcDirs(
-                listOf(if (testLocal) "src/androidMain/jniLibs" else "build/jniLibs")
+                listOf(if (testLocal) "src/androidMain/jniLibs" else "build/jniLibs"),
             )
         }
     }
@@ -313,8 +316,9 @@ tasks.register<Exec>("buildLocalJniLibs") {
     commandLine("bash", buildScript.absolutePath, "--clean")
 
     // Set environment
-    environment("ANDROID_NDK_HOME",
-        System.getenv("ANDROID_NDK_HOME") ?: "${System.getProperty("user.home")}/Library/Android/sdk/ndk/27.0.12077973"
+    environment(
+        "ANDROID_NDK_HOME",
+        System.getenv("ANDROID_NDK_HOME") ?: "${System.getProperty("user.home")}/Library/Android/sdk/ndk/27.0.12077973",
     )
 
     doFirst {
@@ -399,14 +403,15 @@ tasks.register("downloadJniLibs") {
     val commonsBaseUrl = "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v$commonsVersion"
 
     // Packages to download - ORDER MATTERS: Commons first, then backends
-    val packages = listOf(
-        // Commons (RAC infrastructure - must be downloaded first)
-        "$commonsBaseUrl/RACommons-android-v$commonsVersion.zip",
-        // LlamaCPP backend (LLM inference)
-        "$binariesBaseUrl/RABackendLlamaCPP-android-v$coreVersion.zip",
-        // ONNX backend (STT/TTS/VAD)
-        "$binariesBaseUrl/RABackendONNX-android-v$coreVersion.zip"
-    )
+    val packages =
+        listOf(
+            // Commons (RAC infrastructure - must be downloaded first)
+            "$commonsBaseUrl/RACommons-android-v$commonsVersion.zip",
+            // LlamaCPP backend (LLM inference)
+            "$binariesBaseUrl/RABackendLlamaCPP-android-v$coreVersion.zip",
+            // ONNX backend (STT/TTS/VAD)
+            "$binariesBaseUrl/RABackendONNX-android-v$coreVersion.zip",
+        )
 
     outputs.dir(outputDir)
 
@@ -454,7 +459,8 @@ tasks.register("downloadJniLibs") {
                 }
 
                 // Copy all .so files from ABI directories
-                extractDir.walkTopDown()
+                extractDir
+                    .walkTopDown()
                     .filter { it.isDirectory && it.name in listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86") }
                     .forEach { abiDir ->
                         val targetAbiDir = file("$outputDir/${abiDir.name}")
@@ -475,7 +481,6 @@ tasks.register("downloadJniLibs") {
 
                 logger.lifecycle("  ✓ $packageName extracted")
                 logger.lifecycle("")
-
             } catch (e: Exception) {
                 logger.warn("  ⚠ Failed to download $packageName: ${e.message}")
                 logger.warn("    URL: $zipUrl")

@@ -25,12 +25,10 @@ import kotlinx.serialization.Serializable
 data class DeviceStorageInfo(
     /** Total device storage space in bytes */
     val totalSpace: Long,
-
     /** Free space available in bytes */
     val freeSpace: Long,
-
     /** Used space in bytes */
-    val usedSpace: Long
+    val usedSpace: Long,
 ) {
     /** Percentage of storage used (0-100) */
     val usagePercentage: Double
@@ -47,15 +45,12 @@ data class DeviceStorageInfo(
 data class AppStorageInfo(
     /** Documents directory size in bytes */
     val documentsSize: Long,
-
     /** Cache directory size in bytes */
     val cacheSize: Long,
-
     /** Application Support directory size in bytes */
     val appSupportSize: Long,
-
     /** Total app storage in bytes */
-    val totalSize: Long
+    val totalSize: Long,
 )
 
 // MARK: - Model Storage Metrics
@@ -71,9 +66,8 @@ data class AppStorageInfo(
 data class ModelStorageMetrics(
     /** The model info (contains id, framework, localPath, artifactType, etc.) */
     val model: ModelInfo,
-
     /** Actual size on disk in bytes (may differ from downloadSize after extraction) */
-    val sizeOnDisk: Long
+    val sizeOnDisk: Long,
 )
 
 // MARK: - Stored Model (Backward Compatible)
@@ -88,9 +82,8 @@ data class ModelStorageMetrics(
 data class StoredModel(
     /** Underlying model info */
     val modelInfo: ModelInfo,
-
     /** Size on disk in bytes */
-    val size: Long
+    val size: Long,
 ) {
     /** Model ID */
     val id: String get() = modelInfo.id
@@ -118,10 +111,11 @@ data class StoredModel(
 
     companion object {
         /** Create from ModelStorageMetrics */
-        fun from(metrics: ModelStorageMetrics) = StoredModel(
-            modelInfo = metrics.model,
-            size = metrics.sizeOnDisk
-        )
+        fun from(metrics: ModelStorageMetrics) =
+            StoredModel(
+                modelInfo = metrics.model,
+                size = metrics.sizeOnDisk,
+            )
     }
 }
 
@@ -135,12 +129,10 @@ data class StoredModel(
 data class StorageInfo(
     /** App storage usage */
     val appStorage: AppStorageInfo,
-
     /** Device storage capacity */
     val deviceStorage: DeviceStorageInfo,
-
     /** Storage metrics for each downloaded model */
-    val models: List<ModelStorageMetrics>
+    val models: List<ModelStorageMetrics>,
 ) {
     /** Total size of all models */
     val totalModelsSize: Long
@@ -156,20 +148,23 @@ data class StorageInfo(
 
     companion object {
         /** Empty storage info */
-        val EMPTY = StorageInfo(
-            appStorage = AppStorageInfo(
-                documentsSize = 0,
-                cacheSize = 0,
-                appSupportSize = 0,
-                totalSize = 0
-            ),
-            deviceStorage = DeviceStorageInfo(
-                totalSpace = 0,
-                freeSpace = 0,
-                usedSpace = 0
-            ),
-            models = emptyList()
-        )
+        val EMPTY =
+            StorageInfo(
+                appStorage =
+                    AppStorageInfo(
+                        documentsSize = 0,
+                        cacheSize = 0,
+                        appSupportSize = 0,
+                        totalSize = 0,
+                    ),
+                deviceStorage =
+                    DeviceStorageInfo(
+                        totalSpace = 0,
+                        freeSpace = 0,
+                        usedSpace = 0,
+                    ),
+                models = emptyList(),
+            )
     }
 }
 
@@ -183,16 +178,12 @@ data class StorageInfo(
 data class StorageAvailability(
     /** Whether storage is available for the requested operation */
     val isAvailable: Boolean,
-
     /** Required space in bytes */
     val requiredSpace: Long,
-
     /** Available space in bytes */
     val availableSpace: Long,
-
     /** Whether there's a warning (e.g., low space) */
     val hasWarning: Boolean,
-
     /** Recommendation message if any */
-    val recommendation: String?
+    val recommendation: String?,
 )

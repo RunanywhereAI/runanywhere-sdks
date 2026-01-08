@@ -24,25 +24,22 @@ import kotlinx.serialization.Serializable
 data class VoiceAgentResult(
     /** Whether speech was detected in the input audio */
     var speechDetected: Boolean = false,
-
     /** Transcribed text from STT */
     var transcription: String? = null,
-
     /** Generated response text from LLM */
     var response: String? = null,
-
     /** Synthesized audio data from TTS */
     @Serializable(with = ByteArraySerializer::class)
-    var synthesizedAudio: ByteArray? = null
+    var synthesizedAudio: ByteArray? = null,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other == null || this::class != other::class) return false
         other as VoiceAgentResult
         return speechDetected == other.speechDetected &&
-                transcription == other.transcription &&
-                response == other.response &&
-                synthesizedAudio.contentEquals(other.synthesizedAudio)
+            transcription == other.transcription &&
+            response == other.response &&
+            synthesizedAudio.contentEquals(other.synthesizedAudio)
     }
 
     override fun hashCode(): Int {
@@ -58,10 +55,11 @@ data class VoiceAgentResult(
  * Custom serializer for ByteArray (null-safe).
  */
 object ByteArraySerializer : kotlinx.serialization.KSerializer<ByteArray?> {
-    override val descriptor = kotlinx.serialization.descriptors.PrimitiveSerialDescriptor(
-        "ByteArray",
-        kotlinx.serialization.descriptors.PrimitiveKind.STRING
-    )
+    override val descriptor =
+        kotlinx.serialization.descriptors.PrimitiveSerialDescriptor(
+            "ByteArray",
+            kotlinx.serialization.descriptors.PrimitiveKind.STRING,
+        )
 
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ByteArray?) {
         if (value != null) {
@@ -86,9 +84,16 @@ object ByteArraySerializer : kotlinx.serialization.KSerializer<ByteArray?> {
  */
 sealed class ComponentLoadState {
     data object NotLoaded : ComponentLoadState()
+
     data object Loading : ComponentLoadState()
-    data class Loaded(val loadedModelId: String) : ComponentLoadState()
-    data class Error(val message: String) : ComponentLoadState()
+
+    data class Loaded(
+        val loadedModelId: String,
+    ) : ComponentLoadState()
+
+    data class Error(
+        val message: String,
+    ) : ComponentLoadState()
 
     /** Whether the component is currently loaded and ready to use */
     val isLoaded: Boolean get() = this is Loaded
@@ -110,12 +115,10 @@ sealed class ComponentLoadState {
 data class VoiceAgentComponentStates(
     /** Speech-to-Text component state */
     val stt: ComponentLoadState = ComponentLoadState.NotLoaded,
-
     /** Large Language Model component state */
     val llm: ComponentLoadState = ComponentLoadState.NotLoaded,
-
     /** Text-to-Speech component state */
-    val tts: ComponentLoadState = ComponentLoadState.NotLoaded
+    val tts: ComponentLoadState = ComponentLoadState.NotLoaded,
 ) {
     /** Whether all components are loaded and the voice agent is ready to use */
     val isFullyReady: Boolean
@@ -127,11 +130,12 @@ data class VoiceAgentComponentStates(
 
     /** Get a summary of which components are missing */
     val missingComponents: List<String>
-        get() = buildList {
-            if (!stt.isLoaded) add("STT")
-            if (!llm.isLoaded) add("LLM")
-            if (!tts.isLoaded) add("TTS")
-        }
+        get() =
+            buildList {
+                if (!stt.isLoaded) add("STT")
+                if (!llm.isLoaded) add("LLM")
+                if (!tts.isLoaded) add("TTS")
+            }
 }
 
 // MARK: - Voice Agent Configuration
@@ -146,21 +150,16 @@ data class VoiceAgentComponentStates(
 data class VoiceAgentConfiguration(
     /** STT model ID (optional - uses currently loaded model if null) */
     val sttModelId: String? = null,
-
     /** LLM model ID (optional - uses currently loaded model if null) */
     val llmModelId: String? = null,
-
     /** TTS voice (optional - uses currently loaded voice if null) */
     val ttsVoice: String? = null,
-
     /** VAD sample rate */
     val vadSampleRate: Int = 16000,
-
     /** VAD frame length in seconds */
     val vadFrameLength: Float = 0.1f,
-
     /** VAD energy threshold */
-    val vadEnergyThreshold: Float = 0.005f
+    val vadEnergyThreshold: Float = 0.005f,
 )
 
 // MARK: - Voice Session Events
@@ -174,7 +173,9 @@ sealed class VoiceSessionEvent {
     data object Started : VoiceSessionEvent()
 
     /** Listening for speech with current audio level (0.0 - 1.0) */
-    data class Listening(val audioLevel: Float) : VoiceSessionEvent()
+    data class Listening(
+        val audioLevel: Float,
+    ) : VoiceSessionEvent()
 
     /** Speech detected, started accumulating audio */
     data object SpeechStarted : VoiceSessionEvent()
@@ -183,10 +184,14 @@ sealed class VoiceSessionEvent {
     data object Processing : VoiceSessionEvent()
 
     /** Got transcription from STT */
-    data class Transcribed(val text: String) : VoiceSessionEvent()
+    data class Transcribed(
+        val text: String,
+    ) : VoiceSessionEvent()
 
     /** Got response from LLM */
-    data class Responded(val text: String) : VoiceSessionEvent()
+    data class Responded(
+        val text: String,
+    ) : VoiceSessionEvent()
 
     /** Playing TTS audio */
     data object Speaking : VoiceSessionEvent()
@@ -195,15 +200,15 @@ sealed class VoiceSessionEvent {
     data class TurnCompleted(
         val transcript: String,
         val response: String,
-        val audio: ByteArray?
+        val audio: ByteArray?,
     ) : VoiceSessionEvent() {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
             if (other == null || this::class != other::class) return false
             other as TurnCompleted
             return transcript == other.transcript &&
-                    response == other.response &&
-                    audio.contentEquals(other.audio)
+                response == other.response &&
+                audio.contentEquals(other.audio)
         }
 
         override fun hashCode(): Int {
@@ -218,7 +223,9 @@ sealed class VoiceSessionEvent {
     data object Stopped : VoiceSessionEvent()
 
     /** Error occurred */
-    data class Error(val message: String) : VoiceSessionEvent()
+    data class Error(
+        val message: String,
+    ) : VoiceSessionEvent()
 }
 
 // MARK: - Voice Session Configuration
@@ -231,15 +238,12 @@ sealed class VoiceSessionEvent {
 data class VoiceSessionConfig(
     /** Silence duration (seconds) before processing speech */
     var silenceDuration: Double = 1.5,
-
     /** Minimum audio level to detect speech (0.0 - 1.0) */
     var speechThreshold: Float = 0.1f,
-
     /** Whether to auto-play TTS response */
     var autoPlayTTS: Boolean = true,
-
     /** Whether to auto-resume listening after TTS playback */
-    var continuousMode: Boolean = true
+    var continuousMode: Boolean = true,
 ) {
     companion object {
         /** Default configuration */
@@ -255,17 +259,14 @@ data class VoiceSessionConfig(
  */
 sealed class VoiceSessionError : Exception() {
     data object MicrophonePermissionDenied : VoiceSessionError() {
-        private fun readResolve(): Any = MicrophonePermissionDenied
         override val message: String = "Microphone permission denied"
     }
 
     data object NotReady : VoiceSessionError() {
-        private fun readResolve(): Any = NotReady
         override val message: String = "Voice agent not ready. Load STT, LLM, and TTS models first."
     }
 
     data object AlreadyRunning : VoiceSessionError() {
-        private fun readResolve(): Any = AlreadyRunning
         override val message: String = "Voice session already running"
     }
 }

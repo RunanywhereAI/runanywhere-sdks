@@ -13,7 +13,6 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
-import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
@@ -29,20 +28,19 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
  * - Download status is updated via [updateDownloadStatus]
  */
 object CppBridgeModelRegistry {
-
     private const val TAG = "CppBridge/CppBridgeModelRegistry"
 
     /**
      * Model category constants matching C++ RAC_MODEL_CATEGORY_* values.
      */
     object ModelCategory {
-        const val LANGUAGE = 0           // RAC_MODEL_CATEGORY_LANGUAGE
+        const val LANGUAGE = 0 // RAC_MODEL_CATEGORY_LANGUAGE
         const val SPEECH_RECOGNITION = 1 // RAC_MODEL_CATEGORY_SPEECH_RECOGNITION
-        const val SPEECH_SYNTHESIS = 2   // RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS
-        const val AUDIO = 3              // RAC_MODEL_CATEGORY_AUDIO
-        const val VISION = 4             // RAC_MODEL_CATEGORY_VISION
-        const val IMAGE_GENERATION = 5   // RAC_MODEL_CATEGORY_IMAGE_GENERATION
-        const val MULTIMODAL = 6         // RAC_MODEL_CATEGORY_MULTIMODAL
+        const val SPEECH_SYNTHESIS = 2 // RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS
+        const val AUDIO = 3 // RAC_MODEL_CATEGORY_AUDIO
+        const val VISION = 4 // RAC_MODEL_CATEGORY_VISION
+        const val IMAGE_GENERATION = 5 // RAC_MODEL_CATEGORY_IMAGE_GENERATION
+        const val MULTIMODAL = 6 // RAC_MODEL_CATEGORY_MULTIMODAL
     }
 
     /**
@@ -59,27 +57,28 @@ object CppBridgeModelRegistry {
         /**
          * Get display name for a model type.
          */
-        fun getName(type: Int): String = when (type) {
-            LLM -> "LLM"
-            STT -> "STT"
-            TTS -> "TTS"
-            VAD -> "VAD"
-            EMBEDDING -> "EMBEDDING"
-            else -> "UNKNOWN"
-        }
+        fun getName(type: Int): String =
+            when (type) {
+                LLM -> "LLM"
+                STT -> "STT"
+                TTS -> "TTS"
+                VAD -> "VAD"
+                EMBEDDING -> "EMBEDDING"
+                else -> "UNKNOWN"
+            }
     }
 
     /**
      * Model format constants matching C++ RAC_MODEL_FORMAT_* values.
      */
     object ModelFormat {
-        const val UNKNOWN = 0   // RAC_MODEL_FORMAT_UNKNOWN
-        const val GGUF = 1      // RAC_MODEL_FORMAT_GGUF
-        const val ONNX = 2      // RAC_MODEL_FORMAT_ONNX
-        const val ORT = 3       // RAC_MODEL_FORMAT_ORT
-        const val BIN = 4       // RAC_MODEL_FORMAT_BIN
-        const val COREML = 5    // RAC_MODEL_FORMAT_COREML
-        const val TFLITE = 6    // RAC_MODEL_FORMAT_TFLITE
+        const val UNKNOWN = 0 // RAC_MODEL_FORMAT_UNKNOWN
+        const val GGUF = 1 // RAC_MODEL_FORMAT_GGUF
+        const val ONNX = 2 // RAC_MODEL_FORMAT_ONNX
+        const val ORT = 3 // RAC_MODEL_FORMAT_ORT
+        const val BIN = 4 // RAC_MODEL_FORMAT_BIN
+        const val COREML = 5 // RAC_MODEL_FORMAT_COREML
+        const val TFLITE = 6 // RAC_MODEL_FORMAT_TFLITE
     }
 
     /**
@@ -87,14 +86,14 @@ object CppBridgeModelRegistry {
      * IMPORTANT: Must match rac_model_types.h exactly!
      */
     object Framework {
-        const val ONNX = 0               // RAC_FRAMEWORK_ONNX
-        const val LLAMACPP = 1           // RAC_FRAMEWORK_LLAMACPP
-        const val FOUNDATION_MODELS = 2  // RAC_FRAMEWORK_FOUNDATION_MODELS
-        const val SYSTEM_TTS = 3         // RAC_FRAMEWORK_SYSTEM_TTS
-        const val FLUID_AUDIO = 4        // RAC_FRAMEWORK_FLUID_AUDIO
-        const val BUILTIN = 5            // RAC_FRAMEWORK_BUILTIN
-        const val NONE = 6               // RAC_FRAMEWORK_NONE
-        const val UNKNOWN = 99           // RAC_FRAMEWORK_UNKNOWN
+        const val ONNX = 0 // RAC_FRAMEWORK_ONNX
+        const val LLAMACPP = 1 // RAC_FRAMEWORK_LLAMACPP
+        const val FOUNDATION_MODELS = 2 // RAC_FRAMEWORK_FOUNDATION_MODELS
+        const val SYSTEM_TTS = 3 // RAC_FRAMEWORK_SYSTEM_TTS
+        const val FLUID_AUDIO = 4 // RAC_FRAMEWORK_FLUID_AUDIO
+        const val BUILTIN = 5 // RAC_FRAMEWORK_BUILTIN
+        const val NONE = 6 // RAC_FRAMEWORK_NONE
+        const val UNKNOWN = 99 // RAC_FRAMEWORK_UNKNOWN
     }
 
     /**
@@ -127,7 +126,7 @@ object CppBridgeModelRegistry {
         val contextLength: Int,
         val supportsThinking: Boolean,
         val description: String?,
-        val status: Int = ModelStatus.AVAILABLE
+        val status: Int = ModelStatus.AVAILABLE,
     )
 
     // ========================================================================
@@ -146,19 +145,20 @@ object CppBridgeModelRegistry {
     fun save(model: ModelInfo) {
         log(LogLevel.DEBUG, "Saving model to C++ registry: ${model.modelId} (framework=${model.framework})")
 
-        val result = RunAnywhereBridge.racModelRegistrySave(
-            modelId = model.modelId,
-            name = model.name,
-            category = model.category,
-            format = model.format,
-            framework = model.framework,
-            downloadUrl = model.downloadUrl,
-            localPath = model.localPath,
-            downloadSize = model.downloadSize,
-            contextLength = model.contextLength,
-            supportsThinking = model.supportsThinking,
-            description = model.description
-        )
+        val result =
+            RunAnywhereBridge.racModelRegistrySave(
+                modelId = model.modelId,
+                name = model.name,
+                category = model.category,
+                format = model.format,
+                framework = model.framework,
+                downloadUrl = model.downloadUrl,
+                localPath = model.localPath,
+                downloadSize = model.downloadSize,
+                contextLength = model.contextLength,
+                supportsThinking = model.supportsThinking,
+                description = model.description,
+            )
 
         if (result != RunAnywhereBridge.RAC_SUCCESS) {
             log(LogLevel.ERROR, "Failed to save model: ${model.modelId}, error=$result")
@@ -268,15 +268,16 @@ object CppBridgeModelRegistry {
 
         if (!modelsDir.exists()) {
             log(LogLevel.DEBUG, "Models directory does not exist: ${modelsDir.absolutePath}")
-                return
-            }
+            return
+        }
 
-        val typeDirectories = mapOf(
-            "llm" to ModelCategory.LANGUAGE,
-            "stt" to ModelCategory.SPEECH_RECOGNITION,
-            "tts" to ModelCategory.SPEECH_SYNTHESIS,
-            "vad" to ModelCategory.AUDIO
-        )
+        val typeDirectories =
+            mapOf(
+                "llm" to ModelCategory.LANGUAGE,
+                "stt" to ModelCategory.SPEECH_RECOGNITION,
+                "tts" to ModelCategory.SPEECH_SYNTHESIS,
+                "vad" to ModelCategory.AUDIO,
+            )
 
         var restoredCount = 0
 
@@ -331,7 +332,7 @@ object CppBridgeModelRegistry {
                 contextLength = extractInt(json, "context_length"),
                 supportsThinking = extractBoolean(json, "supports_thinking"),
                 description = extractString(json, "description"),
-                status = if (extractString(json, "local_path") != null) ModelStatus.DOWNLOADED else ModelStatus.AVAILABLE
+                status = if (extractString(json, "local_path") != null) ModelStatus.DOWNLOADED else ModelStatus.AVAILABLE,
             )
         } catch (e: Exception) {
             log(LogLevel.ERROR, "Failed to parse model JSON: ${e.message}")
@@ -371,25 +372,41 @@ object CppBridgeModelRegistry {
     private fun extractString(json: String, key: String): String? {
         val pattern = """"$key"\s*:\s*"([^"]*)""""
         val regex = Regex(pattern)
-        return regex.find(json)?.groupValues?.get(1)?.takeIf { it.isNotEmpty() }
+        return regex
+            .find(json)
+            ?.groupValues
+            ?.get(1)
+            ?.takeIf { it.isNotEmpty() }
     }
 
     private fun extractInt(json: String, key: String): Int {
         val pattern = """"$key"\s*:\s*(-?\d+)"""
         val regex = Regex(pattern)
-        return regex.find(json)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+        return regex
+            .find(json)
+            ?.groupValues
+            ?.get(1)
+            ?.toIntOrNull() ?: 0
     }
 
     private fun extractLong(json: String, key: String): Long {
         val pattern = """"$key"\s*:\s*(-?\d+)"""
         val regex = Regex(pattern)
-        return regex.find(json)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+        return regex
+            .find(json)
+            ?.groupValues
+            ?.get(1)
+            ?.toLongOrNull() ?: 0L
     }
 
     private fun extractBoolean(json: String, key: String): Boolean {
         val pattern = """"$key"\s*:\s*(true|false)"""
         val regex = Regex(pattern, RegexOption.IGNORE_CASE)
-        return regex.find(json)?.groupValues?.get(1)?.lowercase() == "true"
+        return regex
+            .find(json)
+            ?.groupValues
+            ?.get(1)
+            ?.lowercase() == "true"
     }
 
     // ========================================================================
@@ -399,12 +416,13 @@ object CppBridgeModelRegistry {
     private enum class LogLevel { DEBUG, INFO, WARN, ERROR }
 
     private fun log(level: LogLevel, message: String) {
-        val adapterLevel = when (level) {
-            LogLevel.DEBUG -> CppBridgePlatformAdapter.LogLevel.DEBUG
-            LogLevel.INFO -> CppBridgePlatformAdapter.LogLevel.INFO
-            LogLevel.WARN -> CppBridgePlatformAdapter.LogLevel.WARN
-            LogLevel.ERROR -> CppBridgePlatformAdapter.LogLevel.ERROR
-        }
+        val adapterLevel =
+            when (level) {
+                LogLevel.DEBUG -> CppBridgePlatformAdapter.LogLevel.DEBUG
+                LogLevel.INFO -> CppBridgePlatformAdapter.LogLevel.INFO
+                LogLevel.WARN -> CppBridgePlatformAdapter.LogLevel.WARN
+                LogLevel.ERROR -> CppBridgePlatformAdapter.LogLevel.ERROR
+            }
         CppBridgePlatformAdapter.logCallback(adapterLevel, TAG, message)
     }
 }

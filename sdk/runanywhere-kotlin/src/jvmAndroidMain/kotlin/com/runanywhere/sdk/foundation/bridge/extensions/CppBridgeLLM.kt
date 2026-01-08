@@ -34,7 +34,6 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
  * - Matches iOS Actor-based pattern using Kotlin synchronized
  */
 object CppBridgeLLM {
-
     /**
      * LLM component state constants matching C++ RAC_LLM_STATE_* values.
      */
@@ -63,16 +62,17 @@ object CppBridgeLLM {
         /**
          * Get a human-readable name for the LLM state.
          */
-        fun getName(state: Int): String = when (state) {
-            NOT_CREATED -> "NOT_CREATED"
-            CREATED -> "CREATED"
-            LOADING -> "LOADING"
-            READY -> "READY"
-            GENERATING -> "GENERATING"
-            UNLOADING -> "UNLOADING"
-            ERROR -> "ERROR"
-            else -> "UNKNOWN($state)"
-        }
+        fun getName(state: Int): String =
+            when (state) {
+                NOT_CREATED -> "NOT_CREATED"
+                CREATED -> "CREATED"
+                LOADING -> "LOADING"
+                READY -> "READY"
+                GENERATING -> "GENERATING"
+                UNLOADING -> "UNLOADING"
+                ERROR -> "ERROR"
+                else -> "UNKNOWN($state)"
+            }
 
         /**
          * Check if the state indicates the component is usable.
@@ -119,15 +119,16 @@ object CppBridgeLLM {
         /**
          * Get a human-readable name for the stop reason.
          */
-        fun getName(reason: Int): String = when (reason) {
-            NOT_STOPPED -> "NOT_STOPPED"
-            EOS -> "EOS"
-            MAX_TOKENS -> "MAX_TOKENS"
-            STOP_SEQUENCE -> "STOP_SEQUENCE"
-            CANCELLED -> "CANCELLED"
-            ERROR -> "ERROR"
-            else -> "UNKNOWN($reason)"
-        }
+        fun getName(reason: Int): String =
+            when (reason) {
+                NOT_STOPPED -> "NOT_STOPPED"
+                EOS -> "EOS"
+                MAX_TOKENS -> "MAX_TOKENS"
+                STOP_SEQUENCE -> "STOP_SEQUENCE"
+                CANCELLED -> "CANCELLED"
+                ERROR -> "ERROR"
+                else -> "UNKNOWN($reason)"
+            }
     }
 
     @Volatile
@@ -176,14 +177,14 @@ object CppBridgeLLM {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Native LLM library check passed"
+                "Native LLM library check passed",
             )
         } catch (e: UnsatisfiedLinkError) {
             isNativeLibraryLoaded = false
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Native LLM library not available: ${e.message}"
+                "Native LLM library not available: ${e.message}",
             )
         }
     }
@@ -226,7 +227,7 @@ object CppBridgeLLM {
         val topK: Int = 40,
         val repeatPenalty: Float = 1.1f,
         val stopSequences: List<String> = emptyList(),
-        val seed: Long = -1
+        val seed: Long = -1,
     ) {
         /**
          * Convert to JSON string for C++ interop.
@@ -272,7 +273,7 @@ object CppBridgeLLM {
         val threads: Int = -1,
         val batchSize: Int = 512,
         val useMemoryMap: Boolean = true,
-        val useLocking: Boolean = false
+        val useLocking: Boolean = false,
     ) {
         /**
          * Convert to JSON string for C++ interop.
@@ -312,7 +313,7 @@ object CppBridgeLLM {
         val tokensEvaluated: Int,
         val stopReason: Int,
         val generationTimeMs: Long,
-        val tokensPerSecond: Float
+        val tokensPerSecond: Float,
     ) {
         /**
          * Get the stop reason name.
@@ -413,7 +414,7 @@ object CppBridgeLLM {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "LLM callbacks registered"
+                "LLM callbacks registered",
             )
         }
     }
@@ -481,7 +482,7 @@ object CppBridgeLLM {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "LLM component already created"
+                    "LLM component already created",
                 )
                 return 0
             }
@@ -491,29 +492,30 @@ object CppBridgeLLM {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Native library not loaded. LLM inference requires native libraries to be bundled."
+                    "Native library not loaded. LLM inference requires native libraries to be bundled.",
                 )
                 throw SDKError.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
             }
 
             // Create LLM component via RunAnywhereBridge
-            val result = try {
-                RunAnywhereBridge.racLlmComponentCreate()
-            } catch (e: UnsatisfiedLinkError) {
-                isNativeLibraryLoaded = false
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.ERROR,
-                    TAG,
-                    "LLM component creation failed. Native method not available: ${e.message}"
-                )
-                throw SDKError.notInitialized("LLM native library not available. Please ensure the LLM backend is bundled in your APK.")
-            }
+            val result =
+                try {
+                    RunAnywhereBridge.racLlmComponentCreate()
+                } catch (e: UnsatisfiedLinkError) {
+                    isNativeLibraryLoaded = false
+                    CppBridgePlatformAdapter.logCallback(
+                        CppBridgePlatformAdapter.LogLevel.ERROR,
+                        TAG,
+                        "LLM component creation failed. Native method not available: ${e.message}",
+                    )
+                    throw SDKError.notInitialized("LLM native library not available. Please ensure the LLM backend is bundled in your APK.")
+                }
 
             if (result == 0L) {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Failed to create LLM component"
+                    "Failed to create LLM component",
                 )
                 return -1
             }
@@ -525,7 +527,7 @@ object CppBridgeLLM {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "LLM component created"
+                "LLM component created",
             )
 
             return 0
@@ -538,9 +540,10 @@ object CppBridgeLLM {
      * @param modelPath Path to the model file
      * @param modelId Unique identifier for the model (for telemetry)
      * @param modelName Human-readable name for the model (for telemetry)
-     * @param config Model configuration (optional)
+     * @param config Model configuration (reserved for future use)
      * @return 0 on success, error code on failure
      */
+    @Suppress("UNUSED_PARAMETER")
     fun loadModel(modelPath: String, modelId: String, modelName: String? = null, config: ModelConfig = ModelConfig.DEFAULT): Int {
         synchronized(lock) {
             if (handle == 0L) {
@@ -555,7 +558,7 @@ object CppBridgeLLM {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Unloading current model before loading new one: $loadedModelId"
+                    "Unloading current model before loading new one: $loadedModelId",
                 )
                 unload()
             }
@@ -565,7 +568,7 @@ object CppBridgeLLM {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Loading model: $modelId from $modelPath"
+                "Loading model: $modelId from $modelPath",
             )
 
             // Pass modelPath, modelId, and modelName separately to C++ lifecycle
@@ -576,7 +579,7 @@ object CppBridgeLLM {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Failed to load model: $modelId (error: $result)"
+                    "Failed to load model: $modelId (error: $result)",
                 )
 
                 try {
@@ -595,20 +598,20 @@ object CppBridgeLLM {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Model loaded successfully: $modelId"
+                "Model loaded successfully: $modelId",
             )
 
             // Update model assignment status
             CppBridgeModelAssignment.setAssignmentStatusCallback(
                 CppBridgeModelRegistry.ModelType.LLM,
                 CppBridgeModelAssignment.AssignmentStatus.READY,
-                CppBridgeModelAssignment.FailureReason.NONE
+                CppBridgeModelAssignment.FailureReason.NONE,
             )
 
             // Update component state
             CppBridgeState.setComponentStateCallback(
                 CppBridgeState.ComponentType.LLM,
-                CppBridgeState.ComponentState.READY
+                CppBridgeState.ComponentState.READY,
             )
 
             try {
@@ -617,7 +620,7 @@ object CppBridgeLLM {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in LLM listener onModelLoaded: ${e.message}"
+                    "Error in LLM listener onModelLoaded: ${e.message}",
                 )
             }
 
@@ -646,7 +649,7 @@ object CppBridgeLLM {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Starting generation (prompt length: ${prompt.length})"
+                "Starting generation (prompt length: ${prompt.length})",
             )
 
             try {
@@ -658,8 +661,9 @@ object CppBridgeLLM {
             val startTime = System.currentTimeMillis()
 
             try {
-                val resultJson = RunAnywhereBridge.racLlmComponentGenerate(handle, prompt, config.toJson())
-                    ?: throw SDKError.llm("Generation failed: null result")
+                val resultJson =
+                    RunAnywhereBridge.racLlmComponentGenerate(handle, prompt, config.toJson())
+                        ?: throw SDKError.llm("Generation failed: null result")
 
                 val result = parseGenerationResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -668,7 +672,7 @@ object CppBridgeLLM {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Generation completed: ${result.tokensGenerated} tokens, ${result.tokensPerSecond} tok/s"
+                    "Generation completed: ${result.tokensGenerated} tokens, ${result.tokensPerSecond} tok/s",
                 )
 
                 try {
@@ -678,7 +682,6 @@ object CppBridgeLLM {
                 }
 
                 return result
-
             } catch (e: Exception) {
                 setState(LLMState.READY) // Reset to ready, not error
                 throw if (e is SDKError) e else SDKError.llm("Generation failed: ${e.message}")
@@ -699,7 +702,7 @@ object CppBridgeLLM {
     fun generateStream(
         prompt: String,
         config: GenerationConfig = GenerationConfig.DEFAULT,
-        callback: StreamCallback
+        callback: StreamCallback,
     ): GenerationResult {
         synchronized(lock) {
             if (handle == 0L || state != LLMState.READY) {
@@ -713,7 +716,7 @@ object CppBridgeLLM {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Starting streaming generation (prompt length: ${prompt.length})"
+                "Starting streaming generation (prompt length: ${prompt.length})",
             )
 
             try {
@@ -727,23 +730,28 @@ object CppBridgeLLM {
             try {
                 // Use the new callback-based streaming JNI method
                 // This calls back to Kotlin for each token in real-time
-                val jniCallback = RunAnywhereBridge.TokenCallback { token ->
-                    try {
-                        // Forward each token to the user's callback
-                        callback.onToken(token)
-                    } catch (e: Exception) {
-                        CppBridgePlatformAdapter.logCallback(
-                            CppBridgePlatformAdapter.LogLevel.WARN,
-                            TAG,
-                            "Error in stream callback: ${e.message}"
-                        )
-                        true // Continue even if callback fails
+                val jniCallback =
+                    RunAnywhereBridge.TokenCallback { token ->
+                        try {
+                            // Forward each token to the user's callback
+                            callback.onToken(token)
+                        } catch (e: Exception) {
+                            CppBridgePlatformAdapter.logCallback(
+                                CppBridgePlatformAdapter.LogLevel.WARN,
+                                TAG,
+                                "Error in stream callback: ${e.message}",
+                            )
+                            true // Continue even if callback fails
+                        }
                     }
-                }
 
-                val resultJson = RunAnywhereBridge.racLlmComponentGenerateStreamWithCallback(
-                    handle, prompt, config.toJson(), jniCallback
-                ) ?: throw SDKError.llm("Streaming generation failed: null result")
+                val resultJson =
+                    RunAnywhereBridge.racLlmComponentGenerateStreamWithCallback(
+                        handle,
+                        prompt,
+                        config.toJson(),
+                        jniCallback,
+                    ) ?: throw SDKError.llm("Streaming generation failed: null result")
 
                 val result = parseGenerationResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -753,7 +761,7 @@ object CppBridgeLLM {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Streaming generation completed: ${result.tokensGenerated} tokens"
+                    "Streaming generation completed: ${result.tokensGenerated} tokens",
                 )
 
                 try {
@@ -763,7 +771,6 @@ object CppBridgeLLM {
                 }
 
                 return result
-
             } catch (e: Exception) {
                 setState(LLMState.READY) // Reset to ready, not error
                 streamCallback = null
@@ -786,7 +793,7 @@ object CppBridgeLLM {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Cancelling generation"
+                "Cancelling generation",
             )
 
             RunAnywhereBridge.racLlmComponentCancel(handle)
@@ -809,7 +816,7 @@ object CppBridgeLLM {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Unloading model: $previousModelId"
+                "Unloading model: $previousModelId",
             )
 
             RunAnywhereBridge.racLlmComponentUnload(handle)
@@ -822,13 +829,13 @@ object CppBridgeLLM {
             CppBridgeModelAssignment.setAssignmentStatusCallback(
                 CppBridgeModelRegistry.ModelType.LLM,
                 CppBridgeModelAssignment.AssignmentStatus.NOT_ASSIGNED,
-                CppBridgeModelAssignment.FailureReason.NONE
+                CppBridgeModelAssignment.FailureReason.NONE,
             )
 
             // Update component state
             CppBridgeState.setComponentStateCallback(
                 CppBridgeState.ComponentType.LLM,
-                CppBridgeState.ComponentState.CREATED
+                CppBridgeState.ComponentState.CREATED,
             )
 
             try {
@@ -837,7 +844,7 @@ object CppBridgeLLM {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in LLM listener onModelUnloaded: ${e.message}"
+                    "Error in LLM listener onModelUnloaded: ${e.message}",
                 )
             }
         }
@@ -860,7 +867,7 @@ object CppBridgeLLM {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Destroying LLM component"
+                "Destroying LLM component",
             )
 
             RunAnywhereBridge.racLlmComponentDestroy(handle)
@@ -871,7 +878,7 @@ object CppBridgeLLM {
             // Update component state
             CppBridgeState.setComponentStateCallback(
                 CppBridgeState.ComponentType.LLM,
-                CppBridgeState.ComponentState.NOT_CREATED
+                CppBridgeState.ComponentState.NOT_CREATED,
             )
         }
     }
@@ -904,7 +911,7 @@ object CppBridgeLLM {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in stream callback: ${e.message}"
+                "Error in stream callback: ${e.message}",
             )
             true // Continue on error
         }
@@ -924,7 +931,7 @@ object CppBridgeLLM {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Model loading progress: ${(progress * 100).toInt()}%"
+            "Model loading progress: ${(progress * 100).toInt()}%",
         )
     }
 
@@ -972,9 +979,11 @@ object CppBridgeLLM {
      * Native method to set the LLM callbacks with C++ core.
      *
      * Registers [streamTokenCallback], [progressCallback], etc. with C++ core.
+     * Reserved for future native callback integration.
      *
      * C API: rac_llm_set_callbacks(...)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeSetLLMCallbacks()
 
@@ -982,9 +991,11 @@ object CppBridgeLLM {
      * Native method to unset the LLM callbacks.
      *
      * Called during shutdown to clean up native resources.
+     * Reserved for future native callback integration.
      *
      * C API: rac_llm_set_callbacks(nullptr)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeUnsetLLMCallbacks()
 
@@ -1134,7 +1145,7 @@ object CppBridgeLLM {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "State changed: ${LLMState.getName(previousState)} -> ${LLMState.getName(newState)}"
+                "State changed: ${LLMState.getName(previousState)} -> ${LLMState.getName(newState)}",
             )
 
             try {
@@ -1143,7 +1154,7 @@ object CppBridgeLLM {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in LLM listener onStateChanged: ${e.message}"
+                    "Error in LLM listener onStateChanged: ${e.message}",
                 )
             }
         }
@@ -1156,30 +1167,43 @@ object CppBridgeLLM {
         fun extractString(key: String): String {
             val pattern = "\"$key\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\""
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.let { unescapeJson(it) } ?: ""
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.let { unescapeJson(it) } ?: ""
         }
 
         fun extractInt(key: String): Int {
             val pattern = "\"$key\"\\s*:\\s*(-?\\d+)"
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.toIntOrNull() ?: 0
         }
 
         fun extractFloat(key: String): Float {
             val pattern = "\"$key\"\\s*:\\s*(-?[\\d.]+)"
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.toFloatOrNull() ?: 0f
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.toFloatOrNull() ?: 0f
         }
 
         val text = extractString("text")
         val tokensGenerated = extractInt("tokens_generated")
         val tokensEvaluated = extractInt("tokens_evaluated")
         val stopReason = extractInt("stop_reason")
-        val tokensPerSecond = if (elapsedMs > 0) {
-            tokensGenerated * 1000f / elapsedMs
-        } else {
-            extractFloat("tokens_per_second")
-        }
+        val tokensPerSecond =
+            if (elapsedMs > 0) {
+                tokensGenerated * 1000f / elapsedMs
+            } else {
+                extractFloat("tokens_per_second")
+            }
 
         return GenerationResult(
             text = text,
@@ -1187,7 +1211,7 @@ object CppBridgeLLM {
             tokensEvaluated = tokensEvaluated,
             stopReason = stopReason,
             generationTimeMs = elapsedMs,
-            tokensPerSecond = tokensPerSecond
+            tokensPerSecond = tokensPerSecond,
         )
     }
 

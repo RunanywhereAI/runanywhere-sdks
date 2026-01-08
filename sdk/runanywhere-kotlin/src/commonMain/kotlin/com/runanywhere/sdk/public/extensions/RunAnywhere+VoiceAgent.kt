@@ -90,7 +90,7 @@ expect suspend fun RunAnywhere.processVoice(audioData: ByteArray): VoiceAgentRes
  * @return Flow of voice session events
  */
 expect fun RunAnywhere.startVoiceSession(
-    config: VoiceSessionConfig = VoiceSessionConfig.DEFAULT
+    config: VoiceSessionConfig = VoiceSessionConfig.DEFAULT,
 ): Flow<VoiceSessionEvent>
 
 /**

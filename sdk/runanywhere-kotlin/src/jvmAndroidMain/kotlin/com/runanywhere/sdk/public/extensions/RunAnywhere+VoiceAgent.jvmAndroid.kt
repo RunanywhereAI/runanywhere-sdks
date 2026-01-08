@@ -80,7 +80,7 @@ actual suspend fun RunAnywhere.voiceAgentComponentStates(): VoiceAgentComponentS
     return VoiceAgentComponentStates(
         stt = if (sttLoaded && sttModelId != null) ComponentLoadState.Loaded(sttModelId) else ComponentLoadState.NotLoaded,
         llm = if (llmLoaded && llmModelId != null) ComponentLoadState.Loaded(llmModelId) else ComponentLoadState.NotLoaded,
-        tts = if (ttsLoaded && ttsVoiceId != null) ComponentLoadState.Loaded(ttsVoiceId) else ComponentLoadState.NotLoaded
+        tts = if (ttsLoaded && ttsVoiceId != null) ComponentLoadState.Loaded(ttsVoiceId) else ComponentLoadState.NotLoaded,
     )
 }
 
@@ -122,7 +122,7 @@ actual suspend fun RunAnywhere.processVoice(audioData: ByteArray): VoiceAgentRes
             speechDetected = false,
             transcription = null,
             response = "Models not loaded: ${missing.joinToString(", ")}",
-            synthesizedAudio = null
+            synthesizedAudio = null,
         )
     }
 
@@ -135,7 +135,7 @@ actual suspend fun RunAnywhere.processVoice(audioData: ByteArray): VoiceAgentRes
                 speechDetected = false,
                 transcription = null,
                 response = null,
-                synthesizedAudio = null
+                synthesizedAudio = null,
             )
         }
 
@@ -147,51 +147,53 @@ actual suspend fun RunAnywhere.processVoice(audioData: ByteArray): VoiceAgentRes
         val responseText = generationResult.text
 
         // Step 3: Synthesize speech using TTS
-        val audioOutput = if (responseText.isNotBlank()) {
-            val synthesisResult = CppBridgeTTS.synthesize(responseText)
-            synthesisResult.audioData
-        } else {
-            null
-        }
+        val audioOutput =
+            if (responseText.isNotBlank()) {
+                val synthesisResult = CppBridgeTTS.synthesize(responseText)
+                synthesisResult.audioData
+            } else {
+                null
+            }
 
         VoiceAgentResult(
             speechDetected = true,
             transcription = transcriptionText,
             response = responseText,
-            synthesizedAudio = audioOutput
+            synthesizedAudio = audioOutput,
         )
     } catch (e: Exception) {
         VoiceAgentResult(
             speechDetected = false,
             transcription = null,
             response = "Processing error: ${e.message}",
-            synthesizedAudio = null
+            synthesizedAudio = null,
         )
     }
 }
 
-actual fun RunAnywhere.startVoiceSession(config: VoiceSessionConfig): Flow<VoiceSessionEvent> = flow {
-    if (!isInitialized) {
-        emit(VoiceSessionEvent.Error("SDK not initialized"))
-        return@flow
+actual fun RunAnywhere.startVoiceSession(config: VoiceSessionConfig): Flow<VoiceSessionEvent> =
+    flow {
+        if (!isInitialized) {
+            emit(VoiceSessionEvent.Error("SDK not initialized"))
+            return@flow
+        }
+
+        // Check if all component models are loaded
+        if (!areAllComponentsLoaded()) {
+            val missing = getMissingComponents()
+            emit(VoiceSessionEvent.Error("Models not loaded: ${missing.joinToString(", ")}"))
+            return@flow
+        }
+
+        // Mark voice agent as initialized and session as active
+        voiceAgentInitialized = true
+        voiceSessionActive = true
+        emit(VoiceSessionEvent.Started)
+
+        // The actual voice session loop would be driven by audio input from the app layer
+        // This flow represents session events that the app can collect
+        // Audio recording and processing should be handled by the app using processVoice()
     }
-
-    // Check if all component models are loaded
-    if (!areAllComponentsLoaded()) {
-        val missing = getMissingComponents()
-        emit(VoiceSessionEvent.Error("Models not loaded: ${missing.joinToString(", ")}"))
-        return@flow
-    }
-
-    // Mark voice agent as initialized and session as active
-    voiceAgentInitialized = true
-    voiceSessionActive = true
-    emit(VoiceSessionEvent.Started)
-
-    // The actual voice session loop would be driven by audio input from the app layer
-    // This flow represents session events that the app can collect
-    // Audio recording and processing should be handled by the app using processVoice()
-}
 
 actual suspend fun RunAnywhere.stopVoiceSession() {
     if (!isInitialized) {

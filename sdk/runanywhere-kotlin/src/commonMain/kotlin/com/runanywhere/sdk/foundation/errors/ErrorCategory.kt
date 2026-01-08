@@ -17,7 +17,6 @@ package com.runanywhere.sdk.foundation.errors
  * @property description A human-readable description of the error category.
  */
 enum class ErrorCategory {
-
     // ========================================================================
     // GENERAL CATEGORIES
     // ========================================================================
@@ -137,31 +136,34 @@ enum class ErrorCategory {
     /**
      * Authentication and authorization errors.
      */
-    AUTHENTICATION;
+    AUTHENTICATION,
+
+    ;
 
     /**
      * A human-readable description of the error category.
      */
     val description: String
-        get() = when (this) {
-            GENERAL -> "General error"
-            CONFIGURATION -> "Configuration error"
-            INITIALIZATION -> "Initialization error"
-            FILE_RESOURCE -> "File or resource error"
-            MEMORY -> "Memory allocation error"
-            STORAGE -> "Storage error"
-            OPERATION -> "Operation lifecycle error"
-            NETWORK -> "Network error"
-            MODEL -> "Model error"
-            PLATFORM -> "Platform integration error"
-            LLM -> "Language model error"
-            STT -> "Speech-to-text error"
-            TTS -> "Text-to-speech error"
-            VAD -> "Voice activity detection error"
-            VOICE_AGENT -> "Voice agent error"
-            DOWNLOAD -> "Download error"
-            AUTHENTICATION -> "Authentication error"
-        }
+        get() =
+            when (this) {
+                GENERAL -> "General error"
+                CONFIGURATION -> "Configuration error"
+                INITIALIZATION -> "Initialization error"
+                FILE_RESOURCE -> "File or resource error"
+                MEMORY -> "Memory allocation error"
+                STORAGE -> "Storage error"
+                OPERATION -> "Operation lifecycle error"
+                NETWORK -> "Network error"
+                MODEL -> "Model error"
+                PLATFORM -> "Platform integration error"
+                LLM -> "Language model error"
+                STT -> "Speech-to-text error"
+                TTS -> "Text-to-speech error"
+                VAD -> "Voice activity detection error"
+                VOICE_AGENT -> "Voice agent error"
+                DOWNLOAD -> "Download error"
+                AUTHENTICATION -> "Authentication error"
+            }
 
     companion object {
         /**

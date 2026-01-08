@@ -79,7 +79,7 @@ public enum LlamaCPP: RunAnywhereModule {
     /// - Parameter priority: Ignored (C++ uses its own priority system)
     /// - Throws: SDKError if registration fails
     @MainActor
-    public static func register(priority: Int = 100) {
+    public static func register(priority _: Int = 100) {
         guard !isRegistered else {
             logger.debug("LlamaCPP already registered, returning")
             return
