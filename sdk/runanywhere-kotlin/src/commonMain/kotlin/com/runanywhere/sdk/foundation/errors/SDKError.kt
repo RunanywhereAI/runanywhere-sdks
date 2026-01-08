@@ -28,9 +28,8 @@ data class SDKError(
     val code: ErrorCode,
     val category: ErrorCategory,
     override val message: String,
-    override val cause: Throwable? = null
+    override val cause: Throwable? = null,
 ) : Exception(message, cause) {
-
     /**
      * Whether this error represents success (error code is SUCCESS).
      */
@@ -52,7 +51,6 @@ data class SDKError(
     override fun toString(): String = detailedDescription
 
     companion object {
-
         // ========================================================================
         // GENERAL ERROR FACTORIES
         // ========================================================================
@@ -68,13 +66,14 @@ data class SDKError(
         fun general(
             message: String,
             code: ErrorCode = ErrorCode.UNKNOWN,
-            cause: Throwable? = null
-        ): SDKError = SDKError(
-            code = code,
-            category = ErrorCategory.GENERAL,
-            message = message,
-            cause = cause
-        )
+            cause: Throwable? = null,
+        ): SDKError =
+            SDKError(
+                code = code,
+                category = ErrorCategory.GENERAL,
+                message = message,
+                cause = cause,
+            )
 
         /**
          * Create an unknown error.
@@ -101,13 +100,14 @@ data class SDKError(
         fun configuration(
             message: String,
             code: ErrorCode = ErrorCode.INVALID_ARGUMENT,
-            cause: Throwable? = null
-        ): SDKError = SDKError(
-            code = code,
-            category = ErrorCategory.CONFIGURATION,
-            message = message,
-            cause = cause
-        )
+            cause: Throwable? = null,
+        ): SDKError =
+            SDKError(
+                code = code,
+                category = ErrorCategory.CONFIGURATION,
+                message = message,
+                cause = cause,
+            )
 
         /**
          * Create an invalid argument error.
@@ -134,13 +134,14 @@ data class SDKError(
         fun initialization(
             message: String,
             code: ErrorCode = ErrorCode.NOT_INITIALIZED,
-            cause: Throwable? = null
-        ): SDKError = SDKError(
-            code = code,
-            category = ErrorCategory.INITIALIZATION,
-            message = message,
-            cause = cause
-        )
+            cause: Throwable? = null,
+        ): SDKError =
+            SDKError(
+                code = code,
+                category = ErrorCategory.INITIALIZATION,
+                message = message,
+                cause = cause,
+            )
 
         /**
          * Create a not initialized error.
@@ -177,13 +178,14 @@ data class SDKError(
         fun fileResource(
             message: String,
             code: ErrorCode = ErrorCode.FILE_NOT_FOUND,
-            cause: Throwable? = null
-        ): SDKError = SDKError(
-            code = code,
-            category = ErrorCategory.FILE_RESOURCE,
-            message = message,
-            cause = cause
-        )
+            cause: Throwable? = null,
+        ): SDKError =
+            SDKError(
+                code = code,
+                category = ErrorCategory.FILE_RESOURCE,
+                message = message,
+                cause = cause,
+            )
 
         /**
          * Create a file not found error.
@@ -206,12 +208,13 @@ data class SDKError(
          * @param cause The underlying throwable cause
          * @return An SDKError with OUT_OF_MEMORY code and MEMORY category
          */
-        fun memory(message: String, cause: Throwable? = null): SDKError = SDKError(
-            code = ErrorCode.OUT_OF_MEMORY,
-            category = ErrorCategory.MEMORY,
-            message = message,
-            cause = cause
-        )
+        fun memory(message: String, cause: Throwable? = null): SDKError =
+            SDKError(
+                code = ErrorCode.OUT_OF_MEMORY,
+                category = ErrorCategory.MEMORY,
+                message = message,
+                cause = cause,
+            )
 
         /**
          * Create an out of memory error.
@@ -238,13 +241,14 @@ data class SDKError(
         fun storage(
             message: String,
             code: ErrorCode = ErrorCode.INSUFFICIENT_STORAGE,
-            cause: Throwable? = null
-        ): SDKError = SDKError(
-            code = code,
-            category = ErrorCategory.STORAGE,
-            message = message,
-            cause = cause
-        )
+            cause: Throwable? = null,
+        ): SDKError =
+            SDKError(
+                code = code,
+                category = ErrorCategory.STORAGE,
+                message = message,
+                cause = cause,
+            )
 
         /**
          * Create an insufficient storage error.
@@ -254,11 +258,12 @@ data class SDKError(
          * @return An SDKError with INSUFFICIENT_STORAGE code
          */
         fun insufficientStorage(requiredBytes: Long? = null, cause: Throwable? = null): SDKError {
-            val message = if (requiredBytes != null) {
-                "Insufficient storage space. Required: ${requiredBytes / 1024 / 1024} MB"
-            } else {
-                "Insufficient storage space"
-            }
+            val message =
+                if (requiredBytes != null) {
+                    "Insufficient storage space. Required: ${requiredBytes / 1024 / 1024} MB"
+                } else {
+                    "Insufficient storage space"
+                }
             return storage(message, ErrorCode.INSUFFICIENT_STORAGE, cause)
         }
 
@@ -277,13 +282,14 @@ data class SDKError(
         fun operation(
             message: String,
             code: ErrorCode = ErrorCode.CANCELLED,
-            cause: Throwable? = null
-        ): SDKError = SDKError(
-            code = code,
-            category = ErrorCategory.OPERATION,
-            message = message,
-            cause = cause
-        )
+            cause: Throwable? = null,
+        ): SDKError =
+            SDKError(
+                code = code,
+                category = ErrorCategory.OPERATION,
+                message = message,
+                cause = cause,
+            )
 
         /**
          * Create a timeout error.
@@ -294,11 +300,12 @@ data class SDKError(
          * @return An SDKError with TIMEOUT code
          */
         fun timeout(operation: String, timeoutMs: Long? = null, cause: Throwable? = null): SDKError {
-            val message = if (timeoutMs != null) {
-                "$operation timed out after ${timeoutMs}ms"
-            } else {
-                "$operation timed out"
-            }
+            val message =
+                if (timeoutMs != null) {
+                    "$operation timed out after ${timeoutMs}ms"
+                } else {
+                    "$operation timed out"
+                }
             return operation(message, ErrorCode.TIMEOUT, cause)
         }
 
@@ -327,13 +334,14 @@ data class SDKError(
         fun network(
             message: String,
             code: ErrorCode = ErrorCode.NETWORK_ERROR,
-            cause: Throwable? = null
-        ): SDKError = SDKError(
-            code = code,
-            category = ErrorCategory.NETWORK,
-            message = message,
-            cause = cause
-        )
+            cause: Throwable? = null,
+        ): SDKError =
+            SDKError(
+                code = code,
+                category = ErrorCategory.NETWORK,
+                message = message,
+                cause = cause,
+            )
 
         /**
          * Create a network unavailable error.
@@ -359,13 +367,14 @@ data class SDKError(
         fun model(
             message: String,
             code: ErrorCode = ErrorCode.MODEL_NOT_LOADED,
-            cause: Throwable? = null
-        ): SDKError = SDKError(
-            code = code,
-            category = ErrorCategory.MODEL,
-            message = message,
-            cause = cause
-        )
+            cause: Throwable? = null,
+        ): SDKError =
+            SDKError(
+                code = code,
+                category = ErrorCategory.MODEL,
+                message = message,
+                cause = cause,
+            )
 
         /**
          * Create a model not found error.
@@ -385,11 +394,12 @@ data class SDKError(
          * @return An SDKError with MODEL_NOT_LOADED code
          */
         fun modelNotLoaded(modelId: String? = null, cause: Throwable? = null): SDKError {
-            val message = if (modelId != null) {
-                "Model not loaded: $modelId"
-            } else {
-                "No model is loaded"
-            }
+            val message =
+                if (modelId != null) {
+                    "Model not loaded: $modelId"
+                } else {
+                    "No model is loaded"
+                }
             return model(message, ErrorCode.MODEL_NOT_LOADED, cause)
         }
 
@@ -402,11 +412,12 @@ data class SDKError(
          * @return An SDKError with MODEL_LOAD_FAILED code
          */
         fun modelLoadFailed(modelId: String, reason: String? = null, cause: Throwable? = null): SDKError {
-            val message = if (reason != null) {
-                "Failed to load model $modelId: $reason"
-            } else {
-                "Failed to load model: $modelId"
-            }
+            val message =
+                if (reason != null) {
+                    "Failed to load model $modelId: $reason"
+                } else {
+                    "Failed to load model: $modelId"
+                }
             return model(message, ErrorCode.MODEL_LOAD_FAILED, cause)
         }
 
@@ -425,13 +436,14 @@ data class SDKError(
         fun platform(
             message: String,
             code: ErrorCode = ErrorCode.INVALID_HANDLE,
-            cause: Throwable? = null
-        ): SDKError = SDKError(
-            code = code,
-            category = ErrorCategory.PLATFORM,
-            message = message,
-            cause = cause
-        )
+            cause: Throwable? = null,
+        ): SDKError =
+            SDKError(
+                code = code,
+                category = ErrorCategory.PLATFORM,
+                message = message,
+                cause = cause,
+            )
 
         /**
          * Create a platform adapter not set error.
@@ -467,13 +479,14 @@ data class SDKError(
         fun llm(
             message: String,
             code: ErrorCode = ErrorCode.LLM_GENERATION_FAILED,
-            cause: Throwable? = null
-        ): SDKError = SDKError(
-            code = code,
-            category = ErrorCategory.LLM,
-            message = message,
-            cause = cause
-        )
+            cause: Throwable? = null,
+        ): SDKError =
+            SDKError(
+                code = code,
+                category = ErrorCategory.LLM,
+                message = message,
+                cause = cause,
+            )
 
         /**
          * Create an LLM generation failed error.
@@ -483,11 +496,12 @@ data class SDKError(
          * @return An SDKError with LLM_GENERATION_FAILED code
          */
         fun llmGenerationFailed(reason: String? = null, cause: Throwable? = null): SDKError {
-            val message = if (reason != null) {
-                "LLM generation failed: $reason"
-            } else {
-                "LLM generation failed"
-            }
+            val message =
+                if (reason != null) {
+                    "LLM generation failed: $reason"
+                } else {
+                    "LLM generation failed"
+                }
             return llm(message, ErrorCode.LLM_GENERATION_FAILED, cause)
         }
 
@@ -506,13 +520,14 @@ data class SDKError(
         fun stt(
             message: String,
             code: ErrorCode = ErrorCode.STT_TRANSCRIPTION_FAILED,
-            cause: Throwable? = null
-        ): SDKError = SDKError(
-            code = code,
-            category = ErrorCategory.STT,
-            message = message,
-            cause = cause
-        )
+            cause: Throwable? = null,
+        ): SDKError =
+            SDKError(
+                code = code,
+                category = ErrorCategory.STT,
+                message = message,
+                cause = cause,
+            )
 
         /**
          * Create an STT transcription failed error.
@@ -522,11 +537,12 @@ data class SDKError(
          * @return An SDKError with STT_TRANSCRIPTION_FAILED code
          */
         fun sttTranscriptionFailed(reason: String? = null, cause: Throwable? = null): SDKError {
-            val message = if (reason != null) {
-                "Speech-to-text transcription failed: $reason"
-            } else {
-                "Speech-to-text transcription failed"
-            }
+            val message =
+                if (reason != null) {
+                    "Speech-to-text transcription failed: $reason"
+                } else {
+                    "Speech-to-text transcription failed"
+                }
             return stt(message, ErrorCode.STT_TRANSCRIPTION_FAILED, cause)
         }
 
@@ -545,13 +561,14 @@ data class SDKError(
         fun tts(
             message: String,
             code: ErrorCode = ErrorCode.TTS_SYNTHESIS_FAILED,
-            cause: Throwable? = null
-        ): SDKError = SDKError(
-            code = code,
-            category = ErrorCategory.TTS,
-            message = message,
-            cause = cause
-        )
+            cause: Throwable? = null,
+        ): SDKError =
+            SDKError(
+                code = code,
+                category = ErrorCategory.TTS,
+                message = message,
+                cause = cause,
+            )
 
         /**
          * Create a TTS synthesis failed error.
@@ -561,11 +578,12 @@ data class SDKError(
          * @return An SDKError with TTS_SYNTHESIS_FAILED code
          */
         fun ttsSynthesisFailed(reason: String? = null, cause: Throwable? = null): SDKError {
-            val message = if (reason != null) {
-                "Text-to-speech synthesis failed: $reason"
-            } else {
-                "Text-to-speech synthesis failed"
-            }
+            val message =
+                if (reason != null) {
+                    "Text-to-speech synthesis failed: $reason"
+                } else {
+                    "Text-to-speech synthesis failed"
+                }
             return tts(message, ErrorCode.TTS_SYNTHESIS_FAILED, cause)
         }
 
@@ -584,13 +602,14 @@ data class SDKError(
         fun vad(
             message: String,
             code: ErrorCode = ErrorCode.VAD_DETECTION_FAILED,
-            cause: Throwable? = null
-        ): SDKError = SDKError(
-            code = code,
-            category = ErrorCategory.VAD,
-            message = message,
-            cause = cause
-        )
+            cause: Throwable? = null,
+        ): SDKError =
+            SDKError(
+                code = code,
+                category = ErrorCategory.VAD,
+                message = message,
+                cause = cause,
+            )
 
         /**
          * Create a VAD detection failed error.
@@ -600,11 +619,12 @@ data class SDKError(
          * @return An SDKError with VAD_DETECTION_FAILED code
          */
         fun vadDetectionFailed(reason: String? = null, cause: Throwable? = null): SDKError {
-            val message = if (reason != null) {
-                "Voice activity detection failed: $reason"
-            } else {
-                "Voice activity detection failed"
-            }
+            val message =
+                if (reason != null) {
+                    "Voice activity detection failed: $reason"
+                } else {
+                    "Voice activity detection failed"
+                }
             return vad(message, ErrorCode.VAD_DETECTION_FAILED, cause)
         }
 
@@ -623,13 +643,14 @@ data class SDKError(
         fun voiceAgent(
             message: String,
             code: ErrorCode = ErrorCode.VOICE_AGENT_ERROR,
-            cause: Throwable? = null
-        ): SDKError = SDKError(
-            code = code,
-            category = ErrorCategory.VOICE_AGENT,
-            message = message,
-            cause = cause
-        )
+            cause: Throwable? = null,
+        ): SDKError =
+            SDKError(
+                code = code,
+                category = ErrorCategory.VOICE_AGENT,
+                message = message,
+                cause = cause,
+            )
 
         /**
          * Create a Voice Agent pipeline error.
@@ -640,11 +661,12 @@ data class SDKError(
          * @return An SDKError with VOICE_AGENT_ERROR code
          */
         fun voiceAgentPipeline(stage: String, reason: String? = null, cause: Throwable? = null): SDKError {
-            val message = if (reason != null) {
-                "Voice agent pipeline failed at $stage: $reason"
-            } else {
-                "Voice agent pipeline failed at: $stage"
-            }
+            val message =
+                if (reason != null) {
+                    "Voice agent pipeline failed at $stage: $reason"
+                } else {
+                    "Voice agent pipeline failed at: $stage"
+                }
             return voiceAgent(message, ErrorCode.VOICE_AGENT_ERROR, cause)
         }
 
@@ -663,13 +685,14 @@ data class SDKError(
         fun download(
             message: String,
             code: ErrorCode = ErrorCode.DOWNLOAD_FAILED,
-            cause: Throwable? = null
-        ): SDKError = SDKError(
-            code = code,
-            category = ErrorCategory.DOWNLOAD,
-            message = message,
-            cause = cause
-        )
+            cause: Throwable? = null,
+        ): SDKError =
+            SDKError(
+                code = code,
+                category = ErrorCategory.DOWNLOAD,
+                message = message,
+                cause = cause,
+            )
 
         /**
          * Create a download failed error.
@@ -680,11 +703,12 @@ data class SDKError(
          * @return An SDKError with DOWNLOAD_FAILED code
          */
         fun downloadFailed(url: String, reason: String? = null, cause: Throwable? = null): SDKError {
-            val message = if (reason != null) {
-                "Download failed for $url: $reason"
-            } else {
-                "Download failed: $url"
-            }
+            val message =
+                if (reason != null) {
+                    "Download failed for $url: $reason"
+                } else {
+                    "Download failed: $url"
+                }
             return download(message, ErrorCode.DOWNLOAD_FAILED, cause)
         }
 
@@ -713,13 +737,14 @@ data class SDKError(
         fun authentication(
             message: String,
             code: ErrorCode = ErrorCode.AUTHENTICATION_FAILED,
-            cause: Throwable? = null
-        ): SDKError = SDKError(
-            code = code,
-            category = ErrorCategory.AUTHENTICATION,
-            message = message,
-            cause = cause
-        )
+            cause: Throwable? = null,
+        ): SDKError =
+            SDKError(
+                code = code,
+                category = ErrorCategory.AUTHENTICATION,
+                message = message,
+                cause = cause,
+            )
 
         /**
          * Create an authentication failed error.
@@ -729,11 +754,12 @@ data class SDKError(
          * @return An SDKError with AUTHENTICATION_FAILED code
          */
         fun authenticationFailed(reason: String? = null, cause: Throwable? = null): SDKError {
-            val message = if (reason != null) {
-                "Authentication failed: $reason"
-            } else {
-                "Authentication failed"
-            }
+            val message =
+                if (reason != null) {
+                    "Authentication failed: $reason"
+                } else {
+                    "Authentication failed"
+                }
             return authentication(message, ErrorCode.AUTHENTICATION_FAILED, cause)
         }
 
@@ -754,11 +780,12 @@ data class SDKError(
          * @return An SDKError with UNAUTHORIZED code
          */
         fun unauthorized(resource: String? = null, cause: Throwable? = null): SDKError {
-            val message = if (resource != null) {
-                "Unauthorized access to: $resource"
-            } else {
-                "Unauthorized access"
-            }
+            val message =
+                if (resource != null) {
+                    "Unauthorized access to: $resource"
+                } else {
+                    "Unauthorized access"
+                }
             return authentication(message, ErrorCode.UNAUTHORIZED, cause)
         }
 
@@ -784,7 +811,7 @@ data class SDKError(
                 code = errorCode,
                 category = errorCategory,
                 message = errorMessage,
-                cause = cause
+                cause = cause,
             )
         }
 
@@ -803,7 +830,7 @@ data class SDKError(
                 code = errorCode,
                 category = errorCategory,
                 message = errorMessage,
-                cause = cause
+                cause = cause,
             )
         }
     }

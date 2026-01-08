@@ -23,21 +23,11 @@ private var fileLoggingPath: String? = null
 
 internal actual fun RunAnywhere.setLogLevelInternal(level: LogLevel) {
     currentLogLevel = level
-    // The platform adapter uses its own log level constants
-    // Map our LogLevel to the platform adapter's level
-    val platformLevel = when (level) {
-        LogLevel.VERBOSE -> CppBridgePlatformAdapter.LogLevel.TRACE
-        LogLevel.DEBUG -> CppBridgePlatformAdapter.LogLevel.DEBUG
-        LogLevel.INFO -> CppBridgePlatformAdapter.LogLevel.INFO
-        LogLevel.WARNING -> CppBridgePlatformAdapter.LogLevel.WARN
-        LogLevel.ERROR -> CppBridgePlatformAdapter.LogLevel.ERROR
-        LogLevel.NONE -> CppBridgePlatformAdapter.LogLevel.FATAL // Use FATAL as "no logging"
-    }
-    // Store for later use - actual configuration happens via platform adapter
+    // Log the level change (platform adapter uses its own log level constants)
     CppBridgePlatformAdapter.logCallback(
         CppBridgePlatformAdapter.LogLevel.DEBUG,
         "RunAnywhere",
-        "Log level set to ${level.name}"
+        "Log level set to ${level.name}",
     )
 }
 
@@ -47,7 +37,7 @@ actual fun RunAnywhere.setFileLogging(enabled: Boolean, path: String?) {
     CppBridgePlatformAdapter.logCallback(
         CppBridgePlatformAdapter.LogLevel.DEBUG,
         "RunAnywhere",
-        "File logging ${if (enabled) "enabled" else "disabled"}${path?.let { " at $it" } ?: ""}"
+        "File logging ${if (enabled) "enabled" else "disabled"}${path?.let { " at $it" } ?: ""}",
     )
 }
 
@@ -60,6 +50,6 @@ actual fun RunAnywhere.flushLogs() {
     CppBridgePlatformAdapter.logCallback(
         CppBridgePlatformAdapter.LogLevel.DEBUG,
         "RunAnywhere",
-        "Logs flushed"
+        "Logs flushed",
     )
 }

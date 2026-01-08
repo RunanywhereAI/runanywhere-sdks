@@ -27,11 +27,12 @@ private val logger = SDKLogger(TAG)
 internal actual fun initializePlatformBridge(environment: SDKEnvironment, apiKey: String?, baseURL: String?) {
     logger.info("Initializing CppBridge for environment: $environment")
 
-    val cppEnvironment = when (environment) {
-        SDKEnvironment.DEVELOPMENT -> CppBridge.Environment.DEVELOPMENT
-        SDKEnvironment.STAGING -> CppBridge.Environment.STAGING
-        SDKEnvironment.PRODUCTION -> CppBridge.Environment.PRODUCTION
-    }
+    val cppEnvironment =
+        when (environment) {
+            SDKEnvironment.DEVELOPMENT -> CppBridge.Environment.DEVELOPMENT
+            SDKEnvironment.STAGING -> CppBridge.Environment.STAGING
+            SDKEnvironment.PRODUCTION -> CppBridge.Environment.PRODUCTION
+        }
 
     // Configure telemetry base URL if provided
     if (!baseURL.isNullOrEmpty()) {

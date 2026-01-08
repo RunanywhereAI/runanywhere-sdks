@@ -33,8 +33,6 @@ import Foundation
 /// try await RunAnywhere.speak("Hello")
 /// ```
 public enum SystemTTS: RunAnywhereModule {
-    private static let logger = SDKLogger(category: "SystemTTS")
-
     // MARK: - RunAnywhereModule Conformance
 
     public static let moduleId = "system-tts"

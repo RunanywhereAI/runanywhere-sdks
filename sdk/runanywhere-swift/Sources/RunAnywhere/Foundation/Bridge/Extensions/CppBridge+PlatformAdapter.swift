@@ -92,7 +92,7 @@ private func platformLogCallback(
     level: rac_log_level_t,
     category: UnsafePointer<CChar>?,
     message: UnsafePointer<CChar>?,
-    userData: UnsafeMutableRawPointer?
+    userData _: UnsafeMutableRawPointer?
 ) {
     guard let message = message else { return }
     let msgString = String(cString: message)
@@ -165,7 +165,7 @@ private func parseLogMetadata(_ message: String) -> (String, [String: Any]?) {
 
 private func platformFileExistsCallback(
     path: UnsafePointer<CChar>?,
-    userData: UnsafeMutableRawPointer?
+    userData _: UnsafeMutableRawPointer?
 ) -> rac_bool_t {
     guard let path = path else {
         return RAC_FALSE
@@ -178,7 +178,7 @@ private func platformFileReadCallback(
     path: UnsafePointer<CChar>?,
     outData: UnsafeMutablePointer<UnsafeMutableRawPointer?>?,
     outSize: UnsafeMutablePointer<Int>?,
-    userData: UnsafeMutableRawPointer?
+    userData _: UnsafeMutableRawPointer?
 ) -> rac_result_t {
     guard let path = path, let outData = outData, let outSize = outSize else {
         return RAC_ERROR_NULL_POINTER
@@ -206,7 +206,7 @@ private func platformFileWriteCallback(
     path: UnsafePointer<CChar>?,
     data: UnsafeRawPointer?,
     size: Int,
-    userData: UnsafeMutableRawPointer?
+    userData _: UnsafeMutableRawPointer?
 ) -> rac_result_t {
     guard let path = path, let data = data else {
         return RAC_ERROR_NULL_POINTER
@@ -225,7 +225,7 @@ private func platformFileWriteCallback(
 
 private func platformFileDeleteCallback(
     path: UnsafePointer<CChar>?,
-    userData: UnsafeMutableRawPointer?
+    userData _: UnsafeMutableRawPointer?
 ) -> rac_result_t {
     guard let path = path else {
         return RAC_ERROR_NULL_POINTER
@@ -244,7 +244,7 @@ private func platformFileDeleteCallback(
 private func platformSecureGetCallback(
     key: UnsafePointer<CChar>?,
     outValue: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?,
-    userData: UnsafeMutableRawPointer?
+    userData _: UnsafeMutableRawPointer?
 ) -> rac_result_t {
     guard let key = key, let outValue = outValue else {
         return RAC_ERROR_NULL_POINTER
@@ -280,7 +280,7 @@ private func platformSecureGetCallback(
 private func platformSecureSetCallback(
     key: UnsafePointer<CChar>?,
     value: UnsafePointer<CChar>?,
-    userData: UnsafeMutableRawPointer?
+    userData _: UnsafeMutableRawPointer?
 ) -> rac_result_t {
     guard let key = key, let value = value else {
         return RAC_ERROR_NULL_POINTER
@@ -316,7 +316,7 @@ private func platformSecureSetCallback(
 
 private func platformSecureDeleteCallback(
     key: UnsafePointer<CChar>?,
-    userData: UnsafeMutableRawPointer?
+    userData _: UnsafeMutableRawPointer?
 ) -> rac_result_t {
     guard let key = key else {
         return RAC_ERROR_NULL_POINTER
@@ -338,7 +338,7 @@ private func platformSecureDeleteCallback(
 }
 
 private func platformNowMsCallback(
-    userData: UnsafeMutableRawPointer?
+    userData _: UnsafeMutableRawPointer?
 ) -> Int64 {
     Int64(Date().timeIntervalSince1970 * 1000)
 }
@@ -348,7 +348,7 @@ private func platformNowMsCallback(
 /// Receives structured error JSON from C++ and sends to Sentry
 private func platformTrackErrorCallback(
     errorJson: UnsafePointer<CChar>?,
-    userData: UnsafeMutableRawPointer?
+    userData _: UnsafeMutableRawPointer?
 ) {
     guard let errorJson = errorJson else { return }
 

@@ -16,8 +16,9 @@ package com.runanywhere.sdk.foundation.errors
  *
  * @property rawValue The C++ compatible error code value for interop.
  */
-enum class ErrorCode(val rawValue: Int) {
-
+enum class ErrorCode(
+    val rawValue: Int,
+) {
     // ========================================================================
     // SUCCESS
     // ========================================================================
@@ -191,7 +192,8 @@ enum class ErrorCode(val rawValue: Int) {
     /**
      * Access denied or unauthorized.
      */
-    UNAUTHORIZED(-302);
+    UNAUTHORIZED(-302),
+    ;
 
     companion object {
         /**
@@ -237,33 +239,34 @@ enum class ErrorCode(val rawValue: Int) {
      * Get a human-readable description of the error.
      */
     val description: String
-        get() = when (this) {
-            SUCCESS -> "Operation completed successfully"
-            UNKNOWN -> "An unknown error occurred"
-            INVALID_ARGUMENT -> "Invalid argument provided"
-            NOT_INITIALIZED -> "SDK or component not initialized"
-            ALREADY_INITIALIZED -> "SDK or component already initialized"
-            OUT_OF_MEMORY -> "Out of memory"
-            FILE_NOT_FOUND -> "File not found"
-            MODEL_NOT_FOUND -> "Model not found"
-            TIMEOUT -> "Operation timed out"
-            CANCELLED -> "Operation was cancelled"
-            NETWORK_UNAVAILABLE -> "Network is unavailable"
-            NETWORK_ERROR -> "Network error occurred"
-            MODEL_NOT_LOADED -> "Model not loaded"
-            MODEL_LOAD_FAILED -> "Failed to load model"
-            PLATFORM_ADAPTER_NOT_SET -> "Platform adapter not set"
-            INVALID_HANDLE -> "Invalid handle"
-            STT_TRANSCRIPTION_FAILED -> "Speech-to-text transcription failed"
-            TTS_SYNTHESIS_FAILED -> "Text-to-speech synthesis failed"
-            LLM_GENERATION_FAILED -> "LLM generation failed"
-            VAD_DETECTION_FAILED -> "Voice activity detection failed"
-            VOICE_AGENT_ERROR -> "Voice agent error"
-            DOWNLOAD_FAILED -> "Download failed"
-            DOWNLOAD_CANCELLED -> "Download cancelled"
-            INSUFFICIENT_STORAGE -> "Insufficient storage space"
-            AUTHENTICATION_FAILED -> "Authentication failed"
-            INVALID_API_KEY -> "Invalid API key"
-            UNAUTHORIZED -> "Unauthorized access"
-        }
+        get() =
+            when (this) {
+                SUCCESS -> "Operation completed successfully"
+                UNKNOWN -> "An unknown error occurred"
+                INVALID_ARGUMENT -> "Invalid argument provided"
+                NOT_INITIALIZED -> "SDK or component not initialized"
+                ALREADY_INITIALIZED -> "SDK or component already initialized"
+                OUT_OF_MEMORY -> "Out of memory"
+                FILE_NOT_FOUND -> "File not found"
+                MODEL_NOT_FOUND -> "Model not found"
+                TIMEOUT -> "Operation timed out"
+                CANCELLED -> "Operation was cancelled"
+                NETWORK_UNAVAILABLE -> "Network is unavailable"
+                NETWORK_ERROR -> "Network error occurred"
+                MODEL_NOT_LOADED -> "Model not loaded"
+                MODEL_LOAD_FAILED -> "Failed to load model"
+                PLATFORM_ADAPTER_NOT_SET -> "Platform adapter not set"
+                INVALID_HANDLE -> "Invalid handle"
+                STT_TRANSCRIPTION_FAILED -> "Speech-to-text transcription failed"
+                TTS_SYNTHESIS_FAILED -> "Text-to-speech synthesis failed"
+                LLM_GENERATION_FAILED -> "LLM generation failed"
+                VAD_DETECTION_FAILED -> "Voice activity detection failed"
+                VOICE_AGENT_ERROR -> "Voice agent error"
+                DOWNLOAD_FAILED -> "Download failed"
+                DOWNLOAD_CANCELLED -> "Download cancelled"
+                INSUFFICIENT_STORAGE -> "Insufficient storage space"
+                AUTHENTICATION_FAILED -> "Authentication failed"
+                INVALID_API_KEY -> "Invalid API key"
+                UNAUTHORIZED -> "Unauthorized access"
+            }
 }

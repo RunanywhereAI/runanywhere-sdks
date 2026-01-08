@@ -25,7 +25,6 @@ import com.runanywhere.sdk.foundation.SDKLogger
  * @see com.runanywhere.sdk.foundation.bridge.CppBridge
  */
 object RunAnywhereBridge {
-
     private const val TAG = "RunAnywhereBridge"
 
     // ========================================================================
@@ -170,7 +169,7 @@ object RunAnywhereBridge {
         handle: Long,
         prompt: String,
         optionsJson: String?,
-        tokenCallback: TokenCallback
+        tokenCallback: TokenCallback,
     ): String?
 
     @JvmStatic
@@ -334,7 +333,7 @@ object RunAnywhereBridge {
         frameCallback: Any?,
         speechStartCallback: Any?,
         speechEndCallback: Any?,
-        progressCallback: Any?
+        progressCallback: Any?,
     )
 
     // ========================================================================
@@ -398,7 +397,7 @@ object RunAnywhereBridge {
         downloadSize: Long,
         contextLength: Int,
         supportsThinking: Boolean,
-        description: String?
+        description: String?,
     ): Int
 
     /**
@@ -542,7 +541,7 @@ object RunAnywhereBridge {
         environment: Int,
         deviceId: String,
         platform: String,
-        sdkVersion: String
+        sdkVersion: String,
     ): Long
 
     /**
@@ -578,7 +577,7 @@ object RunAnywhereBridge {
     /**
      * Register analytics events callback with telemetry manager.
      * Events from C++ will be routed to the telemetry manager for batching and HTTP transport.
-     * 
+     *
      * @param telemetryHandle Handle to the telemetry manager (from racTelemetryManagerCreate)
      *                        Pass 0 to unregister the callback
      * @return RAC_SUCCESS or error code
@@ -601,7 +600,7 @@ object RunAnywhereBridge {
         sizeBytes: Long,
         archiveType: String?,
         errorCode: Int,
-        errorMessage: String?
+        errorMessage: String?,
     ): Int
 
     /**
@@ -614,7 +613,7 @@ object RunAnywhereBridge {
         durationMs: Double,
         count: Int,
         errorCode: Int,
-        errorMessage: String?
+        errorMessage: String?,
     ): Int
 
     /**
@@ -626,7 +625,7 @@ object RunAnywhereBridge {
         eventType: Int,
         freedBytes: Long,
         errorCode: Int,
-        errorMessage: String?
+        errorMessage: String?,
     ): Int
 
     /**
@@ -638,7 +637,7 @@ object RunAnywhereBridge {
         eventType: Int,
         deviceId: String?,
         errorCode: Int,
-        errorMessage: String?
+        errorMessage: String?,
     ): Int
 
     /**
@@ -651,7 +650,7 @@ object RunAnywhereBridge {
         errorCode: Int,
         errorMessage: String?,
         operation: String?,
-        context: String?
+        context: String?,
     ): Int
 
     /**
@@ -661,7 +660,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racAnalyticsEventEmitNetwork(
         eventType: Int,
-        isOnline: Boolean
+        isOnline: Boolean,
     ): Int
 
     /**
@@ -685,7 +684,7 @@ object RunAnywhereBridge {
         maxTokens: Int,
         contextLength: Int,
         errorCode: Int,
-        errorMessage: String?
+        errorMessage: String?,
     ): Int
 
     /**
@@ -701,7 +700,7 @@ object RunAnywhereBridge {
         durationMs: Double,
         framework: Int,
         errorCode: Int,
-        errorMessage: String?
+        errorMessage: String?,
     ): Int
 
     /**
@@ -726,7 +725,7 @@ object RunAnywhereBridge {
         isStreaming: Boolean,
         framework: Int,
         errorCode: Int,
-        errorMessage: String?
+        errorMessage: String?,
     ): Int
 
     /**
@@ -747,7 +746,7 @@ object RunAnywhereBridge {
         sampleRate: Int,
         framework: Int,
         errorCode: Int,
-        errorMessage: String?
+        errorMessage: String?,
     ): Int
 
     /**
@@ -758,7 +757,7 @@ object RunAnywhereBridge {
     external fun racAnalyticsEventEmitVad(
         eventType: Int,
         speechDurationMs: Double,
-        energyLevel: Float
+        energyLevel: Float,
     ): Int
 
     // ========================================================================
@@ -825,7 +824,7 @@ object RunAnywhereBridge {
         platform: String,
         sdkVersion: String,
         apiKey: String?,
-        baseUrl: String?
+        baseUrl: String?,
     ): Int
 
     // ========================================================================

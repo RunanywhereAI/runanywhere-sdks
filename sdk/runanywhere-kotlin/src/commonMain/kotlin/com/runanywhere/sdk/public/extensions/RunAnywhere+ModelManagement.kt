@@ -46,7 +46,7 @@ fun RunAnywhere.registerModel(
     modality: ModelCategory = ModelCategory.LANGUAGE,
     artifactType: ModelArtifactType? = null,
     memoryRequirement: Long? = null,
-    supportsThinking: Boolean = false
+    supportsThinking: Boolean = false,
 ): ModelInfo {
     // Generate model ID from URL filename if not provided
     val modelId = id ?: generateModelIdFromUrl(url)
@@ -58,21 +58,22 @@ fun RunAnywhere.registerModel(
     val effectiveArtifactType = artifactType ?: inferArtifactType(url)
 
     // Create ModelInfo
-    val modelInfo = ModelInfo(
-        id = modelId,
-        name = name,
-        category = modality,
-        format = format,
-        downloadURL = url,
-        localPath = null,
-        artifactType = effectiveArtifactType,
-        downloadSize = memoryRequirement,
-        framework = framework,
-        contextLength = if (modality.requiresContextLength) 2048 else null,
-        supportsThinking = supportsThinking,
-        description = "User-added model",
-        source = com.runanywhere.sdk.public.extensions.Models.ModelSource.LOCAL
-    )
+    val modelInfo =
+        ModelInfo(
+            id = modelId,
+            name = name,
+            category = modality,
+            format = format,
+            downloadURL = url,
+            localPath = null,
+            artifactType = effectiveArtifactType,
+            downloadSize = memoryRequirement,
+            framework = framework,
+            contextLength = if (modality.requiresContextLength) 2048 else null,
+            supportsThinking = supportsThinking,
+            description = "User-added model",
+            source = com.runanywhere.sdk.public.extensions.Models.ModelSource.LOCAL,
+        )
 
     // Save to registry (fire-and-forget)
     registerModelInternal(modelInfo)

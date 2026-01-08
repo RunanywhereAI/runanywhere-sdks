@@ -21,9 +21,6 @@ extension CppBridge {
 
         private static var callbacksRegistered = false
 
-        /// UserDefaults key for registration status
-        private static let registeredKey = "com.runanywhere.sdk.deviceRegistered"
-
         // MARK: - Public API
 
         // Register callbacks with C++ device manager.

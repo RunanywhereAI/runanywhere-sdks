@@ -37,7 +37,7 @@ expect suspend fun RunAnywhere.chat(prompt: String): String
  */
 expect suspend fun RunAnywhere.generate(
     prompt: String,
-    options: LLMGenerationOptions? = null
+    options: LLMGenerationOptions? = null,
 ): LLMGenerationResult
 
 /**
@@ -57,7 +57,7 @@ expect suspend fun RunAnywhere.generate(
  */
 expect fun RunAnywhere.generateStream(
     prompt: String,
-    options: LLMGenerationOptions? = null
+    options: LLMGenerationOptions? = null,
 ): Flow<String>
 
 /**
@@ -84,7 +84,7 @@ expect fun RunAnywhere.generateStream(
  */
 expect suspend fun RunAnywhere.generateStreamWithMetrics(
     prompt: String,
-    options: LLMGenerationOptions? = null
+    options: LLMGenerationOptions? = null,
 ): LLMStreamingResult
 
 // MARK: - Generation Control
