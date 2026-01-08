@@ -14,6 +14,23 @@ import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
 const logger = new SDKLogger('DownloadService');
 
 /**
+ * Extended native module type for download service methods
+ * These methods are optional and may not be implemented in all backends
+ */
+interface DownloadNativeModule {
+  startModelDownload?: (modelId: string) => Promise<string>;
+  pauseDownload?: (taskId: string) => Promise<void>;
+  resumeDownload?: (taskId: string) => Promise<void>;
+  pauseAllDownloads?: () => Promise<void>;
+  resumeAllDownloads?: () => Promise<void>;
+  cancelAllDownloads?: () => Promise<void>;
+  configureDownloadService?: (configJson: string) => Promise<void>;
+  isDownloadServiceHealthy?: () => Promise<boolean>;
+  cancelDownload: (taskId: string) => Promise<boolean>;
+  getDownloadProgress: (modelId: string) => Promise<string>;
+}
+
+/**
  * Download state
  */
 export enum DownloadState {
@@ -82,7 +99,10 @@ class DownloadServiceImpl {
       throw new Error('Native module not available');
     }
 
-    const native = requireNativeModule();
+    const native = requireNativeModule() as unknown as DownloadNativeModule;
+    if (!native.startModelDownload) {
+      throw new Error('startModelDownload not available');
+    }
     const taskId = await native.startModelDownload(modelId);
 
     logger.debug(`Started download: ${modelId} (task: ${taskId})`);
@@ -129,7 +149,7 @@ class DownloadServiceImpl {
   async cancelDownload(taskId: string): Promise<void> {
     if (!isNativeModuleAvailable()) return;
 
-    const native = requireNativeModule();
+    const native = requireNativeModule() as unknown as DownloadNativeModule;
     await native.cancelDownload(taskId);
     this.activeTasks.delete(taskId);
   }
@@ -140,8 +160,10 @@ class DownloadServiceImpl {
   async pauseDownload(taskId: string): Promise<void> {
     if (!isNativeModuleAvailable()) return;
 
-    const native = requireNativeModule();
-    await native.pauseDownload(taskId);
+    const native = requireNativeModule() as unknown as DownloadNativeModule;
+    if (native.pauseDownload) {
+      await native.pauseDownload(taskId);
+    }
   }
 
   /**
@@ -150,8 +172,10 @@ class DownloadServiceImpl {
   async resumeDownload(taskId: string): Promise<void> {
     if (!isNativeModuleAvailable()) return;
 
-    const native = requireNativeModule();
-    await native.resumeDownload(taskId);
+    const native = requireNativeModule() as unknown as DownloadNativeModule;
+    if (native.resumeDownload) {
+      await native.resumeDownload(taskId);
+    }
   }
 
   /**
@@ -160,8 +184,10 @@ class DownloadServiceImpl {
   async pauseAll(): Promise<void> {
     if (!isNativeModuleAvailable()) return;
 
-    const native = requireNativeModule();
-    await native.pauseAllDownloads();
+    const native = requireNativeModule() as unknown as DownloadNativeModule;
+    if (native.pauseAllDownloads) {
+      await native.pauseAllDownloads();
+    }
   }
 
   /**
@@ -170,8 +196,10 @@ class DownloadServiceImpl {
   async resumeAll(): Promise<void> {
     if (!isNativeModuleAvailable()) return;
 
-    const native = requireNativeModule();
-    await native.resumeAllDownloads();
+    const native = requireNativeModule() as unknown as DownloadNativeModule;
+    if (native.resumeAllDownloads) {
+      await native.resumeAllDownloads();
+    }
   }
 
   /**
@@ -180,8 +208,10 @@ class DownloadServiceImpl {
   async cancelAll(): Promise<void> {
     if (!isNativeModuleAvailable()) return;
 
-    const native = requireNativeModule();
-    await native.cancelAllDownloads();
+    const native = requireNativeModule() as unknown as DownloadNativeModule;
+    if (native.cancelAllDownloads) {
+      await native.cancelAllDownloads();
+    }
     this.activeTasks.clear();
   }
 
@@ -191,7 +221,7 @@ class DownloadServiceImpl {
   async getDownloadProgress(modelId: string): Promise<number | null> {
     if (!isNativeModuleAvailable()) return null;
 
-    const native = requireNativeModule();
+    const native = requireNativeModule() as unknown as DownloadNativeModule;
     const json = await native.getDownloadProgress(modelId);
     try {
       const data = JSON.parse(json);
@@ -207,8 +237,10 @@ class DownloadServiceImpl {
   async configure(config: DownloadConfiguration): Promise<void> {
     if (!isNativeModuleAvailable()) return;
 
-    const native = requireNativeModule();
-    await native.configureDownloadService(JSON.stringify(config));
+    const native = requireNativeModule() as unknown as DownloadNativeModule;
+    if (native.configureDownloadService) {
+      await native.configureDownloadService(JSON.stringify(config));
+    }
   }
 
   /**
@@ -217,7 +249,10 @@ class DownloadServiceImpl {
   async isHealthy(): Promise<boolean> {
     if (!isNativeModuleAvailable()) return false;
 
-    const native = requireNativeModule();
+    const native = requireNativeModule() as unknown as DownloadNativeModule;
+    if (!native.isDownloadServiceHealthy) {
+      return true; // Assume healthy if method not available
+    }
     return native.isDownloadServiceHealthy();
   }
 

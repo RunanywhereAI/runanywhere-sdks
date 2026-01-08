@@ -7,15 +7,11 @@
 // Text Generation (LLM)
 export {
   loadModel,
-  loadTextModel,
   isModelLoaded,
-  isTextModelLoaded,
   unloadModel,
-  unloadTextModel,
   chat,
   generate,
   generateStream,
-  generateStreamWithCallback,
   cancelGeneration,
 } from './RunAnywhere+TextGeneration';
 

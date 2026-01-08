@@ -119,8 +119,11 @@ export const STTScreen: React.FC = () => {
         clearTimeout(liveRecordingIntervalRef.current);
         liveRecordingIntervalRef.current = null;
       }
-      // Stop SDK streaming if active
-      RunAnywhere.stopStreamingSTT().catch(() => {});
+      // Stop SDK streaming if active (method may not be exposed on public API)
+      const sdk = RunAnywhere as unknown as Record<string, unknown>;
+      if (typeof sdk.stopStreamingSTT === 'function') {
+        (sdk.stopStreamingSTT as () => Promise<boolean>)().catch(() => {});
+      }
       // Stop batch mode recorder
       AudioService.cleanup().catch(() => {});
       // Clean up temp audio file

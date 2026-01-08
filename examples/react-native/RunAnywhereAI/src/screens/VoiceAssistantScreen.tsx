@@ -217,9 +217,7 @@ export const VoiceAssistantScreen: React.FC = () => {
             break;
           case 'llm':
             if (model.localPath) {
-              const llmSuccess = await RunAnywhere.loadModel(
-                model.localPath
-              );
+              const llmSuccess = await RunAnywhere.loadModel(model.localPath);
               if (llmSuccess) {
                 setLLMModel({
                   id: model.id,
