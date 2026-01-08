@@ -180,11 +180,11 @@ export const SettingsScreen: React.FC = () => {
         const storage = await RunAnywhere.getStorageInfo();
         console.log('[Settings] Storage info:', storage);
         setStorageInfo({
-          totalStorage: storage.deviceStorage.totalSpace,
-          appStorage: storage.appStorage.totalSize,
-          modelsStorage: storage.modelStorage.totalSize || 0,
-          cacheSize: storage.cacheSize || 0,
-          freeSpace: storage.deviceStorage.freeSpace,
+          totalStorage: storage.totalSpace,
+          appStorage: storage.usedSpace,
+          modelsStorage: storage.modelsSize,
+          cacheSize: 0, // SDK doesn't provide cache size separately
+          freeSpace: storage.freeSpace,
         });
         // Update storedModels from downloaded models
         const models = await RunAnywhere.getAvailableModels();

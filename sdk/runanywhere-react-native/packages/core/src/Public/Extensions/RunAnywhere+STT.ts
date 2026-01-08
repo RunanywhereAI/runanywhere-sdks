@@ -19,6 +19,16 @@ import type {
 
 const logger = new SDKLogger('RunAnywhere.STT');
 
+/**
+ * Extended native module type for streaming STT methods
+ * These methods are optional and may not be implemented in all backends
+ */
+interface StreamingSTTNativeModule {
+  startStreamingSTT?: (language: string) => Promise<boolean>;
+  stopStreamingSTT?: () => Promise<boolean>;
+  isStreamingSTT?: () => Promise<boolean>;
+}
+
 // ============================================================================
 // Speech-to-Text (STT) Extension
 // ============================================================================
@@ -377,7 +387,12 @@ export async function startStreamingSTT(
     });
   }
 
-  return native.startStreamingSTT(language);
+  const streamingNative = native as unknown as StreamingSTTNativeModule;
+  if (!streamingNative.startStreamingSTT) {
+    logger.warning('startStreamingSTT not available');
+    return false;
+  }
+  return streamingNative.startStreamingSTT(language);
 }
 
 /**
@@ -387,7 +402,10 @@ export async function stopStreamingSTT(): Promise<boolean> {
   if (!isNativeModuleAvailable()) {
     return false;
   }
-  const native = requireNativeModule();
+  const native = requireNativeModule() as unknown as StreamingSTTNativeModule;
+  if (!native.stopStreamingSTT) {
+    return false;
+  }
   return native.stopStreamingSTT();
 }
 
@@ -398,6 +416,9 @@ export async function isStreamingSTT(): Promise<boolean> {
   if (!isNativeModuleAvailable()) {
     return false;
   }
-  const native = requireNativeModule();
+  const native = requireNativeModule() as unknown as StreamingSTTNativeModule;
+  if (!native.isStreamingSTT) {
+    return false;
+  }
   return native.isStreamingSTT();
 }

@@ -26,15 +26,76 @@ function getNativeModule(): { extractArchive: (archivePath: string, destPath: st
         return null;
       }
     } catch (e) {
-      logger.error('Failed to load native module:', e);
+      logger.error('Failed to load native module:', { error: e });
       return null;
     }
   }
   return _nativeModuleGetter ? _nativeModuleGetter() : null;
 }
 
+// Types for react-native-fs (defined locally to avoid module resolution issues)
+interface RNFSDownloadBeginCallbackResult {
+  jobId: number;
+  statusCode: number;
+  contentLength: number;
+  headers: Record<string, string>;
+}
+
+interface RNFSDownloadProgressCallbackResult {
+  jobId: number;
+  contentLength: number;
+  bytesWritten: number;
+}
+
+interface RNFSStatResult {
+  name: string;
+  path: string;
+  size: number;
+  mode: number;
+  ctime: number;
+  mtime: number;
+  isFile: () => boolean;
+  isDirectory: () => boolean;
+}
+
+interface RNFSDownloadResult {
+  jobId: number;
+  statusCode: number;
+  bytesWritten: number;
+}
+
+interface RNFSDownloadFileOptions {
+  fromUrl: string;
+  toFile: string;
+  headers?: Record<string, string>;
+  background?: boolean;
+  progressDivider?: number;
+  begin?: (res: RNFSDownloadBeginCallbackResult) => void;
+  progress?: (res: RNFSDownloadProgressCallbackResult) => void;
+  resumable?: () => void;
+  connectionTimeout?: number;
+  readTimeout?: number;
+}
+
+interface RNFSModule {
+  DocumentDirectoryPath: string;
+  CachesDirectoryPath: string;
+  exists: (path: string) => Promise<boolean>;
+  mkdir: (path: string, options?: { NSURLIsExcludedFromBackupKey?: boolean }) => Promise<void>;
+  readDir: (path: string) => Promise<RNFSStatResult[]>;
+  readFile: (path: string, encoding?: string) => Promise<string>;
+  writeFile: (path: string, contents: string, encoding?: string) => Promise<void>;
+  moveFile: (source: string, dest: string) => Promise<void>;
+  copyFile: (source: string, dest: string) => Promise<void>;
+  unlink: (path: string) => Promise<void>;
+  stat: (path: string) => Promise<RNFSStatResult>;
+  getFSInfo: () => Promise<{ totalSpace: number; freeSpace: number }>;
+  downloadFile: (options: RNFSDownloadFileOptions) => { jobId: number; promise: Promise<RNFSDownloadResult> };
+  stopDownload: (jobId: number) => void;
+}
+
 // Try to import react-native-fs
-let RNFS: typeof import('react-native-fs') | null = null;
+let RNFS: RNFSModule | null = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   RNFS = require('react-native-fs');
@@ -326,7 +387,7 @@ export const FileSystem = {
         await RNFS.mkdir(path);
       }
     } catch (error) {
-      logger.error(`Failed to create directory: ${path}`, error);
+      logger.error(`Failed to create directory: ${path}`, { error });
     }
   },
 
@@ -385,9 +446,6 @@ export const FileSystem = {
       fromUrl: url,
       toFile: destPath,
       background: true,
-      discretionary: true,
-      cacheable: false,
-      progressInterval: 300,
       progressDivider: 1,
       begin: (res) => {
         logger.info(
@@ -606,7 +664,7 @@ export const FileSystem = {
       }
       return false;
     } catch (error) {
-      logger.error(`Failed to delete model: ${modelId}`, error);
+      logger.error(`Failed to delete model: ${modelId}`, { error });
       return false;
     }
   },

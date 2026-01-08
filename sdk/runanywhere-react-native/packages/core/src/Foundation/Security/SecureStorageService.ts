@@ -21,6 +21,18 @@ import type { SDKInitParams } from '../Initialization';
 import type { SDKEnvironment } from '../../types';
 
 /**
+ * Extended native module type for secure storage methods
+ * These methods are optional and may not be available on all platforms
+ */
+interface SecureStorageNativeModule {
+  secureStorageIsAvailable?: () => Promise<boolean>;
+  secureStorageStore?: (key: string, value: string) => Promise<void>;
+  secureStorageRetrieve?: (key: string) => Promise<string | null>;
+  secureStorageDelete?: (key: string) => Promise<void>;
+  secureStorageExists?: (key: string) => Promise<boolean>;
+}
+
+/**
  * Secure storage service
  *
  * Provides secure key-value storage matching iOS KeychainManager.
@@ -44,7 +56,7 @@ class SecureStorageServiceImpl {
     }
 
     try {
-      const native = requireNativeModule();
+      const native = requireNativeModule() as unknown as SecureStorageNativeModule;
       // Try a simple operation to verify native storage works
       if (native.secureStorageIsAvailable) {
         this._isAvailable = await native.secureStorageIsAvailable();
@@ -52,7 +64,7 @@ class SecureStorageServiceImpl {
         // If native method doesn't exist, assume available (native handles it)
         this._isAvailable = true;
       }
-      return this._isAvailable;
+      return this._isAvailable ?? true;
     } catch {
       this._isAvailable = false;
       return false;
@@ -71,7 +83,7 @@ class SecureStorageServiceImpl {
    */
   async store(value: string, key: SecureStorageKey | string): Promise<void> {
     try {
-      const native = requireNativeModule();
+      const native = requireNativeModule() as unknown as SecureStorageNativeModule;
 
       if (native.secureStorageStore) {
         await native.secureStorageStore(key, value);
@@ -106,7 +118,7 @@ class SecureStorageServiceImpl {
     }
 
     try {
-      const native = requireNativeModule();
+      const native = requireNativeModule() as unknown as SecureStorageNativeModule;
 
       if (native.secureStorageRetrieve) {
         const value = await native.secureStorageRetrieve(key);
@@ -138,7 +150,7 @@ class SecureStorageServiceImpl {
    */
   async delete(key: SecureStorageKey | string): Promise<void> {
     try {
-      const native = requireNativeModule();
+      const native = requireNativeModule() as unknown as SecureStorageNativeModule;
 
       if (native.secureStorageDelete) {
         await native.secureStorageDelete(key);
@@ -171,7 +183,7 @@ class SecureStorageServiceImpl {
     }
 
     try {
-      const native = requireNativeModule();
+      const native = requireNativeModule() as unknown as SecureStorageNativeModule;
 
       if (native.secureStorageExists) {
         return await native.secureStorageExists(key);
