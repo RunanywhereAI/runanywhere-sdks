@@ -30,7 +30,6 @@ import java.util.UUID
  * - All callbacks are thread-safe
  */
 object CppBridgeDevice {
-
     /**
      * Device platform type constants matching C++ RAC_PLATFORM_* values.
      */
@@ -74,7 +73,7 @@ object CppBridgeDevice {
      * Secure storage key for device ID.
      */
     private const val DEVICE_ID_KEY = "runanywhere_device_id"
-    
+
     /**
      * Secure storage key for registration status.
      * Used to persist registration status across app restarts.
@@ -127,7 +126,7 @@ object CppBridgeDevice {
      *
      * Implement this interface to provide accurate device information
      * on Android (Build.MODEL, Build.VERSION.SDK_INT, etc.).
-     * 
+     *
      * This matches the Swift SDK's DeviceInfo struct fields.
      */
     interface DeviceInfoProvider {
@@ -274,177 +273,187 @@ object CppBridgeDevice {
 
             // Initialize device ID if not already set
             initializeDeviceId()
-            
+
             // Load persisted registration status (prevents re-registering on every app start)
             loadRegistrationStatus()
 
             // Create device callbacks object for JNI
-            val callbacks = object {
-                @Suppress("unused")
-                fun getDeviceInfo(): String = getDeviceInfoCallback()
+            val callbacks =
+                object {
+                    @Suppress("unused")
+                    fun getDeviceInfo(): String = getDeviceInfoCallback()
 
-                @Suppress("unused")
-                fun getDeviceId(): String = getDeviceIdCallback()
+                    @Suppress("unused")
+                    fun getDeviceId(): String = getDeviceIdCallback()
 
-                @Suppress("unused")
-                fun isRegistered(): Boolean = isDeviceRegisteredCallback()
+                    @Suppress("unused")
+                    fun isRegistered(): Boolean = isDeviceRegisteredCallback()
 
-                @Suppress("unused")
-                fun setRegistered(registered: Boolean) {
-                    setRegistrationStatusCallback(
-                        if (registered) RegistrationStatus.REGISTERED else RegistrationStatus.NOT_REGISTERED,
-                        null
-                    )
-                }
+                    @Suppress("unused")
+                    fun setRegistered(registered: Boolean) {
+                        setRegistrationStatusCallback(
+                            if (registered) RegistrationStatus.REGISTERED else RegistrationStatus.NOT_REGISTERED,
+                            null,
+                        )
+                    }
 
-                @Suppress("unused")
-                fun httpPost(endpoint: String, body: String, requiresAuth: Boolean): Int {
-                    // Get environment from telemetry (0=DEV, 1=STAGING, 2=PRODUCTION)
-                    val env = CppBridgeTelemetry.currentEnvironment
-                    
-                    val baseUrl: String?
-                    val headers = mutableMapOf(
-                        "Content-Type" to "application/json",
-                        "Accept" to "application/json"
-                    )
-                    
-                    if (env == 0) {
-                        // DEVELOPMENT mode - use Supabase
-                        baseUrl = try {
-                            com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racDevConfigGetSupabaseUrl()
-                        } catch (e: Exception) {
-                            null
-                        }
-                        
-                        // Add Supabase-specific headers
-                        headers["Prefer"] = "resolution=merge-duplicates"
-                        
-                        // Add Supabase API key
-                        try {
-                            val apiKey = com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racDevConfigGetSupabaseKey()
-                            if (!apiKey.isNullOrEmpty()) {
-                                headers["apikey"] = apiKey
+                    @Suppress("unused")
+                    fun httpPost(endpoint: String, body: String, requiresAuth: Boolean): Int {
+                        // Get environment from telemetry (0=DEV, 1=STAGING, 2=PRODUCTION)
+                        val env = CppBridgeTelemetry.currentEnvironment
+
+                        val baseUrl: String?
+                        val headers =
+                            mutableMapOf(
+                                "Content-Type" to "application/json",
+                                "Accept" to "application/json",
+                            )
+
+                        if (env == 0) {
+                            // DEVELOPMENT mode - use Supabase
+                            baseUrl =
+                                try {
+                                    com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+                                        .racDevConfigGetSupabaseUrl()
+                                } catch (e: Exception) {
+                                    null
+                                }
+
+                            // Add Supabase-specific headers
+                            headers["Prefer"] = "resolution=merge-duplicates"
+
+                            // Add Supabase API key
+                            try {
+                                val apiKey =
+                                    com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+                                        .racDevConfigGetSupabaseKey()
+                                if (!apiKey.isNullOrEmpty()) {
+                                    headers["apikey"] = apiKey
+                                    CppBridgePlatformAdapter.logCallback(
+                                        CppBridgePlatformAdapter.LogLevel.DEBUG,
+                                        TAG,
+                                        "Added Supabase apikey header (dev mode)",
+                                    )
+                                }
+                            } catch (e: Exception) {
+                                CppBridgePlatformAdapter.logCallback(
+                                    CppBridgePlatformAdapter.LogLevel.WARN,
+                                    TAG,
+                                    "Failed to get Supabase API key: ${e.message}",
+                                )
+                            }
+                        } else {
+                            // PRODUCTION/STAGING mode - use Railway backend
+                            baseUrl = CppBridgeTelemetry.getBaseUrl()
+
+                            // Add Bearer auth with JWT access token
+                            // Use getValidToken() which automatically refreshes if needed
+                            val accessToken = CppBridgeAuth.getValidToken()
+                            if (!accessToken.isNullOrEmpty()) {
+                                headers["Authorization"] = "Bearer $accessToken"
                                 CppBridgePlatformAdapter.logCallback(
                                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                                     TAG,
-                                    "Added Supabase apikey header (dev mode)"
-                                )
-                            }
-                        } catch (e: Exception) {
-                            CppBridgePlatformAdapter.logCallback(
-                                CppBridgePlatformAdapter.LogLevel.WARN,
-                                TAG,
-                                "Failed to get Supabase API key: ${e.message}"
-                            )
-                        }
-                    } else {
-                        // PRODUCTION/STAGING mode - use Railway backend
-                        baseUrl = CppBridgeTelemetry.getBaseUrl()
-                        
-                        // Add Bearer auth with JWT access token
-                        // Use getValidToken() which automatically refreshes if needed
-                        val accessToken = CppBridgeAuth.getValidToken()
-                        if (!accessToken.isNullOrEmpty()) {
-                            headers["Authorization"] = "Bearer $accessToken"
-                            CppBridgePlatformAdapter.logCallback(
-                                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                                TAG,
-                                "Added Authorization Bearer header with JWT (prod/staging mode)"
-                            )
-                        } else {
-                            // Fallback to API key if no JWT available
-                            val apiKey = CppBridgeTelemetry.getApiKey()
-                            if (!apiKey.isNullOrEmpty()) {
-                                headers["Authorization"] = "Bearer $apiKey"
-                                CppBridgePlatformAdapter.logCallback(
-                                    CppBridgePlatformAdapter.LogLevel.WARN,
-                                    TAG,
-                                    "⚠️ No JWT - using API key directly (may fail if backend requires JWT)"
+                                    "Added Authorization Bearer header with JWT (prod/staging mode)",
                                 )
                             } else {
-                                CppBridgePlatformAdapter.logCallback(
-                                    CppBridgePlatformAdapter.LogLevel.WARN,
-                                    TAG,
-                                    "⚠️ No access token or API key available for Bearer auth!"
-                                )
+                                // Fallback to API key if no JWT available
+                                val apiKey = CppBridgeTelemetry.getApiKey()
+                                if (!apiKey.isNullOrEmpty()) {
+                                    headers["Authorization"] = "Bearer $apiKey"
+                                    CppBridgePlatformAdapter.logCallback(
+                                        CppBridgePlatformAdapter.LogLevel.WARN,
+                                        TAG,
+                                        "⚠️ No JWT - using API key directly (may fail if backend requires JWT)",
+                                    )
+                                } else {
+                                    CppBridgePlatformAdapter.logCallback(
+                                        CppBridgePlatformAdapter.LogLevel.WARN,
+                                        TAG,
+                                        "⚠️ No access token or API key available for Bearer auth!",
+                                    )
+                                }
                             }
                         }
-                    }
-                    
-                    if (baseUrl.isNullOrEmpty()) {
-                        CppBridgePlatformAdapter.logCallback(
-                            CppBridgePlatformAdapter.LogLevel.ERROR,
-                            TAG,
-                            "❌ No base URL configured for device registration (env=$env)"
-                        )
-                        return -1
-                    }
-                    
-                    // For Supabase (dev mode), add ?on_conflict=device_id for UPSERT
-                    // For Railway (prod mode), the backend handles conflict internally
-                    val finalEndpoint = if (env == 0) {
-                        if (endpoint.contains("?")) "$endpoint&on_conflict=device_id" else "$endpoint?on_conflict=device_id"
-                    } else {
-                        endpoint
-                    }
-                    
-                    // Build full URL: baseUrl + endpoint path
-                    val fullUrl = baseUrl.trimEnd('/') + finalEndpoint
-                    
-                    CppBridgePlatformAdapter.logCallback(
-                        CppBridgePlatformAdapter.LogLevel.INFO,
-                        TAG,
-                        "📤 Device registration HTTP POST to: $fullUrl (env=$env)"
-                    )
-                    
-                    // Log request body for debugging
-                    val bodyPreview = if (body.length > 200) body.substring(0, 200) + "..." else body
-                    CppBridgePlatformAdapter.logCallback(
-                        CppBridgePlatformAdapter.LogLevel.DEBUG,
-                        TAG,
-                        "Device registration body: $bodyPreview"
-                    )
-                    
-                    val (statusCode, response) = CppBridgeTelemetry.sendTelemetry(
-                        fullUrl,
-                        CppBridgeTelemetry.HttpMethod.POST,
-                        headers,
-                        body
-                    )
-                    
-                    if (statusCode in 200..299 || statusCode == 409) {
+
+                        if (baseUrl.isNullOrEmpty()) {
+                            CppBridgePlatformAdapter.logCallback(
+                                CppBridgePlatformAdapter.LogLevel.ERROR,
+                                TAG,
+                                "❌ No base URL configured for device registration (env=$env)",
+                            )
+                            return -1
+                        }
+
+                        // For Supabase (dev mode), add ?on_conflict=device_id for UPSERT
+                        // For Railway (prod mode), the backend handles conflict internally
+                        val finalEndpoint =
+                            if (env == 0) {
+                                if (endpoint.contains("?")) "$endpoint&on_conflict=device_id" else "$endpoint?on_conflict=device_id"
+                            } else {
+                                endpoint
+                            }
+
+                        // Build full URL: baseUrl + endpoint path
+                        val fullUrl = baseUrl.trimEnd('/') + finalEndpoint
+
                         CppBridgePlatformAdapter.logCallback(
                             CppBridgePlatformAdapter.LogLevel.INFO,
                             TAG,
-                            "✅ Device registration successful (status=$statusCode)"
+                            "📤 Device registration HTTP POST to: $fullUrl (env=$env)",
                         )
-                    } else {
+
+                        // Log request body for debugging
+                        val bodyPreview = if (body.length > 200) body.substring(0, 200) + "..." else body
                         CppBridgePlatformAdapter.logCallback(
-                            CppBridgePlatformAdapter.LogLevel.ERROR,
+                            CppBridgePlatformAdapter.LogLevel.DEBUG,
                             TAG,
-                            "❌ Device registration failed: status=$statusCode, response=$response"
+                            "Device registration body: $bodyPreview",
                         )
+
+                        val (statusCode, response) =
+                            CppBridgeTelemetry.sendTelemetry(
+                                fullUrl,
+                                CppBridgeTelemetry.HttpMethod.POST,
+                                headers,
+                                body,
+                            )
+
+                        if (statusCode in 200..299 || statusCode == 409) {
+                            CppBridgePlatformAdapter.logCallback(
+                                CppBridgePlatformAdapter.LogLevel.INFO,
+                                TAG,
+                                "✅ Device registration successful (status=$statusCode)",
+                            )
+                        } else {
+                            CppBridgePlatformAdapter.logCallback(
+                                CppBridgePlatformAdapter.LogLevel.ERROR,
+                                TAG,
+                                "❌ Device registration failed: status=$statusCode, response=$response",
+                            )
+                        }
+
+                        return statusCode
                     }
-                    
-                    return statusCode
                 }
-            }
 
             // Register with native
-            val result = com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racDeviceManagerSetCallbacks(callbacks)
+            val result =
+                com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+                    .racDeviceManagerSetCallbacks(callbacks)
 
             if (result == 0) {
                 isRegistered = true
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Device callbacks registered. Device ID: ${deviceId ?: "unknown"}"
+                    "Device callbacks registered. Device ID: ${deviceId ?: "unknown"}",
                 )
             } else {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Failed to register device callbacks: $result"
+                    "Failed to register device callbacks: $result",
                 )
             }
         }
@@ -479,13 +488,13 @@ object CppBridgeDevice {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "📱 getDeviceInfoCallback() called - gathering device info..."
+            "📱 getDeviceInfoCallback() called - gathering device info...",
         )
-        
+
         val provider = deviceInfoProvider
 
         val platform = "android" // String platform for backend
-        val platformId = detectPlatform() // Int for internal use
+        // Note: detectPlatform() available for future use if needed
         val deviceModel = provider?.getDeviceModel() ?: getDefaultDeviceModel()
         val deviceName = provider?.getDeviceName() ?: deviceModel
         val manufacturer = provider?.getDeviceManufacturer() ?: getDefaultManufacturer()
@@ -495,7 +504,10 @@ object CppBridgeDevice {
         // Use RunAnywhere SDK version string (e.g., "0.1.0"), not Android API level
         val sdkVersionString = com.runanywhere.sdk.utils.SDKConstants.SDK_VERSION
         val locale = provider?.getLocale() ?: Locale.getDefault().toLanguageTag()
-        val timezone = provider?.getTimezone() ?: java.util.TimeZone.getDefault().id
+        val timezone =
+            provider?.getTimezone() ?: java.util.TimeZone
+                .getDefault()
+                .id
         val isEmulator = provider?.isEmulator() ?: false
         val formFactor = provider?.getFormFactor() ?: "phone"
         val architecture = provider?.getArchitecture() ?: getDefaultArchitecture()
@@ -513,12 +525,12 @@ object CppBridgeDevice {
         val performanceCores = provider?.getPerformanceCores() ?: (coreCount / 2)
         val efficiencyCores = provider?.getEfficiencyCores() ?: (coreCount - performanceCores)
         val deviceIdValue = deviceId ?: ""
-        
+
         // Log key device info for debugging
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.INFO,
             TAG,
-            "📱 Device info: model=$deviceModel, os=$osVersion, arch=$architecture, chip=$chipName"
+            "📱 Device info: model=$deviceModel, os=$osVersion, arch=$architecture, chip=$chipName",
         )
 
         // Build JSON matching rac_device_registration_info_t struct
@@ -577,6 +589,7 @@ object CppBridgeDevice {
         // Try to get Android SUPPORTED_ABIS first (returns "arm64-v8a", "armeabi-v7a", etc.)
         try {
             val buildClass = Class.forName("android.os.Build")
+
             @Suppress("UNCHECKED_CAST")
             val supportedAbis = buildClass.getField("SUPPORTED_ABIS").get(null) as? Array<String>
             if (!supportedAbis.isNullOrEmpty()) {
@@ -585,7 +598,7 @@ object CppBridgeDevice {
         } catch (e: Exception) {
             // Fall through to system property
         }
-        
+
         // Fallback: map JVM os.arch to Android-style ABI strings
         val arch = System.getProperty("os.arch") ?: return "unknown"
         return when {
@@ -609,23 +622,23 @@ object CppBridgeDevice {
             val contextClass = Class.forName("android.content.Context")
             val activityServiceField = contextClass.getField("ACTIVITY_SERVICE")
             val activityService = activityServiceField.get(null) as String
-            
+
             // Get application context
             val activityThreadClass = Class.forName("android.app.ActivityThread")
             val currentAppMethod = activityThreadClass.getMethod("currentApplication")
             val context = currentAppMethod.invoke(null)
-            
+
             if (context != null) {
                 val getSystemServiceMethod = contextClass.getMethod("getSystemService", String::class.java)
                 val activityManager = getSystemServiceMethod.invoke(context, activityService)
-                
+
                 if (activityManager != null) {
                     val memInfoClass = Class.forName("android.app.ActivityManager\$MemoryInfo")
                     val memInfo = memInfoClass.getDeclaredConstructor().newInstance()
-                    
+
                     val getMemInfoMethod = activityManager.javaClass.getMethod("getMemoryInfo", memInfoClass)
                     getMemInfoMethod.invoke(activityManager, memInfo)
-                    
+
                     val totalMemField = memInfoClass.getField("totalMem")
                     return totalMemField.getLong(memInfo)
                 }
@@ -634,10 +647,10 @@ object CppBridgeDevice {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Could not get device memory via ActivityManager: ${e.message}"
+                "Could not get device memory via ActivityManager: ${e.message}",
             )
         }
-        
+
         // Fallback to JVM max memory (less accurate)
         return Runtime.getRuntime().maxMemory()
     }
@@ -657,7 +670,7 @@ object CppBridgeDevice {
         } catch (e: Exception) {
             // Fall through
         }
-        
+
         // Try to read from /proc/cpuinfo
         try {
             val cpuInfo = java.io.File("/proc/cpuinfo").readText()
@@ -672,7 +685,7 @@ object CppBridgeDevice {
         } catch (e: Exception) {
             // Fall through
         }
-        
+
         // Fallback to architecture as last resort
         return architecture
     }
@@ -681,7 +694,7 @@ object CppBridgeDevice {
      * Get default GPU family based on chip name.
      * Infers GPU vendor from known chip manufacturers:
      * - Samsung Exynos → Mali
-     * - Qualcomm Snapdragon → Adreno  
+     * - Qualcomm Snapdragon → Adreno
      * - MediaTek → Mali (mostly)
      * - HiSilicon Kirin → Mali
      * - Google Tensor → Mali
@@ -689,45 +702,45 @@ object CppBridgeDevice {
      */
     private fun getDefaultGPUFamily(chipName: String): String {
         val chipLower = chipName.lowercase()
-        
+
         return when {
             // Samsung Exynos uses Mali GPUs
             chipLower.contains("exynos") -> "mali"
-            chipLower.startsWith("s5e") -> "mali"  // Samsung internal chip naming (e.g., s5e8535)
+            chipLower.startsWith("s5e") -> "mali" // Samsung internal chip naming (e.g., s5e8535)
             chipLower.contains("samsung") -> "mali"
-            
+
             // Qualcomm Snapdragon uses Adreno GPUs
             chipLower.contains("snapdragon") -> "adreno"
             chipLower.contains("qualcomm") -> "adreno"
-            chipLower.contains("sdm") -> "adreno"  // SDM845, SDM855, etc.
-            chipLower.contains("sm8") -> "adreno"  // SM8150, SM8250, etc.
-            chipLower.contains("sm7") -> "adreno"  // SM7150, etc.
-            chipLower.contains("sm6") -> "adreno"  // SM6150, etc.
-            chipLower.contains("msm") -> "adreno"  // Older MSM chips
-            
+            chipLower.contains("sdm") -> "adreno" // SDM845, SDM855, etc.
+            chipLower.contains("sm8") -> "adreno" // SM8150, SM8250, etc.
+            chipLower.contains("sm7") -> "adreno" // SM7150, etc.
+            chipLower.contains("sm6") -> "adreno" // SM6150, etc.
+            chipLower.contains("msm") -> "adreno" // Older MSM chips
+
             // MediaTek uses Mali GPUs (mostly)
             chipLower.contains("mediatek") -> "mali"
-            chipLower.contains("mt6") -> "mali"    // MT6xxx series
-            chipLower.contains("mt8") -> "mali"    // MT8xxx series
+            chipLower.contains("mt6") -> "mali" // MT6xxx series
+            chipLower.contains("mt8") -> "mali" // MT8xxx series
             chipLower.contains("dimensity") -> "mali"
             chipLower.contains("helio") -> "mali"
-            
+
             // HiSilicon Kirin uses Mali GPUs
             chipLower.contains("kirin") -> "mali"
             chipLower.contains("hisilicon") -> "mali"
-            
+
             // Google Tensor uses Mali GPUs
             chipLower.contains("tensor") -> "mali"
-            chipLower.contains("gs1") -> "mali"    // GS101 (Tensor)
-            chipLower.contains("gs2") -> "mali"    // GS201 (Tensor G2)
-            
+            chipLower.contains("gs1") -> "mali" // GS101 (Tensor)
+            chipLower.contains("gs2") -> "mali" // GS201 (Tensor G2)
+
             // Intel/x86 GPUs
             chipLower.contains("intel") -> "intel"
-            
+
             // NVIDIA (rare on mobile)
             chipLower.contains("nvidia") -> "nvidia"
             chipLower.contains("tegra") -> "nvidia"
-            
+
             else -> "unknown"
         }
     }
@@ -771,18 +784,18 @@ object CppBridgeDevice {
     fun isDeviceRegisteredCallback(): Boolean {
         // Get current environment from telemetry (0=DEV, 1=STAGING, 2=PRODUCTION)
         val env = CppBridgeTelemetry.currentEnvironment
-        
+
         // For DEVELOPMENT mode (env=0): Always return false to trigger UPSERT
         // Supabase handles duplicates gracefully with ?on_conflict=device_id
         if (env == 0) {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "isDeviceRegisteredCallback: dev mode → returning false (UPSERT always)"
+                "isDeviceRegisteredCallback: dev mode → returning false (UPSERT always)",
             )
             return false
         }
-        
+
         // For PRODUCTION/STAGING mode (env != 0): Return persisted status
         // - First launch: NOT_REGISTERED → returns false → registers once
         // - Subsequent launches: REGISTERED → returns true → skips registration
@@ -790,7 +803,7 @@ object CppBridgeDevice {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "isDeviceRegisteredCallback: prod/staging mode → returning $isRegistered (register once)"
+            "isDeviceRegisteredCallback: prod/staging mode → returning $isRegistered (register once)",
         )
         return isRegistered
     }
@@ -815,7 +828,7 @@ object CppBridgeDevice {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Registration status changed: $previousStatus -> $status"
+            "Registration status changed: $previousStatus -> $status",
         )
 
         // Persist registration status so we don't re-register on every app restart
@@ -837,7 +850,7 @@ object CppBridgeDevice {
                 RegistrationStatus.FAILED -> {
                     deviceListener?.onRegistrationFailed(
                         deviceIdValue,
-                        errorMessage ?: "Unknown error"
+                        errorMessage ?: "Unknown error",
                     )
                 }
             }
@@ -845,7 +858,7 @@ object CppBridgeDevice {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in device listener: ${e.message}"
+                "Error in device listener: ${e.message}",
             )
         }
     }
@@ -868,12 +881,12 @@ object CppBridgeDevice {
         url: String,
         body: String,
         headers: String?,
-        completionCallbackId: Long
+        completionCallbackId: Long,
     ) {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Device registration POST to: $url"
+            "Device registration POST to: $url",
         )
 
         // Delegate to telemetry HTTP callback if available
@@ -883,7 +896,7 @@ object CppBridgeDevice {
             method = CppBridgeTelemetry.HttpMethod.POST,
             headers = headers,
             body = body,
-            completionCallbackId = completionCallbackId
+            completionCallbackId = completionCallbackId,
         )
     }
 
@@ -897,9 +910,11 @@ object CppBridgeDevice {
      * Registers [getDeviceInfoCallback], [getDeviceIdCallback],
      * [isDeviceRegisteredCallback], [setRegistrationStatusCallback],
      * and [httpPostCallback] with C++ core.
+     * Reserved for future native callback integration.
      *
      * C API: rac_device_set_callbacks(...)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeSetDeviceCallbacks()
 
@@ -907,9 +922,11 @@ object CppBridgeDevice {
      * Native method to unset the device callbacks.
      *
      * Called during shutdown to clean up native resources.
+     * Reserved for future native callback integration.
      *
      * C API: rac_device_set_callbacks(nullptr)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeUnsetDeviceCallbacks()
 
@@ -958,7 +975,7 @@ object CppBridgeDevice {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Device callbacks unregistered"
+                "Device callbacks unregistered",
             )
         }
     }
@@ -992,13 +1009,13 @@ object CppBridgeDevice {
         // Store in secure storage
         CppBridgePlatformAdapter.secureSetCallback(
             DEVICE_ID_KEY,
-            newId.toByteArray(Charsets.UTF_8)
+            newId.toByteArray(Charsets.UTF_8),
         )
 
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.INFO,
             TAG,
-            "Generated new device ID: $newId"
+            "Generated new device ID: $newId",
         )
     }
 
@@ -1025,7 +1042,7 @@ object CppBridgeDevice {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.INFO,
                     TAG,
-                    "📋 Loaded persisted registration status: REGISTERED"
+                    "📋 Loaded persisted registration status: REGISTERED",
                 )
             }
         }
@@ -1040,12 +1057,12 @@ object CppBridgeDevice {
         val value = if (isRegistered) "true" else "false"
         CppBridgePlatformAdapter.secureSetCallback(
             REGISTRATION_STATUS_KEY,
-            value.toByteArray(Charsets.UTF_8)
+            value.toByteArray(Charsets.UTF_8),
         )
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Persisted registration status: $value"
+            "Persisted registration status: $value",
         )
     }
 
@@ -1061,7 +1078,7 @@ object CppBridgeDevice {
             deviceId = id
             CppBridgePlatformAdapter.secureSetCallback(
                 DEVICE_ID_KEY,
-                id.toByteArray(Charsets.UTF_8)
+                id.toByteArray(Charsets.UTF_8),
             )
         }
     }
@@ -1087,14 +1104,14 @@ object CppBridgeDevice {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.INFO,
             TAG,
-            "📱 triggerRegistration called: env=$environment, buildToken=${if (buildToken != null) "present (${buildToken.length} chars)" else "null"}"
+            "📱 triggerRegistration called: env=$environment, buildToken=${if (buildToken != null) "present (${buildToken.length} chars)" else "null"}",
         )
-        
+
         if (!isRegistered) {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "❌ Cannot trigger registration: device callbacks not registered"
+                "❌ Cannot trigger registration: device callbacks not registered",
             )
             return false
         }
@@ -1102,7 +1119,7 @@ object CppBridgeDevice {
         // NOTE: Unlike development mode, we don't skip registration for production/staging
         // based on local registrationStatus. This matches Swift SDK behavior where the C++
         // layer handles all the logic via rac_device_manager_register_if_needed().
-        // 
+        //
         // For production/staging (env != 0):
         // - The C++ code will skip if already registered (performance optimization)
         // - But we need to call it at least once to send full device info
@@ -1111,12 +1128,12 @@ object CppBridgeDevice {
         // For development (env == 0):
         // - The C++ code uses UPSERT to always update (track active devices)
         // - We still call every time to update last_seen_at
-        
+
         if (registrationStatus == RegistrationStatus.REGISTERING) {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "⏳ Device registration already in progress"
+                "⏳ Device registration already in progress",
             )
             return true
         }
@@ -1124,25 +1141,27 @@ object CppBridgeDevice {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.INFO,
             TAG,
-            "📤 Calling racDeviceManagerRegisterIfNeeded..."
-        )
-        
-        // Call native registration
-        val result = com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racDeviceManagerRegisterIfNeeded(
-            environment,
-            buildToken
+            "📤 Calling racDeviceManagerRegisterIfNeeded...",
         )
 
-        val resultMessage = when (result) {
-            0 -> "✅ SUCCESS"
-            1 -> "⚠️ Already registered"
-            else -> "❌ ERROR (code=$result)"
-        }
-        
+        // Call native registration
+        val result =
+            com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racDeviceManagerRegisterIfNeeded(
+                environment,
+                buildToken,
+            )
+
+        val resultMessage =
+            when (result) {
+                0 -> "✅ SUCCESS"
+                1 -> "⚠️ Already registered"
+                else -> "❌ ERROR (code=$result)"
+            }
+
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.INFO,
             TAG,
-            "Device registration result: $resultMessage"
+            "Device registration result: $resultMessage",
         )
 
         return result == 0
@@ -1153,14 +1172,16 @@ object CppBridgeDevice {
      * Calls native method to get current status.
      */
     fun checkIsRegistered(): Boolean {
-        return com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racDeviceManagerIsRegistered()
+        return com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+            .racDeviceManagerIsRegistered()
     }
 
     /**
      * Clear device registration status.
      */
     fun clearRegistration() {
-        com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racDeviceManagerClearRegistration()
+        com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+            .racDeviceManagerClearRegistration()
         registrationStatus = RegistrationStatus.NOT_REGISTERED
     }
 
@@ -1168,12 +1189,15 @@ object CppBridgeDevice {
      * Get native device ID from C++ device manager.
      */
     fun getNativeDeviceId(): String? {
-        return com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racDeviceManagerGetDeviceId()
+        return com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+            .racDeviceManagerGetDeviceId()
     }
 
     /**
      * Detect the current platform type.
+     * Reserved for future platform-specific handling.
      */
+    @Suppress("unused")
     private fun detectPlatform(): Int {
         val osName = System.getProperty("os.name")?.lowercase() ?: ""
         val javaVendor = System.getProperty("java.vendor")?.lowercase() ?: ""
@@ -1219,7 +1243,7 @@ object CppBridgeDevice {
             System.getProperty("java.vendor") ?: "unknown"
         }
     }
-    
+
     /**
      * Get default OS version for Android.
      */
@@ -1231,7 +1255,7 @@ object CppBridgeDevice {
             System.getProperty("os.version") ?: "unknown"
         }
     }
-    
+
     /**
      * Get default SDK/API version for Android.
      */

@@ -30,7 +30,6 @@ import java.io.File
  * - All callbacks are thread-safe
  */
 object CppBridgeModelPaths {
-
     /**
      * Model file extension constants.
      */
@@ -123,7 +122,7 @@ object CppBridgeModelPaths {
                     CppBridgePlatformAdapter.logCallback(
                         CppBridgePlatformAdapter.LogLevel.DEBUG,
                         TAG,
-                        "Path provider set, resetting base directory (was: $previousBase)"
+                        "Path provider set, resetting base directory (was: $previousBase)",
                     )
                 }
             }
@@ -223,7 +222,7 @@ object CppBridgeModelPaths {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Model paths callbacks registered. Base dir: $baseDirectory"
+                "Model paths callbacks registered. Base dir: $baseDirectory",
             )
         }
     }
@@ -274,7 +273,7 @@ object CppBridgeModelPaths {
                     CppBridgePlatformAdapter.logCallback(
                         CppBridgePlatformAdapter.LogLevel.ERROR,
                         TAG,
-                        "Failed to create base directory: $path"
+                        "Failed to create base directory: $path",
                     )
                     return false
                 }
@@ -285,7 +284,7 @@ object CppBridgeModelPaths {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Path is not a directory: $path"
+                    "Path is not a directory: $path",
                 )
                 return false
             }
@@ -294,21 +293,22 @@ object CppBridgeModelPaths {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Directory is not writable: $path"
+                    "Directory is not writable: $path",
                 )
                 return false
             }
 
-            val previousPath = synchronized(lock) {
-                val prev = baseDirectory
-                baseDirectory = path
-                prev
-            }
+            val previousPath =
+                synchronized(lock) {
+                    val prev = baseDirectory
+                    baseDirectory = path
+                    prev
+                }
 
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Base directory set: $path"
+                "Base directory set: $path",
             )
 
             // Notify listener
@@ -318,7 +318,7 @@ object CppBridgeModelPaths {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in path listener: ${e.message}"
+                    "Error in path listener: ${e.message}",
                 )
             }
 
@@ -327,7 +327,7 @@ object CppBridgeModelPaths {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Failed to set base directory: ${e.message}"
+                "Failed to set base directory: ${e.message}",
             )
             false
         }
@@ -469,7 +469,7 @@ object CppBridgeModelPaths {
                     CppBridgePlatformAdapter.logCallback(
                         CppBridgePlatformAdapter.LogLevel.DEBUG,
                         TAG,
-                        "Created model directory: $dirPath"
+                        "Created model directory: $dirPath",
                     )
 
                     try {
@@ -484,7 +484,7 @@ object CppBridgeModelPaths {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Failed to create model directory: ${e.message}"
+                "Failed to create model directory: ${e.message}",
             )
             false
         }
@@ -512,7 +512,7 @@ object CppBridgeModelPaths {
                     CppBridgePlatformAdapter.logCallback(
                         CppBridgePlatformAdapter.LogLevel.DEBUG,
                         TAG,
-                        "Deleted model file: $modelPath"
+                        "Deleted model file: $modelPath",
                     )
                 }
                 deleted
@@ -521,7 +521,7 @@ object CppBridgeModelPaths {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Failed to delete model file: ${e.message}"
+                "Failed to delete model file: ${e.message}",
             )
             false
         }
@@ -570,9 +570,11 @@ object CppBridgeModelPaths {
      *
      * Registers [getBaseDirCallback], [setBaseDirCallback],
      * [getModelsDirectoryCallback], [getModelPathCallback], etc. with C++ core.
+     * Reserved for future native callback integration.
      *
      * C API: rac_model_paths_set_callbacks(...)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeSetModelPathsCallbacks()
 
@@ -580,9 +582,11 @@ object CppBridgeModelPaths {
      * Native method to unset the model paths callbacks.
      *
      * Called during shutdown to clean up native resources.
+     * Reserved for future native callback integration.
      *
      * C API: rac_model_paths_set_callbacks(nullptr)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeUnsetModelPathsCallbacks()
 
@@ -838,7 +842,7 @@ object CppBridgeModelPaths {
                 CppBridgeModelRegistry.ModelType.STT,
                 CppBridgeModelRegistry.ModelType.TTS,
                 CppBridgeModelRegistry.ModelType.VAD,
-                CppBridgeModelRegistry.ModelType.EMBEDDING
+                CppBridgeModelRegistry.ModelType.EMBEDDING,
             )) {
                 createModelDirectoryCallback(type)
             }
@@ -848,7 +852,7 @@ object CppBridgeModelPaths {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Failed to ensure directories exist: ${e.message}"
+                "Failed to ensure directories exist: ${e.message}",
             )
             false
         }
@@ -862,7 +866,7 @@ object CppBridgeModelPaths {
      */
     fun getTempDownloadPath(modelId: String): String {
         val downloadsDir = getDownloadsDirectoryCallback()
-        return File(downloadsDir, "${modelId}.tmp").absolutePath
+        return File(downloadsDir, "$modelId.tmp").absolutePath
     }
 
     /**
@@ -880,7 +884,7 @@ object CppBridgeModelPaths {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Temp file does not exist: $tempPath"
+                    "Temp file does not exist: $tempPath",
                 )
                 return false
             }
@@ -907,7 +911,7 @@ object CppBridgeModelPaths {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Moved model to final location: $finalPath"
+                "Moved model to final location: $finalPath",
             )
 
             try {
@@ -921,7 +925,7 @@ object CppBridgeModelPaths {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Failed to move download to final location: ${e.message}"
+                "Failed to move download to final location: ${e.message}",
             )
             false
         }
@@ -932,14 +936,15 @@ object CppBridgeModelPaths {
      */
     private fun getModelTypeDirectory(modelType: Int): String {
         val modelsDir = getModelsDirectoryCallback()
-        val typeName = when (modelType) {
-            CppBridgeModelRegistry.ModelType.LLM -> ModelDirectory.LLM
-            CppBridgeModelRegistry.ModelType.STT -> ModelDirectory.STT
-            CppBridgeModelRegistry.ModelType.TTS -> ModelDirectory.TTS
-            CppBridgeModelRegistry.ModelType.VAD -> ModelDirectory.VAD
-            CppBridgeModelRegistry.ModelType.EMBEDDING -> ModelDirectory.EMBEDDING
-            else -> "other"
-        }
+        val typeName =
+            when (modelType) {
+                CppBridgeModelRegistry.ModelType.LLM -> ModelDirectory.LLM
+                CppBridgeModelRegistry.ModelType.STT -> ModelDirectory.STT
+                CppBridgeModelRegistry.ModelType.TTS -> ModelDirectory.TTS
+                CppBridgeModelRegistry.ModelType.VAD -> ModelDirectory.VAD
+                CppBridgeModelRegistry.ModelType.EMBEDDING -> ModelDirectory.EMBEDDING
+                else -> "other"
+            }
         return File(modelsDir, typeName).absolutePath
     }
 
@@ -948,19 +953,20 @@ object CppBridgeModelPaths {
      */
     private fun initializeDefaultBaseDirectory(): String {
         val provider = pathProvider
-        val basePath = if (provider != null) {
-            // Use platform-specific directory
-            val filesDir = provider.getFilesDirectory()
-            File(filesDir, "runanywhere").absolutePath
-        } else {
-            // Use user home directory or temp directory as fallback
-            val userHome = System.getProperty("user.home")
-            if (userHome != null) {
-                File(userHome, ".runanywhere").absolutePath
+        val basePath =
+            if (provider != null) {
+                // Use platform-specific directory
+                val filesDir = provider.getFilesDirectory()
+                File(filesDir, "runanywhere").absolutePath
             } else {
-                File(System.getProperty("java.io.tmpdir", "/tmp"), "runanywhere").absolutePath
+                // Use user home directory or temp directory as fallback
+                val userHome = System.getProperty("user.home")
+                if (userHome != null) {
+                    File(userHome, ".runanywhere").absolutePath
+                } else {
+                    File(System.getProperty("java.io.tmpdir", "/tmp"), "runanywhere").absolutePath
+                }
             }
-        }
 
         synchronized(lock) {
             if (baseDirectory == null) {
@@ -976,7 +982,7 @@ object CppBridgeModelPaths {
                     CppBridgePlatformAdapter.logCallback(
                         CppBridgePlatformAdapter.LogLevel.WARN,
                         TAG,
-                        "Failed to create default base directory: ${e.message}"
+                        "Failed to create default base directory: ${e.message}",
                     )
                 }
             }

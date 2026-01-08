@@ -36,14 +36,17 @@ interface ComponentOutput {
  * Mirrors Swift's AudioFormat enum.
  */
 @Serializable
-enum class AudioFormat(val rawValue: String) {
+enum class AudioFormat(
+    val rawValue: String,
+) {
     PCM("pcm"),
     WAV("wav"),
     MP3("mp3"),
     AAC("aac"),
     OGG("ogg"),
     OPUS("opus"),
-    FLAC("flac");
+    FLAC("flac"),
+    ;
 
     companion object {
         fun fromRawValue(value: String): AudioFormat? {
@@ -72,24 +75,28 @@ enum class AudioFormat(val rawValue: String) {
  *
  * Matches iOS SDKComponent exactly.
  */
-enum class SDKComponent(val rawValue: String) {
+enum class SDKComponent(
+    val rawValue: String,
+) {
     LLM("LLM"),
     STT("STT"),
     TTS("TTS"),
     VAD("VAD"),
     VOICE("VOICE"),
-    EMBEDDING("EMBEDDING");
+    EMBEDDING("EMBEDDING"),
+    ;
 
     /** Human-readable display name */
     val displayName: String
-        get() = when (this) {
-            LLM -> "Language Model"
-            STT -> "Speech to Text"
-            TTS -> "Text to Speech"
-            VAD -> "Voice Activity Detection"
-            VOICE -> "Voice Agent"
-            EMBEDDING -> "Embedding"
-        }
+        get() =
+            when (this) {
+                LLM -> "Language Model"
+                STT -> "Speech to Text"
+                TTS -> "Text to Speech"
+                VAD -> "Voice Activity Detection"
+                VOICE -> "Voice Agent"
+                EMBEDDING -> "Embedding"
+            }
 
     /** Analytics key for the component (lowercase) */
     val analyticsKey: String
@@ -108,7 +115,9 @@ enum class SDKComponent(val rawValue: String) {
  *
  * Matches iOS InferenceFramework exactly.
  */
-enum class InferenceFramework(val rawValue: String) {
+enum class InferenceFramework(
+    val rawValue: String,
+) {
     // Model-based frameworks
     ONNX("ONNX"),
     LLAMA_CPP("LlamaCpp"),
@@ -117,35 +126,38 @@ enum class InferenceFramework(val rawValue: String) {
     FLUID_AUDIO("FluidAudio"),
 
     // Special cases
-    BUILT_IN("BuiltIn"),      // For simple services (e.g., energy-based VAD)
-    NONE("None"),             // For services that don't use a model
-    UNKNOWN("Unknown");       // For unknown/unspecified frameworks
+    BUILT_IN("BuiltIn"), // For simple services (e.g., energy-based VAD)
+    NONE("None"), // For services that don't use a model
+    UNKNOWN("Unknown"), // For unknown/unspecified frameworks
+    ;
 
     /** Human-readable display name for the framework */
     val displayName: String
-        get() = when (this) {
-            ONNX -> "ONNX Runtime"
-            LLAMA_CPP -> "llama.cpp"
-            FOUNDATION_MODELS -> "Foundation Models"
-            SYSTEM_TTS -> "System TTS"
-            FLUID_AUDIO -> "FluidAudio"
-            BUILT_IN -> "Built-in"
-            NONE -> "None"
-            UNKNOWN -> "Unknown"
-        }
+        get() =
+            when (this) {
+                ONNX -> "ONNX Runtime"
+                LLAMA_CPP -> "llama.cpp"
+                FOUNDATION_MODELS -> "Foundation Models"
+                SYSTEM_TTS -> "System TTS"
+                FLUID_AUDIO -> "FluidAudio"
+                BUILT_IN -> "Built-in"
+                NONE -> "None"
+                UNKNOWN -> "Unknown"
+            }
 
     /** Snake_case key for analytics/telemetry */
     val analyticsKey: String
-        get() = when (this) {
-            ONNX -> "onnx"
-            LLAMA_CPP -> "llama_cpp"
-            FOUNDATION_MODELS -> "foundation_models"
-            SYSTEM_TTS -> "system_tts"
-            FLUID_AUDIO -> "fluid_audio"
-            BUILT_IN -> "built_in"
-            NONE -> "none"
-            UNKNOWN -> "unknown"
-        }
+        get() =
+            when (this) {
+                ONNX -> "onnx"
+                LLAMA_CPP -> "llama_cpp"
+                FOUNDATION_MODELS -> "foundation_models"
+                SYSTEM_TTS -> "system_tts"
+                FLUID_AUDIO -> "fluid_audio"
+                BUILT_IN -> "built_in"
+                NONE -> "none"
+                UNKNOWN -> "unknown"
+            }
 
     companion object {
         /** Create from raw string value, matching case-insensitively */

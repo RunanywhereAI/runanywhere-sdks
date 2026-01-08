@@ -34,13 +34,13 @@ import kotlinx.coroutines.flow.filter
  * Mirrors Swift EventBus exactly.
  */
 object EventBus {
-
     // MARK: - Publishers
 
-    private val _events = MutableSharedFlow<SDKEvent>(
-        replay = 0,
-        extraBufferCapacity = 64
-    )
+    private val _events =
+        MutableSharedFlow<SDKEvent>(
+            replay = 0,
+            extraBufferCapacity = 64,
+        )
 
     /** All events flow */
     val events: Flow<SDKEvent> = _events.asSharedFlow()

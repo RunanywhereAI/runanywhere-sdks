@@ -28,7 +28,6 @@ import com.runanywhere.sdk.foundation.SDKLogger
  * - Links to librac_commons.so - Commons library with service registry
  */
 internal object LlamaCPPBridge {
-
     private const val TAG = "LlamaCPPBridge"
     private val logger = SDKLogger(TAG)
 

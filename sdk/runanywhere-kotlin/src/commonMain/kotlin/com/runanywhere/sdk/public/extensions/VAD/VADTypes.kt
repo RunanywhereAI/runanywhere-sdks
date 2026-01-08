@@ -26,20 +26,15 @@ import kotlinx.serialization.Serializable
 data class VADConfiguration(
     /** Energy threshold for voice detection (0.0 to 1.0). Recommended range: 0.01-0.05 */
     val energyThreshold: Float = 0.015f,
-
     /** Sample rate in Hz (default: 16000) */
     val sampleRate: Int = DEFAULT_SAMPLE_RATE,
-
     /** Frame length in seconds (default: 0.1 = 100ms) */
     val frameLength: Float = 0.1f,
-
     /** Enable automatic calibration */
     val enableAutoCalibration: Boolean = false,
-
     /** Calibration multiplier (threshold = ambient noise * multiplier). Range: 1.5 to 5.0 */
-    val calibrationMultiplier: Float = 2.0f
+    val calibrationMultiplier: Float = 2.0f,
 ) : ComponentConfiguration {
-
     override val modelId: String? get() = null
     override val preferredFramework: InferenceFramework? get() = null
 
@@ -92,18 +87,23 @@ data class VADConfiguration(
         private var calibrationMultiplier: Float = 2.0f
 
         fun energyThreshold(threshold: Float) = apply { energyThreshold = threshold }
+
         fun sampleRate(rate: Int) = apply { sampleRate = rate }
+
         fun frameLength(length: Float) = apply { frameLength = length }
+
         fun enableAutoCalibration(enabled: Boolean) = apply { enableAutoCalibration = enabled }
+
         fun calibrationMultiplier(multiplier: Float) = apply { calibrationMultiplier = multiplier }
 
-        fun build() = VADConfiguration(
-            energyThreshold = energyThreshold,
-            sampleRate = sampleRate,
-            frameLength = frameLength,
-            enableAutoCalibration = enableAutoCalibration,
-            calibrationMultiplier = calibrationMultiplier
-        )
+        fun build() =
+            VADConfiguration(
+                energyThreshold = energyThreshold,
+                sampleRate = sampleRate,
+                frameLength = frameLength,
+                enableAutoCalibration = enableAutoCalibration,
+                calibrationMultiplier = calibrationMultiplier,
+            )
     }
 
     companion object {
@@ -123,27 +123,24 @@ data class VADConfiguration(
 data class VADStatistics(
     /** Current energy level */
     val current: Float,
-
     /** Energy threshold being used */
     val threshold: Float,
-
     /** Ambient noise level (from calibration) */
     val ambient: Float,
-
     /** Recent average energy level */
     val recentAvg: Float,
-
     /** Recent maximum energy level */
-    val recentMax: Float
+    val recentMax: Float,
 ) {
-    override fun toString(): String = """
+    override fun toString(): String =
+        """
         VADStatistics:
           Current: ${String.format("%.6f", current)}
           Threshold: ${String.format("%.6f", threshold)}
           Ambient: ${String.format("%.6f", ambient)}
           Recent Avg: ${String.format("%.6f", recentAvg)}
           Recent Max: ${String.format("%.6f", recentMax)}
-    """.trimIndent()
+        """.trimIndent()
 }
 
 // MARK: - VAD Result
@@ -155,18 +152,14 @@ data class VADStatistics(
 data class VADResult(
     /** Whether speech was detected */
     val isSpeech: Boolean,
-
     /** Confidence level (0.0 to 1.0) */
     val confidence: Float,
-
     /** Energy level of the audio */
     val energyLevel: Float,
-
     /** Statistics for debugging */
     val statistics: VADStatistics? = null,
-
     /** Timestamp */
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
 )
 
 // MARK: - Speech Activity Event
@@ -175,10 +168,12 @@ data class VADResult(
  * Events representing speech activity state changes.
  * Mirrors Swift SpeechActivityEvent exactly.
  */
-enum class SpeechActivityEvent(val value: String) {
+enum class SpeechActivityEvent(
+    val value: String,
+) {
     /** Speech has started */
     STARTED("started"),
 
     /** Speech has ended */
-    ENDED("ended")
+    ENDED("ended"),
 }

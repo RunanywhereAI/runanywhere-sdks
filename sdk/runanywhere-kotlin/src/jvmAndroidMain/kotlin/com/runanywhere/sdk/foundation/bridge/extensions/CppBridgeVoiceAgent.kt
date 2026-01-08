@@ -39,7 +39,6 @@ import com.runanywhere.sdk.foundation.errors.SDKError
  * - Matches iOS Actor-based pattern using Kotlin synchronized
  */
 object CppBridgeVoiceAgent {
-
     /**
      * Voice Agent state constants matching C++ RAC_VOICE_AGENT_STATE_* values.
      */
@@ -77,19 +76,20 @@ object CppBridgeVoiceAgent {
         /**
          * Get a human-readable name for the Voice Agent state.
          */
-        fun getName(state: Int): String = when (state) {
-            NOT_CREATED -> "NOT_CREATED"
-            CREATED -> "CREATED"
-            INITIALIZING -> "INITIALIZING"
-            READY -> "READY"
-            LISTENING -> "LISTENING"
-            TRANSCRIBING -> "TRANSCRIBING"
-            GENERATING -> "GENERATING"
-            SPEAKING -> "SPEAKING"
-            PROCESSING_TURN -> "PROCESSING_TURN"
-            ERROR -> "ERROR"
-            else -> "UNKNOWN($state)"
-        }
+        fun getName(state: Int): String =
+            when (state) {
+                NOT_CREATED -> "NOT_CREATED"
+                CREATED -> "CREATED"
+                INITIALIZING -> "INITIALIZING"
+                READY -> "READY"
+                LISTENING -> "LISTENING"
+                TRANSCRIBING -> "TRANSCRIBING"
+                GENERATING -> "GENERATING"
+                SPEAKING -> "SPEAKING"
+                PROCESSING_TURN -> "PROCESSING_TURN"
+                ERROR -> "ERROR"
+                else -> "UNKNOWN($state)"
+            }
 
         /**
          * Check if the state indicates the agent is ready.
@@ -133,17 +133,18 @@ object CppBridgeVoiceAgent {
         /**
          * Get a human-readable name for the turn phase.
          */
-        fun getName(phase: Int): String = when (phase) {
-            IDLE -> "IDLE"
-            SPEECH_DETECTION -> "SPEECH_DETECTION"
-            TRANSCRIPTION -> "TRANSCRIPTION"
-            RESPONSE_GENERATION -> "RESPONSE_GENERATION"
-            SPEECH_SYNTHESIS -> "SPEECH_SYNTHESIS"
-            COMPLETED -> "COMPLETED"
-            CANCELLED -> "CANCELLED"
-            FAILED -> "FAILED"
-            else -> "UNKNOWN($phase)"
-        }
+        fun getName(phase: Int): String =
+            when (phase) {
+                IDLE -> "IDLE"
+                SPEECH_DETECTION -> "SPEECH_DETECTION"
+                TRANSCRIPTION -> "TRANSCRIPTION"
+                RESPONSE_GENERATION -> "RESPONSE_GENERATION"
+                SPEECH_SYNTHESIS -> "SPEECH_SYNTHESIS"
+                COMPLETED -> "COMPLETED"
+                CANCELLED -> "CANCELLED"
+                FAILED -> "FAILED"
+                else -> "UNKNOWN($phase)"
+            }
     }
 
     /**
@@ -177,17 +178,18 @@ object CppBridgeVoiceAgent {
         /**
          * Get a human-readable name for the completion reason.
          */
-        fun getName(reason: Int): String = when (reason) {
-            SUCCESS -> "SUCCESS"
-            CANCELLED -> "CANCELLED"
-            NO_SPEECH -> "NO_SPEECH"
-            TRANSCRIPTION_FAILED -> "TRANSCRIPTION_FAILED"
-            GENERATION_FAILED -> "GENERATION_FAILED"
-            SYNTHESIS_FAILED -> "SYNTHESIS_FAILED"
-            TIMEOUT -> "TIMEOUT"
-            ERROR -> "ERROR"
-            else -> "UNKNOWN($reason)"
-        }
+        fun getName(reason: Int): String =
+            when (reason) {
+                SUCCESS -> "SUCCESS"
+                CANCELLED -> "CANCELLED"
+                NO_SPEECH -> "NO_SPEECH"
+                TRANSCRIPTION_FAILED -> "TRANSCRIPTION_FAILED"
+                GENERATION_FAILED -> "GENERATION_FAILED"
+                SYNTHESIS_FAILED -> "SYNTHESIS_FAILED"
+                TIMEOUT -> "TIMEOUT"
+                ERROR -> "ERROR"
+                else -> "UNKNOWN($reason)"
+            }
 
         /**
          * Check if the reason indicates success.
@@ -211,12 +213,13 @@ object CppBridgeVoiceAgent {
         /**
          * Get a human-readable name for the interrupt mode.
          */
-        fun getName(mode: Int): String = when (mode) {
-            NONE -> "NONE"
-            IMMEDIATE -> "IMMEDIATE"
-            END_OF_PHRASE -> "END_OF_PHRASE"
-            else -> "UNKNOWN($mode)"
-        }
+        fun getName(mode: Int): String =
+            when (mode) {
+                NONE -> "NONE"
+                IMMEDIATE -> "IMMEDIATE"
+                END_OF_PHRASE -> "END_OF_PHRASE"
+                else -> "UNKNOWN($mode)"
+            }
     }
 
     @Volatile
@@ -309,7 +312,7 @@ object CppBridgeVoiceAgent {
         val maxTurnDurationMs: Long = 60000,
         val silenceTimeoutMs: Long = 1500,
         val enableVad: Boolean = true,
-        val enableStreaming: Boolean = true
+        val enableStreaming: Boolean = true,
     ) {
         /**
          * Convert to JSON string for C++ interop.
@@ -360,7 +363,7 @@ object CppBridgeVoiceAgent {
         val temperature: Float = 0.7f,
         val skipVad: Boolean = false,
         val skipTts: Boolean = false,
-        val audioFormat: Int = 0 // PCM_16
+        val audioFormat: Int = 0, // PCM_16
     ) {
         /**
          * Convert to JSON string for C++ interop.
@@ -406,7 +409,7 @@ object CppBridgeVoiceAgent {
         val processingTimeMs: Long,
         val transcriptionTimeMs: Long,
         val generationTimeMs: Long,
-        val synthesisTimeMs: Long
+        val synthesisTimeMs: Long,
     ) {
         /**
          * Check if the turn was successful.
@@ -427,7 +430,9 @@ object CppBridgeVoiceAgent {
             if (audioData != null) {
                 if (other.audioData == null) return false
                 if (!audioData.contentEquals(other.audioData)) return false
-            } else if (other.audioData != null) return false
+            } else if (other.audioData != null) {
+                return false
+            }
             if (audioDurationMs != other.audioDurationMs) return false
             if (completionReason != other.completionReason) return false
             if (processingTimeMs != other.processingTimeMs) return false
@@ -458,7 +463,7 @@ object CppBridgeVoiceAgent {
         val hasSpeech: Boolean,
         val speechStartMs: Long,
         val speechEndMs: Long,
-        val confidence: Float
+        val confidence: Float,
     )
 
     /**
@@ -473,7 +478,7 @@ object CppBridgeVoiceAgent {
         val text: String,
         val language: String,
         val confidence: Float,
-        val durationMs: Long
+        val durationMs: Long,
     )
 
     /**
@@ -486,7 +491,7 @@ object CppBridgeVoiceAgent {
     data class ResponseResult(
         val text: String,
         val tokenCount: Int,
-        val stopReason: Int
+        val stopReason: Int,
     )
 
     /**
@@ -499,7 +504,7 @@ object CppBridgeVoiceAgent {
     data class SynthesisResult(
         val audioData: ByteArray,
         val durationMs: Long,
-        val sampleRate: Int
+        val sampleRate: Int,
     ) {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -662,7 +667,7 @@ object CppBridgeVoiceAgent {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Voice Agent callbacks registered"
+                "Voice Agent callbacks registered",
             )
         }
     }
@@ -731,7 +736,7 @@ object CppBridgeVoiceAgent {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Voice Agent already created"
+                    "Voice Agent already created",
                 )
                 return 0
             }
@@ -741,7 +746,7 @@ object CppBridgeVoiceAgent {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Failed to create Voice Agent"
+                    "Failed to create Voice Agent",
                 )
                 return -1
             }
@@ -752,7 +757,7 @@ object CppBridgeVoiceAgent {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Voice Agent created"
+                "Voice Agent created",
             )
 
             return 0
@@ -779,7 +784,7 @@ object CppBridgeVoiceAgent {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Voice Agent already initialized"
+                    "Voice Agent already initialized",
                 )
                 return 0
             }
@@ -789,7 +794,7 @@ object CppBridgeVoiceAgent {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Initializing Voice Agent"
+                "Initializing Voice Agent",
             )
 
             val result = nativeInitialize(handle, config.toJson())
@@ -798,7 +803,7 @@ object CppBridgeVoiceAgent {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Failed to initialize Voice Agent (error: $result)"
+                    "Failed to initialize Voice Agent (error: $result)",
                 )
 
                 try {
@@ -816,13 +821,13 @@ object CppBridgeVoiceAgent {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Voice Agent initialized successfully"
+                "Voice Agent initialized successfully",
             )
 
             // Update component state
             CppBridgeState.setComponentStateCallback(
                 CppBridgeState.ComponentType.VOICE_AGENT,
-                CppBridgeState.ComponentState.READY
+                CppBridgeState.ComponentState.READY,
             )
 
             try {
@@ -831,7 +836,7 @@ object CppBridgeVoiceAgent {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in Voice Agent listener onInitialized: ${e.message}"
+                    "Error in Voice Agent listener onInitialized: ${e.message}",
                 )
             }
 
@@ -867,14 +872,15 @@ object CppBridgeVoiceAgent {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Starting voice turn (audio size: ${audioData.size} bytes)"
+                "Starting voice turn (audio size: ${audioData.size} bytes)",
             )
 
             val startTime = System.currentTimeMillis()
 
             try {
-                val resultJson = nativeProcessVoiceTurn(handle, audioData, config.toJson())
-                    ?: throw SDKError.voiceAgent("Voice turn processing failed: null result")
+                val resultJson =
+                    nativeProcessVoiceTurn(handle, audioData, config.toJson())
+                        ?: throw SDKError.voiceAgent("Voice turn processing failed: null result")
 
                 val result = parseTurnResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -884,7 +890,7 @@ object CppBridgeVoiceAgent {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.INFO,
                     TAG,
-                    "Voice turn completed: ${result.getCompletionReasonName()}, ${result.processingTimeMs}ms"
+                    "Voice turn completed: ${result.getCompletionReasonName()}, ${result.processingTimeMs}ms",
                 )
 
                 try {
@@ -894,7 +900,6 @@ object CppBridgeVoiceAgent {
                 }
 
                 return result
-
             } catch (e: Exception) {
                 setState(VoiceAgentState.READY)
                 setPhase(TurnPhase.FAILED)
@@ -920,12 +925,13 @@ object CppBridgeVoiceAgent {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Detecting speech (audio size: ${audioData.size} bytes)"
+                "Detecting speech (audio size: ${audioData.size} bytes)",
             )
 
             try {
-                val resultJson = nativeDetectSpeech(handle, audioData)
-                    ?: throw SDKError.voiceAgent("Speech detection failed: null result")
+                val resultJson =
+                    nativeDetectSpeech(handle, audioData)
+                        ?: throw SDKError.voiceAgent("Speech detection failed: null result")
 
                 val result = parseSpeechDetectionResult(resultJson)
 
@@ -936,7 +942,6 @@ object CppBridgeVoiceAgent {
                 }
 
                 return result
-
             } catch (e: Exception) {
                 throw if (e is SDKError) e else SDKError.voiceAgent("Speech detection failed: ${e.message}")
             }
@@ -963,12 +968,13 @@ object CppBridgeVoiceAgent {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Transcribing audio (size: ${audioData.size} bytes)"
+                "Transcribing audio (size: ${audioData.size} bytes)",
             )
 
             try {
-                val resultJson = nativeTranscribe(handle, audioData)
-                    ?: throw SDKError.voiceAgent("Transcription failed: null result")
+                val resultJson =
+                    nativeTranscribe(handle, audioData)
+                        ?: throw SDKError.voiceAgent("Transcription failed: null result")
 
                 val result = parseTranscriptionResult(resultJson)
 
@@ -977,7 +983,7 @@ object CppBridgeVoiceAgent {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Transcription complete: \"${result.text.take(50)}...\""
+                    "Transcription complete: \"${result.text.take(50)}...\"",
                 )
 
                 try {
@@ -987,7 +993,6 @@ object CppBridgeVoiceAgent {
                 }
 
                 return result
-
             } catch (e: Exception) {
                 setState(VoiceAgentState.READY)
                 throw if (e is SDKError) e else SDKError.voiceAgent("Transcription failed: ${e.message}")
@@ -1016,12 +1021,13 @@ object CppBridgeVoiceAgent {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Generating response for: \"${prompt.take(50)}...\""
+                "Generating response for: \"${prompt.take(50)}...\"",
             )
 
             try {
-                val resultJson = nativeGenerateResponse(handle, prompt, context)
-                    ?: throw SDKError.voiceAgent("Response generation failed: null result")
+                val resultJson =
+                    nativeGenerateResponse(handle, prompt, context)
+                        ?: throw SDKError.voiceAgent("Response generation failed: null result")
 
                 val result = parseResponseResult(resultJson)
 
@@ -1030,7 +1036,7 @@ object CppBridgeVoiceAgent {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Response generated: ${result.tokenCount} tokens"
+                    "Response generated: ${result.tokenCount} tokens",
                 )
 
                 try {
@@ -1040,7 +1046,6 @@ object CppBridgeVoiceAgent {
                 }
 
                 return result
-
             } catch (e: Exception) {
                 setState(VoiceAgentState.READY)
                 throw if (e is SDKError) e else SDKError.voiceAgent("Response generation failed: ${e.message}")
@@ -1068,12 +1073,13 @@ object CppBridgeVoiceAgent {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Synthesizing speech: \"${text.take(50)}...\""
+                "Synthesizing speech: \"${text.take(50)}...\"",
             )
 
             try {
-                val audioData = nativeSynthesizeSpeech(handle, text)
-                    ?: throw SDKError.voiceAgent("Speech synthesis failed: null result")
+                val audioData =
+                    nativeSynthesizeSpeech(handle, text)
+                        ?: throw SDKError.voiceAgent("Speech synthesis failed: null result")
 
                 // Parse duration from native result or estimate
                 val durationMs = estimateAudioDuration(audioData.size)
@@ -1084,7 +1090,7 @@ object CppBridgeVoiceAgent {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Speech synthesized: ${audioData.size} bytes, ${durationMs}ms"
+                    "Speech synthesized: ${audioData.size} bytes, ${durationMs}ms",
                 )
 
                 try {
@@ -1094,7 +1100,6 @@ object CppBridgeVoiceAgent {
                 }
 
                 return result
-
             } catch (e: Exception) {
                 setState(VoiceAgentState.READY)
                 throw if (e is SDKError) e else SDKError.voiceAgent("Speech synthesis failed: ${e.message}")
@@ -1116,7 +1121,7 @@ object CppBridgeVoiceAgent {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Cancelling Voice Agent operation"
+                "Cancelling Voice Agent operation",
             )
 
             nativeCancel(handle)
@@ -1137,7 +1142,7 @@ object CppBridgeVoiceAgent {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Resetting Voice Agent"
+                "Resetting Voice Agent",
             )
 
             nativeReset(handle)
@@ -1157,7 +1162,7 @@ object CppBridgeVoiceAgent {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Destroying Voice Agent"
+                "Destroying Voice Agent",
             )
 
             nativeDestroy(handle)
@@ -1170,7 +1175,7 @@ object CppBridgeVoiceAgent {
             // Update component state
             CppBridgeState.setComponentStateCallback(
                 CppBridgeState.ComponentType.VOICE_AGENT,
-                CppBridgeState.ComponentState.NOT_CREATED
+                CppBridgeState.ComponentState.NOT_CREATED,
             )
         }
     }
@@ -1224,7 +1229,7 @@ object CppBridgeVoiceAgent {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in Voice Agent listener onPartialTranscription: ${e.message}"
+                "Error in Voice Agent listener onPartialTranscription: ${e.message}",
             )
         }
     }
@@ -1258,7 +1263,7 @@ object CppBridgeVoiceAgent {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in response stream callback: ${e.message}"
+                "Error in response stream callback: ${e.message}",
             )
             true // Continue on error
         }
@@ -1293,7 +1298,7 @@ object CppBridgeVoiceAgent {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in audio stream callback: ${e.message}"
+                "Error in audio stream callback: ${e.message}",
             )
             true // Continue on error
         }
@@ -1311,7 +1316,7 @@ object CppBridgeVoiceAgent {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "User interrupt detected"
+            "User interrupt detected",
         )
 
         try {
@@ -1320,7 +1325,7 @@ object CppBridgeVoiceAgent {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in Voice Agent listener onUserInterrupt: ${e.message}"
+                "Error in Voice Agent listener onUserInterrupt: ${e.message}",
             )
         }
     }
@@ -1339,7 +1344,7 @@ object CppBridgeVoiceAgent {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Progress: ${(progress * 100).toInt()}%"
+            "Progress: ${(progress * 100).toInt()}%",
         )
     }
 
@@ -1373,17 +1378,21 @@ object CppBridgeVoiceAgent {
 
     /**
      * Native method to set the Voice Agent callbacks with C++ core.
+     * Reserved for future native callback integration.
      *
      * C API: rac_voice_agent_set_callbacks(...)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeSetVoiceAgentCallbacks()
 
     /**
      * Native method to unset the Voice Agent callbacks.
+     * Reserved for future native callback integration.
      *
      * C API: rac_voice_agent_set_callbacks(nullptr)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeUnsetVoiceAgentCallbacks()
 
@@ -1557,7 +1566,7 @@ object CppBridgeVoiceAgent {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "State changed: ${VoiceAgentState.getName(previousState)} -> ${VoiceAgentState.getName(newState)}"
+                "State changed: ${VoiceAgentState.getName(previousState)} -> ${VoiceAgentState.getName(newState)}",
             )
 
             try {
@@ -1566,7 +1575,7 @@ object CppBridgeVoiceAgent {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in Voice Agent listener onStateChanged: ${e.message}"
+                    "Error in Voice Agent listener onStateChanged: ${e.message}",
                 )
             }
         }
@@ -1583,7 +1592,7 @@ object CppBridgeVoiceAgent {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Phase changed: ${TurnPhase.getName(previousPhase)} -> ${TurnPhase.getName(newPhase)}"
+                "Phase changed: ${TurnPhase.getName(previousPhase)} -> ${TurnPhase.getName(newPhase)}",
             )
 
             try {
@@ -1592,7 +1601,7 @@ object CppBridgeVoiceAgent {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in Voice Agent listener onTurnPhaseChanged: ${e.message}"
+                    "Error in Voice Agent listener onTurnPhaseChanged: ${e.message}",
                 )
             }
         }
@@ -1633,13 +1642,21 @@ object CppBridgeVoiceAgent {
         fun extractLong(key: String): Long {
             val pattern = "\"$key\"\\s*:\\s*(-?\\d+)"
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.toLongOrNull() ?: 0L
         }
 
         fun extractInt(key: String): Int {
             val pattern = "\"$key\"\\s*:\\s*(-?\\d+)"
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.toIntOrNull() ?: 0
         }
 
         return TurnResult(
@@ -1651,7 +1668,7 @@ object CppBridgeVoiceAgent {
             processingTimeMs = elapsedMs,
             transcriptionTimeMs = extractLong("transcription_time_ms"),
             generationTimeMs = extractLong("generation_time_ms"),
-            synthesisTimeMs = extractLong("synthesis_time_ms")
+            synthesisTimeMs = extractLong("synthesis_time_ms"),
         )
     }
 
@@ -1662,26 +1679,38 @@ object CppBridgeVoiceAgent {
         fun extractBoolean(key: String): Boolean {
             val pattern = "\"$key\"\\s*:\\s*(true|false)"
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.toBooleanStrictOrNull() ?: false
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.toBooleanStrictOrNull() ?: false
         }
 
         fun extractLong(key: String): Long {
             val pattern = "\"$key\"\\s*:\\s*(-?\\d+)"
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.toLongOrNull() ?: 0L
         }
 
         fun extractFloat(key: String): Float {
             val pattern = "\"$key\"\\s*:\\s*(-?[\\d.]+)"
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.toFloatOrNull() ?: 0f
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.toFloatOrNull() ?: 0f
         }
 
         return SpeechDetectionResult(
             hasSpeech = extractBoolean("has_speech"),
             speechStartMs = extractLong("speech_start_ms"),
             speechEndMs = extractLong("speech_end_ms"),
-            confidence = extractFloat("confidence")
+            confidence = extractFloat("confidence"),
         )
     }
 
@@ -1698,20 +1727,28 @@ object CppBridgeVoiceAgent {
         fun extractFloat(key: String): Float {
             val pattern = "\"$key\"\\s*:\\s*(-?[\\d.]+)"
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.toFloatOrNull() ?: 0f
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.toFloatOrNull() ?: 0f
         }
 
         fun extractLong(key: String): Long {
             val pattern = "\"$key\"\\s*:\\s*(-?\\d+)"
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.toLongOrNull() ?: 0L
         }
 
         return TranscriptionResult(
             text = extractString("text"),
             language = extractString("language"),
             confidence = extractFloat("confidence"),
-            durationMs = extractLong("duration_ms")
+            durationMs = extractLong("duration_ms"),
         )
     }
 
@@ -1728,13 +1765,17 @@ object CppBridgeVoiceAgent {
         fun extractInt(key: String): Int {
             val pattern = "\"$key\"\\s*:\\s*(-?\\d+)"
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.toIntOrNull() ?: 0
         }
 
         return ResponseResult(
             text = extractString("text"),
             tokenCount = extractInt("token_count"),
-            stopReason = extractInt("stop_reason")
+            stopReason = extractInt("stop_reason"),
         )
     }
 

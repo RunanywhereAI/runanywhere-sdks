@@ -210,7 +210,7 @@ fun SpeechToTextScreen(viewModel: SpeechToTextViewModel = viewModel()) {
                         viewModel.onModelLoaded(
                             modelName = model.name,
                             modelId = model.id,
-                            framework = model.framework
+                            framework = model.framework,
                         )
                         android.util.Log.d("SpeechToTextScreen", "STT model selected: ${model.name}")
                     }

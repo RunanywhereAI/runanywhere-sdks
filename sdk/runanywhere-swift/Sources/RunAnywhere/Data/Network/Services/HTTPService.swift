@@ -285,7 +285,7 @@ public actor HTTPService: NetworkService {
         return apiKey ?? ""
     }
 
-    private func parseHTTPError(statusCode: Int, data: Data, url: String) -> SDKError {
+    private func parseHTTPError(statusCode: Int, data: Data, url _: String) -> SDKError {
         // Try to parse error message from response body
         var errorMessage = "HTTP error \(statusCode)"
 
