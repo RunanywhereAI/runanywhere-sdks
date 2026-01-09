@@ -56,9 +56,19 @@ public final class GeneratedPluginRegistrant {
       Log.e(TAG, "Error registering plugin record_android, com.llfbandit.record.RecordPlugin", e);
     }
     try {
-      flutterEngine.getPlugins().add(new ai.runanywhere.nativelibs.RunanywhereNativePlugin());
+      flutterEngine.getPlugins().add(new ai.runanywhere.sdk.RunAnywherePlugin());
     } catch (Exception e) {
-      Log.e(TAG, "Error registering plugin runanywhere_native, ai.runanywhere.nativelibs.RunanywhereNativePlugin", e);
+      Log.e(TAG, "Error registering plugin runanywhere, ai.runanywhere.sdk.RunAnywherePlugin", e);
+    }
+    try {
+      flutterEngine.getPlugins().add(new ai.runanywhere.sdk.llamacpp.LlamaCppPlugin());
+    } catch (Exception e) {
+      Log.e(TAG, "Error registering plugin runanywhere_llamacpp, ai.runanywhere.sdk.llamacpp.LlamaCppPlugin", e);
+    }
+    try {
+      flutterEngine.getPlugins().add(new ai.runanywhere.sdk.onnx.OnnxPlugin());
+    } catch (Exception e) {
+      Log.e(TAG, "Error registering plugin runanywhere_onnx, ai.runanywhere.sdk.onnx.OnnxPlugin", e);
     }
     try {
       flutterEngine.getPlugins().add(new io.flutter.plugins.sharedpreferences.SharedPreferencesPlugin());

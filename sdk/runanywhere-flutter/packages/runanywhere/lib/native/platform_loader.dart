@@ -3,59 +3,126 @@ import 'dart:io';
 
 /// Platform-specific library loader for RunAnywhere native libraries.
 ///
-/// Supports:
-/// - Android: Loads .so from jniLibs
-/// - iOS: Uses DynamicLibrary.process() for statically linked XCFramework
-/// - macOS: Loads .dylib for development/testing
+/// The new architecture uses separate libraries:
+/// - RACommons: Core functionality (logging, module registry, platform adapter)
+/// - RABackendLlamaCPP: LLM text generation with llama.cpp
+/// - RABackendONNX: STT/TTS/VAD with ONNX Runtime
+///
+/// ## iOS
+/// XCFrameworks are statically linked into the app binary via CocoaPods.
+/// All symbols are available via `DynamicLibrary.executable()`.
+///
+/// ## Android
+/// .so files are loaded from jniLibs via `DynamicLibrary.open()`.
+/// The Gradle build system handles downloading and placing the .so files.
 class PlatformLoader {
-  static DynamicLibrary? _library;
-  static bool _isLoaded = false;
+  // Cached library instances
+  static DynamicLibrary? _commonsLibrary;
+  static DynamicLibrary? _llamacppLibrary;
+  static DynamicLibrary? _onnxLibrary;
   static String? _loadError;
 
-  /// The name of the native library (without platform-specific prefix/suffix)
-  static const String _libraryName = 'runanywhere_bridge';
+  // Library names (without platform-specific prefix/suffix)
+  // On Android: librac_commons.so, librunanywhere_llamacpp.so, librunanywhere_onnx.so
+  // On iOS/macOS: RACommons.xcframework, RABackendLlamaCPP.xcframework, RABackendONNX.xcframework
+  static const String _commonsLibraryName = 'rac_commons';
+  static const String _llamacppLibraryName = 'runanywhere_llamacpp';
+  static const String _onnxLibraryName = 'runanywhere_onnx';
 
-  /// Load the RunAnywhere native library for the current platform.
+  // =============================================================================
+  // Main Loaders
+  // =============================================================================
+
+  /// Load the RACommons native library.
   ///
-  /// Returns the loaded DynamicLibrary.
-  /// Throws [UnsupportedError] if the platform is not supported.
-  /// Throws [ArgumentError] if the library cannot be loaded.
-  static DynamicLibrary load() {
-    if (_isLoaded && _library != null) {
-      return _library!;
+  /// This is the core library that provides:
+  /// - Module registry
+  /// - Service provider registry
+  /// - Platform adapter interface
+  /// - Logging and error handling
+  static DynamicLibrary loadCommons() {
+    if (_commonsLibrary != null) {
+      return _commonsLibrary!;
     }
 
     try {
-      _library = _loadPlatformLibrary();
-      _isLoaded = true;
+      _commonsLibrary = _loadLibrary(_commonsLibraryName);
       _loadError = null;
-      return _library!;
+      return _commonsLibrary!;
     } catch (e) {
       _loadError = e.toString();
       rethrow;
     }
   }
 
-  /// Try to load the library, returning null if it fails.
+  /// Load the RABackendLlamaCPP native library.
+  ///
+  /// This library provides:
+  /// - LLM text generation
+  /// - Streaming generation
+  /// - Model loading/unloading
+  static DynamicLibrary loadLlamaCpp() {
+    if (_llamacppLibrary != null) {
+      return _llamacppLibrary!;
+    }
+
+    try {
+      _llamacppLibrary = _loadLibrary(_llamacppLibraryName);
+      return _llamacppLibrary!;
+    } catch (e) {
+      _loadError = e.toString();
+      rethrow;
+    }
+  }
+
+  /// Load the RABackendONNX native library.
+  ///
+  /// This library provides:
+  /// - STT (Speech-to-Text) with Sherpa-ONNX
+  /// - TTS (Text-to-Speech) with VITS models
+  /// - VAD (Voice Activity Detection)
+  static DynamicLibrary loadOnnx() {
+    if (_onnxLibrary != null) {
+      return _onnxLibrary!;
+    }
+
+    try {
+      _onnxLibrary = _loadLibrary(_onnxLibraryName);
+      return _onnxLibrary!;
+    } catch (e) {
+      _loadError = e.toString();
+      rethrow;
+    }
+  }
+
+  /// Legacy method for backward compatibility.
+  /// Loads the commons library by default.
+  static DynamicLibrary load() => loadCommons();
+
+  /// Try to load the commons library, returning null if it fails.
   static DynamicLibrary? tryLoad() {
     try {
-      return load();
+      return loadCommons();
     } catch (_) {
       return null;
     }
   }
 
-  static DynamicLibrary _loadPlatformLibrary() {
+  // =============================================================================
+  // Platform-Specific Loading
+  // =============================================================================
+
+  static DynamicLibrary _loadLibrary(String libraryName) {
     if (Platform.isAndroid) {
-      return _loadAndroid();
+      return _loadAndroid(libraryName);
     } else if (Platform.isIOS) {
-      return _loadIOS();
+      return _loadIOS(libraryName);
     } else if (Platform.isMacOS) {
-      return _loadMacOS();
+      return _loadMacOS(libraryName);
     } else if (Platform.isLinux) {
-      return _loadLinux();
+      return _loadLinux(libraryName);
     } else if (Platform.isWindows) {
-      return _loadWindows();
+      return _loadWindows(libraryName);
     }
 
     throw UnsupportedError(
@@ -64,236 +131,247 @@ class PlatformLoader {
     );
   }
 
-  /// Load on Android from jniLibs
-  static DynamicLibrary _loadAndroid() {
-    // Load dependencies in correct order for Android symbol visibility
-    // Order matters: base libs first, then backends, then bridge
+  /// Load on Android from jniLibs.
+  ///
+  /// Android libraries are placed in jniLibs by the Gradle build:
+  /// - src/main/jniLibs/arm64-v8a/lib*.so
+  /// - src/main/jniLibs/armeabi-v7a/lib*.so
+  /// - src/main/jniLibs/x86_64/lib*.so
+  static DynamicLibrary _loadAndroid(String libraryName) {
+    // On Android, the system loader handles dependencies automatically
+    // when libraries are in jniLibs. Just open the requested library.
+    //
+    // Library naming conventions:
+    // - RACommons -> libracommons.so
+    // - RABackendLlamaCPP -> librabackendllamacpp.so
+    // - RABackendONNX -> librabackendonnx.so
+    final soName = 'lib$libraryName.so';
 
-    // 1. Load C++ standard library (required by all native libs)
-    _tryLoadDependency('c++_shared');
-
-    // 2. Load OpenMP (required by LlamaCpp and some ONNX operations)
-    _tryLoadDependency('omp');
-
-    // 3. Load ONNX Runtime (required by ONNX backend and Sherpa-ONNX)
-    _tryLoadDependency('onnxruntime');
-
-    // 4. Load Sherpa-ONNX libraries (for STT/TTS/VAD)
-    _tryLoadDependency('sherpa-onnx-cxx-api');
-    _tryLoadDependency('sherpa-onnx-c-api');
-    _tryLoadDependency('sherpa-onnx-jni');
-
-    // 5. Load backend-specific libraries
-    _tryLoadDependency('runanywhere_onnx');
-    _tryLoadDependency('runanywhere_llamacpp');
-
-    // 6. Load the RunAnywhere loader (provides global symbol loading)
-    _tryLoadDependency('runanywhere_loader');
-
-    // 7. Finally load the main bridge library
-    return DynamicLibrary.open('lib$_libraryName.so');
+    try {
+      return DynamicLibrary.open(soName);
+    } catch (e) {
+      // Try alternate naming conventions
+      final alternateName = 'lib${_androidLibraryName(libraryName)}.so';
+      if (alternateName != soName) {
+        try {
+          return DynamicLibrary.open(alternateName);
+        } catch (_) {
+          // Fall through to throw original error
+        }
+      }
+      throw ArgumentError(
+        'Could not load $soName on Android: $e. '
+        'Ensure the native library is built and placed in jniLibs.',
+      );
+    }
   }
 
-  /// Load on iOS using executable() for statically linked XCFramework
-  static DynamicLibrary _loadIOS() {
-    // iOS uses static linking via XCFramework in podspec
-    // Symbols are linked into the executable, use DynamicLibrary.executable()
-    // which looks up symbols in the main executable where static libraries are linked
+  /// Map library name to alternate Android convention (for fallback)
+  static String _androidLibraryName(String name) {
+    switch (name) {
+      case 'rac_commons':
+        return 'runanywhere_jni'; // JNI wrapper for commons
+      case 'runanywhere_llamacpp':
+        return 'rac_backend_llamacpp_jni'; // JNI wrapper for llamacpp
+      case 'runanywhere_onnx':
+        return 'rac_backend_onnx_jni'; // JNI wrapper for onnx
+      default:
+        return name;
+    }
+  }
+
+  /// Load on iOS using executable() for statically linked XCFramework.
+  ///
+  /// iOS uses static linking via XCFramework in podspec.
+  /// All symbols from RACommons, RABackendLlamaCPP, and RABackendONNX
+  /// are linked into the main executable.
+  static DynamicLibrary _loadIOS(String libraryName) {
+    // On iOS, XCFrameworks are statically linked into the app binary
+    // via CocoaPods. All symbols are available in the main executable.
+    //
+    // The podspec files configure:
+    // - runanywhere.podspec -> links RACommons.xcframework
+    // - runanywhere_llamacpp.podspec -> links RABackendLlamaCPP.xcframework
+    // - runanywhere_onnx.podspec -> links RABackendONNX.xcframework
     return DynamicLibrary.executable();
   }
 
-  /// Load on macOS for development/testing
-  static DynamicLibrary _loadMacOS() {
-    // Try multiple possible locations for the dylib
-
-    // 1. Check relative to the Flutter app bundle (for release builds)
-    final executablePath = Platform.resolvedExecutable;
-    final bundlePath = File(executablePath).parent.parent.path;
-    final frameworkPaths = [
-      '$bundlePath/Frameworks/lib$_libraryName.dylib',
-      '$bundlePath/Resources/lib$_libraryName.dylib',
-    ];
-
-    for (final path in frameworkPaths) {
-      if (File(path).existsSync()) {
-        return DynamicLibrary.open(path);
-      }
-    }
-
-    // 2. Check for library in Flutter SDK macos/Libraries/ directory
-    final flutterSdkPaths = _getFlutterSdkLibraryPaths();
-    for (final path in flutterSdkPaths) {
-      if (File(path).existsSync()) {
-        return DynamicLibrary.open(path);
-      }
-    }
-
-    // 3. Check for local development build in runanywhere-core/build
-    final devPaths = [
-      // Direct path from runanywhere-core build output
-      '${_getRunAnywhereCoreRoot()}/build/lib$_libraryName.dylib',
-      '${_getRunAnywhereCoreRoot()}/build/Release/lib$_libraryName.dylib',
-      '${_getRunAnywhereCoreRoot()}/build/macos/lib$_libraryName.dylib',
-      '${_getRunAnywhereCoreRoot()}/build/macos-flutter/lib$_libraryName.dylib',
-      // Relative paths for development
-      '../../../runanywhere-core/build/lib$_libraryName.dylib',
-      '../../../../runanywhere-core/build/lib$_libraryName.dylib',
-    ];
-
-    for (final path in devPaths) {
-      final file = File(path);
-      if (file.existsSync()) {
-        return DynamicLibrary.open(file.absolute.path);
-      }
-    }
-
-    // 4. Try system paths
+  /// Load on macOS for development/testing.
+  ///
+  /// macOS supports both:
+  /// 1. Static linking via XCFramework (release builds)
+  /// 2. Dynamic loading of .dylib (development builds)
+  static DynamicLibrary _loadMacOS(String libraryName) {
+    // First try executable() for statically linked builds (like iOS)
     try {
-      return DynamicLibrary.open('lib$_libraryName.dylib');
-    } catch (_) {}
+      final lib = DynamicLibrary.executable();
+      // Verify we can find a symbol from the requested library
+      if (_verifyMacOSLibrary(lib, libraryName)) {
+        return lib;
+      }
+    } catch (_) {
+      // Fall through to dynamic loading
+    }
 
-    // 5. Use process() as fallback (if statically linked)
+    // Try process() for dynamically linked builds
     try {
-      return DynamicLibrary.process();
-    } catch (_) {}
+      final lib = DynamicLibrary.process();
+      if (_verifyMacOSLibrary(lib, libraryName)) {
+        return lib;
+      }
+    } catch (_) {
+      // Fall through to explicit path loading
+    }
 
-    throw ArgumentError(
-      'Could not load lib$_libraryName.dylib on macOS. '
-      'Tried: ${[
-        ...frameworkPaths,
-        ...flutterSdkPaths,
-        ...devPaths
-      ].join(", ")}. '
-      'Run: ./scripts/setup_native.sh --mode local --platform macos',
-    );
+    // Try explicit dylib paths for development
+    final dylibName = 'lib$libraryName.dylib';
+    final searchPaths = _getMacOSSearchPaths(dylibName);
+
+    for (final path in searchPaths) {
+      if (File(path).existsSync()) {
+        try {
+          return DynamicLibrary.open(path);
+        } catch (_) {
+          // Try next path
+        }
+      }
+    }
+
+    // Last resort: let the system find it
+    try {
+      return DynamicLibrary.open(dylibName);
+    } catch (e) {
+      throw ArgumentError(
+        'Could not load $dylibName on macOS. '
+        'Tried: ${searchPaths.join(", ")}. Error: $e',
+      );
+    }
   }
 
-  /// Get paths to check in Flutter SDK macos/Libraries/ directory
-  static List<String> _getFlutterSdkLibraryPaths() {
+  /// Verify macOS library has expected symbols
+  static bool _verifyMacOSLibrary(DynamicLibrary lib, String libraryName) {
+    try {
+      // Check for a known symbol from each library
+      switch (libraryName) {
+        case 'racommons':
+          lib.lookup('rac_init');
+          return true;
+        case 'rabackendllamacpp':
+          lib.lookup('rac_backend_llamacpp_register');
+          return true;
+        case 'rabackendonnx':
+          lib.lookup('rac_stt_onnx_create');
+          return true;
+        default:
+          return true;
+      }
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Get macOS search paths for dylib
+  static List<String> _getMacOSSearchPaths(String dylibName) {
     final paths = <String>[];
 
-    // Try to find the Flutter SDK path from current directory
-    var dir = Directory.current;
+    // App bundle paths
+    final executablePath = Platform.resolvedExecutable;
+    final bundlePath = File(executablePath).parent.parent.path;
+    paths.addAll([
+      '$bundlePath/Frameworks/$dylibName',
+      '$bundlePath/Resources/$dylibName',
+    ]);
 
-    // Walk up looking for pubspec.yaml (Flutter package root)
-    while (dir.path != dir.parent.path) {
-      final pubspec = File('${dir.path}/pubspec.yaml');
-      if (pubspec.existsSync()) {
-        // Check if this is a Flutter package that depends on runanywhere
-        final content = pubspec.readAsStringSync();
-        if (content.contains('runanywhere')) {
-          // Found a consuming app, look for the SDK
-          final potentialPaths = [
-            // For example app inside SDK
-            '${dir.path}/../macos/Libraries/lib$_libraryName.dylib',
-            // For external app with path dependency
-            '${dir.path}/macos/.symlinks/plugins/runanywhere/macos/Libraries/lib$_libraryName.dylib',
-          ];
-          paths.addAll(potentialPaths);
-        }
+    // Development paths relative to current directory
+    final currentDir = Directory.current.path;
+    paths.addAll([
+      '$currentDir/$dylibName',
+      '$currentDir/build/$dylibName',
+      '$currentDir/build/macos/$dylibName',
+    ]);
 
-        // Check if this IS the runanywhere SDK
-        if (content.contains('name: runanywhere')) {
-          paths.add('${dir.path}/macos/Libraries/lib$_libraryName.dylib');
-        }
-        break;
-      }
-      dir = dir.parent;
-    }
+    // System paths
+    paths.addAll([
+      '/usr/local/lib/$dylibName',
+      '/opt/homebrew/lib/$dylibName',
+    ]);
 
     return paths;
   }
 
-  /// Load on Linux
-  static DynamicLibrary _loadLinux() {
-    // Similar search pattern to macOS
+  /// Load on Linux.
+  static DynamicLibrary _loadLinux(String libraryName) {
+    final soName = 'lib$libraryName.so';
     final paths = [
-      'lib$_libraryName.so',
-      './lib$_libraryName.so',
-      '/usr/local/lib/lib$_libraryName.so',
-      '/usr/lib/lib$_libraryName.so',
+      soName,
+      './$soName',
+      '/usr/local/lib/$soName',
+      '/usr/lib/$soName',
     ];
 
     for (final path in paths) {
       try {
         return DynamicLibrary.open(path);
-      } catch (_) {}
-    }
-
-    throw ArgumentError(
-      'Could not load lib$_libraryName.so on Linux. '
-      'Tried: ${paths.join(", ")}',
-    );
-  }
-
-  /// Load on Windows
-  static DynamicLibrary _loadWindows() {
-    final paths = [
-      '$_libraryName.dll',
-      './$_libraryName.dll',
-    ];
-
-    for (final path in paths) {
-      try {
-        return DynamicLibrary.open(path);
-      } catch (_) {}
-    }
-
-    throw ArgumentError(
-      'Could not load $_libraryName.dll on Windows. '
-      'Tried: ${paths.join(", ")}',
-    );
-  }
-
-  /// Try to load a dependency library (for Android)
-  static void _tryLoadDependency(String name) {
-    try {
-      DynamicLibrary.open('lib$name.so');
-    } catch (_) {
-      // Dependency may already be loaded or bundled differently
-    }
-  }
-
-  /// Get the root path of runanywhere-core for development builds
-  static String _getRunAnywhereCoreRoot() {
-    // Try to find runanywhere-core relative to the Flutter SDK
-    final currentDir = Directory.current.path;
-
-    // If we're in the Flutter SDK directory structure
-    if (currentDir.contains('runanywhere-flutter')) {
-      // Navigate up to find runanywhere-core
-      var dir = Directory(currentDir);
-      while (dir.path != dir.parent.path) {
-        final coreDir = Directory('${dir.path}/runanywhere-core');
-        if (coreDir.existsSync()) {
-          return coreDir.path;
-        }
-        // Also check sibling directories
-        final siblingCore = Directory('${dir.parent.path}/runanywhere-core');
-        if (siblingCore.existsSync()) {
-          return siblingCore.path;
-        }
-        dir = dir.parent;
+      } catch (_) {
+        // Try next path
       }
     }
 
-    // Fallback: assume a common workspace structure
-    return '/Users/sanchitmonga/development/ODLM/runanywhere-all/runanywhere-core';
+    throw ArgumentError(
+      'Could not load $soName on Linux. Tried: ${paths.join(", ")}',
+    );
   }
 
-  /// Check if the native library is loaded.
-  static bool get isLoaded => _isLoaded;
+  /// Load on Windows.
+  static DynamicLibrary _loadWindows(String libraryName) {
+    final dllName = '$libraryName.dll';
+    final paths = [
+      dllName,
+      './$dllName',
+    ];
+
+    for (final path in paths) {
+      try {
+        return DynamicLibrary.open(path);
+      } catch (_) {
+        // Try next path
+      }
+    }
+
+    throw ArgumentError(
+      'Could not load $dllName on Windows. Tried: ${paths.join(", ")}',
+    );
+  }
+
+  // =============================================================================
+  // State and Utilities
+  // =============================================================================
+
+  /// Check if the commons library is loaded.
+  static bool get isCommonsLoaded => _commonsLibrary != null;
+
+  /// Check if the LlamaCPP library is loaded.
+  static bool get isLlamaCppLoaded => _llamacppLibrary != null;
+
+  /// Check if the ONNX library is loaded.
+  static bool get isOnnxLoaded => _onnxLibrary != null;
+
+  /// Legacy: Check if any native library is loaded.
+  static bool get isLoaded => _commonsLibrary != null;
 
   /// Get the last load error, if any.
   static String? get loadError => _loadError;
 
-  /// Unload the library reference (the actual library may remain in memory).
+  /// Unload all library references.
+  ///
+  /// Note: The actual libraries may remain in memory until process exit.
   static void unload() {
-    _library = null;
-    _isLoaded = false;
+    _commonsLibrary = null;
+    _llamacppLibrary = null;
+    _onnxLibrary = null;
   }
 
-  /// Get the current platform's library file extension
+  /// Get the current platform's library file extension.
   static String get libraryExtension {
     if (Platform.isAndroid || Platform.isLinux) return '.so';
     if (Platform.isIOS || Platform.isMacOS) return '.dylib';
@@ -301,16 +379,22 @@ class PlatformLoader {
     return '';
   }
 
-  /// Get the current platform's library file prefix
+  /// Get the current platform's library file prefix.
   static String get libraryPrefix {
     if (Platform.isWindows) return '';
     return 'lib';
   }
 
-  /// Get the full library filename for the current platform
-  static String get libraryFilename =>
-      '$libraryPrefix$_libraryName$libraryExtension';
+  /// Check if native libraries are available on this platform.
+  static bool get isAvailable {
+    try {
+      loadCommons();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 
-  /// Convenience alias for load()
+  /// Convenience alias for load().
   static DynamicLibrary loadNativeLibrary() => load();
 }

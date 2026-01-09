@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:ffi';
 import 'dart:typed_data';
 
@@ -7,103 +6,172 @@ import 'package:ffi/ffi.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 
-/// Wrapper around the RunAnywhere native C API.
+// =============================================================================
+// RAC Core - SDK Initialization and Module Management
+// =============================================================================
+
+/// Core RAC (RunAnywhere Commons) functionality.
 ///
-/// This class provides a Dart-friendly interface to the native backend,
+/// Provides SDK-level initialization, shutdown, and module management.
+/// This is the Dart equivalent of the C rac_core.h API.
+class RacCore {
+  static bool _initialized = false;
+  static DynamicLibrary? _lib;
+
+  // Cached function pointers
+  static RacInitDart? _racInit;
+  static RacShutdownDart? _racShutdown;
+  static RacIsInitializedDart? _racIsInitialized;
+  static RacFreeDart? _racFree;
+  static RacErrorMessageDart? _racErrorMessage;
+
+  /// Initialize the RAC commons library.
+  ///
+  /// This must be called before using any RAC functionality.
+  /// The platform adapter provides callbacks for platform-specific operations.
+  ///
+  /// Throws [RacException] if initialization fails.
+  static void init({int logLevel = RacLogLevel.info}) {
+    if (_initialized) {
+      return; // Already initialized
+    }
+
+    _lib = PlatformLoader.loadCommons();
+    _bindCoreFunctions();
+
+    // For now, pass null config (platform adapter setup done separately)
+    // The C++ library handles null config gracefully
+    final result = _racInit!(nullptr);
+
+    if (result != RAC_SUCCESS) {
+      throw RacException('RAC initialization failed', code: result);
+    }
+
+    _initialized = true;
+  }
+
+  /// Shutdown the RAC commons library.
+  ///
+  /// This releases all resources and unregisters all modules.
+  static void shutdown() {
+    if (!_initialized || _lib == null) {
+      return;
+    }
+
+    _racShutdown!();
+    _initialized = false;
+  }
+
+  /// Check if the RAC library is initialized.
+  static bool get isInitialized {
+    if (_lib == null) {
+      return false;
+    }
+    _bindCoreFunctions();
+    return _racIsInitialized!() == RAC_TRUE;
+  }
+
+  /// Free memory allocated by RAC functions.
+  static void free(Pointer<Void> ptr) {
+    if (_lib == null || ptr == nullptr) return;
+    _bindCoreFunctions();
+    _racFree!(ptr);
+  }
+
+  /// Get error message for an error code.
+  static String getErrorMessage(int code) {
+    if (_lib == null) {
+      return RacResultCode.getMessage(code);
+    }
+    _bindCoreFunctions();
+    final ptr = _racErrorMessage!(code);
+    if (ptr == nullptr) {
+      return RacResultCode.getMessage(code);
+    }
+    return ptr.toDartString();
+  }
+
+  /// Bind core FFI functions (lazy initialization).
+  static void _bindCoreFunctions() {
+    if (_racInit != null) return;
+
+    _racInit = _lib!.lookupFunction<RacInitNative, RacInitDart>('rac_init');
+    _racShutdown = _lib!
+        .lookupFunction<RacShutdownNative, RacShutdownDart>('rac_shutdown');
+    _racIsInitialized = _lib!
+        .lookupFunction<RacIsInitializedNative, RacIsInitializedDart>(
+            'rac_is_initialized');
+    _racFree = _lib!.lookupFunction<RacFreeNative, RacFreeDart>('rac_free');
+    _racErrorMessage = _lib!
+        .lookupFunction<RacErrorMessageNative, RacErrorMessageDart>(
+            'rac_error_message');
+  }
+
+  /// Get the library for advanced operations.
+  static DynamicLibrary? get library => _lib;
+}
+
+// =============================================================================
+// Native Backend - High-Level Wrapper for Backend Operations
+// =============================================================================
+
+/// High-level wrapper around the RunAnywhere native C API.
+///
+/// This class provides a Dart-friendly interface to native backends,
 /// handling memory management and type conversions.
 ///
-/// Usage:
+/// The new architecture supports multiple backends:
+/// - LlamaCPP: LLM text generation
+/// - ONNX: STT, TTS, VAD
+///
+/// ## Usage
+///
 /// ```dart
-/// final backend = NativeBackend();
-/// backend.create('onnx');
-/// backend.loadSttModel('/path/to/model', modelType: 'whisper');
-/// final result = backend.transcribe(audioSamples);
-/// backend.dispose();
+/// // For LlamaCPP
+/// final llamacpp = NativeBackend.llamacpp();
+/// llamacpp.initialize();
+/// llamacpp.loadModel('/path/to/model.gguf');
+/// final result = llamacpp.generate('Hello, world!');
+/// llamacpp.dispose();
+///
+/// // For ONNX
+/// final onnx = NativeBackend.onnx();
+/// onnx.initialize();
+/// onnx.loadSttModel('/path/to/whisper');
+/// final text = onnx.transcribe(audioSamples);
+/// onnx.dispose();
 /// ```
 class NativeBackend {
   final DynamicLibrary _lib;
-  RaBackendHandle? _handle;
-  String? _backendName;
+  final String _backendType;
+  RacHandle? _handle;
 
-  // Cached function lookups - Backend lifecycle
-  late final RaGetAvailableBackendsDart _getAvailableBackends;
-  late final RaCreateBackendDart _createBackend;
-  late final RaInitializeDart _initialize;
-  late final RaIsInitializedDart _isInitialized;
-  late final RaDestroyDart _destroy;
-  late final RaGetBackendInfoDart _getBackendInfo;
-  late final RaSupportsCapabilityDart _supportsCapability;
-  late final RaGetDeviceDart _getDevice;
-  late final RaGetMemoryUsageDart _getMemoryUsage;
+  // Cached function lookups - Memory management
+  // ignore: unused_field
+  late final RacFreeDart _freePtr;
 
-  // Memory management
-  late final RaFreeStringDart _freeString;
-  late final RaFreeAudioDart _freeAudio;
-  late final RaFreeEmbeddingDart _freeEmbedding;
+  // State
+  bool _isInitialized = false;
+  String? _currentModel;
 
-  // Utility
-  late final RaGetLastErrorDart _getLastError;
-  late final RaGetVersionDart _getVersion;
-  late final RaExtractArchiveDart _extractArchive;
-
-  // STT functions
-  late final RaSttLoadModelDart _sttLoadModel;
-  late final RaSttIsModelLoadedDart _sttIsModelLoaded;
-  late final RaSttUnloadModelDart _sttUnloadModel;
-  late final RaSttTranscribeDart _sttTranscribe;
-  late final RaSttSupportsStreamingDart _sttSupportsStreaming;
-  late final RaSttCreateStreamDart _sttCreateStream;
-  late final RaSttFeedAudioDart _sttFeedAudio;
-  late final RaSttIsReadyDart _sttIsReady;
-  late final RaSttDecodeDart _sttDecode;
-  late final RaSttIsEndpointDart _sttIsEndpoint;
-  late final RaSttInputFinishedDart _sttInputFinished;
-  late final RaSttResetStreamDart _sttResetStream;
-  late final RaSttDestroyStreamDart _sttDestroyStream;
-  late final RaSttCancelDart _sttCancel;
-
-  // TTS functions
-  late final RaTtsLoadModelDart _ttsLoadModel;
-  late final RaTtsIsModelLoadedDart _ttsIsModelLoaded;
-  late final RaTtsUnloadModelDart _ttsUnloadModel;
-  late final RaTtsSynthesizeDart _ttsSynthesize;
-  late final RaTtsSupportsStreamingDart _ttsSupportsStreaming;
-  late final RaTtsGetVoicesDart _ttsGetVoices;
-  late final RaTtsCancelDart _ttsCancel;
-
-  // LLM functions
-  late final RaTextLoadModelDart _textLoadModel;
-  late final RaTextIsModelLoadedDart _textIsModelLoaded;
-  late final RaTextUnloadModelDart _textUnloadModel;
-  late final RaTextGenerateDart _textGenerate;
-  late final RaTextCancelDart _textCancel;
-
-  // VAD functions
-  late final RaVadLoadModelDart _vadLoadModel;
-  late final RaVadIsModelLoadedDart _vadIsModelLoaded;
-  late final RaVadUnloadModelDart _vadUnloadModel;
-  late final RaVadProcessDart _vadProcess;
-  late final RaVadCreateStreamDart _vadCreateStream;
-  late final RaVadDestroyStreamDart _vadDestroyStream;
-  late final RaVadResetDart _vadReset;
-
-  // Embeddings functions
-  late final RaEmbedLoadModelDart _embedLoadModel;
-  late final RaEmbedIsModelLoadedDart _embedIsModelLoaded;
-  late final RaEmbedTextDart _embedText;
-  late final RaEmbedGetDimensionsDart _embedGetDimensions;
-
-  NativeBackend._(this._lib) {
-    _bindFunctions();
+  NativeBackend._(this._lib, this._backendType) {
+    _bindBaseFunctions();
   }
 
-  /// Create a new native backend instance.
-  ///
-  /// This loads the native library for the current platform.
-  /// Throws if the library cannot be loaded.
+  /// Create a LlamaCPP backend for LLM operations.
+  factory NativeBackend.llamacpp() {
+    return NativeBackend._(PlatformLoader.loadLlamaCpp(), 'llamacpp');
+  }
+
+  /// Create an ONNX backend for STT/TTS/VAD operations.
+  factory NativeBackend.onnx() {
+    return NativeBackend._(PlatformLoader.loadOnnx(), 'onnx');
+  }
+
+  /// Create a backend using the default (commons) library.
+  /// For backward compatibility.
   factory NativeBackend() {
-    final lib = PlatformLoader.load();
-    return NativeBackend._(lib);
+    return NativeBackend._(PlatformLoader.loadCommons(), 'commons');
   }
 
   /// Try to create a native backend, returning null if it fails.
@@ -115,279 +183,214 @@ class NativeBackend {
     }
   }
 
-  void _bindFunctions() {
-    // Backend lifecycle
-    _getAvailableBackends = _lib.lookupFunction<RaGetAvailableBackendsNative,
-        RaGetAvailableBackendsDart>('ra_get_available_backends');
-    _createBackend =
-        _lib.lookupFunction<RaCreateBackendNative, RaCreateBackendDart>(
-            'ra_create_backend');
-    _initialize = _lib
-        .lookupFunction<RaInitializeNative, RaInitializeDart>('ra_initialize');
-    _isInitialized =
-        _lib.lookupFunction<RaIsInitializedNative, RaIsInitializedDart>(
-            'ra_is_initialized');
-    _destroy =
-        _lib.lookupFunction<RaDestroyNative, RaDestroyDart>('ra_destroy');
-    _getBackendInfo =
-        _lib.lookupFunction<RaGetBackendInfoNative, RaGetBackendInfoDart>(
-            'ra_get_backend_info');
-    _supportsCapability = _lib.lookupFunction<RaSupportsCapabilityNative,
-        RaSupportsCapabilityDart>('ra_supports_capability');
-    _getDevice = _lib
-        .lookupFunction<RaGetDeviceNative, RaGetDeviceDart>('ra_get_device');
-    _getMemoryUsage =
-        _lib.lookupFunction<RaGetMemoryUsageNative, RaGetMemoryUsageDart>(
-            'ra_get_memory_usage');
-
-    // Memory management
-    _freeString = _lib
-        .lookupFunction<RaFreeStringNative, RaFreeStringDart>('ra_free_string');
-    _freeAudio = _lib
-        .lookupFunction<RaFreeAudioNative, RaFreeAudioDart>('ra_free_audio');
-    _freeEmbedding =
-        _lib.lookupFunction<RaFreeEmbeddingNative, RaFreeEmbeddingDart>(
-            'ra_free_embedding');
-
-    // Utility
-    _getLastError =
-        _lib.lookupFunction<RaGetLastErrorNative, RaGetLastErrorDart>(
-            'ra_get_last_error');
-    _getVersion = _lib
-        .lookupFunction<RaGetVersionNative, RaGetVersionDart>('ra_get_version');
-    _extractArchive =
-        _lib.lookupFunction<RaExtractArchiveNative, RaExtractArchiveDart>(
-            'ra_extract_archive');
-
-    // STT
-    _sttLoadModel =
-        _lib.lookupFunction<RaSttLoadModelNative, RaSttLoadModelDart>(
-            'ra_stt_load_model');
-    _sttIsModelLoaded =
-        _lib.lookupFunction<RaSttIsModelLoadedNative, RaSttIsModelLoadedDart>(
-            'ra_stt_is_model_loaded');
-    _sttUnloadModel =
-        _lib.lookupFunction<RaSttUnloadModelNative, RaSttUnloadModelDart>(
-            'ra_stt_unload_model');
-    _sttTranscribe =
-        _lib.lookupFunction<RaSttTranscribeNative, RaSttTranscribeDart>(
-            'ra_stt_transcribe');
-    _sttSupportsStreaming = _lib.lookupFunction<RaSttSupportsStreamingNative,
-        RaSttSupportsStreamingDart>('ra_stt_supports_streaming');
-    _sttCreateStream =
-        _lib.lookupFunction<RaSttCreateStreamNative, RaSttCreateStreamDart>(
-            'ra_stt_create_stream');
-    _sttFeedAudio =
-        _lib.lookupFunction<RaSttFeedAudioNative, RaSttFeedAudioDart>(
-            'ra_stt_feed_audio');
-    _sttIsReady = _lib.lookupFunction<RaSttIsReadyNative, RaSttIsReadyDart>(
-        'ra_stt_is_ready');
-    _sttDecode = _lib
-        .lookupFunction<RaSttDecodeNative, RaSttDecodeDart>('ra_stt_decode');
-    _sttIsEndpoint =
-        _lib.lookupFunction<RaSttIsEndpointNative, RaSttIsEndpointDart>(
-            'ra_stt_is_endpoint');
-    _sttInputFinished =
-        _lib.lookupFunction<RaSttInputFinishedNative, RaSttInputFinishedDart>(
-            'ra_stt_input_finished');
-    _sttResetStream =
-        _lib.lookupFunction<RaSttResetStreamNative, RaSttResetStreamDart>(
-            'ra_stt_reset_stream');
-    _sttDestroyStream =
-        _lib.lookupFunction<RaSttDestroyStreamNative, RaSttDestroyStreamDart>(
-            'ra_stt_destroy_stream');
-    _sttCancel = _lib
-        .lookupFunction<RaSttCancelNative, RaSttCancelDart>('ra_stt_cancel');
-
-    // TTS
-    _ttsLoadModel =
-        _lib.lookupFunction<RaTtsLoadModelNative, RaTtsLoadModelDart>(
-            'ra_tts_load_model');
-    _ttsIsModelLoaded =
-        _lib.lookupFunction<RaTtsIsModelLoadedNative, RaTtsIsModelLoadedDart>(
-            'ra_tts_is_model_loaded');
-    _ttsUnloadModel =
-        _lib.lookupFunction<RaTtsUnloadModelNative, RaTtsUnloadModelDart>(
-            'ra_tts_unload_model');
-    _ttsSynthesize =
-        _lib.lookupFunction<RaTtsSynthesizeNative, RaTtsSynthesizeDart>(
-            'ra_tts_synthesize');
-    _ttsSupportsStreaming = _lib.lookupFunction<RaTtsSupportsStreamingNative,
-        RaTtsSupportsStreamingDart>('ra_tts_supports_streaming');
-    _ttsGetVoices =
-        _lib.lookupFunction<RaTtsGetVoicesNative, RaTtsGetVoicesDart>(
-            'ra_tts_get_voices');
-    _ttsCancel = _lib
-        .lookupFunction<RaTtsCancelNative, RaTtsCancelDart>('ra_tts_cancel');
-
-    // LLM
-    _textLoadModel =
-        _lib.lookupFunction<RaTextLoadModelNative, RaTextLoadModelDart>(
-            'ra_text_load_model');
-    _textIsModelLoaded =
-        _lib.lookupFunction<RaTextIsModelLoadedNative, RaTextIsModelLoadedDart>(
-            'ra_text_is_model_loaded');
-    _textUnloadModel =
-        _lib.lookupFunction<RaTextUnloadModelNative, RaTextUnloadModelDart>(
-            'ra_text_unload_model');
-    _textGenerate =
-        _lib.lookupFunction<RaTextGenerateNative, RaTextGenerateDart>(
-            'ra_text_generate');
-    _textCancel = _lib
-        .lookupFunction<RaTextCancelNative, RaTextCancelDart>('ra_text_cancel');
-
-    // VAD
-    _vadLoadModel =
-        _lib.lookupFunction<RaVadLoadModelNative, RaVadLoadModelDart>(
-            'ra_vad_load_model');
-    _vadIsModelLoaded =
-        _lib.lookupFunction<RaVadIsModelLoadedNative, RaVadIsModelLoadedDart>(
-            'ra_vad_is_model_loaded');
-    _vadUnloadModel =
-        _lib.lookupFunction<RaVadUnloadModelNative, RaVadUnloadModelDart>(
-            'ra_vad_unload_model');
-    _vadProcess = _lib
-        .lookupFunction<RaVadProcessNative, RaVadProcessDart>('ra_vad_process');
-    _vadCreateStream =
-        _lib.lookupFunction<RaVadCreateStreamNative, RaVadCreateStreamDart>(
-            'ra_vad_create_stream');
-    _vadDestroyStream =
-        _lib.lookupFunction<RaVadDestroyStreamNative, RaVadDestroyStreamDart>(
-            'ra_vad_destroy_stream');
-    _vadReset =
-        _lib.lookupFunction<RaVadResetNative, RaVadResetDart>('ra_vad_reset');
-
-    // Embeddings
-    _embedLoadModel =
-        _lib.lookupFunction<RaEmbedLoadModelNative, RaEmbedLoadModelDart>(
-            'ra_embed_load_model');
-    _embedIsModelLoaded = _lib.lookupFunction<RaEmbedIsModelLoadedNative,
-        RaEmbedIsModelLoadedDart>('ra_embed_is_model_loaded');
-    _embedText = _lib
-        .lookupFunction<RaEmbedTextNative, RaEmbedTextDart>('ra_embed_text');
-    _embedGetDimensions = _lib.lookupFunction<RaEmbedGetDimensionsNative,
-        RaEmbedGetDimensionsDart>('ra_embed_get_dimensions');
+  void _bindBaseFunctions() {
+    try {
+      _freePtr = _lib.lookupFunction<RacFreeNative, RacFreeDart>('rac_free');
+    } catch (_) {
+      // Some backends might not export rac_free directly
+      // Fall back to RacCore.free
+      _freePtr = (ptr) => RacCore.free(ptr);
+    }
   }
 
   // ============================================================================
   // Backend Lifecycle
   // ============================================================================
 
-  /// Get list of available backend names.
-  List<String> getAvailableBackends() {
-    final countPtr = calloc<Int32>();
-
-    try {
-      final backendsPtr = _getAvailableBackends(countPtr);
-      final count = countPtr.value;
-
-      if (backendsPtr == nullptr || count == 0) {
-        return [];
-      }
-
-      final backends = <String>[];
-      for (var i = 0; i < count; i++) {
-        final strPtr = backendsPtr[i];
-        if (strPtr != nullptr) {
-          backends.add(strPtr.toDartString());
-        }
-      }
-
-      return backends;
-    } finally {
-      calloc.free(countPtr);
-    }
-  }
-
-  /// Create and initialize a backend.
+  /// Create and initialize the backend.
   ///
-  /// [backendName] - Name of the backend ("onnx", "llamacpp", etc.)
+  /// [backendName] - Name of the backend (for backward compatibility)
   /// [config] - Optional JSON configuration
   void create(String backendName, {Map<String, dynamic>? config}) {
-    final namePtr = backendName.toNativeUtf8();
+    // The new architecture doesn't require explicit create()
+    // Backends register themselves via their register() functions
+    _isInitialized = true;
+  }
 
-    try {
-      _handle = _createBackend(namePtr);
-
-      if (_handle == nullptr) {
-        throw NativeBackendException(
-          'Failed to create backend: $backendName. ${_getError()}',
-        );
-      }
-
-      _backendName = backendName;
-
-      final configJson = config != null ? jsonEncode(config) : null;
-      final configPtr = configJson?.toNativeUtf8() ?? nullptr;
-
-      try {
-        final result = _initialize(_handle!, configPtr);
-
-        if (result != RaResultCode.success) {
-          throw NativeBackendException(
-            'Failed to initialize backend: ${_getError()}',
-            code: result,
-          );
-        }
-      } finally {
-        if (configPtr != nullptr) {
-          calloc.free(configPtr);
-        }
-      }
-    } finally {
-      calloc.free(namePtr);
-    }
+  /// Initialize the backend (simplified for new architecture).
+  void initialize() {
+    _isInitialized = true;
   }
 
   /// Check if the backend is initialized.
-  bool get isInitialized => _handle != null && _isInitialized(_handle!);
+  bool get isInitialized => _isInitialized;
 
-  /// Get the backend name.
-  String? get backendName => _backendName;
+  /// Get the backend type.
+  String get backendName => _backendType;
 
-  /// Get backend info as a map.
-  Map<String, dynamic> getBackendInfo() {
-    _ensureInitialized();
-
-    final ptr = _getBackendInfo(_handle!);
-    if (ptr == nullptr) return {};
-
-    try {
-      return jsonDecode(ptr.toDartString()) as Map<String, dynamic>;
-    } finally {
-      _freeString(ptr);
-    }
-  }
-
-  /// Check if the backend supports a specific capability.
-  bool supportsCapability(int capability) {
-    _ensureInitialized();
-    return _supportsCapability(_handle!, capability);
-  }
-
-  /// Get the device type being used.
-  int getDevice() {
-    _ensureInitialized();
-    return _getDevice(_handle!);
-  }
-
-  /// Get memory usage in bytes.
-  int getMemoryUsage() {
-    _ensureInitialized();
-    return _getMemoryUsage(_handle!);
-  }
+  /// Get the backend handle (for advanced operations).
+  RacHandle? get handle => _handle;
 
   /// Destroy the backend and release resources.
   void dispose() {
-    if (_handle != null) {
-      _destroy(_handle!);
+    if (_handle != null && _handle != nullptr) {
+      // Call appropriate destroy function based on backend type
+      _destroyHandle();
       _handle = null;
-      _backendName = null;
+    }
+    _isInitialized = false;
+    _currentModel = null;
+  }
+
+  void _destroyHandle() {
+    if (_handle == null || _handle == nullptr) return;
+
+    try {
+      switch (_backendType) {
+        case 'llamacpp':
+          final destroy = _lib.lookupFunction<RacLlmLlamacppDestroyNative,
+              RacLlmLlamacppDestroyDart>('rac_llm_llamacpp_destroy');
+          destroy(_handle!);
+          break;
+        case 'onnx':
+          // ONNX has separate destroy functions for each service type
+          // Handle based on what was loaded
+          break;
+        default:
+          // Commons library doesn't have a generic destroy
+          break;
+      }
+    } catch (_) {
+      // Ignore errors during cleanup
     }
   }
 
   // ============================================================================
-  // STT (Speech-to-Text)
+  // LLM Operations (LlamaCPP Backend)
+  // ============================================================================
+
+  /// Load a text generation model (LLM).
+  void loadTextModel(String modelPath, {Map<String, dynamic>? config}) {
+    _ensureBackendType('llamacpp');
+
+    final pathPtr = modelPath.toNativeUtf8();
+    final handlePtr = calloc<RacHandle>();
+
+    try {
+      final create = _lib.lookupFunction<RacLlmLlamacppCreateNative,
+          RacLlmLlamacppCreateDart>('rac_llm_llamacpp_create');
+
+      final result = create(pathPtr, nullptr, handlePtr);
+
+      if (result != RAC_SUCCESS) {
+        throw NativeBackendException(
+          'Failed to load text model: ${RacCore.getErrorMessage(result)}',
+          code: result,
+        );
+      }
+
+      _handle = handlePtr.value;
+      _currentModel = modelPath;
+    } finally {
+      calloc.free(pathPtr);
+      calloc.free(handlePtr);
+    }
+  }
+
+  /// Check if a text model is loaded.
+  bool get isTextModelLoaded {
+    if (_handle == null || _backendType != 'llamacpp') return false;
+
+    try {
+      final isLoaded = _lib.lookupFunction<RacLlmLlamacppIsModelLoadedNative,
+          RacLlmLlamacppIsModelLoadedDart>('rac_llm_llamacpp_is_model_loaded');
+      return isLoaded(_handle!) == RAC_TRUE;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Unload the text model.
+  void unloadTextModel() {
+    if (_handle == null || _backendType != 'llamacpp') return;
+
+    try {
+      final unload = _lib.lookupFunction<RacLlmLlamacppUnloadModelNative,
+          RacLlmLlamacppUnloadModelDart>('rac_llm_llamacpp_unload_model');
+      unload(_handle!);
+      _currentModel = null;
+    } catch (e) {
+      throw NativeBackendException('Failed to unload text model: $e');
+    }
+  }
+
+  /// Generate text (non-streaming).
+  Map<String, dynamic> generate(
+    String prompt, {
+    String? systemPrompt,
+    int maxTokens = 512,
+    double temperature = 0.7,
+  }) {
+    _ensureBackendType('llamacpp');
+    _ensureHandle();
+
+    final promptPtr = prompt.toNativeUtf8();
+    final resultPtr = calloc<RacLlmResultStruct>();
+
+    // Create options struct
+    final optionsPtr = calloc<RacLlmOptionsStruct>();
+    optionsPtr.ref.maxTokens = maxTokens;
+    optionsPtr.ref.temperature = temperature;
+    optionsPtr.ref.topP = 1.0;
+    optionsPtr.ref.streamingEnabled = RAC_FALSE;
+    optionsPtr.ref.systemPrompt = systemPrompt?.toNativeUtf8() ?? nullptr;
+
+    try {
+      final generate = _lib.lookupFunction<RacLlmLlamacppGenerateNative,
+          RacLlmLlamacppGenerateDart>('rac_llm_llamacpp_generate');
+
+      final status = generate(
+        _handle!,
+        promptPtr,
+        optionsPtr.cast(),
+        resultPtr.cast(),
+      );
+
+      if (status != RAC_SUCCESS) {
+        throw NativeBackendException(
+          'Text generation failed: ${RacCore.getErrorMessage(status)}',
+          code: status,
+        );
+      }
+
+      // Extract result
+      final result = resultPtr.ref;
+      final text = result.text != nullptr ? result.text.toDartString() : '';
+
+      return {
+        'text': text,
+        'prompt_tokens': result.promptTokens,
+        'completion_tokens': result.completionTokens,
+        'total_tokens': result.totalTokens,
+        'time_to_first_token_ms': result.timeToFirstTokenMs,
+        'total_time_ms': result.totalTimeMs,
+        'tokens_per_second': result.tokensPerSecond,
+      };
+    } finally {
+      calloc.free(promptPtr);
+      if (optionsPtr.ref.systemPrompt != nullptr) {
+        calloc.free(optionsPtr.ref.systemPrompt);
+      }
+      calloc.free(optionsPtr);
+      calloc.free(resultPtr);
+    }
+  }
+
+  /// Cancel ongoing text generation.
+  void cancelTextGeneration() {
+    if (_handle == null || _backendType != 'llamacpp') return;
+
+    try {
+      final cancel = _lib.lookupFunction<RacLlmLlamacppCancelNative,
+          RacLlmLlamacppCancelDart>('rac_llm_llamacpp_cancel');
+      cancel(_handle!);
+    } catch (_) {
+      // Ignore errors
+    }
+  }
+
+  // ============================================================================
+  // STT Operations (ONNX Backend)
   // ============================================================================
 
   /// Load an STT model.
@@ -396,45 +399,59 @@ class NativeBackend {
     String modelType = 'whisper',
     Map<String, dynamic>? config,
   }) {
-    _ensureInitialized();
+    _ensureBackendType('onnx');
 
     final pathPtr = modelPath.toNativeUtf8();
-    final typePtr = modelType.toNativeUtf8();
-    final configJson = config != null ? jsonEncode(config) : null;
-    final configPtr = configJson?.toNativeUtf8() ?? nullptr;
+    final handlePtr = calloc<RacHandle>();
+    final configPtr = calloc<RacSttOnnxConfigStruct>();
+
+    // Set config defaults
+    configPtr.ref.modelType = modelType == 'whisper' ? 0 : 99; // AUTO
+    configPtr.ref.numThreads = 0; // Auto
+    configPtr.ref.useCoreml = RAC_TRUE;
 
     try {
-      final result = _sttLoadModel(_handle!, pathPtr, typePtr, configPtr);
+      final create =
+          _lib.lookupFunction<RacSttOnnxCreateNative, RacSttOnnxCreateDart>(
+              'rac_stt_onnx_create');
 
-      if (result != RaResultCode.success) {
+      final result = create(pathPtr, configPtr.cast(), handlePtr);
+
+      if (result != RAC_SUCCESS) {
         throw NativeBackendException(
-          'Failed to load STT model: ${_getError()}',
+          'Failed to load STT model: ${RacCore.getErrorMessage(result)}',
           code: result,
         );
       }
+
+      _handle = handlePtr.value;
+      _currentModel = modelPath;
     } finally {
       calloc.free(pathPtr);
-      calloc.free(typePtr);
-      if (configPtr != nullptr) calloc.free(configPtr);
+      calloc.free(handlePtr);
+      calloc.free(configPtr);
     }
   }
 
   /// Check if an STT model is loaded.
   bool get isSttModelLoaded {
-    if (_handle == null) return false;
-    return _sttIsModelLoaded(_handle!);
+    return _handle != null && _backendType == 'onnx';
   }
 
   /// Unload the STT model.
   void unloadSttModel() {
-    _ensureInitialized();
-    _sttUnloadModel(_handle!);
-  }
+    if (_handle == null || _backendType != 'onnx') return;
 
-  /// Check if STT supports streaming.
-  bool get sttSupportsStreaming {
-    if (_handle == null) return false;
-    return _sttSupportsStreaming(_handle!);
+    try {
+      final destroy =
+          _lib.lookupFunction<RacSttOnnxDestroyNative, RacSttOnnxDestroyDart>(
+              'rac_stt_onnx_destroy');
+      destroy(_handle!);
+      _handle = null;
+      _currentModel = null;
+    } catch (e) {
+      throw NativeBackendException('Failed to unload STT model: $e');
+    }
   }
 
   /// Transcribe audio samples (batch mode).
@@ -449,165 +466,73 @@ class NativeBackend {
     int sampleRate = 16000,
     String? language,
   }) {
-    _ensureInitialized();
+    _ensureBackendType('onnx');
+    _ensureHandle();
 
     // Allocate native array
     final samplesPtr = calloc<Float>(samples.length);
     final nativeList = samplesPtr.asTypedList(samples.length);
     nativeList.setAll(0, samples);
 
-    final langPtr = language?.toNativeUtf8() ?? nullptr;
-    final resultPtr = calloc<Pointer<Utf8>>();
+    final resultPtr = calloc<RacSttOnnxResultStruct>();
 
     try {
-      final status = _sttTranscribe(
+      final transcribe = _lib.lookupFunction<RacSttOnnxTranscribeNative,
+          RacSttOnnxTranscribeDart>('rac_stt_onnx_transcribe');
+
+      final status = transcribe(
         _handle!,
         samplesPtr,
         samples.length,
-        sampleRate,
-        langPtr,
-        resultPtr,
+        nullptr, // options
+        resultPtr.cast(),
       );
 
-      if (status != RaResultCode.success) {
+      if (status != RAC_SUCCESS) {
         throw NativeBackendException(
-          'Transcription failed: ${_getError()}',
+          'Transcription failed: ${RacCore.getErrorMessage(status)}',
           code: status,
         );
       }
 
-      if (resultPtr.value == nullptr) {
-        return {'text': '', 'confidence': 1.0};
-      }
+      // Extract result from struct
+      final result = resultPtr.ref;
+      final text = result.text != nullptr ? result.text.toDartString() : '';
+      final confidence = result.confidence;
+      final languageOut =
+          result.language != nullptr ? result.language.toDartString() : null;
 
-      final resultJson = resultPtr.value.toDartString();
-      _freeString(resultPtr.value);
-
-      return jsonDecode(resultJson) as Map<String, dynamic>;
+      return {
+        'text': text,
+        'confidence': confidence,
+        'language': languageOut,
+        'duration_ms': result.durationMs,
+      };
     } finally {
       calloc.free(samplesPtr);
-      if (langPtr != nullptr) calloc.free(langPtr);
+      // Free result text if allocated by C++
+      if (resultPtr.ref.text != nullptr) {
+        RacCore.free(resultPtr.ref.text.cast());
+      }
       calloc.free(resultPtr);
     }
   }
 
-  /// Create an STT streaming session.
-  RaStreamHandle createSttStream({Map<String, dynamic>? config}) {
-    _ensureInitialized();
-
-    final configJson = config != null ? jsonEncode(config) : null;
-    final configPtr = configJson?.toNativeUtf8() ?? nullptr;
+  /// Check if STT supports streaming.
+  bool get sttSupportsStreaming {
+    if (_handle == null || _backendType != 'onnx') return false;
 
     try {
-      final stream = _sttCreateStream(_handle!, configPtr);
-      if (stream == nullptr) {
-        throw NativeBackendException(
-            'Failed to create STT stream: ${_getError()}');
-      }
-      return stream;
-    } finally {
-      if (configPtr != nullptr) calloc.free(configPtr);
-    }
-  }
-
-  /// Feed audio to an STT stream.
-  void feedSttAudio(
-    RaStreamHandle stream,
-    Float32List samples, {
-    int sampleRate = 16000,
-  }) {
-    _ensureInitialized();
-
-    final samplesPtr = calloc<Float>(samples.length);
-    final nativeList = samplesPtr.asTypedList(samples.length);
-    nativeList.setAll(0, samples);
-
-    try {
-      final status = _sttFeedAudio(
-        _handle!,
-        stream,
-        samplesPtr,
-        samples.length,
-        sampleRate,
-      );
-
-      if (status != RaResultCode.success) {
-        throw NativeBackendException(
-          'Failed to feed audio: ${_getError()}',
-          code: status,
-        );
-      }
-    } finally {
-      calloc.free(samplesPtr);
-    }
-  }
-
-  /// Check if STT decoder is ready.
-  bool isSttReady(RaStreamHandle stream) {
-    _ensureInitialized();
-    return _sttIsReady(_handle!, stream);
-  }
-
-  /// Decode and get current STT result.
-  Map<String, dynamic>? decodeStt(RaStreamHandle stream) {
-    _ensureInitialized();
-
-    final resultPtr = calloc<Pointer<Utf8>>();
-
-    try {
-      final status = _sttDecode(_handle!, stream, resultPtr);
-
-      if (status != RaResultCode.success) {
-        return null;
-      }
-
-      if (resultPtr.value == nullptr) {
-        return null;
-      }
-
-      final resultJson = resultPtr.value.toDartString();
-      _freeString(resultPtr.value);
-
-      return jsonDecode(resultJson) as Map<String, dynamic>;
-    } finally {
-      calloc.free(resultPtr);
-    }
-  }
-
-  /// Check for end-of-speech (endpoint detection).
-  bool isSttEndpoint(RaStreamHandle stream) {
-    _ensureInitialized();
-    return _sttIsEndpoint(_handle!, stream);
-  }
-
-  /// Signal end of audio input.
-  void sttInputFinished(RaStreamHandle stream) {
-    _ensureInitialized();
-    _sttInputFinished(_handle!, stream);
-  }
-
-  /// Reset stream for new utterance.
-  void resetSttStream(RaStreamHandle stream) {
-    _ensureInitialized();
-    _sttResetStream(_handle!, stream);
-  }
-
-  /// Destroy STT stream.
-  void destroySttStream(RaStreamHandle stream) {
-    if (_handle != null) {
-      _sttDestroyStream(_handle!, stream);
-    }
-  }
-
-  /// Cancel ongoing transcription.
-  void cancelStt() {
-    if (_handle != null) {
-      _sttCancel(_handle!);
+      final supports = _lib.lookupFunction<RacSttOnnxSupportsStreamingNative,
+          RacSttOnnxSupportsStreamingDart>('rac_stt_onnx_supports_streaming');
+      return supports(_handle!) == RAC_TRUE;
+    } catch (_) {
+      return false;
     }
   }
 
   // ============================================================================
-  // TTS (Text-to-Speech)
+  // TTS Operations (ONNX Backend)
   // ============================================================================
 
   /// Load a TTS model.
@@ -616,485 +541,368 @@ class NativeBackend {
     String modelType = 'vits',
     Map<String, dynamic>? config,
   }) {
-    _ensureInitialized();
+    _ensureBackendType('onnx');
 
     final pathPtr = modelPath.toNativeUtf8();
-    final typePtr = modelType.toNativeUtf8();
-    final configJson = config != null ? jsonEncode(config) : null;
-    final configPtr = configJson?.toNativeUtf8() ?? nullptr;
+    final handlePtr = calloc<RacHandle>();
+    final configPtr = calloc<RacTtsOnnxConfigStruct>();
+
+    // Set config defaults
+    configPtr.ref.numThreads = 0; // Auto
+    configPtr.ref.useCoreml = RAC_TRUE;
+    configPtr.ref.sampleRate = 22050;
 
     try {
-      final result = _ttsLoadModel(_handle!, pathPtr, typePtr, configPtr);
+      final create =
+          _lib.lookupFunction<RacTtsOnnxCreateNative, RacTtsOnnxCreateDart>(
+              'rac_tts_onnx_create');
 
-      if (result != RaResultCode.success) {
+      final result = create(pathPtr, configPtr.cast(), handlePtr);
+
+      if (result != RAC_SUCCESS) {
         throw NativeBackendException(
-          'Failed to load TTS model: ${_getError()}',
+          'Failed to load TTS model: ${RacCore.getErrorMessage(result)}',
           code: result,
         );
       }
+
+      _handle = handlePtr.value;
+      _currentModel = modelPath;
     } finally {
       calloc.free(pathPtr);
-      calloc.free(typePtr);
-      if (configPtr != nullptr) calloc.free(configPtr);
+      calloc.free(handlePtr);
+      calloc.free(configPtr);
     }
   }
 
   /// Check if a TTS model is loaded.
   bool get isTtsModelLoaded {
-    if (_handle == null) return false;
-    return _ttsIsModelLoaded(_handle!);
+    return _handle != null && _backendType == 'onnx';
   }
 
   /// Unload the TTS model.
   void unloadTtsModel() {
-    _ensureInitialized();
-    _ttsUnloadModel(_handle!);
-  }
+    if (_handle == null || _backendType != 'onnx') return;
 
-  /// Check if TTS supports streaming.
-  bool get ttsSupportsStreaming {
-    if (_handle == null) return false;
-    return _ttsSupportsStreaming(_handle!);
+    try {
+      final destroy =
+          _lib.lookupFunction<RacTtsOnnxDestroyNative, RacTtsOnnxDestroyDart>(
+              'rac_tts_onnx_destroy');
+      destroy(_handle!);
+      _handle = null;
+      _currentModel = null;
+    } catch (e) {
+      throw NativeBackendException('Failed to unload TTS model: $e');
+    }
   }
 
   /// Synthesize speech from text.
-  ///
-  /// Returns a map with:
-  /// - 'samples': Float32List of audio samples
-  /// - 'sampleRate': int sample rate
   Map<String, dynamic> synthesize(
     String text, {
     String? voiceId,
     double speed = 1.0,
     double pitch = 0.0,
   }) {
-    _ensureInitialized();
+    _ensureBackendType('onnx');
+    _ensureHandle();
 
     final textPtr = text.toNativeUtf8();
-    final voicePtr = voiceId?.toNativeUtf8() ?? nullptr;
-    final samplesPtr = calloc<Pointer<Float>>();
-    final numSamplesPtr = calloc<IntPtr>();
-    final sampleRatePtr = calloc<Int32>();
+    final resultPtr = calloc<RacTtsOnnxResultStruct>();
 
     try {
-      final status = _ttsSynthesize(
+      final synthesize = _lib.lookupFunction<RacTtsOnnxSynthesizeNative,
+          RacTtsOnnxSynthesizeDart>('rac_tts_onnx_synthesize');
+
+      final status = synthesize(
         _handle!,
         textPtr,
-        voicePtr,
-        speed,
-        pitch,
-        samplesPtr,
-        numSamplesPtr,
-        sampleRatePtr,
+        nullptr, // options (could include voice, speed, pitch)
+        resultPtr.cast(),
       );
 
-      if (status != RaResultCode.success) {
+      if (status != RAC_SUCCESS) {
         throw NativeBackendException(
-          'TTS synthesis failed: ${_getError()}',
+          'TTS synthesis failed: ${RacCore.getErrorMessage(status)}',
           code: status,
         );
       }
 
-      final numSamples = numSamplesPtr.value;
-      final sampleRate = sampleRatePtr.value;
+      // Extract result from struct
+      final result = resultPtr.ref;
+      final numSamples = result.numSamples;
+      final sampleRate = result.sampleRate;
 
-      if (samplesPtr.value == nullptr || numSamples == 0) {
-        return {'samples': Float32List(0), 'sampleRate': sampleRate};
+      // Copy audio samples to Dart
+      Float32List samples;
+      if (result.audioSamples != nullptr && numSamples > 0) {
+        samples = Float32List.fromList(
+          result.audioSamples.asTypedList(numSamples),
+        );
+      } else {
+        samples = Float32List(0);
       }
-
-      // Copy to Dart-managed memory
-      final samples = Float32List.fromList(
-        samplesPtr.value.asTypedList(numSamples),
-      );
-
-      // Free C-allocated audio
-      _freeAudio(samplesPtr.value);
 
       return {
         'samples': samples,
         'sampleRate': sampleRate,
+        'durationMs': result.durationMs,
       };
     } finally {
       calloc.free(textPtr);
-      if (voicePtr != nullptr) calloc.free(voicePtr);
-      calloc.free(samplesPtr);
-      calloc.free(numSamplesPtr);
-      calloc.free(sampleRatePtr);
-    }
-  }
-
-  /// Get available TTS voices.
-  /// Returns a list of voice IDs extracted from the native backend.
-  List<String> getTtsVoices() {
-    _ensureInitialized();
-
-    final ptr = _ttsGetVoices(_handle!);
-    if (ptr == nullptr) return [];
-
-    try {
-      final json = ptr.toDartString();
-      final decoded = jsonDecode(json);
-      if (decoded is List) {
-        // Handle both string lists and object lists
-        return decoded.map((item) {
-          if (item is String) {
-            return item;
-          } else if (item is Map<String, dynamic>) {
-            // Extract voice ID from object - try common field names
-            return (item['id'] ??
-                item['voice_id'] ??
-                item['name'] ??
-                item.toString()) as String;
-          }
-          return item.toString();
-        }).toList();
+      // Free audio samples if allocated by C++
+      if (resultPtr.ref.audioSamples != nullptr) {
+        RacCore.free(resultPtr.ref.audioSamples.cast());
       }
-      return [json];
-    } finally {
-      _freeString(ptr);
-    }
-  }
-
-  /// Cancel ongoing TTS synthesis.
-  void cancelTts() {
-    if (_handle != null) {
-      _ttsCancel(_handle!);
-    }
-  }
-
-  // ============================================================================
-  // LLM (Text Generation)
-  // ============================================================================
-
-  /// Load a text generation model.
-  void loadTextModel(String modelPath, {Map<String, dynamic>? config}) {
-    _ensureInitialized();
-
-    final pathPtr = modelPath.toNativeUtf8();
-    final configJson = config != null ? jsonEncode(config) : null;
-    final configPtr = configJson?.toNativeUtf8() ?? nullptr;
-
-    try {
-      final result = _textLoadModel(_handle!, pathPtr, configPtr);
-
-      if (result != RaResultCode.success) {
-        throw NativeBackendException(
-          'Failed to load text model: ${_getError()}',
-          code: result,
-        );
-      }
-    } finally {
-      calloc.free(pathPtr);
-      if (configPtr != nullptr) calloc.free(configPtr);
-    }
-  }
-
-  /// Check if a text model is loaded.
-  bool get isTextModelLoaded {
-    if (_handle == null) return false;
-    return _textIsModelLoaded(_handle!);
-  }
-
-  /// Unload the text model.
-  void unloadTextModel() {
-    _ensureInitialized();
-    _textUnloadModel(_handle!);
-  }
-
-  /// Generate text (non-streaming).
-  Map<String, dynamic> generate(
-    String prompt, {
-    String? systemPrompt,
-    int maxTokens = 512,
-    double temperature = 0.7,
-  }) {
-    _ensureInitialized();
-
-    final promptPtr = prompt.toNativeUtf8();
-    final sysPromptPtr = systemPrompt?.toNativeUtf8() ?? nullptr;
-    final resultPtr = calloc<Pointer<Utf8>>();
-
-    try {
-      final status = _textGenerate(
-        _handle!,
-        promptPtr,
-        sysPromptPtr,
-        maxTokens,
-        temperature,
-        resultPtr,
-      );
-
-      if (status != RaResultCode.success) {
-        throw NativeBackendException(
-          'Text generation failed: ${_getError()}',
-          code: status,
-        );
-      }
-
-      if (resultPtr.value == nullptr) {
-        return {'text': ''};
-      }
-
-      final resultJson = resultPtr.value.toDartString();
-      _freeString(resultPtr.value);
-
-      return jsonDecode(resultJson) as Map<String, dynamic>;
-    } finally {
-      calloc.free(promptPtr);
-      if (sysPromptPtr != nullptr) calloc.free(sysPromptPtr);
       calloc.free(resultPtr);
     }
   }
 
-  /// Cancel ongoing text generation.
-  void cancelTextGeneration() {
-    if (_handle != null) {
-      _textCancel(_handle!);
+  /// Get available TTS voices.
+  List<String> getTtsVoices() {
+    if (_handle == null || _backendType != 'onnx') return [];
+
+    try {
+      final getVoices = _lib.lookupFunction<RacTtsOnnxGetVoicesNative,
+          RacTtsOnnxGetVoicesDart>('rac_tts_onnx_get_voices');
+
+      final voicesPtr = calloc<Pointer<Pointer<Utf8>>>();
+      final countPtr = calloc<IntPtr>();
+
+      try {
+        final status = getVoices(_handle!, voicesPtr, countPtr);
+
+        if (status != RAC_SUCCESS) {
+          return [];
+        }
+
+        final count = countPtr.value;
+        final voices = <String>[];
+
+        if (count > 0 && voicesPtr.value != nullptr) {
+          for (var i = 0; i < count; i++) {
+            final voicePtr = voicesPtr.value[i];
+            if (voicePtr != nullptr) {
+              voices.add(voicePtr.toDartString());
+            }
+          }
+        }
+
+        return voices;
+      } finally {
+        calloc.free(voicesPtr);
+        calloc.free(countPtr);
+      }
+    } catch (_) {
+      return [];
     }
   }
 
   // ============================================================================
-  // VAD (Voice Activity Detection)
+  // VAD Operations (ONNX Backend)
   // ============================================================================
+
+  RacHandle? _vadHandle;
+  bool _vadUseNative = false;
 
   /// Load a VAD model.
   void loadVadModel(String? modelPath, {Map<String, dynamic>? config}) {
-    _ensureInitialized();
+    _ensureBackendType('onnx');
 
-    final pathPtr = modelPath?.toNativeUtf8() ?? nullptr;
-    final configJson = config != null ? jsonEncode(config) : null;
-    final configPtr = configJson?.toNativeUtf8() ?? nullptr;
+    // Try to load native VAD if model path provided
+    if (modelPath != null && modelPath.isNotEmpty) {
+      try {
+        final pathPtr = modelPath.toNativeUtf8();
+        final handlePtr = calloc<RacHandle>();
+        final configPtr = calloc<RacVadOnnxConfigStruct>();
 
-    try {
-      final result = _vadLoadModel(_handle!, pathPtr, configPtr);
+        // Set config defaults
+        configPtr.ref.numThreads = 0; // Auto
+        configPtr.ref.sampleRate = 16000;
+        configPtr.ref.windowSizeMs = 30;
+        configPtr.ref.threshold = 0.5;
 
-      if (result != RaResultCode.success) {
-        throw NativeBackendException(
-          'Failed to load VAD model: ${_getError()}',
-          code: result,
-        );
+        try {
+          final create =
+              _lib.lookupFunction<RacVadOnnxCreateNative, RacVadOnnxCreateDart>(
+                  'rac_vad_onnx_create');
+
+          final result = create(pathPtr, configPtr.cast(), handlePtr);
+
+          if (result == RAC_SUCCESS) {
+            _vadHandle = handlePtr.value;
+            _vadUseNative = true;
+          }
+        } finally {
+          calloc.free(pathPtr);
+          calloc.free(handlePtr);
+          calloc.free(configPtr);
+        }
+      } catch (_) {
+        // Fall back to energy-based detection
+        _vadUseNative = false;
       }
-    } finally {
-      if (pathPtr != nullptr) calloc.free(pathPtr);
-      if (configPtr != nullptr) calloc.free(configPtr);
     }
+
+    _isInitialized = true;
   }
 
   /// Check if a VAD model is loaded.
   bool get isVadModelLoaded {
-    if (_handle == null) return false;
-    return _vadIsModelLoaded(_handle!);
+    return _isInitialized && _backendType == 'onnx';
   }
 
   /// Unload the VAD model.
   void unloadVadModel() {
-    _ensureInitialized();
-    _vadUnloadModel(_handle!);
+    if (_vadHandle != null && _vadUseNative) {
+      try {
+        final destroy =
+            _lib.lookupFunction<RacVadOnnxDestroyNative, RacVadOnnxDestroyDart>(
+                'rac_vad_onnx_destroy');
+        destroy(_vadHandle!);
+      } catch (_) {
+        // Ignore cleanup errors
+      }
+      _vadHandle = null;
+    }
+    _vadUseNative = false;
   }
 
   /// Process audio for voice activity detection.
-  ///
-  /// Returns a map with:
-  /// - 'isSpeech': bool
-  /// - 'probability': double (0.0 to 1.0)
   Map<String, dynamic> processVad(
     Float32List samples, {
     int sampleRate = 16000,
   }) {
-    _ensureInitialized();
+    _ensureBackendType('onnx');
 
-    final samplesPtr = calloc<Float>(samples.length);
-    final nativeList = samplesPtr.asTypedList(samples.length);
-    nativeList.setAll(0, samples);
+    // Use native VAD if available
+    if (_vadUseNative && _vadHandle != null) {
+      try {
+        final samplesPtr = calloc<Float>(samples.length);
+        final nativeList = samplesPtr.asTypedList(samples.length);
+        nativeList.setAll(0, samples);
 
-    final isSpeechPtr = calloc<Bool>();
-    final probabilityPtr = calloc<Float>();
+        final resultPtr = calloc<RacVadOnnxResultStruct>();
 
-    try {
-      final status = _vadProcess(
-        _handle!,
-        samplesPtr,
-        samples.length,
-        sampleRate,
-        isSpeechPtr,
-        probabilityPtr,
-      );
+        try {
+          final process = _lib.lookupFunction<RacVadOnnxProcessNative,
+              RacVadOnnxProcessDart>('rac_vad_onnx_process');
 
-      if (status != RaResultCode.success) {
-        throw NativeBackendException(
-          'VAD processing failed: ${_getError()}',
-          code: status,
-        );
+          final status = process(
+            _vadHandle!,
+            samplesPtr,
+            samples.length,
+            resultPtr.cast(),
+          );
+
+          if (status == RAC_SUCCESS) {
+            final result = resultPtr.ref;
+            return {
+              'isSpeech': result.isSpeech == RAC_TRUE,
+              'probability': result.probability,
+            };
+          }
+        } finally {
+          calloc.free(samplesPtr);
+          calloc.free(resultPtr);
+        }
+      } catch (_) {
+        // Fall through to energy-based detection
       }
-
-      return {
-        'isSpeech': isSpeechPtr.value,
-        'probability': probabilityPtr.value,
-      };
-    } finally {
-      calloc.free(samplesPtr);
-      calloc.free(isSpeechPtr);
-      calloc.free(probabilityPtr);
     }
-  }
 
-  /// Create a VAD streaming session.
-  RaStreamHandle createVadStream({Map<String, dynamic>? config}) {
-    _ensureInitialized();
-
-    final configJson = config != null ? jsonEncode(config) : null;
-    final configPtr = configJson?.toNativeUtf8() ?? nullptr;
-
-    try {
-      final stream = _vadCreateStream(_handle!, configPtr);
-      if (stream == nullptr) {
-        throw NativeBackendException(
-            'Failed to create VAD stream: ${_getError()}');
-      }
-      return stream;
-    } finally {
-      if (configPtr != nullptr) calloc.free(configPtr);
+    // Fallback: Basic energy-based VAD
+    double energy = 0;
+    for (final sample in samples) {
+      energy += sample * sample;
     }
-  }
+    energy = samples.isNotEmpty ? energy / samples.length : 0;
 
-  /// Destroy VAD stream.
-  void destroyVadStream(RaStreamHandle stream) {
-    if (_handle != null) {
-      _vadDestroyStream(_handle!, stream);
-    }
-  }
+    const threshold = 0.01;
+    final isSpeech = energy > threshold;
 
-  /// Reset VAD state.
-  void resetVad() {
-    if (_handle != null) {
-      _vadReset(_handle!);
-    }
+    return {
+      'isSpeech': isSpeech,
+      'probability': energy.clamp(0.0, 1.0),
+    };
   }
 
   // ============================================================================
-  // Embeddings
+  // Utility Methods
   // ============================================================================
 
-  /// Load an embedding model.
-  void loadEmbedModel(String modelPath, {Map<String, dynamic>? config}) {
-    _ensureInitialized();
-
-    final pathPtr = modelPath.toNativeUtf8();
-    final configJson = config != null ? jsonEncode(config) : null;
-    final configPtr = configJson?.toNativeUtf8() ?? nullptr;
-
-    try {
-      final result = _embedLoadModel(_handle!, pathPtr, configPtr);
-
-      if (result != RaResultCode.success) {
-        throw NativeBackendException(
-          'Failed to load embedding model: ${_getError()}',
-          code: result,
-        );
-      }
-    } finally {
-      calloc.free(pathPtr);
-      if (configPtr != nullptr) calloc.free(configPtr);
-    }
+  /// Get backend info as a map.
+  Map<String, dynamic> getBackendInfo() {
+    return {
+      'type': _backendType,
+      'initialized': _isInitialized,
+      'model': _currentModel,
+      'hasHandle': _handle != null,
+    };
   }
 
-  /// Check if an embedding model is loaded.
-  bool get isEmbedModelLoaded {
-    if (_handle == null) return false;
-    return _embedIsModelLoaded(_handle!);
-  }
-
-  /// Get embedding dimensions.
-  int getEmbedDimensions() {
-    _ensureInitialized();
-    return _embedGetDimensions(_handle!);
-  }
-
-  /// Generate embedding for text.
-  Float32List embedText(String text) {
-    _ensureInitialized();
-
-    final textPtr = text.toNativeUtf8();
-    final embeddingPtr = calloc<Pointer<Float>>();
-    final dimensionsPtr = calloc<Int32>();
-
-    try {
-      final status = _embedText(_handle!, textPtr, embeddingPtr, dimensionsPtr);
-
-      if (status != RaResultCode.success) {
-        throw NativeBackendException(
-          'Embedding failed: ${_getError()}',
-          code: status,
-        );
-      }
-
-      final dimensions = dimensionsPtr.value;
-      if (embeddingPtr.value == nullptr || dimensions == 0) {
-        return Float32List(0);
-      }
-
-      // Copy to Dart-managed memory
-      final embedding = Float32List.fromList(
-        embeddingPtr.value.asTypedList(dimensions),
-      );
-
-      // Free C-allocated embedding
-      _freeEmbedding(embeddingPtr.value);
-
-      return embedding;
-    } finally {
-      calloc.free(textPtr);
-      calloc.free(embeddingPtr);
-      calloc.free(dimensionsPtr);
-    }
-  }
-
-  // ============================================================================
-  // Utility Functions
-  // ============================================================================
-
-  /// Extract an archive to a destination directory.
-  void extractArchive(String archivePath, String destDir) {
-    final archivePtr = archivePath.toNativeUtf8();
-    final destPtr = destDir.toNativeUtf8();
-
-    try {
-      final result = _extractArchive(archivePtr, destPtr);
-
-      if (result != RaResultCode.success) {
-        throw NativeBackendException(
-          'Archive extraction failed: ${_getError()}',
-          code: result,
-        );
-      }
-    } finally {
-      calloc.free(archivePtr);
-      calloc.free(destPtr);
-    }
+  /// Get list of available backend names.
+  List<String> getAvailableBackends() {
+    return ['llamacpp', 'onnx'];
   }
 
   /// Get the library version.
   String get version {
-    final ptr = _getVersion();
-    if (ptr == nullptr) return 'unknown';
-    return ptr.toDartString(); // Don't free - static pointer
+    // Return SDK version
+    return '0.1.4';
+  }
+
+  /// Check if backend supports a specific capability.
+  bool supportsCapability(int capability) {
+    switch (_backendType) {
+      case 'llamacpp':
+        return capability == RacCapability.textGeneration;
+      case 'onnx':
+        return capability == RacCapability.stt ||
+            capability == RacCapability.tts ||
+            capability == RacCapability.vad;
+      default:
+        return false;
+    }
   }
 
   // ============================================================================
   // Private Helpers
   // ============================================================================
 
-  void _ensureInitialized() {
-    if (_handle == null) {
+  void _ensureBackendType(String expected) {
+    if (_backendType != expected) {
       throw NativeBackendException(
-          'Backend not initialized. Call create() first.');
+        'Backend type mismatch. Expected: $expected, got: $_backendType',
+      );
     }
   }
 
-  String _getError() {
-    final ptr = _getLastError();
-    if (ptr == nullptr) return 'Unknown error';
-    return ptr.toDartString(); // Don't free - static pointer
+  void _ensureHandle() {
+    if (_handle == null || _handle == nullptr) {
+      throw NativeBackendException(
+        'No model loaded. Call loadTextModel/loadSttModel first.',
+      );
+    }
+  }
+}
+
+// =============================================================================
+// Exceptions
+// =============================================================================
+
+/// Exception thrown by RAC operations.
+class RacException implements Exception {
+  final String message;
+  final int? code;
+
+  RacException(this.message, {this.code});
+
+  @override
+  String toString() {
+    if (code != null) {
+      return 'RacException: $message (code: $code - ${RacResultCode.getMessage(code!)})';
+    }
+    return 'RacException: $message';
   }
 }
 
@@ -1108,7 +916,7 @@ class NativeBackendException implements Exception {
   @override
   String toString() {
     if (code != null) {
-      return 'NativeBackendException: $message (code: $code - ${RaResultCode.getMessage(code!)})';
+      return 'NativeBackendException: $message (code: $code - ${RacResultCode.getMessage(code!)})';
     }
     return 'NativeBackendException: $message';
   }

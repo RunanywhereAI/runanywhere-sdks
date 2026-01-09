@@ -93,9 +93,10 @@ class DartBridgeLLM {
     }
   }
 
-  /// Generate text with streaming
-  /// Note: Streaming is not currently supported in the NativeBackend.
-  /// This is a placeholder that falls back to non-streaming generation.
+  /// Generate text with streaming.
+  ///
+  /// Uses non-streaming generation internally and emits result as word tokens.
+  /// This provides streaming UX while the underlying native call is synchronous.
   Stream<String> generateStream({
     required String prompt,
     String? systemPrompt,

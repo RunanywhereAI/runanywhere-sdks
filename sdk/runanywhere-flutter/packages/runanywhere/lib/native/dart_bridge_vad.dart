@@ -1,11 +1,10 @@
-import 'dart:async';
 // ignore_for_file: avoid_classes_with_only_static_members
 
+import 'dart:async';
 import 'dart:typed_data';
 
-import '../foundation/logging/sdk_logger.dart';
-import 'ffi_types.dart';
-import 'native_backend.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/native_backend.dart';
 
 /// VAD bridge for C++ voice activity detection operations.
 /// Matches Swift's `CppBridge+VAD.swift`.
@@ -37,7 +36,8 @@ class DartBridgeVAD {
       backend.loadVadModel(modelPath, config: config);
       return true;
     } catch (e) {
-      _logger.error('Failed to load VAD model', metadata: {'error': e.toString()});
+      _logger
+          .error('Failed to load VAD model', metadata: {'error': e.toString()});
       return false;
     }
   }
@@ -56,7 +56,8 @@ class DartBridgeVAD {
       backend.unloadVadModel();
       return true;
     } catch (e) {
-      _logger.error('Failed to unload VAD model', metadata: {'error': e.toString()});
+      _logger.error('Failed to unload VAD model',
+          metadata: {'error': e.toString()});
       return false;
     }
   }
@@ -85,27 +86,10 @@ class DartBridgeVAD {
     }
   }
 
-  /// Create a VAD stream for continuous processing
-  RaStreamHandle? createStream({Map<String, dynamic>? config}) {
-    final backend = _backend;
-    if (backend == null) return null;
-
-    try {
-      return backend.createVadStream(config: config);
-    } catch (e) {
-      _logger.error('Failed to create VAD stream', metadata: {'error': e.toString()});
-      return null;
-    }
-  }
-
-  /// Destroy a VAD stream
-  void destroyStream(RaStreamHandle stream) {
-    _backend?.destroyVadStream(stream);
-  }
-
   /// Reset VAD state
+  /// Note: VAD reset is not yet implemented in NativeBackend.
   void reset() {
-    _backend?.resetVad();
+    _logger.debug('VAD reset called (using energy-based detection)');
   }
 }
 

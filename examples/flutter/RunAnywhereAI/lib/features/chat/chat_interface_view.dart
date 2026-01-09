@@ -102,7 +102,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           prefs.getDouble(PreferenceKeys.defaultTemperature) ?? 0.7;
       final maxTokens = prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 500;
 
-      final options = sdk.RunAnywhereGenerationOptions(
+      final options = sdk.LLMGenerationOptions(
         maxTokens: maxTokens,
         temperature: temperature,
       );
@@ -122,7 +122,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
   Future<void> _generateStreaming(
     String prompt,
-    sdk.RunAnywhereGenerationOptions options,
+    sdk.LLMGenerationOptions options,
   ) async {
     // Capture model name before async gap to avoid context issues
     final modelName = context.read<ModelManager>().loadedModelName;
@@ -143,9 +143,10 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     final contentBuffer = StringBuffer();
 
     try {
-      final stream = sdk.RunAnywhere.generateStream(prompt, options: options);
+      final streamingResult =
+          await sdk.RunAnywhere.generateStream(prompt, options: options);
 
-      await for (final token in stream) {
+      await for (final token in streamingResult.stream) {
         if (_timeToFirstToken == null && _generationStartTime != null) {
           _timeToFirstToken =
               DateTime.now().difference(_generationStartTime!).inMilliseconds /
@@ -202,7 +203,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
   Future<void> _generateNonStreaming(
     String prompt,
-    sdk.RunAnywhereGenerationOptions options,
+    sdk.LLMGenerationOptions options,
   ) async {
     // Capture model name before async gap to avoid context issues
     final modelName = context.read<ModelManager>().loadedModelName;
@@ -217,7 +218,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
       // Extract token counts from SDK result
       final outputTokens = result.tokensUsed;
-      final tokensPerSecond = result.performanceMetrics.tokensPerSecond;
+      final tokensPerSecond = result.tokensPerSecond;
 
       final analytics = MessageAnalytics(
         messageId: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -327,22 +328,18 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     ));
   }
 
-  /// Map SDK framework enum to app framework enum
-  LLMFramework _mapSdkFramework(sdk.LLMFramework? sdkFramework) {
-    if (sdkFramework == null) return LLMFramework.llamaCpp;
-    switch (sdkFramework) {
-      case sdk.LLMFramework.llamaCpp:
+  /// Map SDK InferenceFramework enum to app framework enum
+  LLMFramework _mapInferenceFramework(sdk.InferenceFramework? framework) {
+    if (framework == null) return LLMFramework.llamaCpp;
+    switch (framework) {
+      case sdk.InferenceFramework.llamaCpp:
         return LLMFramework.llamaCpp;
-      case sdk.LLMFramework.foundationModels:
+      case sdk.InferenceFramework.foundationModels:
         return LLMFramework.foundationModels;
-      case sdk.LLMFramework.mediaPipe:
-        return LLMFramework.mediaPipe;
-      case sdk.LLMFramework.onnx:
+      case sdk.InferenceFramework.onnx:
         return LLMFramework.onnxRuntime;
-      case sdk.LLMFramework.systemTTS:
+      case sdk.InferenceFramework.systemTTS:
         return LLMFramework.systemTTS;
-      case sdk.LLMFramework.whisperKit:
-        return LLMFramework.whisperKit;
       default:
         return LLMFramework.llamaCpp;
     }
@@ -352,9 +349,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     // Map ModelManager state to LLMFramework for the shared component
     LLMFramework? framework;
     if (modelManager.isModelLoaded && modelManager.currentModel != null) {
-      // Get framework from the current model's preferred framework
-      framework =
-          _mapSdkFramework(modelManager.currentModel!.preferredFramework);
+      // Get framework from the current model's framework
+      framework = _mapInferenceFramework(modelManager.currentModel!.framework);
     }
 
     return Padding(

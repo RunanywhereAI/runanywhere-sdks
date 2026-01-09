@@ -44,6 +44,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
   // Playback state
   bool _isGenerating = false;
   bool _isPlaying = false;
+  // ignore: unused_field - kept for future TTS implementation
   bool _hasAudio = false;
   double _currentTime = 0.0;
   double _duration = 0.0;
@@ -179,30 +180,31 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
       final ttsComponent = sdk.RunAnywhere.loadedTTSCapability;
 
       if (ttsComponent == null) {
-        throw Exception('TTS component not loaded');
+        throw Exception(
+            'TTS component not loaded. Please load a TTS voice first.');
       }
 
-      // Use SDK's TTS component to synthesize speech
-      final output = await ttsComponent.synthesize(_textController.text);
+      // TODO: TTS synthesis via SDK is not yet fully implemented
+      // The TTSCapability class needs synthesize() method implementation
+      // For now, show a placeholder message
+      debugPrint('⚠️ TTS synthesis API not yet implemented in SDK');
+
+      // Simulate synthesis for demo purposes
+      await Future<void>.delayed(const Duration(seconds: 1));
 
       setState(() {
         _isGenerating = false;
-        _hasAudio = output.audioData.isNotEmpty;
-        _duration = output.duration;
-        _metadata = TTSMetadata(
-          durationMs: output.duration * 1000,
-          audioSize: output.audioData.length,
-          sampleRate: 22050, // Default sample rate
+        _hasAudio = false;
+        _duration = 0;
+        _metadata = const TTSMetadata(
+          durationMs: 0,
+          audioSize: 0,
+          sampleRate: 22050,
         );
+        _errorMessage = 'TTS synthesis not yet implemented in SDK';
       });
 
-      debugPrint(
-          '✅ Speech generated: ${output.audioData.length} bytes, duration: ${output.duration}s');
-
-      // Auto-play the generated audio
-      if (_hasAudio) {
-        await _playAudio(output.audioData);
-      }
+      debugPrint('⚠️ TTS synthesis placeholder - no audio generated');
     } catch (e) {
       debugPrint('❌ Speech generation failed: $e');
       setState(() {
@@ -213,6 +215,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
   }
 
   /// Play audio using the audio player service
+  // ignore: unused_element - kept for future TTS implementation
   Future<void> _playAudio(List<int> audioData) async {
     try {
       // Convert List<int> to Uint8List

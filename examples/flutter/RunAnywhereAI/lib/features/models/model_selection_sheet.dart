@@ -303,7 +303,8 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
                         vertical: AppSpacing.xxSmall,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.textPrimary(context).withValues(alpha: 0.1),
+                        color: AppColors.textPrimary(context)
+                            .withValues(alpha: 0.1),
                         borderRadius:
                             BorderRadius.circular(AppSpacing.cornerRadiusSmall),
                       ),
@@ -861,9 +862,6 @@ class _FlatModelRowState extends State<_FlatModelRow> {
     try {
       debugPrint('📥 Starting download for model: ${widget.model.name}');
 
-      // Get the download service from SDK
-      final downloadService = sdk.RunAnywhere.serviceContainer.downloadService;
-
       // Get the SDK model by ID
       final sdkModels = await sdk.RunAnywhere.availableModels();
       final sdkModel = sdkModels.firstWhere(
@@ -872,11 +870,11 @@ class _FlatModelRowState extends State<_FlatModelRow> {
             throw Exception('Model not found in registry: ${widget.model.id}'),
       );
 
-      // Start the actual download using SDK
-      final downloadTask = await downloadService.downloadModel(sdkModel);
+      // Start the actual download using SDK's downloadModel
+      final downloadProgress = sdk.RunAnywhere.downloadModel(sdkModel.id);
 
       // Listen to real download progress
-      await for (final progress in downloadTask.progress) {
+      await for (final progress in downloadProgress) {
         if (!mounted) return;
 
         final progressValue = progress.totalBytes > 0
@@ -888,10 +886,10 @@ class _FlatModelRowState extends State<_FlatModelRow> {
         });
 
         // Check if completed or failed
-        if (progress.state.isCompleted) {
+        if (progress.state == sdk.DownloadProgressState.completed) {
           debugPrint('✅ Download completed for model: ${widget.model.name}');
           break;
-        } else if (progress.state.isFailed) {
+        } else if (progress.state == sdk.DownloadProgressState.failed) {
           debugPrint('❌ Download failed for model: ${widget.model.name}');
           throw Exception('Download failed');
         }

@@ -106,7 +106,8 @@ enum InferenceFramework {
   // Model-based frameworks
   onnx('ONNX', 'ONNX Runtime', 'onnx'),
   llamaCpp('LlamaCpp', 'llama.cpp', 'llama_cpp'),
-  foundationModels('FoundationModels', 'Foundation Models', 'foundation_models'),
+  foundationModels(
+      'FoundationModels', 'Foundation Models', 'foundation_models'),
   systemTTS('SystemTTS', 'System TTS', 'system_tts'),
   fluidAudio('FluidAudio', 'FluidAudio', 'fluid_audio'),
 
@@ -124,8 +125,9 @@ enum InferenceFramework {
   static InferenceFramework fromRawValue(String value) {
     final lowercased = value.toLowerCase();
     return InferenceFramework.values.firstWhere(
-      (f) => f.rawValue.toLowerCase() == lowercased ||
-             f.analyticsKey == lowercased,
+      (f) =>
+          f.rawValue.toLowerCase() == lowercased ||
+          f.analyticsKey == lowercased,
       orElse: () => InferenceFramework.unknown,
     );
   }
@@ -197,12 +199,10 @@ class ExpectedModelFiles {
 
   factory ExpectedModelFiles.fromJson(Map<String, dynamic> json) {
     return ExpectedModelFiles(
-      requiredPatterns: (json['requiredPatterns'] as List<dynamic>?)
-              ?.cast<String>() ??
-          [],
-      optionalPatterns: (json['optionalPatterns'] as List<dynamic>?)
-              ?.cast<String>() ??
-          [],
+      requiredPatterns:
+          (json['requiredPatterns'] as List<dynamic>?)?.cast<String>() ?? [],
+      optionalPatterns:
+          (json['optionalPatterns'] as List<dynamic>?)?.cast<String>() ?? [],
       description: json['description'] as String?,
     );
   }
@@ -215,7 +215,8 @@ class ExpectedModelFiles {
           optionalPatterns.length == other.optionalPatterns.length;
 
   @override
-  int get hashCode => Object.hash(requiredPatterns.length, optionalPatterns.length);
+  int get hashCode =>
+      Object.hash(requiredPatterns.length, optionalPatterns.length);
 }
 
 /// Describes a file that needs to be downloaded as part of a multi-file model
@@ -257,6 +258,56 @@ sealed class ModelArtifactType {
   String get displayName;
 
   Map<String, dynamic> toJson();
+
+  // ============================================================================
+  // Convenience Constructors (matches Swift pattern)
+  // ============================================================================
+
+  /// Create a tar.gz archive artifact
+  static ArchiveArtifact tarGzArchive({
+    ArchiveStructure structure = ArchiveStructure.unknown,
+    ExpectedModelFiles expectedFiles = ExpectedModelFiles.none,
+  }) {
+    return ArchiveArtifact(
+      archiveType: ArchiveType.tarGz,
+      structure: structure,
+      expectedFiles: expectedFiles,
+    );
+  }
+
+  /// Create a tar.bz2 archive artifact
+  static ArchiveArtifact tarBz2Archive({
+    ArchiveStructure structure = ArchiveStructure.unknown,
+    ExpectedModelFiles expectedFiles = ExpectedModelFiles.none,
+  }) {
+    return ArchiveArtifact(
+      archiveType: ArchiveType.tarBz2,
+      structure: structure,
+      expectedFiles: expectedFiles,
+    );
+  }
+
+  /// Create a zip archive artifact
+  static ArchiveArtifact zipArchive({
+    ArchiveStructure structure = ArchiveStructure.unknown,
+    ExpectedModelFiles expectedFiles = ExpectedModelFiles.none,
+  }) {
+    return ArchiveArtifact(
+      archiveType: ArchiveType.zip,
+      structure: structure,
+      expectedFiles: expectedFiles,
+    );
+  }
+
+  /// Create a single file artifact
+  static SingleFileArtifact singleFile({
+    ExpectedModelFiles expectedFiles = ExpectedModelFiles.none,
+  }) {
+    return SingleFileArtifact(expectedFiles: expectedFiles);
+  }
+
+  /// Create a built-in artifact (no download needed)
+  static const BuiltInArtifact builtIn = BuiltInArtifact();
 
   factory ModelArtifactType.fromJson(Map<String, dynamic> json) {
     final type = json['type'] as String?;
@@ -543,7 +594,8 @@ class ModelInfo {
         'framework': framework.rawValue,
         if (contextLength != null) 'contextLength': contextLength,
         'supportsThinking': supportsThinking,
-        if (thinkingPattern != null) 'thinkingPattern': thinkingPattern!.toJson(),
+        if (thinkingPattern != null)
+          'thinkingPattern': thinkingPattern!.toJson(),
         if (description != null) 'description': description,
         'source': source.rawValue,
         'createdAt': createdAt.toIso8601String(),

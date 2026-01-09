@@ -1,117 +1,233 @@
-// ignore_for_file: non_constant_identifier_names
+// ignore_for_file: non_constant_identifier_names, constant_identifier_names
 
 import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 
 /// =============================================================================
-/// RunAnywhere FFI Type Definitions
+/// RunAnywhere Commons FFI Type Definitions
 ///
-/// Dart FFI types matching the C API defined in runanywhere_bridge.h
+/// Dart FFI types matching the C API defined in rac_*.h headers
+/// from runanywhere-commons library.
 /// =============================================================================
 
 // =============================================================================
-// Result Codes (enum ra_result_code / rac_result_code)
+// Basic Types (from rac_types.h)
 // =============================================================================
 
-abstract class RaResultCode {
-  static const int success = 0;
-  static const int errorInitFailed = -1;
-  static const int errorModelLoadFailed = -2;
-  static const int errorInferenceFailed = -3;
-  static const int errorInvalidHandle = -4;
-  static const int errorInvalidParams = -5;
-  static const int errorOutOfMemory = -6;
-  static const int errorNotImplemented = -7;
-  static const int errorCancelled = -8;
-  static const int errorTimeout = -9;
-  static const int errorIO = -10;
-  static const int errorUnknown = -99;
+/// Opaque handle for internal objects (rac_handle_t)
+typedef RacHandle = Pointer<Void>;
 
+/// Result type for all RAC functions (rac_result_t)
+/// 0 = success, negative = error
+typedef RacResult = Int32;
+
+/// Boolean type for C compatibility (rac_bool_t)
+typedef RacBool = Int32;
+
+/// RAC boolean values
+const int RAC_TRUE = 1;
+const int RAC_FALSE = 0;
+
+/// RAC success value
+const int RAC_SUCCESS = 0;
+
+// =============================================================================
+// Result Codes (from rac_error.h)
+// =============================================================================
+
+/// Error codes matching rac_error.h
+abstract class RacResultCode {
+  // Success
+  static const int success = 0;
+
+  // Initialization errors (-100 to -109)
+  static const int errorNotInitialized = -100;
+  static const int errorAlreadyInitialized = -101;
+  static const int errorInitializationFailed = -102;
+  static const int errorInvalidConfiguration = -103;
+  static const int errorInvalidApiKey = -104;
+  static const int errorEnvironmentMismatch = -105;
+  static const int errorInvalidParameter = -106;
+
+  // Model errors (-110 to -129)
+  static const int errorModelNotFound = -110;
+  static const int errorModelLoadFailed = -111;
+  static const int errorModelValidationFailed = -112;
+  static const int errorModelIncompatible = -113;
+  static const int errorInvalidModelFormat = -114;
+  static const int errorModelStorageCorrupted = -115;
+  static const int errorModelNotLoaded = -116;
+
+  // Generation errors (-130 to -149)
+  static const int errorGenerationFailed = -130;
+  static const int errorGenerationTimeout = -131;
+  static const int errorContextTooLong = -132;
+  static const int errorTokenLimitExceeded = -133;
+  static const int errorCostLimitExceeded = -134;
+  static const int errorInferenceFailed = -135;
+
+  // Network errors (-150 to -179)
+  static const int errorNetworkUnavailable = -150;
+  static const int errorNetworkError = -151;
+  static const int errorRequestFailed = -152;
+  static const int errorDownloadFailed = -153;
+  static const int errorServerError = -154;
+  static const int errorTimeout = -155;
+  static const int errorInvalidResponse = -156;
+  static const int errorHttpError = -157;
+  static const int errorConnectionLost = -158;
+  static const int errorPartialDownload = -159;
+
+  // Storage errors (-180 to -219)
+  static const int errorInsufficientStorage = -180;
+  static const int errorStorageFull = -181;
+  static const int errorStorageError = -182;
+  static const int errorFileNotFound = -183;
+  static const int errorFileReadFailed = -184;
+  static const int errorFileWriteFailed = -185;
+  static const int errorPermissionDenied = -186;
+  static const int errorDeleteFailed = -187;
+  static const int errorMoveFailed = -188;
+  static const int errorDirectoryCreationFailed = -189;
+
+  // Hardware errors (-220 to -229)
+  static const int errorHardwareUnsupported = -220;
+  static const int errorInsufficientMemory = -221;
+
+  // Component state errors (-230 to -249)
+  static const int errorComponentNotReady = -230;
+  static const int errorInvalidState = -231;
+  static const int errorServiceNotAvailable = -232;
+  static const int errorServiceBusy = -233;
+  static const int errorProcessingFailed = -234;
+  static const int errorStartFailed = -235;
+  static const int errorNotSupported = -236;
+
+  // Validation errors (-250 to -279)
+  static const int errorValidationFailed = -250;
+  static const int errorInvalidInput = -251;
+  static const int errorInvalidFormat = -252;
+  static const int errorEmptyInput = -253;
+
+  // Audio errors (-280 to -299)
+  static const int errorAudioFormatNotSupported = -280;
+  static const int errorAudioSessionFailed = -281;
+  static const int errorMicrophonePermissionDenied = -282;
+  static const int errorInsufficientAudioData = -283;
+
+  // Language/voice errors (-300 to -319)
+  static const int errorLanguageNotSupported = -300;
+  static const int errorVoiceNotAvailable = -301;
+  static const int errorStreamingNotSupported = -302;
+  static const int errorStreamCancelled = -303;
+
+  // Cancellation (-380 to -389)
+  static const int errorCancelled = -380;
+
+  // Module/service errors (-400 to -499)
+  static const int errorModuleNotFound = -400;
+  static const int errorModuleAlreadyRegistered = -401;
+  static const int errorModuleLoadFailed = -402;
+  static const int errorServiceNotFound = -410;
+  static const int errorServiceAlreadyRegistered = -411;
+  static const int errorServiceCreateFailed = -412;
+  static const int errorCapabilityNotFound = -420;
+  static const int errorProviderNotFound = -421;
+  static const int errorNoCapableProvider = -422;
+  static const int errorNotFound = -423;
+
+  // Platform adapter errors (-500 to -599)
+  static const int errorAdapterNotSet = -500;
+
+  // Backend errors (-600 to -699)
+  static const int errorBackendNotFound = -600;
+  static const int errorBackendNotReady = -601;
+  static const int errorBackendInitFailed = -602;
+  static const int errorBackendBusy = -603;
+  static const int errorInvalidHandle = -610;
+
+  // Other errors (-800 to -899)
+  static const int errorNotImplemented = -800;
+  static const int errorFeatureNotAvailable = -801;
+  static const int errorFrameworkNotAvailable = -802;
+  static const int errorUnsupportedModality = -803;
+  static const int errorUnknown = -804;
+  static const int errorInternal = -805;
+
+  /// Get human-readable message for an error code
   static String getMessage(int code) {
     switch (code) {
       case success:
         return 'Success';
-      case errorInitFailed:
+      case errorNotInitialized:
+        return 'Not initialized';
+      case errorAlreadyInitialized:
+        return 'Already initialized';
+      case errorInitializationFailed:
         return 'Initialization failed';
+      case errorInvalidConfiguration:
+        return 'Invalid configuration';
+      case errorModelNotFound:
+        return 'Model not found';
       case errorModelLoadFailed:
         return 'Model load failed';
+      case errorModelNotLoaded:
+        return 'Model not loaded';
+      case errorGenerationFailed:
+        return 'Generation failed';
       case errorInferenceFailed:
         return 'Inference failed';
-      case errorInvalidHandle:
-        return 'Invalid handle';
-      case errorInvalidParams:
-        return 'Invalid parameters';
-      case errorOutOfMemory:
-        return 'Out of memory';
-      case errorNotImplemented:
-        return 'Not implemented';
-      case errorCancelled:
-        return 'Cancelled';
+      case errorNetworkUnavailable:
+        return 'Network unavailable';
+      case errorDownloadFailed:
+        return 'Download failed';
       case errorTimeout:
         return 'Timeout';
-      case errorIO:
-        return 'I/O error';
+      case errorFileNotFound:
+        return 'File not found';
+      case errorInsufficientMemory:
+        return 'Insufficient memory';
+      case errorNotSupported:
+        return 'Not supported';
+      case errorCancelled:
+        return 'Cancelled';
+      case errorModuleNotFound:
+        return 'Module not found';
+      case errorModuleAlreadyRegistered:
+        return 'Module already registered';
+      case errorServiceNotFound:
+        return 'Service not found';
+      case errorBackendNotFound:
+        return 'Backend not found';
+      case errorInvalidHandle:
+        return 'Invalid handle';
+      case errorNotImplemented:
+        return 'Not implemented';
+      case errorUnknown:
+        return 'Unknown error';
       default:
-        return 'Unknown error (code: $code)';
+        return 'Error (code: $code)';
     }
   }
 }
 
-/// Alias for RaResultCode (used by DartBridge* files)
-/// Maps to rac_result_code in C++ commons
-typedef RacResultCode = RaResultCode;
+/// Alias for backward compatibility
+typedef RaResultCode = RacResultCode;
 
 // =============================================================================
-// Device Types (enum ra_device_type)
+// Capability Types (from rac_types.h)
 // =============================================================================
 
-abstract class RaDeviceType {
-  static const int cpu = 0;
-  static const int gpu = 1;
-  static const int neuralEngine = 2;
-  static const int metal = 3;
-  static const int cuda = 4;
-  static const int nnapi = 5;
-  static const int coreml = 6;
-  static const int vulkan = 7;
-  static const int unknown = 99;
-
-  static String getName(int type) {
-    switch (type) {
-      case cpu:
-        return 'CPU';
-      case gpu:
-        return 'GPU';
-      case neuralEngine:
-        return 'Neural Engine';
-      case metal:
-        return 'Metal';
-      case cuda:
-        return 'CUDA';
-      case nnapi:
-        return 'NNAPI';
-      case coreml:
-        return 'CoreML';
-      case vulkan:
-        return 'Vulkan';
-      default:
-        return 'Unknown';
-    }
-  }
-}
-
-// =============================================================================
-// Capability Types (enum ra_capability_type)
-// =============================================================================
-
-abstract class RaCapabilityType {
-  static const int textGeneration = 0;
-  static const int embeddings = 1;
-  static const int stt = 2;
-  static const int tts = 3;
-  static const int vad = 4;
-  static const int diarization = 5;
+/// Capability types supported by backends (rac_capability_t)
+abstract class RacCapability {
+  static const int unknown = 0;
+  static const int textGeneration = 1;
+  static const int embeddings = 2;
+  static const int stt = 3;
+  static const int tts = 4;
+  static const int vad = 5;
+  static const int diarization = 6;
 
   static String getName(int type) {
     switch (type) {
@@ -134,548 +250,471 @@ abstract class RaCapabilityType {
 }
 
 // =============================================================================
-// Audio Format (enum ra_audio_format)
+// Device Types (from rac_types.h)
 // =============================================================================
 
-abstract class RaAudioFormat {
-  static const int pcmF32 = 0;
-  static const int pcmS16 = 1;
-  static const int pcmS32 = 2;
-  static const int wav = 10;
-  static const int mp3 = 11;
-  static const int flac = 12;
-  static const int aac = 13;
-  static const int opus = 14;
+/// Device type for backend execution (rac_device_t)
+abstract class RacDevice {
+  static const int cpu = 0;
+  static const int gpu = 1;
+  static const int npu = 2;
+  static const int auto = 3;
+
+  static String getName(int type) {
+    switch (type) {
+      case cpu:
+        return 'CPU';
+      case gpu:
+        return 'GPU';
+      case npu:
+        return 'NPU';
+      case auto:
+        return 'Auto';
+      default:
+        return 'Unknown';
+    }
+  }
 }
 
 // =============================================================================
-// Opaque Handle Types
+// Log Levels (from rac_types.h)
 // =============================================================================
 
-/// Opaque handle to a backend instance
-typedef RaBackendHandle = Pointer<Void>;
-
-/// Opaque handle to a streaming session
-typedef RaStreamHandle = Pointer<Void>;
-
-// =============================================================================
-// Callback Function Types (Native signatures)
-// =============================================================================
-
-/// Text generation streaming callback
-/// bool (*ra_text_stream_callback)(const char* token, void* user_data);
-typedef RaTextStreamCallbackNative = Bool Function(
-  Pointer<Utf8> token,
-  Pointer<Void> userData,
-);
-
-/// STT streaming callback
-/// bool (*ra_stt_stream_callback)(const char* text, bool is_final, void* user_data);
-typedef RaSttStreamCallbackNative = Bool Function(
-  Pointer<Utf8> text,
-  Bool isFinal,
-  Pointer<Void> userData,
-);
-
-/// TTS streaming callback
-/// bool (*ra_tts_stream_callback)(const float*, size_t, bool, void*);
-typedef RaTtsStreamCallbackNative = Bool Function(
-  Pointer<Float> samples,
-  IntPtr numSamples,
-  Bool isFinal,
-  Pointer<Void> userData,
-);
-
-/// VAD streaming callback
-/// void (*ra_vad_stream_callback)(bool, float, double, void*);
-typedef RaVadStreamCallbackNative = Void Function(
-  Bool isSpeech,
-  Float probability,
-  Double timestampMs,
-  Pointer<Void> userData,
-);
+/// Log level for logging callback (rac_log_level_t)
+abstract class RacLogLevel {
+  static const int trace = 0;
+  static const int debug = 1;
+  static const int info = 2;
+  static const int warning = 3;
+  static const int error = 4;
+  static const int fatal = 5;
+}
 
 // =============================================================================
-// FFI Function Signatures - Backend Lifecycle
+// Audio Format (from rac_stt_types.h)
 // =============================================================================
 
-/// const char** ra_get_available_backends(int* count);
-typedef RaGetAvailableBackendsNative = Pointer<Pointer<Utf8>> Function(
-  Pointer<Int32> count,
+/// Audio format enumeration (rac_audio_format_enum_t)
+abstract class RacAudioFormat {
+  static const int pcm = 0;
+  static const int wav = 1;
+  static const int mp3 = 2;
+  static const int opus = 3;
+  static const int aac = 4;
+  static const int flac = 5;
+}
+
+// =============================================================================
+// Speech Activity (from rac_vad_types.h)
+// =============================================================================
+
+/// Speech activity event type (rac_speech_activity_t)
+abstract class RacSpeechActivity {
+  static const int started = 0;
+  static const int ended = 1;
+  static const int ongoing = 2;
+}
+
+// =============================================================================
+// Core API Function Signatures (from rac_core.h)
+// =============================================================================
+
+/// rac_result_t rac_init(const rac_config_t* config)
+typedef RacInitNative = Int32 Function(Pointer<Void> config);
+typedef RacInitDart = int Function(Pointer<Void> config);
+
+/// void rac_shutdown(void)
+typedef RacShutdownNative = Void Function();
+typedef RacShutdownDart = void Function();
+
+/// rac_bool_t rac_is_initialized(void)
+typedef RacIsInitializedNative = Int32 Function();
+typedef RacIsInitializedDart = int Function();
+
+/// rac_result_t rac_configure_logging(rac_environment_t environment)
+typedef RacConfigureLoggingNative = Int32 Function(Int32 environment);
+typedef RacConfigureLoggingDart = int Function(int environment);
+
+// =============================================================================
+// Module Registration API (from rac_core.h)
+// =============================================================================
+
+/// rac_result_t rac_module_register(const rac_module_info_t* info)
+typedef RacModuleRegisterNative = Int32 Function(Pointer<Void> info);
+typedef RacModuleRegisterDart = int Function(Pointer<Void> info);
+
+/// rac_result_t rac_module_unregister(const char* module_id)
+typedef RacModuleUnregisterNative = Int32 Function(Pointer<Utf8> moduleId);
+typedef RacModuleUnregisterDart = int Function(Pointer<Utf8> moduleId);
+
+/// rac_result_t rac_module_list(const rac_module_info_t** out_modules, size_t* out_count)
+typedef RacModuleListNative = Int32 Function(
+  Pointer<Pointer<Void>> outModules,
+  Pointer<IntPtr> outCount,
 );
-typedef RaGetAvailableBackendsDart = Pointer<Pointer<Utf8>> Function(
-  Pointer<Int32> count,
+typedef RacModuleListDart = int Function(
+  Pointer<Pointer<Void>> outModules,
+  Pointer<IntPtr> outCount,
 );
 
-/// ra_backend_handle ra_create_backend(const char* backend_name);
-typedef RaCreateBackendNative = RaBackendHandle Function(Pointer<Utf8> name);
-typedef RaCreateBackendDart = RaBackendHandle Function(Pointer<Utf8> name);
+// =============================================================================
+// Service Provider API (from rac_core.h)
+// =============================================================================
 
-/// ra_result_code ra_initialize(ra_backend_handle, const char* config_json);
-typedef RaInitializeNative = Int32 Function(
-  RaBackendHandle handle,
-  Pointer<Utf8> configJson,
-);
-typedef RaInitializeDart = int Function(
-  RaBackendHandle handle,
-  Pointer<Utf8> configJson,
-);
+/// rac_result_t rac_service_register_provider(const rac_service_provider_t* provider)
+typedef RacServiceRegisterProviderNative = Int32 Function(
+    Pointer<Void> provider);
+typedef RacServiceRegisterProviderDart = int Function(Pointer<Void> provider);
 
-/// bool ra_is_initialized(ra_backend_handle);
-typedef RaIsInitializedNative = Bool Function(RaBackendHandle handle);
-typedef RaIsInitializedDart = bool Function(RaBackendHandle handle);
-
-/// void ra_destroy(ra_backend_handle);
-typedef RaDestroyNative = Void Function(RaBackendHandle handle);
-typedef RaDestroyDart = void Function(RaBackendHandle handle);
-
-/// char* ra_get_backend_info(ra_backend_handle);
-typedef RaGetBackendInfoNative = Pointer<Utf8> Function(RaBackendHandle handle);
-typedef RaGetBackendInfoDart = Pointer<Utf8> Function(RaBackendHandle handle);
-
-/// bool ra_supports_capability(ra_backend_handle, ra_capability_type);
-typedef RaSupportsCapabilityNative = Bool Function(
-  RaBackendHandle handle,
+/// rac_result_t rac_service_create(rac_capability_t capability, const rac_service_request_t* request, rac_handle_t* out_handle)
+typedef RacServiceCreateNative = Int32 Function(
   Int32 capability,
+  Pointer<Void> request,
+  Pointer<RacHandle> outHandle,
 );
-typedef RaSupportsCapabilityDart = bool Function(
-  RaBackendHandle handle,
+typedef RacServiceCreateDart = int Function(
   int capability,
+  Pointer<Void> request,
+  Pointer<RacHandle> outHandle,
 );
-
-/// ra_device_type ra_get_device(ra_backend_handle);
-typedef RaGetDeviceNative = Int32 Function(RaBackendHandle handle);
-typedef RaGetDeviceDart = int Function(RaBackendHandle handle);
-
-/// size_t ra_get_memory_usage(ra_backend_handle);
-typedef RaGetMemoryUsageNative = IntPtr Function(RaBackendHandle handle);
-typedef RaGetMemoryUsageDart = int Function(RaBackendHandle handle);
 
 // =============================================================================
-// FFI Function Signatures - STT (Speech-to-Text)
+// LLM API Function Signatures (from rac_llm_llamacpp.h)
 // =============================================================================
 
-/// ra_result_code ra_stt_load_model(handle, model_path, model_type, config_json);
-typedef RaSttLoadModelNative = Int32 Function(
-  RaBackendHandle handle,
+/// rac_result_t rac_backend_llamacpp_register(void)
+typedef RacBackendLlamacppRegisterNative = Int32 Function();
+typedef RacBackendLlamacppRegisterDart = int Function();
+
+/// rac_result_t rac_backend_llamacpp_unregister(void)
+typedef RacBackendLlamacppUnregisterNative = Int32 Function();
+typedef RacBackendLlamacppUnregisterDart = int Function();
+
+/// rac_result_t rac_llm_llamacpp_create(const char* model_path, const rac_llm_llamacpp_config_t* config, rac_handle_t* out_handle)
+typedef RacLlmLlamacppCreateNative = Int32 Function(
   Pointer<Utf8> modelPath,
-  Pointer<Utf8> modelType,
-  Pointer<Utf8> configJson,
+  Pointer<Void> config,
+  Pointer<RacHandle> outHandle,
 );
-typedef RaSttLoadModelDart = int Function(
-  RaBackendHandle handle,
+typedef RacLlmLlamacppCreateDart = int Function(
   Pointer<Utf8> modelPath,
-  Pointer<Utf8> modelType,
-  Pointer<Utf8> configJson,
+  Pointer<Void> config,
+  Pointer<RacHandle> outHandle,
 );
 
-/// bool ra_stt_is_model_loaded(ra_backend_handle);
-typedef RaSttIsModelLoadedNative = Bool Function(RaBackendHandle handle);
-typedef RaSttIsModelLoadedDart = bool Function(RaBackendHandle handle);
-
-/// ra_result_code ra_stt_unload_model(ra_backend_handle);
-typedef RaSttUnloadModelNative = Int32 Function(RaBackendHandle handle);
-typedef RaSttUnloadModelDart = int Function(RaBackendHandle handle);
-
-/// ra_result_code ra_stt_transcribe(handle, samples, num_samples, sample_rate, language, result_json);
-typedef RaSttTranscribeNative = Int32 Function(
-  RaBackendHandle handle,
-  Pointer<Float> samples,
-  IntPtr numSamples,
-  Int32 sampleRate,
-  Pointer<Utf8> language,
-  Pointer<Pointer<Utf8>> resultJson,
-);
-typedef RaSttTranscribeDart = int Function(
-  RaBackendHandle handle,
-  Pointer<Float> samples,
-  int numSamples,
-  int sampleRate,
-  Pointer<Utf8> language,
-  Pointer<Pointer<Utf8>> resultJson,
-);
-
-/// bool ra_stt_supports_streaming(ra_backend_handle);
-typedef RaSttSupportsStreamingNative = Bool Function(RaBackendHandle handle);
-typedef RaSttSupportsStreamingDart = bool Function(RaBackendHandle handle);
-
-/// ra_stream_handle ra_stt_create_stream(handle, config_json);
-typedef RaSttCreateStreamNative = RaStreamHandle Function(
-  RaBackendHandle handle,
-  Pointer<Utf8> configJson,
-);
-typedef RaSttCreateStreamDart = RaStreamHandle Function(
-  RaBackendHandle handle,
-  Pointer<Utf8> configJson,
-);
-
-/// ra_result_code ra_stt_feed_audio(backend, stream, samples, num_samples, sample_rate);
-typedef RaSttFeedAudioNative = Int32 Function(
-  RaBackendHandle backend,
-  RaStreamHandle stream,
-  Pointer<Float> samples,
-  IntPtr numSamples,
-  Int32 sampleRate,
-);
-typedef RaSttFeedAudioDart = int Function(
-  RaBackendHandle backend,
-  RaStreamHandle stream,
-  Pointer<Float> samples,
-  int numSamples,
-  int sampleRate,
-);
-
-/// bool ra_stt_is_ready(backend, stream);
-typedef RaSttIsReadyNative = Bool Function(
-  RaBackendHandle backend,
-  RaStreamHandle stream,
-);
-typedef RaSttIsReadyDart = bool Function(
-  RaBackendHandle backend,
-  RaStreamHandle stream,
-);
-
-/// ra_result_code ra_stt_decode(backend, stream, result_json);
-typedef RaSttDecodeNative = Int32 Function(
-  RaBackendHandle backend,
-  RaStreamHandle stream,
-  Pointer<Pointer<Utf8>> resultJson,
-);
-typedef RaSttDecodeDart = int Function(
-  RaBackendHandle backend,
-  RaStreamHandle stream,
-  Pointer<Pointer<Utf8>> resultJson,
-);
-
-/// bool ra_stt_is_endpoint(backend, stream);
-typedef RaSttIsEndpointNative = Bool Function(
-  RaBackendHandle backend,
-  RaStreamHandle stream,
-);
-typedef RaSttIsEndpointDart = bool Function(
-  RaBackendHandle backend,
-  RaStreamHandle stream,
-);
-
-/// void ra_stt_input_finished(backend, stream);
-typedef RaSttInputFinishedNative = Void Function(
-  RaBackendHandle backend,
-  RaStreamHandle stream,
-);
-typedef RaSttInputFinishedDart = void Function(
-  RaBackendHandle backend,
-  RaStreamHandle stream,
-);
-
-/// void ra_stt_reset_stream(backend, stream);
-typedef RaSttResetStreamNative = Void Function(
-  RaBackendHandle backend,
-  RaStreamHandle stream,
-);
-typedef RaSttResetStreamDart = void Function(
-  RaBackendHandle backend,
-  RaStreamHandle stream,
-);
-
-/// void ra_stt_destroy_stream(backend, stream);
-typedef RaSttDestroyStreamNative = Void Function(
-  RaBackendHandle backend,
-  RaStreamHandle stream,
-);
-typedef RaSttDestroyStreamDart = void Function(
-  RaBackendHandle backend,
-  RaStreamHandle stream,
-);
-
-/// void ra_stt_cancel(handle);
-typedef RaSttCancelNative = Void Function(RaBackendHandle handle);
-typedef RaSttCancelDart = void Function(RaBackendHandle handle);
-
-// =============================================================================
-// FFI Function Signatures - TTS (Text-to-Speech)
-// =============================================================================
-
-/// ra_result_code ra_tts_load_model(handle, model_path, model_type, config_json);
-typedef RaTtsLoadModelNative = Int32 Function(
-  RaBackendHandle handle,
+/// rac_result_t rac_llm_llamacpp_load_model(rac_handle_t handle, const char* model_path, const rac_llm_llamacpp_config_t* config)
+typedef RacLlmLlamacppLoadModelNative = Int32 Function(
+  RacHandle handle,
   Pointer<Utf8> modelPath,
-  Pointer<Utf8> modelType,
-  Pointer<Utf8> configJson,
+  Pointer<Void> config,
 );
-typedef RaTtsLoadModelDart = int Function(
-  RaBackendHandle handle,
+typedef RacLlmLlamacppLoadModelDart = int Function(
+  RacHandle handle,
   Pointer<Utf8> modelPath,
-  Pointer<Utf8> modelType,
-  Pointer<Utf8> configJson,
+  Pointer<Void> config,
 );
 
-/// bool ra_tts_is_model_loaded(ra_backend_handle);
-typedef RaTtsIsModelLoadedNative = Bool Function(RaBackendHandle handle);
-typedef RaTtsIsModelLoadedDart = bool Function(RaBackendHandle handle);
+/// rac_result_t rac_llm_llamacpp_unload_model(rac_handle_t handle)
+typedef RacLlmLlamacppUnloadModelNative = Int32 Function(RacHandle handle);
+typedef RacLlmLlamacppUnloadModelDart = int Function(RacHandle handle);
 
-/// ra_result_code ra_tts_unload_model(ra_backend_handle);
-typedef RaTtsUnloadModelNative = Int32 Function(RaBackendHandle handle);
-typedef RaTtsUnloadModelDart = int Function(RaBackendHandle handle);
+/// rac_bool_t rac_llm_llamacpp_is_model_loaded(rac_handle_t handle)
+typedef RacLlmLlamacppIsModelLoadedNative = Int32 Function(RacHandle handle);
+typedef RacLlmLlamacppIsModelLoadedDart = int Function(RacHandle handle);
 
-/// ra_result_code ra_tts_synthesize(handle, text, voice_id, speed, pitch, samples, num_samples, sample_rate);
-typedef RaTtsSynthesizeNative = Int32 Function(
-  RaBackendHandle handle,
-  Pointer<Utf8> text,
-  Pointer<Utf8> voiceId,
-  Float speed,
-  Float pitch,
-  Pointer<Pointer<Float>> audioSamples,
-  Pointer<IntPtr> numSamples,
-  Pointer<Int32> sampleRate,
-);
-typedef RaTtsSynthesizeDart = int Function(
-  RaBackendHandle handle,
-  Pointer<Utf8> text,
-  Pointer<Utf8> voiceId,
-  double speed,
-  double pitch,
-  Pointer<Pointer<Float>> audioSamples,
-  Pointer<IntPtr> numSamples,
-  Pointer<Int32> sampleRate,
-);
-
-/// bool ra_tts_supports_streaming(ra_backend_handle);
-typedef RaTtsSupportsStreamingNative = Bool Function(RaBackendHandle handle);
-typedef RaTtsSupportsStreamingDart = bool Function(RaBackendHandle handle);
-
-/// char* ra_tts_get_voices(ra_backend_handle);
-typedef RaTtsGetVoicesNative = Pointer<Utf8> Function(RaBackendHandle handle);
-typedef RaTtsGetVoicesDart = Pointer<Utf8> Function(RaBackendHandle handle);
-
-/// void ra_tts_cancel(handle);
-typedef RaTtsCancelNative = Void Function(RaBackendHandle handle);
-typedef RaTtsCancelDart = void Function(RaBackendHandle handle);
-
-// =============================================================================
-// FFI Function Signatures - LLM (Text Generation)
-// =============================================================================
-
-/// ra_result_code ra_text_load_model(handle, model_path, config_json);
-typedef RaTextLoadModelNative = Int32 Function(
-  RaBackendHandle handle,
-  Pointer<Utf8> modelPath,
-  Pointer<Utf8> configJson,
-);
-typedef RaTextLoadModelDart = int Function(
-  RaBackendHandle handle,
-  Pointer<Utf8> modelPath,
-  Pointer<Utf8> configJson,
-);
-
-/// bool ra_text_is_model_loaded(ra_backend_handle);
-typedef RaTextIsModelLoadedNative = Bool Function(RaBackendHandle handle);
-typedef RaTextIsModelLoadedDart = bool Function(RaBackendHandle handle);
-
-/// ra_result_code ra_text_unload_model(ra_backend_handle);
-typedef RaTextUnloadModelNative = Int32 Function(RaBackendHandle handle);
-typedef RaTextUnloadModelDart = int Function(RaBackendHandle handle);
-
-/// ra_result_code ra_text_generate(handle, prompt, system_prompt, max_tokens, temperature, result_json);
-typedef RaTextGenerateNative = Int32 Function(
-  RaBackendHandle handle,
+/// rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt, const rac_llm_options_t* options, rac_llm_result_t* out_result)
+typedef RacLlmLlamacppGenerateNative = Int32 Function(
+  RacHandle handle,
   Pointer<Utf8> prompt,
-  Pointer<Utf8> systemPrompt,
-  Int32 maxTokens,
-  Float temperature,
-  Pointer<Pointer<Utf8>> resultJson,
+  Pointer<Void> options,
+  Pointer<Void> outResult,
 );
-typedef RaTextGenerateDart = int Function(
-  RaBackendHandle handle,
+typedef RacLlmLlamacppGenerateDart = int Function(
+  RacHandle handle,
   Pointer<Utf8> prompt,
-  Pointer<Utf8> systemPrompt,
-  int maxTokens,
-  double temperature,
-  Pointer<Pointer<Utf8>> resultJson,
+  Pointer<Void> options,
+  Pointer<Void> outResult,
 );
 
-/// ra_result_code ra_text_generate_stream(handle, prompt, system_prompt, max_tokens, temperature, callback, user_data);
-typedef RaTextGenerateStreamNative = Int32 Function(
-  RaBackendHandle handle,
-  Pointer<Utf8> prompt,
-  Pointer<Utf8> systemPrompt,
-  Int32 maxTokens,
-  Float temperature,
-  Pointer<NativeFunction<RaTextStreamCallbackNative>> callback,
-  Pointer<Void> userData,
-);
-typedef RaTextGenerateStreamDart = int Function(
-  RaBackendHandle handle,
-  Pointer<Utf8> prompt,
-  Pointer<Utf8> systemPrompt,
-  int maxTokens,
-  double temperature,
-  Pointer<NativeFunction<RaTextStreamCallbackNative>> callback,
+/// LLM streaming callback signature
+/// rac_bool_t (*rac_llm_llamacpp_stream_callback_fn)(const char* token, rac_bool_t is_final, void* user_data)
+typedef RacLlmStreamCallbackNative = Int32 Function(
+  Pointer<Utf8> token,
+  Int32 isFinal,
   Pointer<Void> userData,
 );
 
-/// void ra_text_cancel(handle);
-typedef RaTextCancelNative = Void Function(RaBackendHandle handle);
-typedef RaTextCancelDart = void Function(RaBackendHandle handle);
-
-// =============================================================================
-// FFI Function Signatures - VAD (Voice Activity Detection)
-// =============================================================================
-
-/// ra_result_code ra_vad_load_model(handle, model_path, config_json);
-typedef RaVadLoadModelNative = Int32 Function(
-  RaBackendHandle handle,
-  Pointer<Utf8> modelPath,
-  Pointer<Utf8> configJson,
+/// rac_result_t rac_llm_llamacpp_generate_stream(...)
+typedef RacLlmLlamacppGenerateStreamNative = Int32 Function(
+  RacHandle handle,
+  Pointer<Utf8> prompt,
+  Pointer<Void> options,
+  Pointer<NativeFunction<RacLlmStreamCallbackNative>> callback,
+  Pointer<Void> userData,
 );
-typedef RaVadLoadModelDart = int Function(
-  RaBackendHandle handle,
-  Pointer<Utf8> modelPath,
-  Pointer<Utf8> configJson,
-);
-
-/// bool ra_vad_is_model_loaded(ra_backend_handle);
-typedef RaVadIsModelLoadedNative = Bool Function(RaBackendHandle handle);
-typedef RaVadIsModelLoadedDart = bool Function(RaBackendHandle handle);
-
-/// ra_result_code ra_vad_unload_model(ra_backend_handle);
-typedef RaVadUnloadModelNative = Int32 Function(RaBackendHandle handle);
-typedef RaVadUnloadModelDart = int Function(RaBackendHandle handle);
-
-/// ra_result_code ra_vad_process(handle, samples, num_samples, sample_rate, is_speech, probability);
-typedef RaVadProcessNative = Int32 Function(
-  RaBackendHandle handle,
-  Pointer<Float> samples,
-  IntPtr numSamples,
-  Int32 sampleRate,
-  Pointer<Bool> isSpeech,
-  Pointer<Float> probability,
-);
-typedef RaVadProcessDart = int Function(
-  RaBackendHandle handle,
-  Pointer<Float> samples,
-  int numSamples,
-  int sampleRate,
-  Pointer<Bool> isSpeech,
-  Pointer<Float> probability,
-);
-
-/// ra_stream_handle ra_vad_create_stream(handle, config_json);
-typedef RaVadCreateStreamNative = RaStreamHandle Function(
-  RaBackendHandle handle,
-  Pointer<Utf8> configJson,
-);
-typedef RaVadCreateStreamDart = RaStreamHandle Function(
-  RaBackendHandle handle,
-  Pointer<Utf8> configJson,
-);
-
-/// void ra_vad_destroy_stream(backend, stream);
-typedef RaVadDestroyStreamNative = Void Function(
-  RaBackendHandle backend,
-  RaStreamHandle stream,
-);
-typedef RaVadDestroyStreamDart = void Function(
-  RaBackendHandle backend,
-  RaStreamHandle stream,
-);
-
-/// void ra_vad_reset(handle);
-typedef RaVadResetNative = Void Function(RaBackendHandle handle);
-typedef RaVadResetDart = void Function(RaBackendHandle handle);
-
-// =============================================================================
-// FFI Function Signatures - Embeddings
-// =============================================================================
-
-/// ra_result_code ra_embed_load_model(handle, model_path, config_json);
-typedef RaEmbedLoadModelNative = Int32 Function(
-  RaBackendHandle handle,
-  Pointer<Utf8> modelPath,
-  Pointer<Utf8> configJson,
-);
-typedef RaEmbedLoadModelDart = int Function(
-  RaBackendHandle handle,
-  Pointer<Utf8> modelPath,
-  Pointer<Utf8> configJson,
-);
-
-/// bool ra_embed_is_model_loaded(ra_backend_handle);
-typedef RaEmbedIsModelLoadedNative = Bool Function(RaBackendHandle handle);
-typedef RaEmbedIsModelLoadedDart = bool Function(RaBackendHandle handle);
-
-/// ra_result_code ra_embed_text(handle, text, embedding, dimensions);
-typedef RaEmbedTextNative = Int32 Function(
-  RaBackendHandle handle,
-  Pointer<Utf8> text,
-  Pointer<Pointer<Float>> embedding,
-  Pointer<Int32> dimensions,
-);
-typedef RaEmbedTextDart = int Function(
-  RaBackendHandle handle,
-  Pointer<Utf8> text,
-  Pointer<Pointer<Float>> embedding,
-  Pointer<Int32> dimensions,
-);
-
-/// int ra_embed_get_dimensions(ra_backend_handle);
-typedef RaEmbedGetDimensionsNative = Int32 Function(RaBackendHandle handle);
-typedef RaEmbedGetDimensionsDart = int Function(RaBackendHandle handle);
-
-// =============================================================================
-// FFI Function Signatures - Memory Management
-// =============================================================================
-
-/// void ra_free_string(char* str);
-typedef RaFreeStringNative = Void Function(Pointer<Utf8> str);
-typedef RaFreeStringDart = void Function(Pointer<Utf8> str);
-
-/// void ra_free_audio(float* audio_samples);
-typedef RaFreeAudioNative = Void Function(Pointer<Float> samples);
-typedef RaFreeAudioDart = void Function(Pointer<Float> samples);
-
-/// void ra_free_embedding(float* embedding);
-typedef RaFreeEmbeddingNative = Void Function(Pointer<Float> embedding);
-typedef RaFreeEmbeddingDart = void Function(Pointer<Float> embedding);
-
-// =============================================================================
-// FFI Function Signatures - Utility
-// =============================================================================
-
-/// const char* ra_get_last_error(void);
-typedef RaGetLastErrorNative = Pointer<Utf8> Function();
-typedef RaGetLastErrorDart = Pointer<Utf8> Function();
-
-/// const char* ra_get_version(void);
-typedef RaGetVersionNative = Pointer<Utf8> Function();
-typedef RaGetVersionDart = Pointer<Utf8> Function();
-
-/// ra_result_code ra_extract_archive(const char* archive_path, const char* dest_dir);
-typedef RaExtractArchiveNative = Int32 Function(
-  Pointer<Utf8> archivePath,
-  Pointer<Utf8> destDir,
-);
-typedef RaExtractArchiveDart = int Function(
-  Pointer<Utf8> archivePath,
-  Pointer<Utf8> destDir,
-);
-
-// =============================================================================
-// Platform Adapter Types (matching rac_platform_adapter.h)
-// =============================================================================
-
-/// Callback type signatures for platform adapter
-typedef RacLogCallbackNative = Void Function(
-  Int32 level,
-  Pointer<Utf8> category,
-  Pointer<Utf8> message,
+typedef RacLlmLlamacppGenerateStreamDart = int Function(
+  RacHandle handle,
+  Pointer<Utf8> prompt,
+  Pointer<Void> options,
+  Pointer<NativeFunction<RacLlmStreamCallbackNative>> callback,
   Pointer<Void> userData,
 );
 
+/// void rac_llm_llamacpp_cancel(rac_handle_t handle)
+typedef RacLlmLlamacppCancelNative = Void Function(RacHandle handle);
+typedef RacLlmLlamacppCancelDart = void Function(RacHandle handle);
+
+/// void rac_llm_llamacpp_destroy(rac_handle_t handle)
+typedef RacLlmLlamacppDestroyNative = Void Function(RacHandle handle);
+typedef RacLlmLlamacppDestroyDart = void Function(RacHandle handle);
+
+// =============================================================================
+// STT ONNX API Function Signatures (from rac_stt_onnx.h)
+// =============================================================================
+
+/// rac_result_t rac_stt_onnx_create(const char* model_path, const rac_stt_onnx_config_t* config, rac_handle_t* out_handle)
+typedef RacSttOnnxCreateNative = Int32 Function(
+  Pointer<Utf8> modelPath,
+  Pointer<Void> config,
+  Pointer<RacHandle> outHandle,
+);
+typedef RacSttOnnxCreateDart = int Function(
+  Pointer<Utf8> modelPath,
+  Pointer<Void> config,
+  Pointer<RacHandle> outHandle,
+);
+
+/// rac_result_t rac_stt_onnx_transcribe(rac_handle_t handle, const float* audio_samples, size_t num_samples, const rac_stt_options_t* options, rac_stt_result_t* out_result)
+typedef RacSttOnnxTranscribeNative = Int32 Function(
+  RacHandle handle,
+  Pointer<Float> audioSamples,
+  IntPtr numSamples,
+  Pointer<Void> options,
+  Pointer<Void> outResult,
+);
+typedef RacSttOnnxTranscribeDart = int Function(
+  RacHandle handle,
+  Pointer<Float> audioSamples,
+  int numSamples,
+  Pointer<Void> options,
+  Pointer<Void> outResult,
+);
+
+/// rac_bool_t rac_stt_onnx_supports_streaming(rac_handle_t handle)
+typedef RacSttOnnxSupportsStreamingNative = Int32 Function(RacHandle handle);
+typedef RacSttOnnxSupportsStreamingDart = int Function(RacHandle handle);
+
+/// rac_result_t rac_stt_onnx_create_stream(rac_handle_t handle, rac_handle_t* out_stream)
+typedef RacSttOnnxCreateStreamNative = Int32 Function(
+  RacHandle handle,
+  Pointer<RacHandle> outStream,
+);
+typedef RacSttOnnxCreateStreamDart = int Function(
+  RacHandle handle,
+  Pointer<RacHandle> outStream,
+);
+
+/// rac_result_t rac_stt_onnx_feed_audio(rac_handle_t handle, rac_handle_t stream, const float* audio_samples, size_t num_samples)
+typedef RacSttOnnxFeedAudioNative = Int32 Function(
+  RacHandle handle,
+  RacHandle stream,
+  Pointer<Float> audioSamples,
+  IntPtr numSamples,
+);
+typedef RacSttOnnxFeedAudioDart = int Function(
+  RacHandle handle,
+  RacHandle stream,
+  Pointer<Float> audioSamples,
+  int numSamples,
+);
+
+/// rac_bool_t rac_stt_onnx_stream_is_ready(rac_handle_t handle, rac_handle_t stream)
+typedef RacSttOnnxStreamIsReadyNative = Int32 Function(
+  RacHandle handle,
+  RacHandle stream,
+);
+typedef RacSttOnnxStreamIsReadyDart = int Function(
+  RacHandle handle,
+  RacHandle stream,
+);
+
+/// rac_result_t rac_stt_onnx_decode_stream(rac_handle_t handle, rac_handle_t stream, char** out_text)
+typedef RacSttOnnxDecodeStreamNative = Int32 Function(
+  RacHandle handle,
+  RacHandle stream,
+  Pointer<Pointer<Utf8>> outText,
+);
+typedef RacSttOnnxDecodeStreamDart = int Function(
+  RacHandle handle,
+  RacHandle stream,
+  Pointer<Pointer<Utf8>> outText,
+);
+
+/// void rac_stt_onnx_input_finished(rac_handle_t handle, rac_handle_t stream)
+typedef RacSttOnnxInputFinishedNative = Void Function(
+  RacHandle handle,
+  RacHandle stream,
+);
+typedef RacSttOnnxInputFinishedDart = void Function(
+  RacHandle handle,
+  RacHandle stream,
+);
+
+/// rac_bool_t rac_stt_onnx_is_endpoint(rac_handle_t handle, rac_handle_t stream)
+typedef RacSttOnnxIsEndpointNative = Int32 Function(
+  RacHandle handle,
+  RacHandle stream,
+);
+typedef RacSttOnnxIsEndpointDart = int Function(
+  RacHandle handle,
+  RacHandle stream,
+);
+
+/// void rac_stt_onnx_destroy_stream(rac_handle_t handle, rac_handle_t stream)
+typedef RacSttOnnxDestroyStreamNative = Void Function(
+  RacHandle handle,
+  RacHandle stream,
+);
+typedef RacSttOnnxDestroyStreamDart = void Function(
+  RacHandle handle,
+  RacHandle stream,
+);
+
+/// void rac_stt_onnx_destroy(rac_handle_t handle)
+typedef RacSttOnnxDestroyNative = Void Function(RacHandle handle);
+typedef RacSttOnnxDestroyDart = void Function(RacHandle handle);
+
+// =============================================================================
+// TTS ONNX API Function Signatures (from rac_tts_onnx.h)
+// =============================================================================
+
+/// rac_result_t rac_tts_onnx_create(const char* model_path, const rac_tts_onnx_config_t* config, rac_handle_t* out_handle)
+typedef RacTtsOnnxCreateNative = Int32 Function(
+  Pointer<Utf8> modelPath,
+  Pointer<Void> config,
+  Pointer<RacHandle> outHandle,
+);
+typedef RacTtsOnnxCreateDart = int Function(
+  Pointer<Utf8> modelPath,
+  Pointer<Void> config,
+  Pointer<RacHandle> outHandle,
+);
+
+/// rac_result_t rac_tts_onnx_synthesize(rac_handle_t handle, const char* text, const rac_tts_options_t* options, rac_tts_result_t* out_result)
+typedef RacTtsOnnxSynthesizeNative = Int32 Function(
+  RacHandle handle,
+  Pointer<Utf8> text,
+  Pointer<Void> options,
+  Pointer<Void> outResult,
+);
+typedef RacTtsOnnxSynthesizeDart = int Function(
+  RacHandle handle,
+  Pointer<Utf8> text,
+  Pointer<Void> options,
+  Pointer<Void> outResult,
+);
+
+/// rac_result_t rac_tts_onnx_get_voices(rac_handle_t handle, char*** out_voices, size_t* out_count)
+typedef RacTtsOnnxGetVoicesNative = Int32 Function(
+  RacHandle handle,
+  Pointer<Pointer<Pointer<Utf8>>> outVoices,
+  Pointer<IntPtr> outCount,
+);
+typedef RacTtsOnnxGetVoicesDart = int Function(
+  RacHandle handle,
+  Pointer<Pointer<Pointer<Utf8>>> outVoices,
+  Pointer<IntPtr> outCount,
+);
+
+/// void rac_tts_onnx_stop(rac_handle_t handle)
+typedef RacTtsOnnxStopNative = Void Function(RacHandle handle);
+typedef RacTtsOnnxStopDart = void Function(RacHandle handle);
+
+/// void rac_tts_onnx_destroy(rac_handle_t handle)
+typedef RacTtsOnnxDestroyNative = Void Function(RacHandle handle);
+typedef RacTtsOnnxDestroyDart = void Function(RacHandle handle);
+
+// =============================================================================
+// VAD ONNX Functions (from rac_vad_onnx.h)
+// =============================================================================
+
+/// rac_result_t rac_vad_onnx_create(const char* model_path, const rac_vad_onnx_config_t* config, rac_handle_t* out_handle)
+typedef RacVadOnnxCreateNative = Int32 Function(
+  Pointer<Utf8> modelPath,
+  Pointer<Void> config,
+  Pointer<RacHandle> outHandle,
+);
+typedef RacVadOnnxCreateDart = int Function(
+  Pointer<Utf8> modelPath,
+  Pointer<Void> config,
+  Pointer<RacHandle> outHandle,
+);
+
+/// rac_result_t rac_vad_onnx_process(rac_handle_t handle, const float* samples, size_t num_samples, rac_vad_result_t* out_result)
+typedef RacVadOnnxProcessNative = Int32 Function(
+  RacHandle handle,
+  Pointer<Float> samples,
+  IntPtr numSamples,
+  Pointer<Void> outResult,
+);
+typedef RacVadOnnxProcessDart = int Function(
+  RacHandle handle,
+  Pointer<Float> samples,
+  int numSamples,
+  Pointer<Void> outResult,
+);
+
+/// void rac_vad_onnx_destroy(rac_handle_t handle)
+typedef RacVadOnnxDestroyNative = Void Function(RacHandle handle);
+typedef RacVadOnnxDestroyDart = void Function(RacHandle handle);
+
+// =============================================================================
+// Memory Management (from rac_types.h)
+// =============================================================================
+
+/// void rac_free(void* ptr)
+typedef RacFreeNative = Void Function(Pointer<Void> ptr);
+typedef RacFreeDart = void Function(Pointer<Void> ptr);
+
+/// void* rac_alloc(size_t size)
+typedef RacAllocNative = Pointer<Void> Function(IntPtr size);
+typedef RacAllocDart = Pointer<Void> Function(int size);
+
+/// char* rac_strdup(const char* str)
+typedef RacStrdupNative = Pointer<Utf8> Function(Pointer<Utf8> str);
+typedef RacStrdupDart = Pointer<Utf8> Function(Pointer<Utf8> str);
+
+// =============================================================================
+// Error API (from rac_error.h)
+// =============================================================================
+
+/// const char* rac_error_message(rac_result_t error_code)
+typedef RacErrorMessageNative = Pointer<Utf8> Function(Int32 errorCode);
+typedef RacErrorMessageDart = Pointer<Utf8> Function(int errorCode);
+
+/// const char* rac_error_get_details(void)
+typedef RacErrorGetDetailsNative = Pointer<Utf8> Function();
+typedef RacErrorGetDetailsDart = Pointer<Utf8> Function();
+
+/// void rac_error_set_details(const char* details)
+typedef RacErrorSetDetailsNative = Void Function(Pointer<Utf8> details);
+typedef RacErrorSetDetailsDart = void Function(Pointer<Utf8> details);
+
+/// void rac_error_clear_details(void)
+typedef RacErrorClearDetailsNative = Void Function();
+typedef RacErrorClearDetailsDart = void Function();
+
+// =============================================================================
+// Platform Adapter Callbacks (from rac_platform_adapter.h)
+// =============================================================================
+
+/// File exists callback: rac_bool_t (*file_exists)(const char* path, void* user_data)
 typedef RacFileExistsCallbackNative = Int32 Function(
   Pointer<Utf8> path,
   Pointer<Void> userData,
 );
 
+/// File read callback: rac_result_t (*file_read)(const char* path, void** out_data, size_t* out_size, void* user_data)
 typedef RacFileReadCallbackNative = Int32 Function(
   Pointer<Utf8> path,
   Pointer<Pointer<Void>> outData,
@@ -683,6 +722,7 @@ typedef RacFileReadCallbackNative = Int32 Function(
   Pointer<Void> userData,
 );
 
+/// File write callback: rac_result_t (*file_write)(const char* path, const void* data, size_t size, void* user_data)
 typedef RacFileWriteCallbackNative = Int32 Function(
   Pointer<Utf8> path,
   Pointer<Void> data,
@@ -690,74 +730,267 @@ typedef RacFileWriteCallbackNative = Int32 Function(
   Pointer<Void> userData,
 );
 
+/// File delete callback: rac_result_t (*file_delete)(const char* path, void* user_data)
 typedef RacFileDeleteCallbackNative = Int32 Function(
   Pointer<Utf8> path,
   Pointer<Void> userData,
 );
 
+/// Secure get callback: rac_result_t (*secure_get)(const char* key, char** out_value, void* user_data)
 typedef RacSecureGetCallbackNative = Int32 Function(
   Pointer<Utf8> key,
   Pointer<Pointer<Utf8>> outValue,
   Pointer<Void> userData,
 );
 
+/// Secure set callback: rac_result_t (*secure_set)(const char* key, const char* value, void* user_data)
 typedef RacSecureSetCallbackNative = Int32 Function(
   Pointer<Utf8> key,
   Pointer<Utf8> value,
   Pointer<Void> userData,
 );
 
+/// Secure delete callback: rac_result_t (*secure_delete)(const char* key, void* user_data)
 typedef RacSecureDeleteCallbackNative = Int32 Function(
   Pointer<Utf8> key,
   Pointer<Void> userData,
 );
 
-typedef RacNowMsCallbackNative = Int64 Function(
+/// Log callback: void (*log)(rac_log_level_t level, const char* category, const char* message, void* user_data)
+typedef RacLogCallbackNative = Void Function(
+  Int32 level,
+  Pointer<Utf8> category,
+  Pointer<Utf8> message,
   Pointer<Void> userData,
 );
 
-typedef RacGetMemoryInfoCallbackNative = Int32 Function(
-  Pointer<Void> outInfo,
-  Pointer<Void> userData,
-);
-
+/// Track error callback: void (*track_error)(const char* error_json, void* user_data)
 typedef RacTrackErrorCallbackNative = Void Function(
   Pointer<Utf8> errorJson,
   Pointer<Void> userData,
 );
 
+/// Now ms callback: int64_t (*now_ms)(void* user_data)
+typedef RacNowMsCallbackNative = Int64 Function(Pointer<Void> userData);
+
+/// Get memory info callback: rac_result_t (*get_memory_info)(rac_memory_info_t* out_info, void* user_data)
+typedef RacGetMemoryInfoCallbackNative = Int32 Function(
+  Pointer<Void> outInfo,
+  Pointer<Void> userData,
+);
+
+/// HTTP progress callback: void (*progress)(int64_t bytes_downloaded, int64_t total_bytes, void* callback_user_data)
+typedef RacHttpProgressCallbackNative = Void Function(
+  Int64 bytesDownloaded,
+  Int64 totalBytes,
+  Pointer<Void> callbackUserData,
+);
+
+/// HTTP complete callback: void (*complete)(rac_result_t result, const char* downloaded_path, void* callback_user_data)
+typedef RacHttpCompleteCallbackNative = Void Function(
+  Int32 result,
+  Pointer<Utf8> downloadedPath,
+  Pointer<Void> callbackUserData,
+);
+
+// =============================================================================
+// Structs (using FFI Struct for native memory layout)
+// =============================================================================
+
 /// Platform adapter struct matching rac_platform_adapter_t
-base class RacPlatformAdapter extends Struct {
-  // File System Operations
+/// Note: This is a complex struct - for simplicity we use Pointer<Void> in FFI calls
+/// and manage the struct manually in Dart
+base class RacPlatformAdapterStruct extends Struct {
   external Pointer<NativeFunction<RacFileExistsCallbackNative>> fileExists;
   external Pointer<NativeFunction<RacFileReadCallbackNative>> fileRead;
   external Pointer<NativeFunction<RacFileWriteCallbackNative>> fileWrite;
   external Pointer<NativeFunction<RacFileDeleteCallbackNative>> fileDelete;
-
-  // Secure Storage
   external Pointer<NativeFunction<RacSecureGetCallbackNative>> secureGet;
   external Pointer<NativeFunction<RacSecureSetCallbackNative>> secureSet;
   external Pointer<NativeFunction<RacSecureDeleteCallbackNative>> secureDelete;
-
-  // Logging
   external Pointer<NativeFunction<RacLogCallbackNative>> log;
-
-  // Error Tracking
   external Pointer<NativeFunction<RacTrackErrorCallbackNative>> trackError;
-
-  // Clock
   external Pointer<NativeFunction<RacNowMsCallbackNative>> nowMs;
-
-  // Memory Info
-  external Pointer<NativeFunction<RacGetMemoryInfoCallbackNative>> getMemoryInfo;
-
-  // HTTP Download (optional - can be nullptr)
+  external Pointer<NativeFunction<RacGetMemoryInfoCallbackNative>>
+      getMemoryInfo;
   external Pointer<Void> httpDownload;
   external Pointer<Void> httpDownloadCancel;
-
-  // Archive Extraction (optional - can be nullptr)
   external Pointer<Void> extractArchive;
-
-  // User data
   external Pointer<Void> userData;
 }
+
+/// Memory info struct matching rac_memory_info_t
+base class RacMemoryInfoStruct extends Struct {
+  @Uint64()
+  external int totalBytes;
+
+  @Uint64()
+  external int availableBytes;
+
+  @Uint64()
+  external int usedBytes;
+}
+
+/// Version info struct matching rac_version_t
+base class RacVersionStruct extends Struct {
+  @Uint16()
+  external int major;
+
+  @Uint16()
+  external int minor;
+
+  @Uint16()
+  external int patch;
+
+  external Pointer<Utf8> string;
+}
+
+/// LlamaCPP config struct matching rac_llm_llamacpp_config_t
+base class RacLlmLlamacppConfigStruct extends Struct {
+  @Int32()
+  external int contextSize;
+
+  @Int32()
+  external int numThreads;
+
+  @Int32()
+  external int gpuLayers;
+
+  @Int32()
+  external int batchSize;
+}
+
+/// LLM options struct matching rac_llm_options_t
+base class RacLlmOptionsStruct extends Struct {
+  @Int32()
+  external int maxTokens;
+
+  @Float()
+  external double temperature;
+
+  @Float()
+  external double topP;
+
+  external Pointer<Pointer<Utf8>> stopSequences;
+
+  @IntPtr()
+  external int numStopSequences;
+
+  @Int32()
+  external int streamingEnabled;
+
+  external Pointer<Utf8> systemPrompt;
+}
+
+/// LLM result struct matching rac_llm_result_t
+base class RacLlmResultStruct extends Struct {
+  external Pointer<Utf8> text;
+
+  @Int32()
+  external int promptTokens;
+
+  @Int32()
+  external int completionTokens;
+
+  @Int32()
+  external int totalTokens;
+
+  @Int64()
+  external int timeToFirstTokenMs;
+
+  @Int64()
+  external int totalTimeMs;
+
+  @Float()
+  external double tokensPerSecond;
+}
+
+/// STT ONNX config struct matching rac_stt_onnx_config_t
+base class RacSttOnnxConfigStruct extends Struct {
+  @Int32()
+  external int modelType;
+
+  @Int32()
+  external int numThreads;
+
+  @Int32()
+  external int useCoreml;
+}
+
+/// TTS ONNX config struct matching rac_tts_onnx_config_t
+base class RacTtsOnnxConfigStruct extends Struct {
+  @Int32()
+  external int numThreads;
+
+  @Int32()
+  external int useCoreml;
+
+  @Int32()
+  external int sampleRate;
+}
+
+/// STT ONNX result struct matching rac_stt_onnx_result_t
+base class RacSttOnnxResultStruct extends Struct {
+  external Pointer<Utf8> text;
+
+  @Float()
+  external double confidence;
+
+  external Pointer<Utf8> language;
+
+  @Int32()
+  external int durationMs;
+}
+
+/// TTS ONNX result struct matching rac_tts_onnx_result_t
+base class RacTtsOnnxResultStruct extends Struct {
+  external Pointer<Float> audioSamples;
+
+  @Int32()
+  external int numSamples;
+
+  @Int32()
+  external int sampleRate;
+
+  @Int32()
+  external int durationMs;
+}
+
+/// VAD ONNX config struct matching rac_vad_onnx_config_t
+base class RacVadOnnxConfigStruct extends Struct {
+  @Int32()
+  external int numThreads;
+
+  @Int32()
+  external int sampleRate;
+
+  @Int32()
+  external int windowSizeMs;
+
+  @Float()
+  external double threshold;
+}
+
+/// VAD ONNX result struct matching rac_vad_onnx_result_t
+base class RacVadOnnxResultStruct extends Struct {
+  @Int32()
+  external int isSpeech;
+
+  @Float()
+  external double probability;
+}
+
+// =============================================================================
+// Backward Compatibility Aliases
+// =============================================================================
+
+/// Backward compatibility: old ra_* types map to new rac_* types
+typedef RaBackendHandle = RacHandle;
+typedef RaStreamHandle = RacHandle;
+
+// =============================================================================
+// Convenient Type Alias
+// =============================================================================
+
+/// Type alias for platform adapter struct
+typedef RacPlatformAdapter = RacPlatformAdapterStruct;

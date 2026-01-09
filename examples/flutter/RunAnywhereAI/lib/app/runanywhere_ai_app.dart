@@ -208,8 +208,6 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: ModelManager.shared),
-        // Provide ModelLifecycleTracker for UI updates
-        ChangeNotifierProvider.value(value: ModelLifecycleTracker.shared),
       ],
       child: MaterialApp(
         title: 'RunAnywhere AI',

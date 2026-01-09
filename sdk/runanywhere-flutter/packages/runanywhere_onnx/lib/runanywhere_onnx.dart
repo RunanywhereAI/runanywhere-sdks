@@ -1,6 +1,6 @@
 /// ONNX Runtime backend for RunAnywhere Flutter SDK.
 ///
-/// This package provides STT, TTS, VAD, and LLM capabilities via the native
+/// This package provides STT, TTS, and VAD capabilities via the native
 /// runanywhere-core library using Dart FFI.
 ///
 /// ## Installation
@@ -45,16 +45,13 @@
 /// - **STT (Speech-to-Text)**: Streaming and batch transcription
 /// - **TTS (Text-to-Speech)**: Neural voice synthesis
 /// - **VAD (Voice Activity Detection)**: Real-time speech detection
-/// - **LLM (Language Models)**: Text generation
 library runanywhere_onnx;
 
 export 'onnx.dart';
 export 'onnx_download_strategy.dart';
-export 'providers/onnx_llm_provider.dart';
 export 'providers/onnx_stt_provider.dart';
 export 'providers/onnx_tts_provider.dart';
 export 'providers/onnx_vad_provider.dart';
-export 'services/onnx_llm_service.dart';
 export 'services/onnx_stt_service.dart';
 export 'services/onnx_tts_service.dart';
 export 'services/onnx_vad_service.dart';

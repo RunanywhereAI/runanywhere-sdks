@@ -5,17 +5,15 @@ packages:
 
 command:
   version:
-    linkToCommits: true
     workspaceChangelog: true
 
   bootstrap:
-    usePubspecOverrides: true
     runPubGetInParallel: true
 
 scripts:
   analyze:
-    run: melos exec -- dart analyze .
-    description: Run dart analyze in all packages
+    run: melos exec -- flutter analyze .
+    description: Run flutter analyze in all packages
 
   format:
     run: melos exec -- dart format .

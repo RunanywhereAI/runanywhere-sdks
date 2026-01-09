@@ -1,0 +1,5 @@
+# Ignore xcframework contents (downloaded binaries)
+# Keep only .gitkeep and version files
+*.xcframework/
+!.gitkeep
+!.*_version

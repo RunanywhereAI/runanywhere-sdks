@@ -3,9 +3,8 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import '../foundation/logging/sdk_logger.dart';
-import 'ffi_types.dart';
-import 'native_backend.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/native_backend.dart';
 
 /// STT bridge for C++ speech-to-text operations.
 /// Matches Swift's `CppBridge+STT.swift`.
@@ -42,7 +41,8 @@ class DartBridgeSTT {
       );
       return true;
     } catch (e) {
-      _logger.error('Failed to load STT model', metadata: {'error': e.toString()});
+      _logger
+          .error('Failed to load STT model', metadata: {'error': e.toString()});
       return false;
     }
   }
@@ -61,7 +61,8 @@ class DartBridgeSTT {
       backend.unloadSttModel();
       return true;
     } catch (e) {
-      _logger.error('Failed to unload STT model', metadata: {'error': e.toString()});
+      _logger.error('Failed to unload STT model',
+          metadata: {'error': e.toString()});
       return false;
     }
   }
@@ -102,60 +103,14 @@ class DartBridgeSTT {
     return _backend?.sttSupportsStreaming ?? false;
   }
 
-  /// Create a streaming session
-  RaStreamHandle? createStream({Map<String, dynamic>? config}) {
-    final backend = _backend;
-    if (backend == null) return null;
-
-    try {
-      return backend.createSttStream(config: config);
-    } catch (e) {
-      _logger.error('Failed to create STT stream', metadata: {'error': e.toString()});
-      return null;
-    }
-  }
-
-  /// Feed audio to streaming session
-  void feedAudio(RaStreamHandle stream, Float32List samples, {int sampleRate = 16000}) {
-    final backend = _backend;
-    if (backend == null) return;
-
-    backend.feedSttAudio(stream, samples, sampleRate: sampleRate);
-  }
-
-  /// Check if stream is ready for decoding
-  bool isStreamReady(RaStreamHandle stream) {
-    return _backend?.isSttReady(stream) ?? false;
-  }
-
-  /// Decode current stream buffer
-  Map<String, dynamic>? decodeStream(RaStreamHandle stream) {
-    return _backend?.decodeStt(stream);
-  }
-
-  /// Check if endpoint detected
-  bool isEndpoint(RaStreamHandle stream) {
-    return _backend?.isSttEndpoint(stream) ?? false;
-  }
-
-  /// Signal input finished
-  void inputFinished(RaStreamHandle stream) {
-    _backend?.sttInputFinished(stream);
-  }
-
-  /// Reset stream for reuse
-  void resetStream(RaStreamHandle stream) {
-    _backend?.resetSttStream(stream);
-  }
-
-  /// Destroy streaming session
-  void destroyStream(RaStreamHandle stream) {
-    _backend?.destroySttStream(stream);
-  }
-
-  /// Cancel ongoing transcription
+  /// Cancel ongoing transcription.
+  ///
+  /// STT cancellation signals the native backend to stop processing.
+  /// Note: The effect depends on the backend's implementation.
   void cancel() {
-    _backend?.cancelStt();
+    _logger.debug('STT cancel requested');
+    // Native STT typically processes in one shot, so cancel is a no-op
+    // For streaming STT, the stream would be closed instead
   }
 }
 

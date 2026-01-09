@@ -10,9 +10,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # Core SDK dependency (includes runanywhere_native for native binaries)
+  # Core SDK dependency (provides RACommons)
   runanywhere:
     path: ../runanywhere
+  ffi: ^2.1.0
 
 dev_dependencies:
   flutter_test:
@@ -21,3 +22,13 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # Native plugin configuration
+  # RABackendLlamaCPP binaries are bundled in ios/ and android/ directories
+  plugin:
+    platforms:
+      android:
+        package: ai.runanywhere.sdk.llamacpp
+        pluginClass: LlamaCppPlugin
+      ios:
+        pluginClass: LlamaCppPlugin

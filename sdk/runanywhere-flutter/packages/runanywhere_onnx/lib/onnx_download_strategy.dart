@@ -1,12 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:archive/archive.dart';
 import 'package:http/http.dart' as http;
-import 'package:runanywhere/core/models/framework/llm_framework.dart';
-import 'package:runanywhere/core/models/model/model_info.dart';
-import 'package:runanywhere/core/protocols/downloading/download_strategy.dart';
 import 'package:runanywhere/foundation/error_types/sdk_error.dart';
-import 'package:runanywhere/foundation/file_operations/archive_utils.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// ONNX download strategy for handling .onnx files and .tar.bz2 archives
@@ -14,16 +11,12 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 ///
 /// Uses pure Dart archive extraction (via `archive` package) for cross-platform support.
 /// This works on both iOS and Android without requiring native libarchive.
-class OnnxDownloadStrategy implements DownloadStrategy {
-  final SDKLogger logger = SDKLogger(category: 'OnnxDownloadStrategy');
+class OnnxDownloadStrategy {
+  final SDKLogger logger = SDKLogger('OnnxDownloadStrategy');
 
-  @override
-  bool canHandle(ModelInfo model) {
-    final url = model.downloadURL;
-    if (url == null) return false;
-
-    final urlString = url.toString().toLowerCase();
-    final isONNX = model.compatibleFrameworks.contains(LLMFramework.onnx);
+  /// Check if this strategy can handle a given URL
+  bool canHandle(String url) {
+    final urlString = url.toLowerCase();
 
     // Handle tar.bz2 archives (sherpa-onnx models)
     final isTarBz2 = urlString.endsWith('.tar.bz2');
@@ -31,31 +24,22 @@ class OnnxDownloadStrategy implements DownloadStrategy {
     // Handle direct .onnx files (HuggingFace Piper models)
     final isDirectOnnx = urlString.endsWith('.onnx');
 
-    final canHandle = isONNX && (isTarBz2 || isDirectOnnx);
-    logger.debug('canHandle(${model.id}): $canHandle (url: $urlString)');
-    return canHandle;
+    return isTarBz2 || isDirectOnnx;
   }
 
-  @override
+  /// Download a model from URL to destination folder
   Future<Uri> download({
-    required ModelInfo model,
+    required String modelId,
+    required Uri downloadURL,
     required Uri destinationFolder,
     void Function(double progress)? progressHandler,
   }) async {
-    final downloadURL = model.downloadURL;
-    if (downloadURL == null) {
-      throw SDKError.downloadFailed(
-        'Model ${model.id}',
-        'Model has no download URL',
-      );
-    }
-
     final urlString = downloadURL.toString().toLowerCase();
 
     if (urlString.endsWith('.onnx')) {
       // Handle direct ONNX files (download model + config)
       return _downloadDirectOnnx(
-        model: model,
+        modelId: modelId,
         downloadURL: downloadURL,
         destinationFolder: destinationFolder,
         progressHandler: progressHandler,
@@ -63,7 +47,7 @@ class OnnxDownloadStrategy implements DownloadStrategy {
     } else if (urlString.endsWith('.tar.bz2')) {
       // Handle tar.bz2 archives
       return _downloadTarBz2Archive(
-        model: model,
+        modelId: modelId,
         downloadURL: downloadURL,
         destinationFolder: destinationFolder,
         progressHandler: progressHandler,
@@ -78,12 +62,12 @@ class OnnxDownloadStrategy implements DownloadStrategy {
 
   /// Download direct .onnx files along with their companion .onnx.json config
   Future<Uri> _downloadDirectOnnx({
-    required ModelInfo model,
+    required String modelId,
     required Uri downloadURL,
     required Uri destinationFolder,
     void Function(double progress)? progressHandler,
   }) async {
-    logger.info('Downloading direct ONNX model: ${model.id}');
+    logger.info('Downloading direct ONNX model: $modelId');
 
     // Create model folder
     final modelFolder = Directory(destinationFolder.toFilePath());
@@ -133,12 +117,12 @@ class OnnxDownloadStrategy implements DownloadStrategy {
 
   /// Download and extract tar.bz2 archive
   Future<Uri> _downloadTarBz2Archive({
-    required ModelInfo model,
+    required String modelId,
     required Uri downloadURL,
     required Uri destinationFolder,
     void Function(double progress)? progressHandler,
   }) async {
-    logger.info('Downloading sherpa-onnx archive for model: ${model.id}');
+    logger.info('Downloading sherpa-onnx archive for model: $modelId');
 
     // Use the provided destination folder
     final modelFolder = Directory(destinationFolder.toFilePath());
@@ -146,7 +130,7 @@ class OnnxDownloadStrategy implements DownloadStrategy {
 
     // Download the .tar.bz2 archive to a temporary location
     final tempDirectory = Directory.systemTemp;
-    final archivePath = File('${tempDirectory.path}/${model.id}.tar.bz2');
+    final archivePath = File('${tempDirectory.path}/$modelId.tar.bz2');
 
     logger.info('Downloading archive to: ${archivePath.path}');
 
@@ -162,11 +146,9 @@ class OnnxDownloadStrategy implements DownloadStrategy {
 
     logger.info('Archive downloaded, extracting to: ${modelFolder.path}');
 
-    // Extract the archive using Flutter-side extraction (cross-platform)
+    // Extract the archive using pure Dart
     try {
-      // Use pure Dart archive extraction instead of native backend
-      // This works on both iOS and Android
-      await ArchiveUtils.extractTarBz2(
+      await _extractTarBz2(
         archivePath: archivePath.path,
         destinationPath: modelFolder.path,
         onProgress: (extractProgress) {
@@ -217,6 +199,36 @@ class OnnxDownloadStrategy implements DownloadStrategy {
 
     logger.info('Model download and extraction complete: ${modelDir.path}');
     return modelDir.uri;
+  }
+
+  /// Extract tar.bz2 archive using pure Dart
+  Future<void> _extractTarBz2({
+    required String archivePath,
+    required String destinationPath,
+    void Function(double progress)? onProgress,
+  }) async {
+    final archiveFile = File(archivePath);
+    final bytes = await archiveFile.readAsBytes();
+
+    // Decompress bz2
+    final decompressed = BZip2Decoder().decodeBytes(bytes);
+
+    // Extract tar
+    final archive = TarDecoder().decodeBytes(decompressed);
+    final totalFiles = archive.files.length;
+
+    for (var i = 0; i < archive.files.length; i++) {
+      final file = archive.files[i];
+      final filename = file.name;
+
+      if (file.isFile) {
+        final outputFile = File('$destinationPath/$filename');
+        await outputFile.parent.create(recursive: true);
+        await outputFile.writeAsBytes(file.content as List<int>);
+      }
+
+      onProgress?.call((i + 1) / totalFiles);
+    }
   }
 
   /// Helper to download a single file

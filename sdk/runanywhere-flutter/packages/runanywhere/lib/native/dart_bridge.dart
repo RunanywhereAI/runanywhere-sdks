@@ -115,13 +115,8 @@ class DartBridge {
     DartBridgeEvents.register();
     _logger.debug('Events callback registered');
 
-    // Step 5: Initialize telemetry manager (HTTP callback)
-    DartBridgeTelemetry.initialize(environment);
-    _logger.debug('Telemetry manager initialized');
-
-    // Step 6: Register device callbacks
-    DartBridgeDevice.register();
-    _logger.debug('Device callbacks registered');
+    // Step 5 & 6: Async initialization (deferred to initializeServices)
+    // These require async operations so we defer them to phase 2
 
     _isInitialized = true;
     _logger.info('Phase 1 initialization complete');
@@ -150,11 +145,23 @@ class DartBridge {
 
     _logger.debug('Starting Phase 2 services initialization');
 
-    // Step 1: Model assignment callbacks
-    await DartBridgeModelAssignment.register();
+    // Step 1: Register device callbacks (this also caches device ID)
+    await DartBridgeDevice.register(environment: _environment);
+    _logger.debug('Device callbacks registered');
+
+    // Step 2: Initialize telemetry manager with device ID
+    final deviceId = DartBridgeDevice.cachedDeviceId ?? 'unknown-device';
+    await DartBridgeTelemetry.initialize(
+      environment: _environment,
+      deviceId: deviceId,
+    );
+    _logger.debug('Telemetry manager initialized');
+
+    // Step 3: Model assignment callbacks
+    await DartBridgeModelAssignment.register(environment: _environment);
     _logger.debug('Model assignment callbacks registered');
 
-    // Step 2: Platform services (Foundation Models, System TTS)
+    // Step 4: Platform services (Foundation Models, System TTS)
     await DartBridgePlatformServices.register();
     _logger.debug('Platform services registered');
 
@@ -266,9 +273,9 @@ class DartBridge {
     }
 
     try {
-      final configureLogging = lib.lookupFunction<
-          Void Function(Int32),
-          void Function(int)>('rac_configure_logging');
+      final configureLogging =
+          lib.lookupFunction<Void Function(Int32), void Function(int)>(
+              'rac_configure_logging');
       configureLogging(logLevel);
     } catch (e) {
       _logger.warning('Failed to configure C++ logging: $e');
