@@ -39,6 +39,7 @@
 #include <mutex>
 #include <string>
 #include <optional>
+#include <variant>
 #include <functional>
 
 namespace margelo::nitro::runanywhere {
@@ -224,7 +225,7 @@ public:
   std::shared_ptr<Promise<bool>> secureStorageSet(
     const std::string& key,
     const std::string& value) override;
-  std::shared_ptr<Promise<std::optional<std::string>>> secureStorageGet(
+  std::shared_ptr<Promise<std::variant<nitro::NullType, std::string>>> secureStorageGet(
     const std::string& key) override;
   std::shared_ptr<Promise<bool>> secureStorageDelete(const std::string& key) override;
   std::shared_ptr<Promise<bool>> secureStorageExists(const std::string& key) override;

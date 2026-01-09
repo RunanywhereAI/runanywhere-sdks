@@ -42,7 +42,7 @@ namespace margelo::nitro::runanywhere {
   }
 
   // Properties
-
+  
 
   // Methods
   std::shared_ptr<Promise<std::string>> JHybridRunAnywhereDeviceInfoSpec::getDeviceModel() {

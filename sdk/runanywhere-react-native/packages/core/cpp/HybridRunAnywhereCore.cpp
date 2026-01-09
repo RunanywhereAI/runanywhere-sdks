@@ -2186,16 +2186,16 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::secureStorageSet(
     });
 }
 
-std::shared_ptr<Promise<std::optional<std::string>>> HybridRunAnywhereCore::secureStorageGet(
+std::shared_ptr<Promise<std::variant<nitro::NullType, std::string>>> HybridRunAnywhereCore::secureStorageGet(
     const std::string& key) {
-    return Promise<std::optional<std::string>>::async([key]() -> std::optional<std::string> {
+    return Promise<std::variant<nitro::NullType, std::string>>::async([key]() -> std::variant<nitro::NullType, std::string> {
         LOGI("Secure storage get: key=%s", key.c_str());
 
         std::string value;
         if (InitBridge::shared().secureGet(key, value)) {
             return value;
         }
-        return std::nullopt;
+        return nitro::NullType();
     });
 }
 

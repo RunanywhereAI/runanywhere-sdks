@@ -77,20 +77,27 @@ target 'RunAnywhereAI' do
       end
     end
 
-    # Fix RNZipArchive compiler flags issue
-    # The podspec incorrectly uses compiler_flags with Xcode build settings syntax
+    # Fix RNZipArchive compiler flags issue (Xcode 16+ compatibility)
+    # The podspec uses -G flag which is unsupported on newer Xcode
     installer.pods_project.targets.each do |target|
       if target.name == 'RNZipArchive'
         target.build_configurations.each do |config|
-          # Remove the invalid -G flag and set preprocessor definitions properly
-          config.build_settings['OTHER_CFLAGS'] = '$(inherited)'
-          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
-          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'HAVE_INTTYPES_H=1'
-          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'HAVE_PKCRYPT=1'
-          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'HAVE_STDINT_H=1'
-          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'HAVE_WZAES=1'
-          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'HAVE_ZLIB=1'
-          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'MZ_ZIP_NO_SIGNING=1'
+          # Completely override compiler flags to remove -G
+          cflags = config.build_settings['OTHER_CFLAGS'] || ''
+          cflags = cflags.gsub(/-G\s*/, '') if cflags.is_a?(String)
+          config.build_settings['OTHER_CFLAGS'] = '$(inherited) -DHAVE_INTTYPES_H -DHAVE_PKCRYPT -DHAVE_STDINT_H -DHAVE_WZAES -DHAVE_ZLIB -DMZ_ZIP_NO_SIGNING'
+        end
+        
+        # Also fix the source build phases to remove -G
+        target.build_phases.each do |phase|
+          if phase.respond_to?(:compiler_flags)
+            phase.files.each do |file|
+              if file.settings && file.settings['COMPILER_FLAGS']
+                flags = file.settings['COMPILER_FLAGS']
+                file.settings['COMPILER_FLAGS'] = flags.gsub(/-G\s*/, '') if flags.is_a?(String)
+              end
+            end
+          end
         end
       end
     end
