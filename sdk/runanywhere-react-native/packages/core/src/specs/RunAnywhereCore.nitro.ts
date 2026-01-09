@@ -489,6 +489,49 @@ export interface RunAnywhereCore
   resetVAD(): Promise<void>;
 
   // ============================================================================
+  // Secure Storage
+  // Matches Swift: KeychainManager.swift
+  // Uses platform secure storage (Keychain on iOS, Keystore on Android)
+  // ============================================================================
+
+  /**
+   * Store a string value securely
+   * @param key Storage key (e.g., "com.runanywhere.sdk.apiKey")
+   * @param value String value to store
+   * @returns true if stored successfully
+   */
+  secureStorageSet(key: string, value: string): Promise<boolean>;
+
+  /**
+   * Retrieve a string value from secure storage
+   * @param key Storage key
+   * @returns Stored value or null if not found
+   */
+  secureStorageGet(key: string): Promise<string | null>;
+
+  /**
+   * Delete a value from secure storage
+   * @param key Storage key
+   * @returns true if deleted successfully
+   */
+  secureStorageDelete(key: string): Promise<boolean>;
+
+  /**
+   * Check if a key exists in secure storage
+   * @param key Storage key
+   * @returns true if key exists
+   */
+  secureStorageExists(key: string): Promise<boolean>;
+
+  /**
+   * Get persistent device UUID
+   * This UUID survives app reinstalls (stored in Keychain/Keystore)
+   * Matches Swift: DeviceIdentity.persistentUUID
+   * @returns Persistent device UUID
+   */
+  getPersistentDeviceUUID(): Promise<string>;
+
+  // ============================================================================
   // Voice Agent Capability (Backend-Agnostic)
   // Matches Swift: CppBridge+VoiceAgent.swift - calls rac_voice_agent_* APIs
   // Requires STT, LLM, and TTS backends to be registered

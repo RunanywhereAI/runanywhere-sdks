@@ -14,6 +14,11 @@ import { ModelRegistry } from '../services/ModelRegistry';
 import { ServiceContainer } from '../Foundation/DependencyInjection/ServiceContainer';
 import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
 import { FileSystem } from '../services/FileSystem';
+import {
+  HTTPService,
+  SDKEnvironment as NetworkSDKEnvironment,
+  TelemetryService,
+} from '../services/Network';
 
 import type {
   InitializationState,
@@ -142,23 +147,65 @@ export const RunAnywhere = {
         ? FileSystem.getDocumentsDirectory()
         : '';
 
+      // Configure network layer BEFORE native initialization
+      // This ensures HTTP is ready when C++ callbacks need it
+      const envString = environment === SDKEnvironment.Development ? 'development' 
+        : environment === SDKEnvironment.Staging ? 'staging' 
+        : 'production';
+      
+      // Map environment string to SDKEnvironment enum for HTTPService
+      const networkEnv = environment === SDKEnvironment.Development 
+        ? NetworkSDKEnvironment.Development
+        : environment === SDKEnvironment.Staging
+        ? NetworkSDKEnvironment.Staging  
+        : NetworkSDKEnvironment.Production;
+      
+      // Configure HTTPService with network settings
+      HTTPService.shared.configure({
+        baseURL: options.baseURL || 'https://api.runanywhere.ai',
+        apiKey: options.apiKey ?? '',
+        environment: networkEnv,
+      });
+
+      // Configure dev mode if Supabase credentials provided
+      if (options.supabaseURL && options.supabaseKey) {
+        HTTPService.shared.configureDev({
+          supabaseURL: options.supabaseURL,
+          supabaseKey: options.supabaseKey,
+        });
+      }
+
+      // For development mode, Supabase credentials will be passed to native
+      if (environment === SDKEnvironment.Development && options.supabaseURL) {
+        logger.debug('Development mode - Supabase config provided');
+      }
+
       // Initialize with config
       // Note: Backend registration (llamacpp, onnx) is done by their respective packages
       const configJson = JSON.stringify({
         apiKey: options.apiKey,
         baseURL: options.baseURL,
-        environment: environment,
+        environment: envString,
         documentsPath: documentsPath, // Required for model paths (mirrors Swift SDK)
+        supabaseURL: options.supabaseURL, // For development mode
+        supabaseKey: options.supabaseKey, // For development mode
       });
 
       await native.initialize(configJson);
 
-      // Store API config
-      ServiceContainer.shared.setAPIConfig(options.apiKey, environment);
-
       // Initialize model registry
       await ModelRegistry.initialize();
 
+      // Initialize telemetry
+      TelemetryService.shared.trackSDKInit(envString, true);
+
+      // Trigger device registration (non-blocking, best-effort)
+      // This matches Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
+      this._registerDeviceIfNeeded(environment).catch(err => {
+        logger.warning(`Device registration failed (non-fatal): ${err.message}`);
+      });
+
+      ServiceContainer.shared.markInitialized();
       initState = markCoreInitialized(initState, initParams, 'core');
       initState = markServicesInitialized(initState);
 
@@ -173,7 +220,53 @@ export const RunAnywhere = {
     }
   },
 
+  /**
+   * Register device with backend if not already registered
+   * Uses native module for the actual HTTP call.
+   * @internal
+   */
+  async _registerDeviceIfNeeded(environment: SDKEnvironment): Promise<void> {
+    // Check if device is already registered
+    const isRegistered = await this.isDeviceRegistered();
+    if (isRegistered) {
+      logger.debug('Device already registered');
+      return;
+    }
+
+    // Get device info from native
+    const deviceId = this.deviceId;
+    if (!deviceId) {
+      logger.warning('Cannot register device: no device ID available');
+      return;
+    }
+
+    // Convert environment to string for native
+    const envString = environment === SDKEnvironment.Development ? 'development' 
+      : environment === SDKEnvironment.Staging ? 'staging' 
+      : 'production';
+
+    // Register via native module
+    // This matches Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
+    try {
+      const native = requireNativeModule();
+      const success = await native.registerDevice(JSON.stringify({ environment: envString }));
+      
+      if (success) {
+        logger.info('Device registered successfully');
+        // Note: deviceRegistered is handled internally
+      } else {
+        logger.warning('Device registration returned false');
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.warning(`Device registration error: ${msg}`);
+    }
+  },
+
   async destroy(): Promise<void> {
+    // Telemetry is handled by native layer - no JS-level shutdown needed
+    TelemetryService.shared.setEnabled(false);
+
     if (isNativeModuleAvailable()) {
       const native = requireNativeModule();
       await native.destroy();

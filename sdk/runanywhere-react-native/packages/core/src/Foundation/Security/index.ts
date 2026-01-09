@@ -14,3 +14,4 @@ export {
   isSecureStorageError,
   isItemNotFoundError,
 } from './SecureStorageError';
+export { DeviceIdentity } from './DeviceIdentity';

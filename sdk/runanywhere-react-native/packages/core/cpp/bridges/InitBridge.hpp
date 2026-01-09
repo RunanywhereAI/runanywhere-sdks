@@ -126,6 +126,52 @@ public:
      */
     static rac_environment_t toRacEnvironment(SDKEnvironment env);
 
+    // =========================================================================
+    // Secure Storage Methods
+    // Matches Swift: KeychainManager
+    // =========================================================================
+
+    /**
+     * @brief Store a value in secure storage (Keychain/Keystore)
+     * @param key Storage key
+     * @param value Value to store
+     * @return true if successful
+     */
+    bool secureSet(const std::string& key, const std::string& value);
+
+    /**
+     * @brief Get a value from secure storage
+     * @param key Storage key
+     * @param outValue Output value (empty if not found)
+     * @return true if value found and retrieved
+     */
+    bool secureGet(const std::string& key, std::string& outValue);
+
+    /**
+     * @brief Delete a value from secure storage
+     * @param key Storage key
+     * @return true if deleted or didn't exist
+     */
+    bool secureDelete(const std::string& key);
+
+    /**
+     * @brief Check if a key exists in secure storage
+     * @param key Storage key
+     * @return true if key exists
+     */
+    bool secureExists(const std::string& key);
+
+    /**
+     * @brief Get or create persistent device UUID
+     *
+     * Strategy (matches Swift DeviceIdentity):
+     * 1. Try to load from secure storage (survives reinstalls)
+     * 2. If not found, generate new UUID and store
+     *
+     * @return Persistent device UUID
+     */
+    std::string getPersistentDeviceUUID();
+
 private:
     InitBridge() = default;
     ~InitBridge();
