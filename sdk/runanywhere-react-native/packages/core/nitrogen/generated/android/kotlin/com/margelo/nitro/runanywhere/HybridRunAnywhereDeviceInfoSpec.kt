@@ -43,57 +43,57 @@ abstract class HybridRunAnywhereDeviceInfoSpec: HybridObject() {
   }
 
   // Properties
-
+  
 
   // Methods
   @DoNotStrip
   @Keep
   abstract fun getDeviceModel(): Promise<String>
-
+  
   @DoNotStrip
   @Keep
   abstract fun getOSVersion(): Promise<String>
-
+  
   @DoNotStrip
   @Keep
   abstract fun getPlatform(): Promise<String>
-
+  
   @DoNotStrip
   @Keep
   abstract fun getTotalRAM(): Promise<Double>
-
+  
   @DoNotStrip
   @Keep
   abstract fun getAvailableRAM(): Promise<Double>
-
+  
   @DoNotStrip
   @Keep
   abstract fun getCPUCores(): Promise<Double>
-
+  
   @DoNotStrip
   @Keep
   abstract fun hasGPU(): Promise<Boolean>
-
+  
   @DoNotStrip
   @Keep
   abstract fun hasNPU(): Promise<Boolean>
-
+  
   @DoNotStrip
   @Keep
   abstract fun getChipName(): Promise<String>
-
+  
   @DoNotStrip
   @Keep
   abstract fun getThermalState(): Promise<Double>
-
+  
   @DoNotStrip
   @Keep
   abstract fun getBatteryLevel(): Promise<Double>
-
+  
   @DoNotStrip
   @Keep
   abstract fun isCharging(): Promise<Boolean>
-
+  
   @DoNotStrip
   @Keep
   abstract fun isLowPowerMode(): Promise<Boolean>
