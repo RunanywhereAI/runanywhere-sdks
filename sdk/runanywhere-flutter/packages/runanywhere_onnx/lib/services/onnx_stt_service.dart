@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:runanywhere/core/module_registry.dart';
-import 'package:runanywhere/native/ffi_types.dart' show RaStreamHandle;
 import 'package:runanywhere/native/native_backend.dart';
 
 /// ONNX-based Speech-to-Text service.
@@ -13,9 +12,7 @@ import 'package:runanywhere/native/native_backend.dart';
 /// ## Usage
 ///
 /// ```dart
-/// final backend = NativeBackend();
-/// backend.create('onnx');
-///
+/// final backend = NativeBackend.onnx();
 /// final stt = OnnxSTTService(backend);
 /// await stt.initialize(modelPath: '/path/to/model');
 ///
@@ -81,8 +78,6 @@ class OnnxSTTService implements STTService {
       transcript: result['text'] as String? ?? '',
       confidence: (result['confidence'] as num?)?.toDouble() ?? 1.0,
       language: result['language'] as String?,
-      timestamps: _parseTimestamps(result['timestamps']),
-      alternatives: null,
     );
   }
 
@@ -92,56 +87,6 @@ class OnnxSTTService implements STTService {
       _backend.unloadSttModel();
     }
     _isInitialized = false;
-  }
-
-  // ============================================================================
-  // Streaming Methods
-  // ============================================================================
-
-  /// Create a streaming session.
-  Object createStream({Map<String, dynamic>? config}) {
-    return _backend.createSttStream(config: config);
-  }
-
-  /// Feed audio to a streaming session.
-  void feedAudio(Object stream, Float32List samples, {int sampleRate = 16000}) {
-    _backend.feedSttAudio(stream as RaStreamHandle, samples,
-        sampleRate: sampleRate);
-  }
-
-  /// Check if decoder is ready.
-  bool isStreamReady(Object stream) {
-    return _backend.isSttReady(stream as RaStreamHandle);
-  }
-
-  /// Decode and get current result.
-  Map<String, dynamic>? decodeStream(Object stream) {
-    return _backend.decodeStt(stream as RaStreamHandle);
-  }
-
-  /// Check for end-of-speech.
-  bool isEndpoint(Object stream) {
-    return _backend.isSttEndpoint(stream as RaStreamHandle);
-  }
-
-  /// Signal end of audio input.
-  void inputFinished(Object stream) {
-    _backend.sttInputFinished(stream as RaStreamHandle);
-  }
-
-  /// Reset stream for new utterance.
-  void resetStream(Object stream) {
-    _backend.resetSttStream(stream as RaStreamHandle);
-  }
-
-  /// Destroy streaming session.
-  void destroyStream(Object stream) {
-    _backend.destroySttStream(stream as RaStreamHandle);
-  }
-
-  /// Cancel ongoing transcription.
-  void cancel() {
-    _backend.cancelStt();
   }
 
   // ============================================================================
@@ -168,21 +113,5 @@ class OnnxSTTService implements STTService {
       float32[i] = signedSample / 32768.0;
     }
     return float32;
-  }
-
-  List<TimestampInfo>? _parseTimestamps(dynamic timestamps) {
-    if (timestamps == null) return null;
-    if (timestamps is! List) return null;
-
-    return timestamps.map((t) {
-      if (t is Map) {
-        return TimestampInfo(
-          word: t['word'] as String? ?? '',
-          startTime: (t['start'] as num?)?.toDouble() ?? 0.0,
-          endTime: (t['end'] as num?)?.toDouble() ?? 0.0,
-        );
-      }
-      return TimestampInfo(word: '', startTime: 0, endTime: 0);
-    }).toList();
   }
 }

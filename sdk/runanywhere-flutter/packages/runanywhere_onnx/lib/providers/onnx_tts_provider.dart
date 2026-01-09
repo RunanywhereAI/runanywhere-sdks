@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:runanywhere/core/module_registry.dart';
 import 'package:runanywhere/native/native_backend.dart';
-import 'package:runanywhere_onnx/services/onnx_tts_service.dart';
 
 /// Provider for ONNX-based TTS service.
 ///
@@ -50,9 +49,71 @@ class OnnxTTSServiceProvider implements TTSServiceProvider {
 
   @override
   Future<TTSService> createTTSService(dynamic configuration) async {
-    // Create service but don't initialize yet
-    // Component will call initialize() with the model path separately
-    final service = OnnxTTSService(_backend);
+    // Create wrapper service that conforms to TTSService interface
+    final service = _OnnxTTSServiceWrapper(_backend);
+
+    String? modelPath;
+    if (configuration is Map) {
+      modelPath = configuration['modelPath'] as String?;
+    } else if (configuration is String) {
+      modelPath = configuration;
+    }
+
+    await service.initialize(modelPath: modelPath);
     return service;
+  }
+}
+
+/// Wrapper around NativeBackend to provide TTSService interface
+class _OnnxTTSServiceWrapper implements TTSService {
+  final NativeBackend _backend;
+  bool _isInitialized = false;
+
+  _OnnxTTSServiceWrapper(this._backend);
+
+  @override
+  Future<void> initialize({String? modelPath}) async {
+    if (modelPath != null && modelPath.isNotEmpty) {
+      _backend.loadTtsModel(modelPath, modelType: 'vits');
+    }
+    _isInitialized = true;
+  }
+
+  @override
+  Future<TTSOutput> synthesize(TTSInput input) async {
+    final result = _backend.synthesize(
+      input.text,
+      voiceId: input.voiceId,
+      speed: input.rate,
+      pitch: input.pitch,
+    );
+
+    final samples = result['samples'] as List;
+    final sampleRate = result['sampleRate'] as int? ?? 22050;
+
+    // Convert samples to bytes if needed
+    final List<int> audioData;
+    if (samples is List<int>) {
+      audioData = samples;
+    } else {
+      audioData = <int>[];
+    }
+
+    return TTSOutput(
+      audioData: audioData,
+      format: 'pcm',
+      sampleRate: sampleRate,
+    );
+  }
+
+  @override
+  bool get isReady => _isInitialized && _backend.isTtsModelLoaded;
+
+  @override
+  Future<void> cleanup() async {
+    if (_backend.isTtsModelLoaded) {
+      _backend.unloadTtsModel();
+    }
+    _isInitialized = false;
   }
 }

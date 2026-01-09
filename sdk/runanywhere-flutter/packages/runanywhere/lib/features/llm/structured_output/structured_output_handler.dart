@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'dart:convert';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 

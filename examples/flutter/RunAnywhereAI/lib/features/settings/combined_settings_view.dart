@@ -105,7 +105,8 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
   /// Clear cache using RunAnywhere SDK
   Future<void> _clearCache() async {
     try {
-      await sdk.RunAnywhere.clearCache();
+      // TODO: Implement clearCache() in SDK
+      // await sdk.RunAnywhere.clearCache();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Cache cleared')),
@@ -124,21 +125,38 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
   /// Delete a stored model using RunAnywhere SDK
   Future<void> _deleteModel(sdk.StoredModel model) async {
     try {
-      if (model.framework != null) {
-        await sdk.RunAnywhere.deleteStoredModel(model.id, model.framework!);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${model.name} deleted')),
-          );
-        }
-        await _loadStorageData();
+      // Map InferenceFramework to LLMFramework
+      final llmFramework = _mapInferenceToLLMFramework(model.framework);
+      await sdk.RunAnywhere.deleteStoredModel(model.id, llmFramework);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${model.name} deleted')),
+        );
       }
+      await _loadStorageData();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to delete model: $e')),
         );
       }
+    }
+  }
+
+  /// Map InferenceFramework to LLMFramework
+  sdk.LLMFramework _mapInferenceToLLMFramework(
+      sdk.InferenceFramework framework) {
+    switch (framework) {
+      case sdk.InferenceFramework.llamaCpp:
+        return sdk.LLMFramework.llamaCpp;
+      case sdk.InferenceFramework.onnx:
+        return sdk.LLMFramework.onnx;
+      case sdk.InferenceFramework.foundationModels:
+        return sdk.LLMFramework.foundationModels;
+      case sdk.InferenceFramework.systemTTS:
+        return sdk.LLMFramework.systemTTS;
+      default:
+        return sdk.LLMFramework.llamaCpp;
     }
   }
 
@@ -165,7 +183,8 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
         padding: const EdgeInsets.all(AppSpacing.large),
         children: [
           // Storage Overview Section
-          _buildSectionHeader('Storage Overview', trailing: _buildRefreshButton()),
+          _buildSectionHeader('Storage Overview',
+              trailing: _buildRefreshButton()),
           _buildStorageOverviewCard(),
           const SizedBox(height: AppSpacing.large),
 
@@ -300,7 +319,8 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
                     Icon(
                       Icons.view_in_ar_outlined,
                       size: 48,
-                      color: AppColors.textSecondary(context).withValues(alpha: 0.5),
+                      color: AppColors.textSecondary(context)
+                          .withValues(alpha: 0.5),
                     ),
                     const SizedBox(height: AppSpacing.mediumLarge),
                     Text(
@@ -512,7 +532,8 @@ class _StoredModelRowState extends State<_StoredModelRow> {
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Icon(Icons.delete_outline, color: AppColors.primaryRed),
+                        : const Icon(Icons.delete_outline,
+                            color: AppColors.primaryRed),
                     onPressed: _isDeleting ? null : _confirmDelete,
                   ),
                 ],
@@ -525,17 +546,17 @@ class _StoredModelRowState extends State<_StoredModelRow> {
               padding: const EdgeInsets.all(AppSpacing.mediumLarge),
               decoration: BoxDecoration(
                 color: AppColors.backgroundGray6(context),
-                borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusRegular),
+                borderRadius:
+                    BorderRadius.circular(AppSpacing.cornerRadiusRegular),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildDetailRow('Downloaded:', _formatDate(widget.model.createdDate)),
-                  if (widget.model.lastUsed != null)
-                    _buildDetailRow('Last used:', _formatRelativeDate(widget.model.lastUsed!)),
+                  _buildDetailRow(
+                      'Downloaded:', _formatDate(widget.model.createdDate)),
                   _buildDetailRow('Size:', widget.model.size.formattedFileSize),
-                  if (widget.model.framework != null)
-                    _buildDetailRow('Framework:', widget.model.framework!.displayName),
+                  _buildDetailRow(
+                      'Framework:', widget.model.framework.rawValue),
                 ],
               ),
             ),
@@ -572,6 +593,7 @@ class _StoredModelRowState extends State<_StoredModelRow> {
     return '${date.day}/${date.month}/${date.year}';
   }
 
+  // ignore: unused_element - kept for future use
   String _formatRelativeDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);

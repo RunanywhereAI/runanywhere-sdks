@@ -10,9 +10,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # Native binaries package (bundles .so and XCFramework)
-  runanywhere_native:
-    path: ../runanywhere_native
   # FFI (Foreign Function Interface)
   ffi: ^2.1.0
   # HTTP and networking
@@ -36,7 +33,7 @@ dependencies:
   # TTS fallback (system TTS)
   flutter_tts: ^3.8.0
   # Audio recording for voice sessions
-  record: ^5.1.2
+  record: '>=5.1.2 <7.0.0'
   # Audio playback for TTS
   audioplayers: ^6.0.0
   # Permissions
@@ -52,3 +49,13 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # Native plugin configuration
+  # RACommons binaries are bundled in ios/ and android/ directories
+  plugin:
+    platforms:
+      android:
+        package: ai.runanywhere.sdk
+        pluginClass: RunAnywherePlugin
+      ios:
+        pluginClass: RunAnywherePlugin

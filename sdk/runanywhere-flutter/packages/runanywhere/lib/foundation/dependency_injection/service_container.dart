@@ -29,7 +29,8 @@ class ServiceContainer {
   // Logger
   SDKLogger? _logger;
 
-  // Internal state
+  // Internal state - reserved for future use
+  // ignore: unused_field
   SDKInitParams? _initParams;
 
   /// Logger

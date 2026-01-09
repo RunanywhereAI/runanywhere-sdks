@@ -156,7 +156,7 @@ class SystemTTSService implements TTSService {
     }
 
     final completer = Completer<void>();
-    final startTime = DateTime.now();
+    // Note: startTime could be used for telemetry/metrics in the future
 
     // Set up completion handlers for this synthesis
     _flutterTts.setCompletionHandler(() {

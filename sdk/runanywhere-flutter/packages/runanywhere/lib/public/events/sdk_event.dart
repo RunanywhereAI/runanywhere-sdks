@@ -19,8 +19,10 @@ enum EventCategory {
 enum EventDestination {
   /// Send to both public EventBus and analytics
   all,
+
   /// Send only to public EventBus
   publicOnly,
+
   /// Send only to analytics (internal)
   analyticsOnly,
 }
@@ -264,6 +266,30 @@ abstract class SDKModelEvent with SDKEventDefaults {
   static SDKModelDeleted deleted({required String modelId}) {
     return SDKModelDeleted(modelId: modelId);
   }
+
+  // Download events
+  static SDKModelDownloadStarted downloadStarted({required String modelId}) {
+    return SDKModelDownloadStarted(modelId: modelId);
+  }
+
+  static SDKModelDownloadCompleted downloadCompleted(
+      {required String modelId}) {
+    return SDKModelDownloadCompleted(modelId: modelId);
+  }
+
+  static SDKModelDownloadFailed downloadFailed({
+    required String modelId,
+    required String error,
+  }) {
+    return SDKModelDownloadFailed(modelId: modelId, error: error);
+  }
+
+  static SDKModelDownloadProgress downloadProgress({
+    required String modelId,
+    required double progress,
+  }) {
+    return SDKModelDownloadProgress(modelId: modelId, progress: progress);
+  }
 }
 
 class SDKModelLoadStarted extends SDKModelEvent {
@@ -342,6 +368,62 @@ class SDKModelDeleted extends SDKModelEvent {
   Map<String, String> get properties => {'model_id': modelId};
 }
 
+class SDKModelDownloadStarted extends SDKModelEvent {
+  final String modelId;
+
+  SDKModelDownloadStarted({required this.modelId});
+
+  @override
+  String get type => 'model.download.started';
+
+  @override
+  Map<String, String> get properties => {'model_id': modelId};
+}
+
+class SDKModelDownloadCompleted extends SDKModelEvent {
+  final String modelId;
+
+  SDKModelDownloadCompleted({required this.modelId});
+
+  @override
+  String get type => 'model.download.completed';
+
+  @override
+  Map<String, String> get properties => {'model_id': modelId};
+}
+
+class SDKModelDownloadFailed extends SDKModelEvent {
+  final String modelId;
+  final String error;
+
+  SDKModelDownloadFailed({required this.modelId, required this.error});
+
+  @override
+  String get type => 'model.download.failed';
+
+  @override
+  Map<String, String> get properties => {
+        'model_id': modelId,
+        'error': error,
+      };
+}
+
+class SDKModelDownloadProgress extends SDKModelEvent {
+  final String modelId;
+  final double progress;
+
+  SDKModelDownloadProgress({required this.modelId, required this.progress});
+
+  @override
+  String get type => 'model.download.progress';
+
+  @override
+  Map<String, String> get properties => {
+        'model_id': modelId,
+        'progress': progress.toString(),
+      };
+}
+
 // ============================================================================
 // SDK Voice Events
 // ============================================================================
@@ -367,7 +449,8 @@ abstract class SDKVoiceEvent with SDKEventDefaults {
     return SDKVoiceTranscriptionStarted();
   }
 
-  static SDKVoiceTranscriptionPartial transcriptionPartial({required String text}) {
+  static SDKVoiceTranscriptionPartial transcriptionPartial(
+      {required String text}) {
     return SDKVoiceTranscriptionPartial(text: text);
   }
 

@@ -1,6 +1,6 @@
-import 'dart:async';
 // ignore_for_file: avoid_classes_with_only_static_members
 
+import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
 
@@ -10,6 +10,23 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../foundation/logging/sdk_logger.dart';
 import 'ffi_types.dart';
 import 'platform_loader.dart';
+
+// =============================================================================
+// Exception Return Constants (must be compile-time constants for FFI)
+// =============================================================================
+
+/// Exceptional return value for file operations that return Int32
+const int _exceptionalReturnInt32 = -183; // RAC_ERROR_FILE_NOT_FOUND
+
+/// Exceptional return value for bool operations
+const int _exceptionalReturnFalse = 0;
+
+/// Exceptional return value for int64 operations
+const int _exceptionalReturnInt64 = 0;
+
+// =============================================================================
+// Platform Adapter Bridge
+// =============================================================================
 
 /// Platform adapter bridge for fundamental C++ → Dart operations.
 ///
@@ -34,6 +51,9 @@ class DartBridgePlatform {
   /// Whether the adapter has been registered
   static bool _isRegistered = false;
 
+  /// Pointer to the adapter struct (must persist for C++ to call)
+  static Pointer<RacPlatformAdapterStruct>? _adapterPtr;
+
   /// Secure storage for keychain operations
   // ignore: unused_field
   static const _secureStorage = FlutterSecureStorage(
@@ -50,10 +70,11 @@ class DartBridgePlatform {
     }
 
     try {
-      final lib = PlatformLoader.load();
+      final lib = PlatformLoader.loadCommons();
 
-      // Create and populate the platform adapter struct
-      final adapter = calloc<RacPlatformAdapter>();
+      // Allocate the platform adapter struct
+      _adapterPtr = calloc<RacPlatformAdapterStruct>();
+      final adapter = _adapterPtr!;
 
       // Logging callback
       adapter.ref.log = Pointer.fromFunction<RacLogCallbackNative>(
@@ -61,51 +82,56 @@ class DartBridgePlatform {
       );
 
       // File operations
-      adapter.ref.fileExists = Pointer.fromFunction<RacFileExistsCallbackNative>(
+      adapter.ref.fileExists =
+          Pointer.fromFunction<RacFileExistsCallbackNative>(
         _platformFileExistsCallback,
-        0, // Return 0 (false) on exception
+        _exceptionalReturnFalse,
       );
       adapter.ref.fileRead = Pointer.fromFunction<RacFileReadCallbackNative>(
         _platformFileReadCallback,
-        RacResultCode.errorIO,
+        _exceptionalReturnInt32,
       );
       adapter.ref.fileWrite = Pointer.fromFunction<RacFileWriteCallbackNative>(
         _platformFileWriteCallback,
-        RacResultCode.errorIO,
+        _exceptionalReturnInt32,
       );
-      adapter.ref.fileDelete = Pointer.fromFunction<RacFileDeleteCallbackNative>(
+      adapter.ref.fileDelete =
+          Pointer.fromFunction<RacFileDeleteCallbackNative>(
         _platformFileDeleteCallback,
-        RacResultCode.errorIO,
+        _exceptionalReturnInt32,
       );
 
       // Secure storage (async operations - need special handling)
       adapter.ref.secureGet = Pointer.fromFunction<RacSecureGetCallbackNative>(
         _platformSecureGetCallback,
-        RacResultCode.errorIO,
+        _exceptionalReturnInt32,
       );
       adapter.ref.secureSet = Pointer.fromFunction<RacSecureSetCallbackNative>(
         _platformSecureSetCallback,
-        RacResultCode.errorIO,
+        _exceptionalReturnInt32,
       );
-      adapter.ref.secureDelete = Pointer.fromFunction<RacSecureDeleteCallbackNative>(
+      adapter.ref.secureDelete =
+          Pointer.fromFunction<RacSecureDeleteCallbackNative>(
         _platformSecureDeleteCallback,
-        RacResultCode.errorIO,
+        _exceptionalReturnInt32,
       );
 
-      // Clock
+      // Clock - returns int64, use 0 as exceptional return
       adapter.ref.nowMs = Pointer.fromFunction<RacNowMsCallbackNative>(
         _platformNowMsCallback,
-        0,
+        _exceptionalReturnInt64,
       );
 
-      // Memory info (not implemented)
-      adapter.ref.getMemoryInfo = Pointer.fromFunction<RacGetMemoryInfoCallbackNative>(
+      // Memory info callback - returns errorNotImplemented (platform-specific)
+      adapter.ref.getMemoryInfo =
+          Pointer.fromFunction<RacGetMemoryInfoCallbackNative>(
         _platformGetMemoryInfoCallback,
-        RacResultCode.errorNotImplemented,
+        _exceptionalReturnInt32,
       );
 
       // Error tracking (Sentry)
-      adapter.ref.trackError = Pointer.fromFunction<RacTrackErrorCallbackNative>(
+      adapter.ref.trackError =
+          Pointer.fromFunction<RacTrackErrorCallbackNative>(
         _platformTrackErrorCallback,
       );
 
@@ -117,8 +143,9 @@ class DartBridgePlatform {
 
       // Register with C++
       final setAdapter = lib.lookupFunction<
-          Int32 Function(Pointer<RacPlatformAdapter>),
-          int Function(Pointer<RacPlatformAdapter>)>('rac_set_platform_adapter');
+          Int32 Function(Pointer<RacPlatformAdapterStruct>),
+          int Function(
+              Pointer<RacPlatformAdapterStruct>)>('rac_set_platform_adapter');
 
       final result = setAdapter(adapter);
       if (result != RacResultCode.success) {
@@ -126,6 +153,7 @@ class DartBridgePlatform {
           'error_code': result,
         });
         calloc.free(adapter);
+        _adapterPtr = null;
         return;
       }
 
@@ -141,6 +169,21 @@ class DartBridgePlatform {
       });
     }
   }
+
+  /// Unregister platform adapter (called during shutdown).
+  static void unregister() {
+    if (!_isRegistered) return;
+
+    // Note: We can't actually unregister from C++ since it holds a pointer
+    // Just mark as unregistered
+    _isRegistered = false;
+
+    // Don't free _adapterPtr - C++ may still reference it
+    // It will be cleaned up on process exit
+  }
+
+  /// Check if the adapter is registered.
+  static bool get isRegistered => _isRegistered;
 }
 
 // =============================================================================
@@ -163,23 +206,18 @@ void _platformLogCallback(
 
   switch (level) {
     case RacLogLevel.error:
+    case RacLogLevel.fatal:
       logger.error(msgString);
-      break;
     case RacLogLevel.warning:
       logger.warning(msgString);
-      break;
     case RacLogLevel.info:
       logger.info(msgString);
-      break;
     case RacLogLevel.debug:
       logger.debug(msgString);
-      break;
     case RacLogLevel.trace:
       logger.debug('[TRACE] $msgString');
-      break;
     default:
       logger.info(msgString);
-      break;
   }
 }
 
@@ -188,13 +226,13 @@ int _platformFileExistsCallback(
   Pointer<Utf8> path,
   Pointer<Void> userData,
 ) {
-  if (path == nullptr) return 0;
+  if (path == nullptr) return RAC_FALSE;
 
   try {
     final pathString = path.toDartString();
-    return File(pathString).existsSync() ? 1 : 0;
+    return File(pathString).existsSync() ? RAC_TRUE : RAC_FALSE;
   } catch (_) {
-    return 0;
+    return RAC_FALSE;
   }
 }
 
@@ -206,7 +244,7 @@ int _platformFileReadCallback(
   Pointer<Void> userData,
 ) {
   if (path == nullptr || outData == nullptr || outSize == nullptr) {
-    return RacResultCode.errorInvalidParams;
+    return RacResultCode.errorInvalidParameter;
   }
 
   try {
@@ -214,7 +252,7 @@ int _platformFileReadCallback(
     final file = File(pathString);
 
     if (!file.existsSync()) {
-      return RacResultCode.errorIO; // File not found
+      return RacResultCode.errorFileNotFound;
     }
 
     final data = file.readAsBytesSync();
@@ -230,7 +268,7 @@ int _platformFileReadCallback(
 
     return RacResultCode.success;
   } catch (_) {
-    return RacResultCode.errorIO;
+    return RacResultCode.errorFileReadFailed;
   }
 }
 
@@ -242,7 +280,7 @@ int _platformFileWriteCallback(
   Pointer<Void> userData,
 ) {
   if (path == nullptr || data == nullptr) {
-    return RacResultCode.errorInvalidParams;
+    return RacResultCode.errorInvalidParameter;
   }
 
   try {
@@ -254,7 +292,7 @@ int _platformFileWriteCallback(
 
     return RacResultCode.success;
   } catch (_) {
-    return RacResultCode.errorIO;
+    return RacResultCode.errorFileWriteFailed;
   }
 }
 
@@ -264,7 +302,7 @@ int _platformFileDeleteCallback(
   Pointer<Void> userData,
 ) {
   if (path == nullptr) {
-    return RacResultCode.errorInvalidParams;
+    return RacResultCode.errorInvalidParameter;
   }
 
   try {
@@ -277,7 +315,7 @@ int _platformFileDeleteCallback(
 
     return RacResultCode.success;
   } catch (_) {
-    return RacResultCode.errorIO;
+    return RacResultCode.errorDeleteFailed;
   }
 }
 
@@ -310,7 +348,7 @@ int _platformSecureGetCallback(
   Pointer<Void> userData,
 ) {
   if (key == nullptr || outValue == nullptr) {
-    return RacResultCode.errorInvalidParams;
+    return RacResultCode.errorInvalidParameter;
   }
 
   try {
@@ -318,7 +356,7 @@ int _platformSecureGetCallback(
     final value = _secureStorageCache[keyString];
 
     if (value == null) {
-      return RacResultCode.errorIO; // Not found
+      return RacResultCode.errorFileNotFound; // Not found
     }
 
     // Allocate and copy string
@@ -327,7 +365,7 @@ int _platformSecureGetCallback(
 
     return RacResultCode.success;
   } catch (_) {
-    return RacResultCode.errorIO;
+    return RacResultCode.errorStorageError;
   }
 }
 
@@ -338,7 +376,7 @@ int _platformSecureSetCallback(
   Pointer<Void> userData,
 ) {
   if (key == nullptr || value == nullptr) {
-    return RacResultCode.errorInvalidParams;
+    return RacResultCode.errorInvalidParameter;
   }
 
   try {
@@ -353,7 +391,7 @@ int _platformSecureSetCallback(
 
     return RacResultCode.success;
   } catch (_) {
-    return RacResultCode.errorIO;
+    return RacResultCode.errorStorageError;
   }
 }
 
@@ -376,7 +414,7 @@ int _platformSecureDeleteCallback(
   Pointer<Void> userData,
 ) {
   if (key == nullptr) {
-    return RacResultCode.errorInvalidParams;
+    return RacResultCode.errorInvalidParameter;
   }
 
   try {
@@ -390,7 +428,7 @@ int _platformSecureDeleteCallback(
 
     return RacResultCode.success;
   } catch (_) {
-    return RacResultCode.errorIO;
+    return RacResultCode.errorStorageError;
   }
 }
 
@@ -412,7 +450,8 @@ int _platformNowMsCallback(Pointer<Void> userData) {
   return DateTime.now().millisecondsSinceEpoch;
 }
 
-/// Memory info callback - not implemented
+/// Memory info callback - returns errorNotImplemented.
+/// Memory info requires platform-specific APIs (iOS: mach_task_info, Android: ActivityManager).
 int _platformGetMemoryInfoCallback(
   Pointer<Void> outInfo,
   Pointer<Void> userData,
@@ -430,8 +469,8 @@ void _platformTrackErrorCallback(
   try {
     final jsonString = errorJson.toDartString();
 
-    // Log the error for now
-    // TODO: Integrate with Sentry when available
+    // Log the error from C++ layer
+    // Note: For production, integrate with crash reporting (e.g., Sentry, Firebase Crashlytics)
     SDKLogger('DartBridge.ErrorTracking').error(
       'C++ error received',
       metadata: {'error_json': jsonString},
@@ -439,13 +478,4 @@ void _platformTrackErrorCallback(
   } catch (_) {
     // Ignore errors in error handling
   }
-}
-
-/// Log level constants matching rac_log_level_t
-abstract class RacLogLevel {
-  static const int error = 0;
-  static const int warning = 1;
-  static const int info = 2;
-  static const int debug = 3;
-  static const int trace = 4;
 }

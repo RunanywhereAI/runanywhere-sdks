@@ -53,8 +53,7 @@ class ModelListViewModel extends ChangeNotifier {
       final sdkModels = await sdk.RunAnywhere.availableModels();
 
       // Convert SDK ModelInfo to app ModelInfo
-      _availableModels =
-          sdkModels.map(_convertSDKModel).toList();
+      _availableModels = sdkModels.map(_convertSDKModel).toList();
 
       debugPrint(
           '✅ Loaded ${_availableModels.length} models from SDK registry');
@@ -75,6 +74,7 @@ class ModelListViewModel extends ChangeNotifier {
 
   /// Convert SDK ModelInfo to app ModelInfo
   ModelInfo _convertSDKModel(sdk.ModelInfo sdkModel) {
+    final framework = _convertFramework(sdkModel.framework);
     return ModelInfo(
       id: sdkModel.id,
       name: sdkModel.name,
@@ -82,13 +82,9 @@ class ModelListViewModel extends ChangeNotifier {
       format: _convertFormat(sdkModel.format),
       downloadURL: sdkModel.downloadURL?.toString(),
       localPath: sdkModel.localPath?.toFilePath(),
-      memoryRequired: sdkModel.memoryRequired,
-      compatibleFrameworks: sdkModel.compatibleFrameworks
-          .map(_convertFramework)
-          .toList(),
-      preferredFramework: sdkModel.preferredFramework != null
-          ? _convertFramework(sdkModel.preferredFramework!)
-          : null,
+      memoryRequired: sdkModel.downloadSize,
+      compatibleFrameworks: [framework],
+      preferredFramework: framework,
       supportsThinking: sdkModel.supportsThinking,
     );
   }
@@ -110,8 +106,6 @@ class ModelListViewModel extends ChangeNotifier {
         return ModelCategory.imageGeneration;
       case sdk.ModelCategory.audio:
         return ModelCategory.audio;
-      case sdk.ModelCategory.embedding:
-        return ModelCategory.embedding;
     }
   }
 
@@ -120,38 +114,27 @@ class ModelListViewModel extends ChangeNotifier {
     switch (sdkFormat) {
       case sdk.ModelFormat.gguf:
         return ModelFormat.gguf;
-      case sdk.ModelFormat.ggml:
-        return ModelFormat.ggml;
-      case sdk.ModelFormat.mlmodel:
-      case sdk.ModelFormat.mlpackage:
-        return ModelFormat.coreml;
       case sdk.ModelFormat.onnx:
       case sdk.ModelFormat.ort:
         return ModelFormat.onnx;
-      case sdk.ModelFormat.tflite:
-        return ModelFormat.tflite;
       case sdk.ModelFormat.bin:
         return ModelFormat.bin;
-      default:
+      case sdk.ModelFormat.unknown:
         return ModelFormat.unknown;
     }
   }
 
-  /// Convert SDK LLMFramework to app LLMFramework
-  LLMFramework _convertFramework(sdk.LLMFramework sdkFramework) {
+  /// Convert SDK InferenceFramework to app LLMFramework
+  LLMFramework _convertFramework(sdk.InferenceFramework sdkFramework) {
     switch (sdkFramework) {
-      case sdk.LLMFramework.llamaCpp:
+      case sdk.InferenceFramework.llamaCpp:
         return LLMFramework.llamaCpp;
-      case sdk.LLMFramework.foundationModels:
+      case sdk.InferenceFramework.foundationModels:
         return LLMFramework.foundationModels;
-      case sdk.LLMFramework.mediaPipe:
-        return LLMFramework.mediaPipe;
-      case sdk.LLMFramework.onnx:
+      case sdk.InferenceFramework.onnx:
         return LLMFramework.onnxRuntime;
-      case sdk.LLMFramework.systemTTS:
+      case sdk.InferenceFramework.systemTTS:
         return LLMFramework.systemTTS;
-      case sdk.LLMFramework.whisperKit:
-        return LLMFramework.whisperKit;
       default:
         return LLMFramework.unknown;
     }
@@ -241,22 +224,8 @@ class ModelListViewModel extends ChangeNotifier {
     try {
       debugPrint('📥 Starting download for model: ${model.name}');
 
-      // Get the download service from SDK
-      final downloadService = sdk.RunAnywhere.serviceContainer.downloadService;
-
-      // Find the SDK model by ID
-      final sdkModels = await sdk.RunAnywhere.availableModels();
-      final sdkModel = sdkModels.firstWhere(
-        (m) => m.id == model.id,
-        orElse: () =>
-            throw Exception('Model not found in registry: ${model.id}'),
-      );
-
-      // Start download using SDK
-      final downloadTask = await downloadService.downloadModel(sdkModel);
-
-      // Listen to progress
-      await for (final progress in downloadTask.progress) {
+      // Use SDK's public download API
+      await for (final progress in sdk.RunAnywhere.downloadModel(model.id)) {
         final progressValue = progress.totalBytes > 0
             ? progress.bytesDownloaded / progress.totalBytes
             : 0.0;
@@ -293,19 +262,11 @@ class ModelListViewModel extends ChangeNotifier {
     try {
       debugPrint('🗑️ Deleting model: ${model.name}');
 
-      // Get the download service from SDK
-      final downloadService = sdk.RunAnywhere.serviceContainer.downloadService;
-
-      // Find the SDK model by ID
-      final sdkModels = await sdk.RunAnywhere.availableModels();
-      final sdkModel = sdkModels.firstWhere(
-        (m) => m.id == model.id,
-        orElse: () =>
-            throw Exception('Model not found in registry: ${model.id}'),
+      // Use SDK's public delete API
+      final framework = _convertToSDKFramework(
+        model.preferredFramework ?? LLMFramework.unknown,
       );
-
-      // Delete using SDK
-      await downloadService.deleteModel(sdkModel);
+      await sdk.RunAnywhere.deleteStoredModel(model.id, framework);
 
       // Refresh models from registry
       await loadModelsFromRegistry();
@@ -385,21 +346,19 @@ class ModelListViewModel extends ChangeNotifier {
     try {
       debugPrint('➕ Adding model from URL: $name');
 
-      // Create a ModelRegistration
-      final registration = sdk.ModelRegistration(
-        url: url,
-        framework: _convertToSDKFramework(framework),
-        modality: sdk.FrameworkModality.textToText,
+      // Use SDK's public registration API
+      final modelInfo = sdk.RunAnywhere.registerModelFromString(
         name: name,
-        memoryRequirement: estimatedSize ?? 500000000,
+        urlString: url,
+        framework: _convertToSDKFramework(framework),
+        memoryRequirement: estimatedSize,
         supportsThinking: supportsThinking,
       );
 
-      // Convert to ModelInfo and register with SDK's model registry
-      final modelInfo = registration.toModelInfo();
-      sdk.RunAnywhere.serviceContainer.modelRegistry.registerModel(modelInfo);
-
-      debugPrint('✅ Registered model with SDK: ${modelInfo.name} (${modelInfo.id})');
+      if (modelInfo != null) {
+        debugPrint(
+            '✅ Registered model with SDK: ${modelInfo.name} (${modelInfo.id})');
+      }
 
       // Refresh models from registry
       await loadModelsFromRegistry();

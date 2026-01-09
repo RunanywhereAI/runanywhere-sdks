@@ -1,9 +1,14 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:runanywhere/features/vad/vad_service.dart';
-import 'package:runanywhere/native/ffi_types.dart' show RaStreamHandle;
+import 'package:runanywhere/core/module_registry.dart';
 import 'package:runanywhere/native/native_backend.dart';
+
+/// Speech activity events
+enum SpeechActivityEvent {
+  started,
+  ended,
+}
 
 /// ONNX-based Voice Activity Detection service.
 ///
@@ -13,14 +18,12 @@ import 'package:runanywhere/native/native_backend.dart';
 /// ## Usage
 ///
 /// ```dart
-/// final backend = NativeBackend();
-/// backend.create('onnx');
-///
+/// final backend = NativeBackend.onnx();
 /// final vad = OnnxVADService(backend);
 /// await vad.initialize();
 ///
-/// final result = await vad.detect(audioData: audioBytes);
-/// if (result.hasSpeech) {
+/// final result = await vad.process(audioData: audioBytes);
+/// if (result.isSpeech) {
 ///   print('Speech detected with confidence: ${result.confidence}');
 /// }
 /// ```
@@ -40,36 +43,36 @@ class OnnxVADService implements VADService {
   /// Create a new ONNX VAD service.
   OnnxVADService(this._backend);
 
-  @override
+  /// Get the energy threshold
   double get energyThreshold => _energyThreshold;
 
-  @override
+  /// Set the energy threshold
   set energyThreshold(double value) => _energyThreshold = value;
 
-  @override
+  /// Get the sample rate
   int get sampleRate => _sampleRate;
 
-  @override
+  /// Get the frame length in seconds
   double get frameLength => _frameLength;
 
-  @override
+  /// Whether speech is currently active
   bool get isSpeechActive => _isSpeechActive;
 
   @override
   bool get isReady => _isInitialized && _backend.isVadModelLoaded;
 
-  @override
+  /// Get speech activity callback
   void Function(SpeechActivityEvent)? get onSpeechActivity => _onSpeechActivity;
 
-  @override
+  /// Set speech activity callback
   set onSpeechActivity(void Function(SpeechActivityEvent)? callback) {
     _onSpeechActivity = callback;
   }
 
-  @override
+  /// Get audio buffer callback
   void Function(List<int>)? get onAudioBuffer => _onAudioBuffer;
 
-  @override
+  /// Set audio buffer callback
   set onAudioBuffer(void Function(List<int>)? callback) {
     _onAudioBuffer = callback;
   }
@@ -81,7 +84,7 @@ class OnnxVADService implements VADService {
   }
 
   @override
-  Future<VADResult> detect({required List<int> audioData}) async {
+  Future<VADResult> process(List<int> audioData) async {
     // Convert PCM16 to Float32
     final samples = _convertToFloat32(audioData);
 
@@ -100,29 +103,28 @@ class OnnxVADService implements VADService {
     }
 
     return VADResult(
-      hasSpeech: hasSpeech,
+      isSpeech: hasSpeech,
       confidence: confidence,
     );
   }
 
-  @override
+  /// Start VAD processing
   void start() {
     _isRunning = true;
   }
 
-  @override
+  /// Stop VAD processing
   void stop() {
     _isRunning = false;
     _isSpeechActive = false;
   }
 
-  @override
+  /// Reset VAD state
   void reset() {
-    _backend.resetVad();
     _isSpeechActive = false;
   }
 
-  @override
+  /// Process audio buffer
   void processAudioBuffer(List<int> buffer) {
     if (!_isRunning) return;
 
@@ -130,10 +132,10 @@ class OnnxVADService implements VADService {
     _onAudioBuffer?.call(buffer);
 
     // Process for VAD
-    unawaited(detect(audioData: buffer));
+    unawaited(process(buffer));
   }
 
-  @override
+  /// Process audio data as float samples
   bool processAudioData(List<double> audioData) {
     if (!_isRunning) return false;
 
@@ -157,12 +159,12 @@ class OnnxVADService implements VADService {
     return hasSpeech;
   }
 
-  @override
+  /// Pause VAD processing
   void pause() {
     _isRunning = false;
   }
 
-  @override
+  /// Resume VAD processing
   void resume() {
     _isRunning = true;
   }
@@ -174,20 +176,6 @@ class OnnxVADService implements VADService {
       _backend.unloadVadModel();
     }
     _isInitialized = false;
-  }
-
-  // ============================================================================
-  // Streaming Methods (additional, not in base protocol)
-  // ============================================================================
-
-  /// Create a streaming VAD session.
-  Object createStream({Map<String, dynamic>? config}) {
-    return _backend.createVadStream(config: config);
-  }
-
-  /// Destroy streaming session.
-  void destroyStream(Object stream) {
-    _backend.destroyVadStream(stream as RaStreamHandle);
   }
 
   // ============================================================================

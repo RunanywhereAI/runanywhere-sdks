@@ -253,9 +253,10 @@ class ModelManager extends ChangeNotifier {
 
   /// Check if a model is downloaded by name and framework
   /// Legacy method for backwards compatibility
-  bool isModelDownloadedByName(String modelName, String framework) {
+  bool isModelDownloadedByName(String modelName, String frameworkName) {
     // Built-in models (e.g., Apple Foundation Models) are always available
-    if (framework == 'foundationModels' || framework == 'FoundationModels') {
+    if (frameworkName == 'foundationModels' ||
+        frameworkName == 'FoundationModels') {
       return true;
     }
 
@@ -263,8 +264,8 @@ class ModelManager extends ChangeNotifier {
     try {
       return _availableModels.any((model) =>
           model.name.toLowerCase() == modelName.toLowerCase() &&
-          model.preferredFramework?.rawValue.toLowerCase() ==
-              framework.toLowerCase() &&
+          model.framework.rawValue.toLowerCase() ==
+              frameworkName.toLowerCase() &&
           model.isDownloaded);
     } catch (e) {
       return false;

@@ -1,5 +1,5 @@
 name: runanywhere_onnx
-description: ONNX Runtime backend for RunAnywhere Flutter SDK. Provides STT, TTS, VAD, and LLM capabilities.
+description: ONNX Runtime backend for RunAnywhere Flutter SDK. Provides STT, TTS, and VAD capabilities.
 version: 0.15.8
 homepage: https://runanywhere.ai
 
@@ -10,11 +10,14 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # Core SDK dependency (includes runanywhere_native for native binaries)
+  # Core SDK dependency (provides RACommons)
   runanywhere:
     path: ../runanywhere
+  ffi: ^2.1.0
   # HTTP for download strategy
   http: ^1.2.1
+  # Archive extraction for model downloads
+  archive: ^3.4.9
 
 dev_dependencies:
   flutter_test:
@@ -23,3 +26,13 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # Native plugin configuration
+  # RABackendONNX binaries are bundled in ios/ and android/ directories
+  plugin:
+    platforms:
+      android:
+        package: ai.runanywhere.sdk.onnx
+        pluginClass: OnnxPlugin
+      ios:
+        pluginClass: OnnxPlugin

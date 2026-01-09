@@ -3,8 +3,8 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import '../foundation/logging/sdk_logger.dart';
-import 'native_backend.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/native_backend.dart';
 
 /// TTS bridge for C++ text-to-speech operations.
 /// Matches Swift's `CppBridge+TTS.swift`.
@@ -41,7 +41,8 @@ class DartBridgeTTS {
       );
       return true;
     } catch (e) {
-      _logger.error('Failed to load TTS model', metadata: {'error': e.toString()});
+      _logger
+          .error('Failed to load TTS model', metadata: {'error': e.toString()});
       return false;
     }
   }
@@ -60,7 +61,8 @@ class DartBridgeTTS {
       backend.unloadTtsModel();
       return true;
     } catch (e) {
-      _logger.error('Failed to unload TTS model', metadata: {'error': e.toString()});
+      _logger.error('Failed to unload TTS model',
+          metadata: {'error': e.toString()});
       return false;
     }
   }
@@ -102,8 +104,9 @@ class DartBridgeTTS {
   }
 
   /// Check if streaming is supported
+  /// Note: TTS streaming is not yet implemented in NativeBackend.
   bool supportsStreaming() {
-    return _backend?.ttsSupportsStreaming ?? false;
+    return false;
   }
 
   /// Get available voices
@@ -113,11 +116,13 @@ class DartBridgeTTS {
 
     try {
       final voiceIds = backend.getTtsVoices();
-      return voiceIds.map((id) => TTSVoice(
-        id: id,
-        name: id,
-        language: 'en',
-      )).toList();
+      return voiceIds
+          .map((id) => TTSVoice(
+                id: id,
+                name: id,
+                language: 'en',
+              ))
+          .toList();
     } catch (e) {
       _logger.warning('Failed to get voices: $e');
       return [];
@@ -125,8 +130,9 @@ class DartBridgeTTS {
   }
 
   /// Cancel ongoing synthesis
+  /// Note: TTS cancel is not yet implemented in NativeBackend.
   void cancel() {
-    _backend?.cancelTts();
+    _logger.debug('TTS cancel called (not yet implemented)');
   }
 }
 

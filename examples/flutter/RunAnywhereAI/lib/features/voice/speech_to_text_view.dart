@@ -239,20 +239,25 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
       final sttComponent = sdk.RunAnywhere.loadedSTTCapability;
 
       if (sttComponent == null) {
-        throw Exception('STT component not loaded');
+        throw Exception(
+            'STT component not loaded. Please load an STT model first.');
       }
 
-      // Transcribe using the SDK component
-      final output = await sttComponent.transcribe(audioData);
+      // TODO: STT transcription via SDK is not yet fully implemented
+      // The STTCapability class needs transcribe() method implementation
+      // For now, show a placeholder message
+      debugPrint('⚠️ STT transcription API not yet implemented in SDK');
+
+      // Simulate transcription for demo purposes
+      await Future<void>.delayed(const Duration(seconds: 1));
 
       setState(() {
-        _transcribedText = output.text;
+        _transcribedText =
+            '[STT transcription not yet implemented - audio data received: ${audioData.length} bytes]';
         _isTranscribing = false;
       });
 
-      debugPrint('✅ Transcription complete: ${output.text}');
-      debugPrint('📊 Confidence: ${output.confidence}');
-      debugPrint('⏱️ Processing time: ${output.metadata.processingTime}s');
+      debugPrint('✅ Transcription placeholder complete');
     } catch (e) {
       debugPrint('❌ Transcription failed: $e');
       setState(() {

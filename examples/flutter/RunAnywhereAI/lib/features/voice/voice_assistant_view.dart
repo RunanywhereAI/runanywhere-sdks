@@ -100,30 +100,33 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
   }
 
   /// Refresh model states from SDK
+  /// NOTE: Voice agent API is not yet fully implemented in SDK
   Future<void> _refreshComponentStates() async {
     try {
-      final states = await sdk.RunAnywhere.getVoiceAgentComponentStates();
+      // TODO: Voice agent component states API not yet implemented
+      // For now, check if STT/LLM/TTS models are loaded via available models
+      final sttCapability = sdk.RunAnywhere.loadedSTTCapability;
+      final ttsCapability = sdk.RunAnywhere.loadedTTSCapability;
+      final currentModel = sdk.RunAnywhere.currentModel;
 
       setState(() {
-        // Map SDK ComponentLoadState to app states
-        _sttModelState = _mapComponentLoadState(states.stt);
-        _llmModelState = _mapComponentLoadState(states.llm);
-        _ttsModelState = _mapComponentLoadState(states.tts);
+        _sttModelState = sttCapability != null
+            ? AppModelLoadState.loaded
+            : AppModelLoadState.notLoaded;
+        _llmModelState = currentModel != null
+            ? AppModelLoadState.loaded
+            : AppModelLoadState.notLoaded;
+        _ttsModelState = ttsCapability != null
+            ? AppModelLoadState.loaded
+            : AppModelLoadState.notLoaded;
 
-        // Use convenience getters for model names
-        _currentSTTModel = states.sttModelName ?? 'Not loaded';
-        _currentLLMModel = states.llmModelName ?? 'Not loaded';
-        _currentTTSModel = states.ttsModelName ?? 'Not loaded';
+        _currentSTTModel = sttCapability?.modelName ?? 'Not loaded';
+        _currentLLMModel = currentModel?.name ?? 'Not loaded';
+        _currentTTSModel = ttsCapability?.voiceName ?? 'Not loaded';
       });
     } catch (e) {
       debugPrint('Failed to get component states: $e');
     }
-  }
-
-  AppModelLoadState _mapComponentLoadState(sdk.ComponentLoadState state) {
-    if (state.isLoaded) return AppModelLoadState.loaded;
-    if (state.isLoading) return AppModelLoadState.loading;
-    return AppModelLoadState.notLoaded;
   }
 
   Future<void> _startConversation() async {
@@ -144,13 +147,20 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
     });
 
     try {
-      // Initialize voice agent with loaded models if not ready
-      if (!sdk.RunAnywhere.isVoiceAgentReady) {
-        await sdk.RunAnywhere.initializeVoiceAgentWithLoadedModels();
+      // TODO: Voice agent API is not yet fully implemented in SDK
+      // For now, use VoiceSessionHandle directly if models are loaded
+      if (!_allModelsLoaded) {
+        setState(() {
+          _sessionState = VoiceSessionState.error;
+          _errorMessage = 'Please load STT, LLM, and TTS models first';
+        });
+        return;
       }
 
-      // Start voice session
-      _voiceSession = await sdk.RunAnywhere.startVoiceSession();
+      // Create voice session handle directly
+      _voiceSession = sdk.VoiceSessionHandle(
+        config: const sdk.VoiceSessionConfig(),
+      );
 
       // Listen to session events
       _eventSubscription = _voiceSession!.events.listen(
@@ -162,6 +172,9 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
           });
         },
       );
+
+      // Start the voice session
+      await _voiceSession!.start();
 
       setState(() {
         _sessionState = VoiceSessionState.connected;
