@@ -11,6 +11,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <chrono>
+#include <mutex>
 
 // Platform-specific logging
 #if defined(ANDROID) || defined(__ANDROID__)
@@ -18,11 +19,13 @@
 #define LOG_TAG "InitBridge"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+#define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #else
 #include <cstdio>
 #define LOGI(...) printf("[InitBridge] "); printf(__VA_ARGS__); printf("\n")
 #define LOGD(...) printf("[InitBridge DEBUG] "); printf(__VA_ARGS__); printf("\n")
+#define LOGW(...) printf("[InitBridge WARN] "); printf(__VA_ARGS__); printf("\n")
 #define LOGE(...) printf("[InitBridge ERROR] "); printf(__VA_ARGS__); printf("\n")
 #endif
 
@@ -420,6 +423,151 @@ void InitBridge::shutdown() {
 
     initialized_ = false;
     LOGI("SDK shutdown complete");
+}
+
+// =============================================================================
+// Secure Storage Methods
+// Matches Swift: KeychainManager
+// =============================================================================
+
+bool InitBridge::secureSet(const std::string& key, const std::string& value) {
+    if (!g_platformCallbacks || !g_platformCallbacks->secureSet) {
+        LOGE("secureSet: Platform callback not available");
+        return false;
+    }
+
+    try {
+        bool success = g_platformCallbacks->secureSet(key, value);
+        LOGD("secureSet: key=%s, success=%d", key.c_str(), success);
+        return success;
+    } catch (...) {
+        LOGE("secureSet: Exception for key=%s", key.c_str());
+        return false;
+    }
+}
+
+bool InitBridge::secureGet(const std::string& key, std::string& outValue) {
+    if (!g_platformCallbacks || !g_platformCallbacks->secureGet) {
+        LOGE("secureGet: Platform callback not available");
+        return false;
+    }
+
+    try {
+        std::string value = g_platformCallbacks->secureGet(key);
+        if (value.empty()) {
+            LOGD("secureGet: key=%s not found", key.c_str());
+            return false;
+        }
+        outValue = value;
+        LOGD("secureGet: key=%s found", key.c_str());
+        return true;
+    } catch (...) {
+        LOGE("secureGet: Exception for key=%s", key.c_str());
+        return false;
+    }
+}
+
+bool InitBridge::secureDelete(const std::string& key) {
+    if (!g_platformCallbacks || !g_platformCallbacks->secureDelete) {
+        LOGE("secureDelete: Platform callback not available");
+        return false;
+    }
+
+    try {
+        bool success = g_platformCallbacks->secureDelete(key);
+        LOGD("secureDelete: key=%s, success=%d", key.c_str(), success);
+        return success;
+    } catch (...) {
+        LOGE("secureDelete: Exception for key=%s", key.c_str());
+        return false;
+    }
+}
+
+bool InitBridge::secureExists(const std::string& key) {
+    if (!g_platformCallbacks || !g_platformCallbacks->secureGet) {
+        LOGE("secureExists: Platform callback not available");
+        return false;
+    }
+
+    try {
+        std::string value = g_platformCallbacks->secureGet(key);
+        bool exists = !value.empty();
+        LOGD("secureExists: key=%s, exists=%d", key.c_str(), exists);
+        return exists;
+    } catch (...) {
+        LOGE("secureExists: Exception for key=%s", key.c_str());
+        return false;
+    }
+}
+
+std::string InitBridge::getPersistentDeviceUUID() {
+    // Key matches Swift: KeychainManager.KeychainKey.deviceUUID
+    static const char* DEVICE_UUID_KEY = "com.runanywhere.sdk.device.uuid";
+
+    // Thread-safe: cached result (matches Swift pattern)
+    static std::string cachedUUID;
+    static std::mutex uuidMutex;
+
+    {
+        std::lock_guard<std::mutex> lock(uuidMutex);
+        if (!cachedUUID.empty()) {
+            return cachedUUID;
+        }
+    }
+
+    // Strategy 1: Try to load from secure storage (survives reinstalls)
+    std::string storedUUID;
+    if (secureGet(DEVICE_UUID_KEY, storedUUID) && !storedUUID.empty()) {
+        std::lock_guard<std::mutex> lock(uuidMutex);
+        cachedUUID = storedUUID;
+        LOGI("Loaded persistent device UUID from keychain");
+        return cachedUUID;
+    }
+
+    // Strategy 2: Generate new UUID
+    // Generate a UUID4-like string: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+    auto generateUUID = []() -> std::string {
+        static const char hexChars[] = "0123456789abcdef";
+
+        // Use high-resolution clock and random for seeding
+        auto now = std::chrono::high_resolution_clock::now();
+        auto seed = static_cast<unsigned>(
+            now.time_since_epoch().count() ^
+            reinterpret_cast<uintptr_t>(&now)
+        );
+        srand(seed);
+
+        char uuid[37];
+        for (int i = 0; i < 36; i++) {
+            if (i == 8 || i == 13 || i == 18 || i == 23) {
+                uuid[i] = '-';
+            } else if (i == 14) {
+                uuid[i] = '4'; // UUID version 4
+            } else if (i == 19) {
+                uuid[i] = hexChars[(rand() & 0x03) | 0x08]; // variant bits
+            } else {
+                uuid[i] = hexChars[rand() & 0x0F];
+            }
+        }
+        uuid[36] = '\0';
+        return std::string(uuid);
+    };
+
+    std::string newUUID = generateUUID();
+
+    // Store in secure storage
+    if (secureSet(DEVICE_UUID_KEY, newUUID)) {
+        LOGI("Generated and stored new persistent device UUID");
+    } else {
+        LOGW("Generated device UUID but failed to persist (will regenerate on restart)");
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(uuidMutex);
+        cachedUUID = newUUID;
+    }
+
+    return newUUID;
 }
 
 } // namespace bridges

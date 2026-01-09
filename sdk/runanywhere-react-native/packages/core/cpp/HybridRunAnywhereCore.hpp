@@ -216,6 +216,21 @@ public:
   std::shared_ptr<Promise<void>> resetVAD() override;
 
   // ============================================================================
+  // Secure Storage
+  // Matches Swift: KeychainManager.swift
+  // Uses platform adapter callbacks for Keychain/Keystore
+  // ============================================================================
+
+  std::shared_ptr<Promise<bool>> secureStorageSet(
+    const std::string& key,
+    const std::string& value) override;
+  std::shared_ptr<Promise<std::optional<std::string>>> secureStorageGet(
+    const std::string& key) override;
+  std::shared_ptr<Promise<bool>> secureStorageDelete(const std::string& key) override;
+  std::shared_ptr<Promise<bool>> secureStorageExists(const std::string& key) override;
+  std::shared_ptr<Promise<std::string>> getPersistentDeviceUUID() override;
+
+  // ============================================================================
   // Voice Agent Capability (Backend-Agnostic)
   // Delegates to rac_voice_agent_* APIs via VoiceAgentBridge
   // ============================================================================
