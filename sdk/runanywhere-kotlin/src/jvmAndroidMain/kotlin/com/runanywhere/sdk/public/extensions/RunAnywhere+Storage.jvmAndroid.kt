@@ -8,6 +8,7 @@
 package com.runanywhere.sdk.public.extensions
 
 import com.runanywhere.sdk.core.types.InferenceFramework
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStorage
@@ -23,6 +24,8 @@ import com.runanywhere.sdk.public.extensions.Storage.ModelStorageMetrics
 import com.runanywhere.sdk.public.extensions.Storage.StorageAvailability
 import com.runanywhere.sdk.public.extensions.Storage.StorageInfo
 import java.io.File
+
+private val storageLogger = SDKLogger.shared
 
 // Model storage quota in bytes (default 10GB)
 @Volatile
@@ -119,6 +122,8 @@ actual suspend fun RunAnywhere.clearCache() {
         throw SDKError.notInitialized("SDK not initialized")
     }
 
+    storageLogger.info("Clearing cache...")
+
     // Clear the storage cache namespace
     CppBridgeStorage.clear(CppBridgeStorage.StorageNamespace.INFERENCE_CACHE, CppBridgeStorage.StorageType.CACHE)
 
@@ -128,6 +133,8 @@ actual suspend fun RunAnywhere.clearCache() {
         cacheDir.deleteRecursively()
         cacheDir.mkdirs()
     }
+
+    storageLogger.info("Cache cleared")
 }
 
 actual suspend fun RunAnywhere.setMaxModelStorage(maxBytes: Long) {

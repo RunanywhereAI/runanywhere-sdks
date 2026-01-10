@@ -9,6 +9,7 @@
 
 package com.runanywhere.sdk.public.events
 
+import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -36,6 +37,8 @@ import kotlinx.coroutines.flow.filter
 object EventBus {
     // MARK: - Publishers
 
+    private val logger = SDKLogger.shared
+
     private val _events =
         MutableSharedFlow<SDKEvent>(
             replay = 0,
@@ -51,6 +54,7 @@ object EventBus {
      * Publish an event to all subscribers.
      */
     fun publish(event: SDKEvent) {
+        logger.debug("Publishing event: ${event.type} (category: ${event.category.value})")
         _events.tryEmit(event)
     }
 

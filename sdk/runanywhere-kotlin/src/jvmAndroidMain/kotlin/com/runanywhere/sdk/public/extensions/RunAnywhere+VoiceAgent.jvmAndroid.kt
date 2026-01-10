@@ -10,6 +10,7 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
@@ -23,6 +24,8 @@ import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceSessionConfig
 import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceSessionEvent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+
+private val voiceAgentLogger = SDKLogger.voiceAgent
 
 // Session state managed at Kotlin level
 @Volatile
@@ -97,17 +100,22 @@ actual suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels() {
 
     // Already initialized and all components loaded
     if (voiceAgentInitialized && areAllComponentsLoaded()) {
+        voiceAgentLogger.debug("VoiceAgent already initialized")
         return
     }
+
+    voiceAgentLogger.info("Initializing VoiceAgent with loaded models...")
 
     // Check if all component models are loaded
     if (!areAllComponentsLoaded()) {
         val missing = getMissingComponents()
+        voiceAgentLogger.error("Cannot initialize: Models not loaded: ${missing.joinToString(", ")}")
         throw SDKError.voiceAgent("Cannot initialize: Models not loaded: ${missing.joinToString(", ")}")
     }
 
     // All components are loaded - mark voice agent as initialized at Kotlin level
     voiceAgentInitialized = true
+    voiceAgentLogger.info("VoiceAgent initialized successfully")
 }
 
 actual suspend fun RunAnywhere.processVoice(audioData: ByteArray): VoiceAgentResult {
@@ -115,9 +123,12 @@ actual suspend fun RunAnywhere.processVoice(audioData: ByteArray): VoiceAgentRes
         throw SDKError.notInitialized("SDK not initialized")
     }
 
+    voiceAgentLogger.debug("Processing voice input: ${audioData.size} bytes")
+
     // Check if all components are loaded
     if (!areAllComponentsLoaded()) {
         val missing = getMissingComponents()
+        voiceAgentLogger.warning("Models not loaded: ${missing.joinToString(", ")}")
         return VoiceAgentResult(
             speechDetected = false,
             transcription = null,
@@ -128,9 +139,11 @@ actual suspend fun RunAnywhere.processVoice(audioData: ByteArray): VoiceAgentRes
 
     return try {
         // Step 1: Transcribe audio using STT
+        voiceAgentLogger.debug("Step 1: Transcribing audio...")
         val transcriptionResult = CppBridgeSTT.transcribe(audioData)
         val transcriptionText = transcriptionResult.text
         if (transcriptionText.isBlank()) {
+            voiceAgentLogger.debug("No speech detected in audio")
             return VoiceAgentResult(
                 speechDetected = false,
                 transcription = null,
@@ -138,23 +151,28 @@ actual suspend fun RunAnywhere.processVoice(audioData: ByteArray): VoiceAgentRes
                 synthesizedAudio = null,
             )
         }
+        voiceAgentLogger.info("Transcription: ${transcriptionText.take(100)}${if (transcriptionText.length > 100) "..." else ""}")
 
         // Step 2: Generate response using LLM
-        // Format as a chat prompt with system message and user input
+        voiceAgentLogger.debug("Step 2: Generating LLM response...")
         val systemPrompt = currentSystemPrompt ?: "You are a helpful voice assistant."
         val chatPrompt = "$systemPrompt\n\nUser: $transcriptionText\n\nAssistant:"
         val generationResult = CppBridgeLLM.generate(chatPrompt)
         val responseText = generationResult.text
+        voiceAgentLogger.info("Response: ${responseText.take(100)}${if (responseText.length > 100) "..." else ""}")
 
         // Step 3: Synthesize speech using TTS
+        voiceAgentLogger.debug("Step 3: Synthesizing TTS audio...")
         val audioOutput =
             if (responseText.isNotBlank()) {
                 val synthesisResult = CppBridgeTTS.synthesize(responseText)
+                voiceAgentLogger.debug("TTS synthesis complete: ${synthesisResult.audioData.size} bytes")
                 synthesisResult.audioData
             } else {
                 null
             }
 
+        voiceAgentLogger.info("Voice processing complete")
         VoiceAgentResult(
             speechDetected = true,
             transcription = transcriptionText,
@@ -162,6 +180,7 @@ actual suspend fun RunAnywhere.processVoice(audioData: ByteArray): VoiceAgentRes
             synthesizedAudio = audioOutput,
         )
     } catch (e: Exception) {
+        voiceAgentLogger.error("Voice processing error: ${e.message}", throwable = e)
         VoiceAgentResult(
             speechDetected = false,
             transcription = null,
@@ -174,6 +193,7 @@ actual suspend fun RunAnywhere.processVoice(audioData: ByteArray): VoiceAgentRes
 actual fun RunAnywhere.startVoiceSession(config: VoiceSessionConfig): Flow<VoiceSessionEvent> =
     flow {
         if (!isInitialized) {
+            voiceAgentLogger.error("Cannot start voice session: SDK not initialized")
             emit(VoiceSessionEvent.Error("SDK not initialized"))
             return@flow
         }
@@ -181,6 +201,7 @@ actual fun RunAnywhere.startVoiceSession(config: VoiceSessionConfig): Flow<Voice
         // Check if all component models are loaded
         if (!areAllComponentsLoaded()) {
             val missing = getMissingComponents()
+            voiceAgentLogger.error("Cannot start voice session: Models not loaded: ${missing.joinToString(", ")}")
             emit(VoiceSessionEvent.Error("Models not loaded: ${missing.joinToString(", ")}"))
             return@flow
         }
@@ -188,6 +209,7 @@ actual fun RunAnywhere.startVoiceSession(config: VoiceSessionConfig): Flow<Voice
         // Mark voice agent as initialized and session as active
         voiceAgentInitialized = true
         voiceSessionActive = true
+        voiceAgentLogger.info("Voice session started")
         emit(VoiceSessionEvent.Started)
 
         // The actual voice session loop would be driven by audio input from the app layer
@@ -200,11 +222,13 @@ actual suspend fun RunAnywhere.stopVoiceSession() {
         throw SDKError.notInitialized("SDK not initialized")
     }
 
+    voiceAgentLogger.info("Stopping voice session...")
     voiceSessionActive = false
     // Cancel any ongoing operations
     CppBridgeSTT.cancel()
     CppBridgeLLM.cancel()
     CppBridgeTTS.cancel()
+    voiceAgentLogger.info("Voice session stopped")
 }
 
 actual suspend fun RunAnywhere.isVoiceSessionActive(): Boolean {

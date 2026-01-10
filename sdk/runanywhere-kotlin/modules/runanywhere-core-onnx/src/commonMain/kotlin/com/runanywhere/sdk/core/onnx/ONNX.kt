@@ -39,7 +39,7 @@ import com.runanywhere.sdk.foundation.SDKLogger
  * Matches iOS ONNX.swift exactly.
  */
 object ONNX : RunAnywhereModule {
-    private val logger = SDKLogger("ONNX")
+    private val logger = SDKLogger.onnx
 
     // MARK: - Module Info
 

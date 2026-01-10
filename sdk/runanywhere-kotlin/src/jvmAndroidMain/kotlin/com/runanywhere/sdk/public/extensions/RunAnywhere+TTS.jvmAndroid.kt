@@ -7,6 +7,7 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
 import com.runanywhere.sdk.foundation.errors.SDKError
@@ -16,10 +17,14 @@ import com.runanywhere.sdk.public.extensions.TTS.TTSOutput
 import com.runanywhere.sdk.public.extensions.TTS.TTSSpeakResult
 import com.runanywhere.sdk.public.extensions.TTS.TTSSynthesisMetadata
 
+private val ttsLogger = SDKLogger.tts
+
 actual suspend fun RunAnywhere.loadTTSVoice(voiceId: String) {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
+
+    ttsLogger.debug("Loading TTS voice: $voiceId")
 
     val modelInfo =
         CppBridgeModelRegistry.get(voiceId)
@@ -32,8 +37,10 @@ actual suspend fun RunAnywhere.loadTTSVoice(voiceId: String) {
     // Pass modelPath, modelId, and modelName separately for correct telemetry
     val result = CppBridgeTTS.loadModel(localPath, voiceId, modelInfo.name)
     if (result != 0) {
+        ttsLogger.error("Failed to load TTS voice '$voiceId' (error code: $result)")
         throw SDKError.tts("Failed to load TTS voice '$voiceId' (error code: $result)")
     }
+    ttsLogger.info("TTS voice loaded: $voiceId")
 }
 
 actual suspend fun RunAnywhere.unloadTTSVoice() {
@@ -67,6 +74,7 @@ actual suspend fun RunAnywhere.synthesize(
     }
 
     val voiceId = CppBridgeTTS.getLoadedModelId() ?: "unknown"
+    ttsLogger.debug("Synthesizing text: ${text.take(50)}${if (text.length > 50) "..." else ""} (voice: $voiceId)")
 
     val config =
         CppBridgeTTS.SynthesisConfig(
@@ -78,6 +86,7 @@ actual suspend fun RunAnywhere.synthesize(
         )
 
     val result = CppBridgeTTS.synthesize(text, config)
+    ttsLogger.info("Synthesis complete: ${result.durationMs}ms audio")
 
     val metadata =
         TTSSynthesisMetadata(

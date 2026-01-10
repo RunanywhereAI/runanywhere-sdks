@@ -7,7 +7,7 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 
 // Internal log level state
@@ -21,24 +21,17 @@ private var fileLoggingEnabled: Boolean = false
 @Volatile
 private var fileLoggingPath: String? = null
 
+private val logger = SDKLogger.shared
+
 internal actual fun RunAnywhere.setLogLevelInternal(level: LogLevel) {
     currentLogLevel = level
-    // Log the level change (platform adapter uses its own log level constants)
-    CppBridgePlatformAdapter.logCallback(
-        CppBridgePlatformAdapter.LogLevel.DEBUG,
-        "RunAnywhere",
-        "Log level set to ${level.name}",
-    )
+    logger.debug("Log level set to ${level.name}")
 }
 
 actual fun RunAnywhere.setFileLogging(enabled: Boolean, path: String?) {
     fileLoggingEnabled = enabled
     fileLoggingPath = path
-    CppBridgePlatformAdapter.logCallback(
-        CppBridgePlatformAdapter.LogLevel.DEBUG,
-        "RunAnywhere",
-        "File logging ${if (enabled) "enabled" else "disabled"}${path?.let { " at $it" } ?: ""}",
-    )
+    logger.debug("File logging ${if (enabled) "enabled" else "disabled"}${path?.let { " at $it" } ?: ""}")
 }
 
 actual fun RunAnywhere.getLogLevel(): LogLevel {
@@ -47,9 +40,5 @@ actual fun RunAnywhere.getLogLevel(): LogLevel {
 
 actual fun RunAnywhere.flushLogs() {
     // Logs are written immediately via platform adapter, no buffering
-    CppBridgePlatformAdapter.logCallback(
-        CppBridgePlatformAdapter.LogLevel.DEBUG,
-        "RunAnywhere",
-        "Logs flushed",
-    )
+    logger.debug("Logs flushed")
 }

@@ -7,6 +7,7 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVAD
 import com.runanywhere.sdk.foundation.errors.SDKError
 import com.runanywhere.sdk.public.RunAnywhere
@@ -16,13 +17,21 @@ import com.runanywhere.sdk.public.extensions.VAD.VADStatistics
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
+private val vadLogger = SDKLogger.vad
+
 actual suspend fun RunAnywhere.detectVoiceActivity(audioData: ByteArray): VADResult {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
 
+    vadLogger.debug("Processing VAD frame: ${audioData.size} bytes")
+
     val config = CppBridgeVAD.DetectionConfig()
     val frameResult = CppBridgeVAD.processFrame(audioData, config)
+
+    if (frameResult.isSpeech) {
+        vadLogger.debug("Speech detected (confidence: ${String.format("%.2f", frameResult.probability)})")
+    }
 
     return VADResult(
         isSpeech = frameResult.isSpeech,

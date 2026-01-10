@@ -41,7 +41,7 @@ import com.runanywhere.sdk.foundation.SDKLogger
  * Matches iOS LlamaCPP.swift exactly.
  */
 object LlamaCPP : RunAnywhereModule {
-    private val logger = SDKLogger("LlamaCPP")
+    private val logger = SDKLogger.llamacpp
 
     // MARK: - Module Info
 

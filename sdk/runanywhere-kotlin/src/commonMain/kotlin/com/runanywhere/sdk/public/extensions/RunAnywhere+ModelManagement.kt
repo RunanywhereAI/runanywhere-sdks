@@ -11,6 +11,7 @@
 package com.runanywhere.sdk.public.extensions
 
 import com.runanywhere.sdk.core.types.InferenceFramework
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.ArchiveStructure
 import com.runanywhere.sdk.public.extensions.Models.ArchiveType
@@ -48,14 +49,19 @@ fun RunAnywhere.registerModel(
     memoryRequirement: Long? = null,
     supportsThinking: Boolean = false,
 ): ModelInfo {
+    val logger = SDKLogger.models
+
     // Generate model ID from URL filename if not provided
     val modelId = id ?: generateModelIdFromUrl(url)
+    logger.debug("Registering model: $modelId (name: $name)")
 
     // Detect format from URL extension
     val format = detectFormatFromUrl(url)
+    logger.debug("Detected format: ${format.value} for model: $modelId")
 
     // Infer artifact type if not provided
     val effectiveArtifactType = artifactType ?: inferArtifactType(url)
+    logger.debug("Artifact type: ${effectiveArtifactType.displayName} for model: $modelId")
 
     // Create ModelInfo
     val modelInfo =
@@ -78,6 +84,7 @@ fun RunAnywhere.registerModel(
     // Save to registry (fire-and-forget)
     registerModelInternal(modelInfo)
 
+    logger.info("Registered model: $modelId (category: ${modality.value}, framework: ${framework.rawValue})")
     return modelInfo
 }
 

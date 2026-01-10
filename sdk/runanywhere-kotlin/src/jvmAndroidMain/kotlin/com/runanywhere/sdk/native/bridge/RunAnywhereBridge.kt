@@ -55,10 +55,10 @@ object RunAnywhereBridge {
                 logger.info("✅ Native library loaded successfully")
                 return true
             } catch (e: UnsatisfiedLinkError) {
-                logger.error("❌ Failed to load native library: ${e.message}", e)
+                logger.error("❌ Failed to load native library: ${e.message}", throwable = e)
                 return false
             } catch (e: Exception) {
-                logger.error("❌ Unexpected error: ${e.message}", e)
+                logger.error("❌ Unexpected error: ${e.message}", throwable = e)
                 return false
             }
         }

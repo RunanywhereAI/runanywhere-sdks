@@ -28,8 +28,7 @@ import com.runanywhere.sdk.foundation.SDKLogger
  * - Links to librac_commons.so - Commons library with service registry
  */
 internal object ONNXBridge {
-    private const val TAG = "ONNXBridge"
-    private val logger = SDKLogger(TAG)
+    private val logger = SDKLogger.onnx
 
     @Volatile
     private var nativeLibraryLoaded = false
@@ -61,13 +60,13 @@ internal object ONNXBridge {
                 // The ONNX JNI provides backend registration functions.
                 System.loadLibrary("rac_backend_onnx_jni")
                 nativeLibraryLoaded = true
-                logger.info("✅ ONNX native library loaded successfully")
+                logger.info("ONNX native library loaded successfully")
                 return true
             } catch (e: UnsatisfiedLinkError) {
-                logger.error("❌ Failed to load ONNX native library: ${e.message}", e)
+                logger.error("Failed to load ONNX native library: ${e.message}", throwable = e)
                 return false
             } catch (e: Exception) {
-                logger.error("❌ Unexpected error loading ONNX native library: ${e.message}", e)
+                logger.error("Unexpected error loading ONNX native library: ${e.message}", throwable = e)
                 return false
             }
         }

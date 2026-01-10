@@ -44,6 +44,11 @@ logback = "1.5.12"
 timber = "5.0.1"
 
 # ============================================================================
+# Error Tracking
+# ============================================================================
+sentry = "8.0.0"
+
+# ============================================================================
 # Networking
 # ============================================================================
 okhttp = "4.12.0"
@@ -200,6 +205,11 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }
 logback-classic = { group = "ch.qos.logback", name = "logback-classic", version.ref = "logback" }
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
+
+# ----------------------------------------------------------------------------
+# Error Tracking
+# ----------------------------------------------------------------------------
+sentry = { group = "io.sentry", name = "sentry", version.ref = "sentry" }
 
 # ----------------------------------------------------------------------------
 # Networking - OkHttp & Retrofit

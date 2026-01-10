@@ -39,7 +39,7 @@ import java.util.zip.ZipInputStream
 
 // MARK: - Model Registration Implementation
 
-private val registrationLogger = SDKLogger("RunAnywhere.Models")
+private val modelsLogger = SDKLogger.models
 
 /**
  * Internal implementation for registering a model to the C++ registry.
@@ -99,9 +99,9 @@ internal actual fun registerModelInternal(modelInfo: ModelInfo) {
         // Also add to the in-memory cache for immediate availability from Kotlin
         addToModelCache(modelInfo)
 
-        registrationLogger.info("Registered model: ${modelInfo.name} (${modelInfo.id})")
+        modelsLogger.info("Registered model: ${modelInfo.name} (${modelInfo.id})")
     } catch (e: Exception) {
-        registrationLogger.error("Failed to register model: ${e.message}")
+        modelsLogger.error("Failed to register model: ${e.message}")
     }
 }
 
@@ -274,7 +274,7 @@ private fun bridgeModelToPublic(bridge: CppBridgeModelRegistry.ModelInfo): Model
  */
 actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
     callbackFlow {
-        val downloadLogger = SDKLogger("RunAnywhere.Download")
+        val downloadLogger = SDKLogger.download
 
         // 0. Check network connectivity first (for better user experience)
         val (isNetworkAvailable, networkDescription) = CppBridgeDownload.checkNetworkStatus()
