@@ -232,6 +232,15 @@ public:
   std::shared_ptr<Promise<std::string>> getPersistentDeviceUUID() override;
 
   // ============================================================================
+  // Telemetry
+  // Matches Swift: CppBridge+Telemetry.swift
+  // C++ handles all telemetry logic - batching, JSON building, routing
+  // ============================================================================
+
+  std::shared_ptr<Promise<void>> flushTelemetry() override;
+  std::shared_ptr<Promise<bool>> isTelemetryInitialized() override;
+
+  // ============================================================================
   // Voice Agent Capability (Backend-Agnostic)
   // Delegates to rac_voice_agent_* APIs via VoiceAgentBridge
   // ============================================================================

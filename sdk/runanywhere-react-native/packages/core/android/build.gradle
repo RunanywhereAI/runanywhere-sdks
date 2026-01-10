@@ -313,4 +313,7 @@ dependencies {
 
     // Apache Commons Compress for tar.gz archive extraction
     implementation "org.apache.commons:commons-compress:1.26.0"
+    
+    // AndroidX Security for EncryptedSharedPreferences (device identity persistence)
+    implementation "androidx.security:security-crypto:1.1.0-alpha06"
 }

@@ -8,7 +8,7 @@
  */
 
 import { EventBus } from './Events';
-import { requireNativeModule, isNativeModuleAvailable, requireDeviceInfoModule } from '../native';
+import { requireNativeModule, isNativeModuleAvailable } from '../native';
 import { SDKEnvironment } from '../types';
 import { ModelRegistry } from '../services/ModelRegistry';
 import { ServiceContainer } from '../Foundation/DependencyInjection/ServiceContainer';
@@ -52,6 +52,7 @@ const logger = new SDKLogger('RunAnywhere');
 // ============================================================================
 
 let initState: InitializationState = createInitialState();
+let cachedDeviceId: string = '';
 
 // ============================================================================
 // Conversation Helper
@@ -196,12 +197,22 @@ export const RunAnywhere = {
       // Initialize model registry
       await ModelRegistry.initialize();
 
-      // Initialize telemetry
+      // Cache device ID early (uses secure storage / Keychain)
+      try {
+        cachedDeviceId = await native.getPersistentDeviceUUID();
+        logger.debug(`Device ID cached: ${cachedDeviceId.substring(0, 8)}...`);
+      } catch (e) {
+        logger.warning('Failed to get persistent device UUID');
+      }
+
+      // Initialize telemetry with device ID
+      TelemetryService.shared.configure(cachedDeviceId, networkEnv);
       TelemetryService.shared.trackSDKInit(envString, true);
 
       // Trigger device registration (non-blocking, best-effort)
       // This matches Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
-      this._registerDeviceIfNeeded(environment).catch(err => {
+      // Uses native C++ → platform HTTP (exactly like Swift)
+      this._registerDeviceIfNeeded(environment, options.supabaseKey).catch(err => {
         logger.warning(`Device registration failed (non-fatal): ${err.message}`);
       });
 
@@ -222,38 +233,32 @@ export const RunAnywhere = {
 
   /**
    * Register device with backend if not already registered
-   * Uses native module for the actual HTTP call.
+   * Uses native C++ DeviceBridge + platform HTTP (URLSession/OkHttp)
+   * Exactly matches Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
    * @internal
    */
-  async _registerDeviceIfNeeded(environment: SDKEnvironment): Promise<void> {
-    // Check if device is already registered
-    const isRegistered = await this.isDeviceRegistered();
-    if (isRegistered) {
-      logger.debug('Device already registered');
-      return;
-    }
-
-    // Get device info from native
-    const deviceId = this.deviceId;
-    if (!deviceId) {
-      logger.warning('Cannot register device: no device ID available');
-      return;
-    }
-
-    // Convert environment to string for native
+  async _registerDeviceIfNeeded(
+    environment: SDKEnvironment,
+    supabaseKey?: string
+  ): Promise<void> {
     const envString = environment === SDKEnvironment.Development ? 'development' 
       : environment === SDKEnvironment.Staging ? 'staging' 
       : 'production';
-
-    // Register via native module
-    // This matches Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
+    
     try {
       const native = requireNativeModule();
-      const success = await native.registerDevice(JSON.stringify({ environment: envString }));
       
+      // Call native registerDevice which goes through:
+      // JS → C++ DeviceBridge → rac_device_manager_register_if_needed → http_post callback → native HTTP
+      // This exactly mirrors Swift's flow!
+      const success = await native.registerDevice(JSON.stringify({
+        environment: envString,
+        supabaseKey: supabaseKey || '',
+        buildToken: '', // TODO: Add build token support if needed
+      }));
+
       if (success) {
-        logger.info('Device registered successfully');
-        // Note: deviceRegistered is handled internally
+        logger.info('Device registered successfully via native');
       } else {
         logger.warning('Device registration returned false');
       }
@@ -333,14 +338,25 @@ export const RunAnywhere = {
 
   /**
    * Get device ID (Keychain-persisted, survives reinstalls)
+   * Note: This is async because it uses secure storage
    */
   get deviceId(): string {
+    // Return cached value if available (set during init)
+    return cachedDeviceId;
+  },
+
+  /**
+   * Get device ID asynchronously (Keychain-persisted, survives reinstalls)
+   */
+  async getDeviceId(): Promise<string> {
+    if (cachedDeviceId) {
+      return cachedDeviceId;
+    }
     try {
-      const deviceInfo = requireDeviceInfoModule();
-      // Device info module returns an object with getDeviceIdSync or similar
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const info = deviceInfo as any;
-      return info.deviceId ?? info.getDeviceIdSync?.() ?? info.uniqueId ?? '';
+      const native = requireNativeModule();
+      const uuid = await native.getPersistentDeviceUUID();
+      cachedDeviceId = uuid;
+      return uuid;
     } catch {
       return '';
     }

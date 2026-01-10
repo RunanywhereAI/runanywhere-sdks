@@ -112,6 +112,8 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> secureStorageDelete(const std::string& key) = 0;
       virtual std::shared_ptr<Promise<bool>> secureStorageExists(const std::string& key) = 0;
       virtual std::shared_ptr<Promise<std::string>> getPersistentDeviceUUID() = 0;
+      virtual std::shared_ptr<Promise<void>> flushTelemetry() = 0;
+      virtual std::shared_ptr<Promise<bool>> isTelemetryInitialized() = 0;
       virtual std::shared_ptr<Promise<bool>> initializeVoiceAgent(const std::string& configJson) = 0;
       virtual std::shared_ptr<Promise<bool>> initializeVoiceAgentWithLoadedModels() = 0;
       virtual std::shared_ptr<Promise<bool>> isVoiceAgentReady() = 0;
