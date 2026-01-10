@@ -8,19 +8,465 @@
 
 #include "InitBridge.hpp"
 #include "rac_model_paths.h"
+#include "rac_environment.h"  // For rac_sdk_init, rac_sdk_config_t
 #include <cstring>
 #include <cstdlib>
 #include <chrono>
 #include <mutex>
+#include <tuple>
 
-// Platform-specific logging
+// Platform-specific logging and bridges
 #if defined(ANDROID) || defined(__ANDROID__)
 #include <android/log.h>
+#include <jni.h>
 #define LOG_TAG "InitBridge"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+
+// Global JavaVM for JNI calls
+static JavaVM* g_javaVM = nullptr;
+
+// JNI_OnLoad - called when native library is loaded
+extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
+    g_javaVM = vm;
+    LOGI("JNI_OnLoad: JavaVM stored for secure storage callbacks");
+    return JNI_VERSION_1_6;
+}
+
+// Helper to get JNIEnv for current thread
+static JNIEnv* getJNIEnv() {
+    if (!g_javaVM) {
+        LOGE("JavaVM not initialized");
+        return nullptr;
+    }
+    
+    JNIEnv* env = nullptr;
+    int status = g_javaVM->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    
+    if (status == JNI_EDETACHED) {
+        // Attach current thread
+        if (g_javaVM->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+            LOGE("Failed to attach current thread to JVM");
+            return nullptr;
+        }
+    } else if (status != JNI_OK) {
+        LOGE("Failed to get JNI environment: %d", status);
+        return nullptr;
+    }
+    
+    return env;
+}
+
+// Android JNI bridge for secure storage
+namespace AndroidBridge {
+    bool secureSet(const char* key, const char* value) {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return false;
+        
+        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
+        if (!bridgeClass) {
+            LOGE("Failed to find PlatformAdapterBridge class");
+            return false;
+        }
+        
+        jmethodID method = env->GetStaticMethodID(bridgeClass, "secureSet", "(Ljava/lang/String;Ljava/lang/String;)Z");
+        if (!method) {
+            LOGE("Failed to find secureSet method");
+            return false;
+        }
+        
+        jstring jKey = env->NewStringUTF(key);
+        jstring jValue = env->NewStringUTF(value);
+        jboolean result = env->CallStaticBooleanMethod(bridgeClass, method, jKey, jValue);
+        
+        env->DeleteLocalRef(jKey);
+        env->DeleteLocalRef(jValue);
+        env->DeleteLocalRef(bridgeClass);
+        
+        return result;
+    }
+    
+    bool secureGet(const char* key, std::string& outValue) {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return false;
+        
+        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
+        if (!bridgeClass) {
+            LOGE("Failed to find PlatformAdapterBridge class");
+            return false;
+        }
+        
+        jmethodID method = env->GetStaticMethodID(bridgeClass, "secureGet", "(Ljava/lang/String;)Ljava/lang/String;");
+        if (!method) {
+            LOGE("Failed to find secureGet method");
+            return false;
+        }
+        
+        jstring jKey = env->NewStringUTF(key);
+        jstring jResult = (jstring)env->CallStaticObjectMethod(bridgeClass, method, jKey);
+        
+        env->DeleteLocalRef(jKey);
+        env->DeleteLocalRef(bridgeClass);
+        
+        if (jResult == nullptr) {
+            return false;
+        }
+        
+        const char* resultStr = env->GetStringUTFChars(jResult, nullptr);
+        if (resultStr) {
+            outValue = resultStr;
+            env->ReleaseStringUTFChars(jResult, resultStr);
+        }
+        env->DeleteLocalRef(jResult);
+        
+        return !outValue.empty();
+    }
+    
+    bool secureDelete(const char* key) {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return false;
+        
+        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
+        if (!bridgeClass) return false;
+        
+        jmethodID method = env->GetStaticMethodID(bridgeClass, "secureDelete", "(Ljava/lang/String;)Z");
+        if (!method) return false;
+        
+        jstring jKey = env->NewStringUTF(key);
+        jboolean result = env->CallStaticBooleanMethod(bridgeClass, method, jKey);
+        
+        env->DeleteLocalRef(jKey);
+        env->DeleteLocalRef(bridgeClass);
+        
+        return result;
+    }
+    
+    bool secureExists(const char* key) {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return false;
+        
+        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
+        if (!bridgeClass) return false;
+        
+        jmethodID method = env->GetStaticMethodID(bridgeClass, "secureExists", "(Ljava/lang/String;)Z");
+        if (!method) return false;
+        
+        jstring jKey = env->NewStringUTF(key);
+        jboolean result = env->CallStaticBooleanMethod(bridgeClass, method, jKey);
+        
+        env->DeleteLocalRef(jKey);
+        env->DeleteLocalRef(bridgeClass);
+        
+        return result;
+    }
+    
+    std::string getPersistentDeviceUUID() {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return "";
+        
+        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
+        if (!bridgeClass) return "";
+        
+        jmethodID method = env->GetStaticMethodID(bridgeClass, "getPersistentDeviceUUID", "()Ljava/lang/String;");
+        if (!method) return "";
+        
+        jstring jResult = (jstring)env->CallStaticObjectMethod(bridgeClass, method);
+        if (!jResult) return "";
+        
+        const char* resultStr = env->GetStringUTFChars(jResult, nullptr);
+        std::string uuid = resultStr ? resultStr : "";
+        
+        if (resultStr) env->ReleaseStringUTFChars(jResult, resultStr);
+        env->DeleteLocalRef(jResult);
+        env->DeleteLocalRef(bridgeClass);
+        
+        return uuid;
+    }
+
+    // HTTP POST for device registration (synchronous)
+    // Returns: (success, statusCode, responseBody, errorMessage)
+    std::tuple<bool, int, std::string, std::string> httpPostSync(
+        const std::string& url,
+        const std::string& jsonBody,
+        const std::string& supabaseKey
+    ) {
+        JNIEnv* env = getJNIEnv();
+        if (!env) {
+            return {false, 0, "", "JNI not available"};
+        }
+        
+        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
+        if (!bridgeClass) {
+            return {false, 0, "", "Bridge class not found"};
+        }
+        
+        // Get the HttpResponse inner class
+        jclass responseClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge$HttpResponse");
+        if (!responseClass) {
+            env->DeleteLocalRef(bridgeClass);
+            return {false, 0, "", "HttpResponse class not found"};
+        }
+        
+        jmethodID method = env->GetStaticMethodID(bridgeClass, "httpPostSync",
+            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/margelo/nitro/runanywhere/PlatformAdapterBridge$HttpResponse;");
+        if (!method) {
+            env->DeleteLocalRef(bridgeClass);
+            env->DeleteLocalRef(responseClass);
+            return {false, 0, "", "httpPostSync method not found"};
+        }
+        
+        jstring jUrl = env->NewStringUTF(url.c_str());
+        jstring jBody = env->NewStringUTF(jsonBody.c_str());
+        jstring jKey = supabaseKey.empty() ? nullptr : env->NewStringUTF(supabaseKey.c_str());
+        
+        jobject response = env->CallStaticObjectMethod(bridgeClass, method, jUrl, jBody, jKey);
+        
+        env->DeleteLocalRef(jUrl);
+        env->DeleteLocalRef(jBody);
+        if (jKey) env->DeleteLocalRef(jKey);
+        
+        if (!response) {
+            env->DeleteLocalRef(bridgeClass);
+            env->DeleteLocalRef(responseClass);
+            return {false, 0, "", "httpPostSync returned null"};
+        }
+        
+        // Extract fields from HttpResponse
+        jfieldID successField = env->GetFieldID(responseClass, "success", "Z");
+        jfieldID statusCodeField = env->GetFieldID(responseClass, "statusCode", "I");
+        jfieldID responseBodyField = env->GetFieldID(responseClass, "responseBody", "Ljava/lang/String;");
+        jfieldID errorMessageField = env->GetFieldID(responseClass, "errorMessage", "Ljava/lang/String;");
+        
+        bool success = env->GetBooleanField(response, successField);
+        int statusCode = env->GetIntField(response, statusCodeField);
+        
+        std::string responseBody;
+        jstring jResponseBody = (jstring)env->GetObjectField(response, responseBodyField);
+        if (jResponseBody) {
+            const char* str = env->GetStringUTFChars(jResponseBody, nullptr);
+            if (str) {
+                responseBody = str;
+                env->ReleaseStringUTFChars(jResponseBody, str);
+            }
+            env->DeleteLocalRef(jResponseBody);
+        }
+        
+        std::string errorMessage;
+        jstring jErrorMessage = (jstring)env->GetObjectField(response, errorMessageField);
+        if (jErrorMessage) {
+            const char* str = env->GetStringUTFChars(jErrorMessage, nullptr);
+            if (str) {
+                errorMessage = str;
+                env->ReleaseStringUTFChars(jErrorMessage, str);
+            }
+            env->DeleteLocalRef(jErrorMessage);
+        }
+        
+        env->DeleteLocalRef(response);
+        env->DeleteLocalRef(bridgeClass);
+        env->DeleteLocalRef(responseClass);
+        
+        return {success, statusCode, responseBody, errorMessage};
+    }
+
+    // Device info methods
+    std::string getDeviceModel() {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return "Unknown";
+        
+        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
+        if (!bridgeClass) return "Unknown";
+        
+        jmethodID method = env->GetStaticMethodID(bridgeClass, "getDeviceModel", "()Ljava/lang/String;");
+        if (!method) {
+            env->DeleteLocalRef(bridgeClass);
+            return "Unknown";
+        }
+        
+        jstring result = (jstring)env->CallStaticObjectMethod(bridgeClass, method);
+        env->DeleteLocalRef(bridgeClass);
+        
+        if (!result) return "Unknown";
+        
+        const char* str = env->GetStringUTFChars(result, nullptr);
+        std::string modelName = str ? str : "Unknown";
+        env->ReleaseStringUTFChars(result, str);
+        env->DeleteLocalRef(result);
+        
+        return modelName;
+    }
+
+    std::string getOSVersion() {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return "Unknown";
+        
+        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
+        if (!bridgeClass) return "Unknown";
+        
+        jmethodID method = env->GetStaticMethodID(bridgeClass, "getOSVersion", "()Ljava/lang/String;");
+        if (!method) {
+            env->DeleteLocalRef(bridgeClass);
+            return "Unknown";
+        }
+        
+        jstring result = (jstring)env->CallStaticObjectMethod(bridgeClass, method);
+        env->DeleteLocalRef(bridgeClass);
+        
+        if (!result) return "Unknown";
+        
+        const char* str = env->GetStringUTFChars(result, nullptr);
+        std::string version = str ? str : "Unknown";
+        env->ReleaseStringUTFChars(result, str);
+        env->DeleteLocalRef(result);
+        
+        return version;
+    }
+
+    std::string getChipName() {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return "Unknown";
+        
+        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
+        if (!bridgeClass) return "Unknown";
+        
+        jmethodID method = env->GetStaticMethodID(bridgeClass, "getChipName", "()Ljava/lang/String;");
+        if (!method) {
+            env->DeleteLocalRef(bridgeClass);
+            return "Unknown";
+        }
+        
+        jstring result = (jstring)env->CallStaticObjectMethod(bridgeClass, method);
+        env->DeleteLocalRef(bridgeClass);
+        
+        if (!result) return "Unknown";
+        
+        const char* str = env->GetStringUTFChars(result, nullptr);
+        std::string chipName = str ? str : "Unknown";
+        env->ReleaseStringUTFChars(result, str);
+        env->DeleteLocalRef(result);
+        
+        return chipName;
+    }
+
+    uint64_t getTotalMemory() {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return 0;
+        
+        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
+        if (!bridgeClass) return 0;
+        
+        jmethodID method = env->GetStaticMethodID(bridgeClass, "getTotalMemory", "()J");
+        if (!method) {
+            env->DeleteLocalRef(bridgeClass);
+            return 0;
+        }
+        
+        jlong result = env->CallStaticLongMethod(bridgeClass, method);
+        env->DeleteLocalRef(bridgeClass);
+        
+        return static_cast<uint64_t>(result);
+    }
+
+    uint64_t getAvailableMemory() {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return 0;
+        
+        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
+        if (!bridgeClass) return 0;
+        
+        jmethodID method = env->GetStaticMethodID(bridgeClass, "getAvailableMemory", "()J");
+        if (!method) {
+            env->DeleteLocalRef(bridgeClass);
+            return 0;
+        }
+        
+        jlong result = env->CallStaticLongMethod(bridgeClass, method);
+        env->DeleteLocalRef(bridgeClass);
+        
+        return static_cast<uint64_t>(result);
+    }
+
+    int getCoreCount() {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return 1;
+        
+        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
+        if (!bridgeClass) return 1;
+        
+        jmethodID method = env->GetStaticMethodID(bridgeClass, "getCoreCount", "()I");
+        if (!method) {
+            env->DeleteLocalRef(bridgeClass);
+            return 1;
+        }
+        
+        jint result = env->CallStaticIntMethod(bridgeClass, method);
+        env->DeleteLocalRef(bridgeClass);
+        
+        return static_cast<int>(result);
+    }
+
+    std::string getArchitecture() {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return "unknown";
+        
+        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
+        if (!bridgeClass) return "unknown";
+        
+        jmethodID method = env->GetStaticMethodID(bridgeClass, "getArchitecture", "()Ljava/lang/String;");
+        if (!method) {
+            env->DeleteLocalRef(bridgeClass);
+            return "unknown";
+        }
+        
+        jstring result = (jstring)env->CallStaticObjectMethod(bridgeClass, method);
+        env->DeleteLocalRef(bridgeClass);
+        
+        if (!result) return "unknown";
+        
+        const char* str = env->GetStringUTFChars(result, nullptr);
+        std::string arch = str ? str : "unknown";
+        env->ReleaseStringUTFChars(result, str);
+        env->DeleteLocalRef(result);
+        
+        return arch;
+    }
+} // namespace AndroidBridge
+#elif defined(__APPLE__)
+#include <cstdio>
+// iOS platform bridge for Keychain, HTTP, and Device Info
+extern "C" {
+    // Secure storage
+    bool PlatformAdapter_secureSet(const char* key, const char* value);
+    bool PlatformAdapter_secureGet(const char* key, char** outValue);
+    bool PlatformAdapter_secureDelete(const char* key);
+    bool PlatformAdapter_secureExists(const char* key);
+    bool PlatformAdapter_getPersistentDeviceUUID(char** outValue);
+    
+    // Device info (synchronous)
+    bool PlatformAdapter_getDeviceModel(char** outValue);
+    bool PlatformAdapter_getOSVersion(char** outValue);
+    bool PlatformAdapter_getChipName(char** outValue);
+    uint64_t PlatformAdapter_getTotalMemory(void);
+    uint64_t PlatformAdapter_getAvailableMemory(void);
+    int PlatformAdapter_getCoreCount(void);
+    bool PlatformAdapter_getArchitecture(char** outValue);
+    
+    // HTTP
+    bool PlatformAdapter_httpPostSync(
+        const char* url,
+        const char* jsonBody,
+        const char* supabaseKey,
+        int* outStatusCode,
+        char** outResponseBody,
+        char** outErrorMessage
+    );
+}
+#define LOGI(...) printf("[InitBridge] "); printf(__VA_ARGS__); printf("\n")
+#define LOGD(...) printf("[InitBridge DEBUG] "); printf(__VA_ARGS__); printf("\n")
+#define LOGW(...) printf("[InitBridge WARN] "); printf(__VA_ARGS__); printf("\n")
+#define LOGE(...) printf("[InitBridge ERROR] "); printf(__VA_ARGS__); printf("\n")
 #else
 #include <cstdio>
 #define LOGI(...) printf("[InitBridge] "); printf(__VA_ARGS__); printf("\n")
@@ -387,6 +833,22 @@ rac_result_t InitBridge::initialize(
         return initResult;
     }
 
+    // Step 4: Initialize SDK config with version (required for device registration)
+    // This populates rac_sdk_get_config() which device registration uses
+    // Matches Swift: CppBridge+State.swift initialize()
+    rac_sdk_config_t sdkConfig = {};
+    sdkConfig.platform = "react-native";
+    sdkConfig.sdk_version = "0.2.0";  // TODO: Make configurable
+    sdkConfig.device_id = getPersistentDeviceUUID().c_str();
+    
+    rac_validation_result_t validResult = rac_sdk_init(&sdkConfig);
+    if (validResult != RAC_VALIDATION_OK) {
+        LOGW("SDK config validation warning: %d (non-fatal)", validResult);
+        // Non-fatal - device registration can still work without this
+    } else {
+        LOGI("SDK config initialized with version: %s", sdkConfig.sdk_version);
+    }
+
     initialized_ = true;
     LOGI("SDK initialized successfully for environment %d", static_cast<int>(environment));
 
@@ -431,6 +893,17 @@ void InitBridge::shutdown() {
 // =============================================================================
 
 bool InitBridge::secureSet(const std::string& key, const std::string& value) {
+#if defined(__APPLE__)
+    // Use iOS Keychain bridge directly
+    bool success = PlatformAdapter_secureSet(key.c_str(), value.c_str());
+    LOGD("secureSet (iOS): key=%s, success=%d", key.c_str(), success);
+    return success;
+#elif defined(ANDROID) || defined(__ANDROID__)
+    // Use Android JNI bridge
+    bool success = AndroidBridge::secureSet(key.c_str(), value.c_str());
+    LOGD("secureSet (Android): key=%s, success=%d", key.c_str(), success);
+    return success;
+#else
     if (!g_platformCallbacks || !g_platformCallbacks->secureSet) {
         LOGE("secureSet: Platform callback not available");
         return false;
@@ -444,9 +917,28 @@ bool InitBridge::secureSet(const std::string& key, const std::string& value) {
         LOGE("secureSet: Exception for key=%s", key.c_str());
         return false;
     }
+#endif
 }
 
 bool InitBridge::secureGet(const std::string& key, std::string& outValue) {
+#if defined(__APPLE__)
+    // Use iOS Keychain bridge directly
+    char* value = nullptr;
+    bool success = PlatformAdapter_secureGet(key.c_str(), &value);
+    if (success && value != nullptr) {
+        outValue = value;
+        free(value);
+        LOGD("secureGet (iOS): key=%s found", key.c_str());
+        return true;
+    }
+    LOGD("secureGet (iOS): key=%s not found", key.c_str());
+    return false;
+#elif defined(ANDROID) || defined(__ANDROID__)
+    // Use Android JNI bridge
+    bool success = AndroidBridge::secureGet(key.c_str(), outValue);
+    LOGD("secureGet (Android): key=%s, found=%d", key.c_str(), success);
+    return success;
+#else
     if (!g_platformCallbacks || !g_platformCallbacks->secureGet) {
         LOGE("secureGet: Platform callback not available");
         return false;
@@ -465,9 +957,21 @@ bool InitBridge::secureGet(const std::string& key, std::string& outValue) {
         LOGE("secureGet: Exception for key=%s", key.c_str());
         return false;
     }
+#endif
 }
 
 bool InitBridge::secureDelete(const std::string& key) {
+#if defined(__APPLE__)
+    // Use iOS Keychain bridge directly
+    bool success = PlatformAdapter_secureDelete(key.c_str());
+    LOGD("secureDelete (iOS): key=%s, success=%d", key.c_str(), success);
+    return success;
+#elif defined(ANDROID) || defined(__ANDROID__)
+    // Use Android JNI bridge
+    bool success = AndroidBridge::secureDelete(key.c_str());
+    LOGD("secureDelete (Android): key=%s, success=%d", key.c_str(), success);
+    return success;
+#else
     if (!g_platformCallbacks || !g_platformCallbacks->secureDelete) {
         LOGE("secureDelete: Platform callback not available");
         return false;
@@ -481,9 +985,21 @@ bool InitBridge::secureDelete(const std::string& key) {
         LOGE("secureDelete: Exception for key=%s", key.c_str());
         return false;
     }
+#endif
 }
 
 bool InitBridge::secureExists(const std::string& key) {
+#if defined(__APPLE__)
+    // Use iOS Keychain bridge directly
+    bool exists = PlatformAdapter_secureExists(key.c_str());
+    LOGD("secureExists (iOS): key=%s, exists=%d", key.c_str(), exists);
+    return exists;
+#elif defined(ANDROID) || defined(__ANDROID__)
+    // Use Android JNI bridge
+    bool exists = AndroidBridge::secureExists(key.c_str());
+    LOGD("secureExists (Android): key=%s, exists=%d", key.c_str(), exists);
+    return exists;
+#else
     if (!g_platformCallbacks || !g_platformCallbacks->secureGet) {
         LOGE("secureExists: Platform callback not available");
         return false;
@@ -498,6 +1014,7 @@ bool InitBridge::secureExists(const std::string& key) {
         LOGE("secureExists: Exception for key=%s", key.c_str());
         return false;
     }
+#endif
 }
 
 std::string InitBridge::getPersistentDeviceUUID() {
@@ -568,6 +1085,153 @@ std::string InitBridge::getPersistentDeviceUUID() {
     }
 
     return newUUID;
+}
+
+// =============================================================================
+// Device Info (Synchronous)
+// For device registration callback which must be synchronous
+// =============================================================================
+
+std::string InitBridge::getDeviceModel() {
+#if defined(__APPLE__)
+    char* value = nullptr;
+    if (PlatformAdapter_getDeviceModel(&value) && value) {
+        std::string result(value);
+        free(value);
+        return result;
+    }
+    return "Unknown";
+#elif defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::getDeviceModel();
+#else
+    return "Unknown";
+#endif
+}
+
+std::string InitBridge::getOSVersion() {
+#if defined(__APPLE__)
+    char* value = nullptr;
+    if (PlatformAdapter_getOSVersion(&value) && value) {
+        std::string result(value);
+        free(value);
+        return result;
+    }
+    return "Unknown";
+#elif defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::getOSVersion();
+#else
+    return "Unknown";
+#endif
+}
+
+std::string InitBridge::getChipName() {
+#if defined(__APPLE__)
+    char* value = nullptr;
+    if (PlatformAdapter_getChipName(&value) && value) {
+        std::string result(value);
+        free(value);
+        return result;
+    }
+    return "Apple Silicon";
+#elif defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::getChipName();
+#else
+    return "Unknown";
+#endif
+}
+
+uint64_t InitBridge::getTotalMemory() {
+#if defined(__APPLE__)
+    return PlatformAdapter_getTotalMemory();
+#elif defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::getTotalMemory();
+#else
+    return 0;
+#endif
+}
+
+uint64_t InitBridge::getAvailableMemory() {
+#if defined(__APPLE__)
+    return PlatformAdapter_getAvailableMemory();
+#elif defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::getAvailableMemory();
+#else
+    return 0;
+#endif
+}
+
+int InitBridge::getCoreCount() {
+#if defined(__APPLE__)
+    return PlatformAdapter_getCoreCount();
+#elif defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::getCoreCount();
+#else
+    return 1;
+#endif
+}
+
+std::string InitBridge::getArchitecture() {
+#if defined(__APPLE__)
+    char* value = nullptr;
+    if (PlatformAdapter_getArchitecture(&value) && value) {
+        std::string result(value);
+        free(value);
+        return result;
+    }
+    return "arm64";
+#elif defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::getArchitecture();
+#else
+    return "unknown";
+#endif
+}
+
+// =============================================================================
+// HTTP POST for Device Registration (Synchronous)
+// Matches Swift: CppBridge+Device.swift http_post callback
+// =============================================================================
+
+std::tuple<bool, int, std::string, std::string> InitBridge::httpPostSync(
+    const std::string& url,
+    const std::string& jsonBody,
+    const std::string& supabaseKey
+) {
+    LOGI("httpPostSync to: %s", url.c_str());
+
+#if defined(ANDROID) || defined(__ANDROID__)
+    // Android: Call JNI to PlatformAdapterBridge.httpPostSync
+    return AndroidBridge::httpPostSync(url, jsonBody, supabaseKey);
+
+#elif defined(__APPLE__)
+    // iOS: Call PlatformAdapter_httpPostSync via extern C
+    int statusCode = 0;
+    char* responseBody = nullptr;
+    char* errorMessage = nullptr;
+
+    bool success = PlatformAdapter_httpPostSync(
+        url.c_str(),
+        jsonBody.c_str(),
+        supabaseKey.empty() ? nullptr : supabaseKey.c_str(),
+        &statusCode,
+        &responseBody,
+        &errorMessage
+    );
+
+    std::string responseBodyStr = responseBody ? responseBody : "";
+    std::string errorMessageStr = errorMessage ? errorMessage : "";
+
+    // Free allocated strings
+    if (responseBody) free(responseBody);
+    if (errorMessage) free(errorMessage);
+
+    LOGI("httpPostSync result: success=%d statusCode=%d", success, statusCode);
+    return {success, statusCode, responseBodyStr, errorMessageStr};
+
+#else
+    // Unsupported platform
+    LOGE("httpPostSync: Unsupported platform");
+    return {false, 0, "", "Unsupported platform"};
+#endif
 }
 
 } // namespace bridges

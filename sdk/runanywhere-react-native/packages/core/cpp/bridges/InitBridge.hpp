@@ -13,6 +13,7 @@
 #include <string>
 #include <functional>
 #include <memory>
+#include <tuple>
 
 // RACommons headers
 #include "rac_core.h"
@@ -171,6 +172,68 @@ public:
      * @return Persistent device UUID
      */
     std::string getPersistentDeviceUUID();
+
+    // =========================================================================
+    // Device Info (Synchronous)
+    // For device registration callback which must be synchronous
+    // =========================================================================
+
+    /**
+     * @brief Get device model name (e.g., "iPhone 16 Pro Max")
+     */
+    std::string getDeviceModel();
+
+    /**
+     * @brief Get OS version (e.g., "18.2")
+     */
+    std::string getOSVersion();
+
+    /**
+     * @brief Get chip name (e.g., "A18 Pro")
+     */
+    std::string getChipName();
+
+    /**
+     * @brief Get total memory in bytes
+     */
+    uint64_t getTotalMemory();
+
+    /**
+     * @brief Get available memory in bytes
+     */
+    uint64_t getAvailableMemory();
+
+    /**
+     * @brief Get CPU core count
+     */
+    int getCoreCount();
+
+    /**
+     * @brief Get architecture (e.g., "arm64")
+     */
+    std::string getArchitecture();
+
+    // =========================================================================
+    // HTTP Methods for Device Registration
+    // Matches Swift: CppBridge+Device.swift http_post callback
+    // =========================================================================
+
+    /**
+     * @brief Synchronous HTTP POST for device registration
+     *
+     * Uses native URLSession (iOS) or HttpURLConnection (Android).
+     * Required by C++ rac_device_manager which expects synchronous HTTP.
+     *
+     * @param url Full URL to POST to
+     * @param jsonBody JSON body string
+     * @param supabaseKey Supabase API key (for dev mode, empty for prod)
+     * @return tuple<success, statusCode, responseBody, errorMessage>
+     */
+    std::tuple<bool, int, std::string, std::string> httpPostSync(
+        const std::string& url,
+        const std::string& jsonBody,
+        const std::string& supabaseKey
+    );
 
 private:
     InitBridge() = default;

@@ -532,6 +532,23 @@ export interface RunAnywhereCore
   getPersistentDeviceUUID(): Promise<string>;
 
   // ============================================================================
+  // Telemetry
+  // Matches Swift: CppBridge+Telemetry.swift
+  // C++ handles all telemetry logic - batching, JSON building, routing
+  // ============================================================================
+
+  /**
+   * Flush pending telemetry events immediately
+   * Sends all queued events to the backend
+   */
+  flushTelemetry(): Promise<void>;
+
+  /**
+   * Check if telemetry is initialized
+   */
+  isTelemetryInitialized(): Promise<boolean>;
+
+  // ============================================================================
   // Voice Agent Capability (Backend-Agnostic)
   // Matches Swift: CppBridge+VoiceAgent.swift - calls rac_voice_agent_* APIs
   // Requires STT, LLM, and TTS backends to be registered

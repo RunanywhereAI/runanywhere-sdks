@@ -28,6 +28,7 @@ struct DeviceInfo {
     std::string deviceModel;
     std::string deviceName;
     std::string platform;
+    std::string osName;
     std::string osVersion;
     std::string formFactor;
     std::string architecture;

@@ -53,11 +53,12 @@ const DEFAULT_TIMEOUT_MS = 30000;
 
 /**
  * SDK Environment enum matching Swift/C++ SDKEnvironment
+ * Uses string values to match types/enums.ts
  */
 export enum SDKEnvironment {
-  Development = 0,
-  Staging = 1,
-  Production = 2,
+  Development = 'development',
+  Staging = 'staging',
+  Production = 'production',
 }
 
 /**
@@ -361,8 +362,10 @@ export class HTTPService {
 
     if (this.environment === SDKEnvironment.Development) {
       // Development mode - use Supabase headers
+      // Supabase requires BOTH apikey AND Authorization: Bearer headers
       if (this.supabaseKey) {
         headers['apikey'] = this.supabaseKey;
+        headers['Authorization'] = `Bearer ${this.supabaseKey}`;
         headers['Prefer'] = isDeviceRegistration
           ? 'resolution=merge-duplicates'
           : 'return=representation';

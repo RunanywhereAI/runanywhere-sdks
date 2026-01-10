@@ -193,11 +193,14 @@ const App: React.FC = () => {
       const startTime = Date.now();
 
       // Initialize SDK based on build configuration
-      // Development mode - uses Supabase, no API key needed
+      // Development mode - uses Supabase directly (same creds as iOS/Android native)
       await RunAnywhere.initialize({
         apiKey: '', // Empty in development mode
-        baseURL: 'https://api.runanywhere.com',
+        baseURL: 'https://api.runanywhere.ai',
         environment: SDKEnvironment.Development,
+        // Supabase credentials for development mode (from runanywhere-commons)
+        supabaseURL: 'https://fhtgjtxuoikwwouxqzrn.supabase.co',
+        supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZodGdqdHh1b2lrd3dvdXhxenJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjExOTkwNzIsImV4cCI6MjA3Njc3NTA3Mn0.aIssX-t8CIqt8zoctNhMS8fm3wtH-DzsQiy9FunqD9E',
       });
 
       // Register modules and models (await to ensure models are ready before UI)
