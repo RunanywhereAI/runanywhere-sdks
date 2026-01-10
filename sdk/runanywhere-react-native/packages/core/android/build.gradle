@@ -311,6 +311,6 @@ dependencies {
     implementation "com.facebook.react:react-android"
     implementation project(":react-native-nitro-modules")
 
-    // Apache Commons Compress for tar.gz/tar.bz2 archive extraction
+    // Apache Commons Compress for tar.gz archive extraction
     implementation "org.apache.commons:commons-compress:1.26.0"
 }

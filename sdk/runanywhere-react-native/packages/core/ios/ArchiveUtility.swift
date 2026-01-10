@@ -9,7 +9,7 @@
  * sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/Download/Utilities/ArchiveUtility.swift
  *
  * Supports: tar.gz, zip
- * Note: tar.bz2 and tar.xz are NOT supported without external dependencies
+ * Note: All models should use tar.gz from RunanywhereAI/sherpa-onnx fork for best performance
  */
 
 import Compression
@@ -81,9 +81,9 @@ public enum ArchiveError: Error, LocalizedError {
         case .zip:
             try extractZip(from: archiveURL, to: destinationURL, progressHandler: progressHandler)
         case .bzip2:
-            throw ArchiveError.unsupportedFormat("tar.bz2 requires SWCompression. Use tar.gz instead.")
+            throw ArchiveError.unsupportedFormat("tar.bz2 not supported. Use tar.gz from RunanywhereAI/sherpa-onnx fork.")
         case .xz:
-            throw ArchiveError.unsupportedFormat("tar.xz requires SWCompression. Use tar.gz instead.")
+            throw ArchiveError.unsupportedFormat("tar.xz not supported. Use tar.gz from RunanywhereAI/sherpa-onnx fork.")
         case .unknown:
             // Fallback to file extension check
             let lowercased = archivePath.lowercased()
