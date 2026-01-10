@@ -668,6 +668,73 @@ export const FileSystem = {
   },
 
   /**
+   * Check if a directory exists
+   */
+  async directoryExists(path: string): Promise<boolean> {
+    if (!RNFS) return false;
+    try {
+      const exists = await RNFS.exists(path);
+      if (!exists) return false;
+      const stat = await RNFS.stat(path);
+      return stat.isDirectory();
+    } catch {
+      return false;
+    }
+  },
+
+  /**
+   * Get the size of a directory in bytes (recursive)
+   */
+  async getDirectorySize(dirPath: string): Promise<number> {
+    if (!RNFS) return 0;
+
+    try {
+      const exists = await RNFS.exists(dirPath);
+      if (!exists) return 0;
+
+      let totalSize = 0;
+      const contents = await RNFS.readDir(dirPath);
+
+      for (const item of contents) {
+        if (item.isDirectory()) {
+          totalSize += await this.getDirectorySize(item.path);
+        } else {
+          totalSize += item.size || 0;
+        }
+      }
+
+      return totalSize;
+    } catch {
+      return 0;
+    }
+  },
+
+  /**
+   * Get the cache directory path
+   */
+  getCacheDirectory(): string {
+    if (!RNFS) return '';
+    return RNFS.CachesDirectoryPath;
+  },
+
+  /**
+   * List contents of a directory
+   */
+  async listDirectory(dirPath: string): Promise<string[]> {
+    if (!RNFS) return [];
+
+    try {
+      const exists = await RNFS.exists(dirPath);
+      if (!exists) return [];
+
+      const contents = await RNFS.readDir(dirPath);
+      return contents.map((item) => item.name);
+    } catch {
+      return [];
+    }
+  },
+
+  /**
    * Delete a file
    */
   async deleteFile(path: string): Promise<boolean> {
