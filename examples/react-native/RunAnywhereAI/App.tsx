@@ -157,14 +157,9 @@ const App: React.FC = () => {
       artifactType: ModelArtifactType.TarGzArchive,
       memoryRequirement: 75_000_000,
     });
-    await ONNX.addModel({
-      id: 'sherpa-onnx-whisper-small.en',
-      name: 'Sherpa Whisper Small (ONNX)',
-      url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2',
-      modality: ModelCategory.SpeechRecognition,
-      artifactType: ModelArtifactType.TarBz2Archive,
-      memoryRequirement: 250_000_000,
-    });
+    // NOTE: whisper-small.en not included to match iOS/Android examples
+    // All ONNX models use tar.gz from RunanywhereAI/sherpa-onnx fork for fast native extraction
+    // If you need whisper-small, convert to tar.gz and upload to the fork
     // TTS Models (Piper VITS)
     await ONNX.addModel({
       id: 'vits-piper-en_US-lessac-medium',
