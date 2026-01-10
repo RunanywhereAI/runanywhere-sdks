@@ -365,10 +365,20 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isInitialized() {
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getBackendInfo() {
     return Promise<std::string>::async([]() {
+        // Check if SDK is initialized using the actual InitBridge state
+        bool isInitialized = InitBridge::shared().isInitialized();
+        
+        std::string status = isInitialized ? "initialized" : "not_initialized";
+        std::string name = isInitialized ? "RunAnywhere Core" : "Not initialized";
+        
         return buildJsonObject({
+            {"name", jsonString(name)},
+            {"status", jsonString(status)},
+            {"version", jsonString("0.2.0")},
             {"api", jsonString("rac_*")},
             {"source", jsonString("runanywhere-commons")},
-            {"module", jsonString("core")}
+            {"module", jsonString("core")},
+            {"initialized", isInitialized ? "true" : "false"}
         });
     });
 }
