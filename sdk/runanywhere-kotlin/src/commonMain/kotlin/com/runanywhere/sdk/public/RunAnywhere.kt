@@ -10,6 +10,7 @@
 
 package com.runanywhere.sdk.public
 
+import com.runanywhere.sdk.foundation.LogLevel
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.utils.SDKConstants
@@ -192,11 +193,11 @@ object RunAnywhere {
                 // Set log level based on environment
                 val logLevel =
                     when (environment) {
-                        SDKEnvironment.DEVELOPMENT -> SDKLogger.Companion.LogLevel.DEBUG
-                        SDKEnvironment.STAGING -> SDKLogger.Companion.LogLevel.INFO
-                        SDKEnvironment.PRODUCTION -> SDKLogger.Companion.LogLevel.WARNING
+                        SDKEnvironment.DEVELOPMENT -> LogLevel.DEBUG
+                        SDKEnvironment.STAGING -> LogLevel.INFO
+                        SDKEnvironment.PRODUCTION -> LogLevel.WARNING
                     }
-                SDKLogger.setLogLevel(logLevel)
+                SDKLogger.setLevel(logLevel)
 
                 // Initialize CppBridge (Phase 1)
                 // Note: CppBridge is in jvmAndroidMain, we call it via expect/actual

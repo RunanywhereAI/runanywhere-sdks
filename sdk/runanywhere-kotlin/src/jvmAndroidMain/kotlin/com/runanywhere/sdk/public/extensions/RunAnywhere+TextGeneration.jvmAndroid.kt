@@ -7,6 +7,7 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.errors.SDKError
 import com.runanywhere.sdk.public.RunAnywhere
@@ -21,6 +22,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
+
+private val llmLogger = SDKLogger.llm
 
 actual suspend fun RunAnywhere.chat(prompt: String): String {
     val result = generate(prompt, null)
@@ -39,6 +42,7 @@ actual suspend fun RunAnywhere.generate(
 
     val opts = options ?: LLMGenerationOptions.DEFAULT
     val startTime = System.currentTimeMillis()
+    llmLogger.debug("Generating response for prompt: ${prompt.take(50)}${if (prompt.length > 50) "..." else ""}")
 
     // Convert to CppBridgeLLM config
     val config =
@@ -53,6 +57,7 @@ actual suspend fun RunAnywhere.generate(
 
     val endTime = System.currentTimeMillis()
     val latencyMs = (endTime - startTime).toDouble()
+    llmLogger.info("Generation complete: ${cppResult.tokensGenerated} tokens in ${latencyMs.toLong()}ms (${String.format("%.1f", cppResult.tokensPerSecond)} tok/s)")
 
     return LLMGenerationResult(
         text = cppResult.text,

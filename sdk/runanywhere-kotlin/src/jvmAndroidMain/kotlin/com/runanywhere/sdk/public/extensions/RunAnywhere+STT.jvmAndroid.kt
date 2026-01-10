@@ -7,6 +7,7 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
 import com.runanywhere.sdk.foundation.errors.SDKError
 import com.runanywhere.sdk.public.RunAnywhere
@@ -14,6 +15,8 @@ import com.runanywhere.sdk.public.extensions.STT.STTOptions
 import com.runanywhere.sdk.public.extensions.STT.STTOutput
 import com.runanywhere.sdk.public.extensions.STT.STTTranscriptionResult
 import com.runanywhere.sdk.public.extensions.STT.TranscriptionMetadata
+
+private val sttLogger = SDKLogger.stt
 
 actual suspend fun RunAnywhere.transcribe(audioData: ByteArray): String {
     val result = transcribeWithOptions(audioData, STTOptions())
@@ -46,6 +49,7 @@ actual suspend fun RunAnywhere.transcribeWithOptions(
     }
 
     val audioLengthSec = estimateAudioLength(audioData.size)
+    sttLogger.debug("Transcribing audio: ${audioData.size} bytes (${String.format("%.2f", audioLengthSec)}s)")
 
     // Convert to CppBridgeSTT config
     val config =
@@ -55,6 +59,7 @@ actual suspend fun RunAnywhere.transcribeWithOptions(
         )
 
     val result = CppBridgeSTT.transcribe(audioData, config)
+    sttLogger.info("Transcription complete: ${result.text.take(50)}${if (result.text.length > 50) "..." else ""}")
 
     val metadata =
         TranscriptionMetadata(

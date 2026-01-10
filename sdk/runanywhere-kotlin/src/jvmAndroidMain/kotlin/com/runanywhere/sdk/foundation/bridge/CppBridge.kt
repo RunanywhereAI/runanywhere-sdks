@@ -8,6 +8,8 @@
 
 package com.runanywhere.sdk.foundation.bridge
 
+import com.runanywhere.sdk.foundation.Logging
+import com.runanywhere.sdk.foundation.SDKEnvironment
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeAuth
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
@@ -16,6 +18,8 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelAssignment
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatform
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
+import com.runanywhere.sdk.foundation.logging.SentryDestination
+import com.runanywhere.sdk.foundation.logging.SentryManager
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
@@ -135,7 +139,14 @@ object CppBridge {
             // CRITICAL: Register platform adapter FIRST before any C++ calls
             CppBridgePlatformAdapter.register()
 
-            // Configure logging (handled by platform adapter)
+            // Configure logging with Sentry integration
+            // Setup Sentry hooks so Logging can trigger Sentry setup/teardown
+            setupSentryHooks(environment)
+
+            // Initialize Sentry if enabled for this environment (staging/production)
+            if (environment != Environment.DEVELOPMENT) {
+                setupSentryLogging(environment)
+            }
 
             // Register telemetry HTTP callback (just sets isRegistered flag)
             CppBridgeTelemetry.register()
@@ -471,6 +482,13 @@ object CppBridge {
             CppBridgeEvents.unregister()
             CppBridgePlatformAdapter.unregister()
 
+            // Teardown Sentry logging
+            teardownSentryLogging()
+
+            // Clear Sentry hooks
+            Logging.sentrySetupHook = null
+            Logging.sentryTeardownHook = null
+
             _servicesInitialized = false
             _isInitialized = false
         }
@@ -484,5 +502,75 @@ object CppBridge {
     fun isNativeInitialized(): Boolean {
         // TODO: Call rac_is_initialized()
         return _isInitialized
+    }
+
+    // =============================================================================
+    // SENTRY LOGGING INTEGRATION
+    // =============================================================================
+
+    /**
+     * Setup Sentry hooks so Logging can trigger Sentry setup/teardown dynamically.
+     *
+     * This allows runtime enabling/disabling of Sentry logging via Logging.setSentryLoggingEnabled()
+     */
+    private fun setupSentryHooks(environment: Environment) {
+        Logging.sentrySetupHook = {
+            setupSentryLogging(environment)
+        }
+
+        Logging.sentryTeardownHook = {
+            teardownSentryLogging()
+        }
+    }
+
+    /**
+     * Initialize Sentry logging for error tracking.
+     *
+     * Matches iOS SDK's setupSentryLogging() in Logging class.
+     *
+     * @param environment SDK environment for tagging Sentry events
+     */
+    private fun setupSentryLogging(environment: Environment) {
+        val sdkEnvironment =
+            when (environment) {
+                Environment.DEVELOPMENT -> SDKEnvironment.DEVELOPMENT
+                Environment.STAGING -> SDKEnvironment.STAGING
+                Environment.PRODUCTION -> SDKEnvironment.PRODUCTION
+            }
+
+        try {
+            // Initialize Sentry manager
+            SentryManager.initialize(environment = sdkEnvironment)
+
+            if (SentryManager.isInitialized) {
+                // Add Sentry destination to logging system
+                Logging.addDestinationSync(SentryDestination())
+                logger.info("✅ Sentry logging initialized")
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to setup Sentry logging: ${e.message}")
+        }
+    }
+
+    /**
+     * Teardown Sentry logging.
+     */
+    private fun teardownSentryLogging() {
+        try {
+            // Remove Sentry destination from logging system
+            val sentryDestination =
+                Logging.destinations.find {
+                    it.identifier == SentryDestination.DESTINATION_ID
+                }
+            if (sentryDestination != null) {
+                Logging.removeDestinationSync(sentryDestination)
+            }
+
+            // Close Sentry manager
+            SentryManager.close()
+            logger.info("Sentry logging disabled")
+        } catch (e: Exception) {
+            logger.error("Failed to teardown Sentry logging: ${e.message}")
+        }
     }
 }

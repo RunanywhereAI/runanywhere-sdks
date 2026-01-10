@@ -13,6 +13,7 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Base64
+import com.runanywhere.sdk.foundation.SDKLogger
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
@@ -140,35 +141,81 @@ object CppBridgePlatformAdapter {
      * Log callback for C++ core.
      *
      * Routes C++ log messages to Kotlin logging system.
+     * Parses structured metadata from C++ log messages.
+     *
+     * Format: "Message text | key1=value1, key2=value2"
      *
      * @param level The log level (see [LogLevel] constants)
      * @param tag The log tag/category
-     * @param message The log message
+     * @param message The log message (may contain metadata)
      *
      * NOTE: This function is called from JNI. Do not capture any state.
      */
     @JvmStatic
     fun logCallback(level: Int, tag: String, message: String) {
-        val formattedTag = "$TAG/$tag"
+        // Parse structured metadata from C++ log messages
+        val (cleanMessage, metadata) = parseLogMetadata(message)
+        val category = if (tag.isNotEmpty()) tag else "RAC"
+
+        // Create logger with proper category for destination routing
+        val logger = SDKLogger(category)
 
         when (level) {
-            LogLevel.TRACE, LogLevel.DEBUG -> {
-                // Debug level logging
-                println("D/$formattedTag: $message")
-            }
-            LogLevel.INFO -> {
-                println("I/$formattedTag: $message")
-            }
-            LogLevel.WARN -> {
-                println("W/$formattedTag: $message")
-            }
-            LogLevel.ERROR, LogLevel.FATAL -> {
-                System.err.println("E/$formattedTag: $message")
-            }
-            else -> {
-                println("?/$formattedTag: $message")
+            LogLevel.TRACE -> logger.trace("[Native] $cleanMessage", metadata)
+            LogLevel.DEBUG -> logger.debug("[Native] $cleanMessage", metadata)
+            LogLevel.INFO -> logger.info("[Native] $cleanMessage", metadata)
+            LogLevel.WARN -> logger.warning("[Native] $cleanMessage", metadata)
+            LogLevel.ERROR -> logger.error("[Native] $cleanMessage", metadata)
+            LogLevel.FATAL -> logger.fault("[Native] $cleanMessage", metadata)
+            else -> logger.debug("[Native] $cleanMessage", metadata)
+        }
+    }
+
+    /**
+     * Parse structured metadata from C++ log messages.
+     *
+     * Format: "Message text | key1=value1, key2=value2"
+     *
+     * Matches iOS SDK's parseLogMetadata function in CppBridge+PlatformAdapter.swift
+     *
+     * @param message The raw log message from C++
+     * @return Pair of (clean message, metadata map)
+     */
+    private fun parseLogMetadata(message: String): Pair<String, Map<String, Any?>?> {
+        val parts = message.split(" | ", limit = 2)
+        if (parts.size < 2) {
+            return Pair(message, null)
+        }
+
+        val cleanMessage = parts[0]
+        val metadataString = parts[1]
+
+        val metadata = mutableMapOf<String, Any?>()
+        val pairs =
+            metadataString
+                .split(Regex("[,\\s]+"))
+                .filter { it.isNotEmpty() && it.contains("=") }
+
+        for (pair in pairs) {
+            val keyValue = pair.split("=", limit = 2)
+            if (keyValue.size != 2) continue
+
+            val key = keyValue[0].trim()
+            val value = keyValue[1].trim()
+
+            // Map known C++ keys to SDK metadata keys (matching iOS behavior)
+            when (key) {
+                "file" -> metadata["source_file"] = value
+                "func" -> metadata["source_function"] = value
+                "error_code" -> metadata["error_code"] = value.toIntOrNull() ?: value
+                "error" -> metadata["error_message"] = value
+                "model" -> metadata["model_id"] = value
+                "framework" -> metadata["framework"] = value
+                else -> metadata[key] = value
             }
         }
+
+        return Pair(cleanMessage, metadata.ifEmpty { null })
     }
 
     // ========================================================================

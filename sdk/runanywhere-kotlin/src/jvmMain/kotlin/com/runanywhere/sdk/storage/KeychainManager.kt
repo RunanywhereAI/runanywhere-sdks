@@ -29,7 +29,7 @@ object KeychainManager {
             prefs.flush()
             logger.debug("API key stored securely")
         } catch (e: Exception) {
-            logger.error("Failed to store API key securely", e)
+            logger.error("Failed to store API key securely", throwable = e)
             // Fallback to plain storage
             prefs.put(API_KEY_PREF, apiKey)
             prefs.flush()
@@ -48,7 +48,7 @@ object KeychainManager {
                 null
             }
         } catch (e: Exception) {
-            logger.error("Failed to retrieve API key", e)
+            logger.error("Failed to retrieve API key", throwable = e)
             // Try as plain text
             prefs.get(API_KEY_PREF, null)
         }
