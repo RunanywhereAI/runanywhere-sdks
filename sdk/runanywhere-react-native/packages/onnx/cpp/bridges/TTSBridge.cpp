@@ -10,19 +10,11 @@
 #include <stdexcept>
 #include <cstring>
 
-// Platform-specific logging
-#if defined(ANDROID) || defined(__ANDROID__)
-#include <android/log.h>
-#define LOG_TAG "TTSBridge"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
-#else
-#include <cstdio>
-#define LOGI(...) printf("[TTSBridge] "); printf(__VA_ARGS__); printf("\n")
-#define LOGD(...) printf("[TTSBridge DEBUG] "); printf(__VA_ARGS__); printf("\n")
-#define LOGE(...) printf("[TTSBridge ERROR] "); printf(__VA_ARGS__); printf("\n")
-#endif
+// RACommons logger - unified logging across platforms
+#include "rac_logger.h"
+
+// Category for TTS.ONNX logging
+static const char* LOG_CATEGORY = "TTS.ONNX";
 
 namespace runanywhere {
 namespace bridges {
@@ -78,7 +70,7 @@ rac_result_t TTSBridge::loadModel(const std::string& modelId) {
 
     if (result == RAC_SUCCESS) {
         loadedModelId_ = modelId;
-        LOGI("TTS voice loaded: %s", modelId.c_str());
+        RAC_LOG_INFO(LOG_CATEGORY, "TTS voice loaded: %s", modelId.c_str());
     } else {
         throw std::runtime_error("TTSBridge: Failed to load TTS voice '" + modelId + "'. Error: " + std::to_string(result));
     }

@@ -8,6 +8,7 @@
  */
 
 import { NativeEventEmitter, NativeModules } from 'react-native';
+import { SDKLogger } from '../../Foundation/Logging';
 import type {
   AnySDKEvent,
   ComponentInitializationEvent,
@@ -100,8 +101,8 @@ class EventBusImpl {
       this.setupNativeListener(NativeEventNames.SDK_DEVICE);
       this.setupNativeListener(NativeEventNames.SDK_COMPONENT);
     } else {
-      console.warn(
-        '[RunAnywhere] Native module not available. Events will only work in development mode.'
+      SDKLogger.events.warning(
+        'Native module not available. Events will only work in development mode.'
       );
     }
 
@@ -138,7 +139,7 @@ class EventBusImpl {
         try {
           listener(event);
         } catch (error) {
-          console.error('[RunAnywhere] Error in event listener:', error);
+          SDKLogger.events.logError(error as Error, 'Error in event listener');
         }
       });
     }
@@ -152,7 +153,7 @@ class EventBusImpl {
         try {
           listener(event);
         } catch (error) {
-          console.error('[RunAnywhere] Error in event listener:', error);
+          SDKLogger.events.logError(error as Error, 'Error in event listener');
         }
       });
     }
@@ -340,7 +341,7 @@ class EventBusImpl {
 
     const eventName = eventNameMap[eventType];
     if (!eventName) {
-      console.warn(`[RunAnywhere] Unknown event type: ${eventType}`);
+      SDKLogger.events.warning(`Unknown event type: ${eventType}`);
       return () => {};
     }
 

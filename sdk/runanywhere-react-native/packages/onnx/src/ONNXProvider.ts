@@ -8,14 +8,10 @@
  */
 
 import { requireNativeONNXModule, isNativeONNXModuleAvailable } from './native/NativeRunAnywhereONNX';
+import { SDKLogger } from '@runanywhere/core';
 
-// Simple logger for this package
-const DEBUG = typeof __DEV__ !== 'undefined' ? __DEV__ : false;
-const log = {
-  info: (msg: string) => DEBUG && console.log(`[ONNXProvider] ${msg}`),
-  debug: (msg: string) => DEBUG && console.log(`[ONNXProvider] ${msg}`),
-  warning: (msg: string) => console.warn(`[ONNXProvider] ${msg}`),
-};
+// Use SDKLogger with ONNX.Provider category
+const logger = new SDKLogger('ONNX.Provider');
 
 /**
  * ONNX Module
@@ -49,16 +45,16 @@ export class ONNXProvider {
    */
   static async register(): Promise<boolean> {
     if (this.isRegistered) {
-      log.debug('ONNX already registered, returning');
+      logger.debug('ONNX already registered, returning');
       return true;
     }
 
     if (!isNativeONNXModuleAvailable()) {
-      log.warning('ONNX native module not available');
+      logger.warning('ONNX native module not available');
       return false;
     }
 
-    log.info('Registering ONNX backend with C++ registry...');
+    logger.info('Registering ONNX backend with C++ registry...');
 
     try {
       const native = requireNativeONNXModule();
@@ -66,12 +62,12 @@ export class ONNXProvider {
       const success = await native.registerBackend();
       if (success) {
         this.isRegistered = true;
-        log.info('✅ ONNX backend registered successfully (STT + TTS + VAD)');
+        logger.info('ONNX backend registered successfully (STT + TTS + VAD)');
       }
       return success;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      log.warning(`ONNX registration failed: ${msg}`);
+      logger.warning(`ONNX registration failed: ${msg}`);
       return false;
     }
   }
@@ -94,7 +90,7 @@ export class ONNXProvider {
       const success = await native.unregisterBackend();
       if (success) {
         this.isRegistered = false;
-        log.info('ONNX backend unregistered');
+        logger.info('ONNX backend unregistered');
       }
       return success;
     } catch (error) {

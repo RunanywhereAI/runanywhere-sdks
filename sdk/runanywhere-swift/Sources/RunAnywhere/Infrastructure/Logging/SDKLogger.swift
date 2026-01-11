@@ -283,6 +283,7 @@ public final class Logging: @unchecked Sendable {
 
         // Always print when local logging is enabled (controlled by configuration)
         // The enableLocalLogging flag already controls whether this method is called
+        // swiftlint:disable:next no_print_statements
         print(output)
     }
 

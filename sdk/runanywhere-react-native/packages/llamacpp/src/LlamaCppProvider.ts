@@ -8,14 +8,10 @@
  */
 
 import { requireNativeLlamaModule, isNativeLlamaModuleAvailable } from './native/NativeRunAnywhereLlama';
+import { SDKLogger } from '@runanywhere/core';
 
-// Simple logger for this package
-const DEBUG = typeof __DEV__ !== 'undefined' ? __DEV__ : false;
-const log = {
-  info: (msg: string) => DEBUG && console.log(`[LlamaCppProvider] ${msg}`),
-  debug: (msg: string) => DEBUG && console.log(`[LlamaCppProvider] ${msg}`),
-  warning: (msg: string) => console.warn(`[LlamaCppProvider] ${msg}`),
-};
+// SDKLogger instance for this module
+const log = new SDKLogger('LLM.LlamaCppProvider');
 
 /**
  * LlamaCPP Module
@@ -57,7 +53,7 @@ export class LlamaCppProvider {
       return false;
     }
 
-    log.info('Registering LlamaCPP backend with C++ registry...');
+    log.debug('Registering LlamaCPP backend with C++ registry');
 
     try {
       const native = requireNativeLlamaModule();
@@ -65,7 +61,7 @@ export class LlamaCppProvider {
       const success = await native.registerBackend();
       if (success) {
         this.isRegistered = true;
-        log.info('✅ LlamaCPP backend registered successfully');
+        log.info('LlamaCPP backend registered successfully');
       }
       return success;
     } catch (error) {
@@ -93,10 +89,11 @@ export class LlamaCppProvider {
       const success = await native.unregisterBackend();
       if (success) {
         this.isRegistered = false;
-        log.info('LlamaCPP backend unregistered');
+        log.debug('LlamaCPP backend unregistered');
       }
       return success;
     } catch (error) {
+      log.error(`LlamaCPP unregistration failed: ${error instanceof Error ? error.message : String(error)}`);
       return false;
     }
   }
