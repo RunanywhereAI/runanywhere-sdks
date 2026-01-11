@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/core/types/storage_types.dart';
@@ -232,19 +233,74 @@ class RunAnywhere {
     return List.unmodifiable(uniqueModels.values.toList());
   }
 
-  /// Get the currently loaded model ID
-  ///
-  /// Returns null if no model is loaded.
+  // ============================================================================
+  // MARK: - LLM State (matches Swift RunAnywhere+ModelManagement.swift)
+  // ============================================================================
+
+  /// Get the currently loaded LLM model ID
+  /// Returns null if no LLM model is loaded.
   static String? get currentModelId => DartBridge.llm.currentModelId;
 
   /// Check if an LLM model is currently loaded
   static bool get isModelLoaded => DartBridge.llm.isLoaded;
 
-  /// Get loaded STT capability (null if no STT model is loaded)
-  static STTCapability? get loadedSTTCapability => null;
+  /// Get the currently loaded LLM model as ModelInfo
+  /// Matches Swift: `RunAnywhere.currentLLMModel`
+  static Future<ModelInfo?> currentLLMModel() async {
+    final modelId = currentModelId;
+    if (modelId == null) return null;
+    final models = await availableModels();
+    return models.cast<ModelInfo?>().firstWhere(
+          (m) => m?.id == modelId,
+          orElse: () => null,
+        );
+  }
 
-  /// Get loaded TTS capability (null if no TTS voice is loaded)
-  static TTSCapability? get loadedTTSCapability => null;
+  // ============================================================================
+  // MARK: - STT State (matches Swift RunAnywhere+ModelManagement.swift)
+  // ============================================================================
+
+  /// Get the currently loaded STT model ID
+  /// Returns null if no STT model is loaded.
+  static String? get currentSTTModelId => DartBridge.stt.currentModelId;
+
+  /// Check if an STT model is currently loaded
+  static bool get isSTTModelLoaded => DartBridge.stt.isLoaded;
+
+  /// Get the currently loaded STT model as ModelInfo
+  /// Matches Swift: `RunAnywhere.currentSTTModel`
+  static Future<ModelInfo?> currentSTTModel() async {
+    final modelId = currentSTTModelId;
+    if (modelId == null) return null;
+    final models = await availableModels();
+    return models.cast<ModelInfo?>().firstWhere(
+          (m) => m?.id == modelId,
+          orElse: () => null,
+        );
+  }
+
+  // ============================================================================
+  // MARK: - TTS State (matches Swift RunAnywhere+ModelManagement.swift)
+  // ============================================================================
+
+  /// Get the currently loaded TTS voice ID
+  /// Returns null if no TTS voice is loaded.
+  static String? get currentTTSVoiceId => DartBridge.tts.currentVoiceId;
+
+  /// Check if a TTS voice is currently loaded
+  static bool get isTTSVoiceLoaded => DartBridge.tts.isLoaded;
+
+  /// Get the currently loaded TTS voice as ModelInfo
+  /// Matches Swift: `RunAnywhere.currentTTSVoice` (TTS uses "voice" terminology)
+  static Future<ModelInfo?> currentTTSVoice() async {
+    final voiceId = currentTTSVoiceId;
+    if (voiceId == null) return null;
+    final models = await availableModels();
+    return models.cast<ModelInfo?>().firstWhere(
+          (m) => m?.id == voiceId,
+          orElse: () => null,
+        );
+  }
 
   /// Load a model by ID
   ///
@@ -382,6 +438,94 @@ class RunAnywhere {
         modelId: modelId,
         error: e.toString(),
       ));
+      rethrow;
+    }
+  }
+
+  /// Unload the currently loaded STT model
+  /// Matches Swift: `RunAnywhere.unloadSTTModel()`
+  static Future<void> unloadSTTModel() async {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    DartBridge.stt.unload();
+  }
+
+  // ============================================================================
+  // MARK: - STT Transcription (matches Swift RunAnywhere+STT.swift)
+  // ============================================================================
+
+  /// Transcribe audio data to text.
+  ///
+  /// [audioData] - Raw audio bytes (PCM16 at 16kHz mono expected).
+  ///
+  /// Returns the transcribed text.
+  ///
+  /// Example:
+  /// ```dart
+  /// final text = await RunAnywhere.transcribe(audioBytes);
+  /// ```
+  ///
+  /// Matches Swift: `RunAnywhere.transcribe(_:)`
+  static Future<String> transcribe(Uint8List audioData) async {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    if (!DartBridge.stt.isLoaded) {
+      throw SDKError.sttNotAvailable(
+        'No STT model loaded. Call loadSTTModel() first.',
+      );
+    }
+
+    final logger = SDKLogger('RunAnywhere.Transcribe');
+    logger.debug('Transcribing ${audioData.length} bytes of audio...');
+
+    try {
+      final result = await DartBridge.stt.transcribe(audioData);
+      logger.info(
+          'Transcription complete: ${result.text.length} chars, confidence: ${result.confidence}');
+      return result.text;
+    } catch (e) {
+      logger.error('Transcription failed: $e');
+      rethrow;
+    }
+  }
+
+  /// Transcribe audio data with detailed result.
+  ///
+  /// [audioData] - Raw audio bytes (PCM16 at 16kHz mono expected).
+  ///
+  /// Returns STTResult with text, confidence, and metadata.
+  ///
+  /// Matches Swift: `RunAnywhere.transcribeWithOptions(_:options:)`
+  static Future<STTResult> transcribeWithResult(Uint8List audioData) async {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    if (!DartBridge.stt.isLoaded) {
+      throw SDKError.sttNotAvailable(
+        'No STT model loaded. Call loadSTTModel() first.',
+      );
+    }
+
+    final logger = SDKLogger('RunAnywhere.Transcribe');
+    logger.debug('Transcribing ${audioData.length} bytes with details...');
+
+    try {
+      final result = await DartBridge.stt.transcribe(audioData);
+      logger.info(
+          'Transcription complete: ${result.text.length} chars, confidence: ${result.confidence}');
+      return STTResult(
+        text: result.text,
+        confidence: result.confidence,
+        durationMs: result.durationMs,
+        language: result.language,
+      );
+    } catch (e) {
+      logger.error('Transcription failed: $e');
       rethrow;
     }
   }

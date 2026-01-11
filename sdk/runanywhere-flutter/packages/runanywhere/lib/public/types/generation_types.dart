@@ -1,7 +1,7 @@
 /// Generation Types
 ///
-/// Types for LLM text generation operations.
-/// Mirrors Swift LLMGenerationOptions and LLMGenerationResult.
+/// Types for LLM text generation and STT transcription operations.
+/// Mirrors Swift LLMGenerationOptions, LLMGenerationResult, and STTOutput.
 library generation_types;
 
 import 'package:runanywhere/core/types/model_types.dart';
@@ -84,4 +84,31 @@ class LLMStreamingResult {
     required this.result,
     required this.cancel,
   });
+}
+
+/// Result of STT transcription
+/// Matches Swift's STTOutput
+class STTResult {
+  /// The transcribed text
+  final String text;
+
+  /// Confidence score (0.0 to 1.0)
+  final double confidence;
+
+  /// Duration of audio processed in milliseconds
+  final int durationMs;
+
+  /// Detected language (if available)
+  final String? language;
+
+  const STTResult({
+    required this.text,
+    required this.confidence,
+    required this.durationMs,
+    this.language,
+  });
+
+  @override
+  String toString() =>
+      'STTResult(text: "$text", confidence: $confidence, durationMs: $durationMs, language: $language)';
 }

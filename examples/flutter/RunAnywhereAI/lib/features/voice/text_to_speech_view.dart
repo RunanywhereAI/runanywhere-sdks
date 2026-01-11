@@ -8,7 +8,6 @@ import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/services/audio_player_service.dart';
-import 'package:runanywhere_ai/core/services/model_manager.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_status_components.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
@@ -177,8 +176,8 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     try {
       debugPrint('🔊 Generating speech with SDK...');
 
-      // Check if TTS model is loaded via ModelManager
-      if (!ModelManager.shared.isTTSModelLoaded) {
+      // Check if TTS voice is loaded via SDK (matches Swift: RunAnywhere.isTTSVoiceLoaded)
+      if (!sdk.RunAnywhere.isTTSVoiceLoaded) {
         throw Exception(
             'TTS component not loaded. Please load a TTS voice first.');
       }
