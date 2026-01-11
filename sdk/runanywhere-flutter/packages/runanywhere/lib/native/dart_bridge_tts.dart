@@ -5,6 +5,7 @@
 library dart_bridge_tts;
 
 import 'dart:ffi';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
@@ -48,8 +49,7 @@ class DartBridgeTTS {
 
     try {
       final lib = PlatformLoader.loadCommons();
-      final create = lib.lookupFunction<
-          Int32 Function(Pointer<RacHandle>),
+      final create = lib.lookupFunction<Int32 Function(Pointer<RacHandle>),
           int Function(Pointer<RacHandle>)>('rac_tts_component_create');
 
       final handlePtr = calloc<RacHandle>();
@@ -118,7 +118,8 @@ class DartBridgeTTS {
     try {
       final lib = PlatformLoader.loadCommons();
       final loadVoiceFn = lib.lookupFunction<
-          Int32 Function(RacHandle, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
+          Int32 Function(
+              RacHandle, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
           int Function(RacHandle, Pointer<Utf8>, Pointer<Utf8>,
               Pointer<Utf8>)>('rac_tts_component_load_voice');
 
@@ -177,26 +178,95 @@ class DartBridgeTTS {
   /// Synthesize speech from text.
   ///
   /// [text] - Text to synthesize.
+  /// [rate] - Speech rate (0.5 to 2.0, 1.0 is normal).
+  /// [pitch] - Speech pitch (0.5 to 2.0, 1.0 is normal).
+  /// [volume] - Speech volume (0.0 to 1.0).
   ///
-  /// Returns audio data as Float32 samples and sample rate.
-  Future<TTSComponentResult> synthesize(String text) async {
+  /// Returns audio data and metadata.
+  /// Runs in a background isolate to prevent UI blocking.
+  Future<TTSComponentResult> synthesize(
+    String text, {
+    double rate = 1.0,
+    double pitch = 1.0,
+    double volume = 1.0,
+  }) async {
     final handle = getHandle();
 
     if (!isLoaded) {
       throw StateError('No TTS voice loaded. Call loadVoice() first.');
     }
 
+    _logger.debug(
+        'Synthesizing "${text.substring(0, text.length.clamp(0, 50))}..." in background isolate');
+
+    // Run synthesis in background isolate
+    final result = await Isolate.run(() => _synthesizeInIsolate(
+          handle.address,
+          text,
+          rate,
+          pitch,
+          volume,
+        ));
+
+    _logger.info(
+        'Synthesis complete: ${result.samples.length} samples, ${result.sampleRate} Hz, ${result.durationMs}ms');
+
+    return result;
+  }
+
+  /// Static helper to perform FFI synthesis in isolate.
+  /// Must be static/top-level for Isolate.run().
+  static TTSComponentResult _synthesizeInIsolate(
+    int handleAddress,
+    String text,
+    double rate,
+    double pitch,
+    double volume,
+  ) {
+    final lib = PlatformLoader.loadCommons();
+    final handle = RacHandle.fromAddress(handleAddress);
+
+    // Allocate native memory
     final textPtr = text.toNativeUtf8();
+    final optionsPtr = calloc<RacTtsOptionsStruct>();
     final resultPtr = calloc<RacTtsResultStruct>();
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final synthesizeFn = lib.lookupFunction<
-          Int32 Function(RacHandle, Pointer<Utf8>, Pointer<RacTtsResultStruct>),
-          int Function(RacHandle, Pointer<Utf8>,
-              Pointer<RacTtsResultStruct>)>('rac_tts_component_synthesize');
+      // Set up options (matches Swift's TTSOptions)
+      final languagePtr = 'en-US'.toNativeUtf8();
+      optionsPtr.ref.voice = nullptr; // Use default voice
+      optionsPtr.ref.language = languagePtr;
+      optionsPtr.ref.rate = rate;
+      optionsPtr.ref.pitch = pitch;
+      optionsPtr.ref.volume = volume;
+      optionsPtr.ref.audioFormat = RAC_AUDIO_FORMAT_PCM;
+      optionsPtr.ref.sampleRate = 22050; // Piper default
+      optionsPtr.ref.useSsml = RAC_FALSE;
 
-      final status = synthesizeFn(handle, textPtr, resultPtr);
+      // Get synthesize function
+      final synthesizeFn = lib.lookupFunction<
+          Int32 Function(
+            RacHandle,
+            Pointer<Utf8>,
+            Pointer<RacTtsOptionsStruct>,
+            Pointer<RacTtsResultStruct>,
+          ),
+          int Function(
+            RacHandle,
+            Pointer<Utf8>,
+            Pointer<RacTtsOptionsStruct>,
+            Pointer<RacTtsResultStruct>,
+          )>('rac_tts_component_synthesize');
+
+      final status = synthesizeFn(
+        handle,
+        textPtr,
+        optionsPtr,
+        resultPtr,
+      );
+
+      // Free the language string
+      calloc.free(languagePtr);
 
       if (status != RAC_SUCCESS) {
         throw StateError(
@@ -204,27 +274,32 @@ class DartBridgeTTS {
         );
       }
 
+      // Extract result before freeing
       final result = resultPtr.ref;
+      final audioSize = result.audioSize;
+      final sampleRate = result.sampleRate;
+      final durationMs = result.durationMs;
 
-      // Copy audio samples
-      final numSamples = result.numSamples;
+      // Convert audio data to Float32List
+      // The audio data is PCM float samples
       Float32List samples;
-      if (numSamples > 0 && result.audioSamples != nullptr) {
-        samples = result.audioSamples.asTypedList(numSamples);
-        // Make a copy since the native memory will be freed
-        samples = Float32List.fromList(samples);
+      if (audioSize > 0 && result.audioData != nullptr) {
+        // Audio size is in bytes, each float is 4 bytes
+        final numSamples = audioSize ~/ 4;
+        final floatPtr = result.audioData.cast<Float>();
+        samples = Float32List.fromList(floatPtr.asTypedList(numSamples));
       } else {
         samples = Float32List(0);
       }
 
       return TTSComponentResult(
         samples: samples,
-        sampleRate: result.sampleRate,
-        durationMs: result.durationMs,
+        sampleRate: sampleRate,
+        durationMs: durationMs,
       );
     } finally {
       calloc.free(textPtr);
-      // Note: Audio samples should be freed by caller if allocated by C++
+      calloc.free(optionsPtr);
       calloc.free(resultPtr);
     }
   }
@@ -304,16 +379,69 @@ class TTSStreamResult {
   });
 }
 
-/// FFI struct for TTS result (matches rac_tts_result_t)
-final class RacTtsResultStruct extends Struct {
-  external Pointer<Float> audioSamples;
+// =============================================================================
+// FFI Structs
+// =============================================================================
 
-  @IntPtr()
-  external int numSamples;
+/// Audio format constants (matches rac_audio_format_enum_t)
+const int RAC_AUDIO_FORMAT_PCM = 0;
+const int RAC_AUDIO_FORMAT_WAV = 1;
 
+/// FFI struct for TTS options (matches rac_tts_options_t)
+final class RacTtsOptionsStruct extends Struct {
+  /// Voice to use for synthesis (can be NULL for default)
+  external Pointer<Utf8> voice;
+
+  /// Language for synthesis (BCP-47 format, e.g., "en-US")
+  external Pointer<Utf8> language;
+
+  /// Speech rate (0.0 to 2.0, 1.0 is normal)
+  @Float()
+  external double rate;
+
+  /// Speech pitch (0.0 to 2.0, 1.0 is normal)
+  @Float()
+  external double pitch;
+
+  /// Speech volume (0.0 to 1.0)
+  @Float()
+  external double volume;
+
+  /// Audio format for output
+  @Int32()
+  external int audioFormat;
+
+  /// Sample rate for output audio in Hz
   @Int32()
   external int sampleRate;
 
+  /// Whether to use SSML markup
   @Int32()
+  external int useSsml;
+}
+
+/// FFI struct for TTS result (matches rac_tts_result_t)
+final class RacTtsResultStruct extends Struct {
+  /// Audio data (PCM float samples)
+  external Pointer<Void> audioData;
+
+  /// Size of audio data in bytes
+  @IntPtr()
+  external int audioSize;
+
+  /// Audio format
+  @Int32()
+  external int audioFormat;
+
+  /// Sample rate
+  @Int32()
+  external int sampleRate;
+
+  /// Duration in milliseconds
+  @Int64()
   external int durationMs;
+
+  /// Processing time in milliseconds
+  @Int64()
+  external int processingTimeMs;
 }

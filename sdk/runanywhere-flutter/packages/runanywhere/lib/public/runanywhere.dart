@@ -591,6 +591,77 @@ class RunAnywhere {
     }
   }
 
+  /// Unload the currently loaded TTS voice
+  /// Matches Swift: `RunAnywhere.unloadTTSVoice()`
+  static Future<void> unloadTTSVoice() async {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    DartBridge.tts.unload();
+  }
+
+  // ============================================================================
+  // MARK: - TTS Synthesis (matches Swift RunAnywhere+TTS.swift)
+  // ============================================================================
+
+  /// Synthesize speech from text.
+  ///
+  /// [text] - Text to synthesize.
+  /// [rate] - Speech rate (0.5 to 2.0, 1.0 is normal). Optional.
+  /// [pitch] - Speech pitch (0.5 to 2.0, 1.0 is normal). Optional.
+  /// [volume] - Speech volume (0.0 to 1.0). Optional.
+  ///
+  /// Returns audio samples as Float32List and metadata.
+  ///
+  /// Example:
+  /// ```dart
+  /// final result = await RunAnywhere.synthesize('Hello world');
+  /// // result.samples contains PCM audio data
+  /// // result.sampleRate is typically 22050 Hz
+  /// ```
+  ///
+  /// Matches Swift: `RunAnywhere.synthesize(_:)`
+  static Future<TTSResult> synthesize(
+    String text, {
+    double rate = 1.0,
+    double pitch = 1.0,
+    double volume = 1.0,
+  }) async {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    if (!DartBridge.tts.isLoaded) {
+      throw SDKError.ttsNotAvailable(
+        'No TTS voice loaded. Call loadTTSVoice() first.',
+      );
+    }
+
+    final logger = SDKLogger('RunAnywhere.Synthesize');
+    logger.debug(
+        'Synthesizing: "${text.substring(0, text.length.clamp(0, 50))}..."');
+
+    try {
+      final result = await DartBridge.tts.synthesize(
+        text,
+        rate: rate,
+        pitch: pitch,
+        volume: volume,
+      );
+      logger.info(
+          'Synthesis complete: ${result.samples.length} samples, ${result.sampleRate} Hz');
+      return TTSResult(
+        samples: result.samples,
+        sampleRate: result.sampleRate,
+        durationMs: result.durationMs,
+      );
+    } catch (e) {
+      logger.error('Synthesis failed: $e');
+      rethrow;
+    }
+  }
+
   /// Unload current model
   static Future<void> unloadModel() async {
     if (!_isInitialized) return;

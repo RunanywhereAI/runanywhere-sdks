@@ -49,8 +49,7 @@ class DartBridgeSTT {
 
     try {
       final lib = PlatformLoader.loadCommons();
-      final create = lib.lookupFunction<
-          Int32 Function(Pointer<RacHandle>),
+      final create = lib.lookupFunction<Int32 Function(Pointer<RacHandle>),
           int Function(Pointer<RacHandle>)>('rac_stt_component_create');
 
       final handlePtr = calloc<RacHandle>();
@@ -134,7 +133,8 @@ class DartBridgeSTT {
     try {
       final lib = PlatformLoader.loadCommons();
       final loadModelFn = lib.lookupFunction<
-          Int32 Function(RacHandle, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
+          Int32 Function(
+              RacHandle, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
           int Function(RacHandle, Pointer<Utf8>, Pointer<Utf8>,
               Pointer<Utf8>)>('rac_stt_component_load_model');
 

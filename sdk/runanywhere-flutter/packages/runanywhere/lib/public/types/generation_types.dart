@@ -1,8 +1,10 @@
 /// Generation Types
 ///
-/// Types for LLM text generation and STT transcription operations.
-/// Mirrors Swift LLMGenerationOptions, LLMGenerationResult, and STTOutput.
+/// Types for LLM text generation, STT transcription, and TTS synthesis.
+/// Mirrors Swift LLMGenerationOptions, LLMGenerationResult, STTOutput, and TTSOutput.
 library generation_types;
+
+import 'dart:typed_data';
 
 import 'package:runanywhere/core/types/model_types.dart';
 
@@ -111,4 +113,33 @@ class STTResult {
   @override
   String toString() =>
       'STTResult(text: "$text", confidence: $confidence, durationMs: $durationMs, language: $language)';
+}
+
+/// Result of TTS synthesis
+/// Matches Swift's TTSOutput
+class TTSResult {
+  /// Audio samples as PCM float data
+  final Float32List samples;
+
+  /// Sample rate in Hz (typically 22050 for Piper)
+  final int sampleRate;
+
+  /// Duration of audio in milliseconds
+  final int durationMs;
+
+  const TTSResult({
+    required this.samples,
+    required this.sampleRate,
+    required this.durationMs,
+  });
+
+  /// Duration in seconds
+  double get durationSeconds => durationMs / 1000.0;
+
+  /// Number of audio samples
+  int get numSamples => samples.length;
+
+  @override
+  String toString() =>
+      'TTSResult(samples: ${samples.length}, sampleRate: $sampleRate, durationMs: $durationMs)';
 }
