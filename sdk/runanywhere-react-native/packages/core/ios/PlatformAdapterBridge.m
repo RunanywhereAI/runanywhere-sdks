@@ -400,6 +400,23 @@ bool PlatformAdapter_getGPUFamily(char** outValue) {
     }
 }
 
+/**
+ * Check if device is a tablet
+ * Uses UIDevice.userInterfaceIdiom to determine form factor
+ * Matches Swift SDK: device.userInterfaceIdiom == .pad
+ */
+bool PlatformAdapter_isTablet(void) {
+    @autoreleasepool {
+        @try {
+            UIUserInterfaceIdiom idiom = [[UIDevice currentDevice] userInterfaceIdiom];
+            return idiom == UIUserInterfaceIdiomPad;
+        } @catch (NSException* exception) {
+            NSLog(@"[PlatformAdapterBridge] isTablet exception: %@", exception);
+            return false;
+        }
+    }
+}
+
 // ============================================================================
 // HTTP POST for Device Registration (Synchronous)
 // Matches Swift's CppBridge+Device.swift http_post callback

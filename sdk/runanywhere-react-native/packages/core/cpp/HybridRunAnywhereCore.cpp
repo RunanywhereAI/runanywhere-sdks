@@ -288,6 +288,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
         std::string baseURL = extractStringValue(configJson, "baseURL", "https://api.runanywhere.ai");
         std::string deviceId = extractStringValue(configJson, "deviceId");
         std::string envStr = extractStringValue(configJson, "environment", "production");
+        std::string sdkVersionFromConfig = extractStringValue(configJson, "sdkVersion", "0.2.0");
 
         // Determine environment
         SDKEnvironment env = SDKEnvironment::Production;
@@ -300,6 +301,9 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
             setLastError("Failed to initialize SDK core: " + std::to_string(result));
             return false;
         }
+
+        // Set SDK version from TypeScript SDKConstants (centralized version)
+        InitBridge::shared().setSdkVersion(sdkVersionFromConfig);
 
         // 2. Set base directory for model paths (mirrors Swift's CppBridge.ModelPaths.setBaseDirectory)
         // This must be called before using model path utilities
@@ -347,7 +351,6 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
             std::string persistentDeviceId = InitBridge::shared().getPersistentDeviceUUID();
             std::string deviceModel = InitBridge::shared().getDeviceModel();
             std::string osVersion = InitBridge::shared().getOSVersion();
-            std::string sdkVersion = "0.2.0";
 
             if (!persistentDeviceId.empty()) {
                 TelemetryBridge::shared().initialize(
@@ -356,7 +359,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
                     persistentDeviceId,
                     deviceModel,
                     osVersion,
-                    sdkVersion
+                    sdkVersionFromConfig  // Use version from config
                 );
 
                 // Register analytics events callback to route events to telemetry
@@ -436,7 +439,8 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::authenticate(
 #else
         std::string platform = "ios"; // Default to ios for unknown platforms
 #endif
-        std::string sdkVersion = "0.2.0";
+        // Use centralized SDK version from InitBridge (set from TypeScript SDKConstants)
+        std::string sdkVersion = InitBridge::shared().getSdkVersion();
 
         std::string requestJson = AuthBridge::shared().buildAuthenticateRequestJSON(
             apiKey, deviceId, platform, sdkVersion
@@ -549,7 +553,8 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::registerDevice(
 #else
             info.platform = "ios"; // Default to ios for unknown platforms
 #endif
-            info.sdkVersion = "0.2.0";
+            // Use centralized SDK version from InitBridge (set from TypeScript SDKConstants)
+            info.sdkVersion = InitBridge::shared().getSdkVersion();
             
             // Device hardware info from platform-specific code
             info.deviceModel = InitBridge::shared().getDeviceModel();
@@ -561,21 +566,23 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::registerDevice(
             info.availableMemory = InitBridge::shared().getAvailableMemory();
             info.coreCount = InitBridge::shared().getCoreCount();
             
-            // Form factor detection and GPU family
+            // Form factor detection (matches Swift SDK: device.userInterfaceIdiom == .pad)
+            // Uses platform-specific detection via InitBridge::isTablet()
+            bool isTabletDevice = InitBridge::shared().isTablet();
+            info.formFactor = isTabletDevice ? "tablet" : "phone";
+            
+            // Platform-specific values
             #if defined(__APPLE__)
-            info.formFactor = "phone"; // iOS default, could be tablet
             info.osName = "iOS";
             info.gpuFamily = InitBridge::shared().getGPUFamily(); // "apple"
             info.hasNeuralEngine = true;
             info.neuralEngineCores = 16; // Modern iPhones have 16 ANE cores
             #elif defined(ANDROID) || defined(__ANDROID__)
-            info.formFactor = "phone"; // Android default
             info.osName = "Android";
             info.gpuFamily = InitBridge::shared().getGPUFamily(); // "mali", "adreno", etc.
             info.hasNeuralEngine = false;
             info.neuralEngineCores = 0;
             #else
-            info.formFactor = "unknown";
             info.osName = "Unknown";
             info.gpuFamily = "unknown";
             info.hasNeuralEngine = false;

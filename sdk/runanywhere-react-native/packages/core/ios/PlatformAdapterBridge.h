@@ -112,6 +112,13 @@ bool PlatformAdapter_getArchitecture(char** outValue);
  */
 bool PlatformAdapter_getGPUFamily(char** outValue);
 
+/**
+ * Check if device is a tablet
+ * Uses UIDevice.userInterfaceIdiom on iOS, Configuration on Android
+ * @return true if device is a tablet
+ */
+bool PlatformAdapter_isTablet(void);
+
 // ============================================================================
 // HTTP POST for Device Registration (Synchronous)
 // ============================================================================

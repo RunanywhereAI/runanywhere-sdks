@@ -14,6 +14,7 @@ import { SDKEnvironment } from '../types';
 import { ModelRegistry } from '../services/ModelRegistry';
 import { ServiceContainer } from '../Foundation/DependencyInjection/ServiceContainer';
 import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
+import { SDKConstants } from '../Foundation/Constants';
 import { FileSystem } from '../services/FileSystem';
 import {
   HTTPService,
@@ -113,7 +114,7 @@ export const RunAnywhere = {
   },
 
   get version(): string {
-    return '0.2.0';
+    return SDKConstants.version;
   },
 
   // ============================================================================
@@ -200,6 +201,7 @@ export const RunAnywhere = {
         baseURL: options.baseURL,
         environment: envString,
         documentsPath: documentsPath, // Required for model paths (mirrors Swift SDK)
+        sdkVersion: SDKConstants.version, // Centralized version for C++ layer
         supabaseURL: options.supabaseURL, // For development mode
         supabaseKey: options.supabaseKey, // For development mode
       });
@@ -291,7 +293,7 @@ export const RunAnywhere = {
         api_key: apiKey,
         device_id: deviceId,
         platform: platform,
-        sdk_version: '0.2.0',
+        sdk_version: SDKConstants.version,
       });
 
       logger.debug(`Auth request to: ${fullUrl}`);
@@ -639,8 +641,8 @@ export const RunAnywhere = {
    * @returns Version string
    */
   async getVersion(): Promise<string> {
-    // Return package version - this is a TypeScript-only method
-    return '0.2.0';
+    // Return centralized SDK version constant
+    return SDKConstants.version;
   },
 
   /**

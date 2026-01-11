@@ -371,5 +371,22 @@ object PlatformAdapterBridge {
             else -> "unknown"
         }
     }
+
+    /**
+     * Check if device is a tablet
+     * Uses screen size configuration to determine form factor
+     * Matches Swift SDK: device.userInterfaceIdiom == .pad
+     */
+    @JvmStatic
+    fun isTablet(): Boolean {
+        val context = SecureStorageManager.getContext()
+        if (context != null) {
+            val screenLayout = context.resources.configuration.screenLayout and 
+                android.content.res.Configuration.SCREENLAYOUT_SIZE_MASK
+            return screenLayout >= android.content.res.Configuration.SCREENLAYOUT_SIZE_LARGE
+        }
+        // Fallback: Check display metrics if context unavailable
+        return false
+    }
 }
 

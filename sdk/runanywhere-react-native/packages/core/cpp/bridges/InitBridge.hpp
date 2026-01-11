@@ -218,6 +218,13 @@ public:
      */
     std::string getGPUFamily();
 
+    /**
+     * @brief Check if device is a tablet
+     * Uses platform-specific detection (UIDevice on iOS, Configuration on Android)
+     * Matches Swift SDK: device.userInterfaceIdiom == .pad
+     */
+    bool isTablet();
+
     // =========================================================================
     // Configuration Getters (for HTTP requests in production mode)
     // =========================================================================
@@ -231,6 +238,18 @@ public:
      * @brief Get configured base URL
      */
     std::string getBaseURL() const { return baseURL_; }
+
+    /**
+     * @brief Set SDK version (passed from TypeScript layer)
+     * Must be called during initialization to ensure consistency
+     */
+    void setSdkVersion(const std::string& version) { sdkVersion_ = version; }
+
+    /**
+     * @brief Get SDK version
+     * Returns centralized version passed from TypeScript SDKConstants
+     */
+    std::string getSdkVersion() const { return sdkVersion_.empty() ? "0.2.0" : sdkVersion_; }
 
     // Note: getEnvironment() already defined above in "SDK Environment" section
 
@@ -274,6 +293,7 @@ private:
     std::string apiKey_;
     std::string baseURL_;
     std::string deviceId_;
+    std::string sdkVersion_;  // SDK version from TypeScript SDKConstants
 
     // Platform adapter - must persist for C++ to call
     rac_platform_adapter_t adapter_{};

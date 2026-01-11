@@ -34,6 +34,7 @@ jmethodID g_getAvailableMemoryMethod = nullptr;
 jmethodID g_getCoreCountMethod = nullptr;
 jmethodID g_getArchitectureMethod = nullptr;
 jmethodID g_getGPUFamilyMethod = nullptr;
+jmethodID g_isTabletMethod = nullptr;
 // HttpResponse field IDs
 jfieldID g_httpResponse_successField = nullptr;
 jfieldID g_httpResponse_statusCodeField = nullptr;
@@ -99,11 +100,12 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
       g_getCoreCountMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getCoreCount", "()I");
       g_getArchitectureMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getArchitecture", "()Ljava/lang/String;");
       g_getGPUFamilyMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getGPUFamily", "()Ljava/lang/String;");
+      g_isTabletMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "isTablet", "()Z");
 
       if (g_secureSetMethod && g_secureGetMethod && g_getPersistentDeviceUUIDMethod && 
           g_getDeviceModelMethod && g_getOSVersionMethod && g_getChipNameMethod &&
           g_getTotalMemoryMethod && g_getAvailableMemoryMethod && g_getCoreCountMethod && 
-          g_getArchitectureMethod && g_getGPUFamilyMethod) {
+          g_getArchitectureMethod && g_getGPUFamilyMethod && g_isTabletMethod) {
         LOGI("PlatformAdapterBridge class and methods cached successfully");
       } else {
         LOGE("Failed to cache some PlatformAdapterBridge methods");
