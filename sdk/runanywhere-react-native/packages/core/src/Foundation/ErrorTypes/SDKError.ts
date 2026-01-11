@@ -17,6 +17,7 @@ import {
   formatContext,
   formatLocation,
 } from './ErrorContext';
+import { SDKLogger, LogLevel } from '../Logging';
 
 /**
  * Legacy SDK error code enum (string-based).
@@ -196,14 +197,23 @@ export class SDKError extends Error implements SDKErrorProtocol {
   }
 
   /**
-   * Log error with full context.
+   * Log error with full context using SDKLogger.
    */
   logError(): void {
-    console.error(`[SDKError] ${ErrorCode[this.code]}: ${this.message}`);
-    console.error(formatContext(this.context));
+    const logger = new SDKLogger('SDKError');
+    const metadata: Record<string, unknown> = {
+      error_code: this.code,
+      error_code_name: ErrorCode[this.code],
+      category: this.category,
+      context: formatContext(this.context),
+    };
+
     if (this.underlyingError) {
-      console.error('Underlying error:', this.underlyingError);
+      metadata.underlying_error = this.underlyingError.message;
+      metadata.underlying_stack = this.underlyingError.stack;
     }
+
+    logger.log(LogLevel.Error, `${ErrorCode[this.code]}: ${this.message}`, metadata);
   }
 }
 

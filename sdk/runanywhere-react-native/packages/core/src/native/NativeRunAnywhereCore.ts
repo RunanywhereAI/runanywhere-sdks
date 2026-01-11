@@ -12,6 +12,7 @@
 import { NitroModules } from 'react-native-nitro-modules';
 import type { RunAnywhereCore } from '../specs/RunAnywhereCore.nitro';
 import type { NativeRunAnywhereModule } from './NativeRunAnywhereModule';
+import { SDKLogger } from '../Foundation/Logging';
 
 export type { NativeRunAnywhereModule } from './NativeRunAnywhereModule';
 export { hasNativeMethod } from './NativeRunAnywhereModule';
@@ -262,7 +263,7 @@ export function requireFileSystemModule(): FileSystemModule {
         });
         return true;
       } catch (error) {
-        console.error('[RunAnywhere] Download failed:', error);
+        SDKLogger.download.logError(error as Error, 'Download failed');
         return false;
       }
     },

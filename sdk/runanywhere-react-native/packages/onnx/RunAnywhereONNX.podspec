@@ -131,6 +131,11 @@ Pod::Spec.new do |s|
       "$(PODS_TARGET_SRCROOT)/ios/Frameworks/RABackendONNX.xcframework/ios-arm64_x86_64-simulator/RABackendONNX.framework/Headers",
       "$(PODS_TARGET_SRCROOT)/ios/Frameworks/onnxruntime.xcframework/ios-arm64/Headers",
       "$(PODS_TARGET_SRCROOT)/ios/Frameworks/onnxruntime.xcframework/ios-arm64_x86_64-simulator/Headers",
+      # RACommons headers from sibling core package (for rac_logger.h)
+      "$(PODS_TARGET_SRCROOT)/../core/ios/Frameworks/RACommons.xcframework/ios-arm64/RACommons.framework/Headers",
+      "$(PODS_TARGET_SRCROOT)/../core/ios/Frameworks/RACommons.xcframework/ios-arm64_x86_64-simulator/RACommons.framework/Headers",
+      "$(PODS_TARGET_SRCROOT)/../core/ios/Binaries/RACommons.xcframework/ios-arm64/RACommons.framework/Headers",
+      "$(PODS_TARGET_SRCROOT)/../core/ios/Binaries/RACommons.xcframework/ios-arm64_x86_64-simulator/RACommons.framework/Headers",
       "$(PODS_ROOT)/Headers/Public",
     ].join(" "),
     "GCC_PREPROCESSOR_DEFINITIONS" => "$(inherited) HAS_ONNX=1",

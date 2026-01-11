@@ -19,23 +19,16 @@ extern "C" {
 #include "rac_llm_llamacpp.h"
 }
 
+// Unified logging via rac_logger.h
+#include "rac_logger.h"
+
 #include <sstream>
 #include <chrono>
 #include <vector>
 #include <stdexcept>
 
-// Platform-specific logging
-#if defined(ANDROID) || defined(__ANDROID__)
-#include <android/log.h>
-#define LOG_TAG "HybridRunAnywhereLlama"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
-#else
-#define LOGI(...) printf(__VA_ARGS__); printf("\n")
-#define LOGE(...) printf(__VA_ARGS__); printf("\n")
-#define LOGD(...) printf(__VA_ARGS__); printf("\n")
-#endif
+// Log category for this module
+#define LOG_CATEGORY "LLM.LlamaCpp"
 
 namespace margelo::nitro::runanywhere::llama {
 
@@ -108,11 +101,11 @@ std::string jsonString(const std::string& value) {
 // ============================================================================
 
 HybridRunAnywhereLlama::HybridRunAnywhereLlama() : HybridObject(TAG) {
-  LOGI("HybridRunAnywhereLlama constructor - Llama backend module");
+  RAC_LOG_DEBUG(LOG_CATEGORY, "HybridRunAnywhereLlama constructor - Llama backend module");
 }
 
 HybridRunAnywhereLlama::~HybridRunAnywhereLlama() {
-  LOGI("HybridRunAnywhereLlama destructor");
+  RAC_LOG_DEBUG(LOG_CATEGORY, "HybridRunAnywhereLlama destructor");
   LLMBridge::shared().destroy();
 }
 
@@ -122,16 +115,16 @@ HybridRunAnywhereLlama::~HybridRunAnywhereLlama() {
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereLlama::registerBackend() {
   return Promise<bool>::async([this]() {
-    LOGI("Registering LlamaCPP backend with C++ registry...");
+    RAC_LOG_DEBUG(LOG_CATEGORY, "Registering LlamaCPP backend with C++ registry");
 
     rac_result_t result = rac_backend_llamacpp_register();
     // RAC_SUCCESS (0) or RAC_ERROR_MODULE_ALREADY_REGISTERED (-4) are both OK
     if (result == RAC_SUCCESS || result == -4) {
-      LOGI("✅ LlamaCPP backend registered successfully");
+      RAC_LOG_INFO(LOG_CATEGORY, "LlamaCPP backend registered successfully");
       isRegistered_ = true;
       return true;
     } else {
-      LOGE("❌ LlamaCPP registration failed with code: %d", result);
+      RAC_LOG_ERROR(LOG_CATEGORY, "LlamaCPP registration failed with code: %d", result);
       setLastError("LlamaCPP registration failed with error: " + std::to_string(result));
       throw std::runtime_error("LlamaCPP registration failed with error: " + std::to_string(result));
     }
@@ -140,12 +133,12 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereLlama::registerBackend() {
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereLlama::unregisterBackend() {
   return Promise<bool>::async([this]() {
-    LOGI("Unregistering LlamaCPP backend...");
+    RAC_LOG_DEBUG(LOG_CATEGORY, "Unregistering LlamaCPP backend");
 
     rac_result_t result = rac_backend_llamacpp_unregister();
     isRegistered_ = false;
     if (result != RAC_SUCCESS) {
-      LOGE("❌ LlamaCPP unregistration failed with code: %d", result);
+      RAC_LOG_ERROR(LOG_CATEGORY, "LlamaCPP unregistration failed with code: %d", result);
       throw std::runtime_error("LlamaCPP unregistration failed with error: " + std::to_string(result));
     }
     return true;
@@ -170,7 +163,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereLlama::loadModel(
   return Promise<bool>::async([this, path, modelId, modelName, configJson]() {
     std::lock_guard<std::mutex> lock(modelMutex_);
 
-    LOGI("Loading Llama model: %s", path.c_str());
+    RAC_LOG_INFO(LOG_CATEGORY, "Loading Llama model: %s", path.c_str());
 
     std::string id = modelId.value_or("");
     std::string name = modelName.value_or("");
@@ -234,7 +227,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereLlama::generate(
       options.topK = extractIntValue(*optionsJson, "top_k", 40);
     }
 
-    LOGI("Generating with prompt: %.50s...", prompt.c_str());
+    RAC_LOG_DEBUG(LOG_CATEGORY, "Generating with prompt: %.50s...", prompt.c_str());
 
     auto startTime = std::chrono::high_resolution_clock::now();
     // LLMBridge::generate will throw on error
@@ -347,7 +340,7 @@ std::shared_ptr<Promise<double>> HybridRunAnywhereLlama::getMemoryUsage() {
 
 void HybridRunAnywhereLlama::setLastError(const std::string& error) {
   lastError_ = error;
-  LOGE("Error: %s", error.c_str());
+  RAC_LOG_ERROR(LOG_CATEGORY, "Error: %s", error.c_str());
 }
 
 } // namespace margelo::nitro::runanywhere::llama

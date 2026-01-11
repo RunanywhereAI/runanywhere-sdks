@@ -19,14 +19,12 @@ import {
   ModelCategory,
   ModelFormat,
   ConfigurationSource,
+  SDKLogger,
   type ModelInfo,
 } from '@runanywhere/core';
 
-// Simple logger for this package
-const DEBUG = typeof __DEV__ !== 'undefined' ? __DEV__ : false;
-const log = {
-  info: (msg: string) => DEBUG && console.log(`[LlamaCPP] ${msg}`),
-};
+// SDKLogger instance for this module
+const log = new SDKLogger('LLM.LlamaCpp');
 
 /**
  * Model registration options for LlamaCPP models
@@ -98,9 +96,9 @@ export const LlamaCPP = {
    * ```
    */
   register(): void {
-    log.info('Registering LlamaCPP module');
+    log.debug('Registering LlamaCPP module');
     LlamaCppProvider.register();
-    log.info('✅ LlamaCPP module registered');
+    log.info('LlamaCPP module registered');
   },
 
   /**
@@ -148,11 +146,11 @@ export const LlamaCPP = {
         if (exists) {
           localPath = await FileSystem.getModelPath(modelId, 'LlamaCpp');
           isDownloaded = true;
-          log.info(`Model ${modelId} found on disk: ${localPath}`);
+          log.debug(`Model ${modelId} found on disk: ${localPath}`);
         }
       } catch (error) {
         // Ignore errors checking for existing model
-        log.info(`Could not check for existing model ${modelId}: ${error}`);
+        log.debug(`Could not check for existing model ${modelId}: ${error}`);
       }
     }
 
@@ -181,7 +179,10 @@ export const LlamaCPP = {
     // Register with ModelRegistry and wait for completion
     await ModelRegistry.registerModel(modelInfo);
 
-    log.info(`Added model: ${modelId} (${options.name})${isDownloaded ? ' [already downloaded]' : ''}`);
+    log.info(`Added model: ${modelId} (${options.name})`, {
+      modelId,
+      isDownloaded,
+    });
 
     return modelInfo;
   },

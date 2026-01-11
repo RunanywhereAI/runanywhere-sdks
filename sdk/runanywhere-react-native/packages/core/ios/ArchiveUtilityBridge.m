@@ -6,6 +6,9 @@
  */
 
 #import <Foundation/Foundation.h>
+#import "RNSDKLoggerBridge.h"
+
+static NSString * const kLogCategory = @"ArchiveBridge";
 
 // Import the generated Swift header from the pod
 #if __has_include(<RunAnywhereCore/RunAnywhereCore-Swift.h>)
@@ -26,7 +29,7 @@
 bool ArchiveUtility_extract(const char* archivePath, const char* destinationPath) {
     @autoreleasepool {
         if (archivePath == NULL || destinationPath == NULL) {
-            NSLog(@"[ArchiveUtilityBridge] Invalid null path");
+            RN_LOG_ERROR(kLogCategory, @"Invalid null path");
             return false;
         }
 
@@ -34,7 +37,7 @@ bool ArchiveUtility_extract(const char* archivePath, const char* destinationPath
         NSString* destinationPathStr = [NSString stringWithUTF8String:destinationPath];
 
         if (archivePathStr == nil || destinationPathStr == nil) {
-            NSLog(@"[ArchiveUtilityBridge] Failed to create NSString from path");
+            RN_LOG_ERROR(kLogCategory, @"Failed to create NSString from path");
             return false;
         }
 
@@ -42,7 +45,7 @@ bool ArchiveUtility_extract(const char* archivePath, const char* destinationPath
             BOOL result = [ArchiveUtility extractWithArchivePath:archivePathStr to:destinationPathStr];
             return result;
         } @catch (NSException *exception) {
-            NSLog(@"[ArchiveUtilityBridge] Exception: %@", exception);
+            RN_LOG_ERROR(kLogCategory, @"Exception: %@", exception);
             return false;
         }
     }

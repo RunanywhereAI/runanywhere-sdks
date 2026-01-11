@@ -186,3 +186,36 @@ custom_rules:
     regex: '/\*\s*(TODO|FIXME|HACK|XXX|BUG|REFACTOR|OPTIMIZE)(?!.*#\d+)'
     message: "TODOs must reference a GitHub issue (e.g., /* TODO: #123 - Description */)"
     severity: warning
+
+  # Logging enforcement rules - require SDKLogger usage
+  # Note: SDKLogger.swift is the only file allowed to use print() as it's the console output mechanism.
+  # Use "// swiftlint:disable:next no_print_statements" above intentional print() usage.
+  no_print_statements:
+    name: "Use SDKLogger Instead of print()"
+    regex: '^\s*print\('
+    message: "Use SDKLogger instead of print(). Example: SDKLogger.shared.debug(\"message\")"
+    severity: error
+
+  no_nslog_statements:
+    name: "Use SDKLogger Instead of NSLog()"
+    regex: 'NSLog\('
+    message: "Use SDKLogger instead of NSLog(). Example: SDKLogger.shared.info(\"message\")"
+    severity: error
+
+  no_os_log_statements:
+    name: "Use SDKLogger Instead of os_log()"
+    regex: 'os_log\('
+    message: "Use SDKLogger instead of os_log(). The SDK logging system handles os_log internally."
+    severity: error
+
+  no_debug_print_statements:
+    name: "Use SDKLogger Instead of debugPrint()"
+    regex: 'debugPrint\('
+    message: "Use SDKLogger.debug() instead of debugPrint(). Example: SDKLogger.shared.debug(\"message\")"
+    severity: error
+
+  no_apple_logger:
+    name: "Use SDKLogger Instead of Apple Logger"
+    regex: '= Logger\('
+    message: "Use SDKLogger instead of Apple's os.Logger. Example: SDKLogger(category: \"MyCategory\")"
+    severity: error

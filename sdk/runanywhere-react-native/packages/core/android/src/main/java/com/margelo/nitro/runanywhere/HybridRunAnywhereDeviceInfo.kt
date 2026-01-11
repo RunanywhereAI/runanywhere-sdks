@@ -12,7 +12,6 @@ import android.content.Context
 import android.os.BatteryManager
 import android.os.Build
 import android.os.PowerManager
-import android.util.Log
 import com.margelo.nitro.NitroModules
 import com.margelo.nitro.core.Promise
 import java.io.BufferedReader
@@ -26,7 +25,7 @@ import java.io.FileReader
 class HybridRunAnywhereDeviceInfo : HybridRunAnywhereDeviceInfoSpec() {
 
     companion object {
-        private const val TAG = "HybridRunAnywhereDevice"
+        private val logger = SDKLogger.core
     }
 
     private val context = NitroModules.applicationContext ?: error("Android context not found")
@@ -215,7 +214,7 @@ class HybridRunAnywhereDeviceInfo : HybridRunAnywhereDeviceInfoSpec() {
             }
             Build.HARDWARE
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to read CPU info", e)
+            logger.warning("Failed to read CPU info: ${e.message}")
             Build.HARDWARE
         }
     }

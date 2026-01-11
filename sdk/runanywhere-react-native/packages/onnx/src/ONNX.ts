@@ -19,14 +19,12 @@ import {
   ModelCategory,
   ModelFormat,
   ConfigurationSource,
+  SDKLogger,
   type ModelInfo,
 } from '@runanywhere/core';
 
-// Simple logger for this package
-const DEBUG = typeof __DEV__ !== 'undefined' ? __DEV__ : false;
-const log = {
-  info: (msg: string) => DEBUG && console.log(`[ONNX] ${msg}`),
-};
+// Use SDKLogger with ONNX category
+const logger = new SDKLogger('ONNX');
 
 /**
  * Model artifact type for ONNX models
@@ -126,9 +124,9 @@ export const ONNX = {
    * ```
    */
   register(): void {
-    log.info('Registering ONNX module (STT + TTS)');
+    logger.info('Registering ONNX module (STT + TTS)');
     ONNXProvider.register();
-    log.info('✅ ONNX module registered (STT + TTS)');
+    logger.info('ONNX module registered (STT + TTS)');
   },
 
   /**
@@ -174,11 +172,11 @@ export const ONNX = {
         if (exists) {
           localPath = await FileSystem.getModelPath(modelId, 'ONNX');
           isDownloaded = true;
-          log.info(`Model ${modelId} found on disk: ${localPath}`);
+          logger.info(`Model ${modelId} found on disk: ${localPath}`);
         }
       } catch (error) {
         // Ignore errors checking for existing model
-        log.info(`Could not check for existing model ${modelId}: ${error}`);
+        logger.debug(`Could not check for existing model ${modelId}: ${error}`);
       }
     }
 
@@ -209,7 +207,7 @@ export const ONNX = {
     // Register with ModelRegistry and wait for completion
     await ModelRegistry.registerModel(modelInfo);
 
-    log.info(`Added model: ${modelId} (${options.name})${isDownloaded ? ' [already downloaded]' : ''}`);
+    logger.info(`Added model: ${modelId} (${options.name})${isDownloaded ? ' [already downloaded]' : ''}`);
 
     return modelInfo;
   },
