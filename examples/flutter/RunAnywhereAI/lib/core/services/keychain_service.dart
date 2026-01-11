@@ -70,8 +70,8 @@ class KeychainService {
   }
 
   /// Check if a key exists in keychain
-  Future<bool> containsKey(String key) async {
-    return await _storage.containsKey(key: key);
+  Future<bool> containsKey(String key) {
+    return _storage.containsKey(key: key);
   }
 
   /// Delete all data from keychain

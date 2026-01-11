@@ -1,10 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-import '../models/app_types.dart';
+import 'package:runanywhere_ai/core/models/app_types.dart';
 
 /// DeviceInfoService (mirroring iOS DeviceInfoService.swift)
 ///
@@ -13,7 +14,7 @@ class DeviceInfoService extends ChangeNotifier {
   static final DeviceInfoService shared = DeviceInfoService._();
 
   DeviceInfoService._() {
-    refreshDeviceInfo();
+    unawaited(refreshDeviceInfo());
   }
 
   SystemDeviceInfo? _deviceInfo;
