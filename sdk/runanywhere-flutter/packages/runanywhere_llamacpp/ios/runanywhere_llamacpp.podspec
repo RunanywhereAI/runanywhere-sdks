@@ -136,7 +136,15 @@ https://github.com/RunanywhereAI/runanywhere-binaries
     'ENABLE_BITCODE' => 'NO',
   }
 
+  # CRITICAL: -all_load ensures ALL object files from RABackendLLAMACPP.xcframework are linked.
+  # Without this, the linker won't include rac_backend_llamacpp_register and rac_llm_llamacpp_*
+  # functions because nothing in native code directly references them - only FFI does.
   s.user_target_xcconfig = {
-    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386'
+    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
+    'OTHER_LDFLAGS' => '-lc++ -all_load',
+    'DEAD_CODE_STRIPPING' => 'NO',
   }
+
+  # Mark static framework for proper linking
+  s.static_framework = true
 end

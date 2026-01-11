@@ -140,23 +140,21 @@ class ModelListViewModel extends ChangeNotifier {
     }
   }
 
-  /// Convert app LLMFramework to SDK LLMFramework
-  sdk.LLMFramework _convertToSDKFramework(LLMFramework framework) {
+  /// Convert app LLMFramework to SDK InferenceFramework
+  sdk.InferenceFramework _convertToSDKFramework(LLMFramework framework) {
     switch (framework) {
       case LLMFramework.llamaCpp:
-        return sdk.LLMFramework.llamaCpp;
+        return sdk.InferenceFramework.llamaCpp;
       case LLMFramework.foundationModels:
-        return sdk.LLMFramework.foundationModels;
-      case LLMFramework.mediaPipe:
-        return sdk.LLMFramework.mediaPipe;
+        return sdk.InferenceFramework.foundationModels;
       case LLMFramework.onnxRuntime:
-        return sdk.LLMFramework.onnx;
+        return sdk.InferenceFramework.onnx;
       case LLMFramework.systemTTS:
-        return sdk.LLMFramework.systemTTS;
+        return sdk.InferenceFramework.systemTTS;
+      case LLMFramework.mediaPipe:
       case LLMFramework.whisperKit:
-        return sdk.LLMFramework.whisperKit;
       case LLMFramework.unknown:
-        return sdk.LLMFramework.llamaCpp;
+        return sdk.InferenceFramework.unknown;
     }
   }
 
@@ -262,11 +260,8 @@ class ModelListViewModel extends ChangeNotifier {
     try {
       debugPrint('🗑️ Deleting model: ${model.name}');
 
-      // Use SDK's public delete API
-      final framework = _convertToSDKFramework(
-        model.preferredFramework ?? LLMFramework.unknown,
-      );
-      await sdk.RunAnywhere.deleteStoredModel(model.id, framework);
+      // Use SDK's public delete API (now only takes modelId)
+      await sdk.RunAnywhere.deleteStoredModel(model.id);
 
       // Refresh models from registry
       await loadModelsFromRegistry();
@@ -347,18 +342,16 @@ class ModelListViewModel extends ChangeNotifier {
       debugPrint('➕ Adding model from URL: $name');
 
       // Use SDK's public registration API
-      final modelInfo = sdk.RunAnywhere.registerModelFromString(
+      final modelInfo = sdk.RunAnywhere.registerModel(
         name: name,
-        urlString: url,
+        url: Uri.parse(url),
         framework: _convertToSDKFramework(framework),
-        memoryRequirement: estimatedSize,
+        modality: sdk.ModelCategory.language,
         supportsThinking: supportsThinking,
       );
 
-      if (modelInfo != null) {
-        debugPrint(
-            '✅ Registered model with SDK: ${modelInfo.name} (${modelInfo.id})');
-      }
+      debugPrint(
+          '✅ Registered model with SDK: ${modelInfo.name} (${modelInfo.id})');
 
       // Refresh models from registry
       await loadModelsFromRegistry();

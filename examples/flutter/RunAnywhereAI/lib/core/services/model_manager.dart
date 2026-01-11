@@ -20,6 +20,8 @@ class ModelManager extends ChangeNotifier {
   String? _currentModelId;
   ModelInfo? _currentModel;
   List<ModelInfo> _availableModels = [];
+  String? _loadedSTTModelId;
+  String? _loadedTTSVoiceId;
   // ignore: cancel_subscriptions, cancelled in dispose()
   StreamSubscription<SDKModelEvent>? _modelEventsSubscription;
 
@@ -59,9 +61,15 @@ class ModelManager extends ChangeNotifier {
   /// Handle model load completed event from SDK
   Future<void> _handleModelLoadCompleted(String modelId) async {
     debugPrint('📡 SDK Event: Model load completed: $modelId');
-    // Refresh current model from SDK
-    _currentModel = RunAnywhere.currentModel;
-    _currentModelId = _currentModel?.id;
+    // Update current model ID (model info is managed internally)
+    _currentModelId = modelId;
+    // Find the model in available models to update _currentModel
+    try {
+      _currentModel = _availableModels.firstWhere((m) => m.id == modelId);
+    } catch (_) {
+      // Model not in available models, just keep the ID
+      _currentModel = null;
+    }
     _isLoading = false;
     _error = null;
     notifyListeners();
@@ -119,10 +127,16 @@ class ModelManager extends ChangeNotifier {
       // Use SDK's model loading with new API
       await RunAnywhere.loadModel(modelId);
       _currentModelId = modelId;
-      _currentModel = RunAnywhere.currentModel;
+      // Find the model in available models to update _currentModel
+      try {
+        _currentModel = _availableModels.firstWhere((m) => m.id == modelId);
+      } catch (_) {
+        _currentModel = null;
+      }
       _error = null;
 
-      debugPrint('✅ Model loaded successfully: ${_currentModel?.name}');
+      debugPrint(
+          '✅ Model loaded successfully: ${_currentModel?.name ?? modelId}');
     } catch (e) {
       debugPrint('❌ Failed to load model: $e');
       _error = e;
@@ -151,6 +165,7 @@ class ModelManager extends ChangeNotifier {
 
       // Use SDK's STT model loading
       await RunAnywhere.loadSTTModel(modelId);
+      _loadedSTTModelId = modelId;
 
       debugPrint('✅ STT model loaded successfully: $modelId');
     } catch (e) {
@@ -175,6 +190,7 @@ class ModelManager extends ChangeNotifier {
 
       // Use SDK's TTS voice loading
       await RunAnywhere.loadTTSVoice(voiceId);
+      _loadedTTSVoiceId = voiceId;
 
       debugPrint('✅ TTS voice loaded successfully: $voiceId');
     } catch (e) {
@@ -225,11 +241,11 @@ class ModelManager extends ChangeNotifier {
     }
   }
 
-  /// Get current model from SDK
+  /// Get current model
   /// Matches iOS ModelManager.getCurrentModel pattern
   ModelInfo? getCurrentModel() {
-    // Use the SDK's public method to get the current model
-    return RunAnywhere.currentModel;
+    // Return the locally tracked current model
+    return _currentModel;
   }
 
   /// Check if a specific model is loaded
@@ -275,16 +291,32 @@ class ModelManager extends ChangeNotifier {
   /// Refresh current model state
   /// Matches iOS ModelManager pattern
   Future<void> refresh() async {
-    _currentModel = RunAnywhere.currentModel;
-    _currentModelId = _currentModel?.id;
     await getAvailableModels();
+    // Update _currentModel from available models if we have a current ID
+    if (_currentModelId != null) {
+      try {
+        _currentModel =
+            _availableModels.firstWhere((m) => m.id == _currentModelId);
+      } catch (_) {
+        _currentModel = null;
+      }
+    }
     notifyListeners();
   }
 
   /// Set current model directly (for notification handling)
   void setCurrentModel(String? modelId) {
     _currentModelId = modelId;
-    _currentModel = RunAnywhere.currentModel;
+    // Update _currentModel from available models
+    if (modelId != null) {
+      try {
+        _currentModel = _availableModels.firstWhere((m) => m.id == modelId);
+      } catch (_) {
+        _currentModel = null;
+      }
+    } else {
+      _currentModel = null;
+    }
     notifyListeners();
   }
 
@@ -327,15 +359,27 @@ class ModelManager extends ChangeNotifier {
     return _availableModels.where((m) => m.isDownloaded).toList();
   }
 
-  /// Get loaded STT capability from SDK
-  STTCapability? get loadedSTTCapability => RunAnywhere.loadedSTTCapability;
+  /// Get loaded STT model ID (managed internally)
+  String? get loadedSTTModelId => _loadedSTTModelId;
 
-  /// Get loaded TTS capability from SDK
-  TTSCapability? get loadedTTSCapability => RunAnywhere.loadedTTSCapability;
+  /// Get loaded TTS voice ID (managed internally)
+  String? get loadedTTSVoiceId => _loadedTTSVoiceId;
 
   /// Check if an STT model is loaded
-  bool get isSTTModelLoaded => RunAnywhere.loadedSTTCapability != null;
+  bool get isSTTModelLoaded => _loadedSTTModelId != null;
 
   /// Check if a TTS model is loaded
-  bool get isTTSModelLoaded => RunAnywhere.loadedTTSCapability != null;
+  bool get isTTSModelLoaded => _loadedTTSVoiceId != null;
+
+  /// Unload STT model
+  void unloadSTTModel() {
+    _loadedSTTModelId = null;
+    notifyListeners();
+  }
+
+  /// Unload TTS voice
+  void unloadTTSVoice() {
+    _loadedTTSVoiceId = null;
+    notifyListeners();
+  }
 }

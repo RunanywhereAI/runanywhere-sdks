@@ -129,6 +129,9 @@ https://github.com/RunanywhereAI/runanywhere-sdks
   ]
 
   # Build settings
+  # Note: -all_load forces all symbols from static libraries to be loaded
+  # With static linkage (use_frameworks! :linkage => :static in Podfile),
+  # all symbols from RACommons.xcframework will be available in the final app
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
     'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
@@ -137,7 +140,26 @@ https://github.com/RunanywhereAI/runanywhere-sdks
     'ENABLE_BITCODE' => 'NO',
   }
 
+  # CRITICAL: These flags propagate to the main app target to ensure all symbols
+  # from vendored static frameworks are linked into the final binary.
+  #
+  # -ObjC ensures Objective-C categories are loaded.
+  # DEAD_CODE_STRIPPING=NO prevents unused symbol removal.
+  #
+  # Symbol retention is ensured by RunAnywherePlugin.swift which references
+  # key C symbols, forcing the linker to include them even when only called via FFI.
+  # CRITICAL: -all_load ensures ALL object files from static libraries are linked.
+  # This is required because:
+  # 1. RACommons.xcframework is a static library
+  # 2. The linker normally strips "unused" symbols not directly referenced by native code
+  # 3. Flutter FFI calls these symbols at runtime via dlsym() which the linker can't see
+  # Without -all_load, symbols like rac_llm_component_create won't be in the final binary
   s.user_target_xcconfig = {
-    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386'
+    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
+    'OTHER_LDFLAGS' => '-lc++ -larchive -lbz2 -ObjC -all_load',
+    'DEAD_CODE_STRIPPING' => 'NO',
   }
+
+  # Mark static framework for proper linking
+  s.static_framework = true
 end

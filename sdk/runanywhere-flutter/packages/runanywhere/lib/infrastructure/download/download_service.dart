@@ -4,10 +4,10 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import '../../core/types/model_types.dart';
 import '../../foundation/logging/sdk_logger.dart';
+import '../../native/dart_bridge_model_paths.dart';
 import '../../public/events/event_bus.dart';
 import '../../public/events/sdk_event.dart';
 import '../../public/runanywhere.dart';
@@ -209,7 +209,7 @@ class ModelDownloadService {
         }
 
         // Update model's local path
-        _updateModelLocalPath(model, finalModelPath);
+        await _updateModelLocalPath(model, finalModelPath);
 
         // Emit completion
         EventBus.shared.publish(SDKModelEvent.downloadCompleted(
@@ -243,17 +243,17 @@ class ModelDownloadService {
     }
   }
 
-  /// Get the model storage directory
+  /// Get the model storage directory.
+  /// Uses C++ path functions to ensure consistency with discovery.
+  /// Matches Swift: CppBridge.ModelPaths.getModelFolder()
   Future<Directory> _getModelDirectory(ModelInfo model) async {
-    final appDir = await getApplicationDocumentsDirectory();
-    final modelsDir = Directory(p.join(
-      appDir.path,
-      'runanywhere',
-      'models',
-      model.framework.analyticsKey,
+    // Use C++ path functions - this creates the directory if needed
+    final modelPath =
+        await DartBridgeModelPaths.instance.getModelFolderAndCreate(
       model.id,
-    ));
-    return modelsDir;
+      model.framework,
+    );
+    return Directory(modelPath);
   }
 
   /// Extract an archive to the destination
@@ -321,8 +321,22 @@ class ModelDownloadService {
   }
 
   /// Update model's local path after download
-  void _updateModelLocalPath(ModelInfo model, String path) {
+  Future<void> _updateModelLocalPath(ModelInfo model, String path) async {
     model.localPath = Uri.file(path);
     _logger.info('Updated model local path: ${model.id} -> $path');
+
+    // Also update the C++ registry so model is discoverable
+    await _updateModelRegistry(model.id, path);
+  }
+
+  /// Update the C++ model registry (for persistence across app restarts)
+  Future<void> _updateModelRegistry(String modelId, String path) async {
+    try {
+      // Update the C++ registry so model is discoverable
+      // Matches Swift: CppBridge.ModelRegistry.shared.updateDownloadStatus()
+      await RunAnywhere.updateModelDownloadStatus(modelId, path);
+    } catch (e) {
+      _logger.debug('Could not update C++ registry: $e');
+    }
   }
 }

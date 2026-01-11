@@ -1,130 +1,340 @@
-// ignore_for_file: avoid_classes_with_only_static_members
+/// DartBridge+STT
+///
+/// STT component bridge - manages C++ STT component lifecycle.
+/// Mirrors Swift's CppBridge+STT.swift pattern.
+library dart_bridge_stt;
 
-import 'dart:async';
+import 'dart:ffi';
 import 'dart:typed_data';
 
-import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/native_backend.dart';
+import 'package:ffi/ffi.dart';
 
-/// STT bridge for C++ speech-to-text operations.
-/// Matches Swift's `CppBridge+STT.swift`.
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/native/platform_loader.dart';
+
+/// STT component bridge for C++ interop.
+///
+/// Provides thread-safe access to the C++ STT component.
+/// Handles model loading, transcription, and streaming.
+///
+/// Usage:
+/// ```dart
+/// final stt = DartBridgeSTT.shared;
+/// await stt.loadModel('/path/to/model', 'model-id', 'Model Name');
+/// final text = await stt.transcribe(audioData);
+/// ```
 class DartBridgeSTT {
+  // MARK: - Singleton
+
+  /// Shared instance
+  static final DartBridgeSTT shared = DartBridgeSTT._();
+
   DartBridgeSTT._();
 
-  static final _logger = SDKLogger('DartBridge.STT');
-  static final DartBridgeSTT instance = DartBridgeSTT._();
+  // MARK: - State
 
-  NativeBackend? _backend;
+  RacHandle? _handle;
+  String? _loadedModelId;
+  final _logger = SDKLogger('DartBridge.STT');
 
-  /// Set the native backend for STT operations
-  void setBackend(NativeBackend backend) {
-    _backend = backend;
-  }
+  // MARK: - Handle Management
 
-  /// Load an STT model
-  Future<bool> loadModel({
-    required String modelPath,
-    String? modelType,
-    Map<String, dynamic>? config,
-  }) async {
-    final backend = _backend;
-    if (backend == null) {
-      _logger.warning('No backend set for STT operations');
-      return false;
+  /// Get or create the STT component handle.
+  RacHandle getHandle() {
+    if (_handle != null) {
+      return _handle!;
     }
 
     try {
-      backend.loadSttModel(
-        modelPath,
-        modelType: modelType ?? 'whisper',
-        config: config,
-      );
-      return true;
+      final lib = PlatformLoader.loadCommons();
+      final create = lib.lookupFunction<
+          Int32 Function(Pointer<RacHandle>),
+          int Function(Pointer<RacHandle>)>('rac_stt_component_create');
+
+      final handlePtr = calloc<RacHandle>();
+      try {
+        final result = create(handlePtr);
+
+        if (result != RAC_SUCCESS) {
+          throw StateError(
+            'Failed to create STT component: ${RacResultCode.getMessage(result)}',
+          );
+        }
+
+        _handle = handlePtr.value;
+        _logger.debug('STT component created');
+        return _handle!;
+      } finally {
+        calloc.free(handlePtr);
+      }
     } catch (e) {
-      _logger
-          .error('Failed to load STT model', metadata: {'error': e.toString()});
+      _logger.error('Failed to create STT handle: $e');
+      rethrow;
+    }
+  }
+
+  // MARK: - State Queries
+
+  /// Check if a model is loaded.
+  bool get isLoaded {
+    if (_handle == null) return false;
+
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final isLoadedFn = lib.lookupFunction<Int32 Function(RacHandle),
+          int Function(RacHandle)>('rac_stt_component_is_loaded');
+
+      return isLoadedFn(_handle!) == RAC_TRUE;
+    } catch (e) {
+      _logger.debug('isLoaded check failed: $e');
       return false;
     }
   }
 
-  /// Check if STT model is loaded
-  bool isModelLoaded() {
-    return _backend?.isSttModelLoaded ?? false;
-  }
+  /// Get the currently loaded model ID.
+  String? get currentModelId => _loadedModelId;
 
-  /// Unload the current STT model
-  Future<bool> unloadModel() async {
-    final backend = _backend;
-    if (backend == null) return true;
+  /// Check if streaming is supported.
+  bool get supportsStreaming {
+    if (_handle == null) return false;
 
     try {
-      backend.unloadSttModel();
-      return true;
+      final lib = PlatformLoader.loadCommons();
+      final supportsStreamingFn = lib.lookupFunction<Int32 Function(RacHandle),
+          int Function(RacHandle)>('rac_stt_component_supports_streaming');
+
+      return supportsStreamingFn(_handle!) == RAC_TRUE;
     } catch (e) {
-      _logger.error('Failed to unload STT model',
-          metadata: {'error': e.toString()});
       return false;
     }
   }
 
-  /// Transcribe audio (non-streaming)
-  Future<STTTranscriptionResult?> transcribe({
-    required Float32List samples,
-    int sampleRate = 16000,
-    String? language,
-  }) async {
-    final backend = _backend;
-    if (backend == null) {
-      _logger.warning('No backend set for STT transcription');
-      return null;
-    }
+  // MARK: - Model Lifecycle
 
-    try {
-      final result = backend.transcribe(
-        samples,
-        sampleRate: sampleRate,
-        language: language,
-      );
-
-      return STTTranscriptionResult(
-        text: result['text'] as String? ?? '',
-        language: result['language'] as String? ?? language ?? 'en',
-        confidence: (result['confidence'] as num?)?.toDouble() ?? 1.0,
-        durationMs: result['duration_ms'] as int? ?? 0,
-      );
-    } catch (e) {
-      _logger.error('Transcription failed', metadata: {'error': e.toString()});
-      return null;
-    }
-  }
-
-  /// Check if streaming is supported
-  bool supportsStreaming() {
-    return _backend?.sttSupportsStreaming ?? false;
-  }
-
-  /// Cancel ongoing transcription.
+  /// Load an STT model.
   ///
-  /// STT cancellation signals the native backend to stop processing.
-  /// Note: The effect depends on the backend's implementation.
-  void cancel() {
-    _logger.debug('STT cancel requested');
-    // Native STT typically processes in one shot, so cancel is a no-op
-    // For streaming STT, the stream would be closed instead
+  /// [modelPath] - Full path to the model directory.
+  /// [modelId] - Unique identifier for the model.
+  /// [modelName] - Human-readable name.
+  ///
+  /// Throws on failure.
+  Future<void> loadModel(
+    String modelPath,
+    String modelId,
+    String modelName,
+  ) async {
+    final handle = getHandle();
+
+    final pathPtr = modelPath.toNativeUtf8();
+    final idPtr = modelId.toNativeUtf8();
+    final namePtr = modelName.toNativeUtf8();
+
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final loadModelFn = lib.lookupFunction<
+          Int32 Function(RacHandle, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
+          int Function(RacHandle, Pointer<Utf8>, Pointer<Utf8>,
+              Pointer<Utf8>)>('rac_stt_component_load_model');
+
+      final result = loadModelFn(handle, pathPtr, idPtr, namePtr);
+
+      if (result != RAC_SUCCESS) {
+        throw StateError(
+          'Failed to load STT model: ${RacResultCode.getMessage(result)}',
+        );
+      }
+
+      _loadedModelId = modelId;
+      _logger.info('STT model loaded: $modelId');
+    } finally {
+      calloc.free(pathPtr);
+      calloc.free(idPtr);
+      calloc.free(namePtr);
+    }
+  }
+
+  /// Unload the current model.
+  void unload() {
+    if (_handle == null) return;
+
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final cleanupFn = lib.lookupFunction<Int32 Function(RacHandle),
+          int Function(RacHandle)>('rac_stt_component_cleanup');
+
+      cleanupFn(_handle!);
+      _loadedModelId = null;
+      _logger.info('STT model unloaded');
+    } catch (e) {
+      _logger.error('Failed to unload STT model: $e');
+    }
+  }
+
+  // MARK: - Transcription
+
+  /// Transcribe audio data.
+  ///
+  /// [audioData] - PCM16 audio data at 16kHz mono.
+  ///
+  /// Returns the transcription result.
+  Future<STTComponentResult> transcribe(Uint8List audioData) async {
+    final handle = getHandle();
+
+    if (!isLoaded) {
+      throw StateError('No STT model loaded. Call loadModel() first.');
+    }
+
+    // Convert to native pointer
+    final dataPtr = calloc<Uint8>(audioData.length);
+    final resultPtr = calloc<RacSttResultStruct>();
+
+    try {
+      // Copy audio data
+      for (var i = 0; i < audioData.length; i++) {
+        dataPtr[i] = audioData[i];
+      }
+
+      final lib = PlatformLoader.loadCommons();
+      final transcribeFn = lib.lookupFunction<
+          Int32 Function(
+              RacHandle, Pointer<Void>, IntPtr, Pointer<RacSttResultStruct>),
+          int Function(RacHandle, Pointer<Void>, int,
+              Pointer<RacSttResultStruct>)>('rac_stt_component_transcribe');
+
+      final status = transcribeFn(
+        handle,
+        dataPtr.cast<Void>(),
+        audioData.length,
+        resultPtr,
+      );
+
+      if (status != RAC_SUCCESS) {
+        throw StateError(
+          'STT transcription failed: ${RacResultCode.getMessage(status)}',
+        );
+      }
+
+      final result = resultPtr.ref;
+      return STTComponentResult(
+        text: result.text != nullptr ? result.text.toDartString() : '',
+        confidence: result.confidence,
+        durationMs: result.durationMs,
+        language: result.language != nullptr
+            ? result.language.toDartString()
+            : null,
+      );
+    } finally {
+      calloc.free(dataPtr);
+      calloc.free(resultPtr);
+    }
+  }
+
+  /// Transcribe with streaming.
+  ///
+  /// Returns a stream of partial transcriptions.
+  Stream<STTStreamResult> transcribeStream(Stream<Uint8List> audioStream) {
+    // Create async generator for streaming transcription
+    return _transcribeStreamImpl(audioStream);
+  }
+
+  Stream<STTStreamResult> _transcribeStreamImpl(
+    Stream<Uint8List> audioStream,
+  ) async* {
+    // Accumulate audio and emit partial results
+    final buffer = <int>[];
+
+    await for (final chunk in audioStream) {
+      buffer.addAll(chunk);
+
+      // Process every ~0.5 seconds of audio (8000 samples at 16kHz)
+      if (buffer.length >= 8000) {
+        try {
+          final result = await transcribe(Uint8List.fromList(buffer));
+          yield STTStreamResult(
+            text: result.text,
+            isFinal: false,
+            confidence: result.confidence,
+          );
+        } catch (e) {
+          _logger.debug('Partial transcription failed: $e');
+        }
+      }
+    }
+
+    // Final transcription with all audio
+    if (buffer.isNotEmpty) {
+      try {
+        final result = await transcribe(Uint8List.fromList(buffer));
+        yield STTStreamResult(
+          text: result.text,
+          isFinal: true,
+          confidence: result.confidence,
+        );
+      } catch (e) {
+        _logger.error('Final transcription failed: $e');
+      }
+    }
+  }
+
+  // MARK: - Cleanup
+
+  /// Destroy the component and release resources.
+  void destroy() {
+    if (_handle != null) {
+      try {
+        final lib = PlatformLoader.loadCommons();
+        final destroyFn = lib.lookupFunction<Void Function(RacHandle),
+            void Function(RacHandle)>('rac_stt_component_destroy');
+
+        destroyFn(_handle!);
+        _handle = null;
+        _loadedModelId = null;
+        _logger.debug('STT component destroyed');
+      } catch (e) {
+        _logger.error('Failed to destroy STT component: $e');
+      }
+    }
   }
 }
 
-/// Result of STT transcription
-class STTTranscriptionResult {
+/// Result from STT transcription.
+class STTComponentResult {
   final String text;
-  final String language;
   final double confidence;
   final int durationMs;
+  final String? language;
 
-  STTTranscriptionResult({
+  const STTComponentResult({
     required this.text,
-    required this.language,
     required this.confidence,
     required this.durationMs,
+    this.language,
   });
+}
+
+/// Streaming result from STT transcription.
+class STTStreamResult {
+  final String text;
+  final bool isFinal;
+  final double confidence;
+
+  const STTStreamResult({
+    required this.text,
+    required this.isFinal,
+    required this.confidence,
+  });
+}
+
+/// FFI struct for STT result (matches rac_stt_result_t)
+final class RacSttResultStruct extends Struct {
+  external Pointer<Utf8> text;
+
+  @Double()
+  external double confidence;
+
+  @Int32()
+  external int durationMs;
+
+  external Pointer<Utf8> language;
 }

@@ -1,9 +1,20 @@
-/// LlamaCpp backend for RunAnywhere Flutter SDK.
+/// LlamaCPP backend for RunAnywhere Flutter SDK.
 ///
-/// This module provides LLM (Language Model) capabilities via llama.cpp
-/// through the native runanywhere-core library using Dart FFI.
+/// This module provides LLM (Language Model) capabilities via llama.cpp.
+/// It is a **thin wrapper** that registers the C++ backend with the service registry.
 ///
-/// ## Quick Start (matches Swift LlamaCPP API exactly)
+/// ## Architecture (matches Swift/Kotlin)
+///
+/// The C++ backend (RABackendLlamaCPP) handles all business logic:
+/// - Service provider registration
+/// - Model loading and inference
+/// - Streaming generation
+///
+/// This Dart module just:
+/// 1. Calls `rac_backend_llamacpp_register()` to register the backend
+/// 2. The core SDK handles all LLM operations via `rac_llm_component_*`
+///
+/// ## Quick Start
 ///
 /// ```dart
 /// import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
@@ -11,93 +22,63 @@
 /// // Register the module (matches Swift: LlamaCPP.register())
 /// await LlamaCpp.register();
 ///
-/// // Add models (matches Swift: LlamaCPP.addModel())
+/// // Add models
 /// LlamaCpp.addModel(
 ///   name: 'SmolLM2 360M Q8_0',
 ///   url: 'https://huggingface.co/.../model.gguf',
 ///   memoryRequirement: 500000000,
 /// );
 /// ```
-///
-/// ## What This Provides
-///
-/// - **LLM (Language Model)**: Text generation using GGUF/GGML models
-/// - **Streaming**: Token-by-token streaming generation
-/// - **Template Support**: Auto-detection of model templates (ChatML, Llama, etc.)
 library runanywhere_llamacpp;
 
-import 'dart:async';
+import 'dart:ffi';
 
 import 'package:runanywhere/core/module/runanywhere_module.dart';
-import 'package:runanywhere/core/module_registry.dart';
+import 'package:runanywhere/core/types/model_types.dart';
+import 'package:runanywhere/core/types/sdk_component.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/ffi_types.dart';
-import 'package:runanywhere/native/native_backend.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/public/runanywhere.dart' show RunAnywhere;
 import 'package:runanywhere_llamacpp/native/llamacpp_bindings.dart';
-import 'package:runanywhere_llamacpp/providers/llamacpp_llm_provider.dart';
 
+// Re-export for backward compatibility
 export 'llamacpp_error.dart';
-export 'llamacpp_template_resolver.dart';
-export 'providers/llamacpp_llm_provider.dart';
-export 'services/llamacpp_llm_service.dart';
 
-// ============================================================================
-// LlamaCpp Module Implementation
-// Matches Swift LlamaCPP enum from LlamaCPPRuntime/LlamaCPP.swift
-// ============================================================================
-
-/// LlamaCpp module for LLM text generation.
+/// LlamaCPP module for LLM text generation.
 ///
 /// Provides large language model capabilities using llama.cpp
-/// with GGUF/GGML models and Metal/GPU acceleration.
+/// with GGUF models and Metal/GPU acceleration.
 ///
 /// Matches Swift `LlamaCPP` enum from LlamaCPPRuntime/LlamaCPP.swift.
-///
-/// ## Registration (matches Swift LlamaCPP pattern exactly)
-///
-/// ```dart
-/// // Register module (matches Swift: LlamaCPP.register())
-/// await LlamaCpp.register();
-///
-/// // Or with custom priority
-/// await LlamaCpp.register(priority: 150);
-/// ```
 class LlamaCpp implements RunAnywhereModule {
   // ============================================================================
   // Singleton Pattern (matches Swift enum pattern)
   // ============================================================================
 
-  /// Singleton instance for module metadata
   static final LlamaCpp _instance = LlamaCpp._internal();
-
-  /// Get the module instance (for use with ModuleRegistry.registerModule)
   static LlamaCpp get module => _instance;
-
   LlamaCpp._internal();
 
   // ============================================================================
-  // Module State
+  // Module Info (matches Swift exactly)
   // ============================================================================
 
-  static final SDKLogger _logger = SDKLogger('LlamaCpp');
-  static bool _isRegistered = false;
-  static NativeBackend? _backend;
-  static LlamaCppBindings? _bindings;
+  /// Current version of the LlamaCPP Runtime module
+  static const String version = '2.0.0';
+
+  /// LlamaCPP library version (underlying C++ library)
+  static const String llamaCppVersion = 'b7199';
 
   // ============================================================================
-  // RunAnywhereModule Implementation (matches Swift LlamaCPP enum)
+  // RunAnywhereModule Conformance (matches Swift exactly)
   // ============================================================================
 
   @override
   String get moduleId => 'llamacpp';
 
   @override
-  String get moduleName => 'LlamaCpp';
-
-  @override
-  InferenceFramework get inferenceFramework => InferenceFramework.llamaCpp;
+  String get moduleName => 'LlamaCPP';
 
   @override
   Set<SDKComponent> get capabilities => {SDKComponent.llm};
@@ -105,98 +86,30 @@ class LlamaCpp implements RunAnywhereModule {
   @override
   int get defaultPriority => 100;
 
+  @override
+  InferenceFramework get inferenceFramework => InferenceFramework.llamaCpp;
+
   // ============================================================================
-  // Static API (matches Swift LlamaCPP static methods exactly)
+  // Registration State
   // ============================================================================
 
-  /// Whether the module is registered
-  static bool get isRegistered => _isRegistered;
+  static bool _isRegistered = false;
+  static LlamaCppBindings? _bindings;
+  static final _logger = SDKLogger('LlamaCpp');
 
-  /// Get native backend (for advanced usage)
-  static NativeBackend? get backend => _backend;
-
-  /// Get native bindings (for advanced usage)
-  static LlamaCppBindings? get bindings => _bindings;
-
-  /// Check if the native backend is available on this platform.
-  static bool get isAvailable {
-    try {
-      PlatformLoader.loadLlamaCpp();
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  /// Get the native library version.
-  static String get version => _backend?.version ?? 'not initialized';
-
-  /// Supported quantization levels for GGUF models.
-  static const List<String> supportedQuantizations = [
-    'Q2_K',
-    'Q3_K_S',
-    'Q3_K_M',
-    'Q3_K_L',
-    'Q4_0',
-    'Q4_1',
-    'Q4_K_S',
-    'Q4_K_M',
-    'Q5_0',
-    'Q5_1',
-    'Q5_K_S',
-    'Q5_K_M',
-    'Q6_K',
-    'Q8_0',
-    'IQ2_XXS',
-    'IQ2_XS',
-    'IQ3_S',
-    'IQ3_XXS',
-    'IQ4_NL',
-    'IQ4_XS',
-  ];
-
-  /// Check if a quantization level is supported.
-  static bool isQuantizationSupported(String quantization) {
-    return supportedQuantizations.contains(quantization);
-  }
-
-  /// Get backend info as a map.
-  static Map<String, dynamic> getBackendInfo() {
-    if (_backend == null) return {};
-    return _backend!.getBackendInfo();
-  }
-
-  /// List of available backend names from the native library.
-  static List<String> get availableBackends {
-    if (_backend != null) {
-      try {
-        return _backend!.getAvailableBackends();
-      } catch (_) {
-        return [];
-      }
-    }
-    if (!isAvailable) return [];
-    NativeBackend? tempBackend;
-    try {
-      tempBackend = NativeBackend();
-      return tempBackend.getAvailableBackends();
-    } catch (_) {
-      return [];
-    } finally {
-      tempBackend?.dispose();
-    }
-  }
+  /// Internal model registry for models added via addModel
+  static final List<ModelInfo> _registeredModels = [];
 
   // ============================================================================
   // Registration (matches Swift LlamaCPP.register() exactly)
   // ============================================================================
 
-  /// Register LlamaCpp module with the SDK.
+  /// Register LlamaCPP backend with the C++ service registry.
   ///
-  /// Matches Swift `LlamaCPP.register(priority:)` pattern exactly.
-  /// Calls the C++ `rac_backend_llamacpp_register()` function via FFI.
+  /// This calls `rac_backend_llamacpp_register()` to register the
+  /// LlamaCPP service provider with the C++ commons layer.
   ///
-  /// [priority] - Registration priority (higher = preferred). Default: 100.
+  /// Safe to call multiple times - subsequent calls are no-ops.
   static Future<void> register({int priority = 100}) async {
     if (_isRegistered) {
       _logger.debug('LlamaCpp already registered');
@@ -209,87 +122,77 @@ class LlamaCpp implements RunAnywhereModule {
       return;
     }
 
-    // Step 1: Create bindings and register with C++
+    _logger.info('Registering LlamaCpp backend with C++ registry...');
+
     try {
       _bindings = LlamaCppBindings();
+      _logger.debug(
+          'LlamaCppBindings created, isAvailable: ${_bindings!.isAvailable}');
 
-      // Call C++ registration function via FFI (matches Swift exactly)
       final result = _bindings!.register();
+      _logger.info(
+          'rac_backend_llamacpp_register() returned: $result (${RacResultCode.getMessage(result)})');
 
       // RAC_SUCCESS = 0, RAC_ERROR_MODULE_ALREADY_REGISTERED = specific code
       if (result != RacResultCode.success &&
           result != RacResultCode.errorModuleAlreadyRegistered) {
-        _logger.warning('C++ backend registration returned: $result');
-      } else {
-        _logger.debug('C++ backend registered successfully');
+        _logger.error('C++ backend registration FAILED with code: $result');
+        return;
       }
+
+      // No Dart-level provider needed - all LLM operations go through
+      // DartBridgeLLM -> rac_llm_component_* (just like Swift CppBridge.LLM)
+
+      _isRegistered = true;
+      _logger.info('LlamaCpp backend registered successfully');
     } catch (e) {
-      _logger.debug('LlamaCppBindings not available: $e');
-      // Continue with Dart-side registration as fallback
+      _logger.error('LlamaCppBindings not available: $e');
     }
+  }
 
-    // Step 2: Create native backend for operations (backward compatibility)
-    _backend = NativeBackend.llamacpp();
-    _backend!.initialize();
+  /// Unregister the LlamaCPP backend from C++ registry.
+  static void unregister() {
+    if (!_isRegistered) return;
 
-    // Step 3: Register module metadata with Dart ModuleRegistry
-    ModuleRegistry.shared.registerModuleMetadata(ModuleMetadata(
-      moduleId: _instance.moduleId,
-      moduleName: _instance.moduleName,
-      inferenceFramework: _instance.inferenceFramework,
-      capabilities: _instance.capabilities,
-      priority: priority,
-      registeredAt: DateTime.now(),
-    ));
-
-    // Step 4: Register LLM provider
-    ModuleRegistry.shared.registerLLM(
-      LlamaCppLLMServiceProvider(_backend!),
-      priority: priority,
-    );
-
-    // Step 5: Register model collector with RunAnywhere
-    RunAnywhere.registerModelCollector(() => _registeredModels);
-
-    _isRegistered = true;
-    _logger.info('LlamaCpp registered with capabilities: LLM');
+    _bindings?.unregister();
+    _isRegistered = false;
+    _logger.info('LlamaCpp backend unregistered');
   }
 
   // ============================================================================
-  // Model Registration (matches Swift RunAnywhere.registerModel pattern)
+  // Model Handling (matches Swift exactly)
   // ============================================================================
 
-  /// Add a model to be used with LlamaCpp.
+  /// Check if the native backend is available on this platform.
+  static bool get isAvailable {
+    try {
+      final lib = PlatformLoader.loadCommons();
+      lib.lookup<NativeFunction<Int32 Function()>>(
+          'rac_backend_llamacpp_register');
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Check if LlamaCPP can handle a given model.
+  /// Uses file extension pattern matching - actual framework info is in C++ registry.
+  static bool canHandle(String? modelId) {
+    if (modelId == null) return false;
+    return modelId.toLowerCase().endsWith('.gguf');
+  }
+
+  // ============================================================================
+  // Model Registration (convenience API)
+  // ============================================================================
+
+  /// Add a LLM model to the registry.
   ///
-  /// This is a convenience method that matches the Swift pattern where modules
-  /// own their models. Internally calls [RunAnywhere.registerModel].
+  /// This is a convenience method that registers a model with the SDK.
+  /// The model will be associated with the LlamaCPP backend.
   ///
-  /// ```dart
-  /// LlamaCpp.addModel(
-  ///   id: 'smollm2-360m-q8_0',
-  ///   name: 'SmolLM2 360M Q8_0',
-  ///   url: 'https://huggingface.co/.../model.gguf',
-  ///   memoryRequirement: 500000000,
-  /// );
-  /// ```
+  /// Matches Swift pattern - models are registered globally via RunAnywhere.
   static void addModel({
-    String? id,
-    required String name,
-    required String url,
-    int? memoryRequirement,
-    bool supportsThinking = false,
-  }) {
-    // Import and use RunAnywhere to register the model
-    _addModelInternal(
-      id: id,
-      name: name,
-      url: url,
-      memoryRequirement: memoryRequirement,
-      supportsThinking: supportsThinking,
-    );
-  }
-
-  static void _addModelInternal({
     String? id,
     required String name,
     required String url,
@@ -305,36 +208,21 @@ class LlamaCpp implements RunAnywhereModule {
     final modelId =
         id ?? name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
 
-    // Determine format from URL
-    final format = _inferFormat(uri.path);
-
-    final model = ModelInfo(
+    // Register with the global SDK registry (matches Swift pattern)
+    final model = RunAnywhere.registerModel(
       id: modelId,
       name: name,
-      category: ModelCategory.language,
-      format: format,
+      url: uri,
       framework: InferenceFramework.llamaCpp,
-      downloadURL: uri,
-      downloadSize: memoryRequirement,
+      modality: ModelCategory.language,
+      memoryRequirement: memoryRequirement,
       supportsThinking: supportsThinking,
-      source: ModelSource.local,
     );
 
-    // Register with the global model registry
+    // Keep local reference for convenience
     _registeredModels.add(model);
     _logger.info('Added LlamaCpp model: $name ($modelId)');
   }
-
-  /// Infer model format from URL path
-  static ModelFormat _inferFormat(String path) {
-    final lower = path.toLowerCase();
-    if (lower.endsWith('.gguf')) return ModelFormat.gguf;
-    if (lower.endsWith('.bin')) return ModelFormat.bin;
-    return ModelFormat.gguf; // Default for LlamaCpp
-  }
-
-  /// Internal model registry for models added via addModel
-  static final List<ModelInfo> _registeredModels = [];
 
   /// Get all models registered with this module
   static List<ModelInfo> get registeredModels =>
@@ -344,15 +232,21 @@ class LlamaCpp implements RunAnywhereModule {
   // Cleanup
   // ============================================================================
 
-  /// Dispose of resources (for cleanup)
+  /// Dispose of resources
   static void dispose() {
-    if (_backend != null) {
-      _backend!.dispose();
-      _backend = null;
-    }
     _bindings = null;
     _registeredModels.clear();
     _isRegistered = false;
     _logger.info('LlamaCpp disposed');
   }
+
+  // ============================================================================
+  // Auto-Registration (matches Swift exactly)
+  // ============================================================================
+
+  /// Enable auto-registration for this module.
+  /// Access this property to trigger C++ backend registration.
+  static final autoRegister = () {
+    register();
+  };
 }

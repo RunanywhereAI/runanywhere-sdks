@@ -10,11 +10,17 @@
 #
 # Version: Must match Swift SDK's Package.swift and Kotlin SDK's build.gradle.kts
 #
+# Architecture Note:
+#   This follows the same pattern as React Native and Swift SDKs - bundling
+#   onnxruntime.xcframework directly rather than using a CocoaPods dependency.
+#   This ensures version consistency across all SDKs.
+#
 
 # =============================================================================
 # Version Constants (MUST match Swift Package.swift)
 # =============================================================================
 ONNX_VERSION = "0.1.4"
+ONNXRUNTIME_VERSION = "1.17.1"
 
 # =============================================================================
 # Binary Source - RABackendONNX from runanywhere-binaries
@@ -56,18 +62,29 @@ https://github.com/RunanywhereAI/runanywhere-binaries
   s.dependency 'runanywhere'
 
   # =============================================================================
-  # RABackendONNX XCFramework - STT/TTS/VAD
-  # Downloaded from runanywhere-binaries releases
+  # RABackendONNX + ONNX Runtime XCFrameworks
+  #
+  # Unlike using `s.dependency 'onnxruntime-c'`, we bundle onnxruntime.xcframework
+  # directly to match the architecture of other SDKs:
+  #   - Swift SDK: Downloads via SPM binaryTarget from download.onnxruntime.ai
+  #   - React Native: Downloads in prepare_command alongside RABackendONNX
+  #   - Kotlin: Bundles libonnxruntime.so in jniLibs
+  #
+  # This ensures version consistency (1.17.1) across all platforms.
   # =============================================================================
   if TEST_LOCAL
-    puts "[runanywhere_onnx] Using LOCAL RABackendONNX from Frameworks/"
-    s.vendored_frameworks = 'Frameworks/RABackendONNX.xcframework'
+    puts "[runanywhere_onnx] Using LOCAL frameworks from Frameworks/"
+    s.vendored_frameworks = [
+      'Frameworks/RABackendONNX.xcframework',
+      'Frameworks/onnxruntime.xcframework'
+    ]
   else
     s.prepare_command = <<-CMD
       set -e
 
       FRAMEWORK_DIR="Frameworks"
       VERSION="#{ONNX_VERSION}"
+      ONNX_VERSION="#{ONNXRUNTIME_VERSION}"
       VERSION_FILE="$FRAMEWORK_DIR/.onnx_version"
 
       # Check if already downloaded with correct version
@@ -75,7 +92,10 @@ https://github.com/RunanywhereAI/runanywhere-binaries
         CURRENT_VERSION=$(cat "$VERSION_FILE")
         if [ "$CURRENT_VERSION" = "$VERSION" ]; then
           echo "✅ RABackendONNX.xcframework version $VERSION already downloaded"
-          exit 0
+          # Still need to check onnxruntime
+          if [ -d "$FRAMEWORK_DIR/onnxruntime.xcframework" ]; then
+            exit 0
+          fi
         fi
       fi
 
@@ -99,17 +119,36 @@ https://github.com/RunanywhereAI/runanywhere-binaries
       unzip -q -o "$ZIP_FILE" -d "$FRAMEWORK_DIR/"
       rm -f "$ZIP_FILE"
 
+      # Download ONNX Runtime if not present (matches Swift/React Native SDKs)
+      if [ ! -d "$FRAMEWORK_DIR/onnxruntime.xcframework" ]; then
+        echo "📦 Downloading ONNX Runtime version $ONNX_VERSION..."
+        ONNX_URL="https://download.onnxruntime.ai/pod-archive-onnxruntime-c-$ONNX_VERSION.zip"
+        ONNX_ZIP="/tmp/onnxruntime.zip"
+
+        curl -L -f -o "$ONNX_ZIP" "$ONNX_URL" || {
+          echo "❌ Failed to download ONNX Runtime from $ONNX_URL"
+          exit 1
+        }
+
+        echo "📂 Extracting onnxruntime.xcframework..."
+        unzip -q -o "$ONNX_ZIP" -d "$FRAMEWORK_DIR/"
+        rm -f "$ONNX_ZIP"
+      fi
+
       echo "$VERSION" > "$VERSION_FILE"
 
-      if [ -d "$FRAMEWORK_DIR/RABackendONNX.xcframework" ]; then
-        echo "✅ RABackendONNX.xcframework installed successfully"
+      if [ -d "$FRAMEWORK_DIR/RABackendONNX.xcframework" ] && [ -d "$FRAMEWORK_DIR/onnxruntime.xcframework" ]; then
+        echo "✅ ONNX frameworks installed successfully"
       else
-        echo "❌ RABackendONNX.xcframework extraction failed"
+        echo "❌ ONNX framework extraction failed"
         exit 1
       fi
     CMD
 
-    s.vendored_frameworks = 'Frameworks/RABackendONNX.xcframework'
+    s.vendored_frameworks = [
+      'Frameworks/RABackendONNX.xcframework',
+      'Frameworks/onnxruntime.xcframework'
+    ]
   end
 
   s.preserve_paths = 'Frameworks/**/*'
@@ -137,9 +176,21 @@ https://github.com/RunanywhereAI/runanywhere-binaries
     'OTHER_LDFLAGS' => '-lc++ -larchive -lbz2',
     'CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES' => 'YES',
     'ENABLE_BITCODE' => 'NO',
+    # Header search paths for onnxruntime.xcframework (needed for compilation)
+    'HEADER_SEARCH_PATHS' => [
+      '$(PODS_TARGET_SRCROOT)/Frameworks/onnxruntime.xcframework/ios-arm64/Headers',
+      '$(PODS_TARGET_SRCROOT)/Frameworks/onnxruntime.xcframework/ios-arm64_x86_64-simulator/Headers',
+    ].join(' '),
   }
 
+  # CRITICAL: -all_load ensures ALL object files from RABackendONNX.xcframework are linked.
+  # This is required for Flutter FFI to find symbols at runtime via dlsym().
   s.user_target_xcconfig = {
-    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386'
+    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
+    'OTHER_LDFLAGS' => '-lc++ -larchive -lbz2 -all_load',
+    'DEAD_CODE_STRIPPING' => 'NO',
   }
+
+  # Mark static framework for proper linking
+  s.static_framework = true
 end

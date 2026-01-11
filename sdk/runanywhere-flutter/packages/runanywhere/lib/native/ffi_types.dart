@@ -390,83 +390,115 @@ typedef RacBackendLlamacppRegisterDart = int Function();
 typedef RacBackendLlamacppUnregisterNative = Int32 Function();
 typedef RacBackendLlamacppUnregisterDart = int Function();
 
-/// rac_result_t rac_llm_llamacpp_create(const char* model_path, const rac_llm_llamacpp_config_t* config, rac_handle_t* out_handle)
-typedef RacLlmLlamacppCreateNative = Int32 Function(
-  Pointer<Utf8> modelPath,
-  Pointer<Void> config,
+// =============================================================================
+// LLM Component API Function Signatures (from rac_llm_component.h)
+// =============================================================================
+
+/// rac_result_t rac_llm_component_create(rac_handle_t* out_handle)
+typedef RacLlmComponentCreateNative = Int32 Function(
   Pointer<RacHandle> outHandle,
 );
-typedef RacLlmLlamacppCreateDart = int Function(
-  Pointer<Utf8> modelPath,
-  Pointer<Void> config,
+typedef RacLlmComponentCreateDart = int Function(
   Pointer<RacHandle> outHandle,
 );
 
-/// rac_result_t rac_llm_llamacpp_load_model(rac_handle_t handle, const char* model_path, const rac_llm_llamacpp_config_t* config)
-typedef RacLlmLlamacppLoadModelNative = Int32 Function(
+/// rac_result_t rac_llm_component_load_model(rac_handle_t handle, const char* model_path, const char* model_id, const char* model_name)
+typedef RacLlmComponentLoadModelNative = Int32 Function(
   RacHandle handle,
   Pointer<Utf8> modelPath,
-  Pointer<Void> config,
+  Pointer<Utf8> modelId,
+  Pointer<Utf8> modelName,
 );
-typedef RacLlmLlamacppLoadModelDart = int Function(
+typedef RacLlmComponentLoadModelDart = int Function(
   RacHandle handle,
   Pointer<Utf8> modelPath,
-  Pointer<Void> config,
+  Pointer<Utf8> modelId,
+  Pointer<Utf8> modelName,
 );
 
-/// rac_result_t rac_llm_llamacpp_unload_model(rac_handle_t handle)
-typedef RacLlmLlamacppUnloadModelNative = Int32 Function(RacHandle handle);
-typedef RacLlmLlamacppUnloadModelDart = int Function(RacHandle handle);
+/// rac_bool_t rac_llm_component_is_loaded(rac_handle_t handle)
+typedef RacLlmComponentIsLoadedNative = Int32 Function(RacHandle handle);
+typedef RacLlmComponentIsLoadedDart = int Function(RacHandle handle);
 
-/// rac_bool_t rac_llm_llamacpp_is_model_loaded(rac_handle_t handle)
-typedef RacLlmLlamacppIsModelLoadedNative = Int32 Function(RacHandle handle);
-typedef RacLlmLlamacppIsModelLoadedDart = int Function(RacHandle handle);
+/// const char* rac_llm_component_get_model_id(rac_handle_t handle)
+typedef RacLlmComponentGetModelIdNative = Pointer<Utf8> Function(
+    RacHandle handle);
+typedef RacLlmComponentGetModelIdDart = Pointer<Utf8> Function(RacHandle handle);
 
-/// rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt, const rac_llm_options_t* options, rac_llm_result_t* out_result)
-typedef RacLlmLlamacppGenerateNative = Int32 Function(
+/// rac_result_t rac_llm_component_generate(rac_handle_t handle, const char* prompt, const rac_llm_options_t* options, rac_llm_result_t* out_result)
+typedef RacLlmComponentGenerateNative = Int32 Function(
   RacHandle handle,
   Pointer<Utf8> prompt,
   Pointer<Void> options,
   Pointer<Void> outResult,
 );
-typedef RacLlmLlamacppGenerateDart = int Function(
+typedef RacLlmComponentGenerateDart = int Function(
   RacHandle handle,
   Pointer<Utf8> prompt,
   Pointer<Void> options,
   Pointer<Void> outResult,
 );
 
-/// LLM streaming callback signature
-/// rac_bool_t (*rac_llm_llamacpp_stream_callback_fn)(const char* token, rac_bool_t is_final, void* user_data)
-typedef RacLlmStreamCallbackNative = Int32 Function(
+/// LLM streaming token callback signature
+/// rac_bool_t (*rac_llm_component_token_callback_fn)(const char* token, void* user_data)
+typedef RacLlmComponentTokenCallbackNative = Int32 Function(
   Pointer<Utf8> token,
-  Int32 isFinal,
   Pointer<Void> userData,
 );
 
-/// rac_result_t rac_llm_llamacpp_generate_stream(...)
-typedef RacLlmLlamacppGenerateStreamNative = Int32 Function(
+/// LLM streaming complete callback signature
+typedef RacLlmComponentCompleteCallbackNative = Void Function(
+  Pointer<Void> result,
+  Pointer<Void> userData,
+);
+
+/// LLM streaming error callback signature
+typedef RacLlmComponentErrorCallbackNative = Void Function(
+  Int32 errorCode,
+  Pointer<Utf8> errorMessage,
+  Pointer<Void> userData,
+);
+
+/// rac_result_t rac_llm_component_generate_stream(...)
+typedef RacLlmComponentGenerateStreamNative = Int32 Function(
   RacHandle handle,
   Pointer<Utf8> prompt,
   Pointer<Void> options,
-  Pointer<NativeFunction<RacLlmStreamCallbackNative>> callback,
+  Pointer<NativeFunction<RacLlmComponentTokenCallbackNative>> tokenCallback,
+  Pointer<NativeFunction<RacLlmComponentCompleteCallbackNative>>
+      completeCallback,
+  Pointer<NativeFunction<RacLlmComponentErrorCallbackNative>> errorCallback,
   Pointer<Void> userData,
 );
-typedef RacLlmLlamacppGenerateStreamDart = int Function(
+typedef RacLlmComponentGenerateStreamDart = int Function(
   RacHandle handle,
   Pointer<Utf8> prompt,
   Pointer<Void> options,
-  Pointer<NativeFunction<RacLlmStreamCallbackNative>> callback,
+  Pointer<NativeFunction<RacLlmComponentTokenCallbackNative>> tokenCallback,
+  Pointer<NativeFunction<RacLlmComponentCompleteCallbackNative>>
+      completeCallback,
+  Pointer<NativeFunction<RacLlmComponentErrorCallbackNative>> errorCallback,
   Pointer<Void> userData,
 );
 
-/// void rac_llm_llamacpp_cancel(rac_handle_t handle)
-typedef RacLlmLlamacppCancelNative = Void Function(RacHandle handle);
-typedef RacLlmLlamacppCancelDart = void Function(RacHandle handle);
+/// rac_result_t rac_llm_component_cancel(rac_handle_t handle)
+typedef RacLlmComponentCancelNative = Int32 Function(RacHandle handle);
+typedef RacLlmComponentCancelDart = int Function(RacHandle handle);
 
-/// void rac_llm_llamacpp_destroy(rac_handle_t handle)
-typedef RacLlmLlamacppDestroyNative = Void Function(RacHandle handle);
-typedef RacLlmLlamacppDestroyDart = void Function(RacHandle handle);
+/// rac_result_t rac_llm_component_unload(rac_handle_t handle)
+typedef RacLlmComponentUnloadNative = Int32 Function(RacHandle handle);
+typedef RacLlmComponentUnloadDart = int Function(RacHandle handle);
+
+/// rac_result_t rac_llm_component_cleanup(rac_handle_t handle)
+typedef RacLlmComponentCleanupNative = Int32 Function(RacHandle handle);
+typedef RacLlmComponentCleanupDart = int Function(RacHandle handle);
+
+/// void rac_llm_component_destroy(rac_handle_t handle)
+typedef RacLlmComponentDestroyNative = Void Function(RacHandle handle);
+typedef RacLlmComponentDestroyDart = void Function(RacHandle handle);
+
+// Legacy aliases for backward compatibility (unused - remove after migration)
+typedef RacLlmStreamCallbackNative = RacLlmComponentTokenCallbackNative;
 
 // =============================================================================
 // STT ONNX API Function Signatures (from rac_stt_onnx.h)

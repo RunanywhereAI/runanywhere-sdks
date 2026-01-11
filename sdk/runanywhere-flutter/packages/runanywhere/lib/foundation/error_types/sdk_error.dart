@@ -47,6 +47,8 @@ class SDKError implements Exception {
         return ErrorCode.invalidInput;
       case SDKErrorType.modelNotFound:
         return ErrorCode.modelNotFound;
+      case SDKErrorType.modelNotDownloaded:
+        return ErrorCode.modelNotFound;
       case SDKErrorType.modelLoadFailed:
         return ErrorCode.modelLoadFailed;
       case SDKErrorType.loadingFailed:
@@ -56,6 +58,10 @@ class SDKError implements Exception {
       case SDKErrorType.modelIncompatible:
         return ErrorCode.modelIncompatible;
       case SDKErrorType.frameworkNotAvailable:
+        return ErrorCode.hardwareUnavailable;
+      case SDKErrorType.sttNotAvailable:
+        return ErrorCode.hardwareUnavailable;
+      case SDKErrorType.ttsNotAvailable:
         return ErrorCode.hardwareUnavailable;
       case SDKErrorType.generationFailed:
         return ErrorCode.generationFailed;
@@ -133,10 +139,13 @@ class SDKError implements Exception {
       case SDKErrorType.environmentMismatch:
         return ErrorCategory.initialization;
       case SDKErrorType.modelNotFound:
+      case SDKErrorType.modelNotDownloaded:
       case SDKErrorType.modelLoadFailed:
       case SDKErrorType.loadingFailed:
       case SDKErrorType.modelValidationFailed:
       case SDKErrorType.modelIncompatible:
+      case SDKErrorType.sttNotAvailable:
+      case SDKErrorType.ttsNotAvailable:
         return ErrorCategory.model;
       case SDKErrorType.generationFailed:
       case SDKErrorType.generationTimeout:
@@ -199,8 +208,14 @@ class SDKError implements Exception {
 
       case SDKErrorType.modelNotFound:
         return 'Check the model identifier or download the model first.';
+      case SDKErrorType.modelNotDownloaded:
+        return 'Download the model first using RunAnywhere.downloadModel().';
       case SDKErrorType.modelLoadFailed:
         return 'Ensure the model file is not corrupted and is compatible with your device.';
+      case SDKErrorType.sttNotAvailable:
+        return 'Register an STT provider (e.g., ONNX) before using speech recognition.';
+      case SDKErrorType.ttsNotAvailable:
+        return 'Register a TTS provider (e.g., ONNX) before using text-to-speech.';
       case SDKErrorType.loadingFailed:
         return 'The loading operation failed. Check logs for details.';
       case SDKErrorType.modelValidationFailed:
@@ -346,6 +361,30 @@ class SDKError implements Exception {
     return SDKError(
       'Model \'$modelId\' is incompatible: $reason',
       SDKErrorType.modelIncompatible,
+    );
+  }
+
+  /// Model not downloaded error
+  static SDKError modelNotDownloaded(String message) {
+    return SDKError(
+      message,
+      SDKErrorType.modelNotDownloaded,
+    );
+  }
+
+  /// STT service not available
+  static SDKError sttNotAvailable(String message) {
+    return SDKError(
+      message,
+      SDKErrorType.sttNotAvailable,
+    );
+  }
+
+  /// TTS service not available
+  static SDKError ttsNotAvailable(String message) {
+    return SDKError(
+      message,
+      SDKErrorType.ttsNotAvailable,
     );
   }
 
@@ -589,11 +628,14 @@ enum SDKErrorType {
 
   // Model errors
   modelNotFound,
+  modelNotDownloaded,
   modelLoadFailed,
   loadingFailed,
   modelValidationFailed,
   modelIncompatible,
   frameworkNotAvailable,
+  sttNotAvailable,
+  ttsNotAvailable,
 
   // Generation errors
   generationFailed,

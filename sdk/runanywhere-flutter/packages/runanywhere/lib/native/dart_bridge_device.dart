@@ -62,21 +62,86 @@ class DartBridgeDevice {
   // Public API
   // ============================================================================
 
-  /// Register device callbacks with C++
+  /// Register device callbacks synchronously (Phase 1).
+  /// Matches Swift: Device.register() in CppBridge.initialize()
+  /// This registers the C++ callbacks without initializing SharedPreferences
+  /// or caching device ID (those happen in Phase 2).
+  static void registerCallbacks() {
+    if (_callbacksRegistered) {
+      _logger.debug('Device callbacks already registered');
+      return;
+    }
+
+    try {
+      final lib = PlatformLoader.loadCommons();
+
+      // Allocate callbacks struct
+      _callbacksPtr = calloc<RacDeviceCallbacksStruct>();
+      final callbacks = _callbacksPtr!;
+
+      // Set callback function pointers
+      callbacks.ref.getDeviceInfo =
+          Pointer.fromFunction<RacDeviceGetInfoCallbackNative>(
+              _getDeviceInfoCallback);
+      callbacks.ref.getDeviceId =
+          Pointer.fromFunction<RacDeviceGetIdCallbackNative>(
+              _getDeviceIdCallback, _exceptionalReturnNull);
+      callbacks.ref.isRegistered =
+          Pointer.fromFunction<RacDeviceIsRegisteredCallbackNative>(
+              _isRegisteredCallback, _exceptionalReturnInt32);
+      callbacks.ref.setRegistered =
+          Pointer.fromFunction<RacDeviceSetRegisteredCallbackNative>(
+              _setRegisteredCallback);
+      callbacks.ref.httpPost =
+          Pointer.fromFunction<RacDeviceHttpPostCallbackNative>(
+              _httpPostCallback, _exceptionalReturnInt32);
+      callbacks.ref.userData = nullptr;
+
+      // Register with C++
+      final setCallbacks = lib.lookupFunction<
+          Int32 Function(Pointer<RacDeviceCallbacksStruct>),
+          int Function(
+              Pointer<RacDeviceCallbacksStruct>)>('rac_device_set_callbacks');
+
+      final result = setCallbacks(callbacks);
+      if (result != RacResultCode.success) {
+        _logger.warning('Failed to set device callbacks', metadata: {
+          'error_code': result,
+        });
+        calloc.free(callbacks);
+        _callbacksPtr = null;
+        return;
+      }
+
+      _callbacksRegistered = true;
+      _logger.debug('Device callbacks registered (sync)');
+    } catch (e) {
+      _logger.debug('registerCallbacks error: $e');
+    }
+  }
+
+  static bool _callbacksRegistered = false;
+
+  /// Register device callbacks with C++ (full async init, Phase 2)
   /// Must be called during SDK init after platform adapter
   static Future<void> register({
     required SDKEnvironment environment,
     String? baseURL,
     String? accessToken,
   }) async {
-    if (_isRegistered) {
-      _logger.debug('Device callbacks already registered');
-      return;
-    }
-
     _environment = environment;
     _baseURL = baseURL;
     _accessToken = accessToken;
+
+    // Register callbacks if not already done in Phase 1
+    if (!_callbacksRegistered) {
+      registerCallbacks();
+    }
+
+    if (_isRegistered) {
+      _logger.debug('Device already fully registered');
+      return;
+    }
 
     // Initialize SharedPreferences
     _prefs = await SharedPreferences.getInstance();

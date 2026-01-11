@@ -1,187 +1,21 @@
 import 'dart:async';
 
-import 'package:runanywhere/core/module_registry.dart' as registry;
-import 'package:runanywhere/core/module_registry.dart'
-    show ModuleRegistry, LLMService;
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/core/types/storage_types.dart';
-import 'package:runanywhere/core/models/framework/llm_framework.dart';
 import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
 import 'package:runanywhere/foundation/dependency_injection/service_container.dart'
     hide SDKInitParams;
 import 'package:runanywhere/foundation/error_types/sdk_error.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/infrastructure/download/download_service.dart';
+import 'package:runanywhere/native/dart_bridge_model_registry.dart'
+    hide ModelInfo;
+import 'package:runanywhere/native/dart_bridge.dart';
+import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
-
-// ============================================================================
-// Message Role
-// ============================================================================
-
-/// Role of a message in a conversation
-enum MessageRole {
-  system,
-  user,
-  assistant;
-
-  String get rawValue => name;
-}
-
-// ============================================================================
-// LLM Generation Types
-// ============================================================================
-
-/// Options for LLM text generation
-/// Matches Swift's LLMGenerationOptions
-class LLMGenerationOptions {
-  final int maxTokens;
-  final double temperature;
-  final double topP;
-  final List<String> stopSequences;
-  final bool streamingEnabled;
-  final InferenceFramework? preferredFramework;
-  final String? systemPrompt;
-
-  const LLMGenerationOptions({
-    this.maxTokens = 100,
-    this.temperature = 0.8,
-    this.topP = 1.0,
-    this.stopSequences = const [],
-    this.streamingEnabled = false,
-    this.preferredFramework,
-    this.systemPrompt,
-  });
-}
-
-/// Result of LLM text generation
-/// Matches Swift's LLMGenerationResult
-class LLMGenerationResult {
-  final String text;
-  final String? thinkingContent;
-  final int inputTokens;
-  final int tokensUsed;
-  final String modelUsed;
-  final double latencyMs;
-  final String? framework;
-  final double tokensPerSecond;
-  final double? timeToFirstTokenMs;
-  final int thinkingTokens;
-  final int responseTokens;
-
-  const LLMGenerationResult({
-    required this.text,
-    this.thinkingContent,
-    required this.inputTokens,
-    required this.tokensUsed,
-    required this.modelUsed,
-    required this.latencyMs,
-    this.framework,
-    required this.tokensPerSecond,
-    this.timeToFirstTokenMs,
-    this.thinkingTokens = 0,
-    this.responseTokens = 0,
-  });
-}
-
-/// Result of streaming LLM text generation
-/// Matches Swift's LLMStreamingResult
-class LLMStreamingResult {
-  final Stream<String> stream;
-  final Future<LLMGenerationResult> result;
-
-  const LLMStreamingResult({
-    required this.stream,
-    required this.result,
-  });
-}
-
-// ============================================================================
-// Capability Classes - Metadata about loaded STT/TTS capabilities
-// ============================================================================
-
-/// Speech-to-Text capability information
-class STTCapability {
-  final String modelId;
-  final String? modelName;
-
-  const STTCapability({
-    required this.modelId,
-    this.modelName,
-  });
-}
-
-/// Text-to-Speech capability information
-class TTSCapability {
-  final String voiceId;
-  final String? voiceName;
-
-  const TTSCapability({
-    required this.voiceId,
-    this.voiceName,
-  });
-}
-
-// ============================================================================
-// Download Progress
-// ============================================================================
-
-/// Download progress information
-/// Matches Swift `DownloadProgress`.
-class DownloadProgress {
-  final int bytesDownloaded;
-  final int totalBytes;
-  final DownloadProgressState state;
-  final DownloadProgressStage stage;
-
-  const DownloadProgress({
-    required this.bytesDownloaded,
-    required this.totalBytes,
-    required this.state,
-    this.stage = DownloadProgressStage.downloading,
-  });
-
-  /// Overall progress from 0.0 to 1.0
-  double get overallProgress =>
-      totalBytes > 0 ? bytesDownloaded / totalBytes : 0.0;
-
-  /// Legacy alias for overallProgress
-  double get percentage => overallProgress;
-}
-
-/// Download progress state
-enum DownloadProgressState {
-  downloading,
-  completed,
-  failed,
-  cancelled;
-
-  bool get isCompleted => this == DownloadProgressState.completed;
-  bool get isFailed => this == DownloadProgressState.failed;
-}
-
-/// Download progress stage (more detailed than state)
-enum DownloadProgressStage {
-  queued,
-  downloading,
-  extracting,
-  verifying,
-  completed,
-  failed,
-  cancelled,
-}
-
-/// Supabase configuration for development mode
-class SupabaseConfig {
-  final Uri projectURL;
-  final String anonKey;
-
-  const SupabaseConfig({
-    required this.projectURL,
-    required this.anonKey,
-  });
-}
+import 'package:runanywhere/public/types/types.dart';
 
 /// The RunAnywhere SDK entry point
 ///
@@ -190,10 +24,11 @@ class RunAnywhere {
   static SDKInitParams? _initParams;
   static SDKEnvironment? _currentEnvironment;
   static bool _isInitialized = false;
+  static bool _hasRunDiscovery = false;
   static final List<ModelInfo> _registeredModels = [];
 
-  // Callbacks to collect models from registered modules
-  static final List<List<ModelInfo> Function()> _modelCollectors = [];
+  // Note: LLM state is managed by DartBridgeLLM's native handle
+  // Use DartBridge.llm.currentModelId and DartBridge.llm.isLoaded
 
   /// Access to service container
   static ServiceContainer get serviceContainer => ServiceContainer.shared;
@@ -260,6 +95,10 @@ class RunAnywhere {
   }
 
   /// Initialize with params
+  ///
+  /// Matches Swift `RunAnywhere.performCoreInit()` flow:
+  /// - Phase 1: DartBridge.initialize() (sync, ~1-5ms)
+  /// - Phase 2: DartBridge.initializeServices() (async, ~100-500ms)
   static Future<void> initializeWithParams(SDKInitParams params) async {
     if (_isInitialized) return;
 
@@ -270,11 +109,48 @@ class RunAnywhere {
       _currentEnvironment = params.environment;
       _initParams = params;
 
+      // =========================================================================
+      // PHASE 1: Core Init (sync, ~1-5ms, no network)
+      // Matches Swift: RunAnywhere.performCoreInit() → CppBridge.initialize()
+      // =========================================================================
+      DartBridge.initialize(params.environment);
+      logger.debug('DartBridge initialized with platform adapter');
+
+      // =========================================================================
+      // PHASE 2: Services Init (async, ~100-500ms, may need network)
+      // Matches Swift: RunAnywhere.completeServicesInitialization()
+      // =========================================================================
+
+      // Step 2.1: Initialize service bridges with credentials
+      // Matches Swift: CppBridge.State.initialize() + CppBridge.initializeServices()
+      await DartBridge.initializeServices(
+        apiKey: params.apiKey,
+        baseURL: params.baseURL.toString(),
+        deviceId: DartBridgeDevice.cachedDeviceId,
+      );
+      logger.debug('Service bridges initialized');
+
+      // Step 2.2: Set base directory for model paths
+      // Matches Swift: CppBridge.ModelPaths.setBaseDirectory(documentsURL)
+      await DartBridge.modelPaths.setBaseDirectory();
+      logger.debug('Model paths base directory configured');
+
+      // Step 2.3: Setup local services (HTTP, etc.)
       await serviceContainer.setupLocalServices(
         apiKey: params.apiKey,
         baseURL: params.baseURL,
         environment: params.environment,
       );
+
+      // Step 2.4: Initialize model registry
+      // CRITICAL: Uses the GLOBAL C++ registry via rac_get_model_registry()
+      // Models must be in the global registry for rac_llm_component_load_model to find them
+      logger.debug('Initializing model registry...');
+      await DartBridgeModelRegistry.instance.initialize();
+
+      // NOTE: Discovery is NOT run here. It runs lazily on first availableModels() call.
+      // This matches Swift's Phase 2 behavior where discovery runs in background AFTER
+      // models have been registered by the app.
 
       _isInitialized = true;
       logger.info('✅ SDK initialized (${params.environment.description})');
@@ -284,53 +160,85 @@ class RunAnywhere {
       _initParams = null;
       _currentEnvironment = null;
       _isInitialized = false;
+      _hasRunDiscovery = false;
       EventBus.shared.publish(SDKInitializationFailed(e));
       rethrow;
     }
   }
 
-  /// Get available models
+  /// Get all available models from C++ registry.
   ///
-  /// Returns all models registered via:
-  /// - `registerModel()` / `registerModelWithURL()` on RunAnywhere
-  /// - `addModel()` on module classes (LlamaCpp, Onnx, etc.)
-  /// - Module collectors registered via `registerModelCollector()`
+  /// Returns all models that can be used with the SDK, including:
+  /// - Models registered via `registerModel()`
+  /// - Models discovered on filesystem during SDK init
+  ///
+  /// This reads from the C++ registry, which contains the authoritative
+  /// model state including localPath for downloaded models.
+  ///
+  /// Matches Swift: `return await CppBridge.ModelRegistry.shared.getAll()`
   static Future<List<ModelInfo>> availableModels() async {
     if (!_isInitialized) {
       throw SDKError.notInitialized();
     }
 
-    // Collect models from all sources
-    final allModels = <ModelInfo>[..._registeredModels];
-
-    // Collect from registered module collectors
-    for (final collector in _modelCollectors) {
-      try {
-        allModels.addAll(collector());
-      } catch (e) {
-        SDKLogger('RunAnywhere').warning('Model collector failed: $e');
-      }
+    // Run discovery lazily on first call
+    // This ensures models are already registered before discovery runs
+    // (discovery updates local_path for registered models only)
+    if (!_hasRunDiscovery) {
+      await _runDiscovery();
     }
 
-    // Remove duplicates by ID
+    // Read from C++ registry - this is the authoritative source
+    // Discovery populates localPath for downloaded models
+    final cppModels =
+        await DartBridgeModelRegistry.instance.getAllPublicModels();
+
+    // Merge with _registeredModels to include full metadata (downloadURL, etc.)
+    // C++ registry models may have localPath but lack some metadata
     final uniqueModels = <String, ModelInfo>{};
-    for (final model in allModels) {
+
+    // First add C++ registry models (have authoritative localPath)
+    for (final model in cppModels) {
       uniqueModels[model.id] = model;
+    }
+
+    // Then merge _registeredModels to fill in any missing metadata
+    for (final dartModel in _registeredModels) {
+      final existing = uniqueModels[dartModel.id];
+      if (existing != null) {
+        // Merge: use C++ localPath but keep Dart's downloadURL and other metadata
+        uniqueModels[dartModel.id] = ModelInfo(
+          id: dartModel.id,
+          name: dartModel.name,
+          category: dartModel.category,
+          format: dartModel.format,
+          framework: dartModel.framework,
+          downloadURL: dartModel.downloadURL,
+          localPath: existing.localPath ?? dartModel.localPath,
+          artifactType: dartModel.artifactType,
+          downloadSize: dartModel.downloadSize,
+          contextLength: dartModel.contextLength,
+          supportsThinking: dartModel.supportsThinking,
+          thinkingPattern: dartModel.thinkingPattern,
+          description: dartModel.description,
+          source: dartModel.source,
+        );
+      } else {
+        // Model only in Dart list (not yet saved to C++ registry)
+        uniqueModels[dartModel.id] = dartModel;
+      }
     }
 
     return List.unmodifiable(uniqueModels.values.toList());
   }
 
-  /// Register a model collector callback from a module
+  /// Get the currently loaded model ID
   ///
-  /// Modules can call this to register their model list getter so that
-  /// `availableModels()` includes models from all registered modules.
-  static void registerModelCollector(List<ModelInfo> Function() collector) {
-    _modelCollectors.add(collector);
-  }
+  /// Returns null if no model is loaded.
+  static String? get currentModelId => DartBridge.llm.currentModelId;
 
-  /// Get currently loaded model
-  static ModelInfo? get currentModel => null;
+  /// Check if an LLM model is currently loaded
+  static bool get isModelLoaded => DartBridge.llm.isLoaded;
 
   /// Get loaded STT capability (null if no STT model is loaded)
   static STTCapability? get loadedSTTCapability => null;
@@ -339,12 +247,82 @@ class RunAnywhere {
   static TTSCapability? get loadedTTSCapability => null;
 
   /// Load a model by ID
+  ///
+  /// Finds the model in the registry, gets its local path, and loads it
+  /// via the appropriate backend (LlamaCpp, ONNX, etc.)
   static Future<void> loadModel(String modelId) async {
     if (!_isInitialized) {
       throw SDKError.notInitialized();
     }
+
+    final logger = SDKLogger('RunAnywhere.LoadModel');
+    logger.info('Loading model: $modelId');
+
+    // Emit load started event
     EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId));
-    EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
+
+    try {
+      // Find the model in available models
+      final models = await availableModels();
+      final model = models.where((m) => m.id == modelId).firstOrNull;
+
+      if (model == null) {
+        throw SDKError.modelNotFound('Model not found: $modelId');
+      }
+
+      // Check if model has a local path (downloaded)
+      if (model.localPath == null) {
+        throw SDKError.modelNotDownloaded(
+          'Model is not downloaded. Call downloadModel() first.',
+        );
+      }
+
+      // Resolve the actual model file path (matches Swift resolveModelFilePath)
+      // For LlamaCpp: finds the .gguf file in the model folder
+      // For ONNX: returns the model directory
+      final resolvedPath =
+          await DartBridge.modelPaths.resolveModelFilePath(model);
+      if (resolvedPath == null) {
+        throw SDKError.modelNotFound(
+            'Could not resolve model file path for: $modelId');
+      }
+      logger.info('Resolved model path: $resolvedPath');
+
+      // Unload any existing model first via the bridge
+      if (DartBridge.llm.isLoaded) {
+        logger.debug('Unloading previous model');
+        DartBridge.llm.unload();
+      }
+
+      // Load model directly via DartBridgeLLM (mirrors Swift CppBridge.LLM pattern)
+      // The C++ layer handles finding the right backend via the service registry
+      logger.debug('Loading model via C++ bridge: $resolvedPath');
+      await DartBridge.llm.loadModel(resolvedPath, modelId, model.name);
+
+      // Verify the model loaded successfully
+      if (!DartBridge.llm.isLoaded) {
+        throw SDKError.modelLoadFailed(
+          modelId,
+          'LLM model failed to load - model may not be compatible',
+        );
+      }
+
+      logger.info(
+          'Model loaded successfully: ${model.name} (isLoaded=${DartBridge.llm.isLoaded})');
+
+      // Emit load completed event
+      EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
+    } catch (e) {
+      logger.error('Failed to load model: $e');
+
+      // Emit load failed event
+      EventBus.shared.publish(SDKModelEvent.loadFailed(
+        modelId: modelId,
+        error: e.toString(),
+      ));
+
+      rethrow;
+    }
   }
 
   /// Load an STT model
@@ -352,8 +330,60 @@ class RunAnywhere {
     if (!_isInitialized) {
       throw SDKError.notInitialized();
     }
+
+    final logger = SDKLogger('RunAnywhere.LoadSTTModel');
+    logger.info('Loading STT model: $modelId');
+
     EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId));
-    EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
+
+    try {
+      // Find the model
+      final models = await availableModels();
+      final model = models.where((m) => m.id == modelId).firstOrNull;
+
+      if (model == null) {
+        throw SDKError.modelNotFound('STT model not found: $modelId');
+      }
+
+      if (model.localPath == null) {
+        throw SDKError.modelNotDownloaded(
+          'STT model is not downloaded. Call downloadModel() first.',
+        );
+      }
+
+      // Resolve the actual model path
+      final resolvedPath =
+          await DartBridge.modelPaths.resolveModelFilePath(model);
+      if (resolvedPath == null) {
+        throw SDKError.modelNotFound(
+            'Could not resolve STT model file path for: $modelId');
+      }
+
+      // Unload any existing model first
+      if (DartBridge.stt.isLoaded) {
+        DartBridge.stt.unload();
+      }
+
+      // Load model directly via DartBridgeSTT (mirrors Swift CppBridge.STT pattern)
+      logger.debug('Loading STT model via C++ bridge: $resolvedPath');
+      await DartBridge.stt.loadModel(resolvedPath, modelId, model.name);
+
+      if (!DartBridge.stt.isLoaded) {
+        throw SDKError.sttNotAvailable(
+          'STT model failed to load - model may not be compatible',
+        );
+      }
+
+      EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
+      logger.info('STT model loaded: ${model.name}');
+    } catch (e) {
+      logger.error('Failed to load STT model: $e');
+      EventBus.shared.publish(SDKModelEvent.loadFailed(
+        modelId: modelId,
+        error: e.toString(),
+      ));
+      rethrow;
+    }
   }
 
   /// Load a TTS voice
@@ -361,13 +391,80 @@ class RunAnywhere {
     if (!_isInitialized) {
       throw SDKError.notInitialized();
     }
+
+    final logger = SDKLogger('RunAnywhere.LoadTTSVoice');
+    logger.info('Loading TTS voice: $voiceId');
+
     EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: voiceId));
-    EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: voiceId));
+
+    try {
+      // Find the voice model
+      final models = await availableModels();
+      final model = models.where((m) => m.id == voiceId).firstOrNull;
+
+      if (model == null) {
+        throw SDKError.modelNotFound('TTS voice not found: $voiceId');
+      }
+
+      if (model.localPath == null) {
+        throw SDKError.modelNotDownloaded(
+          'TTS voice is not downloaded. Call downloadModel() first.',
+        );
+      }
+
+      // Resolve the actual voice path
+      final resolvedPath =
+          await DartBridge.modelPaths.resolveModelFilePath(model);
+      if (resolvedPath == null) {
+        throw SDKError.modelNotFound(
+            'Could not resolve TTS voice path for: $voiceId');
+      }
+
+      // Unload any existing voice first
+      if (DartBridge.tts.isLoaded) {
+        DartBridge.tts.unload();
+      }
+
+      // Load voice directly via DartBridgeTTS (mirrors Swift CppBridge.TTS pattern)
+      logger.debug('Loading TTS voice via C++ bridge: $resolvedPath');
+      await DartBridge.tts.loadVoice(resolvedPath, voiceId, model.name);
+
+      if (!DartBridge.tts.isLoaded) {
+        throw SDKError.ttsNotAvailable(
+          'TTS voice failed to load - voice may not be compatible',
+        );
+      }
+
+      EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: voiceId));
+      logger.info('TTS voice loaded: ${model.name}');
+    } catch (e) {
+      logger.error('Failed to load TTS voice: $e');
+      EventBus.shared.publish(SDKModelEvent.loadFailed(
+        modelId: voiceId,
+        error: e.toString(),
+      ));
+      rethrow;
+    }
   }
 
   /// Unload current model
   static Future<void> unloadModel() async {
     if (!_isInitialized) return;
+
+    final logger = SDKLogger('RunAnywhere.UnloadModel');
+
+    if (DartBridge.llm.isLoaded) {
+      final modelId = DartBridge.llm.currentModelId ?? 'unknown';
+      logger.info('Unloading model: $modelId');
+
+      EventBus.shared.publish(SDKModelEvent.unloadStarted(modelId: modelId));
+
+      // Unload via C++ bridge (matches Swift CppBridge.LLM pattern)
+      DartBridge.llm.unload();
+
+      EventBus.shared.publish(SDKModelEvent.unloadCompleted(modelId: modelId));
+      logger.info('Model unloaded');
+    }
   }
 
   // ============================================================================
@@ -410,39 +507,21 @@ class RunAnywhere {
     final opts = options ?? const LLMGenerationOptions();
     final startTime = DateTime.now();
 
-    // Get the LLM provider from ModuleRegistry
-    final provider = ModuleRegistry.shared.llmProvider();
-    if (provider == null) {
+    // Verify model is loaded via DartBridgeLLM (mirrors Swift CppBridge.LLM pattern)
+    if (!DartBridge.llm.isLoaded) {
       throw SDKError.componentNotReady(
-        'No LLM provider available. Register a module first (e.g., LlamaCpp.register())',
+        'LLM model not loaded. Call loadModel() first.',
       );
     }
 
-    // Create and use the LLM service
-    final llmService = await provider.createLLMService(null);
-    _activeLLMService = llmService;
-
-    if (!llmService.isReady) {
-      throw SDKError.componentNotReady(
-        'LLM service is not ready. Load a model first.',
-      );
-    }
+    final modelId = DartBridge.llm.currentModelId ?? 'unknown';
 
     try {
-      // Convert public LLMGenerationOptions to module registry LLMGenerationOptions
-      final moduleOpts = registry.LLMGenerationOptions(
+      // Generate directly via DartBridgeLLM (calls rac_llm_component_generate)
+      final result = await DartBridge.llm.generate(
+        prompt,
         maxTokens: opts.maxTokens,
         temperature: opts.temperature,
-        topP: opts.topP,
-        stopSequences: opts.stopSequences,
-        streamingEnabled: opts.streamingEnabled,
-        systemPrompt: opts.systemPrompt,
-        preferredFramework: opts.preferredFramework,
-      );
-
-      final result = await llmService.generate(
-        prompt: prompt,
-        options: moduleOpts,
       );
 
       final endTime = DateTime.now();
@@ -450,12 +529,14 @@ class RunAnywhere {
 
       return LLMGenerationResult(
         text: result.text,
-        inputTokens: result.inputTokens,
-        tokensUsed: result.tokensUsed,
-        modelUsed: result.modelUsed,
+        inputTokens: result.promptTokens,
+        tokensUsed: result.completionTokens,
+        modelUsed: modelId,
         latencyMs: latencyMs,
-        framework: result.framework,
-        tokensPerSecond: result.tokensPerSecond,
+        framework: 'llamacpp',
+        tokensPerSecond: result.totalTimeMs > 0
+            ? (result.completionTokens / result.totalTimeMs) * 1000
+            : 0,
       );
     } catch (e) {
       throw SDKError.generationFailed('$e');
@@ -485,67 +566,49 @@ class RunAnywhere {
     final opts = options ?? const LLMGenerationOptions();
     final startTime = DateTime.now();
 
-    // Get the LLM provider from ModuleRegistry
-    final provider = ModuleRegistry.shared.llmProvider();
-    if (provider == null) {
+    // Verify model is loaded via DartBridgeLLM (mirrors Swift CppBridge.LLM pattern)
+    if (!DartBridge.llm.isLoaded) {
       throw SDKError.componentNotReady(
-        'No LLM provider available. Register a module first (e.g., LlamaCpp.register())',
+        'LLM model not loaded. Call loadModel() first.',
       );
     }
 
-    // Create and use the LLM service
-    final llmService = await provider.createLLMService(null);
-    _activeLLMService = llmService;
-
-    if (!llmService.isReady) {
-      throw SDKError.componentNotReady(
-        'LLM service is not ready. Load a model first.',
-      );
-    }
+    final modelId = DartBridge.llm.currentModelId ?? 'unknown';
 
     // Create a broadcast stream controller for the tokens
     final controller = StreamController<String>.broadcast();
     final allTokens = <String>[];
 
-    // Convert public LLMGenerationOptions to module registry LLMGenerationOptions
-    final moduleOpts = registry.LLMGenerationOptions(
+    // Start streaming generation via DartBridgeLLM
+    final tokenStream = DartBridge.llm.generateStream(
+      prompt,
       maxTokens: opts.maxTokens,
       temperature: opts.temperature,
-      topP: opts.topP,
-      stopSequences: opts.stopSequences,
-      streamingEnabled: opts.streamingEnabled,
-      systemPrompt: opts.systemPrompt,
-      preferredFramework: opts.preferredFramework,
     );
 
-    // Start streaming generation
-    final tokenStream = llmService.generateStream(
-      prompt: prompt,
-      options: moduleOpts,
+    // Forward tokens and collect them, track subscription in bridge for cancellation
+    DartBridge.llm.setActiveStreamSubscription(
+      tokenStream.listen(
+        (token) {
+          allTokens.add(token);
+          if (!controller.isClosed) {
+            controller.add(token);
+          }
+        },
+        onError: (Object error) {
+          if (!controller.isClosed) {
+            controller.addError(error);
+          }
+        },
+        onDone: () {
+          if (!controller.isClosed) {
+            controller.close();
+          }
+          // Clear subscription when done
+          DartBridge.llm.setActiveStreamSubscription(null);
+        },
+      ),
     );
-
-    // Forward tokens and collect them
-    final subscription = tokenStream.listen(
-      (token) {
-        allTokens.add(token);
-        if (!controller.isClosed) {
-          controller.add(token);
-        }
-      },
-      onError: (Object error) {
-        if (!controller.isClosed) {
-          controller.addError(error);
-        }
-      },
-      onDone: () {
-        if (!controller.isClosed) {
-          controller.close();
-        }
-      },
-    );
-
-    // Track the active stream for cancellation
-    _activeStreamSubscription = subscription;
 
     // Build result future that completes when stream is done
     final resultFuture = controller.stream.toList().then((_) {
@@ -558,9 +621,9 @@ class RunAnywhere {
         text: allTokens.join(),
         inputTokens: (prompt.length / 4).ceil(),
         tokensUsed: allTokens.length,
-        modelUsed: llmService.isReady ? 'loaded' : 'none',
+        modelUsed: modelId,
         latencyMs: latencyMs,
-        framework: null,
+        framework: 'llamacpp',
         tokensPerSecond: tokensPerSecond,
       );
     });
@@ -571,20 +634,10 @@ class RunAnywhere {
     );
   }
 
-  // Active stream subscription for cancellation
-  static StreamSubscription<String>? _activeStreamSubscription;
-  // Active LLM service for cancellation
-  static LLMService? _activeLLMService;
-
   /// Cancel ongoing generation
   static Future<void> cancelGeneration() async {
-    // Cancel active stream subscription
-    await _activeStreamSubscription?.cancel();
-    _activeStreamSubscription = null;
-
-    // Cancel in the LLM service if available
-    await _activeLLMService?.cancel();
-    _activeLLMService = null;
+    // Cancel via the bridge (handles both stream subscription and service)
+    DartBridge.llm.cancelGeneration();
   }
 
   /// Download a model by ID
@@ -648,69 +701,14 @@ class RunAnywhere {
   }
 
   /// Delete a stored model
-  static Future<void> deleteStoredModel(
-    String modelId,
-    LLMFramework framework,
-  ) async {
+  ///
+  /// Matches Swift `RunAnywhere.deleteStoredModel(modelId:)`.
+  static Future<void> deleteStoredModel(String modelId) async {
     if (!_isInitialized) {
       throw SDKError.notInitialized();
     }
+    await DartBridgeModelRegistry.instance.removeModel(modelId);
     EventBus.shared.publish(SDKModelEvent.deleted(modelId: modelId));
-  }
-
-  /// Register a model from URL
-  static ModelInfo registerModelWithURL({
-    String? id,
-    required String name,
-    required Uri url,
-    required LLMFramework framework,
-    ModelCategory modality = ModelCategory.language,
-    int? memoryRequirement,
-    bool supportsThinking = false,
-  }) {
-    final modelId =
-        id ?? name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
-
-    final format = _inferFormat(url.path);
-    final inferenceFramework = _mapFramework(framework);
-
-    final model = ModelInfo(
-      id: modelId,
-      name: name,
-      category: modality,
-      format: format,
-      framework: inferenceFramework,
-      downloadURL: url,
-      downloadSize: memoryRequirement,
-      supportsThinking: supportsThinking,
-    );
-
-    _registeredModels.add(model);
-    return model;
-  }
-
-  /// Register a model from URL string
-  static ModelInfo? registerModelFromString({
-    String? id,
-    required String name,
-    required String urlString,
-    required LLMFramework framework,
-    ModelCategory modality = ModelCategory.language,
-    int? memoryRequirement,
-    bool supportsThinking = false,
-  }) {
-    final url = Uri.tryParse(urlString);
-    if (url == null) return null;
-
-    return registerModelWithURL(
-      id: id,
-      name: name,
-      url: url,
-      framework: framework,
-      modality: modality,
-      memoryRequirement: memoryRequirement,
-      supportsThinking: supportsThinking,
-    );
   }
 
   /// Get storage info
@@ -726,11 +724,78 @@ class RunAnywhere {
   /// Reset SDK state
   static void reset() {
     _isInitialized = false;
+    _hasRunDiscovery = false;
     _initParams = null;
     _currentEnvironment = null;
     _registeredModels.clear();
-    _modelCollectors.clear();
+    DartBridgeModelRegistry.instance.shutdown();
     serviceContainer.reset();
+  }
+
+  /// Update the download status for a model in C++ registry
+  ///
+  /// Called by ModelDownloadService after a successful download.
+  /// Matches Swift: CppBridge.ModelRegistry.shared.updateDownloadStatus()
+  static Future<void> updateModelDownloadStatus(
+      String modelId, String? localPath) async {
+    await DartBridgeModelRegistry.instance
+        .updateDownloadStatus(modelId, localPath);
+  }
+
+  /// Remove a model from the C++ registry
+  ///
+  /// Called when a model is deleted.
+  /// Matches Swift: CppBridge.ModelRegistry.shared.remove()
+  static Future<void> removeModel(String modelId) async {
+    await DartBridgeModelRegistry.instance.removeModel(modelId);
+  }
+
+  /// Internal: Run discovery once on first availableModels() call
+  /// This ensures models are registered before discovery runs
+  static Future<void> _runDiscovery() async {
+    if (_hasRunDiscovery) return;
+
+    final logger = SDKLogger('RunAnywhere.Discovery');
+    logger.debug(
+        'Running lazy discovery (models should already be registered)...');
+
+    final result =
+        await DartBridgeModelRegistry.instance.discoverDownloadedModels();
+
+    _hasRunDiscovery = true;
+
+    if (result.discoveredModels.isNotEmpty) {
+      logger.info(
+          '📦 Discovered ${result.discoveredModels.length} downloaded models');
+      for (final model in result.discoveredModels) {
+        logger.debug(
+            '  - ${model.modelId} -> ${model.localPath} (framework: ${model.framework})');
+      }
+    } else {
+      logger.debug('No downloaded models discovered');
+    }
+  }
+
+  /// Re-discover models on the filesystem via C++ registry.
+  ///
+  /// This scans the filesystem for downloaded models and updates the
+  /// C++ registry with localPath for discovered models.
+  ///
+  /// Note: This is called automatically on first availableModels() call.
+  /// You typically don't need to call this manually unless you've done
+  /// manual file operations outside the SDK.
+  ///
+  /// Matches Swift: CppBridge.ModelRegistry.shared.discoverDownloadedModels()
+  static Future<void> refreshDiscoveredModels() async {
+    if (!_isInitialized) return;
+
+    final logger = SDKLogger('RunAnywhere.Discovery');
+    final result =
+        await DartBridgeModelRegistry.instance.discoverDownloadedModels();
+    if (result.discoveredModels.isNotEmpty) {
+      logger.info(
+          'Discovery found ${result.discoveredModels.length} downloaded models');
+    }
   }
 
   // ============================================================================
@@ -740,6 +805,8 @@ class RunAnywhere {
   /// Register a model with the SDK.
   ///
   /// Matches Swift `RunAnywhere.registerModel(id:name:url:framework:modality:artifactType:memoryRequirement:)`.
+  ///
+  /// This saves the model to the C++ registry so it can be discovered and loaded.
   ///
   /// ```dart
   /// RunAnywhere.registerModel(
@@ -779,7 +846,27 @@ class RunAnywhere {
     );
 
     _registeredModels.add(model);
+
+    // Save to C++ registry (fire-and-forget, matches Swift pattern)
+    // This is critical for model discovery and loading to work correctly
+    _saveToCppRegistry(model);
+
     return model;
+  }
+
+  /// Save model to C++ registry (fire-and-forget).
+  /// Matches Swift: `Task { try await CppBridge.ModelRegistry.shared.save(modelInfo) }`
+  static void _saveToCppRegistry(ModelInfo model) {
+    // Fire-and-forget save to C++ registry
+    DartBridgeModelRegistry.instance.savePublicModel(model).then((success) {
+      final logger = SDKLogger('RunAnywhere.Models');
+      if (!success) {
+        logger.warning('Failed to save model to C++ registry: ${model.id}');
+      }
+    }).catchError((Object error) {
+      SDKLogger('RunAnywhere.Models')
+          .error('Error saving model to C++ registry: $error');
+    });
   }
 
   static ModelFormat _inferFormat(String path) {
@@ -789,20 +876,5 @@ class RunAnywhere {
     if (lower.endsWith('.bin')) return ModelFormat.bin;
     if (lower.endsWith('.ort')) return ModelFormat.ort;
     return ModelFormat.unknown;
-  }
-
-  static InferenceFramework _mapFramework(LLMFramework framework) {
-    switch (framework) {
-      case LLMFramework.llamaCpp:
-        return InferenceFramework.llamaCpp;
-      case LLMFramework.onnx:
-        return InferenceFramework.onnx;
-      case LLMFramework.foundationModels:
-        return InferenceFramework.foundationModels;
-      case LLMFramework.systemTTS:
-        return InferenceFramework.systemTTS;
-      default:
-        return InferenceFramework.unknown;
-    }
   }
 }

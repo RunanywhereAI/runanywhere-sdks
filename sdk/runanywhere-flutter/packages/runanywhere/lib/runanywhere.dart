@@ -9,15 +9,8 @@ export 'core/types/storage_types.dart';
 export 'core/types/component_state.dart';
 export 'core/types/sdk_component.dart';
 
-// Framework types
-export 'core/models/framework/llm_framework.dart';
-export 'core/models/framework/framework_modality.dart';
-export 'core/models/model/model_registration.dart';
-
 // Module system
 export 'core/module/runanywhere_module.dart';
-export 'core/module_registry.dart'
-    hide LLMGenerationOptions, LLMGenerationResult;
 
 // Native support (for backend packages)
 export 'native/native_backend.dart' show NativeBackend, NativeBackendException;
@@ -44,4 +37,12 @@ export 'public/configuration/sdk_environment.dart';
 export 'public/errors/errors.dart';
 export 'public/events/event_bus.dart';
 export 'public/events/sdk_event.dart';
-export 'public/runanywhere.dart' hide SupabaseConfig;
+export 'public/runanywhere.dart';
+
+// Public Types
+export 'public/types/types.dart' hide SupabaseConfig;
+
+// Public Extensions
+export 'public/extensions/runanywhere_frameworks.dart';
+export 'public/extensions/runanywhere_logging.dart';
+export 'public/extensions/runanywhere_storage.dart';

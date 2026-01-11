@@ -7,6 +7,7 @@ import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/models/app_types.dart';
+import 'package:runanywhere_ai/core/services/model_manager.dart';
 import 'package:runanywhere_ai/core/services/permission_service.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
@@ -99,30 +100,30 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
     await _refreshComponentStates();
   }
 
-  /// Refresh model states from SDK
+  /// Refresh model states from ModelManager
   /// NOTE: Voice agent API is not yet fully implemented in SDK
   Future<void> _refreshComponentStates() async {
     try {
-      // TODO: Voice agent component states API not yet implemented
-      // For now, check if STT/LLM/TTS models are loaded via available models
-      final sttCapability = sdk.RunAnywhere.loadedSTTCapability;
-      final ttsCapability = sdk.RunAnywhere.loadedTTSCapability;
-      final currentModel = sdk.RunAnywhere.currentModel;
+      // Use ModelManager to track loaded models
+      final modelManager = ModelManager.shared;
+      final currentModelId = modelManager.currentModelId;
+      final sttModelId = modelManager.loadedSTTModelId;
+      final ttsVoiceId = modelManager.loadedTTSVoiceId;
 
       setState(() {
-        _sttModelState = sttCapability != null
+        _sttModelState = sttModelId != null
             ? AppModelLoadState.loaded
             : AppModelLoadState.notLoaded;
-        _llmModelState = currentModel != null
+        _llmModelState = currentModelId != null
             ? AppModelLoadState.loaded
             : AppModelLoadState.notLoaded;
-        _ttsModelState = ttsCapability != null
+        _ttsModelState = ttsVoiceId != null
             ? AppModelLoadState.loaded
             : AppModelLoadState.notLoaded;
 
-        _currentSTTModel = sttCapability?.modelName ?? 'Not loaded';
-        _currentLLMModel = currentModel?.name ?? 'Not loaded';
-        _currentTTSModel = ttsCapability?.voiceName ?? 'Not loaded';
+        _currentSTTModel = sttModelId ?? 'Not loaded';
+        _currentLLMModel = currentModelId ?? 'Not loaded';
+        _currentTTSModel = ttsVoiceId ?? 'Not loaded';
       });
     } catch (e) {
       debugPrint('Failed to get component states: $e');
