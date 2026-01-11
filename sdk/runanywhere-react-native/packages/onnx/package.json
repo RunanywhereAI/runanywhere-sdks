@@ -1,0 +1,63 @@
+{
+  "name": "@runanywhere/onnx",
+  "version": "0.2.0",
+  "description": "ONNX Runtime backend for RunAnywhere React Native SDK - Speech-to-Text, Text-to-Speech, and VAD",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "react-native": "src/index",
+  "source": "src/index",
+  "files": [
+    "src",
+    "cpp",
+    "ios",
+    "android",
+    "nitrogen",
+    "nitro.json",
+    "react-native.config.js",
+    "*.podspec"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint \"src/**/*.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" --fix",
+    "nitrogen": "nitrogen",
+    "prepare": "nitrogen"
+  },
+  "keywords": [
+    "react-native",
+    "runanywhere",
+    "onnx",
+    "stt",
+    "tts",
+    "vad",
+    "speech-to-text",
+    "text-to-speech",
+    "voice-activity-detection",
+    "sherpa-onnx",
+    "nitro"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@runanywhere/core": "^0.2.0",
+    "react": "*",
+    "react-native": "*",
+    "react-native-nitro-modules": "^0.31.3"
+  },
+  "devDependencies": {
+    "nitrogen": "^0.31.10",
+    "react-native-nitro-modules": "^0.31.10",
+    "typescript": "^5.2.2"
+  },
+  "create-react-native-library": {
+    "languages": "kotlin-swift",
+    "type": "nitro-module"
+  }
+}
