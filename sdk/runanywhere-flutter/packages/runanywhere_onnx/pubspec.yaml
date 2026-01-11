@@ -1,7 +1,15 @@
 name: runanywhere_onnx
-description: ONNX Runtime backend for RunAnywhere Flutter SDK. Provides STT, TTS, and VAD capabilities.
+description: ONNX Runtime backend for RunAnywhere Flutter SDK. On-device Speech-to-Text, Text-to-Speech, and Voice Activity Detection.
 version: 0.15.8
 homepage: https://runanywhere.ai
+repository: https://github.com/RunanywhereAI/runanywhere-sdks
+issue_tracker: https://github.com/RunanywhereAI/runanywhere-sdks/issues
+topics:
+  - ai
+  - onnx
+  - speech-recognition
+  - text-to-speech
+  - on-device
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -11,8 +19,7 @@ dependencies:
   flutter:
     sdk: flutter
   # Core SDK dependency (provides RACommons)
-  runanywhere:
-    path: ../runanywhere
+  runanywhere: ^0.15.8
   ffi: ^2.1.0
   # HTTP for download strategy
   http: ^1.2.1
