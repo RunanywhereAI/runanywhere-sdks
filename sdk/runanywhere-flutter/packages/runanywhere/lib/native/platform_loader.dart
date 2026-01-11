@@ -14,7 +14,8 @@ import 'dart:io';
 ///
 /// ## iOS
 /// XCFrameworks are statically linked into the app binary via CocoaPods.
-/// All symbols are available via `DynamicLibrary.process()`.
+/// Symbols are available via `DynamicLibrary.executable()` which can find
+/// both global and local symbols in the main executable.
 ///
 /// ## Android
 /// .so files are loaded from jniLibs via `DynamicLibrary.open()`.
@@ -119,13 +120,18 @@ class PlatformLoader {
     }
   }
 
-  /// Load on iOS using process() for statically linked XCFramework.
+  /// Load on iOS using executable() for statically linked XCFramework.
   ///
   /// On iOS, all XCFrameworks (RACommons, RABackendLlamaCPP, RABackendONNX)
   /// are statically linked into the app binary via CocoaPods.
-  /// DynamicLibrary.process() provides access to all statically linked symbols.
+  ///
+  /// IMPORTANT: We use DynamicLibrary.executable() instead of process() because:
+  /// - process() uses dlsym(RTLD_DEFAULT) which only finds GLOBAL symbols
+  /// - executable() can find both global and LOCAL symbols in the main binary
+  /// - With static linkage, symbols from xcframeworks become local ('t' in nm)
+  /// - This is the correct approach for statically linked Flutter plugins
   static DynamicLibrary _loadIOS(String libraryName) {
-    return DynamicLibrary.process();
+    return DynamicLibrary.executable();
   }
 
   /// Load on macOS for development/testing.

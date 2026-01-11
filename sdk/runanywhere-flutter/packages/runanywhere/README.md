@@ -3,40 +3,89 @@
 [![pub package](https://img.shields.io/pub/v/runanywhere.svg)](https://pub.dev/packages/runanywhere)
 [![License](https://img.shields.io/badge/License-RunAnywhere-blue.svg)](https://github.com/RunanywhereAI/runanywhere-sdks/blob/main/LICENSE)
 
-A privacy-first, on-device AI SDK for Flutter. Run powerful AI models directly on your users' devices with no data leaving the device.
-
-## Features
-
-- **On-Device AI**: Run language models directly on user devices
-- **Privacy-First**: All processing happens locally, no data leaves the device
-- **Modular Backends**: Only include the backends you need (ONNX, LlamaCpp)
-- **Speech-to-Text (STT)**: Streaming and batch transcription
-- **Text-to-Speech (TTS)**: Neural voice synthesis
-- **Voice Activity Detection (VAD)**: Real-time speech detection
-- **LLM Inference**: Text generation with streaming support
-- **Voice Agent**: Complete voice AI pipeline orchestration
+Privacy-first, on-device AI SDK for Flutter. Run LLMs, Speech-to-Text, Text-to-Speech, and Voice AI directly on user devices.
 
 ## Installation
 
-Add `runanywhere` to your `pubspec.yaml`:
+**Step 1:** Add packages to `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  runanywhere: ^0.15.8
+  runanywhere: ^0.15.9
+  runanywhere_onnx: ^0.15.9      # STT, TTS, VAD
+  runanywhere_llamacpp: ^0.15.9  # LLM text generation
 ```
 
-For AI capabilities, add one or more backend packages:
+**Step 2:** Configure platforms (see below).
 
-```yaml
-dependencies:
-  runanywhere: ^0.15.8
-  runanywhere_onnx: ^0.15.8      # For STT, TTS, VAD
-  runanywhere_llamacpp: ^0.15.8  # For LLM text generation
+---
+
+## iOS Setup (Required)
+
+After adding the packages, you **must** update your iOS Podfile for the SDK to work.
+
+### 1. Update `ios/Podfile`
+
+Make these **two critical changes**:
+
+```ruby
+# Change 1: Set minimum iOS version to 14.0
+platform :ios, '14.0'
+
+# ... (keep existing flutter_root function and setup) ...
+
+target 'Runner' do
+  # Change 2: Add static linkage - THIS IS REQUIRED
+  use_frameworks! :linkage => :static
+
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+      # Required for microphone permission (STT/Voice features)
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
+        '$(inherited)',
+        'PERMISSION_MICROPHONE=1',
+      ]
+    end
+  end
+end
 ```
+
+> ⚠️ **Without `use_frameworks! :linkage => :static`, you will see "symbol not found" errors at runtime.**
+
+### 2. Update `ios/Runner/Info.plist`
+
+Add microphone permission for STT/Voice features:
+
+```xml
+<key>NSMicrophoneUsageDescription</key>
+<string>This app needs microphone access for speech recognition</string>
+```
+
+### 3. Run pod install
+
+```bash
+cd ios && pod install
+```
+
+---
+
+## Android Setup
+
+Add microphone permission to `android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<uses-permission android:name="android.permission.RECORD_AUDIO" />
+```
+
+---
 
 ## Quick Start
-
-### 1. Initialize the SDK
 
 ```dart
 import 'package:runanywhere/runanywhere.dart';
@@ -46,79 +95,46 @@ import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize the SDK
+  // Initialize SDK and register backends
   await RunAnywhere.initialize();
-
-  // Register backends (only include what you need)
-  await Onnx.register();       // For STT, TTS, VAD
-  await LlamaCpp.register();   // For LLM
+  await Onnx.register();
+  await LlamaCpp.register();
 
   runApp(MyApp());
 }
 ```
 
-### 2. Add Models
+### Text Generation (LLM)
 
 ```dart
-// Add an ONNX model for STT
-Onnx.addModel(
-  name: 'Whisper Tiny',
-  url: 'https://your-model-url.com/whisper-tiny.tar.bz2',
-  modality: ModelCategory.speechRecognition,
-);
-
-// Add a LlamaCpp model for LLM
-LlamaCpp.addModel(
-  name: 'SmolLM2 360M',
-  url: 'https://your-model-url.com/smollm2-360m.gguf',
-  memoryRequirement: 500000000,
-);
-```
-
-### 3. Use AI Capabilities
-
-```dart
-// Text generation with streaming
-final stream = RunAnywhere.generateStream(
-  'Tell me a joke',
-  options: RunAnywhereGenerationOptions(),
-);
-
+final stream = RunAnywhere.generateStream('Tell me a joke');
 await for (final token in stream) {
   print(token);
 }
-
-// Speech-to-text
-final transcription = await RunAnywhere.transcribe(audioData);
-print(transcription.text);
 ```
+
+### Speech-to-Text
+
+```dart
+final result = await RunAnywhere.transcribe(audioData);
+print(result.text);
+```
+
+---
 
 ## Platform Support
 
 | Platform | Minimum Version |
 |----------|-----------------|
-| iOS      | 13.0+           |
+| iOS      | 14.0+           |
 | Android  | API 24+         |
-
-## Architecture
-
-This SDK uses a multi-package architecture for modularity:
-
-- **runanywhere** (this package): Core SDK with interfaces, models, and infrastructure
-- **runanywhere_onnx**: ONNX Runtime backend for STT, TTS, VAD
-- **runanywhere_llamacpp**: LlamaCpp backend for high-performance LLM inference
 
 ## Documentation
 
-For comprehensive documentation, visit [runanywhere.ai](https://runanywhere.ai).
+For full documentation: [runanywhere.ai](https://runanywhere.ai)
 
 ## License
 
-This software is licensed under the RunAnywhere License, which is based on Apache 2.0 with additional terms for commercial use. See [LICENSE](https://github.com/RunanywhereAI/runanywhere-sdks/blob/main/LICENSE) for details.
+RunAnywhere License (Apache 2.0 based). See [LICENSE](https://github.com/RunanywhereAI/runanywhere-sdks/blob/main/LICENSE).
 
-For commercial licensing inquiries, contact: san@runanywhere.ai
-
-## Support
-
-- [GitHub Issues](https://github.com/RunanywhereAI/runanywhere-sdks/issues)
-- Email: san@runanywhere.ai
+Commercial licensing: san@runanywhere.ai

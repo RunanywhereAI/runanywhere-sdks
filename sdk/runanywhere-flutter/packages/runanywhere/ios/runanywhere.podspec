@@ -14,7 +14,7 @@
 # =============================================================================
 # Version Constants (MUST match Swift Package.swift)
 # =============================================================================
-COMMONS_VERSION = "0.1.4"
+COMMONS_VERSION = "0.1.5"
 
 # =============================================================================
 # Binary Source - RACommons from runanywhere-sdks
@@ -30,7 +30,7 @@ TEST_LOCAL = ENV['RA_TEST_LOCAL'] == '1' || File.exist?(File.join(__dir__, '.tes
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere'
-  s.version          = '0.15.8'
+  s.version          = '0.15.11'
   s.summary          = 'RunAnywhere: Privacy-first, on-device AI SDK for Flutter'
   s.description      = <<-DESC
 Privacy-first, on-device AI SDK for Flutter. This package provides the core
@@ -141,22 +141,23 @@ https://github.com/RunanywhereAI/runanywhere-sdks
   }
 
   # CRITICAL: These flags propagate to the main app target to ensure all symbols
-  # from vendored static frameworks are linked into the final binary.
+  # from vendored static frameworks are linked AND EXPORTED in the final binary.
   #
   # -ObjC ensures Objective-C categories are loaded.
+  # -all_load forces ALL object files from static libraries to be linked.
   # DEAD_CODE_STRIPPING=NO prevents unused symbol removal.
   #
-  # Symbol retention is ensured by RunAnywherePlugin.swift which references
-  # key C symbols, forcing the linker to include them even when only called via FFI.
-  # CRITICAL: -all_load ensures ALL object files from static libraries are linked.
-  # This is required because:
-  # 1. RACommons.xcframework is a static library
-  # 2. The linker normally strips "unused" symbols not directly referenced by native code
-  # 3. Flutter FFI calls these symbols at runtime via dlsym() which the linker can't see
-  # Without -all_load, symbols like rac_llm_component_create won't be in the final binary
+  # SYMBOL EXPORT FIX (iOS):
+  # When using `use_frameworks! :linkage => :static`, symbols from static frameworks
+  # become LOCAL in the final dylib, making them invisible to dlsym() at runtime.
+  # Flutter FFI uses dlsym() to find symbols, so we MUST explicitly export them.
+  #
+  # -Wl,-export_dynamic exports ALL symbols from the dylib, making them accessible
+  # via dlsym(). This is broader than -exported_symbols_list but ensures Flutter's
+  # own symbols are not accidentally hidden.
   s.user_target_xcconfig = {
     'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
-    'OTHER_LDFLAGS' => '-lc++ -larchive -lbz2 -ObjC -all_load',
+    'OTHER_LDFLAGS' => '-lc++ -larchive -lbz2 -ObjC -all_load -Wl,-export_dynamic',
     'DEAD_CODE_STRIPPING' => 'NO',
   }
 
