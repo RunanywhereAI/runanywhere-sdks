@@ -245,9 +245,11 @@ class DartBridgeLLM {
     // Run FFI call in a separate isolate to avoid heap corruption
     // from C++ background threads (Metal GPU operations)
     final handleAddress = handle.address;
+    final tokens = maxTokens;
+    final temp = temperature;
 
     final result = await Isolate.run(() {
-      return _generateInIsolate(handleAddress, prompt);
+      return _generateInIsolate(handleAddress, prompt, tokens, temp);
     });
 
     if (result.error != null) {
@@ -264,31 +266,81 @@ class DartBridgeLLM {
 
   /// Generate text with streaming.
   ///
-  /// Returns a stream of tokens.
+  /// Returns a stream of tokens as they are generated.
+  /// Uses native C++ streaming via an isolate with ReceivePort for safe
+  /// communication between the FFI callbacks and the main isolate.
   Stream<String> generateStream(
     String prompt, {
     int maxTokens = 512,
     double temperature = 0.7,
-  }) async* {
-    // Ensure handle is created (validates component is ready)
-    getHandle();
+  }) {
+    final handle = getHandle();
 
     if (!isLoaded) {
       throw StateError('No LLM model loaded. Call loadModel() first.');
     }
 
-    // For now, fall back to non-streaming and emit tokens
-    // True native streaming requires callback registration which is complex
-    final result = await generate(
+    // Create stream controller for emitting tokens
+    final controller = StreamController<String>();
+
+    // Start streaming generation asynchronously
+    _startStreamingGeneration(
+      handle.address,
       prompt,
-      maxTokens: maxTokens,
-      temperature: temperature,
+      maxTokens,
+      temperature,
+      controller,
     );
 
-    // Emit text as simulated stream
-    final words = result.text.split(' ');
-    for (var i = 0; i < words.length; i++) {
-      yield i == 0 ? words[i] : ' ${words[i]}';
+    return controller.stream;
+  }
+
+  /// Start the streaming generation using isolate with ReceivePort.
+  Future<void> _startStreamingGeneration(
+    int handleAddress,
+    String prompt,
+    int maxTokens,
+    double temperature,
+    StreamController<String> controller,
+  ) async {
+    // Create a ReceivePort to receive tokens from the isolate
+    final receivePort = ReceivePort();
+
+    // Listen for messages from the isolate
+    receivePort.listen((message) {
+      if (controller.isClosed) return;
+
+      if (message is String) {
+        if (message == '__DONE__') {
+          controller.close();
+          receivePort.close();
+        } else if (message.startsWith('__ERROR__:')) {
+          controller.addError(StateError(message.substring(10)));
+          controller.close();
+          receivePort.close();
+        } else {
+          // It's a token
+          controller.add(message);
+        }
+      }
+    });
+
+    // Run the streaming generation in an isolate
+    try {
+      await Isolate.spawn(
+        _streamingIsolateEntry,
+        _StreamingParams(
+          handleAddress: handleAddress,
+          prompt: prompt,
+          maxTokens: maxTokens,
+          temperature: temperature,
+          sendPort: receivePort.sendPort,
+        ),
+      );
+    } catch (e) {
+      controller.addError(e);
+      controller.close();
+      receivePort.close();
     }
   }
 
@@ -354,24 +406,180 @@ class _IsolateGenerationResult {
   });
 }
 
+// =============================================================================
+// Streaming Generation via Isolate
+// =============================================================================
+
+/// Parameters for streaming generation isolate.
+class _StreamingParams {
+  final int handleAddress;
+  final String prompt;
+  final int maxTokens;
+  final double temperature;
+  final SendPort sendPort;
+
+  const _StreamingParams({
+    required this.handleAddress,
+    required this.prompt,
+    required this.maxTokens,
+    required this.temperature,
+    required this.sendPort,
+  });
+}
+
+/// Global SendPort for static callbacks (set before generation starts).
+/// This is needed because Pointer.fromFunction can only call static/top-level
+/// functions that can't capture variables.
+SendPort? _globalSendPort;
+
+/// Token callback - called from C++ for each token.
+/// Must be static for Pointer.fromFunction.
+@pragma('vm:entry-point')
+int _tokenCallback(Pointer<Utf8> token, Pointer<Void> userData) {
+  if (token != nullptr && _globalSendPort != null) {
+    final tokenStr = token.toDartString();
+    _globalSendPort!.send(tokenStr);
+  }
+  return RAC_TRUE; // Continue generation
+}
+
+/// Complete callback - called from C++ when generation finishes.
+@pragma('vm:entry-point')
+void _completeCallback(
+    Pointer<RacLlmResultStruct> result, Pointer<Void> userData) {
+  _globalSendPort?.send('__DONE__');
+}
+
+/// Error callback - called from C++ on error.
+@pragma('vm:entry-point')
+void _errorCallback(
+    int errorCode, Pointer<Utf8> errorMessage, Pointer<Void> userData) {
+  final message =
+      errorMessage != nullptr ? errorMessage.toDartString() : 'Unknown error';
+  _globalSendPort?.send('__ERROR__:$message (code: $errorCode)');
+}
+
+/// Isolate entry point for streaming generation.
+@pragma('vm:entry-point')
+void _streamingIsolateEntry(_StreamingParams params) {
+  // Set global SendPort for callbacks
+  _globalSendPort = params.sendPort;
+
+  final handle = Pointer<Void>.fromAddress(params.handleAddress);
+  final promptPtr = params.prompt.toNativeUtf8();
+  final optionsPtr = calloc<RacLlmOptionsStruct>();
+
+  try {
+    // Set options
+    optionsPtr.ref.maxTokens = params.maxTokens;
+    optionsPtr.ref.temperature = params.temperature;
+    optionsPtr.ref.topP = 1.0;
+    optionsPtr.ref.stopSequences = nullptr;
+    optionsPtr.ref.numStopSequences = 0;
+    optionsPtr.ref.streamingEnabled = RAC_TRUE;
+    optionsPtr.ref.systemPrompt = nullptr;
+
+    final lib = PlatformLoader.loadCommons();
+
+    // Get callback function pointers using Pointer.fromFunction
+    final tokenCallbackPtr =
+        Pointer.fromFunction<Int32 Function(Pointer<Utf8>, Pointer<Void>)>(
+            _tokenCallback, 0);
+    final completeCallbackPtr = Pointer.fromFunction<
+        Void Function(
+            Pointer<RacLlmResultStruct>, Pointer<Void>)>(_completeCallback);
+    final errorCallbackPtr = Pointer.fromFunction<
+        Void Function(Int32, Pointer<Utf8>, Pointer<Void>)>(_errorCallback);
+
+    final generateStreamFn = lib.lookupFunction<
+        Int32 Function(
+          RacHandle,
+          Pointer<Utf8>,
+          Pointer<RacLlmOptionsStruct>,
+          Pointer<NativeFunction<Int32 Function(Pointer<Utf8>, Pointer<Void>)>>,
+          Pointer<
+              NativeFunction<
+                  Void Function(Pointer<RacLlmResultStruct>, Pointer<Void>)>>,
+          Pointer<
+              NativeFunction<
+                  Void Function(Int32, Pointer<Utf8>, Pointer<Void>)>>,
+          Pointer<Void>,
+        ),
+        int Function(
+          RacHandle,
+          Pointer<Utf8>,
+          Pointer<RacLlmOptionsStruct>,
+          Pointer<NativeFunction<Int32 Function(Pointer<Utf8>, Pointer<Void>)>>,
+          Pointer<
+              NativeFunction<
+                  Void Function(Pointer<RacLlmResultStruct>, Pointer<Void>)>>,
+          Pointer<
+              NativeFunction<
+                  Void Function(Int32, Pointer<Utf8>, Pointer<Void>)>>,
+          Pointer<Void>,
+        )>('rac_llm_component_generate_stream');
+
+    final status = generateStreamFn(
+      handle,
+      promptPtr,
+      optionsPtr,
+      tokenCallbackPtr,
+      completeCallbackPtr,
+      errorCallbackPtr,
+      nullptr,
+    );
+
+    if (status != RAC_SUCCESS) {
+      params.sendPort.send(
+          '__ERROR__:Failed to start streaming: ${RacResultCode.getMessage(status)}');
+    }
+  } catch (e) {
+    params.sendPort.send('__ERROR__:$e');
+  } finally {
+    calloc.free(promptPtr);
+    calloc.free(optionsPtr);
+    _globalSendPort = null;
+  }
+}
+
+// =============================================================================
+// Isolate Helper for Non-Streaming Generation
+// =============================================================================
+
 /// Run LLM generation in an isolate.
 ///
 /// This function is called from Isolate.run() and performs the actual FFI call.
 /// Running in a separate isolate prevents heap corruption from C++ background
 /// threads (Metal GPU operations on iOS).
-_IsolateGenerationResult _generateInIsolate(int handleAddress, String prompt) {
+_IsolateGenerationResult _generateInIsolate(
+  int handleAddress,
+  String prompt,
+  int maxTokens,
+  double temperature,
+) {
   final handle = Pointer<Void>.fromAddress(handleAddress);
   final promptPtr = prompt.toNativeUtf8();
+  final optionsPtr = calloc<RacLlmOptionsStruct>();
   final resultPtr = calloc<RacLlmResultStruct>();
 
   try {
+    // Set options - matching C++ rac_llm_options_t
+    optionsPtr.ref.maxTokens = maxTokens;
+    optionsPtr.ref.temperature = temperature;
+    optionsPtr.ref.topP = 1.0;
+    optionsPtr.ref.stopSequences = nullptr;
+    optionsPtr.ref.numStopSequences = 0;
+    optionsPtr.ref.streamingEnabled = RAC_FALSE;
+    optionsPtr.ref.systemPrompt = nullptr;
+
     final lib = PlatformLoader.loadCommons();
     final generateFn = lib.lookupFunction<
-        Int32 Function(RacHandle, Pointer<Utf8>, Pointer<RacLlmResultStruct>),
-        int Function(RacHandle, Pointer<Utf8>,
+        Int32 Function(RacHandle, Pointer<Utf8>, Pointer<RacLlmOptionsStruct>,
+            Pointer<RacLlmResultStruct>),
+        int Function(RacHandle, Pointer<Utf8>, Pointer<RacLlmOptionsStruct>,
             Pointer<RacLlmResultStruct>)>('rac_llm_component_generate');
 
-    final status = generateFn(handle, promptPtr, resultPtr);
+    final status = generateFn(handle, promptPtr, optionsPtr, resultPtr);
 
     if (status != RAC_SUCCESS) {
       return _IsolateGenerationResult(
@@ -392,6 +600,7 @@ _IsolateGenerationResult _generateInIsolate(int handleAddress, String prompt) {
     return _IsolateGenerationResult(error: 'Generation exception: $e');
   } finally {
     calloc.free(promptPtr);
+    calloc.free(optionsPtr);
     calloc.free(resultPtr);
   }
 }
