@@ -7,7 +7,6 @@ library simple_energy_vad;
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:runanywhere/core/module_registry.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// Speech activity events
@@ -16,9 +15,24 @@ enum SpeechActivityEvent {
   ended,
 }
 
+/// Result of Voice Activity Detection
+class VADResult {
+  final bool isSpeech;
+  final double confidence;
+  final double startTime;
+  final double endTime;
+
+  const VADResult({
+    required this.isSpeech,
+    required this.confidence,
+    this.startTime = 0,
+    this.endTime = 0,
+  });
+}
+
 /// Simple energy-based Voice Activity Detection
 /// Based on iOS WhisperKit's EnergyVAD implementation but simplified for real-time audio processing
-class SimpleEnergyVAD implements VADService {
+class SimpleEnergyVAD {
   final SDKLogger _logger = SDKLogger('SimpleEnergyVAD');
 
   /// Energy threshold for voice activity detection (0.0 to 1.0)
@@ -28,7 +42,7 @@ class SimpleEnergyVAD implements VADService {
   double _baseEnergyThreshold = 0.005;
 
   /// Multiplier applied during TTS playback to prevent feedback
-  double _ttsThresholdMultiplier = 3.0;
+  final double _ttsThresholdMultiplier = 3.0;
 
   /// Sample rate of the audio (typically 16000 Hz)
   final int sampleRate;
@@ -65,7 +79,7 @@ class SimpleEnergyVAD implements VADService {
   int _calibrationFrameCount = 0;
   final int _calibrationFramesNeeded = 20;
   double _ambientNoiseLevel = 0.0;
-  double _calibrationMultiplier = 2.5;
+  final double _calibrationMultiplier = 2.5;
 
   // Debug statistics
   final List<double> _recentEnergyValues = [];
@@ -84,16 +98,13 @@ class SimpleEnergyVAD implements VADService {
     );
   }
 
-  @override
   Future<void> initialize({String? modelPath}) async {
     start();
     await startCalibration();
   }
 
-  @override
   bool get isReady => _isActive;
 
-  @override
   Future<VADResult> process(List<int> audioData) async {
     processAudioBuffer(audioData);
     final confidence = _calculateConfidence(_lastEnergyLevel);
@@ -103,7 +114,6 @@ class SimpleEnergyVAD implements VADService {
     );
   }
 
-  @override
   Future<void> cleanup() async {
     stop();
     _recentEnergyValues.clear();

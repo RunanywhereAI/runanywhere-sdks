@@ -50,7 +50,32 @@ class DartBridgeTelemetry {
   // Lifecycle
   // ============================================================================
 
-  /// Initialize telemetry manager with device info
+  /// Synchronous initialization - just stores environment.
+  /// Matches Swift's Telemetry.initialize() in Phase 1 (minimal setup).
+  /// Full initialization with device info happens in Phase 2 via initialize().
+  static void initializeSync({required SDKEnvironment environment}) {
+    _environment = environment;
+    _logger.debug('Telemetry sync init for ${environment.name}');
+  }
+
+  /// Flush any queued telemetry events.
+  /// Static method that delegates to instance if initialized.
+  /// Matches Swift: CppBridge.Telemetry.flush()
+  static void flush() {
+    if (_isInitialized && _managerPtr != null) {
+      try {
+        final lib = PlatformLoader.loadCommons();
+        final flushFn = lib.lookupFunction<Int32 Function(Pointer<Void>),
+            int Function(Pointer<Void>)>('rac_telemetry_manager_flush');
+        flushFn(_managerPtr!);
+        _logger.debug('Telemetry flushed');
+      } catch (e) {
+        _logger.debug('flush error: $e');
+      }
+    }
+  }
+
+  /// Initialize telemetry manager with device info (full async init)
   static Future<void> initialize({
     required SDKEnvironment environment,
     required String deviceId,
@@ -214,19 +239,9 @@ class DartBridgeTelemetry {
     }
   }
 
-  /// Flush pending telemetry
-  Future<void> flush() async {
-    if (!_isInitialized || _managerPtr == null) return;
-
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final flushFn = lib.lookupFunction<Int32 Function(Pointer<Void>),
-          int Function(Pointer<Void>)>('rac_telemetry_manager_flush');
-
-      flushFn(_managerPtr!);
-    } catch (e) {
-      _logger.debug('flush error: $e');
-    }
+  /// Flush pending telemetry (instance method, delegates to static)
+  Future<void> flushAsync() async {
+    flush();
   }
 
   // ============================================================================

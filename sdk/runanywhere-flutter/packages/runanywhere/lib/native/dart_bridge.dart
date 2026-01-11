@@ -3,10 +3,13 @@
 import 'dart:async';
 import 'dart:ffi';
 
+import 'package:ffi/ffi.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
+import '../foundation/configuration/sdk_constants.dart';
 import '../foundation/logging/sdk_logger.dart';
-import 'dart_bridge_auth.dart';
+import 'dart_bridge_auth.dart' hide RacSdkConfigStruct;
 import 'dart_bridge_device.dart';
+import 'dart_bridge_environment.dart' show RacSdkConfigStruct;
 import 'dart_bridge_download.dart';
 import 'dart_bridge_events.dart';
 import 'dart_bridge_http.dart';
@@ -76,13 +79,14 @@ class DartBridge {
 
   /// Initialize the core bridge layer.
   ///
-  /// This is Phase 1 of 2-phase initialization (matches Swift exactly):
+  /// This is Phase 1 of 2-phase initialization (matches Swift CppBridge.initialize exactly):
   /// 1. Load native library
-  /// 2. Register platform adapter (file ops, logging, keychain)
-  /// 3. Configure C++ logging
-  /// 4. Register events callback
-  /// 5. Initialize telemetry manager
-  /// 6. Register device callbacks
+  /// 2. Register platform adapter FIRST (file ops, logging, keychain)
+  /// 3. Configure C++ logging level (rac_configure_logging)
+  /// 4. Initialize SDK config (rac_sdk_init) - sets platform, version
+  /// 5. Register events callback (analytics routing)
+  /// 6. Initialize telemetry manager
+  /// 7. Register device callbacks
   ///
   /// Call this FIRST during SDK init. Must complete before Phase 2.
   ///
@@ -104,19 +108,36 @@ class DartBridge {
 
     // Step 2: Register platform adapter FIRST (file ops, logging, keychain)
     // C++ needs these callbacks before any other operations
+    // Matches Swift: PlatformAdapter.register()
     DartBridgePlatform.register();
     _logger.debug('Platform adapter registered');
 
     // Step 3: Configure C++ logging level
+    // Matches Swift: rac_configure_logging(environment.cEnvironment)
     _configureLogging(environment);
     _logger.debug('C++ logging configured');
 
-    // Step 4: Register events callback (analytics routing)
+    // Step 4: Initialize SDK with configuration
+    // Matches Swift: rac_sdk_init(&sdkConfig) in CppBridge.State.initialize()
+    // This is CRITICAL - the LlamaCPP backend needs this to be set
+    _initializeSdkConfig(environment);
+    _logger.debug('SDK config initialized');
+
+    // Step 5: Register events callback (analytics routing)
+    // Matches Swift: Events.register()
     DartBridgeEvents.register();
     _logger.debug('Events callback registered');
 
-    // Step 5 & 6: Async initialization (deferred to initializeServices)
-    // These require async operations so we defer them to phase 2
+    // Step 6: Initialize telemetry manager (sync part)
+    // Matches Swift: Telemetry.initialize(environment: environment)
+    // Note: Full telemetry init with HTTP is in Phase 2
+    DartBridgeTelemetry.initializeSync(environment: environment);
+    _logger.debug('Telemetry initialized (sync)');
+
+    // Step 7: Register device callbacks
+    // Matches Swift: Device.register()
+    DartBridgeDevice.registerCallbacks();
+    _logger.debug('Device callbacks registered');
 
     _isInitialized = true;
     _logger.info('Phase 1 initialization complete');
@@ -128,12 +149,24 @@ class DartBridge {
 
   /// Initialize service bridges.
   ///
-  /// This is Phase 2 of 2-phase initialization:
-  /// 1. Register model assignment callbacks
-  /// 2. Register platform services (Foundation Models, System TTS)
+  /// This is Phase 2 of 2-phase initialization (matches Swift completeServicesInitialization):
+  /// 1. Setup HTTP transport (if needed)
+  /// 2. Initialize C++ state (rac_state_initialize with apiKey, baseURL, deviceId)
+  /// 3. Initialize service bridges (ModelAssignment, Platform)
+  /// 4. Model paths base directory (done in RunAnywhere.initializeWithParams)
+  /// 5. Device registration (if needed)
+  /// 6. Flush telemetry
   ///
   /// Call this AFTER Phase 1. Can be called in background.
-  static Future<void> initializeServices() async {
+  ///
+  /// [apiKey] API key for production/staging
+  /// [baseURL] Backend URL for production/staging
+  /// [deviceId] Device identifier
+  static Future<void> initializeServices({
+    String? apiKey,
+    String? baseURL,
+    String? deviceId,
+  }) async {
     if (!_isInitialized) {
       throw StateError('Must call initialize() before initializeServices()');
     }
@@ -145,25 +178,35 @@ class DartBridge {
 
     _logger.debug('Starting Phase 2 services initialization');
 
-    // Step 1: Register device callbacks (this also caches device ID)
-    await DartBridgeDevice.register(environment: _environment);
-    _logger.debug('Device callbacks registered');
+    // Step 1: Get device ID if not provided
+    final effectiveDeviceId =
+        deviceId ?? DartBridgeDevice.cachedDeviceId ?? 'unknown-device';
 
-    // Step 2: Initialize telemetry manager with device ID
-    final deviceId = DartBridgeDevice.cachedDeviceId ?? 'unknown-device';
-    await DartBridgeTelemetry.initialize(
+    // Step 2: Initialize C++ state with credentials
+    // Matches Swift: CppBridge.State.initialize(environment:apiKey:baseURL:deviceId:)
+    await DartBridgeState.instance.initialize(
       environment: _environment,
-      deviceId: deviceId,
+      apiKey: apiKey,
+      baseURL: baseURL,
+      deviceId: effectiveDeviceId,
     );
-    _logger.debug('Telemetry manager initialized');
+    _logger.debug('C++ state initialized');
 
-    // Step 3: Model assignment callbacks
+    // Step 3: Initialize service bridges
+    // Matches Swift: CppBridge.initializeServices()
+
+    // Step 3a: Model assignment callbacks
     await DartBridgeModelAssignment.register(environment: _environment);
     _logger.debug('Model assignment callbacks registered');
 
-    // Step 4: Platform services (Foundation Models, System TTS)
+    // Step 3b: Platform services (Foundation Models, System TTS)
     await DartBridgePlatformServices.register();
     _logger.debug('Platform services registered');
+
+    // Step 4: Flush telemetry (if any queued events)
+    // Matches Swift: CppBridge.Telemetry.flush()
+    DartBridgeTelemetry.flush();
+    _logger.debug('Telemetry flushed');
 
     _servicesInitialized = true;
     _logger.info('Phase 2 services initialization complete');
@@ -212,7 +255,7 @@ class DartBridge {
   static DartBridgeHTTP get http => DartBridgeHTTP.instance;
 
   /// LLM bridge
-  static DartBridgeLLM get llm => DartBridgeLLM.instance;
+  static DartBridgeLLM get llm => DartBridgeLLM.shared;
 
   /// Model assignment bridge
   static DartBridgeModelAssignment get modelAssignment =>
@@ -239,19 +282,19 @@ class DartBridge {
   static DartBridgeStorage get storage => DartBridgeStorage.instance;
 
   /// STT bridge
-  static DartBridgeSTT get stt => DartBridgeSTT.instance;
+  static DartBridgeSTT get stt => DartBridgeSTT.shared;
 
   /// Telemetry bridge
   static DartBridgeTelemetry get telemetry => DartBridgeTelemetry.instance;
 
   /// TTS bridge
-  static DartBridgeTTS get tts => DartBridgeTTS.instance;
+  static DartBridgeTTS get tts => DartBridgeTTS.shared;
 
   /// VAD bridge
-  static DartBridgeVAD get vad => DartBridgeVAD.instance;
+  static DartBridgeVAD get vad => DartBridgeVAD.shared;
 
   /// Voice agent bridge
-  static DartBridgeVoiceAgent get voiceAgent => DartBridgeVoiceAgent.instance;
+  static DartBridgeVoiceAgent get voiceAgent => DartBridgeVoiceAgent.shared;
 
   // -------------------------------------------------------------------------
   // Private Helpers
@@ -279,6 +322,52 @@ class DartBridge {
       configureLogging(logLevel);
     } catch (e) {
       _logger.warning('Failed to configure C++ logging: $e');
+    }
+  }
+
+  /// Initialize SDK configuration in C++ (matches Swift's rac_sdk_init call)
+  /// This is critical for the LlamaCPP backend to function correctly.
+  static void _initializeSdkConfig(SDKEnvironment environment) {
+    try {
+      final sdkInit = lib.lookupFunction<
+          Int32 Function(Pointer<RacSdkConfigStruct>),
+          int Function(Pointer<RacSdkConfigStruct>)>('rac_sdk_init');
+
+      final config = calloc<RacSdkConfigStruct>();
+      final platformPtr = 'flutter'.toNativeUtf8();
+      final sdkVersionPtr = SDKConstants.version.toNativeUtf8();
+
+      try {
+        config.ref.environment = _environmentToInt(environment);
+        config.ref.apiKey = nullptr; // Set later if available
+        config.ref.baseURL = nullptr; // Set later if available
+        config.ref.deviceId = nullptr; // Set later if available
+        config.ref.platform = platformPtr;
+        config.ref.sdkVersion = sdkVersionPtr;
+
+        final result = sdkInit(config);
+        if (result != 0) {
+          _logger.warning('rac_sdk_init returned: $result');
+        }
+      } finally {
+        calloc.free(platformPtr);
+        calloc.free(sdkVersionPtr);
+        calloc.free(config);
+      }
+    } catch (e) {
+      _logger.debug('rac_sdk_init not available: $e');
+    }
+  }
+
+  /// Convert environment to C int value
+  static int _environmentToInt(SDKEnvironment env) {
+    switch (env) {
+      case SDKEnvironment.development:
+        return 0;
+      case SDKEnvironment.staging:
+        return 1;
+      case SDKEnvironment.production:
+        return 2;
     }
   }
 }

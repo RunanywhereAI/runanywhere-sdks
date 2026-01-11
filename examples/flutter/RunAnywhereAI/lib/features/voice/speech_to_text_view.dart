@@ -6,6 +6,7 @@ import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/services/audio_recording_service.dart';
+import 'package:runanywhere_ai/core/services/model_manager.dart';
 import 'package:runanywhere_ai/core/services/permission_service.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_status_components.dart';
@@ -235,10 +236,8 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
     try {
       debugPrint('🔄 Transcribing ${audioData.length} bytes of audio...');
 
-      // Get the STT capability from SDK
-      final sttComponent = sdk.RunAnywhere.loadedSTTCapability;
-
-      if (sttComponent == null) {
+      // Check if STT model is loaded via ModelManager
+      if (!ModelManager.shared.isSTTModelLoaded) {
         throw Exception(
             'STT component not loaded. Please load an STT model first.');
       }

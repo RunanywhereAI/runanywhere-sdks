@@ -1,36 +1,33 @@
 import 'dart:ffi';
 import 'dart:io';
 
-/// Platform-specific library loader for RunAnywhere native libraries.
+/// Platform-specific library loader for RunAnywhere core native library (RACommons).
 ///
-/// The new architecture uses separate libraries:
-/// - RACommons: Core functionality (logging, module registry, platform adapter)
-/// - RABackendLlamaCPP: LLM text generation with llama.cpp
-/// - RABackendONNX: STT/TTS/VAD with ONNX Runtime
+/// This loader is ONLY responsible for loading the core RACommons library.
+/// Backend modules (LlamaCPP, ONNX, etc.) are responsible for loading their own
+/// native libraries using their own loaders.
+///
+/// ## Architecture
+/// - Core SDK (runanywhere) only knows about RACommons
+/// - Backend modules are self-contained and handle their own native loading
+/// - This separation ensures modularity and prevents tight coupling
 ///
 /// ## iOS
 /// XCFrameworks are statically linked into the app binary via CocoaPods.
-/// All symbols are available via `DynamicLibrary.executable()`.
+/// All symbols are available via `DynamicLibrary.process()`.
 ///
 /// ## Android
 /// .so files are loaded from jniLibs via `DynamicLibrary.open()`.
-/// The Gradle build system handles downloading and placing the .so files.
 class PlatformLoader {
-  // Cached library instances
+  // Cached library instance for RACommons
   static DynamicLibrary? _commonsLibrary;
-  static DynamicLibrary? _llamacppLibrary;
-  static DynamicLibrary? _onnxLibrary;
   static String? _loadError;
 
-  // Library names (without platform-specific prefix/suffix)
-  // On Android: librac_commons.so, librunanywhere_llamacpp.so, librunanywhere_onnx.so
-  // On iOS/macOS: RACommons.xcframework, RABackendLlamaCPP.xcframework, RABackendONNX.xcframework
+  // Library name for RACommons (without platform-specific prefix/suffix)
   static const String _commonsLibraryName = 'rac_commons';
-  static const String _llamacppLibraryName = 'runanywhere_llamacpp';
-  static const String _onnxLibraryName = 'runanywhere_onnx';
 
   // =============================================================================
-  // Main Loaders
+  // Public API - RACommons Loading Only
   // =============================================================================
 
   /// Load the RACommons native library.
@@ -40,6 +37,7 @@ class PlatformLoader {
   /// - Service provider registry
   /// - Platform adapter interface
   /// - Logging and error handling
+  /// - LLM/STT/TTS component APIs
   static DynamicLibrary loadCommons() {
     if (_commonsLibrary != null) {
       return _commonsLibrary!;
@@ -49,46 +47,6 @@ class PlatformLoader {
       _commonsLibrary = _loadLibrary(_commonsLibraryName);
       _loadError = null;
       return _commonsLibrary!;
-    } catch (e) {
-      _loadError = e.toString();
-      rethrow;
-    }
-  }
-
-  /// Load the RABackendLlamaCPP native library.
-  ///
-  /// This library provides:
-  /// - LLM text generation
-  /// - Streaming generation
-  /// - Model loading/unloading
-  static DynamicLibrary loadLlamaCpp() {
-    if (_llamacppLibrary != null) {
-      return _llamacppLibrary!;
-    }
-
-    try {
-      _llamacppLibrary = _loadLibrary(_llamacppLibraryName);
-      return _llamacppLibrary!;
-    } catch (e) {
-      _loadError = e.toString();
-      rethrow;
-    }
-  }
-
-  /// Load the RABackendONNX native library.
-  ///
-  /// This library provides:
-  /// - STT (Speech-to-Text) with Sherpa-ONNX
-  /// - TTS (Text-to-Speech) with VITS models
-  /// - VAD (Voice Activity Detection)
-  static DynamicLibrary loadOnnx() {
-    if (_onnxLibrary != null) {
-      return _onnxLibrary!;
-    }
-
-    try {
-      _onnxLibrary = _loadLibrary(_onnxLibraryName);
-      return _onnxLibrary!;
     } catch (e) {
       _loadError = e.toString();
       rethrow;
@@ -109,8 +67,16 @@ class PlatformLoader {
   }
 
   // =============================================================================
-  // Platform-Specific Loading
+  // Platform-Specific Loading (Internal)
   // =============================================================================
+
+  /// Load a native library by name, using platform-appropriate method.
+  ///
+  /// This is exposed for backend modules to use if they want consistent
+  /// platform handling, but modules can also implement their own loading.
+  static DynamicLibrary loadLibrary(String libraryName) {
+    return _loadLibrary(libraryName);
+  }
 
   static DynamicLibrary _loadLibrary(String libraryName) {
     if (Platform.isAndroid) {
@@ -132,31 +98,18 @@ class PlatformLoader {
   }
 
   /// Load on Android from jniLibs.
-  ///
-  /// Android libraries are placed in jniLibs by the Gradle build:
-  /// - src/main/jniLibs/arm64-v8a/lib*.so
-  /// - src/main/jniLibs/armeabi-v7a/lib*.so
-  /// - src/main/jniLibs/x86_64/lib*.so
   static DynamicLibrary _loadAndroid(String libraryName) {
-    // On Android, the system loader handles dependencies automatically
-    // when libraries are in jniLibs. Just open the requested library.
-    //
-    // Library naming conventions:
-    // - RACommons -> libracommons.so
-    // - RABackendLlamaCPP -> librabackendllamacpp.so
-    // - RABackendONNX -> librabackendonnx.so
     final soName = 'lib$libraryName.so';
 
     try {
       return DynamicLibrary.open(soName);
     } catch (e) {
-      // Try alternate naming conventions
-      final alternateName = 'lib${_androidLibraryName(libraryName)}.so';
-      if (alternateName != soName) {
+      // Try JNI wrapper naming convention as fallback
+      if (libraryName == 'rac_commons') {
         try {
-          return DynamicLibrary.open(alternateName);
+          return DynamicLibrary.open('librunanywhere_jni.so');
         } catch (_) {
-          // Fall through to throw original error
+          // Fall through
         }
       }
       throw ArgumentError(
@@ -166,59 +119,32 @@ class PlatformLoader {
     }
   }
 
-  /// Map library name to alternate Android convention (for fallback)
-  static String _androidLibraryName(String name) {
-    switch (name) {
-      case 'rac_commons':
-        return 'runanywhere_jni'; // JNI wrapper for commons
-      case 'runanywhere_llamacpp':
-        return 'rac_backend_llamacpp_jni'; // JNI wrapper for llamacpp
-      case 'runanywhere_onnx':
-        return 'rac_backend_onnx_jni'; // JNI wrapper for onnx
-      default:
-        return name;
-    }
-  }
-
-  /// Load on iOS using executable() for statically linked XCFramework.
+  /// Load on iOS using process() for statically linked XCFramework.
   ///
-  /// iOS uses static linking via XCFramework in podspec.
-  /// All symbols from RACommons, RABackendLlamaCPP, and RABackendONNX
-  /// are linked into the main executable.
+  /// On iOS, all XCFrameworks (RACommons, RABackendLlamaCPP, RABackendONNX)
+  /// are statically linked into the app binary via CocoaPods.
+  /// DynamicLibrary.process() provides access to all statically linked symbols.
   static DynamicLibrary _loadIOS(String libraryName) {
-    // On iOS, XCFrameworks are statically linked into the app binary
-    // via CocoaPods. All symbols are available in the main executable.
-    //
-    // The podspec files configure:
-    // - runanywhere.podspec -> links RACommons.xcframework
-    // - runanywhere_llamacpp.podspec -> links RABackendLlamaCPP.xcframework
-    // - runanywhere_onnx.podspec -> links RABackendONNX.xcframework
-    return DynamicLibrary.executable();
+    return DynamicLibrary.process();
   }
 
   /// Load on macOS for development/testing.
-  ///
-  /// macOS supports both:
-  /// 1. Static linking via XCFramework (release builds)
-  /// 2. Dynamic loading of .dylib (development builds)
   static DynamicLibrary _loadMacOS(String libraryName) {
-    // First try executable() for statically linked builds (like iOS)
+    // First try process() for statically linked builds (like iOS)
     try {
-      final lib = DynamicLibrary.executable();
-      // Verify we can find a symbol from the requested library
-      if (_verifyMacOSLibrary(lib, libraryName)) {
-        return lib;
-      }
+      final lib = DynamicLibrary.process();
+      // Verify we can find rac_init (RACommons symbol)
+      lib.lookup('rac_init');
+      return lib;
     } catch (_) {
       // Fall through to dynamic loading
     }
 
-    // Try process() for dynamically linked builds
+    // Try executable() for statically linked builds
     try {
-      final lib = DynamicLibrary.process();
-      if (_verifyMacOSLibrary(lib, libraryName)) {
-        return lib;
-      }
+      final lib = DynamicLibrary.executable();
+      lib.lookup('rac_init');
+      return lib;
     } catch (_) {
       // Fall through to explicit path loading
     }
@@ -245,28 +171,6 @@ class PlatformLoader {
         'Could not load $dylibName on macOS. '
         'Tried: ${searchPaths.join(", ")}. Error: $e',
       );
-    }
-  }
-
-  /// Verify macOS library has expected symbols
-  static bool _verifyMacOSLibrary(DynamicLibrary lib, String libraryName) {
-    try {
-      // Check for a known symbol from each library
-      switch (libraryName) {
-        case 'racommons':
-          lib.lookup('rac_init');
-          return true;
-        case 'rabackendllamacpp':
-          lib.lookup('rac_backend_llamacpp_register');
-          return true;
-        case 'rabackendonnx':
-          lib.lookup('rac_stt_onnx_create');
-          return true;
-        default:
-          return true;
-      }
-    } catch (_) {
-      return false;
     }
   }
 
@@ -350,25 +254,17 @@ class PlatformLoader {
   /// Check if the commons library is loaded.
   static bool get isCommonsLoaded => _commonsLibrary != null;
 
-  /// Check if the LlamaCPP library is loaded.
-  static bool get isLlamaCppLoaded => _llamacppLibrary != null;
-
-  /// Check if the ONNX library is loaded.
-  static bool get isOnnxLoaded => _onnxLibrary != null;
-
   /// Legacy: Check if any native library is loaded.
   static bool get isLoaded => _commonsLibrary != null;
 
   /// Get the last load error, if any.
   static String? get loadError => _loadError;
 
-  /// Unload all library references.
+  /// Unload library reference.
   ///
-  /// Note: The actual libraries may remain in memory until process exit.
+  /// Note: The actual library may remain in memory until process exit.
   static void unload() {
     _commonsLibrary = null;
-    _llamacppLibrary = null;
-    _onnxLibrary = null;
   }
 
   /// Get the current platform's library file extension.

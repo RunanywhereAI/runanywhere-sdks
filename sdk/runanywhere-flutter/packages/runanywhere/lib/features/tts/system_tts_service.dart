@@ -8,7 +8,6 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_tts/flutter_tts.dart';
-import 'package:runanywhere/core/module_registry.dart';
 
 /// Configuration for TTS synthesis
 class TTSConfiguration {
@@ -87,9 +86,37 @@ class TTSSynthesisOutput {
   });
 }
 
+/// Basic TTS input (simplified interface)
+class TTSInput {
+  final String text;
+  final String? voiceId;
+  final double rate;
+  final double pitch;
+
+  const TTSInput({
+    required this.text,
+    this.voiceId,
+    this.rate = 1.0,
+    this.pitch = 1.0,
+  });
+}
+
+/// Basic TTS output (simplified interface)
+class TTSOutput {
+  final List<int> audioData;
+  final String format;
+  final int sampleRate;
+
+  const TTSOutput({
+    required this.audioData,
+    this.format = 'pcm',
+    this.sampleRate = 22050,
+  });
+}
+
 /// System TTS Service implementation using flutter_tts
 /// Matches iOS SystemTTSService from TTSComponent.swift
-class SystemTTSService implements TTSService {
+class SystemTTSService {
   final FlutterTts _flutterTts = FlutterTts();
   List<TTSVoice> _availableVoicesList = [];
   TTSConfiguration? _configuration;
@@ -99,7 +126,6 @@ class SystemTTSService implements TTSService {
 
   String get inferenceFramework => 'system';
 
-  @override
   bool get isReady => _configuration != null;
 
   bool get isSynthesizing => _isSynthesizing;
@@ -107,7 +133,6 @@ class SystemTTSService implements TTSService {
   List<String> get availableVoices =>
       _availableVoicesList.map((v) => v.id).toList();
 
-  @override
   Future<void> initialize({String? modelPath}) async {
     _configuration = const TTSConfiguration();
 
@@ -149,7 +174,6 @@ class SystemTTSService implements TTSService {
     });
   }
 
-  @override
   Future<TTSOutput> synthesize(TTSInput input) async {
     if (_configuration == null) {
       throw StateError('SystemTTSService not initialized');
@@ -212,7 +236,6 @@ class SystemTTSService implements TTSService {
     return _availableVoicesList;
   }
 
-  @override
   Future<void> cleanup() async {
     await _flutterTts.stop();
     _isSynthesizing = false;

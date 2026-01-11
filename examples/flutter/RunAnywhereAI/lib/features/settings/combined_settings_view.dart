@@ -125,9 +125,7 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
   /// Delete a stored model using RunAnywhere SDK
   Future<void> _deleteModel(sdk.StoredModel model) async {
     try {
-      // Map InferenceFramework to LLMFramework
-      final llmFramework = _mapInferenceToLLMFramework(model.framework);
-      await sdk.RunAnywhere.deleteStoredModel(model.id, llmFramework);
+      await sdk.RunAnywhere.deleteStoredModel(model.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${model.name} deleted')),
@@ -140,23 +138,6 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
           SnackBar(content: Text('Failed to delete model: $e')),
         );
       }
-    }
-  }
-
-  /// Map InferenceFramework to LLMFramework
-  sdk.LLMFramework _mapInferenceToLLMFramework(
-      sdk.InferenceFramework framework) {
-    switch (framework) {
-      case sdk.InferenceFramework.llamaCpp:
-        return sdk.LLMFramework.llamaCpp;
-      case sdk.InferenceFramework.onnx:
-        return sdk.LLMFramework.onnx;
-      case sdk.InferenceFramework.foundationModels:
-        return sdk.LLMFramework.foundationModels;
-      case sdk.InferenceFramework.systemTTS:
-        return sdk.LLMFramework.systemTTS;
-      default:
-        return sdk.LLMFramework.llamaCpp;
     }
   }
 

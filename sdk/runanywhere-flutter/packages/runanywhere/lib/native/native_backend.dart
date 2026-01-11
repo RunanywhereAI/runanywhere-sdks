@@ -124,6 +124,14 @@ class RacCore {
 /// - LlamaCPP: LLM text generation
 /// - ONNX: STT, TTS, VAD
 ///
+/// ## Architecture Note
+/// - **RACommons** provides the generic component APIs (`rac_llm_component_*`,
+///   `rac_stt_component_*`, etc.)
+/// - **Backend libraries** (LlamaCPP, ONNX) register themselves with RACommons
+///
+/// For LlamaCPP, component functions are loaded from RACommons, matching the
+/// pattern used in Swift's CppBridge and React Native's C++ bridges.
+///
 /// ## Usage
 ///
 /// ```dart
@@ -158,20 +166,32 @@ class NativeBackend {
     _bindBaseFunctions();
   }
 
-  /// Create a LlamaCPP backend for LLM operations.
-  factory NativeBackend.llamacpp() {
-    return NativeBackend._(PlatformLoader.loadLlamaCpp(), 'llamacpp');
-  }
-
-  /// Create an ONNX backend for STT/TTS/VAD operations.
-  factory NativeBackend.onnx() {
-    return NativeBackend._(PlatformLoader.loadOnnx(), 'onnx');
-  }
-
-  /// Create a backend using the default (commons) library.
-  /// For backward compatibility.
+  /// Create a NativeBackend using RACommons for all component operations.
+  ///
+  /// All component APIs (`rac_llm_component_*`, `rac_stt_component_*`, etc.)
+  /// are provided by RACommons. Backend modules (LlamaCPP, ONNX) register
+  /// themselves with the C++ service registry via `rac_backend_*_register()`.
+  ///
+  /// This is the standard way to create a NativeBackend - it uses the
+  /// RACommons library which provides all the generic component interfaces.
   factory NativeBackend() {
     return NativeBackend._(PlatformLoader.loadCommons(), 'commons');
+  }
+
+  /// Create a NativeBackend for LLM operations.
+  ///
+  /// Uses RACommons for `rac_llm_component_*` functions.
+  /// The LlamaCPP backend must be registered first via `LlamaCpp.register()`.
+  factory NativeBackend.llamacpp() {
+    return NativeBackend._(PlatformLoader.loadCommons(), 'llamacpp');
+  }
+
+  /// Create a NativeBackend for STT/TTS/VAD operations.
+  ///
+  /// Uses RACommons for component functions.
+  /// The ONNX backend must be registered first via `Onnx.register()`.
+  factory NativeBackend.onnx() {
+    return NativeBackend._(PlatformLoader.loadCommons(), 'onnx');
   }
 
   /// Try to create a native backend, returning null if it fails.
@@ -238,8 +258,8 @@ class NativeBackend {
     try {
       switch (_backendType) {
         case 'llamacpp':
-          final destroy = _lib.lookupFunction<RacLlmLlamacppDestroyNative,
-              RacLlmLlamacppDestroyDart>('rac_llm_llamacpp_destroy');
+          final destroy = _lib.lookupFunction<RacLlmComponentDestroyNative,
+              RacLlmComponentDestroyDart>('rac_llm_component_destroy');
           destroy(_handle!);
           break;
         case 'onnx':
@@ -260,17 +280,46 @@ class NativeBackend {
   // ============================================================================
 
   /// Load a text generation model (LLM).
+  ///
+  /// Uses the `rac_llm_component_*` API from RACommons.
+  /// First creates the component handle, then loads the model.
   void loadTextModel(String modelPath, {Map<String, dynamic>? config}) {
     _ensureBackendType('llamacpp');
 
+    // Step 1: Create the LLM component if we don't have a handle
+    if (_handle == null) {
+      final handlePtr = calloc<RacHandle>();
+      try {
+        final create = _lib.lookupFunction<RacLlmComponentCreateNative,
+            RacLlmComponentCreateDart>('rac_llm_component_create');
+
+        final result = create(handlePtr);
+
+        if (result != RAC_SUCCESS) {
+          throw NativeBackendException(
+            'Failed to create LLM component: ${RacCore.getErrorMessage(result)}',
+            code: result,
+          );
+        }
+
+        _handle = handlePtr.value;
+      } finally {
+        calloc.free(handlePtr);
+      }
+    }
+
+    // Step 2: Load the model
     final pathPtr = modelPath.toNativeUtf8();
-    final handlePtr = calloc<RacHandle>();
+    // Use filename as model ID
+    final modelId = modelPath.split('/').last;
+    final modelIdPtr = modelId.toNativeUtf8();
+    final modelNamePtr = modelId.toNativeUtf8();
 
     try {
-      final create = _lib.lookupFunction<RacLlmLlamacppCreateNative,
-          RacLlmLlamacppCreateDart>('rac_llm_llamacpp_create');
+      final loadModel = _lib.lookupFunction<RacLlmComponentLoadModelNative,
+          RacLlmComponentLoadModelDart>('rac_llm_component_load_model');
 
-      final result = create(pathPtr, nullptr, handlePtr);
+      final result = loadModel(_handle!, pathPtr, modelIdPtr, modelNamePtr);
 
       if (result != RAC_SUCCESS) {
         throw NativeBackendException(
@@ -279,11 +328,11 @@ class NativeBackend {
         );
       }
 
-      _handle = handlePtr.value;
       _currentModel = modelPath;
     } finally {
       calloc.free(pathPtr);
-      calloc.free(handlePtr);
+      calloc.free(modelIdPtr);
+      calloc.free(modelNamePtr);
     }
   }
 
@@ -292,8 +341,8 @@ class NativeBackend {
     if (_handle == null || _backendType != 'llamacpp') return false;
 
     try {
-      final isLoaded = _lib.lookupFunction<RacLlmLlamacppIsModelLoadedNative,
-          RacLlmLlamacppIsModelLoadedDart>('rac_llm_llamacpp_is_model_loaded');
+      final isLoaded = _lib.lookupFunction<RacLlmComponentIsLoadedNative,
+          RacLlmComponentIsLoadedDart>('rac_llm_component_is_loaded');
       return isLoaded(_handle!) == RAC_TRUE;
     } catch (_) {
       return false;
@@ -305,9 +354,9 @@ class NativeBackend {
     if (_handle == null || _backendType != 'llamacpp') return;
 
     try {
-      final unload = _lib.lookupFunction<RacLlmLlamacppUnloadModelNative,
-          RacLlmLlamacppUnloadModelDart>('rac_llm_llamacpp_unload_model');
-      unload(_handle!);
+      final cleanup = _lib.lookupFunction<RacLlmComponentCleanupNative,
+          RacLlmComponentCleanupDart>('rac_llm_component_cleanup');
+      cleanup(_handle!);
       _currentModel = null;
     } catch (e) {
       throw NativeBackendException('Failed to unload text model: $e');
@@ -336,8 +385,8 @@ class NativeBackend {
     optionsPtr.ref.systemPrompt = systemPrompt?.toNativeUtf8() ?? nullptr;
 
     try {
-      final generate = _lib.lookupFunction<RacLlmLlamacppGenerateNative,
-          RacLlmLlamacppGenerateDart>('rac_llm_llamacpp_generate');
+      final generate = _lib.lookupFunction<RacLlmComponentGenerateNative,
+          RacLlmComponentGenerateDart>('rac_llm_component_generate');
 
       final status = generate(
         _handle!,
@@ -381,8 +430,8 @@ class NativeBackend {
     if (_handle == null || _backendType != 'llamacpp') return;
 
     try {
-      final cancel = _lib.lookupFunction<RacLlmLlamacppCancelNative,
-          RacLlmLlamacppCancelDart>('rac_llm_llamacpp_cancel');
+      final cancel = _lib.lookupFunction<RacLlmComponentCancelNative,
+          RacLlmComponentCancelDart>('rac_llm_component_cancel');
       cancel(_handle!);
     } catch (_) {
       // Ignore errors

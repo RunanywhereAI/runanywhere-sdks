@@ -167,12 +167,12 @@ class StoredModel {
         id: json['id'] as String,
         name: json['name'] as String,
         category: ModelCategory.language,
-        format: ModelFormat.fromRawValue(json['format'] as String? ?? 'unknown'),
+        format:
+            ModelFormat.fromRawValue(json['format'] as String? ?? 'unknown'),
         framework: InferenceFramework.fromRawValue(
             json['framework'] as String? ?? 'unknown'),
-        localPath: json['path'] != null
-            ? Uri.parse(json['path'] as String)
-            : null,
+        localPath:
+            json['path'] != null ? Uri.parse(json['path'] as String) : null,
         description: json['description'] as String?,
         createdAt: json['createdDate'] != null
             ? DateTime.parse(json['createdDate'] as String)
@@ -216,19 +216,19 @@ class StorageInfo {
   }
 
   /// Empty storage info
-  static final StorageInfo empty = StorageInfo(
-    appStorage: const AppStorageInfo(
+  static const StorageInfo empty = StorageInfo(
+    appStorage: AppStorageInfo(
       documentsSize: 0,
       cacheSize: 0,
       appSupportSize: 0,
       totalSize: 0,
     ),
-    deviceStorage: const DeviceStorageInfo(
+    deviceStorage: DeviceStorageInfo(
       totalSpace: 0,
       freeSpace: 0,
       usedSpace: 0,
     ),
-    models: const [],
+    models: [],
   );
 
   Map<String, dynamic> toJson() => {
@@ -249,7 +249,8 @@ class StorageInfo {
       deviceStorage: DeviceStorageInfo.fromJson(
           json['deviceStorage'] as Map<String, dynamic>),
       models: storedModels
-          .map((s) => ModelStorageMetrics(model: s.modelInfo, sizeOnDisk: s.size))
+          .map((s) =>
+              ModelStorageMetrics(model: s.modelInfo, sizeOnDisk: s.size))
           .toList(),
     );
   }

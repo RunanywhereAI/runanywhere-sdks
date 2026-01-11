@@ -1,17 +1,18 @@
 /// ONNX Runtime backend for RunAnywhere Flutter SDK.
 ///
-/// This package provides STT, TTS, and VAD capabilities via the native
-/// runanywhere-core library using Dart FFI.
+/// This package provides STT, TTS, and VAD capabilities.
+/// It is a **thin wrapper** that registers the C++ backend with the service registry.
 ///
-/// ## Installation
+/// ## Architecture (matches Swift/Kotlin exactly)
 ///
-/// Add both the core SDK and this backend to your pubspec.yaml:
+/// The C++ backend (RABackendONNX) handles all business logic:
+/// - Service provider registration
+/// - Model loading and inference for STT/TTS/VAD
+/// - Streaming transcription
 ///
-/// ```yaml
-/// dependencies:
-///   runanywhere: ^0.15.8
-///   runanywhere_onnx: ^0.15.8
-/// ```
+/// This Dart module just:
+/// 1. Calls `rac_backend_onnx_register()` to register the backend
+/// 2. The core SDK handles all operations via component APIs
 ///
 /// ## Quick Start
 ///
@@ -22,22 +23,8 @@
 /// // Initialize SDK
 /// await RunAnywhere.initialize();
 ///
-/// // Register ONNX module
+/// // Register ONNX module (matches Swift: ONNX.register())
 /// await Onnx.register();
-///
-/// // Add STT model
-/// Onnx.addModel(
-///   name: 'Sherpa Whisper Tiny',
-///   url: 'https://github.com/.../sherpa-onnx-whisper-tiny.en.tar.gz',
-///   modality: ModelCategory.speechRecognition,
-/// );
-///
-/// // Add TTS model
-/// Onnx.addModel(
-///   name: 'Piper TTS',
-///   url: 'https://github.com/.../vits-piper-en_US-lessac-medium.tar.gz',
-///   modality: ModelCategory.speechSynthesis,
-/// );
 /// ```
 ///
 /// ## Capabilities
@@ -49,9 +36,3 @@ library runanywhere_onnx;
 
 export 'onnx.dart';
 export 'onnx_download_strategy.dart';
-export 'providers/onnx_stt_provider.dart';
-export 'providers/onnx_tts_provider.dart';
-export 'providers/onnx_vad_provider.dart';
-export 'services/onnx_stt_service.dart';
-export 'services/onnx_tts_service.dart';
-export 'services/onnx_vad_service.dart';
