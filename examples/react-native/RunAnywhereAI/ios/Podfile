@@ -76,5 +76,23 @@ target 'RunAnywhereAI' do
         end
       end
     end
+
+    # Fix RNZipArchive compiler flags issue
+    # The podspec incorrectly uses compiler_flags with Xcode build settings syntax
+    installer.pods_project.targets.each do |target|
+      if target.name == 'RNZipArchive'
+        target.build_configurations.each do |config|
+          # Remove the invalid -G flag and set preprocessor definitions properly
+          config.build_settings['OTHER_CFLAGS'] = '$(inherited)'
+          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
+          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'HAVE_INTTYPES_H=1'
+          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'HAVE_PKCRYPT=1'
+          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'HAVE_STDINT_H=1'
+          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'HAVE_WZAES=1'
+          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'HAVE_ZLIB=1'
+          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'MZ_ZIP_NO_SIGNING=1'
+        end
+      end
+    end
   end
 end

@@ -365,8 +365,7 @@ RAC_API void rac_voice_agent_destroy(rac_voice_agent_handle_t handle);
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t handle,
-                                                    const char* model_path,
-                                                    const char* model_id,
+                                                    const char* model_path, const char* model_id,
                                                     const char* model_name);
 
 /**
@@ -379,8 +378,7 @@ RAC_API rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t han
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t handle,
-                                                    const char* model_path,
-                                                    const char* model_id,
+                                                    const char* model_path, const char* model_id,
                                                     const char* model_name);
 
 /**
@@ -393,8 +391,7 @@ RAC_API rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t han
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t handle,
-                                                    const char* voice_path,
-                                                    const char* voice_id,
+                                                    const char* voice_path, const char* voice_id,
                                                     const char* voice_name);
 
 /**

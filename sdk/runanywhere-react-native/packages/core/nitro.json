@@ -1,0 +1,20 @@
+{
+  "cxxNamespace": ["runanywhere"],
+  "ios": {
+    "iosModuleName": "RunAnywhereCore"
+  },
+  "android": {
+    "androidNamespace": ["runanywhere"],
+    "androidCxxLibName": "runanywherecore"
+  },
+  "autolinking": {
+    "RunAnywhereCore": {
+      "cpp": "HybridRunAnywhereCore"
+    },
+    "RunAnywhereDeviceInfo": {
+      "kotlin": "HybridRunAnywhereDeviceInfo",
+      "swift": "HybridRunAnywhereDeviceInfo"
+    }
+  },
+  "ignorePaths": ["node_modules", "lib", "example"]
+}

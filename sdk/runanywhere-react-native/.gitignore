@@ -9,9 +9,12 @@ dist/
 nitrogen/generated/
 
 # iOS
-ios/Frameworks/
+# Downloaded XCFrameworks and native libraries (from runanywhere-sdks/runanywhere-binaries releases)
+# These are automatically downloaded during pod install - DO NOT commit
+**/ios/Frameworks/
 ios/build/
 *.xcframework
+*.xcframework/
 *.xcframework.zip
 
 # Xcode environment (machine-specific Node.js paths)
@@ -23,7 +26,11 @@ android/build/
 android/.gradle/
 android/.cxx/
 android/libs/
-android/src/main/jniLibs/
+# Downloaded native libraries and headers (from runanywhere-sdks/runanywhere-binaries releases)
+# These are automatically downloaded during gradle build - DO NOT commit
+**/android/src/main/jniLibs/
+**/android/src/main/include/
+**/android/include/
 *.aar
 
 # TypeScript

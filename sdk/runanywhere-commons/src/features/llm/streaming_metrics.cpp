@@ -276,8 +276,7 @@ rac_result_t rac_streaming_metrics_get_text(rac_streaming_metrics_handle_t handl
 }
 
 rac_result_t rac_streaming_metrics_set_token_counts(rac_streaming_metrics_handle_t handle,
-                                                    int32_t input_tokens,
-                                                    int32_t output_tokens) {
+                                                    int32_t input_tokens, int32_t output_tokens) {
     if (!handle) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }

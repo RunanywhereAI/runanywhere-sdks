@@ -69,8 +69,10 @@ void ensure_rand_seeded() {
     std::call_once(rand_seed_flag, []() {
         // Seed with combination of time and memory address for better entropy
         auto now = std::chrono::high_resolution_clock::now();
-        auto nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
-        unsigned int seed = static_cast<unsigned int>(nanos ^ reinterpret_cast<uintptr_t>(&rand_seed_flag));
+        auto nanos =
+            std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
+        unsigned int seed =
+            static_cast<unsigned int>(nanos ^ reinterpret_cast<uintptr_t>(&rand_seed_flag));
         srand(seed);
     });
 }
@@ -79,7 +81,7 @@ void ensure_rand_seeded() {
 std::string generate_uuid() {
     // Ensure random number generator is seeded
     ensure_rand_seeded();
-    
+
     // Simple UUID generation (not RFC4122 compliant, but sufficient for event IDs)
     static const char hex[] = "0123456789abcdef";
     std::string uuid = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx";
@@ -428,7 +430,8 @@ rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
     if (manager->environment == RAC_ENV_DEVELOPMENT) {
         // Development: Immediate flush for real-time debugging
         should_flush = true;
-        log_debug("Telemetry", "Development mode: auto-flushing immediately (queue size: %zu)", queue_size);
+        log_debug("Telemetry", "Development mode: auto-flushing immediately (queue size: %zu)",
+                  queue_size);
     } else {
         // Production: Flush based on batch size or timeout
         // (completion events are handled in rac_telemetry_manager_track_analytics)
@@ -436,19 +439,20 @@ rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
         if (queue_size >= manager->BATCH_SIZE_PRODUCTION) {
             should_flush = true;
             log_debug("Telemetry", "Auto-flushing: queue size (%zu) >= batch size (%zu)",
-                        queue_size, manager->BATCH_SIZE_PRODUCTION);
+                      queue_size, manager->BATCH_SIZE_PRODUCTION);
         }
         // Flush if timeout reached (5 seconds since last flush)
         else if (manager->last_flush_time_ms > 0 &&
                  (current_time - manager->last_flush_time_ms) >= manager->BATCH_TIMEOUT_MS) {
             should_flush = true;
             log_debug("Telemetry", "Auto-flushing: timeout reached (%lld ms since last flush)",
-                        current_time - manager->last_flush_time_ms);
+                      current_time - manager->last_flush_time_ms);
         }
         // First flush: start the timer by flushing immediately if we have events
         else if (manager->last_flush_time_ms == 0 && queue_size > 0) {
             should_flush = true;
-            log_debug("Telemetry", "Production: first flush to start timer (queue size: %zu)", queue_size);
+            log_debug("Telemetry", "Production: first flush to start timer (queue size: %zu)",
+                      queue_size);
         }
     }
 
@@ -490,7 +494,8 @@ rac_result_t rac_telemetry_manager_track_analytics(rac_telemetry_manager_t* mana
             case RAC_EVENT_LLM_FIRST_TOKEN:
             case RAC_EVENT_LLM_STREAMING_UPDATE: {
                 const auto& llm = data->data.llm_generation;
-                // model_id and model_name come directly from the event (set by component from lifecycle)
+                // model_id and model_name come directly from the event (set by component from
+                // lifecycle)
                 payload.model_id = llm.model_id;
                 payload.model_name = llm.model_name ? llm.model_name : llm.model_id;
                 payload.session_id = llm.generation_id;
@@ -498,7 +503,8 @@ rac_result_t rac_telemetry_manager_track_analytics(rac_telemetry_manager_t* mana
                 payload.output_tokens = llm.output_tokens;
                 payload.total_tokens = llm.input_tokens + llm.output_tokens;
                 payload.processing_time_ms = llm.duration_ms;
-                payload.generation_time_ms = llm.duration_ms;  // Also set generation_time_ms for LLM events
+                payload.generation_time_ms =
+                    llm.duration_ms;  // Also set generation_time_ms for LLM events
                 payload.tokens_per_second = llm.tokens_per_second;
                 payload.time_to_first_token_ms = llm.time_to_first_token_ms;
                 payload.is_streaming = llm.is_streaming;
@@ -582,7 +588,7 @@ rac_result_t rac_telemetry_manager_track_analytics(rac_telemetry_manager_t* mana
                 // model_id and model_name come directly from the event
                 payload.model_id = tts.model_id;
                 payload.model_name = tts.model_name ? tts.model_name : tts.model_id;
-                payload.voice = tts.model_id; // Voice is the same as model_id for TTS
+                payload.voice = tts.model_id;  // Voice is the same as model_id for TTS
                 payload.session_id = tts.synthesis_id;
                 payload.character_count = tts.character_count;
                 payload.output_duration_ms = tts.audio_duration_ms;
@@ -601,7 +607,9 @@ rac_result_t rac_telemetry_manager_track_analytics(rac_telemetry_manager_t* mana
                 }
                 // Debug: Log if voice/model_id is null
                 if (!payload.voice || !payload.model_id) {
-                    log_debug("Telemetry", "TTS event has null voice/model_id (voice_id from lifecycle may be null)");
+                    log_debug(
+                        "Telemetry",
+                        "TTS event has null voice/model_id (voice_id from lifecycle may be null)");
                 } else {
                     log_debug("Telemetry", "TTS event voice: %s", payload.voice);
                 }
@@ -629,10 +637,8 @@ rac_result_t rac_telemetry_manager_track_analytics(rac_telemetry_manager_t* mana
 
     // For completion/failure events in production, trigger immediate flush
     // This ensures important terminal events are captured before app exits
-    if (result == RAC_SUCCESS && 
-        manager->environment != RAC_ENV_DEVELOPMENT &&
-        is_completion_event(event_type) &&
-        manager->http_callback) {
+    if (result == RAC_SUCCESS && manager->environment != RAC_ENV_DEVELOPMENT &&
+        is_completion_event(event_type) && manager->http_callback) {
         log_debug("Telemetry", "Completion event detected, triggering immediate flush");
         rac_telemetry_manager_flush(manager);
     }
@@ -725,8 +731,9 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
 
             if (result == RAC_SUCCESS && json) {
                 // WARN: Log production telemetry payload for debugging (first 500 chars)
-                log_debug("Telemetry", "Sending production telemetry (modality=%s, %zu bytes): %.500s",
-                            modality.c_str(), json_len, json);
+                log_debug("Telemetry",
+                          "Sending production telemetry (modality=%s, %zu bytes): %.500s",
+                          modality.c_str(), json_len, json);
                 manager->http_callback(manager->http_user_data, endpoint, json, json_len,
                                        RAC_TRUE  // Production always requires auth
                 );

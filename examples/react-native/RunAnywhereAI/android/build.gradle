@@ -19,3 +19,18 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+// =============================================================================
+// Fix: Node.js not found when running from Android Studio
+// Android Studio doesn't inherit terminal PATH
+// =============================================================================
+gradle.taskGraph.whenReady { taskGraph ->
+    taskGraph.allTasks.each { task ->
+        if (task.name.contains("generateCodegenSchemaFromJavaScript") ||
+            task.name.contains("Codegen")) {
+            if (task.hasProperty("environment")) {
+                task.environment("PATH", "/opt/homebrew/bin:/usr/local/bin:/usr/bin:" + (System.getenv("PATH") ?: ""))
+            }
+        }
+    }
+}

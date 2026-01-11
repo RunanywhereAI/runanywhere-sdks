@@ -271,10 +271,11 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
     std::string synthesis_id = generate_uuid_v4();
     const char* voice_id = rac_lifecycle_get_model_id(component->lifecycle);
     const char* voice_name = rac_lifecycle_get_model_name(component->lifecycle);
-    
+
     // Debug: Log if voice_id is null
     if (!voice_id) {
-        log_warning("TTS.Component", "rac_lifecycle_get_model_id returned null - voice may not be set in telemetry");
+        log_warning("TTS.Component",
+                    "rac_lifecycle_get_model_id returned null - voice may not be set in telemetry");
     } else {
         log_debug("TTS.Component", "TTS synthesis using voice_id: %s", voice_id);
     }

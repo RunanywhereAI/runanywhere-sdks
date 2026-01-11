@@ -103,18 +103,22 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
     // Step 1: Check if already registered
     // Production behavior: Skip if already registered (performance, network efficiency)
     // Development behavior: Always update via UPSERT (track active devices, update last_seen_at)
-    rac_bool_t was_registered = state.callbacks.is_registered(state.callbacks.user_data) == RAC_TRUE;
+    rac_bool_t was_registered =
+        state.callbacks.is_registered(state.callbacks.user_data) == RAC_TRUE;
     if (was_registered && env != RAC_ENV_DEVELOPMENT) {
         RAC_LOG_DEBUG(LOG_CAT, "Device already registered, skipping (production mode)");
         return RAC_SUCCESS;
     }
-    
+
     if (was_registered && env == RAC_ENV_DEVELOPMENT) {
-        RAC_LOG_DEBUG(LOG_CAT, "Device marked as registered, but will update via UPSERT (development mode)");
+        RAC_LOG_DEBUG(LOG_CAT,
+                      "Device marked as registered, but will update via UPSERT (development mode)");
     }
 
-    RAC_LOG_INFO(LOG_CAT, "Starting device registration%s", 
-                 (env == RAC_ENV_DEVELOPMENT && was_registered) ? " (UPSERT will update existing records)" : "");
+    RAC_LOG_INFO(LOG_CAT, "Starting device registration%s",
+                 (env == RAC_ENV_DEVELOPMENT && was_registered)
+                     ? " (UPSERT will update existing records)"
+                     : "");
 
     // Step 2: Get device ID
     const char* device_id = state.callbacks.get_device_id(state.callbacks.user_data);
@@ -162,7 +166,8 @@ rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const 
         return RAC_ERROR_INVALID_STATE;
     }
     RAC_LOG_DEBUG(LOG_CAT, "Registration endpoint: %s", endpoint);
-    RAC_LOG_DEBUG(LOG_CAT, "Registration JSON payload (first 200 chars): %.200s", json_ptr ? json_ptr : "(null)");
+    RAC_LOG_DEBUG(LOG_CAT, "Registration JSON payload (first 200 chars): %.200s",
+                  json_ptr ? json_ptr : "(null)");
 
     // Step 7: Determine if auth is required (staging/production require auth)
     rac_bool_t requires_auth = (env != RAC_ENV_DEVELOPMENT) ? RAC_TRUE : RAC_FALSE;

@@ -151,7 +151,9 @@ rac_result_t rac_service_unregister_provider(const char* name, rac_capability_t 
 rac_result_t rac_service_create(rac_capability_t capability, const rac_service_request_t* request,
                                 rac_handle_t* out_handle) {
     RAC_LOG_INFO(LOG_CAT, "rac_service_create called for capability=%d, identifier=%s",
-                 static_cast<int>(capability), request ? (request->identifier ? request->identifier : "(null)") : "(null request)");
+                 static_cast<int>(capability),
+                 request ? (request->identifier ? request->identifier : "(null)")
+                         : "(null request)");
 
     if (request == nullptr || out_handle == nullptr) {
         RAC_LOG_ERROR(LOG_CAT, "rac_service_create: null pointer");
@@ -188,7 +190,8 @@ rac_result_t rac_service_create(rac_capability_t capability, const rac_service_r
             rac_handle_t handle = provider.create(request, provider.user_data);
             if (handle != nullptr) {
                 *out_handle = handle;
-                RAC_LOG_INFO(LOG_CAT, "rac_service_create: Service created by provider '%s', handle=%p",
+                RAC_LOG_INFO(LOG_CAT,
+                             "rac_service_create: Service created by provider '%s', handle=%p",
                              provider.name.c_str(), handle);
                 return RAC_SUCCESS;
             } else {

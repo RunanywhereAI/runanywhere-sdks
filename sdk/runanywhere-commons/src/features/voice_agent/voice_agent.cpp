@@ -251,10 +251,8 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
 // MODEL LOADING API
 // =============================================================================
 
-rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t handle,
-                                            const char* model_path,
-                                            const char* model_id,
-                                            const char* model_name) {
+rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t handle, const char* model_path,
+                                            const char* model_id, const char* model_name) {
     if (!handle || !model_path) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -267,7 +265,8 @@ rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t handle,
     rac::events::emit_voice_agent_stt_state_changed(RAC_VOICE_AGENT_STATE_LOADING, model_id,
                                                     nullptr);
 
-    rac_result_t result = rac_stt_component_load_model(handle->stt_handle, model_path, model_id, model_name);
+    rac_result_t result =
+        rac_stt_component_load_model(handle->stt_handle, model_path, model_id, model_name);
 
     if (result == RAC_SUCCESS) {
         rac::events::emit_voice_agent_stt_state_changed(RAC_VOICE_AGENT_STATE_LOADED, model_id,
@@ -286,10 +285,8 @@ rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t handle,
     return result;
 }
 
-rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t handle,
-                                            const char* model_path,
-                                            const char* model_id,
-                                            const char* model_name) {
+rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t handle, const char* model_path,
+                                            const char* model_id, const char* model_name) {
     if (!handle || !model_path) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -302,7 +299,8 @@ rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t handle,
     rac::events::emit_voice_agent_llm_state_changed(RAC_VOICE_AGENT_STATE_LOADING, model_id,
                                                     nullptr);
 
-    rac_result_t result = rac_llm_component_load_model(handle->llm_handle, model_path, model_id, model_name);
+    rac_result_t result =
+        rac_llm_component_load_model(handle->llm_handle, model_path, model_id, model_name);
 
     if (result == RAC_SUCCESS) {
         rac::events::emit_voice_agent_llm_state_changed(RAC_VOICE_AGENT_STATE_LOADED, model_id,
@@ -321,10 +319,8 @@ rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t handle,
     return result;
 }
 
-rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t handle,
-                                            const char* voice_path,
-                                            const char* voice_id,
-                                            const char* voice_name) {
+rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t handle, const char* voice_path,
+                                            const char* voice_id, const char* voice_name) {
     if (!handle || !voice_path) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -337,7 +333,8 @@ rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t handle,
     rac::events::emit_voice_agent_tts_state_changed(RAC_VOICE_AGENT_STATE_LOADING, voice_id,
                                                     nullptr);
 
-    rac_result_t result = rac_tts_component_load_voice(handle->tts_handle, voice_path, voice_id, voice_name);
+    rac_result_t result =
+        rac_tts_component_load_voice(handle->tts_handle, voice_path, voice_id, voice_name);
 
     if (result == RAC_SUCCESS) {
         rac::events::emit_voice_agent_tts_state_changed(RAC_VOICE_AGENT_STATE_LOADED, voice_id,
