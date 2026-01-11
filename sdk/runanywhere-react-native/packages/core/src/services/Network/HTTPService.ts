@@ -40,7 +40,7 @@ interface Response {
 }
 
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
+import { SDKError } from '../../Foundation/ErrorTypes';
 import { ErrorCode } from '../../Foundation/ErrorTypes/ErrorCodes';
 
 const logger = new SDKLogger('HTTPService');
@@ -441,7 +441,7 @@ export class HTTPService {
       case 401:
         return new SDKError(ErrorCode.AuthenticationFailed, message);
       case 403:
-        return new SDKError(SDKErrorCode.AuthenticationFailed, `Forbidden: ${message}`);
+        return new SDKError(ErrorCode.AuthenticationFailed, `Forbidden: ${message}`);
       case 404:
         return new SDKError(ErrorCode.ApiError, `Not found: ${path}`);
       case 429:

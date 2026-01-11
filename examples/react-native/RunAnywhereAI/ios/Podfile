@@ -78,25 +78,30 @@ target 'RunAnywhereAI' do
     end
 
     # Fix RNZipArchive compiler flags issue (Xcode 16+ compatibility)
-    # The podspec uses -G flag which is unsupported on newer Xcode
+    # The RNZipArchive podspec uses -G flag which is unsupported on arm64-apple-ios targets
+    # in Xcode 16+. We must fix this at two levels:
+    #   1. Build settings (OTHER_CFLAGS) - full replacement with known required flags
+    #   2. Per-file compiler flags - surgical removal of -G only
     installer.pods_project.targets.each do |target|
       if target.name == 'RNZipArchive'
         target.build_configurations.each do |config|
-          # Completely override compiler flags to remove -G
-          cflags = config.build_settings['OTHER_CFLAGS'] || ''
-          cflags = cflags.gsub(/-G\s*/, '') if cflags.is_a?(String)
+          # Full replacement of OTHER_CFLAGS for RNZipArchive.
+          # We intentionally discard any existing flags because:
+          #   - RNZipArchive's podspec sets problematic flags including -G
+          #   - The required flags are well-known (minizip compile definitions)
+          #   - $(inherited) ensures project-level flags are still included
           config.build_settings['OTHER_CFLAGS'] = '$(inherited) -DHAVE_INTTYPES_H -DHAVE_PKCRYPT -DHAVE_STDINT_H -DHAVE_WZAES -DHAVE_ZLIB -DMZ_ZIP_NO_SIGNING'
         end
         
-        # Also fix the source build phases to remove -G
+        # Surgical removal of -G from per-file COMPILER_FLAGS.
+        # Unlike OTHER_CFLAGS above, per-file flags may contain legitimate
+        # settings we want to preserve, so we only strip the problematic -G flag.
         target.build_phases.each do |phase|
-          if phase.respond_to?(:compiler_flags)
-            phase.files.each do |file|
-              if file.settings && file.settings['COMPILER_FLAGS']
-                flags = file.settings['COMPILER_FLAGS']
-                file.settings['COMPILER_FLAGS'] = flags.gsub(/-G\s*/, '') if flags.is_a?(String)
-              end
-            end
+          next unless phase.respond_to?(:files)
+          phase.files.each do |file|
+            next unless file.settings && file.settings['COMPILER_FLAGS']
+            flags = file.settings['COMPILER_FLAGS']
+            file.settings['COMPILER_FLAGS'] = flags.gsub(/-G\s*/, '') if flags.is_a?(String)
           end
         end
       end
