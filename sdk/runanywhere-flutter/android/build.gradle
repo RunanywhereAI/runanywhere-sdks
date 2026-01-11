@@ -9,10 +9,10 @@
 //   - testLocal = false: Download from GitHub releases (for production)
 //
 // Local mode setup:
-//   1. Build locally: cd ../../runanywhere-core/scripts/android && ./build.sh
+//   1. Build locally: cd ../../native/scripts/android && ./build.sh
 //   2. Copy: cp -R build/android/arm64-v8a path/to/flutter-sdk/android/src/main/jniLibs/
 //
-// Remote mode: Binaries are automatically downloaded from runanywhere-binaries releases
+// Remote mode: Binaries are automatically downloaded from runanywhere-sdks releases
 //
 // Expected structure:
 //   android/src/main/jniLibs/
@@ -170,7 +170,7 @@ task downloadNativeLibs {
                     ⚠️  Native libraries not found in src/main/jniLibs/!
 
                     For local mode, please build and copy the libraries:
-                      1. cd ../../runanywhere-core/scripts/android && ./build.sh
+                      1. cd ../../native/scripts/android && ./build.sh
                       2. Copy the .so files to android/src/main/jniLibs/
 
                     Or switch to remote mode by editing binary_config.gradle:

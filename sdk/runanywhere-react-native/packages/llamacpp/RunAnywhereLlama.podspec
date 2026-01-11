@@ -8,10 +8,10 @@ package = JSON.parse(File.read(File.join(__dir__, "package.json")))
 LLAMACPP_VERSION = "0.1.4"
 
 # =============================================================================
-# Binary Source - RABackendLlamaCPP from runanywhere-binaries
+# Binary Source - RABackendLlamaCPP from runanywhere-sdks
 # =============================================================================
 LLAMACPP_GITHUB_ORG = "RunanywhereAI"
-LLAMACPP_REPO = "runanywhere-binaries"
+LLAMACPP_REPO = "runanywhere-sdks"
 
 # =============================================================================
 # testLocal Toggle
@@ -32,7 +32,7 @@ Pod::Spec.new do |s|
 
   # =============================================================================
   # Llama Backend - RABackendLlamaCPP
-  # Downloads from runanywhere-binaries (NOT runanywhere-sdks)
+  # Downloads from runanywhere-sdks (NOT runanywhere-sdks)
   # =============================================================================
   if LLAMACPP_TEST_LOCAL
     puts "[RunAnywhereLlama] Using LOCAL RABackendLlamaCPP from ios/Frameworks/"
@@ -59,7 +59,7 @@ Pod::Spec.new do |s|
       mkdir -p "$FRAMEWORK_DIR"
       rm -rf "$FRAMEWORK_DIR/RABackendLLAMACPP.xcframework"
 
-      # Download from runanywhere-binaries
+      # Download from runanywhere-sdks
       DOWNLOAD_URL="https://github.com/#{LLAMACPP_GITHUB_ORG}/#{LLAMACPP_REPO}/releases/download/core-v$VERSION/RABackendLlamaCPP-ios-v$VERSION.zip"
       ZIP_FILE="/tmp/RABackendLlamaCPP.zip"
 

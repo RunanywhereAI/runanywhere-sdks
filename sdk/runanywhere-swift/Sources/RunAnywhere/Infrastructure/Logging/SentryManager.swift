@@ -31,7 +31,10 @@ public final class SentryManager: @unchecked Sendable {
 
         guard let configuredDSN = sentryDSN,
               configuredDSN != "YOUR_SENTRY_DSN_HERE" && !configuredDSN.isEmpty else {
-            SDKLogger.shared.debug("Sentry DSN not configured. Crash reporting disabled.")
+            // NOTE: Do NOT use SDKLogger here - it would cause a deadlock during Logging.shared initialization
+            #if DEBUG
+            print("🔍 [Sentry] DSN not configured. Crash reporting disabled.")
+            #endif
             return
         }
 

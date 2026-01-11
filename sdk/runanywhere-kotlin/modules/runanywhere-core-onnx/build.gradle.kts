@@ -201,7 +201,7 @@ tasks.register("downloadJniLibs") {
 
     val outputDir = file("build/jniLibs")
     val tempDir = file("${layout.buildDirectory.get()}/jni-temp")
-    val releaseBaseUrl = "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v$coreVersion"
+    val releaseBaseUrl = "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/core-v$coreVersion"
     val packageName = "RABackendONNX-android-v$coreVersion.zip"
 
     outputs.dir(outputDir)

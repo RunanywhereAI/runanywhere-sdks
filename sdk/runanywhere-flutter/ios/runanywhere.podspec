@@ -10,10 +10,10 @@
 #   - TEST_LOCAL = false: Download from GitHub releases (for production)
 #
 # Local mode setup:
-#   1. Build locally: cd ../../runanywhere-core/scripts/ios && ./build.sh --all
+#   1. Build locally: cd ../../native/scripts/ios && ./build.sh --all
 #   2. Copy: cp -R ../dist/RunAnywhereCore.xcframework path/to/flutter-sdk/ios/Frameworks/
 #
-# Remote mode: Binaries are automatically downloaded from runanywhere-binaries releases
+# Remote mode: Binaries are automatically downloaded from runanywhere-sdks releases
 #
 
 # Load binary configuration
@@ -29,7 +29,7 @@ speech-to-text (STT), text-to-speech (TTS), language models (LLM), voice activit
 detection (VAD), and embeddings.
 
 Pre-built binaries are downloaded from:
-https://github.com/RunanywhereAI/runanywhere-binaries
+https://github.com/RunanywhereAI/runanywhere-sdks
                        DESC
   s.homepage         = 'https://runanywhere.ai'
   s.license          = { :type => 'MIT', :file => '../LICENSE' }
@@ -143,7 +143,7 @@ https://github.com/RunanywhereAI/runanywhere-binaries
         echo "⚠️  RunAnywhereCore.xcframework not found!"
         echo ""
         echo "For local mode, please build and copy the xcframework:"
-        echo "  1. cd ../../runanywhere-core/scripts/ios && ./build.sh --all"
+        echo "  1. cd ../../native/scripts/ios && ./build.sh --all"
         echo "  2. cp -R ../dist/RunAnywhereCore.xcframework path/to/flutter-sdk/ios/Frameworks/"
         echo ""
         echo "Or switch to remote mode by editing binary_config.rb:"

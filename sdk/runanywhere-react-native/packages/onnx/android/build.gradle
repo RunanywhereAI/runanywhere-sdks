@@ -28,15 +28,15 @@ def getExtOrIntegerDefault(name) {
 
 // =============================================================================
 // Version Constants (MUST match Swift Package.swift and iOS Podspec)
-// RABackendONNX from runanywhere-binaries
+// RABackendONNX from runanywhere-sdks
 // =============================================================================
 def coreVersion = "0.1.4"
 
 // =============================================================================
-// Binary Source - RABackendONNX from runanywhere-binaries
+// Binary Source - RABackendONNX from runanywhere-sdks
 // =============================================================================
 def githubOrg = "RunanywhereAI"
-def coreRepo = "runanywhere-binaries"
+def coreRepo = "runanywhere-sdks"
 
 // =============================================================================
 // testLocal Toggle
@@ -163,7 +163,7 @@ task downloadNativeLibs {
         jniLibsDir.mkdirs()
 
         // =============================================================================
-        // Download RABackendONNX from runanywhere-binaries
+        // Download RABackendONNX from runanywhere-sdks
         // =============================================================================
         def onnxUrl = "https://github.com/${githubOrg}/${coreRepo}/releases/download/core-v${coreVersion}/RABackendONNX-android-v${coreVersion}.zip"
         def onnxZip = file("${downloadedLibsDir}/RABackendONNX.zip")
