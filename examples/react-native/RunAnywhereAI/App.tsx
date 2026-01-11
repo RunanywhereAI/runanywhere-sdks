@@ -183,7 +183,7 @@ const App: React.FC = () => {
       memoryRequirement: 65_000_000,
     });
 
-    console.log('[App] All models registered');
+    console.warn('[App] All models registered');
   };
 
   /**

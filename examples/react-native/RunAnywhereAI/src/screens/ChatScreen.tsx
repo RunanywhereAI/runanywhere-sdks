@@ -128,7 +128,7 @@ export const ChatScreen: React.FC = () => {
         (m: SDKModelInfo) => m.category === ModelCategory.Language
       );
       setAvailableModels(llmModels);
-      console.log(
+      console.warn(
         '[ChatScreen] Available LLM models:',
         llmModels.map(
           (m: SDKModelInfo) =>
@@ -136,7 +136,7 @@ export const ChatScreen: React.FC = () => {
         )
       );
     } catch (error) {
-      console.log('[ChatScreen] Error loading models:', error);
+      console.warn('[ChatScreen] Error loading models:', error);
     }
   };
 
@@ -146,7 +146,7 @@ export const ChatScreen: React.FC = () => {
   const checkModelStatus = async () => {
     try {
       const isLoaded = await RunAnywhere.isModelLoaded();
-      console.log('[ChatScreen] Text model loaded:', isLoaded);
+      console.warn('[ChatScreen] Text model loaded:', isLoaded);
       if (isLoaded) {
         setCurrentModel({
           id: 'loaded-model',
@@ -160,7 +160,7 @@ export const ChatScreen: React.FC = () => {
         });
       }
     } catch (error) {
-      console.log('[ChatScreen] Error checking model status:', error);
+      console.warn('[ChatScreen] Error checking model status:', error);
     }
   };
 
@@ -187,7 +187,7 @@ export const ChatScreen: React.FC = () => {
   const loadModel = async (model: SDKModelInfo) => {
     try {
       setIsModelLoading(true);
-      console.log(
+      console.warn(
         `[ChatScreen] Loading model: ${model.id} from ${model.localPath}`
       );
 
@@ -212,7 +212,7 @@ export const ChatScreen: React.FC = () => {
           isAvailable: true,
           supportsThinking: false,
         });
-        console.log('[ChatScreen] Model loaded successfully');
+        console.warn('[ChatScreen] Model loaded successfully');
       } else {
         const lastError = await RunAnywhere.getLastError();
         Alert.alert(
@@ -253,7 +253,7 @@ export const ChatScreen: React.FC = () => {
     }, 100);
 
     try {
-      console.log('[ChatScreen] Generating response for:', prompt);
+      console.warn('[ChatScreen] Generating response for:', prompt);
 
       // Use the SDK generate method
       const result = await RunAnywhere.generate(prompt, {
@@ -261,7 +261,7 @@ export const ChatScreen: React.FC = () => {
         temperature: 0.7,
       });
 
-      console.log('[ChatScreen] Generation result:', result);
+      console.warn('[ChatScreen] Generation result:', result);
 
       if (result.text?.includes('error')) {
         throw new Error(result.text);

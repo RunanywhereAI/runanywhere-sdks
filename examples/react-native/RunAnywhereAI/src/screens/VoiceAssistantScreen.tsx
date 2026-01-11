@@ -108,14 +108,14 @@ export const VoiceAssistantScreen: React.FC = () => {
     try {
       const models = await RunAnywhere.getAvailableModels();
       setAvailableModels(models);
-      console.log(
+      console.warn(
         '[VoiceAssistant] Available models:',
         models.map(
           (m) => `${m.id}(${m.isDownloaded ? 'downloaded' : 'not downloaded'})`
         )
       );
     } catch (error) {
-      console.log('[VoiceAssistant] Error loading models:', error);
+      console.warn('[VoiceAssistant] Error loading models:', error);
     }
   };
 
@@ -128,7 +128,7 @@ export const VoiceAssistantScreen: React.FC = () => {
       const llmLoaded = await RunAnywhere.isModelLoaded();
       const ttsLoaded = await RunAnywhere.isTTSModelLoaded();
 
-      console.log(
+      console.warn(
         '[VoiceAssistant] Model status - STT:',
         sttLoaded,
         'LLM:',
@@ -156,7 +156,7 @@ export const VoiceAssistantScreen: React.FC = () => {
         } as ModelInfo);
       }
     } catch (error) {
-      console.log('[VoiceAssistant] Error checking model status:', error);
+      console.warn('[VoiceAssistant] Error checking model status:', error);
     }
   };
 
@@ -193,7 +193,7 @@ export const VoiceAssistantScreen: React.FC = () => {
       setShowModelSelection(false);
 
       try {
-        console.log(
+        console.warn(
           `[VoiceAssistant] Loading ${modelSelectionType} model:`,
           model.id,
           model.localPath
@@ -272,13 +272,13 @@ export const VoiceAssistantScreen: React.FC = () => {
 
       try {
         // Step 1: Stop recording and get audio file
-        console.log('[VoiceAssistant] Stopping recording...');
+        console.warn('[VoiceAssistant] Stopping recording...');
         const { uri: audioPath } = await AudioService.stopRecording();
-        console.log('[VoiceAssistant] Recording stopped:', audioPath);
+        console.warn('[VoiceAssistant] Recording stopped:', audioPath);
 
         // Step 2: Transcribe audio using STT
         setStatus(VoicePipelineStatus.Processing);
-        console.log('[VoiceAssistant] Transcribing audio...');
+        console.warn('[VoiceAssistant] Transcribing audio...');
 
         const sttResult = await RunAnywhere.transcribeFile(audioPath, {
           language: 'en',
@@ -286,7 +286,7 @@ export const VoiceAssistantScreen: React.FC = () => {
         const userText = sttResult.text?.trim() || '';
 
         if (!userText) {
-          console.log('[VoiceAssistant] No speech detected');
+          console.warn('[VoiceAssistant] No speech detected');
           Alert.alert('No Speech', 'No speech was detected. Please try again.');
           setStatus(VoicePipelineStatus.Idle);
           return;
@@ -301,11 +301,11 @@ export const VoiceAssistantScreen: React.FC = () => {
         };
         setConversation((prev) => [...prev, userEntry]);
         setCurrentTranscript('');
-        console.log('[VoiceAssistant] User said:', userText);
+        console.warn('[VoiceAssistant] User said:', userText);
 
         // Step 3: Generate LLM response
         setStatus(VoicePipelineStatus.Thinking);
-        console.log('[VoiceAssistant] Generating response...');
+        console.warn('[VoiceAssistant] Generating response...');
 
         let responseText: string;
         try {
@@ -327,11 +327,11 @@ export const VoiceAssistantScreen: React.FC = () => {
           timestamp: new Date(),
         };
         setConversation((prev) => [...prev, assistantEntry]);
-        console.log('[VoiceAssistant] Assistant:', responseText);
+        console.warn('[VoiceAssistant] Assistant:', responseText);
 
         // Step 4: Synthesize TTS and play audio
         setStatus(VoicePipelineStatus.Speaking);
-        console.log('[VoiceAssistant] Synthesizing speech...');
+        console.warn('[VoiceAssistant] Synthesizing speech...');
 
         try {
           const ttsResult = await RunAnywhere.synthesize(responseText);
@@ -339,7 +339,7 @@ export const VoiceAssistantScreen: React.FC = () => {
           if (ttsResult.audio) {
             // Play the synthesized audio
             // The audio is base64 encoded, need to save to file and play
-            console.log('[VoiceAssistant] Playing TTS audio...');
+            console.warn('[VoiceAssistant] Playing TTS audio...');
             // For now, estimate duration based on text length
             // TODO: Play actual audio using AudioService
             const estimatedDuration = Math.min(responseText.length * 50, 5000);
@@ -353,7 +353,7 @@ export const VoiceAssistantScreen: React.FC = () => {
         }
 
         setStatus(VoicePipelineStatus.Idle);
-        console.log('[VoiceAssistant] Pipeline complete');
+        console.warn('[VoiceAssistant] Pipeline complete');
       } catch (error) {
         console.error('[VoiceAssistant] Pipeline error:', error);
         Alert.alert('Error', `Pipeline failed: ${error}`);
@@ -382,7 +382,7 @@ export const VoiceAssistantScreen: React.FC = () => {
         }
 
         // Start recording
-        console.log('[VoiceAssistant] Starting recording...');
+        console.warn('[VoiceAssistant] Starting recording...');
         await AudioService.startRecording({
           onProgress: (currentPositionMs, metering) => {
             setRecordingDuration(Math.floor(currentPositionMs / 1000));
@@ -393,7 +393,7 @@ export const VoiceAssistantScreen: React.FC = () => {
                 Math.min(1, (metering + 60) / 60)
               );
               // Could use this for audio level visualization
-              console.log(
+              console.warn(
                 '[VoiceAssistant] Audio level:',
                 normalizedLevel.toFixed(2)
               );
@@ -404,12 +404,12 @@ export const VoiceAssistantScreen: React.FC = () => {
         setIsRecording(true);
         setStatus(VoicePipelineStatus.Listening);
         setCurrentTranscript('');
-        console.log('[VoiceAssistant] Recording started');
+        console.warn('[VoiceAssistant] Recording started');
 
         // Auto-stop after 30 seconds
         timerRef.current = setTimeout(async () => {
           if (isRecording) {
-            console.log('[VoiceAssistant] Auto-stopping after 30 seconds');
+            console.warn('[VoiceAssistant] Auto-stopping after 30 seconds');
             await handleToggleRecording();
           }
         }, 30000) as unknown as ReturnType<typeof setInterval>;
