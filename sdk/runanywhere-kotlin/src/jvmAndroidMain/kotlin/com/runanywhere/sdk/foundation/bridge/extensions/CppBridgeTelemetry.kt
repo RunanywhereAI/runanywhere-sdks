@@ -34,7 +34,6 @@ import java.util.concurrent.Executors
  * - Callbacks from C++ are thread-safe
  */
 object CppBridgeTelemetry {
-
     /**
      * HTTP method constants matching C++ RAC_HTTP_METHOD_* values.
      */
@@ -48,14 +47,15 @@ object CppBridgeTelemetry {
         /**
          * Get the string representation of an HTTP method.
          */
-        fun getName(method: Int): String = when (method) {
-            GET -> "GET"
-            POST -> "POST"
-            PUT -> "PUT"
-            DELETE -> "DELETE"
-            PATCH -> "PATCH"
-            else -> "GET"
-        }
+        fun getName(method: Int): String =
+            when (method) {
+                GET -> "GET"
+                POST -> "POST"
+                PUT -> "PUT"
+                DELETE -> "DELETE"
+                PATCH -> "PATCH"
+                else -> "GET"
+            }
     }
 
     /**
@@ -70,7 +70,9 @@ object CppBridgeTelemetry {
         const val SERVER_ERROR_MAX = 599
 
         fun isSuccess(statusCode: Int): Boolean = statusCode in SUCCESS_MIN..SUCCESS_MAX
+
         fun isClientError(statusCode: Int): Boolean = statusCode in CLIENT_ERROR_MIN..CLIENT_ERROR_MAX
+
         fun isServerError(statusCode: Int): Boolean = statusCode in SERVER_ERROR_MIN..SERVER_ERROR_MAX
     }
 
@@ -98,11 +100,12 @@ object CppBridgeTelemetry {
      * Background executor for HTTP requests.
      * Using a cached thread pool to handle concurrent telemetry requests efficiently.
      */
-    private val httpExecutor = Executors.newCachedThreadPool { runnable ->
-        Thread(runnable, "runanywhere-telemetry").apply {
-            isDaemon = true
+    private val httpExecutor =
+        Executors.newCachedThreadPool { runnable ->
+            Thread(runnable, "runanywhere-telemetry").apply {
+                isDaemon = true
+            }
         }
-    }
 
     /**
      * Optional interceptor for customizing HTTP requests.
@@ -179,7 +182,7 @@ object CppBridgeTelemetry {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Registering telemetry callbacks..."
+                "Registering telemetry callbacks...",
             )
 
             isRegistered = true
@@ -201,53 +204,55 @@ object CppBridgeTelemetry {
         deviceId: String,
         deviceModel: String,
         osVersion: String,
-        sdkVersion: String
+        sdkVersion: String,
     ) {
         synchronized(lock) {
             // Store environment for HTTP base URL resolution
             currentEnvironment = environment
 
             // Create telemetry manager
-            telemetryManagerHandle = com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racTelemetryManagerCreate(
-                environment,
-                deviceId,
-                "android",
-                sdkVersion
-            )
+            telemetryManagerHandle =
+                com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racTelemetryManagerCreate(
+                    environment,
+                    deviceId,
+                    "android",
+                    sdkVersion,
+                )
 
             if (telemetryManagerHandle != 0L) {
                 // Set device info
                 com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racTelemetryManagerSetDeviceInfo(
                     telemetryManagerHandle,
                     deviceModel,
-                    osVersion
+                    osVersion,
                 )
 
                 // Set HTTP callback
-                val httpCallback = object {
-                    @Suppress("unused")
-                    fun onHttpRequest(endpoint: String, body: String, bodyLength: Int, requiresAuth: Boolean) {
-                        // Execute HTTP request on background thread
-                        httpExecutor.execute {
-                            performTelemetryHttp(endpoint, body, requiresAuth)
+                val httpCallback =
+                    object {
+                        @Suppress("unused")
+                        fun onHttpRequest(endpoint: String, body: String, bodyLength: Int, requiresAuth: Boolean) {
+                            // Execute HTTP request on background thread
+                            httpExecutor.execute {
+                                performTelemetryHttp(endpoint, body, requiresAuth)
+                            }
                         }
                     }
-                }
                 com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racTelemetryManagerSetHttpCallback(
                     telemetryManagerHandle,
-                    httpCallback
+                    httpCallback,
                 )
 
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.INFO,
                     TAG,
-                    "Telemetry manager initialized (handle=$telemetryManagerHandle, env=$environment)"
+                    "Telemetry manager initialized (handle=$telemetryManagerHandle, env=$environment)",
                 )
             } else {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Failed to create telemetry manager"
+                    "Failed to create telemetry manager",
                 )
             }
         }
@@ -297,7 +302,7 @@ object CppBridgeTelemetry {
 
     /**
      * Get the effective base URL for the current environment.
-     * 
+     *
      * Priority by environment:
      * - DEVELOPMENT (env=0): Always use Supabase URL from C++ dev config (ignores _baseUrl)
      * - STAGING/PRODUCTION: Use _baseUrl if available, otherwise environment defaults
@@ -306,7 +311,7 @@ object CppBridgeTelemetry {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "🔍 getEffectiveBaseUrl: env=$environment, _baseUrl=$_baseUrl"
+            "🔍 getEffectiveBaseUrl: env=$environment, _baseUrl=$_baseUrl",
         )
 
         // DEVELOPMENT mode: Always use Supabase from C++ dev config, ignore any passed baseUrl
@@ -315,34 +320,36 @@ object CppBridgeTelemetry {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "🔍 Attempting to get Supabase URL from C++ dev config..."
+                "🔍 Attempting to get Supabase URL from C++ dev config...",
             )
             try {
-                val supabaseUrl = com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racDevConfigGetSupabaseUrl()
+                val supabaseUrl =
+                    com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+                        .racDevConfigGetSupabaseUrl()
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "C++ dev config returned supabaseUrl: '$supabaseUrl'"
+                    "C++ dev config returned supabaseUrl: '$supabaseUrl'",
                 )
                 if (!supabaseUrl.isNullOrEmpty()) {
                     CppBridgePlatformAdapter.logCallback(
                         CppBridgePlatformAdapter.LogLevel.INFO,
                         TAG,
-                        "✅ Using Supabase URL from C++ dev config: $supabaseUrl"
+                        "✅ Using Supabase URL from C++ dev config: $supabaseUrl",
                     )
                     return supabaseUrl
                 } else {
                     CppBridgePlatformAdapter.logCallback(
                         CppBridgePlatformAdapter.LogLevel.WARN,
                         TAG,
-                        "⚠️ C++ dev config returned null/empty Supabase URL"
+                        "⚠️ C++ dev config returned null/empty Supabase URL",
                     )
                 }
             } catch (e: Exception) {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "❌ Failed to get Supabase URL from dev config: ${e.message}"
+                    "❌ Failed to get Supabase URL from dev config: ${e.message}",
                 )
             }
         } else {
@@ -351,7 +358,7 @@ object CppBridgeTelemetry {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Using explicitly configured _baseUrl for env=$environment: $it"
+                    "Using explicitly configured _baseUrl for env=$environment: $it",
                 )
                 return it
             }
@@ -366,7 +373,7 @@ object CppBridgeTelemetry {
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
                     "⚠️ Development mode but Supabase URL not configured in C++ dev_config. " +
-                    "Please fill in development_config.cpp with your Supabase credentials."
+                        "Please fill in development_config.cpp with your Supabase credentials.",
                 )
                 "" // Return empty to indicate not configured
             }
@@ -374,7 +381,7 @@ object CppBridgeTelemetry {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Using staging API URL"
+                    "Using staging API URL",
                 )
                 "https://staging-api.runanywhere.ai" // STAGING
             }
@@ -382,7 +389,7 @@ object CppBridgeTelemetry {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Using production API URL"
+                    "Using production API URL",
                 )
                 "https://api.runanywhere.ai" // PRODUCTION
             }
@@ -393,7 +400,7 @@ object CppBridgeTelemetry {
     /**
      * Current SDK environment (0=DEV, 1=STAGING, 2=PRODUCTION).
      * Exposed for CppBridgeDevice to determine which URL and auth to use.
-     * 
+     *
      * IMPORTANT: This MUST be set early in initialization (before device registration)
      * so that CppBridgeDevice.isDeviceRegisteredCallback() can determine the correct
      * behavior for production/staging modes.
@@ -401,7 +408,7 @@ object CppBridgeTelemetry {
     @Volatile
     var currentEnvironment: Int = 0
         private set
-    
+
     /**
      * Set the current environment early in initialization.
      * This must be called before CppBridgeDevice.register() so that device registration
@@ -412,7 +419,9 @@ object CppBridgeTelemetry {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Environment set to: $environment (${when(environment) { 0 -> "DEVELOPMENT" 1 -> "STAGING" else -> "PRODUCTION" }})"
+            "Environment set to: $environment (${when (environment) {
+                0 -> "DEVELOPMENT" 1 -> "STAGING" else -> "PRODUCTION"
+            }})",
         )
     }
 
@@ -434,9 +443,11 @@ object CppBridgeTelemetry {
      */
     private fun getSupabaseApiKey(): String? {
         cachedApiKey?.let { return it }
-        
+
         return try {
-            val apiKey = com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racDevConfigGetSupabaseKey()
+            val apiKey =
+                com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+                    .racDevConfigGetSupabaseKey()
             if (!apiKey.isNullOrEmpty()) {
                 cachedApiKey = apiKey
                 apiKey
@@ -447,7 +458,7 @@ object CppBridgeTelemetry {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Failed to get Supabase API key from dev config: ${e.message}"
+                "Failed to get Supabase API key from dev config: ${e.message}",
             )
             null
         }
@@ -460,33 +471,34 @@ object CppBridgeTelemetry {
         try {
             // Build full URL - endpoint is relative path like "/api/v1/sdk/telemetry"
             val effectiveBaseUrl = getEffectiveBaseUrl(currentEnvironment)
-            
+
             // Check if base URL is configured
             if (effectiveBaseUrl.isEmpty()) {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Telemetry base URL not configured, skipping HTTP request to $endpoint. Events will be queued."
+                    "Telemetry base URL not configured, skipping HTTP request to $endpoint. Events will be queued.",
                 )
                 return
             }
-            
+
             val fullUrl = "$effectiveBaseUrl$endpoint"
 
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "📤 Telemetry HTTP POST to: $fullUrl"
+                "📤 Telemetry HTTP POST to: $fullUrl",
             )
 
             // Build headers
-            val headers = mutableMapOf(
-                "Content-Type" to "application/json",
-                "Accept" to "application/json",
-                "X-SDK-Client" to "RunAnywhereSDK",
-                "X-SDK-Version" to "1.0.0",
-                "X-Platform" to "Android"
-            )
+            val headers =
+                mutableMapOf(
+                    "Content-Type" to "application/json",
+                    "Accept" to "application/json",
+                    "X-SDK-Client" to "RunAnywhereSDK",
+                    "X-SDK-Version" to "1.0.0",
+                    "X-Platform" to "Android",
+                )
 
             // Environment 0=DEV, 1=STAGING, 2=PRODUCTION
             // In production/staging: Use Authorization: Bearer {apiKey}
@@ -500,13 +512,13 @@ object CppBridgeTelemetry {
                     CppBridgePlatformAdapter.logCallback(
                         CppBridgePlatformAdapter.LogLevel.DEBUG,
                         TAG,
-                        "Added Supabase apikey header (dev mode)"
+                        "Added Supabase apikey header (dev mode)",
                     )
                 } else {
                     CppBridgePlatformAdapter.logCallback(
                         CppBridgePlatformAdapter.LogLevel.WARN,
                         TAG,
-                        "⚠️ No Supabase API key available - request may fail!"
+                        "⚠️ No Supabase API key available - request may fail!",
                     )
                 }
             } else {
@@ -519,7 +531,7 @@ object CppBridgeTelemetry {
                     CppBridgePlatformAdapter.logCallback(
                         CppBridgePlatformAdapter.LogLevel.DEBUG,
                         TAG,
-                        "Added Authorization Bearer header with JWT (prod/staging mode)"
+                        "Added Authorization Bearer header with JWT (prod/staging mode)",
                     )
                 } else {
                     // Fallback to API key if no JWT available
@@ -530,13 +542,13 @@ object CppBridgeTelemetry {
                         CppBridgePlatformAdapter.logCallback(
                             CppBridgePlatformAdapter.LogLevel.WARN,
                             TAG,
-                            "⚠️ No JWT token - using API key directly (may fail if backend requires JWT)"
+                            "⚠️ No JWT token - using API key directly (may fail if backend requires JWT)",
                         )
                     } else {
                         CppBridgePlatformAdapter.logCallback(
                             CppBridgePlatformAdapter.LogLevel.WARN,
                             TAG,
-                            "⚠️ No access token or API key available - request may fail!"
+                            "⚠️ No access token or API key available - request may fail!",
                         )
                     }
                 }
@@ -552,7 +564,7 @@ object CppBridgeTelemetry {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Request body: $bodyPreview"
+                "Request body: $bodyPreview",
             )
 
             val (statusCode, response) = sendTelemetry(fullUrl, HttpMethod.POST, headers, body)
@@ -561,29 +573,28 @@ object CppBridgeTelemetry {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.INFO,
                     TAG,
-                    "✅ Telemetry sent successfully (status=$statusCode)"
+                    "✅ Telemetry sent successfully (status=$statusCode)",
                 )
                 if (response != null) {
                     CppBridgePlatformAdapter.logCallback(
                         CppBridgePlatformAdapter.LogLevel.DEBUG,
                         TAG,
-                        "Response: $response"
+                        "Response: $response",
                     )
                 }
             } else {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "❌ Telemetry HTTP failed: status=$statusCode, response=$response"
+                    "❌ Telemetry HTTP failed: status=$statusCode, response=$response",
                 )
             }
         } catch (e: Exception) {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "❌ Telemetry HTTP error: ${e.message}"
+                "❌ Telemetry HTTP error: ${e.message}, cause: ${e.cause?.message}",
             )
-            e.printStackTrace()
         }
     }
 
@@ -593,7 +604,8 @@ object CppBridgeTelemetry {
     fun flush() {
         synchronized(lock) {
             if (telemetryManagerHandle != 0L) {
-                com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racTelemetryManagerFlush(telemetryManagerHandle)
+                com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+                    .racTelemetryManagerFlush(telemetryManagerHandle)
             }
         }
     }
@@ -634,13 +646,13 @@ object CppBridgeTelemetry {
         method: Int,
         headers: String?,
         body: String?,
-        completionCallbackId: Long
+        completionCallbackId: Long,
     ) {
         // Log the request for debugging
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "HTTP ${HttpMethod.getName(method)} request to: $url"
+            "HTTP ${HttpMethod.getName(method)} request to: $url",
         )
 
         // Notify listener of request start
@@ -650,7 +662,7 @@ object CppBridgeTelemetry {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in telemetry listener onRequestStart: ${e.message}"
+                "Error in telemetry listener onRequestStart: ${e.message}",
             )
         }
 
@@ -662,7 +674,7 @@ object CppBridgeTelemetry {
                 method = method,
                 headersJson = headers,
                 body = body,
-                completionCallbackId = completionCallbackId
+                completionCallbackId = completionCallbackId,
             )
         }
     }
@@ -670,13 +682,14 @@ object CppBridgeTelemetry {
     /**
      * Execute an HTTP request synchronously.
      */
+    @Suppress("UNUSED_PARAMETER")
     private fun executeHttpRequest(
         requestId: String,
         url: String,
         method: Int,
         headersJson: String?,
         body: String?,
-        completionCallbackId: Long
+        completionCallbackId: Long, // Reserved for future async callback support
     ) {
         var connection: HttpURLConnection? = null
         var statusCode = -1
@@ -724,11 +737,12 @@ object CppBridgeTelemetry {
             statusCode = connection.responseCode
 
             // Read response body
-            val inputStream = if (HttpStatus.isSuccess(statusCode)) {
-                connection.inputStream
-            } else {
-                connection.errorStream
-            }
+            val inputStream =
+                if (HttpStatus.isSuccess(statusCode)) {
+                    connection.inputStream
+                } else {
+                    connection.errorStream
+                }
 
             if (inputStream != null) {
                 BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8)).use { reader ->
@@ -739,15 +753,14 @@ object CppBridgeTelemetry {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "HTTP response: $statusCode"
+                "HTTP response: $statusCode",
             )
-
         } catch (e: Exception) {
             errorMessage = e.message ?: "Unknown error"
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "HTTP request failed: $errorMessage"
+                "HTTP request failed: $errorMessage",
             )
         } finally {
             connection?.disconnect()
@@ -761,7 +774,7 @@ object CppBridgeTelemetry {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in telemetry listener onRequestComplete: ${e.message}"
+                "Error in telemetry listener onRequestComplete: ${e.message}",
             )
         }
 
@@ -770,7 +783,7 @@ object CppBridgeTelemetry {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "HTTP request completed with status: $statusCode"
+            "HTTP request completed with status: $statusCode",
         )
     }
 
@@ -809,10 +822,11 @@ object CppBridgeTelemetry {
                     }
                     '{', '[' -> depth++
                     '}', ']' -> depth--
-                    ',' -> if (depth == 0) {
-                        pairs.add(content.substring(start, i).trim())
-                        start = i + 1
-                    }
+                    ',' ->
+                        if (depth == 0) {
+                            pairs.add(content.substring(start, i).trim())
+                            start = i + 1
+                        }
                 }
             }
             pairs.add(content.substring(start).trim())
@@ -832,7 +846,7 @@ object CppBridgeTelemetry {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Failed to parse headers JSON: ${e.message}"
+                "Failed to parse headers JSON: ${e.message}",
             )
         }
     }
@@ -854,7 +868,8 @@ object CppBridgeTelemetry {
 
             // Destroy telemetry manager
             if (telemetryManagerHandle != 0L) {
-                com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racTelemetryManagerDestroy(telemetryManagerHandle)
+                com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+                    .racTelemetryManagerDestroy(telemetryManagerHandle)
                 telemetryManagerHandle = 0
             }
 
@@ -865,7 +880,7 @@ object CppBridgeTelemetry {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Telemetry unregistered"
+                "Telemetry unregistered",
             )
         }
     }
@@ -890,7 +905,7 @@ object CppBridgeTelemetry {
         url: String,
         method: Int = HttpMethod.POST,
         headers: Map<String, String>? = null,
-        body: String? = null
+        body: String? = null,
     ): Pair<Int, String?> {
         var connection: HttpURLConnection? = null
 
@@ -923,30 +938,30 @@ object CppBridgeTelemetry {
 
             val statusCode = connection.responseCode
 
-            val inputStream = if (HttpStatus.isSuccess(statusCode)) {
-                connection.inputStream
-            } else {
-                connection.errorStream
-            }
-
-            val responseBody = if (inputStream != null) {
-                BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8)).use { reader ->
-                    reader.readText()
+            val inputStream =
+                if (HttpStatus.isSuccess(statusCode)) {
+                    connection.inputStream
+                } else {
+                    connection.errorStream
                 }
-            } else {
-                null
-            }
+
+            val responseBody =
+                if (inputStream != null) {
+                    BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8)).use { reader ->
+                        reader.readText()
+                    }
+                } else {
+                    null
+                }
 
             return Pair(statusCode, responseBody)
-
         } catch (e: Exception) {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "sendTelemetry failed: ${e.message}"
+                "sendTelemetry failed: ${e.message}",
             )
             return Pair(-1, null)
-
         } finally {
             connection?.disconnect()
         }
@@ -965,11 +980,10 @@ object CppBridgeTelemetry {
     fun sendJsonPost(
         url: String,
         jsonBody: String,
-        additionalHeaders: Map<String, String>? = null
+        additionalHeaders: Map<String, String>? = null,
     ): Pair<Int, String?> {
         val headers = mutableMapOf("Content-Type" to "application/json")
         additionalHeaders?.let { headers.putAll(it) }
         return sendTelemetry(url, HttpMethod.POST, headers, jsonBody)
     }
 }
-

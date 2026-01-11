@@ -64,7 +64,7 @@ expect val RunAnywhere.isSTTModelLoadedSync: Boolean
  */
 expect suspend fun RunAnywhere.transcribeWithOptions(
     audioData: ByteArray,
-    options: STTOptions
+    options: STTOptions,
 ): STTOutput
 
 // MARK: - Streaming Transcription
@@ -80,7 +80,7 @@ expect suspend fun RunAnywhere.transcribeWithOptions(
 expect suspend fun RunAnywhere.transcribeStream(
     audioData: ByteArray,
     options: STTOptions = STTOptions(),
-    onPartialResult: (STTTranscriptionResult) -> Unit
+    onPartialResult: (STTTranscriptionResult) -> Unit,
 ): STTOutput
 
 /**

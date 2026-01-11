@@ -8,6 +8,7 @@
 package com.runanywhere.sdk.public.extensions
 
 import com.runanywhere.sdk.core.types.InferenceFramework
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStorage
@@ -23,6 +24,8 @@ import com.runanywhere.sdk.public.extensions.Storage.ModelStorageMetrics
 import com.runanywhere.sdk.public.extensions.Storage.StorageAvailability
 import com.runanywhere.sdk.public.extensions.Storage.StorageInfo
 import java.io.File
+
+private val storageLogger = SDKLogger.shared
 
 // Model storage quota in bytes (default 10GB)
 @Volatile
@@ -43,34 +46,37 @@ actual suspend fun RunAnywhere.storageInfo(): StorageInfo {
     val modelsSize = calculateDirectorySize(modelsDir)
     val appSupportSize = calculateDirectorySize(appSupportDir)
 
-    val appStorage = AppStorageInfo(
-        documentsSize = modelsSize,
-        cacheSize = cacheSize,
-        appSupportSize = appSupportSize,
-        totalSize = cacheSize + modelsSize + appSupportSize
-    )
+    val appStorage =
+        AppStorageInfo(
+            documentsSize = modelsSize,
+            cacheSize = cacheSize,
+            appSupportSize = appSupportSize,
+            totalSize = cacheSize + modelsSize + appSupportSize,
+        )
 
     // Get device storage info
     val totalSpace = baseDir.totalSpace
     val freeSpace = baseDir.freeSpace
     val usedSpace = totalSpace - freeSpace
 
-    val deviceStorage = DeviceStorageInfo(
-        totalSpace = totalSpace,
-        freeSpace = freeSpace,
-        usedSpace = usedSpace
-    )
+    val deviceStorage =
+        DeviceStorageInfo(
+            totalSpace = totalSpace,
+            freeSpace = freeSpace,
+            usedSpace = usedSpace,
+        )
 
     // Get downloaded models from C++ registry and convert to storage metrics
     val downloadedModels = CppBridgeModelRegistry.getDownloaded()
-    val modelMetrics = downloadedModels.mapNotNull { registryModel ->
-        convertToModelStorageMetrics(registryModel)
-    }
+    val modelMetrics =
+        downloadedModels.mapNotNull { registryModel ->
+            convertToModelStorageMetrics(registryModel)
+        }
 
     return StorageInfo(
         appStorage = appStorage,
         deviceStorage = deviceStorage,
-        models = modelMetrics
+        models = modelMetrics,
     )
 }
 
@@ -86,18 +92,19 @@ actual suspend fun RunAnywhere.checkStorageAvailability(requiredBytes: Long): St
     // Check if we're getting low on space (less than 1GB after this operation)
     val hasWarning = isAvailable && (availableSpace - requiredBytes) < 1024L * 1024 * 1024
 
-    val recommendation = when {
-        !isAvailable -> "Not enough storage space. Required: ${formatBytes(requiredBytes)}, Available: ${formatBytes(availableSpace)}"
-        hasWarning -> "Storage is running low. Consider clearing cache or removing unused models."
-        else -> null
-    }
+    val recommendation =
+        when {
+            !isAvailable -> "Not enough storage space. Required: ${formatBytes(requiredBytes)}, Available: ${formatBytes(availableSpace)}"
+            hasWarning -> "Storage is running low. Consider clearing cache or removing unused models."
+            else -> null
+        }
 
     return StorageAvailability(
         isAvailable = isAvailable,
         requiredSpace = requiredBytes,
         availableSpace = availableSpace,
         hasWarning = hasWarning,
-        recommendation = recommendation
+        recommendation = recommendation,
     )
 }
 
@@ -115,6 +122,8 @@ actual suspend fun RunAnywhere.clearCache() {
         throw SDKError.notInitialized("SDK not initialized")
     }
 
+    storageLogger.info("Clearing cache...")
+
     // Clear the storage cache namespace
     CppBridgeStorage.clear(CppBridgeStorage.StorageNamespace.INFERENCE_CACHE, CppBridgeStorage.StorageType.CACHE)
 
@@ -124,6 +133,8 @@ actual suspend fun RunAnywhere.clearCache() {
         cacheDir.deleteRecursively()
         cacheDir.mkdirs()
     }
+
+    storageLogger.info("Cache cleared")
 }
 
 actual suspend fun RunAnywhere.setMaxModelStorage(maxBytes: Long) {
@@ -151,11 +162,12 @@ private fun calculateDirectorySize(directory: File): Long {
 
     var size = 0L
     directory.listFiles()?.forEach { file ->
-        size += if (file.isDirectory) {
-            calculateDirectorySize(file)
-        } else {
-            file.length()
-        }
+        size +=
+            if (file.isDirectory) {
+                calculateDirectorySize(file)
+            } else {
+                file.length()
+            }
     }
     return size
 }
@@ -176,7 +188,7 @@ private fun formatBytes(bytes: Long): String {
  * Calculates actual size on disk from the model's local path.
  */
 private fun convertToModelStorageMetrics(
-    registryModel: CppBridgeModelRegistry.ModelInfo
+    registryModel: CppBridgeModelRegistry.ModelInfo,
 ): ModelStorageMetrics? {
     val localPath = registryModel.localPath ?: return null
 
@@ -185,56 +197,60 @@ private fun convertToModelStorageMetrics(
     val sizeOnDisk = calculateDirectorySize(modelFile)
 
     // Convert framework int to InferenceFramework enum
-    val framework = when (registryModel.framework) {
-        CppBridgeModelRegistry.Framework.ONNX -> InferenceFramework.ONNX
-        CppBridgeModelRegistry.Framework.LLAMACPP -> InferenceFramework.LLAMA_CPP
-        CppBridgeModelRegistry.Framework.FOUNDATION_MODELS -> InferenceFramework.FOUNDATION_MODELS
-        CppBridgeModelRegistry.Framework.SYSTEM_TTS -> InferenceFramework.SYSTEM_TTS
-        CppBridgeModelRegistry.Framework.FLUID_AUDIO -> InferenceFramework.FLUID_AUDIO
-        CppBridgeModelRegistry.Framework.BUILTIN -> InferenceFramework.BUILT_IN
-        CppBridgeModelRegistry.Framework.NONE -> InferenceFramework.NONE
-        else -> InferenceFramework.UNKNOWN
-    }
+    val framework =
+        when (registryModel.framework) {
+            CppBridgeModelRegistry.Framework.ONNX -> InferenceFramework.ONNX
+            CppBridgeModelRegistry.Framework.LLAMACPP -> InferenceFramework.LLAMA_CPP
+            CppBridgeModelRegistry.Framework.FOUNDATION_MODELS -> InferenceFramework.FOUNDATION_MODELS
+            CppBridgeModelRegistry.Framework.SYSTEM_TTS -> InferenceFramework.SYSTEM_TTS
+            CppBridgeModelRegistry.Framework.FLUID_AUDIO -> InferenceFramework.FLUID_AUDIO
+            CppBridgeModelRegistry.Framework.BUILTIN -> InferenceFramework.BUILT_IN
+            CppBridgeModelRegistry.Framework.NONE -> InferenceFramework.NONE
+            else -> InferenceFramework.UNKNOWN
+        }
 
     // Convert category int to ModelCategory enum
-    val category = when (registryModel.category) {
-        CppBridgeModelRegistry.ModelCategory.LANGUAGE -> ModelCategory.LANGUAGE
-        CppBridgeModelRegistry.ModelCategory.SPEECH_RECOGNITION -> ModelCategory.SPEECH_RECOGNITION
-        CppBridgeModelRegistry.ModelCategory.SPEECH_SYNTHESIS -> ModelCategory.SPEECH_SYNTHESIS
-        CppBridgeModelRegistry.ModelCategory.AUDIO -> ModelCategory.AUDIO
-        CppBridgeModelRegistry.ModelCategory.VISION -> ModelCategory.VISION
-        CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION -> ModelCategory.IMAGE_GENERATION
-        CppBridgeModelRegistry.ModelCategory.MULTIMODAL -> ModelCategory.MULTIMODAL
-        else -> ModelCategory.LANGUAGE
-    }
+    val category =
+        when (registryModel.category) {
+            CppBridgeModelRegistry.ModelCategory.LANGUAGE -> ModelCategory.LANGUAGE
+            CppBridgeModelRegistry.ModelCategory.SPEECH_RECOGNITION -> ModelCategory.SPEECH_RECOGNITION
+            CppBridgeModelRegistry.ModelCategory.SPEECH_SYNTHESIS -> ModelCategory.SPEECH_SYNTHESIS
+            CppBridgeModelRegistry.ModelCategory.AUDIO -> ModelCategory.AUDIO
+            CppBridgeModelRegistry.ModelCategory.VISION -> ModelCategory.VISION
+            CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION -> ModelCategory.IMAGE_GENERATION
+            CppBridgeModelRegistry.ModelCategory.MULTIMODAL -> ModelCategory.MULTIMODAL
+            else -> ModelCategory.LANGUAGE
+        }
 
     // Convert format int to ModelFormat enum
-    val format = when (registryModel.format) {
-        CppBridgeModelRegistry.ModelFormat.GGUF -> ModelFormat.GGUF
-        CppBridgeModelRegistry.ModelFormat.ONNX -> ModelFormat.ONNX
-        CppBridgeModelRegistry.ModelFormat.ORT -> ModelFormat.ORT
-        CppBridgeModelRegistry.ModelFormat.BIN -> ModelFormat.BIN
-        else -> ModelFormat.UNKNOWN
-    }
+    val format =
+        when (registryModel.format) {
+            CppBridgeModelRegistry.ModelFormat.GGUF -> ModelFormat.GGUF
+            CppBridgeModelRegistry.ModelFormat.ONNX -> ModelFormat.ONNX
+            CppBridgeModelRegistry.ModelFormat.ORT -> ModelFormat.ORT
+            CppBridgeModelRegistry.ModelFormat.BIN -> ModelFormat.BIN
+            else -> ModelFormat.UNKNOWN
+        }
 
     // Create public ModelInfo from registry model
-    val modelInfo = ModelInfo(
-        id = registryModel.modelId,
-        name = registryModel.name,
-        category = category,
-        format = format,
-        downloadURL = registryModel.downloadUrl,
-        localPath = localPath,
-        artifactType = ModelArtifactType.SingleFile(),
-        downloadSize = registryModel.downloadSize.takeIf { it > 0 },
-        framework = framework,
-        contextLength = registryModel.contextLength.takeIf { it > 0 },
-        supportsThinking = registryModel.supportsThinking,
-        description = registryModel.description
-    )
+    val modelInfo =
+        ModelInfo(
+            id = registryModel.modelId,
+            name = registryModel.name,
+            category = category,
+            format = format,
+            downloadURL = registryModel.downloadUrl,
+            localPath = localPath,
+            artifactType = ModelArtifactType.SingleFile(),
+            downloadSize = registryModel.downloadSize.takeIf { it > 0 },
+            framework = framework,
+            contextLength = registryModel.contextLength.takeIf { it > 0 },
+            supportsThinking = registryModel.supportsThinking,
+            description = registryModel.description,
+        )
 
     return ModelStorageMetrics(
         model = modelInfo,
-        sizeOnDisk = sizeOnDisk
+        sizeOnDisk = sizeOnDisk,
     )
 }

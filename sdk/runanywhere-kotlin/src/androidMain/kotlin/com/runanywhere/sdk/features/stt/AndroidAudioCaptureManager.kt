@@ -32,7 +32,7 @@ actual fun createAudioCaptureManager(): AudioCaptureManager = AndroidAudioCaptur
  * Matches iOS AudioCaptureManager behavior exactly.
  */
 class AndroidAudioCaptureManager : AudioCaptureManager {
-    private val logger = SDKLogger("AudioCapture")
+    private val logger = SDKLogger.stt
 
     private var audioRecord: AudioRecord? = null
 
@@ -149,7 +149,7 @@ class AndroidAudioCaptureManager : AudioCaptureManager {
             } catch (e: AudioCaptureError) {
                 throw e
             } catch (e: Exception) {
-                logger.error("Recording error: ${e.message}", e)
+                logger.error("Recording error: ${e.message}", throwable = e)
                 throw AudioCaptureError.RecordingFailed(e.message ?: "Unknown error")
             } finally {
                 stopRecordingInternal()

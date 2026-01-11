@@ -24,7 +24,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -272,7 +271,11 @@ class SpeechToTextViewModel : ViewModel() {
      * Called when a model has been loaded (e.g., by ModelSelectionViewModel)
      * This updates the UI state to reflect the loaded model
      */
-    fun onModelLoaded(modelName: String, modelId: String, framework: InferenceFramework?) {
+    fun onModelLoaded(
+        modelName: String,
+        modelId: String,
+        framework: InferenceFramework?,
+    ) {
         Log.i(TAG, "Model loaded notification: $modelName (id: $modelId, framework: ${framework?.displayName})")
         _uiState.update {
             it.copy(
@@ -448,19 +451,20 @@ class SpeechToTextViewModel : ViewModel() {
                             withContext(Dispatchers.IO) {
                                 try {
                                     val options = STTOptions(language = _uiState.value.language)
-                                    val result = RunAnywhere.transcribeStream(
-                                        audioData = chunkData,
-                                        options = options
-                                    ) { partial ->
-                                        // Update UI with partial result (non-suspend callback)
-                                        if (partial.transcript.isNotBlank()) {
-                                            val newText = lastTranscription + " " + partial.transcript
-                                            // Use launch since we're in a non-suspend callback
-                                            viewModelScope.launch(Dispatchers.Main) {
-                                                handleSTTStreamText(newText.trim())
+                                    val result =
+                                        RunAnywhere.transcribeStream(
+                                            audioData = chunkData,
+                                            options = options,
+                                        ) { partial ->
+                                            // Update UI with partial result (non-suspend callback)
+                                            if (partial.transcript.isNotBlank()) {
+                                                val newText = lastTranscription + " " + partial.transcript
+                                                // Use launch since we're in a non-suspend callback
+                                                viewModelScope.launch(Dispatchers.Main) {
+                                                    handleSTTStreamText(newText.trim())
+                                                }
                                             }
                                         }
-                                    }
                                     // Update with final result
                                     lastTranscription = (lastTranscription + " " + result.text).trim()
                                     withContext(Dispatchers.Main) {

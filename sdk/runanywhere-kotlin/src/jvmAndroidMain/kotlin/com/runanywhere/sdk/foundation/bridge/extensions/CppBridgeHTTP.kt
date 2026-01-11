@@ -41,7 +41,6 @@ import java.util.concurrent.TimeUnit
  * - Callbacks from C++ are thread-safe
  */
 object CppBridgeHTTP {
-
     /**
      * HTTP method constants matching C++ RAC_HTTP_METHOD_* values.
      */
@@ -57,16 +56,17 @@ object CppBridgeHTTP {
         /**
          * Get the string representation of an HTTP method.
          */
-        fun getName(method: Int): String = when (method) {
-            GET -> "GET"
-            POST -> "POST"
-            PUT -> "PUT"
-            DELETE -> "DELETE"
-            PATCH -> "PATCH"
-            HEAD -> "HEAD"
-            OPTIONS -> "OPTIONS"
-            else -> "GET"
-        }
+        fun getName(method: Int): String =
+            when (method) {
+                GET -> "GET"
+                POST -> "POST"
+                PUT -> "PUT"
+                DELETE -> "DELETE"
+                PATCH -> "PATCH"
+                HEAD -> "HEAD"
+                OPTIONS -> "OPTIONS"
+                else -> "GET"
+            }
     }
 
     /**
@@ -83,9 +83,13 @@ object CppBridgeHTTP {
         const val SERVER_ERROR_MAX = 599
 
         fun isSuccess(statusCode: Int): Boolean = statusCode in SUCCESS_MIN..SUCCESS_MAX
+
         fun isRedirect(statusCode: Int): Boolean = statusCode in REDIRECT_MIN..REDIRECT_MAX
+
         fun isClientError(statusCode: Int): Boolean = statusCode in CLIENT_ERROR_MIN..CLIENT_ERROR_MAX
+
         fun isServerError(statusCode: Int): Boolean = statusCode in SERVER_ERROR_MIN..SERVER_ERROR_MAX
+
         fun isError(statusCode: Int): Boolean = isClientError(statusCode) || isServerError(statusCode)
     }
 
@@ -130,11 +134,12 @@ object CppBridgeHTTP {
      * Background executor for HTTP requests.
      * Using a cached thread pool to handle concurrent HTTP requests efficiently.
      */
-    private val httpExecutor = Executors.newCachedThreadPool { runnable ->
-        Thread(runnable, "runanywhere-http").apply {
-            isDaemon = true
+    private val httpExecutor =
+        Executors.newCachedThreadPool { runnable ->
+            Thread(runnable, "runanywhere-http").apply {
+                isDaemon = true
+            }
         }
-    }
 
     /**
      * Optional interceptor for customizing HTTP requests.
@@ -193,7 +198,7 @@ object CppBridgeHTTP {
             statusCode: Int,
             success: Boolean,
             durationMs: Long,
-            errorMessage: String?
+            errorMessage: String?,
         )
     }
 
@@ -250,7 +255,7 @@ object CppBridgeHTTP {
         headers: String?,
         body: String?,
         timeoutMs: Int,
-        completionCallbackId: Long
+        completionCallbackId: Long,
     ) {
         val actualRequestId = requestId ?: UUID.randomUUID().toString()
 
@@ -258,7 +263,7 @@ object CppBridgeHTTP {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "HTTP ${HttpMethod.getName(method)} request to: $url"
+            "HTTP ${HttpMethod.getName(method)} request to: $url",
         )
 
         // Notify listener of request start
@@ -268,7 +273,7 @@ object CppBridgeHTTP {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in HTTP listener onRequestStart: ${e.message}"
+                "Error in HTTP listener onRequestStart: ${e.message}",
             )
         }
 
@@ -281,7 +286,7 @@ object CppBridgeHTTP {
                 headersJson = headers,
                 body = body,
                 timeoutMs = timeoutMs,
-                completionCallbackId = completionCallbackId
+                completionCallbackId = completionCallbackId,
             )
         }
     }
@@ -296,7 +301,7 @@ object CppBridgeHTTP {
         headersJson: String?,
         body: String?,
         timeoutMs: Int,
-        completionCallbackId: Long
+        completionCallbackId: Long,
     ) {
         var connection: HttpURLConnection? = null
         var statusCode = -1
@@ -317,12 +322,13 @@ object CppBridgeHTTP {
             val finalUrl = requestInterceptor?.onBeforeRequest(url, method, headers) ?: url
 
             // Create connection
-            val urlObj = try {
-                URL(finalUrl)
-            } catch (e: Exception) {
-                errorCode = HttpErrorCode.INVALID_URL
-                throw IllegalArgumentException("Invalid URL: $finalUrl", e)
-            }
+            val urlObj =
+                try {
+                    URL(finalUrl)
+                } catch (e: Exception) {
+                    errorCode = HttpErrorCode.INVALID_URL
+                    throw IllegalArgumentException("Invalid URL: $finalUrl", e)
+                }
 
             connection = urlObj.openConnection() as HttpURLConnection
             connection.requestMethod = HttpMethod.getName(method)
@@ -362,17 +368,19 @@ object CppBridgeHTTP {
             statusCode = connection.responseCode
 
             // Read response headers
-            responseHeaders = connection.headerFields
-                .filterKeys { it != null }
-                .mapValues { it.value.firstOrNull() ?: "" }
-                .filterValues { it.isNotEmpty() }
+            responseHeaders =
+                connection.headerFields
+                    .filterKeys { it != null }
+                    .mapValues { it.value.firstOrNull() ?: "" }
+                    .filterValues { it.isNotEmpty() }
 
             // Read response body
-            val inputStream = if (HttpStatus.isSuccess(statusCode)) {
-                connection.inputStream
-            } else {
-                connection.errorStream
-            }
+            val inputStream =
+                if (HttpStatus.isSuccess(statusCode)) {
+                    connection.inputStream
+                } else {
+                    connection.errorStream
+                }
 
             if (inputStream != null) {
                 BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8)).use { reader ->
@@ -387,7 +395,7 @@ object CppBridgeHTTP {
                             CppBridgePlatformAdapter.logCallback(
                                 CppBridgePlatformAdapter.LogLevel.WARN,
                                 TAG,
-                                "Response truncated: exceeded max size of $MAX_RESPONSE_SIZE bytes"
+                                "Response truncated: exceeded max size of $MAX_RESPONSE_SIZE bytes",
                             )
                             break
                         }
@@ -400,16 +408,15 @@ object CppBridgeHTTP {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "HTTP response: $statusCode (${System.currentTimeMillis() - startTime}ms)"
+                "HTTP response: $statusCode (${System.currentTimeMillis() - startTime}ms)",
             )
-
         } catch (e: java.net.SocketTimeoutException) {
             errorMessage = "Request timeout: ${e.message}"
             errorCode = HttpErrorCode.TIMEOUT
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "HTTP request timeout: $errorMessage"
+                "HTTP request timeout: $errorMessage",
             )
         } catch (e: javax.net.ssl.SSLException) {
             errorMessage = "SSL error: ${e.message}"
@@ -417,7 +424,7 @@ object CppBridgeHTTP {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "HTTP SSL error: $errorMessage"
+                "HTTP SSL error: $errorMessage",
             )
         } catch (e: java.net.UnknownHostException) {
             errorMessage = "Network error: Unknown host ${e.message}"
@@ -425,7 +432,7 @@ object CppBridgeHTTP {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "HTTP network error: $errorMessage"
+                "HTTP network error: $errorMessage",
             )
         } catch (e: java.io.IOException) {
             errorMessage = "Network error: ${e.message}"
@@ -433,7 +440,7 @@ object CppBridgeHTTP {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "HTTP I/O error: $errorMessage"
+                "HTTP I/O error: $errorMessage",
             )
         } catch (e: Exception) {
             errorMessage = e.message ?: "Unknown error"
@@ -443,7 +450,7 @@ object CppBridgeHTTP {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "HTTP request failed: $errorMessage"
+                "HTTP request failed: $errorMessage",
             )
         } finally {
             connection?.disconnect()
@@ -459,7 +466,7 @@ object CppBridgeHTTP {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in HTTP listener onRequestComplete: ${e.message}"
+                "Error in HTTP listener onRequestComplete: ${e.message}",
             )
         }
 
@@ -471,13 +478,13 @@ object CppBridgeHTTP {
                 responseBody,
                 serializeHeaders(responseHeaders),
                 errorCode,
-                errorMessage
+                errorMessage,
             )
         } catch (e: Exception) {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Error invoking completion callback: ${e.message}"
+                "Error invoking completion callback: ${e.message}",
             )
         }
     }
@@ -537,7 +544,7 @@ object CppBridgeHTTP {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Failed to parse headers JSON: ${e.message}"
+                "Failed to parse headers JSON: ${e.message}",
             )
         }
     }
@@ -575,9 +582,11 @@ object CppBridgeHTTP {
      * Native method to set the HTTP callback with C++ core.
      *
      * This registers [httpCallback] with the C++ rac_http_set_callback function.
+     * Reserved for future native callback integration.
      *
      * C API: rac_http_set_callback(rac_http_callback_t callback)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeSetHttpCallback()
 
@@ -585,9 +594,11 @@ object CppBridgeHTTP {
      * Native method to unset the HTTP callback.
      *
      * Called during shutdown to clean up native resources.
+     * Reserved for future native callback integration.
      *
      * C API: rac_http_set_callback(nullptr)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeUnsetHttpCallback()
 
@@ -610,7 +621,7 @@ object CppBridgeHTTP {
         responseBody: String?,
         responseHeaders: String?,
         errorCode: Int,
-        errorMessage: String?
+        errorMessage: String?,
     )
 
     // ========================================================================
@@ -654,7 +665,7 @@ object CppBridgeHTTP {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error shutting down HTTP executor: ${e.message}"
+                    "Error shutting down HTTP executor: ${e.message}",
                 )
                 httpExecutor.shutdownNow()
             }
@@ -683,7 +694,7 @@ object CppBridgeHTTP {
         method: Int = HttpMethod.GET,
         headers: Map<String, String>? = null,
         body: String? = null,
-        timeoutMs: Int = 0
+        timeoutMs: Int = 0,
     ): HttpResponse {
         var connection: HttpURLConnection? = null
 
@@ -719,47 +730,48 @@ object CppBridgeHTTP {
 
             val statusCode = connection.responseCode
 
-            val inputStream = if (HttpStatus.isSuccess(statusCode)) {
-                connection.inputStream
-            } else {
-                connection.errorStream
-            }
-
-            val responseBody = if (inputStream != null) {
-                BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8)).use { reader ->
-                    reader.readText()
+            val inputStream =
+                if (HttpStatus.isSuccess(statusCode)) {
+                    connection.inputStream
+                } else {
+                    connection.errorStream
                 }
-            } else {
-                null
-            }
 
-            val responseHeaders = connection.headerFields
-                .filterKeys { it != null }
-                .mapValues { it.value.firstOrNull() ?: "" }
-                .filterValues { it.isNotEmpty() }
+            val responseBody =
+                if (inputStream != null) {
+                    BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8)).use { reader ->
+                        reader.readText()
+                    }
+                } else {
+                    null
+                }
+
+            val responseHeaders =
+                connection.headerFields
+                    .filterKeys { it != null }
+                    .mapValues { it.value.firstOrNull() ?: "" }
+                    .filterValues { it.isNotEmpty() }
 
             return HttpResponse(
                 statusCode = statusCode,
                 body = responseBody,
                 headers = responseHeaders,
                 success = HttpStatus.isSuccess(statusCode),
-                errorMessage = null
+                errorMessage = null,
             )
-
         } catch (e: Exception) {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "HTTP request failed: ${e.message}"
+                "HTTP request failed: ${e.message}",
             )
             return HttpResponse(
                 statusCode = -1,
                 body = null,
                 headers = emptyMap(),
                 success = false,
-                errorMessage = e.message ?: "Unknown error"
+                errorMessage = e.message ?: "Unknown error",
             )
-
         } finally {
             connection?.disconnect()
         }
@@ -779,7 +791,7 @@ object CppBridgeHTTP {
         url: String,
         body: String?,
         headers: Map<String, String>? = null,
-        timeoutMs: Int = 0
+        timeoutMs: Int = 0,
     ): HttpResponse {
         return request(url, HttpMethod.POST, headers, body, timeoutMs)
     }
@@ -791,7 +803,7 @@ object CppBridgeHTTP {
         url: String,
         body: String?,
         headers: Map<String, String>? = null,
-        timeoutMs: Int = 0
+        timeoutMs: Int = 0,
     ): HttpResponse {
         return request(url, HttpMethod.PUT, headers, body, timeoutMs)
     }
@@ -811,6 +823,6 @@ object CppBridgeHTTP {
         val body: String?,
         val headers: Map<String, String>,
         val success: Boolean,
-        val errorMessage: String?
+        val errorMessage: String?,
     )
 }

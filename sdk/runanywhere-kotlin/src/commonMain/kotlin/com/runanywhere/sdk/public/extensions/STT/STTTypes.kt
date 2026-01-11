@@ -33,9 +33,8 @@ data class STTConfiguration(
     val vocabularyList: List<String> = emptyList(),
     val maxAlternatives: Int = 1,
     val enableTimestamps: Boolean = true,
-    override val preferredFramework: InferenceFramework? = null
+    override val preferredFramework: InferenceFramework? = null,
 ) : ComponentConfiguration {
-
     val componentType: SDKComponent get() = SDKComponent.STT
 
     /**
@@ -66,33 +65,24 @@ data class STTConfiguration(
 data class STTOptions(
     /** Language code for transcription (e.g., "en", "es", "fr") */
     val language: String = "en",
-
     /** Whether to auto-detect the spoken language */
     val detectLanguage: Boolean = false,
-
     /** Enable automatic punctuation in transcription */
     val enablePunctuation: Boolean = true,
-
     /** Enable speaker diarization (identify different speakers) */
     val enableDiarization: Boolean = false,
-
     /** Maximum number of speakers to identify (requires enableDiarization) */
     val maxSpeakers: Int? = null,
-
     /** Enable word-level timestamps */
     val enableTimestamps: Boolean = true,
-
     /** Custom vocabulary words to improve recognition */
     val vocabularyFilter: List<String> = emptyList(),
-
     /** Audio format of input data */
     val audioFormat: AudioFormat = AudioFormat.PCM,
-
     /** Sample rate of input audio (default: 16000 Hz for STT models) */
     val sampleRate: Int = STTConfiguration.DEFAULT_SAMPLE_RATE,
-
     /** Preferred framework for transcription (ONNX, etc.) */
-    val preferredFramework: InferenceFramework? = null
+    val preferredFramework: InferenceFramework? = null,
 ) {
     companion object {
         /** Create options with default settings for a specific language */
@@ -110,24 +100,18 @@ data class STTOptions(
 data class STTOutput(
     /** Transcribed text */
     val text: String,
-
     /** Confidence score (0.0 to 1.0) */
     val confidence: Float,
-
     /** Word-level timestamps if available */
     val wordTimestamps: List<WordTimestamp>? = null,
-
     /** Detected language if auto-detected */
     val detectedLanguage: String? = null,
-
     /** Alternative transcriptions if available */
     val alternatives: List<TranscriptionAlternative>? = null,
-
     /** Processing metadata */
     val metadata: TranscriptionMetadata,
-
     /** Timestamp (required by ComponentOutput) */
-    override val timestamp: Long = System.currentTimeMillis()
+    override val timestamp: Long = System.currentTimeMillis(),
 ) : ComponentOutput
 
 // MARK: - Supporting Types
@@ -142,7 +126,7 @@ data class TranscriptionMetadata(
     /** Processing time in seconds */
     val processingTime: Double,
     /** Audio length in seconds */
-    val audioLength: Double
+    val audioLength: Double,
 ) {
     /** Processing time / audio length */
     val realTimeFactor: Double
@@ -160,7 +144,7 @@ data class WordTimestamp(
     val startTime: Double,
     /** End time in seconds */
     val endTime: Double,
-    val confidence: Float
+    val confidence: Float,
 )
 
 /**
@@ -170,7 +154,7 @@ data class WordTimestamp(
 @Serializable
 data class TranscriptionAlternative(
     val text: String,
-    val confidence: Float
+    val confidence: Float,
 )
 
 // MARK: - STT Transcription Result
@@ -185,19 +169,19 @@ data class STTTranscriptionResult(
     val confidence: Float? = null,
     val timestamps: List<TimestampInfo>? = null,
     val language: String? = null,
-    val alternatives: List<AlternativeTranscription>? = null
+    val alternatives: List<AlternativeTranscription>? = null,
 ) {
     @Serializable
     data class TimestampInfo(
         val word: String,
         val startTime: Double,
         val endTime: Double,
-        val confidence: Float? = null
+        val confidence: Float? = null,
     )
 
     @Serializable
     data class AlternativeTranscription(
         val transcript: String,
-        val confidence: Float
+        val confidence: Float,
     )
 }

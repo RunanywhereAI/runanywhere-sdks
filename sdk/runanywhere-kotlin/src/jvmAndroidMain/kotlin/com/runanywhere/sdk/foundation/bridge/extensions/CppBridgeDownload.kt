@@ -42,7 +42,6 @@ import java.util.concurrent.atomic.AtomicLong
  * - Downloads are executed on a background thread pool
  */
 object CppBridgeDownload {
-
     /**
      * Download status constants matching C++ RAC_DOWNLOAD_STATUS_* values.
      */
@@ -71,16 +70,17 @@ object CppBridgeDownload {
         /**
          * Get a human-readable name for the download status.
          */
-        fun getName(status: Int): String = when (status) {
-            QUEUED -> "QUEUED"
-            DOWNLOADING -> "DOWNLOADING"
-            PAUSED -> "PAUSED"
-            COMPLETED -> "COMPLETED"
-            FAILED -> "FAILED"
-            CANCELLED -> "CANCELLED"
-            VERIFYING -> "VERIFYING"
-            else -> "UNKNOWN($status)"
-        }
+        fun getName(status: Int): String =
+            when (status) {
+                QUEUED -> "QUEUED"
+                DOWNLOADING -> "DOWNLOADING"
+                PAUSED -> "PAUSED"
+                COMPLETED -> "COMPLETED"
+                FAILED -> "FAILED"
+                CANCELLED -> "CANCELLED"
+                VERIFYING -> "VERIFYING"
+                else -> "UNKNOWN($status)"
+            }
 
         /**
          * Check if the download status indicates completion (success or failure).
@@ -134,42 +134,44 @@ object CppBridgeDownload {
         /**
          * Get a human-readable name for the error code.
          */
-        fun getName(error: Int): String = when (error) {
-            NONE -> "NONE"
-            NETWORK_ERROR -> "NETWORK_ERROR"
-            FILE_ERROR -> "FILE_ERROR"
-            INSUFFICIENT_STORAGE -> "INSUFFICIENT_STORAGE"
-            INVALID_URL -> "INVALID_URL"
-            CHECKSUM_FAILED -> "CHECKSUM_FAILED"
-            CANCELLED -> "CANCELLED"
-            SERVER_ERROR -> "SERVER_ERROR"
-            TIMEOUT -> "TIMEOUT"
-            NETWORK_UNAVAILABLE -> "NETWORK_UNAVAILABLE"
-            DNS_ERROR -> "DNS_ERROR"
-            SSL_ERROR -> "SSL_ERROR"
-            UNKNOWN -> "UNKNOWN"
-            else -> "UNKNOWN($error)"
-        }
+        fun getName(error: Int): String =
+            when (error) {
+                NONE -> "NONE"
+                NETWORK_ERROR -> "NETWORK_ERROR"
+                FILE_ERROR -> "FILE_ERROR"
+                INSUFFICIENT_STORAGE -> "INSUFFICIENT_STORAGE"
+                INVALID_URL -> "INVALID_URL"
+                CHECKSUM_FAILED -> "CHECKSUM_FAILED"
+                CANCELLED -> "CANCELLED"
+                SERVER_ERROR -> "SERVER_ERROR"
+                TIMEOUT -> "TIMEOUT"
+                NETWORK_UNAVAILABLE -> "NETWORK_UNAVAILABLE"
+                DNS_ERROR -> "DNS_ERROR"
+                SSL_ERROR -> "SSL_ERROR"
+                UNKNOWN -> "UNKNOWN"
+                else -> "UNKNOWN($error)"
+            }
 
         /**
          * Get a user-friendly error message for the error code.
          */
-        fun getUserMessage(error: Int): String = when (error) {
-            NONE -> "No error"
-            NETWORK_ERROR -> "Network error. Please check your internet connection and try again."
-            FILE_ERROR -> "Failed to save the file. Please check available storage."
-            INSUFFICIENT_STORAGE -> "Not enough storage space. Please free up some space and try again."
-            INVALID_URL -> "Invalid download URL."
-            CHECKSUM_FAILED -> "File verification failed. The download may be corrupted."
-            CANCELLED -> "Download was cancelled."
-            SERVER_ERROR -> "Server error. Please try again later."
-            TIMEOUT -> "Connection timed out. Please check your internet connection and try again."
-            NETWORK_UNAVAILABLE -> "No internet connection. Please check your network settings and try again."
-            DNS_ERROR -> "Unable to connect to server. Please check your internet connection."
-            SSL_ERROR -> "Secure connection failed. Please try again."
-            UNKNOWN -> "An unexpected error occurred. Please try again."
-            else -> "Download failed. Please try again."
-        }
+        fun getUserMessage(error: Int): String =
+            when (error) {
+                NONE -> "No error"
+                NETWORK_ERROR -> "Network error. Please check your internet connection and try again."
+                FILE_ERROR -> "Failed to save the file. Please check available storage."
+                INSUFFICIENT_STORAGE -> "Not enough storage space. Please free up some space and try again."
+                INVALID_URL -> "Invalid download URL."
+                CHECKSUM_FAILED -> "File verification failed. The download may be corrupted."
+                CANCELLED -> "Download was cancelled."
+                SERVER_ERROR -> "Server error. Please try again later."
+                TIMEOUT -> "Connection timed out. Please check your internet connection and try again."
+                NETWORK_UNAVAILABLE -> "No internet connection. Please check your network settings and try again."
+                DNS_ERROR -> "Unable to connect to server. Please check your internet connection."
+                SSL_ERROR -> "Secure connection failed. Please try again."
+                UNKNOWN -> "An unexpected error occurred. Please try again."
+                else -> "Download failed. Please try again."
+            }
     }
 
     /**
@@ -222,11 +224,12 @@ object CppBridgeDownload {
     /**
      * Background executor for download operations.
      */
-    private val downloadExecutor = Executors.newFixedThreadPool(MAX_CONCURRENT_DOWNLOADS) { runnable ->
-        Thread(runnable, "runanywhere-download").apply {
-            isDaemon = true
+    private val downloadExecutor =
+        Executors.newFixedThreadPool(MAX_CONCURRENT_DOWNLOADS) { runnable ->
+            Thread(runnable, "runanywhere-download").apply {
+                isDaemon = true
+            }
         }
-    }
 
     /**
      * Active downloads map.
@@ -284,7 +287,7 @@ object CppBridgeDownload {
         val startedAt: Long = System.currentTimeMillis(),
         var completedAt: Long = 0L,
         val priority: Int = DownloadPriority.NORMAL,
-        val expectedChecksum: String? = null
+        val expectedChecksum: String? = null,
     ) {
         /**
          * Get the download progress as a percentage (0-100).
@@ -400,7 +403,7 @@ object CppBridgeDownload {
         fun download(
             url: String,
             destinationPath: String,
-            progressCallback: (downloadedBytes: Long, totalBytes: Long) -> Unit
+            progressCallback: (downloadedBytes: Long, totalBytes: Long) -> Unit,
         ): Boolean
 
         /**
@@ -433,7 +436,7 @@ object CppBridgeDownload {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Download manager callbacks registered"
+                "Download manager callbacks registered",
             )
         }
     }
@@ -467,7 +470,7 @@ object CppBridgeDownload {
         modelId: String,
         modelType: Int,
         priority: Int,
-        expectedChecksum: String?
+        expectedChecksum: String?,
     ): String? {
         return try {
             // Check network connectivity first
@@ -475,7 +478,7 @@ object CppBridgeDownload {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "No internet connection. Please check your network settings and try again."
+                    "No internet connection. Please check your network settings and try again.",
                 )
                 // Notify listener of failure
                 val downloadId = UUID.randomUUID().toString()
@@ -484,7 +487,7 @@ object CppBridgeDownload {
                         downloadId,
                         modelId,
                         DownloadError.NETWORK_UNAVAILABLE,
-                        "No internet connection. Please check your network settings and try again."
+                        "No internet connection. Please check your network settings and try again.",
                     )
                 } catch (e: Exception) {
                     // Ignore listener errors
@@ -499,7 +502,7 @@ object CppBridgeDownload {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Invalid download URL: $url"
+                    "Invalid download URL: $url",
                 )
                 return null
             }
@@ -510,7 +513,7 @@ object CppBridgeDownload {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Download destination path: $tempPath"
+                "Download destination path: $tempPath",
             )
 
             // Check available storage
@@ -519,37 +522,39 @@ object CppBridgeDownload {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Low storage space: ${availableStorage / (1024 * 1024)}MB available"
+                    "Low storage space: ${availableStorage / (1024 * 1024)}MB available",
                 )
             }
 
             // Create download task
             val downloadId = UUID.randomUUID().toString()
-            val task = DownloadTask(
-                downloadId = downloadId,
-                url = url,
-                destinationPath = tempPath,
-                modelId = modelId,
-                modelType = modelType,
-                priority = priority,
-                expectedChecksum = expectedChecksum
-            )
+            val task =
+                DownloadTask(
+                    downloadId = downloadId,
+                    url = url,
+                    destinationPath = tempPath,
+                    modelId = modelId,
+                    modelType = modelType,
+                    priority = priority,
+                    expectedChecksum = expectedChecksum,
+                )
 
             activeDownloads[downloadId] = task
 
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Starting download: $downloadId for model $modelId"
+                "Starting download: $downloadId for model $modelId",
             )
 
             // Note: Download status is tracked by the download manager, not model registry
             // The C++ registry just stores the local_path when download is complete
 
             // Start download on background thread
-            val future = downloadExecutor.submit {
-                executeDownload(task)
-            }
+            val future =
+                downloadExecutor.submit {
+                    executeDownload(task)
+                }
             downloadFutures[downloadId] = future
 
             // Notify listener
@@ -559,7 +564,7 @@ object CppBridgeDownload {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in download listener onDownloadStarted: ${e.message}"
+                    "Error in download listener onDownloadStarted: ${e.message}",
                 )
             }
 
@@ -568,7 +573,7 @@ object CppBridgeDownload {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Failed to start download: ${e.message}"
+                "Failed to start download: ${e.message}",
             )
             null
         }
@@ -603,7 +608,7 @@ object CppBridgeDownload {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Download cancelled: $downloadId"
+            "Download cancelled: $downloadId",
         )
 
         // Clear model download status on cancellation
@@ -623,7 +628,7 @@ object CppBridgeDownload {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in download listener onDownloadCancelled: ${e.message}"
+                "Error in download listener onDownloadCancelled: ${e.message}",
             )
         }
 
@@ -656,7 +661,7 @@ object CppBridgeDownload {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Download paused: $downloadId at ${task.downloadedBytes} bytes"
+            "Download paused: $downloadId at ${task.downloadedBytes} bytes",
         )
 
         // Notify listener
@@ -666,7 +671,7 @@ object CppBridgeDownload {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in download listener onDownloadPaused: ${e.message}"
+                "Error in download listener onDownloadPaused: ${e.message}",
             )
         }
 
@@ -693,13 +698,14 @@ object CppBridgeDownload {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Resuming download: $downloadId from ${task.downloadedBytes} bytes"
+            "Resuming download: $downloadId from ${task.downloadedBytes} bytes",
         )
 
         // Restart download on background thread
-        val future = downloadExecutor.submit {
-            executeDownload(task, resumeFrom = task.downloadedBytes)
-        }
+        val future =
+            downloadExecutor.submit {
+                executeDownload(task, resumeFrom = task.downloadedBytes)
+            }
         downloadFutures[downloadId] = future
 
         // Notify listener
@@ -709,7 +715,7 @@ object CppBridgeDownload {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in download listener onDownloadResumed: ${e.message}"
+                "Error in download listener onDownloadResumed: ${e.message}",
             )
         }
 
@@ -821,7 +827,7 @@ object CppBridgeDownload {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Cleared ${toRemove.size} completed downloads"
+            "Cleared ${toRemove.size} completed downloads",
         )
 
         return toRemove.size
@@ -846,15 +852,16 @@ object CppBridgeDownload {
             val provider = downloadProvider
             if (provider != null) {
                 val downloadedBytes = AtomicLong(resumeFrom)
-                val success = provider.download(
-                    task.url,
-                    task.destinationPath
-                ) { bytes, total ->
-                    downloadedBytes.set(bytes)
-                    task.downloadedBytes = bytes
-                    task.totalBytes = total
-                    notifyProgress(task)
-                }
+                val success =
+                    provider.download(
+                        task.url,
+                        task.destinationPath,
+                    ) { bytes, total ->
+                        downloadedBytes.set(bytes)
+                        task.downloadedBytes = bytes
+                        task.totalBytes = total
+                        notifyProgress(task)
+                    }
 
                 if (success) {
                     completeDownload(task)
@@ -922,7 +929,7 @@ object CppBridgeDownload {
                     CppBridgePlatformAdapter.logCallback(
                         CppBridgePlatformAdapter.LogLevel.DEBUG,
                         TAG,
-                        "Download interrupted: ${task.downloadId}"
+                        "Download interrupted: ${task.downloadId}",
                     )
                     return
                 }
@@ -932,7 +939,7 @@ object CppBridgeDownload {
                     CppBridgePlatformAdapter.logCallback(
                         CppBridgePlatformAdapter.LogLevel.DEBUG,
                         TAG,
-                        "Download paused during execution: ${task.downloadId}"
+                        "Download paused during execution: ${task.downloadId}",
                     )
                     return
                 }
@@ -961,24 +968,25 @@ object CppBridgeDownload {
 
             // Complete download
             completeDownload(task)
-
         } catch (e: java.net.SocketTimeoutException) {
             failDownload(task, DownloadError.TIMEOUT, DownloadError.getUserMessage(DownloadError.TIMEOUT))
         } catch (e: java.net.UnknownHostException) {
             // DNS resolution failed - likely no internet or DNS issue
-            val userMessage = if (!checkNetworkConnectivity()) {
-                DownloadError.getUserMessage(DownloadError.NETWORK_UNAVAILABLE)
-            } else {
-                DownloadError.getUserMessage(DownloadError.DNS_ERROR)
-            }
+            val userMessage =
+                if (!checkNetworkConnectivity()) {
+                    DownloadError.getUserMessage(DownloadError.NETWORK_UNAVAILABLE)
+                } else {
+                    DownloadError.getUserMessage(DownloadError.DNS_ERROR)
+                }
             failDownload(task, DownloadError.DNS_ERROR, userMessage)
         } catch (e: java.net.ConnectException) {
             // Connection refused or network unreachable
-            val userMessage = if (!checkNetworkConnectivity()) {
-                DownloadError.getUserMessage(DownloadError.NETWORK_UNAVAILABLE)
-            } else {
-                DownloadError.getUserMessage(DownloadError.NETWORK_ERROR)
-            }
+            val userMessage =
+                if (!checkNetworkConnectivity()) {
+                    DownloadError.getUserMessage(DownloadError.NETWORK_UNAVAILABLE)
+                } else {
+                    DownloadError.getUserMessage(DownloadError.NETWORK_ERROR)
+                }
             failDownload(task, DownloadError.NETWORK_ERROR, userMessage)
         } catch (e: java.net.NoRouteToHostException) {
             failDownload(task, DownloadError.NETWORK_UNAVAILABLE, DownloadError.getUserMessage(DownloadError.NETWORK_UNAVAILABLE))
@@ -991,21 +999,22 @@ object CppBridgeDownload {
             }
             // Check if this is a network-related IO error
             val errorMessage = e.message?.lowercase() ?: ""
-            val (errorCode, userMessage) = when {
-                errorMessage.contains("network") || errorMessage.contains("connection") -> {
-                    if (!checkNetworkConnectivity()) {
-                        Pair(DownloadError.NETWORK_UNAVAILABLE, DownloadError.getUserMessage(DownloadError.NETWORK_UNAVAILABLE))
-                    } else {
-                        Pair(DownloadError.NETWORK_ERROR, DownloadError.getUserMessage(DownloadError.NETWORK_ERROR))
+            val (errorCode, userMessage) =
+                when {
+                    errorMessage.contains("network") || errorMessage.contains("connection") -> {
+                        if (!checkNetworkConnectivity()) {
+                            Pair(DownloadError.NETWORK_UNAVAILABLE, DownloadError.getUserMessage(DownloadError.NETWORK_UNAVAILABLE))
+                        } else {
+                            Pair(DownloadError.NETWORK_ERROR, DownloadError.getUserMessage(DownloadError.NETWORK_ERROR))
+                        }
+                    }
+                    errorMessage.contains("space") || errorMessage.contains("storage") -> {
+                        Pair(DownloadError.INSUFFICIENT_STORAGE, DownloadError.getUserMessage(DownloadError.INSUFFICIENT_STORAGE))
+                    }
+                    else -> {
+                        Pair(DownloadError.FILE_ERROR, DownloadError.getUserMessage(DownloadError.FILE_ERROR))
                     }
                 }
-                errorMessage.contains("space") || errorMessage.contains("storage") -> {
-                    Pair(DownloadError.INSUFFICIENT_STORAGE, DownloadError.getUserMessage(DownloadError.INSUFFICIENT_STORAGE))
-                }
-                else -> {
-                    Pair(DownloadError.FILE_ERROR, DownloadError.getUserMessage(DownloadError.FILE_ERROR))
-                }
-            }
             failDownload(task, errorCode, userMessage)
         } catch (e: Exception) {
             if (Thread.currentThread().isInterrupted) {
@@ -1044,15 +1053,16 @@ object CppBridgeDownload {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Download completed: ${task.downloadId} (${fileSize / 1024}KB)"
+            "Download completed: ${task.downloadId} (${fileSize / 1024}KB)",
         )
 
         // Move to final location
-        val moved = CppBridgeModelPaths.moveDownloadToFinal(
-            task.destinationPath,
-            task.modelId,
-            task.modelType
-        )
+        val moved =
+            CppBridgeModelPaths.moveDownloadToFinal(
+                task.destinationPath,
+                task.modelId,
+                task.modelType,
+            )
 
         if (moved) {
             // Update model download status in C++ registry with local path
@@ -1066,7 +1076,7 @@ object CppBridgeDownload {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in download listener onDownloadCompleted: ${e.message}"
+                    "Error in download listener onDownloadCompleted: ${e.message}",
                 )
             }
         } else {
@@ -1085,7 +1095,7 @@ object CppBridgeDownload {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.ERROR,
             TAG,
-            "Download failed: ${task.downloadId} - $message"
+            "Download failed: ${task.downloadId} - $message",
         )
 
         // Clear download status on failure (model is no longer downloaded)
@@ -1105,7 +1115,7 @@ object CppBridgeDownload {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in download listener onDownloadFailed: ${e.message}"
+                "Error in download listener onDownloadFailed: ${e.message}",
             )
         }
     }
@@ -1119,7 +1129,7 @@ object CppBridgeDownload {
                 task.downloadId,
                 task.downloadedBytes,
                 task.totalBytes,
-                task.getProgress()
+                task.getProgress(),
             )
         } catch (e: Exception) {
             // Ignore progress listener errors
@@ -1153,7 +1163,7 @@ object CppBridgeDownload {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Checksum mismatch: expected=$expectedChecksum, actual=$actualChecksum"
+                    "Checksum mismatch: expected=$expectedChecksum, actual=$actualChecksum",
                 )
             }
 
@@ -1162,7 +1172,7 @@ object CppBridgeDownload {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Checksum verification error: ${e.message}"
+                "Checksum verification error: ${e.message}",
             )
             false
         }
@@ -1177,9 +1187,11 @@ object CppBridgeDownload {
      *
      * Registers [startDownloadCallback], [cancelDownloadCallback],
      * [pauseDownloadCallback], [resumeDownloadCallback], etc. with C++ core.
+     * Reserved for future native callback integration.
      *
      * C API: rac_download_set_callbacks(...)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeSetDownloadCallbacks()
 
@@ -1187,9 +1199,11 @@ object CppBridgeDownload {
      * Native method to unset the download callbacks.
      *
      * Called during shutdown to clean up native resources.
+     * Reserved for future native callback integration.
      *
      * C API: rac_download_set_callbacks(nullptr)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeUnsetDownloadCallbacks()
 
@@ -1214,7 +1228,7 @@ object CppBridgeDownload {
         modelId: String,
         modelType: Int,
         priority: Int,
-        expectedChecksum: String?
+        expectedChecksum: String?,
     ): String?
 
     /**
@@ -1311,7 +1325,7 @@ object CppBridgeDownload {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error shutting down download executor: ${e.message}"
+                    "Error shutting down download executor: ${e.message}",
                 )
                 downloadExecutor.shutdownNow()
             }
@@ -1340,7 +1354,7 @@ object CppBridgeDownload {
         modelId: String,
         modelType: Int,
         priority: Int = DownloadPriority.NORMAL,
-        expectedChecksum: String? = null
+        expectedChecksum: String? = null,
     ): String? {
         return startDownloadCallback(url, modelId, modelType, priority, expectedChecksum)
     }
@@ -1437,9 +1451,10 @@ object CppBridgeDownload {
      * @return Number of downloads cancelled
      */
     fun cancelAllDownloads(): Int {
-        val activeIds = activeDownloads.values
-            .filter { it.isActive() }
-            .map { it.downloadId }
+        val activeIds =
+            activeDownloads.values
+                .filter { it.isActive() }
+                .map { it.downloadId }
 
         var cancelled = 0
         for (downloadId in activeIds) {
@@ -1490,7 +1505,7 @@ object CppBridgeDownload {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Could not check network connectivity: ${e.message}"
+                "Could not check network connectivity: ${e.message}",
             )
             true
         }

@@ -28,7 +28,6 @@ package com.runanywhere.sdk.foundation.bridge.extensions
  * - All callbacks are thread-safe using atomic operations
  */
 object CppBridgeState {
-
     /**
      * SDK state constants matching C++ RAC_STATE_* values.
      */
@@ -57,16 +56,17 @@ object CppBridgeState {
         /**
          * Get a human-readable name for the SDK state.
          */
-        fun getName(state: Int): String = when (state) {
-            UNINITIALIZED -> "UNINITIALIZED"
-            INITIALIZING -> "INITIALIZING"
-            CORE_READY -> "CORE_READY"
-            SERVICES_READY -> "SERVICES_READY"
-            READY -> "READY"
-            SHUTTING_DOWN -> "SHUTTING_DOWN"
-            ERROR -> "ERROR"
-            else -> "UNKNOWN($state)"
-        }
+        fun getName(state: Int): String =
+            when (state) {
+                UNINITIALIZED -> "UNINITIALIZED"
+                INITIALIZING -> "INITIALIZING"
+                CORE_READY -> "CORE_READY"
+                SERVICES_READY -> "SERVICES_READY"
+                READY -> "READY"
+                SHUTTING_DOWN -> "SHUTTING_DOWN"
+                ERROR -> "ERROR"
+                else -> "UNKNOWN($state)"
+            }
 
         /**
          * Check if the state indicates the SDK is usable.
@@ -102,16 +102,17 @@ object CppBridgeState {
         /**
          * Get a human-readable name for the component state.
          */
-        fun getName(state: Int): String = when (state) {
-            NOT_CREATED -> "NOT_CREATED"
-            CREATED -> "CREATED"
-            LOADING -> "LOADING"
-            READY -> "READY"
-            PROCESSING -> "PROCESSING"
-            UNLOADING -> "UNLOADING"
-            ERROR -> "ERROR"
-            else -> "UNKNOWN($state)"
-        }
+        fun getName(state: Int): String =
+            when (state) {
+                NOT_CREATED -> "NOT_CREATED"
+                CREATED -> "CREATED"
+                LOADING -> "LOADING"
+                READY -> "READY"
+                PROCESSING -> "PROCESSING"
+                UNLOADING -> "UNLOADING"
+                ERROR -> "ERROR"
+                else -> "UNKNOWN($state)"
+            }
     }
 
     /**
@@ -127,14 +128,15 @@ object CppBridgeState {
         /**
          * Get a human-readable name for the component type.
          */
-        fun getName(type: Int): String = when (type) {
-            LLM -> "LLM"
-            STT -> "STT"
-            TTS -> "TTS"
-            VAD -> "VAD"
-            VOICE_AGENT -> "VOICE_AGENT"
-            else -> "UNKNOWN($type)"
-        }
+        fun getName(type: Int): String =
+            when (type) {
+                LLM -> "LLM"
+                STT -> "STT"
+                TTS -> "TTS"
+                VAD -> "VAD"
+                VOICE_AGENT -> "VOICE_AGENT"
+                else -> "UNKNOWN($type)"
+            }
     }
 
     /**
@@ -153,12 +155,13 @@ object CppBridgeState {
         /**
          * Get a human-readable name for the health status.
          */
-        fun getName(status: Int): String = when (status) {
-            HEALTHY -> "HEALTHY"
-            DEGRADED -> "DEGRADED"
-            UNHEALTHY -> "UNHEALTHY"
-            else -> "UNKNOWN($status)"
-        }
+        fun getName(status: Int): String =
+            when (status) {
+                HEALTHY -> "HEALTHY"
+                DEGRADED -> "DEGRADED"
+                UNHEALTHY -> "UNHEALTHY"
+                else -> "UNKNOWN($status)"
+            }
     }
 
     @Volatile
@@ -262,7 +265,7 @@ object CppBridgeState {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "State callbacks registered. SDK State: ${SDKState.getName(sdkState)}"
+                "State callbacks registered. SDK State: ${SDKState.getName(sdkState)}",
             )
         }
     }
@@ -316,7 +319,7 @@ object CppBridgeState {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "SDK state changed: ${SDKState.getName(previousState)} -> ${SDKState.getName(state)}"
+                "SDK state changed: ${SDKState.getName(previousState)} -> ${SDKState.getName(state)}",
             )
 
             // Notify listener
@@ -326,7 +329,7 @@ object CppBridgeState {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in state listener: ${e.message}"
+                    "Error in state listener: ${e.message}",
                 )
             }
         }
@@ -375,7 +378,7 @@ object CppBridgeState {
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
                 "Component ${ComponentType.getName(componentType)} state changed: " +
-                    "${ComponentState.getName(previousState)} -> ${ComponentState.getName(state)}"
+                    "${ComponentState.getName(previousState)} -> ${ComponentState.getName(state)}",
             )
 
             // Notify listener
@@ -385,7 +388,7 @@ object CppBridgeState {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in state listener onComponentStateChanged: ${e.message}"
+                    "Error in state listener onComponentStateChanged: ${e.message}",
                 )
             }
 
@@ -415,7 +418,7 @@ object CppBridgeState {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.ERROR,
             TAG,
-            "Component ${ComponentType.getName(componentType)} error: [$errorCode] $errorMessage"
+            "Component ${ComponentType.getName(componentType)} error: [$errorCode] $errorMessage",
         )
 
         // Notify listener
@@ -425,7 +428,7 @@ object CppBridgeState {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in state listener onError: ${e.message}"
+                "Error in state listener onError: ${e.message}",
             )
         }
 
@@ -462,7 +465,7 @@ object CppBridgeState {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Health status changed: ${HealthStatus.getName(previousStatus)} -> ${HealthStatus.getName(status)}"
+                "Health status changed: ${HealthStatus.getName(previousStatus)} -> ${HealthStatus.getName(status)}",
             )
 
             // Notify listener
@@ -472,7 +475,7 @@ object CppBridgeState {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in state listener onHealthStatusChanged: ${e.message}"
+                    "Error in state listener onHealthStatusChanged: ${e.message}",
                 )
             }
         }
@@ -496,7 +499,7 @@ object CppBridgeState {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.ERROR,
             TAG,
-            "SDK error: [$errorCode] $errorMessage"
+            "SDK error: [$errorCode] $errorMessage",
         )
 
         // Set SDK state to ERROR if it's a critical error
@@ -511,7 +514,7 @@ object CppBridgeState {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in state listener onError: ${e.message}"
+                "Error in state listener onError: ${e.message}",
             )
         }
     }
@@ -531,7 +534,7 @@ object CppBridgeState {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Error state cleared"
+            "Error state cleared",
         )
     }
 
@@ -556,9 +559,11 @@ object CppBridgeState {
      *
      * Registers [getSDKStateCallback], [setSDKStateCallback],
      * [getComponentStateCallback], [setComponentStateCallback], etc. with C++ core.
+     * Reserved for future native callback integration.
      *
      * C API: rac_state_set_callbacks(...)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeSetStateCallbacks()
 
@@ -566,9 +571,11 @@ object CppBridgeState {
      * Native method to unset the state callbacks.
      *
      * Called during shutdown to clean up native resources.
+     * Reserved for future native callback integration.
      *
      * C API: rac_state_set_callbacks(nullptr)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeUnsetStateCallbacks()
 
@@ -640,15 +647,17 @@ object CppBridgeState {
      * Update health status based on component states.
      */
     private fun updateHealthStatus() {
-        val hasErrors = synchronized(lock) {
-            componentStates.values.any { it == ComponentState.ERROR }
-        }
+        val hasErrors =
+            synchronized(lock) {
+                componentStates.values.any { it == ComponentState.ERROR }
+            }
 
-        val newStatus = when {
-            sdkState == SDKState.ERROR -> HealthStatus.UNHEALTHY
-            hasErrors -> HealthStatus.DEGRADED
-            else -> HealthStatus.HEALTHY
-        }
+        val newStatus =
+            when {
+                sdkState == SDKState.ERROR -> HealthStatus.UNHEALTHY
+                hasErrors -> HealthStatus.DEGRADED
+                else -> HealthStatus.HEALTHY
+            }
 
         if (newStatus != healthStatus) {
             setHealthStatusCallback(newStatus)
@@ -742,7 +751,7 @@ object CppBridgeState {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "All error states cleared"
+            "All error states cleared",
         )
     }
 
