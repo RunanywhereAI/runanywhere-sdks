@@ -10,11 +10,18 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # RunAnywhere SDK - Core
   runanywhere:
-    path: ../../../sdk/runanywhere-flutter
+    path: ../../../sdk/runanywhere-flutter/packages/runanywhere
+  # RunAnywhere SDK - ONNX Backend (STT, TTS, VAD, LLM)
+  runanywhere_onnx:
+    path: ../../../sdk/runanywhere-flutter/packages/runanywhere_onnx
+  # RunAnywhere SDK - LlamaCpp Backend (LLM)
+  runanywhere_llamacpp:
+    path: ../../../sdk/runanywhere-flutter/packages/runanywhere_llamacpp
   provider: ^6.1.0
   flutter_markdown: ^0.6.18
-  record: ^6.1.2
+  record: ^6.1.0
   audioplayers: ^6.0.0
   permission_handler: ^11.1.0
   shared_preferences: ^2.2.2
@@ -28,11 +35,18 @@ dependencies:
   device_info_plus: ^10.0.0
   # App package info
   package_info_plus: ^4.2.0
+  # URL launcher
+  url_launcher: ^6.2.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+
+# Force all packages to use local path dependencies during development
+dependency_overrides:
+  runanywhere:
+    path: ../../../sdk/runanywhere-flutter/packages/runanywhere
 
 flutter:
   uses-material-design: true

@@ -1,73 +1,108 @@
 # RunAnywhere Flutter SDK
 
-A privacy-first, on-device AI SDK for Flutter that brings powerful language models directly to your applications.
+A privacy-first, on-device AI SDK for Flutter that brings powerful AI models directly to your applications.
+
+## Architecture
+
+This SDK uses a **multi-package architecture** for modularity and smaller app sizes:
+
+```text
+runanywhere-flutter/
+├── packages/
+│   ├── runanywhere/           # Core SDK (required)
+│   ├── runanywhere_onnx/      # ONNX backend (STT, TTS, VAD, LLM)
+│   └── runanywhere_llamacpp/  # LlamaCpp backend (LLM)
+├── melos.yaml                 # Multi-package management
+└── analysis_options.yaml      # Shared lint rules
+```
 
 ## Features
 
-- 🤖 **On-Device AI**: Run language models directly on user devices
-- 🔒 **Privacy-First**: All processing happens locally, no data leaves the device
-- ⚡ **Fast & Efficient**: Optimized for mobile performance
-- 🎯 **Structured Output**: Generate type-safe structured data from LLMs
-- 📊 **Analytics**: Track generation performance (development mode)
-- 💾 **Memory Management**: Automatic memory pressure handling
-- 📥 **Model Management**: Download and manage AI models
+- **On-Device AI**: Run language models directly on user devices
+- **Privacy-First**: All processing happens locally, no data leaves the device
+- **Modular Backends**: Only include the backends you need
+- **Speech-to-Text (STT)**: Streaming and batch transcription via ONNX
+- **Text-to-Speech (TTS)**: Neural voice synthesis via ONNX
+- **Voice Activity Detection (VAD)**: Real-time speech detection
+- **LLM Inference**: Text generation via LlamaCpp or ONNX
 
 ## Installation
 
-Add the SDK to your `pubspec.yaml`:
+Add the packages you need to your `pubspec.yaml`:
+
+### Core + ONNX (STT/TTS/VAD)
 
 ```yaml
 dependencies:
-  runanywhere_flutter:
-    path: ../path/to/runanywhere-flutter
+  runanywhere:
+    path: ../path/to/runanywhere-flutter/packages/runanywhere
+  runanywhere_onnx:
+    path: ../path/to/runanywhere-flutter/packages/runanywhere_onnx
 ```
 
-Or from pub.dev (when published):
+### Core + LlamaCpp (LLM)
 
 ```yaml
 dependencies:
-  runanywhere_flutter: ^0.15.8
+  runanywhere:
+    path: ../path/to/runanywhere-flutter/packages/runanywhere
+  runanywhere_llamacpp:
+    path: ../path/to/runanywhere-flutter/packages/runanywhere_llamacpp
+```
+
+### All Backends
+
+```yaml
+dependencies:
+  runanywhere:
+    path: ../path/to/runanywhere-flutter/packages/runanywhere
+  runanywhere_onnx:
+    path: ../path/to/runanywhere-flutter/packages/runanywhere_onnx
+  runanywhere_llamacpp:
+    path: ../path/to/runanywhere-flutter/packages/runanywhere_llamacpp
 ```
 
 ## Quick Start
 
-### 1. Initialize the SDK
+### 1. Initialize SDK and Register Backends
 
 ```dart
 import 'package:runanywhere/runanywhere.dart';
+import 'package:runanywhere_onnx/runanywhere_onnx.dart';
+import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
 
 void main() async {
-  await RunAnywhere.initialize(
-    apiKey: 'your-api-key',
-    baseURL: 'https://api.runanywhere.ai',
-    environment: SDKEnvironment.production,
-  );
+  // Initialize the SDK
+  await RunAnywhere.initialize();
+
+  // Register backends (only include what you need)
+  await Onnx.register();       // For STT, TTS, VAD
+  await LlamaCpp.register();   // For LLM
 }
 ```
 
-### 2. Generate Text
+### 2. Add Models
 
 ```dart
-// Simple text generation
-final response = await RunAnywhere.chat('Hello, how are you?');
-print(response);
-
-// With options
-final result = await RunAnywhere.generate(
-  'Write a short story',
-  options: RunAnywhereGenerationOptions(
-    maxTokens: 500,
-    temperature: 0.7,
-  ),
+// Add an ONNX model for STT
+Onnx.addModel(
+  name: 'Whisper Tiny',
+  url: 'https://...',
+  modality: ModelCategory.speechRecognition,
 );
 
-print(result.text);
-print('Tokens used: ${result.tokensUsed}');
+// Add a LlamaCpp model for LLM
+LlamaCpp.addModel(
+  name: 'SmolLM2 360M',
+  url: 'https://...',
+  memoryRequirement: 500000000,
+);
 ```
 
-### 3. Streaming Generation
+### 3. Use AI Capabilities
 
 ```dart
+// Text generation with streaming
 final stream = RunAnywhere.generateStream(
   'Tell me a joke',
   options: RunAnywhereGenerationOptions(),
@@ -76,165 +111,57 @@ final stream = RunAnywhere.generateStream(
 await for (final token in stream) {
   print(token);
 }
+
+// Speech-to-text
+final transcription = await RunAnywhere.transcribe(audioData);
 ```
 
-### 4. Structured Output
+## Development
 
-```dart
-// Define a Generatable type
-class UserProfile implements Generatable {
-  final String name;
-  final int age;
-  final String email;
+### Prerequisites
 
-  UserProfile({required this.name, required this.age, required this.email});
+- Flutter SDK >= 3.10.0
+- Dart SDK >= 3.0.0
+- [Melos](https://melos.invertase.dev/) for multi-package management
 
-  static String get jsonSchema => '''
-  {
-    "type": "object",
-    "properties": {
-      "name": {"type": "string"},
-      "age": {"type": "integer"},
-      "email": {"type": "string"}
-    },
-    "required": ["name", "age", "email"]
-  }
-  ''';
+### Setup
 
-  factory UserProfile.fromJson(Map<String, dynamic> json) {
-    return UserProfile(
-      name: json['name'] as String,
-      age: json['age'] as int,
-      email: json['email'] as String,
-    );
-  }
-}
+```bash
+# Install melos globally
+dart pub global activate melos
 
-// Generate structured output
-final profile = await RunAnywhere.generateStructuredOutput<UserProfile>(
-  type: UserProfile,
-  prompt: 'Create a user profile for John Doe, age 30',
-);
+# Bootstrap all packages
+melos bootstrap
+
+# Run analysis on all packages
+melos analyze
+
+# Run tests on all packages
+melos test
 ```
 
-### 5. Model Management
+### Native Libraries
 
-```dart
-// Load a model
-await RunAnywhere.loadModel('model-id');
+The native AI inference libraries are provided by `runanywhere-core`. Run the setup script to download them:
 
-// Get available models
-final models = await RunAnywhere.availableModels();
-
-// Get current model
-final currentModel = RunAnywhere.currentModel;
+```bash
+./scripts/setup_native.sh
 ```
 
-### 6. Download Models
+## Packages
 
-```dart
-// Download a model with progress tracking
-final downloadTask = await RunAnywhere.downloadModel('model-id');
-
-await for (final progress in downloadTask.progress) {
-  print('Download progress: ${progress.progress * 100}%');
-}
-
-final localPath = await downloadTask.result;
-print('Model downloaded to: $localPath');
-```
-
-## Event-Driven API
-
-The SDK provides an event bus for reactive programming:
-
-```dart
-// Listen to generation events
-RunAnywhere.events.generationEvents.listen((event) {
-  if (event is SDKGenerationEvent.completed) {
-    print('Generation completed: ${event.response}');
-  }
-});
-
-// Listen to model events
-RunAnywhere.events.modelEvents.listen((event) {
-  if (event is SDKModelEvent.loadCompleted) {
-    print('Model loaded: ${event.modelId}');
-  }
-});
-```
-
-## Architecture
-
-The SDK follows a modular, protocol-oriented architecture:
-
-- **Core**: Base components, protocols, and types
-- **Capabilities**: High-level services (generation, memory, analytics)
-- **Components**: AI component implementations (LLM, STT, TTS)
-- **Foundation**: Infrastructure (logging, security, device management)
-- **Public**: Public API and configuration
-
-## Error Handling
-
-The SDK uses typed errors for better error handling:
-
-```dart
-try {
-  await RunAnywhere.generate('prompt');
-} on SDKError catch (e) {
-  switch (e.type) {
-    case SDKErrorType.modelNotFound:
-      print('Model not found');
-      break;
-    case SDKErrorType.generationFailed:
-      print('Generation failed');
-      break;
-    default:
-      print('Error: ${e.message}');
-  }
-}
-```
-
-## Memory Management
-
-The SDK automatically manages memory:
-
-```dart
-// Get memory statistics
-final stats = RunAnywhere.serviceContainer.memoryService.getMemoryStatistics();
-print('Total memory: ${stats.totalMemory}');
-print('Model memory: ${stats.modelMemory}');
-print('Available: ${stats.availableMemory}');
-```
-
-## Analytics
-
-Analytics are automatically submitted in development mode:
-
-```dart
-// Analytics are submitted automatically after generation
-// No manual tracking needed
-```
-
-## Platform Channels
-
-The SDK uses platform channels for native functionality:
-
-- Audio session management (iOS/Android)
-- Microphone permissions
-- Device capabilities
-- Native model loading (when using native SDKs)
+| Package | Description |
+|---------|-------------|
+| `runanywhere` | Core SDK with interfaces, models, and infrastructure |
+| `runanywhere_onnx` | ONNX Runtime backend for STT, TTS, VAD, and LLM |
+| `runanywhere_llamacpp` | LlamaCpp backend for high-performance LLM inference |
 
 ## Requirements
 
-- Flutter SDK >= 3.0.0
-- Dart >= 3.0.0
-- iOS 13.0+ / Android API 21+
+- Flutter SDK >= 3.10.0
+- Dart SDK >= 3.0.0
+- iOS 13.0+ / Android API 24+
 
 ## License
 
 See LICENSE file for details.
-
-## Support
-
-For issues and questions, please open an issue on GitHub.
