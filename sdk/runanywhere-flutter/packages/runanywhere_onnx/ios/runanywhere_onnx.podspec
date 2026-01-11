@@ -36,7 +36,7 @@ TEST_LOCAL = ENV['RA_TEST_LOCAL'] == '1' || File.exist?(File.join(__dir__, '.tes
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere_onnx'
-  s.version          = '0.15.8'
+  s.version          = '0.15.10'
   s.summary          = 'RunAnywhere ONNX: STT, TTS, VAD for Flutter'
   s.description      = <<-DESC
 ONNX Runtime backend for RunAnywhere Flutter SDK. Provides speech-to-text (STT),
