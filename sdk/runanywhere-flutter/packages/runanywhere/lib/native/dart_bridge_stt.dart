@@ -5,6 +5,7 @@
 library dart_bridge_stt;
 
 import 'dart:ffi';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
@@ -175,39 +176,96 @@ class DartBridgeSTT {
 
   /// Transcribe audio data.
   ///
-  /// [audioData] - PCM16 audio data at 16kHz mono.
+  /// [audioData] - PCM16 audio data (WAV format expected with 16kHz sample rate).
+  /// [sampleRate] - Sample rate of the audio (default: 16000 Hz for Whisper).
   ///
   /// Returns the transcription result.
-  Future<STTComponentResult> transcribe(Uint8List audioData) async {
+  /// Runs in a background isolate to prevent UI blocking.
+  Future<STTComponentResult> transcribe(
+    Uint8List audioData, {
+    int sampleRate = 16000,
+  }) async {
     final handle = getHandle();
 
     if (!isLoaded) {
       throw StateError('No STT model loaded. Call loadModel() first.');
     }
 
-    // Convert to native pointer
+    _logger.debug(
+        'Transcribing ${audioData.length} bytes at $sampleRate Hz in background isolate...');
+
+    // Run transcription in background isolate
+    final result = await Isolate.run(() => _transcribeInIsolate(
+          handle.address,
+          audioData,
+          sampleRate,
+        ));
+
+    _logger.info(
+        'Transcription complete: ${result.text.length} chars, confidence: ${result.confidence}');
+
+    return result;
+  }
+
+  /// Static helper to perform FFI transcription in isolate.
+  /// Must be static/top-level for Isolate.run().
+  static STTComponentResult _transcribeInIsolate(
+    int handleAddress,
+    Uint8List audioData,
+    int sampleRate,
+  ) {
+    final lib = PlatformLoader.loadCommons();
+    final handle = RacHandle.fromAddress(handleAddress);
+
+    // Allocate native memory
     final dataPtr = calloc<Uint8>(audioData.length);
+    final optionsPtr = calloc<RacSttOptionsStruct>();
     final resultPtr = calloc<RacSttResultStruct>();
 
     try {
       // Copy audio data
-      for (var i = 0; i < audioData.length; i++) {
-        dataPtr[i] = audioData[i];
-      }
+      final dataList = dataPtr.asTypedList(audioData.length);
+      dataList.setAll(0, audioData);
 
-      final lib = PlatformLoader.loadCommons();
+      // Set up options with correct sample rate
+      // Matches Swift's STTOptions setup
+      final languagePtr = 'en'.toNativeUtf8();
+      optionsPtr.ref.language = languagePtr;
+      optionsPtr.ref.detectLanguage = RAC_FALSE;
+      optionsPtr.ref.enablePunctuation = RAC_TRUE;
+      optionsPtr.ref.enableDiarization = RAC_FALSE;
+      optionsPtr.ref.maxSpeakers = 0;
+      optionsPtr.ref.enableTimestamps = RAC_TRUE;
+      optionsPtr.ref.audioFormat = RAC_AUDIO_FORMAT_WAV; // WAV format
+      optionsPtr.ref.sampleRate = sampleRate;
+
+      // Get transcribe function
       final transcribeFn = lib.lookupFunction<
           Int32 Function(
-              RacHandle, Pointer<Void>, IntPtr, Pointer<RacSttResultStruct>),
-          int Function(RacHandle, Pointer<Void>, int,
-              Pointer<RacSttResultStruct>)>('rac_stt_component_transcribe');
+            RacHandle,
+            Pointer<Void>,
+            IntPtr,
+            Pointer<RacSttOptionsStruct>,
+            Pointer<RacSttResultStruct>,
+          ),
+          int Function(
+            RacHandle,
+            Pointer<Void>,
+            int,
+            Pointer<RacSttOptionsStruct>,
+            Pointer<RacSttResultStruct>,
+          )>('rac_stt_component_transcribe');
 
       final status = transcribeFn(
         handle,
         dataPtr.cast<Void>(),
         audioData.length,
+        optionsPtr,
         resultPtr,
       );
+
+      // Free the language string
+      calloc.free(languagePtr);
 
       if (status != RAC_SUCCESS) {
         throw StateError(
@@ -215,17 +273,23 @@ class DartBridgeSTT {
         );
       }
 
+      // Extract result before freeing
       final result = resultPtr.ref;
+      final text = result.text != nullptr ? result.text.toDartString() : '';
+      final confidence = result.confidence;
+      final durationMs = result.durationMs;
+      final language =
+          result.language != nullptr ? result.language.toDartString() : null;
+
       return STTComponentResult(
-        text: result.text != nullptr ? result.text.toDartString() : '',
-        confidence: result.confidence,
-        durationMs: result.durationMs,
-        language: result.language != nullptr
-            ? result.language.toDartString()
-            : null,
+        text: text,
+        confidence: confidence,
+        durationMs: durationMs,
+        language: language,
       );
     } finally {
       calloc.free(dataPtr);
+      calloc.free(optionsPtr);
       calloc.free(resultPtr);
     }
   }
@@ -324,6 +388,52 @@ class STTStreamResult {
     required this.isFinal,
     required this.confidence,
   });
+}
+
+// =============================================================================
+// FFI Structs
+// =============================================================================
+
+/// Audio format enum (matches rac_audio_format_enum_t)
+const int RAC_AUDIO_FORMAT_PCM = 0;
+const int RAC_AUDIO_FORMAT_WAV = 1;
+const int RAC_AUDIO_FORMAT_MP3 = 2;
+const int RAC_AUDIO_FORMAT_OPUS = 3;
+const int RAC_AUDIO_FORMAT_AAC = 4;
+const int RAC_AUDIO_FORMAT_FLAC = 5;
+
+/// FFI struct for STT options (matches rac_stt_options_t)
+final class RacSttOptionsStruct extends Struct {
+  /// Language code (e.g., "en")
+  external Pointer<Utf8> language;
+
+  /// Whether to auto-detect language
+  @Int32()
+  external int detectLanguage;
+
+  /// Whether to add punctuation
+  @Int32()
+  external int enablePunctuation;
+
+  /// Whether to enable speaker diarization
+  @Int32()
+  external int enableDiarization;
+
+  /// Maximum number of speakers for diarization
+  @Int32()
+  external int maxSpeakers;
+
+  /// Whether to include word timestamps
+  @Int32()
+  external int enableTimestamps;
+
+  /// Audio format of input data
+  @Int32()
+  external int audioFormat;
+
+  /// Sample rate of input audio (default: 16000 Hz)
+  @Int32()
+  external int sampleRate;
 }
 
 /// FFI struct for STT result (matches rac_stt_result_t)

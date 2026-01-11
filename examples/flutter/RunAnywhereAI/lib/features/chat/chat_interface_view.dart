@@ -2,13 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:provider/provider.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/services/conversation_store.dart';
-import 'package:runanywhere_ai/core/services/model_manager.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_status_components.dart';
@@ -39,6 +37,11 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   bool _isGenerating = false;
   bool _useStreaming = true;
   String? _errorMessage;
+  final bool _isLoading = false;
+
+  // Model state (from SDK - matches Swift pattern)
+  String? _loadedModelName;
+  sdk.InferenceFramework? _loadedFramework;
 
   // Analytics
   DateTime? _generationStartTime;
@@ -49,6 +52,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   void initState() {
     super.initState();
     unawaited(_loadSettings());
+    unawaited(_syncModelState());
   }
 
   @override
@@ -66,10 +70,21 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     });
   }
 
+  /// Sync model state from SDK (matches Swift pattern)
+  Future<void> _syncModelState() async {
+    final model = await sdk.RunAnywhere.currentLLMModel();
+    if (mounted) {
+      setState(() {
+        _loadedModelName = model?.name;
+        _loadedFramework = model?.framework;
+      });
+    }
+  }
+
   bool get _canSend =>
       _controller.text.isNotEmpty &&
       !_isGenerating &&
-      context.read<ModelManager>().isModelLoaded;
+      sdk.RunAnywhere.isModelLoaded;
 
   Future<void> _sendMessage() async {
     if (!_canSend) return;
@@ -124,8 +139,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     String prompt,
     sdk.LLMGenerationOptions options,
   ) async {
-    // Capture model name before async gap to avoid context issues
-    final modelName = context.read<ModelManager>().loadedModelName;
+    // Capture model name from local state (matches Swift pattern)
+    final modelName = _loadedModelName;
 
     // Add empty assistant message for streaming
     final assistantMessage = ChatMessage(
@@ -205,8 +220,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     String prompt,
     sdk.LLMGenerationOptions options,
   ) async {
-    // Capture model name before async gap to avoid context issues
-    final modelName = context.read<ModelManager>().loadedModelName;
+    // Capture model name from local state (matches Swift pattern)
+    final modelName = _loadedModelName;
 
     try {
       final result = await sdk.RunAnywhere.generate(prompt, options: options);
@@ -272,8 +287,6 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
   @override
   Widget build(BuildContext context) {
-    final modelManager = context.watch<ModelManager>();
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Chat'),
@@ -288,8 +301,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
       ),
       body: Column(
         children: [
-          // Model status banner
-          _buildModelStatusBanner(modelManager),
+          // Model status banner (uses local state from SDK)
+          _buildModelStatusBanner(),
 
           // Messages area - tap to dismiss keyboard
           Expanded(
@@ -307,7 +320,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           if (_isGenerating) _buildTypingIndicator(),
 
           // Input area
-          _buildInputArea(modelManager),
+          _buildInputArea(),
         ],
       ),
     );
@@ -321,8 +334,9 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
       builder: (sheetContext) => ModelSelectionSheet(
         context: ModelSelectionContext.llm,
         onModelSelected: (model) async {
-          // Model is loaded by ModelSelectionSheet via SDK
-          // UI will update via ModelManager listener
+          // Model loaded by ModelSelectionSheet via SDK
+          // Sync local state after model load
+          await _syncModelState();
         },
       ),
     ));
@@ -345,20 +359,19 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     }
   }
 
-  Widget _buildModelStatusBanner(ModelManager modelManager) {
-    // Map ModelManager state to LLMFramework for the shared component
+  Widget _buildModelStatusBanner() {
+    // Use local state synced from SDK (matches Swift pattern)
     LLMFramework? framework;
-    if (modelManager.isModelLoaded && modelManager.currentModel != null) {
-      // Get framework from the current model's framework
-      framework = _mapInferenceFramework(modelManager.currentModel!.framework);
+    if (sdk.RunAnywhere.isModelLoaded && _loadedFramework != null) {
+      framework = _mapInferenceFramework(_loadedFramework);
     }
 
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.large),
       child: ModelStatusBanner(
         framework: framework,
-        modelName: modelManager.loadedModelName,
-        isLoading: modelManager.isLoading,
+        modelName: _loadedModelName,
+        isLoading: _isLoading,
         onSelectModel: _showModelSelectionSheet,
       ),
     );
@@ -440,7 +453,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     );
   }
 
-  Widget _buildInputArea(ModelManager modelManager) {
+  Widget _buildInputArea() {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.large),
       decoration: BoxDecoration(

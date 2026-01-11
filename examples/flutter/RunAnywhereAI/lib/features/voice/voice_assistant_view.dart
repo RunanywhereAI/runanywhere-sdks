@@ -7,7 +7,6 @@ import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/models/app_types.dart';
-import 'package:runanywhere_ai/core/services/model_manager.dart';
 import 'package:runanywhere_ai/core/services/permission_service.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
@@ -100,15 +99,14 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
     await _refreshComponentStates();
   }
 
-  /// Refresh model states from ModelManager
+  /// Refresh model states from SDK (matches Swift VoiceAgentViewModel pattern)
   /// NOTE: Voice agent API is not yet fully implemented in SDK
   Future<void> _refreshComponentStates() async {
     try {
-      // Use ModelManager to track loaded models
-      final modelManager = ModelManager.shared;
-      final currentModelId = modelManager.currentModelId;
-      final sttModelId = modelManager.loadedSTTModelId;
-      final ttsVoiceId = modelManager.loadedTTSVoiceId;
+      // Use SDK public API to check loaded states (matches Swift pattern)
+      final currentModelId = sdk.RunAnywhere.currentModelId;
+      final sttModelId = sdk.RunAnywhere.currentSTTModelId;
+      final ttsVoiceId = sdk.RunAnywhere.currentTTSVoiceId;
 
       setState(() {
         _sttModelState = sttModelId != null

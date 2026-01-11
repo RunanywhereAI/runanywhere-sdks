@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
@@ -6,7 +7,6 @@ import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/services/audio_recording_service.dart';
-import 'package:runanywhere_ai/core/services/model_manager.dart';
 import 'package:runanywhere_ai/core/services/permission_service.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_status_components.dart';
@@ -118,7 +118,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
     ));
   }
 
-  /// Load STT model using RunAnywhere SDK
+  /// Load STT model using RunAnywhere SDK directly (matches Swift STTViewModel pattern)
   Future<void> _loadModel(ModelInfo model) async {
     setState(() {
       _isProcessing = true;
@@ -128,7 +128,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
     try {
       debugPrint('🔄 Loading STT model: ${model.name}');
 
-      // Load STT model via RunAnywhere SDK
+      // Load STT model directly via SDK (matches Swift: RunAnywhere.loadSTTModel)
       await sdk.RunAnywhere.loadSTTModel(model.id);
 
       setState(() {
@@ -236,27 +236,22 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
     try {
       debugPrint('🔄 Transcribing ${audioData.length} bytes of audio...');
 
-      // Check if STT model is loaded via ModelManager
-      if (!ModelManager.shared.isSTTModelLoaded) {
+      // Check if STT model is loaded via SDK (matches Swift: RunAnywhere.isSTTModelLoaded)
+      if (!sdk.RunAnywhere.isSTTModelLoaded) {
         throw Exception(
             'STT component not loaded. Please load an STT model first.');
       }
 
-      // TODO: STT transcription via SDK is not yet fully implemented
-      // The STTCapability class needs transcribe() method implementation
-      // For now, show a placeholder message
-      debugPrint('⚠️ STT transcription API not yet implemented in SDK');
-
-      // Simulate transcription for demo purposes
-      await Future<void>.delayed(const Duration(seconds: 1));
+      // Call SDK transcription API (matches Swift: RunAnywhere.transcribe(_:))
+      final audioBytes = Uint8List.fromList(audioData);
+      final transcribedText = await sdk.RunAnywhere.transcribe(audioBytes);
 
       setState(() {
-        _transcribedText =
-            '[STT transcription not yet implemented - audio data received: ${audioData.length} bytes]';
+        _transcribedText = transcribedText;
         _isTranscribing = false;
       });
 
-      debugPrint('✅ Transcription placeholder complete');
+      debugPrint('✅ Transcription complete: ${transcribedText.length} chars');
     } catch (e) {
       debugPrint('❌ Transcription failed: $e');
       setState(() {
