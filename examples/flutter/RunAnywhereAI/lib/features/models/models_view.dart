@@ -1,14 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
-import '../../core/design_system/app_colors.dart';
-import '../../core/design_system/app_spacing.dart';
-import '../../core/design_system/typography.dart';
-import '../../core/models/app_types.dart';
-import '../../core/services/device_info_service.dart';
-import 'add_model_from_url_view.dart';
-import 'model_components.dart';
-import 'model_list_view_model.dart';
-import 'model_types.dart';
+import 'package:runanywhere_ai/core/design_system/app_colors.dart';
+import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
+import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/models/app_types.dart';
+import 'package:runanywhere_ai/core/services/device_info_service.dart';
+import 'package:runanywhere_ai/features/models/add_model_from_url_view.dart';
+import 'package:runanywhere_ai/features/models/model_components.dart';
+import 'package:runanywhere_ai/features/models/model_list_view_model.dart';
+import 'package:runanywhere_ai/features/models/model_types.dart';
 
 /// ModelsView (mirroring iOS SimplifiedModelsView.swift)
 ///
@@ -30,7 +32,7 @@ class _ModelsViewState extends State<ModelsView> {
   @override
   void initState() {
     super.initState();
-    _loadInitialData();
+    unawaited(_loadInitialData());
   }
 
   Future<void> _loadInitialData() async {
@@ -246,7 +248,7 @@ class _ModelsViewState extends State<ModelsView> {
   }
 
   void _showAddModelSheet() {
-    showModalBottomSheet(
+    unawaited(showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -258,6 +260,6 @@ class _ModelsViewState extends State<ModelsView> {
           if (mounted) navigator.pop();
         },
       ),
-    );
+    ));
   }
 }

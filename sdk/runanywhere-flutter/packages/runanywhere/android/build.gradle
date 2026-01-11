@@ -1,0 +1,184 @@
+// RunAnywhere Core SDK - Android
+//
+// This plugin bundles RACommons native libraries (.so files) for Android.
+// RACommons provides the core infrastructure for on-device AI capabilities.
+//
+// Binary Configuration:
+//   Edit binary_config.gradle to toggle between local and remote binaries:
+//   - testLocal = true:  Use local .so files from android/src/main/jniLibs/ (for development)
+//   - testLocal = false: Download from GitHub releases (for production)
+//
+// Version: Must match Swift SDK's Package.swift and Kotlin SDK's build.gradle.kts
+
+group 'ai.runanywhere.sdk'
+version '0.15.8'
+
+// Load binary configuration
+apply from: 'binary_config.gradle'
+
+buildscript {
+    ext.kotlin_version = '1.9.10'
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.1.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+android {
+    namespace 'ai.runanywhere.sdk'
+    compileSdk 34
+
+    // Use NDK for native library support
+    ndkVersion "25.2.9519653"
+
+    defaultConfig {
+        minSdk 24
+        targetSdk 34
+
+        // ABI filters for native libraries
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+        }
+
+        // Consumer proguard rules
+        consumerProguardFiles 'proguard-rules.pro'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
+    sourceSets {
+        main {
+            // Native libraries location - use downloaded libs or local libs based on config
+            jniLibs.srcDirs = [testLocal ? 'src/main/jniLibs' : 'build/jniLibs']
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+}
+
+// =============================================================================
+// Helper Functions
+// =============================================================================
+import java.security.MessageDigest
+
+def calculateChecksum(File file) {
+    MessageDigest digest = MessageDigest.getInstance("SHA-256")
+    file.withInputStream { stream ->
+        byte[] buffer = new byte[8192]
+        int read
+        while ((read = stream.read(buffer)) > 0) {
+            digest.update(buffer, 0, read)
+        }
+    }
+    return digest.digest().collect { String.format("%02x", it) }.join('')
+}
+
+// =============================================================================
+// Binary Download Task (runs when testLocal = false)
+// =============================================================================
+task downloadNativeLibs {
+    group = 'runanywhere'
+    description = 'Download RACommons native libraries from GitHub releases'
+
+    doLast {
+        if (shouldDownloadAndroidLibs()) {
+            println "📦 Remote mode: Downloading RACommons Android native libraries..."
+
+            def jniLibsDir = file('build/jniLibs')
+            if (jniLibsDir.exists()) {
+                delete(jniLibsDir)
+            }
+            jniLibsDir.mkdirs()
+
+            // Ensure build directory exists
+            buildDir.mkdirs()
+
+            def downloadUrl = commonsAndroidUrl
+            def zipFile = file("${buildDir}/racommons-android.zip")
+
+            println "Downloading from: ${downloadUrl}"
+
+            // Download the zip file
+            ant.get(src: downloadUrl, dest: zipFile)
+
+            println "✅ Downloaded successfully"
+
+            // Extract to temp directory first
+            def tempDir = file("${buildDir}/racommons-temp")
+            if (tempDir.exists()) {
+                delete(tempDir)
+            }
+            tempDir.mkdirs()
+
+            copy {
+                from zipTree(zipFile)
+                into tempDir
+            }
+
+            // Copy .so files from jniLibs structure
+            tempDir.eachFileRecurse { file ->
+                if (file.isDirectory() && file.name in ['arm64-v8a', 'armeabi-v7a', 'x86_64', 'x86']) {
+                    def targetAbiDir = new File(jniLibsDir, file.name)
+                    targetAbiDir.mkdirs()
+                    file.eachFile { soFile ->
+                        if (soFile.name.endsWith('.so')) {
+                            copy {
+                                from soFile
+                                into targetAbiDir
+                            }
+                            println "  ✓ ${file.name}/${soFile.name}"
+                        }
+                    }
+                }
+            }
+
+            // Clean up
+            zipFile.delete()
+            if (tempDir.exists()) {
+                delete(tempDir)
+            }
+
+            println "✅ RACommons native libraries downloaded successfully"
+        } else {
+            println "🔧 Local mode: Using native libraries from src/main/jniLibs/"
+
+            if (!checkLocalLibsExist()) {
+                throw new GradleException("""
+                    ⚠️  Native libraries not found in src/main/jniLibs/!
+                    For local mode, please build and copy the libraries:
+                      1. cd runanywhere-commons && ./scripts/build-android.sh
+                      2. Copy the .so files to packages/runanywhere/android/src/main/jniLibs/
+                    Or switch to remote mode by editing binary_config.gradle:
+                      testLocal = false
+                """)
+            } else {
+                println "✅ Using local native libraries"
+            }
+        }
+    }
+}
+
+// Run downloadNativeLibs before preBuild
+preBuild.dependsOn downloadNativeLibs

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
 
-import '../../core/design_system/app_colors.dart';
-import '../../core/design_system/app_spacing.dart';
-import '../../core/design_system/typography.dart';
-import '../../core/models/app_types.dart';
-import 'model_types.dart';
+import 'package:runanywhere_ai/core/design_system/app_colors.dart';
+import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
+import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/models/app_types.dart';
+import 'package:runanywhere_ai/features/models/model_types.dart';
 
 /// FrameworkRow (mirroring iOS FrameworkRow)
 ///
@@ -395,27 +395,14 @@ class _ModelRowState extends State<ModelRow> {
     try {
       debugPrint('📥 Starting download for model: ${widget.model.name}');
 
-      // Get the download service from SDK
-      final downloadService = sdk.RunAnywhere.serviceContainer.downloadService;
-
-      // Get the SDK model by ID
-      final sdkModels = await sdk.RunAnywhere.availableModels();
-      final sdkModel = sdkModels.firstWhere(
-        (m) => m.id == widget.model.id,
-        orElse: () =>
-            throw Exception('Model not found in registry: ${widget.model.id}'),
-      );
-
       // Start the actual download using SDK
-      final downloadTask = await downloadService.downloadModel(sdkModel);
+      final progressStream = sdk.RunAnywhere.downloadModel(widget.model.id);
 
       // Listen to real download progress
-      await for (final progress in downloadTask.progress) {
+      await for (final progress in progressStream) {
         if (!mounted) return;
 
-        final progressValue = progress.totalBytes > 0
-            ? progress.bytesDownloaded / progress.totalBytes
-            : 0.0;
+        final progressValue = progress.percentage;
 
         setState(() {
           _downloadProgress = progressValue;

@@ -1,0 +1,50 @@
+// =============================================================================
+// BINARY CONFIGURATION FOR RUNANYWHERE FLUTTER SDK - ANDROID (Core Package)
+// =============================================================================
+// This file controls whether to use local or remote native libraries (.so files).
+// Similar to Swift Package.swift's testLocal flag.
+//
+// Set to `true` to use local binaries from android/src/main/jniLibs/
+// Set to `false` to download binaries from GitHub releases (production mode)
+// =============================================================================
+
+ext {
+    // Set this to true for local development/testing
+    // Set to false for production builds (downloads from GitHub releases)
+    testLocal = false
+
+    // =============================================================================
+    // Version Configuration (MUST match Swift Package.swift and Kotlin build.gradle.kts)
+    // =============================================================================
+    commonsVersion = "0.1.4"
+
+    // =============================================================================
+    // Remote binary URLs
+    // RACommons from runanywhere-sdks (NOT runanywhere-binaries)
+    // =============================================================================
+    commonsGitHubOrg = "RunanywhereAI"
+    commonsRepo = "runanywhere-sdks"
+    commonsBaseUrl = "https://github.com/${commonsGitHubOrg}/${commonsRepo}/releases/download"
+
+    // Android native libraries package
+    commonsAndroidUrl = "${commonsBaseUrl}/commons-v${commonsVersion}/RACommons-android-v${commonsVersion}.zip"
+
+    // Helper method to check if we should download
+    shouldDownloadAndroidLibs = { ->
+        return !testLocal
+    }
+
+    // Helper method to check if local libs exist
+    checkLocalLibsExist = { ->
+        def jniLibsDir = project.file('src/main/jniLibs')
+        def arm64Dir = new File(jniLibsDir, 'arm64-v8a')
+
+        if (!arm64Dir.exists() || !arm64Dir.isDirectory()) {
+            return false
+        }
+
+        // Check for RACommons library
+        def commonsLib = new File(arm64Dir, 'librac_commons.so')
+        return commonsLib.exists()
+    }
+}

@@ -54,10 +54,40 @@
 @import record_ios;
 #endif
 
+#if __has_include(<runanywhere/RunAnywherePlugin.h>)
+#import <runanywhere/RunAnywherePlugin.h>
+#else
+@import runanywhere;
+#endif
+
+#if __has_include(<runanywhere_llamacpp/LlamaCppPlugin.h>)
+#import <runanywhere_llamacpp/LlamaCppPlugin.h>
+#else
+@import runanywhere_llamacpp;
+#endif
+
+#if __has_include(<runanywhere_onnx/OnnxPlugin.h>)
+#import <runanywhere_onnx/OnnxPlugin.h>
+#else
+@import runanywhere_onnx;
+#endif
+
 #if __has_include(<shared_preferences_foundation/SharedPreferencesPlugin.h>)
 #import <shared_preferences_foundation/SharedPreferencesPlugin.h>
 #else
 @import shared_preferences_foundation;
+#endif
+
+#if __has_include(<sqflite_darwin/SqflitePlugin.h>)
+#import <sqflite_darwin/SqflitePlugin.h>
+#else
+@import sqflite_darwin;
+#endif
+
+#if __has_include(<url_launcher_ios/URLLauncherPlugin.h>)
+#import <url_launcher_ios/URLLauncherPlugin.h>
+#else
+@import url_launcher_ios;
 #endif
 
 @implementation GeneratedPluginRegistrant
@@ -71,7 +101,12 @@
   [PathProviderPlugin registerWithRegistrar:[registry registrarForPlugin:@"PathProviderPlugin"]];
   [PermissionHandlerPlugin registerWithRegistrar:[registry registrarForPlugin:@"PermissionHandlerPlugin"]];
   [RecordIosPlugin registerWithRegistrar:[registry registrarForPlugin:@"RecordIosPlugin"]];
+  [RunAnywherePlugin registerWithRegistrar:[registry registrarForPlugin:@"RunAnywherePlugin"]];
+  [LlamaCppPlugin registerWithRegistrar:[registry registrarForPlugin:@"LlamaCppPlugin"]];
+  [OnnxPlugin registerWithRegistrar:[registry registrarForPlugin:@"OnnxPlugin"]];
   [SharedPreferencesPlugin registerWithRegistrar:[registry registrarForPlugin:@"SharedPreferencesPlugin"]];
+  [SqflitePlugin registerWithRegistrar:[registry registrarForPlugin:@"SqflitePlugin"]];
+  [URLLauncherPlugin registerWithRegistrar:[registry registrarForPlugin:@"URLLauncherPlugin"]];
 }
 
 @end

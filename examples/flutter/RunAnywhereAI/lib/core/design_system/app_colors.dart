@@ -79,9 +79,4 @@ class AppColors {
   // MARK: - Border colors
   static Color get borderLight => Colors.white.withValues(alpha: 0.3);
   static Color get borderMedium => Colors.black.withValues(alpha: 0.05);
-
-  // MARK: - Quiz specific
-  static const Color quizTrue = Colors.green;
-  static const Color quizFalse = Colors.red;
-  static Color get quizCardShadow => Colors.black.withValues(alpha: 0.1);
 }

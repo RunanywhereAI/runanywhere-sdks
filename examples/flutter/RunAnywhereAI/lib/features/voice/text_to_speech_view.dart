@@ -4,13 +4,13 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
 
-import '../../core/design_system/app_colors.dart';
-import '../../core/design_system/app_spacing.dart';
-import '../../core/design_system/typography.dart';
-import '../../core/services/audio_player_service.dart';
-import '../models/model_selection_sheet.dart';
-import '../models/model_status_components.dart';
-import '../models/model_types.dart';
+import 'package:runanywhere_ai/core/design_system/app_colors.dart';
+import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
+import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/services/audio_player_service.dart';
+import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
+import 'package:runanywhere_ai/features/models/model_status_components.dart';
+import 'package:runanywhere_ai/features/models/model_types.dart';
 
 /// TTSMetadata (matching iOS TTSMetadata)
 class TTSMetadata {
@@ -44,6 +44,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
   // Playback state
   bool _isGenerating = false;
   bool _isPlaying = false;
+  // ignore: unused_field - kept for future TTS implementation
   bool _hasAudio = false;
   double _currentTime = 0.0;
   double _duration = 0.0;
@@ -78,14 +79,14 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
   @override
   void initState() {
     super.initState();
-    _initializeAudioPlayer();
+    unawaited(_initializeAudioPlayer());
   }
 
   @override
   void dispose() {
     _textController.dispose();
-    _playingSubscription?.cancel();
-    _progressSubscription?.cancel();
+    unawaited(_playingSubscription?.cancel());
+    unawaited(_progressSubscription?.cancel());
     super.dispose();
   }
 
@@ -113,7 +114,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
   }
 
   void _showModelSelectionSheet() {
-    showModalBottomSheet(
+    unawaited(showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -123,7 +124,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
           await _loadModel(model);
         },
       ),
-    );
+    ));
   }
 
   /// Load TTS model using RunAnywhere SDK
@@ -134,10 +135,10 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     });
 
     try {
-      debugPrint('🔄 Loading TTS model: ${model.name}');
+      debugPrint('🔄 Loading TTS voice: ${model.name}');
 
-      // Load TTS model via RunAnywhere SDK
-      await sdk.RunAnywhere.loadTTSModel(model.id);
+      // Load TTS voice via RunAnywhere SDK
+      await sdk.RunAnywhere.loadTTSVoice(model.id);
 
       setState(() {
         _selectedFramework = model.preferredFramework ?? LLMFramework.systemTTS;
@@ -175,33 +176,37 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     try {
       debugPrint('🔊 Generating speech with SDK...');
 
-      // Get the TTS component from SDK
-      final ttsComponent = sdk.RunAnywhere.loadedTTSComponent;
-
-      if (ttsComponent == null) {
-        throw Exception('TTS component not loaded');
+      // Check if TTS voice is loaded via SDK (matches Swift: RunAnywhere.isTTSVoiceLoaded)
+      if (!sdk.RunAnywhere.isTTSVoiceLoaded) {
+        throw Exception(
+            'TTS component not loaded. Please load a TTS voice first.');
       }
 
-      // Use SDK's TTS component to synthesize speech
-      final output = await ttsComponent.synthesize(_textController.text);
+      // Call SDK TTS synthesis API (matches Swift: RunAnywhere.synthesize(_:))
+      final result = await sdk.RunAnywhere.synthesize(
+        _textController.text,
+        rate: _speechRate,
+        pitch: _pitch,
+        volume: 1.0,
+      );
+
+      debugPrint(
+          '✅ TTS synthesis complete: ${result.samples.length} samples, ${result.sampleRate} Hz, ${result.durationMs}ms');
 
       setState(() {
         _isGenerating = false;
-        _hasAudio = output.audioData.isNotEmpty;
-        _duration = output.duration;
+        _hasAudio = result.samples.isNotEmpty;
+        _duration = result.durationSeconds;
         _metadata = TTSMetadata(
-          durationMs: output.duration * 1000,
-          audioSize: output.audioData.length,
-          sampleRate: 22050, // Default sample rate
+          durationMs: result.durationMs.toDouble(),
+          audioSize: result.samples.length * 4, // 4 bytes per float sample
+          sampleRate: result.sampleRate,
         );
       });
 
-      debugPrint(
-          '✅ Speech generated: ${output.audioData.length} bytes, duration: ${output.duration}s');
-
-      // Auto-play the generated audio
-      if (_hasAudio) {
-        await _playAudio(output.audioData);
+      // Auto-play if audio was generated
+      if (result.samples.isNotEmpty) {
+        await _playFloatAudio(result.samples, result.sampleRate);
       }
     } catch (e) {
       debugPrint('❌ Speech generation failed: $e');
@@ -212,7 +217,37 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     }
   }
 
-  /// Play audio using the audio player service
+  /// Play audio from Float32List samples (TTS output)
+  Future<void> _playFloatAudio(Float32List samples, int sampleRate) async {
+    try {
+      // Convert Float32 PCM samples to Int16 PCM bytes
+      // TTS returns samples in range [-1.0, 1.0], we convert to Int16 range [-32768, 32767]
+      final pcmData = ByteData(samples.length * 2); // 2 bytes per Int16 sample
+      for (var i = 0; i < samples.length; i++) {
+        // Clamp and scale to Int16 range
+        final sample = (samples[i].clamp(-1.0, 1.0) * 32767).round();
+        pcmData.setInt16(i * 2, sample, Endian.little);
+      }
+
+      await _playerService.playFromBytes(
+        pcmData.buffer.asUint8List(),
+        volume: 1.0,
+        rate: 1.0, // Rate is already applied in TTS synthesis
+        sampleRate: sampleRate,
+        numChannels: 1, // Mono audio
+      );
+      debugPrint(
+          '🔊 Playing TTS audio: ${samples.length} samples at $sampleRate Hz');
+    } catch (e) {
+      debugPrint('❌ Failed to play TTS audio: $e');
+      setState(() {
+        _errorMessage = 'Failed to play audio: $e';
+      });
+    }
+  }
+
+  /// Play audio using the audio player service (for Int16 PCM data)
+  // ignore: unused_element - kept for alternative audio formats
   Future<void> _playAudio(List<int> audioData) async {
     try {
       // Convert List<int> to Uint8List
@@ -236,7 +271,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     }
   }
 
-  void _togglePlayback() async {
+  Future<void> _togglePlayback() async {
     if (_isPlaying) {
       await _stopPlayback();
     }

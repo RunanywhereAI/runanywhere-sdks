@@ -28,7 +28,8 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 flutter_ios_podfile_setup
 
 target 'Runner' do
-  use_frameworks!
+  # Use static linkage to properly include RACommons symbols from vendored xcframeworks
+  use_frameworks! :linkage => :static
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do
@@ -50,4 +51,12 @@ post_install do |installer|
       ]
     end
   end
+
+  # NOTE: We rely on -all_load (set in runanywhere.podspec) to include all symbols
+  # from static frameworks. The symbols will be in the binary (visible via nm)
+  # but marked as local (lowercase 't'). Flutter's DynamicLibrary.executable()
+  # can still find these symbols because it operates at a lower level than dlsym.
+  #
+  # DO NOT use -exported_symbols_list here as it breaks Flutter's debug mode
+  # by hiding the debug dylib entry point.
 end

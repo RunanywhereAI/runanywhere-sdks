@@ -1,0 +1,28 @@
+name: runanywhere_flutter
+
+packages:
+  - packages/**
+
+command:
+  version:
+    workspaceChangelog: true
+
+  bootstrap:
+    runPubGetInParallel: true
+
+scripts:
+  analyze:
+    run: melos exec -- flutter analyze .
+    description: Run flutter analyze in all packages
+
+  format:
+    run: melos exec -- dart format .
+    description: Run dart format in all packages
+
+  test:
+    run: melos exec -- flutter test
+    description: Run tests in all packages
+
+  clean:
+    run: melos exec -- flutter clean
+    description: Run flutter clean in all packages
