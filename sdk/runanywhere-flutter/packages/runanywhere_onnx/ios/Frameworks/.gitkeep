@@ -1,0 +1,9 @@
+# This directory will contain:
+#   - RABackendONNX.xcframework (STT/TTS/VAD backend)
+#   - onnxruntime.xcframework (ONNX Runtime 1.17.1)
+#
+# Downloaded automatically during pod install (when testLocal=false)
+# Or copied manually for local development (when testLocal=true)
+#
+# NOTE: onnxruntime is bundled directly (like Swift/React Native SDKs)
+# rather than using CocoaPods 'onnxruntime-c' dependency for version consistency.

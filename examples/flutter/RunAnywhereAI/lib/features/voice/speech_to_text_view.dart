@@ -1,16 +1,16 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
-
-import '../../core/design_system/app_colors.dart';
-import '../../core/design_system/app_spacing.dart';
-import '../../core/design_system/typography.dart';
-import '../../core/services/permission_service.dart';
-import '../../core/services/audio_recording_service.dart';
-import '../models/model_selection_sheet.dart';
-import '../models/model_status_components.dart';
-import '../models/model_types.dart';
+import 'package:runanywhere_ai/core/design_system/app_colors.dart';
+import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
+import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/services/audio_recording_service.dart';
+import 'package:runanywhere_ai/core/services/permission_service.dart';
+import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
+import 'package:runanywhere_ai/features/models/model_status_components.dart';
+import 'package:runanywhere_ai/features/models/model_types.dart';
 
 /// STTMode enumeration (matching iOS STTMode)
 enum STTMode {
@@ -85,12 +85,12 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
   @override
   void initState() {
     super.initState();
-    _checkMicrophonePermission();
+    unawaited(_checkMicrophonePermission());
   }
 
   @override
   void dispose() {
-    _audioLevelSubscription?.cancel();
+    unawaited(_audioLevelSubscription?.cancel());
     super.dispose();
   }
 
@@ -105,7 +105,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
   }
 
   void _showModelSelectionSheet() {
-    showModalBottomSheet(
+    unawaited(showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -115,10 +115,10 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
           await _loadModel(model);
         },
       ),
-    );
+    ));
   }
 
-  /// Load STT model using RunAnywhere SDK
+  /// Load STT model using RunAnywhere SDK directly (matches Swift STTViewModel pattern)
   Future<void> _loadModel(ModelInfo model) async {
     setState(() {
       _isProcessing = true;
@@ -128,7 +128,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
     try {
       debugPrint('🔄 Loading STT model: ${model.name}');
 
-      // Load STT model via RunAnywhere SDK
+      // Load STT model directly via SDK (matches Swift: RunAnywhere.loadSTTModel)
       await sdk.RunAnywhere.loadSTTModel(model.id);
 
       setState(() {
@@ -216,9 +216,9 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
     final (audioData, _) = await _recordingService.stopRecording();
 
     if (audioData == null || audioData.isEmpty) {
-        setState(() {
+      setState(() {
         _errorMessage = 'No audio data recorded';
-        });
+      });
       return;
     }
 
@@ -236,24 +236,22 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
     try {
       debugPrint('🔄 Transcribing ${audioData.length} bytes of audio...');
 
-      // Get the STT component from SDK
-      final sttComponent = sdk.RunAnywhere.loadedSTTComponent;
-
-      if (sttComponent == null) {
-        throw Exception('STT component not loaded');
+      // Check if STT model is loaded via SDK (matches Swift: RunAnywhere.isSTTModelLoaded)
+      if (!sdk.RunAnywhere.isSTTModelLoaded) {
+        throw Exception(
+            'STT component not loaded. Please load an STT model first.');
       }
 
-      // Transcribe using the SDK component
-      final output = await sttComponent.transcribe(audioData);
+      // Call SDK transcription API (matches Swift: RunAnywhere.transcribe(_:))
+      final audioBytes = Uint8List.fromList(audioData);
+      final transcribedText = await sdk.RunAnywhere.transcribe(audioBytes);
 
-        setState(() {
-        _transcribedText = output.text;
-          _isTranscribing = false;
-        });
+      setState(() {
+        _transcribedText = transcribedText;
+        _isTranscribing = false;
+      });
 
-      debugPrint('✅ Transcription complete: ${output.text}');
-      debugPrint('📊 Confidence: ${output.confidence}');
-      debugPrint('⏱️ Processing time: ${output.metadata.processingTime}s');
+      debugPrint('✅ Transcription complete: ${transcribedText.length} chars');
     } catch (e) {
       debugPrint('❌ Transcription failed: $e');
       setState(() {
