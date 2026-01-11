@@ -192,16 +192,31 @@ const App: React.FC = () => {
     try {
       const startTime = Date.now();
 
-      // Initialize SDK based on build configuration
-      // Development mode - uses Supabase directly (same creds as iOS/Android native)
+      // =========================================================================
+      // SDK Initialization - Choose ONE mode below
+      // =========================================================================
+
+      // DEVELOPMENT mode (default) - uses Supabase directly
+      // Credentials come from runanywhere-commons/development_config.cpp (git-ignored)
+      // This is the safest option for committing to git
       await RunAnywhere.initialize({
-        apiKey: '', // Empty in development mode
+        apiKey: '', // Empty in development mode - uses C++ dev config
         baseURL: 'https://api.runanywhere.ai',
         environment: SDKEnvironment.Development,
-        // Supabase credentials for development mode (from runanywhere-commons)
-        supabaseURL: 'https://fhtgjtxuoikwwouxqzrn.supabase.co',
-        supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZodGdqdHh1b2lrd3dvdXhxenJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjExOTkwNzIsImV4cCI6MjA3Njc3NTA3Mn0.aIssX-t8CIqt8zoctNhMS8fm3wtH-DzsQiy9FunqD9E',
       });
+      console.log('✅ SDK initialized in DEVELOPMENT mode (Supabase via C++ config)');
+
+      // PRODUCTION mode - uncomment below and set your credentials
+      // WARNING: Do NOT commit real API keys to git!
+      // For production testing, set credentials via environment variables or config file
+      // const apiKey = process.env.RUNANYWHERE_API_KEY || '';
+      // const baseURL = process.env.RUNANYWHERE_BASE_URL || 'https://api.runanywhere.ai';
+      // await RunAnywhere.initialize({
+      //   apiKey: apiKey,
+      //   baseURL: baseURL,
+      //   environment: SDKEnvironment.Production,
+      // });
+      // console.log('✅ SDK initialized in PRODUCTION mode');
 
       // Register modules and models (await to ensure models are ready before UI)
       await registerModulesAndModels();

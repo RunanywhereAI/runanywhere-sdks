@@ -92,6 +92,14 @@ export interface RunAnywhereCore
    */
   getOrganizationId(): Promise<string>;
 
+  /**
+   * Set authentication tokens directly (after JS-side authentication)
+   * This stores the tokens in C++ AuthBridge for use by telemetry/device registration
+   * @param authResponseJson JSON string with access_token, refresh_token, expires_in, etc.
+   * @returns true if tokens were set successfully
+   */
+  setAuthTokens(authResponseJson: string): Promise<boolean>;
+
   // ============================================================================
   // Device Registration
   // Matches Swift: CppBridge+Device.swift
@@ -108,6 +116,12 @@ export interface RunAnywhereCore
    * Check if device is registered
    */
   isDeviceRegistered(): Promise<boolean>;
+
+  /**
+   * Clear device registration flag (for testing)
+   * Forces re-registration on next SDK init
+   */
+  clearDeviceRegistration(): Promise<boolean>;
 
   /**
    * Get the device ID

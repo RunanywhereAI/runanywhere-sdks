@@ -25,20 +25,38 @@
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
-// Global JavaVM for JNI calls
-static JavaVM* g_javaVM = nullptr;
+// Use the JavaVM from cpp-adapter.cpp (set in JNI_OnLoad there)
+// NOTE: JNI_OnLoad is defined in cpp-adapter.cpp - do NOT define it here!
+extern JavaVM* g_javaVM;
 
-// JNI_OnLoad - called when native library is loaded
-extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
-    g_javaVM = vm;
-    LOGI("JNI_OnLoad: JavaVM stored for secure storage callbacks");
-    return JNI_VERSION_1_6;
-}
+// Use cached class and method references from cpp-adapter.cpp
+// These are set in JNI_OnLoad to avoid FindClass from background threads
+extern jclass g_platformAdapterBridgeClass;
+extern jclass g_httpResponseClass;
+extern jmethodID g_secureSetMethod;
+extern jmethodID g_secureGetMethod;
+extern jmethodID g_secureDeleteMethod;
+extern jmethodID g_secureExistsMethod;
+extern jmethodID g_getPersistentDeviceUUIDMethod;
+extern jmethodID g_httpPostSyncMethod;
+extern jmethodID g_getDeviceModelMethod;
+extern jmethodID g_getOSVersionMethod;
+extern jmethodID g_getChipNameMethod;
+extern jmethodID g_getTotalMemoryMethod;
+extern jmethodID g_getAvailableMemoryMethod;
+extern jmethodID g_getCoreCountMethod;
+extern jmethodID g_getArchitectureMethod;
+extern jmethodID g_getGPUFamilyMethod;
+// HttpResponse field IDs
+extern jfieldID g_httpResponse_successField;
+extern jfieldID g_httpResponse_statusCodeField;
+extern jfieldID g_httpResponse_responseBodyField;
+extern jfieldID g_httpResponse_errorMessageField;
 
 // Helper to get JNIEnv for current thread
 static JNIEnv* getJNIEnv() {
     if (!g_javaVM) {
-        LOGE("JavaVM not initialized");
+        LOGE("JavaVM not initialized - cpp-adapter JNI_OnLoad may not have been called");
         return nullptr;
     }
     
@@ -60,30 +78,26 @@ static JNIEnv* getJNIEnv() {
 }
 
 // Android JNI bridge for secure storage
+// Uses cached class/method references from cpp-adapter.cpp to avoid FindClass from bg threads
 namespace AndroidBridge {
     bool secureSet(const char* key, const char* value) {
         JNIEnv* env = getJNIEnv();
         if (!env) return false;
         
-        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
-        if (!bridgeClass) {
-            LOGE("Failed to find PlatformAdapterBridge class");
-            return false;
-        }
-        
-        jmethodID method = env->GetStaticMethodID(bridgeClass, "secureSet", "(Ljava/lang/String;Ljava/lang/String;)Z");
-        if (!method) {
-            LOGE("Failed to find secureSet method");
+        // Use cached references from JNI_OnLoad
+        if (!g_platformAdapterBridgeClass || !g_secureSetMethod) {
+            LOGE("PlatformAdapterBridge class or secureSet method not cached");
             return false;
         }
         
         jstring jKey = env->NewStringUTF(key);
         jstring jValue = env->NewStringUTF(value);
-        jboolean result = env->CallStaticBooleanMethod(bridgeClass, method, jKey, jValue);
+        jboolean result = env->CallStaticBooleanMethod(g_platformAdapterBridgeClass, g_secureSetMethod, jKey, jValue);
+        
+        LOGD("secureSet (Android): key=%s, success=%d", key, result);
         
         env->DeleteLocalRef(jKey);
         env->DeleteLocalRef(jValue);
-        env->DeleteLocalRef(bridgeClass);
         
         return result;
     }
@@ -92,25 +106,19 @@ namespace AndroidBridge {
         JNIEnv* env = getJNIEnv();
         if (!env) return false;
         
-        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
-        if (!bridgeClass) {
-            LOGE("Failed to find PlatformAdapterBridge class");
-            return false;
-        }
-        
-        jmethodID method = env->GetStaticMethodID(bridgeClass, "secureGet", "(Ljava/lang/String;)Ljava/lang/String;");
-        if (!method) {
-            LOGE("Failed to find secureGet method");
+        // Use cached references from JNI_OnLoad
+        if (!g_platformAdapterBridgeClass || !g_secureGetMethod) {
+            LOGE("PlatformAdapterBridge class or secureGet method not cached");
             return false;
         }
         
         jstring jKey = env->NewStringUTF(key);
-        jstring jResult = (jstring)env->CallStaticObjectMethod(bridgeClass, method, jKey);
+        jstring jResult = (jstring)env->CallStaticObjectMethod(g_platformAdapterBridgeClass, g_secureGetMethod, jKey);
         
         env->DeleteLocalRef(jKey);
-        env->DeleteLocalRef(bridgeClass);
         
         if (jResult == nullptr) {
+            LOGD("secureGet (Android): key=%s not found", key);
             return false;
         }
         
@@ -121,6 +129,7 @@ namespace AndroidBridge {
         }
         env->DeleteLocalRef(jResult);
         
+        LOGD("secureGet (Android): key=%s found", key);
         return !outValue.empty();
     }
     
@@ -128,51 +137,40 @@ namespace AndroidBridge {
         JNIEnv* env = getJNIEnv();
         if (!env) return false;
         
-        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
-        if (!bridgeClass) return false;
-        
-        jmethodID method = env->GetStaticMethodID(bridgeClass, "secureDelete", "(Ljava/lang/String;)Z");
-        if (!method) return false;
+        // Use cached references from JNI_OnLoad
+        if (!g_platformAdapterBridgeClass || !g_secureDeleteMethod) {
+            LOGE("PlatformAdapterBridge class or secureDelete method not cached");
+            return false;
+        }
         
         jstring jKey = env->NewStringUTF(key);
-        jboolean result = env->CallStaticBooleanMethod(bridgeClass, method, jKey);
+        jboolean result = env->CallStaticBooleanMethod(g_platformAdapterBridgeClass, g_secureDeleteMethod, jKey);
+        
+        LOGD("secureDelete (Android): key=%s, success=%d", key, result);
         
         env->DeleteLocalRef(jKey);
-        env->DeleteLocalRef(bridgeClass);
         
         return result;
     }
     
     bool secureExists(const char* key) {
-        JNIEnv* env = getJNIEnv();
-        if (!env) return false;
-        
-        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
-        if (!bridgeClass) return false;
-        
-        jmethodID method = env->GetStaticMethodID(bridgeClass, "secureExists", "(Ljava/lang/String;)Z");
-        if (!method) return false;
-        
-        jstring jKey = env->NewStringUTF(key);
-        jboolean result = env->CallStaticBooleanMethod(bridgeClass, method, jKey);
-        
-        env->DeleteLocalRef(jKey);
-        env->DeleteLocalRef(bridgeClass);
-        
-        return result;
+        // For secureExists, we'll try secureGet and check if value is non-empty
+        // since we don't have a cached method for it
+        std::string value;
+        return secureGet(key, value);
     }
     
     std::string getPersistentDeviceUUID() {
         JNIEnv* env = getJNIEnv();
         if (!env) return "";
         
-        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
-        if (!bridgeClass) return "";
+        // Use cached references from JNI_OnLoad
+        if (!g_platformAdapterBridgeClass || !g_getPersistentDeviceUUIDMethod) {
+            LOGE("PlatformAdapterBridge class or getPersistentDeviceUUID method not cached");
+            return "";
+        }
         
-        jmethodID method = env->GetStaticMethodID(bridgeClass, "getPersistentDeviceUUID", "()Ljava/lang/String;");
-        if (!method) return "";
-        
-        jstring jResult = (jstring)env->CallStaticObjectMethod(bridgeClass, method);
+        jstring jResult = (jstring)env->CallStaticObjectMethod(g_platformAdapterBridgeClass, g_getPersistentDeviceUUIDMethod);
         if (!jResult) return "";
         
         const char* resultStr = env->GetStringUTFChars(jResult, nullptr);
@@ -180,8 +178,8 @@ namespace AndroidBridge {
         
         if (resultStr) env->ReleaseStringUTFChars(jResult, resultStr);
         env->DeleteLocalRef(jResult);
-        env->DeleteLocalRef(bridgeClass);
         
+        LOGD("getPersistentDeviceUUID (Android): %s", uuid.c_str());
         return uuid;
     }
 
@@ -197,53 +195,40 @@ namespace AndroidBridge {
             return {false, 0, "", "JNI not available"};
         }
         
-        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
-        if (!bridgeClass) {
-            return {false, 0, "", "Bridge class not found"};
+        // Use cached references from JNI_OnLoad
+        if (!g_platformAdapterBridgeClass || !g_httpPostSyncMethod) {
+            LOGE("PlatformAdapterBridge class or httpPostSync method not cached");
+            return {false, 0, "", "Bridge class/method not cached"};
         }
         
-        // Get the HttpResponse inner class
-        jclass responseClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge$HttpResponse");
-        if (!responseClass) {
-            env->DeleteLocalRef(bridgeClass);
-            return {false, 0, "", "HttpResponse class not found"};
+        if (!g_httpResponseClass || !g_httpResponse_successField) {
+            LOGE("HttpResponse class or fields not cached");
+            return {false, 0, "", "HttpResponse class/fields not cached"};
         }
         
-        jmethodID method = env->GetStaticMethodID(bridgeClass, "httpPostSync",
-            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/margelo/nitro/runanywhere/PlatformAdapterBridge$HttpResponse;");
-        if (!method) {
-            env->DeleteLocalRef(bridgeClass);
-            env->DeleteLocalRef(responseClass);
-            return {false, 0, "", "httpPostSync method not found"};
-        }
+        LOGI("httpPostSync to: %s", url.c_str());
         
         jstring jUrl = env->NewStringUTF(url.c_str());
         jstring jBody = env->NewStringUTF(jsonBody.c_str());
         jstring jKey = supabaseKey.empty() ? nullptr : env->NewStringUTF(supabaseKey.c_str());
         
-        jobject response = env->CallStaticObjectMethod(bridgeClass, method, jUrl, jBody, jKey);
+        jobject response = env->CallStaticObjectMethod(g_platformAdapterBridgeClass, g_httpPostSyncMethod, jUrl, jBody, jKey);
         
         env->DeleteLocalRef(jUrl);
         env->DeleteLocalRef(jBody);
         if (jKey) env->DeleteLocalRef(jKey);
         
         if (!response) {
-            env->DeleteLocalRef(bridgeClass);
-            env->DeleteLocalRef(responseClass);
+            LOGE("httpPostSync returned null response");
             return {false, 0, "", "httpPostSync returned null"};
         }
         
-        // Extract fields from HttpResponse
-        jfieldID successField = env->GetFieldID(responseClass, "success", "Z");
-        jfieldID statusCodeField = env->GetFieldID(responseClass, "statusCode", "I");
-        jfieldID responseBodyField = env->GetFieldID(responseClass, "responseBody", "Ljava/lang/String;");
-        jfieldID errorMessageField = env->GetFieldID(responseClass, "errorMessage", "Ljava/lang/String;");
-        
-        bool success = env->GetBooleanField(response, successField);
-        int statusCode = env->GetIntField(response, statusCodeField);
+        // Extract fields from HttpResponse using cached field IDs
+        bool success = env->GetBooleanField(response, g_httpResponse_successField);
+        int statusCode = env->GetIntField(response, g_httpResponse_statusCodeField);
         
         std::string responseBody;
-        jstring jResponseBody = (jstring)env->GetObjectField(response, responseBodyField);
+        jstring jResponseBody = (jstring)env->GetObjectField(response, g_httpResponse_responseBodyField);
         if (jResponseBody) {
             const char* str = env->GetStringUTFChars(jResponseBody, nullptr);
             if (str) {
@@ -254,7 +239,7 @@ namespace AndroidBridge {
         }
         
         std::string errorMessage;
-        jstring jErrorMessage = (jstring)env->GetObjectField(response, errorMessageField);
+        jstring jErrorMessage = (jstring)env->GetObjectField(response, g_httpResponse_errorMessageField);
         if (jErrorMessage) {
             const char* str = env->GetStringUTFChars(jErrorMessage, nullptr);
             if (str) {
@@ -265,28 +250,24 @@ namespace AndroidBridge {
         }
         
         env->DeleteLocalRef(response);
-        env->DeleteLocalRef(bridgeClass);
-        env->DeleteLocalRef(responseClass);
+        
+        LOGI("httpPostSync result: success=%d statusCode=%d", success, statusCode);
         
         return {success, statusCode, responseBody, errorMessage};
     }
 
-    // Device info methods
+    // Device info methods - use cached references from JNI_OnLoad
     std::string getDeviceModel() {
         JNIEnv* env = getJNIEnv();
         if (!env) return "Unknown";
         
-        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
-        if (!bridgeClass) return "Unknown";
-        
-        jmethodID method = env->GetStaticMethodID(bridgeClass, "getDeviceModel", "()Ljava/lang/String;");
-        if (!method) {
-            env->DeleteLocalRef(bridgeClass);
+        // Use cached references
+        if (!g_platformAdapterBridgeClass || !g_getDeviceModelMethod) {
+            LOGE("PlatformAdapterBridge class or getDeviceModel method not cached");
             return "Unknown";
         }
         
-        jstring result = (jstring)env->CallStaticObjectMethod(bridgeClass, method);
-        env->DeleteLocalRef(bridgeClass);
+        jstring result = (jstring)env->CallStaticObjectMethod(g_platformAdapterBridgeClass, g_getDeviceModelMethod);
         
         if (!result) return "Unknown";
         
@@ -295,6 +276,7 @@ namespace AndroidBridge {
         env->ReleaseStringUTFChars(result, str);
         env->DeleteLocalRef(result);
         
+        LOGD("getDeviceModel (Android): %s", modelName.c_str());
         return modelName;
     }
 
@@ -302,17 +284,13 @@ namespace AndroidBridge {
         JNIEnv* env = getJNIEnv();
         if (!env) return "Unknown";
         
-        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
-        if (!bridgeClass) return "Unknown";
-        
-        jmethodID method = env->GetStaticMethodID(bridgeClass, "getOSVersion", "()Ljava/lang/String;");
-        if (!method) {
-            env->DeleteLocalRef(bridgeClass);
+        // Use cached references
+        if (!g_platformAdapterBridgeClass || !g_getOSVersionMethod) {
+            LOGE("PlatformAdapterBridge class or getOSVersion method not cached");
             return "Unknown";
         }
         
-        jstring result = (jstring)env->CallStaticObjectMethod(bridgeClass, method);
-        env->DeleteLocalRef(bridgeClass);
+        jstring result = (jstring)env->CallStaticObjectMethod(g_platformAdapterBridgeClass, g_getOSVersionMethod);
         
         if (!result) return "Unknown";
         
@@ -328,17 +306,13 @@ namespace AndroidBridge {
         JNIEnv* env = getJNIEnv();
         if (!env) return "Unknown";
         
-        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
-        if (!bridgeClass) return "Unknown";
-        
-        jmethodID method = env->GetStaticMethodID(bridgeClass, "getChipName", "()Ljava/lang/String;");
-        if (!method) {
-            env->DeleteLocalRef(bridgeClass);
+        // Use cached references
+        if (!g_platformAdapterBridgeClass || !g_getChipNameMethod) {
+            LOGE("PlatformAdapterBridge class or getChipName method not cached");
             return "Unknown";
         }
         
-        jstring result = (jstring)env->CallStaticObjectMethod(bridgeClass, method);
-        env->DeleteLocalRef(bridgeClass);
+        jstring result = (jstring)env->CallStaticObjectMethod(g_platformAdapterBridgeClass, g_getChipNameMethod);
         
         if (!result) return "Unknown";
         
@@ -354,17 +328,13 @@ namespace AndroidBridge {
         JNIEnv* env = getJNIEnv();
         if (!env) return 0;
         
-        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
-        if (!bridgeClass) return 0;
-        
-        jmethodID method = env->GetStaticMethodID(bridgeClass, "getTotalMemory", "()J");
-        if (!method) {
-            env->DeleteLocalRef(bridgeClass);
+        // Use cached references
+        if (!g_platformAdapterBridgeClass || !g_getTotalMemoryMethod) {
+            LOGE("PlatformAdapterBridge class or getTotalMemory method not cached");
             return 0;
         }
         
-        jlong result = env->CallStaticLongMethod(bridgeClass, method);
-        env->DeleteLocalRef(bridgeClass);
+        jlong result = env->CallStaticLongMethod(g_platformAdapterBridgeClass, g_getTotalMemoryMethod);
         
         return static_cast<uint64_t>(result);
     }
@@ -373,17 +343,13 @@ namespace AndroidBridge {
         JNIEnv* env = getJNIEnv();
         if (!env) return 0;
         
-        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
-        if (!bridgeClass) return 0;
-        
-        jmethodID method = env->GetStaticMethodID(bridgeClass, "getAvailableMemory", "()J");
-        if (!method) {
-            env->DeleteLocalRef(bridgeClass);
+        // Use cached references
+        if (!g_platformAdapterBridgeClass || !g_getAvailableMemoryMethod) {
+            LOGE("PlatformAdapterBridge class or getAvailableMemory method not cached");
             return 0;
         }
         
-        jlong result = env->CallStaticLongMethod(bridgeClass, method);
-        env->DeleteLocalRef(bridgeClass);
+        jlong result = env->CallStaticLongMethod(g_platformAdapterBridgeClass, g_getAvailableMemoryMethod);
         
         return static_cast<uint64_t>(result);
     }
@@ -392,17 +358,13 @@ namespace AndroidBridge {
         JNIEnv* env = getJNIEnv();
         if (!env) return 1;
         
-        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
-        if (!bridgeClass) return 1;
-        
-        jmethodID method = env->GetStaticMethodID(bridgeClass, "getCoreCount", "()I");
-        if (!method) {
-            env->DeleteLocalRef(bridgeClass);
+        // Use cached references
+        if (!g_platformAdapterBridgeClass || !g_getCoreCountMethod) {
+            LOGE("PlatformAdapterBridge class or getCoreCount method not cached");
             return 1;
         }
         
-        jint result = env->CallStaticIntMethod(bridgeClass, method);
-        env->DeleteLocalRef(bridgeClass);
+        jint result = env->CallStaticIntMethod(g_platformAdapterBridgeClass, g_getCoreCountMethod);
         
         return static_cast<int>(result);
     }
@@ -411,17 +373,13 @@ namespace AndroidBridge {
         JNIEnv* env = getJNIEnv();
         if (!env) return "unknown";
         
-        jclass bridgeClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
-        if (!bridgeClass) return "unknown";
-        
-        jmethodID method = env->GetStaticMethodID(bridgeClass, "getArchitecture", "()Ljava/lang/String;");
-        if (!method) {
-            env->DeleteLocalRef(bridgeClass);
+        // Use cached references
+        if (!g_platformAdapterBridgeClass || !g_getArchitectureMethod) {
+            LOGE("PlatformAdapterBridge class or getArchitecture method not cached");
             return "unknown";
         }
         
-        jstring result = (jstring)env->CallStaticObjectMethod(bridgeClass, method);
-        env->DeleteLocalRef(bridgeClass);
+        jstring result = (jstring)env->CallStaticObjectMethod(g_platformAdapterBridgeClass, g_getArchitectureMethod);
         
         if (!result) return "unknown";
         
@@ -431,6 +389,28 @@ namespace AndroidBridge {
         env->DeleteLocalRef(result);
         
         return arch;
+    }
+    
+    std::string getGPUFamily() {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return "unknown";
+        
+        // Use cached references
+        if (!g_platformAdapterBridgeClass || !g_getGPUFamilyMethod) {
+            LOGE("PlatformAdapterBridge class or getGPUFamily method not cached");
+            return "unknown";
+        }
+        
+        jstring result = (jstring)env->CallStaticObjectMethod(g_platformAdapterBridgeClass, g_getGPUFamilyMethod);
+        
+        if (!result) return "unknown";
+        
+        const char* str = env->GetStringUTFChars(result, nullptr);
+        std::string gpuFamily = str ? str : "unknown";
+        env->ReleaseStringUTFChars(result, str);
+        env->DeleteLocalRef(result);
+        
+        return gpuFamily;
     }
 } // namespace AndroidBridge
 #elif defined(__APPLE__)
@@ -452,6 +432,7 @@ extern "C" {
     uint64_t PlatformAdapter_getAvailableMemory(void);
     int PlatformAdapter_getCoreCount(void);
     bool PlatformAdapter_getArchitecture(char** outValue);
+    bool PlatformAdapter_getGPUFamily(char** outValue);
     
     // HTTP
     bool PlatformAdapter_httpPostSync(
@@ -837,7 +818,14 @@ rac_result_t InitBridge::initialize(
     // This populates rac_sdk_get_config() which device registration uses
     // Matches Swift: CppBridge+State.swift initialize()
     rac_sdk_config_t sdkConfig = {};
-    sdkConfig.platform = "react-native";
+    // Use actual platform (ios/android) as backend only accepts these values
+#if defined(__APPLE__)
+    sdkConfig.platform = "ios";
+#elif defined(ANDROID) || defined(__ANDROID__)
+    sdkConfig.platform = "android";
+#else
+    sdkConfig.platform = "ios"; // Default to ios for unknown platforms
+#endif
     sdkConfig.sdk_version = "0.2.0";  // TODO: Make configurable
     sdkConfig.device_id = getPersistentDeviceUUID().c_str();
     
@@ -1181,6 +1169,22 @@ std::string InitBridge::getArchitecture() {
     return "arm64";
 #elif defined(ANDROID) || defined(__ANDROID__)
     return AndroidBridge::getArchitecture();
+#else
+    return "unknown";
+#endif
+}
+
+std::string InitBridge::getGPUFamily() {
+#if defined(__APPLE__)
+    char* value = nullptr;
+    if (PlatformAdapter_getGPUFamily(&value) && value) {
+        std::string result(value);
+        free(value);
+        return result;
+    }
+    return "apple"; // Default GPU family for iOS/macOS
+#elif defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::getGPUFamily();
 #else
     return "unknown";
 #endif

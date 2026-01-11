@@ -385,6 +385,21 @@ bool PlatformAdapter_getArchitecture(char** outValue) {
     }
 }
 
+bool PlatformAdapter_getGPUFamily(char** outValue) {
+    @autoreleasepool {
+        if (!outValue) return false;
+        *outValue = NULL;
+        
+        @try {
+            // All iOS/macOS devices use Apple's custom GPUs
+            *outValue = strdup("apple");
+            return *outValue != NULL;
+        } @catch (NSException* exception) {
+            return false;
+        }
+    }
+}
+
 // ============================================================================
 // HTTP POST for Device Registration (Synchronous)
 // Matches Swift's CppBridge+Device.swift http_post callback

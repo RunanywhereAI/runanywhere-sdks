@@ -61,8 +61,10 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> isAuthenticated() = 0;
       virtual std::shared_ptr<Promise<std::string>> getUserId() = 0;
       virtual std::shared_ptr<Promise<std::string>> getOrganizationId() = 0;
+      virtual std::shared_ptr<Promise<bool>> setAuthTokens(const std::string& authResponseJson) = 0;
       virtual std::shared_ptr<Promise<bool>> registerDevice(const std::string& environmentJson) = 0;
       virtual std::shared_ptr<Promise<bool>> isDeviceRegistered() = 0;
+      virtual std::shared_ptr<Promise<bool>> clearDeviceRegistration() = 0;
       virtual std::shared_ptr<Promise<std::string>> getDeviceId() = 0;
       virtual std::shared_ptr<Promise<std::string>> getAvailableModels() = 0;
       virtual std::shared_ptr<Promise<std::string>> getModelInfo(const std::string& modelId) = 0;

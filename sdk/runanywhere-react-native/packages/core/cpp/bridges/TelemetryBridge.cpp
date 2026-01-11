@@ -13,6 +13,7 @@
 
 #include "TelemetryBridge.hpp"
 #include "InitBridge.hpp"
+#include "AuthBridge.hpp"
 #include "rac_dev_config.h"
 
 // Platform-specific logging
@@ -261,9 +262,28 @@ static void telemetryHttpCallback(
 
         LOGD("Telemetry using Supabase: %s", baseURL.c_str());
     } else {
-        // Production/Staging: Use Railway
-        baseURL = "https://api.runanywhere.ai";
-        apiKey = "";  // API key handled by backend
+        // Production/Staging: Use configured Railway URL
+        // These come from SDK initialization (App.tsx -> RunAnywhere.initialize)
+        baseURL = InitBridge::shared().getBaseURL();
+        
+        // For production mode, prefer JWT access token (from authentication)
+        // over raw API key. This matches Swift/Kotlin behavior.
+        std::string accessToken = AuthBridge::shared().getAccessToken();
+        if (!accessToken.empty()) {
+            apiKey = accessToken;  // Use JWT for Authorization header
+            LOGD("Telemetry using JWT access token");
+        } else {
+            // Fallback to API key if not authenticated yet
+            apiKey = InitBridge::shared().getApiKey();
+            LOGD("Telemetry using API key (not authenticated)");
+        }
+        
+        // Fallback to default if not configured
+        if (baseURL.empty()) {
+            baseURL = "https://api.runanywhere.ai";
+        }
+        
+        LOGD("Telemetry using production: %s", baseURL.c_str());
     }
 
     std::string fullURL = baseURL + path;
