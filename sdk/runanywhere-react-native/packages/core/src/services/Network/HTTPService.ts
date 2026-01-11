@@ -42,12 +42,12 @@ interface Response {
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import { SDKError } from '../../Foundation/ErrorTypes';
 import { ErrorCode } from '../../Foundation/ErrorTypes/ErrorCodes';
+import { SDKConstants } from '../../Foundation/Constants';
 
 const logger = new SDKLogger('HTTPService');
 
-// SDK Constants
+// SDK Constants - use centralized constants where available
 const SDK_CLIENT = 'RunAnywhereSDK';
-const SDK_VERSION = '0.2.0';
 const SDK_PLATFORM = 'react-native';
 const DEFAULT_TIMEOUT_MS = 30000;
 
@@ -152,7 +152,7 @@ export class HTTPService {
       'Content-Type': 'application/json',
       Accept: 'application/json',
       'X-SDK-Client': SDK_CLIENT,
-      'X-SDK-Version': SDK_VERSION,
+      'X-SDK-Version': SDKConstants.version,
       'X-Platform': SDK_PLATFORM,
     };
   }

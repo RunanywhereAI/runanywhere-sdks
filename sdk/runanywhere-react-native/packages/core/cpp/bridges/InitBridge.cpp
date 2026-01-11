@@ -47,6 +47,7 @@ extern jmethodID g_getAvailableMemoryMethod;
 extern jmethodID g_getCoreCountMethod;
 extern jmethodID g_getArchitectureMethod;
 extern jmethodID g_getGPUFamilyMethod;
+extern jmethodID g_isTabletMethod;
 // HttpResponse field IDs
 extern jfieldID g_httpResponse_successField;
 extern jfieldID g_httpResponse_statusCodeField;
@@ -412,6 +413,20 @@ namespace AndroidBridge {
         
         return gpuFamily;
     }
+
+    bool isTablet() {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return false;
+        
+        // Use cached references
+        if (!g_platformAdapterBridgeClass || !g_isTabletMethod) {
+            LOGE("PlatformAdapterBridge class or isTablet method not cached");
+            return false;
+        }
+        
+        jboolean result = env->CallStaticBooleanMethod(g_platformAdapterBridgeClass, g_isTabletMethod);
+        return result == JNI_TRUE;
+    }
 } // namespace AndroidBridge
 #elif defined(__APPLE__)
 #include <cstdio>
@@ -422,6 +437,9 @@ extern "C" {
     bool PlatformAdapter_secureGet(const char* key, char** outValue);
     bool PlatformAdapter_secureDelete(const char* key);
     bool PlatformAdapter_secureExists(const char* key);
+    
+    // Device type detection
+    bool PlatformAdapter_isTablet(void);
     bool PlatformAdapter_getPersistentDeviceUUID(char** outValue);
     
     // Device info (synchronous)
@@ -826,7 +844,10 @@ rac_result_t InitBridge::initialize(
 #else
     sdkConfig.platform = "ios"; // Default to ios for unknown platforms
 #endif
-    sdkConfig.sdk_version = "0.2.0";  // TODO: Make configurable
+    // Use centralized SDK version (set from TypeScript SDKConstants via setSdkVersion)
+    static std::string s_sdkVersion;
+    s_sdkVersion = getSdkVersion();
+    sdkConfig.sdk_version = s_sdkVersion.c_str();
     sdkConfig.device_id = getPersistentDeviceUUID().c_str();
     
     rac_validation_result_t validResult = rac_sdk_init(&sdkConfig);
@@ -1187,6 +1208,16 @@ std::string InitBridge::getGPUFamily() {
     return AndroidBridge::getGPUFamily();
 #else
     return "unknown";
+#endif
+}
+
+bool InitBridge::isTablet() {
+#if defined(__APPLE__)
+    return PlatformAdapter_isTablet();
+#elif defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::isTablet();
+#else
+    return false;
 #endif
 }
 

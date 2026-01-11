@@ -5,6 +5,9 @@
  * Matches iOS SDK: Foundation/
  */
 
+// Constants
+export { SDKConstants } from './Constants';
+
 // Error Types
 export * from './ErrorTypes';
 
