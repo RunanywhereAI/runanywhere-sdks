@@ -96,7 +96,7 @@ export async function generate(
   const native = requireNativeModule();
 
   const optionsJson = JSON.stringify({
-    max_tokens: options?.maxTokens ?? 256,
+    max_tokens: options?.maxTokens ?? 1000,
     temperature: options?.temperature ?? 0.7,
     system_prompt: options?.systemPrompt ?? null,
   });
@@ -188,7 +188,7 @@ export async function generateStream(
   let rejectResult: ((error: Error) => void) | null = null;
 
   const optionsJson = JSON.stringify({
-    max_tokens: options?.maxTokens ?? 256,
+    max_tokens: options?.maxTokens ?? 1000,
     temperature: options?.temperature ?? 0.7,
     system_prompt: options?.systemPrompt ?? null,
   });

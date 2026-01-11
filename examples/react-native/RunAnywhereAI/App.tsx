@@ -157,14 +157,9 @@ const App: React.FC = () => {
       artifactType: ModelArtifactType.TarGzArchive,
       memoryRequirement: 75_000_000,
     });
-    await ONNX.addModel({
-      id: 'sherpa-onnx-whisper-small.en',
-      name: 'Sherpa Whisper Small (ONNX)',
-      url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2',
-      modality: ModelCategory.SpeechRecognition,
-      artifactType: ModelArtifactType.TarBz2Archive,
-      memoryRequirement: 250_000_000,
-    });
+    // NOTE: whisper-small.en not included to match iOS/Android examples
+    // All ONNX models use tar.gz from RunanywhereAI/sherpa-onnx fork for fast native extraction
+    // If you need whisper-small, convert to tar.gz and upload to the fork
     // TTS Models (Piper VITS)
     await ONNX.addModel({
       id: 'vits-piper-en_US-lessac-medium',
@@ -197,13 +192,31 @@ const App: React.FC = () => {
     try {
       const startTime = Date.now();
 
-      // Initialize SDK based on build configuration
-      // Development mode - uses Supabase, no API key needed
+      // =========================================================================
+      // SDK Initialization - Choose ONE mode below
+      // =========================================================================
+
+      // DEVELOPMENT mode (default) - uses Supabase directly
+      // Credentials come from runanywhere-commons/development_config.cpp (git-ignored)
+      // This is the safest option for committing to git
       await RunAnywhere.initialize({
-        apiKey: '', // Empty in development mode
-        baseURL: 'https://api.runanywhere.com',
+        apiKey: '', // Empty in development mode - uses C++ dev config
+        baseURL: 'https://api.runanywhere.ai',
         environment: SDKEnvironment.Development,
       });
+      console.log('✅ SDK initialized in DEVELOPMENT mode (Supabase via C++ config)');
+
+      // PRODUCTION mode - uncomment below and set your credentials
+      // WARNING: Do NOT commit real API keys to git!
+      // For production testing, set credentials via environment variables or config file
+      // const apiKey = process.env.RUNANYWHERE_API_KEY || '';
+      // const baseURL = process.env.RUNANYWHERE_BASE_URL || 'https://api.runanywhere.ai';
+      // await RunAnywhere.initialize({
+      //   apiKey: apiKey,
+      //   baseURL: baseURL,
+      //   environment: SDKEnvironment.Production,
+      // });
+      // console.log('✅ SDK initialized in PRODUCTION mode');
 
       // Register modules and models (await to ensure models are ready before UI)
       await registerModulesAndModels();

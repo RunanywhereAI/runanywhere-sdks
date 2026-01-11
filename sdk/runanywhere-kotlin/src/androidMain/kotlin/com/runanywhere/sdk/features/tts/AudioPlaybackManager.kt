@@ -17,7 +17,7 @@ import kotlin.coroutines.resumeWithException
  * Matches iOS AudioPlaybackManager behavior.
  */
 class AudioPlaybackManager {
-    private val logger = SDKLogger("AudioPlayback")
+    private val logger = SDKLogger.tts
 
     private var audioTrack: AudioTrack? = null
 

@@ -12,7 +12,7 @@ import java.net.URL
  * This is a temporary solution to avoid Ktor's memory buffering issues
  */
 object AndroidSimpleDownloader {
-    private val logger = SDKLogger("AndroidSimpleDownloader")
+    private val logger = SDKLogger.download
 
     /**
      * Download a file from URL to destination path

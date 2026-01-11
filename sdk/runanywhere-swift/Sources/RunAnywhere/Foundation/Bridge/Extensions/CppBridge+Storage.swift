@@ -176,7 +176,7 @@ extension CppBridge {
 /// Calculate directory size using FileManager
 private func storageCalculateDirSizeCallback(
     path: UnsafePointer<CChar>?,
-    userData: UnsafeMutableRawPointer?
+    userData _: UnsafeMutableRawPointer?
 ) -> Int64 {
     guard let path = path else { return 0 }
     let url = URL(fileURLWithPath: String(cString: path))
@@ -186,7 +186,7 @@ private func storageCalculateDirSizeCallback(
 /// Get file size
 private func storageGetFileSizeCallback(
     path: UnsafePointer<CChar>?,
-    userData: UnsafeMutableRawPointer?
+    userData _: UnsafeMutableRawPointer?
 ) -> Int64 {
     guard let path = path else { return -1 }
     let url = URL(fileURLWithPath: String(cString: path))
@@ -197,7 +197,7 @@ private func storageGetFileSizeCallback(
 private func storagePathExistsCallback(
     path: UnsafePointer<CChar>?,
     isDirectory: UnsafeMutablePointer<rac_bool_t>?,
-    userData: UnsafeMutableRawPointer?
+    userData _: UnsafeMutableRawPointer?
 ) -> rac_bool_t {
     guard let path = path else { return RAC_FALSE }
     let url = URL(fileURLWithPath: String(cString: path))
@@ -207,7 +207,7 @@ private func storagePathExistsCallback(
 }
 
 /// Get available disk space
-private func storageGetAvailableSpaceCallback(userData: UnsafeMutableRawPointer?) -> Int64 {
+private func storageGetAvailableSpaceCallback(userData _: UnsafeMutableRawPointer?) -> Int64 {
     do {
         let attrs = try FileManager.default.attributesOfFileSystem(
             forPath: NSHomeDirectory()
@@ -219,7 +219,7 @@ private func storageGetAvailableSpaceCallback(userData: UnsafeMutableRawPointer?
 }
 
 /// Get total disk space
-private func storageGetTotalSpaceCallback(userData: UnsafeMutableRawPointer?) -> Int64 {
+private func storageGetTotalSpaceCallback(userData _: UnsafeMutableRawPointer?) -> Int64 {
     do {
         let attrs = try FileManager.default.attributesOfFileSystem(
             forPath: NSHomeDirectory()
@@ -291,19 +291,6 @@ extension StorageInfo {
         }
 
         self.init(appStorage: appStorage, deviceStorage: deviceStorage, models: models)
-    }
-}
-
-extension StorageAvailability {
-    /// Initialize from C++ storage availability
-    init(from cAvailability: rac_storage_availability_t) {
-        self.init(
-            isAvailable: cAvailability.is_available == RAC_TRUE,
-            requiredSpace: cAvailability.required_space,
-            availableSpace: cAvailability.available_space,
-            hasWarning: cAvailability.has_warning == RAC_TRUE,
-            recommendation: cAvailability.recommendation.map { String(cString: $0) }
-        )
     }
 }
 

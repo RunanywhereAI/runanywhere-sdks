@@ -92,6 +92,14 @@ export interface RunAnywhereCore
    */
   getOrganizationId(): Promise<string>;
 
+  /**
+   * Set authentication tokens directly (after JS-side authentication)
+   * This stores the tokens in C++ AuthBridge for use by telemetry/device registration
+   * @param authResponseJson JSON string with access_token, refresh_token, expires_in, etc.
+   * @returns true if tokens were set successfully
+   */
+  setAuthTokens(authResponseJson: string): Promise<boolean>;
+
   // ============================================================================
   // Device Registration
   // Matches Swift: CppBridge+Device.swift
@@ -108,6 +116,12 @@ export interface RunAnywhereCore
    * Check if device is registered
    */
   isDeviceRegistered(): Promise<boolean>;
+
+  /**
+   * Clear device registration flag (for testing)
+   * Forces re-registration on next SDK init
+   */
+  clearDeviceRegistration(): Promise<boolean>;
 
   /**
    * Get the device ID
@@ -487,6 +501,66 @@ export interface RunAnywhereCore
    * Reset VAD state
    */
   resetVAD(): Promise<void>;
+
+  // ============================================================================
+  // Secure Storage
+  // Matches Swift: KeychainManager.swift
+  // Uses platform secure storage (Keychain on iOS, Keystore on Android)
+  // ============================================================================
+
+  /**
+   * Store a string value securely
+   * @param key Storage key (e.g., "com.runanywhere.sdk.apiKey")
+   * @param value String value to store
+   * @returns true if stored successfully
+   */
+  secureStorageSet(key: string, value: string): Promise<boolean>;
+
+  /**
+   * Retrieve a string value from secure storage
+   * @param key Storage key
+   * @returns Stored value or null if not found
+   */
+  secureStorageGet(key: string): Promise<string | null>;
+
+  /**
+   * Delete a value from secure storage
+   * @param key Storage key
+   * @returns true if deleted successfully
+   */
+  secureStorageDelete(key: string): Promise<boolean>;
+
+  /**
+   * Check if a key exists in secure storage
+   * @param key Storage key
+   * @returns true if key exists
+   */
+  secureStorageExists(key: string): Promise<boolean>;
+
+  /**
+   * Get persistent device UUID
+   * This UUID survives app reinstalls (stored in Keychain/Keystore)
+   * Matches Swift: DeviceIdentity.persistentUUID
+   * @returns Persistent device UUID
+   */
+  getPersistentDeviceUUID(): Promise<string>;
+
+  // ============================================================================
+  // Telemetry
+  // Matches Swift: CppBridge+Telemetry.swift
+  // C++ handles all telemetry logic - batching, JSON building, routing
+  // ============================================================================
+
+  /**
+   * Flush pending telemetry events immediately
+   * Sends all queued events to the backend
+   */
+  flushTelemetry(): Promise<void>;
+
+  /**
+   * Check if telemetry is initialized
+   */
+  isTelemetryInitialized(): Promise<boolean>;
 
   // ============================================================================
   // Voice Agent Capability (Backend-Agnostic)

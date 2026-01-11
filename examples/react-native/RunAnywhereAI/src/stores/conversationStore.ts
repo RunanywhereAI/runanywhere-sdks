@@ -72,6 +72,7 @@ interface ConversationState {
   loadConversation: (conversationId: string) => Promise<Conversation | null>;
   setCurrentConversation: (conversation: Conversation | null) => void;
   addMessage: (message: Message, conversationId?: string) => Promise<void>;
+  updateMessage: (message: Message, conversationId?: string) => void;
   searchConversations: (query: string) => Conversation[];
   clearAllConversations: () => Promise<void>;
 }
@@ -331,6 +332,49 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
             : state.currentConversation,
       };
     });
+  },
+
+  /**
+   * Update an existing message in a conversation (for streaming updates)
+   * Matches iOS updateMessage(at:with:) behavior
+   */
+  updateMessage: (message: Message, conversationId?: string) => {
+    const { currentConversation, conversations } = get();
+    const targetId = conversationId || currentConversation?.id;
+
+    if (!targetId) {
+      return;
+    }
+
+    const conversation = conversations.find((c) => c.id === targetId);
+    if (!conversation) {
+      return;
+    }
+
+    // Find and update the message by ID
+    const updatedMessages = conversation.messages.map((m) =>
+      m.id === message.id ? message : m
+    );
+
+    const updatedConversation: Conversation = {
+      ...conversation,
+      messages: updatedMessages,
+      updatedAt: new Date(),
+      modelName: message.modelInfo?.modelName || conversation.modelName,
+      frameworkName:
+        message.modelInfo?.frameworkDisplayName || conversation.frameworkName,
+    };
+
+    // Update state (don't persist to disk during streaming - final update will persist)
+    set((state) => ({
+      conversations: state.conversations.map((c) =>
+        c.id === targetId ? updatedConversation : c
+      ),
+      currentConversation:
+        state.currentConversation?.id === targetId
+          ? updatedConversation
+          : state.currentConversation,
+    }));
   },
 
   /**

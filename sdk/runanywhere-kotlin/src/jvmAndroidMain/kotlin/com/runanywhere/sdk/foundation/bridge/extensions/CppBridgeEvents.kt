@@ -28,7 +28,6 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
  * - Event callback is called from C++ threads, must be thread-safe
  */
 object CppBridgeEvents {
-
     /**
      * Event type constants matching C++ rac_analytics_events.h RAC_EVENT_* values.
      * These values MUST match the C++ enum exactly for proper event routing.
@@ -126,84 +125,85 @@ object CppBridgeEvents {
         /**
          * Get a human-readable name for the event type.
          */
-        fun getName(type: Int): String = when (type) {
-            // LLM
-            LLM_MODEL_LOAD_STARTED -> "LLM_MODEL_LOAD_STARTED"
-            LLM_MODEL_LOAD_COMPLETED -> "LLM_MODEL_LOAD_COMPLETED"
-            LLM_MODEL_LOAD_FAILED -> "LLM_MODEL_LOAD_FAILED"
-            LLM_MODEL_UNLOADED -> "LLM_MODEL_UNLOADED"
-            LLM_GENERATION_STARTED -> "LLM_GENERATION_STARTED"
-            LLM_GENERATION_COMPLETED -> "LLM_GENERATION_COMPLETED"
-            LLM_GENERATION_FAILED -> "LLM_GENERATION_FAILED"
-            LLM_FIRST_TOKEN -> "LLM_FIRST_TOKEN"
-            LLM_STREAMING_UPDATE -> "LLM_STREAMING_UPDATE"
-            // STT
-            STT_MODEL_LOAD_STARTED -> "STT_MODEL_LOAD_STARTED"
-            STT_MODEL_LOAD_COMPLETED -> "STT_MODEL_LOAD_COMPLETED"
-            STT_MODEL_LOAD_FAILED -> "STT_MODEL_LOAD_FAILED"
-            STT_MODEL_UNLOADED -> "STT_MODEL_UNLOADED"
-            STT_TRANSCRIPTION_STARTED -> "STT_TRANSCRIPTION_STARTED"
-            STT_TRANSCRIPTION_COMPLETED -> "STT_TRANSCRIPTION_COMPLETED"
-            STT_TRANSCRIPTION_FAILED -> "STT_TRANSCRIPTION_FAILED"
-            STT_PARTIAL_TRANSCRIPT -> "STT_PARTIAL_TRANSCRIPT"
-            // TTS
-            TTS_VOICE_LOAD_STARTED -> "TTS_VOICE_LOAD_STARTED"
-            TTS_VOICE_LOAD_COMPLETED -> "TTS_VOICE_LOAD_COMPLETED"
-            TTS_VOICE_LOAD_FAILED -> "TTS_VOICE_LOAD_FAILED"
-            TTS_VOICE_UNLOADED -> "TTS_VOICE_UNLOADED"
-            TTS_SYNTHESIS_STARTED -> "TTS_SYNTHESIS_STARTED"
-            TTS_SYNTHESIS_COMPLETED -> "TTS_SYNTHESIS_COMPLETED"
-            TTS_SYNTHESIS_FAILED -> "TTS_SYNTHESIS_FAILED"
-            TTS_SYNTHESIS_CHUNK -> "TTS_SYNTHESIS_CHUNK"
-            // VAD
-            VAD_STARTED -> "VAD_STARTED"
-            VAD_STOPPED -> "VAD_STOPPED"
-            VAD_SPEECH_STARTED -> "VAD_SPEECH_STARTED"
-            VAD_SPEECH_ENDED -> "VAD_SPEECH_ENDED"
-            VAD_PAUSED -> "VAD_PAUSED"
-            VAD_RESUMED -> "VAD_RESUMED"
-            // Voice Agent
-            VOICE_AGENT_TURN_STARTED -> "VOICE_AGENT_TURN_STARTED"
-            VOICE_AGENT_TURN_COMPLETED -> "VOICE_AGENT_TURN_COMPLETED"
-            VOICE_AGENT_TURN_FAILED -> "VOICE_AGENT_TURN_FAILED"
-            VOICE_AGENT_STT_STATE_CHANGED -> "VOICE_AGENT_STT_STATE_CHANGED"
-            VOICE_AGENT_LLM_STATE_CHANGED -> "VOICE_AGENT_LLM_STATE_CHANGED"
-            VOICE_AGENT_TTS_STATE_CHANGED -> "VOICE_AGENT_TTS_STATE_CHANGED"
-            VOICE_AGENT_ALL_READY -> "VOICE_AGENT_ALL_READY"
-            // SDK Lifecycle
-            SDK_INIT_STARTED -> "SDK_INIT_STARTED"
-            SDK_INIT_COMPLETED -> "SDK_INIT_COMPLETED"
-            SDK_INIT_FAILED -> "SDK_INIT_FAILED"
-            SDK_MODELS_LOADED -> "SDK_MODELS_LOADED"
-            // Download
-            MODEL_DOWNLOAD_STARTED -> "MODEL_DOWNLOAD_STARTED"
-            MODEL_DOWNLOAD_PROGRESS -> "MODEL_DOWNLOAD_PROGRESS"
-            MODEL_DOWNLOAD_COMPLETED -> "MODEL_DOWNLOAD_COMPLETED"
-            MODEL_DOWNLOAD_FAILED -> "MODEL_DOWNLOAD_FAILED"
-            MODEL_DOWNLOAD_CANCELLED -> "MODEL_DOWNLOAD_CANCELLED"
-            // Extraction
-            MODEL_EXTRACTION_STARTED -> "MODEL_EXTRACTION_STARTED"
-            MODEL_EXTRACTION_PROGRESS -> "MODEL_EXTRACTION_PROGRESS"
-            MODEL_EXTRACTION_COMPLETED -> "MODEL_EXTRACTION_COMPLETED"
-            MODEL_EXTRACTION_FAILED -> "MODEL_EXTRACTION_FAILED"
-            // Deletion
-            MODEL_DELETED -> "MODEL_DELETED"
-            // Storage
-            STORAGE_CACHE_CLEARED -> "STORAGE_CACHE_CLEARED"
-            STORAGE_CACHE_CLEAR_FAILED -> "STORAGE_CACHE_CLEAR_FAILED"
-            STORAGE_TEMP_CLEANED -> "STORAGE_TEMP_CLEANED"
-            // Device
-            DEVICE_REGISTERED -> "DEVICE_REGISTERED"
-            DEVICE_REGISTRATION_FAILED -> "DEVICE_REGISTRATION_FAILED"
-            // Network
-            NETWORK_CONNECTIVITY_CHANGED -> "NETWORK_CONNECTIVITY_CHANGED"
-            // Error
-            SDK_ERROR -> "SDK_ERROR"
-            // Framework
-            FRAMEWORK_MODELS_REQUESTED -> "FRAMEWORK_MODELS_REQUESTED"
-            FRAMEWORK_MODELS_RETRIEVED -> "FRAMEWORK_MODELS_RETRIEVED"
-            else -> "UNKNOWN($type)"
-        }
+        fun getName(type: Int): String =
+            when (type) {
+                // LLM
+                LLM_MODEL_LOAD_STARTED -> "LLM_MODEL_LOAD_STARTED"
+                LLM_MODEL_LOAD_COMPLETED -> "LLM_MODEL_LOAD_COMPLETED"
+                LLM_MODEL_LOAD_FAILED -> "LLM_MODEL_LOAD_FAILED"
+                LLM_MODEL_UNLOADED -> "LLM_MODEL_UNLOADED"
+                LLM_GENERATION_STARTED -> "LLM_GENERATION_STARTED"
+                LLM_GENERATION_COMPLETED -> "LLM_GENERATION_COMPLETED"
+                LLM_GENERATION_FAILED -> "LLM_GENERATION_FAILED"
+                LLM_FIRST_TOKEN -> "LLM_FIRST_TOKEN"
+                LLM_STREAMING_UPDATE -> "LLM_STREAMING_UPDATE"
+                // STT
+                STT_MODEL_LOAD_STARTED -> "STT_MODEL_LOAD_STARTED"
+                STT_MODEL_LOAD_COMPLETED -> "STT_MODEL_LOAD_COMPLETED"
+                STT_MODEL_LOAD_FAILED -> "STT_MODEL_LOAD_FAILED"
+                STT_MODEL_UNLOADED -> "STT_MODEL_UNLOADED"
+                STT_TRANSCRIPTION_STARTED -> "STT_TRANSCRIPTION_STARTED"
+                STT_TRANSCRIPTION_COMPLETED -> "STT_TRANSCRIPTION_COMPLETED"
+                STT_TRANSCRIPTION_FAILED -> "STT_TRANSCRIPTION_FAILED"
+                STT_PARTIAL_TRANSCRIPT -> "STT_PARTIAL_TRANSCRIPT"
+                // TTS
+                TTS_VOICE_LOAD_STARTED -> "TTS_VOICE_LOAD_STARTED"
+                TTS_VOICE_LOAD_COMPLETED -> "TTS_VOICE_LOAD_COMPLETED"
+                TTS_VOICE_LOAD_FAILED -> "TTS_VOICE_LOAD_FAILED"
+                TTS_VOICE_UNLOADED -> "TTS_VOICE_UNLOADED"
+                TTS_SYNTHESIS_STARTED -> "TTS_SYNTHESIS_STARTED"
+                TTS_SYNTHESIS_COMPLETED -> "TTS_SYNTHESIS_COMPLETED"
+                TTS_SYNTHESIS_FAILED -> "TTS_SYNTHESIS_FAILED"
+                TTS_SYNTHESIS_CHUNK -> "TTS_SYNTHESIS_CHUNK"
+                // VAD
+                VAD_STARTED -> "VAD_STARTED"
+                VAD_STOPPED -> "VAD_STOPPED"
+                VAD_SPEECH_STARTED -> "VAD_SPEECH_STARTED"
+                VAD_SPEECH_ENDED -> "VAD_SPEECH_ENDED"
+                VAD_PAUSED -> "VAD_PAUSED"
+                VAD_RESUMED -> "VAD_RESUMED"
+                // Voice Agent
+                VOICE_AGENT_TURN_STARTED -> "VOICE_AGENT_TURN_STARTED"
+                VOICE_AGENT_TURN_COMPLETED -> "VOICE_AGENT_TURN_COMPLETED"
+                VOICE_AGENT_TURN_FAILED -> "VOICE_AGENT_TURN_FAILED"
+                VOICE_AGENT_STT_STATE_CHANGED -> "VOICE_AGENT_STT_STATE_CHANGED"
+                VOICE_AGENT_LLM_STATE_CHANGED -> "VOICE_AGENT_LLM_STATE_CHANGED"
+                VOICE_AGENT_TTS_STATE_CHANGED -> "VOICE_AGENT_TTS_STATE_CHANGED"
+                VOICE_AGENT_ALL_READY -> "VOICE_AGENT_ALL_READY"
+                // SDK Lifecycle
+                SDK_INIT_STARTED -> "SDK_INIT_STARTED"
+                SDK_INIT_COMPLETED -> "SDK_INIT_COMPLETED"
+                SDK_INIT_FAILED -> "SDK_INIT_FAILED"
+                SDK_MODELS_LOADED -> "SDK_MODELS_LOADED"
+                // Download
+                MODEL_DOWNLOAD_STARTED -> "MODEL_DOWNLOAD_STARTED"
+                MODEL_DOWNLOAD_PROGRESS -> "MODEL_DOWNLOAD_PROGRESS"
+                MODEL_DOWNLOAD_COMPLETED -> "MODEL_DOWNLOAD_COMPLETED"
+                MODEL_DOWNLOAD_FAILED -> "MODEL_DOWNLOAD_FAILED"
+                MODEL_DOWNLOAD_CANCELLED -> "MODEL_DOWNLOAD_CANCELLED"
+                // Extraction
+                MODEL_EXTRACTION_STARTED -> "MODEL_EXTRACTION_STARTED"
+                MODEL_EXTRACTION_PROGRESS -> "MODEL_EXTRACTION_PROGRESS"
+                MODEL_EXTRACTION_COMPLETED -> "MODEL_EXTRACTION_COMPLETED"
+                MODEL_EXTRACTION_FAILED -> "MODEL_EXTRACTION_FAILED"
+                // Deletion
+                MODEL_DELETED -> "MODEL_DELETED"
+                // Storage
+                STORAGE_CACHE_CLEARED -> "STORAGE_CACHE_CLEARED"
+                STORAGE_CACHE_CLEAR_FAILED -> "STORAGE_CACHE_CLEAR_FAILED"
+                STORAGE_TEMP_CLEANED -> "STORAGE_TEMP_CLEANED"
+                // Device
+                DEVICE_REGISTERED -> "DEVICE_REGISTERED"
+                DEVICE_REGISTRATION_FAILED -> "DEVICE_REGISTRATION_FAILED"
+                // Network
+                NETWORK_CONNECTIVITY_CHANGED -> "NETWORK_CONNECTIVITY_CHANGED"
+                // Error
+                SDK_ERROR -> "SDK_ERROR"
+                // Framework
+                FRAMEWORK_MODELS_REQUESTED -> "FRAMEWORK_MODELS_REQUESTED"
+                FRAMEWORK_MODELS_RETRIEVED -> "FRAMEWORK_MODELS_RETRIEVED"
+                else -> "UNKNOWN($type)"
+            }
     }
 
     @Volatile
@@ -257,7 +257,7 @@ object CppBridgeEvents {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Cannot register analytics callback: telemetry handle is null"
+                    "Cannot register analytics callback: telemetry handle is null",
                 )
                 return false
             }
@@ -270,14 +270,14 @@ object CppBridgeEvents {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Analytics events callback registered with telemetry manager"
+                    "Analytics events callback registered with telemetry manager",
                 )
                 return true
             } else {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Failed to register analytics callback: error $result"
+                    "Failed to register analytics callback: error $result",
                 )
                 return false
             }
@@ -299,7 +299,7 @@ object CppBridgeEvents {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Analytics events callback unregistered"
+                "Analytics events callback unregistered",
             )
         }
     }
@@ -331,7 +331,7 @@ object CppBridgeEvents {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.TRACE,
             TAG,
-            "Event: ${EventType.getName(eventType)} - $eventName"
+            "Event: ${EventType.getName(eventType)} - $eventName",
         )
 
         // Route to the registered listener
@@ -341,7 +341,7 @@ object CppBridgeEvents {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Error in event listener: ${e.message}"
+                "Error in event listener: ${e.message}",
             )
         }
     }
@@ -383,15 +383,16 @@ object CppBridgeEvents {
      * @param warningData Optional context data
      */
     fun trackWarning(warningMessage: String, warningData: String? = null) {
-        val message = if (warningData != null) {
-            "$warningMessage [context: $warningData]"
-        } else {
-            warningMessage
-        }
+        val message =
+            if (warningData != null) {
+                "$warningMessage [context: $warningData]"
+            } else {
+                warningMessage
+            }
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.WARN,
             TAG,
-            message
+            message,
         )
     }
 
@@ -416,7 +417,7 @@ object CppBridgeEvents {
             0, // sizeBytes
             null, // archiveType
             0, // errorCode
-            null // errorMessage
+            null, // errorMessage
         )
     }
 
@@ -434,7 +435,7 @@ object CppBridgeEvents {
             0, // sizeBytes
             null, // archiveType
             0, // errorCode
-            null // errorMessage
+            null, // errorMessage
         )
     }
 
@@ -452,7 +453,7 @@ object CppBridgeEvents {
             sizeBytes,
             null, // archiveType
             0, // errorCode (RAC_SUCCESS)
-            null // errorMessage
+            null, // errorMessage
         )
     }
 
@@ -470,7 +471,7 @@ object CppBridgeEvents {
             0, // sizeBytes
             null, // archiveType
             -5, // errorCode (RAC_ERROR_OPERATION_FAILED)
-            errorMessage
+            errorMessage,
         )
     }
 
@@ -481,9 +482,14 @@ object CppBridgeEvents {
         RunAnywhereBridge.racAnalyticsEventEmitDownload(
             EventType.MODEL_DOWNLOAD_CANCELLED,
             modelId,
-            0.0, 0, 0, 0.0, 0, null,
+            0.0,
+            0,
+            0,
+            0.0,
+            0,
+            null,
             0, // RAC_SUCCESS
-            null
+            null,
         )
     }
 
@@ -498,9 +504,14 @@ object CppBridgeEvents {
         RunAnywhereBridge.racAnalyticsEventEmitDownload(
             EventType.MODEL_EXTRACTION_STARTED,
             modelId,
-            0.0, 0, 0, 0.0, 0,
+            0.0,
+            0,
+            0,
+            0.0,
+            0,
             archiveType,
-            0, null
+            0,
+            null,
         )
     }
 
@@ -512,7 +523,13 @@ object CppBridgeEvents {
             EventType.MODEL_EXTRACTION_PROGRESS,
             modelId,
             progress,
-            0, 0, 0.0, 0, null, 0, null
+            0,
+            0,
+            0.0,
+            0,
+            null,
+            0,
+            null,
         )
     }
 
@@ -523,7 +540,14 @@ object CppBridgeEvents {
         RunAnywhereBridge.racAnalyticsEventEmitDownload(
             EventType.MODEL_EXTRACTION_COMPLETED,
             modelId,
-            100.0, 0, 0, durationMs, 0, null, 0, null
+            100.0,
+            0,
+            0,
+            durationMs,
+            0,
+            null,
+            0,
+            null,
         )
     }
 
@@ -534,8 +558,14 @@ object CppBridgeEvents {
         RunAnywhereBridge.racAnalyticsEventEmitDownload(
             EventType.MODEL_EXTRACTION_FAILED,
             modelId,
-            0.0, 0, 0, 0.0, 0, null,
-            -5, errorMessage
+            0.0,
+            0,
+            0,
+            0.0,
+            0,
+            null,
+            -5,
+            errorMessage,
         )
     }
 
@@ -550,7 +580,14 @@ object CppBridgeEvents {
         RunAnywhereBridge.racAnalyticsEventEmitDownload(
             EventType.MODEL_DELETED,
             modelId,
-            0.0, 0, 0, 0.0, 0, null, 0, null
+            0.0,
+            0,
+            0,
+            0.0,
+            0,
+            null,
+            0,
+            null,
         )
     }
 
@@ -565,9 +602,9 @@ object CppBridgeEvents {
         RunAnywhereBridge.racAnalyticsEventEmitSdkLifecycle(
             EventType.SDK_INIT_STARTED,
             0.0, // durationMs
-            0,   // count
-            0,   // errorCode
-            null // errorMessage
+            0, // count
+            0, // errorCode
+            null, // errorMessage
         )
     }
 
@@ -578,7 +615,9 @@ object CppBridgeEvents {
         RunAnywhereBridge.racAnalyticsEventEmitSdkLifecycle(
             EventType.SDK_INIT_COMPLETED,
             durationMs,
-            0, 0, null
+            0,
+            0,
+            null,
         )
     }
 
@@ -591,7 +630,7 @@ object CppBridgeEvents {
             0.0,
             0,
             -5, // RAC_ERROR_OPERATION_FAILED
-            errorMessage
+            errorMessage,
         )
     }
 
@@ -603,7 +642,8 @@ object CppBridgeEvents {
             EventType.SDK_MODELS_LOADED,
             0.0,
             count,
-            0, null
+            0,
+            null,
         )
     }
 
@@ -618,7 +658,8 @@ object CppBridgeEvents {
         RunAnywhereBridge.racAnalyticsEventEmitStorage(
             EventType.STORAGE_CACHE_CLEARED,
             freedBytes,
-            0, null
+            0,
+            null,
         )
     }
 
@@ -629,7 +670,8 @@ object CppBridgeEvents {
         RunAnywhereBridge.racAnalyticsEventEmitStorage(
             EventType.STORAGE_CACHE_CLEAR_FAILED,
             0,
-            -5, errorMessage
+            -5,
+            errorMessage,
         )
     }
 
@@ -640,7 +682,8 @@ object CppBridgeEvents {
         RunAnywhereBridge.racAnalyticsEventEmitStorage(
             EventType.STORAGE_TEMP_CLEANED,
             freedBytes,
-            0, null
+            0,
+            null,
         )
     }
 
@@ -654,7 +697,10 @@ object CppBridgeEvents {
     fun emitVoiceAgentTurnStarted() {
         RunAnywhereBridge.racAnalyticsEventEmitSdkLifecycle(
             EventType.VOICE_AGENT_TURN_STARTED,
-            0.0, 0, 0, null
+            0.0,
+            0,
+            0,
+            null,
         )
     }
 
@@ -664,7 +710,10 @@ object CppBridgeEvents {
     fun emitVoiceAgentTurnCompleted(durationMs: Double) {
         RunAnywhereBridge.racAnalyticsEventEmitSdkLifecycle(
             EventType.VOICE_AGENT_TURN_COMPLETED,
-            durationMs, 0, 0, null
+            durationMs,
+            0,
+            0,
+            null,
         )
     }
 
@@ -674,7 +723,10 @@ object CppBridgeEvents {
     fun emitVoiceAgentTurnFailed(errorMessage: String) {
         RunAnywhereBridge.racAnalyticsEventEmitSdkLifecycle(
             EventType.VOICE_AGENT_TURN_FAILED,
-            0.0, 0, -5, errorMessage
+            0.0,
+            0,
+            -5,
+            errorMessage,
         )
     }
 
@@ -689,7 +741,8 @@ object CppBridgeEvents {
         RunAnywhereBridge.racAnalyticsEventEmitDevice(
             EventType.DEVICE_REGISTERED,
             deviceId,
-            0, null
+            0,
+            null,
         )
     }
 
@@ -700,7 +753,8 @@ object CppBridgeEvents {
         RunAnywhereBridge.racAnalyticsEventEmitDevice(
             EventType.DEVICE_REGISTRATION_FAILED,
             null,
-            -5, errorMessage
+            -5,
+            errorMessage,
         )
     }
 
@@ -717,7 +771,7 @@ object CppBridgeEvents {
             -5, // RAC_ERROR_OPERATION_FAILED
             errorMessage,
             operation,
-            context
+            context,
         )
     }
 
@@ -731,7 +785,7 @@ object CppBridgeEvents {
     fun emitNetworkConnectivityChanged(isOnline: Boolean) {
         RunAnywhereBridge.racAnalyticsEventEmitNetwork(
             EventType.NETWORK_CONNECTIVITY_CHANGED,
-            isOnline
+            isOnline,
         )
     }
 
@@ -763,7 +817,8 @@ object CppBridgeEvents {
             0, // modelSizeBytes
             0.0, // durationMs
             framework,
-            0, null
+            0,
+            null,
         )
     }
 
@@ -775,7 +830,7 @@ object CppBridgeEvents {
         modelName: String?,
         modelSizeBytes: Long,
         durationMs: Double,
-        framework: Int = Framework.UNKNOWN
+        framework: Int = Framework.UNKNOWN,
     ) {
         RunAnywhereBridge.racAnalyticsEventEmitLlmModel(
             EventType.LLM_MODEL_LOAD_COMPLETED,
@@ -784,7 +839,8 @@ object CppBridgeEvents {
             modelSizeBytes,
             durationMs,
             framework,
-            0, null
+            0,
+            null,
         )
     }
 
@@ -795,15 +851,17 @@ object CppBridgeEvents {
         modelId: String,
         modelName: String?,
         errorMessage: String,
-        framework: Int = Framework.UNKNOWN
+        framework: Int = Framework.UNKNOWN,
     ) {
         RunAnywhereBridge.racAnalyticsEventEmitLlmModel(
             EventType.LLM_MODEL_LOAD_FAILED,
             modelId,
             modelName,
-            0, 0.0,
+            0,
+            0.0,
             framework,
-            -5, errorMessage
+            -5,
+            errorMessage,
         )
     }
 
@@ -815,9 +873,11 @@ object CppBridgeEvents {
             EventType.LLM_MODEL_UNLOADED,
             modelId,
             modelName,
-            0, 0.0,
+            0,
+            0.0,
             framework,
-            0, null
+            0,
+            null,
         )
     }
 
@@ -833,17 +893,25 @@ object CppBridgeEvents {
         modelId: String?,
         modelName: String?,
         isStreaming: Boolean = false,
-        framework: Int = Framework.UNKNOWN
+        framework: Int = Framework.UNKNOWN,
     ) {
         RunAnywhereBridge.racAnalyticsEventEmitLlmGeneration(
             EventType.LLM_GENERATION_STARTED,
-            generationId, modelId, modelName,
-            0, 0, 0.0, 0.0, // tokens, duration, tokensPerSec
+            generationId,
+            modelId,
+            modelName,
+            0,
+            0,
+            0.0,
+            0.0, // tokens, duration, tokensPerSec
             isStreaming,
             0.0, // timeToFirstToken
             framework,
-            0f, 0, 0, // temperature, maxTokens, contextLength
-            0, null
+            0f,
+            0,
+            0, // temperature, maxTokens, contextLength
+            0,
+            null,
         )
     }
 
@@ -863,15 +931,25 @@ object CppBridgeEvents {
         framework: Int = Framework.UNKNOWN,
         temperature: Float = 0f,
         maxTokens: Int = 0,
-        contextLength: Int = 0
+        contextLength: Int = 0,
     ) {
         RunAnywhereBridge.racAnalyticsEventEmitLlmGeneration(
             EventType.LLM_GENERATION_COMPLETED,
-            generationId, modelId, modelName,
-            inputTokens, outputTokens, durationMs, tokensPerSecond,
-            isStreaming, timeToFirstTokenMs,
-            framework, temperature, maxTokens, contextLength,
-            0, null
+            generationId,
+            modelId,
+            modelName,
+            inputTokens,
+            outputTokens,
+            durationMs,
+            tokensPerSecond,
+            isStreaming,
+            timeToFirstTokenMs,
+            framework,
+            temperature,
+            maxTokens,
+            contextLength,
+            0,
+            null,
         )
     }
 
@@ -884,15 +962,25 @@ object CppBridgeEvents {
         modelName: String?,
         errorMessage: String,
         isStreaming: Boolean = false,
-        framework: Int = Framework.UNKNOWN
+        framework: Int = Framework.UNKNOWN,
     ) {
         RunAnywhereBridge.racAnalyticsEventEmitLlmGeneration(
             EventType.LLM_GENERATION_FAILED,
-            generationId, modelId, modelName,
-            0, 0, 0.0, 0.0,
-            isStreaming, 0.0,
-            framework, 0f, 0, 0,
-            -5, errorMessage
+            generationId,
+            modelId,
+            modelName,
+            0,
+            0,
+            0.0,
+            0.0,
+            isStreaming,
+            0.0,
+            framework,
+            0f,
+            0,
+            0,
+            -5,
+            errorMessage,
         )
     }
 
@@ -903,16 +991,25 @@ object CppBridgeEvents {
         generationId: String?,
         modelId: String?,
         timeToFirstTokenMs: Double,
-        framework: Int = Framework.UNKNOWN
+        framework: Int = Framework.UNKNOWN,
     ) {
         RunAnywhereBridge.racAnalyticsEventEmitLlmGeneration(
             EventType.LLM_FIRST_TOKEN,
-            generationId, modelId, null,
-            0, 0, 0.0, 0.0,
+            generationId,
+            modelId,
+            null,
+            0,
+            0,
+            0.0,
+            0.0,
             true, // isStreaming
             timeToFirstTokenMs,
-            framework, 0f, 0, 0,
-            0, null
+            framework,
+            0f,
+            0,
+            0,
+            0,
+            null,
         )
     }
 
@@ -926,10 +1023,22 @@ object CppBridgeEvents {
     fun emitSttModelLoadStarted(modelId: String, modelName: String?, framework: Int = Framework.UNKNOWN) {
         RunAnywhereBridge.racAnalyticsEventEmitSttTranscription(
             EventType.STT_MODEL_LOAD_STARTED,
-            null, modelId, modelName, null,
-            0f, 0.0, 0.0, 0, 0, 0.0,
-            null, 0, false,
-            framework, 0, null
+            null,
+            modelId,
+            modelName,
+            null,
+            0f,
+            0.0,
+            0.0,
+            0,
+            0,
+            0.0,
+            null,
+            0,
+            false,
+            framework,
+            0,
+            null,
         )
     }
 
@@ -940,14 +1049,26 @@ object CppBridgeEvents {
         modelId: String,
         modelName: String?,
         durationMs: Double,
-        framework: Int = Framework.UNKNOWN
+        framework: Int = Framework.UNKNOWN,
     ) {
         RunAnywhereBridge.racAnalyticsEventEmitSttTranscription(
             EventType.STT_MODEL_LOAD_COMPLETED,
-            null, modelId, modelName, null,
-            0f, durationMs, 0.0, 0, 0, 0.0,
-            null, 0, false,
-            framework, 0, null
+            null,
+            modelId,
+            modelName,
+            null,
+            0f,
+            durationMs,
+            0.0,
+            0,
+            0,
+            0.0,
+            null,
+            0,
+            false,
+            framework,
+            0,
+            null,
         )
     }
 
@@ -958,14 +1079,26 @@ object CppBridgeEvents {
         modelId: String,
         modelName: String?,
         errorMessage: String,
-        framework: Int = Framework.UNKNOWN
+        framework: Int = Framework.UNKNOWN,
     ) {
         RunAnywhereBridge.racAnalyticsEventEmitSttTranscription(
             EventType.STT_MODEL_LOAD_FAILED,
-            null, modelId, modelName, null,
-            0f, 0.0, 0.0, 0, 0, 0.0,
-            null, 0, false,
-            framework, -5, errorMessage
+            null,
+            modelId,
+            modelName,
+            null,
+            0f,
+            0.0,
+            0.0,
+            0,
+            0,
+            0.0,
+            null,
+            0,
+            false,
+            framework,
+            -5,
+            errorMessage,
         )
     }
 
@@ -983,14 +1116,26 @@ object CppBridgeEvents {
         audioLengthMs: Double,
         audioSizeBytes: Int,
         isStreaming: Boolean = false,
-        framework: Int = Framework.UNKNOWN
+        framework: Int = Framework.UNKNOWN,
     ) {
         RunAnywhereBridge.racAnalyticsEventEmitSttTranscription(
             EventType.STT_TRANSCRIPTION_STARTED,
-            transcriptionId, modelId, modelName, null,
-            0f, 0.0, audioLengthMs, audioSizeBytes, 0, 0.0,
-            null, 0, isStreaming,
-            framework, 0, null
+            transcriptionId,
+            modelId,
+            modelName,
+            null,
+            0f,
+            0.0,
+            audioLengthMs,
+            audioSizeBytes,
+            0,
+            0.0,
+            null,
+            0,
+            isStreaming,
+            framework,
+            0,
+            null,
         )
     }
 
@@ -1011,14 +1156,26 @@ object CppBridgeEvents {
         language: String?,
         sampleRate: Int,
         isStreaming: Boolean = false,
-        framework: Int = Framework.UNKNOWN
+        framework: Int = Framework.UNKNOWN,
     ) {
         RunAnywhereBridge.racAnalyticsEventEmitSttTranscription(
             EventType.STT_TRANSCRIPTION_COMPLETED,
-            transcriptionId, modelId, modelName, text,
-            confidence, durationMs, audioLengthMs, audioSizeBytes, wordCount, realTimeFactor,
-            language, sampleRate, isStreaming,
-            framework, 0, null
+            transcriptionId,
+            modelId,
+            modelName,
+            text,
+            confidence,
+            durationMs,
+            audioLengthMs,
+            audioSizeBytes,
+            wordCount,
+            realTimeFactor,
+            language,
+            sampleRate,
+            isStreaming,
+            framework,
+            0,
+            null,
         )
     }
 
@@ -1031,14 +1188,26 @@ object CppBridgeEvents {
         modelName: String?,
         errorMessage: String,
         isStreaming: Boolean = false,
-        framework: Int = Framework.UNKNOWN
+        framework: Int = Framework.UNKNOWN,
     ) {
         RunAnywhereBridge.racAnalyticsEventEmitSttTranscription(
             EventType.STT_TRANSCRIPTION_FAILED,
-            transcriptionId, modelId, modelName, null,
-            0f, 0.0, 0.0, 0, 0, 0.0,
-            null, 0, isStreaming,
-            framework, -5, errorMessage
+            transcriptionId,
+            modelId,
+            modelName,
+            null,
+            0f,
+            0.0,
+            0.0,
+            0,
+            0,
+            0.0,
+            null,
+            0,
+            isStreaming,
+            framework,
+            -5,
+            errorMessage,
         )
     }
 
@@ -1052,9 +1221,18 @@ object CppBridgeEvents {
     fun emitTtsVoiceLoadStarted(modelId: String, modelName: String?, framework: Int = Framework.UNKNOWN) {
         RunAnywhereBridge.racAnalyticsEventEmitTtsSynthesis(
             EventType.TTS_VOICE_LOAD_STARTED,
-            null, modelId, modelName,
-            0, 0.0, 0, 0.0, 0.0, 0,
-            framework, 0, null
+            null,
+            modelId,
+            modelName,
+            0,
+            0.0,
+            0,
+            0.0,
+            0.0,
+            0,
+            framework,
+            0,
+            null,
         )
     }
 
@@ -1065,13 +1243,22 @@ object CppBridgeEvents {
         modelId: String,
         modelName: String?,
         durationMs: Double,
-        framework: Int = Framework.UNKNOWN
+        framework: Int = Framework.UNKNOWN,
     ) {
         RunAnywhereBridge.racAnalyticsEventEmitTtsSynthesis(
             EventType.TTS_VOICE_LOAD_COMPLETED,
-            null, modelId, modelName,
-            0, 0.0, 0, durationMs, 0.0, 0,
-            framework, 0, null
+            null,
+            modelId,
+            modelName,
+            0,
+            0.0,
+            0,
+            durationMs,
+            0.0,
+            0,
+            framework,
+            0,
+            null,
         )
     }
 
@@ -1082,13 +1269,22 @@ object CppBridgeEvents {
         modelId: String,
         modelName: String?,
         errorMessage: String,
-        framework: Int = Framework.UNKNOWN
+        framework: Int = Framework.UNKNOWN,
     ) {
         RunAnywhereBridge.racAnalyticsEventEmitTtsSynthesis(
             EventType.TTS_VOICE_LOAD_FAILED,
-            null, modelId, modelName,
-            0, 0.0, 0, 0.0, 0.0, 0,
-            framework, -5, errorMessage
+            null,
+            modelId,
+            modelName,
+            0,
+            0.0,
+            0,
+            0.0,
+            0.0,
+            0,
+            framework,
+            -5,
+            errorMessage,
         )
     }
 
@@ -1104,13 +1300,22 @@ object CppBridgeEvents {
         modelId: String?,
         modelName: String?,
         characterCount: Int,
-        framework: Int = Framework.UNKNOWN
+        framework: Int = Framework.UNKNOWN,
     ) {
         RunAnywhereBridge.racAnalyticsEventEmitTtsSynthesis(
             EventType.TTS_SYNTHESIS_STARTED,
-            synthesisId, modelId, modelName,
-            characterCount, 0.0, 0, 0.0, 0.0, 0,
-            framework, 0, null
+            synthesisId,
+            modelId,
+            modelName,
+            characterCount,
+            0.0,
+            0,
+            0.0,
+            0.0,
+            0,
+            framework,
+            0,
+            null,
         )
     }
 
@@ -1127,13 +1332,22 @@ object CppBridgeEvents {
         processingDurationMs: Double,
         charactersPerSecond: Double,
         sampleRate: Int,
-        framework: Int = Framework.UNKNOWN
+        framework: Int = Framework.UNKNOWN,
     ) {
         RunAnywhereBridge.racAnalyticsEventEmitTtsSynthesis(
             EventType.TTS_SYNTHESIS_COMPLETED,
-            synthesisId, modelId, modelName,
-            characterCount, audioDurationMs, audioSizeBytes, processingDurationMs, charactersPerSecond, sampleRate,
-            framework, 0, null
+            synthesisId,
+            modelId,
+            modelName,
+            characterCount,
+            audioDurationMs,
+            audioSizeBytes,
+            processingDurationMs,
+            charactersPerSecond,
+            sampleRate,
+            framework,
+            0,
+            null,
         )
     }
 
@@ -1145,13 +1359,22 @@ object CppBridgeEvents {
         modelId: String?,
         modelName: String?,
         errorMessage: String,
-        framework: Int = Framework.UNKNOWN
+        framework: Int = Framework.UNKNOWN,
     ) {
         RunAnywhereBridge.racAnalyticsEventEmitTtsSynthesis(
             EventType.TTS_SYNTHESIS_FAILED,
-            synthesisId, modelId, modelName,
-            0, 0.0, 0, 0.0, 0.0, 0,
-            framework, -5, errorMessage
+            synthesisId,
+            modelId,
+            modelName,
+            0,
+            0.0,
+            0,
+            0.0,
+            0.0,
+            0,
+            framework,
+            -5,
+            errorMessage,
         )
     }
 
@@ -1165,7 +1388,8 @@ object CppBridgeEvents {
     fun emitVadStarted() {
         RunAnywhereBridge.racAnalyticsEventEmitVad(
             EventType.VAD_STARTED,
-            0.0, 0f
+            0.0,
+            0f,
         )
     }
 
@@ -1175,7 +1399,8 @@ object CppBridgeEvents {
     fun emitVadStopped() {
         RunAnywhereBridge.racAnalyticsEventEmitVad(
             EventType.VAD_STOPPED,
-            0.0, 0f
+            0.0,
+            0f,
         )
     }
 
@@ -1185,7 +1410,8 @@ object CppBridgeEvents {
     fun emitVadSpeechStarted(energyLevel: Float = 0f) {
         RunAnywhereBridge.racAnalyticsEventEmitVad(
             EventType.VAD_SPEECH_STARTED,
-            0.0, energyLevel
+            0.0,
+            energyLevel,
         )
     }
 
@@ -1195,7 +1421,8 @@ object CppBridgeEvents {
     fun emitVadSpeechEnded(speechDurationMs: Double, energyLevel: Float = 0f) {
         RunAnywhereBridge.racAnalyticsEventEmitVad(
             EventType.VAD_SPEECH_ENDED,
-            speechDurationMs, energyLevel
+            speechDurationMs,
+            energyLevel,
         )
     }
 
@@ -1205,7 +1432,8 @@ object CppBridgeEvents {
     fun emitVadPaused() {
         RunAnywhereBridge.racAnalyticsEventEmitVad(
             EventType.VAD_PAUSED,
-            0.0, 0f
+            0.0,
+            0f,
         )
     }
 
@@ -1215,7 +1443,8 @@ object CppBridgeEvents {
     fun emitVadResumed() {
         RunAnywhereBridge.racAnalyticsEventEmitVad(
             EventType.VAD_RESUMED,
-            0.0, 0f
+            0.0,
+            0f,
         )
     }
 }

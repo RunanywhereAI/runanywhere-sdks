@@ -31,7 +31,6 @@ import java.util.concurrent.ConcurrentHashMap
  * - All callbacks are thread-safe
  */
 object CppBridgeStrategy {
-
     /**
      * Execution strategy type constants matching C++ RAC_STRATEGY_TYPE_* values.
      */
@@ -54,14 +53,15 @@ object CppBridgeStrategy {
         /**
          * Get a human-readable name for the strategy type.
          */
-        fun getName(type: Int): String = when (type) {
-            ON_DEVICE -> "ON_DEVICE"
-            CLOUD -> "CLOUD"
-            HYBRID_LOCAL_FIRST -> "HYBRID_LOCAL_FIRST"
-            HYBRID_CLOUD_FIRST -> "HYBRID_CLOUD_FIRST"
-            AUTO -> "AUTO"
-            else -> "UNKNOWN($type)"
-        }
+        fun getName(type: Int): String =
+            when (type) {
+                ON_DEVICE -> "ON_DEVICE"
+                CLOUD -> "CLOUD"
+                HYBRID_LOCAL_FIRST -> "HYBRID_LOCAL_FIRST"
+                HYBRID_CLOUD_FIRST -> "HYBRID_CLOUD_FIRST"
+                AUTO -> "AUTO"
+                else -> "UNKNOWN($type)"
+            }
 
         /**
          * Check if the strategy type uses on-device execution.
@@ -96,14 +96,15 @@ object CppBridgeStrategy {
         /**
          * Get a human-readable name for the optimization target.
          */
-        fun getName(target: Int): String = when (target) {
-            LATENCY -> "LATENCY"
-            QUALITY -> "QUALITY"
-            COST -> "COST"
-            POWER -> "POWER"
-            BALANCED -> "BALANCED"
-            else -> "UNKNOWN($target)"
-        }
+        fun getName(target: Int): String =
+            when (target) {
+                LATENCY -> "LATENCY"
+                QUALITY -> "QUALITY"
+                COST -> "COST"
+                POWER -> "POWER"
+                BALANCED -> "BALANCED"
+                else -> "UNKNOWN($target)"
+            }
     }
 
     /**
@@ -140,18 +141,19 @@ object CppBridgeStrategy {
         /**
          * Get a human-readable name for the decision reason.
          */
-        fun getName(reason: Int): String = when (reason) {
-            USER_PREFERENCE -> "USER_PREFERENCE"
-            MODEL_NOT_AVAILABLE -> "MODEL_NOT_AVAILABLE"
-            MODEL_NOT_DOWNLOADED -> "MODEL_NOT_DOWNLOADED"
-            INSUFFICIENT_RESOURCES -> "INSUFFICIENT_RESOURCES"
-            NETWORK_UNAVAILABLE -> "NETWORK_UNAVAILABLE"
-            CLOUD_QUOTA_EXCEEDED -> "CLOUD_QUOTA_EXCEEDED"
-            FALLBACK -> "FALLBACK"
-            AUTO_DECISION -> "AUTO_DECISION"
-            LOW_BATTERY -> "LOW_BATTERY"
-            else -> "UNKNOWN($reason)"
-        }
+        fun getName(reason: Int): String =
+            when (reason) {
+                USER_PREFERENCE -> "USER_PREFERENCE"
+                MODEL_NOT_AVAILABLE -> "MODEL_NOT_AVAILABLE"
+                MODEL_NOT_DOWNLOADED -> "MODEL_NOT_DOWNLOADED"
+                INSUFFICIENT_RESOURCES -> "INSUFFICIENT_RESOURCES"
+                NETWORK_UNAVAILABLE -> "NETWORK_UNAVAILABLE"
+                CLOUD_QUOTA_EXCEEDED -> "CLOUD_QUOTA_EXCEEDED"
+                FALLBACK -> "FALLBACK"
+                AUTO_DECISION -> "AUTO_DECISION"
+                LOW_BATTERY -> "LOW_BATTERY"
+                else -> "UNKNOWN($reason)"
+            }
     }
 
     /**
@@ -179,15 +181,16 @@ object CppBridgeStrategy {
         /**
          * Get a human-readable name for the component type.
          */
-        fun getName(type: Int): String = when (type) {
-            LLM -> "LLM"
-            STT -> "STT"
-            TTS -> "TTS"
-            VAD -> "VAD"
-            VOICE_AGENT -> "VOICE_AGENT"
-            EMBEDDING -> "EMBEDDING"
-            else -> "UNKNOWN($type)"
-        }
+        fun getName(type: Int): String =
+            when (type) {
+                LLM -> "LLM"
+                STT -> "STT"
+                TTS -> "TTS"
+                VAD -> "VAD"
+                VOICE_AGENT -> "VOICE_AGENT"
+                EMBEDDING -> "EMBEDDING"
+                else -> "UNKNOWN($type)"
+            }
     }
 
     @Volatile
@@ -252,7 +255,7 @@ object CppBridgeStrategy {
         val availableMemoryMB: Long = 0,
         val availableStorageMB: Long = 0,
         val batteryLevel: Int = 100,
-        val isCharging: Boolean = false
+        val isCharging: Boolean = false,
     ) {
         /**
          * Check if on-device execution is viable.
@@ -277,7 +280,7 @@ object CppBridgeStrategy {
         val reason: Int,
         val componentType: Int,
         val canFallback: Boolean,
-        val fallbackStrategy: Int?
+        val fallbackStrategy: Int?,
     ) {
         /**
          * Get the strategy name.
@@ -398,7 +401,7 @@ object CppBridgeStrategy {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Strategy callbacks registered. Default: ${StrategyType.getName(defaultStrategy)}"
+                "Strategy callbacks registered. Default: ${StrategyType.getName(defaultStrategy)}",
             )
         }
     }
@@ -445,7 +448,7 @@ object CppBridgeStrategy {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Strategy set: ${ComponentType.getName(componentType)} = ${StrategyType.getName(strategy)}"
+            "Strategy set: ${ComponentType.getName(componentType)} = ${StrategyType.getName(strategy)}",
         )
 
         // Notify listener
@@ -457,7 +460,7 @@ object CppBridgeStrategy {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in strategy listener: ${e.message}"
+                "Error in strategy listener: ${e.message}",
             )
         }
 
@@ -491,7 +494,7 @@ object CppBridgeStrategy {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Default strategy set: ${StrategyType.getName(strategy)}"
+            "Default strategy set: ${StrategyType.getName(strategy)}",
         )
 
         // Notify listener
@@ -503,7 +506,7 @@ object CppBridgeStrategy {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in strategy listener: ${e.message}"
+                "Error in strategy listener: ${e.message}",
             )
         }
     }
@@ -536,7 +539,7 @@ object CppBridgeStrategy {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Optimization target set: ${ComponentType.getName(componentType)} = ${OptimizationTarget.getName(target)}"
+            "Optimization target set: ${ComponentType.getName(componentType)} = ${OptimizationTarget.getName(target)}",
         )
     }
 
@@ -562,7 +565,7 @@ object CppBridgeStrategy {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in strategy listener: ${e.message}"
+                "Error in strategy listener: ${e.message}",
             )
         }
 
@@ -594,7 +597,7 @@ object CppBridgeStrategy {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.WARN,
             TAG,
-            "Strategy failed: ${ComponentType.getName(componentType)} ${StrategyType.getName(failedStrategy)} - $errorMessage"
+            "Strategy failed: ${ComponentType.getName(componentType)} ${StrategyType.getName(failedStrategy)} - $errorMessage",
         )
 
         // Determine fallback
@@ -604,7 +607,7 @@ object CppBridgeStrategy {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Falling back to: ${StrategyType.getName(fallback)}"
+                "Falling back to: ${StrategyType.getName(fallback)}",
             )
 
             // Notify listener
@@ -614,7 +617,7 @@ object CppBridgeStrategy {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in strategy listener: ${e.message}"
+                    "Error in strategy listener: ${e.message}",
                 )
             }
         }
@@ -668,13 +671,13 @@ object CppBridgeStrategy {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Capabilities updated for ${ComponentType.getName(componentType)}"
+                "Capabilities updated for ${ComponentType.getName(componentType)}",
             )
         } catch (e: Exception) {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Failed to parse capabilities: ${e.message}"
+                "Failed to parse capabilities: ${e.message}",
             )
         }
     }
@@ -709,17 +712,21 @@ object CppBridgeStrategy {
 
     /**
      * Native method to set the strategy callbacks with C++ core.
+     * Reserved for future native callback integration.
      *
      * C API: rac_strategy_set_callbacks(...)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeSetStrategyCallbacks()
 
     /**
      * Native method to unset the strategy callbacks.
+     * Reserved for future native callback integration.
      *
      * C API: rac_strategy_set_callbacks(nullptr)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeUnsetStrategyCallbacks()
 
@@ -912,7 +919,7 @@ object CppBridgeStrategy {
             ComponentType.TTS,
             ComponentType.VAD,
             ComponentType.VOICE_AGENT,
-            ComponentType.EMBEDDING
+            ComponentType.EMBEDDING,
         )) {
             setStrategy(type, StrategyType.ON_DEVICE)
         }
@@ -920,7 +927,7 @@ object CppBridgeStrategy {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.INFO,
             TAG,
-            "Switched to on-device only mode"
+            "Switched to on-device only mode",
         )
     }
 
@@ -933,7 +940,7 @@ object CppBridgeStrategy {
             ComponentType.LLM,
             ComponentType.STT,
             ComponentType.TTS,
-            ComponentType.VOICE_AGENT
+            ComponentType.VOICE_AGENT,
         )) {
             setStrategy(type, StrategyType.CLOUD)
         }
@@ -941,7 +948,7 @@ object CppBridgeStrategy {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.INFO,
             TAG,
-            "Switched to cloud only mode"
+            "Switched to cloud only mode",
         )
     }
 
@@ -954,7 +961,7 @@ object CppBridgeStrategy {
             ComponentType.LLM,
             ComponentType.STT,
             ComponentType.TTS,
-            ComponentType.VOICE_AGENT
+            ComponentType.VOICE_AGENT,
         )) {
             setStrategy(type, StrategyType.HYBRID_LOCAL_FIRST)
         }
@@ -962,7 +969,7 @@ object CppBridgeStrategy {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.INFO,
             TAG,
-            "Switched to hybrid (local first) mode"
+            "Switched to hybrid (local first) mode",
         )
     }
 
@@ -976,7 +983,7 @@ object CppBridgeStrategy {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.INFO,
             TAG,
-            "Switched to auto strategy mode"
+            "Switched to auto strategy mode",
         )
     }
 
@@ -994,7 +1001,7 @@ object CppBridgeStrategy {
                     reason = StrategyReason.USER_PREFERENCE,
                     componentType = componentType,
                     canFallback = determineFallbackStrategy(componentType, configuredStrategy) >= 0,
-                    fallbackStrategy = determineFallbackStrategy(componentType, configuredStrategy).takeIf { it >= 0 }
+                    fallbackStrategy = determineFallbackStrategy(componentType, configuredStrategy).takeIf { it >= 0 },
                 )
             }
         }
@@ -1003,85 +1010,87 @@ object CppBridgeStrategy {
         val caps = strategyCapabilities[componentType] ?: getCurrentCapabilities()
 
         // Check if we have a local model
-        val hasLocalModel = if (modelId != null) {
-            val model = CppBridgeModelRegistry.get(modelId)
-            model != null && model.localPath != null
-        } else {
-            caps.hasLocalModel
-        }
+        val hasLocalModel =
+            if (modelId != null) {
+                val model = CppBridgeModelRegistry.get(modelId)
+                model != null && model.localPath != null
+            } else {
+                caps.hasLocalModel
+            }
 
-        val decision = when {
-            // Network unavailable - must use on-device
-            !caps.hasNetworkAccess -> {
-                if (hasLocalModel && caps.canExecuteOnDevice()) {
+        val decision =
+            when {
+                // Network unavailable - must use on-device
+                !caps.hasNetworkAccess -> {
+                    if (hasLocalModel && caps.canExecuteOnDevice()) {
+                        StrategyDecision(
+                            strategy = StrategyType.ON_DEVICE,
+                            reason = StrategyReason.NETWORK_UNAVAILABLE,
+                            componentType = componentType,
+                            canFallback = false,
+                            fallbackStrategy = null,
+                        )
+                    } else {
+                        // No fallback available
+                        StrategyDecision(
+                            strategy = StrategyType.ON_DEVICE,
+                            reason = StrategyReason.MODEL_NOT_DOWNLOADED,
+                            componentType = componentType,
+                            canFallback = false,
+                            fallbackStrategy = null,
+                        )
+                    }
+                }
+
+                // Low battery and not charging - prefer cloud to save power
+                caps.batteryLevel < 20 && !caps.isCharging -> {
                     StrategyDecision(
-                        strategy = StrategyType.ON_DEVICE,
-                        reason = StrategyReason.NETWORK_UNAVAILABLE,
+                        strategy = StrategyType.CLOUD,
+                        reason = StrategyReason.LOW_BATTERY,
                         componentType = componentType,
-                        canFallback = false,
-                        fallbackStrategy = null
+                        canFallback = hasLocalModel,
+                        fallbackStrategy = if (hasLocalModel) StrategyType.ON_DEVICE else null,
                     )
-                } else {
-                    // No fallback available
+                }
+
+                // Has local model - prefer on-device
+                hasLocalModel && caps.canExecuteOnDevice() -> {
                     StrategyDecision(
                         strategy = StrategyType.ON_DEVICE,
+                        reason = StrategyReason.AUTO_DECISION,
+                        componentType = componentType,
+                        canFallback = caps.hasNetworkAccess,
+                        fallbackStrategy = if (caps.hasNetworkAccess) StrategyType.CLOUD else null,
+                    )
+                }
+
+                // No local model - use cloud
+                caps.canExecuteOnCloud() -> {
+                    StrategyDecision(
+                        strategy = StrategyType.CLOUD,
                         reason = StrategyReason.MODEL_NOT_DOWNLOADED,
                         componentType = componentType,
                         canFallback = false,
-                        fallbackStrategy = null
+                        fallbackStrategy = null,
+                    )
+                }
+
+                // No options available
+                else -> {
+                    StrategyDecision(
+                        strategy = StrategyType.ON_DEVICE,
+                        reason = StrategyReason.INSUFFICIENT_RESOURCES,
+                        componentType = componentType,
+                        canFallback = false,
+                        fallbackStrategy = null,
                     )
                 }
             }
 
-            // Low battery and not charging - prefer cloud to save power
-            caps.batteryLevel < 20 && !caps.isCharging -> {
-                StrategyDecision(
-                    strategy = StrategyType.CLOUD,
-                    reason = StrategyReason.LOW_BATTERY,
-                    componentType = componentType,
-                    canFallback = hasLocalModel,
-                    fallbackStrategy = if (hasLocalModel) StrategyType.ON_DEVICE else null
-                )
-            }
-
-            // Has local model - prefer on-device
-            hasLocalModel && caps.canExecuteOnDevice() -> {
-                StrategyDecision(
-                    strategy = StrategyType.ON_DEVICE,
-                    reason = StrategyReason.AUTO_DECISION,
-                    componentType = componentType,
-                    canFallback = caps.hasNetworkAccess,
-                    fallbackStrategy = if (caps.hasNetworkAccess) StrategyType.CLOUD else null
-                )
-            }
-
-            // No local model - use cloud
-            caps.canExecuteOnCloud() -> {
-                StrategyDecision(
-                    strategy = StrategyType.CLOUD,
-                    reason = StrategyReason.MODEL_NOT_DOWNLOADED,
-                    componentType = componentType,
-                    canFallback = false,
-                    fallbackStrategy = null
-                )
-            }
-
-            // No options available
-            else -> {
-                StrategyDecision(
-                    strategy = StrategyType.ON_DEVICE,
-                    reason = StrategyReason.INSUFFICIENT_RESOURCES,
-                    componentType = componentType,
-                    canFallback = false,
-                    fallbackStrategy = null
-                )
-            }
-        }
-
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Strategy decision: ${decision.getComponentName()} = ${decision.getStrategyName()} (${decision.getReasonName()})"
+            "Strategy decision: ${decision.getComponentName()} = ${decision.getStrategyName()} (${decision.getReasonName()})",
         )
 
         return decision
@@ -1132,7 +1141,7 @@ object CppBridgeStrategy {
             availableMemoryMB = availableMemoryMB,
             availableStorageMB = availableStorageMB,
             batteryLevel = 100, // JVM doesn't have battery
-            isCharging = true
+            isCharging = true,
         )
     }
 
@@ -1164,13 +1173,21 @@ object CppBridgeStrategy {
         fun extractLong(key: String): Long {
             val pattern = "\"$key\"\\s*:\\s*(-?\\d+)"
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.toLongOrNull() ?: 0L
         }
 
         fun extractInt(key: String): Int {
             val pattern = "\"$key\"\\s*:\\s*(-?\\d+)"
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.toIntOrNull() ?: 0
         }
 
         return StrategyCapabilities(
@@ -1181,7 +1198,7 @@ object CppBridgeStrategy {
             availableMemoryMB = extractLong("available_memory_mb"),
             availableStorageMB = extractLong("available_storage_mb"),
             batteryLevel = extractInt("battery_level"),
-            isCharging = extractBoolean("is_charging")
+            isCharging = extractBoolean("is_charging"),
         )
     }
 }

@@ -8,5 +8,5 @@
 public final class RunAnywhereONNXAutolinking {
   public typealias bridge = margelo.nitro.runanywhere.onnx.bridge.swift
 
-
+  
 }
