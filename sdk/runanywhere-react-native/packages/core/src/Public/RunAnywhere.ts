@@ -122,6 +122,17 @@ export const RunAnywhere = {
 
   async initialize(options: SDKInitOptions): Promise<void> {
     const environment = options.environment ?? SDKEnvironment.Production;
+
+    // Fail fast: API key is required for production/staging environments
+    // Development mode uses C++ dev config (Supabase credentials) instead
+    if (environment !== SDKEnvironment.Development && !options.apiKey) {
+      const envName = environment === SDKEnvironment.Staging ? 'staging' : 'production';
+      throw new Error(
+        `API key is required for ${envName} environment. ` +
+        `Pass apiKey in initialize() options or use SDKEnvironment.Development for local testing.`
+      );
+    }
+
     const initParams: SDKInitParams = {
       apiKey: options.apiKey,
       baseURL: options.baseURL,
