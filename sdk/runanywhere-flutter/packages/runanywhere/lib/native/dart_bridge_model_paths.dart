@@ -4,10 +4,10 @@ import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../core/types/model_types.dart';
-import '../foundation/logging/sdk_logger.dart';
-import 'ffi_types.dart';
-import 'platform_loader.dart';
+import 'package:runanywhere/core/types/model_types.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/native/platform_loader.dart';
 
 /// Model path utilities bridge.
 /// Wraps C++ rac_model_paths.h functions.

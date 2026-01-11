@@ -8,10 +8,10 @@ import 'package:ffi/ffi.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
-import '../foundation/logging/sdk_logger.dart';
-import '../public/configuration/sdk_environment.dart';
-import 'dart_bridge_state.dart';
-import 'platform_loader.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/dart_bridge_state.dart';
+import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 // =============================================================================
 // Secure Storage Callbacks
@@ -534,8 +534,8 @@ int _secureStoreCallback(
     // Update cache
     _secureCache[keyStr] = valueStr;
 
-    // Schedule async write
-    _writeToSecureStorage(keyStr, valueStr);
+    // Schedule async write (fire-and-forget, cache is authoritative)
+    unawaited(_writeToSecureStorage(keyStr, valueStr));
 
     return 0;
   } catch (e) {
@@ -584,8 +584,8 @@ int _secureDeleteCallback(Pointer<Utf8> key, Pointer<Void> context) {
     // Update cache
     _secureCache.remove(keyStr);
 
-    // Schedule async delete
-    _deleteFromSecureStorage(keyStr);
+    // Schedule async delete (fire-and-forget, cache is authoritative)
+    unawaited(_deleteFromSecureStorage(keyStr));
 
     return 0;
   } catch (e) {

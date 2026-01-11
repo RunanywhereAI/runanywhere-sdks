@@ -4,7 +4,7 @@
 /// Matches Swift ComponentTypes.swift from Core/Types/
 library component_types;
 
-import 'model_types.dart';
+import 'package:runanywhere/core/types/model_types.dart';
 
 // MARK: - Component Protocols
 

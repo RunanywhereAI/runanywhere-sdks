@@ -331,7 +331,7 @@ class DartBridgeVAD {
   /// Dispose resources.
   void dispose() {
     destroy();
-    _activityController.close();
+    unawaited(_activityController.close());
   }
 }
 

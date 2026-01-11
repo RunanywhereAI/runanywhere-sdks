@@ -6,10 +6,10 @@ import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 
-import '../core/types/model_types.dart' as public_types;
-import '../foundation/logging/sdk_logger.dart';
-import 'ffi_types.dart';
-import 'platform_loader.dart';
+import 'package:runanywhere/core/types/model_types.dart' as public_types;
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/native/platform_loader.dart';
 
 // =============================================================================
 // Exception Return Constants
@@ -147,11 +147,11 @@ class DartBridgeModelRegistry {
         modelPtr.ref.category = model.category;
         modelPtr.ref.format = model.format;
         modelPtr.ref.framework = model.framework;
-        modelPtr.ref.download_url =
+        modelPtr.ref.downloadUrl =
             urlDart != null ? strdupFn(urlDart) : nullptr;
-        modelPtr.ref.local_path =
+        modelPtr.ref.localPath =
             pathDart != null ? strdupFn(pathDart) : nullptr;
-        modelPtr.ref.download_size = model.sizeBytes;
+        modelPtr.ref.downloadSize = model.sizeBytes;
         modelPtr.ref.source = model.source;
 
         final result = saveFn(_registryHandle!, modelPtr);
@@ -746,7 +746,7 @@ class DartBridgeModelRegistry {
         final discoveredCount = resultStruct.ref.discoveredCount;
 
         for (var i = 0; i < discoveredCount; i++) {
-          final modelPtr = resultStruct.ref.discoveredModels.elementAt(i);
+          final modelPtr = resultStruct.ref.discoveredModels + i;
           discoveredModels.add(DiscoveredModel(
             modelId: modelPtr.ref.modelId.toDartString(),
             localPath: modelPtr.ref.localPath.toDartString(),
@@ -792,12 +792,12 @@ class DartBridgeModelRegistry {
       format: struct.ref.format,
       framework: struct.ref.framework,
       source: struct.ref.source,
-      sizeBytes: struct.ref.download_size,
-      downloadURL: struct.ref.download_url != nullptr
-          ? struct.ref.download_url.toDartString()
+      sizeBytes: struct.ref.downloadSize,
+      downloadURL: struct.ref.downloadUrl != nullptr
+          ? struct.ref.downloadUrl.toDartString()
           : null,
-      localPath: struct.ref.local_path != nullptr
-          ? struct.ref.local_path.toDartString()
+      localPath: struct.ref.localPath != nullptr
+          ? struct.ref.localPath.toDartString()
           : null,
       version: null,
     );
@@ -905,19 +905,19 @@ base class RacArtifactInfoStruct extends Struct {
   external int kind; // rac_artifact_type_kind_t
 
   @Int32()
-  external int archive_type; // rac_archive_type_t
+  external int archiveType; // rac_archive_type_t
 
   @Int32()
-  external int archive_structure; // rac_archive_structure_t
+  external int archiveStructure; // rac_archive_structure_t
 
-  external Pointer<Void> expected_files; // rac_expected_model_files_t*
+  external Pointer<Void> expectedFiles; // rac_expected_model_files_t*
 
-  external Pointer<Void> file_descriptors; // rac_model_file_descriptor_t*
+  external Pointer<Void> fileDescriptors; // rac_model_file_descriptor_t*
 
   @IntPtr()
-  external int file_descriptor_count; // size_t
+  external int fileDescriptorCount; // size_t
 
-  external Pointer<Utf8> strategy_id; // const char*
+  external Pointer<Utf8> strategyId; // const char*
 }
 
 /// Model info struct matching actual C++ rac_model_info_t layout.
@@ -945,36 +945,36 @@ base class RacModelInfoCStruct extends Struct {
   external int framework;
 
   // char* download_url
-  external Pointer<Utf8> download_url;
+  external Pointer<Utf8> downloadUrl;
 
   // char* local_path
-  external Pointer<Utf8> local_path;
+  external Pointer<Utf8> localPath;
 
   // rac_model_artifact_info_t artifact_info (nested struct, ~40 bytes)
-  external RacArtifactInfoStruct artifact_info;
+  external RacArtifactInfoStruct artifactInfo;
 
   // int64_t download_size
   @Int64()
-  external int download_size;
+  external int downloadSize;
 
   // int64_t memory_required
   @Int64()
-  external int memory_required;
+  external int memoryRequired;
 
   // int32_t context_length
   @Int32()
-  external int context_length;
+  external int contextLength;
 
   // rac_bool_t supports_thinking (int32_t)
   @Int32()
-  external int supports_thinking;
+  external int supportsThinking;
 
   // char** tags
   external Pointer<Pointer<Utf8>> tags;
 
   // size_t tag_count
   @IntPtr()
-  external int tag_count;
+  external int tagCount;
 
   // char* description
   external Pointer<Utf8> description;
@@ -985,19 +985,19 @@ base class RacModelInfoCStruct extends Struct {
 
   // int64_t created_at
   @Int64()
-  external int created_at;
+  external int createdAt;
 
   // int64_t updated_at
   @Int64()
-  external int updated_at;
+  external int updatedAt;
 
   // int64_t last_used
   @Int64()
-  external int last_used;
+  external int lastUsed;
 
   // int32_t usage_count
   @Int32()
-  external int usage_count;
+  external int usageCount;
 }
 
 /// Model info struct (simplified, for internal Dart use only)

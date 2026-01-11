@@ -341,7 +341,7 @@ class DartBridgeVoiceAgent {
     }
 
     // Run the heavy C++ processing in a background isolate
-    return await Isolate.run(
+    return Isolate.run(
         () => _processVoiceTurnInIsolate(handle, audioData));
   }
 
@@ -591,7 +591,7 @@ class DartBridgeVoiceAgent {
   /// Dispose resources.
   void dispose() {
     destroy();
-    _eventController.close();
+    unawaited(_eventController.close());
   }
 
   // MARK: - Helpers

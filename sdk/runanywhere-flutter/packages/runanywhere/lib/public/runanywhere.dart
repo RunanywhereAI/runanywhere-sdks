@@ -12,16 +12,15 @@ import 'package:runanywhere/foundation/dependency_injection/service_container.da
 import 'package:runanywhere/foundation/error_types/sdk_error.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/infrastructure/download/download_service.dart';
+import 'package:runanywhere/native/dart_bridge.dart';
+import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_model_paths.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart'
     hide ModelInfo;
-import 'package:runanywhere/native/dart_bridge.dart';
-import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
 import 'package:runanywhere/public/types/types.dart';
-import 'package:runanywhere/public/types/voice_agent_types.dart';
 
 /// The RunAnywhere SDK entry point
 ///
@@ -1000,7 +999,7 @@ class RunAnywhere {
         },
         onDone: () {
           if (!controller.isClosed) {
-            controller.close();
+            unawaited(controller.close());
           }
           // Clear subscription when done
           DartBridge.llm.setActiveStreamSubscription(null);
@@ -1410,15 +1409,17 @@ class RunAnywhere {
   /// Matches Swift: `Task { try await CppBridge.ModelRegistry.shared.save(modelInfo) }`
   static void _saveToCppRegistry(ModelInfo model) {
     // Fire-and-forget save to C++ registry
-    DartBridgeModelRegistry.instance.savePublicModel(model).then((success) {
-      final logger = SDKLogger('RunAnywhere.Models');
-      if (!success) {
-        logger.warning('Failed to save model to C++ registry: ${model.id}');
-      }
-    }).catchError((Object error) {
-      SDKLogger('RunAnywhere.Models')
-          .error('Error saving model to C++ registry: $error');
-    });
+    unawaited(
+      DartBridgeModelRegistry.instance.savePublicModel(model).then((success) {
+        final logger = SDKLogger('RunAnywhere.Models');
+        if (!success) {
+          logger.warning('Failed to save model to C++ registry: ${model.id}');
+        }
+      }).catchError((Object error) {
+        SDKLogger('RunAnywhere.Models')
+            .error('Error saving model to C++ registry: $error');
+      }),
+    );
   }
 
   static ModelFormat _inferFormat(String path) {

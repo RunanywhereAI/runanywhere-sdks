@@ -3,8 +3,8 @@ import 'dart:async';
 
 import 'dart:ffi';
 
-import '../foundation/logging/sdk_logger.dart';
-import 'platform_loader.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/platform_loader.dart';
 
 /// Platform services bridge for Foundation Models and System TTS.
 /// Matches Swift's `CppBridge+Platform.swift`.

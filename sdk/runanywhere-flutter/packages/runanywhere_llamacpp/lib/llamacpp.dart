@@ -31,6 +31,8 @@
 /// ```
 library runanywhere_llamacpp;
 
+import 'dart:async' show unawaited;
+
 import 'package:runanywhere/core/module/runanywhere_module.dart';
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/core/types/sdk_component.dart';
@@ -236,8 +238,8 @@ class LlamaCpp implements RunAnywhereModule {
   // ============================================================================
 
   /// Enable auto-registration for this module.
-  /// Access this property to trigger C++ backend registration.
-  static final autoRegister = () {
-    register();
-  };
+  /// Call this method to trigger C++ backend registration.
+  static void autoRegister() {
+    unawaited(register());
+  }
 }

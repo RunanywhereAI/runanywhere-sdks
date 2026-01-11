@@ -9,10 +9,10 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:ffi/ffi.dart';
 import 'package:http/http.dart' as http;
 
-import '../public/configuration/sdk_environment.dart';
-import '../foundation/logging/sdk_logger.dart';
-import 'ffi_types.dart';
-import 'platform_loader.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 // =============================================================================
 // Telemetry Manager Bridge
@@ -624,7 +624,7 @@ void _telemetryHttpCallback(
     final needsAuth = requiresAuth != 0;
 
     // Fire and forget HTTP call
-    _sendTelemetryHttp(endpointStr, bodyStr, needsAuth);
+    unawaited(_sendTelemetryHttp(endpointStr, bodyStr, needsAuth));
   } catch (e) {
     SDKLogger('DartBridge.Telemetry').error('HTTP callback error: $e');
   }

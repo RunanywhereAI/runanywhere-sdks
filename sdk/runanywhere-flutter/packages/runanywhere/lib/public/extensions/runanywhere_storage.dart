@@ -6,12 +6,12 @@ library runanywhere_storage;
 
 import 'dart:io';
 
+import 'package:path_provider/path_provider.dart';
 import 'package:runanywhere/infrastructure/download/download_service.dart';
 import 'package:runanywhere/native/dart_bridge_storage.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
 import 'package:runanywhere/public/runanywhere.dart';
-import 'package:path_provider/path_provider.dart';
 
 // =============================================================================
 // RunAnywhere Storage Extensions

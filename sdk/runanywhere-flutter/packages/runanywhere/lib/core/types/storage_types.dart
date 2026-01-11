@@ -5,7 +5,7 @@
 /// Includes: storage info, configuration, availability, and model storage metrics.
 library storage_types;
 
-import 'model_types.dart';
+import 'package:runanywhere/core/types/model_types.dart';
 
 // MARK: - Device Storage
 
@@ -212,7 +212,7 @@ class StorageInfo {
 
   /// Stored models array (backward compatible)
   List<StoredModel> get storedModels {
-    return models.map((m) => StoredModel.fromMetrics(m)).toList();
+    return models.map(StoredModel.fromMetrics).toList();
   }
 
   /// Empty storage info
