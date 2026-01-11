@@ -19,7 +19,7 @@ dependencies:
   flutter:
     sdk: flutter
   # Core SDK dependency (provides RACommons)
-  runanywhere: ^0.15.10
+  runanywhere: ^0.15.11
   ffi: ^2.1.0
 
 dev_dependencies:
