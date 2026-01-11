@@ -1016,6 +1016,7 @@ class RunAnywhere {
 
       return LLMGenerationResult(
         text: allTokens.join(),
+        // TODO: Use actual tokenizer - this is a rough estimate (~4 chars per token)
         inputTokens: (prompt.length / 4).ceil(),
         tokensUsed: allTokens.length,
         modelUsed: modelId,

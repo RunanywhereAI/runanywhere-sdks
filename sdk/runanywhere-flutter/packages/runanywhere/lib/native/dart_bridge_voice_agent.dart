@@ -356,10 +356,8 @@ class DartBridgeVoiceAgent {
     final resultPtr = calloc<RacVoiceAgentResultStruct>();
 
     try {
-      // Copy audio bytes
-      for (var i = 0; i < audioData.length; i++) {
-        audioPtr[i] = audioData[i];
-      }
+      // Efficient bulk copy of audio bytes
+      audioPtr.asTypedList(audioData.length).setAll(0, audioData);
 
       final lib = PlatformLoader.loadCommons();
       final processFn = lib.lookupFunction<
@@ -445,9 +443,8 @@ class DartBridgeVoiceAgent {
     final resultPtr = calloc<Pointer<Utf8>>();
 
     try {
-      for (var i = 0; i < audioData.length; i++) {
-        audioPtr[i] = audioData[i];
-      }
+      // Efficient bulk copy of audio bytes
+      audioPtr.asTypedList(audioData.length).setAll(0, audioData);
 
       final lib = PlatformLoader.loadCommons();
       final transcribeFn = lib.lookupFunction<

@@ -52,6 +52,7 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
 
   /// Load storage data using RunAnywhere SDK
   Future<void> _loadStorageData() async {
+    if (!mounted) return;
     setState(() {
       _isRefreshingStorage = true;
     });
@@ -104,21 +105,28 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
 
   /// Clear cache using RunAnywhere SDK
   Future<void> _clearCache() async {
-    try {
-      // TODO: Implement clearCache() in SDK
-      // await sdk.RunAnywhere.clearCache();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cache cleared')),
-        );
-      }
-      await _loadStorageData();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to clear cache: $e')),
-        );
-      }
+    // TODO: Implement clearCache() in SDK
+    // Once SDK implements clearCache(), replace this with:
+    // try {
+    //   await sdk.RunAnywhere.clearCache();
+    //   if (mounted) {
+    //     ScaffoldMessenger.of(context).showSnackBar(
+    //       const SnackBar(content: Text('Cache cleared')),
+    //     );
+    //   }
+    //   await _loadStorageData();
+    // } catch (e) {
+    //   if (mounted) {
+    //     ScaffoldMessenger.of(context).showSnackBar(
+    //       SnackBar(content: Text('Failed to clear cache: $e')),
+    //     );
+    //   }
+    // }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Clear Cache not available yet')),
+      );
     }
   }
 
@@ -429,7 +437,7 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
 /// Stored model row widget
 class _StoredModelRow extends StatefulWidget {
   final sdk.StoredModel model;
-  final VoidCallback onDelete;
+  final Future<void> Function() onDelete;
 
   const _StoredModelRow({
     required this.model,
@@ -444,24 +452,34 @@ class _StoredModelRowState extends State<_StoredModelRow> {
   bool _showDetails = false;
   bool _isDeleting = false;
 
+  Future<void> _performDelete() async {
+    setState(() => _isDeleting = true);
+    try {
+      await widget.onDelete();
+    } finally {
+      if (mounted) {
+        setState(() => _isDeleting = false);
+      }
+    }
+  }
+
   void _confirmDelete() {
     unawaited(showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Model'),
         content: Text(
           'Are you sure you want to delete ${widget.model.name}? This action cannot be undone.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () {
-              Navigator.pop(context);
-              setState(() => _isDeleting = true);
-              widget.onDelete();
+              Navigator.pop(dialogContext);
+              unawaited(_performDelete());
             },
             style: TextButton.styleFrom(foregroundColor: AppColors.primaryRed),
             child: const Text('Delete'),

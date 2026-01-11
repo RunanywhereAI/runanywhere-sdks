@@ -281,10 +281,10 @@ class VoiceSessionHandle {
 
     _emit(VoiceSessionListening(audioLevel: level));
 
-    if (level > config.speechThreshold) {
+    if (level >= config.speechThreshold) {
       if (!_isSpeechActive) {
         _logger.info(
-            '🎤 Speech STARTED! level=${level.toStringAsFixed(4)} > threshold=${config.speechThreshold}');
+            '🎤 Speech STARTED! level=${level.toStringAsFixed(4)} >= threshold=${config.speechThreshold}');
         _isSpeechActive = true;
         _emit(const VoiceSessionSpeechStarted());
       }
