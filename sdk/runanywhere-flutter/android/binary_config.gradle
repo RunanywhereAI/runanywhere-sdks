@@ -16,7 +16,7 @@ ext {
     // Remote binary configuration (used when testLocal = false)
     remoteVersion = "v0.0.1-dev.27bdcd0"
     remoteCommit = "27bdcd0"  // Short commit hash for artifact naming
-    remoteBaseUrl = "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download"
+    remoteBaseUrl = "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download"
 
     // Android native libraries (unified package with ONNX + LlamaCPP)
     androidLibsUrl = "${remoteBaseUrl}/${remoteVersion}/RunAnywhereUnified-android-${remoteCommit}.zip"

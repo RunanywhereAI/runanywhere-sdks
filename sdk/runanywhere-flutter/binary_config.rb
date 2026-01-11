@@ -16,7 +16,7 @@ module RunAnywhereBinaryConfig
   # Remote binary configuration (used when TEST_LOCAL = false)
   REMOTE_VERSION = "v0.0.1-dev.27bdcd0"
   REMOTE_COMMIT = "27bdcd0"  # Short commit hash for Android artifact naming
-  REMOTE_BASE_URL = "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download"
+  REMOTE_BASE_URL = "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download"
 
   # iOS XCFramework
   IOS_XCFRAMEWORK_URL = "#{REMOTE_BASE_URL}/#{REMOTE_VERSION}/RunAnywhereCore.xcframework.zip"

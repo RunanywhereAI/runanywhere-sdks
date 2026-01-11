@@ -9,10 +9,10 @@ ONNX_BACKEND_VERSION = "0.1.4"
 ONNXRUNTIME_VERSION = "1.17.1"
 
 # =============================================================================
-# Binary Source - RABackendONNX from runanywhere-binaries
+# Binary Source - RABackendONNX from runanywhere-sdks
 # =============================================================================
 ONNX_GITHUB_ORG = "RunanywhereAI"
-ONNX_REPO = "runanywhere-binaries"
+ONNX_REPO = "runanywhere-sdks"
 
 # =============================================================================
 # testLocal Toggle
@@ -33,7 +33,7 @@ Pod::Spec.new do |s|
 
   # =============================================================================
   # ONNX Backend - RABackendONNX + ONNX Runtime
-  # Downloads from runanywhere-binaries (NOT runanywhere-sdks)
+  # Downloads from runanywhere-sdks (NOT runanywhere-sdks)
   # =============================================================================
   if ONNX_TEST_LOCAL
     puts "[RunAnywhereONNX] Using LOCAL RABackendONNX from ios/Frameworks/"
@@ -67,7 +67,7 @@ Pod::Spec.new do |s|
       mkdir -p "$FRAMEWORK_DIR"
       rm -rf "$FRAMEWORK_DIR/RABackendONNX.xcframework"
 
-      # Download RABackendONNX from runanywhere-binaries
+      # Download RABackendONNX from runanywhere-sdks
       DOWNLOAD_URL="https://github.com/#{ONNX_GITHUB_ORG}/#{ONNX_REPO}/releases/download/core-v$VERSION/RABackendONNX-ios-v$VERSION.zip"
       ZIP_FILE="/tmp/RABackendONNX.zip"
 

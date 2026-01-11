@@ -49,7 +49,7 @@ version = "0.1.4"
 //                     Run: ./scripts/build-local.sh to build and copy libs
 //
 // testLocal = false → Download pre-built JNI libs from GitHub releases (default)
-//                     Downloads from: https://github.com/RunanywhereAI/runanywhere-binaries/releases
+//                     Downloads from: https://github.com/RunanywhereAI/runanywhere-sdks/releases
 //
 // Mirrors Swift SDK's Package.swift testLocal pattern
 // =============================================================================
@@ -62,12 +62,12 @@ val testLocal: Boolean =
 
 // Version constants for remote downloads (mirrors Swift's Package.swift)
 // These should match the releases at:
-// - https://github.com/RunanywhereAI/runanywhere-binaries/releases (Android JNI libs for backends)
+// - https://github.com/RunanywhereAI/runanywhere-sdks/releases (Android JNI libs for backends)
 // - https://github.com/RunanywhereAI/runanywhere-sdks/releases (Android JNI libs for commons)
 // IMPORTANT: Check rootProject first to support composite builds
 // Version defaults must match GitHub releases:
 // - Commons: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/commons-v{commonsVersion}
-// - Backends: https://github.com/RunanywhereAI/runanywhere-binaries/releases/tag/core-v{coreVersion}
+// - Backends: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/core-v{coreVersion}
 val coreVersion: String =
     rootProject.findProperty("runanywhere.coreVersion")?.toString()
         ?: project.findProperty("runanywhere.coreVersion")?.toString()
@@ -383,7 +383,7 @@ tasks.register<Exec>("buildLocalJniLibs") {
 //   - Commons: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/commons-v{version}
 //     - librac_commons.so - RAC Commons infrastructure
 //     - librac_commons_jni.so - RAC Commons JNI bridge
-//   - Core backends: https://github.com/RunanywhereAI/runanywhere-binaries/releases/tag/core-v{version}
+//   - Core backends: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/core-v{version}
 //     - librac_backend_llamacpp_jni.so - LLM inference (llama.cpp)
 //     - librac_backend_onnx_jni.so - STT/TTS/VAD (Sherpa ONNX)
 //     - libonnxruntime.so - ONNX Runtime
@@ -401,7 +401,7 @@ tasks.register("downloadJniLibs") {
     val tempDir = file("${layout.buildDirectory.get()}/jni-temp")
 
     // GitHub release URLs
-    val binariesBaseUrl = "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/core-v$coreVersion"
+    val binariesBaseUrl = "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/core-v$coreVersion"
     val commonsBaseUrl = "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v$commonsVersion"
 
     // Packages to download - ORDER MATTERS: Commons first, then backends
