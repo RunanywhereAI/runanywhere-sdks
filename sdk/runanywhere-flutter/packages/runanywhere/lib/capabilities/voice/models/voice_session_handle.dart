@@ -77,24 +77,33 @@ class VoiceSessionHandle {
 
     _logger.info('🚀 Starting voice session...');
 
-    // Verify voice agent is ready, or try to initialize
-    _logger.info('Checking if voice agent is ready...');
-    final isReady = await _isVoiceAgentReadyCallback?.call() ?? false;
-    _logger.info('Voice agent ready: $isReady');
+    // Check if voice agent components are ready
+    _logger.info('Checking if voice agent components are ready...');
+    final componentsReady = await _isVoiceAgentReadyCallback?.call() ?? false;
+    _logger.info('Voice agent components ready: $componentsReady');
 
-    if (!isReady) {
-      try {
-        _logger.info(
-            'Voice agent not ready, attempting to initialize with loaded models...');
-        await _initializeVoiceAgentCallback?.call();
-        _logger.info('✅ Voice agent initialized successfully');
-      } catch (e) {
-        _logger.error('❌ Failed to initialize voice agent: $e');
-        final errorMsg =
-            'Voice agent not ready: $e. Make sure STT, LLM, and TTS models are loaded.';
-        _emit(VoiceSessionError(message: errorMsg));
-        rethrow;
-      }
+    if (!componentsReady) {
+      const errorMsg =
+          'Voice agent components not ready. Make sure STT, LLM, and TTS models are loaded.';
+      _logger.error('❌ $errorMsg');
+      _emit(const VoiceSessionError(message: errorMsg));
+      throw const VoiceSessionException(
+        VoiceSessionErrorType.notReady,
+        errorMsg,
+      );
+    }
+
+    // Always initialize voice agent with loaded models
+    // This creates the voice agent handle and connects it to the shared component handles
+    try {
+      _logger.info('Initializing voice agent with loaded models...');
+      await _initializeVoiceAgentCallback?.call();
+      _logger.info('✅ Voice agent initialized successfully');
+    } catch (e) {
+      _logger.error('❌ Failed to initialize voice agent: $e');
+      final errorMsg = 'Voice agent initialization failed: $e';
+      _emit(VoiceSessionError(message: errorMsg));
+      rethrow;
     }
 
     // Request mic permission via audio capture manager

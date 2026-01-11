@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:runanywhere/capabilities/voice/models/voice_session.dart';
+import 'package:runanywhere/capabilities/voice/models/voice_session_handle.dart';
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/core/types/storage_types.dart';
 import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
@@ -9,6 +12,7 @@ import 'package:runanywhere/foundation/dependency_injection/service_container.da
 import 'package:runanywhere/foundation/error_types/sdk_error.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/infrastructure/download/download_service.dart';
+import 'package:runanywhere/native/dart_bridge_model_paths.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart'
     hide ModelInfo;
 import 'package:runanywhere/native/dart_bridge.dart';
@@ -17,6 +21,7 @@ import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
 import 'package:runanywhere/public/types/types.dart';
+import 'package:runanywhere/public/types/voice_agent_types.dart';
 
 /// The RunAnywhere SDK entry point
 ///
@@ -683,6 +688,178 @@ class RunAnywhere {
   }
 
   // ============================================================================
+  // MARK: - Voice Agent (matches Swift RunAnywhere+VoiceAgent.swift)
+  // ============================================================================
+
+  /// Check if the voice agent is ready (all required components loaded).
+  ///
+  /// Returns true if STT, LLM, and TTS are all loaded and ready.
+  ///
+  /// Matches Swift: `RunAnywhere.isVoiceAgentReady`
+  static bool get isVoiceAgentReady {
+    return DartBridge.stt.isLoaded &&
+        DartBridge.llm.isLoaded &&
+        DartBridge.tts.isLoaded;
+  }
+
+  /// Get the current state of all voice agent components (STT, LLM, TTS).
+  ///
+  /// Use this to check which models are loaded and ready for the voice pipeline.
+  /// Models are loaded via the individual APIs (loadSTTModel, loadModel, loadTTSVoice).
+  ///
+  /// Matches Swift: `RunAnywhere.getVoiceAgentComponentStates()`
+  static VoiceAgentComponentStates getVoiceAgentComponentStates() {
+    final sttId = currentSTTModelId;
+    final llmId = currentModelId;
+    final ttsId = currentTTSVoiceId;
+
+    return VoiceAgentComponentStates(
+      stt: sttId != null
+          ? ComponentLoadState.loaded(modelId: sttId)
+          : const ComponentLoadState.notLoaded(),
+      llm: llmId != null
+          ? ComponentLoadState.loaded(modelId: llmId)
+          : const ComponentLoadState.notLoaded(),
+      tts: ttsId != null
+          ? ComponentLoadState.loaded(modelId: ttsId)
+          : const ComponentLoadState.notLoaded(),
+    );
+  }
+
+  /// Start a voice session with audio capture, VAD, and full voice pipeline.
+  ///
+  /// This is the simplest way to integrate voice assistant functionality.
+  /// The session handles audio capture, VAD, and processing internally.
+  ///
+  /// Example:
+  /// ```dart
+  /// final session = await RunAnywhere.startVoiceSession();
+  ///
+  /// // Consume events
+  /// session.events.listen((event) {
+  ///   if (event is VoiceSessionListening) {
+  ///     audioMeter = event.audioLevel;
+  ///   } else if (event is VoiceSessionTurnCompleted) {
+  ///     userText = event.transcript;
+  ///     assistantText = event.response;
+  ///   }
+  /// });
+  ///
+  /// // Later...
+  /// session.stop();
+  /// ```
+  ///
+  /// Matches Swift: `RunAnywhere.startVoiceSession(config:)`
+  static Future<VoiceSessionHandle> startVoiceSession({
+    VoiceSessionConfig config = VoiceSessionConfig.defaultConfig,
+  }) async {
+    if (!_isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    final logger = SDKLogger('RunAnywhere.VoiceSession');
+
+    // Create the session handle with all necessary callbacks
+    final session = VoiceSessionHandle(
+      config: config,
+      processAudioCallback: _processVoiceAgentAudio,
+      isVoiceAgentReadyCallback: () async => isVoiceAgentReady,
+      initializeVoiceAgentCallback: _initializeVoiceAgentWithLoadedModels,
+    );
+
+    logger.info('Voice session created with callbacks');
+
+    // Start the session (this will verify voice agent readiness)
+    try {
+      await session.start();
+      logger.info('Voice session started successfully');
+    } catch (e) {
+      logger.error('Failed to start voice session: $e');
+      rethrow;
+    }
+
+    return session;
+  }
+
+  /// Initialize voice agent using already-loaded models.
+  ///
+  /// This is called internally by VoiceSessionHandle when starting a session.
+  /// It verifies all components (STT, LLM, TTS) are loaded.
+  ///
+  /// Matches Swift: `RunAnywhere.initializeVoiceAgentWithLoadedModels()`
+  static Future<void> _initializeVoiceAgentWithLoadedModels() async {
+    final logger = SDKLogger('RunAnywhere.VoiceAgent');
+
+    if (!isVoiceAgentReady) {
+      throw SDKError.voiceAgentNotReady(
+        'Voice agent components not ready. Load STT, LLM, and TTS models first.',
+      );
+    }
+
+    try {
+      await DartBridge.voiceAgent.initializeWithLoadedModels();
+      logger.info('Voice agent initialized with loaded models');
+    } catch (e) {
+      logger.error('Failed to initialize voice agent: $e');
+      rethrow;
+    }
+  }
+
+  /// Process audio through the voice agent pipeline (STT -> LLM -> TTS).
+  ///
+  /// This is called internally by VoiceSessionHandle during audio processing.
+  ///
+  /// Matches Swift: `RunAnywhere.processVoiceTurn(_:)`
+  static Future<VoiceAgentProcessResult> _processVoiceAgentAudio(
+    Uint8List audioData,
+  ) async {
+    final logger = SDKLogger('RunAnywhere.VoiceAgent');
+    logger.debug('Processing ${audioData.length} bytes of audio...');
+
+    try {
+      // Use the DartBridgeVoiceAgent to process the voice turn
+      final result = await DartBridge.voiceAgent.processVoiceTurn(audioData);
+
+      // Convert Float32 audio to Uint8List PCM16 for playback
+      Uint8List? synthesizedAudio;
+      if (result.audioSamples.isNotEmpty) {
+        final byteData = ByteData(result.audioSamples.length * 2);
+        for (var i = 0; i < result.audioSamples.length; i++) {
+          final sample =
+              (result.audioSamples[i].clamp(-1.0, 1.0) * 32767).round();
+          byteData.setInt16(i * 2, sample, Endian.little);
+        }
+        synthesizedAudio = byteData.buffer.asUint8List();
+      }
+
+      logger.info(
+        'Voice turn complete: transcript="${result.transcription.substring(0, result.transcription.length.clamp(0, 50))}", '
+        'response="${result.response.substring(0, result.response.length.clamp(0, 50))}", '
+        'audio=${synthesizedAudio?.length ?? 0} bytes',
+      );
+
+      return VoiceAgentProcessResult(
+        speechDetected: result.transcription.isNotEmpty,
+        transcription: result.transcription,
+        response: result.response,
+        synthesizedAudio: synthesizedAudio,
+      );
+    } catch (e) {
+      logger.error('Voice turn processing failed: $e');
+      rethrow;
+    }
+  }
+
+  /// Cleanup voice agent resources.
+  ///
+  /// Call this when you're done with voice agent functionality.
+  ///
+  /// Matches Swift: `RunAnywhere.cleanupVoiceAgent()`
+  static void cleanupVoiceAgent() {
+    DartBridge.voiceAgent.cleanup();
+  }
+
+  // ============================================================================
   // Text Generation (LLM)
   // ============================================================================
 
@@ -942,14 +1119,164 @@ class RunAnywhere {
     EventBus.shared.publish(SDKModelEvent.deleted(modelId: modelId));
   }
 
-  /// Get storage info
+  /// Get storage info including device storage, app storage, and downloaded models.
+  ///
+  /// Matches Swift: `RunAnywhere.getStorageInfo()`
   static Future<StorageInfo> getStorageInfo() async {
-    return StorageInfo.empty;
+    if (!_isInitialized) {
+      return StorageInfo.empty;
+    }
+
+    try {
+      // Get device storage info
+      final deviceStorage = await _getDeviceStorageInfo();
+
+      // Get app storage info
+      final appStorage = await _getAppStorageInfo();
+
+      // Get downloaded models with sizes
+      final storedModels = await getDownloadedModelsWithInfo();
+      final modelMetrics = storedModels
+          .map((m) =>
+              ModelStorageMetrics(model: m.modelInfo, sizeOnDisk: m.size))
+          .toList();
+
+      return StorageInfo(
+        appStorage: appStorage,
+        deviceStorage: deviceStorage,
+        models: modelMetrics,
+      );
+    } catch (e) {
+      SDKLogger('RunAnywhere.Storage').error('Failed to get storage info: $e');
+      return StorageInfo.empty;
+    }
   }
 
-  /// Get downloaded models with info
+  /// Get device storage information.
+  static Future<DeviceStorageInfo> _getDeviceStorageInfo() async {
+    try {
+      // Get device storage info from documents directory
+      final modelsDir = DartBridgeModelPaths.instance.getModelsDirectory();
+      if (modelsDir == null) {
+        return const DeviceStorageInfo(
+            totalSpace: 0, freeSpace: 0, usedSpace: 0);
+      }
+
+      // Calculate total storage used by models
+      final modelsDirSize = await _getDirectorySize(modelsDir);
+
+      // For iOS/Android, we can't easily get device free space without native code
+      // Return what we know: the models directory size
+      return DeviceStorageInfo(
+        totalSpace: modelsDirSize,
+        freeSpace: 0, // Would need native code to get real free space
+        usedSpace: modelsDirSize,
+      );
+    } catch (e) {
+      return const DeviceStorageInfo(totalSpace: 0, freeSpace: 0, usedSpace: 0);
+    }
+  }
+
+  /// Get app storage breakdown.
+  static Future<AppStorageInfo> _getAppStorageInfo() async {
+    try {
+      // Get models directory size
+      final modelsDir = DartBridgeModelPaths.instance.getModelsDirectory();
+      final modelsDirSize =
+          modelsDir != null ? await _getDirectorySize(modelsDir) : 0;
+
+      // For now, we'll estimate cache and app support as 0
+      // since we don't have a dedicated cache directory
+      return AppStorageInfo(
+        documentsSize: modelsDirSize,
+        cacheSize: 0,
+        appSupportSize: 0,
+        totalSize: modelsDirSize,
+      );
+    } catch (e) {
+      return const AppStorageInfo(
+        documentsSize: 0,
+        cacheSize: 0,
+        appSupportSize: 0,
+        totalSize: 0,
+      );
+    }
+  }
+
+  /// Calculate directory size recursively.
+  static Future<int> _getDirectorySize(String path) async {
+    try {
+      final dir = Directory(path);
+      if (!await dir.exists()) return 0;
+
+      int totalSize = 0;
+      await for (final entity
+          in dir.list(recursive: true, followLinks: false)) {
+        if (entity is File) {
+          try {
+            totalSize += await entity.length();
+          } catch (_) {
+            // Skip files we can't read
+          }
+        }
+      }
+      return totalSize;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  /// Get downloaded models with their file sizes.
+  ///
+  /// Returns a list of StoredModel objects with size information populated
+  /// from the actual files on disk.
+  ///
+  /// Matches Swift: `RunAnywhere.getDownloadedModelsWithInfo()`
   static Future<List<StoredModel>> getDownloadedModelsWithInfo() async {
-    return [];
+    if (!_isInitialized) {
+      return [];
+    }
+
+    try {
+      // Get all models that have localPath set (are downloaded)
+      final allModels = await availableModels();
+      final downloadedModels =
+          allModels.where((m) => m.localPath != null).toList();
+
+      final storedModels = <StoredModel>[];
+
+      for (final model in downloadedModels) {
+        // Get the actual file size
+        final localPath = model.localPath!.toFilePath();
+        int fileSize = 0;
+
+        try {
+          // Check if it's a directory (for multi-file models) or single file
+          final file = File(localPath);
+          final dir = Directory(localPath);
+
+          if (await file.exists()) {
+            fileSize = await file.length();
+          } else if (await dir.exists()) {
+            fileSize = await _getDirectorySize(localPath);
+          }
+        } catch (e) {
+          SDKLogger('RunAnywhere.Storage')
+              .debug('Could not get size for ${model.id}: $e');
+        }
+
+        storedModels.add(StoredModel(
+          modelInfo: model,
+          size: fileSize,
+        ));
+      }
+
+      return storedModels;
+    } catch (e) {
+      SDKLogger('RunAnywhere.Storage')
+          .error('Failed to get downloaded models: $e');
+      return [];
+    }
   }
 
   /// Reset SDK state

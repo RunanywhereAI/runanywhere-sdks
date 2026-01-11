@@ -146,9 +146,8 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
     });
 
     try {
-      // TODO: Voice agent API is not yet fully implemented in SDK
-      // For now, use VoiceSessionHandle directly if models are loaded
-      if (!_allModelsLoaded) {
+      // Check if voice agent is ready using SDK API
+      if (!sdk.RunAnywhere.isVoiceAgentReady) {
         setState(() {
           _sessionState = VoiceSessionState.error;
           _errorMessage = 'Please load STT, LLM, and TTS models first';
@@ -156,8 +155,8 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
         return;
       }
 
-      // Create voice session handle directly
-      _voiceSession = sdk.VoiceSessionHandle(
+      // Use SDK's startVoiceSession API (matches Swift: RunAnywhere.startVoiceSession())
+      _voiceSession = await sdk.RunAnywhere.startVoiceSession(
         config: const sdk.VoiceSessionConfig(),
       );
 
@@ -171,9 +170,6 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
           });
         },
       );
-
-      // Start the voice session
-      await _voiceSession!.start();
 
       setState(() {
         _sessionState = VoiceSessionState.connected;

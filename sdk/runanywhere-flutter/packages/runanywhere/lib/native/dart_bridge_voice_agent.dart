@@ -6,6 +6,7 @@ library dart_bridge_voice_agent;
 
 import 'dart:async';
 import 'dart:ffi';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
@@ -57,6 +58,7 @@ class DartBridgeVoiceAgent {
   /// Get or create the VoiceAgent handle.
   ///
   /// Requires LLM, STT, TTS, and VAD components to be available.
+  /// Uses shared component handles (matches Swift CppBridge+VoiceAgent.swift).
   Future<RacVoiceAgentHandle> getHandle() async {
     if (_handle != null) {
       return _handle!;
@@ -65,35 +67,16 @@ class DartBridgeVoiceAgent {
     try {
       final lib = PlatformLoader.loadCommons();
 
-      // Try standalone creation first (preferred)
-      try {
-        final createStandalone = lib.lookupFunction<
-                Int32 Function(Pointer<RacVoiceAgentHandle>),
-                int Function(Pointer<RacVoiceAgentHandle>)>(
-            'rac_voice_agent_create_standalone');
-
-        final handlePtr = calloc<RacVoiceAgentHandle>();
-        try {
-          final result = createStandalone(handlePtr);
-
-          if (result == RAC_SUCCESS) {
-            _handle = handlePtr.value;
-            _logger.info('Voice agent created (standalone)');
-            return _handle!;
-          }
-        } finally {
-          calloc.free(handlePtr);
-        }
-      } catch (e) {
-        _logger
-            .debug('Standalone creation not available, trying component-based');
-      }
-
-      // Fallback: Create with component handles
+      // Use shared component handles (matches Swift approach)
+      // This allows the voice agent to use already-loaded models from the
+      // individual component bridges (STT, LLM, TTS, VAD)
       final llmHandle = DartBridgeLLM.shared.getHandle();
       final sttHandle = DartBridgeSTT.shared.getHandle();
       final ttsHandle = DartBridgeTTS.shared.getHandle();
       final vadHandle = DartBridgeVAD.shared.getHandle();
+
+      _logger.debug(
+          'Creating voice agent with shared handles: LLM=$llmHandle, STT=$sttHandle, TTS=$ttsHandle, VAD=$vadHandle');
 
       final create = lib.lookupFunction<
           Int32 Function(RacHandle, RacHandle, RacHandle, RacHandle,
@@ -113,7 +96,7 @@ class DartBridgeVoiceAgent {
         }
 
         _handle = handlePtr.value;
-        _logger.info('Voice agent created');
+        _logger.info('Voice agent created with shared component handles');
         return _handle!;
       } finally {
         calloc.free(handlePtr);
@@ -344,9 +327,11 @@ class DartBridgeVoiceAgent {
 
   /// Process a complete voice turn.
   ///
-  /// [audioData] - Complete audio data for the user's utterance.
+  /// [audioData] - Complete audio data for the user's utterance (PCM16 bytes).
   ///
   /// Returns the voice turn result with transcription, response, and audio.
+  /// NOTE: This runs the entire STT -> LLM -> TTS pipeline, so it should be
+  /// called from a background isolate to avoid blocking the UI.
   Future<VoiceTurnResult> processVoiceTurn(Uint8List audioData) async {
     final handle = await getHandle();
 
@@ -355,27 +340,37 @@ class DartBridgeVoiceAgent {
           'Voice agent not ready. Load models and initialize first.');
     }
 
-    // Convert to float samples (assuming PCM16)
-    final floatSamples = _pcm16ToFloat32(audioData);
-    final samplesPtr = calloc<Float>(floatSamples.length);
+    // Run the heavy C++ processing in a background isolate
+    return await Isolate.run(
+        () => _processVoiceTurnInIsolate(handle, audioData));
+  }
+
+  /// Static helper for processing voice turn in an isolate.
+  /// The C++ API expects raw audio bytes (PCM16), not float samples.
+  static Future<VoiceTurnResult> _processVoiceTurnInIsolate(
+    RacVoiceAgentHandle handle,
+    Uint8List audioData,
+  ) async {
+    // Allocate native memory for audio data (raw PCM16 bytes)
+    final audioPtr = calloc<Uint8>(audioData.length);
     final resultPtr = calloc<RacVoiceAgentResultStruct>();
 
     try {
-      // Copy samples
-      for (var i = 0; i < floatSamples.length; i++) {
-        samplesPtr[i] = floatSamples[i];
+      // Copy audio bytes
+      for (var i = 0; i < audioData.length; i++) {
+        audioPtr[i] = audioData[i];
       }
 
       final lib = PlatformLoader.loadCommons();
       final processFn = lib.lookupFunction<
-              Int32 Function(RacVoiceAgentHandle, Pointer<Float>, IntPtr,
+              Int32 Function(RacVoiceAgentHandle, Pointer<Void>, IntPtr,
                   Pointer<RacVoiceAgentResultStruct>),
-              int Function(RacVoiceAgentHandle, Pointer<Float>, int,
+              int Function(RacVoiceAgentHandle, Pointer<Void>, int,
                   Pointer<RacVoiceAgentResultStruct>)>(
           'rac_voice_agent_process_voice_turn');
 
       final status =
-          processFn(handle, samplesPtr, floatSamples.length, resultPtr);
+          processFn(handle, audioPtr.cast<Void>(), audioData.length, resultPtr);
 
       if (status != RAC_SUCCESS) {
         throw StateError(
@@ -383,35 +378,91 @@ class DartBridgeVoiceAgent {
         );
       }
 
-      return _parseVoiceTurnResult(resultPtr.ref);
+      // Parse result while still in isolate (before freeing memory)
+      return _parseVoiceTurnResultStatic(resultPtr.ref, lib);
     } finally {
-      calloc.free(samplesPtr);
+      // Free audio data
+      calloc.free(audioPtr);
+
+      // Free result struct - the C++ side allocates strings/audio that need freeing
+      final lib = PlatformLoader.loadCommons();
+      try {
+        final freeFn = lib.lookupFunction<
+            Void Function(Pointer<RacVoiceAgentResultStruct>),
+            void Function(Pointer<RacVoiceAgentResultStruct>)>(
+          'rac_voice_agent_result_free',
+        );
+        freeFn(resultPtr);
+      } catch (e) {
+        // Function may not exist, just free the struct
+      }
       calloc.free(resultPtr);
     }
   }
 
+  /// Static helper to parse voice turn result (can be called from isolate).
+  /// The C++ result contains raw audio bytes that need to be converted to Float32.
+  static VoiceTurnResult _parseVoiceTurnResultStatic(
+    RacVoiceAgentResultStruct result,
+    DynamicLibrary lib,
+  ) {
+    final transcription = result.transcription != nullptr
+        ? result.transcription.toDartString()
+        : '';
+    final response =
+        result.response != nullptr ? result.response.toDartString() : '';
+
+    // The synthesized audio is raw bytes from TTS (typically PCM float samples)
+    // TTS components output Float32 samples, so we can cast directly
+    Float32List audioSamples;
+    if (result.synthesizedAudioSize > 0 && result.synthesizedAudio != nullptr) {
+      // Audio data is float samples (4 bytes per sample)
+      final numSamples = result.synthesizedAudioSize ~/ 4;
+      if (numSamples > 0) {
+        audioSamples = Float32List.fromList(
+          result.synthesizedAudio.cast<Float>().asTypedList(numSamples),
+        );
+      } else {
+        audioSamples = Float32List(0);
+      }
+    } else {
+      audioSamples = Float32List(0);
+    }
+
+    return VoiceTurnResult(
+      transcription: transcription,
+      response: response,
+      audioSamples: audioSamples,
+      // Duration fields not available in C++ struct - use 0
+      sttDurationMs: 0,
+      llmDurationMs: 0,
+      ttsDurationMs: 0,
+    );
+  }
+
   /// Transcribe audio using voice agent.
+  /// Audio data should be raw PCM16 bytes.
   Future<String> transcribe(Uint8List audioData) async {
     final handle = await getHandle();
 
-    final floatSamples = _pcm16ToFloat32(audioData);
-    final samplesPtr = calloc<Float>(floatSamples.length);
+    // Pass raw audio bytes - C++ handles conversion
+    final audioPtr = calloc<Uint8>(audioData.length);
     final resultPtr = calloc<Pointer<Utf8>>();
 
     try {
-      for (var i = 0; i < floatSamples.length; i++) {
-        samplesPtr[i] = floatSamples[i];
+      for (var i = 0; i < audioData.length; i++) {
+        audioPtr[i] = audioData[i];
       }
 
       final lib = PlatformLoader.loadCommons();
       final transcribeFn = lib.lookupFunction<
-          Int32 Function(RacVoiceAgentHandle, Pointer<Float>, IntPtr,
+          Int32 Function(RacVoiceAgentHandle, Pointer<Void>, IntPtr,
               Pointer<Pointer<Utf8>>),
-          int Function(RacVoiceAgentHandle, Pointer<Float>, int,
+          int Function(RacVoiceAgentHandle, Pointer<Void>, int,
               Pointer<Pointer<Utf8>>)>('rac_voice_agent_transcribe');
 
-      final status =
-          transcribeFn(handle, samplesPtr, floatSamples.length, resultPtr);
+      final status = transcribeFn(
+          handle, audioPtr.cast<Void>(), audioData.length, resultPtr);
 
       if (status != RAC_SUCCESS) {
         throw StateError(
@@ -420,7 +471,7 @@ class DartBridgeVoiceAgent {
 
       return resultPtr.value != nullptr ? resultPtr.value.toDartString() : '';
     } finally {
-      calloc.free(samplesPtr);
+      calloc.free(audioPtr);
       calloc.free(resultPtr);
     }
   }
@@ -455,41 +506,55 @@ class DartBridgeVoiceAgent {
   }
 
   /// Synthesize speech using voice agent.
+  /// Returns Float32 audio samples.
   Future<Float32List> synthesizeSpeech(String text) async {
     final handle = await getHandle();
 
     final textPtr = text.toNativeUtf8();
-    final samplesPtr = calloc<Pointer<Float>>();
-    final numSamplesPtr = calloc<IntPtr>();
+    final audioPtr = calloc<Pointer<Void>>();
+    final audioSizePtr = calloc<IntPtr>();
 
     try {
       final lib = PlatformLoader.loadCommons();
       final synthesizeFn = lib.lookupFunction<
           Int32 Function(RacVoiceAgentHandle, Pointer<Utf8>,
-              Pointer<Pointer<Float>>, Pointer<IntPtr>),
+              Pointer<Pointer<Void>>, Pointer<IntPtr>),
           int Function(
               RacVoiceAgentHandle,
               Pointer<Utf8>,
-              Pointer<Pointer<Float>>,
+              Pointer<Pointer<Void>>,
               Pointer<IntPtr>)>('rac_voice_agent_synthesize_speech');
 
-      final status = synthesizeFn(handle, textPtr, samplesPtr, numSamplesPtr);
+      final status = synthesizeFn(handle, textPtr, audioPtr, audioSizePtr);
 
       if (status != RAC_SUCCESS) {
         throw StateError(
             'Speech synthesis failed: ${RacResultCode.getMessage(status)}');
       }
 
-      final numSamples = numSamplesPtr.value;
-      if (numSamples > 0 && samplesPtr.value != nullptr) {
-        final samples = samplesPtr.value.asTypedList(numSamples);
+      // Audio data is float32 samples (4 bytes per sample)
+      final audioSize = audioSizePtr.value;
+      final numSamples = audioSize ~/ 4;
+      if (numSamples > 0 && audioPtr.value != nullptr) {
+        final samples = audioPtr.value.cast<Float>().asTypedList(numSamples);
         return Float32List.fromList(samples);
       }
       return Float32List(0);
     } finally {
       calloc.free(textPtr);
-      calloc.free(samplesPtr);
-      calloc.free(numSamplesPtr);
+      // Free the audio data allocated by C++
+      if (audioPtr.value != nullptr) {
+        final lib = PlatformLoader.loadCommons();
+        try {
+          final freeFn = lib.lookupFunction<Void Function(Pointer<Void>),
+              void Function(Pointer<Void>)>('rac_free');
+          freeFn(audioPtr.value);
+        } catch (_) {
+          // rac_free may not exist
+        }
+      }
+      calloc.free(audioPtr);
+      calloc.free(audioSizePtr);
     }
   }
 
@@ -535,41 +600,6 @@ class DartBridgeVoiceAgent {
   }
 
   // MARK: - Helpers
-
-  /// Convert PCM16 audio to Float32 samples.
-  Float32List _pcm16ToFloat32(Uint8List pcm16) {
-    final numSamples = pcm16.length ~/ 2;
-    final samples = Float32List(numSamples);
-
-    for (var i = 0; i < numSamples; i++) {
-      final low = pcm16[i * 2];
-      final high = pcm16[i * 2 + 1];
-      final sample = (high << 8) | low;
-      // Convert to signed
-      final signed = sample > 32767 ? sample - 65536 : sample;
-      samples[i] = signed / 32768.0;
-    }
-
-    return samples;
-  }
-
-  /// Parse voice turn result from FFI struct.
-  VoiceTurnResult _parseVoiceTurnResult(RacVoiceAgentResultStruct result) {
-    return VoiceTurnResult(
-      transcription: result.transcription != nullptr
-          ? result.transcription.toDartString()
-          : '',
-      response:
-          result.response != nullptr ? result.response.toDartString() : '',
-      audioSamples: result.audioSamples != nullptr && result.numAudioSamples > 0
-          ? Float32List.fromList(
-              result.audioSamples.asTypedList(result.numAudioSamples))
-          : Float32List(0),
-      sttDurationMs: result.sttDurationMs,
-      llmDurationMs: result.llmDurationMs,
-      ttsDurationMs: result.ttsDurationMs,
-    );
-  }
 }
 
 // MARK: - Result Types
@@ -633,20 +663,24 @@ class VoiceAgentErrorEvent extends VoiceAgentEvent {
 // MARK: - FFI Structs
 
 /// FFI struct for voice agent result (matches rac_voice_agent_result_t).
+/// MUST match exact layout of C struct:
+/// typedef struct rac_voice_agent_result {
+///     rac_bool_t speech_detected;
+///     char* transcription;
+///     char* response;
+///     void* synthesized_audio;
+///     size_t synthesized_audio_size;
+/// } rac_voice_agent_result_t;
 final class RacVoiceAgentResultStruct extends Struct {
-  external Pointer<Utf8> transcription;
-  external Pointer<Utf8> response;
-  external Pointer<Float> audioSamples;
+  @Int32()
+  external int speechDetected; // rac_bool_t
+
+  external Pointer<Utf8> transcription; // char*
+
+  external Pointer<Utf8> response; // char*
+
+  external Pointer<Void> synthesizedAudio; // void* (raw audio bytes)
 
   @IntPtr()
-  external int numAudioSamples;
-
-  @Int32()
-  external int sttDurationMs;
-
-  @Int32()
-  external int llmDurationMs;
-
-  @Int32()
-  external int ttsDurationMs;
+  external int synthesizedAudioSize; // size_t (size in bytes)
 }
