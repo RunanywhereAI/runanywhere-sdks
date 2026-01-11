@@ -2,7 +2,7 @@
  * Network Services
  *
  * Centralized network layer for RunAnywhere React Native SDK.
- * Uses axios for HTTP requests - the industry standard for JavaScript HTTP clients.
+ * Uses React Native's built-in fetch API for HTTP requests.
  */
 
 // Core HTTP service
