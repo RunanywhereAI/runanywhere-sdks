@@ -123,6 +123,8 @@ class SDKError implements Exception {
         return ErrorCode.invalidInput;
       case SDKErrorType.resourceExhausted:
         return ErrorCode.insufficientStorage;
+      case SDKErrorType.voiceAgentNotReady:
+        return ErrorCode.notInitialized;
       case SDKErrorType.internalError:
         return ErrorCode.unknown;
     }
@@ -184,6 +186,8 @@ class SDKError implements Exception {
       case SDKErrorType.unsupportedModality:
       case SDKErrorType.invalidInput:
         return ErrorCategory.validation;
+      case SDKErrorType.voiceAgentNotReady:
+        return ErrorCategory.component;
       case SDKErrorType.featureNotAvailable:
       case SDKErrorType.notImplemented:
       case SDKErrorType.internalError:
@@ -284,6 +288,9 @@ class SDKError implements Exception {
       case SDKErrorType.featureNotAvailable:
       case SDKErrorType.notImplemented:
         return 'This feature may be available in a future update.';
+
+      case SDKErrorType.voiceAgentNotReady:
+        return 'Load all required voice agent components (STT, LLM, TTS) before starting a voice session.';
 
       case SDKErrorType.internalError:
         return 'An internal error occurred. Please report this issue.';
@@ -605,6 +612,14 @@ class SDKError implements Exception {
     );
   }
 
+  /// Voice agent not ready error
+  static SDKError voiceAgentNotReady(String message) {
+    return SDKError(
+      message,
+      SDKErrorType.voiceAgentNotReady,
+    );
+  }
+
   /// Helper to format bytes
   static String _formatBytes(int bytes) {
     if (bytes < 1024) return '$bytes B';
@@ -684,6 +699,9 @@ enum SDKErrorType {
   // Feature errors
   featureNotAvailable,
   notImplemented,
+
+  // Voice agent errors
+  voiceAgentNotReady,
 
   // General errors
   internalError,

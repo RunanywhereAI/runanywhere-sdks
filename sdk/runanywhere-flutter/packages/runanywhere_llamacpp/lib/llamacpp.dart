@@ -31,14 +31,11 @@
 /// ```
 library runanywhere_llamacpp;
 
-import 'dart:ffi';
-
 import 'package:runanywhere/core/module/runanywhere_module.dart';
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/core/types/sdk_component.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/ffi_types.dart';
-import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/public/runanywhere.dart' show RunAnywhere;
 import 'package:runanywhere_llamacpp/native/llamacpp_bindings.dart';
 
@@ -164,16 +161,10 @@ class LlamaCpp implements RunAnywhereModule {
   // ============================================================================
 
   /// Check if the native backend is available on this platform.
-  static bool get isAvailable {
-    try {
-      final lib = PlatformLoader.loadCommons();
-      lib.lookup<NativeFunction<Int32 Function()>>(
-          'rac_backend_llamacpp_register');
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
+  ///
+  /// On iOS: Checks DynamicLibrary.process() for statically linked symbols
+  /// On Android: Checks if librac_backend_llamacpp_jni.so can be loaded
+  static bool get isAvailable => LlamaCppBindings.checkAvailability();
 
   /// Check if LlamaCPP can handle a given model.
   /// Uses file extension pattern matching - actual framework info is in C++ registry.
