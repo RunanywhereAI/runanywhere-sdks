@@ -6,10 +6,9 @@ import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-
-import '../foundation/logging/sdk_logger.dart';
-import 'ffi_types.dart';
-import 'platform_loader.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/native/platform_loader.dart';
 
 // =============================================================================
 // Exception Return Constants (must be compile-time constants for FFI)
@@ -387,7 +386,7 @@ int _platformSecureSetCallback(
     _secureStorageCache[keyString] = valueString;
 
     // Schedule async write (fire and forget)
-    _writeSecureStorage(keyString, valueString);
+    unawaited(_writeSecureStorage(keyString, valueString));
 
     return RacResultCode.success;
   } catch (_) {
@@ -424,7 +423,7 @@ int _platformSecureDeleteCallback(
     _secureStorageCache.remove(keyString);
 
     // Schedule async delete (fire and forget)
-    _deleteSecureStorage(keyString);
+    unawaited(_deleteSecureStorage(keyString));
 
     return RacResultCode.success;
   } catch (_) {

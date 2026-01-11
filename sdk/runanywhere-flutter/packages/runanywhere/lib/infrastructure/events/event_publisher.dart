@@ -111,52 +111,52 @@ class EventPublisher {
 
     switch (event.type) {
       case 'model.download.started':
-        DartBridgeTelemetry.instance.emitDownloadStarted(
+        unawaited(DartBridgeTelemetry.instance.emitDownloadStarted(
           modelId: modelId,
           modelName: modelName,
           modelSize: int.tryParse(props['modelSize'] ?? '0') ?? 0,
           framework: framework,
-        );
+        ));
         break;
       case 'model.download.completed':
-        DartBridgeTelemetry.instance.emitDownloadCompleted(
+        unawaited(DartBridgeTelemetry.instance.emitDownloadCompleted(
           modelId: modelId,
           modelName: modelName,
           modelSize: int.tryParse(props['modelSize'] ?? '0') ?? 0,
           framework: framework,
           durationMs: int.tryParse(props['durationMs'] ?? '0') ?? 0,
-        );
+        ));
         break;
       case 'model.download.failed':
-        DartBridgeTelemetry.instance.emitDownloadFailed(
+        unawaited(DartBridgeTelemetry.instance.emitDownloadFailed(
           modelId: modelId,
           modelName: modelName,
           error: props['error'] ?? 'Unknown error',
           framework: framework,
-        );
+        ));
         break;
       case 'model.extraction.started':
-        DartBridgeTelemetry.instance.emitExtractionStarted(
+        unawaited(DartBridgeTelemetry.instance.emitExtractionStarted(
           modelId: modelId,
           modelName: modelName,
           framework: framework,
-        );
+        ));
         break;
       case 'model.extraction.completed':
-        DartBridgeTelemetry.instance.emitExtractionCompleted(
+        unawaited(DartBridgeTelemetry.instance.emitExtractionCompleted(
           modelId: modelId,
           modelName: modelName,
           framework: framework,
           durationMs: int.tryParse(props['durationMs'] ?? '0') ?? 0,
-        );
+        ));
         break;
       case 'model.loaded':
-        DartBridgeTelemetry.instance.emitModelLoaded(
+        unawaited(DartBridgeTelemetry.instance.emitModelLoaded(
           modelId: modelId,
           modelName: modelName,
           framework: framework,
           durationMs: int.tryParse(props['durationMs'] ?? '0') ?? 0,
-        );
+        ));
         break;
     }
   }
@@ -168,14 +168,14 @@ class EventPublisher {
 
     switch (event.type) {
       case 'llm.generation.completed':
-        DartBridgeTelemetry.instance.emitInferenceCompleted(
+        unawaited(DartBridgeTelemetry.instance.emitInferenceCompleted(
           modelId: modelId,
           modelName: modelName,
           modality: 'llm',
           durationMs: int.tryParse(props['durationMs'] ?? '0') ?? 0,
           tokensGenerated: int.tryParse(props['tokensGenerated'] ?? ''),
           tokensPerSecond: double.tryParse(props['tokensPerSecond'] ?? ''),
-        );
+        ));
         break;
     }
   }
@@ -187,12 +187,12 @@ class EventPublisher {
 
     switch (event.type) {
       case 'stt.transcription.completed':
-        DartBridgeTelemetry.instance.emitInferenceCompleted(
+        unawaited(DartBridgeTelemetry.instance.emitInferenceCompleted(
           modelId: modelId,
           modelName: modelName,
           modality: 'stt',
           durationMs: int.tryParse(props['durationMs'] ?? '0') ?? 0,
-        );
+        ));
         break;
     }
   }
@@ -204,12 +204,12 @@ class EventPublisher {
 
     switch (event.type) {
       case 'tts.synthesis.completed':
-        DartBridgeTelemetry.instance.emitInferenceCompleted(
+        unawaited(DartBridgeTelemetry.instance.emitInferenceCompleted(
           modelId: modelId,
           modelName: modelName,
           modality: 'tts',
           durationMs: int.tryParse(props['durationMs'] ?? '0') ?? 0,
-        );
+        ));
         break;
     }
   }
@@ -219,10 +219,10 @@ class EventPublisher {
 
     switch (event.type) {
       case 'sdk.initialized':
-        DartBridgeTelemetry.instance.emitSDKInitialized(
+        unawaited(DartBridgeTelemetry.instance.emitSDKInitialized(
           durationMs: int.tryParse(props['durationMs'] ?? '0') ?? 0,
           environment: props['environment'] ?? 'production',
-        );
+        ));
         break;
     }
   }
@@ -232,19 +232,19 @@ class EventPublisher {
 
     switch (event.type) {
       case 'storage.cache.cleared':
-        DartBridgeTelemetry.instance.emitStorageCacheCleared(
+        unawaited(DartBridgeTelemetry.instance.emitStorageCacheCleared(
           freedBytes: int.tryParse(props['freedBytes'] ?? '0') ?? 0,
-        );
+        ));
         break;
       case 'storage.cache.clear_failed':
-        DartBridgeTelemetry.instance.emitStorageCacheClearFailed(
+        unawaited(DartBridgeTelemetry.instance.emitStorageCacheClearFailed(
           error: props['error'] ?? 'Unknown error',
-        );
+        ));
         break;
       case 'storage.temp.cleaned':
-        DartBridgeTelemetry.instance.emitStorageTempCleaned(
+        unawaited(DartBridgeTelemetry.instance.emitStorageTempCleaned(
           freedBytes: int.tryParse(props['freedBytes'] ?? '0') ?? 0,
-        );
+        ));
         break;
     }
   }
@@ -254,14 +254,14 @@ class EventPublisher {
 
     switch (event.type) {
       case 'device.registered':
-        DartBridgeTelemetry.instance.emitDeviceRegistered(
+        unawaited(DartBridgeTelemetry.instance.emitDeviceRegistered(
           deviceId: props['deviceId'] ?? '',
-        );
+        ));
         break;
       case 'device.registration_failed':
-        DartBridgeTelemetry.instance.emitDeviceRegistrationFailed(
+        unawaited(DartBridgeTelemetry.instance.emitDeviceRegistrationFailed(
           error: props['error'] ?? 'Unknown error',
-        );
+        ));
         break;
     }
   }
@@ -271,35 +271,35 @@ class EventPublisher {
 
     switch (event.type) {
       case 'voice.turn.started':
-        DartBridgeTelemetry.instance.emitVoiceAgentTurnStarted();
+        unawaited(DartBridgeTelemetry.instance.emitVoiceAgentTurnStarted());
         break;
       case 'voice.turn.completed':
-        DartBridgeTelemetry.instance.emitVoiceAgentTurnCompleted(
+        unawaited(DartBridgeTelemetry.instance.emitVoiceAgentTurnCompleted(
           durationMs: int.tryParse(props['durationMs'] ?? '0') ?? 0,
-        );
+        ));
         break;
       case 'voice.turn.failed':
-        DartBridgeTelemetry.instance.emitVoiceAgentTurnFailed(
+        unawaited(DartBridgeTelemetry.instance.emitVoiceAgentTurnFailed(
           error: props['error'] ?? 'Unknown error',
-        );
+        ));
         break;
       case 'voice.stt.state_changed':
-        DartBridgeTelemetry.instance.emitVoiceAgentSttStateChanged(
+        unawaited(DartBridgeTelemetry.instance.emitVoiceAgentSttStateChanged(
           state: props['state'] ?? 'unknown',
-        );
+        ));
         break;
       case 'voice.llm.state_changed':
-        DartBridgeTelemetry.instance.emitVoiceAgentLlmStateChanged(
+        unawaited(DartBridgeTelemetry.instance.emitVoiceAgentLlmStateChanged(
           state: props['state'] ?? 'unknown',
-        );
+        ));
         break;
       case 'voice.tts.state_changed':
-        DartBridgeTelemetry.instance.emitVoiceAgentTtsStateChanged(
+        unawaited(DartBridgeTelemetry.instance.emitVoiceAgentTtsStateChanged(
           state: props['state'] ?? 'unknown',
-        );
+        ));
         break;
       case 'voice.all_ready':
-        DartBridgeTelemetry.instance.emitVoiceAgentAllReady();
+        unawaited(DartBridgeTelemetry.instance.emitVoiceAgentAllReady());
         break;
     }
   }

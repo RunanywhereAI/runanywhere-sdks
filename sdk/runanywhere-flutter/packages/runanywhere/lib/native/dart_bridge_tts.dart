@@ -239,7 +239,7 @@ class DartBridgeTTS {
       optionsPtr.ref.rate = rate;
       optionsPtr.ref.pitch = pitch;
       optionsPtr.ref.volume = volume;
-      optionsPtr.ref.audioFormat = RAC_AUDIO_FORMAT_PCM;
+      optionsPtr.ref.audioFormat = racAudioFormatPcm;
       optionsPtr.ref.sampleRate = 22050; // Piper default
       optionsPtr.ref.useSsml = RAC_FALSE;
 
@@ -384,8 +384,8 @@ class TTSStreamResult {
 // =============================================================================
 
 /// Audio format constants (matches rac_audio_format_enum_t)
-const int RAC_AUDIO_FORMAT_PCM = 0;
-const int RAC_AUDIO_FORMAT_WAV = 1;
+const int racAudioFormatPcm = 0;
+const int racAudioFormatWav = 1;
 
 /// FFI struct for TTS options (matches rac_tts_options_t)
 final class RacTtsOptionsStruct extends Struct {

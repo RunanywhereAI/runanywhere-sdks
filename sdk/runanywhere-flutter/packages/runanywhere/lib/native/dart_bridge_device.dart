@@ -7,12 +7,11 @@ import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:ffi/ffi.dart';
 import 'package:http/http.dart' as http;
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-import '../public/configuration/sdk_environment.dart';
-import '../foundation/logging/sdk_logger.dart';
-import 'ffi_types.dart';
-import 'platform_loader.dart';
 
 // =============================================================================
 // Exceptional return constants for FFI callbacks
@@ -397,8 +396,8 @@ int _isRegisteredCallback(Pointer<Void> userData) {
 /// Set device registered status callback
 void _setRegisteredCallback(int registered, Pointer<Void> userData) {
   try {
-    DartBridgeDevice._prefs
-        ?.setBool(DartBridgeDevice._keyIsRegistered, registered != 0);
+    unawaited(DartBridgeDevice._prefs
+        ?.setBool(DartBridgeDevice._keyIsRegistered, registered != 0));
   } catch (e) {
     SDKLogger('DartBridge.Device').error('Error setting registration: $e');
   }
@@ -462,7 +461,7 @@ void _performHttpPost(
 
   // Schedule async HTTP call (fire and forget for now)
   // The C++ layer will retry if needed
-  Future.microtask(() async {
+  unawaited(Future.microtask(() async {
     try {
       final response = await http.post(url, headers: headers, body: body);
 
@@ -483,7 +482,7 @@ void _performHttpPost(
       final errorPtr = e.toString().toNativeUtf8();
       outResponse.ref.errorMessage = errorPtr;
     }
-  });
+  }));
 
   // Return immediately with pending state
   outResponse.ref.result = RacResultCode.success;

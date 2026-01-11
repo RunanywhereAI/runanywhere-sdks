@@ -8,11 +8,11 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:ffi/ffi.dart';
 import 'package:http/http.dart' as http;
 
-import '../foundation/logging/sdk_logger.dart';
-import '../public/configuration/sdk_environment.dart';
-import 'dart_bridge_model_registry.dart';
-import 'ffi_types.dart';
-import 'platform_loader.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/dart_bridge_model_registry.dart';
+import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 // =============================================================================
 // Exception Return Constants
@@ -320,7 +320,7 @@ void _performHttpGet(
     headers['Authorization'] = 'Bearer ${DartBridgeModelAssignment._accessToken}';
   }
 
-  Future.microtask(() async {
+  unawaited(Future.microtask(() async {
     try {
       final response = await http.get(url, headers: headers);
 
@@ -340,7 +340,7 @@ void _performHttpGet(
       final errorPtr = e.toString().toNativeUtf8();
       outResponse.ref.errorMessage = errorPtr;
     }
-  });
+  }));
 
   // Return immediately with pending state
   outResponse.ref.result = RacResultCode.success;

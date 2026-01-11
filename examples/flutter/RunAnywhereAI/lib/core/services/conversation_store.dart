@@ -27,8 +27,7 @@ class ConversationStore extends ChangeNotifier {
 
   Future<void> _initialize() async {
     final documentsDir = await getApplicationDocumentsDirectory();
-    _conversationsDirectory =
-        Directory('${documentsDir.path}/Conversations');
+    _conversationsDirectory = Directory('${documentsDir.path}/Conversations');
 
     if (!await _conversationsDirectory!.exists()) {
       await _conversationsDirectory!.create(recursive: true);
@@ -76,7 +75,8 @@ class ConversationStore extends ChangeNotifier {
     _conversations.removeWhere((c) => c.id == conversation.id);
 
     if (_currentConversation?.id == conversation.id) {
-      _currentConversation = _conversations.isNotEmpty ? _conversations.first : null;
+      _currentConversation =
+          _conversations.isNotEmpty ? _conversations.first : null;
     }
 
     unawaited(_deleteConversationFile(conversation.id));
@@ -165,7 +165,8 @@ class ConversationStore extends ChangeNotifier {
     if (_conversationsDirectory == null) return;
 
     try {
-      final file = File('${_conversationsDirectory!.path}/${conversation.id}.json');
+      final file =
+          File('${_conversationsDirectory!.path}/${conversation.id}.json');
       final json = jsonEncode(conversation.toJson());
       await file.writeAsString(json);
     } catch (e) {
@@ -256,7 +257,8 @@ class Conversation {
     if (messages.isEmpty) return 'No messages';
 
     final messageCount = messages.length;
-    final userMessages = messages.where((m) => m.role == MessageRole.user).length;
+    final userMessages =
+        messages.where((m) => m.role == MessageRole.user).length;
     final assistantMessages =
         messages.where((m) => m.role == MessageRole.assistant).length;
 
@@ -267,9 +269,7 @@ class Conversation {
     if (messages.isEmpty) return 'Start a conversation';
 
     final lastMessage = messages.last;
-    final preview = lastMessage.content
-        .trim()
-        .replaceAll('\n', ' ');
+    final preview = lastMessage.content.trim().replaceAll('\n', ' ');
 
     return preview.length > 100 ? preview.substring(0, 100) : preview;
   }
@@ -352,7 +352,8 @@ class Message {
         thinkingContent: json['thinkingContent'] as String?,
         timestamp: DateTime.parse(json['timestamp'] as String),
         analytics: json['analytics'] != null
-            ? MessageAnalytics.fromJson(json['analytics'] as Map<String, dynamic>)
+            ? MessageAnalytics.fromJson(
+                json['analytics'] as Map<String, dynamic>)
             : null,
       );
 }
@@ -396,7 +397,8 @@ class MessageAnalytics {
         'completionStatus': completionStatus.name,
       };
 
-  factory MessageAnalytics.fromJson(Map<String, dynamic> json) => MessageAnalytics(
+  factory MessageAnalytics.fromJson(Map<String, dynamic> json) =>
+      MessageAnalytics(
         messageId: json['messageId'] as String,
         modelName: json['modelName'] as String?,
         framework: json['framework'] as String?,

@@ -209,7 +209,7 @@ class NativeBackend {
     } catch (_) {
       // Some backends might not export rac_free directly
       // Fall back to RacCore.free
-      _freePtr = (ptr) => RacCore.free(ptr);
+      _freePtr = RacCore.free;
     }
   }
 

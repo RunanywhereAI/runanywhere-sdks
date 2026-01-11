@@ -31,6 +31,8 @@
 /// ```
 library runanywhere_onnx;
 
+import 'dart:async';
+
 import 'package:runanywhere/core/module/runanywhere_module.dart';
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/core/types/sdk_component.dart';
@@ -247,8 +249,8 @@ class Onnx implements RunAnywhereModule {
   // ============================================================================
 
   /// Enable auto-registration for this module.
-  /// Access this property to trigger C++ backend registration.
-  static final autoRegister = () {
-    register();
-  };
+  /// Call this function to trigger C++ backend registration.
+  static void autoRegister() {
+    unawaited(register());
+  }
 }

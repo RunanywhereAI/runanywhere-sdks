@@ -236,7 +236,7 @@ class DartBridgeSTT {
       optionsPtr.ref.enableDiarization = RAC_FALSE;
       optionsPtr.ref.maxSpeakers = 0;
       optionsPtr.ref.enableTimestamps = RAC_TRUE;
-      optionsPtr.ref.audioFormat = RAC_AUDIO_FORMAT_WAV; // WAV format
+      optionsPtr.ref.audioFormat = racAudioFormatWav; // WAV format
       optionsPtr.ref.sampleRate = sampleRate;
 
       // Get transcribe function
@@ -395,12 +395,12 @@ class STTStreamResult {
 // =============================================================================
 
 /// Audio format enum (matches rac_audio_format_enum_t)
-const int RAC_AUDIO_FORMAT_PCM = 0;
-const int RAC_AUDIO_FORMAT_WAV = 1;
-const int RAC_AUDIO_FORMAT_MP3 = 2;
-const int RAC_AUDIO_FORMAT_OPUS = 3;
-const int RAC_AUDIO_FORMAT_AAC = 4;
-const int RAC_AUDIO_FORMAT_FLAC = 5;
+const int racAudioFormatPcm = 0;
+const int racAudioFormatWav = 1;
+const int racAudioFormatMp3 = 2;
+const int racAudioFormatOpus = 3;
+const int racAudioFormatAac = 4;
+const int racAudioFormatFlac = 5;
 
 /// FFI struct for STT options (matches rac_stt_options_t)
 final class RacSttOptionsStruct extends Struct {

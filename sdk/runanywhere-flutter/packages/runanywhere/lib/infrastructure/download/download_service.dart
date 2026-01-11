@@ -4,13 +4,12 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
-
-import '../../core/types/model_types.dart';
-import '../../foundation/logging/sdk_logger.dart';
-import '../../native/dart_bridge_model_paths.dart';
-import '../../public/events/event_bus.dart';
-import '../../public/events/sdk_event.dart';
-import '../../public/runanywhere.dart';
+import 'package:runanywhere/core/types/model_types.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/dart_bridge_model_paths.dart';
+import 'package:runanywhere/public/events/event_bus.dart';
+import 'package:runanywhere/public/events/sdk_event.dart';
+import 'package:runanywhere/public/runanywhere.dart';
 
 /// Download progress information
 class ModelDownloadProgress {

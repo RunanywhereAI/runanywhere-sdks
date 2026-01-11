@@ -52,7 +52,7 @@ class DartBridgeLLM {
 
   /// Cancel any active generation
   void cancelGeneration() {
-    _activeStreamSubscription?.cancel();
+    unawaited(_activeStreamSubscription?.cancel());
     _activeStreamSubscription = null;
     // Cancel at native level
     cancel();
@@ -283,14 +283,14 @@ class DartBridgeLLM {
     // Create stream controller for emitting tokens
     final controller = StreamController<String>();
 
-    // Start streaming generation asynchronously
-    _startStreamingGeneration(
+    // Start streaming generation asynchronously (fire-and-forget, errors are sent to controller)
+    unawaited(_startStreamingGeneration(
       handle.address,
       prompt,
       maxTokens,
       temperature,
       controller,
-    );
+    ));
 
     return controller.stream;
   }
@@ -312,11 +312,11 @@ class DartBridgeLLM {
 
       if (message is String) {
         if (message == '__DONE__') {
-          controller.close();
+          unawaited(controller.close());
           receivePort.close();
         } else if (message.startsWith('__ERROR__:')) {
           controller.addError(StateError(message.substring(10)));
-          controller.close();
+          unawaited(controller.close());
           receivePort.close();
         } else {
           // It's a token
@@ -339,7 +339,7 @@ class DartBridgeLLM {
       );
     } catch (e) {
       controller.addError(e);
-      controller.close();
+      await controller.close();
       receivePort.close();
     }
   }
