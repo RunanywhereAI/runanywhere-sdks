@@ -228,6 +228,9 @@ class DartBridgeLLM {
   /// [temperature] - Sampling temperature (default: 0.7).
   ///
   /// Returns the generated text and metrics.
+  ///
+  /// IMPORTANT: This runs in a separate isolate to prevent heap corruption
+  /// from C++ Metal/GPU background threads.
   Future<LLMComponentResult> generate(
     String prompt, {
     int maxTokens = 512,
@@ -239,35 +242,24 @@ class DartBridgeLLM {
       throw StateError('No LLM model loaded. Call loadModel() first.');
     }
 
-    final promptPtr = prompt.toNativeUtf8();
-    final resultPtr = calloc<RacLlmResultStruct>();
+    // Run FFI call in a separate isolate to avoid heap corruption
+    // from C++ background threads (Metal GPU operations)
+    final handleAddress = handle.address;
 
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final generateFn = lib.lookupFunction<
-          Int32 Function(RacHandle, Pointer<Utf8>, Pointer<RacLlmResultStruct>),
-          int Function(RacHandle, Pointer<Utf8>,
-              Pointer<RacLlmResultStruct>)>('rac_llm_component_generate');
+    final result = await Isolate.run(() {
+      return _generateInIsolate(handleAddress, prompt);
+    });
 
-      final status = generateFn(handle, promptPtr, resultPtr);
-
-      if (status != RAC_SUCCESS) {
-        throw StateError(
-          'LLM generation failed: ${RacResultCode.getMessage(status)}',
-        );
-      }
-
-      final result = resultPtr.ref;
-      return LLMComponentResult(
-        text: result.text != nullptr ? result.text.toDartString() : '',
-        promptTokens: result.promptTokens,
-        completionTokens: result.completionTokens,
-        totalTimeMs: result.totalTimeMs,
-      );
-    } finally {
-      calloc.free(promptPtr);
-      calloc.free(resultPtr);
+    if (result.error != null) {
+      throw StateError(result.error!);
     }
+
+    return LLMComponentResult(
+      text: result.text ?? '',
+      promptTokens: result.promptTokens,
+      completionTokens: result.completionTokens,
+      totalTimeMs: result.totalTimeMs,
+    );
   }
 
   /// Generate text with streaming.
@@ -338,5 +330,68 @@ class LLMComponentResult {
   double get tokensPerSecond {
     if (totalTimeMs <= 0) return 0;
     return completionTokens / (totalTimeMs / 1000.0);
+  }
+}
+
+// =============================================================================
+// Isolate Helper for FFI Generation
+// =============================================================================
+
+/// Result container for isolate communication (must be simple types).
+class _IsolateGenerationResult {
+  final String? text;
+  final int promptTokens;
+  final int completionTokens;
+  final int totalTimeMs;
+  final String? error;
+
+  const _IsolateGenerationResult({
+    this.text,
+    this.promptTokens = 0,
+    this.completionTokens = 0,
+    this.totalTimeMs = 0,
+    this.error,
+  });
+}
+
+/// Run LLM generation in an isolate.
+///
+/// This function is called from Isolate.run() and performs the actual FFI call.
+/// Running in a separate isolate prevents heap corruption from C++ background
+/// threads (Metal GPU operations on iOS).
+_IsolateGenerationResult _generateInIsolate(int handleAddress, String prompt) {
+  final handle = Pointer<Void>.fromAddress(handleAddress);
+  final promptPtr = prompt.toNativeUtf8();
+  final resultPtr = calloc<RacLlmResultStruct>();
+
+  try {
+    final lib = PlatformLoader.loadCommons();
+    final generateFn = lib.lookupFunction<
+        Int32 Function(RacHandle, Pointer<Utf8>, Pointer<RacLlmResultStruct>),
+        int Function(RacHandle, Pointer<Utf8>,
+            Pointer<RacLlmResultStruct>)>('rac_llm_component_generate');
+
+    final status = generateFn(handle, promptPtr, resultPtr);
+
+    if (status != RAC_SUCCESS) {
+      return _IsolateGenerationResult(
+        error: 'LLM generation failed: ${RacResultCode.getMessage(status)}',
+      );
+    }
+
+    final result = resultPtr.ref;
+    final text = result.text != nullptr ? result.text.toDartString() : '';
+
+    return _IsolateGenerationResult(
+      text: text,
+      promptTokens: result.promptTokens,
+      completionTokens: result.completionTokens,
+      totalTimeMs: result.totalTimeMs,
+    );
+  } catch (e) {
+    return _IsolateGenerationResult(error: 'Generation exception: $e');
+  } finally {
+    calloc.free(promptPtr);
+    calloc.free(resultPtr);
   }
 }
