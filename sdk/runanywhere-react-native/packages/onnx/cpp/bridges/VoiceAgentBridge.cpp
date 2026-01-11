@@ -12,18 +12,11 @@
 #include <stdexcept>
 #include <cstring>
 
-#if defined(ANDROID) || defined(__ANDROID__)
-#include <android/log.h>
-#define LOG_TAG "VoiceAgentBridge"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
-#else
-#include <cstdio>
-#define LOGI(...) printf("[VoiceAgentBridge] "); printf(__VA_ARGS__); printf("\n")
-#define LOGD(...) printf("[VoiceAgentBridge DEBUG] "); printf(__VA_ARGS__); printf("\n")
-#define LOGE(...) printf("[VoiceAgentBridge ERROR] "); printf(__VA_ARGS__); printf("\n")
-#endif
+// RACommons logger - unified logging across platforms
+#include "rac_logger.h"
+
+// Category for VoiceAgent.ONNX logging
+static const char* LOG_CATEGORY = "VoiceAgent.ONNX";
 
 namespace runanywhere {
 namespace bridges {
@@ -34,7 +27,7 @@ VoiceAgentBridge& VoiceAgentBridge::shared() {
 }
 
 VoiceAgentBridge::VoiceAgentBridge() {
-    LOGI("VoiceAgentBridge created");
+    RAC_LOG_INFO(LOG_CATEGORY, "VoiceAgentBridge created");
 }
 
 VoiceAgentBridge::~VoiceAgentBridge() {
@@ -42,14 +35,14 @@ VoiceAgentBridge::~VoiceAgentBridge() {
 }
 
 rac_result_t VoiceAgentBridge::initialize(const VoiceAgentConfig& config) {
-    LOGI("Initializing voice agent with config");
+    RAC_LOG_INFO(LOG_CATEGORY, "Initializing voice agent with config");
     config_ = config;
 
     // Create voice agent handle using standalone API (owns its component handles)
     if (!handle_) {
         rac_result_t result = rac_voice_agent_create_standalone(&handle_);
         if (result != RAC_SUCCESS) {
-            LOGE("Failed to create voice agent: %d", result);
+            RAC_LOG_ERROR(LOG_CATEGORY, "Failed to create voice agent: %d", result);
             throw std::runtime_error("VoiceAgentBridge: Failed to create voice agent. Error: " + std::to_string(result));
         }
     }
@@ -80,29 +73,29 @@ rac_result_t VoiceAgentBridge::initialize(const VoiceAgentConfig& config) {
 
     rac_result_t result = rac_voice_agent_initialize(handle_, &cConfig);
     if (result != RAC_SUCCESS) {
-        LOGE("Failed to initialize voice agent: %d", result);
+        RAC_LOG_ERROR(LOG_CATEGORY, "Failed to initialize voice agent: %d", result);
         throw std::runtime_error("VoiceAgentBridge: Failed to initialize voice agent. Error: " + std::to_string(result));
     }
 
     initialized_ = true;
-    LOGI("Voice agent initialized successfully");
+    RAC_LOG_INFO(LOG_CATEGORY, "Voice agent initialized successfully");
     return RAC_SUCCESS;
 }
 
 rac_result_t VoiceAgentBridge::initializeWithLoadedModels() {
-    LOGI("Initializing voice agent with loaded models");
+    RAC_LOG_INFO(LOG_CATEGORY, "Initializing voice agent with loaded models");
 
     if (!handle_) {
         rac_result_t result = rac_voice_agent_create_standalone(&handle_);
         if (result != RAC_SUCCESS) {
-            LOGE("Failed to create voice agent: %d", result);
+            RAC_LOG_ERROR(LOG_CATEGORY, "Failed to create voice agent: %d", result);
             throw std::runtime_error("VoiceAgentBridge: Failed to create voice agent. Error: " + std::to_string(result));
         }
     }
 
     rac_result_t result = rac_voice_agent_initialize_with_loaded_models(handle_);
     if (result != RAC_SUCCESS) {
-        LOGE("Failed to initialize with loaded models: %d", result);
+        RAC_LOG_ERROR(LOG_CATEGORY, "Failed to initialize with loaded models: %d", result);
         throw std::runtime_error("VoiceAgentBridge: Failed to initialize with loaded models. Error: " + std::to_string(result));
     }
 
@@ -116,7 +109,7 @@ bool VoiceAgentBridge::isReady() const {
     rac_bool_t ready = RAC_FALSE;
     rac_result_t result = rac_voice_agent_is_ready(handle_, &ready);
     if (result != RAC_SUCCESS) {
-        LOGE("Failed to check if voice agent is ready: %d", result);
+        RAC_LOG_ERROR(LOG_CATEGORY, "Failed to check if voice agent is ready: %d", result);
         return false;
     }
     return ready == RAC_TRUE;
@@ -177,11 +170,11 @@ rac_result_t VoiceAgentBridge::loadSTTModel(const std::string& modelPath,
     );
 
     if (result != RAC_SUCCESS) {
-        LOGE("Failed to load STT model: %d", result);
+        RAC_LOG_ERROR(LOG_CATEGORY, "Failed to load STT model: %d", result);
         throw std::runtime_error("VoiceAgentBridge: Failed to load STT model. Error: " + std::to_string(result));
     }
 
-    LOGI("STT model loaded: %s", modelId.c_str());
+    RAC_LOG_INFO(LOG_CATEGORY, "STT model loaded: %s", modelId.c_str());
     return result;
 }
 
@@ -200,11 +193,11 @@ rac_result_t VoiceAgentBridge::loadLLMModel(const std::string& modelPath,
     );
 
     if (result != RAC_SUCCESS) {
-        LOGE("Failed to load LLM model: %d", result);
+        RAC_LOG_ERROR(LOG_CATEGORY, "Failed to load LLM model: %d", result);
         throw std::runtime_error("VoiceAgentBridge: Failed to load LLM model. Error: " + std::to_string(result));
     }
 
-    LOGI("LLM model loaded: %s", modelId.c_str());
+    RAC_LOG_INFO(LOG_CATEGORY, "LLM model loaded: %s", modelId.c_str());
     return result;
 }
 
@@ -223,11 +216,11 @@ rac_result_t VoiceAgentBridge::loadTTSVoice(const std::string& voicePath,
     );
 
     if (result != RAC_SUCCESS) {
-        LOGE("Failed to load TTS voice: %d", result);
+        RAC_LOG_ERROR(LOG_CATEGORY, "Failed to load TTS voice: %d", result);
         throw std::runtime_error("VoiceAgentBridge: Failed to load TTS voice. Error: " + std::to_string(result));
     }
 
-    LOGI("TTS voice loaded: %s", voiceId.c_str());
+    RAC_LOG_INFO(LOG_CATEGORY, "TTS voice loaded: %s", voiceId.c_str());
     return result;
 }
 
@@ -251,7 +244,7 @@ VoiceAgentResult VoiceAgentBridge::processVoiceTurn(const void* audioData, size_
     );
 
     if (ret != RAC_SUCCESS) {
-        LOGE("Failed to process voice turn: %d", ret);
+        RAC_LOG_ERROR(LOG_CATEGORY, "Failed to process voice turn: %d", ret);
         throw std::runtime_error("VoiceAgentBridge: Failed to process voice turn. Error: " + std::to_string(ret));
     }
 
@@ -289,7 +282,7 @@ std::string VoiceAgentBridge::transcribe(const void* audioData, size_t audioSize
     );
 
     if (result != RAC_SUCCESS) {
-        LOGE("Failed to transcribe: %d", result);
+        RAC_LOG_ERROR(LOG_CATEGORY, "Failed to transcribe: %d", result);
         throw std::runtime_error("VoiceAgentBridge: Failed to transcribe audio. Error: " + std::to_string(result));
     }
 
@@ -314,7 +307,7 @@ std::string VoiceAgentBridge::generateResponse(const std::string& prompt) {
     );
 
     if (result != RAC_SUCCESS) {
-        LOGE("Failed to generate response: %d", result);
+        RAC_LOG_ERROR(LOG_CATEGORY, "Failed to generate response: %d", result);
         throw std::runtime_error("VoiceAgentBridge: Failed to generate response. Error: " + std::to_string(result));
     }
 
@@ -341,7 +334,7 @@ std::vector<uint8_t> VoiceAgentBridge::synthesizeSpeech(const std::string& text)
     );
 
     if (result != RAC_SUCCESS) {
-        LOGE("Failed to synthesize speech: %d", result);
+        RAC_LOG_ERROR(LOG_CATEGORY, "Failed to synthesize speech: %d", result);
         throw std::runtime_error("VoiceAgentBridge: Failed to synthesize speech. Error: " + std::to_string(result));
     }
 
@@ -370,7 +363,7 @@ bool VoiceAgentBridge::detectSpeech(const float* samples, size_t sampleCount) {
     );
 
     if (result != RAC_SUCCESS) {
-        LOGE("Failed to detect speech: %d", result);
+        RAC_LOG_ERROR(LOG_CATEGORY, "Failed to detect speech: %d", result);
         throw std::runtime_error("VoiceAgentBridge: Failed to detect speech. Error: " + std::to_string(result));
     }
 
@@ -381,14 +374,14 @@ void VoiceAgentBridge::cleanup() {
     if (handle_) {
         rac_result_t result = rac_voice_agent_cleanup(handle_);
         if (result != RAC_SUCCESS) {
-            LOGE("Failed to cleanup voice agent: %d", result);
+            RAC_LOG_ERROR(LOG_CATEGORY, "Failed to cleanup voice agent: %d", result);
         }
 
         rac_voice_agent_destroy(handle_);
         handle_ = nullptr;
     }
     initialized_ = false;
-    LOGI("Voice agent cleaned up");
+    RAC_LOG_INFO(LOG_CATEGORY, "Voice agent cleaned up");
 }
 
 } // namespace bridges

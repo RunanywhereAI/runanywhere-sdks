@@ -12,18 +12,11 @@
 #include <stdexcept>
 #include <cstdlib> // For free()
 
-#if defined(ANDROID) || defined(__ANDROID__)
-#include <android/log.h>
-#define LOG_TAG "StructuredOutputBridge"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
-#else
-#include <cstdio>
-#define LOGI(...) printf("[StructuredOutputBridge] "); printf(__VA_ARGS__); printf("\n")
-#define LOGD(...) printf("[StructuredOutputBridge DEBUG] "); printf(__VA_ARGS__); printf("\n")
-#define LOGE(...) printf("[StructuredOutputBridge ERROR] "); printf(__VA_ARGS__); printf("\n")
-#endif
+// Unified logging via rac_logger.h
+#include "rac_logger.h"
+
+// Log category for this module
+#define LOG_CATEGORY "LLM.StructuredOutput"
 
 namespace runanywhere {
 namespace bridges {
@@ -62,7 +55,7 @@ StructuredOutputResult StructuredOutputBridge::generate(
         free(preparedPrompt);
     } else {
         // Fallback: Build prompt manually
-        LOGD("Fallback to manual prompt preparation");
+        RAC_LOG_DEBUG(LOG_CATEGORY, "Fallback to manual prompt preparation");
         structuredPrompt =
             "You must respond with valid JSON matching this schema:\n" +
             schema + "\n\n" +
@@ -100,10 +93,10 @@ StructuredOutputResult StructuredOutputBridge::generate(
         result.json = std::string(extractedJson, jsonLength);
         result.success = true;
         free(extractedJson);
-        LOGI("Successfully extracted JSON (%zu bytes)", jsonLength);
+        RAC_LOG_INFO(LOG_CATEGORY, "Successfully extracted JSON (%zu bytes)", jsonLength);
     } else {
         // Fallback: Try manual extraction
-        LOGD("Fallback to manual JSON extraction");
+        RAC_LOG_DEBUG(LOG_CATEGORY, "Fallback to manual JSON extraction");
 
         std::string text = llmResult.text;
         size_t start = 0, end = 0;
@@ -144,7 +137,7 @@ StructuredOutputResult StructuredOutputBridge::generate(
         );
 
         if (valResult != RAC_SUCCESS || validation.is_valid != RAC_TRUE) {
-            LOGE("Extracted JSON failed validation");
+            RAC_LOG_WARNING(LOG_CATEGORY, "Extracted JSON failed validation");
             // Don't throw - the JSON was extracted, just log warning
         }
 

@@ -9,11 +9,11 @@
  * sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/Download/Utilities/ArchiveUtility.swift
  *
  * Supports: tar.gz, zip
+ * Note: All models should use tar.gz from RunanywhereAI/sherpa-onnx fork for best performance
  */
 
 package com.margelo.nitro.runanywhere
 
-import android.util.Log
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
@@ -27,7 +27,7 @@ import java.util.zip.ZipInputStream
  * Utility for handling archive extraction on Android
  */
 object ArchiveUtility {
-    private const val TAG = "ArchiveUtility"
+    private val logger = SDKLogger.archive
 
     /**
      * Extract an archive to a destination directory
@@ -37,14 +37,13 @@ object ArchiveUtility {
      */
     @JvmStatic
     fun extract(archivePath: String, destinationPath: String): Boolean {
-        Log.i(TAG, "extract() called: $archivePath -> $destinationPath")
+        logger.info("extract() called: $archivePath -> $destinationPath")
         return try {
             extractArchive(archivePath, destinationPath)
-            Log.i(TAG, "extract() succeeded")
+            logger.info("extract() succeeded")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Extraction failed: ${e.message}")
-            Log.e(TAG, "Stack trace:", e)
+            logger.logError(e, "Extraction failed")
             false
         }
     }
@@ -67,7 +66,7 @@ object ArchiveUtility {
 
         // Detect archive type by magic bytes (more reliable than file extension)
         val archiveType = detectArchiveTypeByMagicBytes(archiveFile)
-        Log.i(TAG, "Detected archive type: $archiveType for: $archivePath")
+        logger.info("Detected archive type: $archiveType for: $archivePath")
 
         when (archiveType) {
             ArchiveType.GZIP -> {
@@ -77,12 +76,10 @@ object ArchiveUtility {
                 extractZip(archiveFile, destinationDir, progressHandler)
             }
             ArchiveType.BZIP2 -> {
-                // tar.bz2 not commonly used for ML models, recommend tar.gz
-                throw Exception("tar.bz2 format not currently supported. Please use tar.gz format.")
+                throw Exception("tar.bz2 not supported. Use tar.gz from RunanywhereAI/sherpa-onnx fork.")
             }
             ArchiveType.XZ -> {
-                // tar.xz not commonly used for ML models, recommend tar.gz
-                throw Exception("tar.xz format not currently supported. Please use tar.gz format.")
+                throw Exception("tar.xz not supported. Use tar.gz from RunanywhereAI/sherpa-onnx fork.")
             }
             ArchiveType.UNKNOWN -> {
                 // Fallback to file extension check
@@ -147,7 +144,7 @@ object ArchiveUtility {
                 ArchiveType.UNKNOWN
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to detect archive type: ${e.message}")
+            logger.error("Failed to detect archive type: ${e.message}")
             ArchiveType.UNKNOWN
         }
     }
@@ -164,7 +161,7 @@ object ArchiveUtility {
         progressHandler: ((Double) -> Unit)?
     ) {
         val startTime = System.currentTimeMillis()
-        Log.i(TAG, "Extracting tar.gz: ${sourceFile.name} (size: ${formatBytes(sourceFile.length())})")
+        logger.info("Extracting tar.gz: ${sourceFile.name} (size: ${formatBytes(sourceFile.length())})")
         progressHandler?.invoke(0.0)
 
         destinationDir.mkdirs()
@@ -195,7 +192,7 @@ object ArchiveUtility {
                                 val outputFilePath = outputFile.canonicalPath
                                 if (!outputFilePath.startsWith(destDirPath + File.separator) &&
                                     outputFilePath != destDirPath) {
-                                    Log.w(TAG, "Skipping entry outside destination: $name")
+                                    logger.warning("Skipping entry outside destination: $name")
                                     entry = tarIn.nextTarEntry
                                     continue
                                 }
@@ -219,7 +216,7 @@ object ArchiveUtility {
 
                                     // Log progress for large files
                                     if (fileCount % 10 == 0) {
-                                        Log.d(TAG, "Extracted $fileCount files...")
+                                        logger.debug("Extracted $fileCount files...")
                                     }
                                 }
 
@@ -235,10 +232,10 @@ object ArchiveUtility {
             }
 
             val totalTime = System.currentTimeMillis() - startTime
-            Log.i(TAG, "Extracted $fileCount files in ${totalTime}ms")
+            logger.info("Extracted $fileCount files in ${totalTime}ms")
             progressHandler?.invoke(1.0)
         } catch (e: Exception) {
-            Log.e(TAG, "tar.gz extraction failed: ${e.message}", e)
+            logger.logError(e, "tar.gz extraction failed")
             throw e
         }
     }
@@ -253,7 +250,7 @@ object ArchiveUtility {
         destinationDir: File,
         progressHandler: ((Double) -> Unit)?
     ) {
-        Log.i(TAG, "Extracting zip: ${sourceFile.name}")
+        logger.info("Extracting zip: ${sourceFile.name}")
         progressHandler?.invoke(0.0)
 
         destinationDir.mkdirs()
@@ -294,7 +291,7 @@ object ArchiveUtility {
             }
         }
 
-        Log.i(TAG, "Extracted $fileCount files from zip")
+        logger.info("Extracted $fileCount files from zip")
         progressHandler?.invoke(1.0)
     }
 

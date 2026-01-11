@@ -8,10 +8,13 @@
 #import <Foundation/Foundation.h>
 #import <AudioToolbox/AudioToolbox.h>
 #import "AudioDecoder.h"
+#import "RNSDKLoggerBridge.h"
+
+static NSString * const kLogCategory = @"AudioDecoder";
 
 int ra_decode_audio_file(const char* filePath, float** samples, size_t* numSamples, int* sampleRate) {
     if (!filePath || !samples || !numSamples || !sampleRate) {
-        NSLog(@"[AudioDecoder] Invalid parameters");
+        RN_LOG_ERROR(kLogCategory, @"Invalid parameters");
         return 0;
     }
 
@@ -20,17 +23,17 @@ int ra_decode_audio_file(const char* filePath, float** samples, size_t* numSampl
     // Create URL from file path
     NSURL *fileURL = [NSURL fileURLWithPath:path];
     if (![[NSFileManager defaultManager] fileExistsAtPath:path]) {
-        NSLog(@"[AudioDecoder] File not found: %@", path);
+        RN_LOG_ERROR(kLogCategory, @"File not found: %@", path);
         return 0;
     }
 
-    NSLog(@"[AudioDecoder] Decoding file: %@", path);
+    RN_LOG_INFO(kLogCategory, @"Decoding file: %@", path);
 
     // Open the audio file
     ExtAudioFileRef audioFile = NULL;
     OSStatus status = ExtAudioFileOpenURL((__bridge CFURLRef)fileURL, &audioFile);
     if (status != noErr || !audioFile) {
-        NSLog(@"[AudioDecoder] Failed to open audio file: %d", (int)status);
+        RN_LOG_ERROR(kLogCategory, @"Failed to open audio file: %d", (int)status);
         return 0;
     }
 
@@ -39,12 +42,12 @@ int ra_decode_audio_file(const char* filePath, float** samples, size_t* numSampl
     UInt32 propSize = sizeof(srcFormat);
     status = ExtAudioFileGetProperty(audioFile, kExtAudioFileProperty_FileDataFormat, &propSize, &srcFormat);
     if (status != noErr) {
-        NSLog(@"[AudioDecoder] Failed to get source format: %d", (int)status);
+        RN_LOG_ERROR(kLogCategory, @"Failed to get source format: %d", (int)status);
         ExtAudioFileDispose(audioFile);
         return 0;
     }
 
-    NSLog(@"[AudioDecoder] Source format: %.0f Hz, %d channels, %d bits",
+    RN_LOG_INFO(kLogCategory, @"Source format: %.0f Hz, %d channels, %d bits",
           srcFormat.mSampleRate, srcFormat.mChannelsPerFrame, srcFormat.mBitsPerChannel);
 
     // Set the output format to 16kHz mono float32 (optimal for Whisper)
@@ -61,7 +64,7 @@ int ra_decode_audio_file(const char* filePath, float** samples, size_t* numSampl
 
     status = ExtAudioFileSetProperty(audioFile, kExtAudioFileProperty_ClientDataFormat, sizeof(dstFormat), &dstFormat);
     if (status != noErr) {
-        NSLog(@"[AudioDecoder] Failed to set output format: %d", (int)status);
+        RN_LOG_ERROR(kLogCategory, @"Failed to set output format: %d", (int)status);
         ExtAudioFileDispose(audioFile);
         return 0;
     }
@@ -71,7 +74,7 @@ int ra_decode_audio_file(const char* filePath, float** samples, size_t* numSampl
     propSize = sizeof(totalFrames);
     status = ExtAudioFileGetProperty(audioFile, kExtAudioFileProperty_FileLengthFrames, &propSize, &totalFrames);
     if (status != noErr) {
-        NSLog(@"[AudioDecoder] Failed to get frame count: %d", (int)status);
+        RN_LOG_ERROR(kLogCategory, @"Failed to get frame count: %d", (int)status);
         ExtAudioFileDispose(audioFile);
         return 0;
     }
@@ -80,12 +83,12 @@ int ra_decode_audio_file(const char* filePath, float** samples, size_t* numSampl
     double ratio = 16000.0 / srcFormat.mSampleRate;
     SInt64 outputFrames = (SInt64)(totalFrames * ratio) + 4096;  // Add buffer
 
-    NSLog(@"[AudioDecoder] Total frames: %lld, estimated output: %lld", totalFrames, outputFrames);
+    RN_LOG_DEBUG(kLogCategory, @"Total frames: %lld, estimated output: %lld", totalFrames, outputFrames);
 
     // Allocate buffer for all samples
     float *buffer = (float *)malloc(outputFrames * sizeof(float));
     if (!buffer) {
-        NSLog(@"[AudioDecoder] Failed to allocate buffer");
+        RN_LOG_ERROR(kLogCategory, @"Failed to allocate buffer");
         ExtAudioFileDispose(audioFile);
         return 0;
     }
@@ -106,7 +109,7 @@ int ra_decode_audio_file(const char* filePath, float** samples, size_t* numSampl
         status = ExtAudioFileRead(audioFile, &framesToRead, &bufferList);
 
         if (status != noErr) {
-            NSLog(@"[AudioDecoder] Error reading audio: %d", (int)status);
+            RN_LOG_ERROR(kLogCategory, @"Error reading audio: %d", (int)status);
             break;
         }
 
@@ -120,7 +123,7 @@ int ra_decode_audio_file(const char* filePath, float** samples, size_t* numSampl
             outputFrames *= 2;
             float *newBuffer = (float *)realloc(buffer, outputFrames * sizeof(float));
             if (!newBuffer) {
-                NSLog(@"[AudioDecoder] Failed to reallocate buffer");
+                RN_LOG_ERROR(kLogCategory, @"Failed to reallocate buffer");
                 free(buffer);
                 free(tempBuffer);
                 ExtAudioFileDispose(audioFile);
@@ -138,12 +141,12 @@ int ra_decode_audio_file(const char* filePath, float** samples, size_t* numSampl
     ExtAudioFileDispose(audioFile);
 
     if (totalSamples == 0) {
-        NSLog(@"[AudioDecoder] No samples decoded");
+        RN_LOG_WARNING(kLogCategory, @"No samples decoded");
         free(buffer);
         return 0;
     }
 
-    NSLog(@"[AudioDecoder] Decoded %zu samples at 16000 Hz", totalSamples);
+    RN_LOG_INFO(kLogCategory, @"Decoded %zu samples at 16000 Hz", totalSamples);
 
     *samples = buffer;
     *numSamples = totalSamples;

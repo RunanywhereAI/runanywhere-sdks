@@ -64,6 +64,7 @@ export const ChatScreen: React.FC = () => {
     createConversation,
     setCurrentConversation,
     addMessage,
+    updateMessage,
   } = useConversationStore();
 
   // Local state
@@ -128,7 +129,7 @@ export const ChatScreen: React.FC = () => {
         (m: SDKModelInfo) => m.category === ModelCategory.Language
       );
       setAvailableModels(llmModels);
-      console.log(
+      console.warn(
         '[ChatScreen] Available LLM models:',
         llmModels.map(
           (m: SDKModelInfo) =>
@@ -136,7 +137,7 @@ export const ChatScreen: React.FC = () => {
         )
       );
     } catch (error) {
-      console.log('[ChatScreen] Error loading models:', error);
+      console.warn('[ChatScreen] Error loading models:', error);
     }
   };
 
@@ -146,7 +147,7 @@ export const ChatScreen: React.FC = () => {
   const checkModelStatus = async () => {
     try {
       const isLoaded = await RunAnywhere.isModelLoaded();
-      console.log('[ChatScreen] Text model loaded:', isLoaded);
+      console.warn('[ChatScreen] Text model loaded:', isLoaded);
       if (isLoaded) {
         setCurrentModel({
           id: 'loaded-model',
@@ -160,7 +161,7 @@ export const ChatScreen: React.FC = () => {
         });
       }
     } catch (error) {
-      console.log('[ChatScreen] Error checking model status:', error);
+      console.warn('[ChatScreen] Error checking model status:', error);
     }
   };
 
@@ -187,7 +188,7 @@ export const ChatScreen: React.FC = () => {
   const loadModel = async (model: SDKModelInfo) => {
     try {
       setIsModelLoading(true);
-      console.log(
+      console.warn(
         `[ChatScreen] Loading model: ${model.id} from ${model.localPath}`
       );
 
@@ -212,7 +213,7 @@ export const ChatScreen: React.FC = () => {
           isAvailable: true,
           supportsThinking: false,
         });
-        console.log('[ChatScreen] Model loaded successfully');
+        console.warn('[ChatScreen] Model loaded successfully');
       } else {
         const lastError = await RunAnywhere.getLastError();
         Alert.alert(
@@ -229,7 +230,8 @@ export const ChatScreen: React.FC = () => {
   };
 
   /**
-   * Send a message using the real SDK
+   * Send a message using the real SDK with streaming (matches Swift SDK)
+   * Uses RunAnywhere.generateStream() for real-time token display
    */
   const handleSend = useCallback(async () => {
     if (!inputText.trim() || !currentConversation) return;
@@ -247,30 +249,58 @@ export const ChatScreen: React.FC = () => {
     setInputText('');
     setIsLoading(true);
 
+    // Create placeholder assistant message for streaming
+    const assistantMessageId = generateId();
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: MessageRole.Assistant,
+      content: '',
+      timestamp: new Date(),
+    };
+    await addMessage(assistantMessage, currentConversation.id);
+
     // Scroll to bottom
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
     }, 100);
 
     try {
-      console.log('[ChatScreen] Generating response for:', prompt);
+      console.log('[ChatScreen] Starting streaming generation for:', prompt);
 
-      // Use the SDK generate method
-      const result = await RunAnywhere.generate(prompt, {
+      // Use streaming generation (matches Swift SDK: RunAnywhere.generateStream)
+      const streamingResult = await RunAnywhere.generateStream(prompt, {
         maxTokens: 1000,
         temperature: 0.7,
       });
 
-      console.log('[ChatScreen] Generation result:', result);
+      let fullResponse = '';
 
-      if (result.text?.includes('error')) {
-        throw new Error(result.text);
+      // Stream tokens in real-time (matches Swift's for await loop)
+      for await (const token of streamingResult.stream) {
+        fullResponse += token;
+        
+        // Update assistant message content as tokens arrive
+        updateMessage(
+          {
+            ...assistantMessage,
+            content: fullResponse,
+          },
+          currentConversation.id
+        );
+
+        // Scroll to keep up with new content
+        flatListRef.current?.scrollToEnd({ animated: false });
       }
 
-      const assistantMessage: Message = {
-        id: generateId(),
+      // Get final metrics after streaming completes
+      const result = await streamingResult.result;
+      console.log('[ChatScreen] Streaming complete, metrics:', result);
+
+      // Update with final message including analytics
+      const finalMessage: Message = {
+        id: assistantMessageId,
         role: MessageRole.Assistant,
-        content: result.text || '(No response generated)',
+        content: fullResponse || '(No response generated)',
         timestamp: new Date(),
         modelInfo: {
           modelId: result.modelUsed || 'unknown',
@@ -280,10 +310,10 @@ export const ChatScreen: React.FC = () => {
         },
         analytics: {
           totalGenerationTime: result.latencyMs,
-          inputTokens: prompt.split(' ').length,
+          inputTokens: result.inputTokens || Math.ceil(prompt.length / 4),
           outputTokens: result.tokensUsed,
-          averageTokensPerSecond:
-            result.performanceMetrics?.tokensPerSecond || 0,
+          averageTokensPerSecond: result.tokensPerSecond || 0,
+          timeToFirstToken: result.timeToFirstTokenMs,
           completionStatus: 'completed',
           wasThinkingMode: false,
           wasInterrupted: false,
@@ -291,27 +321,29 @@ export const ChatScreen: React.FC = () => {
         },
       };
 
-      // Add assistant message to conversation
-      await addMessage(assistantMessage, currentConversation.id);
+      updateMessage(finalMessage, currentConversation.id);
 
-      // Scroll to bottom
+      // Final scroll to bottom
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } catch (error) {
       console.error('[ChatScreen] Generation error:', error);
 
-      const errorMessage: Message = {
-        id: generateId(),
-        role: MessageRole.Assistant,
-        content: `Error: ${error}\n\nThis likely means no LLM model is loaded. Use demo mode to test the interface, or provide a GGUF model.`,
-        timestamp: new Date(),
-      };
-      await addMessage(errorMessage, currentConversation.id);
+      // Update the placeholder message with error
+      updateMessage(
+        {
+          id: assistantMessageId,
+          role: MessageRole.Assistant,
+          content: `Error: ${error}\n\nThis likely means no LLM model is loaded. Use demo mode to test the interface, or provide a GGUF model.`,
+          timestamp: new Date(),
+        },
+        currentConversation.id
+      );
     } finally {
       setIsLoading(false);
     }
-  }, [inputText, currentConversation, addMessage]);
+  }, [inputText, currentConversation, addMessage, updateMessage]);
 
   /**
    * Create a new conversation (clears current chat)

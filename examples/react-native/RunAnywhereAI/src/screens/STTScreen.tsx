@@ -119,8 +119,11 @@ export const STTScreen: React.FC = () => {
         clearTimeout(liveRecordingIntervalRef.current);
         liveRecordingIntervalRef.current = null;
       }
-      // Stop SDK streaming if active
-      RunAnywhere.stopStreamingSTT().catch(() => {});
+      // Stop SDK streaming if active (method may not be exposed on public API)
+      const sdk = RunAnywhere as unknown as Record<string, unknown>;
+      if (typeof sdk.stopStreamingSTT === 'function') {
+        (sdk.stopStreamingSTT as () => Promise<boolean>)().catch(() => {});
+      }
       // Stop batch mode recorder
       AudioService.cleanup().catch(() => {});
       // Clean up temp audio file
@@ -146,18 +149,18 @@ export const STTScreen: React.FC = () => {
 
       // Log downloaded status for debugging
       const downloadedModels = sttModels.filter((m) => m.isDownloaded);
-      console.log(
+      console.warn(
         '[STTScreen] Available STT models:',
         sttModels.map((m) => `${m.id} (downloaded: ${m.isDownloaded})`)
       );
-      console.log(
+      console.warn(
         '[STTScreen] Downloaded STT models:',
         downloadedModels.map((m) => m.id)
       );
 
       // Check if model is already loaded
       const isLoaded = await RunAnywhere.isSTTModelLoaded();
-      console.log('[STTScreen] isSTTModelLoaded:', isLoaded);
+      console.warn('[STTScreen] isSTTModelLoaded:', isLoaded);
       if (isLoaded && !currentModel) {
         // Try to find which model is loaded from downloaded models
         const downloadedStt = sttModels.filter((m) => m.isDownloaded);
@@ -169,7 +172,7 @@ export const STTScreen: React.FC = () => {
               name: firstModel.name,
               preferredFramework: LLMFramework.ONNX,
             } as ModelInfo);
-            console.log(
+            console.warn(
               '[STTScreen] Set currentModel from downloaded:',
               firstModel.name
             );
@@ -180,11 +183,11 @@ export const STTScreen: React.FC = () => {
             name: 'STT Model (Loaded)',
             preferredFramework: LLMFramework.ONNX,
           } as ModelInfo);
-          console.log('[STTScreen] Set currentModel as generic STT Model');
+          console.warn('[STTScreen] Set currentModel as generic STT Model');
         }
       }
     } catch (error) {
-      console.log('[STTScreen] Error loading models:', error);
+      console.warn('[STTScreen] Error loading models:', error);
     }
   }, [currentModel]);
 
@@ -192,7 +195,7 @@ export const STTScreen: React.FC = () => {
   // This ensures we pick up any models downloaded in the Settings tab
   useFocusEffect(
     useCallback(() => {
-      console.log('[STTScreen] Screen focused - refreshing models');
+      console.warn('[STTScreen] Screen focused - refreshing models');
       loadModels();
     }, [loadModels])
   );
@@ -220,7 +223,7 @@ export const STTScreen: React.FC = () => {
   const loadModel = async (model: SDKModelInfo) => {
     try {
       setIsModelLoading(true);
-      console.log(
+      console.warn(
         `[STTScreen] Loading model: ${model.id} from ${model.localPath}`
       );
 
@@ -249,11 +252,11 @@ export const STTScreen: React.FC = () => {
             name: model.name,
             preferredFramework: LLMFramework.ONNX,
           } as ModelInfo);
-          console.log(
+          console.warn(
             `[STTScreen] Model ${model.name} loaded successfully, currentModel set`
           );
         } else {
-          console.log(
+          console.warn(
             `[STTScreen] Model reported success but isSTTModelLoaded() returned false`
           );
         }
@@ -289,7 +292,7 @@ export const STTScreen: React.FC = () => {
     try {
       if (Platform.OS === 'ios') {
         const status = await check(PERMISSIONS.IOS.MICROPHONE);
-        console.log('[STTScreen] iOS microphone permission status:', status);
+        console.warn('[STTScreen] iOS microphone permission status:', status);
 
         if (status === RESULTS.GRANTED) {
           return true;
@@ -297,7 +300,7 @@ export const STTScreen: React.FC = () => {
 
         if (status === RESULTS.DENIED) {
           const result = await request(PERMISSIONS.IOS.MICROPHONE);
-          console.log(
+          console.warn(
             '[STTScreen] iOS microphone permission request result:',
             result
           );
@@ -343,17 +346,17 @@ export const STTScreen: React.FC = () => {
    */
   const startRecording = async () => {
     try {
-      console.log('[STTScreen] Starting recording...');
+      console.warn('[STTScreen] Starting recording...');
 
       // Request microphone permission first
       const hasPermission = await requestMicrophonePermission();
       if (!hasPermission) {
-        console.log('[STTScreen] Microphone permission denied');
+        console.warn('[STTScreen] Microphone permission denied');
         return;
       }
 
       // Start recording using expo-av
-      console.log('[STTScreen] Starting recorder...');
+      console.warn('[STTScreen] Starting recorder...');
       const uri = await AudioService.startRecording({
         onProgress: (currentPositionMs, metering) => {
           setRecordingDuration(currentPositionMs);
@@ -367,7 +370,7 @@ export const STTScreen: React.FC = () => {
 
       // Store the returned URI as the recording path
       recordingPath.current = uri;
-      console.log('[STTScreen] Recording started at:', uri);
+      console.warn('[STTScreen] Recording started at:', uri);
 
       setIsRecording(true);
       setTranscript('');
@@ -384,14 +387,14 @@ export const STTScreen: React.FC = () => {
    */
   const stopRecordingAndTranscribe = async () => {
     try {
-      console.log('[STTScreen] Stopping recording...');
+      console.warn('[STTScreen] Stopping recording...');
 
       // Stop recording
       const { uri } = await AudioService.stopRecording();
       setIsRecording(false);
       setIsProcessing(true);
 
-      console.log('[STTScreen] Recording stopped, file at:', uri);
+      console.warn('[STTScreen] Recording stopped, file at:', uri);
 
       // Use the URI returned by stopRecorder
       const filePath = uri || recordingPath.current;
@@ -404,7 +407,7 @@ export const STTScreen: React.FC = () => {
         ? filePath.substring(7)
         : filePath;
 
-      console.log('[STTScreen] Normalized path:', normalizedPath);
+      console.warn('[STTScreen] Normalized path:', normalizedPath);
 
       const exists = await RNFS.exists(normalizedPath);
       if (!exists) {
@@ -412,7 +415,7 @@ export const STTScreen: React.FC = () => {
       }
 
       const stat = await RNFS.stat(normalizedPath);
-      console.log('[STTScreen] Recording file size:', stat.size, 'bytes');
+      console.warn('[STTScreen] Recording file size:', stat.size, 'bytes');
 
       if (stat.size < 1000) {
         throw new Error('Recording too short');
@@ -426,12 +429,12 @@ export const STTScreen: React.FC = () => {
 
       // Transcribe the audio file - native module handles format conversion
       // iOS AudioToolbox converts M4A/CAF/WAV to 16kHz mono float32 PCM
-      console.log('[STTScreen] Starting transcription...');
+      console.warn('[STTScreen] Starting transcription...');
       const result = await RunAnywhere.transcribeFile(normalizedPath, {
         language: 'en',
       });
 
-      console.log('[STTScreen] Transcription result:', result);
+      console.warn('[STTScreen] Transcription result:', result);
 
       if (result.text) {
         setTranscript(result.text);
@@ -465,14 +468,14 @@ export const STTScreen: React.FC = () => {
    */
   const startLiveTranscription = async () => {
     try {
-      console.log(
+      console.warn(
         '[STTScreen] Starting live transcription (pseudo-streaming)...'
       );
 
       // Request microphone permission first
       const hasPermission = await requestMicrophonePermission();
       if (!hasPermission) {
-        console.log('[STTScreen] Microphone permission denied');
+        console.warn('[STTScreen] Microphone permission denied');
         return;
       }
 
@@ -496,7 +499,7 @@ export const STTScreen: React.FC = () => {
       await startLiveChunk();
       setIsRecording(true);
 
-      console.log('[STTScreen] Live transcription started');
+      console.warn('[STTScreen] Live transcription started');
     } catch (error) {
       console.error('[STTScreen] Error starting live transcription:', error);
       Alert.alert(
@@ -512,14 +515,16 @@ export const STTScreen: React.FC = () => {
    */
   const startLiveChunk = async () => {
     if (!isLiveRecordingRef.current) {
-      console.log('[STTScreen] Live recording stopped, not starting new chunk');
+      console.warn(
+        '[STTScreen] Live recording stopped, not starting new chunk'
+      );
       return;
     }
 
     try {
       liveChunkCountRef.current++;
       const chunkNum = liveChunkCountRef.current;
-      console.log(`[STTScreen] Starting live chunk #${chunkNum}...`);
+      console.warn(`[STTScreen] Starting live chunk #${chunkNum}...`);
 
       // Record with expo-av
       const path = await AudioService.startRecording({
@@ -534,7 +539,7 @@ export const STTScreen: React.FC = () => {
         },
       });
       recordingPath.current = path;
-      console.log(`[STTScreen] Live chunk #${chunkNum} recording at:`, path);
+      console.warn(`[STTScreen] Live chunk #${chunkNum} recording at:`, path);
 
       // Schedule transcription after interval (3 seconds for each chunk)
       liveRecordingIntervalRef.current = setTimeout(async () => {
@@ -557,7 +562,7 @@ export const STTScreen: React.FC = () => {
     }
 
     try {
-      console.log('[STTScreen] Transcribing live chunk...');
+      console.warn('[STTScreen] Transcribing live chunk...');
       setPartialTranscript('Processing...');
 
       // Stop current recording
@@ -583,7 +588,7 @@ export const STTScreen: React.FC = () => {
       // Check file size (skip very small files)
       const stat = await RNFS.stat(audioPath);
       if (stat.size < 5000) {
-        console.log('[STTScreen] Chunk too small, skipping transcription');
+        console.warn('[STTScreen] Chunk too small, skipping transcription');
         setPartialTranscript('Listening...');
         if (isLiveRecordingRef.current) {
           await startLiveChunk();
@@ -595,7 +600,7 @@ export const STTScreen: React.FC = () => {
       const result = await RunAnywhere.transcribeFile(audioPath, {
         language: 'en',
       });
-      console.log('[STTScreen] Live chunk transcription:', result.text);
+      console.warn('[STTScreen] Live chunk transcription:', result.text);
 
       // Append to accumulated transcript if we got text
       if (result.text && result.text.trim() && result.text.trim() !== '') {
@@ -634,7 +639,7 @@ export const STTScreen: React.FC = () => {
    * Uses react-native-audio-api for final chunk decoding
    */
   const stopLiveTranscription = async () => {
-    console.log('[STTScreen] Stopping live transcription...');
+    console.warn('[STTScreen] Stopping live transcription...');
     isLiveRecordingRef.current = false;
 
     // Clear any pending interval
@@ -663,7 +668,7 @@ export const STTScreen: React.FC = () => {
         if (exists) {
           const stat = await RNFS.stat(audioPath);
           if (stat.size >= 5000) {
-            console.log('[STTScreen] Transcribing final live chunk...');
+            console.warn('[STTScreen] Transcribing final live chunk...');
             // Transcribe using native module (handles audio decoding)
             const result = await RunAnywhere.transcribeFile(audioPath, {
               language: 'en',
@@ -683,8 +688,8 @@ export const STTScreen: React.FC = () => {
         }
       }
 
-      console.log('[STTScreen] Live transcription stopped');
-      console.log(
+      console.warn('[STTScreen] Live transcription stopped');
+      console.warn(
         '[STTScreen] Final transcript:',
         accumulatedTranscriptRef.current
       );

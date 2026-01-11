@@ -12,19 +12,11 @@
 #include "VADBridge.hpp"
 #include <stdexcept>
 
-// Platform-specific logging
-#if defined(ANDROID) || defined(__ANDROID__)
-#include <android/log.h>
-#define LOG_TAG "VADBridge"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
-#else
-#include <cstdio>
-#define LOGI(...) printf("[VADBridge] "); printf(__VA_ARGS__); printf("\n")
-#define LOGD(...) printf("[VADBridge DEBUG] "); printf(__VA_ARGS__); printf("\n")
-#define LOGE(...) printf("[VADBridge ERROR] "); printf(__VA_ARGS__); printf("\n")
-#endif
+// RACommons logger - unified logging across platforms
+#include "rac_logger.h"
+
+// Category for VAD.ONNX logging
+static const char* LOG_CATEGORY = "VAD.ONNX";
 
 namespace runanywhere {
 namespace bridges {
@@ -87,7 +79,7 @@ rac_result_t VADBridge::loadModel(const std::string& modelId) {
     result = rac_vad_component_initialize(handle_);
     if (result == RAC_SUCCESS) {
         loadedModelId_ = modelId;
-        LOGI("VAD initialized with model: %s", modelId.c_str());
+        RAC_LOG_INFO(LOG_CATEGORY, "VAD initialized with model: %s", modelId.c_str());
     } else {
         throw std::runtime_error("VADBridge: Failed to initialize VAD. Error: " + std::to_string(result));
     }
@@ -101,7 +93,7 @@ rac_result_t VADBridge::unload() {
         rac_result_t result = rac_vad_component_stop(handle_);
         if (result == RAC_SUCCESS) {
             loadedModelId_.clear();
-            LOGI("VAD stopped");
+            RAC_LOG_INFO(LOG_CATEGORY, "VAD stopped");
         } else {
             throw std::runtime_error("VADBridge: Failed to stop VAD. Error: " + std::to_string(result));
         }
@@ -122,7 +114,7 @@ void VADBridge::reset() {
     if (handle_) {
         rac_result_t result = rac_vad_component_reset(handle_);
         if (result != RAC_SUCCESS) {
-            LOGE("Failed to reset VAD: %d", result);
+            RAC_LOG_ERROR(LOG_CATEGORY, "Failed to reset VAD: %d", result);
         }
     }
     // Note: reset() doesn't clear the model, just resets the VAD state

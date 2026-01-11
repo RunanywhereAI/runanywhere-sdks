@@ -9,7 +9,7 @@
  * sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/Download/Utilities/ArchiveUtility.swift
  *
  * Supports: tar.gz, zip
- * Note: tar.bz2 and tar.xz are NOT supported without external dependencies
+ * Note: All models should use tar.gz from RunanywhereAI/sherpa-onnx fork for best performance
  */
 
 import Compression
@@ -52,7 +52,7 @@ public enum ArchiveError: Error, LocalizedError {
             try extractArchive(archivePath: archivePath, to: destinationPath)
             return true
         } catch {
-            NSLog("[ArchiveUtility] Extraction failed: \(error)")
+            SDKLogger.archive.logError(error, additionalInfo: "Extraction failed")
             return false
         }
     }
@@ -73,7 +73,7 @@ public enum ArchiveError: Error, LocalizedError {
 
         // Detect archive type by magic bytes (more reliable than file extension)
         let archiveType = try detectArchiveTypeByMagicBytes(archivePath)
-        NSLog("[ArchiveUtility] Detected archive type: \(archiveType) for: \(archivePath)")
+        SDKLogger.archive.info("Detected archive type: \(archiveType) for: \(archivePath)")
 
         switch archiveType {
         case .gzip:
@@ -81,9 +81,9 @@ public enum ArchiveError: Error, LocalizedError {
         case .zip:
             try extractZip(from: archiveURL, to: destinationURL, progressHandler: progressHandler)
         case .bzip2:
-            throw ArchiveError.unsupportedFormat("tar.bz2 requires SWCompression. Use tar.gz instead.")
+            throw ArchiveError.unsupportedFormat("tar.bz2 not supported. Use tar.gz from RunanywhereAI/sherpa-onnx fork.")
         case .xz:
-            throw ArchiveError.unsupportedFormat("tar.xz requires SWCompression. Use tar.gz instead.")
+            throw ArchiveError.unsupportedFormat("tar.xz not supported. Use tar.gz from RunanywhereAI/sherpa-onnx fork.")
         case .unknown:
             // Fallback to file extension check
             let lowercased = archivePath.lowercased()
@@ -155,35 +155,35 @@ public enum ArchiveError: Error, LocalizedError {
         progressHandler: ((Double) -> Void)?
     ) throws {
         let overallStart = Date()
-        NSLog("[ArchiveUtility] Extracting tar.gz: \(sourceURL.lastPathComponent)")
+        SDKLogger.archive.info("Extracting tar.gz: \(sourceURL.lastPathComponent)")
         progressHandler?(0.0)
 
         // Step 1: Read compressed data
         let readStart = Date()
         let compressedData = try Data(contentsOf: sourceURL)
         let readTime = Date().timeIntervalSince(readStart)
-        NSLog("[ArchiveUtility] Read \(formatBytes(compressedData.count)) in \(String(format: "%.2f", readTime))s")
+        SDKLogger.archive.info("Read \(formatBytes(compressedData.count)) in \(String(format: "%.2f", readTime))s")
         progressHandler?(0.05)
 
         // Step 2: Decompress gzip using NATIVE Compression framework
         let decompressStart = Date()
-        NSLog("[ArchiveUtility] Starting native gzip decompression...")
+        SDKLogger.archive.info("Starting native gzip decompression...")
         let tarData = try decompressGzipNative(compressedData)
         let decompressTime = Date().timeIntervalSince(decompressStart)
-        NSLog("[ArchiveUtility] Decompressed to \(formatBytes(tarData.count)) in \(String(format: "%.2f", decompressTime))s")
+        SDKLogger.archive.info("Decompressed to \(formatBytes(tarData.count)) in \(String(format: "%.2f", decompressTime))s")
         progressHandler?(0.3)
 
         // Step 3: Extract tar archive
         let extractStart = Date()
-        NSLog("[ArchiveUtility] Extracting tar data...")
+        SDKLogger.archive.info("Extracting tar data...")
         try extractTarData(tarData, to: destinationURL, progressHandler: { progress in
             progressHandler?(0.3 + progress * 0.7)
         })
         let extractTime = Date().timeIntervalSince(extractStart)
-        NSLog("[ArchiveUtility] Tar extract completed in \(String(format: "%.2f", extractTime))s")
+        SDKLogger.archive.info("Tar extract completed in \(String(format: "%.2f", extractTime))s")
 
         let totalTime = Date().timeIntervalSince(overallStart)
-        NSLog("[ArchiveUtility] Total extraction time: \(String(format: "%.2f", totalTime))s")
+        SDKLogger.archive.info("Total extraction time: \(String(format: "%.2f", totalTime))s")
         progressHandler?(1.0)
     }
 
@@ -301,7 +301,7 @@ public enum ArchiveError: Error, LocalizedError {
         to destinationURL: URL,
         progressHandler: ((Double) -> Void)?
     ) throws {
-        NSLog("[ArchiveUtility] Extracting zip: \(sourceURL.lastPathComponent)")
+        SDKLogger.archive.info("Extracting zip: \(sourceURL.lastPathComponent)")
         progressHandler?(0.0)
 
         // Create destination directory
@@ -364,10 +364,10 @@ public enum ArchiveError: Error, LocalizedError {
                         if let decompressed = decompressDeflateDataForZip(compressedData, uncompressedSize: Int(uncompressedSize)) {
                             try decompressed.write(to: filePath)
                         } else {
-                            NSLog("[ArchiveUtility] Warning: Failed to decompress \(fileName)")
+                            SDKLogger.archive.warning("Failed to decompress \(fileName)")
                         }
                     } else {
-                        NSLog("[ArchiveUtility] Warning: Unsupported compression method \(compressionMethod) for \(fileName)")
+                        SDKLogger.archive.warning("Unsupported compression method \(compressionMethod) for \(fileName)")
                     }
 
                     fileCount += 1
@@ -386,7 +386,7 @@ public enum ArchiveError: Error, LocalizedError {
             }
         }
 
-        NSLog("[ArchiveUtility] Extracted \(fileCount) files from zip")
+        SDKLogger.archive.info("Extracted \(fileCount) files from zip")
         progressHandler?(1.0)
     }
 
@@ -500,7 +500,7 @@ public enum ArchiveError: Error, LocalizedError {
             progressHandler?(Double(offset) / Double(totalSize))
         }
 
-        NSLog("[ArchiveUtility] Extracted \(fileCount) files")
+        SDKLogger.archive.info("Extracted \(fileCount) files")
     }
 
     // MARK: - Helpers

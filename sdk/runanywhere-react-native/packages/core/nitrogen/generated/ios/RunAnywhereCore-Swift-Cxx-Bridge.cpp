@@ -21,7 +21,7 @@ namespace margelo::nitro::runanywhere::bridge::swift {
       swiftClosure.call(result);
     };
   }
-
+  
   // pragma MARK: std::function<void(const std::exception_ptr& /* error */)>
   Func_void_std__exception_ptr create_Func_void_std__exception_ptr(void* NON_NULL swiftClosureWrapper) noexcept {
     auto swiftClosure = RunAnywhereCore::Func_void_std__exception_ptr::fromUnsafe(swiftClosureWrapper);
@@ -29,7 +29,7 @@ namespace margelo::nitro::runanywhere::bridge::swift {
       swiftClosure.call(error);
     };
   }
-
+  
   // pragma MARK: std::function<void(double /* result */)>
   Func_void_double create_Func_void_double(void* NON_NULL swiftClosureWrapper) noexcept {
     auto swiftClosure = RunAnywhereCore::Func_void_double::fromUnsafe(swiftClosureWrapper);
@@ -37,7 +37,7 @@ namespace margelo::nitro::runanywhere::bridge::swift {
       swiftClosure.call(result);
     };
   }
-
+  
   // pragma MARK: std::function<void(bool /* result */)>
   Func_void_bool create_Func_void_bool(void* NON_NULL swiftClosureWrapper) noexcept {
     auto swiftClosure = RunAnywhereCore::Func_void_bool::fromUnsafe(swiftClosureWrapper);
@@ -45,7 +45,7 @@ namespace margelo::nitro::runanywhere::bridge::swift {
       swiftClosure.call(result);
     };
   }
-
+  
   // pragma MARK: std::shared_ptr<HybridRunAnywhereDeviceInfoSpec>
   std::shared_ptr<HybridRunAnywhereDeviceInfoSpec> create_std__shared_ptr_HybridRunAnywhereDeviceInfoSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
     RunAnywhereCore::HybridRunAnywhereDeviceInfoSpec_cxx swiftPart = RunAnywhereCore::HybridRunAnywhereDeviceInfoSpec_cxx::fromUnsafe(swiftUnsafePointer);

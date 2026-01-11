@@ -7,9 +7,6 @@
  * the generic service APIs.
  */
 
-#include "rac/features/platform/rac_llm_platform.h"
-#include "rac/features/platform/rac_tts_platform.h"
-
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
@@ -18,6 +15,8 @@
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/platform/rac_llm_platform.h"
+#include "rac/features/platform/rac_tts_platform.h"
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 

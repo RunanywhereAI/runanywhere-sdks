@@ -22,8 +22,10 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("isAuthenticated", &HybridRunAnywhereCoreSpec::isAuthenticated);
       prototype.registerHybridMethod("getUserId", &HybridRunAnywhereCoreSpec::getUserId);
       prototype.registerHybridMethod("getOrganizationId", &HybridRunAnywhereCoreSpec::getOrganizationId);
+      prototype.registerHybridMethod("setAuthTokens", &HybridRunAnywhereCoreSpec::setAuthTokens);
       prototype.registerHybridMethod("registerDevice", &HybridRunAnywhereCoreSpec::registerDevice);
       prototype.registerHybridMethod("isDeviceRegistered", &HybridRunAnywhereCoreSpec::isDeviceRegistered);
+      prototype.registerHybridMethod("clearDeviceRegistration", &HybridRunAnywhereCoreSpec::clearDeviceRegistration);
       prototype.registerHybridMethod("getDeviceId", &HybridRunAnywhereCoreSpec::getDeviceId);
       prototype.registerHybridMethod("getAvailableModels", &HybridRunAnywhereCoreSpec::getAvailableModels);
       prototype.registerHybridMethod("getModelInfo", &HybridRunAnywhereCoreSpec::getModelInfo);
@@ -68,6 +70,13 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("unloadVADModel", &HybridRunAnywhereCoreSpec::unloadVADModel);
       prototype.registerHybridMethod("processVAD", &HybridRunAnywhereCoreSpec::processVAD);
       prototype.registerHybridMethod("resetVAD", &HybridRunAnywhereCoreSpec::resetVAD);
+      prototype.registerHybridMethod("secureStorageSet", &HybridRunAnywhereCoreSpec::secureStorageSet);
+      prototype.registerHybridMethod("secureStorageGet", &HybridRunAnywhereCoreSpec::secureStorageGet);
+      prototype.registerHybridMethod("secureStorageDelete", &HybridRunAnywhereCoreSpec::secureStorageDelete);
+      prototype.registerHybridMethod("secureStorageExists", &HybridRunAnywhereCoreSpec::secureStorageExists);
+      prototype.registerHybridMethod("getPersistentDeviceUUID", &HybridRunAnywhereCoreSpec::getPersistentDeviceUUID);
+      prototype.registerHybridMethod("flushTelemetry", &HybridRunAnywhereCoreSpec::flushTelemetry);
+      prototype.registerHybridMethod("isTelemetryInitialized", &HybridRunAnywhereCoreSpec::isTelemetryInitialized);
       prototype.registerHybridMethod("initializeVoiceAgent", &HybridRunAnywhereCoreSpec::initializeVoiceAgent);
       prototype.registerHybridMethod("initializeVoiceAgentWithLoadedModels", &HybridRunAnywhereCoreSpec::initializeVoiceAgentWithLoadedModels);
       prototype.registerHybridMethod("isVoiceAgentReady", &HybridRunAnywhereCoreSpec::isVoiceAgentReady);

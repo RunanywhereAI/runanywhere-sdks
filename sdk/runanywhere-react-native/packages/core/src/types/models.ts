@@ -423,14 +423,25 @@ export interface ConfigurationData {
  * SDK initialization options
  */
 export interface SDKInitOptions {
-  /** API key for authentication */
-  apiKey: string;
+  /** API key for authentication (production/staging) */
+  apiKey?: string;
 
-  /** Base URL for API requests */
-  baseURL: string;
+  /** Base URL for API requests (production: Railway endpoint) */
+  baseURL?: string;
 
   /** SDK environment */
   environment?: SDKEnvironment;
+
+  /**
+   * Supabase project URL (development mode)
+   * When set, SDK makes calls directly to Supabase
+   */
+  supabaseURL?: string;
+
+  /**
+   * Supabase anon key (development mode)
+   */
+  supabaseKey?: string;
 
   /** Enable debug logging */
   debug?: boolean;
