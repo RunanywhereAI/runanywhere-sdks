@@ -820,17 +820,11 @@ class RunAnywhere {
       // Use the DartBridgeVoiceAgent to process the voice turn
       final result = await DartBridge.voiceAgent.processVoiceTurn(audioData);
 
-      // Convert Float32 audio to Uint8List PCM16 for playback
-      Uint8List? synthesizedAudio;
-      if (result.audioSamples.isNotEmpty) {
-        final byteData = ByteData(result.audioSamples.length * 2);
-        for (var i = 0; i < result.audioSamples.length; i++) {
-          final sample =
-              (result.audioSamples[i].clamp(-1.0, 1.0) * 32767).round();
-          byteData.setInt16(i * 2, sample, Endian.little);
-        }
-        synthesizedAudio = byteData.buffer.asUint8List();
-      }
+      // Audio is already in WAV format (C++ voice agent converts Float32 TTS to WAV)
+      // No conversion needed - pass directly to playback
+      final synthesizedAudio = result.audioWavData.isNotEmpty
+          ? result.audioWavData
+          : null;
 
       logger.info(
         'Voice turn complete: transcript="${result.transcription.substring(0, result.transcription.length.clamp(0, 50))}", '

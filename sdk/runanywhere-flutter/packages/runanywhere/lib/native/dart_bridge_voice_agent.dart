@@ -401,7 +401,8 @@ class DartBridgeVoiceAgent {
   }
 
   /// Static helper to parse voice turn result (can be called from isolate).
-  /// The C++ result contains raw audio bytes that need to be converted to Float32.
+  /// The C++ voice agent already converts TTS output to WAV format internally
+  /// using rac_audio_float32_to_wav, so synthesized_audio is WAV data.
   static VoiceTurnResult _parseVoiceTurnResultStatic(
     RacVoiceAgentResultStruct result,
     DynamicLibrary lib,
@@ -412,27 +413,21 @@ class DartBridgeVoiceAgent {
     final response =
         result.response != nullptr ? result.response.toDartString() : '';
 
-    // The synthesized audio is raw bytes from TTS (typically PCM float samples)
-    // TTS components output Float32 samples, so we can cast directly
-    Float32List audioSamples;
+    // The synthesized audio is WAV format (C++ voice agent converts Float32 to WAV)
+    // Just copy the raw bytes - no conversion needed
+    Uint8List audioWavData;
     if (result.synthesizedAudioSize > 0 && result.synthesizedAudio != nullptr) {
-      // Audio data is float samples (4 bytes per sample)
-      final numSamples = result.synthesizedAudioSize ~/ 4;
-      if (numSamples > 0) {
-        audioSamples = Float32List.fromList(
-          result.synthesizedAudio.cast<Float>().asTypedList(numSamples),
-        );
-      } else {
-        audioSamples = Float32List(0);
-      }
+      audioWavData = Uint8List.fromList(
+        result.synthesizedAudio.cast<Uint8>().asTypedList(result.synthesizedAudioSize),
+      );
     } else {
-      audioSamples = Float32List(0);
+      audioWavData = Uint8List(0);
     }
 
     return VoiceTurnResult(
       transcription: transcription,
       response: response,
-      audioSamples: audioSamples,
+      audioWavData: audioWavData,
       // Duration fields not available in C++ struct - use 0
       sttDurationMs: 0,
       llmDurationMs: 0,
@@ -605,10 +600,12 @@ class DartBridgeVoiceAgent {
 // MARK: - Result Types
 
 /// Result from a complete voice turn.
+/// Audio is in WAV format (C++ voice agent converts Float32 TTS output to WAV).
 class VoiceTurnResult {
   final String transcription;
   final String response;
-  final Float32List audioSamples;
+  /// WAV-formatted audio data ready for playback
+  final Uint8List audioWavData;
   final int sttDurationMs;
   final int llmDurationMs;
   final int ttsDurationMs;
@@ -616,7 +613,7 @@ class VoiceTurnResult {
   const VoiceTurnResult({
     required this.transcription,
     required this.response,
-    required this.audioSamples,
+    required this.audioWavData,
     required this.sttDurationMs,
     required this.llmDurationMs,
     required this.ttsDurationMs,

@@ -192,8 +192,17 @@ class AudioPlaybackManager {
       final tempFile = File('${tempDir.path}/tts_audio_$timestamp.wav');
       _currentTempFile = tempFile;
 
-      // Convert PCM16 to proper WAV file with headers
-      final wavData = _createWavFile(audioData, sampleRate, numChannels);
+      // Check if data is already WAV format (starts with "RIFF" and contains "WAVE")
+      Uint8List wavData;
+      if (_isWavFormat(audioData)) {
+        // Data is already WAV format - use directly
+        wavData = audioData;
+        _logger.info('🔊 Audio is already WAV format, using directly');
+      } else {
+        // Convert PCM16 to proper WAV file with headers
+        wavData = _createWavFile(audioData, sampleRate, numChannels);
+        _logger.info('🔊 Converted PCM16 to WAV format');
+      }
 
       // Write WAV data to temp file
       await tempFile.writeAsBytes(wavData);
@@ -214,6 +223,20 @@ class AudioPlaybackManager {
       _cleanupPlayback(success: false);
       rethrow;
     }
+  }
+
+  /// Check if audio data is already in WAV format
+  bool _isWavFormat(Uint8List data) {
+    if (data.length < 12) return false;
+    // Check for RIFF header (bytes 0-3) and WAVE format (bytes 8-11)
+    return data[0] == 0x52 && // 'R'
+        data[1] == 0x49 && // 'I'
+        data[2] == 0x46 && // 'F'
+        data[3] == 0x46 && // 'F'
+        data[8] == 0x57 && // 'W'
+        data[9] == 0x41 && // 'A'
+        data[10] == 0x56 && // 'V'
+        data[11] == 0x45; // 'E'
   }
 
   /// Create a proper WAV file from PCM16 data
