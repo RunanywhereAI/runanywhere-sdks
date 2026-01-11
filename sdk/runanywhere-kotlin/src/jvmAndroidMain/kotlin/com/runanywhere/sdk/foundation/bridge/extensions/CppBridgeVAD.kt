@@ -34,7 +34,6 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
  * - Matches iOS Actor-based pattern using Kotlin synchronized
  */
 object CppBridgeVAD {
-
     /**
      * VAD component state constants matching C++ RAC_VAD_STATE_* values.
      */
@@ -63,16 +62,17 @@ object CppBridgeVAD {
         /**
          * Get a human-readable name for the VAD state.
          */
-        fun getName(state: Int): String = when (state) {
-            NOT_CREATED -> "NOT_CREATED"
-            CREATED -> "CREATED"
-            LOADING -> "LOADING"
-            READY -> "READY"
-            DETECTING -> "DETECTING"
-            UNLOADING -> "UNLOADING"
-            ERROR -> "ERROR"
-            else -> "UNKNOWN($state)"
-        }
+        fun getName(state: Int): String =
+            when (state) {
+                NOT_CREATED -> "NOT_CREATED"
+                CREATED -> "CREATED"
+                LOADING -> "LOADING"
+                READY -> "READY"
+                DETECTING -> "DETECTING"
+                UNLOADING -> "UNLOADING"
+                ERROR -> "ERROR"
+                else -> "UNKNOWN($state)"
+            }
 
         /**
          * Check if the state indicates the component is usable.
@@ -93,11 +93,12 @@ object CppBridgeVAD {
         /**
          * Get a human-readable name for the audio format.
          */
-        fun getName(format: Int): String = when (format) {
-            PCM_16 -> "PCM_16"
-            PCM_FLOAT -> "PCM_FLOAT"
-            else -> "UNKNOWN($format)"
-        }
+        fun getName(format: Int): String =
+            when (format) {
+                PCM_16 -> "PCM_16"
+                PCM_FLOAT -> "PCM_FLOAT"
+                else -> "UNKNOWN($format)"
+            }
     }
 
     /**
@@ -116,12 +117,13 @@ object CppBridgeVAD {
         /**
          * Get a human-readable name for the detection mode.
          */
-        fun getName(mode: Int): String = when (mode) {
-            FRAME -> "FRAME"
-            STREAM -> "STREAM"
-            SEGMENT -> "SEGMENT"
-            else -> "UNKNOWN($mode)"
-        }
+        fun getName(mode: Int): String =
+            when (mode) {
+                FRAME -> "FRAME"
+                STREAM -> "STREAM"
+                SEGMENT -> "SEGMENT"
+                else -> "UNKNOWN($mode)"
+            }
     }
 
     /**
@@ -143,13 +145,14 @@ object CppBridgeVAD {
         /**
          * Get a human-readable name for the event type.
          */
-        fun getName(type: Int): String = when (type) {
-            SILENCE -> "SILENCE"
-            SPEECH_START -> "SPEECH_START"
-            SPEECH_ONGOING -> "SPEECH_ONGOING"
-            SPEECH_END -> "SPEECH_END"
-            else -> "UNKNOWN($type)"
-        }
+        fun getName(type: Int): String =
+            when (type) {
+                SILENCE -> "SILENCE"
+                SPEECH_START -> "SPEECH_START"
+                SPEECH_ONGOING -> "SPEECH_ONGOING"
+                SPEECH_END -> "SPEECH_END"
+                else -> "UNKNOWN($type)"
+            }
     }
 
     @Volatile
@@ -219,7 +222,7 @@ object CppBridgeVAD {
         val minSpeechDurationMs: Int = 250,
         val minSilenceDurationMs: Int = 300,
         val padding: Int = 100,
-        val mode: Int = DetectionMode.STREAM
+        val mode: Int = DetectionMode.STREAM,
     ) {
         /**
          * Convert to JSON string for C++ interop.
@@ -254,7 +257,7 @@ object CppBridgeVAD {
      */
     data class ModelConfig(
         val threads: Int = -1,
-        val gpuEnabled: Boolean = false
+        val gpuEnabled: Boolean = false,
     ) {
         /**
          * Convert to JSON string for C++ interop.
@@ -284,7 +287,7 @@ object CppBridgeVAD {
     data class SpeechSegment(
         val startMs: Long,
         val endMs: Long,
-        val confidence: Float
+        val confidence: Float,
     ) {
         /**
          * Get the duration of the segment in milliseconds.
@@ -304,7 +307,7 @@ object CppBridgeVAD {
         val isSpeech: Boolean,
         val probability: Float,
         val eventType: Int,
-        val timestampMs: Long
+        val timestampMs: Long,
     ) {
         /**
          * Get the event type name.
@@ -324,7 +327,7 @@ object CppBridgeVAD {
         val segments: List<SpeechSegment>,
         val audioDurationMs: Long,
         val processingTimeMs: Long,
-        val hasSpeech: Boolean
+        val hasSpeech: Boolean,
     ) {
         /**
          * Get the total speech duration in milliseconds.
@@ -445,7 +448,7 @@ object CppBridgeVAD {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "VAD callbacks registered"
+                "VAD callbacks registered",
             )
         }
     }
@@ -513,7 +516,7 @@ object CppBridgeVAD {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "VAD component already created"
+                    "VAD component already created",
                 )
                 return 0
             }
@@ -523,28 +526,29 @@ object CppBridgeVAD {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Native library not loaded. VAD inference requires native libraries to be bundled."
+                    "Native library not loaded. VAD inference requires native libraries to be bundled.",
                 )
                 throw SDKError.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
             }
 
             // Create VAD component via RunAnywhereBridge
-            val result = try {
-                RunAnywhereBridge.racVadComponentCreate()
-            } catch (e: UnsatisfiedLinkError) {
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.ERROR,
-                    TAG,
-                    "VAD component creation failed. Native method not available: ${e.message}"
-                )
-                throw SDKError.notInitialized("VAD native library not available. Please ensure the VAD backend is bundled in your APK.")
-            }
+            val result =
+                try {
+                    RunAnywhereBridge.racVadComponentCreate()
+                } catch (e: UnsatisfiedLinkError) {
+                    CppBridgePlatformAdapter.logCallback(
+                        CppBridgePlatformAdapter.LogLevel.ERROR,
+                        TAG,
+                        "VAD component creation failed. Native method not available: ${e.message}",
+                    )
+                    throw SDKError.notInitialized("VAD native library not available. Please ensure the VAD backend is bundled in your APK.")
+                }
 
             if (result == 0L) {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Failed to create VAD component"
+                    "Failed to create VAD component",
                 )
                 return -1
             }
@@ -555,7 +559,7 @@ object CppBridgeVAD {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "VAD component created"
+                "VAD component created",
             )
 
             return 0
@@ -584,7 +588,7 @@ object CppBridgeVAD {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Unloading current model before loading new one: $loadedModelId"
+                    "Unloading current model before loading new one: $loadedModelId",
                 )
                 unload()
             }
@@ -594,7 +598,7 @@ object CppBridgeVAD {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Loading model: $modelId from $modelPath"
+                "Loading model: $modelId from $modelPath",
             )
 
             val result = RunAnywhereBridge.racVadComponentLoadModel(handle, modelPath, config.toJson())
@@ -603,7 +607,7 @@ object CppBridgeVAD {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Failed to load model: $modelId (error: $result)"
+                    "Failed to load model: $modelId (error: $result)",
                 )
 
                 try {
@@ -622,20 +626,20 @@ object CppBridgeVAD {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Model loaded successfully: $modelId"
+                "Model loaded successfully: $modelId",
             )
 
             // Update model assignment status
             CppBridgeModelAssignment.setAssignmentStatusCallback(
                 CppBridgeModelRegistry.ModelType.VAD,
                 CppBridgeModelAssignment.AssignmentStatus.READY,
-                CppBridgeModelAssignment.FailureReason.NONE
+                CppBridgeModelAssignment.FailureReason.NONE,
             )
 
             // Update component state
             CppBridgeState.setComponentStateCallback(
                 CppBridgeState.ComponentType.VAD,
-                CppBridgeState.ComponentState.READY
+                CppBridgeState.ComponentState.READY,
             )
 
             try {
@@ -644,7 +648,7 @@ object CppBridgeVAD {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in VAD listener onModelLoaded: ${e.message}"
+                    "Error in VAD listener onModelLoaded: ${e.message}",
                 )
             }
 
@@ -673,7 +677,7 @@ object CppBridgeVAD {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Starting detection (audio size: ${audioData.size} bytes)"
+                "Starting detection (audio size: ${audioData.size} bytes)",
             )
 
             try {
@@ -685,8 +689,9 @@ object CppBridgeVAD {
             val startTime = System.currentTimeMillis()
 
             try {
-                val resultJson = RunAnywhereBridge.racVadComponentProcess(handle, audioData, config.toJson())
-                    ?: throw SDKError.vad("Detection failed: null result")
+                val resultJson =
+                    RunAnywhereBridge.racVadComponentProcess(handle, audioData, config.toJson())
+                        ?: throw SDKError.vad("Detection failed: null result")
 
                 val result = parseDetectionResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -695,7 +700,7 @@ object CppBridgeVAD {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Detection completed: ${result.segments.size} segments, ${result.processingTimeMs}ms"
+                    "Detection completed: ${result.segments.size} segments, ${result.processingTimeMs}ms",
                 )
 
                 try {
@@ -705,7 +710,6 @@ object CppBridgeVAD {
                 }
 
                 return result
-
             } catch (e: Exception) {
                 setState(VADState.READY) // Reset to ready, not error
                 throw if (e is SDKError) e else SDKError.vad("Detection failed: ${e.message}")
@@ -726,7 +730,7 @@ object CppBridgeVAD {
     fun processStream(
         audioData: ByteArray,
         config: DetectionConfig = DetectionConfig.DEFAULT,
-        callback: StreamCallback
+        callback: StreamCallback,
     ): DetectionResult {
         synchronized(lock) {
             if (handle == 0L || state != VADState.READY) {
@@ -740,7 +744,7 @@ object CppBridgeVAD {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Starting streaming detection (audio size: ${audioData.size} bytes)"
+                "Starting streaming detection (audio size: ${audioData.size} bytes)",
             )
 
             try {
@@ -752,8 +756,9 @@ object CppBridgeVAD {
             val startTime = System.currentTimeMillis()
 
             try {
-                val resultJson = RunAnywhereBridge.racVadComponentProcessStream(handle, audioData, config.toJson())
-                    ?: throw SDKError.vad("Streaming detection failed: null result")
+                val resultJson =
+                    RunAnywhereBridge.racVadComponentProcessStream(handle, audioData, config.toJson())
+                        ?: throw SDKError.vad("Streaming detection failed: null result")
 
                 val result = parseDetectionResult(resultJson, System.currentTimeMillis() - startTime)
 
@@ -763,7 +768,7 @@ object CppBridgeVAD {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Streaming detection completed: ${result.segments.size} segments"
+                    "Streaming detection completed: ${result.segments.size} segments",
                 )
 
                 try {
@@ -773,7 +778,6 @@ object CppBridgeVAD {
                 }
 
                 return result
-
             } catch (e: Exception) {
                 setState(VADState.READY) // Reset to ready, not error
                 streamCallback = null
@@ -798,11 +802,11 @@ object CppBridgeVAD {
             }
 
             try {
-                val resultJson = RunAnywhereBridge.racVadComponentProcessFrame(handle, audioData, config.toJson())
-                    ?: throw SDKError.vad("Frame processing failed: null result")
+                val resultJson =
+                    RunAnywhereBridge.racVadComponentProcessFrame(handle, audioData, config.toJson())
+                        ?: throw SDKError.vad("Frame processing failed: null result")
 
                 return parseFrameResult(resultJson)
-
             } catch (e: Exception) {
                 throw if (e is SDKError) e else SDKError.vad("Frame processing failed: ${e.message}")
             }
@@ -823,7 +827,7 @@ object CppBridgeVAD {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Cancelling detection"
+                "Cancelling detection",
             )
 
             RunAnywhereBridge.racVadComponentCancel(handle)
@@ -844,7 +848,7 @@ object CppBridgeVAD {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Resetting VAD state"
+                "Resetting VAD state",
             )
 
             RunAnywhereBridge.racVadComponentReset(handle)
@@ -867,7 +871,7 @@ object CppBridgeVAD {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Unloading model: $previousModelId"
+                "Unloading model: $previousModelId",
             )
 
             RunAnywhereBridge.racVadComponentUnload(handle)
@@ -880,13 +884,13 @@ object CppBridgeVAD {
             CppBridgeModelAssignment.setAssignmentStatusCallback(
                 CppBridgeModelRegistry.ModelType.VAD,
                 CppBridgeModelAssignment.AssignmentStatus.NOT_ASSIGNED,
-                CppBridgeModelAssignment.FailureReason.NONE
+                CppBridgeModelAssignment.FailureReason.NONE,
             )
 
             // Update component state
             CppBridgeState.setComponentStateCallback(
                 CppBridgeState.ComponentType.VAD,
-                CppBridgeState.ComponentState.CREATED
+                CppBridgeState.ComponentState.CREATED,
             )
 
             try {
@@ -895,7 +899,7 @@ object CppBridgeVAD {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in VAD listener onModelUnloaded: ${e.message}"
+                    "Error in VAD listener onModelUnloaded: ${e.message}",
                 )
             }
         }
@@ -918,7 +922,7 @@ object CppBridgeVAD {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Destroying VAD component"
+                "Destroying VAD component",
             )
 
             RunAnywhereBridge.racVadComponentDestroy(handle)
@@ -929,7 +933,7 @@ object CppBridgeVAD {
             // Update component state
             CppBridgeState.setComponentStateCallback(
                 CppBridgeState.ComponentType.VAD,
-                CppBridgeState.ComponentState.NOT_CREATED
+                CppBridgeState.ComponentState.NOT_CREATED,
             )
         }
     }
@@ -959,12 +963,13 @@ object CppBridgeVAD {
         val callback = streamCallback ?: return true
 
         // Create frame result for listener
-        val frameResult = FrameResult(
-            isSpeech = isSpeech,
-            probability = probability,
-            eventType = eventType,
-            timestampMs = System.currentTimeMillis()
-        )
+        val frameResult =
+            FrameResult(
+                isSpeech = isSpeech,
+                probability = probability,
+                eventType = eventType,
+                timestampMs = System.currentTimeMillis(),
+            )
 
         // Notify listener
         try {
@@ -979,7 +984,7 @@ object CppBridgeVAD {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in stream callback: ${e.message}"
+                "Error in stream callback: ${e.message}",
             )
             true // Continue on error
         }
@@ -999,7 +1004,7 @@ object CppBridgeVAD {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Speech started at ${timestampMs}ms"
+            "Speech started at ${timestampMs}ms",
         )
 
         try {
@@ -1008,7 +1013,7 @@ object CppBridgeVAD {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in VAD listener onSpeechStart: ${e.message}"
+                "Error in VAD listener onSpeechStart: ${e.message}",
             )
         }
     }
@@ -1029,7 +1034,7 @@ object CppBridgeVAD {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Speech ended: ${startMs}ms - ${endMs}ms (confidence: $confidence)"
+            "Speech ended: ${startMs}ms - ${endMs}ms (confidence: $confidence)",
         )
 
         val segment = SpeechSegment(startMs, endMs, confidence)
@@ -1040,7 +1045,7 @@ object CppBridgeVAD {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in VAD listener onSpeechEnd: ${e.message}"
+                "Error in VAD listener onSpeechEnd: ${e.message}",
             )
         }
     }
@@ -1059,7 +1064,7 @@ object CppBridgeVAD {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Progress: ${(progress * 100).toInt()}%"
+            "Progress: ${(progress * 100).toInt()}%",
         )
     }
 
@@ -1108,9 +1113,11 @@ object CppBridgeVAD {
      *
      * Registers [streamFrameCallback], [speechStartCallback],
      * [speechEndCallback], [progressCallback], etc. with C++ core.
+     * Reserved for future native callback integration.
      *
      * C API: rac_vad_set_callbacks(...)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeSetVADCallbacks()
 
@@ -1118,9 +1125,11 @@ object CppBridgeVAD {
      * Native method to unset the VAD callbacks.
      *
      * Called during shutdown to clean up native resources.
+     * Reserved for future native callback integration.
      *
      * C API: rac_vad_set_callbacks(nullptr)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeUnsetVADCallbacks()
 
@@ -1292,7 +1301,7 @@ object CppBridgeVAD {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "State changed: ${VADState.getName(previousState)} -> ${VADState.getName(newState)}"
+                "State changed: ${VADState.getName(previousState)} -> ${VADState.getName(newState)}",
             )
 
             try {
@@ -1301,7 +1310,7 @@ object CppBridgeVAD {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in VAD listener onStateChanged: ${e.message}"
+                    "Error in VAD listener onStateChanged: ${e.message}",
                 )
             }
         }
@@ -1314,13 +1323,21 @@ object CppBridgeVAD {
         fun extractLong(key: String): Long {
             val pattern = "\"$key\"\\s*:\\s*(-?\\d+)"
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.toLongOrNull() ?: 0L
         }
 
         fun extractBoolean(key: String): Boolean {
             val pattern = "\"$key\"\\s*:\\s*(true|false)"
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.toBooleanStrictOrNull() ?: false
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.toBooleanStrictOrNull() ?: false
         }
 
         // Parse segments array
@@ -1332,6 +1349,7 @@ object CppBridgeVAD {
             val segmentPattern = "\\{[^}]+\\}"
             Regex(segmentPattern).findAll(segmentsContent).forEach { match ->
                 val segmentJson = match.value
+
                 fun extractFromSegment(key: String): String? {
                     val p = "\"$key\"\\s*:\\s*(-?[\\d.]+)"
                     return Regex(p).find(segmentJson)?.groupValues?.get(1)
@@ -1350,7 +1368,7 @@ object CppBridgeVAD {
             segments = segments,
             audioDurationMs = audioDurationMs,
             processingTimeMs = elapsedMs,
-            hasSpeech = hasSpeech
+            hasSpeech = hasSpeech,
         )
     }
 
@@ -1361,32 +1379,48 @@ object CppBridgeVAD {
         fun extractBoolean(key: String): Boolean {
             val pattern = "\"$key\"\\s*:\\s*(true|false)"
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.toBooleanStrictOrNull() ?: false
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.toBooleanStrictOrNull() ?: false
         }
 
         fun extractFloat(key: String): Float {
             val pattern = "\"$key\"\\s*:\\s*(-?[\\d.]+)"
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.toFloatOrNull() ?: 0f
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.toFloatOrNull() ?: 0f
         }
 
         fun extractInt(key: String): Int {
             val pattern = "\"$key\"\\s*:\\s*(-?\\d+)"
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.toIntOrNull() ?: 0
         }
 
         fun extractLong(key: String): Long {
             val pattern = "\"$key\"\\s*:\\s*(-?\\d+)"
             val regex = Regex(pattern)
-            return regex.find(json)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+            return regex
+                .find(json)
+                ?.groupValues
+                ?.get(1)
+                ?.toLongOrNull() ?: 0L
         }
 
         return FrameResult(
             isSpeech = extractBoolean("is_speech"),
             probability = extractFloat("probability"),
             eventType = extractInt("event_type"),
-            timestampMs = extractLong("timestamp_ms")
+            timestampMs = extractLong("timestamp_ms"),
         )
     }
 

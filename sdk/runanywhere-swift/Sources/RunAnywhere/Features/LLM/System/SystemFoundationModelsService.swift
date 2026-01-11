@@ -56,7 +56,7 @@ public class SystemFoundationModelsService {
     public init() {
     }
 
-    public func initialize(modelPath: String?) async throws {
+    public func initialize(modelPath _: String?) async throws {
         logger.info("Initializing Apple Foundation Models (iOS 26+/macOS 26+)")
 
         #if canImport(FoundationModels)

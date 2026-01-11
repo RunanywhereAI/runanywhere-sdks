@@ -1,5 +1,7 @@
 package com.runanywhere.sdk.native.bridge
 
+import com.runanywhere.sdk.foundation.SDKLogger
+
 /**
  * Result from TTS synthesis operation via native backend.
  * Contains audio samples and sample rate.
@@ -42,4 +44,8 @@ data class NativeVADResult(
 class NativeBridgeException(
     val resultCode: NativeResultCode,
     message: String? = null,
-) : Exception(message ?: "Native operation failed with code: ${resultCode.name}")
+) : Exception(message ?: "Native operation failed with code: ${resultCode.name}") {
+    init {
+        SDKLogger.core.error("NativeBridgeException: ${this.message} (code: ${resultCode.name})", throwable = this)
+    }
+}

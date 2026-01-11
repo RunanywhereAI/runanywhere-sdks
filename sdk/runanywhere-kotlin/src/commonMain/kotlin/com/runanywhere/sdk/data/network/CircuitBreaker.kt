@@ -1,8 +1,8 @@
 package com.runanywhere.sdk.data.network
 
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.errors.ErrorCategory
 import com.runanywhere.sdk.foundation.errors.SDKError
-import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 

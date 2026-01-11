@@ -10,6 +10,7 @@
 
 package com.runanywhere.sdk.public
 
+import com.runanywhere.sdk.foundation.LogLevel
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.utils.SDKConstants
@@ -41,10 +42,13 @@ import com.runanywhere.sdk.utils.SDKConstants
 /**
  * SDK environment configuration.
  */
-enum class SDKEnvironment(val cEnvironment: Int) {
+enum class SDKEnvironment(
+    val cEnvironment: Int,
+) {
     DEVELOPMENT(0),
     STAGING(1),
-    PRODUCTION(2);
+    PRODUCTION(2),
+    ;
 
     companion object {
         fun fromCEnvironment(cEnvironment: Int): SDKEnvironment =
@@ -71,7 +75,6 @@ enum class SDKEnvironment(val cEnvironment: Int) {
  * layer via CppBridge. Kotlin only handles platform-specific operations (HTTP, audio, file I/O).
  */
 object RunAnywhere {
-
     // ═══════════════════════════════════════════════════════════════════════════
     // MARK: - Private State
     // ═══════════════════════════════════════════════════════════════════════════
@@ -188,12 +191,13 @@ object RunAnywhere {
                 _currentEnvironment = environment
 
                 // Set log level based on environment
-                val logLevel = when (environment) {
-                    SDKEnvironment.DEVELOPMENT -> SDKLogger.Companion.LogLevel.DEBUG
-                    SDKEnvironment.STAGING -> SDKLogger.Companion.LogLevel.INFO
-                    SDKEnvironment.PRODUCTION -> SDKLogger.Companion.LogLevel.WARNING
-                }
-                SDKLogger.setLogLevel(logLevel)
+                val logLevel =
+                    when (environment) {
+                        SDKEnvironment.DEVELOPMENT -> LogLevel.DEBUG
+                        SDKEnvironment.STAGING -> LogLevel.INFO
+                        SDKEnvironment.PRODUCTION -> LogLevel.WARNING
+                    }
+                SDKLogger.setLevel(logLevel)
 
                 // Initialize CppBridge (Phase 1)
                 // Note: CppBridge is in jvmAndroidMain, we call it via expect/actual

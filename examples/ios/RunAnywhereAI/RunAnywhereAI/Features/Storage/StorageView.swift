@@ -474,7 +474,6 @@ private struct StoredModelRow: View {
                             .font(AppTypography.caption2)
                             .foregroundColor(AppColors.textSecondary)
                     }
-
                 }
                 .padding(.top, AppSpacing.xSmall)
                 .padding(.horizontal, AppSpacing.smallMedium)
