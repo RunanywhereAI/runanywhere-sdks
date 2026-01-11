@@ -2,8 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
-import '../core/design_system/app_colors.dart';
-import '../core/design_system/app_spacing.dart';
+import 'package:runanywhere_ai/core/design_system/app_colors.dart';
+import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 
 /// AdaptiveLayout (mirroring iOS AdaptiveLayout.swift)
 ///

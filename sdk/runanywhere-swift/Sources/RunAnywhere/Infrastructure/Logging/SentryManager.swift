@@ -33,6 +33,7 @@ public final class SentryManager: @unchecked Sendable {
               configuredDSN != "YOUR_SENTRY_DSN_HERE" && !configuredDSN.isEmpty else {
             // NOTE: Do NOT use SDKLogger here - it would cause a deadlock during Logging.shared initialization
             #if DEBUG
+            // swiftlint:disable:next no_print_statements
             print("🔍 [Sentry] DSN not configured. Crash reporting disabled.")
             #endif
             return
