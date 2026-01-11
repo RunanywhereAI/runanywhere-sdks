@@ -87,13 +87,13 @@ let package = Package(
     ],
     targets: [
         // =================================================================
-        // C Bridge Module - Core Commons
+        // C Bridge Module - Core Commons (inside RunAnywhere directory)
         // Exposes runanywhere-commons C APIs to Swift
         // =================================================================
         .target(
             name: "CRACommons",
             dependencies: ["RACommonsBinary"],
-            path: "Sources/CRACommons",
+            path: "Sources/RunAnywhere/CRACommons",
             publicHeadersPath: "include"
         ),
 
@@ -122,6 +122,7 @@ let package = Package(
 
         // =================================================================
         // Core SDK
+        // Swift sources with CRACommons C bridge as dependency
         // =================================================================
         .target(
             name: "RunAnywhere",
@@ -137,6 +138,7 @@ let package = Package(
                 "CRACommons",
             ],
             path: "Sources/RunAnywhere",
+            exclude: ["CRACommons"],  // Exclude C bridge directory from Swift sources
             swiftSettings: [
                 .define("SWIFT_PACKAGE")
             ],
