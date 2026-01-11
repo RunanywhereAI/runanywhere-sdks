@@ -97,7 +97,7 @@ export async function requestAudioPermission(): Promise<boolean> {
       const recordGranted =
         grants[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] ===
         PermissionsAndroid.RESULTS.GRANTED;
-      console.log('[AudioService] Android permission granted:', recordGranted);
+      console.warn('[AudioService] Android permission granted:', recordGranted);
       return recordGranted;
     } catch (err) {
       console.error('[AudioService] Permission request error:', err);
@@ -178,7 +178,7 @@ export async function startRecording(
     try {
       // iOS: Use native audio module
       if (Platform.OS === 'ios') {
-        console.log('[AudioService] iOS: Starting native recording...');
+        console.warn('[AudioService] iOS: Starting native recording...');
 
         if (!NativeAudioModule) {
           console.error('[AudioService] iOS: NativeAudioModule not available');
@@ -188,7 +188,7 @@ export async function startRecording(
 
         try {
           const result = await NativeAudioModule.startRecording();
-          console.log('[AudioService] iOS: Recording started:', result);
+          console.warn('[AudioService] iOS: Recording started:', result);
 
           isRecording = true;
           recordingStartTime = Date.now();
@@ -227,7 +227,7 @@ export async function startRecording(
       }
 
       // Android: Use LiveAudioStream for raw PCM
-      console.log('[AudioService] Android: Starting live audio stream...');
+      console.warn('[AudioService] Android: Starting live audio stream...');
 
       const fileName = `recording_${Date.now()}.wav`;
       const filePath = `${RNFS.CachesDirectoryPath}/${fileName}`;
@@ -269,7 +269,7 @@ export async function startRecording(
       isRecording = true;
       recordingStartTime = Date.now();
 
-      console.log('[AudioService] Android recording started:', filePath);
+      console.warn('[AudioService] Android recording started:', filePath);
       resolve(filePath);
     } catch (error) {
       console.error('[AudioService] Failed to start recording:', error);
@@ -298,7 +298,7 @@ export async function stopRecording(): Promise<{
 
     // iOS: Use native audio module
     if (Platform.OS === 'ios' && NativeAudioModule) {
-      console.log('[AudioService] iOS: Stopping native recording...');
+      console.warn('[AudioService] iOS: Stopping native recording...');
 
       const result = await NativeAudioModule.stopRecording();
       const durationMs = Date.now() - recordingStartTime;
@@ -306,7 +306,7 @@ export async function stopRecording(): Promise<{
       isRecording = false;
       progressCallback = null;
 
-      console.log('[AudioService] iOS: Recording stopped:', result);
+      console.warn('[AudioService] iOS: Recording stopped:', result);
       return { uri: result.path, durationMs };
     }
 
@@ -320,7 +320,7 @@ export async function stopRecording(): Promise<{
     const durationMs = Date.now() - recordingStartTime;
     const uri = currentRecordPath || '';
 
-    console.log(
+    console.warn(
       '[AudioService] Recording stopped, processing',
       audioChunks.length,
       'chunks'
@@ -344,7 +344,7 @@ export async function stopRecording(): Promise<{
       offset += chunk.length;
     }
 
-    console.log('[AudioService] Total PCM data:', totalLength, 'bytes');
+    console.warn('[AudioService] Total PCM data:', totalLength, 'bytes');
 
     // Create WAV header
     const wavHeader = createWavHeader(totalLength);
@@ -359,7 +359,7 @@ export async function stopRecording(): Promise<{
     const wavBase64 = arrayBufferToBase64(wavData.buffer);
     await RNFS.writeFile(uri, wavBase64, 'base64');
 
-    console.log(
+    console.warn(
       '[AudioService] WAV file written:',
       uri,
       'size:',
@@ -443,7 +443,7 @@ export async function playAudio(
   uri: string,
   callbacks?: PlaybackCallbacks
 ): Promise<void> {
-  console.log('[AudioService] Playing audio:', uri);
+  console.warn('[AudioService] Playing audio:', uri);
 
   // iOS: Use native audio module
   if (Platform.OS === 'ios' && NativeAudioModule) {
@@ -485,7 +485,7 @@ export async function playAudio(
         }, 100);
       }
 
-      console.log('[AudioService] iOS: Playback started, duration:', duration);
+      console.warn('[AudioService] iOS: Playback started, duration:', duration);
     } catch (error) {
       console.error('[AudioService] iOS: Failed to play audio:', error);
       throw error;
@@ -494,7 +494,7 @@ export async function playAudio(
   }
 
   // Android: Use react-native-sound if available
-  console.log('[AudioService] Android: Playback via react-native-sound');
+  console.warn('[AudioService] Android: Playback via react-native-sound');
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const Sound = require('react-native-sound').default;
@@ -539,7 +539,7 @@ export async function playAudio(
       });
     });
   } catch (e) {
-    console.log('[AudioService] react-native-sound not available:', e);
+    console.warn('[AudioService] react-native-sound not available:', e);
     throw new Error('Audio playback not available');
   }
 }

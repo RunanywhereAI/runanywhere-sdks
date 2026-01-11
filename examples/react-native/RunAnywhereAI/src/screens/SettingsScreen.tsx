@@ -125,12 +125,12 @@ export const SettingsScreen: React.FC = () => {
 
       // Get backend info for storage data
       const backendInfo = await RunAnywhere.getBackendInfo();
-      console.log('[Settings] Backend info:', backendInfo);
+      console.warn('[Settings] Backend info:', backendInfo);
       setBackendInfoData(backendInfo);
 
       // Get capabilities (returns string[], not number[])
       const caps = await RunAnywhere.getCapabilities();
-      console.log('[Settings] Capabilities:', caps);
+      console.warn('[Settings] Capabilities:', caps);
       // Convert string capabilities to numbers for display mapping
       const capNumbers = caps.map((cap, index) => index);
       setCapabilities(capNumbers);
@@ -146,7 +146,7 @@ export const SettingsScreen: React.FC = () => {
       setIsTextLoaded(textLoaded);
       setIsVADLoaded(vadLoaded);
 
-      console.log(
+      console.warn(
         '[Settings] Models loaded - STT:',
         sttLoaded,
         'TTS:',
@@ -160,7 +160,7 @@ export const SettingsScreen: React.FC = () => {
       // Get available models from catalog
       try {
         const available = await RunAnywhere.getAvailableModels();
-        console.log('[Settings] Available models:', available);
+        console.warn('[Settings] Available models:', available);
         setAvailableModels(available);
       } catch (err) {
         console.warn('[Settings] Failed to get available models:', err);
@@ -169,7 +169,7 @@ export const SettingsScreen: React.FC = () => {
       // Get downloaded models
       try {
         const downloaded = await RunAnywhere.getDownloadedModels();
-        console.log('[Settings] Downloaded models:', downloaded);
+        console.warn('[Settings] Downloaded models:', downloaded);
         setDownloadedModels(downloaded);
       } catch (err) {
         console.warn('[Settings] Failed to get downloaded models:', err);
@@ -178,7 +178,7 @@ export const SettingsScreen: React.FC = () => {
       // Get storage info using new SDK API
       try {
         const storage = await RunAnywhere.getStorageInfo();
-        console.log('[Settings] Storage info:', storage);
+        console.warn('[Settings] Storage info:', storage);
         setStorageInfo({
           totalStorage: storage.totalSpace,
           appStorage: storage.usedSpace,
@@ -332,7 +332,7 @@ export const SettingsScreen: React.FC = () => {
 
       try {
         await RunAnywhere.downloadModel(model.id, (progress) => {
-          console.log(
+          console.warn(
             `[Settings] Download progress for ${model.id}: ${(progress.progress * 100).toFixed(1)}%`
           );
           setDownloadingModels((prev) => ({
