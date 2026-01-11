@@ -69,10 +69,7 @@ class ModelManager extends ChangeNotifier {
     if (modelId == null) return null;
 
     final models = await getAvailableModels();
-    return models.cast<ModelInfo?>().firstWhere(
-          (m) => m?.id == modelId,
-          orElse: () => null,
-        );
+    return models.where((m) => m.id == modelId).firstOrNull;
   }
 
   /// Refresh state (for UI notification purposes)

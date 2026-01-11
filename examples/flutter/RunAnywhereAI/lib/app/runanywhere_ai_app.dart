@@ -245,9 +245,6 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
   }
 }
 
-/// Helper to explicitly ignore a Future (avoid discarded_futures warning)
-void unawaited(Future<void>? future) {}
-
 /// Loading view shown during SDK initialization
 class _InitializationLoadingView extends StatefulWidget {
   final String status;

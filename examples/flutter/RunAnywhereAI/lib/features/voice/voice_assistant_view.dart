@@ -108,6 +108,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
       final sttModelId = sdk.RunAnywhere.currentSTTModelId;
       final ttsVoiceId = sdk.RunAnywhere.currentTTSVoiceId;
 
+      if (!mounted) return;
       setState(() {
         _sttModelState = sttModelId != null
             ? AppModelLoadState.loaded
@@ -235,9 +236,8 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
         _errorMessage = event.message;
       });
     } else if (event is sdk.VoiceSessionStopped) {
-      setState(() {
-        _sessionState = VoiceSessionState.disconnected;
-      });
+      // Properly clean up subscriptions and controllers instead of just setting state
+      unawaited(_stopConversation());
     }
   }
 
