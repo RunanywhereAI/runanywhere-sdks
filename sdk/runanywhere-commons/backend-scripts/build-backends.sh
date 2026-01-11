@@ -476,10 +476,13 @@ build_ios_backend() {
 
             # CRITICAL: Include rac_backend_onnx which contains registration functions
             # (_rac_backend_onnx_register, _rac_backend_onnx_unregister)
-            local RAC_ONNX_LIB="${SLICE_DIR}/backends/onnx/librac_backend_onnx.a"
+            local RAC_ONNX_LIB="${SLICE_DIR}/onnx/librac_backend_onnx.a"
+            [ ! -f "${RAC_ONNX_LIB}" ] && RAC_ONNX_LIB="${SLICE_DIR}/backends/onnx/librac_backend_onnx.a"
             if [ -f "${RAC_ONNX_LIB}" ]; then
                 log_step "    Adding RAC ONNX API library (contains registration functions)"
                 ALL_LIBS+=("${RAC_ONNX_LIB}")
+            else
+                log_warn "    WARNING: librac_backend_onnx.a not found - registration functions will be missing!"
             fi
         fi
 
