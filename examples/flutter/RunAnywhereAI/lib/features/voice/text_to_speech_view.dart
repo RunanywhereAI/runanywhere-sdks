@@ -182,27 +182,32 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
             'TTS component not loaded. Please load a TTS voice first.');
       }
 
-      // TODO: TTS synthesis via SDK is not yet fully implemented
-      // The TTSCapability class needs synthesize() method implementation
-      // For now, show a placeholder message
-      debugPrint('⚠️ TTS synthesis API not yet implemented in SDK');
+      // Call SDK TTS synthesis API (matches Swift: RunAnywhere.synthesize(_:))
+      final result = await sdk.RunAnywhere.synthesize(
+        _textController.text,
+        rate: _speechRate,
+        pitch: _pitch,
+        volume: 1.0,
+      );
 
-      // Simulate synthesis for demo purposes
-      await Future<void>.delayed(const Duration(seconds: 1));
+      debugPrint(
+          '✅ TTS synthesis complete: ${result.samples.length} samples, ${result.sampleRate} Hz, ${result.durationMs}ms');
 
       setState(() {
         _isGenerating = false;
-        _hasAudio = false;
-        _duration = 0;
-        _metadata = const TTSMetadata(
-          durationMs: 0,
-          audioSize: 0,
-          sampleRate: 22050,
+        _hasAudio = result.samples.isNotEmpty;
+        _duration = result.durationSeconds;
+        _metadata = TTSMetadata(
+          durationMs: result.durationMs.toDouble(),
+          audioSize: result.samples.length * 4, // 4 bytes per float sample
+          sampleRate: result.sampleRate,
         );
-        _errorMessage = 'TTS synthesis not yet implemented in SDK';
       });
 
-      debugPrint('⚠️ TTS synthesis placeholder - no audio generated');
+      // Auto-play if audio was generated
+      if (result.samples.isNotEmpty) {
+        await _playFloatAudio(result.samples, result.sampleRate);
+      }
     } catch (e) {
       debugPrint('❌ Speech generation failed: $e');
       setState(() {
@@ -212,8 +217,37 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     }
   }
 
-  /// Play audio using the audio player service
-  // ignore: unused_element - kept for future TTS implementation
+  /// Play audio from Float32List samples (TTS output)
+  Future<void> _playFloatAudio(Float32List samples, int sampleRate) async {
+    try {
+      // Convert Float32 PCM samples to Int16 PCM bytes
+      // TTS returns samples in range [-1.0, 1.0], we convert to Int16 range [-32768, 32767]
+      final pcmData = ByteData(samples.length * 2); // 2 bytes per Int16 sample
+      for (var i = 0; i < samples.length; i++) {
+        // Clamp and scale to Int16 range
+        final sample = (samples[i].clamp(-1.0, 1.0) * 32767).round();
+        pcmData.setInt16(i * 2, sample, Endian.little);
+      }
+
+      await _playerService.playFromBytes(
+        pcmData.buffer.asUint8List(),
+        volume: 1.0,
+        rate: 1.0, // Rate is already applied in TTS synthesis
+        sampleRate: sampleRate,
+        numChannels: 1, // Mono audio
+      );
+      debugPrint(
+          '🔊 Playing TTS audio: ${samples.length} samples at $sampleRate Hz');
+    } catch (e) {
+      debugPrint('❌ Failed to play TTS audio: $e');
+      setState(() {
+        _errorMessage = 'Failed to play audio: $e';
+      });
+    }
+  }
+
+  /// Play audio using the audio player service (for Int16 PCM data)
+  // ignore: unused_element - kept for alternative audio formats
   Future<void> _playAudio(List<int> audioData) async {
     try {
       // Convert List<int> to Uint8List
