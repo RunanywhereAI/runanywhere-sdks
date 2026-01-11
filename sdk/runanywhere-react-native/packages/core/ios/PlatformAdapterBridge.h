@@ -105,6 +105,13 @@ int PlatformAdapter_getCoreCount(void);
  */
 bool PlatformAdapter_getArchitecture(char** outValue);
 
+/**
+ * Get GPU family (e.g., "apple" for iOS, "mali", "adreno" for Android)
+ * @param outValue Pointer to store the result (must be freed by caller)
+ * @return true if successful
+ */
+bool PlatformAdapter_getGPUFamily(char** outValue);
+
 // ============================================================================
 // HTTP POST for Device Registration (Synchronous)
 // ============================================================================

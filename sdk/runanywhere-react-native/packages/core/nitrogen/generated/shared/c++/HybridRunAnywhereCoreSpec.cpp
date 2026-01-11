@@ -22,8 +22,10 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("isAuthenticated", &HybridRunAnywhereCoreSpec::isAuthenticated);
       prototype.registerHybridMethod("getUserId", &HybridRunAnywhereCoreSpec::getUserId);
       prototype.registerHybridMethod("getOrganizationId", &HybridRunAnywhereCoreSpec::getOrganizationId);
+      prototype.registerHybridMethod("setAuthTokens", &HybridRunAnywhereCoreSpec::setAuthTokens);
       prototype.registerHybridMethod("registerDevice", &HybridRunAnywhereCoreSpec::registerDevice);
       prototype.registerHybridMethod("isDeviceRegistered", &HybridRunAnywhereCoreSpec::isDeviceRegistered);
+      prototype.registerHybridMethod("clearDeviceRegistration", &HybridRunAnywhereCoreSpec::clearDeviceRegistration);
       prototype.registerHybridMethod("getDeviceId", &HybridRunAnywhereCoreSpec::getDeviceId);
       prototype.registerHybridMethod("getAvailableModels", &HybridRunAnywhereCoreSpec::getAvailableModels);
       prototype.registerHybridMethod("getModelInfo", &HybridRunAnywhereCoreSpec::getModelInfo);

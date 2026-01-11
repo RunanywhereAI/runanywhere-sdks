@@ -89,6 +89,8 @@ object PlatformAdapterBridge {
     @JvmStatic
     fun httpPostSync(url: String, jsonBody: String, supabaseKey: String?): HttpResponse {
         Log.d(TAG, "httpPostSync to: $url")
+        // Log first 300 chars of JSON body for debugging
+        Log.d(TAG, "httpPostSync body (first 300 chars): ${jsonBody.take(300)}")
 
         // For Supabase device registration, add ?on_conflict=device_id for UPSERT
         // This matches Swift's HTTPService.swift logic
@@ -133,6 +135,9 @@ object PlatformAdapterBridge {
             val isSuccess = statusCode in 200..299 || statusCode == 409
 
             Log.d(TAG, "httpPostSync completed: status=$statusCode success=$isSuccess")
+            if (!isSuccess) {
+                Log.e(TAG, "httpPostSync error response: $responseBody")
+            }
 
             HttpResponse(
                 success = isSuccess,
@@ -185,15 +190,42 @@ object PlatformAdapterBridge {
      */
     @JvmStatic
     fun getTotalMemory(): Long {
+        // Try ActivityManager first (needs Context)
         val context = SecureStorageManager.getContext()
-        return if (context != null) {
-            val activityManager = context.getSystemService(android.content.Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
-            val memInfo = android.app.ActivityManager.MemoryInfo()
-            activityManager?.getMemoryInfo(memInfo)
-            memInfo.totalMem
-        } else {
-            0L
+        if (context != null) {
+            try {
+                val activityManager = context.getSystemService(android.content.Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+                val memInfo = android.app.ActivityManager.MemoryInfo()
+                activityManager?.getMemoryInfo(memInfo)
+                if (memInfo.totalMem > 0) {
+                    return memInfo.totalMem
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "getTotalMemory via ActivityManager failed: ${e.message}")
+            }
         }
+        
+        // Fallback: Read from /proc/meminfo (works without Context)
+        try {
+            val memInfoFile = java.io.File("/proc/meminfo")
+            if (memInfoFile.exists()) {
+                memInfoFile.bufferedReader().use { reader ->
+                    val line = reader.readLine() // First line: MemTotal: ...
+                    if (line != null && line.startsWith("MemTotal:")) {
+                        val parts = line.split("\\s+".toRegex())
+                        if (parts.size >= 2) {
+                            val kB = parts[1].toLongOrNull() ?: 0L
+                            return kB * 1024 // Convert KB to bytes
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "getTotalMemory via /proc/meminfo failed: ${e.message}")
+        }
+        
+        // Last resort: Return a reasonable default for modern phones (4GB)
+        return 4L * 1024 * 1024 * 1024
     }
 
     /**
@@ -201,15 +233,45 @@ object PlatformAdapterBridge {
      */
     @JvmStatic
     fun getAvailableMemory(): Long {
+        // Try ActivityManager first (needs Context)
         val context = SecureStorageManager.getContext()
-        return if (context != null) {
-            val activityManager = context.getSystemService(android.content.Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
-            val memInfo = android.app.ActivityManager.MemoryInfo()
-            activityManager?.getMemoryInfo(memInfo)
-            memInfo.availMem
-        } else {
-            0L
+        if (context != null) {
+            try {
+                val activityManager = context.getSystemService(android.content.Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+                val memInfo = android.app.ActivityManager.MemoryInfo()
+                activityManager?.getMemoryInfo(memInfo)
+                if (memInfo.availMem > 0) {
+                    return memInfo.availMem
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "getAvailableMemory via ActivityManager failed: ${e.message}")
+            }
         }
+        
+        // Fallback: Read from /proc/meminfo (works without Context)
+        try {
+            val memInfoFile = java.io.File("/proc/meminfo")
+            if (memInfoFile.exists()) {
+                memInfoFile.bufferedReader().use { reader ->
+                    var line = reader.readLine()
+                    while (line != null) {
+                        if (line.startsWith("MemAvailable:")) {
+                            val parts = line.split("\\s+".toRegex())
+                            if (parts.size >= 2) {
+                                val kB = parts[1].toLongOrNull() ?: 0L
+                                return kB * 1024 // Convert KB to bytes
+                            }
+                        }
+                        line = reader.readLine()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "getAvailableMemory via /proc/meminfo failed: ${e.message}")
+        }
+        
+        // Last resort: Return half of total as estimate
+        return getTotalMemory() / 2
     }
 
     /**
@@ -226,6 +288,88 @@ object PlatformAdapterBridge {
     @JvmStatic
     fun getArchitecture(): String {
         return android.os.Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"
+    }
+
+    /**
+     * Get GPU family based on chip name
+     * Infers GPU vendor from known chip manufacturers:
+     * - Google Tensor/Pixel → Mali
+     * - Samsung Exynos → Mali
+     * - Qualcomm Snapdragon → Adreno
+     * - MediaTek → Mali (mostly)
+     * - HiSilicon Kirin → Mali
+     *
+     * Aligned with Kotlin SDK's CppBridgeDevice.getDefaultGPUFamily()
+     */
+    @JvmStatic
+    fun getGPUFamily(): String {
+        val chipName = getChipName().lowercase()
+        val manufacturer = android.os.Build.MANUFACTURER.lowercase()
+        
+        return when {
+            // Google Pixel codenames (all use Mali GPUs from Samsung/Google Tensor)
+            chipName == "bluejay" -> "mali"      // Pixel 6a (Tensor)
+            chipName == "oriole" -> "mali"       // Pixel 6 (Tensor)
+            chipName == "raven" -> "mali"        // Pixel 6 Pro (Tensor)
+            chipName == "cheetah" -> "mali"      // Pixel 7 (Tensor G2)
+            chipName == "panther" -> "mali"      // Pixel 7 Pro (Tensor G2)
+            chipName == "lynx" -> "mali"         // Pixel 7a (Tensor G2)
+            chipName == "tangorpro" -> "mali"    // Pixel Tablet (Tensor G2)
+            chipName == "shiba" -> "mali"        // Pixel 8 (Tensor G3)
+            chipName == "husky" -> "mali"        // Pixel 8 Pro (Tensor G3)
+            chipName == "akita" -> "mali"        // Pixel 8a (Tensor G3)
+            chipName == "caiman" -> "mali"       // Pixel 9 (Tensor G4)
+            chipName == "komodo" -> "mali"       // Pixel 9 Pro (Tensor G4)
+            chipName == "comet" -> "mali"        // Pixel 9 Pro XL (Tensor G4)
+            chipName == "tokay" -> "mali"        // Pixel 9 Pro Fold (Tensor G4)
+            
+            // Google Tensor generic patterns
+            chipName.contains("tensor") -> "mali"
+            chipName.contains("gs1") -> "mali"   // GS101 (Tensor)
+            chipName.contains("gs2") -> "mali"   // GS201 (Tensor G2)
+            chipName.contains("zuma") -> "mali"  // Zuma (Tensor G3)
+            manufacturer == "google" -> "mali"   // Default for Google devices
+            
+            // Samsung Exynos uses Mali GPUs
+            chipName.contains("exynos") -> "mali"
+            chipName.startsWith("s5e") -> "mali" // Samsung internal naming (e.g., s5e8535)
+            chipName.contains("samsung") -> "mali"
+            
+            // Qualcomm Snapdragon uses Adreno GPUs
+            chipName.contains("snapdragon") -> "adreno"
+            chipName.contains("qualcomm") -> "adreno"
+            chipName.contains("sdm") -> "adreno" // SDM845, SDM855, etc.
+            chipName.contains("sm8") -> "adreno" // SM8150, SM8250, etc.
+            chipName.contains("sm7") -> "adreno" // SM7150, etc.
+            chipName.contains("sm6") -> "adreno" // SM6150, etc.
+            chipName.contains("msm") -> "adreno" // Older MSM chips
+            chipName.contains("kona") -> "adreno" // Snapdragon 865
+            chipName.contains("lahaina") -> "adreno" // Snapdragon 888
+            chipName.contains("taro") -> "adreno" // Snapdragon 8 Gen 1
+            chipName.contains("kalama") -> "adreno" // Snapdragon 8 Gen 2
+            chipName.contains("pineapple") -> "adreno" // Snapdragon 8 Gen 3
+            manufacturer == "qualcomm" -> "adreno"
+            
+            // MediaTek uses Mali GPUs (mostly)
+            chipName.contains("mediatek") -> "mali"
+            chipName.contains("mt6") -> "mali"   // MT6xxx series
+            chipName.contains("mt8") -> "mali"   // MT8xxx series
+            chipName.contains("dimensity") -> "mali"
+            chipName.contains("helio") -> "mali"
+            
+            // HiSilicon Kirin uses Mali GPUs
+            chipName.contains("kirin") -> "mali"
+            chipName.contains("hisilicon") -> "mali"
+            
+            // Intel/x86 GPUs
+            chipName.contains("intel") -> "intel"
+            
+            // NVIDIA (rare on mobile)
+            chipName.contains("nvidia") -> "nvidia"
+            chipName.contains("tegra") -> "nvidia"
+            
+            else -> "unknown"
+        }
     }
 }
 

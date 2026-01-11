@@ -72,6 +72,7 @@ public:
   std::shared_ptr<Promise<bool>> isAuthenticated() override;
   std::shared_ptr<Promise<std::string>> getUserId() override;
   std::shared_ptr<Promise<std::string>> getOrganizationId() override;
+  std::shared_ptr<Promise<bool>> setAuthTokens(const std::string& authResponseJson) override;
 
   // ============================================================================
   // Device Registration - Delegates to DeviceBridge
@@ -79,6 +80,7 @@ public:
 
   std::shared_ptr<Promise<bool>> registerDevice(const std::string& environmentJson) override;
   std::shared_ptr<Promise<bool>> isDeviceRegistered() override;
+  std::shared_ptr<Promise<bool>> clearDeviceRegistration() override;
   std::shared_ptr<Promise<std::string>> getDeviceId() override;
 
   // ============================================================================

@@ -8,12 +8,37 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 // Store JavaVM globally for JNI calls from background threads
-static JavaVM* g_javaVM = nullptr;
+// NOT static - needs to be accessible from InitBridge.cpp for secure storage
+JavaVM* g_javaVM = nullptr;
 
 // Cache class and method references at JNI_OnLoad time
 // This is necessary because FindClass from native threads uses the system class loader
 static jclass g_archiveUtilityClass = nullptr;
 static jmethodID g_extractMethod = nullptr;
+
+// PlatformAdapterBridge class and methods for secure storage (used by InitBridge.cpp)
+// NOT static - needs to be accessible from InitBridge.cpp
+jclass g_platformAdapterBridgeClass = nullptr;
+jclass g_httpResponseClass = nullptr;  // Inner class for httpPostSync response
+jmethodID g_secureSetMethod = nullptr;
+jmethodID g_secureGetMethod = nullptr;
+jmethodID g_secureDeleteMethod = nullptr;
+jmethodID g_secureExistsMethod = nullptr;
+jmethodID g_getPersistentDeviceUUIDMethod = nullptr;
+jmethodID g_httpPostSyncMethod = nullptr;
+jmethodID g_getDeviceModelMethod = nullptr;
+jmethodID g_getOSVersionMethod = nullptr;
+jmethodID g_getChipNameMethod = nullptr;
+jmethodID g_getTotalMemoryMethod = nullptr;
+jmethodID g_getAvailableMemoryMethod = nullptr;
+jmethodID g_getCoreCountMethod = nullptr;
+jmethodID g_getArchitectureMethod = nullptr;
+jmethodID g_getGPUFamilyMethod = nullptr;
+// HttpResponse field IDs
+jfieldID g_httpResponse_successField = nullptr;
+jfieldID g_httpResponse_statusCodeField = nullptr;
+jfieldID g_httpResponse_responseBodyField = nullptr;
+jfieldID g_httpResponse_errorMessageField = nullptr;
 
 // Forward declaration
 extern "C" bool ArchiveUtility_extractAndroid(const char* archivePath, const char* destinationPath);
@@ -48,6 +73,69 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
       }
     } else {
       LOGE("Failed to find ArchiveUtility class at JNI_OnLoad");
+      if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+      }
+    }
+
+    // Find and cache the PlatformAdapterBridge class (for secure storage)
+    jclass platformClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge");
+    if (platformClass != nullptr) {
+      g_platformAdapterBridgeClass = (jclass)env->NewGlobalRef(platformClass);
+      env->DeleteLocalRef(platformClass);
+
+      // Cache all methods we need
+      g_secureSetMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "secureSet", "(Ljava/lang/String;Ljava/lang/String;)Z");
+      g_secureGetMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "secureGet", "(Ljava/lang/String;)Ljava/lang/String;");
+      g_secureDeleteMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "secureDelete", "(Ljava/lang/String;)Z");
+      g_secureExistsMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "secureExists", "(Ljava/lang/String;)Z");
+      g_getPersistentDeviceUUIDMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getPersistentDeviceUUID", "()Ljava/lang/String;");
+      g_httpPostSyncMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "httpPostSync", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/margelo/nitro/runanywhere/PlatformAdapterBridge$HttpResponse;");
+      g_getDeviceModelMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getDeviceModel", "()Ljava/lang/String;");
+      g_getOSVersionMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getOSVersion", "()Ljava/lang/String;");
+      g_getChipNameMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getChipName", "()Ljava/lang/String;");
+      g_getTotalMemoryMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getTotalMemory", "()J");
+      g_getAvailableMemoryMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getAvailableMemory", "()J");
+      g_getCoreCountMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getCoreCount", "()I");
+      g_getArchitectureMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getArchitecture", "()Ljava/lang/String;");
+      g_getGPUFamilyMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getGPUFamily", "()Ljava/lang/String;");
+
+      if (g_secureSetMethod && g_secureGetMethod && g_getPersistentDeviceUUIDMethod && 
+          g_getDeviceModelMethod && g_getOSVersionMethod && g_getChipNameMethod &&
+          g_getTotalMemoryMethod && g_getAvailableMemoryMethod && g_getCoreCountMethod && 
+          g_getArchitectureMethod && g_getGPUFamilyMethod) {
+        LOGI("PlatformAdapterBridge class and methods cached successfully");
+      } else {
+        LOGE("Failed to cache some PlatformAdapterBridge methods");
+        if (env->ExceptionCheck()) {
+          env->ExceptionClear();
+        }
+      }
+
+      // Cache HttpResponse inner class and its fields
+      jclass responseClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge$HttpResponse");
+      if (responseClass != nullptr) {
+        g_httpResponseClass = (jclass)env->NewGlobalRef(responseClass);
+        env->DeleteLocalRef(responseClass);
+
+        g_httpResponse_successField = env->GetFieldID(g_httpResponseClass, "success", "Z");
+        g_httpResponse_statusCodeField = env->GetFieldID(g_httpResponseClass, "statusCode", "I");
+        g_httpResponse_responseBodyField = env->GetFieldID(g_httpResponseClass, "responseBody", "Ljava/lang/String;");
+        g_httpResponse_errorMessageField = env->GetFieldID(g_httpResponseClass, "errorMessage", "Ljava/lang/String;");
+
+        if (g_httpResponse_successField && g_httpResponse_statusCodeField) {
+          LOGI("HttpResponse class and fields cached successfully");
+        } else {
+          LOGE("Failed to cache HttpResponse fields");
+        }
+      } else {
+        LOGE("Failed to find HttpResponse inner class at JNI_OnLoad");
+        if (env->ExceptionCheck()) {
+          env->ExceptionClear();
+        }
+      }
+    } else {
+      LOGE("Failed to find PlatformAdapterBridge class at JNI_OnLoad");
       if (env->ExceptionCheck()) {
         env->ExceptionClear();
       }

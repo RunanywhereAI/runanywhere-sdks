@@ -89,7 +89,9 @@ android {
             "**/libc++_shared.so",
             "**/libjsi.so",
             "**/libfbjni.so",
-            "**/libfolly_runtime.so"
+            "**/libfolly_runtime.so",
+            "**/librac_commons.so",
+            "**/librunanywhere_jni.so"
         ]
         jniLibs {
             useLegacyPackaging = true

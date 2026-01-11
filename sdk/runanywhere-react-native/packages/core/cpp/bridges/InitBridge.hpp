@@ -213,6 +213,27 @@ public:
      */
     std::string getArchitecture();
 
+    /**
+     * @brief Get GPU family (e.g., "mali", "adreno")
+     */
+    std::string getGPUFamily();
+
+    // =========================================================================
+    // Configuration Getters (for HTTP requests in production mode)
+    // =========================================================================
+
+    /**
+     * @brief Get configured API key
+     */
+    std::string getApiKey() const { return apiKey_; }
+
+    /**
+     * @brief Get configured base URL
+     */
+    std::string getBaseURL() const { return baseURL_; }
+
+    // Note: getEnvironment() already defined above in "SDK Environment" section
+
     // =========================================================================
     // HTTP Methods for Device Registration
     // Matches Swift: CppBridge+Device.swift http_post callback

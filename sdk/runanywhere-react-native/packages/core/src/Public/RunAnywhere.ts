@@ -7,6 +7,7 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/RunAnywhere.swift
  */
 
+import { Platform } from 'react-native';
 import { EventBus } from './Events';
 import { requireNativeModule, isNativeModuleAvailable } from '../native';
 import { SDKEnvironment } from '../types';
@@ -209,6 +210,26 @@ export const RunAnywhere = {
       TelemetryService.shared.configure(cachedDeviceId, networkEnv);
       TelemetryService.shared.trackSDKInit(envString, true);
 
+      // For production/staging mode, authenticate with backend to get JWT tokens
+      // This matches Swift SDK's CppBridge.Auth.authenticate(apiKey:) in setupHTTP()
+      if (environment !== SDKEnvironment.Development && options.apiKey) {
+        try {
+          logger.info('Authenticating with backend (production/staging mode)...');
+          const authenticated = await this._authenticateWithBackend(
+            options.apiKey,
+            options.baseURL || 'https://api.runanywhere.ai',
+            cachedDeviceId
+          );
+          if (authenticated) {
+            logger.info('Authentication successful - JWT tokens obtained');
+          } else {
+            logger.warning('Authentication failed - API requests may fail');
+          }
+        } catch (authErr) {
+          logger.warning(`Authentication failed (non-fatal): ${authErr instanceof Error ? authErr.message : String(authErr)}`);
+        }
+      }
+
       // Trigger device registration (non-blocking, best-effort)
       // This matches Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
       // Uses native C++ → platform HTTP (exactly like Swift)
@@ -237,6 +258,97 @@ export const RunAnywhere = {
    * Exactly matches Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
    * @internal
    */
+  /**
+   * Authenticate with backend to get JWT access/refresh tokens
+   * This matches Swift SDK's CppBridge.Auth.authenticate(apiKey:)
+   * @internal
+   */
+  async _authenticateWithBackend(
+    apiKey: string,
+    baseURL: string,
+    deviceId: string
+  ): Promise<boolean> {
+    try {
+      const endpoint = '/api/v1/auth/sdk/authenticate';
+      const fullUrl = baseURL.replace(/\/$/, '') + endpoint;
+      
+      // Use actual platform (ios/android) as backend only accepts these values
+      // This matches how Swift sends 'ios' and Kotlin sends 'android'
+      const platform = Platform.OS === 'ios' ? 'ios' : 'android';
+      
+      const requestBody = JSON.stringify({
+        api_key: apiKey,
+        device_id: deviceId,
+        platform: platform,
+        sdk_version: '0.2.0',
+      });
+
+      logger.debug(`Auth request to: ${fullUrl}`);
+
+      const response = await fetch(fullUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: requestBody,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        logger.error(`Authentication failed: HTTP ${response.status} - ${errorText}`);
+        return false;
+      }
+
+      const authResponse = await response.json() as {
+        access_token: string;
+        refresh_token: string;
+        expires_in: number;
+        device_id: string;
+        organization_id: string;
+        user_id?: string;
+        token_type: string;
+      };
+
+      // Store tokens in HTTPService for subsequent requests
+      HTTPService.shared.setToken(authResponse.access_token);
+      
+      // Store tokens in C++ AuthBridge for native HTTP requests (telemetry, device registration)
+      try {
+        const native = requireNativeModule();
+        if (native && typeof native.setAuthTokens === 'function') {
+          await native.setAuthTokens(JSON.stringify(authResponse));
+          logger.debug('Auth tokens set in C++ AuthBridge');
+        } else {
+          logger.warning('setAuthTokens not available on native module - tokens stored in JS only');
+        }
+      } catch (nativeErr) {
+        logger.warning(`Failed to set auth tokens in native: ${nativeErr}`);
+        // Continue - tokens are still stored in HTTPService
+      }
+      
+      // Store tokens in secure storage for persistence
+      try {
+        const { SecureStorageService } = await import('../Foundation/Security/SecureStorageService');
+        await SecureStorageService.storeAuthTokens(
+          authResponse.access_token,
+          authResponse.refresh_token,
+          authResponse.expires_in
+        );
+      } catch (storageErr) {
+        logger.warning(`Failed to persist tokens: ${storageErr}`);
+        // Continue - tokens are still in memory
+      }
+
+      logger.info(`Authentication successful! Token expires in ${authResponse.expires_in}s`);
+      return true;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error(`Authentication error: ${msg}`);
+      return false;
+    }
+  },
+
   async _registerDeviceIfNeeded(
     environment: SDKEnvironment,
     supabaseKey?: string
@@ -334,6 +446,16 @@ export const RunAnywhere = {
     if (!isNativeModuleAvailable()) return false;
     const native = requireNativeModule();
     return native.isDeviceRegistered();
+  },
+
+  /**
+   * Clear device registration flag (for testing)
+   * Forces re-registration on next SDK init
+   */
+  async clearDeviceRegistration(): Promise<boolean> {
+    if (!isNativeModuleAvailable()) return false;
+    const native = requireNativeModule();
+    return native.clearDeviceRegistration();
   },
 
   /**
