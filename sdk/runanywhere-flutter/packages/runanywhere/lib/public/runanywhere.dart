@@ -547,13 +547,25 @@ class RunAnywhere {
   ///
   /// Matches Swift `RunAnywhere.generateStream(_:options:)`.
   ///
+  /// Returns an `LLMStreamingResult` containing:
+  /// - `stream`: Stream of tokens as they are generated
+  /// - `result`: Future that completes with final generation metrics
+  /// - `cancel`: Function to cancel the generation
+  ///
   /// ```dart
   /// final result = await RunAnywhere.generateStream('Tell me a story');
+  ///
+  /// // Consume tokens as they arrive
   /// await for (final token in result.stream) {
   ///   print(token);
   /// }
+  ///
+  /// // Get final metrics after stream completes
   /// final metrics = await result.result;
   /// print('Tokens: ${metrics.tokensUsed}');
+  ///
+  /// // Or cancel early if needed
+  /// result.cancel();
   /// ```
   static Future<LLMStreamingResult> generateStream(
     String prompt, {
@@ -631,6 +643,10 @@ class RunAnywhere {
     return LLMStreamingResult(
       stream: controller.stream,
       result: resultFuture,
+      cancel: () {
+        // Cancel via the bridge (handles both stream subscription and native cancel)
+        DartBridge.llm.cancelGeneration();
+      },
     );
   }
 

@@ -60,12 +60,28 @@ class LLMGenerationResult {
 
 /// Result of streaming LLM text generation
 /// Matches Swift's LLMStreamingResult
+///
+/// Contains:
+/// - `stream`: Stream of tokens as they are generated
+/// - `result`: Future that completes with final generation metrics
+/// - `cancel`: Function to cancel the generation
 class LLMStreamingResult {
+  /// Stream of tokens as they are generated.
+  /// Listen to this to receive real-time token updates.
   final Stream<String> stream;
+
+  /// Future that completes with the final generation result and metrics
+  /// when streaming finishes. Wait for this after consuming the stream
+  /// to get the complete analytics.
   final Future<LLMGenerationResult> result;
+
+  /// Function to cancel the ongoing generation.
+  /// Call this to stop generation early (e.g., user pressed stop button).
+  final void Function() cancel;
 
   const LLMStreamingResult({
     required this.stream,
     required this.result,
+    required this.cancel,
   });
 }
