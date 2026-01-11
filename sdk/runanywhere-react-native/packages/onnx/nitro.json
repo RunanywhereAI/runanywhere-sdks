@@ -1,0 +1,16 @@
+{
+  "cxxNamespace": ["runanywhere", "onnx"],
+  "ios": {
+    "iosModuleName": "RunAnywhereONNX"
+  },
+  "android": {
+    "androidNamespace": ["runanywhere", "onnx"],
+    "androidCxxLibName": "runanywhereonnx"
+  },
+  "autolinking": {
+    "RunAnywhereONNX": {
+      "cpp": "HybridRunAnywhereONNX"
+    }
+  },
+  "ignorePaths": ["node_modules", "lib", "example"]
+}

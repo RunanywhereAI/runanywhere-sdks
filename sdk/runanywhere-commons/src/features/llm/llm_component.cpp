@@ -370,7 +370,8 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
     }
     if (out_result->completion_tokens <= 0) {
         out_result->completion_tokens = estimate_tokens(out_result->text);
-        log_debug("LLM.Component", "Using estimated completion_tokens=%d", out_result->completion_tokens);
+        log_debug("LLM.Component", "Using estimated completion_tokens=%d",
+                  out_result->completion_tokens);
     }
     out_result->total_tokens = out_result->prompt_tokens + out_result->completion_tokens;
     out_result->total_time_ms = total_time_ms;
@@ -386,13 +387,16 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
     log_info("LLM.Component", "Generation completed");
 
     // Emit generation completed event
+    // Use estimated input_tokens for telemetry consistency across platforms
+    // (some backends return actual tokenized count including chat template,
+    // others return 0 - estimation ensures consistent user-facing metrics)
     {
         rac_analytics_event_data_t event = {};
         event.type = RAC_EVENT_LLM_GENERATION_COMPLETED;
         event.data.llm_generation.generation_id = generation_id.c_str();
         event.data.llm_generation.model_id = model_id;
         event.data.llm_generation.model_name = model_name;
-        event.data.llm_generation.input_tokens = out_result->prompt_tokens;
+        event.data.llm_generation.input_tokens = estimate_tokens(prompt);
         event.data.llm_generation.output_tokens = out_result->completion_tokens;
         event.data.llm_generation.duration_ms = static_cast<double>(total_time_ms);
         event.data.llm_generation.tokens_per_second = tokens_per_second;

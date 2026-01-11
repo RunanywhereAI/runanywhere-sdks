@@ -1,13 +1,23 @@
 /**
  * ChatScreen - Tab 0: Language Model Chat
  *
- * Reference: iOS Features/Chat/ChatInterfaceView.swift
+ * Provides LLM-powered chat interface with conversation management.
+ * Matches iOS ChatInterfaceView architecture and patterns.
  *
  * Features:
  * - Conversation management (create, switch, delete)
  * - Streaming LLM text generation
- * - Message analytics
- * - Model selection
+ * - Message analytics (tokens/sec, generation time)
+ * - Model selection sheet
+ * - Model status banner (shows loaded model)
+ *
+ * Architecture:
+ * - Uses ConversationStore for state management (matches iOS)
+ * - Separates UI from business logic (View + ViewModel pattern)
+ * - Model loading via RunAnywhere.loadModel()
+ * - Text generation via RunAnywhere.generate()
+ *
+ * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Chat/Views/ChatInterfaceView.swift
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
@@ -24,18 +34,23 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
-import { Spacing, Padding, BorderRadius, IconSize } from '../theme/spacing';
+import { Spacing, Padding, IconSize } from '../theme/spacing';
 import { ModelStatusBanner, ModelRequiredOverlay } from '../components/common';
 import { MessageBubble, TypingIndicator, ChatInput } from '../components/chat';
 import { ChatAnalyticsScreen } from './ChatAnalyticsScreen';
 import { ConversationListScreen } from './ConversationListScreen';
-import { Message, MessageRole, Conversation } from '../types/chat';
-import { ModelInfo, ModelModality, LLMFramework, ModelCategory } from '../types/model';
+import type { Message, Conversation } from '../types/chat';
+import { MessageRole } from '../types/chat';
+import type { ModelInfo } from '../types/model';
+import { ModelModality, LLMFramework, ModelCategory } from '../types/model';
 import { useConversationStore } from '../stores/conversationStore';
-import { ModelSelectionSheet, ModelSelectionContext } from '../components/model';
+import {
+  ModelSelectionSheet,
+  ModelSelectionContext,
+} from '../components/model';
 
-// Import actual RunAnywhere SDK
-import { RunAnywhere, type ModelInfo as SDKModelInfo } from 'runanywhere-react-native';
+// Import RunAnywhere SDK (Multi-Package Architecture)
+import { RunAnywhere, type ModelInfo as SDKModelInfo } from '@runanywhere/core';
 
 // Generate unique ID
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -49,6 +64,7 @@ export const ChatScreen: React.FC = () => {
     createConversation,
     setCurrentConversation,
     addMessage,
+    updateMessage,
   } = useConversationStore();
 
   // Local state
@@ -56,7 +72,7 @@ export const ChatScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isModelLoading, setIsModelLoading] = useState(false);
   const [currentModel, setCurrentModel] = useState<ModelInfo | null>(null);
-  const [availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
+  const [_availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showConversationList, setShowConversationList] = useState(false);
   const [showModelSelection, setShowModelSelection] = useState(false);
@@ -78,11 +94,21 @@ export const ChatScreen: React.FC = () => {
   useEffect(() => {
     if (isInitialized && conversations.length === 0 && !currentConversation) {
       createConversation();
-    } else if (isInitialized && !currentConversation && conversations.length > 0) {
+    } else if (
+      isInitialized &&
+      !currentConversation &&
+      conversations.length > 0
+    ) {
       // Set most recent conversation as current
       setCurrentConversation(conversations[0] || null);
     }
-  }, [isInitialized, conversations, currentConversation, createConversation, setCurrentConversation]);
+  }, [
+    isInitialized,
+    conversations,
+    currentConversation,
+    createConversation,
+    setCurrentConversation,
+  ]);
 
   // Check for loaded model and load available models on mount
   useEffect(() => {
@@ -99,11 +125,19 @@ export const ChatScreen: React.FC = () => {
   const loadAvailableModels = async () => {
     try {
       const allModels = await RunAnywhere.getAvailableModels();
-      const llmModels = allModels.filter((m: SDKModelInfo) => m.category === ModelCategory.Language);
+      const llmModels = allModels.filter(
+        (m: SDKModelInfo) => m.category === ModelCategory.Language
+      );
       setAvailableModels(llmModels);
-      console.log('[ChatScreen] Available LLM models:', llmModels.map((m: SDKModelInfo) => `${m.id} (${m.isDownloaded ? 'downloaded' : 'not downloaded'})`));
+      console.warn(
+        '[ChatScreen] Available LLM models:',
+        llmModels.map(
+          (m: SDKModelInfo) =>
+            `${m.id} (${m.isDownloaded ? 'downloaded' : 'not downloaded'})`
+        )
+      );
     } catch (error) {
-      console.log('[ChatScreen] Error loading models:', error);
+      console.warn('[ChatScreen] Error loading models:', error);
     }
   };
 
@@ -112,8 +146,8 @@ export const ChatScreen: React.FC = () => {
    */
   const checkModelStatus = async () => {
     try {
-      const isLoaded = await RunAnywhere.isTextModelLoaded();
-      console.log('[ChatScreen] Text model loaded:', isLoaded);
+      const isLoaded = await RunAnywhere.isModelLoaded();
+      console.warn('[ChatScreen] Text model loaded:', isLoaded);
       if (isLoaded) {
         setCurrentModel({
           id: 'loaded-model',
@@ -127,7 +161,7 @@ export const ChatScreen: React.FC = () => {
         });
       }
     } catch (error) {
-      console.log('[ChatScreen] Error checking model status:', error);
+      console.warn('[ChatScreen] Error checking model status:', error);
     }
   };
 
@@ -149,36 +183,24 @@ export const ChatScreen: React.FC = () => {
   }, []);
 
   /**
-   * Enable demo mode - simulates having a loaded model
-   */
-  const enableDemoMode = () => {
-    console.log('[ChatScreen] Enabling demo mode');
-    setCurrentModel({
-      id: 'demo-model',
-      name: 'Demo Mode (Simulated)',
-      category: ModelCategory.Language,
-      compatibleFrameworks: [LLMFramework.LlamaCpp],
-      preferredFramework: LLMFramework.LlamaCpp,
-      isDownloaded: true,
-      isAvailable: true,
-      supportsThinking: false,
-    });
-  };
-
-  /**
-   * Load a model using the real SDK
+   * Load a model using the SDK
    */
   const loadModel = async (model: SDKModelInfo) => {
     try {
       setIsModelLoading(true);
-      console.log(`[ChatScreen] Loading model: ${model.id} from ${model.localPath}`);
+      console.warn(
+        `[ChatScreen] Loading model: ${model.id} from ${model.localPath}`
+      );
 
       if (!model.localPath) {
-        Alert.alert('Error', 'Model path not found. Please re-download the model.');
+        Alert.alert(
+          'Error',
+          'Model path not found. Please re-download the model.'
+        );
         return;
       }
 
-      const success = await RunAnywhere.loadTextModel(model.localPath);
+      const success = await RunAnywhere.loadModel(model.localPath);
 
       if (success) {
         setCurrentModel({
@@ -191,10 +213,13 @@ export const ChatScreen: React.FC = () => {
           isAvailable: true,
           supportsThinking: false,
         });
-        console.log('[ChatScreen] Model loaded successfully');
+        console.warn('[ChatScreen] Model loaded successfully');
       } else {
         const lastError = await RunAnywhere.getLastError();
-        Alert.alert('Error', `Failed to load model: ${lastError || 'Unknown error'}`);
+        Alert.alert(
+          'Error',
+          `Failed to load model: ${lastError || 'Unknown error'}`
+        );
       }
     } catch (error) {
       console.error('[ChatScreen] Error loading model:', error);
@@ -205,7 +230,8 @@ export const ChatScreen: React.FC = () => {
   };
 
   /**
-   * Send a message using the real SDK
+   * Send a message using the real SDK with streaming (matches Swift SDK)
+   * Uses RunAnywhere.generateStream() for real-time token display
    */
   const handleSend = useCallback(async () => {
     if (!inputText.trim() || !currentConversation) return;
@@ -223,107 +249,101 @@ export const ChatScreen: React.FC = () => {
     setInputText('');
     setIsLoading(true);
 
+    // Create placeholder assistant message for streaming
+    const assistantMessageId = generateId();
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: MessageRole.Assistant,
+      content: '',
+      timestamp: new Date(),
+    };
+    await addMessage(assistantMessage, currentConversation.id);
+
     // Scroll to bottom
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
     }, 100);
 
     try {
-      console.log('[ChatScreen] Generating response for:', prompt);
-      const isDemoMode = currentModel?.id === 'demo-model';
+      console.log('[ChatScreen] Starting streaming generation for:', prompt);
 
-      let assistantMessage: Message;
+      // Use streaming generation (matches Swift SDK: RunAnywhere.generateStream)
+      const streamingResult = await RunAnywhere.generateStream(prompt, {
+        maxTokens: 1000,
+        temperature: 0.7,
+      });
 
-      if (isDemoMode) {
-        // Simulate a delay and provide a demo response
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+      let fullResponse = '';
 
-        const demoResponses = [
-          "I'm running in demo mode! To use real AI generation, you'll need to provide a GGUF model file. The RunAnywhere SDK supports LLM inference through the ONNX backend.",
-          "This is a simulated response. The SDK is fully initialized and ready for real inference once you provide a model. Check the Settings tab for backend info!",
-          "Demo mode is active. The RunAnywhere React Native SDK can perform on-device AI inference for STT, TTS, and LLM when models are available.",
-        ];
-
-        assistantMessage = {
-          id: generateId(),
-          role: MessageRole.Assistant,
-          content: demoResponses[messages.length % demoResponses.length] || demoResponses[0]!,
-          timestamp: new Date(),
-          modelInfo: {
-            modelId: 'demo',
-            modelName: 'Demo Mode',
-            framework: 'simulated',
-            frameworkDisplayName: 'Simulated',
+      // Stream tokens in real-time (matches Swift's for await loop)
+      for await (const token of streamingResult.stream) {
+        fullResponse += token;
+        
+        // Update assistant message content as tokens arrive
+        updateMessage(
+          {
+            ...assistantMessage,
+            content: fullResponse,
           },
-          analytics: {
-            totalGenerationTime: 1000,
-            inputTokens: prompt.split(' ').length,
-            outputTokens: 50,
-            averageTokensPerSecond: 50,
-            completionStatus: 'completed',
-            wasThinkingMode: false,
-            wasInterrupted: false,
-            retryCount: 0,
-          },
-        };
-      } else {
-        // Use the real SDK generate method
-        const result = await RunAnywhere.generate(prompt, {
-          maxTokens: 1000,
-          temperature: 0.7,
-        });
+          currentConversation.id
+        );
 
-        console.log('[ChatScreen] Generation result:', result);
-
-        if (result.text?.includes('error')) {
-          throw new Error(result.text);
-        }
-
-        assistantMessage = {
-          id: generateId(),
-          role: MessageRole.Assistant,
-          content: result.text || '(No response generated)',
-          timestamp: new Date(),
-          modelInfo: {
-            modelId: result.modelUsed || 'unknown',
-            modelName: result.modelUsed || 'Unknown Model',
-            framework: result.framework || 'llama.cpp',
-            frameworkDisplayName: 'llama.cpp',
-          },
-          analytics: {
-            totalGenerationTime: result.latencyMs,
-            inputTokens: prompt.split(' ').length,
-            outputTokens: result.tokensUsed,
-            averageTokensPerSecond: result.performanceMetrics?.tokensPerSecond || 0,
-            completionStatus: 'completed',
-            wasThinkingMode: false,
-            wasInterrupted: false,
-            retryCount: 0,
-          },
-        };
+        // Scroll to keep up with new content
+        flatListRef.current?.scrollToEnd({ animated: false });
       }
 
-      // Add assistant message to conversation
-      await addMessage(assistantMessage, currentConversation.id);
+      // Get final metrics after streaming completes
+      const result = await streamingResult.result;
+      console.log('[ChatScreen] Streaming complete, metrics:', result);
 
-      // Scroll to bottom
+      // Update with final message including analytics
+      const finalMessage: Message = {
+        id: assistantMessageId,
+        role: MessageRole.Assistant,
+        content: fullResponse || '(No response generated)',
+        timestamp: new Date(),
+        modelInfo: {
+          modelId: result.modelUsed || 'unknown',
+          modelName: result.modelUsed || 'Unknown Model',
+          framework: result.framework || 'llama.cpp',
+          frameworkDisplayName: 'llama.cpp',
+        },
+        analytics: {
+          totalGenerationTime: result.latencyMs,
+          inputTokens: result.inputTokens || Math.ceil(prompt.length / 4),
+          outputTokens: result.tokensUsed,
+          averageTokensPerSecond: result.tokensPerSecond || 0,
+          timeToFirstToken: result.timeToFirstTokenMs,
+          completionStatus: 'completed',
+          wasThinkingMode: false,
+          wasInterrupted: false,
+          retryCount: 0,
+        },
+      };
+
+      updateMessage(finalMessage, currentConversation.id);
+
+      // Final scroll to bottom
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } catch (error) {
       console.error('[ChatScreen] Generation error:', error);
 
-      const errorMessage: Message = {
-        id: generateId(),
-        role: MessageRole.Assistant,
-        content: `Error: ${error}\n\nThis likely means no LLM model is loaded. Use demo mode to test the interface, or provide a GGUF model.`,
-        timestamp: new Date(),
-      };
-      await addMessage(errorMessage, currentConversation.id);
+      // Update the placeholder message with error
+      updateMessage(
+        {
+          id: assistantMessageId,
+          role: MessageRole.Assistant,
+          content: `Error: ${error}\n\nThis likely means no LLM model is loaded. Use demo mode to test the interface, or provide a GGUF model.`,
+          timestamp: new Date(),
+        },
+        currentConversation.id
+      );
     } finally {
       setIsLoading(false);
     }
-  }, [inputText, currentModel, currentConversation, addMessage, messages.length]);
+  }, [inputText, currentConversation, addMessage, updateMessage]);
 
   /**
    * Create a new conversation (clears current chat)
@@ -335,9 +355,12 @@ export const ChatScreen: React.FC = () => {
   /**
    * Handle selecting a conversation from the list
    */
-  const handleSelectConversation = useCallback((conversation: Conversation) => {
-    setCurrentConversation(conversation);
-  }, [setCurrentConversation]);
+  const handleSelectConversation = useCallback(
+    (conversation: Conversation) => {
+      setCurrentConversation(conversation);
+    },
+    [setCurrentConversation]
+  );
 
   /**
    * Render a message
@@ -397,23 +420,25 @@ export const ChatScreen: React.FC = () => {
 
       <View style={styles.headerActions}>
         {/* New chat button */}
-        <TouchableOpacity
-          style={styles.headerButton}
-          onPress={handleNewChat}
-        >
+        <TouchableOpacity style={styles.headerButton} onPress={handleNewChat}>
           <Icon name="add" size={24} color={Colors.primaryBlue} />
         </TouchableOpacity>
 
         {/* Info button for chat analytics */}
         <TouchableOpacity
-          style={[styles.headerButton, messages.length === 0 && styles.headerButtonDisabled]}
+          style={[
+            styles.headerButton,
+            messages.length === 0 && styles.headerButtonDisabled,
+          ]}
           onPress={handleShowAnalytics}
           disabled={messages.length === 0}
         >
           <Icon
             name="information-circle-outline"
             size={22}
-            color={messages.length > 0 ? Colors.primaryBlue : Colors.textTertiary}
+            color={
+              messages.length > 0 ? Colors.primaryBlue : Colors.textTertiary
+            }
           />
         </TouchableOpacity>
       </View>
