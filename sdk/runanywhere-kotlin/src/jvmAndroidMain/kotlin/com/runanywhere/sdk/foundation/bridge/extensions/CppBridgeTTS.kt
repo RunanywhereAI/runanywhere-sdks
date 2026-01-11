@@ -34,7 +34,6 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
  * - Matches iOS Actor-based pattern using Kotlin synchronized
  */
 object CppBridgeTTS {
-
     /**
      * TTS component state constants matching C++ RAC_TTS_STATE_* values.
      */
@@ -63,16 +62,17 @@ object CppBridgeTTS {
         /**
          * Get a human-readable name for the TTS state.
          */
-        fun getName(state: Int): String = when (state) {
-            NOT_CREATED -> "NOT_CREATED"
-            CREATED -> "CREATED"
-            LOADING -> "LOADING"
-            READY -> "READY"
-            SYNTHESIZING -> "SYNTHESIZING"
-            UNLOADING -> "UNLOADING"
-            ERROR -> "ERROR"
-            else -> "UNKNOWN($state)"
-        }
+        fun getName(state: Int): String =
+            when (state) {
+                NOT_CREATED -> "NOT_CREATED"
+                CREATED -> "CREATED"
+                LOADING -> "LOADING"
+                READY -> "READY"
+                SYNTHESIZING -> "SYNTHESIZING"
+                UNLOADING -> "UNLOADING"
+                ERROR -> "ERROR"
+                else -> "UNKNOWN($state)"
+            }
 
         /**
          * Check if the state indicates the component is usable.
@@ -105,15 +105,16 @@ object CppBridgeTTS {
         /**
          * Get a human-readable name for the audio format.
          */
-        fun getName(format: Int): String = when (format) {
-            PCM_16 -> "PCM_16"
-            PCM_FLOAT -> "PCM_FLOAT"
-            WAV -> "WAV"
-            MP3 -> "MP3"
-            OPUS -> "OPUS"
-            AAC -> "AAC"
-            else -> "UNKNOWN($format)"
-        }
+        fun getName(format: Int): String =
+            when (format) {
+                PCM_16 -> "PCM_16"
+                PCM_FLOAT -> "PCM_FLOAT"
+                WAV -> "WAV"
+                MP3 -> "MP3"
+                OPUS -> "OPUS"
+                AAC -> "AAC"
+                else -> "UNKNOWN($format)"
+            }
     }
 
     /**
@@ -156,14 +157,15 @@ object CppBridgeTTS {
         /**
          * Get a human-readable name for the completion reason.
          */
-        fun getName(reason: Int): String = when (reason) {
-            NOT_COMPLETED -> "NOT_COMPLETED"
-            END_OF_TEXT -> "END_OF_TEXT"
-            CANCELLED -> "CANCELLED"
-            MAX_DURATION -> "MAX_DURATION"
-            ERROR -> "ERROR"
-            else -> "UNKNOWN($reason)"
-        }
+        fun getName(reason: Int): String =
+            when (reason) {
+                NOT_COMPLETED -> "NOT_COMPLETED"
+                END_OF_TEXT -> "END_OF_TEXT"
+                CANCELLED -> "CANCELLED"
+                MAX_DURATION -> "MAX_DURATION"
+                ERROR -> "ERROR"
+                else -> "UNKNOWN($reason)"
+            }
     }
 
     @Volatile
@@ -231,7 +233,7 @@ object CppBridgeTTS {
         val volume: Float = 1.0f,
         val sampleRate: Int = 22050,
         val audioFormat: Int = AudioFormat.PCM_16,
-        val maxDurationMs: Long = 0
+        val maxDurationMs: Long = 0,
     ) {
         /**
          * Convert to JSON string for C++ interop.
@@ -267,7 +269,7 @@ object CppBridgeTTS {
     data class ModelConfig(
         val threads: Int = -1,
         val gpuEnabled: Boolean = false,
-        val useFlashAttention: Boolean = true
+        val useFlashAttention: Boolean = true,
     ) {
         /**
          * Convert to JSON string for C++ interop.
@@ -302,7 +304,7 @@ object CppBridgeTTS {
         val name: String,
         val language: String,
         val gender: String,
-        val quality: String
+        val quality: String,
     )
 
     /**
@@ -323,7 +325,7 @@ object CppBridgeTTS {
         val completionReason: Int,
         val sampleRate: Int,
         val audioFormat: Int,
-        val processingTimeMs: Long
+        val processingTimeMs: Long,
     ) {
         /**
          * Get the completion reason name.
@@ -375,7 +377,7 @@ object CppBridgeTTS {
     data class AudioChunk(
         val audioData: ByteArray,
         val isFinal: Boolean,
-        val chunkIndex: Int
+        val chunkIndex: Int,
     ) {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -485,7 +487,7 @@ object CppBridgeTTS {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "TTS callbacks registered"
+                "TTS callbacks registered",
             )
         }
     }
@@ -553,7 +555,7 @@ object CppBridgeTTS {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "TTS component already created"
+                    "TTS component already created",
                 )
                 return 0
             }
@@ -563,28 +565,29 @@ object CppBridgeTTS {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Native library not loaded. TTS inference requires native libraries to be bundled."
+                    "Native library not loaded. TTS inference requires native libraries to be bundled.",
                 )
                 throw SDKError.notInitialized("Native library not available. Please ensure the native libraries are bundled in your APK.")
             }
 
             // Create TTS component via RunAnywhereBridge
-            val result = try {
-                RunAnywhereBridge.racTtsComponentCreate()
-            } catch (e: UnsatisfiedLinkError) {
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.ERROR,
-                    TAG,
-                    "TTS component creation failed. Native method not available: ${e.message}"
-                )
-                throw SDKError.notInitialized("TTS native library not available. Please ensure the TTS backend is bundled in your APK.")
-            }
+            val result =
+                try {
+                    RunAnywhereBridge.racTtsComponentCreate()
+                } catch (e: UnsatisfiedLinkError) {
+                    CppBridgePlatformAdapter.logCallback(
+                        CppBridgePlatformAdapter.LogLevel.ERROR,
+                        TAG,
+                        "TTS component creation failed. Native method not available: ${e.message}",
+                    )
+                    throw SDKError.notInitialized("TTS native library not available. Please ensure the TTS backend is bundled in your APK.")
+                }
 
             if (result == 0L) {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Failed to create TTS component"
+                    "Failed to create TTS component",
                 )
                 return -1
             }
@@ -595,7 +598,7 @@ object CppBridgeTTS {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "TTS component created"
+                "TTS component created",
             )
 
             return 0
@@ -608,9 +611,10 @@ object CppBridgeTTS {
      * @param modelPath Path to the model file
      * @param modelId Unique identifier for the model (for telemetry)
      * @param modelName Human-readable name for the model (for telemetry)
-     * @param config Model configuration (optional)
+     * @param config Model configuration (reserved for future use)
      * @return 0 on success, error code on failure
      */
+    @Suppress("UNUSED_PARAMETER")
     fun loadModel(modelPath: String, modelId: String, modelName: String? = null, config: ModelConfig = ModelConfig.DEFAULT): Int {
         synchronized(lock) {
             if (handle == 0L) {
@@ -625,7 +629,7 @@ object CppBridgeTTS {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Unloading current model before loading new one: $loadedModelId"
+                    "Unloading current model before loading new one: $loadedModelId",
                 )
                 unload()
             }
@@ -635,7 +639,7 @@ object CppBridgeTTS {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Loading model: $modelId from $modelPath"
+                "Loading model: $modelId from $modelPath",
             )
 
             val result = RunAnywhereBridge.racTtsComponentLoadModel(handle, modelPath, modelId, modelName)
@@ -644,7 +648,7 @@ object CppBridgeTTS {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Failed to load model: $modelId (error: $result)"
+                    "Failed to load model: $modelId (error: $result)",
                 )
 
                 try {
@@ -663,20 +667,20 @@ object CppBridgeTTS {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Model loaded successfully: $modelId"
+                "Model loaded successfully: $modelId",
             )
 
             // Update model assignment status
             CppBridgeModelAssignment.setAssignmentStatusCallback(
                 CppBridgeModelRegistry.ModelType.TTS,
                 CppBridgeModelAssignment.AssignmentStatus.READY,
-                CppBridgeModelAssignment.FailureReason.NONE
+                CppBridgeModelAssignment.FailureReason.NONE,
             )
 
             // Update component state
             CppBridgeState.setComponentStateCallback(
                 CppBridgeState.ComponentType.TTS,
-                CppBridgeState.ComponentState.READY
+                CppBridgeState.ComponentState.READY,
             )
 
             try {
@@ -685,7 +689,7 @@ object CppBridgeTTS {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in TTS listener onModelLoaded: ${e.message}"
+                    "Error in TTS listener onModelLoaded: ${e.message}",
                 )
             }
 
@@ -714,7 +718,7 @@ object CppBridgeTTS {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Starting synthesis (text length: ${text.length})"
+                "Starting synthesis (text length: ${text.length})",
             )
 
             try {
@@ -726,41 +730,44 @@ object CppBridgeTTS {
             val startTime = System.currentTimeMillis()
 
             try {
-                val rawAudioData = RunAnywhereBridge.racTtsComponentSynthesize(handle, text, config.toJson())
-                    ?: throw SDKError.tts("Synthesis failed: null result")
+                val rawAudioData =
+                    RunAnywhereBridge.racTtsComponentSynthesize(handle, text, config.toJson())
+                        ?: throw SDKError.tts("Synthesis failed: null result")
 
                 // TTS backends output Float32 PCM - convert to WAV for playback compatibility
-                val audioData = RunAnywhereBridge.racAudioFloat32ToWav(rawAudioData, config.sampleRate)
-                    ?: throw SDKError.tts("Failed to convert audio to WAV format")
+                val audioData =
+                    RunAnywhereBridge.racAudioFloat32ToWav(rawAudioData, config.sampleRate)
+                        ?: throw SDKError.tts("Failed to convert audio to WAV format")
 
                 val processingTimeMs = System.currentTimeMillis() - startTime
 
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Converted ${rawAudioData.size} bytes Float32 PCM to ${audioData.size} bytes WAV"
+                    "Converted ${rawAudioData.size} bytes Float32 PCM to ${audioData.size} bytes WAV",
                 )
 
                 // Calculate approximate duration based on WAV data size (minus 44-byte header) and sample rate
                 // WAV is Int16 (2 bytes per sample) mono, so samples = (size - 44) / 2
                 val durationMs = calculateWavDuration(audioData.size, config.sampleRate)
 
-                val result = SynthesisResult(
-                    audioData = audioData,
-                    text = text,
-                    durationMs = durationMs,
-                    completionReason = CompletionReason.END_OF_TEXT,
-                    sampleRate = config.sampleRate,
-                    audioFormat = AudioFormat.WAV,  // Output is now WAV format
-                    processingTimeMs = processingTimeMs
-                )
+                val result =
+                    SynthesisResult(
+                        audioData = audioData,
+                        text = text,
+                        durationMs = durationMs,
+                        completionReason = CompletionReason.END_OF_TEXT,
+                        sampleRate = config.sampleRate,
+                        audioFormat = AudioFormat.WAV, // Output is now WAV format
+                        processingTimeMs = processingTimeMs,
+                    )
 
                 setState(TTSState.READY)
 
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Synthesis completed: ${audioData.size} bytes WAV, ${result.durationMs}ms audio"
+                    "Synthesis completed: ${audioData.size} bytes WAV, ${result.durationMs}ms audio",
                 )
 
                 try {
@@ -770,7 +777,6 @@ object CppBridgeTTS {
                 }
 
                 return result
-
             } catch (e: Exception) {
                 setState(TTSState.READY) // Reset to ready, not error
                 throw if (e is SDKError) e else SDKError.tts("Synthesis failed: ${e.message}")
@@ -791,7 +797,7 @@ object CppBridgeTTS {
     fun synthesizeStream(
         text: String,
         config: SynthesisConfig = SynthesisConfig.DEFAULT,
-        callback: StreamCallback
+        callback: StreamCallback,
     ): SynthesisResult {
         synchronized(lock) {
             if (handle == 0L || state != TTSState.READY) {
@@ -805,7 +811,7 @@ object CppBridgeTTS {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Starting streaming synthesis (text length: ${text.length})"
+                "Starting streaming synthesis (text length: ${text.length})",
             )
 
             try {
@@ -817,32 +823,35 @@ object CppBridgeTTS {
             val startTime = System.currentTimeMillis()
 
             try {
-                val rawAudioData = RunAnywhereBridge.racTtsComponentSynthesizeStream(handle, text, config.toJson())
-                    ?: throw SDKError.tts("Streaming synthesis failed: null result")
+                val rawAudioData =
+                    RunAnywhereBridge.racTtsComponentSynthesizeStream(handle, text, config.toJson())
+                        ?: throw SDKError.tts("Streaming synthesis failed: null result")
 
                 // TTS backends output Float32 PCM - convert to WAV for playback compatibility
-                val audioData = RunAnywhereBridge.racAudioFloat32ToWav(rawAudioData, config.sampleRate)
-                    ?: throw SDKError.tts("Failed to convert streaming audio to WAV format")
+                val audioData =
+                    RunAnywhereBridge.racAudioFloat32ToWav(rawAudioData, config.sampleRate)
+                        ?: throw SDKError.tts("Failed to convert streaming audio to WAV format")
 
                 val processingTimeMs = System.currentTimeMillis() - startTime
 
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Converted ${rawAudioData.size} bytes Float32 PCM to ${audioData.size} bytes WAV (streaming)"
+                    "Converted ${rawAudioData.size} bytes Float32 PCM to ${audioData.size} bytes WAV (streaming)",
                 )
 
                 val durationMs = calculateWavDuration(audioData.size, config.sampleRate)
 
-                val result = SynthesisResult(
-                    audioData = audioData,
-                    text = text,
-                    durationMs = durationMs,
-                    completionReason = if (isCancelled) CompletionReason.CANCELLED else CompletionReason.END_OF_TEXT,
-                    sampleRate = config.sampleRate,
-                    audioFormat = AudioFormat.WAV,  // Output is now WAV format
-                    processingTimeMs = processingTimeMs
-                )
+                val result =
+                    SynthesisResult(
+                        audioData = audioData,
+                        text = text,
+                        durationMs = durationMs,
+                        completionReason = if (isCancelled) CompletionReason.CANCELLED else CompletionReason.END_OF_TEXT,
+                        sampleRate = config.sampleRate,
+                        audioFormat = AudioFormat.WAV, // Output is now WAV format
+                        processingTimeMs = processingTimeMs,
+                    )
 
                 setState(TTSState.READY)
                 streamCallback = null
@@ -850,7 +859,7 @@ object CppBridgeTTS {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Streaming synthesis completed: ${audioData.size} bytes WAV"
+                    "Streaming synthesis completed: ${audioData.size} bytes WAV",
                 )
 
                 try {
@@ -860,7 +869,6 @@ object CppBridgeTTS {
                 }
 
                 return result
-
             } catch (e: Exception) {
                 setState(TTSState.READY) // Reset to ready, not error
                 streamCallback = null
@@ -882,7 +890,7 @@ object CppBridgeTTS {
     fun synthesizeToFile(
         text: String,
         outputPath: String,
-        config: SynthesisConfig = SynthesisConfig.DEFAULT
+        config: SynthesisConfig = SynthesisConfig.DEFAULT,
     ): SynthesisResult {
         synchronized(lock) {
             if (handle == 0L || state != TTSState.READY) {
@@ -895,7 +903,7 @@ object CppBridgeTTS {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Starting synthesis to file: $outputPath (text length: ${text.length})"
+                "Starting synthesis to file: $outputPath (text length: ${text.length})",
             )
 
             try {
@@ -914,22 +922,23 @@ object CppBridgeTTS {
 
                 val processingTimeMs = System.currentTimeMillis() - startTime
 
-                val result = SynthesisResult(
-                    audioData = ByteArray(0), // Empty since saved to file
-                    text = text,
-                    durationMs = durationMs,
-                    completionReason = CompletionReason.END_OF_TEXT,
-                    sampleRate = config.sampleRate,
-                    audioFormat = config.audioFormat,
-                    processingTimeMs = processingTimeMs
-                )
+                val result =
+                    SynthesisResult(
+                        audioData = ByteArray(0), // Empty since saved to file
+                        text = text,
+                        durationMs = durationMs,
+                        completionReason = CompletionReason.END_OF_TEXT,
+                        sampleRate = config.sampleRate,
+                        audioFormat = config.audioFormat,
+                        processingTimeMs = processingTimeMs,
+                    )
 
                 setState(TTSState.READY)
 
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.DEBUG,
                     TAG,
-                    "Synthesis to file completed: $outputPath, ${durationMs}ms audio"
+                    "Synthesis to file completed: $outputPath, ${durationMs}ms audio",
                 )
 
                 try {
@@ -939,7 +948,6 @@ object CppBridgeTTS {
                 }
 
                 return result
-
             } catch (e: Exception) {
                 setState(TTSState.READY) // Reset to ready, not error
                 throw if (e is SDKError) e else SDKError.tts("Synthesis to file failed: ${e.message}")
@@ -961,7 +969,7 @@ object CppBridgeTTS {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Cancelling synthesis"
+                "Cancelling synthesis",
             )
 
             RunAnywhereBridge.racTtsComponentCancel(handle)
@@ -984,7 +992,7 @@ object CppBridgeTTS {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Unloading model: $previousModelId"
+                "Unloading model: $previousModelId",
             )
 
             RunAnywhereBridge.racTtsComponentUnload(handle)
@@ -997,13 +1005,13 @@ object CppBridgeTTS {
             CppBridgeModelAssignment.setAssignmentStatusCallback(
                 CppBridgeModelRegistry.ModelType.TTS,
                 CppBridgeModelAssignment.AssignmentStatus.NOT_ASSIGNED,
-                CppBridgeModelAssignment.FailureReason.NONE
+                CppBridgeModelAssignment.FailureReason.NONE,
             )
 
             // Update component state
             CppBridgeState.setComponentStateCallback(
                 CppBridgeState.ComponentType.TTS,
-                CppBridgeState.ComponentState.CREATED
+                CppBridgeState.ComponentState.CREATED,
             )
 
             try {
@@ -1012,7 +1020,7 @@ object CppBridgeTTS {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in TTS listener onModelUnloaded: ${e.message}"
+                    "Error in TTS listener onModelUnloaded: ${e.message}",
                 )
             }
         }
@@ -1035,7 +1043,7 @@ object CppBridgeTTS {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Destroying TTS component"
+                "Destroying TTS component",
             )
 
             RunAnywhereBridge.racTtsComponentDestroy(handle)
@@ -1046,7 +1054,7 @@ object CppBridgeTTS {
             // Update component state
             CppBridgeState.setComponentStateCallback(
                 CppBridgeState.ComponentType.TTS,
-                CppBridgeState.ComponentState.NOT_CREATED
+                CppBridgeState.ComponentState.NOT_CREATED,
             )
         }
     }
@@ -1087,7 +1095,7 @@ object CppBridgeTTS {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in stream callback: ${e.message}"
+                "Error in stream callback: ${e.message}",
             )
             true // Continue on error
         }
@@ -1107,7 +1115,7 @@ object CppBridgeTTS {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Progress: ${(progress * 100).toInt()}%"
+            "Progress: ${(progress * 100).toInt()}%",
         )
     }
 
@@ -1155,9 +1163,11 @@ object CppBridgeTTS {
      * Native method to set the TTS callbacks with C++ core.
      *
      * Registers [streamAudioCallback], [progressCallback], etc. with C++ core.
+     * Reserved for future native callback integration.
      *
      * C API: rac_tts_set_callbacks(...)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeSetTTSCallbacks()
 
@@ -1165,9 +1175,11 @@ object CppBridgeTTS {
      * Native method to unset the TTS callbacks.
      *
      * Called during shutdown to clean up native resources.
+     * Reserved for future native callback integration.
      *
      * C API: rac_tts_set_callbacks(nullptr)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeUnsetTTSCallbacks()
 
@@ -1342,7 +1354,7 @@ object CppBridgeTTS {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "State changed: ${TTSState.getName(previousState)} -> ${TTSState.getName(newState)}"
+                "State changed: ${TTSState.getName(previousState)} -> ${TTSState.getName(newState)}",
             )
 
             try {
@@ -1351,7 +1363,7 @@ object CppBridgeTTS {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in TTS listener onStateChanged: ${e.message}"
+                    "Error in TTS listener onStateChanged: ${e.message}",
                 )
             }
         }
@@ -1359,14 +1371,17 @@ object CppBridgeTTS {
 
     /**
      * Calculate approximate audio duration from data size.
+     * Reserved for future audio duration estimation.
      */
+    @Suppress("unused")
     private fun calculateAudioDuration(dataSize: Int, sampleRate: Int, audioFormat: Int): Long {
         // Calculate based on audio format
-        val bytesPerSample = when (audioFormat) {
-            AudioFormat.PCM_16 -> 2
-            AudioFormat.PCM_FLOAT -> 4
-            else -> 2 // Default to 16-bit PCM
-        }
+        val bytesPerSample =
+            when (audioFormat) {
+                AudioFormat.PCM_16 -> 2
+                AudioFormat.PCM_FLOAT -> 4
+                else -> 2 // Default to 16-bit PCM
+            }
 
         // Assuming mono audio
         val samples = dataSize / bytesPerSample
@@ -1469,8 +1484,8 @@ object CppBridgeTTS {
                     name = extractString("name"),
                     language = extractString("language"),
                     gender = extractString("gender"),
-                    quality = extractString("quality")
-                )
+                    quality = extractString("quality"),
+                ),
             )
         }
 

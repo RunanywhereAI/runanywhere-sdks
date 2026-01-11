@@ -221,10 +221,10 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
       const allModels = await RunAnywhere.getAvailableModels();
       const categoryFilter = getCategoryForContext(context);
 
-      console.log('[ModelSelectionSheet] All models count:', allModels.length);
-      console.log('[ModelSelectionSheet] Category filter:', categoryFilter);
+      console.warn('[ModelSelectionSheet] All models count:', allModels.length);
+      console.warn('[ModelSelectionSheet] Category filter:', categoryFilter);
       if (allModels.length > 0) {
-        console.log(
+        console.warn(
           '[ModelSelectionSheet] First model:',
           JSON.stringify(allModels[0], null, 2)
         );
@@ -243,7 +243,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
           })
         : allModels;
 
-      console.log(
+      console.warn(
         '[ModelSelectionSheet] Filtered models count:',
         filteredModels.length
       );
@@ -253,7 +253,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
         filteredModels.length === 0 &&
         context === ModelSelectionContext.LLM
       ) {
-        console.log(
+        console.warn(
           '[ModelSelectionSheet] No category matches, trying framework fallback'
         );
         filteredModels = allModels.filter((m: SDKModelInfo) => {
@@ -262,7 +262,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
             m.compatibleFrameworks?.includes(SDKLLMFramework.LlamaCpp);
           return hasLlamaFramework;
         });
-        console.log(
+        console.warn(
           '[ModelSelectionSheet] Framework fallback models:',
           filteredModels.length
         );
@@ -274,7 +274,9 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
         context === ModelSelectionContext.LLM &&
         allModels.length > 0
       ) {
-        console.log('[ModelSelectionSheet] Using all models as final fallback');
+        console.warn(
+          '[ModelSelectionSheet] Using all models as final fallback'
+        );
         filteredModels = allModels;
       }
 
@@ -354,7 +356,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   const getFrameworks = useCallback((): FrameworkDisplayInfo[] => {
     const frameworkCounts = new Map<LLMFramework, number>();
 
-    console.log(
+    console.warn(
       '[ModelSelectionSheet] getFrameworks called, availableModels count:',
       availableModels.length
     );
@@ -365,7 +367,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
         model.preferredFramework || model.compatibleFrameworks?.[0];
 
       if (index < 3) {
-        console.log(
+        console.warn(
           `[ModelSelectionSheet] Model ${index}: preferredFramework=${model.preferredFramework}, compatibleFrameworks=${JSON.stringify(model.compatibleFrameworks)}`
         );
       }
@@ -392,7 +394,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
       frameworkCounts.set(LLMFramework.SystemTTS, 1);
     }
 
-    console.log(
+    console.warn(
       '[ModelSelectionSheet] Framework counts:',
       Array.from(frameworkCounts.entries())
     );
@@ -465,7 +467,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
           ...prev,
           [model.id]: progress.progress,
         }));
-        console.log(
+        console.warn(
           `[Download] ${model.id}: ${Math.round(progress.progress * 100)}% (${formatBytes(progress.bytesDownloaded)} / ${formatBytes(progress.totalBytes)})`
         );
       });

@@ -59,7 +59,7 @@ function getSound() {
         soundInitialized = true;
       }
     } catch (e) {
-      console.log('[TTSScreen] react-native-sound not available');
+      console.warn('[TTSScreen] react-native-sound not available');
       return null;
     }
   }
@@ -78,7 +78,7 @@ function getTts() {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       Tts = require('react-native-tts').default;
     } catch (e) {
-      console.log('[TTSScreen] react-native-tts not available');
+      console.warn('[TTSScreen] react-native-tts not available');
       return null;
     }
   }
@@ -202,18 +202,18 @@ export const TTSScreen: React.FC = () => {
 
       // Log downloaded status for debugging
       const downloadedModels = ttsModels.filter((m) => m.isDownloaded);
-      console.log(
+      console.warn(
         '[TTSScreen] Available TTS models:',
         ttsModels.map((m) => `${m.id} (downloaded: ${m.isDownloaded})`)
       );
-      console.log(
+      console.warn(
         '[TTSScreen] Downloaded TTS models:',
         downloadedModels.map((m) => m.id)
       );
 
       // Check if model is already loaded
       const isLoaded = await RunAnywhere.isTTSModelLoaded();
-      console.log('[TTSScreen] isTTSModelLoaded:', isLoaded);
+      console.warn('[TTSScreen] isTTSModelLoaded:', isLoaded);
       if (isLoaded && !currentModel) {
         // Try to find which model is loaded from downloaded models
         const downloadedTts = ttsModels.filter((m) => m.isDownloaded);
@@ -226,7 +226,7 @@ export const TTSScreen: React.FC = () => {
               name: firstModel.name,
               preferredFramework: LLMFramework.ONNX,
             } as ModelInfo);
-            console.log(
+            console.warn(
               '[TTSScreen] Set currentModel from downloaded:',
               firstModel.name
             );
@@ -237,11 +237,11 @@ export const TTSScreen: React.FC = () => {
             name: 'TTS Model (Loaded)',
             preferredFramework: LLMFramework.ONNX,
           } as ModelInfo);
-          console.log('[TTSScreen] Set currentModel as generic TTS Model');
+          console.warn('[TTSScreen] Set currentModel as generic TTS Model');
         }
       }
     } catch (error) {
-      console.log('[TTSScreen] Error loading models:', error);
+      console.warn('[TTSScreen] Error loading models:', error);
     }
   }, [currentModel]);
 
@@ -249,7 +249,7 @@ export const TTSScreen: React.FC = () => {
   // This ensures we pick up any models downloaded in the Settings tab
   useFocusEffect(
     useCallback(() => {
-      console.log('[TTSScreen] Screen focused - refreshing models');
+      console.warn('[TTSScreen] Screen focused - refreshing models');
       loadModels();
     }, [loadModels])
   );
@@ -274,7 +274,7 @@ export const TTSScreen: React.FC = () => {
         setAudioFilePath(null);
         stopSound();
 
-        console.log(
+        console.warn(
           `[TTSScreen] Loading model: ${model.id} from ${model.localPath}`
         );
 
@@ -285,7 +285,7 @@ export const TTSScreen: React.FC = () => {
           model.localPath?.startsWith('builtin://');
 
         if (isSystemTTS) {
-          console.log(
+          console.warn(
             `[TTSScreen] Using System TTS - no model loading required`
           );
           // System TTS doesn't need to load a model, just mark it as ready
@@ -309,11 +309,11 @@ export const TTSScreen: React.FC = () => {
         try {
           const wasLoaded = await RunAnywhere.isTTSModelLoaded();
           if (wasLoaded) {
-            console.log('[TTSScreen] Unloading previous TTS model...');
+            console.warn('[TTSScreen] Unloading previous TTS model...');
             await RunAnywhere.unloadTTSModel();
           }
         } catch (unloadError) {
-          console.log(
+          console.warn(
             '[TTSScreen] Error unloading previous model (ignoring):',
             unloadError
           );
@@ -322,7 +322,7 @@ export const TTSScreen: React.FC = () => {
         // Pass the path directly - C++ extractArchiveIfNeeded handles archive extraction
         // and finding the correct nested model folder
         const modelType = model.category || 'piper';
-        console.log(
+        console.warn(
           `[TTSScreen] Calling loadTTSModel with path: ${model.localPath}, type: ${modelType}`
         );
 
@@ -341,11 +341,11 @@ export const TTSScreen: React.FC = () => {
               name: model.name,
               preferredFramework: LLMFramework.ONNX,
             } as ModelInfo);
-            console.log(
+            console.warn(
               `[TTSScreen] Model ${model.name} loaded successfully, currentModel set`
             );
           } else {
-            console.log(
+            console.warn(
               `[TTSScreen] Model reported success but isTTSModelLoaded() returned false`
             );
             Alert.alert(
@@ -477,12 +477,12 @@ export const TTSScreen: React.FC = () => {
    * Android: Uses react-native-tts
    */
   const handleSystemTTSGenerate = useCallback(async () => {
-    console.log('[TTSScreen] Using System TTS (native speech synthesizer)');
+    console.warn('[TTSScreen] Using System TTS (native speech synthesizer)');
 
     try {
       // iOS: Use NativeAudioModule for System TTS
       if (Platform.OS === 'ios' && NativeAudioModule) {
-        console.log('[TTSScreen] iOS: Using NativeAudioModule.speak()');
+        console.warn('[TTSScreen] iOS: Using NativeAudioModule.speak()');
 
         setIsPlaying(true);
 
@@ -494,7 +494,7 @@ export const TTSScreen: React.FC = () => {
 
         try {
           const result = await NativeAudioModule.speak(text, speed, pitch);
-          console.log('[TTSScreen] iOS System TTS result:', result);
+          console.warn('[TTSScreen] iOS System TTS result:', result);
           setIsPlaying(false);
         } catch (speakError: unknown) {
           console.error('[TTSScreen] iOS System TTS error:', speakError);
@@ -518,14 +518,14 @@ export const TTSScreen: React.FC = () => {
 
       // Listen for finish event first
       const finishListener = tts.addListener('tts-finish', () => {
-        console.log('[TTSScreen] System TTS finished');
+        console.warn('[TTSScreen] System TTS finished');
         setIsPlaying(false);
         finishListener.remove();
       });
 
       // Listen for cancel event
       const cancelListener = tts.addListener('tts-cancel', () => {
-        console.log('[TTSScreen] System TTS cancelled');
+        console.warn('[TTSScreen] System TTS cancelled');
         setIsPlaying(false);
         cancelListener.remove();
       });
@@ -534,7 +534,7 @@ export const TTSScreen: React.FC = () => {
       // iOS rate: 0.0-1.0, Android rate: 0.01-0.99
       const androidRate = Math.min(0.99, Math.max(0.01, speed * 0.5));
 
-      console.log(
+      console.warn(
         '[TTSScreen] Android System TTS speaking with rate:',
         androidRate,
         'pitch:',
@@ -595,7 +595,7 @@ export const TTSScreen: React.FC = () => {
     try {
       // For System TTS, use native AVSpeechSynthesizer
       if (isSystemTTS) {
-        console.log('[TTSScreen] Synthesizing with System TTS (native)');
+        console.warn('[TTSScreen] Synthesizing with System TTS (native)');
         await handleSystemTTSGenerate();
         setIsGenerating(false);
         return;
@@ -617,7 +617,7 @@ export const TTSScreen: React.FC = () => {
         volume: volume,
       };
 
-      console.log(
+      console.warn(
         '[TTSScreen] Synthesizing text with ONNX:',
         text.substring(0, 50) + '...'
       );
@@ -625,7 +625,7 @@ export const TTSScreen: React.FC = () => {
       // SDK returns TTSResult with audio, sampleRate, numSamples, duration
       const result = await RunAnywhere.synthesize(text, sdkConfig);
 
-      console.log('[TTSScreen] Synthesis result:', {
+      console.warn('[TTSScreen] Synthesis result:', {
         sampleRate: result.sampleRate,
         numSamples: result.numSamples,
         duration: result.duration,
@@ -659,7 +659,7 @@ export const TTSScreen: React.FC = () => {
           setPlaybackProgress(0);
           setIsPlaying(false);
 
-          console.log('[TTSScreen] WAV file created:', wavPath);
+          console.warn('[TTSScreen] WAV file created:', wavPath);
         } catch (wavError) {
           console.error('[TTSScreen] Error creating WAV file:', wavError);
           Alert.alert(
@@ -703,7 +703,7 @@ export const TTSScreen: React.FC = () => {
    * Toggle playback - plays or pauses audio using react-native-sound
    */
   const handleTogglePlayback = useCallback(async () => {
-    console.log('[TTSScreen] handleTogglePlayback called', {
+    console.warn('[TTSScreen] handleTogglePlayback called', {
       audioGenerated,
       audioFilePath,
       isPlaying,
@@ -712,7 +712,7 @@ export const TTSScreen: React.FC = () => {
     });
 
     if (!audioGenerated || !audioFilePath) {
-      console.log(
+      console.warn(
         '[TTSScreen] No audio to play - audioGenerated:',
         audioGenerated,
         'audioFilePath:',
@@ -725,7 +725,7 @@ export const TTSScreen: React.FC = () => {
     // Verify file exists
     try {
       const fileExists = await RNFS.exists(audioFilePath);
-      console.log(
+      console.warn(
         '[TTSScreen] Audio file exists:',
         fileExists,
         'path:',
@@ -739,7 +739,7 @@ export const TTSScreen: React.FC = () => {
         return;
       }
       const fileStat = await RNFS.stat(audioFilePath);
-      console.log('[TTSScreen] Audio file size:', fileStat.size, 'bytes');
+      console.warn('[TTSScreen] Audio file size:', fileStat.size, 'bytes');
     } catch (statError) {
       console.error('[TTSScreen] Error checking file:', statError);
     }
@@ -747,14 +747,14 @@ export const TTSScreen: React.FC = () => {
     try {
       if (isPlaying) {
         // Pause playback
-        console.log('[TTSScreen] Pausing playback...');
+        console.warn('[TTSScreen] Pausing playback...');
 
         // iOS: Use NativeAudioModule
         if (Platform.OS === 'ios' && NativeAudioModule) {
           try {
             await NativeAudioModule.pausePlayback();
           } catch (e) {
-            console.log('[TTSScreen] iOS pause error:', e);
+            console.warn('[TTSScreen] iOS pause error:', e);
           }
         } else if (soundRef.current) {
           soundRef.current.pause();
@@ -762,12 +762,12 @@ export const TTSScreen: React.FC = () => {
 
         stopProgressUpdates();
         setIsPlaying(false);
-        console.log('[TTSScreen] Playback paused');
+        console.warn('[TTSScreen] Playback paused');
       } else {
         // Check if we should resume on iOS
         if (Platform.OS === 'ios' && NativeAudioModule && currentTime > 0) {
           // Resume iOS playback
-          console.log('[TTSScreen] Resuming iOS playback from:', currentTime);
+          console.warn('[TTSScreen] Resuming iOS playback from:', currentTime);
           try {
             await NativeAudioModule.resumePlayback();
             setIsPlaying(true);
@@ -796,18 +796,18 @@ export const TTSScreen: React.FC = () => {
 
             return;
           } catch (e) {
-            console.log('[TTSScreen] iOS resume error, starting fresh:', e);
+            console.warn('[TTSScreen] iOS resume error, starting fresh:', e);
           }
         }
 
         // Android: Use react-native-sound
         if (soundRef.current && currentTime > 0) {
           // Resume existing sound
-          console.log('[TTSScreen] Resuming playback from:', currentTime);
+          console.warn('[TTSScreen] Resuming playback from:', currentTime);
           soundRef.current.setVolume(volume);
           soundRef.current.play((success: boolean) => {
             if (success) {
-              console.log('[TTSScreen] Playback finished');
+              console.warn('[TTSScreen] Playback finished');
             }
             stopProgressUpdates();
             setIsPlaying(false);
@@ -829,15 +829,17 @@ export const TTSScreen: React.FC = () => {
           setIsPlaying(true);
         } else {
           // Start fresh playback
-          console.log('[TTSScreen] Starting fresh playback...');
+          console.warn('[TTSScreen] Starting fresh playback...');
           await stopSound(); // Clean up any existing sound
 
           // iOS: Use NativeAudioModule
           if (Platform.OS === 'ios' && NativeAudioModule) {
-            console.log('[TTSScreen] Using NativeAudioModule for iOS playback');
+            console.warn(
+              '[TTSScreen] Using NativeAudioModule for iOS playback'
+            );
             try {
               const result = await NativeAudioModule.playAudio(audioFilePath);
-              console.log('[TTSScreen] iOS playback started:', result);
+              console.warn('[TTSScreen] iOS playback started:', result);
               setIsPlaying(true);
 
               // Start progress updates for iOS
@@ -857,7 +859,7 @@ export const TTSScreen: React.FC = () => {
                     setIsPlaying(false);
                     setCurrentTime(0);
                     setPlaybackProgress(0);
-                    console.log('[TTSScreen] iOS playback finished');
+                    console.warn('[TTSScreen] iOS playback finished');
                   }
                 } catch (e) {
                   // Ignore errors during polling
@@ -895,7 +897,7 @@ export const TTSScreen: React.FC = () => {
                 return;
               }
 
-              console.log(
+              console.warn(
                 '[TTSScreen] Sound loaded, duration:',
                 sound.getDuration(),
                 'seconds'
@@ -905,9 +907,9 @@ export const TTSScreen: React.FC = () => {
 
               sound.play((success: boolean) => {
                 if (success) {
-                  console.log('[TTSScreen] Playback finished successfully');
+                  console.warn('[TTSScreen] Playback finished successfully');
                 } else {
-                  console.log('[TTSScreen] Playback interrupted');
+                  console.warn('[TTSScreen] Playback interrupted');
                 }
                 stopProgressUpdates();
                 setIsPlaying(false);
@@ -927,7 +929,7 @@ export const TTSScreen: React.FC = () => {
               }, 100);
 
               setIsPlaying(true);
-              console.log('[TTSScreen] Playback started successfully');
+              console.warn('[TTSScreen] Playback started successfully');
             }
           );
         }

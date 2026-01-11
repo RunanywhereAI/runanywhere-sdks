@@ -1,13 +1,31 @@
 /**
  * LoggingManager.ts
  *
- * Centralized logging manager with multiple destination support
+ * Centralized logging manager with multiple destination support.
+ * Routes logs to multiple destinations (Console, Sentry, etc.) based on configuration.
  *
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Logging/Services/LoggingManager.swift
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/Logging/Protocol/LogDestination.swift
+ * Matches iOS: sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/Logging/SDKLogger.swift
+ *              (Logging class - central service)
+ *
+ * Usage:
+ *   // Configure for environment
+ *   LoggingManager.shared.configure({ environment: SDKEnvironment.Production });
+ *
+ *   // Add Sentry destination
+ *   LoggingManager.shared.addDestination(new SentryDestination(Sentry));
+ *
+ *   // Subscribe to log events (for custom handling)
+ *   const unsubscribe = LoggingManager.shared.onLog((entry) => {
+ *     // Forward to your analytics, etc.
+ *   });
  */
 
 import { LogLevel } from '../Models/LogLevel';
+import {
+  type LoggingConfiguration,
+  SDKEnvironment,
+  getConfigurationForEnvironment,
+} from '../Models/LoggingConfiguration';
 
 // ============================================================================
 // Log Entry
@@ -78,10 +96,12 @@ export class ConsoleLogDestination implements LogDestination {
         console.info(logMessage, entry.metadata ?? '');
         break;
       case LogLevel.Warning:
+        // eslint-disable-next-line no-console
         console.warn(logMessage, entry.metadata ?? '');
         break;
       case LogLevel.Error:
       case LogLevel.Fault:
+        // eslint-disable-next-line no-console
         console.error(logMessage, entry.metadata ?? '');
         break;
     }
@@ -143,23 +163,102 @@ export class EventLogDestination implements LogDestination {
 // ============================================================================
 
 /**
- * Centralized logging manager with multiple destination support
- * Matches iOS: LoggingManager + DefaultLoggingService
+ * Centralized logging manager with multiple destination support.
+ * Matches iOS: Logging class (central service)
  */
 export class LoggingManager {
   private static sharedInstance: LoggingManager | null = null;
-  private logLevel: LogLevel = LogLevel.Info;
   private destinations: Map<string, LogDestination> = new Map();
+
+  // Configuration
+  private config: LoggingConfiguration;
 
   // Default destinations
   private readonly consoleDestination = new ConsoleLogDestination();
   private readonly eventDestination = new EventLogDestination();
 
   private constructor() {
+    // Initialize with default development config
+    this.config = getConfigurationForEnvironment(SDKEnvironment.Development);
+
     // Add default console destination
     this.addDestination(this.consoleDestination);
     // Add event destination for public log exposure
     this.addDestination(this.eventDestination);
+  }
+
+  // ============================================================================
+  // Configuration (matches iOS Logging.configure)
+  // ============================================================================
+
+  /**
+   * Get current configuration
+   */
+  public get configuration(): LoggingConfiguration {
+    return { ...this.config };
+  }
+
+  /**
+   * Configure the logging system.
+   * Matches iOS: Logging.configure(_ config: LoggingConfiguration)
+   *
+   * @param config - Partial configuration to apply
+   */
+  public configure(config: Partial<LoggingConfiguration>): void {
+    // If environment is specified, get defaults for that environment
+    if (config.environment && !config.minLogLevel) {
+      const envConfig = getConfigurationForEnvironment(config.environment);
+      this.config = { ...envConfig, ...config };
+    } else {
+      this.config = { ...this.config, ...config };
+    }
+
+    // Update console destination based on enableLocalLogging
+    if (!this.config.enableLocalLogging) {
+      this.removeDestination(this.consoleDestination.identifier);
+    } else if (!this.hasDestination(this.consoleDestination.identifier)) {
+      this.addDestination(this.consoleDestination);
+    }
+  }
+
+  /**
+   * Apply configuration for a specific environment.
+   * Matches iOS: Logging.applyEnvironmentConfiguration(_ environment:)
+   *
+   * @param environment - SDK environment
+   */
+  public applyEnvironmentConfiguration(environment: SDKEnvironment): void {
+    const envConfig = getConfigurationForEnvironment(environment);
+    this.configure(envConfig);
+  }
+
+  /**
+   * Set local logging enabled.
+   * Matches iOS: Logging.setLocalLoggingEnabled(_ enabled:)
+   */
+  public setLocalLoggingEnabled(enabled: boolean): void {
+    this.config.enableLocalLogging = enabled;
+    if (!enabled) {
+      this.removeDestination(this.consoleDestination.identifier);
+    } else if (!this.hasDestination(this.consoleDestination.identifier)) {
+      this.addDestination(this.consoleDestination);
+    }
+  }
+
+  /**
+   * Set minimum log level.
+   * Matches iOS: Logging.setMinLogLevel(_ level:)
+   */
+  public setMinLogLevel(level: LogLevel): void {
+    this.config.minLogLevel = level;
+  }
+
+  /**
+   * Set include device metadata.
+   * Matches iOS: Logging.setIncludeDeviceMetadata(_ include:)
+   */
+  public setIncludeDeviceMetadata(include: boolean): void {
+    this.config.includeDeviceMetadata = include;
   }
 
   /**
@@ -172,22 +271,12 @@ export class LoggingManager {
     return LoggingManager.sharedInstance;
   }
 
-  // ============================================================================
-  // Configuration
-  // ============================================================================
-
-  /**
-   * Set log level
-   */
-  public setLogLevel(level: LogLevel): void {
-    this.logLevel = level;
-  }
-
   /**
    * Get current log level
+   * @deprecated Use configuration.minLogLevel instead
    */
   public getLogLevel(): LogLevel {
-    return this.logLevel;
+    return this.config.minLogLevel;
   }
 
   // ============================================================================
@@ -245,7 +334,8 @@ export class LoggingManager {
   // ============================================================================
 
   /**
-   * Log a message
+   * Log a message.
+   * Matches iOS: Logging.log(level:category:message:metadata:)
    */
   public log(
     level: LogLevel,
@@ -253,7 +343,14 @@ export class LoggingManager {
     message: string,
     metadata?: Record<string, unknown>
   ): void {
-    if (level < this.logLevel) {
+    // Filter by minimum log level
+    if (level < this.config.minLogLevel) {
+      return;
+    }
+
+    // Check if logging is enabled at all
+    if (!this.config.enableLocalLogging && this.destinations.size <= 1) {
+      // Only event destination, check if there are subscribers
       return;
     }
 

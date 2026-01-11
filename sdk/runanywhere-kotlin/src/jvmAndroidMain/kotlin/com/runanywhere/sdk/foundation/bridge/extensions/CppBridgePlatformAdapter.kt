@@ -13,6 +13,7 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Base64
+import com.runanywhere.sdk.foundation.SDKLogger
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
@@ -29,7 +30,6 @@ import java.util.concurrent.ConcurrentHashMap
  * - Clock: nowMs (current timestamp in milliseconds)
  */
 object CppBridgePlatformAdapter {
-
     /**
      * Log level constants matching C++ RAC_LOG_LEVEL_* values.
      */
@@ -57,7 +57,7 @@ object CppBridgePlatformAdapter {
     /**
      * SharedPreferences for persistent secure storage on Android.
      * Initialized when context is set.
-     * 
+     *
      * @Volatile ensures visibility across threads - reads will see the latest
      * value written by setContext() even without explicit synchronization.
      */
@@ -141,35 +141,81 @@ object CppBridgePlatformAdapter {
      * Log callback for C++ core.
      *
      * Routes C++ log messages to Kotlin logging system.
+     * Parses structured metadata from C++ log messages.
+     *
+     * Format: "Message text | key1=value1, key2=value2"
      *
      * @param level The log level (see [LogLevel] constants)
      * @param tag The log tag/category
-     * @param message The log message
+     * @param message The log message (may contain metadata)
      *
      * NOTE: This function is called from JNI. Do not capture any state.
      */
     @JvmStatic
     fun logCallback(level: Int, tag: String, message: String) {
-        val formattedTag = "$TAG/$tag"
+        // Parse structured metadata from C++ log messages
+        val (cleanMessage, metadata) = parseLogMetadata(message)
+        val category = if (tag.isNotEmpty()) tag else "RAC"
+
+        // Create logger with proper category for destination routing
+        val logger = SDKLogger(category)
 
         when (level) {
-            LogLevel.TRACE, LogLevel.DEBUG -> {
-                // Debug level logging
-                println("D/$formattedTag: $message")
-            }
-            LogLevel.INFO -> {
-                println("I/$formattedTag: $message")
-            }
-            LogLevel.WARN -> {
-                println("W/$formattedTag: $message")
-            }
-            LogLevel.ERROR, LogLevel.FATAL -> {
-                System.err.println("E/$formattedTag: $message")
-            }
-            else -> {
-                println("?/$formattedTag: $message")
+            LogLevel.TRACE -> logger.trace("[Native] $cleanMessage", metadata)
+            LogLevel.DEBUG -> logger.debug("[Native] $cleanMessage", metadata)
+            LogLevel.INFO -> logger.info("[Native] $cleanMessage", metadata)
+            LogLevel.WARN -> logger.warning("[Native] $cleanMessage", metadata)
+            LogLevel.ERROR -> logger.error("[Native] $cleanMessage", metadata)
+            LogLevel.FATAL -> logger.fault("[Native] $cleanMessage", metadata)
+            else -> logger.debug("[Native] $cleanMessage", metadata)
+        }
+    }
+
+    /**
+     * Parse structured metadata from C++ log messages.
+     *
+     * Format: "Message text | key1=value1, key2=value2"
+     *
+     * Matches iOS SDK's parseLogMetadata function in CppBridge+PlatformAdapter.swift
+     *
+     * @param message The raw log message from C++
+     * @return Pair of (clean message, metadata map)
+     */
+    private fun parseLogMetadata(message: String): Pair<String, Map<String, Any?>?> {
+        val parts = message.split(" | ", limit = 2)
+        if (parts.size < 2) {
+            return Pair(message, null)
+        }
+
+        val cleanMessage = parts[0]
+        val metadataString = parts[1]
+
+        val metadata = mutableMapOf<String, Any?>()
+        val pairs =
+            metadataString
+                .split(Regex("[,\\s]+"))
+                .filter { it.isNotEmpty() && it.contains("=") }
+
+        for (pair in pairs) {
+            val keyValue = pair.split("=", limit = 2)
+            if (keyValue.size != 2) continue
+
+            val key = keyValue[0].trim()
+            val value = keyValue[1].trim()
+
+            // Map known C++ keys to SDK metadata keys (matching iOS behavior)
+            when (key) {
+                "file" -> metadata["source_file"] = value
+                "func" -> metadata["source_function"] = value
+                "error_code" -> metadata["error_code"] = value.toIntOrNull() ?: value
+                "error" -> metadata["error_message"] = value
+                "model" -> metadata["model_id"] = value
+                "framework" -> metadata["framework"] = value
+                else -> metadata[key] = value
             }
         }
+
+        return Pair(cleanMessage, metadata.ifEmpty { null })
     }
 
     // ========================================================================
@@ -282,7 +328,7 @@ object CppBridgePlatformAdapter {
         return try {
             // Take a thread-safe local copy of the volatile reference
             val prefs = sharedPreferences
-            
+
             // Try SharedPreferences first (persistent storage)
             if (prefs != null) {
                 val base64Value = prefs.getString(key, null)
@@ -315,7 +361,7 @@ object CppBridgePlatformAdapter {
         return try {
             // Take a thread-safe local copy of the volatile reference
             val prefs = sharedPreferences
-            
+
             // Try SharedPreferences first (persistent storage)
             if (prefs != null) {
                 val base64Value = Base64.encodeToString(value, Base64.NO_WRAP)
@@ -346,7 +392,7 @@ object CppBridgePlatformAdapter {
         return try {
             // Take a thread-safe local copy of the volatile reference
             val prefs = sharedPreferences
-            
+
             // Remove from SharedPreferences if available
             prefs?.edit()?.remove(key)?.apply()
             // Also remove from in-memory
@@ -382,7 +428,9 @@ object CppBridgePlatformAdapter {
      * Native method to register the platform adapter with C++ core.
      *
      * This is called during [register] to pass callback references to native code.
+     * Reserved for future native callback integration.
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeRegisterPlatformAdapter()
 
@@ -390,7 +438,9 @@ object CppBridgePlatformAdapter {
      * Native method to unregister the platform adapter.
      *
      * Called during shutdown to clean up native resources.
+     * Reserved for future native callback integration.
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeUnregisterPlatformAdapter()
 

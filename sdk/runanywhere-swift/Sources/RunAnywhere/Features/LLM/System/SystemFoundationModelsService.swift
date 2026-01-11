@@ -7,7 +7,6 @@
 //
 
 import Foundation
-import OSLog
 
 // Import FoundationModels with conditional compilation
 #if canImport(FoundationModels)
@@ -22,10 +21,7 @@ import FoundationModels
 public class SystemFoundationModelsService {
     private var _currentModel: String?
     private var _isReady = false
-    private let logger = Logger(
-        subsystem: "com.runanywhere.sdk",
-        category: "SystemFoundationModelsService"
-    )
+    private let logger = SDKLogger(category: "SystemFoundationModels")
 
     #if canImport(FoundationModels)
     // Type-erased wrapper for FoundationModels session
@@ -56,7 +52,7 @@ public class SystemFoundationModelsService {
     public init() {
     }
 
-    public func initialize(modelPath: String?) async throws {
+    public func initialize(modelPath _: String?) async throws {
         logger.info("Initializing Apple Foundation Models (iOS 26+/macOS 26+)")
 
         #if canImport(FoundationModels)

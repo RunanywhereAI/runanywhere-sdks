@@ -11,7 +11,9 @@
 
 import { NitroModules } from 'react-native-nitro-modules';
 import type { RunAnywhereCore } from '../specs/RunAnywhereCore.nitro';
+import type { RunAnywhereDeviceInfo } from '../specs/RunAnywhereDeviceInfo.nitro';
 import type { NativeRunAnywhereModule } from './NativeRunAnywhereModule';
+import { SDKLogger } from '../Foundation/Logging';
 
 export type { NativeRunAnywhereModule } from './NativeRunAnywhereModule';
 export { hasNativeMethod } from './NativeRunAnywhereModule';
@@ -98,14 +100,35 @@ export interface DeviceInfoModule {
 }
 
 /**
+ * Singleton for device info hybrid object
+ */
+let _deviceInfoModule: RunAnywhereDeviceInfo | null = null;
+
+/**
+ * Get the RunAnywhereDeviceInfo hybrid object
+ * This provides real device info from native iOS/Android code
+ */
+function getDeviceInfoHybridObject(): RunAnywhereDeviceInfo | null {
+  if (_deviceInfoModule) {
+    return _deviceInfoModule;
+  }
+  try {
+    _deviceInfoModule = NitroModules.createHybridObject<RunAnywhereDeviceInfo>('RunAnywhereDeviceInfo');
+    return _deviceInfoModule;
+  } catch (error) {
+    console.warn('[NativeRunAnywhereCore] Failed to create RunAnywhereDeviceInfo:', error);
+    return null;
+  }
+}
+
+/**
  * Device info module - provides device information
  *
- * Note: Full device info requires platform-specific APIs.
- * This provides basic info from native.getDeviceCapabilities() and
- * platform defaults for values not yet implemented in C++.
+ * Uses the RunAnywhereDeviceInfo NitroModule for real device info
+ * from native iOS (Swift) and Android (Kotlin) implementations.
  */
 export function requireDeviceInfoModule(): DeviceInfoModule {
-  const native = isNativeCoreModuleAvailable() ? getNativeCoreModule() : null;
+  const deviceInfo = getDeviceInfoHybridObject();
 
   return {
     deviceId: '',
@@ -113,105 +136,88 @@ export function requireDeviceInfoModule(): DeviceInfoModule {
     uniqueId: '',
 
     getDeviceModel: async () => {
-      // Try to get from native capabilities
-      if (native) {
+      if (deviceInfo) {
         try {
-          const capsJson = await native.getDeviceCapabilities();
-          const caps = JSON.parse(capsJson);
-          return caps.device_model || caps.platform || 'Unknown Device';
-        } catch {
-          // Fallback
+          return await deviceInfo.getDeviceModel();
+        } catch (error) {
+          console.warn('[DeviceInfo] getDeviceModel failed:', error);
         }
       }
       return 'Unknown Device';
     },
 
     getChipName: async () => {
-      if (native) {
+      if (deviceInfo) {
         try {
-          const capsJson = await native.getDeviceCapabilities();
-          const caps = JSON.parse(capsJson);
-          return caps.chip_name || caps.processor || 'Unknown';
-        } catch {
-          // Fallback
+          return await deviceInfo.getChipName();
+        } catch (error) {
+          console.warn('[DeviceInfo] getChipName failed:', error);
         }
       }
       return 'Unknown';
     },
 
     getTotalRAM: async () => {
-      if (native) {
+      if (deviceInfo) {
         try {
-          const capsJson = await native.getDeviceCapabilities();
-          const caps = JSON.parse(capsJson);
-          return caps.total_memory || 0;
-        } catch {
-          // Fallback
+          return await deviceInfo.getTotalRAM();
+        } catch (error) {
+          console.warn('[DeviceInfo] getTotalRAM failed:', error);
         }
       }
       return 0;
     },
 
     getAvailableRAM: async () => {
-      if (native) {
+      if (deviceInfo) {
         try {
-          const capsJson = await native.getDeviceCapabilities();
-          const caps = JSON.parse(capsJson);
-          return caps.available_memory || 0;
-        } catch {
-          // Fallback
+          return await deviceInfo.getAvailableRAM();
+        } catch (error) {
+          console.warn('[DeviceInfo] getAvailableRAM failed:', error);
         }
       }
       return 0;
     },
 
     hasNPU: async () => {
-      if (native) {
+      if (deviceInfo) {
         try {
-          const capsJson = await native.getDeviceCapabilities();
-          const caps = JSON.parse(capsJson);
-          return caps.has_npu || caps.supports_metal || false;
-        } catch {
-          // Fallback
+          return await deviceInfo.hasNPU();
+        } catch (error) {
+          console.warn('[DeviceInfo] hasNPU failed:', error);
         }
       }
       return false;
     },
 
     getOSVersion: async () => {
-      if (native) {
+      if (deviceInfo) {
         try {
-          const capsJson = await native.getDeviceCapabilities();
-          const caps = JSON.parse(capsJson);
-          return caps.os_version || caps.platform || 'Unknown';
-        } catch {
-          // Fallback
+          return await deviceInfo.getOSVersion();
+        } catch (error) {
+          console.warn('[DeviceInfo] getOSVersion failed:', error);
         }
       }
       return 'Unknown';
     },
 
     hasGPU: async () => {
-      if (native) {
+      if (deviceInfo) {
         try {
-          const capsJson = await native.getDeviceCapabilities();
-          const caps = JSON.parse(capsJson);
-          return caps.has_gpu || caps.supports_vulkan || caps.supports_metal || false;
-        } catch {
-          // Fallback
+          return await deviceInfo.hasGPU();
+        } catch (error) {
+          console.warn('[DeviceInfo] hasGPU failed:', error);
         }
       }
       return false;
     },
 
     getCPUCores: async () => {
-      if (native) {
+      if (deviceInfo) {
         try {
-          const capsJson = await native.getDeviceCapabilities();
-          const caps = JSON.parse(capsJson);
-          return caps.cpu_cores || caps.core_count || 0;
-        } catch {
-          // Fallback
+          return await deviceInfo.getCPUCores();
+        } catch (error) {
+          console.warn('[DeviceInfo] getCPUCores failed:', error);
         }
       }
       return 0;
@@ -262,7 +268,7 @@ export function requireFileSystemModule(): FileSystemModule {
         });
         return true;
       } catch (error) {
-        console.error('[RunAnywhere] Download failed:', error);
+        SDKLogger.download.logError(error as Error, 'Download failed');
         return false;
       }
     },

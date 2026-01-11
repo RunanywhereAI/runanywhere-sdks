@@ -28,7 +28,6 @@ package com.runanywhere.sdk.foundation.bridge.extensions
  * - All callbacks are thread-safe
  */
 object CppBridgeModelAssignment {
-
     /**
      * Assignment status constants matching C++ RAC_ASSIGNMENT_STATUS_* values.
      */
@@ -54,15 +53,16 @@ object CppBridgeModelAssignment {
         /**
          * Get a human-readable name for the assignment status.
          */
-        fun getName(status: Int): String = when (status) {
-            NOT_ASSIGNED -> "NOT_ASSIGNED"
-            PENDING -> "PENDING"
-            READY -> "READY"
-            LOADING -> "LOADING"
-            FAILED -> "FAILED"
-            UNLOADING -> "UNLOADING"
-            else -> "UNKNOWN($status)"
-        }
+        fun getName(status: Int): String =
+            when (status) {
+                NOT_ASSIGNED -> "NOT_ASSIGNED"
+                PENDING -> "PENDING"
+                READY -> "READY"
+                LOADING -> "LOADING"
+                FAILED -> "FAILED"
+                UNLOADING -> "UNLOADING"
+                else -> "UNKNOWN($status)"
+            }
 
         /**
          * Check if the assignment status indicates the model is usable.
@@ -104,18 +104,19 @@ object CppBridgeModelAssignment {
         /**
          * Get a human-readable name for the failure reason.
          */
-        fun getName(reason: Int): String = when (reason) {
-            NONE -> "NONE"
-            MODEL_NOT_FOUND -> "MODEL_NOT_FOUND"
-            FILE_NOT_FOUND -> "FILE_NOT_FOUND"
-            MODEL_CORRUPTED -> "MODEL_CORRUPTED"
-            FORMAT_NOT_SUPPORTED -> "FORMAT_NOT_SUPPORTED"
-            TYPE_MISMATCH -> "TYPE_MISMATCH"
-            INSUFFICIENT_MEMORY -> "INSUFFICIENT_MEMORY"
-            LOAD_FAILED -> "LOAD_FAILED"
-            UNKNOWN -> "UNKNOWN"
-            else -> "UNKNOWN($reason)"
-        }
+        fun getName(reason: Int): String =
+            when (reason) {
+                NONE -> "NONE"
+                MODEL_NOT_FOUND -> "MODEL_NOT_FOUND"
+                FILE_NOT_FOUND -> "FILE_NOT_FOUND"
+                MODEL_CORRUPTED -> "MODEL_CORRUPTED"
+                FORMAT_NOT_SUPPORTED -> "FORMAT_NOT_SUPPORTED"
+                TYPE_MISMATCH -> "TYPE_MISMATCH"
+                INSUFFICIENT_MEMORY -> "INSUFFICIENT_MEMORY"
+                LOAD_FAILED -> "LOAD_FAILED"
+                UNKNOWN -> "UNKNOWN"
+                else -> "UNKNOWN($reason)"
+            }
     }
 
     @Volatile
@@ -171,7 +172,7 @@ object CppBridgeModelAssignment {
         val status: Int,
         val failureReason: Int = FailureReason.NONE,
         val assignedAt: Long = System.currentTimeMillis(),
-        val loadedAt: Long = 0
+        val loadedAt: Long = 0,
     ) {
         /**
          * Check if the assignment is ready for use.
@@ -226,7 +227,7 @@ object CppBridgeModelAssignment {
             componentType: Int,
             modelId: String,
             previousStatus: Int,
-            newStatus: Int
+            newStatus: Int,
         )
 
         /**
@@ -301,7 +302,7 @@ object CppBridgeModelAssignment {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Model assignment callbacks registered"
+                "Model assignment callbacks registered",
             )
         }
     }
@@ -337,17 +338,18 @@ object CppBridgeModelAssignment {
                     CppBridgePlatformAdapter.logCallback(
                         CppBridgePlatformAdapter.LogLevel.WARN,
                         TAG,
-                        "Model assignment failed compatibility check: ${FailureReason.getName(compatibilityReason)}"
+                        "Model assignment failed compatibility check: ${FailureReason.getName(compatibilityReason)}",
                     )
 
                     // Create failed assignment
                     synchronized(lock) {
-                        assignments[componentType] = ModelAssignment(
-                            componentType = componentType,
-                            modelId = modelId,
-                            status = AssignmentStatus.FAILED,
-                            failureReason = compatibilityReason
-                        )
+                        assignments[componentType] =
+                            ModelAssignment(
+                                componentType = componentType,
+                                modelId = modelId,
+                                status = AssignmentStatus.FAILED,
+                                failureReason = compatibilityReason,
+                            )
                     }
 
                     try {
@@ -364,17 +366,18 @@ object CppBridgeModelAssignment {
 
             synchronized(lock) {
                 previousAssignment = assignments[componentType]
-                assignments[componentType] = ModelAssignment(
-                    componentType = componentType,
-                    modelId = modelId,
-                    status = AssignmentStatus.PENDING
-                )
+                assignments[componentType] =
+                    ModelAssignment(
+                        componentType = componentType,
+                        modelId = modelId,
+                        status = AssignmentStatus.PENDING,
+                    )
             }
 
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Model assigned: ${CppBridgeModelRegistry.ModelType.getName(componentType)} -> $modelId"
+                "Model assigned: ${CppBridgeModelRegistry.ModelType.getName(componentType)} -> $modelId",
             )
 
             // Notify listener
@@ -387,7 +390,7 @@ object CppBridgeModelAssignment {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in assignment listener: ${e.message}"
+                    "Error in assignment listener: ${e.message}",
                 )
             }
 
@@ -396,7 +399,7 @@ object CppBridgeModelAssignment {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Failed to assign model: ${e.message}"
+                "Failed to assign model: ${e.message}",
             )
             false
         }
@@ -414,15 +417,16 @@ object CppBridgeModelAssignment {
      */
     @JvmStatic
     fun unassignModelCallback(componentType: Int): Boolean {
-        val removed = synchronized(lock) {
-            assignments.remove(componentType)
-        }
+        val removed =
+            synchronized(lock) {
+                assignments.remove(componentType)
+            }
 
         if (removed != null) {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Model unassigned: ${CppBridgeModelRegistry.ModelType.getName(componentType)}"
+                "Model unassigned: ${CppBridgeModelRegistry.ModelType.getName(componentType)}",
             )
 
             // Notify listener
@@ -432,7 +436,7 @@ object CppBridgeModelAssignment {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in assignment listener onModelUnassigned: ${e.message}"
+                    "Error in assignment listener onModelUnassigned: ${e.message}",
                 )
             }
 
@@ -454,18 +458,20 @@ object CppBridgeModelAssignment {
      */
     @JvmStatic
     fun getAssignedModelCallback(componentType: Int): String? {
-        val assignment = synchronized(lock) {
-            assignments[componentType]
-        }
+        val assignment =
+            synchronized(lock) {
+                assignments[componentType]
+            }
 
         if (assignment != null) {
             return assignment.modelId
         }
 
         // Check for default assignment
-        val defaultModelId = synchronized(lock) {
-            defaultAssignments[componentType]
-        }
+        val defaultModelId =
+            synchronized(lock) {
+                defaultAssignments[componentType]
+            }
 
         if (defaultModelId != null) {
             return defaultModelId
@@ -480,7 +486,7 @@ object CppBridgeModelAssignment {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error getting best model: ${e.message}"
+                    "Error getting best model: ${e.message}",
                 )
             }
         }
@@ -538,11 +544,12 @@ object CppBridgeModelAssignment {
 
             val loadedAt = if (status == AssignmentStatus.READY) System.currentTimeMillis() else assignment.loadedAt
 
-            assignments[componentType] = assignment.copy(
-                status = status,
-                failureReason = if (status == AssignmentStatus.FAILED) failureReason else FailureReason.NONE,
-                loadedAt = loadedAt
-            )
+            assignments[componentType] =
+                assignment.copy(
+                    status = status,
+                    failureReason = if (status == AssignmentStatus.FAILED) failureReason else FailureReason.NONE,
+                    loadedAt = loadedAt,
+                )
             updated = true
         }
 
@@ -551,7 +558,7 @@ object CppBridgeModelAssignment {
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
                 "Assignment status updated: ${CppBridgeModelRegistry.ModelType.getName(componentType)} " +
-                    "${AssignmentStatus.getName(previousStatus)} -> ${AssignmentStatus.getName(status)}"
+                    "${AssignmentStatus.getName(previousStatus)} -> ${AssignmentStatus.getName(status)}",
             )
 
             // Notify listener
@@ -570,7 +577,7 @@ object CppBridgeModelAssignment {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
-                    "Error in assignment listener: ${e.message}"
+                    "Error in assignment listener: ${e.message}",
                 )
             }
         }
@@ -604,9 +611,10 @@ object CppBridgeModelAssignment {
      */
     @JvmStatic
     fun getAllAssignmentsCallback(): String {
-        val allAssignments = synchronized(lock) {
-            assignments.values.toList()
-        }
+        val allAssignments =
+            synchronized(lock) {
+                assignments.values.toList()
+            }
 
         return buildString {
             append("[")
@@ -637,7 +645,7 @@ object CppBridgeModelAssignment {
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "Default model set: ${CppBridgeModelRegistry.ModelType.getName(componentType)} -> $modelId"
+            "Default model set: ${CppBridgeModelRegistry.ModelType.getName(componentType)} -> $modelId",
         )
     }
 
@@ -667,16 +675,17 @@ object CppBridgeModelAssignment {
      */
     @JvmStatic
     fun clearAllAssignmentsCallback() {
-        val clearedAssignments = synchronized(lock) {
-            val all = assignments.toMap()
-            assignments.clear()
-            all
-        }
+        val clearedAssignments =
+            synchronized(lock) {
+                val all = assignments.toMap()
+                assignments.clear()
+                all
+            }
 
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "All assignments cleared (${clearedAssignments.size} assignments)"
+            "All assignments cleared (${clearedAssignments.size} assignments)",
         )
 
         // Notify listener for each cleared assignment
@@ -688,7 +697,7 @@ object CppBridgeModelAssignment {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.WARN,
                 TAG,
-                "Error in assignment listener during clear: ${e.message}"
+                "Error in assignment listener during clear: ${e.message}",
             )
         }
     }
@@ -702,9 +711,11 @@ object CppBridgeModelAssignment {
      *
      * Registers [assignModelCallback], [unassignModelCallback],
      * [getAssignedModelCallback], [getAssignmentStatusCallback], etc. with C++ core.
+     * Reserved for future native callback integration.
      *
      * C API: rac_model_assignment_set_callbacks(...)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeSetModelAssignmentCallbacks()
 
@@ -712,9 +723,11 @@ object CppBridgeModelAssignment {
      * Native method to unset the model assignment callbacks.
      *
      * Called during shutdown to clean up native resources.
+     * Reserved for future native callback integration.
      *
      * C API: rac_model_assignment_set_callbacks(nullptr)
      */
+    @Suppress("unused")
     @JvmStatic
     private external fun nativeUnsetModelAssignmentCallbacks()
 

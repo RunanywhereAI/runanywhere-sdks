@@ -7,13 +7,20 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/RunAnywhere.swift
  */
 
+import { Platform } from 'react-native';
 import { EventBus } from './Events';
-import { requireNativeModule, isNativeModuleAvailable, requireDeviceInfoModule } from '../native';
+import { requireNativeModule, isNativeModuleAvailable } from '../native';
 import { SDKEnvironment } from '../types';
 import { ModelRegistry } from '../services/ModelRegistry';
 import { ServiceContainer } from '../Foundation/DependencyInjection/ServiceContainer';
 import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
+import { SDKConstants } from '../Foundation/Constants';
 import { FileSystem } from '../services/FileSystem';
+import {
+  HTTPService,
+  SDKEnvironment as NetworkSDKEnvironment,
+  TelemetryService,
+} from '../services/Network';
 
 import type {
   InitializationState,
@@ -47,6 +54,7 @@ const logger = new SDKLogger('RunAnywhere');
 // ============================================================================
 
 let initState: InitializationState = createInitialState();
+let cachedDeviceId: string = '';
 
 // ============================================================================
 // Conversation Helper
@@ -106,7 +114,7 @@ export const RunAnywhere = {
   },
 
   get version(): string {
-    return '0.2.0';
+    return SDKConstants.version;
   },
 
   // ============================================================================
@@ -115,6 +123,17 @@ export const RunAnywhere = {
 
   async initialize(options: SDKInitOptions): Promise<void> {
     const environment = options.environment ?? SDKEnvironment.Production;
+
+    // Fail fast: API key is required for production/staging environments
+    // Development mode uses C++ dev config (Supabase credentials) instead
+    if (environment !== SDKEnvironment.Development && !options.apiKey) {
+      const envName = environment === SDKEnvironment.Staging ? 'staging' : 'production';
+      throw new Error(
+        `API key is required for ${envName} environment. ` +
+        `Pass apiKey in initialize() options or use SDKEnvironment.Development for local testing.`
+      );
+    }
+
     const initParams: SDKInitParams = {
       apiKey: options.apiKey,
       baseURL: options.baseURL,
@@ -142,23 +161,96 @@ export const RunAnywhere = {
         ? FileSystem.getDocumentsDirectory()
         : '';
 
+      // Configure network layer BEFORE native initialization
+      // This ensures HTTP is ready when C++ callbacks need it
+      const envString = environment === SDKEnvironment.Development ? 'development' 
+        : environment === SDKEnvironment.Staging ? 'staging' 
+        : 'production';
+      
+      // Map environment string to SDKEnvironment enum for HTTPService
+      const networkEnv = environment === SDKEnvironment.Development 
+        ? NetworkSDKEnvironment.Development
+        : environment === SDKEnvironment.Staging
+        ? NetworkSDKEnvironment.Staging  
+        : NetworkSDKEnvironment.Production;
+      
+      // Configure HTTPService with network settings
+      HTTPService.shared.configure({
+        baseURL: options.baseURL || 'https://api.runanywhere.ai',
+        apiKey: options.apiKey ?? '',
+        environment: networkEnv,
+      });
+
+      // Configure dev mode if Supabase credentials provided
+      if (options.supabaseURL && options.supabaseKey) {
+        HTTPService.shared.configureDev({
+          supabaseURL: options.supabaseURL,
+          supabaseKey: options.supabaseKey,
+        });
+      }
+
+      // For development mode, Supabase credentials will be passed to native
+      if (environment === SDKEnvironment.Development && options.supabaseURL) {
+        logger.debug('Development mode - Supabase config provided');
+      }
+
       // Initialize with config
       // Note: Backend registration (llamacpp, onnx) is done by their respective packages
       const configJson = JSON.stringify({
         apiKey: options.apiKey,
         baseURL: options.baseURL,
-        environment: environment,
+        environment: envString,
         documentsPath: documentsPath, // Required for model paths (mirrors Swift SDK)
+        sdkVersion: SDKConstants.version, // Centralized version for C++ layer
+        supabaseURL: options.supabaseURL, // For development mode
+        supabaseKey: options.supabaseKey, // For development mode
       });
 
       await native.initialize(configJson);
 
-      // Store API config
-      ServiceContainer.shared.setAPIConfig(options.apiKey, environment);
-
       // Initialize model registry
       await ModelRegistry.initialize();
 
+      // Cache device ID early (uses secure storage / Keychain)
+      try {
+        cachedDeviceId = await native.getPersistentDeviceUUID();
+        logger.debug(`Device ID cached: ${cachedDeviceId.substring(0, 8)}...`);
+      } catch (e) {
+        logger.warning('Failed to get persistent device UUID');
+      }
+
+      // Initialize telemetry with device ID
+      TelemetryService.shared.configure(cachedDeviceId, networkEnv);
+      TelemetryService.shared.trackSDKInit(envString, true);
+
+      // For production/staging mode, authenticate with backend to get JWT tokens
+      // This matches Swift SDK's CppBridge.Auth.authenticate(apiKey:) in setupHTTP()
+      if (environment !== SDKEnvironment.Development && options.apiKey) {
+        try {
+          logger.info('Authenticating with backend (production/staging mode)...');
+          const authenticated = await this._authenticateWithBackend(
+            options.apiKey,
+            options.baseURL || 'https://api.runanywhere.ai',
+            cachedDeviceId
+          );
+          if (authenticated) {
+            logger.info('Authentication successful - JWT tokens obtained');
+          } else {
+            logger.warning('Authentication failed - API requests may fail');
+          }
+        } catch (authErr) {
+          logger.warning(`Authentication failed (non-fatal): ${authErr instanceof Error ? authErr.message : String(authErr)}`);
+        }
+      }
+
+      // Trigger device registration (non-blocking, best-effort)
+      // This matches Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
+      // Uses native C++ → platform HTTP (exactly like Swift)
+      this._registerDeviceIfNeeded(environment, options.supabaseKey).catch(err => {
+        logger.warning(`Device registration failed (non-fatal): ${err.message}`);
+      });
+
+      ServiceContainer.shared.markInitialized();
       initState = markCoreInitialized(initState, initParams, 'core');
       initState = markServicesInitialized(initState);
 
@@ -173,7 +265,138 @@ export const RunAnywhere = {
     }
   },
 
+  /**
+   * Register device with backend if not already registered
+   * Uses native C++ DeviceBridge + platform HTTP (URLSession/OkHttp)
+   * Exactly matches Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
+   * @internal
+   */
+  /**
+   * Authenticate with backend to get JWT access/refresh tokens
+   * This matches Swift SDK's CppBridge.Auth.authenticate(apiKey:)
+   * @internal
+   */
+  async _authenticateWithBackend(
+    apiKey: string,
+    baseURL: string,
+    deviceId: string
+  ): Promise<boolean> {
+    try {
+      const endpoint = '/api/v1/auth/sdk/authenticate';
+      const fullUrl = baseURL.replace(/\/$/, '') + endpoint;
+      
+      // Use actual platform (ios/android) as backend only accepts these values
+      // This matches how Swift sends 'ios' and Kotlin sends 'android'
+      const platform = Platform.OS === 'ios' ? 'ios' : 'android';
+      
+      const requestBody = JSON.stringify({
+        api_key: apiKey,
+        device_id: deviceId,
+        platform: platform,
+        sdk_version: SDKConstants.version,
+      });
+
+      logger.debug(`Auth request to: ${fullUrl}`);
+
+      const response = await fetch(fullUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: requestBody,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        logger.error(`Authentication failed: HTTP ${response.status} - ${errorText}`);
+        return false;
+      }
+
+      const authResponse = await response.json() as {
+        access_token: string;
+        refresh_token: string;
+        expires_in: number;
+        device_id: string;
+        organization_id: string;
+        user_id?: string;
+        token_type: string;
+      };
+
+      // Store tokens in HTTPService for subsequent requests
+      HTTPService.shared.setToken(authResponse.access_token);
+      
+      // Store tokens in C++ AuthBridge for native HTTP requests (telemetry, device registration)
+      try {
+        const native = requireNativeModule();
+        if (native && typeof native.setAuthTokens === 'function') {
+          await native.setAuthTokens(JSON.stringify(authResponse));
+          logger.debug('Auth tokens set in C++ AuthBridge');
+        } else {
+          logger.warning('setAuthTokens not available on native module - tokens stored in JS only');
+        }
+      } catch (nativeErr) {
+        logger.warning(`Failed to set auth tokens in native: ${nativeErr}`);
+        // Continue - tokens are still stored in HTTPService
+      }
+      
+      // Store tokens in secure storage for persistence
+      try {
+        const { SecureStorageService } = await import('../Foundation/Security/SecureStorageService');
+        await SecureStorageService.storeAuthTokens(
+          authResponse.access_token,
+          authResponse.refresh_token,
+          authResponse.expires_in
+        );
+      } catch (storageErr) {
+        logger.warning(`Failed to persist tokens: ${storageErr}`);
+        // Continue - tokens are still in memory
+      }
+
+      logger.info(`Authentication successful! Token expires in ${authResponse.expires_in}s`);
+      return true;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error(`Authentication error: ${msg}`);
+      return false;
+    }
+  },
+
+  async _registerDeviceIfNeeded(
+    environment: SDKEnvironment,
+    supabaseKey?: string
+  ): Promise<void> {
+    const envString = environment === SDKEnvironment.Development ? 'development' 
+      : environment === SDKEnvironment.Staging ? 'staging' 
+      : 'production';
+    
+    try {
+      const native = requireNativeModule();
+      
+      // Call native registerDevice which goes through:
+      // JS → C++ DeviceBridge → rac_device_manager_register_if_needed → http_post callback → native HTTP
+      // This exactly mirrors Swift's flow!
+      const success = await native.registerDevice(JSON.stringify({
+        environment: envString,
+        supabaseKey: supabaseKey || '',
+        buildToken: '', // TODO: Add build token support if needed
+      }));
+
+      if (success) {
+        logger.info('Device registered successfully via native');
+      } else {
+        logger.warning('Device registration returned false');
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.warning(`Device registration error: ${msg}`);
+    }
+  },
+
   async destroy(): Promise<void> {
+    // Telemetry is handled by native layer - no JS-level shutdown needed
+    TelemetryService.shared.setEnabled(false);
+
     if (isNativeModuleAvailable()) {
       const native = requireNativeModule();
       await native.destroy();
@@ -239,15 +462,36 @@ export const RunAnywhere = {
   },
 
   /**
+   * Clear device registration flag (for testing)
+   * Forces re-registration on next SDK init
+   */
+  async clearDeviceRegistration(): Promise<boolean> {
+    if (!isNativeModuleAvailable()) return false;
+    const native = requireNativeModule();
+    return native.clearDeviceRegistration();
+  },
+
+  /**
    * Get device ID (Keychain-persisted, survives reinstalls)
+   * Note: This is async because it uses secure storage
    */
   get deviceId(): string {
+    // Return cached value if available (set during init)
+    return cachedDeviceId;
+  },
+
+  /**
+   * Get device ID asynchronously (Keychain-persisted, survives reinstalls)
+   */
+  async getDeviceId(): Promise<string> {
+    if (cachedDeviceId) {
+      return cachedDeviceId;
+    }
     try {
-      const deviceInfo = requireDeviceInfoModule();
-      // Device info module returns an object with getDeviceIdSync or similar
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const info = deviceInfo as any;
-      return info.deviceId ?? info.getDeviceIdSync?.() ?? info.uniqueId ?? '';
+      const native = requireNativeModule();
+      const uuid = await native.getPersistentDeviceUUID();
+      cachedDeviceId = uuid;
+      return uuid;
     } catch {
       return '';
     }
@@ -397,8 +641,8 @@ export const RunAnywhere = {
    * @returns Version string
    */
   async getVersion(): Promise<string> {
-    // Return package version - this is a TypeScript-only method
-    return '0.2.0';
+    // Return centralized SDK version constant
+    return SDKConstants.version;
   },
 
   /**

@@ -97,7 +97,14 @@ export {
   SecureStorageError,
   isSecureStorageError,
   isItemNotFoundError,
+  DeviceIdentity,
 } from './Foundation/Security';
+
+// =============================================================================
+// Foundation - Constants
+// =============================================================================
+
+export { SDKConstants } from './Foundation/Constants';
 
 // =============================================================================
 // Foundation - Logging
@@ -148,6 +155,37 @@ export {
   type DownloadTask,
   type DownloadConfiguration,
   type ProgressCallback,
+} from './services';
+
+// =============================================================================
+// Network Layer - Using axios (industry standard HTTP library)
+// =============================================================================
+
+export {
+  // HTTP Service
+  HTTPService,
+  // Configuration
+  SDKEnvironment,
+  createNetworkConfig,
+  getEnvironmentName,
+  isDevelopment,
+  isProduction,
+  DEFAULT_BASE_URL,
+  DEFAULT_TIMEOUT_MS,
+  // Telemetry
+  TelemetryService,
+  TelemetryCategory,
+  // Endpoints
+  APIEndpoints,
+} from './services';
+
+export type {
+  HTTPServiceConfig,
+  DevModeConfig,
+  NetworkConfig,
+  TelemetryEvent,
+  APIEndpointKey,
+  APIEndpointValue,
 } from './services';
 
 // =============================================================================

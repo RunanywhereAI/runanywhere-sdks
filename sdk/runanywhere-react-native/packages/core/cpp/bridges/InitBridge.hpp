@@ -13,6 +13,7 @@
 #include <string>
 #include <functional>
 #include <memory>
+#include <tuple>
 
 // RACommons headers
 #include "rac_core.h"
@@ -126,6 +127,154 @@ public:
      */
     static rac_environment_t toRacEnvironment(SDKEnvironment env);
 
+    // =========================================================================
+    // Secure Storage Methods
+    // Matches Swift: KeychainManager
+    // =========================================================================
+
+    /**
+     * @brief Store a value in secure storage (Keychain/Keystore)
+     * @param key Storage key
+     * @param value Value to store
+     * @return true if successful
+     */
+    bool secureSet(const std::string& key, const std::string& value);
+
+    /**
+     * @brief Get a value from secure storage
+     * @param key Storage key
+     * @param outValue Output value (empty if not found)
+     * @return true if value found and retrieved
+     */
+    bool secureGet(const std::string& key, std::string& outValue);
+
+    /**
+     * @brief Delete a value from secure storage
+     * @param key Storage key
+     * @return true if deleted or didn't exist
+     */
+    bool secureDelete(const std::string& key);
+
+    /**
+     * @brief Check if a key exists in secure storage
+     * @param key Storage key
+     * @return true if key exists
+     */
+    bool secureExists(const std::string& key);
+
+    /**
+     * @brief Get or create persistent device UUID
+     *
+     * Strategy (matches Swift DeviceIdentity):
+     * 1. Try to load from secure storage (survives reinstalls)
+     * 2. If not found, generate new UUID and store
+     *
+     * @return Persistent device UUID
+     */
+    std::string getPersistentDeviceUUID();
+
+    // =========================================================================
+    // Device Info (Synchronous)
+    // For device registration callback which must be synchronous
+    // =========================================================================
+
+    /**
+     * @brief Get device model name (e.g., "iPhone 16 Pro Max")
+     */
+    std::string getDeviceModel();
+
+    /**
+     * @brief Get OS version (e.g., "18.2")
+     */
+    std::string getOSVersion();
+
+    /**
+     * @brief Get chip name (e.g., "A18 Pro")
+     */
+    std::string getChipName();
+
+    /**
+     * @brief Get total memory in bytes
+     */
+    uint64_t getTotalMemory();
+
+    /**
+     * @brief Get available memory in bytes
+     */
+    uint64_t getAvailableMemory();
+
+    /**
+     * @brief Get CPU core count
+     */
+    int getCoreCount();
+
+    /**
+     * @brief Get architecture (e.g., "arm64")
+     */
+    std::string getArchitecture();
+
+    /**
+     * @brief Get GPU family (e.g., "mali", "adreno")
+     */
+    std::string getGPUFamily();
+
+    /**
+     * @brief Check if device is a tablet
+     * Uses platform-specific detection (UIDevice on iOS, Configuration on Android)
+     * Matches Swift SDK: device.userInterfaceIdiom == .pad
+     */
+    bool isTablet();
+
+    // =========================================================================
+    // Configuration Getters (for HTTP requests in production mode)
+    // =========================================================================
+
+    /**
+     * @brief Get configured API key
+     */
+    std::string getApiKey() const { return apiKey_; }
+
+    /**
+     * @brief Get configured base URL
+     */
+    std::string getBaseURL() const { return baseURL_; }
+
+    /**
+     * @brief Set SDK version (passed from TypeScript layer)
+     * Must be called during initialization to ensure consistency
+     */
+    void setSdkVersion(const std::string& version) { sdkVersion_ = version; }
+
+    /**
+     * @brief Get SDK version
+     * Returns centralized version passed from TypeScript SDKConstants
+     */
+    std::string getSdkVersion() const { return sdkVersion_.empty() ? "0.2.0" : sdkVersion_; }
+
+    // Note: getEnvironment() already defined above in "SDK Environment" section
+
+    // =========================================================================
+    // HTTP Methods for Device Registration
+    // Matches Swift: CppBridge+Device.swift http_post callback
+    // =========================================================================
+
+    /**
+     * @brief Synchronous HTTP POST for device registration
+     *
+     * Uses native URLSession (iOS) or HttpURLConnection (Android).
+     * Required by C++ rac_device_manager which expects synchronous HTTP.
+     *
+     * @param url Full URL to POST to
+     * @param jsonBody JSON body string
+     * @param supabaseKey Supabase API key (for dev mode, empty for prod)
+     * @return tuple<success, statusCode, responseBody, errorMessage>
+     */
+    std::tuple<bool, int, std::string, std::string> httpPostSync(
+        const std::string& url,
+        const std::string& jsonBody,
+        const std::string& supabaseKey
+    );
+
 private:
     InitBridge() = default;
     ~InitBridge();
@@ -144,6 +293,7 @@ private:
     std::string apiKey_;
     std::string baseURL_;
     std::string deviceId_;
+    std::string sdkVersion_;  // SDK version from TypeScript SDKConstants
 
     // Platform adapter - must persist for C++ to call
     rac_platform_adapter_t adapter_{};

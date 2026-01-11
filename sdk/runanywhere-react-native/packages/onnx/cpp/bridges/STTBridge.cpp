@@ -9,19 +9,11 @@
 #include "STTBridge.hpp"
 #include <stdexcept>
 
-// Platform-specific logging
-#if defined(ANDROID) || defined(__ANDROID__)
-#include <android/log.h>
-#define LOG_TAG "STTBridge"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
-#else
-#include <cstdio>
-#define LOGI(...) printf("[STTBridge] "); printf(__VA_ARGS__); printf("\n")
-#define LOGD(...) printf("[STTBridge DEBUG] "); printf(__VA_ARGS__); printf("\n")
-#define LOGE(...) printf("[STTBridge ERROR] "); printf(__VA_ARGS__); printf("\n")
-#endif
+// RACommons logger - unified logging across platforms
+#include "rac_logger.h"
+
+// Category for STT.ONNX logging
+static const char* LOG_CATEGORY = "STT.ONNX";
 
 namespace runanywhere {
 namespace bridges {
@@ -82,7 +74,7 @@ rac_result_t STTBridge::loadModel(const std::string& modelPath,
 
     if (result == RAC_SUCCESS) {
         loadedModelId_ = effectiveModelId;
-        LOGI("STT model loaded: %s", effectiveModelId.c_str());
+        RAC_LOG_INFO(LOG_CATEGORY, "STT model loaded: %s", effectiveModelId.c_str());
     } else {
         throw std::runtime_error("STTBridge: Failed to load STT model '" + effectiveModelId + "'. Error: " + std::to_string(result));
     }

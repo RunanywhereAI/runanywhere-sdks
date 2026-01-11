@@ -1,0 +1,81 @@
+# SwiftLint configuration for RunAnywhere React Native SDK
+# Applies to all Swift code in the monorepo packages
+
+# Directories to include
+included:
+  - packages/core/ios
+  - packages/llamacpp/ios
+  - packages/onnx/ios
+
+# Directories to exclude
+excluded:
+  - node_modules
+  - .build
+  - DerivedData
+  - Pods
+
+# Basic rules
+line_length:
+  warning: 150
+  error: 200
+  ignores_urls: true
+  ignores_function_declarations: true
+  ignores_comments: true
+
+file_length:
+  warning: 800
+  error: 1500
+
+function_body_length:
+  warning: 80
+  error: 300
+
+identifier_name:
+  min_length:
+    warning: 2
+    error: 1
+  max_length:
+    warning: 40
+    error: 50
+  excluded:
+    - id
+    - i
+    - j
+    - k
+    - x
+    - y
+    - z
+
+# Custom rules for logging enforcement
+custom_rules:
+  # Logging enforcement rules - require SDKLogger usage
+  # Use "// swiftlint:disable:next no_print_statements" above intentional print() usage.
+  no_print_statements:
+    name: "Use SDKLogger Instead of print()"
+    regex: '^\s*print\('
+    message: "Use SDKLogger instead of print(). Example: SDKLogger.shared.debug(\"message\")"
+    severity: error
+
+  no_nslog_statements:
+    name: "Use SDKLogger Instead of NSLog()"
+    regex: 'NSLog\('
+    message: "Use SDKLogger instead of NSLog(). Example: SDKLogger.shared.info(\"message\")"
+    severity: error
+
+  no_os_log_statements:
+    name: "Use SDKLogger Instead of os_log()"
+    regex: 'os_log\('
+    message: "Use SDKLogger instead of os_log(). The SDK logging system handles os_log internally."
+    severity: error
+
+  no_debug_print_statements:
+    name: "Use SDKLogger Instead of debugPrint()"
+    regex: 'debugPrint\('
+    message: "Use SDKLogger.debug() instead of debugPrint(). Example: SDKLogger.shared.debug(\"message\")"
+    severity: error
+
+  no_apple_logger:
+    name: "Use SDKLogger Instead of Apple Logger"
+    regex: '= Logger\('
+    message: "Use SDKLogger instead of Apple's os.Logger. Example: SDKLogger(category: \"MyCategory\")"
+    severity: error

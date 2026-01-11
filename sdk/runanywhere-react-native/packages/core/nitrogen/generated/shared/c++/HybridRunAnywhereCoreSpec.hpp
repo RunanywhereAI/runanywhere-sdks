@@ -19,6 +19,8 @@
 #include <string>
 #include <optional>
 #include <functional>
+#include <NitroModules/Null.hpp>
+#include <variant>
 
 namespace margelo::nitro::runanywhere {
 
@@ -47,7 +49,7 @@ namespace margelo::nitro::runanywhere {
 
     public:
       // Properties
-
+      
 
     public:
       // Methods
@@ -59,8 +61,10 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> isAuthenticated() = 0;
       virtual std::shared_ptr<Promise<std::string>> getUserId() = 0;
       virtual std::shared_ptr<Promise<std::string>> getOrganizationId() = 0;
+      virtual std::shared_ptr<Promise<bool>> setAuthTokens(const std::string& authResponseJson) = 0;
       virtual std::shared_ptr<Promise<bool>> registerDevice(const std::string& environmentJson) = 0;
       virtual std::shared_ptr<Promise<bool>> isDeviceRegistered() = 0;
+      virtual std::shared_ptr<Promise<bool>> clearDeviceRegistration() = 0;
       virtual std::shared_ptr<Promise<std::string>> getDeviceId() = 0;
       virtual std::shared_ptr<Promise<std::string>> getAvailableModels() = 0;
       virtual std::shared_ptr<Promise<std::string>> getModelInfo(const std::string& modelId) = 0;
@@ -105,6 +109,13 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> unloadVADModel() = 0;
       virtual std::shared_ptr<Promise<std::string>> processVAD(const std::string& audioBase64, const std::optional<std::string>& optionsJson) = 0;
       virtual std::shared_ptr<Promise<void>> resetVAD() = 0;
+      virtual std::shared_ptr<Promise<bool>> secureStorageSet(const std::string& key, const std::string& value) = 0;
+      virtual std::shared_ptr<Promise<std::variant<nitro::NullType, std::string>>> secureStorageGet(const std::string& key) = 0;
+      virtual std::shared_ptr<Promise<bool>> secureStorageDelete(const std::string& key) = 0;
+      virtual std::shared_ptr<Promise<bool>> secureStorageExists(const std::string& key) = 0;
+      virtual std::shared_ptr<Promise<std::string>> getPersistentDeviceUUID() = 0;
+      virtual std::shared_ptr<Promise<void>> flushTelemetry() = 0;
+      virtual std::shared_ptr<Promise<bool>> isTelemetryInitialized() = 0;
       virtual std::shared_ptr<Promise<bool>> initializeVoiceAgent(const std::string& configJson) = 0;
       virtual std::shared_ptr<Promise<bool>> initializeVoiceAgentWithLoadedModels() = 0;
       virtual std::shared_ptr<Promise<bool>> isVoiceAgentReady() = 0;

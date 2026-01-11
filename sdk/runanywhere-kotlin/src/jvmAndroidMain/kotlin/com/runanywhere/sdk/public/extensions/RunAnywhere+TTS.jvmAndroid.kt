@@ -7,8 +7,9 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
 import com.runanywhere.sdk.foundation.errors.SDKError
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.TTS.TTSOptions
@@ -16,22 +17,30 @@ import com.runanywhere.sdk.public.extensions.TTS.TTSOutput
 import com.runanywhere.sdk.public.extensions.TTS.TTSSpeakResult
 import com.runanywhere.sdk.public.extensions.TTS.TTSSynthesisMetadata
 
+private val ttsLogger = SDKLogger.tts
+
 actual suspend fun RunAnywhere.loadTTSVoice(voiceId: String) {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
 
-    val modelInfo = CppBridgeModelRegistry.get(voiceId)
-        ?: throw SDKError.tts("Voice '$voiceId' not found in registry")
+    ttsLogger.debug("Loading TTS voice: $voiceId")
 
-    val localPath = modelInfo.localPath
-        ?: throw SDKError.tts("Voice '$voiceId' is not downloaded")
+    val modelInfo =
+        CppBridgeModelRegistry.get(voiceId)
+            ?: throw SDKError.tts("Voice '$voiceId' not found in registry")
+
+    val localPath =
+        modelInfo.localPath
+            ?: throw SDKError.tts("Voice '$voiceId' is not downloaded")
 
     // Pass modelPath, modelId, and modelName separately for correct telemetry
     val result = CppBridgeTTS.loadModel(localPath, voiceId, modelInfo.name)
     if (result != 0) {
+        ttsLogger.error("Failed to load TTS voice '$voiceId' (error code: $result)")
         throw SDKError.tts("Failed to load TTS voice '$voiceId' (error code: $result)")
     }
+    ttsLogger.info("TTS voice loaded: $voiceId")
 }
 
 actual suspend fun RunAnywhere.unloadTTSVoice() {
@@ -58,44 +67,48 @@ actual suspend fun RunAnywhere.availableTTSVoices(): List<String> {
 
 actual suspend fun RunAnywhere.synthesize(
     text: String,
-    options: TTSOptions
+    options: TTSOptions,
 ): TTSOutput {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
 
     val voiceId = CppBridgeTTS.getLoadedModelId() ?: "unknown"
+    ttsLogger.debug("Synthesizing text: ${text.take(50)}${if (text.length > 50) "..." else ""} (voice: $voiceId)")
 
-    val config = CppBridgeTTS.SynthesisConfig(
-        speed = options.rate,
-        pitch = options.pitch,
-        volume = options.volume,
-        sampleRate = options.sampleRate,
-        language = options.language ?: CppBridgeTTS.Language.ENGLISH
-    )
+    val config =
+        CppBridgeTTS.SynthesisConfig(
+            speed = options.rate,
+            pitch = options.pitch,
+            volume = options.volume,
+            sampleRate = options.sampleRate,
+            language = options.language ?: CppBridgeTTS.Language.ENGLISH,
+        )
 
     val result = CppBridgeTTS.synthesize(text, config)
+    ttsLogger.info("Synthesis complete: ${result.durationMs}ms audio")
 
-    val metadata = TTSSynthesisMetadata(
-        voice = voiceId,
-        language = config.language,
-        processingTime = result.processingTimeMs / 1000.0,
-        characterCount = text.length
-    )
+    val metadata =
+        TTSSynthesisMetadata(
+            voice = voiceId,
+            language = config.language,
+            processingTime = result.processingTimeMs / 1000.0,
+            characterCount = text.length,
+        )
 
     return TTSOutput(
         audioData = result.audioData,
         format = options.audioFormat,
         duration = result.durationMs / 1000.0,
         phonemeTimestamps = null,
-        metadata = metadata
+        metadata = metadata,
     )
 }
 
 actual suspend fun RunAnywhere.synthesizeStream(
     text: String,
     options: TTSOptions,
-    onAudioChunk: (ByteArray) -> Unit
+    onAudioChunk: (ByteArray) -> Unit,
 ): TTSOutput {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
@@ -103,32 +116,35 @@ actual suspend fun RunAnywhere.synthesizeStream(
 
     val voiceId = CppBridgeTTS.getLoadedModelId() ?: "unknown"
 
-    val config = CppBridgeTTS.SynthesisConfig(
-        speed = options.rate,
-        pitch = options.pitch,
-        volume = options.volume,
-        sampleRate = options.sampleRate,
-        language = options.language ?: CppBridgeTTS.Language.ENGLISH
-    )
+    val config =
+        CppBridgeTTS.SynthesisConfig(
+            speed = options.rate,
+            pitch = options.pitch,
+            volume = options.volume,
+            sampleRate = options.sampleRate,
+            language = options.language ?: CppBridgeTTS.Language.ENGLISH,
+        )
 
-    val result = CppBridgeTTS.synthesizeStream(text, config) { audioData, isFinal ->
-        onAudioChunk(audioData)
-        true // Continue processing
-    }
+    val result =
+        CppBridgeTTS.synthesizeStream(text, config) { audioData, isFinal ->
+            onAudioChunk(audioData)
+            true // Continue processing
+        }
 
-    val metadata = TTSSynthesisMetadata(
-        voice = voiceId,
-        language = config.language,
-        processingTime = result.processingTimeMs / 1000.0,
-        characterCount = text.length
-    )
+    val metadata =
+        TTSSynthesisMetadata(
+            voice = voiceId,
+            language = config.language,
+            processingTime = result.processingTimeMs / 1000.0,
+            characterCount = text.length,
+        )
 
     return TTSOutput(
         audioData = result.audioData,
         format = options.audioFormat,
         duration = result.durationMs / 1000.0,
         phonemeTimestamps = null,
-        metadata = metadata
+        metadata = metadata,
     )
 }
 
@@ -138,7 +154,7 @@ actual suspend fun RunAnywhere.stopSynthesis() {
 
 actual suspend fun RunAnywhere.speak(
     text: String,
-    options: TTSOptions
+    options: TTSOptions,
 ): TTSSpeakResult {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")

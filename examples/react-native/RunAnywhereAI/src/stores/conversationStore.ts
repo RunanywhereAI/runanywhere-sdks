@@ -72,6 +72,7 @@ interface ConversationState {
   loadConversation: (conversationId: string) => Promise<Conversation | null>;
   setCurrentConversation: (conversation: Conversation | null) => void;
   addMessage: (message: Message, conversationId?: string) => Promise<void>;
+  updateMessage: (message: Message, conversationId?: string) => void;
   searchConversations: (query: string) => Conversation[];
   clearAllConversations: () => Promise<void>;
 }
@@ -92,7 +93,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       const dirExists = await RNFS.exists(CONVERSATIONS_DIR);
       if (!dirExists) {
         await RNFS.mkdir(CONVERSATIONS_DIR);
-        console.log('[ConversationStore] Created conversations directory');
+        console.warn('[ConversationStore] Created conversations directory');
       }
 
       // Load all conversation files
@@ -121,7 +122,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
         (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
       );
 
-      console.log(
+      console.warn(
         `[ConversationStore] Loaded ${loadedConversations.length} conversations`
       );
       set({ conversations: loadedConversations, isLoading: false });
@@ -155,7 +156,9 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       currentConversation: conversation,
     }));
 
-    console.log(`[ConversationStore] Created conversation: ${conversation.id}`);
+    console.warn(
+      `[ConversationStore] Created conversation: ${conversation.id}`
+    );
     return conversation;
   },
 
@@ -188,7 +191,9 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
           : state.currentConversation,
     }));
 
-    console.log(`[ConversationStore] Updated conversation: ${conversation.id}`);
+    console.warn(
+      `[ConversationStore] Updated conversation: ${conversation.id}`
+    );
   },
 
   /**
@@ -221,7 +226,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       };
     });
 
-    console.log(`[ConversationStore] Deleted conversation: ${conversationId}`);
+    console.warn(`[ConversationStore] Deleted conversation: ${conversationId}`);
   },
 
   /**
@@ -330,6 +335,49 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   },
 
   /**
+   * Update an existing message in a conversation (for streaming updates)
+   * Matches iOS updateMessage(at:with:) behavior
+   */
+  updateMessage: (message: Message, conversationId?: string) => {
+    const { currentConversation, conversations } = get();
+    const targetId = conversationId || currentConversation?.id;
+
+    if (!targetId) {
+      return;
+    }
+
+    const conversation = conversations.find((c) => c.id === targetId);
+    if (!conversation) {
+      return;
+    }
+
+    // Find and update the message by ID
+    const updatedMessages = conversation.messages.map((m) =>
+      m.id === message.id ? message : m
+    );
+
+    const updatedConversation: Conversation = {
+      ...conversation,
+      messages: updatedMessages,
+      updatedAt: new Date(),
+      modelName: message.modelInfo?.modelName || conversation.modelName,
+      frameworkName:
+        message.modelInfo?.frameworkDisplayName || conversation.frameworkName,
+    };
+
+    // Update state (don't persist to disk during streaming - final update will persist)
+    set((state) => ({
+      conversations: state.conversations.map((c) =>
+        c.id === targetId ? updatedConversation : c
+      ),
+      currentConversation:
+        state.currentConversation?.id === targetId
+          ? updatedConversation
+          : state.currentConversation,
+    }));
+  },
+
+  /**
    * Search conversations by title and message content
    * Matches iOS searchConversations(query:) behavior
    */
@@ -358,7 +406,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       await RNFS.unlink(CONVERSATIONS_DIR);
       await RNFS.mkdir(CONVERSATIONS_DIR);
       set({ conversations: [], currentConversation: null });
-      console.log('[ConversationStore] Cleared all conversations');
+      console.warn('[ConversationStore] Cleared all conversations');
     } catch (error) {
       console.error(
         '[ConversationStore] Failed to clear conversations:',

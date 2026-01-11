@@ -31,12 +31,14 @@ plugins {
 // Local vs Remote JNI Library Configuration (mirrors main SDK)
 // =============================================================================
 // Read from root project to ensure consistency with main SDK
-val testLocal: Boolean = rootProject.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
-    ?: project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
-    ?: false
-val coreVersion: String = rootProject.findProperty("runanywhere.coreVersion")?.toString()
-    ?: project.findProperty("runanywhere.coreVersion")?.toString()
-    ?: "0.1.4"
+val testLocal: Boolean =
+    rootProject.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
+        ?: project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
+        ?: false
+val coreVersion: String =
+    rootProject.findProperty("runanywhere.coreVersion")?.toString()
+        ?: project.findProperty("runanywhere.coreVersion")?.toString()
+        ?: "0.1.4"
 
 logger.lifecycle("ONNX Module: testLocal=$testLocal, coreVersion=$coreVersion")
 
@@ -184,7 +186,7 @@ android {
         getByName("main") {
             // IMPORTANT: Use setSrcDirs to REPLACE (not add to) default jniLibs locations
             jniLibs.setSrcDirs(
-                listOf(if (testLocal) "src/androidMain/jniLibs" else "build/jniLibs")
+                listOf(if (testLocal) "src/androidMain/jniLibs" else "build/jniLibs"),
             )
         }
     }
@@ -236,7 +238,8 @@ tasks.register("downloadJniLibs") {
             // In the new RAC architecture, the common libs are from RACommons
             val commonLibs = setOf("libc++_shared.so", "librac_commons.so", "librac_commons_jni.so")
 
-            extractDir.walkTopDown()
+            extractDir
+                .walkTopDown()
                 .filter { it.isDirectory && it.name in listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86") }
                 .forEach { abiDir ->
                     val targetAbiDir = file("$outputDir/${abiDir.name}")
