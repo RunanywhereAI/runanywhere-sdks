@@ -44,7 +44,7 @@ class KeychainManager private constructor(
         private const val EXPIRES_AT_KEY = "expires_at"
     }
 
-    private val logger = SDKLogger("KeychainManager")
+    private val logger = SDKLogger.core
     private val mutex = Mutex()
 
     private val masterKey: MasterKey by lazy {
@@ -85,7 +85,7 @@ class KeychainManager private constructor(
 
             logger.debug("Tokens saved successfully")
         } catch (e: Exception) {
-            logger.error("Failed to save tokens", e)
+            logger.error("Failed to save tokens", throwable = e)
             throw e
         }
     }
@@ -118,7 +118,7 @@ class KeychainManager private constructor(
                     return null
                 }
             } catch (e: Exception) {
-                logger.error("Failed to retrieve tokens", e)
+                logger.error("Failed to retrieve tokens", throwable = e)
                 return null
             }
         }
@@ -141,7 +141,7 @@ class KeychainManager private constructor(
 
                 logger.debug("Tokens deleted successfully")
             } catch (e: Exception) {
-                logger.error("Failed to delete tokens", e)
+                logger.error("Failed to delete tokens", throwable = e)
                 throw e
             }
         }
@@ -157,7 +157,7 @@ class KeychainManager private constructor(
                 val refreshToken = encryptedPrefs.getString(REFRESH_TOKEN_KEY, null)
                 return accessToken != null && refreshToken != null
             } catch (e: Exception) {
-                logger.error("Failed to check stored tokens", e)
+                logger.error("Failed to check stored tokens", throwable = e)
                 return false
             }
         }
@@ -178,7 +178,7 @@ class KeychainManager private constructor(
 
                 logger.info("All keychain data cleared")
             } catch (e: Exception) {
-                logger.error("Failed to clear keychain data", e)
+                logger.error("Failed to clear keychain data", throwable = e)
                 throw e
             }
         }

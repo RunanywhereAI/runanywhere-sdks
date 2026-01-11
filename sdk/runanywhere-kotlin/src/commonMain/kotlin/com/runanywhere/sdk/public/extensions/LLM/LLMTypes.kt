@@ -31,9 +31,8 @@ data class LLMConfiguration(
     val maxTokens: Int = 100,
     val systemPrompt: String? = null,
     val streamingEnabled: Boolean = true,
-    override val preferredFramework: InferenceFramework? = null
+    override val preferredFramework: InferenceFramework? = null,
 ) : ComponentConfiguration {
-
     val componentType: SDKComponent get() = SDKComponent.LLM
 
     /**
@@ -55,7 +54,9 @@ data class LLMConfiguration(
     /**
      * Builder pattern for LLMConfiguration.
      */
-    class Builder(private var modelId: String? = null) {
+    class Builder(
+        private var modelId: String? = null,
+    ) {
         private var contextLength: Int = 2048
         private var temperature: Double = 0.7
         private var maxTokens: Int = 100
@@ -64,21 +65,27 @@ data class LLMConfiguration(
         private var preferredFramework: InferenceFramework? = null
 
         fun contextLength(length: Int) = apply { contextLength = length }
+
         fun temperature(temp: Double) = apply { temperature = temp }
+
         fun maxTokens(tokens: Int) = apply { maxTokens = tokens }
+
         fun systemPrompt(prompt: String?) = apply { systemPrompt = prompt }
+
         fun streamingEnabled(enabled: Boolean) = apply { streamingEnabled = enabled }
+
         fun preferredFramework(framework: InferenceFramework?) = apply { preferredFramework = framework }
 
-        fun build() = LLMConfiguration(
-            modelId = modelId,
-            contextLength = contextLength,
-            temperature = temperature,
-            maxTokens = maxTokens,
-            systemPrompt = systemPrompt,
-            streamingEnabled = streamingEnabled,
-            preferredFramework = preferredFramework
-        )
+        fun build() =
+            LLMConfiguration(
+                modelId = modelId,
+                contextLength = contextLength,
+                temperature = temperature,
+                maxTokens = maxTokens,
+                systemPrompt = systemPrompt,
+                streamingEnabled = streamingEnabled,
+                preferredFramework = preferredFramework,
+            )
     }
 
     companion object {
@@ -104,7 +111,7 @@ data class LLMGenerationOptions(
     val streamingEnabled: Boolean = false,
     val preferredFramework: InferenceFramework? = null,
     val structuredOutput: StructuredOutputConfig? = null,
-    val systemPrompt: String? = null
+    val systemPrompt: String? = null,
 ) {
     companion object {
         val DEFAULT = LLMGenerationOptions()
@@ -121,39 +128,28 @@ data class LLMGenerationOptions(
 data class LLMGenerationResult(
     /** Generated text (with thinking content removed if extracted) */
     val text: String,
-
     /** Thinking/reasoning content extracted from the response */
     val thinkingContent: String? = null,
-
     /** Number of input/prompt tokens (from tokenizer) */
     val inputTokens: Int = 0,
-
     /** Number of tokens used (output tokens) */
     val tokensUsed: Int,
-
     /** Model used for generation */
     val modelUsed: String,
-
     /** Total latency in milliseconds */
     val latencyMs: Double,
-
     /** Framework used for generation */
     val framework: String? = null,
-
     /** Tokens generated per second */
     val tokensPerSecond: Double = 0.0,
-
     /** Time to first token in milliseconds (only for streaming) */
     val timeToFirstTokenMs: Double? = null,
-
     /** Structured output validation result */
     val structuredOutputValidation: StructuredOutputValidation? = null,
-
     /** Number of tokens used for thinking/reasoning */
     val thinkingTokens: Int? = null,
-
     /** Number of tokens in the actual response content */
-    val responseTokens: Int = tokensUsed
+    val responseTokens: Int = tokensUsed,
 )
 
 // MARK: - LLM Streaming Result
@@ -167,9 +163,8 @@ data class LLMGenerationResult(
 data class LLMStreamingResult(
     /** Flow of tokens as they are generated */
     val stream: Flow<String>,
-
     /** Deferred result that completes with final generation result including metrics */
-    val result: Deferred<LLMGenerationResult>
+    val result: Deferred<LLMGenerationResult>,
 )
 
 // MARK: - Thinking Tag Pattern
@@ -181,7 +176,7 @@ data class LLMStreamingResult(
 @Serializable
 data class ThinkingTagPattern(
     val openingTag: String,
-    val closingTag: String
+    val closingTag: String,
 ) {
     companion object {
         /** Default pattern used by models like DeepSeek and Hermes */
@@ -204,12 +199,13 @@ data class ThinkingTagPattern(
 interface Generatable {
     companion object {
         /** Default JSON schema */
-        val DEFAULT_JSON_SCHEMA = """
+        val DEFAULT_JSON_SCHEMA =
+            """
             {
               "type": "object",
               "additionalProperties": false
             }
-        """.trimIndent()
+            """.trimIndent()
     }
 }
 
@@ -221,12 +217,10 @@ interface Generatable {
 data class StructuredOutputConfig(
     /** The type name to generate */
     val typeName: String,
-
     /** Whether to include schema in prompt */
     val includeSchemaInPrompt: Boolean = true,
-
     /** JSON schema for the type */
-    val jsonSchema: String = Generatable.DEFAULT_JSON_SCHEMA
+    val jsonSchema: String = Generatable.DEFAULT_JSON_SCHEMA,
 )
 
 /**
@@ -237,7 +231,7 @@ data class StructuredOutputConfig(
 data class GenerationHints(
     val temperature: Float? = null,
     val maxTokens: Int? = null,
-    val systemRole: String? = null
+    val systemRole: String? = null,
 )
 
 /**
@@ -248,7 +242,7 @@ data class GenerationHints(
 data class StreamToken(
     val text: String,
     val timestamp: Long = System.currentTimeMillis(),
-    val tokenIndex: Int
+    val tokenIndex: Int,
 )
 
 /**
@@ -259,5 +253,5 @@ data class StreamToken(
 data class StructuredOutputValidation(
     val isValid: Boolean,
     val containsJSON: Boolean,
-    val error: String?
+    val error: String?,
 )

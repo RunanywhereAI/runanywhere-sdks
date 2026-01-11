@@ -41,7 +41,7 @@ import com.runanywhere.sdk.foundation.SDKLogger
  * Matches iOS LlamaCPP.swift exactly.
  */
 object LlamaCPP : RunAnywhereModule {
-    private val logger = SDKLogger("LlamaCPP")
+    private val logger = SDKLogger.llamacpp
 
     // MARK: - Module Info
 
@@ -81,6 +81,7 @@ object LlamaCPP : RunAnywhereModule {
      *
      * @param priority Ignored (C++ uses its own priority system)
      */
+    @Suppress("UNUSED_PARAMETER")
     @JvmStatic
     @JvmOverloads
     fun register(priority: Int = defaultPriority) {

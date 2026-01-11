@@ -123,10 +123,22 @@ export const SettingsScreen: React.FC = () => {
       const version = await RunAnywhere.getVersion();
       setSdkVersion(version);
 
+      // Check if SDK is initialized first
+      const isInit = await RunAnywhere.isInitialized();
+      console.log('[Settings] SDK isInitialized:', isInit);
+
       // Get backend info for storage data
       const backendInfo = await RunAnywhere.getBackendInfo();
-      console.warn('[Settings] Backend info:', backendInfo);
-      setBackendInfoData(backendInfo);
+      console.log('[Settings] Backend info:', backendInfo);
+      
+      // Override name with actual init status
+      const updatedBackendInfo = {
+        ...backendInfo,
+        name: isInit ? 'RunAnywhere Core' : 'Not initialized',
+        version: version,
+        initialized: isInit,
+      };
+      setBackendInfoData(updatedBackendInfo);
 
       // Get capabilities (returns string[], not number[])
       const caps = await RunAnywhere.getCapabilities();
@@ -503,10 +515,14 @@ export const SettingsScreen: React.FC = () => {
 
   /**
    * Render storage bar
+   * Matches iOS: shows app storage usage relative to device free space
    */
   const renderStorageBar = () => {
-    const usedPercent =
-      (storageInfo.appStorage / storageInfo.totalStorage) * 100;
+    // Show app storage as portion of (app storage + free space)
+    const totalAvailable = storageInfo.appStorage + storageInfo.freeSpace;
+    const usedPercent = totalAvailable > 0 
+      ? (storageInfo.appStorage / totalAvailable) * 100 
+      : 0;
     return (
       <View style={styles.storageBar}>
         <View style={styles.storageBarTrack}>
@@ -519,7 +535,7 @@ export const SettingsScreen: React.FC = () => {
         </View>
         <Text style={styles.storageText}>
           {formatBytes(storageInfo.appStorage)} of{' '}
-          {formatBytes(storageInfo.totalStorage)} used
+          {formatBytes(storageInfo.freeSpace)} available
         </Text>
       </View>
     );
@@ -639,130 +655,7 @@ export const SettingsScreen: React.FC = () => {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* SDK Status */}
-        {renderSectionHeader('SDK Status')}
-        <View style={styles.section}>
-          {/* Backend Info */}
-          <View style={styles.statusRow}>
-            <Text style={styles.statusLabel}>Backend</Text>
-            <Text style={styles.statusValue}>
-              {(backendInfoData as { name?: string }).name || 'Not initialized'}
-            </Text>
-          </View>
-          <View style={styles.statusRow}>
-            <Text style={styles.statusLabel}>Version</Text>
-            <Text style={styles.statusValue}>
-              {(backendInfoData as { version?: string }).version || '-'}
-            </Text>
-          </View>
-
-          {/* Capabilities */}
-          <View style={styles.capabilitiesContainer}>
-            <Text style={styles.capabilitiesLabel}>
-              Supported Capabilities:
-            </Text>
-            {capabilities.length > 0 ? (
-              <View style={styles.capabilitiesList}>
-                {capabilities.map((cap) => (
-                  <View key={cap} style={styles.capabilityBadge}>
-                    <Icon
-                      name="checkmark-circle"
-                      size={14}
-                      color={Colors.primaryGreen}
-                    />
-                    <Text style={styles.capabilityText}>
-                      {capabilityNames[cap] || `Capability ${cap}`}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <Text style={styles.noCapabilities}>
-                No capabilities reported
-              </Text>
-            )}
-          </View>
-
-          {/* Model Status */}
-          <View style={styles.modelStatusContainer}>
-            <Text style={styles.capabilitiesLabel}>Loaded Models:</Text>
-            <View style={styles.modelStatusGrid}>
-              <View
-                style={[
-                  styles.modelStatusItem,
-                  isSTTLoaded && styles.modelStatusItemLoaded,
-                ]}
-              >
-                <Icon
-                  name={isSTTLoaded ? 'checkmark-circle' : 'close-circle'}
-                  size={16}
-                  color={
-                    isSTTLoaded ? Colors.primaryGreen : Colors.textTertiary
-                  }
-                />
-                <Text style={styles.modelStatusText}>STT</Text>
-              </View>
-              <View
-                style={[
-                  styles.modelStatusItem,
-                  isTTSLoaded && styles.modelStatusItemLoaded,
-                ]}
-              >
-                <Icon
-                  name={isTTSLoaded ? 'checkmark-circle' : 'close-circle'}
-                  size={16}
-                  color={
-                    isTTSLoaded ? Colors.primaryGreen : Colors.textTertiary
-                  }
-                />
-                <Text style={styles.modelStatusText}>TTS</Text>
-              </View>
-              <View
-                style={[
-                  styles.modelStatusItem,
-                  isTextLoaded && styles.modelStatusItemLoaded,
-                ]}
-              >
-                <Icon
-                  name={isTextLoaded ? 'checkmark-circle' : 'close-circle'}
-                  size={16}
-                  color={
-                    isTextLoaded ? Colors.primaryGreen : Colors.textTertiary
-                  }
-                />
-                <Text style={styles.modelStatusText}>LLM</Text>
-              </View>
-              <View
-                style={[
-                  styles.modelStatusItem,
-                  isVADLoaded && styles.modelStatusItemLoaded,
-                ]}
-              >
-                <Icon
-                  name={isVADLoaded ? 'checkmark-circle' : 'close-circle'}
-                  size={16}
-                  color={
-                    isVADLoaded ? Colors.primaryGreen : Colors.textTertiary
-                  }
-                />
-                <Text style={styles.modelStatusText}>VAD</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* SDK Configuration */}
-        {renderSectionHeader('SDK Configuration')}
-        <View style={styles.section}>
-          {renderSettingRow(
-            'git-branch-outline',
-            'Routing Policy',
-            RoutingPolicyDisplayNames[routingPolicy],
-            handleRoutingPolicyChange
-          )}
-        </View>
-
-        {/* Generation Settings */}
+        {/* Generation Settings - Matches iOS CombinedSettingsView order */}
         {renderSectionHeader('Generation Settings')}
         <View style={styles.section}>
           {renderSliderSetting(
@@ -796,25 +689,35 @@ export const SettingsScreen: React.FC = () => {
           )}
         </View>
 
-        {/* Storage Overview */}
+        {/* Storage Overview - Matches iOS CombinedSettingsView */}
         {renderSectionHeader('Storage Overview')}
         <View style={styles.section}>
           {renderStorageBar()}
           <View style={styles.storageDetails}>
+            {/* Total Storage - App's total storage usage */}
+            <View style={styles.storageDetailRow}>
+              <Text style={styles.storageDetailLabel}>Total Storage</Text>
+              <Text style={styles.storageDetailValue}>
+                {formatBytes(storageInfo.appStorage)}
+              </Text>
+            </View>
+            {/* Models Storage - Downloaded models size */}
             <View style={styles.storageDetailRow}>
               <Text style={styles.storageDetailLabel}>Models</Text>
               <Text style={styles.storageDetailValue}>
                 {formatBytes(storageInfo.modelsStorage)}
               </Text>
             </View>
+            {/* Cache Size */}
             <View style={styles.storageDetailRow}>
               <Text style={styles.storageDetailLabel}>Cache</Text>
               <Text style={styles.storageDetailValue}>
                 {formatBytes(storageInfo.cacheSize)}
               </Text>
             </View>
+            {/* Available - Device free space */}
             <View style={styles.storageDetailRow}>
-              <Text style={styles.storageDetailLabel}>Free Space</Text>
+              <Text style={styles.storageDetailLabel}>Available</Text>
               <Text style={styles.storageDetailValue}>
                 {formatBytes(storageInfo.freeSpace)}
               </Text>

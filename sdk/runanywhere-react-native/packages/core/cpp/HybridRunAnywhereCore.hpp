@@ -39,6 +39,7 @@
 #include <mutex>
 #include <string>
 #include <optional>
+#include <variant>
 #include <functional>
 
 namespace margelo::nitro::runanywhere {
@@ -71,6 +72,7 @@ public:
   std::shared_ptr<Promise<bool>> isAuthenticated() override;
   std::shared_ptr<Promise<std::string>> getUserId() override;
   std::shared_ptr<Promise<std::string>> getOrganizationId() override;
+  std::shared_ptr<Promise<bool>> setAuthTokens(const std::string& authResponseJson) override;
 
   // ============================================================================
   // Device Registration - Delegates to DeviceBridge
@@ -78,6 +80,7 @@ public:
 
   std::shared_ptr<Promise<bool>> registerDevice(const std::string& environmentJson) override;
   std::shared_ptr<Promise<bool>> isDeviceRegistered() override;
+  std::shared_ptr<Promise<bool>> clearDeviceRegistration() override;
   std::shared_ptr<Promise<std::string>> getDeviceId() override;
 
   // ============================================================================
@@ -214,6 +217,30 @@ public:
     const std::string& audioBase64,
     const std::optional<std::string>& optionsJson) override;
   std::shared_ptr<Promise<void>> resetVAD() override;
+
+  // ============================================================================
+  // Secure Storage
+  // Matches Swift: KeychainManager.swift
+  // Uses platform adapter callbacks for Keychain/Keystore
+  // ============================================================================
+
+  std::shared_ptr<Promise<bool>> secureStorageSet(
+    const std::string& key,
+    const std::string& value) override;
+  std::shared_ptr<Promise<std::variant<nitro::NullType, std::string>>> secureStorageGet(
+    const std::string& key) override;
+  std::shared_ptr<Promise<bool>> secureStorageDelete(const std::string& key) override;
+  std::shared_ptr<Promise<bool>> secureStorageExists(const std::string& key) override;
+  std::shared_ptr<Promise<std::string>> getPersistentDeviceUUID() override;
+
+  // ============================================================================
+  // Telemetry
+  // Matches Swift: CppBridge+Telemetry.swift
+  // C++ handles all telemetry logic - batching, JSON building, routing
+  // ============================================================================
+
+  std::shared_ptr<Promise<void>> flushTelemetry() override;
+  std::shared_ptr<Promise<bool>> isTelemetryInitialized() override;
 
   // ============================================================================
   // Voice Agent Capability (Backend-Agnostic)

@@ -28,9 +28,7 @@ import com.runanywhere.sdk.foundation.SDKLogger
  * - Links to librac_commons.so - Commons library with service registry
  */
 internal object LlamaCPPBridge {
-
-    private const val TAG = "LlamaCPPBridge"
-    private val logger = SDKLogger(TAG)
+    private val logger = SDKLogger.llamacpp
 
     @Volatile
     private var nativeLibraryLoaded = false
@@ -61,13 +59,13 @@ internal object LlamaCPPBridge {
                 // The LlamaCPP JNI provides backend registration functions.
                 System.loadLibrary("rac_backend_llamacpp_jni")
                 nativeLibraryLoaded = true
-                logger.info("✅ LlamaCPP native library loaded successfully")
+                logger.info("LlamaCPP native library loaded successfully")
                 return true
             } catch (e: UnsatisfiedLinkError) {
-                logger.error("❌ Failed to load LlamaCPP native library: ${e.message}", e)
+                logger.error("Failed to load LlamaCPP native library: ${e.message}", throwable = e)
                 return false
             } catch (e: Exception) {
-                logger.error("❌ Unexpected error loading LlamaCPP native library: ${e.message}", e)
+                logger.error("Unexpected error loading LlamaCPP native library: ${e.message}", throwable = e)
                 return false
             }
         }

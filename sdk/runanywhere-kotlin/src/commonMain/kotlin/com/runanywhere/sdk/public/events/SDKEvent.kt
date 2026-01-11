@@ -28,7 +28,7 @@ enum class EventDestination {
     ANALYTICS_ONLY,
 
     /** Both destinations (default) */
-    ALL
+    ALL,
 }
 
 // MARK: - Event Category
@@ -37,7 +37,9 @@ enum class EventDestination {
  * Event categories for filtering/grouping (mirrors C++ categories).
  * Mirrors Swift EventCategory exactly.
  */
-enum class EventCategory(val value: String) {
+enum class EventCategory(
+    val value: String,
+) {
     SDK("sdk"),
     MODEL("model"),
     LLM("llm"),
@@ -47,7 +49,7 @@ enum class EventCategory(val value: String) {
     STORAGE("storage"),
     DEVICE("device"),
     NETWORK("network"),
-    ERROR("error")
+    ERROR("error"),
 }
 
 // MARK: - SDK Event Interface
@@ -96,7 +98,7 @@ data class BaseSDKEvent(
     override val timestamp: Long = System.currentTimeMillis(),
     override val sessionId: String? = null,
     override val destination: EventDestination = EventDestination.ALL,
-    override val properties: Map<String, String> = emptyMap()
+    override val properties: Map<String, String> = emptyMap(),
 ) : SDKEvent
 
 // MARK: - Specific Event Types
@@ -111,19 +113,22 @@ data class SDKLifecycleEvent(
     override val id: String = Uuid.random().toString(),
     override val timestamp: Long = System.currentTimeMillis(),
     override val sessionId: String? = null,
-    override val destination: EventDestination = EventDestination.ALL
+    override val destination: EventDestination = EventDestination.ALL,
 ) : SDKEvent {
     override val type: String get() = "sdk.${lifecycleType.value}"
     override val category: EventCategory get() = EventCategory.SDK
     override val properties: Map<String, String>
-        get() = buildMap {
-            version?.let { put("version", it) }
-        }
+        get() =
+            buildMap {
+                version?.let { put("version", it) }
+            }
 
-    enum class LifecycleType(val value: String) {
+    enum class LifecycleType(
+        val value: String,
+    ) {
         INITIALIZED("initialized"),
         SHUTDOWN("shutdown"),
-        ERROR("error")
+        ERROR("error"),
     }
 }
 
@@ -139,25 +144,28 @@ data class ModelEvent(
     override val id: String = Uuid.random().toString(),
     override val timestamp: Long = System.currentTimeMillis(),
     override val sessionId: String? = null,
-    override val destination: EventDestination = EventDestination.ALL
+    override val destination: EventDestination = EventDestination.ALL,
 ) : SDKEvent {
     override val type: String get() = "model.${eventType.value}"
     override val category: EventCategory get() = EventCategory.MODEL
     override val properties: Map<String, String>
-        get() = buildMap {
-            put("model_id", modelId)
-            progress?.let { put("progress", it.toString()) }
-            error?.let { put("error", it) }
-        }
+        get() =
+            buildMap {
+                put("model_id", modelId)
+                progress?.let { put("progress", it.toString()) }
+                error?.let { put("error", it) }
+            }
 
-    enum class ModelEventType(val value: String) {
+    enum class ModelEventType(
+        val value: String,
+    ) {
         DOWNLOAD_STARTED("download_started"),
         DOWNLOAD_PROGRESS("download_progress"),
         DOWNLOAD_COMPLETED("download_completed"),
         DOWNLOAD_FAILED("download_failed"),
         LOADED("loaded"),
         UNLOADED("unloaded"),
-        DELETED("deleted")
+        DELETED("deleted"),
     }
 }
 
@@ -174,24 +182,27 @@ data class LLMEvent(
     override val id: String = Uuid.random().toString(),
     override val timestamp: Long = System.currentTimeMillis(),
     override val sessionId: String? = null,
-    override val destination: EventDestination = EventDestination.ALL
+    override val destination: EventDestination = EventDestination.ALL,
 ) : SDKEvent {
     override val type: String get() = "llm.${eventType.value}"
     override val category: EventCategory get() = EventCategory.LLM
     override val properties: Map<String, String>
-        get() = buildMap {
-            modelId?.let { put("model_id", it) }
-            tokensGenerated?.let { put("tokens_generated", it.toString()) }
-            latencyMs?.let { put("latency_ms", it.toString()) }
-            error?.let { put("error", it) }
-        }
+        get() =
+            buildMap {
+                modelId?.let { put("model_id", it) }
+                tokensGenerated?.let { put("tokens_generated", it.toString()) }
+                latencyMs?.let { put("latency_ms", it.toString()) }
+                error?.let { put("error", it) }
+            }
 
-    enum class LLMEventType(val value: String) {
+    enum class LLMEventType(
+        val value: String,
+    ) {
         GENERATION_STARTED("generation_started"),
         GENERATION_COMPLETED("generation_completed"),
         GENERATION_FAILED("generation_failed"),
         STREAM_TOKEN("stream_token"),
-        STREAM_COMPLETED("stream_completed")
+        STREAM_COMPLETED("stream_completed"),
     }
 }
 
@@ -208,23 +219,26 @@ data class STTEvent(
     override val id: String = Uuid.random().toString(),
     override val timestamp: Long = System.currentTimeMillis(),
     override val sessionId: String? = null,
-    override val destination: EventDestination = EventDestination.ALL
+    override val destination: EventDestination = EventDestination.ALL,
 ) : SDKEvent {
     override val type: String get() = "stt.${eventType.value}"
     override val category: EventCategory get() = EventCategory.STT
     override val properties: Map<String, String>
-        get() = buildMap {
-            modelId?.let { put("model_id", it) }
-            transcript?.let { put("transcript", it) }
-            confidence?.let { put("confidence", it.toString()) }
-            error?.let { put("error", it) }
-        }
+        get() =
+            buildMap {
+                modelId?.let { put("model_id", it) }
+                transcript?.let { put("transcript", it) }
+                confidence?.let { put("confidence", it.toString()) }
+                error?.let { put("error", it) }
+            }
 
-    enum class STTEventType(val value: String) {
+    enum class STTEventType(
+        val value: String,
+    ) {
         TRANSCRIPTION_STARTED("transcription_started"),
         TRANSCRIPTION_COMPLETED("transcription_completed"),
         TRANSCRIPTION_FAILED("transcription_failed"),
-        PARTIAL_RESULT("partial_result")
+        PARTIAL_RESULT("partial_result"),
     }
 }
 
@@ -240,23 +254,26 @@ data class TTSEvent(
     override val id: String = Uuid.random().toString(),
     override val timestamp: Long = System.currentTimeMillis(),
     override val sessionId: String? = null,
-    override val destination: EventDestination = EventDestination.ALL
+    override val destination: EventDestination = EventDestination.ALL,
 ) : SDKEvent {
     override val type: String get() = "tts.${eventType.value}"
     override val category: EventCategory get() = EventCategory.TTS
     override val properties: Map<String, String>
-        get() = buildMap {
-            voice?.let { put("voice", it) }
-            durationMs?.let { put("duration_ms", it.toString()) }
-            error?.let { put("error", it) }
-        }
+        get() =
+            buildMap {
+                voice?.let { put("voice", it) }
+                durationMs?.let { put("duration_ms", it.toString()) }
+                error?.let { put("error", it) }
+            }
 
-    enum class TTSEventType(val value: String) {
+    enum class TTSEventType(
+        val value: String,
+    ) {
         SYNTHESIS_STARTED("synthesis_started"),
         SYNTHESIS_COMPLETED("synthesis_completed"),
         SYNTHESIS_FAILED("synthesis_failed"),
         PLAYBACK_STARTED("playback_started"),
-        PLAYBACK_COMPLETED("playback_completed")
+        PLAYBACK_COMPLETED("playback_completed"),
     }
 }
 
@@ -272,15 +289,16 @@ data class ErrorEvent(
     override val id: String = Uuid.random().toString(),
     override val timestamp: Long = System.currentTimeMillis(),
     override val sessionId: String? = null,
-    override val destination: EventDestination = EventDestination.ALL
+    override val destination: EventDestination = EventDestination.ALL,
 ) : SDKEvent {
     override val type: String get() = "error.occurred"
     override val category: EventCategory get() = EventCategory.ERROR
     override val properties: Map<String, String>
-        get() = buildMap {
-            put("error_code", errorCode)
-            put("error_message", errorMessage)
-            errorCategory?.let { put("error_category", it) }
-            component?.let { put("component", it) }
-        }
+        get() =
+            buildMap {
+                put("error_code", errorCode)
+                put("error_message", errorMessage)
+                errorCategory?.let { put("error_category", it) }
+                component?.let { put("component", it) }
+            }
 }

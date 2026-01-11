@@ -39,7 +39,7 @@ import com.runanywhere.sdk.foundation.SDKLogger
  * Matches iOS ONNX.swift exactly.
  */
 object ONNX : RunAnywhereModule {
-    private val logger = SDKLogger("ONNX")
+    private val logger = SDKLogger.onnx
 
     // MARK: - Module Info
 
@@ -55,11 +55,12 @@ object ONNX : RunAnywhereModule {
 
     override val moduleName: String = "ONNX Runtime"
 
-    override val capabilities: Set<SDKComponent> = setOf(
-        SDKComponent.STT,
-        SDKComponent.TTS,
-        SDKComponent.VAD
-    )
+    override val capabilities: Set<SDKComponent> =
+        setOf(
+            SDKComponent.STT,
+            SDKComponent.TTS,
+            SDKComponent.VAD,
+        )
 
     override val defaultPriority: Int = 100
 
@@ -83,6 +84,7 @@ object ONNX : RunAnywhereModule {
      *
      * @param priority Ignored (C++ uses its own priority system)
      */
+    @Suppress("UNUSED_PARAMETER")
     @JvmStatic
     @JvmOverloads
     fun register(priority: Int = defaultPriority) {
@@ -127,8 +129,8 @@ object ONNX : RunAnywhereModule {
         if (modelId == null) return false
         val lowercased = modelId.lowercase()
         return lowercased.contains("whisper") ||
-                lowercased.contains("zipformer") ||
-                lowercased.contains("paraformer")
+            lowercased.contains("zipformer") ||
+            lowercased.contains("paraformer")
     }
 
     /**
@@ -143,9 +145,11 @@ object ONNX : RunAnywhereModule {
 
     /**
      * Check if ONNX can handle VAD (always true for Silero VAD).
+     * ONNX Silero VAD is the default VAD implementation.
      */
+    @Suppress("UNUSED_PARAMETER", "FunctionOnlyReturningConstant")
     fun canHandleVAD(modelId: String?): Boolean {
-        return true // ONNX Silero VAD is the default
+        return true
     }
 
     // MARK: - Auto-Registration

@@ -1,6 +1,9 @@
 package com.runanywhere.sdk.llm.llamacpp
 
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+
+private val logger = SDKLogger.llamacpp
 
 /**
  * JVM/Android implementation of LlamaCPP native registration.
@@ -12,20 +15,29 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
  * that provides backend registration, separate from the main commons JNI.
  */
 internal actual fun LlamaCPP.registerNative(): Int {
+    logger.debug("Ensuring commons JNI is loaded for service registry")
     // Ensure commons JNI is loaded first (provides service registry)
     RunAnywhereBridge.ensureNativeLibraryLoaded()
 
+    logger.debug("Loading dedicated LlamaCPP JNI library")
     // Load and use the dedicated LlamaCPP JNI
     if (!LlamaCPPBridge.ensureNativeLibraryLoaded()) {
+        logger.error("Failed to load LlamaCPP native library")
         throw UnsatisfiedLinkError("Failed to load LlamaCPP native library")
     }
 
-    return LlamaCPPBridge.nativeRegister()
+    logger.debug("Calling native register")
+    val result = LlamaCPPBridge.nativeRegister()
+    logger.debug("Native register returned: $result")
+    return result
 }
 
 /**
  * JVM/Android implementation of LlamaCPP native unregistration.
  */
 internal actual fun LlamaCPP.unregisterNative(): Int {
-    return LlamaCPPBridge.nativeUnregister()
+    logger.debug("Calling native unregister")
+    val result = LlamaCPPBridge.nativeUnregister()
+    logger.debug("Native unregister returned: $result")
+    return result
 }

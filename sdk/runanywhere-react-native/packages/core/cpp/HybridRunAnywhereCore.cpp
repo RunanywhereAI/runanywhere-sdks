@@ -22,6 +22,9 @@
 
 #include "HybridRunAnywhereCore.hpp"
 
+// RACommons headers
+#include "rac_dev_config.h"  // For rac_dev_config_get_build_token
+
 // Core bridges - aligned with actual RACommons API
 #include "bridges/InitBridge.hpp"
 #include "bridges/DeviceBridge.hpp"
@@ -31,6 +34,7 @@
 #include "bridges/EventBridge.hpp"
 #include "bridges/HTTPBridge.hpp"
 #include "bridges/DownloadBridge.hpp"
+#include "bridges/TelemetryBridge.hpp"
 
 // RACommons C API headers for capability methods
 // These are backend-agnostic - they work with any registered backend
@@ -258,12 +262,14 @@ HybridRunAnywhereCore::HybridRunAnywhereCore() : HybridObject(TAG) {
 HybridRunAnywhereCore::~HybridRunAnywhereCore() {
     LOGI("HybridRunAnywhereCore destructor");
 
-    // Cleanup bridges
+    // Cleanup bridges (note: telemetry is NOT shutdown here because it's shared
+    // across instances and should persist for the SDK lifetime)
     EventBridge::shared().unregisterFromEvents();
     DownloadBridge::shared().shutdown();
     StorageBridge::shared().shutdown();
     ModelRegistryBridge::shared().shutdown();
-    InitBridge::shared().shutdown();
+    // Note: InitBridge and TelemetryBridge are not shutdown in destructor
+    // to allow events to be tracked even after HybridObject instances are destroyed
 }
 
 // ============================================================================
@@ -335,6 +341,33 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
         // 7. Configure HTTP
         HTTPBridge::shared().configure(baseURL, apiKey);
 
+        // 8. Initialize telemetry (matches Swift's CppBridge.Telemetry.initialize)
+        // This creates the C++ telemetry manager and registers HTTP callback
+        {
+            std::string persistentDeviceId = InitBridge::shared().getPersistentDeviceUUID();
+            std::string deviceModel = InitBridge::shared().getDeviceModel();
+            std::string osVersion = InitBridge::shared().getOSVersion();
+            std::string sdkVersion = "0.2.0";
+
+            if (!persistentDeviceId.empty()) {
+                TelemetryBridge::shared().initialize(
+                    env == SDKEnvironment::Development ? RAC_ENV_DEVELOPMENT :
+                    env == SDKEnvironment::Staging ? RAC_ENV_STAGING : RAC_ENV_PRODUCTION,
+                    persistentDeviceId,
+                    deviceModel,
+                    osVersion,
+                    sdkVersion
+                );
+
+                // Register analytics events callback to route events to telemetry
+                TelemetryBridge::shared().registerEventsCallback();
+
+                LOGI("Telemetry initialized with device: %s", persistentDeviceId.c_str());
+            } else {
+                LOGE("Cannot initialize telemetry: device ID unavailable");
+            }
+        }
+
         LOGI("Core SDK initialized successfully");
         return true;
     });
@@ -347,6 +380,7 @@ std::shared_ptr<Promise<void>> HybridRunAnywhereCore::destroy() {
         LOGI("Destroying Core SDK...");
 
         // Cleanup in reverse order
+        TelemetryBridge::shared().shutdown();  // Flush and destroy telemetry first
         EventBridge::shared().unregisterFromEvents();
         DownloadBridge::shared().shutdown();
         StorageBridge::shared().shutdown();
@@ -365,10 +399,20 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isInitialized() {
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getBackendInfo() {
     return Promise<std::string>::async([]() {
+        // Check if SDK is initialized using the actual InitBridge state
+        bool isInitialized = InitBridge::shared().isInitialized();
+        
+        std::string status = isInitialized ? "initialized" : "not_initialized";
+        std::string name = isInitialized ? "RunAnywhere Core" : "Not initialized";
+        
         return buildJsonObject({
+            {"name", jsonString(name)},
+            {"status", jsonString(status)},
+            {"version", jsonString("0.2.0")},
             {"api", jsonString("rac_*")},
             {"source", jsonString("runanywhere-commons")},
-            {"module", jsonString("core")}
+            {"module", jsonString("core")},
+            {"initialized", isInitialized ? "true" : "false"}
         });
     });
 }
@@ -384,8 +428,15 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::authenticate(
 
         // Build auth request JSON
         std::string deviceId = DeviceBridge::shared().getDeviceId();
-        std::string platform = "react-native";
-        std::string sdkVersion = "0.1.0"; // TODO: Get from config
+        // Use actual platform (ios/android) as backend only accepts these values
+#if defined(__APPLE__)
+        std::string platform = "ios";
+#elif defined(ANDROID) || defined(__ANDROID__)
+        std::string platform = "android";
+#else
+        std::string platform = "ios"; // Default to ios for unknown platforms
+#endif
+        std::string sdkVersion = "0.2.0";
 
         std::string requestJson = AuthBridge::shared().buildAuthenticateRequestJSON(
             apiKey, deviceId, platform, sdkVersion
@@ -427,6 +478,31 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getOrganizationId()
     });
 }
 
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::setAuthTokens(
+    const std::string& authResponseJson) {
+    return Promise<bool>::async([this, authResponseJson]() -> bool {
+        LOGI("Setting auth tokens from JS authentication response...");
+
+        // Parse the auth response
+        AuthResponse response = AuthBridge::shared().handleAuthResponse(authResponseJson);
+
+        if (response.success) {
+            // IMPORTANT: Actually store the tokens in AuthBridge!
+            // handleAuthResponse only parses, setAuth stores them
+            AuthBridge::shared().setAuth(response);
+            
+            LOGI("Auth tokens set successfully. Token expires in %lld seconds", 
+                 static_cast<long long>(response.expiresIn));
+            LOGD("Access token stored (length=%zu)", response.accessToken.length());
+            return true;
+        } else {
+            LOGE("Failed to set auth tokens: %s", response.error.c_str());
+            setLastError("Failed to set auth tokens: " + response.error);
+            return false;
+        }
+    });
+}
+
 // ============================================================================
 // Device Registration
 // ============================================================================
@@ -443,8 +519,159 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::registerDevice(
         else if (envStr == "staging") env = RAC_ENV_STAGING;
 
         std::string buildToken = extractStringValue(environmentJson, "buildToken", "");
+        std::string supabaseKey = extractStringValue(environmentJson, "supabaseKey", "");
+        
+        // For development mode, get build token from C++ dev config if not provided
+        // This matches Swift's CppBridge.DevConfig.buildToken behavior
+        if (buildToken.empty() && env == RAC_ENV_DEVELOPMENT) {
+            const char* devBuildToken = rac_dev_config_get_build_token();
+            if (devBuildToken && strlen(devBuildToken) > 0) {
+                buildToken = devBuildToken;
+                LOGD("Using build token from dev config");
+            }
+        }
 
-        // Register callbacks first
+        // Set up platform callbacks (matches Swift's CppBridge.Device.registerCallbacks)
+        DevicePlatformCallbacks callbacks;
+
+        // Device info callback - populates all fields needed by backend
+        // Matches Swift's CppBridge+Device.swift get_device_info callback
+        callbacks.getDeviceInfo = []() -> DeviceInfo {
+            DeviceInfo info;
+            
+            // Core identification
+            info.deviceId = InitBridge::shared().getPersistentDeviceUUID();
+            // Use actual platform (ios/android) as backend only accepts these values
+#if defined(__APPLE__)
+            info.platform = "ios";
+#elif defined(ANDROID) || defined(__ANDROID__)
+            info.platform = "android";
+#else
+            info.platform = "ios"; // Default to ios for unknown platforms
+#endif
+            info.sdkVersion = "0.2.0";
+            
+            // Device hardware info from platform-specific code
+            info.deviceModel = InitBridge::shared().getDeviceModel();
+            info.deviceName = info.deviceModel; // Use model as name (React Native doesn't expose device name)
+            info.osVersion = InitBridge::shared().getOSVersion();
+            info.chipName = InitBridge::shared().getChipName();
+            info.architecture = InitBridge::shared().getArchitecture();
+            info.totalMemory = InitBridge::shared().getTotalMemory();
+            info.availableMemory = InitBridge::shared().getAvailableMemory();
+            info.coreCount = InitBridge::shared().getCoreCount();
+            
+            // Form factor detection and GPU family
+            #if defined(__APPLE__)
+            info.formFactor = "phone"; // iOS default, could be tablet
+            info.osName = "iOS";
+            info.gpuFamily = InitBridge::shared().getGPUFamily(); // "apple"
+            info.hasNeuralEngine = true;
+            info.neuralEngineCores = 16; // Modern iPhones have 16 ANE cores
+            #elif defined(ANDROID) || defined(__ANDROID__)
+            info.formFactor = "phone"; // Android default
+            info.osName = "Android";
+            info.gpuFamily = InitBridge::shared().getGPUFamily(); // "mali", "adreno", etc.
+            info.hasNeuralEngine = false;
+            info.neuralEngineCores = 0;
+            #else
+            info.formFactor = "unknown";
+            info.osName = "Unknown";
+            info.gpuFamily = "unknown";
+            info.hasNeuralEngine = false;
+            info.neuralEngineCores = 0;
+            #endif
+            
+            // Battery info (not available in React Native easily, use defaults)
+            info.batteryLevel = -1.0; // Unknown
+            info.batteryState = ""; // Unknown
+            info.isLowPowerMode = false;
+            
+            // Core distribution (approximate for mobile devices)
+            info.performanceCores = info.coreCount > 4 ? 2 : 1;
+            info.efficiencyCores = info.coreCount - info.performanceCores;
+            
+            return info;
+        };
+
+        // Device ID callback
+        callbacks.getDeviceId = []() -> std::string {
+            return InitBridge::shared().getPersistentDeviceUUID();
+        };
+
+        // Check registration status callback
+        callbacks.isRegistered = []() -> bool {
+            // Check UserDefaults/SharedPrefs for registration status
+            std::string value;
+            if (InitBridge::shared().secureGet("com.runanywhere.sdk.deviceRegistered", value)) {
+                return value == "true";
+            }
+            return false;
+        };
+
+        // Set registration status callback
+        callbacks.setRegistered = [](bool registered) {
+            InitBridge::shared().secureSet("com.runanywhere.sdk.deviceRegistered",
+                                           registered ? "true" : "false");
+        };
+
+        // HTTP POST callback - key for device registration!
+        // Uses native URLSession (iOS) or HttpURLConnection (Android)
+        // All credentials come from C++ dev config (matches Swift's CppBridge.DevConfig)
+        callbacks.httpPost = [env](
+            const std::string& endpoint,
+            const std::string& jsonBody,
+            bool requiresAuth
+        ) -> std::tuple<bool, int, std::string, std::string> {
+            // Build full URL based on environment (matches Swift HTTPService)
+            std::string baseURL;
+            std::string apiKey;
+
+            if (env == RAC_ENV_DEVELOPMENT) {
+                // Development: Use Supabase from C++ dev config
+                // This matches Swift's CppBridge.DevConfig.supabaseURL/supabaseKey
+                const char* devUrl = rac_dev_config_get_supabase_url();
+                const char* devKey = rac_dev_config_get_supabase_key();
+                
+                baseURL = devUrl ? devUrl : "https://fhtgjtxuoikwwouxqzrn.supabase.co";
+                apiKey = devKey ? devKey : "";
+                
+                LOGD("Using Supabase from dev config: %s", baseURL.c_str());
+            } else {
+                // Production/Staging: Use configured Railway URL
+                // These come from SDK initialization (App.tsx -> RunAnywhere.initialize)
+                baseURL = InitBridge::shared().getBaseURL();
+                
+                // For production mode, prefer JWT access token (from authentication)
+                // over raw API key. This matches Swift/Kotlin behavior.
+                std::string accessToken = AuthBridge::shared().getAccessToken();
+                if (!accessToken.empty()) {
+                    apiKey = accessToken;  // Use JWT for Authorization header
+                    LOGD("Using JWT access token for device registration");
+                } else {
+                    // Fallback to API key if not authenticated yet
+                    apiKey = InitBridge::shared().getApiKey();
+                    LOGD("Using API key for device registration (not authenticated)");
+                }
+                
+                // Fallback to default if not configured
+                if (baseURL.empty()) {
+                    baseURL = "https://api.runanywhere.ai";
+                }
+                
+                LOGD("Using production config: %s", baseURL.c_str());
+            }
+
+            std::string fullURL = baseURL + endpoint;
+            LOGI("Device HTTP POST to: %s (env=%d)", fullURL.c_str(), env);
+
+            return InitBridge::shared().httpPostSync(fullURL, jsonBody, apiKey);
+        };
+
+        // Set callbacks on DeviceBridge
+        DeviceBridge::shared().setPlatformCallbacks(callbacks);
+
+        // Register callbacks with C++
         rac_result_t result = DeviceBridge::shared().registerCallbacks();
         if (result != RAC_SUCCESS) {
             setLastError("Failed to register device callbacks: " + std::to_string(result));
@@ -466,6 +693,19 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::registerDevice(
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isDeviceRegistered() {
     return Promise<bool>::async([]() -> bool {
         return DeviceBridge::shared().isRegistered();
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::clearDeviceRegistration() {
+    return Promise<bool>::async([]() -> bool {
+        LOGI("Clearing device registration flag for testing...");
+        bool success = InitBridge::shared().secureDelete("com.runanywhere.sdk.deviceRegistered");
+        if (success) {
+            LOGI("Device registration flag cleared successfully");
+        } else {
+            LOGI("Device registration flag not found (may not exist)");
+        }
+        return true; // Return true even if key didn't exist
     });
 }
 
@@ -1099,7 +1339,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::generate(
         float temperature = 0.7f;
         if (optionsJson.has_value()) {
             maxTokens = extractIntValue(optionsJson.value(), "max_tokens", 256);
-            temperature = static_cast<float>(extractIntValue(optionsJson.value(), "temperature", 7)) / 10.0f;
+            temperature = static_cast<float>(extractDoubleValue(optionsJson.value(), "temperature", 0.7));
         }
 
         rac_llm_options_t options = {};
@@ -2164,6 +2404,94 @@ std::shared_ptr<Promise<void>> HybridRunAnywhereCore::cleanupVoiceAgent() {
 
         // Note: We don't destroy the voice agent handle here - it's reusable
         // The models can be unloaded separately via unloadSTTModel, etc.
+    });
+}
+
+// ============================================================================
+// Secure Storage Methods
+// Matches Swift: KeychainManager.swift
+// ============================================================================
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::secureStorageSet(
+    const std::string& key,
+    const std::string& value) {
+    return Promise<bool>::async([key, value]() -> bool {
+        LOGI("Secure storage set: key=%s", key.c_str());
+
+        bool success = InitBridge::shared().secureSet(key, value);
+        if (!success) {
+            LOGE("Failed to store value for key: %s", key.c_str());
+        }
+        return success;
+    });
+}
+
+std::shared_ptr<Promise<std::variant<nitro::NullType, std::string>>> HybridRunAnywhereCore::secureStorageGet(
+    const std::string& key) {
+    return Promise<std::variant<nitro::NullType, std::string>>::async([key]() -> std::variant<nitro::NullType, std::string> {
+        LOGI("Secure storage get: key=%s", key.c_str());
+
+        std::string value;
+        if (InitBridge::shared().secureGet(key, value)) {
+            return value;
+        }
+        return nitro::NullType();
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::secureStorageDelete(
+    const std::string& key) {
+    return Promise<bool>::async([key]() -> bool {
+        LOGI("Secure storage delete: key=%s", key.c_str());
+
+        bool success = InitBridge::shared().secureDelete(key);
+        if (!success) {
+            LOGE("Failed to delete key: %s", key.c_str());
+        }
+        return success;
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::secureStorageExists(
+    const std::string& key) {
+    return Promise<bool>::async([key]() -> bool {
+        LOGD("Secure storage exists: key=%s", key.c_str());
+        return InitBridge::shared().secureExists(key);
+    });
+}
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getPersistentDeviceUUID() {
+    return Promise<std::string>::async([]() -> std::string {
+        LOGI("Getting persistent device UUID...");
+
+        std::string uuid = InitBridge::shared().getPersistentDeviceUUID();
+
+        if (uuid.empty()) {
+            throw std::runtime_error("Failed to get or generate device UUID");
+        }
+
+        LOGI("Persistent device UUID: %s", uuid.c_str());
+        return uuid;
+    });
+}
+
+// ============================================================================
+// Telemetry
+// Matches Swift: CppBridge+Telemetry.swift
+// C++ handles all telemetry logic - batching, JSON building, routing
+// ============================================================================
+
+std::shared_ptr<Promise<void>> HybridRunAnywhereCore::flushTelemetry() {
+    return Promise<void>::async([]() -> void {
+        LOGI("Flushing telemetry events...");
+        TelemetryBridge::shared().flush();
+        LOGI("Telemetry flushed");
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isTelemetryInitialized() {
+    return Promise<bool>::async([]() -> bool {
+        return TelemetryBridge::shared().isInitialized();
     });
 }
 

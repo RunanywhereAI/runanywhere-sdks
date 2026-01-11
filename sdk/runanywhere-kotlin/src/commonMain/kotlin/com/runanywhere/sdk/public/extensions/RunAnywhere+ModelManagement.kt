@@ -11,6 +11,7 @@
 package com.runanywhere.sdk.public.extensions
 
 import com.runanywhere.sdk.core.types.InferenceFramework
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.ArchiveStructure
 import com.runanywhere.sdk.public.extensions.Models.ArchiveType
@@ -46,37 +47,44 @@ fun RunAnywhere.registerModel(
     modality: ModelCategory = ModelCategory.LANGUAGE,
     artifactType: ModelArtifactType? = null,
     memoryRequirement: Long? = null,
-    supportsThinking: Boolean = false
+    supportsThinking: Boolean = false,
 ): ModelInfo {
+    val logger = SDKLogger.models
+
     // Generate model ID from URL filename if not provided
     val modelId = id ?: generateModelIdFromUrl(url)
+    logger.debug("Registering model: $modelId (name: $name)")
 
     // Detect format from URL extension
     val format = detectFormatFromUrl(url)
+    logger.debug("Detected format: ${format.value} for model: $modelId")
 
     // Infer artifact type if not provided
     val effectiveArtifactType = artifactType ?: inferArtifactType(url)
+    logger.debug("Artifact type: ${effectiveArtifactType.displayName} for model: $modelId")
 
     // Create ModelInfo
-    val modelInfo = ModelInfo(
-        id = modelId,
-        name = name,
-        category = modality,
-        format = format,
-        downloadURL = url,
-        localPath = null,
-        artifactType = effectiveArtifactType,
-        downloadSize = memoryRequirement,
-        framework = framework,
-        contextLength = if (modality.requiresContextLength) 2048 else null,
-        supportsThinking = supportsThinking,
-        description = "User-added model",
-        source = com.runanywhere.sdk.public.extensions.Models.ModelSource.LOCAL
-    )
+    val modelInfo =
+        ModelInfo(
+            id = modelId,
+            name = name,
+            category = modality,
+            format = format,
+            downloadURL = url,
+            localPath = null,
+            artifactType = effectiveArtifactType,
+            downloadSize = memoryRequirement,
+            framework = framework,
+            contextLength = if (modality.requiresContextLength) 2048 else null,
+            supportsThinking = supportsThinking,
+            description = "User-added model",
+            source = com.runanywhere.sdk.public.extensions.Models.ModelSource.LOCAL,
+        )
 
     // Save to registry (fire-and-forget)
     registerModelInternal(modelInfo)
 
+    logger.info("Registered model: $modelId (category: ${modality.value}, framework: ${framework.rawValue})")
     return modelInfo
 }
 

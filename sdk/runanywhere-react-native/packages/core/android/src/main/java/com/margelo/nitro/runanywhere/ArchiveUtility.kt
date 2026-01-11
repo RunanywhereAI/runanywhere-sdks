@@ -9,6 +9,7 @@
  * sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/Download/Utilities/ArchiveUtility.swift
  *
  * Supports: tar.gz, zip
+ * Note: All models should use tar.gz from RunanywhereAI/sherpa-onnx fork for best performance
  */
 
 package com.margelo.nitro.runanywhere
@@ -75,12 +76,10 @@ object ArchiveUtility {
                 extractZip(archiveFile, destinationDir, progressHandler)
             }
             ArchiveType.BZIP2 -> {
-                // tar.bz2 not commonly used for ML models, recommend tar.gz
-                throw Exception("tar.bz2 format not currently supported. Please use tar.gz format.")
+                throw Exception("tar.bz2 not supported. Use tar.gz from RunanywhereAI/sherpa-onnx fork.")
             }
             ArchiveType.XZ -> {
-                // tar.xz not commonly used for ML models, recommend tar.gz
-                throw Exception("tar.xz format not currently supported. Please use tar.gz format.")
+                throw Exception("tar.xz not supported. Use tar.gz from RunanywhereAI/sherpa-onnx fork.")
             }
             ArchiveType.UNKNOWN -> {
                 // Fallback to file extension check

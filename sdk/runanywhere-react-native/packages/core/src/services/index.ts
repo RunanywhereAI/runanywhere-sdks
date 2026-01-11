@@ -39,3 +39,28 @@ export {
   getPlatformDefaultVoice,
   PlatformVoices,
 } from './SystemTTSService';
+
+// Network Layer - HTTP service using axios (industry standard)
+export {
+  // HTTP Service
+  HTTPService,
+  SDKEnvironment,
+  type HTTPServiceConfig,
+  type DevModeConfig,
+  // Configuration
+  createNetworkConfig,
+  getEnvironmentName,
+  isDevelopment,
+  isProduction,
+  DEFAULT_BASE_URL,
+  DEFAULT_TIMEOUT_MS,
+  type NetworkConfig,
+  // Telemetry
+  TelemetryService,
+  TelemetryCategory,
+  type TelemetryEvent,
+  // Endpoints
+  APIEndpoints,
+  type APIEndpointKey,
+  type APIEndpointValue,
+} from './Network';

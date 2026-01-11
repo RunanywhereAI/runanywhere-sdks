@@ -122,7 +122,7 @@ class JvmAudioCaptureManager : AudioCaptureManager {
             } catch (e: AudioCaptureError) {
                 throw e
             } catch (e: Exception) {
-                logger.error("Recording error: ${e.message}", e)
+                logger.error("Recording error: ${e.message}", throwable = e)
                 throw AudioCaptureError.RecordingFailed(e.message ?: "Unknown error")
             } finally {
                 stopRecordingInternal()

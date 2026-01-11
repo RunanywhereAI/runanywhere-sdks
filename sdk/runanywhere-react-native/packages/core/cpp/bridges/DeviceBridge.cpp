@@ -64,7 +64,7 @@ static void deviceGetInfoCallback(rac_device_registration_info_t* outInfo, void*
     s_gpuFamily = info.gpuFamily;
     s_batteryState = info.batteryState;
     s_deviceType = info.formFactor; // Use formFactor as device_type
-    s_osName = info.platform;
+    s_osName = info.osName.empty() ? info.platform : info.osName;
     s_deviceFingerprint = info.deviceId;
 
     // Fill out the struct - matches Swift's implementation

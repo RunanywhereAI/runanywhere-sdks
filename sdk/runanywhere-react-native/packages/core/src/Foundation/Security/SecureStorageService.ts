@@ -49,6 +49,10 @@ class SecureStorageServiceImpl {
 
   /**
    * Check if secure storage is available
+   *
+   * Secure storage uses platform-native storage:
+   * - iOS: Keychain (always available)
+   * - Android: Keystore/EncryptedSharedPreferences (always available)
    */
   async isAvailable(): Promise<boolean> {
     if (this._isAvailable !== null) {
@@ -56,15 +60,13 @@ class SecureStorageServiceImpl {
     }
 
     try {
-      const native = requireNativeModule() as unknown as SecureStorageNativeModule;
-      // Try a simple operation to verify native storage works
-      if (native.secureStorageIsAvailable) {
-        this._isAvailable = await native.secureStorageIsAvailable();
-      } else {
-        // If native method doesn't exist, assume available (native handles it)
-        this._isAvailable = true;
-      }
-      return this._isAvailable ?? true;
+      const native = requireNativeModule();
+      // Verify native module is available by checking for secure storage methods
+      // The methods are implemented in C++ and use platform callbacks
+      this._isAvailable =
+        typeof native.secureStorageSet === 'function' &&
+        typeof native.secureStorageGet === 'function';
+      return this._isAvailable;
     } catch {
       this._isAvailable = false;
       return false;
@@ -78,6 +80,10 @@ class SecureStorageServiceImpl {
   /**
    * Store a string value securely
    *
+   * Uses native secure storage:
+   * - iOS: Keychain
+   * - Android: Keystore/EncryptedSharedPreferences
+   *
    * @param value - String value to store
    * @param key - Storage key
    */
@@ -85,12 +91,11 @@ class SecureStorageServiceImpl {
     try {
       const native = requireNativeModule() as unknown as SecureStorageNativeModule;
 
-      if (native.secureStorageStore) {
-        await native.secureStorageStore(key, value);
-      } else {
-        // Fallback: Use a generic method if specific one doesn't exist
-        // This allows the native layer to handle storage however it wants
-        this.logger.debug(`Storing value for key: ${key}`);
+      // Use the new native method
+      const success = await native.secureStorageSet(key, value);
+
+      if (!success) {
+        throw new Error(`Native secureStorageSet returned false for key: ${key}`);
       }
 
       // Update cache
@@ -107,6 +112,10 @@ class SecureStorageServiceImpl {
   /**
    * Retrieve a string value from secure storage
    *
+   * Uses native secure storage:
+   * - iOS: Keychain
+   * - Android: Keystore/EncryptedSharedPreferences
+   *
    * @param key - Storage key
    * @returns Stored value or null if not found
    */
@@ -120,16 +129,13 @@ class SecureStorageServiceImpl {
     try {
       const native = requireNativeModule() as unknown as SecureStorageNativeModule;
 
-      if (native.secureStorageRetrieve) {
-        const value = await native.secureStorageRetrieve(key);
-        if (value !== null && value !== undefined) {
-          this.cache.set(key, value);
-        }
-        return value ?? null;
-      }
+      // Use the new native method
+      const value = await native.secureStorageGet(key);
 
-      // Fallback: return null if native method doesn't exist
-      return null;
+      if (value !== null && value !== undefined) {
+        this.cache.set(key, value);
+      }
+      return value ?? null;
     } catch (error) {
       // Item not found is not an error - just return null
       if (isItemNotFoundError(error)) {
@@ -146,15 +152,18 @@ class SecureStorageServiceImpl {
   /**
    * Delete a value from secure storage
    *
+   * Uses native secure storage:
+   * - iOS: Keychain
+   * - Android: Keystore/EncryptedSharedPreferences
+   *
    * @param key - Storage key
    */
   async delete(key: SecureStorageKey | string): Promise<void> {
     try {
       const native = requireNativeModule() as unknown as SecureStorageNativeModule;
 
-      if (native.secureStorageDelete) {
-        await native.secureStorageDelete(key);
-      }
+      // Use the new native method
+      await native.secureStorageDelete(key);
 
       // Remove from cache
       this.cache.delete(key);
@@ -173,6 +182,10 @@ class SecureStorageServiceImpl {
   /**
    * Check if a key exists in secure storage
    *
+   * Uses native secure storage:
+   * - iOS: Keychain
+   * - Android: Keystore/EncryptedSharedPreferences
+   *
    * @param key - Storage key
    * @returns True if key exists
    */
@@ -185,13 +198,8 @@ class SecureStorageServiceImpl {
     try {
       const native = requireNativeModule() as unknown as SecureStorageNativeModule;
 
-      if (native.secureStorageExists) {
-        return await native.secureStorageExists(key);
-      }
-
-      // Fallback: try to retrieve and check if null
-      const value = await this.retrieve(key);
-      return value !== null;
+      // Use the new native method
+      return await native.secureStorageExists(key);
     } catch {
       return false;
     }
