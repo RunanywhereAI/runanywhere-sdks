@@ -110,8 +110,11 @@ echo "Backends to include:"
 [ "$BUILD_WHISPERCPP" = true ] && echo "  - WhisperCPP (STT)"
 echo ""
 
-# Use version from VERSIONS file, allow env override
-IOS_DEPLOYMENT_TARGET="${IOS_DEPLOYMENT_TARGET:-$IOS_DEPLOYMENT_TARGET}"
+# Use version from VERSIONS file (loaded via load-versions.sh)
+if [ -z "${IOS_DEPLOYMENT_TARGET:-}" ]; then
+    echo "ERROR: IOS_DEPLOYMENT_TARGET not loaded from VERSIONS file" >&2
+    exit 1
+fi
 echo "iOS Deployment Target: ${IOS_DEPLOYMENT_TARGET}"
 
 # =============================================================================

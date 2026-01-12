@@ -170,8 +170,14 @@ fi
 
 BACKENDS="${1:-all}"
 ABIS="${2:-arm64-v8a}"
-# Use version from VERSIONS file, allow env override
-ANDROID_API_LEVEL="${ANDROID_API_LEVEL:-$ANDROID_API_LEVEL}"
+
+# Use version from VERSIONS file (loaded via load-versions.sh)
+# ANDROID_MIN_SDK is the canonical name from VERSIONS file
+if [ -z "${ANDROID_MIN_SDK:-}" ]; then
+    echo "ERROR: ANDROID_MIN_SDK not loaded from VERSIONS file" >&2
+    exit 1
+fi
+ANDROID_API_LEVEL="${ANDROID_MIN_SDK}"
 
 # Determine which backends to build
 BUILD_ONNX=OFF

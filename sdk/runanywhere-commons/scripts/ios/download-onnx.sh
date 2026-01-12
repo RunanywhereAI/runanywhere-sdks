@@ -7,11 +7,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 ONNX_DIR="${ROOT_DIR}/third_party/onnxruntime-ios"
 
-# Load versions from centralized VERSIONS file
+# Load versions from centralized VERSIONS file (SINGLE SOURCE OF TRUTH)
 source "${SCRIPT_DIR}/../load-versions.sh"
 
-# Use centralized version (fallback to hardcoded if not set)
-ONNX_VERSION="${ONNX_VERSION_IOS:-1.17.1}"
+# Use version from VERSIONS file - no hardcoded fallbacks
+if [ -z "${ONNX_VERSION_IOS:-}" ]; then
+    echo "ERROR: ONNX_VERSION_IOS not loaded from VERSIONS file" >&2
+    exit 1
+fi
+ONNX_VERSION="${ONNX_VERSION_IOS}"
 DOWNLOAD_URL="https://download.onnxruntime.ai/pod-archive-onnxruntime-c-${ONNX_VERSION}.zip"
 
 echo "Downloading ONNX Runtime iOS xcframework v${ONNX_VERSION}..."

@@ -3,21 +3,22 @@
 
 include(FetchContent)
 
-# Load versions from centralized VERSIONS file
+# Load versions from centralized VERSIONS file (SINGLE SOURCE OF TRUTH)
+# All versions are defined in VERSIONS file - no hardcoded fallbacks needed
 include(LoadVersions)
 
-# Use versions from VERSIONS file (with fallbacks for backward compatibility)
-if(NOT DEFINED ONNX_VERSION_IOS)
-    set(ONNX_VERSION_IOS "1.17.1")
+# Validate required versions are loaded
+if(NOT DEFINED ONNX_VERSION_IOS OR "${ONNX_VERSION_IOS}" STREQUAL "")
+    message(FATAL_ERROR "ONNX_VERSION_IOS not defined in VERSIONS file")
 endif()
-if(NOT DEFINED ONNX_VERSION_MACOS)
-    set(ONNX_VERSION_MACOS "1.23.2")
+if(NOT DEFINED ONNX_VERSION_MACOS OR "${ONNX_VERSION_MACOS}" STREQUAL "")
+    message(FATAL_ERROR "ONNX_VERSION_MACOS not defined in VERSIONS file")
 endif()
-if(NOT DEFINED ONNX_VERSION_LINUX)
-    set(ONNX_VERSION_LINUX "1.23.2")
+if(NOT DEFINED ONNX_VERSION_LINUX OR "${ONNX_VERSION_LINUX}" STREQUAL "")
+    message(FATAL_ERROR "ONNX_VERSION_LINUX not defined in VERSIONS file")
 endif()
 
-message(STATUS "ONNX Runtime versions: iOS=${ONNX_VERSION_IOS}, macOS=${ONNX_VERSION_MACOS}, Linux=${ONNX_VERSION_LINUX}")
+message(STATUS "ONNX Runtime versions: iOS=${ONNX_VERSION_IOS}, Android=${ONNX_VERSION_ANDROID}, macOS=${ONNX_VERSION_MACOS}, Linux=${ONNX_VERSION_LINUX}")
 
 if(IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     # iOS: Use local ONNX Runtime xcframework from third_party
@@ -97,8 +98,9 @@ if(IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
 
 elseif(ANDROID)
     # Android: Use ONNX Runtime from Sherpa-ONNX (16KB aligned in v1.12.20+)
+    # Sherpa-ONNX version is defined in VERSIONS file: SHERPA_ONNX_VERSION_ANDROID
     # Sherpa-ONNX bundles a compatible version of ONNX Runtime
-    # Downloaded by backend-scripts/android/download-sherpa-onnx.sh
+    # Downloaded by: ./scripts/android/download-sherpa-onnx.sh
     set(SHERPA_ONNX_DIR "${CMAKE_SOURCE_DIR}/../third_party/sherpa-onnx-android")
 
     # Check if Sherpa-ONNX libraries exist
