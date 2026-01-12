@@ -32,9 +32,9 @@ runanywhere-commons/
 └── third_party/
     └── sherpa-onnx-android/
         └── jniLibs/
-            └── arm64-v8a/
-                ├── libonnxruntime.so
-                └── libsherpa-onnx-*.so
+    └── arm64-v8a/
+    ├── libonnxruntime.so
+    └── libsherpa-onnx-*.so
 ```
 
 ## Generate Release Manifest
