@@ -7,6 +7,8 @@
 # Usage:
 #   include(LoadVersions)
 #   # Then use: ${RAC_ONNX_VERSION_IOS}, ${RAC_SHERPA_ONNX_VERSION_IOS}, etc.
+#
+# All variables are also set without the RAC_ prefix for backward compatibility.
 # =============================================================================
 
 # Find VERSIONS file relative to this cmake module
@@ -49,7 +51,15 @@ message(STATUS "Loaded versions from ${_VERSIONS_FILE}:")
 message(STATUS "  Platform targets:")
 message(STATUS "    IOS_DEPLOYMENT_TARGET: ${RAC_IOS_DEPLOYMENT_TARGET}")
 message(STATUS "    ANDROID_MIN_SDK: ${RAC_ANDROID_MIN_SDK}")
-message(STATUS "  Dependencies:")
+message(STATUS "  ONNX Runtime:")
 message(STATUS "    ONNX_VERSION_IOS: ${RAC_ONNX_VERSION_IOS}")
+message(STATUS "    ONNX_VERSION_ANDROID: ${RAC_ONNX_VERSION_ANDROID}")
 message(STATUS "    ONNX_VERSION_MACOS: ${RAC_ONNX_VERSION_MACOS}")
+message(STATUS "    ONNX_VERSION_LINUX: ${RAC_ONNX_VERSION_LINUX}")
+message(STATUS "  Sherpa-ONNX:")
 message(STATUS "    SHERPA_ONNX_VERSION_IOS: ${RAC_SHERPA_ONNX_VERSION_IOS}")
+message(STATUS "    SHERPA_ONNX_VERSION_ANDROID: ${RAC_SHERPA_ONNX_VERSION_ANDROID}")
+message(STATUS "    SHERPA_ONNX_VERSION_MACOS: ${RAC_SHERPA_ONNX_VERSION_MACOS}")
+message(STATUS "  Other:")
+message(STATUS "    LLAMACPP_VERSION: ${RAC_LLAMACPP_VERSION}")
+message(STATUS "    NLOHMANN_JSON_VERSION: ${RAC_NLOHMANN_JSON_VERSION}")

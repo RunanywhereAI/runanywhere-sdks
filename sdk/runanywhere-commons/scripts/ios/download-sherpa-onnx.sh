@@ -12,11 +12,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 SHERPA_DIR="${ROOT_DIR}/third_party/sherpa-onnx-ios"
 
-# Load versions from centralized VERSIONS file
+# Load versions from centralized VERSIONS file (SINGLE SOURCE OF TRUTH)
 source "${SCRIPT_DIR}/../load-versions.sh"
 
-# Use centralized version (fallback to hardcoded if not set)
-SHERPA_VERSION="${SHERPA_ONNX_VERSION_IOS:-1.12.18}"
+# Use version from VERSIONS file - no hardcoded fallbacks
+if [ -z "${SHERPA_ONNX_VERSION_IOS:-}" ]; then
+    echo "ERROR: SHERPA_ONNX_VERSION_IOS not loaded from VERSIONS file" >&2
+    exit 1
+fi
+SHERPA_VERSION="${SHERPA_ONNX_VERSION_IOS}"
 # Try runanywhere-sdks first, fallback to runanywhere-binaries
 DOWNLOAD_URL="https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/sherpa-onnx-v${SHERPA_VERSION}/sherpa-onnx.xcframework.zip"
 

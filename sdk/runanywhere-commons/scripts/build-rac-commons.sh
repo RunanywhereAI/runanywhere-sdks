@@ -125,11 +125,19 @@ if [ "$BUILD_ALL" = true ]; then
 fi
 
 # =============================================================================
-# Configuration
+# Configuration (versions loaded from VERSIONS file via load-versions.sh)
 # =============================================================================
 
-IOS_DEPLOYMENT_TARGET="${IOS_DEPLOYMENT_TARGET:-14.0}"
-ANDROID_MIN_SDK="${ANDROID_MIN_SDK:-24}"
+# Validate required versions are loaded from VERSIONS file
+if [ -z "${IOS_DEPLOYMENT_TARGET:-}" ]; then
+    echo "ERROR: IOS_DEPLOYMENT_TARGET not loaded from VERSIONS file" >&2
+    exit 1
+fi
+if [ -z "${ANDROID_MIN_SDK:-}" ]; then
+    echo "ERROR: ANDROID_MIN_SDK not loaded from VERSIONS file" >&2
+    exit 1
+fi
+
 ANDROID_NDK="${ANDROID_NDK_HOME:-$ANDROID_NDK}"
 
 # Auto-detect NDK on macOS

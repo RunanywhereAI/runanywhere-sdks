@@ -25,11 +25,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 SHERPA_DIR="${ROOT_DIR}/third_party/sherpa-onnx-android"
 
-# Load versions from centralized VERSIONS file
+# Load versions from centralized VERSIONS file (SINGLE SOURCE OF TRUTH)
 source "${SCRIPT_DIR}/../load-versions.sh"
 
-# Use centralized version (fallback to hardcoded if not set)
-SHERPA_VERSION="${SHERPA_ONNX_VERSION_ANDROID:-1.12.20}"
+# Use version from VERSIONS file - no hardcoded fallbacks
+if [ -z "${SHERPA_ONNX_VERSION_ANDROID:-}" ]; then
+    echo "ERROR: SHERPA_ONNX_VERSION_ANDROID not loaded from VERSIONS file" >&2
+    exit 1
+fi
+SHERPA_VERSION="${SHERPA_ONNX_VERSION_ANDROID}"
 # Official Sherpa-ONNX Android release
 DOWNLOAD_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/v${SHERPA_VERSION}/sherpa-onnx-v${SHERPA_VERSION}-android.tar.bz2"
 
@@ -257,7 +261,11 @@ if [ "${HTTP_CODE}" = "200" ] && [ -f "${TEMP_ARCHIVE}" ] && [ -s "${TEMP_ARCHIV
     if [ ! -f "${SHERPA_DIR}/include/onnxruntime_c_api.h" ]; then
         echo ""
         echo "Downloading ONNX Runtime C API header..."
-        ONNX_RT_VERSION="${ONNX_VERSION_ANDROID:-1.17.1}"
+        if [ -z "${ONNX_VERSION_ANDROID:-}" ]; then
+            echo "ERROR: ONNX_VERSION_ANDROID not loaded from VERSIONS file" >&2
+            exit 1
+        fi
+        ONNX_RT_VERSION="${ONNX_VERSION_ANDROID}"
         curl -sL "https://raw.githubusercontent.com/microsoft/onnxruntime/v${ONNX_RT_VERSION}/include/onnxruntime/core/session/onnxruntime_c_api.h" \
             -o "${SHERPA_DIR}/include/onnxruntime_c_api.h"
         echo "✅ ONNX Runtime header installed (v${ONNX_RT_VERSION})"

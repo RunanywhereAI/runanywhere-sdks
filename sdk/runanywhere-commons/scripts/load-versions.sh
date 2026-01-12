@@ -8,7 +8,12 @@
 # After sourcing, you can use variables like:
 #   $ONNX_VERSION_IOS
 #   $SHERPA_ONNX_VERSION_IOS
+#   $IOS_DEPLOYMENT_TARGET
+#   $ANDROID_MIN_SDK
 #   etc.
+#
+# The VERSIONS file is the SINGLE SOURCE OF TRUTH for all versions.
+# DO NOT hardcode version fallbacks in scripts - always source this file.
 # =============================================================================
 
 # Find the VERSIONS file - look relative to this script's location
@@ -51,11 +56,19 @@ if [ "${VERBOSE:-}" = "1" ]; then
     echo "    IOS_DEPLOYMENT_TARGET=${IOS_DEPLOYMENT_TARGET}"
     echo "    ANDROID_MIN_SDK=${ANDROID_MIN_SDK}"
     echo "    XCODE_VERSION=${XCODE_VERSION}"
-    echo "  Dependencies:"
+    echo "  ONNX Runtime:"
     echo "    ONNX_VERSION_IOS=${ONNX_VERSION_IOS}"
+    echo "    ONNX_VERSION_ANDROID=${ONNX_VERSION_ANDROID}"
     echo "    ONNX_VERSION_MACOS=${ONNX_VERSION_MACOS}"
+    echo "    ONNX_VERSION_LINUX=${ONNX_VERSION_LINUX}"
+    echo "  Sherpa-ONNX:"
     echo "    SHERPA_ONNX_VERSION_IOS=${SHERPA_ONNX_VERSION_IOS}"
+    echo "    SHERPA_ONNX_VERSION_ANDROID=${SHERPA_ONNX_VERSION_ANDROID}"
+    echo "    SHERPA_ONNX_VERSION_MACOS=${SHERPA_ONNX_VERSION_MACOS}"
+    echo "  Other:"
     echo "    LLAMACPP_VERSION=${LLAMACPP_VERSION}"
+    echo "    NLOHMANN_JSON_VERSION=${NLOHMANN_JSON_VERSION}"
+    echo "    RAC_COMMONS_VERSION=${RAC_COMMONS_VERSION}"
 fi
 
 # Clean up temporary variables

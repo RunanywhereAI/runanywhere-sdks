@@ -79,12 +79,24 @@ SETUP_SDK=false
 BUILD_MODE="LOCAL"
 # SDK root is 3 levels up: backend-scripts -> runanywhere-commons -> sdk -> runanywhere-sdks
 SDK_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
-# Use version from VERSIONS file if available
-COMMONS_VERSION="${RAC_COMMONS_VERSION:-0.1.1}"
+
+# Validate required versions are loaded from VERSIONS file
+if [ -z "${RAC_COMMONS_VERSION:-}" ]; then
+    echo "ERROR: RAC_COMMONS_VERSION not loaded from VERSIONS file" >&2
+    exit 1
+fi
+if [ -z "${IOS_DEPLOYMENT_TARGET:-}" ]; then
+    echo "ERROR: IOS_DEPLOYMENT_TARGET not loaded from VERSIONS file" >&2
+    exit 1
+fi
+if [ -z "${ANDROID_MIN_SDK:-}" ]; then
+    echo "ERROR: ANDROID_MIN_SDK not loaded from VERSIONS file" >&2
+    exit 1
+fi
+
+COMMONS_VERSION="${RAC_COMMONS_VERSION}"
 BACKEND="all"
 ANDROID_ABIS="arm64-v8a,armeabi-v7a,x86_64"
-IOS_DEPLOYMENT_TARGET="${IOS_DEPLOYMENT_TARGET:-14.0}"
-ANDROID_MIN_SDK="${ANDROID_API_LEVEL:-24}"
 
 # =============================================================================
 # Parse Arguments
