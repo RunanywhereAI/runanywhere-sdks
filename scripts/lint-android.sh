@@ -29,7 +29,7 @@ OVERALL_STATUS=0
 
 # Check Android SDK
 echo "📦 Linting Android SDK..."
-cd "$PROJECT_ROOT/sdk/runanywhere-kotlin"
+cd "$PROJECT_ROOT/sdk/runanywhere-android"
 
 # Run Android Lint
 echo "Running Android Lint..."
@@ -38,7 +38,7 @@ if ./gradlew lint; then
 else
     print_status 1 "Android SDK lint failed"
     OVERALL_STATUS=1
-    echo "Check the lint report at: sdk/runanywhere-kotlin/build/reports/lint-results.html"
+    echo "Check the lint report at: sdk/runanywhere-android/build/reports/lint-results.html"
 fi
 
 # Run Detekt
@@ -49,11 +49,11 @@ if ./gradlew detekt; then
 else
     print_status 1 "Android SDK Detekt failed"
     OVERALL_STATUS=1
-    echo "Check the Detekt report at: sdk/runanywhere-kotlin/build/reports/detekt/detekt.html"
+    echo "Check the Detekt report at: sdk/runanywhere-android/build/reports/detekt/detekt.html"
 fi
 
 echo
-echo "═══════════════════════════════════════"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # Check Android Example App
 echo "📱 Linting Android Example App..."
@@ -81,13 +81,13 @@ else
 fi
 
 echo
-echo "═══════════════════════════════════════"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # Summary
 if [ $OVERALL_STATUS -eq 0 ]; then
-    echo -e "${GREEN}✓ All Android lint checks passed!${NC}"
+    echo -e "${GREEN}✅ All Android lint checks passed!${NC}"
 else
-    echo -e "${RED}✗ Android lint checks failed${NC}"
+    echo -e "${RED}❌ Android lint checks failed${NC}"
     echo
     echo "Fix suggestions:"
     echo "1. For TODO issues: Add GitHub issue reference (e.g., // TODO: #123 - Description)"
