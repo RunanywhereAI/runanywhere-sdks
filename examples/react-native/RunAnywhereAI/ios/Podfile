@@ -92,16 +92,17 @@ target 'RunAnywhereAI' do
           #   - $(inherited) ensures project-level flags are still included
           config.build_settings['OTHER_CFLAGS'] = '$(inherited) -DHAVE_INTTYPES_H -DHAVE_PKCRYPT -DHAVE_STDINT_H -DHAVE_WZAES -DHAVE_ZLIB -DMZ_ZIP_NO_SIGNING'
         end
-        
-        # Surgical removal of -G from per-file COMPILER_FLAGS.
-        # Unlike OTHER_CFLAGS above, per-file flags may contain legitimate
-        # settings we want to preserve, so we only strip the problematic -G flag.
+
+        # Completely clear per-file COMPILER_FLAGS.
+        # The RNZipArchive podspec sets malformed flags like:
+        #   -G CC_PREPROCESSOR_DEFINITIONS="..."
+        # Both -G and CC_PREPROCESSOR_DEFINITIONS= syntax are invalid.
+        # Since we set proper flags via OTHER_CFLAGS above, we can safely clear these.
         target.build_phases.each do |phase|
           next unless phase.respond_to?(:files)
           phase.files.each do |file|
             next unless file.settings && file.settings['COMPILER_FLAGS']
-            flags = file.settings['COMPILER_FLAGS']
-            file.settings['COMPILER_FLAGS'] = flags.gsub(/-G\s*/, '') if flags.is_a?(String)
+            file.settings.delete('COMPILER_FLAGS')
           end
         end
       end

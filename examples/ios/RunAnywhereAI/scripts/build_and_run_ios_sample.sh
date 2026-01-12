@@ -50,7 +50,7 @@ SWIFT_SDK_DIR="$WORKSPACE_ROOT/sdk/runanywhere-swift"
 APP_DIR="$SCRIPT_DIR/.."
 
 # Build scripts
-COMMONS_BUILD_SCRIPT="$COMMONS_DIR/scripts/build-all-ios.sh"
+COMMONS_BUILD_SCRIPT="$COMMONS_DIR/scripts/build-ios.sh"
 SWIFT_BUILD_SCRIPT="$SWIFT_SDK_DIR/scripts/build-swift.sh"
 
 # Colors
