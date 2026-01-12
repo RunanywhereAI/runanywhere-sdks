@@ -16,7 +16,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 print_header() { echo -e "\n${BLUE}=== $* ===${NC}\n"; }
-print_success() { echo -e "${GREEN}✔ $*${NC}"; }
+print_success() { echo -e "${GREEN}✓ $*${NC}"; }
 print_error() { echo -e "${RED}✗ $*${NC}"; }
 print_warning() { echo -e "${YELLOW}⚠ $*${NC}"; }
 print_info() { echo -e "${BLUE}ℹ $*${NC}"; }
@@ -37,13 +37,13 @@ SUPABASE_ANON_KEY=""
 
 ### Portable sed (GNU vs BSD)
 sedi() {
-    if sed --version >/dev/null 2>&1; then
-        # GNU sed
-        sed -i "$@"
-    else
-        # BSD sed (macOS)
-        sed -i '' "$@"
-    fi
+  if sed --version >/dev/null 2>&1; then
+    # GNU sed
+    sed -i "$@"
+  else
+    # BSD sed (macOS)
+    sed -i '' "$@"
+  fi
 }
 
 ### Load secrets from file or environment
@@ -145,135 +145,133 @@ done
 
 ### Validate preconditions
 validate_preconditions() {
-    print_header "Validating Preconditions"
+  print_header "Validating Preconditions"
 
-    # Must run at repo root
-    if [[ ! -f "Package.swift" || ! -d "$SDK_DIR" ]]; then
-        print_error "Must run from repository root (expected Package.swift and $SDK_DIR)"
+  # Must run at repo root
+  if [[ ! -f "Package.swift" || ! -d "$SDK_DIR" ]]; then
+    print_error "Must run from repository root (expected Package.swift and $SDK_DIR)"
+    exit 1
+  fi
+  print_success "Running from repository root"
+
+  # Git working directory must be clean
+  if [[ -n "$(git status --porcelain)" ]]; then
+    print_error "Git working directory is not clean"
+    print_info "Commit or stash your changes first"
+    git status --short
+    exit 1
+  fi
+  print_success "Git working directory is clean"
+
+  # Warn if not on main branch
+  CURRENT_BRANCH="$(git branch --show-current)"
+  if [[ "$CURRENT_BRANCH" != "main" ]]; then
+    print_warning "You are on branch '$CURRENT_BRANCH', not 'main'"
+    if [[ $AUTO_YES -ne 1 ]]; then
+      read -p "Continue anyway? (y/N): " -n 1 -r
+      echo
+      if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        print_info "Aborted by user"
         exit 1
+      fi
     fi
-    print_success "Running from repository root"
+  else
+    print_success "On main branch"
+  fi
 
-    # Git working directory must be clean
-    if [[ -n "$(git status --porcelain)" ]]; then
-        print_error "Git working directory is not clean"
-        print_info "Commit or stash your changes first"
-        git status --short
-        exit 1
+  # Check required tools
+  local required_tools=("gh" "git" "swift" "uuidgen")
+  for tool in "${required_tools[@]}"; do
+    if ! command -v "$tool" >/dev/null; then
+      print_error "Required tool not found: $tool"
+      exit 1
     fi
-    print_success "Git working directory is clean"
+  done
+  print_success "All required tools available"
 
-    # Warn if not on main branch
-    CURRENT_BRANCH="$(git branch --show-current)"
-    if [[ "$CURRENT_BRANCH" != "main" ]]; then
-        print_warning "You are on branch '$CURRENT_BRANCH', not 'main'"
-        if [[ $AUTO_YES -ne 1 ]]; then
-            read -p "Continue anyway? (y/N): " -n 1 -r
-            echo
-            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-                print_info "Aborted by user"
-                exit 1
-            fi
-        fi
-    else
-        print_success "On main branch"
-    fi
+  # Check GitHub CLI authentication
+  if ! gh auth status &>/dev/null; then
+    print_error "Not authenticated with GitHub CLI"
+    print_info "Run: gh auth login"
+    exit 1
+  fi
+  print_success "Authenticated with GitHub CLI"
 
-    # Check required tools
-    local required_tools=("gh" "git" "swift" "uuidgen")
-    for tool in "${required_tools[@]}"; do
-        if ! command -v "$tool" >/dev/null; then
-            print_error "Required tool not found: $tool"
-            exit 1
-        fi
-    done
-    print_success "All required tools available"
+  # Check for psql if DATABASE_URL is set
+  if [[ -n "${DATABASE_URL:-}" && ! $(command -v psql) ]]; then
+    print_warning "DATABASE_URL is set but psql not found (will print SQL for manual execution)"
+  fi
 
-    # Check GitHub CLI authentication
-    if ! gh auth status &>/dev/null; then
-        print_error "Not authenticated with GitHub CLI"
-        print_info "Run: gh auth login"
-        exit 1
-    fi
-    print_success "Authenticated with GitHub CLI"
-
-    # Check for psql if DATABASE_URL is set
-    if [[ -n "${DATABASE_URL:-}" ]] && ! command -v psql >/dev/null; then
-        print_warning "DATABASE_URL is set but psql not found (will print SQL for manual execution)"
-    fi
-
-    # Verify .gitignore contains BuildToken.swift
-    if ! grep -qF "$TOKEN_ABS_PATH" .gitignore 2>/dev/null; then
-        print_warning "BuildToken.swift not in .gitignore - add this line:"
-        print_info "  $TOKEN_ABS_PATH"
-    fi
+  # Verify .gitignore contains DevelopmentConfig.swift
+  if ! grep -qF "$DEV_CONFIG_ABS_PATH" .gitignore 2>/dev/null; then
+    print_warning "DevelopmentConfig.swift not in .gitignore - add this line:"
+    print_info "  $DEV_CONFIG_ABS_PATH"
+  fi
 }
 
 ### Get current version from VERSION file
 get_current_version() {
-    if [[ -f "$VERSION_FILE" ]]; then
-        cat "$VERSION_FILE"
-    else
-        echo "0.14.0"  # Fallback
-    fi
+  if [[ -f "$VERSION_FILE" ]]; then
+    cat "$VERSION_FILE"
+  else
+    echo "0.14.0"  # Fallback
+  fi
 }
 
 ### Calculate new version based on bump type
 calculate_new_version() {
-    local current="$1"
-    local bump="$2"
+  local current="$1"
+  local bump="$2"
 
-    IFS='.' read -r major minor patch <<<"$current"
+  IFS='.' read -r major minor patch <<<"$current"
 
-    case "$bump" in
-        major)
-            major=$((major + 1))
-            minor=0
-            patch=0
-            ;;
-        minor)
-            minor=$((minor + 1))
-            patch=0
-            ;;
-        patch)
-            patch=$((patch + 1))
-            ;;
-        *)
-            print_error "Invalid bump type: $bump (expected: major, minor, or patch)"
-            exit 1
-            ;;
-    esac
+  case "$bump" in
+    major)
+      major=$((major + 1))
+      minor=0
+      patch=0
+      ;;
+    minor)
+      minor=$((minor + 1))
+      patch=0
+      ;;
+    patch)
+      patch=$((patch + 1))
+      ;;
+    *)
+      print_error "Invalid bump type: $bump (expected: major, minor, or patch)"
+      exit 1
+      ;;
+  esac
 
-    echo "$major.$minor.$patch"
+  echo "$major.$minor.$patch"
 }
 
 ### Generate build token (format: bt_<uuid>_<timestamp>)
 generate_build_token() {
-    local uuid
-    local timestamp
+  local uuid
+  local timestamp
 
-    uuid="$(uuidgen | tr '[:upper:]' '[:lower:]')"
-    timestamp="$(date +%s)"
+  uuid="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+  timestamp="$(date +%s)"
 
-    echo "bt_${uuid}_${timestamp}"
+  echo "bt_${uuid}_${timestamp}"
 }
-### Generate BuildToken.swift file with real token
-generate_build_token_file() {
-    local build_token="$1"
-    local output_file="$2"
+
 ### Generate DevelopmentConfig.swift file with all 3 values
 generate_dev_config_file() {
   local build_token="$1"
   local output_file="$2"
-    mkdir -p "$(dirname "$output_file")"
 
-    cat > "$output_file" <<EOF
+  mkdir -p "$(dirname "$output_file")"
+
+  cat > "$output_file" <<EOF
 import Foundation
 
 /// Development mode configuration for SDK
 ///
-/// WARNING: THIS FILE IS AUTO-GENERATED DURING RELEASES
-/// WARNING: DO NOT MANUALLY EDIT THIS FILE
+/// ⚠️ THIS FILE IS AUTO-GENERATED DURING RELEASES
+/// ⚠️ DO NOT MANUALLY EDIT THIS FILE
 ///
 /// Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 /// Release: Auto-generated by scripts/release_ios_sdk.sh
@@ -312,201 +310,308 @@ enum DevelopmentConfig {
     static let buildToken = "$build_token"
 }
 EOF
+
+  print_success "Generated DevelopmentConfig.swift with all 3 values"
 }
 
 ### Update version references in files
 update_version_references() {
-    local new_version="$1"
+  local new_version="$1"
 
-    print_header "Updating Version References"
+  print_header "Updating Version References"
 
-    # Update VERSION file
-    echo "$new_version" > "$VERSION_FILE"
-    print_success "Updated $VERSION_FILE"
+  # Update VERSION file
+  echo "$new_version" > "$VERSION_FILE"
+  print_success "Updated $VERSION_FILE"
 
-    # Update root README.md
-    if [[ -f "$README_ROOT" ]]; then
-        sedi "s/from: \"[0-9]*\.[0-9]*\.[0-9]*\"/from: \"$new_version\"/g" "$README_ROOT"
-        sedi "s/exact: \"[0-9]*\.[0-9]*\.[0-9]*\"/exact: \"$new_version\"/g" "$README_ROOT"
-        sedi "s/'RunAnywhere', '~> [0-9]*\.[0-9]*'/'RunAnywhere', '~> ${new_version%.*}'/g" "$README_ROOT"
-        sedi "s/'RunAnywhere', '[0-9]*\.[0-9]*\.[0-9]*'/'RunAnywhere', '$new_version'/g" "$README_ROOT"
-        print_success "Updated $README_ROOT"
-    fi
+  # Update root README.md
+  if [[ -f "$README_ROOT" ]]; then
+    sedi "s/from: \"[0-9]*\.[0-9]*\.[0-9]*\"/from: \"$new_version\"/g" "$README_ROOT"
+    sedi "s/exact: \"[0-9]*\.[0-9]*\.[0-9]*\"/exact: \"$new_version\"/g" "$README_ROOT"
+    sedi "s/'RunAnywhere', '~> [0-9]*\.[0-9]*'/'RunAnywhere', '~> ${new_version%.*}'/g" "$README_ROOT"
+    sedi "s/'RunAnywhere', '[0-9]*\.[0-9]*\.[0-9]*'/'RunAnywhere', '$new_version'/g" "$README_ROOT"
+    print_success "Updated $README_ROOT"
+  fi
 
-    # Update SDK README.md
-    if [[ -f "$README_SDK" ]]; then
-        sedi "s/from: \"[0-9]*\.[0-9]*\.[0-9]*\"/from: \"$new_version\"/g" "$README_SDK"
-        sedi "s/exact: \"[0-9]*\.[0-9]*\.[0-9]*\"/exact: \"$new_version\"/g" "$README_SDK"
-        print_success "Updated $README_SDK"
-    fi
+  # Update SDK README.md
+  if [[ -f "$README_SDK" ]]; then
+    sedi "s/from: \"[0-9]*\.[0-9]*\.[0-9]*\"/from: \"$new_version\"/g" "$README_SDK"
+    sedi "s/exact: \"[0-9]*\.[0-9]*\.[0-9]*\"/exact: \"$new_version\"/g" "$README_SDK"
+    print_success "Updated $README_SDK"
+  fi
 
-    # Update CHANGELOG.md
-    if [[ -f "$CHANGELOG_FILE" ]]; then
-        local today
-        today="$(date +%Y-%m-%d)"
-        sedi "s/## \[Unreleased\]/## [Unreleased]\n\n## [$new_version] - $today/g" "$CHANGELOG_FILE"
-        print_success "Updated $CHANGELOG_FILE"
-    fi
+  # Update CHANGELOG.md
+  if [[ -f "$CHANGELOG_FILE" ]]; then
+    local today
+    today="$(date +%Y-%m-%d)"
+    sedi "s/## \[Unreleased\]/## [Unreleased]\n\n## [$new_version] - $today/g" "$CHANGELOG_FILE"
+    print_success "Updated $CHANGELOG_FILE"
+  fi
 }
 
 ### Display SQL command for manual Supabase insertion
 show_build_token_sql() {
-    local version="$1"
-    local build_token="$2"
+  local version="$1"
+  local build_token="$2"
 
-    print_header "Manual Supabase Setup Required"
+  print_header "Manual Supabase Setup Required"
 
-    echo ""
-    print_warning "IMPORTANT: You must manually insert this build token into Supabase"
-    echo ""
-    print_info "Run this SQL command in your Supabase SQL Editor:"
-    echo ""
-    echo -e "${GREEN}-------------------------------------------------------------------${NC}"
-    echo -e "${YELLOW}INSERT INTO build_tokens (token, platform, label, is_active, notes)"
-    echo -e "VALUES ("
-    echo -e "  '$build_token',"
-    echo -e "  'ios',"
-    echo -e "  'v$version',"
-    echo -e "  TRUE,"
-    echo -e "  'iOS SDK v$version - Released $(date +%Y-%m-%d)'"
-    echo -e ");${NC}"
-    echo -e "${GREEN}-------------------------------------------------------------------${NC}"
-    echo ""
-    echo ""
-    print_info "This ensures only valid SDKs can register devices to your database."
-    echo ""
+  echo ""
+  print_warning "⚠️  IMPORTANT: You must manually insert this build token into Supabase"
+  echo ""
+  print_info "Run this SQL command in your Supabase SQL Editor:"
+  echo ""
+  echo -e "${GREEN}-------------------------------------------------------------------${NC}"
+  echo -e "${YELLOW}INSERT INTO build_tokens (token, platform, label, is_active, notes)"
+  echo -e "VALUES ("
+  echo -e "  '$build_token',"
+  echo -e "  'ios',"
+  echo -e "  'v$version',"
+  echo -e "  TRUE,"
+  echo -e "  'iOS SDK v$version - Released $(date +%Y-%m-%d)'"
+  echo -e ");${NC}"
+  echo -e "${GREEN}-------------------------------------------------------------------${NC}"
+  echo ""
+  echo ""
+  print_info "This ensures only valid SDKs can register devices to your database."
+  echo ""
 }
 
 ### Run tests
 run_tests() {
-    if [[ $SKIP_BUILD -eq 1 ]]; then
-        print_warning "Skipping build check (--skip-build flag)"
-        return
-    fi
+  if [[ $SKIP_BUILD -eq 1 ]]; then
+    print_warning "Skipping build check (--skip-build flag)"
+    return
+  fi
 
-    print_header "Building Package"
+  print_header "Building Package"
 
-    print_info "Running swift build..."
-    if swift build --target RunAnywhere; then
-        print_success "Package builds successfully"
-    else
-        print_error "Swift build failed"
-        exit 1
-    fi
+  print_info "Running swift build..."
+  if swift build --target RunAnywhere; then
+    print_success "Package builds successfully"
+  else
+    print_error "Swift build failed"
+    exit 1
+  fi
 
-    # TODO: Add swift test when tests exist
-    # if swift test; then
-    #   print_success "All tests passed"
-    # else
-    #   print_error "Tests failed"
-    #   exit 1
-    # fi
+  # TODO: Add swift test when tests exist
+  # if swift test; then
+  #   print_success "All tests passed"
+  # else
+  #   print_error "Tests failed"
+  #   exit 1
+  # fi
 }
 
 ### Create GitHub release
 create_github_release() {
-    local new_version="$1"
-    local tag_name="v$new_version"
+  local new_version="$1"
+  local tag_name="v$new_version"
 
-    print_header "Creating GitHub Release"
+  print_header "Creating GitHub Release"
 
-    # Extract release notes from CHANGELOG
-    local release_notes=""
-    if [[ -f "$CHANGELOG_FILE" ]]; then
-        release_notes="$(sed -n "/## \[$new_version\]/,/^## \[/p" "$CHANGELOG_FILE" | sed '$d' | tail -n +2)"
-    fi
-    # Create GitHub release
-    # SECURITY NOTE: DO NOT include build token in release notes (it's public)
-    print_info "Creating GitHub release..."
-    gh release create "$tag_name" \
-        --title "RunAnywhere iOS SDK v$new_version" \
-        --notes "$release_notes" \
-        --latest
+  # Extract release notes from CHANGELOG
+  local release_notes=""
+  if [[ -f "$CHANGELOG_FILE" ]]; then
+    release_notes="$(sed -n "/## \[$new_version\]/,/^## \[/p" "$CHANGELOG_FILE" | sed '$d' | tail -n +2)"
+  fi
 
-    print_success "GitHub release created: https://github.com/RunanywhereAI/sdks/releases/tag/$tag_name"
+  # Fallback if no notes found
+  if [[ -z "$release_notes" ]]; then
+    release_notes="Release v$new_version"
+  fi
+
+  # Create GitHub release
+  # SECURITY NOTE: DO NOT include build token in release notes (it's public)
+  print_info "Creating GitHub release..."
+  gh release create "$tag_name" \
+    --title "RunAnywhere iOS SDK v$new_version" \
+    --notes "$release_notes" \
+    --latest
+
+  print_success "GitHub release created: https://github.com/RunanywhereAI/sdks/releases/tag/$tag_name"
 }
 
 ### Main release process
 main() {
-    print_header "RunAnywhere iOS SDK Release"
+  print_header "RunAnywhere iOS SDK Release"
 
-    # Validate everything first
-    validate_preconditions
+  # Validate everything first
+  validate_preconditions
 
-    # Get current version
-    local current_version
-    current_version="$(get_current_version)"
-    print_info "Current version: $current_version"
+  # Load secrets from file or environment
+  load_secrets
 
-    # Determine bump type
-    if [[ -z "$BUMP_TYPE" ]]; then
-        echo ""
-        echo "Select version bump type:"
-        echo "  1) patch (bug fixes)           - $current_version -> $(calculate_new_version "$current_version" "patch")"
-        echo "  2) minor (new features)        - $current_version -> $(calculate_new_version "$current_version" "minor")"
-        echo "  3) major (breaking changes)    - $current_version -> $(calculate_new_version "$current_version" "major")"
-        echo ""
+  # Get current version
+  local current_version
+  current_version="$(get_current_version)"
+  print_info "Current version: $current_version"
 
-        if [[ $AUTO_YES -ne 1 ]]; then
-            read -p "Enter choice (1-3): " choice
-        else
-            choice=1  # Default to patch in auto mode
-        fi
+  # Determine bump type
+  if [[ -z "$BUMP_TYPE" ]]; then
+    echo ""
+    echo "Select version bump type:"
+    echo "  1) patch (bug fixes)           - $current_version -> $(calculate_new_version "$current_version" "patch")"
+    echo "  2) minor (new features)        - $current_version -> $(calculate_new_version "$current_version" "minor")"
+    echo "  3) major (breaking changes)    - $current_version -> $(calculate_new_version "$current_version" "major")"
+    echo ""
 
-        case "${choice:-1}" in
-            1) BUMP_TYPE="patch" ;;
-            2) BUMP_TYPE="minor" ;;
-            3) BUMP_TYPE="major" ;;
-            *)
-                print_error "Invalid choice"
-                exit 1
-                ;;
-        esac
-    fi
-
-    # Calculate new version
-    local new_version
-    new_version="$(calculate_new_version "$current_version" "$BUMP_TYPE")"
-
-    # Confirm release
-    print_warning "About to release v$new_version (was $current_version)"
     if [[ $AUTO_YES -ne 1 ]]; then
-        read -p "Continue? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            print_info "Release cancelled by user"
-            exit 0
-        fi
+      read -p "Enter choice (1-3): " choice
+    else
+      choice=1  # Default to patch in auto mode
     fi
 
-    # Generate build token
-    local build_token
-    build_token="$(generate_build_token)"
-    print_success "Generated build token: $build_token"
+    case "${choice:-1}" in
+      1) BUMP_TYPE="patch" ;;
+      2) BUMP_TYPE="minor" ;;
+      3) BUMP_TYPE="major" ;;
+      *)
+        print_error "Invalid choice"
+        exit 1
+        ;;
+    esac
+  fi
 
-    # Show SQL command for manual Supabase insertion
-    show_build_token_sql "$new_version" "$build_token"
+  # Calculate new version
+  local new_version
+  new_version="$(calculate_new_version "$current_version" "$BUMP_TYPE")"
 
-    # Run tests before making any changes
-    run_tests
+  # Confirm release
+  print_warning "About to release v$new_version (was $current_version)"
+  if [[ $AUTO_YES -ne 1 ]]; then
+    read -p "Continue? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+      print_info "Release cancelled by user"
+      exit 0
+    fi
+  fi
 
-    # Step 1: Update version files and commit to main
-    print_header "Step 1: Committing Version Updates to Main"
-    update_version_references "$new_version"
+  # Generate build token
+  local build_token
+  build_token="$(generate_build_token)"
+  print_success "Generated build token: $build_token"
 
-    local paths_to_add=("$VERSION_FILE")
-    [[ -f "$CHANGELOG_FILE" ]] && paths_to_add+=("$CHANGELOG_FILE")
-    [[ -f "$README_ROOT" ]] && paths_to_add+=("$README_ROOT")
-    [[ -f "$README_SDK" ]] && paths_to_add+=("$README_SDK")
+  # Show SQL command for manual Supabase insertion
+  show_build_token_sql "$new_version" "$build_token"
 
-    git add "${paths_to_add[@]}"
-    git commit -m "Release v$new_version
+  # Run tests before making any changes
+  run_tests
+
+  # Step 1: Update version files and commit to main
+  print_header "Step 1: Committing Version Updates to Main"
+  update_version_references "$new_version"
+
+  local paths_to_add=("$VERSION_FILE")
+  [[ -f "$CHANGELOG_FILE" ]] && paths_to_add+=("$CHANGELOG_FILE")
+  [[ -f "$README_ROOT" ]] && paths_to_add+=("$README_ROOT")
+  [[ -f "$README_SDK" ]] && paths_to_add+=("$README_SDK")
+
+  git add "${paths_to_add[@]}"
+  git commit -m "Release v$new_version
 
 - Updated version to $new_version
 - Updated documentation
 - See CHANGELOG.md for details"
 
-    print_success "Committed version updates to main"
+  print_success "Committed version updates to main"
+
+  # Step 2: Create worktree for tag commit (includes DevelopmentConfig.swift)
+  print_header "Step 2: Creating Release Tag with DevelopmentConfig.swift"
+
+  local worktree_dir
+  worktree_dir="$(mktemp -d)/release-v$new_version"
+  local release_branch="release/v$new_version"
+
+  # Create worktree
+  git worktree add -b "$release_branch" "$worktree_dir"
+  print_info "Created worktree at $worktree_dir"
+
+  # Generate DevelopmentConfig.swift in worktree (contains all 3 values)
+  local worktree_config_path="$worktree_dir/$DEV_CONFIG_ABS_PATH"
+  generate_dev_config_file "$build_token" "$worktree_config_path"
+
+  # Commit DevelopmentConfig.swift in worktree
+  pushd "$worktree_dir" >/dev/null
+  git add -f "$DEV_CONFIG_ABS_PATH"
+  git commit -m "Add DevelopmentConfig.swift for release v$new_version
+
+SECURITY: DevelopmentConfig.swift is in .gitignore and NOT in main branch.
+This file is ONLY included in release tags for SPM distribution.
+
+Contains all 3 development mode values:
+- Supabase URL: $SUPABASE_URL
+- Supabase anon key: [included]
+- Build token: $build_token
+
+Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+
+  print_success "Committed DevelopmentConfig.swift in worktree"
+
+  # Create annotated tag
+  local tag_name="v$new_version"
+  git tag -a "$tag_name" -m "Release v$new_version"
+  print_success "Created tag $tag_name"
+
+  # Push tag to GitHub
+  git push origin "$tag_name"
+  print_success "Pushed tag to GitHub"
+
+  popd >/dev/null
+
+  # Clean up worktree
+  git worktree remove "$worktree_dir" --force
+  git branch -D "$release_branch"
+  print_success "Cleaned up worktree"
+
+  # Step 3: Push main branch
+  print_header "Step 3: Pushing Main Branch"
+  git push origin HEAD
+  print_success "Pushed main branch"
+
+  # Step 4: Create GitHub release
+  create_github_release "$new_version"
+
+  # Success summary
+  print_header "Release Complete!"
+  print_success "Released v$new_version successfully"
+  print_success "Build token: $build_token"
+  echo ""
+  print_info "Main branch: Contains version updates (NO DevelopmentConfig.swift)"
+  print_info "Tag $tag_name: Contains DevelopmentConfig.swift with all 3 values:"
+  print_info "  - Supabase URL: $SUPABASE_URL"
+  print_info "  - Supabase anon key: [included]"
+  print_info "  - Build token: $build_token"
+  print_info "SPM users downloading v$new_version will get the real configuration"
+  echo ""
+  print_info "Users can now install with:"
+  echo ""
+  echo "  dependencies: ["
+  echo "      .package(url: \"https://github.com/RunanywhereAI/sdks\", from: \"$new_version\")"
+  echo "  ]"
+  echo ""
+
+  # Final reminder to insert build token
+  print_warning "═══════════════════════════════════════════════════════════"
+  print_warning "⚠️  FINAL REMINDER: Insert build token into Supabase!"
+  print_warning "═══════════════════════════════════════════════════════════"
+  echo ""
+  echo -e "${YELLOW}INSERT INTO build_tokens (token, platform, label, is_active, notes)"
+  echo -e "VALUES ("
+  echo -e "  '$build_token',"
+  echo -e "  'ios',"
+  echo -e "  'v$new_version',"
+  echo -e "  TRUE,"
+  echo -e "  'iOS SDK v$new_version - Released $(date +%Y-%m-%d)'"
+  echo -e ");${NC}"
+  echo ""
+  print_warning "Without this, the new SDK release will NOT be able to register devices!"
+  echo ""
+  print_warning "SECURITY REMINDER: Build token shown above is for internal use only"
+  print_warning "DO NOT include the token in public GitHub release notes"
+  echo ""
+  print_info "View release: https://github.com/RunanywhereAI/sdks/releases/tag/v$new_version"
 }
 
 # Run main function
