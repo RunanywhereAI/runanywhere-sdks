@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>RunAnywhereAI</string>
+	<string>RunAnywhere</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -34,9 +34,9 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>RunAnywhereAI needs access to your microphone for speech-to-text transcription.</string>
+	<string>RunAnywhere needs access to your microphone for speech-to-text transcription.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>RunAnywhereAI uses on-device speech recognition to transcribe your voice.</string>
+	<string>RunAnywhere uses on-device speech recognition to transcribe your voice.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIAppFonts</key>

@@ -47,15 +47,19 @@ class ModelManager: ObservableObject {
 
     func getAvailableModels() async -> [ModelInfo] {
         do {
-            return try await RunAnywhere.listAvailableModels()
+            return try await RunAnywhere.availableModels()
         } catch {
             print("Failed to get available models: \(error)")
             return []
         }
     }
 
-    func getCurrentModel() -> ModelInfo? {
-        // Use the SDK's public method to get the current model
-        return RunAnywhere.currentModel
+    func getCurrentModel() async -> ModelInfo? {
+        // Get current model ID from SDK and look up the model info
+        guard let modelId = await RunAnywhere.getCurrentModelId() else {
+            return nil
+        }
+        let models = await getAvailableModels()
+        return models.first { $0.id == modelId }
     }
 }

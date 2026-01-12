@@ -2,14 +2,39 @@
 
 On-device AI with intelligent routing between on-device and cloud execution for optimal cost and privacy.
 
-> **📖 Complete Documentation**: See [STATUS.md](./STATUS.md) for comprehensive status, architecture, Swift SDK alignment, and implementation details.
+> **📖 Architecture Documentation**: See [MULTI_PACKAGE_ARCHITECTURE.md](./MULTI_PACKAGE_ARCHITECTURE.md) for comprehensive multi-package structure and implementation details.
+
+## Multi-Package Architecture
+
+This SDK uses a modular multi-package architecture. Install only the packages you need:
+
+| Package | Description |
+|---------|-------------|
+| `@runanywhere/core` | Core SDK infrastructure and public API (required) |
+| `@runanywhere/native` | Native bridge with Nitro bindings (peer dependency of core) |
+| `@runanywhere/llamacpp` | LlamaCpp backend for LLM text generation |
+| `@runanywhere/onnx` | ONNX Runtime backend for STT/TTS |
 
 ## Installation
 
+### Full Installation (All Features)
+
 ```bash
-npm install @runanywhere/react-native-sdk
+npm install @runanywhere/core @runanywhere/native @runanywhere/llamacpp @runanywhere/onnx
 # or
-yarn add @runanywhere/react-native-sdk
+yarn add @runanywhere/core @runanywhere/native @runanywhere/llamacpp @runanywhere/onnx
+```
+
+### Minimal Installation (LLM Only)
+
+```bash
+npm install @runanywhere/core @runanywhere/native @runanywhere/llamacpp
+```
+
+### Minimal Installation (STT/TTS Only)
+
+```bash
+npm install @runanywhere/core @runanywhere/native @runanywhere/onnx
 ```
 
 ### iOS Setup
@@ -25,13 +50,36 @@ No additional setup required. The module will be automatically linked.
 ## Quick Start
 
 ```typescript
-import { RunAnywhere, SDKEnvironment } from '@runanywhere/react-native-sdk';
+// Import from the modular packages
+import { RunAnywhere, SDKEnvironment, ModelCategory } from '@runanywhere/core';
+import { LlamaCPP } from '@runanywhere/llamacpp';
+import { ONNX, ModelArtifactType } from '@runanywhere/onnx';
 
 // Initialize the SDK
 await RunAnywhere.initialize({
   apiKey: 'your-api-key',
   baseURL: 'https://api.runanywhere.com',
-  environment: SDKEnvironment.Production,
+  environment: SDKEnvironment.Development,
+});
+
+// Register LlamaCpp module and add models
+LlamaCPP.register();
+LlamaCPP.addModel({
+  id: 'smollm2-360m-q8_0',
+  name: 'SmolLM2 360M Q8_0',
+  url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
+  memoryRequirement: 500_000_000,
+});
+
+// Register ONNX module and add STT/TTS models
+ONNX.register();
+ONNX.addModel({
+  id: 'sherpa-onnx-whisper-tiny.en',
+  name: 'Sherpa Whisper Tiny (ONNX)',
+  url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
+  modality: ModelCategory.SpeechRecognition,
+  artifactType: ModelArtifactType.TarGzArchive,
+  memoryRequirement: 75_000_000,
 });
 
 // Simple chat
@@ -45,7 +93,6 @@ const result = await RunAnywhere.generate('Explain quantum computing', {
 });
 console.log('Text:', result.text);
 console.log('Tokens:', result.tokensUsed);
-console.log('Speed:', result.performanceMetrics.tokensPerSecond, 'tok/s');
 ```
 
 ## Features
@@ -56,12 +103,15 @@ console.log('Speed:', result.performanceMetrics.tokensPerSecond, 'tok/s');
 - **Model Management**: Download, load, and manage AI models
 - **Events**: Subscribe to SDK events for real-time updates
 - **Cross-Platform**: iOS and Android support
+- **Modular**: Install only the backends you need
 
 ## API Reference
 
 ### Initialization
 
 ```typescript
+import { RunAnywhere, SDKEnvironment } from '@runanywhere/core';
+
 // Initialize SDK
 await RunAnywhere.initialize({
   apiKey: string,
@@ -71,7 +121,7 @@ await RunAnywhere.initialize({
 
 // Check initialization state
 const isInit = await RunAnywhere.isInitialized();
-const isActive = await RunAnywhere.isActive();
+const isActive = RunAnywhere.isActive;
 
 // Reset SDK
 await RunAnywhere.reset();
@@ -87,30 +137,26 @@ const response = await RunAnywhere.chat('Hello!');
 const result = await RunAnywhere.generate('Prompt', {
   maxTokens: 100,
   temperature: 0.7,
-  topP: 1.0,
   systemPrompt: 'You are a helpful assistant.',
 });
 
 // Streaming
-const unsubscribe = RunAnywhere.events.onGeneration((event) => {
-  if (event.type === 'tokenGenerated') {
-    process.stdout.write(event.token);
-  }
+RunAnywhere.generateStream('Tell me a story', undefined, (token) => {
+  process.stdout.write(token);
 });
-const sessionId = await RunAnywhere.generateStream('Tell me a story');
 ```
 
 ### Model Management
 
 ```typescript
 // List available models
-const models = await RunAnywhere.availableModels();
+const models = await RunAnywhere.getAvailableModels();
 
 // Load a model
 await RunAnywhere.loadModel('llama-3.2-1b');
 
-// Get current model
-const current = await RunAnywhere.currentModel();
+// Check if model is loaded
+const isLoaded = await RunAnywhere.isModelLoaded();
 
 // Download a model (with progress events)
 RunAnywhere.events.onModel((event) => {
@@ -191,7 +237,6 @@ import {
   LLMFramework,
   ModelCategory,
   ModelFormat,
-  ComponentState,
 
   // Interfaces
   GenerationResult,
@@ -208,38 +253,28 @@ import {
   // Errors
   SDKError,
   SDKErrorCode,
-} from '@runanywhere/react-native-sdk';
+} from '@runanywhere/core';
 ```
 
 ## Requirements
 
 - React Native 0.71+
-- iOS 14.0+
+- iOS 15.1+
 - Android API 24+
 
 ## Development Setup
 
-After cloning the repository, you need to generate the Nitrogen binding files before building:
+After cloning the repository:
 
 ```bash
 cd sdk/runanywhere-react-native
 
 # Install dependencies
-npm install
+yarn install
 
-# Generate Nitrogen bindings (REQUIRED before first build)
-npm run nitrogen
+# Build all packages
+yarn build
 ```
-
-### What is Nitrogen?
-
-Nitrogen is the code generator for [NitroModules](https://github.com/margelo/react-native-nitro-modules) - a high-performance native module system for React Native. It generates:
-
-- **C++ bridge code** - Type-safe bindings between JS and native
-- **Swift/Kotlin code** - Platform-specific implementations  
-- **Autolinking files** - For CocoaPods and Gradle integration
-
-The generated files are in `nitrogen/generated/` and are gitignored (auto-generated on each machine).
 
 ### Native Binaries
 
@@ -248,7 +283,7 @@ Native binaries (XCFramework for iOS, .so libraries for Android) are **automatic
 - **iOS**: Downloaded during `pod install` via the podspec's `prepare_command`
 - **Android**: Downloaded during Gradle's `preBuild` phase via `downloadNativeLibs` task
 
-The version is controlled by `native-version.txt` in the SDK root.
+The version is controlled by `native-version.txt` in the native package.
 
 ### Build Commands
 
@@ -259,7 +294,7 @@ pod install
 cd ..
 npx react-native run-ios
 
-# Android  
+# Android
 cd examples/react-native/RunAnywhereAI
 npx react-native run-android
 ```

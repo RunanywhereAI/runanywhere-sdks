@@ -1,0 +1,562 @@
+#!/bin/bash
+# =============================================================================
+# RunAnywhere React Native SDK - Build Script
+# =============================================================================
+#
+# Single entry point for building the React Native SDK and its native dependencies.
+# Similar to iOS's build-swift.sh and Android's build-kotlin.sh.
+#
+# USAGE:
+#   ./scripts/build-react-native.sh [options]
+#
+# OPTIONS:
+#   --setup             First-time setup: install deps, build commons, copy frameworks/libs
+#   --local             Use locally built native libs (sets RA_TEST_LOCAL=1)
+#   --remote            Use remote libs from GitHub releases (unsets RA_TEST_LOCAL)
+#   --rebuild-commons   Force rebuild of runanywhere-commons
+#   --ios               Build for iOS only
+#   --android           Build for Android only (default: both)
+#   --clean             Clean build directories before building
+#   --skip-build        Skip native build (only setup frameworks/libs)
+#   --help              Show this help message
+#
+# EXAMPLES:
+#   # First-time setup (downloads + builds + copies everything)
+#   ./scripts/build-react-native.sh --setup
+#
+#   # Rebuild only commons (after C++ code changes)
+#   ./scripts/build-react-native.sh --local --rebuild-commons
+#
+#   # Just switch to local mode (uses cached libs)
+#   ./scripts/build-react-native.sh --local --skip-build
+#
+#   # iOS only setup
+#   ./scripts/build-react-native.sh --setup --ios
+#
+# =============================================================================
+
+set -e
+
+# =============================================================================
+# Configuration
+# =============================================================================
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RN_SDK_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+SDK_ROOT="$(cd "${RN_SDK_DIR}/.." && pwd)"
+COMMONS_DIR="${SDK_ROOT}/runanywhere-commons"
+COMMONS_IOS_SCRIPT="${COMMONS_DIR}/scripts/build-ios.sh"
+COMMONS_ANDROID_SCRIPT="${COMMONS_DIR}/scripts/build-android.sh"
+
+# Output directories
+CORE_IOS_BINARIES="${RN_SDK_DIR}/packages/core/ios/Binaries"
+LLAMACPP_IOS_FRAMEWORKS="${RN_SDK_DIR}/packages/llamacpp/ios/Frameworks"
+ONNX_IOS_FRAMEWORKS="${RN_SDK_DIR}/packages/onnx/ios/Frameworks"
+
+CORE_ANDROID_JNILIBS="${RN_SDK_DIR}/packages/core/android/src/main/jniLibs"
+LLAMACPP_ANDROID_JNILIBS="${RN_SDK_DIR}/packages/llamacpp/android/src/main/jniLibs"
+ONNX_ANDROID_JNILIBS="${RN_SDK_DIR}/packages/onnx/android/src/main/jniLibs"
+
+# Defaults
+MODE="local"
+SETUP_MODE=false
+REBUILD_COMMONS=false
+CLEAN_BUILD=false
+SKIP_BUILD=false
+BUILD_IOS=true
+BUILD_ANDROID=true
+ABIS="arm64-v8a"
+
+# =============================================================================
+# Colors & Logging
+# =============================================================================
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+log_header() {
+    echo ""
+    echo -e "${GREEN}═══════════════════════════════════════════${NC}"
+    echo -e "${GREEN} $1${NC}"
+    echo -e "${GREEN}═══════════════════════════════════════════${NC}"
+}
+
+log_step() {
+    echo -e "${BLUE}==>${NC} $1"
+}
+
+log_info() {
+    echo -e "${CYAN}[✓]${NC} $1"
+}
+
+log_warn() {
+    echo -e "${YELLOW}[!]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[✗]${NC} $1"
+}
+
+# =============================================================================
+# Argument Parsing
+# =============================================================================
+
+show_help() {
+    head -38 "$0" | tail -35
+    exit 0
+}
+
+for arg in "$@"; do
+    case "$arg" in
+        --setup)
+            SETUP_MODE=true
+            REBUILD_COMMONS=true
+            ;;
+        --local)
+            MODE="local"
+            ;;
+        --remote)
+            MODE="remote"
+            ;;
+        --rebuild-commons)
+            REBUILD_COMMONS=true
+            ;;
+        --ios)
+            BUILD_IOS=true
+            BUILD_ANDROID=false
+            ;;
+        --android)
+            BUILD_IOS=false
+            BUILD_ANDROID=true
+            ;;
+        --clean)
+            CLEAN_BUILD=true
+            ;;
+        --skip-build)
+            SKIP_BUILD=true
+            ;;
+        --abis=*)
+            ABIS="${arg#*=}"
+            ;;
+        --help|-h)
+            show_help
+            ;;
+        *)
+            log_error "Unknown option: $arg"
+            show_help
+            ;;
+    esac
+done
+
+# =============================================================================
+# Setup Environment
+# =============================================================================
+
+setup_environment() {
+    log_header "Setting Up Environment"
+
+    cd "$RN_SDK_DIR"
+
+    # Check for yarn
+    if ! command -v yarn &> /dev/null; then
+        log_error "yarn is not installed. Please install yarn first."
+        exit 1
+    fi
+
+    # Install dependencies
+    log_step "Installing yarn dependencies..."
+    yarn install
+
+    log_info "Dependencies installed"
+}
+
+# =============================================================================
+# Build Commons (Native Libraries)
+# =============================================================================
+
+build_commons_ios() {
+    log_header "Building runanywhere-commons for iOS"
+
+    if [[ ! -x "$COMMONS_IOS_SCRIPT" ]]; then
+        log_error "iOS build script not found: $COMMONS_IOS_SCRIPT"
+        exit 1
+    fi
+
+    local FLAGS=""
+    [[ "$CLEAN_BUILD" == true ]] && FLAGS="$FLAGS --clean"
+
+    log_step "Running: build-ios.sh $FLAGS"
+    "$COMMONS_IOS_SCRIPT" $FLAGS
+
+    log_info "iOS commons build complete"
+}
+
+build_commons_android() {
+    log_header "Building runanywhere-commons for Android"
+
+    if [[ ! -x "$COMMONS_ANDROID_SCRIPT" ]]; then
+        log_error "Android build script not found: $COMMONS_ANDROID_SCRIPT"
+        exit 1
+    fi
+
+    # build-android.sh takes positional args: BACKENDS ABIS
+    # Use "all" for backends to get both LlamaCPP and ONNX
+    local BACKENDS="llamacpp,onnx"
+
+    log_step "Running: build-android.sh $BACKENDS $ABIS"
+    "$COMMONS_ANDROID_SCRIPT" "$BACKENDS" "$ABIS"
+
+    log_info "Android commons build complete"
+}
+
+# =============================================================================
+# Copy iOS Frameworks
+# =============================================================================
+
+copy_ios_frameworks() {
+    log_header "Copying iOS XCFrameworks"
+
+    local COMMONS_DIST="${COMMONS_DIR}/dist"
+
+    # Create directories
+    mkdir -p "$CORE_IOS_BINARIES"
+    mkdir -p "$LLAMACPP_IOS_FRAMEWORKS"
+    mkdir -p "$ONNX_IOS_FRAMEWORKS"
+
+    # Copy RACommons.xcframework to core package
+    if [[ -d "${COMMONS_DIST}/RACommons.xcframework" ]]; then
+        rm -rf "${CORE_IOS_BINARIES}/RACommons.xcframework"
+        cp -R "${COMMONS_DIST}/RACommons.xcframework" "${CORE_IOS_BINARIES}/"
+        log_info "Core: RACommons.xcframework"
+    else
+        log_warn "RACommons.xcframework not found at ${COMMONS_DIST}/"
+    fi
+
+    # Copy RABackendLLAMACPP.xcframework to llamacpp package
+    if [[ -d "${COMMONS_DIST}/RABackendLLAMACPP.xcframework" ]]; then
+        rm -rf "${LLAMACPP_IOS_FRAMEWORKS}/RABackendLLAMACPP.xcframework"
+        cp -R "${COMMONS_DIST}/RABackendLLAMACPP.xcframework" "${LLAMACPP_IOS_FRAMEWORKS}/"
+        log_info "LlamaCPP: RABackendLLAMACPP.xcframework"
+    else
+        log_warn "RABackendLLAMACPP.xcframework not found at ${COMMONS_DIST}/"
+    fi
+
+    # Copy RABackendONNX.xcframework to onnx package
+    if [[ -d "${COMMONS_DIST}/RABackendONNX.xcframework" ]]; then
+        rm -rf "${ONNX_IOS_FRAMEWORKS}/RABackendONNX.xcframework"
+        cp -R "${COMMONS_DIST}/RABackendONNX.xcframework" "${ONNX_IOS_FRAMEWORKS}/"
+        log_info "ONNX: RABackendONNX.xcframework"
+    else
+        log_warn "RABackendONNX.xcframework not found at ${COMMONS_DIST}/"
+    fi
+
+    # Copy onnxruntime.xcframework to onnx package (required dependency)
+    local ONNX_RUNTIME_PATH="${COMMONS_DIR}/third_party/onnxruntime-ios/onnxruntime.xcframework"
+    if [[ -d "${ONNX_RUNTIME_PATH}" ]]; then
+        rm -rf "${ONNX_IOS_FRAMEWORKS}/onnxruntime.xcframework"
+        cp -R "${ONNX_RUNTIME_PATH}" "${ONNX_IOS_FRAMEWORKS}/"
+        log_info "ONNX: onnxruntime.xcframework"
+    else
+        log_warn "onnxruntime.xcframework not found at ${ONNX_RUNTIME_PATH}"
+    fi
+
+    # Create .testlocal markers for local mode
+    touch "${RN_SDK_DIR}/packages/core/ios/.testlocal"
+    touch "${RN_SDK_DIR}/packages/llamacpp/ios/.testlocal"
+    touch "${RN_SDK_DIR}/packages/onnx/ios/.testlocal"
+
+    log_info "iOS frameworks copied"
+}
+
+# =============================================================================
+# Copy Android JNI Libraries
+# =============================================================================
+
+copy_android_jnilibs() {
+    log_header "Copying Android JNI Libraries"
+
+    local COMMONS_DIST="${COMMONS_DIR}/dist/android"
+    local COMMONS_BUILD="${COMMONS_DIR}/build/android/unified"
+
+    IFS=',' read -ra ABI_ARRAY <<< "$ABIS"
+
+    for ABI in "${ABI_ARRAY[@]}"; do
+        log_step "Copying libraries for ${ABI}..."
+
+        # Create directories
+        mkdir -p "${CORE_ANDROID_JNILIBS}/${ABI}"
+        mkdir -p "${LLAMACPP_ANDROID_JNILIBS}/${ABI}"
+        mkdir -p "${ONNX_ANDROID_JNILIBS}/${ABI}"
+
+        # =======================================================================
+        # Core Package: RACommons (librunanywhere_jni.so, librac_commons.so, libc++_shared.so)
+        # =======================================================================
+
+        # Copy librunanywhere_jni.so
+        if [[ -f "${COMMONS_DIST}/jni/${ABI}/librunanywhere_jni.so" ]]; then
+            cp "${COMMONS_DIST}/jni/${ABI}/librunanywhere_jni.so" "${CORE_ANDROID_JNILIBS}/${ABI}/"
+            log_info "Core: librunanywhere_jni.so"
+        elif [[ -f "${COMMONS_BUILD}/${ABI}/src/jni/librunanywhere_jni.so" ]]; then
+            cp "${COMMONS_BUILD}/${ABI}/src/jni/librunanywhere_jni.so" "${CORE_ANDROID_JNILIBS}/${ABI}/"
+            log_info "Core: librunanywhere_jni.so (from build)"
+        else
+            log_warn "Core: librunanywhere_jni.so NOT FOUND"
+        fi
+
+        # Copy librac_commons.so
+        if [[ -f "${COMMONS_BUILD}/${ABI}/librac_commons.so" ]]; then
+            cp "${COMMONS_BUILD}/${ABI}/librac_commons.so" "${CORE_ANDROID_JNILIBS}/${ABI}/"
+            log_info "Core: librac_commons.so"
+        fi
+
+        # Copy libc++_shared.so
+        if [[ -f "${COMMONS_DIST}/llamacpp/${ABI}/libc++_shared.so" ]]; then
+            cp "${COMMONS_DIST}/llamacpp/${ABI}/libc++_shared.so" "${CORE_ANDROID_JNILIBS}/${ABI}/"
+            log_info "Core: libc++_shared.so"
+        elif [[ -f "${COMMONS_DIST}/jni/${ABI}/libc++_shared.so" ]]; then
+            cp "${COMMONS_DIST}/jni/${ABI}/libc++_shared.so" "${CORE_ANDROID_JNILIBS}/${ABI}/"
+            log_info "Core: libc++_shared.so"
+        fi
+
+        # Copy libomp.so
+        if [[ -f "${COMMONS_DIST}/llamacpp/${ABI}/libomp.so" ]]; then
+            cp "${COMMONS_DIST}/llamacpp/${ABI}/libomp.so" "${CORE_ANDROID_JNILIBS}/${ABI}/"
+            log_info "Core: libomp.so"
+        elif [[ -f "${COMMONS_DIST}/jni/${ABI}/libomp.so" ]]; then
+            cp "${COMMONS_DIST}/jni/${ABI}/libomp.so" "${CORE_ANDROID_JNILIBS}/${ABI}/"
+            log_info "Core: libomp.so"
+        fi
+
+        # =======================================================================
+        # LlamaCPP Package: RABackendLlamaCPP
+        # Rename to librunanywhere_llamacpp.so as expected by RN SDK
+        # =======================================================================
+
+        # Copy and rename backend library
+        if [[ -f "${COMMONS_DIST}/llamacpp/${ABI}/librac_backend_llamacpp.so" ]]; then
+            cp "${COMMONS_DIST}/llamacpp/${ABI}/librac_backend_llamacpp.so" "${LLAMACPP_ANDROID_JNILIBS}/${ABI}/librunanywhere_llamacpp.so"
+            log_info "LlamaCPP: librunanywhere_llamacpp.so"
+        elif [[ -f "${COMMONS_BUILD}/${ABI}/src/backends/llamacpp/librac_backend_llamacpp.so" ]]; then
+            cp "${COMMONS_BUILD}/${ABI}/src/backends/llamacpp/librac_backend_llamacpp.so" "${LLAMACPP_ANDROID_JNILIBS}/${ABI}/librunanywhere_llamacpp.so"
+            log_info "LlamaCPP: librunanywhere_llamacpp.so (from build)"
+        fi
+
+        # Copy JNI bridge
+        if [[ -f "${COMMONS_DIST}/llamacpp/${ABI}/librac_backend_llamacpp_jni.so" ]]; then
+            cp "${COMMONS_DIST}/llamacpp/${ABI}/librac_backend_llamacpp_jni.so" "${LLAMACPP_ANDROID_JNILIBS}/${ABI}/"
+            log_info "LlamaCPP: librac_backend_llamacpp_jni.so"
+        elif [[ -f "${COMMONS_BUILD}/${ABI}/src/backends/llamacpp/librac_backend_llamacpp_jni.so" ]]; then
+            cp "${COMMONS_BUILD}/${ABI}/src/backends/llamacpp/librac_backend_llamacpp_jni.so" "${LLAMACPP_ANDROID_JNILIBS}/${ABI}/"
+            log_info "LlamaCPP: librac_backend_llamacpp_jni.so (from build)"
+        fi
+
+        # =======================================================================
+        # ONNX Package: RABackendONNX
+        # Rename to librunanywhere_onnx.so as expected by RN SDK
+        # =======================================================================
+
+        # Copy and rename backend library
+        if [[ -f "${COMMONS_DIST}/onnx/${ABI}/librac_backend_onnx.so" ]]; then
+            cp "${COMMONS_DIST}/onnx/${ABI}/librac_backend_onnx.so" "${ONNX_ANDROID_JNILIBS}/${ABI}/librunanywhere_onnx.so"
+            log_info "ONNX: librunanywhere_onnx.so"
+        elif [[ -f "${COMMONS_BUILD}/${ABI}/src/backends/onnx/librac_backend_onnx.so" ]]; then
+            cp "${COMMONS_BUILD}/${ABI}/src/backends/onnx/librac_backend_onnx.so" "${ONNX_ANDROID_JNILIBS}/${ABI}/librunanywhere_onnx.so"
+            log_info "ONNX: librunanywhere_onnx.so (from build)"
+        fi
+
+        # Copy JNI bridge
+        if [[ -f "${COMMONS_DIST}/onnx/${ABI}/librac_backend_onnx_jni.so" ]]; then
+            cp "${COMMONS_DIST}/onnx/${ABI}/librac_backend_onnx_jni.so" "${ONNX_ANDROID_JNILIBS}/${ABI}/"
+            log_info "ONNX: librac_backend_onnx_jni.so"
+        elif [[ -f "${COMMONS_BUILD}/${ABI}/src/backends/onnx/librac_backend_onnx_jni.so" ]]; then
+            cp "${COMMONS_BUILD}/${ABI}/src/backends/onnx/librac_backend_onnx_jni.so" "${ONNX_ANDROID_JNILIBS}/${ABI}/"
+            log_info "ONNX: librac_backend_onnx_jni.so (from build)"
+        fi
+
+        # Copy ONNX Runtime
+        if [[ -f "${COMMONS_DIST}/onnx/${ABI}/libonnxruntime.so" ]]; then
+            cp "${COMMONS_DIST}/onnx/${ABI}/libonnxruntime.so" "${ONNX_ANDROID_JNILIBS}/${ABI}/"
+            log_info "ONNX: libonnxruntime.so"
+        fi
+
+        # Copy Sherpa-ONNX libraries
+        for lib in libsherpa-onnx-c-api.so libsherpa-onnx-cxx-api.so libsherpa-onnx-jni.so; do
+            if [[ -f "${COMMONS_DIST}/onnx/${ABI}/${lib}" ]]; then
+                cp "${COMMONS_DIST}/onnx/${ABI}/${lib}" "${ONNX_ANDROID_JNILIBS}/${ABI}/"
+                log_info "ONNX: ${lib}"
+            fi
+        done
+    done
+
+    log_info "Android JNI libraries copied"
+}
+
+# =============================================================================
+# Copy C++ Headers (required for Android build)
+# =============================================================================
+
+copy_cpp_headers() {
+    log_header "Copying C++ Headers for Android"
+
+    local COMMONS_INCLUDE="${COMMONS_DIR}/include/rac"
+    local CORE_INCLUDE="${RN_SDK_DIR}/packages/core/android/src/main/include"
+
+    # Check if headers exist
+    if [[ ! -d "${COMMONS_INCLUDE}" ]]; then
+        log_warn "Headers not found at ${COMMONS_INCLUDE}"
+        return 1
+    fi
+
+    # Clean and recreate include directory
+    rm -rf "${CORE_INCLUDE}"
+    mkdir -p "${CORE_INCLUDE}"
+
+    # Copy entire rac directory structure
+    cp -R "${COMMONS_INCLUDE}" "${CORE_INCLUDE}/"
+
+    # Count headers
+    local count=$(find "${CORE_INCLUDE}" -name "*.h" | wc -l | tr -d ' ')
+    log_info "Copied ${count} headers to packages/core/android/src/main/include/"
+}
+
+# =============================================================================
+# Set Mode (Local/Remote)
+# =============================================================================
+
+set_mode() {
+    log_header "Setting Build Mode: $MODE"
+
+    if [[ "$MODE" == "local" ]]; then
+        export RA_TEST_LOCAL=1
+
+        # Create .testlocal markers for iOS
+        touch "${RN_SDK_DIR}/packages/core/ios/.testlocal"
+        touch "${RN_SDK_DIR}/packages/llamacpp/ios/.testlocal"
+        touch "${RN_SDK_DIR}/packages/onnx/ios/.testlocal"
+
+        log_info "Switched to LOCAL mode"
+        log_info "  iOS: Using Binaries/ and Frameworks/ directories"
+        log_info "  Android: Set RA_TEST_LOCAL=1 or runanywhere.testLocal=true"
+    else
+        unset RA_TEST_LOCAL
+
+        # Remove .testlocal markers
+        rm -f "${RN_SDK_DIR}/packages/core/ios/.testlocal"
+        rm -f "${RN_SDK_DIR}/packages/llamacpp/ios/.testlocal"
+        rm -f "${RN_SDK_DIR}/packages/onnx/ios/.testlocal"
+
+        log_info "Switched to REMOTE mode"
+        log_info "  iOS: Will download from GitHub releases"
+        log_info "  Android: Will download from GitHub releases"
+    fi
+}
+
+# =============================================================================
+# Clean
+# =============================================================================
+
+clean_build() {
+    log_header "Cleaning Build Directories"
+
+    if [[ "$BUILD_IOS" == true ]]; then
+        rm -rf "${CORE_IOS_BINARIES}"
+        rm -rf "${LLAMACPP_IOS_FRAMEWORKS}"
+        rm -rf "${ONNX_IOS_FRAMEWORKS}"
+        log_info "Cleaned iOS frameworks"
+    fi
+
+    if [[ "$BUILD_ANDROID" == true ]]; then
+        rm -rf "${CORE_ANDROID_JNILIBS}"
+        rm -rf "${LLAMACPP_ANDROID_JNILIBS}"
+        rm -rf "${ONNX_ANDROID_JNILIBS}"
+        rm -rf "${RN_SDK_DIR}/packages/core/android/src/main/include"
+        log_info "Cleaned Android jniLibs and headers"
+    fi
+}
+
+# =============================================================================
+# Print Summary
+# =============================================================================
+
+print_summary() {
+    log_header "Build Complete!"
+
+    echo ""
+    echo "Mode: $MODE"
+    echo ""
+
+    if [[ "$BUILD_IOS" == true ]]; then
+        echo "iOS Frameworks:"
+        ls -la "${CORE_IOS_BINARIES}" 2>/dev/null || echo "  (none)"
+        ls -la "${LLAMACPP_IOS_FRAMEWORKS}" 2>/dev/null || echo "  (none)"
+        ls -la "${ONNX_IOS_FRAMEWORKS}" 2>/dev/null || echo "  (none)"
+        echo ""
+    fi
+
+    if [[ "$BUILD_ANDROID" == true ]]; then
+        echo "Android JNI Libraries:"
+        for pkg in core llamacpp onnx; do
+            local dir="${RN_SDK_DIR}/packages/${pkg}/android/src/main/jniLibs"
+            if [[ -d "$dir" ]]; then
+                local count=$(find "$dir" -name "*.so" 2>/dev/null | wc -l)
+                local size=$(du -sh "$dir" 2>/dev/null | cut -f1)
+                echo "  ${pkg}: ${count} libs (${size})"
+            fi
+        done
+        echo ""
+    fi
+
+    echo "Next steps:"
+    echo "  1. Run example app: cd examples/react-native/RunAnywhereAI"
+    echo "  2. iOS: cd ios && pod install && cd .. && npx react-native run-ios"
+    echo "  3. Android: npx react-native run-android"
+    echo ""
+    echo "To rebuild after C++ changes:"
+    echo "  ./scripts/build-react-native.sh --local --rebuild-commons"
+}
+
+# =============================================================================
+# Main
+# =============================================================================
+
+main() {
+    log_header "RunAnywhere React Native SDK Build"
+    echo "Mode:           $MODE"
+    echo "Setup:          $SETUP_MODE"
+    echo "Rebuild Commons: $REBUILD_COMMONS"
+    echo "iOS:            $BUILD_IOS"
+    echo "Android:        $BUILD_ANDROID"
+    echo "ABIs:           $ABIS"
+    echo ""
+
+    # Clean if requested
+    [[ "$CLEAN_BUILD" == true ]] && clean_build
+
+    # Setup environment (install deps)
+    [[ "$SETUP_MODE" == true ]] && setup_environment
+
+    # Build native libraries if needed
+    if [[ "$REBUILD_COMMONS" == true ]] && [[ "$SKIP_BUILD" == false ]]; then
+        [[ "$BUILD_IOS" == true ]] && build_commons_ios
+        [[ "$BUILD_ANDROID" == true ]] && build_commons_android
+    fi
+
+    # Copy frameworks/libs if in local mode
+    if [[ "$MODE" == "local" ]]; then
+        [[ "$BUILD_IOS" == true ]] && copy_ios_frameworks
+        [[ "$BUILD_ANDROID" == true ]] && copy_android_jnilibs
+        [[ "$BUILD_ANDROID" == true ]] && copy_cpp_headers
+    fi
+
+    # Set mode
+    set_mode
+
+    # Print summary
+    print_summary
+}
+
+main "$@"

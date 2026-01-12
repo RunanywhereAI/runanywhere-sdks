@@ -1,0 +1,73 @@
+# RunAnywhere Commons - Clang Tidy Configuration
+# Static analysis for C++ code quality
+#
+# NOTE: This library provides a C API (extern "C") for cross-language compatibility.
+# Some modernize-* checks are disabled because they would break C compatibility.
+
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -bugprone-branch-clone,
+  clang-analyzer-*,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
+  modernize-*,
+  -modernize-use-trailing-return-type,
+  -modernize-avoid-c-arrays,
+  -modernize-use-nodiscard,
+  -modernize-use-using,
+  -modernize-use-auto,
+  -modernize-use-default-member-init,
+  performance-*,
+  -performance-avoid-endl,
+  -performance-enum-size,
+  readability-const-return-type,
+  readability-container-size-empty,
+  readability-duplicate-include,
+  readability-implicit-bool-conversion,
+  readability-inconsistent-declaration-parameter-name,
+  readability-misleading-indentation,
+  readability-redundant-control-flow,
+  readability-redundant-string-cstr,
+  readability-simplify-boolean-expr,
+  readability-static-accessed-through-instance,
+  readability-string-compare,
+  misc-redundant-expression,
+  misc-unused-parameters,
+  misc-unused-using-decls
+
+# Warnings treated as errors (uncomment to enforce)
+# WarningsAsErrors: '*'
+
+# Header filter - only check our own headers
+HeaderFilterRegex: '.*rac_.*\.h$'
+
+# Check options
+CheckOptions:
+  # modernize-use-nullptr
+  - key: modernize-use-nullptr.NullMacros
+    value: 'NULL'
+
+  # readability-implicit-bool-conversion
+  - key: readability-implicit-bool-conversion.AllowPointerConditions
+    value: true
+  - key: readability-implicit-bool-conversion.AllowIntegerConditions
+    value: false
+
+  # performance-move-const-arg
+  - key: performance-move-const-arg.CheckTriviallyCopyableMove
+    value: true
+
+  # cppcoreguidelines-init-variables
+  - key: cppcoreguidelines-init-variables.IncludeStyle
+    value: 'llvm'
+  - key: cppcoreguidelines-init-variables.MathHeader
+    value: '<cmath>'
+
+  # misc-unused-parameters
+  - key: misc-unused-parameters.StrictMode
+    value: false
+
+# Format style for fix suggestions
+FormatStyle: file

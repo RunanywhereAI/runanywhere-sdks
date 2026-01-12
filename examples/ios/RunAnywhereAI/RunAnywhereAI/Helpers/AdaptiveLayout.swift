@@ -276,17 +276,19 @@ struct AdaptiveButtonStyle: ButtonStyle {
         if isPrimary {
             configuration.label
                 .buttonStyle(.borderedProminent)
+                .tint(AppColors.primaryAccent)
                 .controlSize(.regular)
         } else {
             configuration.label
                 .buttonStyle(.bordered)
+                .tint(AppColors.primaryAccent)
                 .controlSize(.regular)
         }
         #else
         configuration.label
             .padding(.horizontal, isPrimary ? 16 : 12)
             .padding(.vertical, isPrimary ? 12 : 8)
-            .background(isPrimary ? Color.accentColor : Color.secondary.opacity(0.2))
+            .background(isPrimary ? AppColors.primaryAccent : Color.secondary.opacity(0.2))
             .foregroundColor(isPrimary ? .white : .primary)
             .cornerRadius(8)
             .opacity(configuration.isPressed ? 0.8 : 1.0)
@@ -313,8 +315,14 @@ extension View {
 
     func adaptiveFrame() -> some View {
         #if os(macOS)
-        self.frame(minWidth: 400, idealWidth: 600, maxWidth: 900,
-                   minHeight: 300, idealHeight: 500, maxHeight: 800)
+        self.frame(
+            minWidth: 400,
+            idealWidth: 600,
+            maxWidth: 900,
+            minHeight: 300,
+            idealHeight: 500,
+            maxHeight: 800
+        )
         #else
         self
         #endif
@@ -447,7 +455,7 @@ struct AdaptiveMicButton: View {
         isPulsing: Bool = false,
         isLoading: Bool = false,
         activeColor: Color = .red,
-        inactiveColor: Color = .blue,
+        inactiveColor: Color = AppColors.primaryAccent,
         icon: String = "mic.fill",
         action: @escaping () -> Void
     ) {

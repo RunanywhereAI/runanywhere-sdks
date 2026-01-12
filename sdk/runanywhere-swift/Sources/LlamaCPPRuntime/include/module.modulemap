@@ -1,0 +1,11 @@
+module LlamaCPPBackend {
+    umbrella header "LlamaCPPBackend.h"
+
+    export *
+    module * { export * }
+
+    link framework "Accelerate"
+    link framework "Metal"
+    link framework "MetalKit"
+    link framework "MetalPerformanceShaders"
+}

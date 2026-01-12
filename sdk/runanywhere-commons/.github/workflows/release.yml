@@ -1,0 +1,292 @@
+name: Release RACommons
+
+# =============================================================================
+# RACommons Release Workflow
+#
+# Builds and publishes:
+#   iOS:     RACommons.xcframework
+#   Android: librac_commons.so (per ABI)
+#
+# Triggered by:
+#   - Push tag: commons-v*
+#   - Manual dispatch
+# =============================================================================
+
+on:
+  push:
+    tags:
+      - 'commons-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.2.0)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Dry run (build only, do not publish)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  PUBLIC_REPO: 'RunanywhereAI/runanywhere-binaries'
+
+jobs:
+  # ===========================================================================
+  # Prepare
+  # ===========================================================================
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Determine Version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/commons-v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building RACommons v$VERSION"
+
+  # ===========================================================================
+  # Build iOS
+  # ===========================================================================
+  build-ios:
+    name: Build iOS
+    needs: prepare
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.4'
+
+      - name: Build iOS
+        run: |
+          chmod +x scripts/build-rac-commons.sh
+          ./scripts/build-rac-commons.sh --ios --release --package
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-${{ needs.prepare.outputs.version }}
+          path: dist/packages/*ios*.zip*
+          retention-days: 7
+
+  # ===========================================================================
+  # Build Android
+  # ===========================================================================
+  build-android:
+    name: Build Android (${{ matrix.abi }})
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86_64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup NDK
+        run: |
+          source scripts/load-versions.sh
+          NDK_VERSION="${ANDROID_NDK_VERSION:-27.0.12077973}"
+          echo "y" | sdkmanager --install "ndk;${NDK_VERSION}" --sdk_root=${ANDROID_SDK_ROOT}
+          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> $GITHUB_ENV
+
+      - name: Build Android ${{ matrix.abi }}
+        run: |
+          chmod +x scripts/build-rac-commons.sh
+          ./scripts/build-rac-commons.sh --android --abi ${{ matrix.abi }} --release
+
+      - name: Package ABI
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+          ABI="${{ matrix.abi }}"
+          mkdir -p dist/packages
+          cd dist/android
+          zip -r "../packages/RACommons-android-${ABI}-v${VERSION}.zip" jniLibs/${ABI} include
+          cd ../packages
+          shasum -a 256 "RACommons-android-${ABI}-v${VERSION}.zip" > "RACommons-android-${ABI}-v${VERSION}.zip.sha256"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ matrix.abi }}-${{ needs.prepare.outputs.version }}
+          path: dist/packages/*
+          retention-days: 7
+
+  # ===========================================================================
+  # Combine Android ABIs
+  # ===========================================================================
+  combine-android:
+    name: Combine Android
+    needs: [prepare, build-android]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download All Android Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: android-*
+          path: artifacts
+          merge-multiple: false
+
+      - name: Create Combined Package
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+          COMBINED="RACommons-android-v${VERSION}"
+
+          mkdir -p "${COMBINED}/jniLibs"
+          mkdir -p output
+
+          # Extract each ABI
+          for dir in artifacts/android-*/; do
+            if [ -d "$dir" ]; then
+              for zip in "${dir}"*.zip; do
+                if [ -f "$zip" ] && [[ ! "$zip" == *.sha256 ]]; then
+                  unzip -o "$zip" -d "${COMBINED}/"
+                fi
+              done
+            fi
+          done
+
+          # Create combined package
+          zip -r "output/${COMBINED}.zip" "${COMBINED}"
+          cd output
+          shasum -a 256 "${COMBINED}.zip" > "${COMBINED}.zip.sha256"
+
+          ls -la
+
+      - name: Upload Combined Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-combined-${{ needs.prepare.outputs.version }}
+          path: output/*
+          retention-days: 7
+
+  # ===========================================================================
+  # Publish
+  # ===========================================================================
+  publish:
+    name: Publish Release
+    needs: [prepare, build-ios, combine-android]
+    if: github.event.inputs.dry_run != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download iOS Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-${{ needs.prepare.outputs.version }}
+          path: release-assets
+
+      - name: Download Android Combined Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-combined-${{ needs.prepare.outputs.version }}
+          path: release-assets
+
+      - name: List Release Assets
+        run: |
+          echo "Release assets:"
+          ls -la release-assets/
+
+      - name: Create Checksums File
+        run: |
+          cd release-assets
+          cat *.sha256 > checksums.txt
+          cat checksums.txt
+
+      - name: Checkout Public Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PUBLIC_REPO }}
+          token: ${{ secrets.BINARY_REPO_PAT }}
+          path: public-repo
+
+      - name: Update Public Repository
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+          cd public-repo
+
+          mkdir -p releases/commons-v${VERSION}
+          cp ../release-assets/*.zip releases/commons-v${VERSION}/
+          cp ../release-assets/*.sha256 releases/commons-v${VERSION}/
+          cp ../release-assets/checksums.txt releases/commons-v${VERSION}/
+
+          echo "${VERSION}" > LATEST_COMMONS_VERSION
+
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add -A
+          git commit -m "Release RACommons v${VERSION}" || echo "No changes"
+          git tag -a "commons-v${VERSION}" -m "RACommons v${VERSION}" 2>/dev/null || true
+
+      - name: Push to Public Repository
+        run: |
+          cd public-repo
+          git push origin main --tags
+        env:
+          GITHUB_TOKEN: ${{ secrets.BINARY_REPO_PAT }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: ${{ env.PUBLIC_REPO }}
+          tag_name: commons-v${{ needs.prepare.outputs.version }}
+          name: RACommons v${{ needs.prepare.outputs.version }}
+          files: |
+            release-assets/*.zip
+            release-assets/*.sha256
+            release-assets/checksums.txt
+          body: |
+            ## RACommons v${{ needs.prepare.outputs.version }}
+
+            Standalone infrastructure library for RunAnywhere SDKs.
+
+            ### Contents
+            - Logging, error handling, and event tracking
+            - Service registry and provider infrastructure
+            - Model management (download strategies, storage)
+            - Platform backend (Apple Foundation Models, System TTS) - iOS/macOS only
+
+            ### iOS/macOS
+            `RACommons-ios-v${{ needs.prepare.outputs.version }}.zip`
+            - Contains `RACommons.xcframework`
+
+            ### Android
+            `RACommons-android-v${{ needs.prepare.outputs.version }}.zip`
+            - Contains `jniLibs/{abi}/librac_commons.so`
+            - Contains `include/` headers
+
+            ### Note
+            Backend libraries (LlamaCPP, ONNX, WhisperCPP) are released from `runanywhere-core`.
+
+            ---
+            Built from runanywhere-commons @ ${{ github.sha }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.BINARY_REPO_PAT }}

@@ -1,0 +1,288 @@
+def getExtOrDefault(name) {
+    return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties['RunAnywhereONNX_' + name]
+}
+
+// Only arm64-v8a is supported
+def reactNativeArchitectures() {
+    return ["arm64-v8a"]
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+apply from: '../nitrogen/generated/android/runanywhereonnx+autolinking.gradle'
+apply plugin: 'com.facebook.react'
+
+def getExtOrIntegerDefault(name) {
+    if (rootProject.ext.has(name)) {
+        return rootProject.ext.get(name)
+    } else if (project.properties.containsKey('RunAnywhereONNX_' + name)) {
+        return (project.properties['RunAnywhereONNX_' + name]).toInteger()
+    }
+    def defaults = [
+        'compileSdkVersion': 36,
+        'minSdkVersion': 24,
+        'targetSdkVersion': 36
+    ]
+    return defaults[name] ?: 36
+}
+
+// =============================================================================
+// Version Constants (MUST match Swift Package.swift and iOS Podspec)
+// RABackendONNX from runanywhere-sdks
+// =============================================================================
+def coreVersion = "0.1.4"
+
+// =============================================================================
+// Binary Source - RABackendONNX from runanywhere-sdks
+// =============================================================================
+def githubOrg = "RunanywhereAI"
+def coreRepo = "runanywhere-sdks"
+
+// =============================================================================
+// testLocal Toggle
+// =============================================================================
+def useLocalBuild = project.findProperty("runanywhere.testLocal")?.toBoolean() ?:
+                    System.getenv("RA_TEST_LOCAL") == "1" ?: false
+
+// Native libraries directory
+def jniLibsDir = file("src/main/jniLibs")
+def downloadedLibsDir = file("build/downloaded-libs")
+
+android {
+    namespace "com.margelo.nitro.runanywhere.onnx"
+
+    compileSdkVersion getExtOrIntegerDefault('compileSdkVersion')
+
+    defaultConfig {
+        minSdkVersion getExtOrIntegerDefault('minSdkVersion')
+        targetSdkVersion getExtOrIntegerDefault('targetSdkVersion')
+
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
+
+        externalNativeBuild {
+            cmake {
+                cppFlags "-frtti -fexceptions -Wall -fstack-protector-all"
+                arguments "-DANDROID_STL=c++_shared"
+                abiFilters 'arm64-v8a'
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "CMakeLists.txt"
+        }
+    }
+
+    packagingOptions {
+        excludes = [
+            "META-INF",
+            "META-INF/**"
+        ]
+        pickFirsts = [
+            "**/libc++_shared.so",
+            "**/libjsi.so",
+            "**/libfbjni.so",
+            "**/libfolly_runtime.so"
+        ]
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
+    buildFeatures {
+        buildConfig true
+        prefab true
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    lint {
+        disable 'GradleCompatible'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs += [
+                "generated/java",
+                "generated/jni"
+            ]
+            jniLibs.srcDirs = [jniLibsDir]
+        }
+    }
+}
+
+// =============================================================================
+// Download Native Libraries (RABackendONNX + ONNX Runtime)
+// =============================================================================
+
+task downloadNativeLibs {
+    description = "Downloads RABackendONNX and ONNX Runtime from GitHub releases"
+    group = "build setup"
+
+    def versionFile = file("${jniLibsDir}/.version")
+    def expectedVersion = coreVersion
+
+    outputs.dir(jniLibsDir)
+    outputs.upToDateWhen {
+        versionFile.exists() && versionFile.text.trim() == expectedVersion
+    }
+
+    doLast {
+        if (useLocalBuild) {
+            logger.lifecycle("[RunAnywhereONNX] Skipping download - using local build mode")
+            return
+        }
+
+        def currentVersion = versionFile.exists() ? versionFile.text.trim() : ""
+        if (currentVersion == expectedVersion) {
+            logger.lifecycle("[RunAnywhereONNX] RABackendONNX version $expectedVersion already downloaded")
+            return
+        }
+
+        logger.lifecycle("[RunAnywhereONNX] Downloading RABackendONNX...")
+        logger.lifecycle("  Core Version: $coreVersion")
+
+        downloadedLibsDir.mkdirs()
+        jniLibsDir.deleteDir()
+        jniLibsDir.mkdirs()
+
+        // =============================================================================
+        // Download RABackendONNX from runanywhere-sdks
+        // =============================================================================
+        def onnxUrl = "https://github.com/${githubOrg}/${coreRepo}/releases/download/core-v${coreVersion}/RABackendONNX-android-v${coreVersion}.zip"
+        def onnxZip = file("${downloadedLibsDir}/RABackendONNX.zip")
+
+        logger.lifecycle("\n📦 Downloading RABackendONNX...")
+        logger.lifecycle("   URL: $onnxUrl")
+
+        try {
+            new URL(onnxUrl).withInputStream { input ->
+                onnxZip.withOutputStream { output ->
+                    output << input
+                }
+            }
+            logger.lifecycle("   Downloaded: ${onnxZip.length() / 1024}KB")
+
+            // Extract and flatten the archive structure
+            // Archive structure: RABackendONNX-android-vX.Y.Z/onnx/arm64-v8a/*.so
+            // Target structure: arm64-v8a/*.so
+            copy {
+                from zipTree(onnxZip)
+                into jniLibsDir
+                // IMPORTANT: Exclude libc++_shared.so - React Native provides its own
+                // Using a different version causes ABI compatibility issues
+                exclude "**/libc++_shared.so"
+                eachFile { fileCopyDetails ->
+                    def pathString = fileCopyDetails.relativePath.pathString
+                    // Handle RABackendONNX-android-vX.Y.Z/onnx/ABI/*.so structure
+                    def match = pathString =~ /.*\/(arm64-v8a|armeabi-v7a|x86|x86_64)\/(.+\.so)$/
+                    if (match) {
+                        def abi = match[0][1]
+                        def filename = match[0][2]
+                        fileCopyDetails.relativePath = new RelativePath(true, abi, filename)
+                    } else if (pathString.endsWith(".so")) {
+                        // Fallback: just use the last two segments (abi/file.so)
+                        def segments = pathString.split("/")
+                        if (segments.length >= 2) {
+                            fileCopyDetails.relativePath = new RelativePath(true, segments[-2], segments[-1])
+                        }
+                    } else {
+                        // Exclude non-so files
+                        fileCopyDetails.exclude()
+                    }
+                }
+                includeEmptyDirs = false
+            }
+
+            logger.lifecycle("   ✅ RABackendONNX native libraries installed")
+
+            // Extract header files
+            def includeDir = file("include")
+            includeDir.deleteDir()
+            includeDir.mkdirs()
+
+            copy {
+                from zipTree(onnxZip)
+                into includeDir
+                eachFile { fileCopyDetails ->
+                    def pathString = fileCopyDetails.relativePath.pathString
+                    // Handle RABackendONNX-android-vX.Y.Z/include/*.h structure
+                    if (pathString.contains("/include/") && pathString.endsWith(".h")) {
+                        def filename = pathString.substring(pathString.lastIndexOf("/") + 1)
+                        fileCopyDetails.relativePath = new RelativePath(true, filename)
+                    } else {
+                        fileCopyDetails.exclude()
+                    }
+                }
+                includeEmptyDirs = false
+            }
+            logger.lifecycle("   ✅ RABackendONNX headers installed")
+
+        } catch (Exception e) {
+            logger.error("❌ Failed to download RABackendONNX: ${e.message}")
+            throw new GradleException("Failed to download RABackendONNX", e)
+        }
+
+        // =============================================================================
+        // List installed files
+        // =============================================================================
+        logger.lifecycle("\n📋 Installed native libraries:")
+        jniLibsDir.listFiles()?.findAll { it.isDirectory() }?.each { abiDir ->
+            logger.lifecycle("  ${abiDir.name}/")
+            abiDir.listFiles()?.findAll { it.name.endsWith(".so") }?.sort()?.each { soFile ->
+                logger.lifecycle("    ${soFile.name} (${soFile.length() / 1024}KB)")
+            }
+        }
+
+        versionFile.text = expectedVersion
+        logger.lifecycle("\n✅ RABackendONNX version $expectedVersion installed")
+    }
+}
+
+if (!useLocalBuild) {
+    preBuild.dependsOn downloadNativeLibs
+
+    afterEvaluate {
+        tasks.matching {
+            it.name.contains("generateCodegen") || it.name.contains("Codegen")
+        }.configureEach {
+            mustRunAfter downloadNativeLibs
+        }
+    }
+}
+
+task cleanNativeLibs(type: Delete) {
+    description = "Removes downloaded native libraries"
+    group = "build"
+    delete jniLibsDir
+    delete downloadedLibsDir
+}
+
+clean.dependsOn cleanNativeLibs
+
+repositories {
+    mavenCentral()
+    google()
+}
+
+dependencies {
+    implementation "com.facebook.react:react-android"
+    implementation project(":react-native-nitro-modules")
+    implementation project(":runanywhere_core")
+}
