@@ -13,7 +13,7 @@ data class AuthenticationRequest(
     val platform: String,
     val sdkVersion: String,
     val platformVersion: String? = null,
-    val appIdentifier: String? = null
+    val appIdentifier: String? = null,
 )
 
 /**
@@ -28,7 +28,7 @@ data class AuthenticationResponse(
     val tokenType: String = "Bearer",
     val deviceId: String,
     val organizationId: String,
-    val userId: String? = null  // Can be null for org-level access
+    val userId: String? = null, // Can be null for org-level access
 )
 
 /**
@@ -38,7 +38,7 @@ data class AuthenticationResponse(
 @Serializable
 data class RefreshTokenRequest(
     val refreshToken: String,
-    val deviceId: String? = null
+    val deviceId: String? = null,
 )
 
 /**
@@ -53,7 +53,7 @@ data class RefreshTokenResponse(
     val tokenType: String = "Bearer",
     val deviceId: String? = null,
     val organizationId: String? = null,
-    val userId: String? = null
+    val userId: String? = null,
 )
 
 /**
@@ -66,7 +66,7 @@ data class HealthCheckResponse(
     val version: String,
     val timestamp: Long? = null,
     val uptime: Long? = null,
-    val environment: String? = null
+    val environment: String? = null,
 )
 
 /**
@@ -75,19 +75,21 @@ data class HealthCheckResponse(
  */
 @Serializable
 data class DeviceRegistrationRequest(
-    val deviceInfo: DeviceRegistrationInfo
+    val deviceInfo: DeviceRegistrationInfo,
 )
 
 /**
  * Device registration response model
- * Matches iOS DeviceRegistrationResponse structure
+ * Matches iOS DeviceRegistrationResponse structure exactly
+ * Location: Infrastructure/Device/Models/Network/DeviceRegistrationResponse.swift
  */
 @Serializable
 data class DeviceRegistrationResponse(
+    val success: Boolean,
+    @kotlinx.serialization.SerialName("device_id")
     val deviceId: String,
-    val status: String,
-    val capabilities: List<String>? = null,
-    val features: Map<String, Boolean>? = null
+    @kotlinx.serialization.SerialName("registered_at")
+    val registeredAt: String,
 )
 
 /**
@@ -113,7 +115,7 @@ data class DeviceRegistrationInfo(
     val osVersion: String,
     val performanceCores: Int,
     val platform: String,
-    val totalMemory: Long
+    val totalMemory: Long,
 )
 
 /**
@@ -124,5 +126,5 @@ data class APIErrorResponse(
     val error: String,
     val message: String,
     val code: Int? = null,
-    val details: Map<String, String>? = null  // Changed from Any to String for serialization
+    val details: Map<String, String>? = null, // Changed from Any to String for serialization
 )

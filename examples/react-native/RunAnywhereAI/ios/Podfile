@@ -76,5 +76,36 @@ target 'RunAnywhereAI' do
         end
       end
     end
+
+    # Fix RNZipArchive compiler flags issue (Xcode 16+ compatibility)
+    # The RNZipArchive podspec uses -G flag which is unsupported on arm64-apple-ios targets
+    # in Xcode 16+. We must fix this at two levels:
+    #   1. Build settings (OTHER_CFLAGS) - full replacement with known required flags
+    #   2. Per-file compiler flags - surgical removal of -G only
+    installer.pods_project.targets.each do |target|
+      if target.name == 'RNZipArchive'
+        target.build_configurations.each do |config|
+          # Full replacement of OTHER_CFLAGS for RNZipArchive.
+          # We intentionally discard any existing flags because:
+          #   - RNZipArchive's podspec sets problematic flags including -G
+          #   - The required flags are well-known (minizip compile definitions)
+          #   - $(inherited) ensures project-level flags are still included
+          config.build_settings['OTHER_CFLAGS'] = '$(inherited) -DHAVE_INTTYPES_H -DHAVE_PKCRYPT -DHAVE_STDINT_H -DHAVE_WZAES -DHAVE_ZLIB -DMZ_ZIP_NO_SIGNING'
+        end
+
+        # Completely clear per-file COMPILER_FLAGS.
+        # The RNZipArchive podspec sets malformed flags like:
+        #   -G CC_PREPROCESSOR_DEFINITIONS="..."
+        # Both -G and CC_PREPROCESSOR_DEFINITIONS= syntax are invalid.
+        # Since we set proper flags via OTHER_CFLAGS above, we can safely clear these.
+        target.build_phases.each do |phase|
+          next unless phase.respond_to?(:files)
+          phase.files.each do |file|
+            next unless file.settings && file.settings['COMPILER_FLAGS']
+            file.settings.delete('COMPILER_FLAGS')
+          end
+        end
+      end
+    end
   end
 end

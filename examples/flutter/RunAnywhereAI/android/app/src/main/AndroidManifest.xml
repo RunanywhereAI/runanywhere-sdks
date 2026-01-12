@@ -3,7 +3,7 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-    
+
     <application
         android:label="RunAnywhere AI"
         android:name="${applicationName}"
@@ -30,4 +30,3 @@
             android:value="2" />
     </application>
 </manifest>
-

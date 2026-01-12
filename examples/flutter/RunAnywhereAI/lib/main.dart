@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'app/runanywhere_ai_app.dart';
+import 'package:runanywhere_ai/app/runanywhere_ai_app.dart';
 
 void main() {
   runApp(const RunAnywhereAIApp());
 }
-

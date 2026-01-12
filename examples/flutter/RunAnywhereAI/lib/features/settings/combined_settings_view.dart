@@ -1,17 +1,19 @@
-import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
 
-import '../../core/design_system/app_colors.dart';
-import '../../core/design_system/app_spacing.dart';
-import '../../core/design_system/typography.dart';
-import '../../core/models/app_types.dart';
-import '../../core/utilities/constants.dart';
-import '../../core/utilities/keychain_helper.dart';
+import 'package:flutter/material.dart';
+import 'package:runanywhere/runanywhere.dart' as sdk;
+import 'package:runanywhere_ai/core/design_system/app_colors.dart';
+import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
+import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/models/app_types.dart';
+import 'package:runanywhere_ai/core/utilities/constants.dart';
+import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// CombinedSettingsView (mirroring iOS CombinedSettingsView.swift)
 ///
-/// Comprehensive settings interface with SDK configuration, storage management,
-/// and API settings.
+/// Settings interface with storage management and logging configuration.
+/// Uses RunAnywhere SDK for actual storage operations.
 class CombinedSettingsView extends StatefulWidget {
   const CombinedSettingsView({super.key});
 
@@ -20,81 +22,75 @@ class CombinedSettingsView extends StatefulWidget {
 }
 
 class _CombinedSettingsViewState extends State<CombinedSettingsView> {
-  // Settings state
-  RoutingPolicy _routingPolicy = RoutingPolicy.automatic;
-  double _defaultTemperature = 0.7;
-  int _defaultMaxTokens = 10000;
+  // Logging
   bool _analyticsLogToLocal = false;
-  bool _showApiKeyEntry = false;
-  String _apiKey = '';
 
-  // Storage info
+  // Storage info (from SDK)
   int _totalStorageSize = 0;
   int _availableSpace = 0;
   int _modelStorageSize = 0;
-  List<dynamic> _storedModels = [];
+  List<sdk.StoredModel> _storedModels = [];
+
+  // Loading state
+  bool _isRefreshingStorage = false;
 
   @override
   void initState() {
     super.initState();
-    _loadSettings();
-    _loadStorageInfo();
+    unawaited(_loadSettings());
+    unawaited(_loadStorageData());
   }
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    setState(() {
-      _routingPolicy = RoutingPolicy.values[
-          prefs.getInt(PreferenceKeys.routingPolicy) ?? 0];
-      _defaultTemperature =
-          prefs.getDouble(PreferenceKeys.defaultTemperature) ?? 0.7;
-      _defaultMaxTokens =
-          prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 10000;
-    });
-
     // Load from keychain
     _analyticsLogToLocal =
         await KeychainHelper.loadBool(KeychainKeys.analyticsLogToLocal);
-    final savedApiKey = await KeychainHelper.loadString(KeychainKeys.apiKey);
-    if (savedApiKey != null) {
-      setState(() {
-        _apiKey = savedApiKey;
-      });
+    if (mounted) {
+      setState(() {});
     }
   }
 
-  Future<void> _saveSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(PreferenceKeys.routingPolicy, _routingPolicy.index);
-    await prefs.setDouble(
-        PreferenceKeys.defaultTemperature, _defaultTemperature);
-    await prefs.setInt(PreferenceKeys.defaultMaxTokens, _defaultMaxTokens);
-  }
-
-  Future<void> _loadStorageInfo() async {
-    // TODO: Implement via RunAnywhere SDK
-    // final storageInfo = await RunAnywhere.getStorageInfo();
+  /// Load storage data using RunAnywhere SDK
+  Future<void> _loadStorageData() async {
+    if (!mounted) return;
     setState(() {
-      _totalStorageSize = 1024 * 1024 * 1024; // Placeholder: 1GB
-      _availableSpace = 512 * 1024 * 1024; // Placeholder: 512MB
-      _modelStorageSize = 256 * 1024 * 1024; // Placeholder: 256MB
-      _storedModels = [];
+      _isRefreshingStorage = true;
     });
-  }
 
-  Future<void> _saveApiKey() async {
-    if (_apiKey.isNotEmpty) {
-      await KeychainHelper.saveString(key: KeychainKeys.apiKey, data: _apiKey);
+    try {
+      // Get storage info from SDK
+      final storageInfo = await sdk.RunAnywhere.getStorageInfo();
+
+      // Get downloaded models with full info (including sizes)
+      final storedModels = await sdk.RunAnywhere.getDownloadedModelsWithInfo();
+
+      // Calculate total model storage from actual models
+      int totalModelStorage = 0;
+      for (final model in storedModels) {
+        totalModelStorage += model.size;
+      }
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('API Key saved')),
-        );
+        setState(() {
+          _totalStorageSize = storageInfo.appStorage.totalSize;
+          _availableSpace = storageInfo.deviceStorage.freeSpace;
+          _modelStorageSize = totalModelStorage;
+          _storedModels = storedModels;
+          _isRefreshingStorage = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to load storage data: $e');
+      if (mounted) {
+        setState(() {
+          _isRefreshingStorage = false;
+        });
       }
     }
-    setState(() {
-      _showApiKeyEntry = false;
-    });
+  }
+
+  Future<void> _refreshStorageData() async {
+    await _loadStorageData();
   }
 
   Future<void> _toggleAnalyticsLogging(bool value) async {
@@ -107,26 +103,63 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     );
   }
 
+  /// Clear cache using RunAnywhere SDK
   Future<void> _clearCache() async {
-    // TODO: Implement via RunAnywhere SDK
-    // await RunAnywhere.clearCache();
+    // TODO: Implement clearCache() in SDK
+    // Once SDK implements clearCache(), replace this with:
+    // try {
+    //   await sdk.RunAnywhere.clearCache();
+    //   if (mounted) {
+    //     ScaffoldMessenger.of(context).showSnackBar(
+    //       const SnackBar(content: Text('Cache cleared')),
+    //     );
+    //   }
+    //   await _loadStorageData();
+    // } catch (e) {
+    //   if (mounted) {
+    //     ScaffoldMessenger.of(context).showSnackBar(
+    //       SnackBar(content: Text('Failed to clear cache: $e')),
+    //     );
+    //   }
+    // }
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cache cleared')),
+        const SnackBar(content: Text('Clear Cache not available yet')),
       );
     }
-    await _loadStorageInfo();
   }
 
-  Future<void> _cleanTempFiles() async {
-    // TODO: Implement via RunAnywhere SDK
-    // await RunAnywhere.cleanTempFiles();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Temporary files cleaned')),
-      );
+  /// Delete a stored model using RunAnywhere SDK
+  Future<void> _deleteModel(sdk.StoredModel model) async {
+    try {
+      await sdk.RunAnywhere.deleteStoredModel(model.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${model.name} deleted')),
+        );
+      }
+      await _loadStorageData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete model: $e')),
+        );
+      }
     }
-    await _loadStorageInfo();
+  }
+
+  Future<void> _openGitHub() async {
+    final uri = Uri.parse('https://github.com/RunanywhereAI/runanywhere-sdks/');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open GitHub')),
+        );
+      }
+    }
   }
 
   @override
@@ -138,24 +171,15 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.large),
         children: [
-          // SDK Configuration Section
-          _buildSectionHeader('SDK Configuration'),
-          _buildRoutingPolicyCard(),
-          const SizedBox(height: AppSpacing.large),
-
-          // Generation Settings Section
-          _buildSectionHeader('Generation Settings'),
-          _buildGenerationSettingsCard(),
-          const SizedBox(height: AppSpacing.large),
-
-          // API Configuration Section
-          _buildSectionHeader('API Configuration'),
-          _buildApiConfigCard(),
-          const SizedBox(height: AppSpacing.large),
-
           // Storage Overview Section
-          _buildSectionHeader('Storage Overview'),
+          _buildSectionHeader('Storage Overview',
+              trailing: _buildRefreshButton()),
           _buildStorageOverviewCard(),
+          const SizedBox(height: AppSpacing.large),
+
+          // Downloaded Models Section
+          _buildSectionHeader('Downloaded Models'),
+          _buildDownloadedModelsCard(),
           const SizedBox(height: AppSpacing.large),
 
           // Storage Management Section
@@ -177,197 +201,35 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(String title, {Widget? trailing}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.smallMedium),
-      child: Text(
-        title,
-        style: AppTypography.headlineSemibold(context),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: AppTypography.headlineSemibold(context),
+          ),
+          if (trailing != null) trailing,
+        ],
       ),
     );
   }
 
-  Widget _buildRoutingPolicyCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.large),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Routing Policy',
-              style: AppTypography.subheadlineSemibold(context),
-            ),
-            const SizedBox(height: AppSpacing.mediumLarge),
-            SegmentedButton<RoutingPolicy>(
-              segments: const [
-                ButtonSegment(
-                  value: RoutingPolicy.automatic,
-                  label: Text('Auto'),
-                ),
-                ButtonSegment(
-                  value: RoutingPolicy.deviceOnly,
-                  label: Text('Device'),
-                ),
-                ButtonSegment(
-                  value: RoutingPolicy.preferDevice,
-                  label: Text('Prefer Device'),
-                ),
-                ButtonSegment(
-                  value: RoutingPolicy.preferCloud,
-                  label: Text('Prefer Cloud'),
-                ),
-              ],
-              selected: {_routingPolicy},
-              onSelectionChanged: (Set<RoutingPolicy> selection) {
-                setState(() {
-                  _routingPolicy = selection.first;
-                });
-                _saveSettings();
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGenerationSettingsCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.large),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Temperature
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Temperature',
-                  style: AppTypography.subheadline(context),
-                ),
-                Text(
-                  _defaultTemperature.toStringAsFixed(1),
-                  style: AppTypography.monospaced.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            Slider(
-              value: _defaultTemperature,
-              min: 0,
-              max: 2,
-              divisions: 20,
-              onChanged: (value) {
-                setState(() {
-                  _defaultTemperature = value;
-                });
-              },
-              onChangeEnd: (_) => _saveSettings(),
-            ),
-            const SizedBox(height: AppSpacing.large),
-
-            // Max Tokens
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Max Tokens',
-                  style: AppTypography.subheadline(context),
-                ),
-                Text(
-                  _defaultMaxTokens.toString(),
-                  style: AppTypography.monospaced.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            Slider(
-              value: _defaultMaxTokens.toDouble(),
-              min: 500,
-              max: 20000,
-              divisions: 39,
-              onChanged: (value) {
-                setState(() {
-                  _defaultMaxTokens = value.toInt();
-                });
-              },
-              onChangeEnd: (_) => _saveSettings(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildApiConfigCard() {
-    final hasApiKey = _apiKey.isNotEmpty;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.large),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_showApiKeyEntry) ...[
-              TextField(
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'API Key',
-                  hintText: 'Enter your API key',
-                  border: OutlineInputBorder(),
-                ),
-                onChanged: (value) {
-                  setState(() {
-                    _apiKey = value;
-                  });
-                },
-              ),
-              const SizedBox(height: AppSpacing.mediumLarge),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () {
-                      setState(() {
-                        _showApiKeyEntry = false;
-                      });
-                    },
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: AppSpacing.smallMedium),
-                  FilledButton(
-                    onPressed: _saveApiKey,
-                    child: const Text('Save'),
-                  ),
-                ],
-              ),
-            ] else ...[
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                  hasApiKey ? Icons.check_circle : Icons.warning,
-                  color: hasApiKey
-                      ? AppColors.statusGreen
-                      : AppColors.statusOrange,
-                ),
-                title: const Text('API Key'),
-                subtitle: Text(hasApiKey ? 'Configured' : 'Not Set'),
-                trailing: TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _showApiKeyEntry = true;
-                    });
-                  },
-                  child: Text(hasApiKey ? 'Change' : 'Set'),
-                ),
-              ),
-            ],
-          ],
-        ),
+  Widget _buildRefreshButton() {
+    return TextButton.icon(
+      onPressed: _isRefreshingStorage ? null : _refreshStorageData,
+      icon: _isRefreshingStorage
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.refresh, size: 16),
+      label: Text(
+        'Refresh',
+        style: AppTypography.caption(context),
       ),
     );
   }
@@ -388,12 +250,14 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
               icon: Icons.add_circle_outline,
               label: 'Available Space',
               value: _availableSpace.formattedFileSize,
+              valueColor: AppColors.statusGreen,
             ),
             const Divider(),
             _buildStorageRow(
               icon: Icons.memory,
               label: 'Models Storage',
               value: _modelStorageSize.formattedFileSize,
+              valueColor: AppColors.primaryBlue,
             ),
             const Divider(),
             _buildStorageRow(
@@ -411,6 +275,7 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     required IconData icon,
     required String label,
     required String value,
+    Color? valueColor,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.smallMedium),
@@ -419,16 +284,57 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
           Icon(icon, size: AppSpacing.iconRegular),
           const SizedBox(width: AppSpacing.mediumLarge),
           Expanded(
-            child: Text(
-              label,
-              style: AppTypography.subheadline(context),
-            ),
+            child: Text(label, style: AppTypography.subheadline(context)),
           ),
           Text(
             value,
-            style: AppTypography.subheadlineSemibold(context),
+            style: AppTypography.subheadlineSemibold(context).copyWith(
+              color: valueColor,
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDownloadedModelsCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.large),
+        child: _storedModels.isEmpty
+            ? Center(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.view_in_ar_outlined,
+                      size: 48,
+                      color: AppColors.textSecondary(context)
+                          .withValues(alpha: 0.5),
+                    ),
+                    const SizedBox(height: AppSpacing.mediumLarge),
+                    Text(
+                      'No models downloaded yet',
+                      style: AppTypography.subheadline(context).copyWith(
+                        color: AppColors.textSecondary(context),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : Column(
+                children: _storedModels.map((model) {
+                  final isLast = model == _storedModels.last;
+                  return Column(
+                    children: [
+                      _StoredModelRow(
+                        model: model,
+                        onDelete: () => _deleteModel(model),
+                      ),
+                      if (!isLast) const Divider(),
+                    ],
+                  );
+                }).toList(),
+              ),
       ),
     );
   }
@@ -437,27 +343,50 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.large),
-        child: Column(
+        child: _buildManagementButton(
+          icon: Icons.delete_outline,
+          title: 'Clear Cache',
+          subtitle: 'Free up space by clearing cached data',
+          color: AppColors.primaryRed,
+          onTap: _clearCache,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildManagementButton({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusRegular),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.mediumLarge),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusRegular),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
           children: [
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.delete_outline, color: Colors.red),
-              title: const Text('Clear Cache'),
-              subtitle: const Text('Remove cached data'),
-              trailing: TextButton(
-                onPressed: _clearCache,
-                child: const Text('Clear'),
-              ),
-            ),
-            const Divider(),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.cleaning_services, color: Colors.orange),
-              title: const Text('Clean Temporary Files'),
-              subtitle: const Text('Remove temporary files'),
-              trailing: TextButton(
-                onPressed: _cleanTempFiles,
-                child: const Text('Clean'),
+            Icon(icon, color: color),
+            const SizedBox(width: AppSpacing.mediumLarge),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: AppTypography.subheadline(context)),
+                  Text(
+                    subtitle,
+                    style: AppTypography.caption(context).copyWith(
+                      color: AppColors.textSecondary(context),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -477,7 +406,7 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
               contentPadding: EdgeInsets.zero,
               title: const Text('Log Analytics Locally'),
               subtitle: const Text(
-                'Store analytics data on device for debugging',
+                'When enabled, analytics events will be saved locally on your device.',
               ),
               value: _analyticsLogToLocal,
               onChanged: _toggleAnalyticsLogging,
@@ -492,28 +421,190 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.large),
-        child: Column(
-          children: [
-            const ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.extension),
-              title: Text('RunAnywhere SDK'),
-              subtitle: Text('Version 0.1'),
-            ),
-            const Divider(),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.book),
-              title: const Text('Documentation'),
-              subtitle: const Text('https://docs.runanywhere.ai'),
-              trailing: const Icon(Icons.open_in_new),
-              onTap: () {
-                // TODO: Open documentation URL
-              },
-            ),
-          ],
+        child: ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.code, color: AppColors.primaryBlue),
+          title: const Text('RunAnywhere SDK'),
+          subtitle: const Text('github.com/RunanywhereAI/runanywhere-sdks'),
+          trailing: const Icon(Icons.open_in_new),
+          onTap: _openGitHub,
         ),
       ),
     );
+  }
+}
+
+/// Stored model row widget
+class _StoredModelRow extends StatefulWidget {
+  final sdk.StoredModel model;
+  final Future<void> Function() onDelete;
+
+  const _StoredModelRow({
+    required this.model,
+    required this.onDelete,
+  });
+
+  @override
+  State<_StoredModelRow> createState() => _StoredModelRowState();
+}
+
+class _StoredModelRowState extends State<_StoredModelRow> {
+  bool _showDetails = false;
+  bool _isDeleting = false;
+
+  Future<void> _performDelete() async {
+    setState(() => _isDeleting = true);
+    try {
+      await widget.onDelete();
+    } finally {
+      if (mounted) {
+        setState(() => _isDeleting = false);
+      }
+    }
+  }
+
+  void _confirmDelete() {
+    unawaited(showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete Model'),
+        content: Text(
+          'Are you sure you want to delete ${widget.model.name}? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              unawaited(_performDelete());
+            },
+            style: TextButton.styleFrom(foregroundColor: AppColors.primaryRed),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xSmall),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.model.name,
+                      style: AppTypography.subheadlineSemibold(context),
+                    ),
+                    const SizedBox(height: AppSpacing.xSmall),
+                    Text(
+                      widget.model.size.formattedFileSize,
+                      style: AppTypography.caption2(context).copyWith(
+                        color: AppColors.textSecondary(context),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Row(
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      setState(() => _showDetails = !_showDetails);
+                    },
+                    child: Text(_showDetails ? 'Hide' : 'Details'),
+                  ),
+                  IconButton(
+                    icon: _isDeleting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.delete_outline,
+                            color: AppColors.primaryRed),
+                    onPressed: _isDeleting ? null : _confirmDelete,
+                  ),
+                ],
+              ),
+            ],
+          ),
+          if (_showDetails) ...[
+            const SizedBox(height: AppSpacing.smallMedium),
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.mediumLarge),
+              decoration: BoxDecoration(
+                color: AppColors.backgroundGray6(context),
+                borderRadius:
+                    BorderRadius.circular(AppSpacing.cornerRadiusRegular),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildDetailRow(
+                      'Downloaded:', _formatDate(widget.model.createdDate)),
+                  _buildDetailRow('Size:', widget.model.size.formattedFileSize),
+                  _buildDetailRow(
+                      'Framework:', widget.model.framework.rawValue),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xSmall),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: AppTypography.caption2(context).copyWith(
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xSmall),
+          Text(
+            value,
+            style: AppTypography.caption2(context).copyWith(
+              color: AppColors.textSecondary(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  // ignore: unused_element - kept for future use
+  String _formatRelativeDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays > 0) {
+      return '${difference.inDays} days ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours} hours ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} minutes ago';
+    } else {
+      return 'Just now';
+    }
   }
 }

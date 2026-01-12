@@ -25,7 +25,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius, IconSize } from '../theme/spacing';
-import { Conversation } from '../types/chat';
+import type { Conversation } from '../types/chat';
 import {
   useConversationStore,
   getConversationSummary,
@@ -47,6 +47,11 @@ interface ConversationRowProps {
   onPress: () => void;
   onDelete: () => void;
 }
+
+/**
+ * Stable separator component to avoid react/no-unstable-nested-components
+ */
+const ItemSeparator: React.FC = () => <View style={styles.separator} />;
 
 const ConversationRow: React.FC<ConversationRowProps> = ({
   conversation,
@@ -255,7 +260,7 @@ export const ConversationListScreen: React.FC<ConversationListScreenProps> = ({
         ]}
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ItemSeparatorComponent={ItemSeparator}
       />
     </SafeAreaView>
   );

@@ -543,7 +543,6 @@ See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for the complete list of 
 and acknowledgments, including:
 
 - **llama.cpp** (MIT License) - GGUF model support
-- **MLC-LLM** (Apache License 2.0) - Universal LLM deployment engine
 
 ## 💬 Community & Support
 
@@ -551,14 +550,3 @@ and acknowledgments, including:
 - **GitHub Issues**: [Report bugs or request features](https://github.com/RunanywhereAI/runanywhere-sdks/issues)
 - **Email**: founders@runanywhere.ai
 - **Twitter**: [@RunanywhereAI](https://twitter.com/RunanywhereAI)
-
-## 🙏 Acknowledgments
-
-Built with ❤️ by the RunAnywhere team. Special thanks to:
-- The open-source community for inspiring this project
-- Our early adopters and beta testers
-- Contributors who help make this SDK better
-
----
-
-**Ready to build privacy-first AI apps?** [Get started with our iOS SDK →](sdk/runanywhere-swift/)

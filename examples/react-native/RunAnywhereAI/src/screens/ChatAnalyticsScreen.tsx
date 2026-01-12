@@ -22,8 +22,9 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
-import { Spacing, Padding, BorderRadius, Layout } from '../theme/spacing';
-import { Message, MessageRole, MessageAnalytics, Conversation } from '../types/chat';
+import { Spacing, Padding, BorderRadius } from '../theme/spacing';
+import type { Message, MessageAnalytics, Conversation } from '../types/chat';
+import { MessageRole } from '../types/chat';
 
 /**
  * Tab type for navigation
@@ -97,12 +98,16 @@ const MessageAnalyticsRow: React.FC<MessageAnalyticsRowProps> = ({
       <View style={styles.messageRowBadges}>
         {message.modelInfo && (
           <View style={[styles.badge, styles.badgeBlue]}>
-            <Text style={styles.badgeTextBlue}>{message.modelInfo.modelName}</Text>
+            <Text style={styles.badgeTextBlue}>
+              {message.modelInfo.modelName}
+            </Text>
           </View>
         )}
         {message.modelInfo?.framework && (
           <View style={[styles.badge, styles.badgePurple]}>
-            <Text style={styles.badgeTextPurple}>{message.modelInfo.framework}</Text>
+            <Text style={styles.badgeTextPurple}>
+              {message.modelInfo.framework}
+            </Text>
           </View>
         )}
       </View>
@@ -121,13 +126,14 @@ const MessageAnalyticsRow: React.FC<MessageAnalyticsRowProps> = ({
           color={Colors.statusBlue}
         />
       )}
-      {analytics.averageTokensPerSecond != null && analytics.averageTokensPerSecond > 0 && (
-        <MetricView
-          label="Speed"
-          value={`${Math.round(analytics.averageTokensPerSecond)} tok/s`}
-          color={Colors.primaryPurple}
-        />
-      )}
+      {analytics.averageTokensPerSecond != null &&
+        analytics.averageTokensPerSecond > 0 && (
+          <MetricView
+            label="Speed"
+            value={`${Math.round(analytics.averageTokensPerSecond)} tok/s`}
+            color={Colors.primaryPurple}
+          />
+        )}
       {analytics.wasThinkingMode && (
         <Icon name="bulb-outline" size={14} color={Colors.statusOrange} />
       )}
@@ -149,8 +155,11 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
   // Extract analytics from messages
   const analyticsMessages = useMemo(() => {
     return messages
-      .filter((m) => m.analytics != null)
-      .map((m) => ({ message: m, analytics: m.analytics! }));
+      .filter(
+        (m): m is Message & { analytics: MessageAnalytics } =>
+          m.analytics != null
+      )
+      .map((m) => ({ message: m, analytics: m.analytics }));
   }, [messages]);
 
   // Computed metrics
@@ -163,7 +172,10 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
         completionRate: 0,
         thinkingModeCount: 0,
         thinkingModePercentage: 0,
-        modelsUsed: new Map<string, { count: number; avgSpeed: number; avgTime: number }>(),
+        modelsUsed: new Map<
+          string,
+          { count: number; avgSpeed: number; avgTime: number }
+        >(),
       };
     }
 
@@ -176,7 +188,8 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
       0
     );
     const totalTokens = analyticsMessages.reduce(
-      (sum, { analytics }) => sum + analytics.inputTokens + analytics.outputTokens,
+      (sum, { analytics }) =>
+        sum + analytics.inputTokens + analytics.outputTokens,
       0
     );
     const completedCount = analyticsMessages.filter(
@@ -187,18 +200,26 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
     ).length;
 
     // Group by model
-    const modelGroups = new Map<string, { times: number[]; speeds: number[] }>();
+    const modelGroups = new Map<
+      string,
+      { times: number[]; speeds: number[] }
+    >();
     analyticsMessages.forEach(({ message, analytics }) => {
       const modelName = message.modelInfo?.modelName || 'Unknown';
       if (!modelGroups.has(modelName)) {
         modelGroups.set(modelName, { times: [], speeds: [] });
       }
-      const group = modelGroups.get(modelName)!;
-      group.times.push(analytics.totalGenerationTime);
-      group.speeds.push(analytics.averageTokensPerSecond || 0);
+      const group = modelGroups.get(modelName);
+      if (group) {
+        group.times.push(analytics.totalGenerationTime);
+        group.speeds.push(analytics.averageTokensPerSecond || 0);
+      }
     });
 
-    const modelsUsed = new Map<string, { count: number; avgSpeed: number; avgTime: number }>();
+    const modelsUsed = new Map<
+      string,
+      { count: number; avgSpeed: number; avgTime: number }
+    >();
     modelGroups.forEach((data, modelName) => {
       modelsUsed.set(modelName, {
         count: data.times.length,
@@ -213,15 +234,20 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
       totalTokens,
       completionRate: (completedCount / analyticsMessages.length) * 100,
       thinkingModeCount,
-      thinkingModePercentage: (thinkingModeCount / analyticsMessages.length) * 100,
+      thinkingModePercentage:
+        (thinkingModeCount / analyticsMessages.length) * 100,
       modelsUsed,
     };
   }, [analyticsMessages]);
 
   // Conversation summary
   const conversationSummary = useMemo(() => {
-    const userMessages = messages.filter((m) => m.role === MessageRole.User).length;
-    const assistantMessages = messages.filter((m) => m.role === MessageRole.Assistant).length;
+    const userMessages = messages.filter(
+      (m) => m.role === MessageRole.User
+    ).length;
+    const assistantMessages = messages.filter(
+      (m) => m.role === MessageRole.Assistant
+    ).length;
     return `${messages.length} messages \u2022 ${userMessages} from you, ${assistantMessages} from AI`;
   }, [messages]);
 
@@ -237,10 +263,15 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
         <Icon
           name="stats-chart"
           size={18}
-          color={activeTab === 'overview' ? Colors.primaryBlue : Colors.textSecondary}
+          color={
+            activeTab === 'overview' ? Colors.primaryBlue : Colors.textSecondary
+          }
         />
         <Text
-          style={[styles.tabText, activeTab === 'overview' && styles.tabTextActive]}
+          style={[
+            styles.tabText,
+            activeTab === 'overview' && styles.tabTextActive,
+          ]}
         >
           Overview
         </Text>
@@ -253,10 +284,15 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
         <Icon
           name="chatbubbles-outline"
           size={18}
-          color={activeTab === 'messages' ? Colors.primaryBlue : Colors.textSecondary}
+          color={
+            activeTab === 'messages' ? Colors.primaryBlue : Colors.textSecondary
+          }
         />
         <Text
-          style={[styles.tabText, activeTab === 'messages' && styles.tabTextActive]}
+          style={[
+            styles.tabText,
+            activeTab === 'messages' && styles.tabTextActive,
+          ]}
         >
           Messages
         </Text>
@@ -269,10 +305,17 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
         <Icon
           name="speedometer-outline"
           size={18}
-          color={activeTab === 'performance' ? Colors.primaryBlue : Colors.textSecondary}
+          color={
+            activeTab === 'performance'
+              ? Colors.primaryBlue
+              : Colors.textSecondary
+          }
         />
         <Text
-          style={[styles.tabText, activeTab === 'performance' && styles.tabTextActive]}
+          style={[
+            styles.tabText,
+            activeTab === 'performance' && styles.tabTextActive,
+          ]}
         >
           Performance
         </Text>
@@ -289,7 +332,11 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Conversation Summary</Text>
         <View style={styles.summaryRow}>
-          <Icon name="chatbubble-ellipses-outline" size={18} color={Colors.primaryBlue} />
+          <Icon
+            name="chatbubble-ellipses-outline"
+            size={18}
+            color={Colors.primaryBlue}
+          />
           <Text style={styles.summaryText}>{conversationSummary}</Text>
         </View>
         {conversation && (
@@ -304,7 +351,8 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
           <View style={styles.summaryRow}>
             <Icon name="cube-outline" size={18} color={Colors.primaryBlue} />
             <Text style={styles.summaryText}>
-              {metrics.modelsUsed.size} model{metrics.modelsUsed.size === 1 ? '' : 's'} used
+              {metrics.modelsUsed.size} model
+              {metrics.modelsUsed.size === 1 ? '' : 's'} used
             </Text>
           </View>
         )}
@@ -345,7 +393,11 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
 
       {analyticsMessages.length === 0 && (
         <View style={styles.emptyState}>
-          <Icon name="analytics-outline" size={48} color={Colors.textTertiary} />
+          <Icon
+            name="analytics-outline"
+            size={48}
+            color={Colors.textTertiary}
+          />
           <Text style={styles.emptyText}>No analytics data available yet</Text>
           <Text style={styles.emptySubtext}>
             Start a conversation to see performance metrics
@@ -373,7 +425,11 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
       showsVerticalScrollIndicator={false}
       ListEmptyComponent={
         <View style={styles.emptyState}>
-          <Icon name="chatbubbles-outline" size={48} color={Colors.textTertiary} />
+          <Icon
+            name="chatbubbles-outline"
+            size={48}
+            color={Colors.textTertiary}
+          />
           <Text style={styles.emptyText}>No messages with analytics</Text>
         </View>
       }
@@ -426,7 +482,11 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
 
       {analyticsMessages.length === 0 && (
         <View style={styles.emptyState}>
-          <Icon name="speedometer-outline" size={48} color={Colors.textTertiary} />
+          <Icon
+            name="speedometer-outline"
+            size={48}
+            color={Colors.textTertiary}
+          />
           <Text style={styles.emptyText}>No performance data available</Text>
         </View>
       )}

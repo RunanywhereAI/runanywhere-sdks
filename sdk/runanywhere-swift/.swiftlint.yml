@@ -15,7 +15,6 @@ opt_in_rules:
   - empty_string
   - first_where
   - force_unwrapping
-  - implicit_return
   - last_where
   - legacy_multiple
   - multiline_arguments
@@ -23,23 +22,49 @@ opt_in_rules:
   - multiline_parameters
   - operator_usage_whitespace
   - overridden_super_call
-  - pattern_matching_keywords
   - prefer_self_type_over_type_of_self
   - redundant_nil_coalescing
   - redundant_type_annotation
   - strict_fileprivate
   - toggle_bool
-  - trailing_closure
   - unneeded_parentheses_in_closure_argument
-  - vertical_whitespace_closing_braces
-  - vertical_whitespace_opening_braces
   - yoda_condition
   # Strongly typed rules
-  - explicit_type_interface
   - discouraged_object_literal
-  - discouraged_optional_collection
-  - typesafe_array_init
   - array_init
+  # Unused code detection rules (lint-time)
+  - unused_closure_parameter
+  - unused_control_flow_label
+  - unused_enumerated
+  - unused_optional_binding
+  - unused_setter_value
+  - redundant_optional_initialization
+  - redundant_set_access_control
+  - redundant_void_return
+  - redundant_objc_attribute
+  - redundant_string_enum_value
+  # Code quality rules
+  - sorted_imports
+  - trailing_semicolon
+  - opening_brace
+  - closure_parameter_position
+
+# Analyzer rules (require `swiftlint analyze` with compilation)
+# Run: swiftlint analyze --compiler-log-path <path-to-xcodebuild-log>
+analyzer_rules:
+  - unused_import
+  - unused_declaration
+  - typesafe_array_init
+
+# Disabled rules (too strict or cosmetic)
+disabled_rules:
+  - explicit_type_interface  # Swift's type inference is a feature
+  - implicit_return  # Explicit returns are often clearer
+  - discouraged_optional_collection  # Optional collections are valid Swift
+  - pattern_matching_keywords  # Too opinionated
+  - vertical_whitespace_opening_braces  # Too cosmetic
+  - vertical_whitespace_closing_braces  # Too cosmetic
+  - trailing_closure  # Explicit closures are often clearer
 
 # Directories to include
 included:
@@ -54,8 +79,8 @@ excluded:
 
 # Configure individual rules
 line_length:
-  warning: 120
-  error: 150
+  warning: 150
+  error: 200
   ignores_urls: true
   ignores_function_declarations: true
   ignores_comments: true
@@ -114,11 +139,9 @@ trailing_whitespace:
 vertical_whitespace:
   max_empty_lines: 2
 
-# Strongly typed configuration
-explicit_type_interface:
-  excluded:
-    - local
-  allow_redundancy: false
+# Additional rule configuration
+redundant_string_enum_value:
+  severity: warning
 
 # Custom rules for strong typing
 custom_rules:
@@ -163,3 +186,36 @@ custom_rules:
     regex: '/\*\s*(TODO|FIXME|HACK|XXX|BUG|REFACTOR|OPTIMIZE)(?!.*#\d+)'
     message: "TODOs must reference a GitHub issue (e.g., /* TODO: #123 - Description */)"
     severity: warning
+
+  # Logging enforcement rules - require SDKLogger usage
+  # Note: SDKLogger.swift is the only file allowed to use print() as it's the console output mechanism.
+  # Use "// swiftlint:disable:next no_print_statements" above intentional print() usage.
+  no_print_statements:
+    name: "Use SDKLogger Instead of print()"
+    regex: '^\s*print\('
+    message: "Use SDKLogger instead of print(). Example: SDKLogger.shared.debug(\"message\")"
+    severity: error
+
+  no_nslog_statements:
+    name: "Use SDKLogger Instead of NSLog()"
+    regex: 'NSLog\('
+    message: "Use SDKLogger instead of NSLog(). Example: SDKLogger.shared.info(\"message\")"
+    severity: error
+
+  no_os_log_statements:
+    name: "Use SDKLogger Instead of os_log()"
+    regex: 'os_log\('
+    message: "Use SDKLogger instead of os_log(). The SDK logging system handles os_log internally."
+    severity: error
+
+  no_debug_print_statements:
+    name: "Use SDKLogger Instead of debugPrint()"
+    regex: 'debugPrint\('
+    message: "Use SDKLogger.debug() instead of debugPrint(). Example: SDKLogger.shared.debug(\"message\")"
+    severity: error
+
+  no_apple_logger:
+    name: "Use SDKLogger Instead of Apple Logger"
+    regex: '= Logger\('
+    message: "Use SDKLogger instead of Apple's os.Logger. Example: SDKLogger(category: \"MyCategory\")"
+    severity: error

@@ -1,0 +1,137 @@
+name: Build RACommons
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'include/**'
+      - 'src/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/build-commons.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # ===========================================================================
+  # Build macOS (native)
+  # ===========================================================================
+  build-macos:
+    name: Build macOS
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.4'
+
+      - name: Build
+        run: |
+          mkdir -p build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DRAC_BUILD_PLATFORM=ON
+          make -j$(sysctl -n hw.ncpu) rac_commons
+
+      - name: Verify Build
+        run: |
+          ls -la build/librac_commons.a
+          echo "Build successful!"
+
+  # ===========================================================================
+  # Build iOS (XCFramework)
+  # ===========================================================================
+  build-ios:
+    name: Build iOS
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.4'
+
+      - name: Build iOS XCFramework
+        run: |
+          chmod +x scripts/build-rac-commons.sh
+          ./scripts/build-rac-commons.sh --ios --release
+
+      - name: Verify Build
+        run: |
+          ls -la dist/RACommons.xcframework/
+          echo "iOS build successful!"
+
+      - name: Upload XCFramework
+        uses: actions/upload-artifact@v4
+        with:
+          name: RACommons-xcframework
+          path: dist/RACommons.xcframework
+          retention-days: 7
+
+  # ===========================================================================
+  # Build Android
+  # ===========================================================================
+  build-android:
+    name: Build Android
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup NDK
+        run: |
+          source scripts/load-versions.sh
+          NDK_VERSION="${ANDROID_NDK_VERSION:-27.0.12077973}"
+          echo "y" | sdkmanager --install "ndk;${NDK_VERSION}" --sdk_root=${ANDROID_SDK_ROOT}
+          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> $GITHUB_ENV
+
+      - name: Build Android (arm64-v8a)
+        run: |
+          chmod +x scripts/build-rac-commons.sh
+          ./scripts/build-rac-commons.sh --android --abi arm64-v8a --release
+
+      - name: Verify Build
+        run: |
+          ls -la dist/android/jniLibs/arm64-v8a/
+          echo "Android build successful!"
+
+      - name: Upload Android Libraries
+        uses: actions/upload-artifact@v4
+        with:
+          name: RACommons-android
+          path: dist/android/
+          retention-days: 7
+
+  # ===========================================================================
+  # Lint
+  # ===========================================================================
+  lint:
+    name: Lint C++
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+
+      - name: Check Formatting
+        run: |
+          find include src -name '*.cpp' -o -name '*.h' | \
+            xargs clang-format --dry-run --Werror 2>&1 | head -50 || true
+        continue-on-error: true

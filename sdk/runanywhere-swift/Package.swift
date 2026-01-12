@@ -14,9 +14,28 @@ let onnxRuntimeMacOSPath = "\(packageDir)/Binaries/onnxruntime-macos"
 // =============================================================================
 // BINARY TARGET CONFIGURATION
 // =============================================================================
-// Set to `true` to use local XCFramework from Binaries/ directory (for local development/testing)
-// Set to `false` to use remote XCFramework from GitHub releases (default for production use)
-let testLocal = false
+//
+// testLocal = true  → Use local XCFrameworks from Binaries/ directory
+//                     For local development. Run first-time setup:
+//                       ./scripts/build-swift.sh --setup
+//
+// testLocal = false → Download XCFrameworks from GitHub releases (PRODUCTION)
+//                     For end users and CI/CD. No setup needed.
+//
+// FIRST TIME SETUP (when testLocal = true):
+//   1. Run: ./scripts/build-swift.sh --setup
+//   2. Open Xcode: open Package.swift
+//   3. If needed: File > Packages > Reset Package Caches
+//
+// =============================================================================
+let testLocal = true  // LOCAL: use XCFrameworks from Binaries/ directory
+
+// Version constants for remote XCFrameworks (must be defined before package)
+// These versions must match the GitHub releases:
+// - Commons: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/commons-v{commonsVersion}
+// - Backends: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/core-v{coreVersion}
+let commonsVersion = "0.1.4"
+let coreVersion = "0.1.4"
 // =============================================================================
 
 let package = Package(
@@ -24,9 +43,8 @@ let package = Package(
     // NOTE: Platform minimums are set to support all modules.
     // Core SDK (RunAnywhere) has availability annotations for iOS 14+ / macOS 12+
     // Optional modules have higher requirements:
-    //   - WhisperKit, LlamaCPPRuntime: iOS 16+ / macOS 13+
-    //   - FluidAudio: iOS 17+ / macOS 14+
-    //   - AppleAI: iOS 26+ runtime (builds on iOS 16+)
+    //   - LlamaCPPRuntime: iOS 16+ / macOS 13+
+    //   - SystemFoundationModels: iOS 26+ runtime (builds on iOS 17+)
     platforms: [
         .iOS(.v17),
         .macOS(.v14),
@@ -44,7 +62,7 @@ let package = Package(
 
         // =================================================================
         // ONNX Runtime Backend - adds STT/TTS/VAD capabilities
-        // Includes ~70MB binary download
+        // Single unified module (C headers + Swift)
         // =================================================================
         .library(
             name: "RunAnywhereONNX",
@@ -53,36 +71,13 @@ let package = Package(
 
         // =================================================================
         // LlamaCPP Backend - adds LLM text generation
-        // Uses GGUF models with Metal acceleration
+        // Single unified module (C headers + Swift)
         // =================================================================
         .library(
             name: "RunAnywhereLlamaCPP",
             targets: ["LlamaCPPRuntime"]
         ),
 
-        // =================================================================
-        // WhisperKit Backend - CoreML-based STT (iOS 16+)
-        // =================================================================
-        .library(
-            name: "RunAnywhereWhisperKit",
-            targets: ["WhisperKitTranscription"]
-        ),
-
-        // =================================================================
-        // Apple Foundation Models - Apple Intelligence (iOS 26+)
-        // =================================================================
-        .library(
-            name: "RunAnywhereAppleAI",
-            targets: ["FoundationModelsAdapter"]
-        ),
-
-        // =================================================================
-        // FluidAudio - Speaker Diarization (iOS 17+)
-        // =================================================================
-        .library(
-            name: "RunAnywhereFluidAudio",
-            targets: ["FluidAudioDiarization"]
-        ),
     ],
     dependencies: [
         // Core SDK dependencies
@@ -90,20 +85,50 @@ let package = Package(
         .package(url: "https://github.com/Alamofire/Alamofire.git", from: "5.9.0"),
         .package(url: "https://github.com/JohnSundell/Files.git", from: "4.3.0"),
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.0"),
-        .package(url: "https://github.com/groue/GRDB.swift", from: "7.6.1"),
         .package(url: "https://github.com/devicekit/DeviceKit.git", from: "5.6.0"),
-        .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.57.1"),
-        .package(url: "https://github.com/kean/Pulse", from: "4.0.0"),
-
-        // WhisperKit dependency
-        .package(url: "https://github.com/argmaxinc/WhisperKit", exact: "0.13.1"),
-
-        // FluidAudio dependency
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", branch: "main"),
+        // SWCompression for pure Swift tar.bz2/tar.gz extraction
+        .package(url: "https://github.com/tsolomko/SWCompression.git", from: "4.8.0"),
+        // Sentry for crash reporting and error tracking
+        .package(url: "https://github.com/getsentry/sentry-cocoa", from: "8.40.0"),
     ],
     targets: [
         // =================================================================
+        // C Bridge Module - Core Commons (inside RunAnywhere directory)
+        // Exposes runanywhere-commons C APIs to Swift
+        // =================================================================
+        .target(
+            name: "CRACommons",
+            dependencies: ["RACommonsBinary"],
+            path: "Sources/RunAnywhere/CRACommons",
+            publicHeadersPath: "include"
+        ),
+
+        // =================================================================
+        // C Bridge Module - LlamaCPP Backend Headers
+        // Exposes LlamaCPP backend C APIs
+        // =================================================================
+        .target(
+            name: "LlamaCPPBackend",
+            dependencies: ["RABackendLlamaCPPBinary"],
+            path: "Sources/LlamaCPPRuntime/include",
+            publicHeadersPath: "."
+        ),
+
+        // =================================================================
+        // C Bridge Module - ONNX Backend Headers
+        // Exposes ONNX backend C APIs
+        // Note: RABackendONNX requires RunAnywhereCore for ra_create_backend symbols
+        // =================================================================
+        .target(
+            name: "ONNXBackend",
+            dependencies: onnxBackendDependencies(),
+            path: "Sources/ONNXRuntime/include",
+            publicHeadersPath: "."
+        ),
+
+        // =================================================================
         // Core SDK
+        // Swift sources with CRACommons C bridge as dependency
         // =================================================================
         .target(
             name: "RunAnywhere",
@@ -112,55 +137,44 @@ let package = Package(
                 .product(name: "Alamofire", package: "Alamofire"),
                 .product(name: "Files", package: "Files"),
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
-                .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "DeviceKit", package: "DeviceKit"),
-                .product(name: "Pulse", package: "Pulse"),
+                .product(name: "SWCompression", package: "SWCompression"),
+                .product(name: "Sentry", package: "sentry-cocoa"),
+                // Link to commons C bridge
+                "CRACommons",
             ],
             path: "Sources/RunAnywhere",
-            exclude: [
-                "Data/README.md",
-                "Data/Storage/Database/README.md"
-            ],
+            exclude: ["CRACommons"],  // Exclude C bridge directory from Swift sources
             swiftSettings: [
                 .define("SWIFT_PACKAGE")
+            ],
+            linkerSettings: [
+                .linkedLibrary("c++"),
             ]
         ),
 
         // =================================================================
-        // C Bridge Module - Exposes unified xcframework C APIs to Swift
-        // =================================================================
-        .target(
-            name: "CRunAnywhereCore",
-            dependencies: ["RunAnywhereCoreBinary"],
-            path: "Sources/CRunAnywhereCore",
-            publicHeadersPath: "include"
-        ),
-
-        // =================================================================
-        // ONNX Runtime Backend
-        // Provides: STT (streaming), TTS, VAD, Speaker Diarization
-        // NOTE: For macOS, ONNX Runtime is dynamically linked (not in xcframework).
-        //       For development: brew install onnxruntime
-        //       For production: embed Binaries/onnxruntime-macos/libonnxruntime.dylib
-        //                       in YourApp.app/Contents/Frameworks/
+        // ONNX Runtime Backend (Unified Module)
+        // C headers in include/, Swift sources in root
+        // Provides: STT (streaming), TTS, VAD
         // =================================================================
         .target(
             name: "ONNXRuntime",
             dependencies: [
                 "RunAnywhere",
-                "CRunAnywhereCore",
-                "RunAnywhereCoreBinary",
+                "ONNXBackend",  // C headers
             ],
             path: "Sources/ONNXRuntime",
+            exclude: ["include"],  // Exclude include/ from Swift sources
             linkerSettings: [
                 .linkedLibrary("c++"),
                 .linkedFramework("Accelerate"),
+                .linkedFramework("CoreML"),
                 .linkedLibrary("archive"),
                 .linkedLibrary("bz2"),
-                .unsafeFlags(["-ObjC", "-all_load"]),
+                // Use -ObjC instead of -all_load for smaller binary size
+                .unsafeFlags(["-ObjC"]),
                 // macOS requires linking against ONNX Runtime dylib (not statically included)
-                // The bundled dylib in Binaries/onnxruntime-macos/ includes CoreML provider
-                // For production: embed libonnxruntime.dylib in YourApp.app/Contents/Frameworks/
                 .unsafeFlags([
                     "-L\(onnxRuntimeMacOSPath)",
                     "-lonnxruntime",
@@ -170,89 +184,117 @@ let package = Package(
         ),
 
         // =================================================================
-        // LlamaCPP Runtime Backend
+        // LlamaCPP Runtime Backend (Unified Module)
+        // C headers in include/, Swift sources in root
         // Provides: Text Generation (LLM) with GGUF models
         // =================================================================
         .target(
             name: "LlamaCPPRuntime",
             dependencies: [
                 "RunAnywhere",
-                "CRunAnywhereCore",
-                "RunAnywhereCoreBinary",
+                "LlamaCPPBackend",  // C headers
             ],
             path: "Sources/LlamaCPPRuntime",
+            exclude: ["include"],  // Exclude include/ from Swift sources
             linkerSettings: [
                 .linkedLibrary("c++"),
                 .linkedFramework("Accelerate"),
                 .linkedFramework("Metal"),
                 .linkedFramework("MetalKit"),
-                .unsafeFlags(["-ObjC", "-all_load"])
+                // Use -ObjC instead of -all_load for smaller binary size
+                .unsafeFlags(["-ObjC"])
             ]
         ),
 
-        // =================================================================
-        // WhisperKit Backend (iOS 16+, macOS 13+)
-        // Provides: CoreML-based Speech-to-Text
-        // =================================================================
-        .target(
-            name: "WhisperKitTranscription",
-            dependencies: [
-                "RunAnywhere",
-                "WhisperKit",
-            ],
-            path: "Sources/WhisperKitTranscription"
-        ),
-
-        // =================================================================
-        // Apple Foundation Models (iOS 16+ build, iOS 26+ runtime)
-        // Provides: Apple Intelligence integration
-        // =================================================================
-        .target(
-            name: "FoundationModelsAdapter",
-            dependencies: [
-                "RunAnywhere",
-            ],
-            path: "Sources/FoundationModelsAdapter"
-        ),
-
-        // =================================================================
-        // FluidAudio Diarization (iOS 17+, macOS 14+)
-        // Provides: Speaker diarization
-        // =================================================================
-        .target(
-            name: "FluidAudioDiarization",
-            dependencies: [
-                "RunAnywhere",
-                .product(name: "FluidAudio", package: "FluidAudio"),
-            ],
-            path: "Sources/FluidAudioDiarization"
-        ),
     ] + binaryTargets()
 )
 
 // =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+// ONNXBackend dependencies
+// Note: RABackendONNX already includes runanywhere_bridge symbols (ra_create_backend, etc.)
+// so we don't need to link RunAnywhereCore separately
+func onnxBackendDependencies() -> [Target.Dependency] {
+    return ["RABackendONNXBinary", "ONNXRuntimeBinary"]
+}
+
+// =============================================================================
 // BINARY TARGET SELECTION
 // =============================================================================
-// This function returns the appropriate binary target based on testLocal setting
+// This function returns the appropriate binary targets based on testLocal setting
+// NOTE: When testLocal = true, only commons frameworks are local.
+//       RunAnywhereCore and onnxruntime always come from remote releases.
 func binaryTargets() -> [Target] {
     if testLocal {
-        // Local development mode: Use XCFramework from Binaries/ directory
-        // NOTE: You must manually place RunAnywhereCore.xcframework in Binaries/
-        // to use this mode (download from runanywhere-binaries releases)
+        // Local development mode: All runanywhere frameworks are local
+        // Only ONNX Runtime comes from official source
         return [
+            // Local commons framework (built locally from runanywhere-commons)
             .binaryTarget(
-                name: "RunAnywhereCoreBinary",
-                path: "Binaries/RunAnywhereCore.xcframework"
-            )
+                name: "RACommonsBinary",
+                path: "Binaries/RACommons.xcframework"
+            ),
+            // LlamaCPP backend (built locally from native/backends)
+            .binaryTarget(
+                name: "RABackendLlamaCPPBinary",
+                path: "Binaries/RABackendLLAMACPP.xcframework"
+            ),
+            // ONNX backend (built locally from native/backends)
+            .binaryTarget(
+                name: "RABackendONNXBinary",
+                path: "Binaries/RABackendONNX.xcframework"
+            ),
+            // ONNX Runtime from official source
+            .binaryTarget(
+                name: "ONNXRuntimeBinary",
+                url: "https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.17.1.zip",
+                checksum: "9a2d54d4f503fbb82d2f86361a1d22d4fe015e2b5e9fb419767209cc9ab6372c"
+            ),
         ]
     } else {
         // Production mode (default): Download from GitHub releases
+        // Commons from runanywhere-sdks releases
+        // Backend frameworks from runanywhere-sdks releases
         return [
+            // =================================================================
+            // RACommons - Core infrastructure library
+            // Source: runanywhere-sdks/releases (commons-v*)
+            // =================================================================
             .binaryTarget(
-                name: "RunAnywhereCoreBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.e6b7a2f/RunAnywhereCore.xcframework.zip",
-                checksum: "0786d494553226820a3a19ba5ee573d4bedf4096b9ebfae9010b621952bb617b"
-            )
+                name: "RACommonsBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v\(commonsVersion)/RACommons-ios-v\(commonsVersion).zip",
+                checksum: "5841cc914ae3041a2c26fd18e09fccb523295fbba12c03605d9bff86fec1a276"
+            ),
+            // =================================================================
+            // RABackendLlamaCPP - LLM text generation backend
+            // Source: runanywhere-sdks/releases (core-v*)
+            // =================================================================
+            .binaryTarget(
+                name: "RABackendLlamaCPPBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/core-v\(coreVersion)/RABackendLlamaCPP-ios-v\(coreVersion).zip",
+                checksum: "d53bc8b34c23c87385c1b38ae556a487317ae88ffda47fe6860ac893548dad00"
+            ),
+            // =================================================================
+            // RABackendONNX - STT/TTS/VAD backend (includes Sherpa-ONNX)
+            // Source: runanywhere-sdks/releases (core-v*)
+            // =================================================================
+            .binaryTarget(
+                name: "RABackendONNXBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/core-v\(coreVersion)/RABackendONNX-ios-v\(coreVersion).zip",
+                checksum: "467ce647745f8bb913d4daf70c0c7f86f77ba6e444eaf697cba09c40d75220a0"
+            ),
+            // =================================================================
+            // ONNX Runtime - Required by RABackendONNX
+            // Source: Official ONNX Runtime releases from onnxruntime.ai
+            // Contains xcframework with CoreML support
+            // =================================================================
+            .binaryTarget(
+                name: "ONNXRuntimeBinary",
+                url: "https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.17.1.zip",
+                checksum: "9a2d54d4f503fbb82d2f86361a1d22d4fe015e2b5e9fb419767209cc9ab6372c"
+            ),
         ]
     }
 }

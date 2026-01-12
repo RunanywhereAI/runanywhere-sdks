@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import '../services/keychain_service.dart';
+import 'package:runanywhere_ai/core/services/keychain_service.dart';
 
 /// KeychainHelper (mirroring iOS KeychainHelper.swift)
 ///
@@ -51,13 +51,13 @@ class KeychainHelper {
   }
 
   /// Load bytes from keychain
-  static Future<Uint8List?> loadBytes(String key) async {
-    return await KeychainService.shared.readBytes(_prefixKey(key));
+  static Future<Uint8List?> loadBytes(String key) {
+    return KeychainService.shared.readBytes(_prefixKey(key));
   }
 
   /// Load string from keychain
-  static Future<String?> loadString(String key) async {
-    return await KeychainService.shared.read(_prefixKey(key));
+  static Future<String?> loadString(String key) {
+    return KeychainService.shared.read(_prefixKey(key));
   }
 
   /// Delete an item from keychain

@@ -30,7 +30,6 @@ extension Color {
 
 // MARK: - App Colors (RunAnywhere Brand Theme)
 struct AppColors {
-
     // ====================
     // PRIMARY ACCENT COLORS - RunAnywhere Brand Colors
     // ====================
@@ -220,8 +219,6 @@ struct AppColors {
         switch framework.uppercased() {
         case "LLAMA_CPP", "LLAMACPP":
             return primaryAccent.opacity(0.2)  // Brand primary
-        case "WHISPERKIT", "WHISPER":
-            return badgeGreen
         case "MLKIT", "ML_KIT":
             return badgePurple
         case "COREML", "CORE_ML":
@@ -235,8 +232,6 @@ struct AppColors {
         switch framework.uppercased() {
         case "LLAMA_CPP", "LLAMACPP":
             return primaryAccent  // Brand primary
-        case "WHISPERKIT", "WHISPER":
-            return primaryGreen
         case "MLKIT", "ML_KIT":
             return primaryPurple
         case "COREML", "CORE_ML":
