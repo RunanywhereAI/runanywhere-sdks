@@ -45,10 +45,9 @@ class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
     Bundle.main.url(forResource: "main", withExtension: "jsbundle")
 #endif
   }
-  
+
   // CRITICAL: Disable bridgeless mode for Nitrogen/NitroModules compatibility
   override func bridgelessEnabled() -> Bool {
     return false
   }
 }
-

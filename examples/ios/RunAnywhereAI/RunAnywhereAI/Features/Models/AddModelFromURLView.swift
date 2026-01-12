@@ -10,10 +10,11 @@ import RunAnywhere
 import Combine
 
 struct AddModelFromURLView: View {
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismiss)
+    private var dismiss
     @State private var modelName: String = ""
     @State private var modelURL: String = ""
-    @State private var selectedFramework: LLMFramework = .llamaCpp
+    @State private var selectedFramework: InferenceFramework = .llamaCpp
     @State private var estimatedSize: String = ""
     @State private var supportsThinking = false
     @State private var thinkingOpenTag = "<thinking>"
@@ -21,7 +22,7 @@ struct AddModelFromURLView: View {
     @State private var useCustomThinkingTags = false
     @State private var isAdding = false
     @State private var errorMessage: String?
-    @State private var availableFrameworks: [LLMFramework] = []
+    @State private var availableFrameworks: [InferenceFramework] = []
 
     let onModelAdded: (ModelInfo) -> Void
 
@@ -39,6 +40,7 @@ struct AddModelFromURLView: View {
                     .disabled(modelName.isEmpty || modelURL.isEmpty || isAdding)
                     #if os(macOS)
                     .buttonStyle(.borderedProminent)
+                    .tint(AppColors.primaryAccent)
                     #endif
 
                     if isAdding {
@@ -86,8 +88,7 @@ struct AddModelFromURLView: View {
         }
     }
 
-    @ViewBuilder
-    private var formContent: some View {
+    @ViewBuilder private var formContent: some View {
         Section("Model Information") {
             TextField("Model Name", text: $modelName)
                 .textFieldStyle(.roundedBorder)
@@ -159,12 +160,12 @@ struct AddModelFromURLView: View {
     }
 
     private func loadAvailableFrameworks() async {
-        let frameworks = RunAnywhere.getAvailableFrameworks()
+        let frameworks = await RunAnywhere.getRegisteredFrameworks()
         await MainActor.run {
             self.availableFrameworks = frameworks.isEmpty ? [.llamaCpp] : frameworks
             // Set default selection to first available framework
-            if !frameworks.isEmpty && !frameworks.contains(selectedFramework) {
-                selectedFramework = frameworks.first!
+            if let first = frameworks.first, !frameworks.contains(selectedFramework) {
+                selectedFramework = first
             }
         }
     }
@@ -178,12 +179,16 @@ struct AddModelFromURLView: View {
         isAdding = true
         errorMessage = nil
 
-        // Use the simplified addModelFromURL API which doesn't throw
-        let modelInfo = await RunAnywhere.addModelFromURL(
-            url,
-            name: modelName,
-            type: selectedFramework.rawValue
-        )
+        // Use the new registerModel API
+        let modelInfo = await MainActor.run {
+            RunAnywhere.registerModel(
+                name: modelName,
+                url: url,
+                framework: selectedFramework,
+                memoryRequirement: Int64(estimatedSize),
+                supportsThinking: supportsThinking
+            )
+        }
 
         await MainActor.run {
             onModelAdded(modelInfo)

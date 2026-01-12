@@ -3,10 +3,15 @@
  *
  * React Native demonstration app for the RunAnywhere on-device AI SDK.
  *
- * Reference: iOS RunAnywhereAIApp.swift
+ * Architecture Pattern:
+ * - Two-phase SDK initialization (matching iOS pattern)
+ * - Module registration with models (LlamaCPP, ONNX, FluidAudio)
+ * - Tab-based navigation with 5 tabs (Chat, STT, TTS, Voice, Settings)
+ *
+ * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/App/RunAnywhereAIApp.swift
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -20,10 +25,18 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import TabNavigator from './src/navigation/TabNavigator';
 import { Colors } from './src/theme/colors';
 import { Typography } from './src/theme/typography';
-import { Spacing, Padding, BorderRadius, IconSize, ButtonHeight } from './src/theme/spacing';
+import {
+  Spacing,
+  Padding,
+  BorderRadius,
+  IconSize,
+  ButtonHeight,
+} from './src/theme/spacing';
 
-// Import RunAnywhere SDK
-import { RunAnywhere, SDKEnvironment } from 'runanywhere-react-native';
+// Import RunAnywhere SDK (Multi-Package Architecture)
+import { RunAnywhere, SDKEnvironment, ModelCategory } from '@runanywhere/core';
+import { LlamaCPP } from '@runanywhere/llamacpp';
+import { ONNX, ModelArtifactType } from '@runanywhere/onnx';
 
 /**
  * App initialization state
@@ -37,7 +50,11 @@ const InitializationLoadingView: React.FC = () => (
   <View style={styles.loadingContainer}>
     <View style={styles.loadingContent}>
       <View style={styles.iconContainer}>
-        <Icon name="hardware-chip-outline" size={48} color={Colors.primaryBlue} />
+        <Icon
+          name="hardware-chip-outline"
+          size={48}
+          color={Colors.primaryBlue}
+        />
       </View>
       <Text style={styles.loadingTitle}>RunAnywhere AI</Text>
       <Text style={styles.loadingSubtitle}>Initializing SDK...</Text>
@@ -53,10 +70,10 @@ const InitializationLoadingView: React.FC = () => (
 /**
  * Initialization Error View
  */
-const InitializationErrorView: React.FC<{ error: string; onRetry: () => void }> = ({
-  error,
-  onRetry,
-}) => (
+const InitializationErrorView: React.FC<{
+  error: string;
+  onRetry: () => void;
+}> = ({ error, onRetry }) => (
   <View style={styles.errorContainer}>
     <View style={styles.errorContent}>
       <View style={styles.errorIconContainer}>
@@ -80,45 +97,156 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * Initialize the SDK
+   * Register modules and their models
+   * Matches iOS registerModulesAndModels() in RunAnywhereAIApp.swift
+   *
+   * Note: Model registration is async, so we need to wait for all registrations
+   * to complete before the UI queries models.
    */
-  const initializeSDK = async () => {
+  const registerModulesAndModels = async () => {
+    // LlamaCPP module with LLM models
+    // Using explicit IDs ensures models are recognized after download across app restarts
+    LlamaCPP.register();
+    await LlamaCPP.addModel({
+      id: 'smollm2-360m-q8_0',
+      name: 'SmolLM2 360M Q8_0',
+      url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
+      memoryRequirement: 500_000_000,
+    });
+    await LlamaCPP.addModel({
+      id: 'llama-2-7b-chat-q4_k_m',
+      name: 'Llama 2 7B Chat Q4_K_M',
+      url: 'https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf',
+      memoryRequirement: 4_000_000_000,
+    });
+    await LlamaCPP.addModel({
+      id: 'mistral-7b-instruct-q4_k_m',
+      name: 'Mistral 7B Instruct Q4_K_M',
+      url: 'https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf',
+      memoryRequirement: 4_000_000_000,
+    });
+    await LlamaCPP.addModel({
+      id: 'qwen2.5-0.5b-instruct-q6_k',
+      name: 'Qwen 2.5 0.5B Instruct Q6_K',
+      url: 'https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf',
+      memoryRequirement: 600_000_000,
+    });
+    await LlamaCPP.addModel({
+      id: 'lfm2-350m-q4_k_m',
+      name: 'LiquidAI LFM2 350M Q4_K_M',
+      url: 'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf',
+      memoryRequirement: 250_000_000,
+    });
+    await LlamaCPP.addModel({
+      id: 'lfm2-350m-q8_0',
+      name: 'LiquidAI LFM2 350M Q8_0',
+      url: 'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf',
+      memoryRequirement: 400_000_000,
+    });
+
+    // ONNX module with STT and TTS models
+    // Using tar.gz format hosted on RunanywhereAI/sherpa-onnx for fast native extraction
+    // Using explicit IDs ensures models are recognized after download across app restarts
+    ONNX.register();
+    // STT Models (Sherpa-ONNX Whisper)
+    await ONNX.addModel({
+      id: 'sherpa-onnx-whisper-tiny.en',
+      name: 'Sherpa Whisper Tiny (ONNX)',
+      url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
+      modality: ModelCategory.SpeechRecognition,
+      artifactType: ModelArtifactType.TarGzArchive,
+      memoryRequirement: 75_000_000,
+    });
+    // NOTE: whisper-small.en not included to match iOS/Android examples
+    // All ONNX models use tar.gz from RunanywhereAI/sherpa-onnx fork for fast native extraction
+    // If you need whisper-small, convert to tar.gz and upload to the fork
+    // TTS Models (Piper VITS)
+    await ONNX.addModel({
+      id: 'vits-piper-en_US-lessac-medium',
+      name: 'Piper TTS (US English - Medium)',
+      url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz',
+      modality: ModelCategory.SpeechSynthesis,
+      artifactType: ModelArtifactType.TarGzArchive,
+      memoryRequirement: 65_000_000,
+    });
+    await ONNX.addModel({
+      id: 'vits-piper-en_GB-alba-medium',
+      name: 'Piper TTS (British English)',
+      url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz',
+      modality: ModelCategory.SpeechSynthesis,
+      artifactType: ModelArtifactType.TarGzArchive,
+      memoryRequirement: 65_000_000,
+    });
+
+    console.warn('[App] All models registered');
+  };
+
+  /**
+   * Initialize the SDK
+   * Matches iOS initializeSDK() in RunAnywhereAIApp.swift
+   */
+  const initializeSDK = useCallback(async () => {
     setInitState('loading');
     setError(null);
 
     try {
-      console.log('[App] Initializing RunAnywhere SDK...');
-      // Initialize RunAnywhere SDK
-      // In development mode, authentication is bypassed
+      const startTime = Date.now();
+
+      // =========================================================================
+      // SDK Initialization - Choose ONE mode below
+      // =========================================================================
+
+      // DEVELOPMENT mode (default) - uses Supabase directly
+      // Credentials come from runanywhere-commons/development_config.cpp (git-ignored)
+      // This is the safest option for committing to git
       await RunAnywhere.initialize({
-        apiKey: '', // Empty in development mode
-        baseURL: 'https://api.runanywhere.com',
+        apiKey: '', // Empty in development mode - uses C++ dev config
+        baseURL: 'https://api.runanywhere.ai',
         environment: SDKEnvironment.Development,
       });
-      console.log('[App] SDK initialized successfully');
+      console.log('✅ SDK initialized in DEVELOPMENT mode (Supabase via C++ config)');
 
-      // Check if really initialized
+      // PRODUCTION mode - uncomment below and set your credentials
+      // WARNING: Do NOT commit real API keys to git!
+      // For production testing, set credentials via environment variables or config file
+      // const apiKey = process.env.RUNANYWHERE_API_KEY || '';
+      // const baseURL = process.env.RUNANYWHERE_BASE_URL || 'https://api.runanywhere.ai';
+      // await RunAnywhere.initialize({
+      //   apiKey: apiKey,
+      //   baseURL: baseURL,
+      //   environment: SDKEnvironment.Production,
+      // });
+      // console.log('✅ SDK initialized in PRODUCTION mode');
+
+      // Register modules and models (await to ensure models are ready before UI)
+      await registerModulesAndModels();
+
+      const initTime = Date.now() - startTime;
+
+      // Get SDK info for debugging
       const isInit = await RunAnywhere.isInitialized();
-      console.log('[App] isInitialized:', isInit);
-
       const version = await RunAnywhere.getVersion();
-      console.log('[App] SDK version:', version);
-
       const backendInfo = await RunAnywhere.getBackendInfo();
-      console.log('[App] Backend info:', JSON.stringify(backendInfo));
+
+      // Log initialization summary
+      // eslint-disable-next-line no-console
+      console.log(
+        `[App] SDK initialized: v${version}, ${isInit ? 'Active' : 'Inactive'}, ${initTime}ms, env: ${JSON.stringify(backendInfo)}`
+      );
 
       setInitState('ready');
     } catch (err) {
-      console.error('[App] SDK initialization error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      console.error('[App] SDK initialization failed:', err);
+      const errorMessage =
+        err instanceof Error ? err.message : 'Unknown error occurred';
       setError(errorMessage);
       setInitState('error');
     }
-  };
+  }, []);
 
   useEffect(() => {
     initializeSDK();
-  }, []);
+  }, [initializeSDK]);
 
   // Render based on state
   if (initState === 'loading') {

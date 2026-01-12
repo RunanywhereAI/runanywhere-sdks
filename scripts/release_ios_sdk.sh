@@ -27,8 +27,13 @@ VERSION_FILE="$SDK_DIR/VERSION"
 CHANGELOG_FILE="$SDK_DIR/CHANGELOG.md"
 README_ROOT="README.md"
 README_SDK="$SDK_DIR/README.md"
-TOKEN_REL_PATH="Sources/RunAnywhere/Foundation/Constants/BuildToken.swift"
-TOKEN_ABS_PATH="$SDK_DIR/$TOKEN_REL_PATH"
+DEV_CONFIG_REL_PATH="Sources/RunAnywhere/Foundation/Constants/DevelopmentConfig.swift"
+DEV_CONFIG_ABS_PATH="$SDK_DIR/$DEV_CONFIG_REL_PATH"
+SECRETS_FILE="scripts/.release-secrets"
+
+# These will be loaded from secrets file or environment
+SUPABASE_URL=""
+SUPABASE_ANON_KEY=""
 
 ### Portable sed (GNU vs BSD)
 sedi() {
@@ -41,50 +46,101 @@ sedi() {
     fi
 }
 
+### Load secrets from file or environment
+load_secrets() {
+  print_header "Loading Release Secrets"
+
+  # Try to load from secrets file first
+  if [[ -f "$SECRETS_FILE" ]]; then
+    print_info "Loading secrets from $SECRETS_FILE"
+    # Source the file to get variables (only SUPABASE_URL and SUPABASE_ANON_KEY)
+    # shellcheck source=/dev/null
+    source "$SECRETS_FILE"
+  fi
+
+  # Environment variables override file values (useful for CI)
+  SUPABASE_URL="${SUPABASE_URL:-}"
+  SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-}"
+
+  # Validate required secrets
+  local missing_secrets=0
+
+  if [[ -z "$SUPABASE_URL" ]]; then
+    print_error "Missing SUPABASE_URL"
+    missing_secrets=1
+  else
+    print_success "SUPABASE_URL: ${SUPABASE_URL:0:40}..."
+  fi
+
+  if [[ -z "$SUPABASE_ANON_KEY" ]]; then
+    print_error "Missing SUPABASE_ANON_KEY"
+    missing_secrets=1
+  else
+    print_success "SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:0:20}..."
+  fi
+
+  if [[ $missing_secrets -eq 1 ]]; then
+    echo ""
+    print_error "Missing required secrets!"
+    print_info "Option 1: Ensure scripts/.release-secrets exists with:"
+    echo "  SUPABASE_URL=\"https://your-project.supabase.co\""
+    echo "  SUPABASE_ANON_KEY=\"your-anon-key\""
+    echo ""
+    print_info "Option 2: Set environment variables:"
+    echo "  export SUPABASE_URL=\"https://your-project.supabase.co\""
+    echo "  export SUPABASE_ANON_KEY=\"your-anon-key\""
+    echo ""
+    exit 1
+  fi
+}
+
 ### CLI flags
 AUTO_YES=0
 BUMP_TYPE=""
 SKIP_BUILD=0
 
 while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --yes|-y)
-            AUTO_YES=1
-            shift
-            ;;
-        --bump)
-            if [[ -z "$2" ]] || [[ "$2" == -* ]]; then
-                print_error "--bump requires a value (major, minor, or patch)"
-                echo ""
-                echo "Usage: $0 --bump <major|minor|patch>"
-                exit 1
-            fi
-            BUMP_TYPE="$2"
-            shift 2
-            ;;
-        --skip-build)
-            SKIP_BUILD=1
-            shift
-            ;;
-        --help|-h)
-            echo "Usage: $0 [OPTIONS]"
-            echo ""
-            echo "Options:"
-            echo "  --yes, -y           Auto-confirm prompts (for CI)"
-            echo "  --bump TYPE         Version bump type: major|minor|patch"
-            echo "  --skip-build        Skip build check (for testing)"
-            echo "  --help, -h          Show this help"
-            echo ""
-            echo "Environment Variables:"
-            echo "  DATABASE_URL        PostgreSQL URL for auto-inserting build token"
-            echo ""
-            exit 0
-            ;;
-        *)
-            print_error "Unknown argument: $1 (use --help for usage)"
-            exit 1
-            ;;
-    esac
+  case "$1" in
+    --yes|-y)
+      AUTO_YES=1
+      shift
+      ;;
+    --bump)
+      BUMP_TYPE="${2:-}"
+      shift 2
+      ;;
+    --skip-build)
+      SKIP_BUILD=1
+      shift
+      ;;
+    --help|-h)
+      echo "Usage: $0 [OPTIONS]"
+      echo ""
+      echo "Options:"
+      echo "  --yes, -y           Auto-confirm prompts (for CI)"
+      echo "  --bump TYPE         Version bump type: major|minor|patch"
+      echo "  --skip-build        Skip build check (for testing)"
+      echo "  --help, -h          Show this help"
+      echo ""
+      echo "Secrets (required - use ONE of these methods):"
+      echo ""
+      echo "  Method 1: Secrets file (for local dev)"
+      echo "    Ensure scripts/.release-secrets exists with SUPABASE_URL and SUPABASE_ANON_KEY"
+      echo ""
+      echo "  Method 2: Environment variables (for CI)"
+      echo "    export SUPABASE_URL=\"https://your-project.supabase.co\""
+      echo "    export SUPABASE_ANON_KEY=\"your-anon-key\""
+      echo ""
+      echo "Other Environment Variables:"
+      echo "  DATABASE_URL        PostgreSQL URL for auto-inserting build token"
+      echo ""
+      exit 0
+      ;;
+    *)
+      print_warning "Unknown argument: $1 (use --help for usage)"
+      shift
+      ;;
+  esac
 done
 
 ### Validate preconditions
@@ -201,18 +257,20 @@ generate_build_token() {
 
     echo "bt_${uuid}_${timestamp}"
 }
-
 ### Generate BuildToken.swift file with real token
 generate_build_token_file() {
     local build_token="$1"
     local output_file="$2"
-
+### Generate DevelopmentConfig.swift file with all 3 values
+generate_dev_config_file() {
+  local build_token="$1"
+  local output_file="$2"
     mkdir -p "$(dirname "$output_file")"
 
     cat > "$output_file" <<EOF
 import Foundation
 
-/// Build token for development mode device registration
+/// Development mode configuration for SDK
 ///
 /// WARNING: THIS FILE IS AUTO-GENERATED DURING RELEASES
 /// WARNING: DO NOT MANUALLY EDIT THIS FILE
@@ -222,23 +280,38 @@ import Foundation
 ///
 /// Security Model:
 /// - This file is in .gitignore (not committed to main branch)
-/// - Real tokens are ONLY in release tags (for SPM distribution)
-/// - Token is used ONLY when SDK is in .development mode
-/// - Backend validates token via POST /api/v1/devices/register/dev
+/// - Real values are ONLY in release tags (for SPM distribution)
+/// - Used ONLY when SDK is in .development mode
+/// - Backend validates build token via POST /api/v1/devices/register/dev
 ///
-/// Token Properties:
+/// This file contains all 3 values needed for development mode:
+/// 1. Supabase project URL
+/// 2. Supabase anon key (safe to expose - RLS controls data access)
+/// 3. Build token (validates SDK installation)
+///
+/// Build Token Properties:
 /// - Format: bt_<uuid>_<timestamp>
 /// - Rotatable: Each release gets a new token
 /// - Revocable: Backend can mark token as inactive
 /// - Rate-limited: Backend enforces 100 req/min per device
-enum BuildToken {
+enum DevelopmentConfig {
+    // MARK: - Supabase Configuration
+
+    /// Supabase project URL for development device analytics
+    static let supabaseURL = "$SUPABASE_URL"
+
+    /// Supabase anon/public API key
+    /// Note: Anon key is safe to include in client code - data access is controlled by RLS policies
+    // swiftlint:disable:next line_length
+    static let supabaseAnonKey = "$SUPABASE_ANON_KEY"
+
+    // MARK: - Build Token
+
     /// Development mode build token
     /// Generated at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-    static let token = "$build_token"
+    static let buildToken = "$build_token"
 }
 EOF
-
-    print_success "Generated BuildToken.swift"
 }
 
 ### Update version references in files
@@ -342,12 +415,6 @@ create_github_release() {
     if [[ -f "$CHANGELOG_FILE" ]]; then
         release_notes="$(sed -n "/## \[$new_version\]/,/^## \[/p" "$CHANGELOG_FILE" | sed '$d' | tail -n +2)"
     fi
-
-    # Fallback if no notes found
-    if [[ -z "$release_notes" ]]; then
-        release_notes="Release v$new_version"
-    fi
-
     # Create GitHub release
     # SECURITY NOTE: DO NOT include build token in release notes (it's public)
     print_info "Creating GitHub release..."
@@ -440,114 +507,6 @@ main() {
 - See CHANGELOG.md for details"
 
     print_success "Committed version updates to main"
-
-    # Step 2: Create worktree for tag commit (includes BuildToken.swift)
-    print_header "Step 2: Creating Release Tag with BuildToken.swift"
-
-    # Variables for cleanup trap
-    local worktree_dir
-    worktree_dir="$(mktemp -d)/release-v$new_version"
-    local release_branch="release/v$new_version"
-
-    # Cleanup function for worktree
-    cleanup_worktree() {
-        if [[ -n "$worktree_dir" ]] && [[ -d "$worktree_dir" ]]; then
-            print_info "Cleaning up worktree..."
-            git worktree remove "$worktree_dir" --force 2>/dev/null || true
-        fi
-        if [[ -n "$release_branch" ]]; then
-            git branch -D "$release_branch" 2>/dev/null || true
-        fi
-    }
-
-    # Set trap to cleanup on exit (including errors)
-    trap cleanup_worktree EXIT
-
-    # Create worktree
-    git worktree add -b "$release_branch" "$worktree_dir"
-    print_info "Created worktree at $worktree_dir"
-
-    # Generate BuildToken.swift in worktree
-    local worktree_token_path="$worktree_dir/$TOKEN_ABS_PATH"
-    generate_build_token_file "$build_token" "$worktree_token_path"
-
-    # Commit BuildToken.swift in worktree
-    pushd "$worktree_dir" >/dev/null
-    git add -f "$TOKEN_ABS_PATH"
-    git commit -m "Add BuildToken.swift for release v$new_version
-
-SECURITY: BuildToken.swift is in .gitignore and NOT in main branch.
-This file is ONLY included in release tags for SPM distribution.
-
-Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
-
-    print_success "Committed BuildToken.swift in worktree"
-
-    # Create annotated tag
-    local tag_name="v$new_version"
-    git tag -a "$tag_name" -m "Release v$new_version"
-    print_success "Created tag $tag_name"
-
-    # Push tag to GitHub
-    git push origin "$tag_name"
-    print_success "Pushed tag to GitHub"
-
-    popd >/dev/null
-
-    # Clean up worktree (trap will also handle this on exit, but do it explicitly here for success case)
-    cleanup_worktree
-    trap - EXIT  # Remove trap after successful cleanup
-    print_success "Cleaned up worktree"
-
-    # Step 3: Push main branch
-    print_header "Step 3: Pushing Main Branch"
-    git push origin HEAD
-    print_success "Pushed main branch"
-
-    # Step 4: Create GitHub release
-    create_github_release "$new_version"
-
-    # Success summary
-    print_header "Release Complete!"
-    print_success "Released v$new_version successfully"
-    if [[ -t 1 ]]; then
-        # Only print token if running interactively (not in CI)
-        print_success "Build token: $build_token"
-    else
-        print_success "Build token generated (masked in CI)"
-    fi
-    echo ""
-    print_info "Main branch: Contains version updates (NO BuildToken.swift)"
-    print_info "Tag $tag_name: Contains BuildToken.swift with real token"
-    print_info "SPM users downloading v$new_version will get the real token"
-    echo ""
-    print_info "Users can now install with:"
-    echo ""
-    echo "  dependencies: ["
-    echo "      .package(url: \"https://github.com/RunanywhereAI/sdks\", from: \"$new_version\")"
-    echo "  ]"
-    echo ""
-
-    # Final reminder to insert build token
-    print_warning "═══════════════════════════════════════════════════════════════════════════════"
-    print_warning "FINAL REMINDER: Insert build token into Supabase!"
-    print_warning "═══════════════════════════════════════════════════════════════════════════════"
-    echo ""
-    echo -e "${YELLOW}INSERT INTO build_tokens (token, platform, label, is_active, notes)"
-    echo -e "VALUES ("
-    echo -e "  '$build_token',"
-    echo -e "  'ios',"
-    echo -e "  'v$new_version',"
-    echo -e "  TRUE,"
-    echo -e "  'iOS SDK v$new_version - Released $(date +%Y-%m-%d)'"
-    echo -e ");${NC}"
-    echo ""
-    print_warning "Without this, the new SDK release will NOT be able to register devices!"
-    echo ""
-    print_warning "SECURITY REMINDER: Build token shown above is for internal use only"
-    print_warning "DO NOT include the token in public GitHub release notes"
-    echo ""
-    print_info "View release: https://github.com/RunanywhereAI/sdks/releases/tag/v$new_version"
 }
 
 # Run main function

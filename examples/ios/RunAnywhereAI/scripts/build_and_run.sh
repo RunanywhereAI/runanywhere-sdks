@@ -1,558 +1,625 @@
 #!/bin/bash
-# build_and_run.sh - Build, install, and run the RunAnywhereAI app
-# Usage: ./build_and_run.sh [simulator|device|mac] [device-name-or-id] [--add-models] [--build-sdk] [--clean] [--clean-data]
-# Examples:
-#   ./build_and_run.sh simulator "iPhone 16 Pro"
-#   ./build_and_run.sh simulator "iPhone 16 Pro" --add-models
-#   ./build_and_run.sh device "YOUR_DEVICE_ID"
-#   ./build_and_run.sh device "Your Device Name" --add-models
-#   ./build_and_run.sh simulator "iPhone 16 Pro" --build-sdk
-#   ./build_and_run.sh simulator "iPhone 16 Pro" --clean
-#   ./build_and_run.sh simulator "iPhone 16 Pro" --clean-data
-#   ./build_and_run.sh mac
-#   ./build_and_run.sh mac --clean
+# =============================================================================
+# RunAnywhereAI - Build & Run Script
+# =============================================================================
 #
-# IMPORTANT: Swift Macro Support Fix
-# ----------------------------------
-# This project uses llm.swift which requires Swift Macros support. If you encounter
-# macro fingerprint validation errors or macro-related build issues, run this command:
+# Single source of truth for building and running the RunAnywhereAI sample app.
+# Orchestrates builds across three independent projects, each with their own scripts.
 #
-#   defaults write com.apple.dt.Xcode IDESkipMacroFingerprintValidation -bool YES
+# PROJECT STRUCTURE & SCRIPTS:
+# ─────────────────────────────────────────────────────────────────────────────
+# runanywhere-core/
+#   scripts/ios/build.sh              Build iOS static libraries
+#   scripts/build-xcframework.sh      Create RunAnywhereCore.xcframework
+#   scripts/macos/build.sh            Build macOS libraries
+#   scripts/android/build.sh          Build Android libraries
 #
-# Additionally, ensure your project has "-enable-experimental-feature Macros" in
-# "Other Swift Flags" under Build Settings. This is required because llm.swift
-# uses Swift Macros for code generation, particularly for LLM model definitions
-# and prompt handling.
+# runanywhere-commons/
+#   scripts/build-ios.sh              Build iOS XCFrameworks (RACommons, backends)
+#   scripts/build-android.sh          Build Android libraries
+#   scripts/build-all.sh              Build all platforms
+#
+# runanywhere-swift/
+#   scripts/build-ios.sh              Build Swift SDK, install frameworks
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# USAGE:
+#   ./build_and_run.sh [target] [options]
+#
+# TARGETS:
+#   simulator "Device Name"  Build and run on iOS Simulator
+#   device                   Build and run on connected iOS device
+#   mac                      Build and run on macOS
+#
+# BUILD OPTIONS:
+#   --build-core      Build runanywhere-core (C++ inference engine)
+#   --build-commons   Build runanywhere-commons (C++ SDK layer)
+#   --build-sdk       Build runanywhere-swift (Swift SDK)
+#   --build-all       Build everything (core + commons + sdk)
+#   --skip-app        Only build SDK components, skip Xcode app build
+#   --local           Use local builds (copies core to commons, frameworks to swift, enables testLocal)
+#
+# OTHER OPTIONS:
+#   --clean           Clean build artifacts before building
+#   --help            Show this help message
+#
+# EXAMPLES:
+#   ./build_and_run.sh device                      # Run app (use cached frameworks)
+#   ./build_and_run.sh device --build-all          # Rebuild everything, run on device
+#   ./build_and_run.sh simulator --build-commons   # Rebuild commons + SDK, run on sim
+#   ./build_and_run.sh --build-all --skip-app      # Just rebuild all SDK components
+#   ./build_and_run.sh device --build-all --local  # Full local build (core->commons->swift->app)
+#
+# INDIVIDUAL PROJECT BUILDS (can be run standalone):
+#   cd runanywhere-core && ./scripts/ios/build.sh && ./scripts/build-xcframework.sh
+#   cd runanywhere-commons && ./scripts/build-ios.sh
+#   cd runanywhere-swift && ./scripts/build-ios.sh --install-frameworks --sync-headers
+#
+# =============================================================================
 
 set -e
 
-# Colors for output
+# =============================================================================
+# PATHS
+# =============================================================================
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../../../../" && pwd)"
+
+# Project directories
+CORE_DIR="$WORKSPACE_ROOT/../runanywhere-core"
+COMMONS_DIR="$WORKSPACE_ROOT/sdk/runanywhere-commons"
+SWIFT_SDK_DIR="$WORKSPACE_ROOT/sdk/runanywhere-swift"
+APP_DIR="$SCRIPT_DIR/.."
+
+# Build scripts (each project has its own)
+CORE_BUILD_SCRIPT="$CORE_DIR/scripts/ios/build.sh"
+CORE_XCFRAMEWORK_SCRIPT="$CORE_DIR/scripts/build-xcframework.sh"
+COMMONS_BUILD_SCRIPT="$COMMONS_DIR/scripts/build-ios.sh"
+SWIFT_BUILD_SCRIPT="$SWIFT_SDK_DIR/scripts/build-ios.sh"
+
+# =============================================================================
+# COLORS & LOGGING
+# =============================================================================
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
 
-# Function to print colored output
-print_status() {
-    echo -e "${GREEN}[✓]${NC} $1"
+log_info()   { echo -e "${GREEN}[✓]${NC} $1"; }
+log_warn()   { echo -e "${YELLOW}[!]${NC} $1"; }
+log_error()  { echo -e "${RED}[✗]${NC} $1"; }
+log_step()   { echo -e "${BLUE}==>${NC} $1"; }
+log_time()   { echo -e "${CYAN}[⏱]${NC} $1"; }
+log_header() {
+    echo -e "\n${GREEN}═══════════════════════════════════════════${NC}"
+    echo -e "${GREEN} $1${NC}"
+    echo -e "${GREEN}═══════════════════════════════════════════${NC}"
 }
 
-print_error() {
-    echo -e "${RED}[✗]${NC} $1"
-}
-
-print_warning() {
-    echo -e "${YELLOW}[!]${NC} $1"
-}
-
-print_debug() {
-    if [ "${DEBUG:-0}" = "1" ]; then
-        echo -e "${BLUE}[DEBUG]${NC} $1"
-    fi
-}
-
-# Function to check required tools
-check_requirements() {
-    local missing_tools=()
-
-    # Check for xcodebuild
-    if ! command -v xcodebuild &> /dev/null; then
-        missing_tools+=("xcodebuild (Xcode)")
-    fi
-
-    # Check for xcrun
-    if ! command -v xcrun &> /dev/null; then
-        missing_tools+=("xcrun (Xcode Command Line Tools)")
-    fi
-
-    # CocoaPods is no longer required - using Swift Package Manager only
-
-    # Check if any required tools are missing
-    if [ ${#missing_tools[@]} -gt 0 ]; then
-        print_error "Missing required tools:"
-        for tool in "${missing_tools[@]}"; do
-            print_error "  - $tool"
-        done
-        print_error "Please install Xcode from the App Store and run: xcode-select --install"
-        exit 1
-    fi
-
-    # Check Xcode selection
-    if ! xcode-select -p &> /dev/null; then
-        print_error "Xcode path not set. Run: sudo xcode-select --switch /Applications/Xcode.app"
-        exit 1
-    fi
-
-    print_status "All required tools are installed"
-}
-
-# Parse arguments
-TARGET_TYPE="${1:-device}"
-DEVICE_NAME="${2:-}"
-ADD_MODELS=false
-BUILD_SDK=false
-CLEAN_BUILD=false
-CLEAN_DATA=false
-FORCE_PROJECT=false
-
-# Check for help flag
-if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
-    echo "Usage: $0 [simulator|device|mac] [device-name-or-id] [--add-models] [--build-sdk] [--clean] [--clean-data] [--use-project]"
-    echo ""
-    echo "Arguments:"
-    echo "  simulator|device|mac  Target type (default: device)"
-    echo "  device-name-or-id     Device name or ID (optional for simulator, not used for mac)"
-    echo "  --add-models          Add model files to Xcode project (optional)"
-    echo "  --build-sdk           Build the RunAnywhere SDK before building the app (optional)"
-    echo "  --clean               Clean all build artifacts before building (optional)"
-    echo "  --clean-data          Clean app data including database (optional)"
-    echo "  --use-project         (Deprecated - always uses .xcodeproj now)"
-    echo ""
-    echo "Examples:"
-    echo "  $0 simulator \"iPhone 16 Pro\""
-    echo "  $0 simulator \"iPhone 16 Pro\" --add-models"
-    echo "  $0 device"
-    echo "  $0 device \"My iPhone\" --add-models"
-    echo "  $0 simulator \"iPhone 16 Pro\" --build-sdk"
-    echo "  $0 simulator \"iPhone 16 Pro\" --clean"
-    echo "  $0 simulator \"iPhone 16 Pro\" --clean-data"
-    echo "  $0 mac"
-    echo "  $0 mac --clean"
+show_help() {
+    head -56 "$0" | tail -51
     exit 0
-fi
+}
 
-# Check for flags in any position after the first two arguments
-for arg in "${@:3}"; do
-    if [ "$arg" = "--add-models" ]; then
-        ADD_MODELS=true
-    elif [ "$arg" = "--build-sdk" ]; then
-        BUILD_SDK=true
-    elif [ "$arg" = "--clean" ]; then
-        CLEAN_BUILD=true
-    elif [ "$arg" = "--clean-data" ]; then
-        CLEAN_DATA=true
-        CLEAN_BUILD=true  # Clean data implies clean build
-    elif [ "$arg" = "--use-project" ]; then
-        FORCE_PROJECT=true
+# =============================================================================
+# TIMING
+# =============================================================================
+
+TOTAL_START_TIME=0
+TIME_CORE=0
+TIME_COMMONS=0
+TIME_SWIFT=0
+TIME_APP=0
+TIME_DEPLOY=0
+
+format_duration() {
+    local seconds=$1
+    if (( seconds >= 60 )); then
+        local mins=$((seconds / 60))
+        local secs=$((seconds % 60))
+        echo "${mins}m ${secs}s"
+    else
+        echo "${seconds}s"
     fi
+}
+
+# =============================================================================
+# PARSE ARGUMENTS
+# =============================================================================
+
+TARGET="device"
+DEVICE_NAME=""
+BUILD_CORE=false
+BUILD_COMMONS=false
+BUILD_SDK=false
+SKIP_APP=false
+CLEAN_BUILD=false
+LOCAL_MODE=false
+
+[[ "$1" == "--help" || "$1" == "-h" ]] && show_help
+
+for arg in "$@"; do
+    case "$arg" in
+        simulator|device|mac)
+            TARGET="$arg"
+            ;;
+        --build-all)
+            BUILD_CORE=true
+            BUILD_COMMONS=true
+            BUILD_SDK=true
+            ;;
+        --build-core)
+            BUILD_CORE=true
+            BUILD_SDK=true
+            ;;
+        --build-commons)
+            BUILD_COMMONS=true
+            BUILD_SDK=true
+            ;;
+        --build-sdk)
+            BUILD_SDK=true
+            ;;
+        --skip-app)
+            SKIP_APP=true
+            ;;
+        --local)
+            LOCAL_MODE=true
+            ;;
+        --clean)
+            CLEAN_BUILD=true
+            ;;
+        --*)
+            ;;
+        *)
+            [[ "$arg" != "simulator" && "$arg" != "device" && "$arg" != "mac" ]] && DEVICE_NAME="$arg"
+            ;;
+    esac
 done
 
-# Default values
-PROJECT="RunAnywhereAI.xcodeproj"
-SCHEME="RunAnywhereAI"
-CONFIGURATION="Debug"
-BUNDLE_ID="com.runanywhere.RunAnywhereAI"
+# =============================================================================
+# BUILD FUNCTIONS - Call individual project scripts
+# =============================================================================
 
-# Always use project file now (no CocoaPods workspace)
-USE_PROJECT=true
+build_core() {
+    log_header "Building runanywhere-core"
+    local start_time=$(date +%s)
 
-# Function to get device destination
-get_destination() {
-    if [ "$TARGET_TYPE" = "mac" ]; then
-        # For macOS
-        echo "platform=macOS"
-    elif [ "$TARGET_TYPE" = "simulator" ]; then
-        # First, check if there's already a booted simulator matching our criteria
-        if [ -n "$DEVICE_NAME" ]; then
-            # Check if the requested device is already booted
-            BOOTED_ID=$(xcrun simctl list devices | grep "$DEVICE_NAME" | grep "(Booted)" | sed 's/.*(\([^)]*\)) (Booted).*/\1/' | head -1)
-            if [ -n "$BOOTED_ID" ]; then
-                print_status "Using already booted simulator: $DEVICE_NAME ($BOOTED_ID)" >&2
-                echo "platform=iOS Simulator,id=$BOOTED_ID"
-                return
-            fi
-            echo "platform=iOS Simulator,name=$DEVICE_NAME"
-        else
-            # Check for any booted iPhone simulator
-            BOOTED_IPHONE=$(xcrun simctl list devices | grep -E "iPhone.*\(Booted\)" | head -1)
-            if [ -n "$BOOTED_IPHONE" ]; then
-                BOOTED_NAME=$(echo "$BOOTED_IPHONE" | sed 's/ *(.*//')
-                BOOTED_ID=$(echo "$BOOTED_IPHONE" | sed 's/.*(\([^)]*\)) (Booted).*/\1/')
-                print_status "Using already booted simulator: $BOOTED_NAME ($BOOTED_ID)" >&2
-                echo "platform=iOS Simulator,id=$BOOTED_ID"
-                return
-            fi
-            # Default to iPhone 16 simulator
-            echo "platform=iOS Simulator,name=iPhone 16"
-        fi
-    else
-        # For device - use xcodebuild to get device IDs that work with build system
-        if [ -z "$DEVICE_NAME" ]; then
-            # Get first connected device UUID using xcodebuild destinations
-            if [ "$USE_PROJECT" = "true" ]; then
-                DEVICE_ID=$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -showdestinations 2>/dev/null | grep "platform:iOS" | grep -v "Simulator" | head -1 | sed -n 's/.*id:\([^,]*\).*/\1/p')
-            else
-                DEVICE_ID=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -showdestinations 2>/dev/null | grep "platform:iOS" | grep -v "Simulator" | head -1 | sed -n 's/.*id:\([^,]*\).*/\1/p')
-            fi
-            if [ -z "$DEVICE_ID" ]; then
-                print_error "No connected iOS device found!"
-                exit 1
-            fi
-            echo "platform=iOS,id=$DEVICE_ID"
-        elif [[ "$DEVICE_NAME" =~ ^[0-9a-fA-F-]+$ ]]; then
-            # It's a device ID
-            echo "platform=iOS,id=$DEVICE_NAME"
-        else
-            # It's a device name, try to find its ID using xcodebuild destinations
-            if [ "$USE_PROJECT" = "true" ]; then
-                DEVICE_ID=$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -showdestinations 2>/dev/null | grep "platform:iOS" | grep -v "Simulator" | grep "$DEVICE_NAME" | head -1 | sed -n 's/.*id:\([^,]*\).*/\1/p')
-            else
-                DEVICE_ID=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -showdestinations 2>/dev/null | grep "platform:iOS" | grep -v "Simulator" | grep "$DEVICE_NAME" | head -1 | sed -n 's/.*id:\([^,]*\).*/\1/p')
-            fi
-            if [ -z "$DEVICE_ID" ]; then
-                print_error "Device '$DEVICE_NAME' not found!"
-                exit 1
-            fi
-            echo "platform=iOS,id=$DEVICE_ID"
-        fi
+    if [[ ! -d "$CORE_DIR" ]]; then
+        log_error "runanywhere-core not found at: $CORE_DIR"
+        log_error "Expected location: $WORKSPACE_ROOT/../runanywhere-core"
+        exit 1
     fi
+
+    if [[ ! -x "$CORE_BUILD_SCRIPT" ]]; then
+        log_error "Core build script not found: $CORE_BUILD_SCRIPT"
+        exit 1
+    fi
+
+    log_step "Running: $CORE_BUILD_SCRIPT"
+    cd "$CORE_DIR"
+    "$CORE_BUILD_SCRIPT"
+
+    if [[ -x "$CORE_XCFRAMEWORK_SCRIPT" ]]; then
+        log_step "Running: $CORE_XCFRAMEWORK_SCRIPT --ios-only"
+        "$CORE_XCFRAMEWORK_SCRIPT" --ios-only
+    fi
+
+    local end_time=$(date +%s)
+    TIME_CORE=$((end_time - start_time))
+    log_info "runanywhere-core build complete"
+    log_time "Core build time: $(format_duration $TIME_CORE)"
 }
 
-# Function to clean build artifacts
-clean_build_artifacts() {
-    print_status "Cleaning build artifacts..."
-
-    # Clean DerivedData
-    print_status "Removing DerivedData..."
-    rm -rf ~/Library/Developer/Xcode/DerivedData/RunAnywhereAI-*
-
-    # Clean local build directory
-    if [ -d "build" ]; then
-        print_status "Removing local build directory..."
-        rm -rf build/
+copy_core_to_commons() {
+    if ! $LOCAL_MODE; then
+        return 0
     fi
 
-    # Clean using xcodebuild
-    print_status "Running xcodebuild clean..."
-    if [ "$USE_PROJECT" = "true" ]; then
-        xcodebuild clean -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIGURATION" >/dev/null 2>&1 || true
+    log_header "Copying runanywhere-core to runanywhere-commons (Local Mode)"
+    
+    local core_dest="$COMMONS_DIR/third_party/runanywhere-core"
+    
+    if [[ ! -d "$CORE_DIR" ]]; then
+        log_error "runanywhere-core not found at: $CORE_DIR"
+        exit 1
+    fi
+
+    log_step "Copying runanywhere-core source to $core_dest"
+    mkdir -p "$(dirname "$core_dest")"
+    
+    # Remove existing if present
+    if [[ -d "$core_dest" ]]; then
+        log_step "Removing existing copy..."
+        rm -rf "$core_dest"
+    fi
+    
+    # Copy source (exclude build artifacts)
+    log_step "Copying source files..."
+    if command -v rsync &> /dev/null; then
+        rsync -av --exclude='build/' --exclude='.git/' --exclude='dist/' --exclude='*.xcframework' "$CORE_DIR/" "$core_dest/" || {
+            log_warn "rsync failed, using cp..."
+            cp -r "$CORE_DIR" "$(dirname "$core_dest")/"
+        }
     else
-        xcodebuild clean -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration "$CONFIGURATION" >/dev/null 2>&1 || true
+        cp -r "$CORE_DIR" "$(dirname "$core_dest")/"
+        # Clean up build artifacts after copy
+        find "$core_dest" -type d -name "build" -exec rm -rf {} + 2>/dev/null || true
+        find "$core_dest" -type d -name ".git" -exec rm -rf {} + 2>/dev/null || true
     fi
-
-    # Clean Swift Package Manager cache
-    print_status "Cleaning Swift Package Manager cache..."
-    rm -rf .build/
-    rm -rf ~/Library/Caches/org.swift.swiftpm/
-
-    # CocoaPods removed - no need to clean Pods
-    print_status "CocoaPods dependencies removed - using Swift Package Manager"
+    
+    log_info "Copied runanywhere-core to commons third_party"
 }
 
-# Function to clean app data
-clean_app_data() {
-    print_status "Cleaning app data including database..."
+build_commons() {
+    log_header "Building runanywhere-commons"
+    local start_time=$(date +%s)
 
-    # Remove app data from simulators
-    BUNDLE_ID="com.runanywhere.RunAnywhereAI"
-    LEGACY_BUNDLE_ID="com.runanywhere.ai.RunAnywhereAI"  # Also clean legacy bundle ID
+    if [[ ! -x "$COMMONS_BUILD_SCRIPT" ]]; then
+        log_error "Commons build script not found: $COMMONS_BUILD_SCRIPT"
+        exit 1
+    fi
 
-    print_status "Removing simulator app data..."
-    # Clean both bundle IDs
-    rm -rf ~/Library/Developer/CoreSimulator/Devices/*/data/Containers/Data/Application/*/${BUNDLE_ID}/Documents/* 2>/dev/null || true
-    rm -rf ~/Library/Developer/CoreSimulator/Devices/*/data/Containers/Data/Application/*/${LEGACY_BUNDLE_ID}/Documents/* 2>/dev/null || true
+    # In local mode, download PRE-BUILT core libraries (not source)
+    # Commons will link against pre-built libraries instead of compiling core
+    if $LOCAL_MODE; then
+        local download_script="$COMMONS_DIR/scripts/download-core-prebuilt.sh"
+        if [[ -x "$download_script" ]]; then
+            # Check if directory exists AND has required files
+            local prebuilt_dir="$COMMONS_DIR/third_party/runanywhere-core-prebuilt"
+            local has_libs=false
+            if [[ -d "$prebuilt_dir" ]] && [[ -f "$prebuilt_dir/librunanywhere_bridge.a" ]]; then
+                has_libs=true
+            fi
+            
+            if [[ "$has_libs" == false ]]; then
+                log_info "Local mode: Downloading PRE-BUILT runanywhere-core libraries"
+                log_info "  (Commons will link against pre-built libraries, not compile core)"
+                log_step "Running: $download_script"
+                cd "$COMMONS_DIR"
+                if ! "$download_script"; then
+                    log_warn "Failed to download pre-built core libraries"
+                    log_warn "Pre-built static libraries may not be available for this version"
+                    log_warn "Commons build may fail - you may need to build core locally or use a different version"
+                fi
+            else
+                log_info "Local mode: Using downloaded PRE-BUILT core libraries"
+                log_info "  (Commons will link against pre-built libraries, not compile core)"
+            fi
+        else
+            log_warn "download-core-prebuilt.sh not found - commons build may fail if core is missing"
+        fi
+    fi
 
-    # Clean app container if it exists
-    find ~/Library/Developer/CoreSimulator/Devices/*/data/Containers/Data/Application -name ".com.apple.mobile_container_manager.metadata.plist" -exec grep -l "${BUNDLE_ID}\|${LEGACY_BUNDLE_ID}" {} \; | while read plist; do
-        APP_DIR=$(dirname "$plist")
-        if [ -d "$APP_DIR/Documents" ]; then
-            print_status "Cleaning app data in: $APP_DIR"
-            rm -rf "$APP_DIR/Documents"/*
+    log_step "Running: $COMMONS_BUILD_SCRIPT"
+    cd "$COMMONS_DIR"
+    # In local mode, try to use pre-built core libraries
+    # If pre-built libraries aren't available, fall back to building core from source
+    if $LOCAL_MODE; then
+        local prebuilt_dir="$COMMONS_DIR/third_party/runanywhere-core-prebuilt"
+        if [[ -d "$prebuilt_dir" ]] && [[ -f "$prebuilt_dir/librunanywhere_bridge.a" ]]; then
+            log_info "Using pre-built core libraries"
+            USE_PREBUILT_CORE=ON "$COMMONS_BUILD_SCRIPT"
+        else
+            log_warn "Pre-built core libraries not available - building core from source (temporary workaround)"
+            log_warn "Note: Pre-built libraries should be published for proper local dev workflow"
+            "$COMMONS_BUILD_SCRIPT"
+        fi
+    else
+        "$COMMONS_BUILD_SCRIPT"
+    fi
+
+    local end_time=$(date +%s)
+    TIME_COMMONS=$((end_time - start_time))
+    log_info "runanywhere-commons build complete"
+    log_time "Commons build time: $(format_duration $TIME_COMMONS)"
+}
+
+copy_frameworks_to_swift() {
+    if ! $LOCAL_MODE; then
+        return 0
+    fi
+
+    log_header "Copying XCFrameworks to runanywhere-swift/Binaries (Local Mode - Commons Only)"
+    log_info "Note: onnxruntime will be consumed from remote releases"
+    
+    local binaries_dir="$SWIFT_SDK_DIR/Binaries"
+    mkdir -p "$binaries_dir"
+
+    # Copy all runanywhere-commons frameworks (built locally)
+    # onnxruntime comes from remote GitHub releases
+    local frameworks=("RACommons" "RABackendLlamaCPP" "RABackendONNX")
+    for framework in "${frameworks[@]}"; do
+        local src="$COMMONS_DIR/dist/${framework}.xcframework"
+        if [[ -d "$src" ]]; then
+            log_step "Copying ${framework}.xcframework (local build)"
+            rm -rf "$binaries_dir/${framework}.xcframework"
+            cp -r "$src" "$binaries_dir/"
+            log_info "  ✓ ${framework}.xcframework"
+        else
+            log_warn "  ✗ ${framework}.xcframework not found at $src"
         fi
     done
 
-    print_status "App data cleaned successfully!"
+    log_info "XCFrameworks copied to: $binaries_dir"
+    log_info "onnxruntime will be downloaded from GitHub releases"
 }
 
-# Function to get DerivedData path
-get_derived_data_path() {
-    # First try to get from xcodebuild
-    if [ "$USE_PROJECT" = "true" ]; then
-        local derived_data=$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -showBuildSettings 2>/dev/null | grep -E "^\s*BUILD_ROOT" | head -1 | awk '{print $3}' | sed 's|/Build/Products||')
-    else
-        local derived_data=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -showBuildSettings 2>/dev/null | grep -E "^\s*BUILD_ROOT" | head -1 | awk '{print $3}' | sed 's|/Build/Products||')
+set_package_mode() {
+    local package_file="$SWIFT_SDK_DIR/Package.swift"
+    
+    if [[ ! -f "$package_file" ]]; then
+        log_error "Package.swift not found: $package_file"
+        exit 1
     fi
 
-    if [ -n "$derived_data" ] && [ -d "$derived_data" ]; then
-        echo "$derived_data"
-        return
-    fi
+    if $LOCAL_MODE; then
+        log_header "Enabling Local Mode in Package.swift"
+        
+        # Check if already in local mode
+        if grep -q 'let testLocal = true' "$package_file"; then
+            log_info "Already in local mode"
+            return 0
+        fi
 
-    # Fallback to default location
-    echo "$HOME/Library/Developer/Xcode/DerivedData"
-}
-
-# Main execution
-print_status "Starting build process for $TARGET_TYPE..."
-
-# Check requirements first
-check_requirements
-
-# Clean if requested
-if [ "$CLEAN_BUILD" = true ]; then
-    clean_build_artifacts
-fi
-
-# Clean data if requested
-if [ "$CLEAN_DATA" = true ]; then
-    clean_app_data
-fi
-
-# Build SDK if requested
-if [ "$BUILD_SDK" = true ]; then
-    print_status "Building RunAnywhere SDK..."
-    SDK_PATH="../../../sdk/runanywhere-swift"
-    if [ -d "$SDK_PATH" ]; then
-        pushd "$SDK_PATH" > /dev/null
-        if swift build -Xswiftc -suppress-warnings 2>&1 | tee /tmp/sdk_build.log; then
-            print_status "SDK built successfully!"
+        # Change testLocal to true
+        log_step "Setting testLocal = true"
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            sed -i '' 's/let testLocal = false/let testLocal = true/' "$package_file"
         else
-            # Check if it's just warnings
-            if grep -q "Build complete!" /tmp/sdk_build.log; then
-                print_status "SDK built successfully with warnings!"
+            sed -i 's/let testLocal = false/let testLocal = true/' "$package_file"
+        fi
+        
+        if grep -q 'let testLocal = true' "$package_file"; then
+            log_info "✓ Local mode enabled"
+        else
+            log_error "Failed to enable local mode"
+            exit 1
+        fi
+    else
+        # Restore remote mode if currently in local mode
+        if grep -q 'let testLocal = true' "$package_file"; then
+            log_header "Restoring Remote Mode in Package.swift"
+            log_step "Setting testLocal = false"
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                sed -i '' 's/let testLocal = true/let testLocal = false/' "$package_file"
             else
-                print_error "SDK build failed!"
-                exit 1
+                sed -i 's/let testLocal = true/let testLocal = false/' "$package_file"
+            fi
+            
+            if grep -q 'let testLocal = false' "$package_file"; then
+                log_info "✓ Remote mode restored"
             fi
         fi
-        popd > /dev/null
-    else
-        print_error "SDK directory not found at $SDK_PATH"
-        exit 1
     fi
-fi
+}
 
-# Ensure all model files are in the project (only if --add-models flag is set)
-if [ "$ADD_MODELS" = true ]; then
-    if [ -x "scripts/ensure_models_in_project.sh" ]; then
-        print_status "Ensuring model files are added to project..."
-        ./scripts/ensure_models_in_project.sh || print_warning "Failed to add models to project"
-    else
-        print_warning "Model addition script not found or not executable"
-    fi
-fi
+build_swift_sdk() {
+    log_header "Building runanywhere-swift"
+    local start_time=$(date +%s)
 
-# Get destination
-DESTINATION=$(get_destination)
-print_status "Building for destination: $DESTINATION"
-
-# Build the app
-print_status "Building the app..."
-# Removed debug output
-if [ "$USE_PROJECT" = "true" ]; then
-    BUILD_CMD="xcodebuild -project \"$PROJECT\""
-else
-    BUILD_CMD="xcodebuild -workspace \"$WORKSPACE\""
-fi
-
-if eval "$BUILD_CMD" \
-    -scheme \"$SCHEME\" \
-    -configuration \"$CONFIGURATION\" \
-    -destination \"$DESTINATION\" \
-    -allowProvisioningUpdates \
-    build > /tmp/xcodebuild.log 2>&1; then
-    print_status "Build succeeded!"
-else
-    print_error "Build failed! Check /tmp/xcodebuild.log for details"
-    tail -50 /tmp/xcodebuild.log
-    exit 1
-fi
-
-# Install and run
-if [ "$TARGET_TYPE" = "mac" ]; then
-    # For macOS
-    print_status "Running on macOS..."
-
-    # Get the app path
-    if [ "$USE_PROJECT" = "true" ]; then
-        BUILD_DIR=$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIGURATION" -destination "$DESTINATION" -showBuildSettings 2>/dev/null | grep -E "^\s*BUILT_PRODUCTS_DIR" | head -1 | awk '{print $3}')
-    else
-        BUILD_DIR=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration "$CONFIGURATION" -destination "$DESTINATION" -showBuildSettings 2>/dev/null | grep -E "^\s*BUILT_PRODUCTS_DIR" | head -1 | awk '{print $3}')
-    fi
-
-    if [ -n "$BUILD_DIR" ]; then
-        APP_PATH="$BUILD_DIR/$SCHEME.app"
-    fi
-
-    # Verify the app exists
-    if [ ! -d "$APP_PATH" ]; then
-        print_warning "App not found at expected path, searching for built app..."
-
-        # Search in DerivedData
-        DERIVED_DATA=$(get_derived_data_path)
-        APP_PATH=$(find "$DERIVED_DATA" -name "${SCHEME}.app" -path "*/Debug/*" -not -path "*/Index.noindex/*" -not -path "*-iphonesimulator/*" -not -path "*-iphoneos/*" 2>/dev/null | head -1)
-
-        if [ ! -d "$APP_PATH" ]; then
-            print_error "Could not find built app!"
-            print_error "You may need to clean and rebuild. Try: $0 mac --clean"
-            exit 1
-        fi
-    fi
-
-    print_status "Found app at: $APP_PATH"
-
-    # Launch the macOS app
-    print_status "Launching macOS app..."
-    open "$APP_PATH"
-
-elif [ "$TARGET_TYPE" = "simulator" ]; then
-    # For simulator
-    print_status "Installing on simulator..."
-
-    # Get the app path - use xcodebuild to get the exact build location
-    print_debug "Getting build directory from xcodebuild..."
-    if [ "$USE_PROJECT" = "true" ]; then
-        BUILD_DIR=$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIGURATION" -destination "$DESTINATION" -showBuildSettings 2>/dev/null | grep -E "^\s*BUILT_PRODUCTS_DIR" | head -1 | awk '{print $3}')
-    else
-        BUILD_DIR=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration "$CONFIGURATION" -destination "$DESTINATION" -showBuildSettings 2>/dev/null | grep -E "^\s*BUILT_PRODUCTS_DIR" | head -1 | awk '{print $3}')
-    fi
-
-    if [ -n "$BUILD_DIR" ]; then
-        APP_PATH="$BUILD_DIR/$SCHEME.app"
-        print_debug "Expected app path: $APP_PATH"
-    fi
-
-    # Verify the app exists, if not try multiple strategies
-    if [ ! -d "$APP_PATH" ]; then
-        print_warning "App not found at expected path, searching for built app..."
-
-        # Strategy 1: Search in DerivedData with multiple patterns
-        DERIVED_DATA=$(get_derived_data_path)
-        print_debug "Searching in DerivedData: $DERIVED_DATA"
-
-        # Try to find the app with various search patterns
-        APP_PATH=$(find "$DERIVED_DATA" -name "${SCHEME}.app" -path "*/Debug-iphonesimulator/*" -not -path "*/Index.noindex/*" 2>/dev/null | head -1)
-
-        # Strategy 2: If still not found, try without the Debug requirement
-        if [ ! -d "$APP_PATH" ]; then
-            APP_PATH=$(find "$DERIVED_DATA" -name "${SCHEME}.app" -path "*-iphonesimulator/*" -not -path "*/Index.noindex/*" 2>/dev/null | head -1)
-        fi
-
-        # Strategy 3: Last resort - any .app file for our scheme
-        if [ ! -d "$APP_PATH" ]; then
-            APP_PATH=$(find "$DERIVED_DATA" -name "${SCHEME}.app" -not -path "*/Index.noindex/*" 2>/dev/null | grep -i simulator | head -1)
-        fi
-
-        if [ ! -d "$APP_PATH" ]; then
-            print_error "Could not find built app!"
-            print_error "Searched in: $DERIVED_DATA"
-            print_error "You may need to clean and rebuild. Try: $0 $TARGET_TYPE \"$DEVICE_NAME\" --clean"
-            exit 1
-        fi
-    fi
-
-    print_status "Found app at: $APP_PATH"
-
-    # Extract simulator ID from destination if it's an ID-based destination
-    if [[ "$DESTINATION" == *"id="* ]]; then
-        SIMULATOR_ID=$(echo "$DESTINATION" | sed 's/.*id=//')
-        print_status "Using simulator ID from destination: $SIMULATOR_ID"
-    else
-        # Boot simulator if needed (name-based destination)
-        SIMULATOR_ID=$(xcrun simctl list devices | grep "$DEVICE_NAME" | grep -v "unavailable" | awk -F '[()]' '{print $2}' | head -1)
-        if [ -z "$SIMULATOR_ID" ]; then
-            SIMULATOR_ID=$(xcrun simctl list devices | grep "iPhone 16" | grep -v "unavailable" | awk -F '[()]' '{print $2}' | head -1)
-        fi
-        xcrun simctl boot "$SIMULATOR_ID" 2>/dev/null || true
-    fi
-
-    # Install app
-    xcrun simctl install "$SIMULATOR_ID" "$APP_PATH"
-
-    # Launch app
-    print_status "Launching app on simulator..."
-    xcrun simctl launch "$SIMULATOR_ID" "$BUNDLE_ID"
-
-    # Open simulator
-    open -a Simulator
-
-else
-    # For device
-    # Extract Xcode device ID from destination
-    XCODE_DEVICE_ID=$(echo "$DESTINATION" | sed 's/platform=iOS,id=//')
-
-    # Get the devicectl ID for the same device (needed for installation)
-    # Map from Xcode device ID to devicectl device ID using device name
-    if [ "$USE_PROJECT" = "true" ]; then
-        DEVICE_NAME_FOR_INSTALL=$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -showdestinations 2>/dev/null | grep "platform:iOS" | grep -v "Simulator" | grep "$XCODE_DEVICE_ID" | sed -n 's/.*name:\([^}]*\).*/\1/p' | sed 's/  *$//')
-    else
-        DEVICE_NAME_FOR_INSTALL=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -showdestinations 2>/dev/null | grep "platform:iOS" | grep -v "Simulator" | grep "$XCODE_DEVICE_ID" | sed -n 's/.*name:\([^}]*\).*/\1/p' | sed 's/  *$//')
-    fi
-
-    if [ -n "$DEVICE_NAME_FOR_INSTALL" ]; then
-        DEVICECTL_ID=$(xcrun devicectl list devices | grep "$DEVICE_NAME_FOR_INSTALL" | grep "connected" | head -1 | awk '{print $3}')
-    else
-        # Fallback: use first connected device
-        DEVICECTL_ID=$(xcrun devicectl list devices | grep -E "iPhone|iPad" | grep "connected" | head -1 | awk '{print $3}')
-    fi
-
-    if [ -z "$DEVICECTL_ID" ]; then
-        print_error "Could not find device for installation!"
+    if [[ ! -x "$SWIFT_BUILD_SCRIPT" ]]; then
+        log_error "Swift build script not found: $SWIFT_BUILD_SCRIPT"
         exit 1
     fi
 
-    print_status "Using device: $DEVICE_NAME_FOR_INSTALL (Xcode: $XCODE_DEVICE_ID, devicectl: $DEVICECTL_ID)"
+    # In local mode, copy frameworks and set package mode
+    if $LOCAL_MODE; then
+        copy_frameworks_to_swift
+    fi
+    set_package_mode
 
-    # Get the built app path - use xcodebuild to get the exact build location
-    print_debug "Getting build directory from xcodebuild..."
-    if [ "$USE_PROJECT" = "true" ]; then
-        BUILD_DIR=$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIGURATION" -destination "$DESTINATION" -showBuildSettings 2>/dev/null | grep -E "^\s*BUILT_PRODUCTS_DIR" | head -1 | awk '{print $3}')
+    # Determine what flags to pass
+    local FLAGS=""
+
+    # Install frameworks if core or commons was rebuilt (only if not in local mode)
+    if ! $LOCAL_MODE && ($BUILD_CORE || $BUILD_COMMONS); then
+        FLAGS="$FLAGS --install-frameworks --sync-headers"
+    fi
+
+    if $CLEAN_BUILD; then
+        FLAGS="$FLAGS --clean"
+    fi
+
+    log_step "Running: $SWIFT_BUILD_SCRIPT $FLAGS"
+    cd "$SWIFT_SDK_DIR"
+    "$SWIFT_BUILD_SCRIPT" $FLAGS
+
+    local end_time=$(date +%s)
+    TIME_SWIFT=$((end_time - start_time))
+    log_info "runanywhere-swift build complete"
+    log_time "Swift SDK build time: $(format_duration $TIME_SWIFT)"
+}
+
+# =============================================================================
+# APP BUILD & DEPLOY
+# =============================================================================
+
+build_app() {
+    log_header "Building RunAnywhereAI App"
+    local start_time=$(date +%s)
+
+    cd "$APP_DIR"
+
+    # Determine destination
+    local DESTINATION
+    case "$TARGET" in
+        simulator)
+            DESTINATION="platform=iOS Simulator,name=${DEVICE_NAME:-iPhone 16}"
+            ;;
+        mac)
+            DESTINATION="platform=macOS"
+            ;;
+        device|*)
+            local DEVICE_ID=$(xcodebuild -project RunAnywhereAI.xcodeproj -scheme RunAnywhereAI -showdestinations 2>/dev/null | grep "platform:iOS" | grep -v "Simulator" | head -1 | sed -n 's/.*id:\([^,]*\).*/\1/p')
+            [[ -z "$DEVICE_ID" ]] && { log_error "No connected iOS device found"; exit 1; }
+            DESTINATION="platform=iOS,id=$DEVICE_ID"
+            ;;
+    esac
+
+    log_step "Building for: $DESTINATION"
+
+    $CLEAN_BUILD && xcodebuild clean -project RunAnywhereAI.xcodeproj -scheme RunAnywhereAI -configuration Debug >/dev/null 2>&1 || true
+
+    if xcodebuild -project RunAnywhereAI.xcodeproj -scheme RunAnywhereAI -configuration Debug -destination "$DESTINATION" -allowProvisioningUpdates build > /tmp/xcodebuild.log 2>&1; then
+        local end_time=$(date +%s)
+        TIME_APP=$((end_time - start_time))
+        log_info "App build succeeded"
+        log_time "App build time: $(format_duration $TIME_APP)"
     else
-        BUILD_DIR=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration "$CONFIGURATION" -destination "$DESTINATION" -showBuildSettings 2>/dev/null | grep -E "^\s*BUILT_PRODUCTS_DIR" | head -1 | awk '{print $3}')
-    fi
-
-    if [ -n "$BUILD_DIR" ]; then
-        APP_PATH="$BUILD_DIR/$SCHEME.app"
-        print_debug "Expected app path: $APP_PATH"
-    fi
-
-    # Verify the app exists, if not try multiple strategies
-    if [ ! -d "$APP_PATH" ]; then
-        print_warning "App not found at expected path, searching for built app..."
-
-        # Strategy 1: Search in DerivedData with multiple patterns
-        DERIVED_DATA=$(get_derived_data_path)
-        print_debug "Searching in DerivedData: $DERIVED_DATA"
-
-        # Try to find the app with various search patterns
-        APP_PATH=$(find "$DERIVED_DATA" -name "${SCHEME}.app" -path "*/Debug-iphoneos/*" -not -path "*/Index.noindex/*" 2>/dev/null | head -1)
-
-        # Strategy 2: If still not found, try without the Debug requirement
-        if [ ! -d "$APP_PATH" ]; then
-            APP_PATH=$(find "$DERIVED_DATA" -name "${SCHEME}.app" -path "*-iphoneos/*" -not -path "*/Index.noindex/*" 2>/dev/null | head -1)
-        fi
-
-        # Strategy 3: Last resort - any .app file for our scheme
-        if [ ! -d "$APP_PATH" ]; then
-            APP_PATH=$(find "$DERIVED_DATA" -name "${SCHEME}.app" -not -path "*/Index.noindex/*" 2>/dev/null | grep -v simulator | head -1)
-        fi
-
-        if [ ! -d "$APP_PATH" ]; then
-            print_error "Could not find built app!"
-            print_error "Searched in: $DERIVED_DATA"
-            print_error "You may need to clean and rebuild. Try: $0 $TARGET_TYPE \"$DEVICE_NAME\" --clean"
-            exit 1
-        fi
-    fi
-
-    print_status "Found app at: $APP_PATH"
-
-    print_status "Installing app on device..."
-    if xcrun devicectl device install app --device "$DEVICECTL_ID" "$APP_PATH"; then
-        print_status "App installed successfully!"
-    else
-        print_error "Failed to install app!"
+        log_error "App build failed! Check /tmp/xcodebuild.log"
+        tail -30 /tmp/xcodebuild.log
         exit 1
     fi
+}
 
-    print_status "Launching app on device..."
-    if xcrun devicectl device process launch --device "$DEVICECTL_ID" "$BUNDLE_ID"; then
-        print_status "App launched successfully!"
-    else
-        print_error "Failed to launch app!"
-        exit 1
+deploy_and_run() {
+    log_header "Deploying to $TARGET"
+    local start_time=$(date +%s)
+
+    cd "$APP_DIR"
+
+    # Find built app (exclude Index.noindex)
+    local APP_PATH
+    case "$TARGET" in
+        simulator)
+            APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "RunAnywhereAI.app" -path "*Debug-iphonesimulator*" -not -path "*/Index.noindex/*" 2>/dev/null | head -1)
+            ;;
+        mac)
+            APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "RunAnywhereAI.app" -path "*/Debug/*" -not -path "*-iphone*" -not -path "*/Index.noindex/*" 2>/dev/null | head -1)
+            ;;
+        device|*)
+            APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "RunAnywhereAI.app" -path "*Debug-iphoneos*" -not -path "*/Index.noindex/*" 2>/dev/null | head -1)
+            ;;
+    esac
+
+    [[ ! -d "$APP_PATH" ]] && { log_error "Could not find built app"; exit 1; }
+
+    log_info "Found app: $APP_PATH"
+
+    case "$TARGET" in
+        simulator)
+            local SIM_ID=$(xcrun simctl list devices | grep "${DEVICE_NAME:-iPhone}" | grep -v "unavailable" | head -1 | sed 's/.*(\([^)]*\)).*/\1/')
+            xcrun simctl boot "$SIM_ID" 2>/dev/null || true
+            xcrun simctl install "$SIM_ID" "$APP_PATH"
+            xcrun simctl launch "$SIM_ID" "com.runanywhere.RunAnywhere"
+            open -a Simulator
+            log_info "App launched on simulator"
+            ;;
+        mac)
+            open "$APP_PATH"
+            log_info "App launched on macOS"
+            ;;
+        device|*)
+            local DEVICE_ID=$(xcrun devicectl list devices 2>/dev/null | grep "connected" | grep -oE '[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}' | head -1)
+            [[ -z "$DEVICE_ID" ]] && { log_error "No connected iOS device found"; exit 1; }
+            log_step "Installing on device: $DEVICE_ID"
+            xcrun devicectl device install app --device "$DEVICE_ID" "$APP_PATH"
+            xcrun devicectl device process launch --device "$DEVICE_ID" "com.runanywhere.RunAnywhere" || log_warn "Launch failed - device may be locked. Unlock and tap the app icon."
+            log_info "App installed on device"
+            ;;
+    esac
+
+    local end_time=$(date +%s)
+    TIME_DEPLOY=$((end_time - start_time))
+    log_time "Deploy time: $(format_duration $TIME_DEPLOY)"
+}
+
+# =============================================================================
+# BUILD SUMMARY
+# =============================================================================
+
+print_summary() {
+    local total_end_time=$(date +%s)
+    local total_time=$((total_end_time - TOTAL_START_TIME))
+
+    echo ""
+    echo -e "${BOLD}${GREEN}═══════════════════════════════════════════${NC}"
+    echo -e "${BOLD}${GREEN}           BUILD TIME SUMMARY              ${NC}"
+    echo -e "${BOLD}${GREEN}═══════════════════════════════════════════${NC}"
+    echo ""
+
+    if (( TIME_CORE > 0 )); then
+        printf "  %-25s %s\n" "runanywhere-core:" "$(format_duration $TIME_CORE)"
     fi
-fi
+    if (( TIME_COMMONS > 0 )); then
+        printf "  %-25s %s\n" "runanywhere-commons:" "$(format_duration $TIME_COMMONS)"
+    fi
+    if (( TIME_SWIFT > 0 )); then
+        printf "  %-25s %s\n" "runanywhere-swift:" "$(format_duration $TIME_SWIFT)"
+    fi
+    if (( TIME_APP > 0 )); then
+        printf "  %-25s %s\n" "iOS App:" "$(format_duration $TIME_APP)"
+    fi
+    if (( TIME_DEPLOY > 0 )); then
+        printf "  %-25s %s\n" "Deploy:" "$(format_duration $TIME_DEPLOY)"
+    fi
 
-print_status "Done! The app is now running on your $TARGET_TYPE."
+    echo "  ─────────────────────────────────────────"
+    printf "  ${BOLD}%-25s %s${NC}\n" "TOTAL:" "$(format_duration $total_time)"
+    echo ""
+}
+
+# =============================================================================
+# MAIN
+# =============================================================================
+
+main() {
+    TOTAL_START_TIME=$(date +%s)
+
+    log_header "RunAnywhereAI Build Pipeline"
+    echo "Target: $TARGET"
+    echo "Build Core: $BUILD_CORE"
+    echo "Build Commons: $BUILD_COMMONS"
+    echo "Build SDK: $BUILD_SDK"
+    echo "Skip App: $SKIP_APP"
+    echo "Local Mode: $LOCAL_MODE"
+    echo ""
+    echo "Scripts:"
+    echo "  Core:    $CORE_BUILD_SCRIPT"
+    echo "  Commons: $COMMONS_BUILD_SCRIPT"
+    echo "  Swift:   $SWIFT_BUILD_SCRIPT"
+    echo ""
+
+    # Execute build steps by calling individual project scripts
+    # 
+    # WITHOUT --local flag (REMOTE MODE):
+    #   - Everything consumed from remote GitHub releases
+    #   - No local builds, all XCFrameworks downloaded
+    #
+    # WITH --local flag (LOCAL DEVELOPMENT MODE):
+    #   - Downloads PRE-BUILT core libraries (not source, not compiled)
+    #   - Only runanywhere-commons is built locally
+    #   - Commons links against pre-built core libraries (remote)
+    #   - Commons frameworks copied to Swift SDK for local use
+    if $LOCAL_MODE; then
+        log_info "Local mode: Using pre-built core libraries (remote), building commons locally"
+        # Build commons locally (links against pre-built core libraries)
+        $BUILD_COMMONS && build_commons
+    else
+        # Remote mode: Everything from GitHub releases, no local builds
+        log_info "Remote mode: All frameworks from GitHub releases"
+        # Note: build_core and build_commons are skipped in remote mode
+        # All XCFrameworks come from Package.swift remote URLs
+    fi
+    $BUILD_SDK && build_swift_sdk
+
+    # Build and deploy app
+    if ! $SKIP_APP; then
+        build_app
+        deploy_and_run
+    else
+        log_info "App build skipped (--skip-app)"
+    fi
+
+    # Print timing summary
+    print_summary
+
+    log_header "Done!"
+}
+
+main "$@"

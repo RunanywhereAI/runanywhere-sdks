@@ -1,0 +1,403 @@
+name: Build and Release RACommons
+
+# =============================================================================
+# RACommons Release Workflow
+#
+# Builds RACommons.xcframework - the standalone infrastructure library.
+# This does NOT build backends (LlamaCPP, ONNX, WhisperCPP) - those are
+# released from runanywhere-core repository.
+#
+# Trigger:
+#   - Tag push: commons-v*
+#   - Manual workflow_dispatch
+# =============================================================================
+
+on:
+  push:
+    tags:
+      - 'commons-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.2.0)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Dry run (build only, do not publish)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  COMMONS_DIR: sdk/runanywhere-commons
+
+jobs:
+  # ===========================================================================
+  # Build iOS XCFramework
+  # ===========================================================================
+  build-ios:
+    name: Build iOS
+    runs-on: macos-14
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/commons-v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building RACommons v$VERSION"
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.4'
+
+      - name: Install Dependencies
+        run: brew install cmake ninja
+
+      - name: Setup Development Config
+        working-directory: ${{ env.COMMONS_DIR }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          BUILD_TOKEN: ${{ secrets.BUILD_TOKEN }}
+        run: |
+          CONFIG_FILE="src/infrastructure/network/development_config.cpp"
+          
+          CLEAN_URL=$(printf '%s' "$SUPABASE_URL" | tr -d '\n\r')
+          CLEAN_KEY=$(printf '%s' "$SUPABASE_ANON_KEY" | tr -d '\n\r')
+          CLEAN_TOKEN=$(printf '%s' "${BUILD_TOKEN:-bt_release_build}" | tr -d '\n\r')
+          
+          cat > "$CONFIG_FILE" << CONFIGEOF
+          /**
+           * @file development_config.cpp
+           * @brief Development mode configuration with credentials from CI secrets
+           */
+          
+          #include <cstring>
+          
+          #include "rac/core/rac_logger.h"
+          #include "rac/infrastructure/network/rac_dev_config.h"
+          
+          namespace {
+          
+          constexpr const char* SUPABASE_URL = "${CLEAN_URL}";
+          constexpr const char* SUPABASE_ANON_KEY = "${CLEAN_KEY}";
+          constexpr const char* BUILD_TOKEN = "${CLEAN_TOKEN}";
+          constexpr const char* SENTRY_DSN = nullptr;
+          
+          }  // anonymous namespace
+          
+          extern "C" {
+          
+          bool rac_dev_config_is_available(void) {
+              if (SUPABASE_URL == nullptr || SUPABASE_ANON_KEY == nullptr) return false;
+              if (std::strlen(SUPABASE_URL) == 0 || std::strlen(SUPABASE_ANON_KEY) == 0) return false;
+              if (std::strstr(SUPABASE_URL, "YOUR_") != nullptr) return false;
+              if (std::strstr(SUPABASE_ANON_KEY, "YOUR_") != nullptr) return false;
+              return true;
+          }
+          
+          const char* rac_dev_config_get_supabase_url(void) {
+              return SUPABASE_URL;
+          }
+          
+          const char* rac_dev_config_get_supabase_key(void) {
+              return SUPABASE_ANON_KEY;
+          }
+          
+          const char* rac_dev_config_get_build_token(void) {
+              return BUILD_TOKEN;
+          }
+          
+          const char* rac_dev_config_get_sentry_dsn(void) {
+              return SENTRY_DSN;
+          }
+          
+          bool rac_dev_config_has_supabase(void) {
+              return rac_dev_config_is_available();
+          }
+          
+          bool rac_dev_config_has_build_token(void) {
+              return BUILD_TOKEN != nullptr && std::strlen(BUILD_TOKEN) > 0;
+          }
+          
+          }  // extern "C"
+          CONFIGEOF
+          
+          echo "=== Generated development_config.cpp ==="
+          head -20 "$CONFIG_FILE"
+
+      - name: Build RACommons XCFramework
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/build-rac-commons.sh
+          ./scripts/build-rac-commons.sh --ios --release --package
+
+      - name: List Artifacts
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          echo "=== Build Artifacts ==="
+          ls -la dist/
+          if [ -d dist/packages ]; then
+            echo ""
+            echo "=== Packages ==="
+            ls -la dist/packages/
+          fi
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: racommons-ios-${{ steps.version.outputs.version }}
+          path: |
+            ${{ env.COMMONS_DIR }}/dist/RACommons.xcframework
+            ${{ env.COMMONS_DIR }}/dist/packages/*.zip
+            ${{ env.COMMONS_DIR }}/dist/packages/*.sha256
+          retention-days: 30
+
+  # ===========================================================================
+  # Build Android Libraries
+  # ===========================================================================
+  build-android:
+    name: Build Android (${{ matrix.abi }})
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86_64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/commons-v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup NDK
+        run: |
+          NDK_VERSION="27.0.12077973"
+          echo "y" | sdkmanager --install "ndk;${NDK_VERSION}" --sdk_root=${ANDROID_SDK_ROOT}
+          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> $GITHUB_ENV
+
+      - name: Setup Development Config
+        working-directory: ${{ env.COMMONS_DIR }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          BUILD_TOKEN: ${{ secrets.BUILD_TOKEN }}
+        run: |
+          CONFIG_FILE="src/infrastructure/network/development_config.cpp"
+          
+          CLEAN_URL=$(printf '%s' "$SUPABASE_URL" | tr -d '\n\r')
+          CLEAN_KEY=$(printf '%s' "$SUPABASE_ANON_KEY" | tr -d '\n\r')
+          CLEAN_TOKEN=$(printf '%s' "${BUILD_TOKEN:-bt_release_build}" | tr -d '\n\r')
+          
+          cat > "$CONFIG_FILE" << CONFIGEOF
+          /**
+           * @file development_config.cpp
+           * @brief Development mode configuration with credentials from CI secrets
+           */
+          
+          #include <cstring>
+          
+          #include "rac/core/rac_logger.h"
+          #include "rac/infrastructure/network/rac_dev_config.h"
+          
+          namespace {
+          
+          constexpr const char* SUPABASE_URL = "${CLEAN_URL}";
+          constexpr const char* SUPABASE_ANON_KEY = "${CLEAN_KEY}";
+          constexpr const char* BUILD_TOKEN = "${CLEAN_TOKEN}";
+          constexpr const char* SENTRY_DSN = nullptr;
+          
+          }  // anonymous namespace
+          
+          extern "C" {
+          
+          bool rac_dev_config_is_available(void) {
+              if (SUPABASE_URL == nullptr || SUPABASE_ANON_KEY == nullptr) return false;
+              if (std::strlen(SUPABASE_URL) == 0 || std::strlen(SUPABASE_ANON_KEY) == 0) return false;
+              if (std::strstr(SUPABASE_URL, "YOUR_") != nullptr) return false;
+              if (std::strstr(SUPABASE_ANON_KEY, "YOUR_") != nullptr) return false;
+              return true;
+          }
+          
+          const char* rac_dev_config_get_supabase_url(void) {
+              return SUPABASE_URL;
+          }
+          
+          const char* rac_dev_config_get_supabase_key(void) {
+              return SUPABASE_ANON_KEY;
+          }
+          
+          const char* rac_dev_config_get_build_token(void) {
+              return BUILD_TOKEN;
+          }
+          
+          const char* rac_dev_config_get_sentry_dsn(void) {
+              return SENTRY_DSN;
+          }
+          
+          bool rac_dev_config_has_supabase(void) {
+              return rac_dev_config_is_available();
+          }
+          
+          bool rac_dev_config_has_build_token(void) {
+              return BUILD_TOKEN != nullptr && std::strlen(BUILD_TOKEN) > 0;
+          }
+          
+          }  // extern "C"
+          CONFIGEOF
+          
+          echo "=== Generated development_config.cpp for Android ==="
+
+      - name: Build Android ${{ matrix.abi }}
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/build-rac-commons.sh
+          ./scripts/build-rac-commons.sh --android --abi ${{ matrix.abi }} --release
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: racommons-android-${{ matrix.abi }}-${{ steps.version.outputs.version }}
+          path: |
+            ${{ env.COMMONS_DIR }}/dist/android/
+          retention-days: 30
+
+  # ===========================================================================
+  # Publish Release
+  # ===========================================================================
+  publish:
+    name: Publish Release
+    needs: [build-ios, build-android]
+    if: github.event.inputs.dry_run != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download iOS Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: racommons-ios-${{ needs.build-ios.outputs.version }}
+          path: dist/ios
+
+      - name: Download Android Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: racommons-android-*
+          path: dist/android-artifacts
+          merge-multiple: false
+
+      - name: Prepare Release Assets
+        run: |
+          VERSION="${{ needs.build-ios.outputs.version }}"
+          mkdir -p release-assets
+
+          if [ -d dist/ios/RACommons.xcframework ]; then
+            cd dist/ios
+            zip -r "../../release-assets/RACommons-ios-v${VERSION}.zip" RACommons.xcframework
+            cd ../../release-assets
+            shasum -a 256 "RACommons-ios-v${VERSION}.zip" > "RACommons-ios-v${VERSION}.zip.sha256"
+            cd ..
+          fi
+
+          mkdir -p android-combined/jniLibs
+          for dir in dist/android-artifacts/racommons-android-*/jniLibs/*/; do
+            if [ -d "$dir" ]; then
+              abi=$(basename "$dir")
+              mkdir -p "android-combined/jniLibs/${abi}"
+              cp -r "${dir}"* "android-combined/jniLibs/${abi}/" 2>/dev/null || true
+              echo "Copied libs for ${abi}: $(ls android-combined/jniLibs/${abi}/ 2>/dev/null | wc -l) files"
+            fi
+          done
+
+          HEADER_DIR=$(find dist/android-artifacts -name "include" -type d | head -1)
+          if [ -n "$HEADER_DIR" ]; then
+            cp -r "$HEADER_DIR" android-combined/
+          fi
+
+          cd android-combined
+          echo "=== Android Combined Contents ==="
+          find . -type f | head -20
+          zip -r "../release-assets/RACommons-android-v${VERSION}.zip" .
+          cd ../release-assets
+          shasum -a 256 "RACommons-android-v${VERSION}.zip" > "RACommons-android-v${VERSION}.zip.sha256"
+
+          echo "=== Release Assets ==="
+          ls -la
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: commons-v${{ needs.build-ios.outputs.version }}
+          name: RACommons v${{ needs.build-ios.outputs.version }}
+          files: |
+            release-assets/*.zip
+            release-assets/*.sha256
+          body: |
+            ## RACommons v${{ needs.build-ios.outputs.version }}
+
+            Standalone infrastructure library for RunAnywhere SDKs.
+
+            ### Contents
+            - Logging, error handling, and event tracking
+            - Service registry and provider infrastructure
+            - Model management (download strategies, storage)
+            - Platform backend (Apple Foundation Models, System TTS) - iOS/macOS only
+
+            ### iOS/macOS
+            `RACommons-ios-v${{ needs.build-ios.outputs.version }}.zip`
+            - Contains `RACommons.xcframework`
+
+            ### Android
+            `RACommons-android-v${{ needs.build-ios.outputs.version }}.zip`
+            - Contains `jniLibs/{abi}/librac_commons.so` (core library)
+            - Contains `jniLibs/{abi}/librunanywhere_jni.so` (JNI bridge for Kotlin SDK)
+            - Contains `include/` headers
+
+            ### Note
+            Backend libraries (LlamaCPP, ONNX, WhisperCPP) are released separately from `runanywhere-core`.
+
+            ### Verification
+            ```bash
+            shasum -a 256 -c *.sha256
+            ```
+
+            ---
+            Built from runanywhere-sdks @ ${{ github.sha }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,6 +1,5 @@
 package com.runanywhere.runanywhereai.presentation.chat
 
-import android.app.Application
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -21,10 +20,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import com.runanywhere.runanywhereai.ui.theme.AppColors
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -35,6 +32,7 @@ import com.runanywhere.runanywhereai.data.ConversationStore
 import com.runanywhere.runanywhereai.domain.models.ChatMessage
 import com.runanywhere.runanywhereai.domain.models.Conversation
 import com.runanywhere.runanywhereai.domain.models.MessageRole
+import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppTypography
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
 import kotlinx.coroutines.launch
@@ -61,9 +59,7 @@ import java.util.Locale
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(
-    viewModel: ChatViewModel = viewModel()
-) {
+fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -89,12 +85,13 @@ fun ChatScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = if (uiState.isModelLoaded) {
-                            uiState.loadedModelName ?: "Chat"
-                        } else {
-                            "Chat"
-                        },
-                        style = MaterialTheme.typography.headlineMedium
+                        text =
+                            if (uiState.isModelLoaded) {
+                                uiState.loadedModelName ?: "Chat"
+                            } else {
+                                "Chat"
+                            },
+                        style = MaterialTheme.typography.headlineMedium,
                     )
                 },
                 navigationIcon = {
@@ -102,7 +99,7 @@ fun ChatScreen(
                     IconButton(onClick = { showingConversationList = true }) {
                         Icon(
                             imageVector = Icons.Default.List,
-                            contentDescription = "Conversations"
+                            contentDescription = "Conversations",
                         )
                     }
                 },
@@ -110,16 +107,17 @@ fun ChatScreen(
                     // Info button for chat details - matching iOS
                     IconButton(
                         onClick = { showingChatDetails = true },
-                        enabled = uiState.messages.isNotEmpty()
+                        enabled = uiState.messages.isNotEmpty(),
                     ) {
                         Icon(
                             imageVector = Icons.Default.Info,
                             contentDescription = "Info",
-                            tint = if (uiState.messages.isNotEmpty()) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                            }
+                            tint =
+                                if (uiState.messages.isNotEmpty()) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                                },
                         )
                     }
 
@@ -127,17 +125,17 @@ fun ChatScreen(
 
                     // Model selection button - matching iOS
                     TextButton(
-                        onClick = { showingModelSelection = true }
+                        onClick = { showingModelSelection = true },
                     ) {
                         Icon(
                             imageVector = Icons.Default.ViewInAr,
                             contentDescription = null,
-                            modifier = Modifier.size(Dimensions.iconRegular)
+                            modifier = Modifier.size(Dimensions.iconRegular),
                         )
                         Spacer(modifier = Modifier.width(Dimensions.xSmall))
                         Text(
                             text = if (uiState.isModelLoaded) "Switch Model" else "Select Model",
-                            style = AppTypography.caption
+                            style = AppTypography.caption,
                         )
                     }
 
@@ -146,36 +144,39 @@ fun ChatScreen(
                     // Clear chat button - matching iOS
                     IconButton(
                         onClick = { viewModel.clearChat() },
-                        enabled = uiState.messages.isNotEmpty()
+                        enabled = uiState.messages.isNotEmpty(),
                     ) {
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "Clear Chat",
-                            tint = if (uiState.messages.isNotEmpty()) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                            }
+                            tint =
+                                if (uiState.messages.isNotEmpty()) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                                },
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                colors =
+                    TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                    ),
             )
-        }
+        },
     ) { padding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(MaterialTheme.colorScheme.background)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .background(MaterialTheme.colorScheme.background),
         ) {
             // Model info bar (conditional) - matching iOS
             AnimatedVisibility(
                 visible = uiState.isModelLoaded && uiState.loadedModelName != null,
                 enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
+                exit = fadeOut() + shrinkVertically(),
             ) {
                 ModelInfoBar(modelName = uiState.loadedModelName ?: "", framework = "KMP")
             }
@@ -184,14 +185,14 @@ fun ChatScreen(
             if (uiState.messages.isEmpty() && !uiState.isGenerating) {
                 EmptyStateView(
                     isModelLoaded = uiState.isModelLoaded,
-                    modelName = uiState.loadedModelName
+                    modelName = uiState.loadedModelName,
                 )
             } else {
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(Dimensions.large),
-                    verticalArrangement = Arrangement.spacedBy(Dimensions.messageSpacingBetween)
+                    verticalArrangement = Arrangement.spacedBy(Dimensions.messageSpacingBetween),
                 ) {
                     // Add spacer at top for better scrolling - matching iOS
                     item {
@@ -201,7 +202,7 @@ fun ChatScreen(
                     items(uiState.messages, key = { it.id }) { message ->
                         MessageBubbleView(
                             message = message,
-                            isGenerating = uiState.isGenerating
+                            isGenerating = uiState.isGenerating,
                         )
                     }
 
@@ -222,17 +223,17 @@ fun ChatScreen(
             // Divider above input
             HorizontalDivider(
                 thickness = Dimensions.strokeThin,
-                color = MaterialTheme.colorScheme.outline
+                color = MaterialTheme.colorScheme.outline,
             )
 
             // Model selection prompt (when no model loaded) - matching iOS
             AnimatedVisibility(
                 visible = !uiState.isModelLoaded,
                 enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
+                exit = fadeOut() + shrinkVertically(),
             ) {
                 ModelSelectionPrompt(
-                    onSelectModel = { showingModelSelection = true }
+                    onSelectModel = { showingModelSelection = true },
                 )
             }
 
@@ -243,7 +244,7 @@ fun ChatScreen(
                 onSend = viewModel::sendMessage,
                 enabled = uiState.canSend,
                 isGenerating = uiState.isGenerating,
-                isModelLoaded = uiState.isModelLoaded
+                isModelLoaded = uiState.isModelLoaded,
             )
         }
     }
@@ -257,7 +258,7 @@ fun ChatScreen(
                     // Update view model that model was selected
                     viewModel.checkModelStatus()
                 }
-            }
+            },
         )
     }
 
@@ -281,7 +282,7 @@ fun ChatScreen(
             },
             onDeleteConversation = { conversation ->
                 conversationStore.deleteConversation(conversation)
-            }
+            },
         )
     }
 
@@ -291,7 +292,7 @@ fun ChatScreen(
             messages = uiState.messages,
             conversationTitle = uiState.currentConversation?.title ?: "Chat",
             modelName = uiState.loadedModelName,
-            onDismiss = { showingChatDetails = false }
+            onDismiss = { showingChatDetails = false },
         )
     }
 
@@ -317,11 +318,11 @@ fun ChatScreen(
                     onClick = {
                         showDebugAlert = false
                         viewModel.clearError()
-                    }
+                    },
                 ) {
                     Text("OK")
                 }
-            }
+            },
         )
     }
 }
@@ -333,40 +334,43 @@ fun ChatScreen(
 @Composable
 fun ModelInfoBar(
     modelName: String,
-    framework: String
+    framework: String,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    horizontal = Dimensions.modelInfoBarPaddingHorizontal,
-                    vertical = Dimensions.modelInfoBarPaddingVertical
-                ),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        horizontal = Dimensions.modelInfoBarPaddingHorizontal,
+                        vertical = Dimensions.modelInfoBarPaddingVertical,
+                    ),
             horizontalArrangement = Arrangement.spacedBy(Dimensions.modelInfoStatsItemSpacing),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             // Framework badge
             Surface(
                 color = MaterialTheme.colorScheme.primary,
                 shape = RoundedCornerShape(Dimensions.modelInfoFrameworkBadgeCornerRadius),
-                modifier = Modifier.border(
-                    width = Dimensions.strokeThin,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(Dimensions.modelInfoFrameworkBadgeCornerRadius)
-                )
+                modifier =
+                    Modifier.border(
+                        width = Dimensions.strokeThin,
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(Dimensions.modelInfoFrameworkBadgeCornerRadius),
+                    ),
             ) {
                 Text(
                     text = framework,
                     style = AppTypography.monospacedCaption,
                     color = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.padding(
-                        horizontal = Dimensions.modelInfoFrameworkBadgePaddingHorizontal,
-                        vertical = Dimensions.modelInfoFrameworkBadgePaddingVertical
-                    )
+                    modifier =
+                        Modifier.padding(
+                            horizontal = Dimensions.modelInfoFrameworkBadgePaddingHorizontal,
+                            vertical = Dimensions.modelInfoFrameworkBadgePaddingVertical,
+                        ),
                 )
             }
 
@@ -374,56 +378,59 @@ fun ModelInfoBar(
             Text(
                 text = modelName.split(" ").first(),
                 style = AppTypography.rounded11,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             // Stats (storage icon + size) - matching iOS
             Row(
                 horizontalArrangement = Arrangement.spacedBy(Dimensions.modelInfoStatsIconTextSpacing),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
                     imageVector = Icons.Default.Storage,
                     contentDescription = null,
                     modifier = Modifier.size(Dimensions.iconSmall),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                // TODO: Get actual size
                 Text(
-                    text = "1.2G",  // TODO: Get actual size
+                    text = "1.2G",
                     style = AppTypography.rounded10,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
             // Context length - matching iOS
             Row(
                 horizontalArrangement = Arrangement.spacedBy(Dimensions.modelInfoStatsIconTextSpacing),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
                     imageVector = Icons.Default.Description,
                     contentDescription = null,
                     modifier = Modifier.size(Dimensions.iconSmall),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                // TODO: Get actual context length
                 Text(
-                    text = "128K",  // TODO: Get actual context length
+                    text = "128K",
                     style = AppTypography.rounded10,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
     }
 
-    // Bottom border with offset - matching iOS
+    // Bottom border with offset - matching iOS (12.dp offset)
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .offset(y = Dimensions.mediumLarge)  // 12.dp offset
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .offset(y = Dimensions.mediumLarge),
     ) {
         HorizontalDivider(
             thickness = Dimensions.strokeThin,
-            color = MaterialTheme.colorScheme.outline
+            color = MaterialTheme.colorScheme.outline,
         )
     }
 }
@@ -435,17 +442,18 @@ fun ModelInfoBar(
 @Composable
 fun MessageBubbleView(
     message: ChatMessage,
-    isGenerating: Boolean = false
+    isGenerating: Boolean = false,
 ) {
-    val alignment = if (message.role == MessageRole.USER) {
-        Arrangement.End
-    } else {
-        Arrangement.Start
-    }
+    val alignment =
+        if (message.role == MessageRole.USER) {
+            Arrangement.End
+        } else {
+            Arrangement.Start
+        }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = alignment
+        horizontalArrangement = alignment,
     ) {
         // Spacer for alignment
         if (message.role == MessageRole.USER) {
@@ -454,17 +462,18 @@ fun MessageBubbleView(
 
         Column(
             modifier = Modifier.widthIn(max = Dimensions.messageBubbleMaxWidth),
-            horizontalAlignment = if (message.role == MessageRole.USER) {
-                Alignment.End
-            } else {
-                Alignment.Start
-            }
+            horizontalAlignment =
+                if (message.role == MessageRole.USER) {
+                    Alignment.End
+                } else {
+                    Alignment.Start
+                },
         ) {
             // Model badge (for assistant messages) - matching iOS
             if (message.role == MessageRole.ASSISTANT && message.modelInfo != null) {
                 ModelBadge(
                     modelName = message.modelInfo.modelName,
-                    framework = message.modelInfo.framework
+                    framework = message.modelInfo.framework,
                 )
                 Spacer(modifier = Modifier.height(Dimensions.small))
             }
@@ -473,7 +482,7 @@ fun MessageBubbleView(
             message.thinkingContent?.let { thinking ->
                 ThinkingToggle(
                     thinkingContent = thinking,
-                    isGenerating = isGenerating
+                    isGenerating = isGenerating,
                 )
                 Spacer(modifier = Modifier.height(Dimensions.small))
             }
@@ -495,41 +504,46 @@ fun MessageBubbleView(
                 val isUserMessage = message.role == MessageRole.USER
 
                 Box(
-                    modifier = Modifier
-                        .shadow(
-                            elevation = Dimensions.messageBubbleShadowRadius,
-                            shape = bubbleShape
-                        )
-                        .clip(bubbleShape)
-                        .background(
-                            brush = if (isUserMessage) {
-                                AppColors.userBubbleGradient()
-                            } else {
-                                AppColors.assistantBubbleGradientThemed()
-                            }
-                        )
-                        .border(
-                            width = Dimensions.strokeThin,
-                            color = if (isUserMessage) {
-                                AppColors.borderLight
-                            } else {
-                                AppColors.borderMedium
-                            },
-                            shape = bubbleShape
-                        )
+                    modifier =
+                        Modifier
+                            .shadow(
+                                elevation = Dimensions.messageBubbleShadowRadius,
+                                shape = bubbleShape,
+                            )
+                            .clip(bubbleShape)
+                            .background(
+                                brush =
+                                    if (isUserMessage) {
+                                        AppColors.userBubbleGradient()
+                                    } else {
+                                        AppColors.assistantBubbleGradientThemed()
+                                    },
+                            )
+                            .border(
+                                width = Dimensions.strokeThin,
+                                color =
+                                    if (isUserMessage) {
+                                        AppColors.borderLight
+                                    } else {
+                                        AppColors.borderMedium
+                                    },
+                                shape = bubbleShape,
+                            ),
                 ) {
                     Text(
                         text = message.content,
                         style = MaterialTheme.typography.bodyLarge,
-                        color = if (isUserMessage) {
-                            AppColors.textWhite
-                        } else {
-                            AppColors.assistantBubbleTextColor()
-                        },
-                        modifier = Modifier.padding(
-                            horizontal = Dimensions.messageBubblePaddingHorizontal,
-                            vertical = Dimensions.messageBubblePaddingVertical
-                        )
+                        color =
+                            if (isUserMessage) {
+                                AppColors.textWhite
+                            } else {
+                                AppColors.assistantBubbleTextColor()
+                            },
+                        modifier =
+                            Modifier.padding(
+                                horizontal = Dimensions.messageBubblePaddingHorizontal,
+                                vertical = Dimensions.messageBubblePaddingVertical,
+                            ),
                     )
                 }
             }
@@ -539,7 +553,7 @@ fun MessageBubbleView(
                 Spacer(modifier = Modifier.height(Dimensions.small))
                 AnalyticsFooter(
                     analytics = message.analytics,
-                    hasThinking = message.thinkingContent != null
+                    hasThinking = message.thinkingContent != null,
                 )
             }
 
@@ -550,7 +564,7 @@ fun MessageBubbleView(
                     text = formatTimestamp(message.timestamp),
                     style = AppTypography.caption2,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.align(Alignment.End)
+                    modifier = Modifier.align(Alignment.End),
                 )
             }
         }
@@ -579,46 +593,50 @@ private fun formatTimestamp(timestamp: Long): String {
 @Composable
 fun ModelBadge(
     modelName: String,
-    framework: com.runanywhere.sdk.models.enums.LLMFramework
+    framework: String? = null,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.primary,
         shape = RoundedCornerShape(Dimensions.modelBadgeCornerRadius),
-        modifier = Modifier
-            .shadow(
-                elevation = Dimensions.shadowSmall,
-                shape = RoundedCornerShape(Dimensions.modelBadgeCornerRadius)
-            )
-            .border(
-                width = Dimensions.strokeThin,
-                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(Dimensions.modelBadgeCornerRadius)
-            )
+        modifier =
+            Modifier
+                .shadow(
+                    elevation = Dimensions.shadowSmall,
+                    shape = RoundedCornerShape(Dimensions.modelBadgeCornerRadius),
+                )
+                .border(
+                    width = Dimensions.strokeThin,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(Dimensions.modelBadgeCornerRadius),
+                ),
     ) {
         Row(
-            modifier = Modifier.padding(
-                horizontal = Dimensions.modelBadgePaddingHorizontal,
-                vertical = Dimensions.modelBadgePaddingVertical
-            ),
+            modifier =
+                Modifier.padding(
+                    horizontal = Dimensions.modelBadgePaddingHorizontal,
+                    vertical = Dimensions.modelBadgePaddingVertical,
+                ),
             horizontalArrangement = Arrangement.spacedBy(Dimensions.modelBadgeSpacing),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 imageVector = Icons.Default.ViewInAr,
                 contentDescription = null,
                 modifier = Modifier.size(AppTypography.caption2.fontSize.value.dp),
-                tint = MaterialTheme.colorScheme.onPrimary
+                tint = MaterialTheme.colorScheme.onPrimary,
             )
             Text(
                 text = modelName,
                 style = AppTypography.caption2Medium,
-                color = MaterialTheme.colorScheme.onPrimary
+                color = MaterialTheme.colorScheme.onPrimary,
             )
-            Text(
-                text = framework.displayName,
-                style = AppTypography.caption2,
-                color = MaterialTheme.colorScheme.onPrimary
-            )
+            if (framework != null) {
+                Text(
+                    text = framework,
+                    style = AppTypography.caption2,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+            }
         }
     }
 }
@@ -636,9 +654,10 @@ private fun extractThinkingSummary(thinking: String): String {
     if (trimmed.isEmpty()) return "Show reasoning..."
 
     // Extract first meaningful sentence
-    val sentences = trimmed.split(Regex("[.!?]"))
-        .map { it.trim() }
-        .filter { it.length > 20 }
+    val sentences =
+        trimmed.split(Regex("[.!?]"))
+            .map { it.trim() }
+            .filter { it.length > 20 }
 
     // If we have at least 2 sentences and first is meaningful, use it
     if (sentences.size >= 2 && sentences[0].length > 20) {
@@ -668,22 +687,23 @@ fun ThinkingProgressIndicator() {
     val thinkingShape = RoundedCornerShape(Dimensions.thinkingSectionCornerRadius)
 
     Box(
-        modifier = Modifier
-            .clip(thinkingShape)
-            .background(brush = AppColors.thinkingProgressGradient())
-            .border(
-                width = Dimensions.strokeThin,
-                color = AppColors.thinkingBorder,
-                shape = thinkingShape
-            )
-            .padding(
-                horizontal = Dimensions.thinkingSectionPaddingHorizontal,
-                vertical = Dimensions.thinkingSectionPaddingVertical
-            )
+        modifier =
+            Modifier
+                .clip(thinkingShape)
+                .background(brush = AppColors.thinkingProgressGradient())
+                .border(
+                    width = Dimensions.strokeThin,
+                    color = AppColors.thinkingBorder,
+                    shape = thinkingShape,
+                )
+                .padding(
+                    horizontal = Dimensions.thinkingSectionPaddingHorizontal,
+                    vertical = Dimensions.thinkingSectionPaddingVertical,
+                ),
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             // Animated dots (matching iOS)
             repeat(3) { index ->
@@ -691,25 +711,27 @@ fun ThinkingProgressIndicator() {
                 val scale by infiniteTransition.animateFloat(
                     initialValue = 0.5f,
                     targetValue = 1.0f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(600),
-                        repeatMode = RepeatMode.Reverse,
-                        initialStartOffset = StartOffset(index * 200)
-                    ),
-                    label = "thinking_dot_$index"
+                    animationSpec =
+                        infiniteRepeatable(
+                            animation = tween(600),
+                            repeatMode = RepeatMode.Reverse,
+                            initialStartOffset = StartOffset(index * 200),
+                        ),
+                    label = "thinking_dot_$index",
                 )
 
                 Box(
-                    modifier = Modifier
-                        .size(Dimensions.small)
-                        .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                        }
-                        .background(
-                            color = AppColors.primaryPurple,
-                            shape = CircleShape
-                        )
+                    modifier =
+                        Modifier
+                            .size(Dimensions.small)
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                            }
+                            .background(
+                                color = AppColors.primaryPurple,
+                                shape = CircleShape,
+                            ),
                 )
             }
 
@@ -718,7 +740,7 @@ fun ThinkingProgressIndicator() {
             Text(
                 text = "Thinking...",
                 style = AppTypography.caption,
-                color = AppColors.primaryPurple.copy(alpha = 0.8f)
+                color = AppColors.primaryPurple.copy(alpha = 0.8f),
             )
         }
     }
@@ -727,49 +749,52 @@ fun ThinkingProgressIndicator() {
 @Composable
 fun ThinkingToggle(
     thinkingContent: String,
-    isGenerating: Boolean
+    @Suppress("UNUSED_PARAMETER") isGenerating: Boolean,
 ) {
     var isExpanded by remember { mutableStateOf(false) }
 
     // Extract intelligent summary like iOS
-    val thinkingSummary = remember(thinkingContent) {
-        extractThinkingSummary(thinkingContent)
-    }
+    val thinkingSummary =
+        remember(thinkingContent) {
+            extractThinkingSummary(thinkingContent)
+        }
 
     Column {
         // Toggle button with gradient background matching iOS
         val toggleShape = RoundedCornerShape(Dimensions.thinkingSectionCornerRadius)
 
         Box(
-            modifier = Modifier
-                .clickable { isExpanded = !isExpanded }
-                .shadow(
-                    elevation = Dimensions.shadowSmall,
-                    shape = toggleShape,
-                    ambientColor = AppColors.shadowThinking,
-                    spotColor = AppColors.shadowThinking
-                )
-                .clip(toggleShape)
-                .background(brush = AppColors.thinkingBackgroundGradient())
-                .border(
-                    width = Dimensions.strokeThin,
-                    color = AppColors.thinkingBorder,
-                    shape = toggleShape
-                )
+            modifier =
+                Modifier
+                    .clickable { isExpanded = !isExpanded }
+                    .shadow(
+                        elevation = Dimensions.shadowSmall,
+                        shape = toggleShape,
+                        ambientColor = AppColors.shadowThinking,
+                        spotColor = AppColors.shadowThinking,
+                    )
+                    .clip(toggleShape)
+                    .background(brush = AppColors.thinkingBackgroundGradient())
+                    .border(
+                        width = Dimensions.strokeThin,
+                        color = AppColors.thinkingBorder,
+                        shape = toggleShape,
+                    ),
         ) {
             Row(
-                modifier = Modifier.padding(
-                    horizontal = Dimensions.thinkingSectionPaddingHorizontal,
-                    vertical = Dimensions.thinkingSectionPaddingVertical
-                ),
+                modifier =
+                    Modifier.padding(
+                        horizontal = Dimensions.thinkingSectionPaddingHorizontal,
+                        vertical = Dimensions.thinkingSectionPaddingVertical,
+                    ),
                 horizontalArrangement = Arrangement.spacedBy(Dimensions.toolbarButtonSpacing),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
                     imageVector = Icons.Default.Lightbulb,
                     contentDescription = null,
                     modifier = Modifier.size(AppTypography.caption.fontSize.value.dp),
-                    tint = AppColors.primaryPurple
+                    tint = AppColors.primaryPurple,
                 )
                 Text(
                     text = if (isExpanded) "Hide reasoning" else thinkingSummary,
@@ -777,13 +802,13 @@ fun ThinkingToggle(
                     color = AppColors.primaryPurple,
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Icon(
                     imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowRight,
                     contentDescription = null,
                     modifier = Modifier.size(AppTypography.caption2.fontSize.value.dp),
-                    tint = AppColors.primaryPurple.copy(alpha = 0.6f)
+                    tint = AppColors.primaryPurple.copy(alpha = 0.6f),
                 )
             }
         }
@@ -792,23 +817,24 @@ fun ThinkingToggle(
         AnimatedVisibility(
             visible = isExpanded,
             enter = fadeIn(animationSpec = tween(250)) + expandVertically(),
-            exit = fadeOut(animationSpec = tween(250)) + shrinkVertically()
+            exit = fadeOut(animationSpec = tween(250)) + shrinkVertically(),
         ) {
             Column {
                 Spacer(modifier = Modifier.height(Dimensions.small))
                 Surface(
                     color = AppColors.thinkingContentBackground,
-                    shape = RoundedCornerShape(Dimensions.thinkingContentCornerRadius)
+                    shape = RoundedCornerShape(Dimensions.thinkingContentCornerRadius),
                 ) {
                     Box(
-                        modifier = Modifier
-                            .heightIn(max = Dimensions.thinkingContentMaxHeight)
-                            .padding(Dimensions.thinkingContentPadding)
+                        modifier =
+                            Modifier
+                                .heightIn(max = Dimensions.thinkingContentMaxHeight)
+                                .padding(Dimensions.thinkingContentPadding),
                     ) {
                         Text(
                             text = thinkingContent,
                             style = AppTypography.caption,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -824,24 +850,24 @@ fun ThinkingToggle(
 @Composable
 fun AnalyticsFooter(
     analytics: com.runanywhere.runanywhereai.domain.models.MessageAnalytics,
-    hasThinking: Boolean
+    hasThinking: Boolean,
 ) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(Dimensions.smallMedium),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         // Timestamp
         Text(
             text = formatTimestamp(analytics.timestamp),
             style = AppTypography.caption2,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         // Separator
         Text(
             text = "•",
             style = AppTypography.caption2,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
         )
 
         // Duration
@@ -849,12 +875,12 @@ fun AnalyticsFooter(
             Text(
                 text = "${ttft / 1000f}s",
                 style = AppTypography.caption2,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 text = "•",
                 style = AppTypography.caption2,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
             )
         }
 
@@ -862,7 +888,7 @@ fun AnalyticsFooter(
         Text(
             text = String.format("%.1f tok/s", analytics.averageTokensPerSecond),
             style = AppTypography.caption2,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         // Thinking indicator
@@ -870,13 +896,13 @@ fun AnalyticsFooter(
             Text(
                 text = "•",
                 style = AppTypography.caption2,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
             )
             Icon(
                 imageVector = Icons.Default.Lightbulb,
                 contentDescription = null,
                 modifier = Modifier.size(AppTypography.caption2.fontSize.value.dp),
-                tint = MaterialTheme.colorScheme.secondary
+                tint = MaterialTheme.colorScheme.secondary,
             )
         }
     }
@@ -890,29 +916,31 @@ fun AnalyticsFooter(
 fun TypingIndicatorView() {
     Row(
         modifier = Modifier.widthIn(max = Dimensions.messageBubbleMaxWidth),
-        horizontalArrangement = Arrangement.Start
+        horizontalArrangement = Arrangement.Start,
     ) {
         Surface(
             color = MaterialTheme.colorScheme.surfaceVariant,
             shape = RoundedCornerShape(Dimensions.typingIndicatorCornerRadius),
-            modifier = Modifier
-                .shadow(
-                    elevation = Dimensions.shadowMedium,
-                    shape = RoundedCornerShape(Dimensions.typingIndicatorCornerRadius)
-                )
-                .border(
-                    width = Dimensions.strokeThin,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(Dimensions.typingIndicatorCornerRadius)
-                )
+            modifier =
+                Modifier
+                    .shadow(
+                        elevation = Dimensions.shadowMedium,
+                        shape = RoundedCornerShape(Dimensions.typingIndicatorCornerRadius),
+                    )
+                    .border(
+                        width = Dimensions.strokeThin,
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f),
+                        shape = RoundedCornerShape(Dimensions.typingIndicatorCornerRadius),
+                    ),
         ) {
             Row(
-                modifier = Modifier.padding(
-                    horizontal = Dimensions.typingIndicatorPaddingHorizontal,
-                    vertical = Dimensions.typingIndicatorPaddingVertical
-                ),
+                modifier =
+                    Modifier.padding(
+                        horizontal = Dimensions.typingIndicatorPaddingHorizontal,
+                        vertical = Dimensions.typingIndicatorPaddingVertical,
+                    ),
                 horizontalArrangement = Arrangement.spacedBy(Dimensions.typingIndicatorDotSpacing),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Animated dots
                 repeat(3) { index ->
@@ -920,25 +948,27 @@ fun TypingIndicatorView() {
                     val scale by infiniteTransition.animateFloat(
                         initialValue = 0.8f,
                         targetValue = 1.3f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(600),
-                            repeatMode = RepeatMode.Reverse,
-                            initialStartOffset = StartOffset(index * 200)
-                        ),
-                        label = "dot_scale_$index"
+                        animationSpec =
+                            infiniteRepeatable(
+                                animation = tween(600),
+                                repeatMode = RepeatMode.Reverse,
+                                initialStartOffset = StartOffset(index * 200),
+                            ),
+                        label = "dot_scale_$index",
                     )
 
                     Box(
-                        modifier = Modifier
-                            .size(Dimensions.typingIndicatorDotSize)
-                            .graphicsLayer {
-                                scaleX = scale
-                                scaleY = scale
-                            }
-                            .background(
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                                shape = CircleShape
-                            )
+                        modifier =
+                            Modifier
+                                .size(Dimensions.typingIndicatorDotSize)
+                                .graphicsLayer {
+                                    scaleX = scale
+                                    scaleY = scale
+                                }
+                                .background(
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                    shape = CircleShape,
+                                ),
                     )
                 }
 
@@ -948,7 +978,7 @@ fun TypingIndicatorView() {
                 Text(
                     text = "AI is thinking...",
                     style = AppTypography.caption,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                 )
             }
         }
@@ -964,21 +994,22 @@ fun TypingIndicatorView() {
 @Composable
 fun EmptyStateView(
     isModelLoaded: Boolean,
-    modelName: String?
+    @Suppress("UNUSED_PARAMETER") modelName: String?,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(Dimensions.huge),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(Dimensions.huge),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Center,
     ) {
         // Icon
         Icon(
             imageVector = if (isModelLoaded) Icons.Default.Chat else Icons.Default.Download,
             contentDescription = null,
             modifier = Modifier.size(Dimensions.emptyStateIconSize),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
         )
 
         Spacer(modifier = Modifier.height(Dimensions.emptyStateIconTextSpacing))
@@ -987,21 +1018,22 @@ fun EmptyStateView(
         Text(
             text = "Start a conversation",
             style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
 
         Spacer(modifier = Modifier.height(Dimensions.emptyStateTitleSubtitleSpacing))
 
         // Subtitle
         Text(
-            text = if (isModelLoaded) {
-                "Type a message below to get started"
-            } else {
-                "Select a model first, then start chatting"
-            },
+            text =
+                if (isModelLoaded) {
+                    "Type a message below to get started"
+                } else {
+                    "Select a model first, then start chatting"
+                },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -1011,34 +1043,33 @@ fun EmptyStateView(
 // ====================
 
 @Composable
-fun ModelSelectionPrompt(
-    onSelectModel: () -> Unit
-) {
+fun ModelSelectionPrompt(onSelectModel: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.primaryContainer
+        color = MaterialTheme.colorScheme.primaryContainer,
     ) {
         Column(
             modifier = Modifier.padding(Dimensions.mediumLarge),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(Dimensions.smallMedium)
+            verticalArrangement = Arrangement.spacedBy(Dimensions.smallMedium),
         ) {
             Text(
                 text = "Welcome! Select and download a model to start chatting.",
                 style = AppTypography.caption,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
 
             Button(
                 onClick = onSelectModel,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                    ),
             ) {
                 Text(
                     text = "Select Model",
-                    style = AppTypography.caption
+                    style = AppTypography.caption,
                 )
             }
         }
@@ -1054,21 +1085,22 @@ fun ChatInputView(
     value: String,
     onValueChange: (String) -> Unit,
     onSend: () -> Unit,
-    enabled: Boolean,
+    @Suppress("UNUSED_PARAMETER") enabled: Boolean,
     isGenerating: Boolean,
-    isModelLoaded: Boolean
+    isModelLoaded: Boolean,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 8.dp
+        shadowElevation = 8.dp,
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Dimensions.inputAreaPadding),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(Dimensions.inputAreaPadding),
             horizontalArrangement = Arrangement.spacedBy(Dimensions.inputFieldButtonSpacing),
-            verticalAlignment = Alignment.Bottom
+            verticalAlignment = Alignment.Bottom,
         ) {
             // Text field
             TextField(
@@ -1077,25 +1109,27 @@ fun ChatInputView(
                 modifier = Modifier.weight(1f),
                 placeholder = {
                     Text(
-                        text = when {
-                            !isModelLoaded -> "Load a model first..."
-                            isGenerating -> "Generating..."
-                            else -> "Type a message..."
-                        },
-                        style = MaterialTheme.typography.bodyLarge
+                        text =
+                            when {
+                                !isModelLoaded -> "Load a model first..."
+                                isGenerating -> "Generating..."
+                                else -> "Type a message..."
+                            },
+                        style = MaterialTheme.typography.bodyLarge,
                     )
                 },
                 enabled = isModelLoaded && !isGenerating,
                 textStyle = MaterialTheme.typography.bodyLarge,
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    disabledContainerColor = Color.Transparent,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    disabledIndicatorColor = Color.Transparent
-                ),
-                maxLines = 4
+                colors =
+                    TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        disabledContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        disabledIndicatorColor = Color.Transparent,
+                    ),
+                maxLines = 4,
             )
 
             // Send button
@@ -1103,23 +1137,24 @@ fun ChatInputView(
             IconButton(
                 onClick = onSend,
                 enabled = canSendMessage,
-                modifier = Modifier.size(Dimensions.sendButtonSize)
+                modifier = Modifier.size(Dimensions.sendButtonSize),
             ) {
                 Icon(
                     imageVector = Icons.Default.ArrowUpward,
                     contentDescription = "Send",
                     tint = Color.White,
-                    modifier = Modifier
-                        .size(Dimensions.sendButtonSize)
-                        .clip(CircleShape)
-                        .background(
-                            if (canSendMessage) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                            }
-                        )
-                        .padding(6.dp)
+                    modifier =
+                        Modifier
+                            .size(Dimensions.sendButtonSize)
+                            .clip(CircleShape)
+                            .background(
+                                if (canSendMessage) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                                },
+                            )
+                            .padding(6.dp),
                 )
             }
         }
@@ -1139,38 +1174,41 @@ fun ConversationListSheet(
     onDismiss: () -> Unit,
     onConversationSelected: (Conversation) -> Unit,
     onNewConversation: () -> Unit,
-    onDeleteConversation: (Conversation) -> Unit
+    onDeleteConversation: (Conversation) -> Unit,
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var conversationToDelete by remember { mutableStateOf<Conversation?>(null) }
 
-    val filteredConversations = remember(conversations, searchQuery) {
-        if (searchQuery.isEmpty()) {
-            conversations
-        } else {
-            conversations.filter { conversation ->
-                conversation.title?.lowercase()?.contains(searchQuery.lowercase()) == true ||
+    val filteredConversations =
+        remember(conversations, searchQuery) {
+            if (searchQuery.isEmpty()) {
+                conversations
+            } else {
+                conversations.filter { conversation ->
+                    conversation.title?.lowercase()?.contains(searchQuery.lowercase()) == true ||
                         conversation.messages.any { it.content.lowercase().contains(searchQuery.lowercase()) }
+                }
             }
         }
-    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.85f)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.85f),
         ) {
             // Header
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 TextButton(onClick = onDismiss) {
                     Text("Done")
@@ -1178,13 +1216,13 @@ fun ConversationListSheet(
 
                 Text(
                     text = "Conversations",
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
                 )
 
                 IconButton(onClick = onNewConversation) {
                     Icon(
                         imageVector = Icons.Default.Add,
-                        contentDescription = "New Conversation"
+                        contentDescription = "New Conversation",
                     )
                 }
             }
@@ -1197,7 +1235,7 @@ fun ConversationListSheet(
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Search,
-                        contentDescription = null
+                        contentDescription = null,
                     )
                 },
                 trailingIcon = {
@@ -1205,43 +1243,45 @@ fun ConversationListSheet(
                         IconButton(onClick = { searchQuery = "" }) {
                             Icon(
                                 imageVector = Icons.Default.Clear,
-                                contentDescription = "Clear"
+                                contentDescription = "Clear",
                             )
                         }
                     }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
             )
 
             // Conversation list
             if (filteredConversations.isEmpty()) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = if (searchQuery.isEmpty()) "No conversations yet" else "No results found",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             } else {
                 LazyColumn(
                     modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 ) {
                     items(filteredConversations, key = { it.id }) { conversation ->
                         ConversationRow(
                             conversation = conversation,
                             isSelected = conversation.id == currentConversationId,
                             onClick = { onConversationSelected(conversation) },
-                            onDelete = { conversationToDelete = conversation }
+                            onDelete = { conversationToDelete = conversation },
                         )
                     }
                 }
@@ -1260,7 +1300,7 @@ fun ConversationListSheet(
                     onClick = {
                         onDeleteConversation(conversation)
                         conversationToDelete = null
-                    }
+                    },
                 ) {
                     Text("Delete", color = MaterialTheme.colorScheme.error)
                 }
@@ -1269,7 +1309,7 @@ fun ConversationListSheet(
                 TextButton(onClick = { conversationToDelete = null }) {
                     Text("Cancel")
                 }
-            }
+            },
         )
     }
 }
@@ -1279,27 +1319,30 @@ private fun ConversationRow(
     conversation: Conversation,
     isSelected: Boolean,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
 ) {
     val dateFormatter = remember { SimpleDateFormat("MMM d", Locale.getDefault()) }
 
     Surface(
         onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
         shape = RoundedCornerShape(12.dp),
-        color = if (isSelected) {
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-        } else {
-            Color.Transparent
-        }
+        color =
+            if (isSelected) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+            } else {
+                Color.Transparent
+            },
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 // Title
@@ -1307,19 +1350,20 @@ private fun ConversationRow(
                     text = conversation.title ?: "New Chat",
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
 
                 // Last message preview
                 Text(
-                    text = conversation.messages.lastOrNull()?.content?.take(100)
-                        ?: "Start a conversation",
+                    text =
+                        conversation.messages.lastOrNull()?.content?.take(100)
+                            ?: "Start a conversation",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -1327,7 +1371,7 @@ private fun ConversationRow(
                 // Summary and date
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val messageCount = conversation.messages.size
                     val userMessages = conversation.messages.count { it.role == MessageRole.USER }
@@ -1336,7 +1380,7 @@ private fun ConversationRow(
                     Text(
                         text = "$messageCount messages • $userMessages from you, $aiMessages from AI",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     )
 
                     Spacer(modifier = Modifier.weight(1f))
@@ -1344,7 +1388,7 @@ private fun ConversationRow(
                     Text(
                         text = dateFormatter.format(Date(conversation.updatedAt)),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     )
                 }
             }
@@ -1354,7 +1398,7 @@ private fun ConversationRow(
                 Icon(
                     imageVector = Icons.Default.Delete,
                     contentDescription = "Delete",
-                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
                 )
             }
         }
@@ -1372,40 +1416,43 @@ fun ChatDetailsSheet(
     messages: List<ChatMessage>,
     conversationTitle: String,
     modelName: String?,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
-    val analyticsMessages = remember(messages) {
-        messages.filter { it.analytics != null }
-    }
+    val analyticsMessages =
+        remember(messages) {
+            messages.filter { it.analytics != null }
+        }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.75f)
-                .padding(horizontal = 16.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.75f)
+                    .padding(horizontal = 16.dp),
         ) {
             // Header
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onDismiss) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Close"
+                        contentDescription = "Close",
                     )
                 }
 
                 Text(
                     text = "Chat Details",
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
                 )
 
                 Spacer(modifier = Modifier.width(48.dp)) // Balance the back button
@@ -1416,7 +1463,7 @@ fun ChatDetailsSheet(
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = PaddingValues(vertical = 16.dp)
+                contentPadding = PaddingValues(vertical = 16.dp),
             ) {
                 // Conversation Info Section
                 item {
@@ -1425,11 +1472,11 @@ fun ChatDetailsSheet(
                         DetailsRow(label = "Messages", value = "${messages.size}")
                         DetailsRow(
                             label = "User Messages",
-                            value = "${messages.count { it.role == MessageRole.USER }}"
+                            value = "${messages.count { it.role == MessageRole.USER }}",
                         )
                         DetailsRow(
                             label = "AI Responses",
-                            value = "${messages.count { it.role == MessageRole.ASSISTANT }}"
+                            value = "${messages.count { it.role == MessageRole.ASSISTANT }}",
                         )
                         modelName?.let {
                             DetailsRow(label = "Model", value = it)
@@ -1441,34 +1488,38 @@ fun ChatDetailsSheet(
                 if (analyticsMessages.isNotEmpty()) {
                     item {
                         DetailsSection(title = "Performance Summary") {
-                            val avgTTFT = analyticsMessages
-                                .mapNotNull { it.analytics?.timeToFirstToken }
-                                .average()
-                                .takeIf { !it.isNaN() }
+                            val avgTTFT =
+                                analyticsMessages
+                                    .mapNotNull { it.analytics?.timeToFirstToken }
+                                    .average()
+                                    .takeIf { !it.isNaN() }
 
-                            val avgSpeed = analyticsMessages
-                                .mapNotNull { it.analytics?.averageTokensPerSecond }
-                                .average()
-                                .takeIf { !it.isNaN() }
+                            val avgSpeed =
+                                analyticsMessages
+                                    .mapNotNull { it.analytics?.averageTokensPerSecond }
+                                    .average()
+                                    .takeIf { !it.isNaN() }
 
-                            val totalTokens = analyticsMessages
-                                .mapNotNull { it.analytics }
-                                .sumOf { it.inputTokens + it.outputTokens }
+                            val totalTokens =
+                                analyticsMessages
+                                    .mapNotNull { it.analytics }
+                                    .sumOf { it.inputTokens + it.outputTokens }
 
-                            val thinkingCount = analyticsMessages
-                                .count { it.analytics?.wasThinkingMode == true }
+                            val thinkingCount =
+                                analyticsMessages
+                                    .count { it.analytics?.wasThinkingMode == true }
 
                             avgTTFT?.let {
                                 DetailsRow(
                                     label = "Avg Time to First Token",
-                                    value = String.format("%.2fs", it / 1000.0)
+                                    value = String.format("%.2fs", it / 1000.0),
                                 )
                             }
 
                             avgSpeed?.let {
                                 DetailsRow(
                                     label = "Avg Generation Speed",
-                                    value = String.format("%.1f tok/s", it)
+                                    value = String.format("%.1f tok/s", it),
                                 )
                             }
 
@@ -1477,7 +1528,7 @@ fun ChatDetailsSheet(
                             if (thinkingCount > 0) {
                                 DetailsRow(
                                     label = "Thinking Mode Usage",
-                                    value = "$thinkingCount/${analyticsMessages.size} responses"
+                                    value = "$thinkingCount/${analyticsMessages.size} responses",
                                 )
                             }
                         }
@@ -1490,7 +1541,7 @@ fun ChatDetailsSheet(
                         Text(
                             text = "Message Analytics",
                             style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.primary,
                         )
                     }
 
@@ -1499,7 +1550,7 @@ fun ChatDetailsSheet(
                             MessageAnalyticsCard(
                                 messagePreview = message.content.take(50) + if (message.content.length > 50) "..." else "",
                                 analytics = analytics,
-                                hasThinking = message.thinkingContent != null
+                                hasThinking = message.thinkingContent != null,
                             )
                         }
                     }
@@ -1512,21 +1563,21 @@ fun ChatDetailsSheet(
 @Composable
 private fun DetailsSection(
     title: String,
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
             )
             content()
         }
@@ -1536,21 +1587,21 @@ private fun DetailsSection(
 @Composable
 private fun DetailsRow(
     label: String,
-    value: String
+    value: String,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }
@@ -1559,20 +1610,21 @@ private fun DetailsRow(
 private fun MessageAnalyticsCard(
     messagePreview: String,
     analytics: com.runanywhere.runanywhereai.domain.models.MessageAnalytics,
-    hasThinking: Boolean
+    hasThinking: Boolean,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-        )
+        border =
+            androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+            ),
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // Message preview
             Text(
@@ -1580,7 +1632,7 @@ private fun MessageAnalyticsCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
             )
 
             HorizontalDivider()
@@ -1588,17 +1640,17 @@ private fun MessageAnalyticsCard(
             // Analytics grid
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column {
                     Text(
                         text = "Tokens",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
                         text = "${analytics.outputTokens}",
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
                     )
                 }
 
@@ -1606,11 +1658,11 @@ private fun MessageAnalyticsCard(
                     Text(
                         text = "Speed",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
                         text = String.format("%.1f tok/s", analytics.averageTokensPerSecond),
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
                     )
                 }
 
@@ -1618,11 +1670,11 @@ private fun MessageAnalyticsCard(
                     Text(
                         text = "Time",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
                         text = String.format("%.2fs", analytics.totalGenerationTime / 1000.0),
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
                     )
                 }
 
@@ -1631,7 +1683,7 @@ private fun MessageAnalyticsCard(
                         imageVector = Icons.Default.Lightbulb,
                         contentDescription = "Thinking mode",
                         modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.secondary
+                        tint = MaterialTheme.colorScheme.secondary,
                     )
                 }
             }

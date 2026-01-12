@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.detekt)
+    alias(libs.plugins.ktlint)
 }
 
 android {
@@ -30,8 +31,8 @@ android {
         applicationId = "com.runanywhere.runanywhereai"
         minSdk = 24
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.1.0"
+        versionCode = 11
+        versionName = "0.1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -73,7 +74,7 @@ android {
 
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
 
             // Build configuration fields
@@ -124,27 +125,31 @@ android {
     // Packaging options
     packaging {
         resources {
-            excludes += listOf(
-                "/META-INF/{AL2.0,LGPL2.1}",
-                "/META-INF/DEPENDENCIES",
-                "/META-INF/LICENSE",
-                "/META-INF/LICENSE.txt",
-                "/META-INF/NOTICE",
-                "/META-INF/NOTICE.txt",
-                "/META-INF/licenses/**",
-                "/META-INF/AL2.0",
-                "/META-INF/LGPL2.1",
-                "**/kotlin/**",
-                "kotlin/**",
-                "META-INF/kotlin/**",
-                "META-INF/*.kotlin_module",
-                "META-INF/INDEX.LIST"
-            )
+            excludes +=
+                listOf(
+                    "/META-INF/{AL2.0,LGPL2.1}",
+                    "/META-INF/DEPENDENCIES",
+                    "/META-INF/LICENSE",
+                    "/META-INF/LICENSE.txt",
+                    "/META-INF/NOTICE",
+                    "/META-INF/NOTICE.txt",
+                    "/META-INF/licenses/**",
+                    "/META-INF/AL2.0",
+                    "/META-INF/LGPL2.1",
+                    "**/kotlin/**",
+                    "kotlin/**",
+                    "META-INF/kotlin/**",
+                    "META-INF/*.kotlin_module",
+                    "META-INF/INDEX.LIST",
+                )
         }
 
         jniLibs {
             // Use legacy packaging to extract libraries to filesystem
             // This helps with symbol resolution for transitive dependencies
+            // CRITICAL: useLegacyPackaging = true is REQUIRED for 16KB page size support
+            // when using AGP < 8.5.1. With AGP 8.5.1+, this ensures proper extraction
+            // and 16KB alignment during packaging.
             useLegacyPackaging = true
             // NOTE: pickFirsts no longer needed!
             // All native libraries now come from the unified runanywhere-core-native module,
@@ -173,13 +178,14 @@ android {
         jvmTarget = "17"
 
         // Kotlin compiler optimizations
-        freeCompilerArgs += listOf(
-            "-opt-in=kotlin.RequiresOptIn",
-            "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
-            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
-            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
-            "-Xjvm-default=all"
-        )
+        freeCompilerArgs +=
+            listOf(
+                "-opt-in=kotlin.RequiresOptIn",
+                "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
+                "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+                "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
+                "-Xjvm-default=all",
+            )
     }
 
     buildFeatures {
@@ -219,8 +225,8 @@ dependencies {
 
     // Backend modules - each is SELF-CONTAINED with all native libs
     // Pick the backends you need:
-    implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-llamacpp"))  // ~45MB - LLM text generation
-    implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-onnx"))      // ~30MB - STT, TTS, VAD
+    implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-llamacpp")) // ~45MB - LLM text generation
+    implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-onnx")) // ~30MB - STT, TTS, VAD
 
     // ========================================
     // AndroidX Core & Lifecycle

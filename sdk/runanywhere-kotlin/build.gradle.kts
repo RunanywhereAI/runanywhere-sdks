@@ -4,11 +4,81 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.detekt)
+    alias(libs.plugins.ktlint)
     id("maven-publish")
 }
 
+// =============================================================================
+// Detekt Configuration
+// =============================================================================
+detekt {
+    buildUponDefaultConfig = true
+    allRules = false
+    config.setFrom(files("detekt.yml"))
+    source.setFrom(
+        "src/commonMain/kotlin",
+        "src/jvmMain/kotlin",
+        "src/jvmAndroidMain/kotlin",
+        "src/androidMain/kotlin",
+    )
+}
+
+// =============================================================================
+// ktlint Configuration
+// =============================================================================
+ktlint {
+    version.set("1.5.0")
+    android.set(true)
+    verbose.set(true)
+    outputToConsole.set(true)
+    enableExperimentalRules.set(false)
+    filter {
+        exclude("**/generated/**")
+        include("**/kotlin/**")
+    }
+}
+
 group = "com.runanywhere.sdk"
-version = "0.1.3"
+version = "0.1.4"
+
+// =============================================================================
+// Local vs Remote JNI Library Configuration
+// =============================================================================
+// testLocal = true  → Use locally built JNI libs from src/androidMain/jniLibs/
+//                     Run: ./scripts/build-local.sh to build and copy libs
+//
+// testLocal = false → Download pre-built JNI libs from GitHub releases (default)
+//                     Downloads from: https://github.com/RunanywhereAI/runanywhere-binaries/releases
+//
+// Mirrors Swift SDK's Package.swift testLocal pattern
+// =============================================================================
+// IMPORTANT: Check rootProject first to support composite builds (e.g., when SDK is included from example app)
+// This ensures the app's gradle.properties takes precedence over the SDK's default
+val testLocal: Boolean =
+    rootProject.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
+        ?: project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
+        ?: false
+
+// Version constants for remote downloads (mirrors Swift's Package.swift)
+// These should match the releases at:
+// - https://github.com/RunanywhereAI/runanywhere-binaries/releases (Android JNI libs for backends)
+// - https://github.com/RunanywhereAI/runanywhere-sdks/releases (Android JNI libs for commons)
+// IMPORTANT: Check rootProject first to support composite builds
+// Version defaults must match GitHub releases:
+// - Commons: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/commons-v{commonsVersion}
+// - Backends: https://github.com/RunanywhereAI/runanywhere-binaries/releases/tag/core-v{coreVersion}
+val coreVersion: String =
+    rootProject.findProperty("runanywhere.coreVersion")?.toString()
+        ?: project.findProperty("runanywhere.coreVersion")?.toString()
+        ?: "0.1.4"
+val commonsVersion: String =
+    rootProject.findProperty("runanywhere.commonsVersion")?.toString()
+        ?: project.findProperty("runanywhere.commonsVersion")?.toString()
+        ?: "0.1.4"
+
+// Log the build mode
+logger.lifecycle("RunAnywhere SDK: testLocal=$testLocal, coreVersion=$coreVersion")
 
 // =============================================================================
 // Project Path Resolution
@@ -22,11 +92,12 @@ version = "0.1.3"
 // - When SDK is at ":sdk:runanywhere-kotlin": path → ":sdk:runanywhere-kotlin:modules:$moduleName"
 fun resolveModulePath(moduleName: String): String {
     val basePath = project.path
-    val computedPath = if (basePath == ":") {
-        ":modules:$moduleName"
-    } else {
-        "$basePath:modules:$moduleName"
-    }
+    val computedPath =
+        if (basePath == ":") {
+            ":modules:$moduleName"
+        } else {
+            "$basePath:modules:$moduleName"
+        }
 
     // Try to find the project using rootProject to handle Android Studio sync ordering
     val foundProject = rootProject.findProject(computedPath)
@@ -114,7 +185,10 @@ kotlin {
                 implementation(libs.okhttp.logging)
                 implementation(libs.gson)
                 implementation(libs.commons.io)
+                implementation(libs.commons.compress)
                 implementation(libs.ktor.client.okhttp)
+                // Error tracking - Sentry (matches iOS SDK SentryDestination)
+                implementation(libs.sentry)
             }
         }
 
@@ -132,16 +206,14 @@ kotlin {
         androidMain {
             dependsOn(jvmAndroidMain)
             dependencies {
-                // Unified native library package (all backends)
-                api(project(resolveModulePath("runanywhere-core-native")))
+                // Native libs (.so files) are included directly in jniLibs/
+                // Built from runanywhere-commons/scripts/build-android.sh
 
                 implementation(libs.androidx.core.ktx)
                 implementation(libs.kotlinx.coroutines.android)
                 implementation(libs.android.vad.webrtc)
                 implementation(libs.prdownloader)
                 implementation(libs.androidx.work.runtime.ktx)
-                implementation(libs.androidx.room.runtime)
-                implementation(libs.androidx.room.ktx)
                 implementation(libs.androidx.security.crypto)
                 implementation(libs.retrofit)
                 implementation(libs.retrofit.gson)
@@ -172,7 +244,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }
@@ -181,59 +253,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-
-    testOptions {
-        unitTests {
-            isIncludeAndroidResources = true
-        }
-    }
-}
-
-// JaCoCo configuration for code coverage
-// Note: JaCoCo works with JVM tests. For full KMP coverage, consider using Kover plugin.
-apply(plugin = "jacoco")
-
-configure<org.gradle.testing.jacoco.plugins.JacocoExtension> {
-    toolVersion = "0.8.11"
-}
-
-tasks.register<org.gradle.testing.jacoco.tasks.JacocoReport>("jacocoTestReport") {
-    dependsOn("jvmTest", "testDebugUnitTest")
-
-    reports {
-        xml.required.set(true)
-        html.required.set(true)
-        csv.required.set(false)
-    }
-
-    // Collect execution data from JVM tests
-    val jvmTestTask = tasks.named<Test>("jvmTest")
-    executionData(jvmTestTask)
-
-    // Collect execution data from Android unit tests if available
-    val androidTestTask = tasks.findByName("testDebugUnitTest")
-    if (androidTestTask != null) {
-        executionData(androidTestTask)
-    }
-
-    sourceDirectories.setFrom(
-        files(
-            kotlin.sourceSets.getByName("commonMain").kotlin.srcDirs,
-            kotlin.sourceSets.getByName("jvmMain").kotlin.srcDirs,
-            kotlin.sourceSets.getByName("androidMain").kotlin.srcDirs
-        )
-    )
-
-    classDirectories.setFrom(
-        files(
-            fileTree(layout.buildDirectory.dir("classes/kotlin/jvm/main")) {
-                exclude("**/R.class", "**/R\$*.class", "**/BuildConfig.class")
-            },
-            fileTree(layout.buildDirectory.dir("classes/kotlin/android/main")) {
-                exclude("**/R.class", "**/R\$*.class", "**/BuildConfig.class")
-            }
-        )
-    )
 }
 
 // Include third-party licenses in JVM JAR

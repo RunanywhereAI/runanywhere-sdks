@@ -1,10 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
-import '../../core/design_system/app_colors.dart';
-import '../../core/design_system/app_spacing.dart';
-import '../../core/design_system/typography.dart';
-import '../../core/models/app_types.dart';
-import 'model_types.dart';
+import 'package:runanywhere_ai/core/design_system/app_colors.dart';
+import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
+import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/models/app_types.dart';
+import 'package:runanywhere_ai/features/models/model_types.dart';
 
 /// ModelStatusBanner (mirroring iOS ModelStatusBanner)
 ///
@@ -414,7 +416,8 @@ class _TypingIndicatorViewState extends State<TypingIndicatorView>
     _controller = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
-    )..repeat();
+    );
+    unawaited(_controller.repeat());
   }
 
   @override

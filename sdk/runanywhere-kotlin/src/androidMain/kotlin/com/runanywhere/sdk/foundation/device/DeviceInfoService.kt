@@ -11,7 +11,6 @@ import com.runanywhere.sdk.storage.AndroidPlatformContext
  * Collects device information using Android APIs
  */
 actual class DeviceInfoService {
-
     private val context: Context? by lazy {
         if (AndroidPlatformContext.isInitialized()) {
             AndroidPlatformContext.applicationContext
@@ -20,13 +19,9 @@ actual class DeviceInfoService {
         }
     }
 
-    actual fun getOSName(): String {
-        return "Android"
-    }
+    actual fun getOSName(): String = "Android"
 
-    actual fun getOSVersion(): String {
-        return Build.VERSION.RELEASE
-    }
+    actual fun getOSVersion(): String = Build.VERSION.RELEASE
 
     actual fun getDeviceModel(): String {
         val manufacturer = Build.MANUFACTURER
@@ -38,8 +33,8 @@ actual class DeviceInfoService {
         }
     }
 
-    actual fun getChipName(): String? {
-        return try {
+    actual fun getChipName(): String? =
+        try {
             // Get primary ABI (architecture)
             val abis = Build.SUPPORTED_ABIS
             if (abis.isNotEmpty()) {
@@ -50,13 +45,13 @@ actual class DeviceInfoService {
         } catch (e: Exception) {
             null
         }
-    }
 
     actual fun getTotalMemoryGB(): Double? {
         return try {
             val ctx = context ?: return null
-            val activityManager = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-                ?: return null
+            val activityManager =
+                ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+                    ?: return null
 
             val memInfo = ActivityManager.MemoryInfo()
             activityManager.getMemoryInfo(memInfo)
@@ -71,8 +66,9 @@ actual class DeviceInfoService {
     actual fun getTotalMemoryBytes(): Long? {
         return try {
             val ctx = context ?: return null
-            val activityManager = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-                ?: return null
+            val activityManager =
+                ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+                    ?: return null
 
             val memInfo = ActivityManager.MemoryInfo()
             activityManager.getMemoryInfo(memInfo)
@@ -84,8 +80,8 @@ actual class DeviceInfoService {
         }
     }
 
-    actual fun getArchitecture(): String? {
-        return try {
+    actual fun getArchitecture(): String? =
+        try {
             // Get primary ABI (architecture) - same as chip name for Android
             val abis = Build.SUPPORTED_ABIS
             if (abis.isNotEmpty()) {
@@ -96,5 +92,4 @@ actual class DeviceInfoService {
         } catch (e: Exception) {
             null
         }
-    }
 }

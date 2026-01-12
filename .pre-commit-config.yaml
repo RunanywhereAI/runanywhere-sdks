@@ -42,12 +42,26 @@ repos:
         files: ^examples/android/RunAnywhereAI/.*\.(kt|kts|java|xml)$
         pass_filenames: false
 
-  # SwiftLint for iOS SDK
+  # SwiftLint for iOS SDK (with autofix)
   - repo: local
     hooks:
+      - id: ios-sdk-swiftlint-fix
+        name: iOS SDK SwiftLint AutoFix
+        entry: bash -c 'cd sdk/runanywhere-swift && if which swiftlint >/dev/null; then swiftlint --fix --quiet 2>/dev/null || true; else echo "SwiftLint not installed"; fi'
+        language: system
+        files: ^sdk/runanywhere-swift/.*\.swift$
+        pass_filenames: false
+
       - id: ios-sdk-swiftlint
         name: iOS SDK SwiftLint
-        entry: bash -c 'cd sdk/runanywhere-swift && if which swiftlint >/dev/null; then swiftlint --quiet --reporter csv 2>/dev/null || true; else echo "SwiftLint not installed"; exit 0; fi'
+        entry: bash -c 'cd sdk/runanywhere-swift && if which swiftlint >/dev/null; then swiftlint --strict; else echo "SwiftLint not installed"; exit 0; fi'
+        language: system
+        files: ^sdk/runanywhere-swift/.*\.swift$
+        pass_filenames: false
+
+      - id: ios-sdk-periphery
+        name: iOS SDK Periphery (Unused Code)
+        entry: bash -c 'cd sdk/runanywhere-swift && if which periphery >/dev/null; then OUTPUT=$(periphery scan --targets RunAnywhere --targets ONNXRuntime --targets LlamaCPPRuntime --targets FoundationModelsAdapter --targets FluidAudioDiarization 2>&1); WARNINGS=$(echo "$OUTPUT" | grep "warning:" | grep -v "Associatedtype .* is unused"); if [ -n "$WARNINGS" ]; then echo "$WARNINGS"; echo "Periphery found unused code"; exit 1; fi; exit 0; else echo "Periphery not installed"; exit 0; fi'
         language: system
         files: ^sdk/runanywhere-swift/.*\.swift$
         pass_filenames: false
@@ -66,10 +80,12 @@ repos:
 default_language_version:
   python: python3
 
-# Skip these hooks during CI
+# Skip these hooks during CI (they run in dedicated CI jobs)
 ci:
   skip:
     - android-sdk-lint
     - android-app-lint
+    - ios-sdk-swiftlint-fix
     - ios-sdk-swiftlint
+    - ios-sdk-periphery
     - ios-app-swiftlint

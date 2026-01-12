@@ -33,8 +33,11 @@ The Flutter SDK provides Dart bindings for on-device AI with platform channels f
   <a href="https://www.youtube.com/watch?v=GG100ijJHl4">
     <img src="https://img.shields.io/badge/▶️_Watch_Demo-red?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch Demo" />
   </a>
-  <a href="https://testflight.apple.com/join/xc4HVVJE">
-    <img src="https://img.shields.io/badge/📱_Try_iOS_App-blue?style=for-the-badge&logo=apple&logoColor=white" alt="Try on TestFlight" />
+  <a href="https://apps.apple.com/us/app/runanywhere/id6756506307">
+    <img src="https://img.shields.io/badge/📱_Try_iOS_App-blue?style=for-the-badge&logo=apple&logoColor=white" alt="Try it" />
+  </a>
+  <a href="https://play.google.com/store/apps/details?id=com.runanywhere.runanywhereai">
+    <img src="https://img.shields.io/badge/%F0%9F%9A%BAndroid_App-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Try it" />
   </a>
   <a href="https://runanywhere.ai">
     <img src="https://img.shields.io/badge/🌐_Visit_Website-green?style=for-the-badge" alt="Visit Website" />
@@ -544,7 +547,7 @@ and acknowledgments, including:
 
 ## 💬 Community & Support
 
-- **Discord**: [Join our community](https://discord.gg/pxRkYmWh)
+- **Discord**: [Join our community](https://discord.gg/N359FBbDVd)
 - **GitHub Issues**: [Report bugs or request features](https://github.com/RunanywhereAI/runanywhere-sdks/issues)
 - **Email**: founders@runanywhere.ai
 - **Twitter**: [@RunanywhereAI](https://twitter.com/RunanywhereAI)
@@ -559,3 +562,5 @@ Built with ❤️ by the RunAnywhere team. Special thanks to:
 ---
 
 **Ready to build privacy-first AI apps?** [Get started with our iOS SDK →](sdk/runanywhere-swift/)
+
+
