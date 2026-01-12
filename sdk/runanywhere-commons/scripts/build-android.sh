@@ -27,12 +27,12 @@
 set -e  # Exit on error
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 BUILD_DIR="${ROOT_DIR}/build/android"
 DIST_DIR="${ROOT_DIR}/dist/android"
 
 # Load centralized versions
-source "${SCRIPT_DIR}/../load-versions.sh"
+source "${SCRIPT_DIR}/load-versions.sh"
 
 # Colors
 RED='\033[0;31m'
@@ -338,12 +338,13 @@ for ABI in "${ABI_ARRAY[@]}"; do
         -DANDROID_PLATFORM="android-${ANDROID_API_LEVEL}" \
         -DANDROID_STL=c++_shared \
         -DCMAKE_BUILD_TYPE=Release \
-        -DRA_BUILD_ONNX=${BUILD_ONNX} \
-        -DRA_BUILD_LLAMACPP=${BUILD_LLAMACPP} \
-        -DRA_BUILD_WHISPERCPP=${BUILD_WHISPERCPP} \
-        -DRA_BUILD_TFLITE=${BUILD_TFLITE} \
-        -DRA_BUILD_TESTS=OFF \
-        -DRA_BUILD_SHARED=ON \
+        -DRAC_BUILD_BACKENDS=ON \
+        -DRAC_BUILD_JNI=ON \
+        -DRAC_BACKEND_ONNX=${BUILD_ONNX} \
+        -DRAC_BACKEND_LLAMACPP=${BUILD_LLAMACPP} \
+        -DRAC_BACKEND_WHISPERCPP=${BUILD_WHISPERCPP} \
+        -DRAC_BUILD_TESTS=OFF \
+        -DRAC_BUILD_SHARED=ON \
         -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON \
         -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384" \
         "${ROOT_DIR}"
@@ -360,13 +361,20 @@ for ABI in "${ABI_ARRAY[@]}"; do
 
     # Copy JNI bridge libraries (always to jni/ directory)
     print_step "Copying JNI bridge libraries for ${ABI}..."
+
+    # Core JNI library (from src/jni subdirectory)
+    if [ -f "${ABI_BUILD_DIR}/src/jni/librunanywhere_jni.so" ]; then
+        cp "${ABI_BUILD_DIR}/src/jni/librunanywhere_jni.so" "${JNI_DIST_DIR}/${ABI}/"
+        echo "  Copied: librunanywhere_jni.so -> jni/${ABI}/"
+    elif [ -f "${ABI_BUILD_DIR}/librunanywhere_jni.so" ]; then
+        cp "${ABI_BUILD_DIR}/librunanywhere_jni.so" "${JNI_DIST_DIR}/${ABI}/"
+        echo "  Copied: librunanywhere_jni.so -> jni/${ABI}/"
+    fi
+
+    # Legacy loader/bridge libraries (if present)
     if [ -f "${ABI_BUILD_DIR}/librunanywhere_loader.so" ]; then
         cp "${ABI_BUILD_DIR}/librunanywhere_loader.so" "${JNI_DIST_DIR}/${ABI}/"
         echo "  Copied: librunanywhere_loader.so -> jni/${ABI}/"
-    fi
-    if [ -f "${ABI_BUILD_DIR}/librunanywhere_jni.so" ]; then
-        cp "${ABI_BUILD_DIR}/librunanywhere_jni.so" "${JNI_DIST_DIR}/${ABI}/"
-        echo "  Copied: librunanywhere_jni.so -> jni/${ABI}/"
     fi
     if [ -f "${ABI_BUILD_DIR}/librunanywhere_bridge.so" ]; then
         cp "${ABI_BUILD_DIR}/librunanywhere_bridge.so" "${JNI_DIST_DIR}/${ABI}/"
@@ -428,13 +436,20 @@ for ABI in "${ABI_ARRAY[@]}"; do
     # ONNX backend
     if [ "$BUILD_ONNX" = "ON" ]; then
         mkdir -p "${DIST_DIR}/onnx/${ABI}"
-        if [ -f "${ABI_BUILD_DIR}/backends/onnx/librunanywhere_onnx.so" ]; then
+        # Check both paths (backends/ for older builds, src/backends/ for current)
+        if [ -f "${ABI_BUILD_DIR}/src/backends/onnx/librac_backend_onnx.so" ]; then
+            cp "${ABI_BUILD_DIR}/src/backends/onnx/librac_backend_onnx.so" "${DIST_DIR}/onnx/${ABI}/"
+            echo "  Copied: librac_backend_onnx.so -> onnx/${ABI}/"
+        elif [ -f "${ABI_BUILD_DIR}/backends/onnx/librunanywhere_onnx.so" ]; then
             cp "${ABI_BUILD_DIR}/backends/onnx/librunanywhere_onnx.so" "${DIST_DIR}/onnx/${ABI}/"
             echo "  Copied: librunanywhere_onnx.so -> onnx/${ABI}/"
         fi
 
         # Copy JNI bridge library (required for Kotlin SDK)
-        if [ -f "${ABI_BUILD_DIR}/backends/onnx/librac_backend_onnx_jni.so" ]; then
+        if [ -f "${ABI_BUILD_DIR}/src/backends/onnx/librac_backend_onnx_jni.so" ]; then
+            cp "${ABI_BUILD_DIR}/src/backends/onnx/librac_backend_onnx_jni.so" "${DIST_DIR}/onnx/${ABI}/"
+            echo "  Copied: librac_backend_onnx_jni.so -> onnx/${ABI}/"
+        elif [ -f "${ABI_BUILD_DIR}/backends/onnx/librac_backend_onnx_jni.so" ]; then
             cp "${ABI_BUILD_DIR}/backends/onnx/librac_backend_onnx_jni.so" "${DIST_DIR}/onnx/${ABI}/"
             echo "  Copied: librac_backend_onnx_jni.so -> onnx/${ABI}/"
         else
@@ -467,13 +482,20 @@ for ABI in "${ABI_ARRAY[@]}"; do
     # LlamaCPP backend
     if [ "$BUILD_LLAMACPP" = "ON" ]; then
         mkdir -p "${DIST_DIR}/llamacpp/${ABI}"
-        if [ -f "${ABI_BUILD_DIR}/backends/llamacpp/librunanywhere_llamacpp.so" ]; then
+        # Check both paths (backends/ for older builds, src/backends/ for current)
+        if [ -f "${ABI_BUILD_DIR}/src/backends/llamacpp/librac_backend_llamacpp.so" ]; then
+            cp "${ABI_BUILD_DIR}/src/backends/llamacpp/librac_backend_llamacpp.so" "${DIST_DIR}/llamacpp/${ABI}/"
+            echo "  Copied: librac_backend_llamacpp.so -> llamacpp/${ABI}/"
+        elif [ -f "${ABI_BUILD_DIR}/backends/llamacpp/librunanywhere_llamacpp.so" ]; then
             cp "${ABI_BUILD_DIR}/backends/llamacpp/librunanywhere_llamacpp.so" "${DIST_DIR}/llamacpp/${ABI}/"
             echo "  Copied: librunanywhere_llamacpp.so -> llamacpp/${ABI}/"
         fi
 
         # Copy JNI bridge library (required for Kotlin SDK)
-        if [ -f "${ABI_BUILD_DIR}/backends/llamacpp/librac_backend_llamacpp_jni.so" ]; then
+        if [ -f "${ABI_BUILD_DIR}/src/backends/llamacpp/librac_backend_llamacpp_jni.so" ]; then
+            cp "${ABI_BUILD_DIR}/src/backends/llamacpp/librac_backend_llamacpp_jni.so" "${DIST_DIR}/llamacpp/${ABI}/"
+            echo "  Copied: librac_backend_llamacpp_jni.so -> llamacpp/${ABI}/"
+        elif [ -f "${ABI_BUILD_DIR}/backends/llamacpp/librac_backend_llamacpp_jni.so" ]; then
             cp "${ABI_BUILD_DIR}/backends/llamacpp/librac_backend_llamacpp_jni.so" "${DIST_DIR}/llamacpp/${ABI}/"
             echo "  Copied: librac_backend_llamacpp_jni.so -> llamacpp/${ABI}/"
         else

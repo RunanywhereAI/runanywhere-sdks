@@ -116,7 +116,8 @@ if(RAC_PLATFORM_IOS)
 elseif(RAC_PLATFORM_ANDROID)
     message(STATUS "Configuring LlamaCPP backend for Android")
     target_link_libraries(rac_backend_llamacpp PRIVATE log)
-    target_compile_options(rac_backend_llamacpp PRIVATE -O3 -fvisibility=hidden -ffunction-sections -fdata-sections)
+    # Don't use -fvisibility=hidden here - JNI bridge needs these symbols
+    target_compile_options(rac_backend_llamacpp PRIVATE -O3 -ffunction-sections -fdata-sections)
     target_link_options(rac_backend_llamacpp PRIVATE -Wl,--gc-sections)
 
 elseif(RAC_PLATFORM_MACOS)
