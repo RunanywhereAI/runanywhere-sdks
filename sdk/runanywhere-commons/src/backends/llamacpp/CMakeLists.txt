@@ -38,6 +38,7 @@ if(RAC_PLATFORM_IOS)
     set(GGML_METAL ON CACHE BOOL "" FORCE)
     set(GGML_ACCELERATE ON CACHE BOOL "" FORCE)
     set(GGML_NEON ON CACHE BOOL "" FORCE)
+    set(GGML_METAL_EMBED_LIBRARY ON CACHE BOOL "" FORCE)  # Embed precompiled Metal shaders
 elseif(RAC_PLATFORM_ANDROID)
     set(GGML_METAL OFF CACHE BOOL "" FORCE)
     set(GGML_NEON ON CACHE BOOL "" FORCE)
@@ -45,6 +46,7 @@ elseif(RAC_PLATFORM_ANDROID)
 elseif(RAC_PLATFORM_MACOS)
     set(GGML_METAL ON CACHE BOOL "" FORCE)
     set(GGML_ACCELERATE ON CACHE BOOL "" FORCE)
+    set(GGML_METAL_EMBED_LIBRARY ON CACHE BOOL "" FORCE)  # Embed precompiled Metal shaders
 endif()
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Force static libraries for llama.cpp" FORCE)
@@ -79,10 +81,12 @@ endif()
 
 target_include_directories(rac_backend_llamacpp PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include                 # Public headers (include/rac/backends/*)
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/include/rac/backends
     ${llamacpp_SOURCE_DIR}/include
     ${llamacpp_SOURCE_DIR}/common
     ${llamacpp_SOURCE_DIR}/ggml/include
+    ${llamacpp_SOURCE_DIR}/vendor               # nlohmann/json.hpp
 )
 
 target_compile_definitions(rac_backend_llamacpp PRIVATE RAC_LLAMACPP_BUILDING)
