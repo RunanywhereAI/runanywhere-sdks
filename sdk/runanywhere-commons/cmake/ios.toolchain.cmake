@@ -13,14 +13,21 @@ if(NOT DEFINED IOS_PLATFORM)
 endif()
 
 # Deployment target
+# The VERSIONS file is the SINGLE SOURCE OF TRUTH for this value.
 # This can be set via:
 #   1. CMake variable: -DIOS_DEPLOYMENT_TARGET=13.0
-#   2. Environment variable (set by build scripts from VERSIONS file)
-# Default matches VERSIONS file - keep in sync!
+#   2. Environment variable (set by build scripts via: source scripts/load-versions.sh)
+#
+# IMPORTANT: Build scripts should always source load-versions.sh which exports
+# IOS_DEPLOYMENT_TARGET from VERSIONS file to the environment.
 if(NOT DEFINED IOS_DEPLOYMENT_TARGET)
     if(DEFINED ENV{IOS_DEPLOYMENT_TARGET})
         set(IOS_DEPLOYMENT_TARGET "$ENV{IOS_DEPLOYMENT_TARGET}" CACHE STRING "iOS deployment target version")
     else()
+        # Fallback value - should match VERSIONS file (IOS_DEPLOYMENT_TARGET=13.0)
+        # This is only used if build scripts don't source load-versions.sh
+        message(WARNING "IOS_DEPLOYMENT_TARGET not set via environment. Using fallback value. "
+                       "Build scripts should source scripts/load-versions.sh to get version from VERSIONS file.")
         set(IOS_DEPLOYMENT_TARGET "13.0" CACHE STRING "iOS deployment target version")
     endif()
 endif()

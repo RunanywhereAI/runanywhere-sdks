@@ -28,15 +28,15 @@ def getExtOrIntegerDefault(name) {
 
 // =============================================================================
 // Version Constants (MUST match Swift Package.swift and iOS Podspec)
-// RABackendLlamaCPP from runanywhere-binaries
+// RABackendLlamaCPP from runanywhere-sdks
 // =============================================================================
 def coreVersion = "0.1.4"
 
 // =============================================================================
-// Binary Source - RABackendLlamaCPP from runanywhere-binaries
+// Binary Source - RABackendLlamaCPP from runanywhere-sdks
 // =============================================================================
 def githubOrg = "RunanywhereAI"
-def coreRepo = "runanywhere-binaries"
+def coreRepo = "runanywhere-sdks"
 
 // =============================================================================
 // testLocal Toggle
@@ -163,7 +163,7 @@ task downloadNativeLibs {
         jniLibsDir.mkdirs()
 
         // =============================================================================
-        // Download RABackendLlamaCPP from runanywhere-binaries
+        // Download RABackendLlamaCPP from runanywhere-sdks
         // =============================================================================
         def llamacppUrl = "https://github.com/${githubOrg}/${coreRepo}/releases/download/core-v${coreVersion}/RABackendLlamaCPP-android-v${coreVersion}.zip"
         def llamacppZip = file("${downloadedLibsDir}/RABackendLlamaCPP.zip")

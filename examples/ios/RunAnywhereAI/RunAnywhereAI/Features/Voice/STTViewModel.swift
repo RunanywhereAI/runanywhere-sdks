@@ -54,8 +54,12 @@ class STTViewModel: ObservableObject {
 
     private var audioBuffer = Data()
 
-    /// SDK-managed live transcription session (handles audio capture + streaming internally)
-    private var liveSession: LiveTranscriptionSession?
+    /// For live mode: VAD-based transcription
+    private var lastSpeechTime: Date?
+    private var isSpeechActive = false
+    private var silenceCheckTask: Task<Void, Never>?
+    private let speechThreshold: Float = 0.02  // Audio level threshold for speech detection
+    private let silenceDuration: TimeInterval = 1.5  // Seconds of silence before transcribing
 
     // MARK: - Initialization State (for idempotency)
 
@@ -215,6 +219,8 @@ class STTViewModel: ObservableObject {
         errorMessage = nil
         audioBuffer = Data()
         transcription = ""
+        lastSpeechTime = nil
+        isSpeechActive = false
 
         guard selectedModelId != nil else {
             errorMessage = "No STT model loaded"
@@ -222,18 +228,20 @@ class STTViewModel: ObservableObject {
         }
 
         do {
-            if selectedMode == .live {
-                // Live mode: Use SDK's LiveTranscriptionSession (handles audio capture internally)
-                try await startLiveTranscription()
-            } else {
-                // Batch mode: Collect audio for later transcription
-                try audioCapture.startRecording { [weak self] audioData in
-                    Task { @MainActor in
-                        self?.audioBuffer.append(audioData)
-                    }
+            // Both modes use audio capture - live mode adds VAD-based auto-transcription
+            try audioCapture.startRecording { [weak self] audioData in
+                Task { @MainActor in
+                    self?.audioBuffer.append(audioData)
                 }
             }
+            
             isRecording = true
+            
+            if selectedMode == .live {
+                // Live mode: Start VAD monitoring for auto-transcription
+                startVADMonitoring()
+            }
+            
             logger.info("Recording started in \(self.selectedMode.rawValue) mode")
         } catch {
             logger.error("Failed to start recording: \(error.localizedDescription)")
@@ -244,17 +252,22 @@ class STTViewModel: ObservableObject {
     private func stopRecording() async {
         logger.info("Stopping recording")
 
-        if selectedMode == .live {
-            // Live mode: Stop SDK session (handles audio cleanup internally)
-            await stopLiveTranscription()
-        } else {
-            // Batch mode: Stop audio capture and perform transcription
-            audioCapture.stopRecording()
+        // Stop VAD monitoring if active
+        silenceCheckTask?.cancel()
+        silenceCheckTask = nil
+        
+        // Stop audio capture
+        audioCapture.stopRecording()
+        
+        // Perform final transcription if we have audio
+        if !audioBuffer.isEmpty {
             await performBatchTranscription()
         }
 
         isRecording = false
         audioLevel = 0.0
+        isSpeechActive = false
+        lastSpeechTime = nil
     }
 
     // MARK: - Private Methods - Transcription
@@ -282,56 +295,84 @@ class STTViewModel: ObservableObject {
         isTranscribing = false
     }
 
-    /// Start live streaming transcription using SDK's LiveTranscriptionSession
-    private func startLiveTranscription() async throws {
-        logger.info("Starting live transcription via SDK")
-
-        // Start session
-        let session = try await RunAnywhere.startLiveTranscription()
-        self.liveSession = session
-
-        // Bind directly to SDK's published properties instead of manually iterating streams
-        // This eliminates state duplication and uses the SDK's reactive bindings
-
-        // Bind audio level directly from session
-        session.$audioLevel
-            .receive(on: DispatchQueue.main)
-            .assign(to: &$audioLevel)
-
-        // Bind transcription text directly from session's published property
-        session.$currentText
-            .receive(on: DispatchQueue.main)
-            .assign(to: &$transcription)
-
-        // Bind isActive to isTranscribing (session manages this state)
-        session.$isActive
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] isActive in
-                self?.isTranscribing = isActive
-                if !isActive {
-                    self?.logger.info("Live transcription completed")
+    /// Start VAD monitoring for live mode
+    /// Automatically transcribes when silence is detected after speech
+    private func startVADMonitoring() {
+        logger.info("Starting VAD monitoring for live transcription")
+        
+        silenceCheckTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self = self, await self.isRecording else { break }
+                
+                let level = await self.audioLevel
+                await self.checkSpeechState(level: level)
+                
+                try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
+            }
+        }
+    }
+    
+    /// Check speech state and auto-transcribe on silence
+    private func checkSpeechState(level: Float) async {
+        guard isRecording, selectedMode == .live else { return }
+        
+        if level > speechThreshold {
+            // Speech detected
+            if !isSpeechActive {
+                logger.debug("Speech started")
+                isSpeechActive = true
+            }
+            lastSpeechTime = Date()
+        } else if isSpeechActive {
+            // Check for silence duration
+            if let lastSpeech = lastSpeechTime, 
+               Date().timeIntervalSince(lastSpeech) > silenceDuration {
+                logger.debug("Silence detected - auto-transcribing")
+                isSpeechActive = false
+                
+                // Only transcribe if we have enough audio (~0.5s at 16kHz)
+                if audioBuffer.count > 16000 {
+                    await performLiveTranscription()
+                } else {
+                    audioBuffer = Data()
                 }
             }
-            .store(in: &cancellables)
-
-        // Bind error from session to propagate transcription errors
-        session.$error
-            .receive(on: DispatchQueue.main)
-            .compactMap { $0?.localizedDescription }
-            .sink { [weak self] errorDescription in
-                self?.errorMessage = "Transcription error: \(errorDescription)"
+        }
+    }
+    
+    /// Perform transcription for live mode (keeps recording going)
+    private func performLiveTranscription() async {
+        let audio = audioBuffer
+        audioBuffer = Data()  // Clear buffer for next utterance
+        
+        guard !audio.isEmpty else { return }
+        
+        logger.info("Live transcription of \(audio.count) bytes")
+        isTranscribing = true
+        
+        do {
+            let result = try await RunAnywhere.transcribe(audio)
+            // Append to existing transcription with newline
+            if !transcription.isEmpty {
+                transcription += "\n"
             }
-            .store(in: &cancellables)
+            transcription += result
+            logger.info("Live transcription result: \(result)")
+        } catch {
+            logger.error("Live transcription failed: \(error.localizedDescription)")
+            errorMessage = "Transcription failed: \(error.localizedDescription)"
+        }
+        
+        isTranscribing = false
     }
 
-    /// Stop live streaming transcription
+    /// Stop live transcription (called when mode changes)
     private func stopLiveTranscription() async {
         logger.info("Stopping live transcription")
-
-        await liveSession?.stop()
-        liveSession = nil
-
-        // Note: isTranscribing is automatically set to false via session.$isActive binding
+        silenceCheckTask?.cancel()
+        silenceCheckTask = nil
+        isSpeechActive = false
+        lastSpeechTime = nil
     }
 
     // MARK: - Cleanup
@@ -341,11 +382,9 @@ class STTViewModel: ObservableObject {
     func cleanup() {
         audioCapture.stopRecording()
 
-        // Clean up live transcription session
-        Task { @MainActor in
-            await liveSession?.stop()
-            liveSession = nil
-        }
+        // Clean up VAD monitoring
+        silenceCheckTask?.cancel()
+        silenceCheckTask = nil
 
         cancellables.removeAll()
 
@@ -373,7 +412,7 @@ enum STTMode: String {
     var description: String {
         switch self {
         case .batch: return "Record first, then transcribe"
-        case .live: return "Real-time transcription"
+        case .live: return "Auto-transcribe on silence"
         }
     }
 }

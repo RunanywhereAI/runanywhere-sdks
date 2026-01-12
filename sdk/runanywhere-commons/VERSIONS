@@ -2,7 +2,9 @@
 # RunAnywhere Commons - Dependency Versions
 # =============================================================================
 # This file is the SINGLE SOURCE OF TRUTH for all dependency versions.
-# All scripts and CMake files should read from this file.
+# All scripts and CMake files should read from this file via:
+#   - Shell scripts: source scripts/load-versions.sh
+#   - CMake: include(LoadVersions)
 #
 # IMPORTANT: These versions MUST match runanywhere-core/VERSIONS
 # The ONNX Runtime version used here must match what's in runanywhere-swift/Binaries/
@@ -38,21 +40,39 @@ XCODE_VERSION=15.4
 # sherpa-onnx 1.12.17+ requires ONNX Runtime >= 1.17.1
 ONNX_VERSION_IOS=1.17.1
 
-# macOS/Linux can use latest
+# Android version - used by Sherpa-ONNX, must be compatible
+ONNX_VERSION_ANDROID=1.17.1
+
+# macOS version (can use latest)
 ONNX_VERSION_MACOS=1.23.2
+
+# Linux version (can use latest)
+ONNX_VERSION_LINUX=1.23.2
 
 # =============================================================================
 # Sherpa-ONNX (via runanywhere-core)
 # =============================================================================
+# iOS version
 SHERPA_ONNX_VERSION_IOS=1.12.18
+
+# Android version (v1.12.20+ has 16KB alignment for Play Store)
+SHERPA_ONNX_VERSION_ANDROID=1.12.20
+
+# macOS version
 SHERPA_ONNX_VERSION_MACOS=1.12.18
 
 # =============================================================================
-# llama.cpp (via runanywhere-core)
+# llama.cpp (LLM inference)
 # =============================================================================
-LLAMACPP_VERSION=b7199
+# b7658 - latest release with vulkan improvements and bug fixes
+LLAMACPP_VERSION=b7658
 
 # =============================================================================
 # nlohmann/json
 # =============================================================================
 NLOHMANN_JSON_VERSION=3.11.3
+
+# =============================================================================
+# RAC Commons Version (for remote builds/CI)
+# =============================================================================
+RAC_COMMONS_VERSION=0.1.1

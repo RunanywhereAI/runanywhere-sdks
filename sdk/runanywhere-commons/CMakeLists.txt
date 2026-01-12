@@ -29,6 +29,10 @@ option(RAC_BUILD_JNI "Build JNI bridge for Android/JVM" OFF)
 option(RAC_BUILD_TESTS "Build unit tests" OFF)
 option(RAC_BUILD_SHARED "Build shared libraries" OFF)
 option(RAC_BUILD_PLATFORM "Build platform backend (Apple Foundation Models, System TTS)" ON)
+option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, WhisperCPP)" OFF)
+option(RAC_BACKEND_LLAMACPP "Build LlamaCPP backend" ON)
+option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
+option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" ON)
 
 # =============================================================================
 # C++ CONFIGURATION
@@ -256,6 +260,29 @@ if(RAC_BUILD_JNI)
 endif()
 
 # =============================================================================
+# BACKENDS (LlamaCPP, ONNX, WhisperCPP)
+# =============================================================================
+
+if(RAC_BUILD_BACKENDS)
+    message(STATUS "Building ML backends...")
+
+    if(RAC_BACKEND_LLAMACPP AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/llamacpp/CMakeLists.txt")
+        message(STATUS "  - LlamaCPP backend")
+        add_subdirectory(src/backends/llamacpp)
+    endif()
+
+    if(RAC_BACKEND_ONNX AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/onnx/CMakeLists.txt")
+        message(STATUS "  - ONNX backend")
+        add_subdirectory(src/backends/onnx)
+    endif()
+
+    if(RAC_BACKEND_WHISPERCPP AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/whispercpp/CMakeLists.txt")
+        message(STATUS "  - WhisperCPP backend")
+        add_subdirectory(src/backends/whispercpp)
+    endif()
+endif()
+
+# =============================================================================
 # TESTS
 # =============================================================================
 
@@ -298,6 +325,9 @@ message(STATUS "  Models:       Download strategies, storage")
 message(STATUS "  Services:     LLM, STT, TTS, VAD interfaces")
 if(APPLE AND RAC_BUILD_PLATFORM)
     message(STATUS "  Platform:     Apple Foundation Models, System TTS")
+endif()
+if(RAC_BUILD_BACKENDS)
+    message(STATUS "  Backends:     LlamaCPP=${RAC_BACKEND_LLAMACPP}, ONNX=${RAC_BACKEND_ONNX}, WhisperCPP=${RAC_BACKEND_WHISPERCPP}")
 endif()
 message(STATUS "")
 message(STATUS "JNI bridge:     ${RAC_BUILD_JNI}")
