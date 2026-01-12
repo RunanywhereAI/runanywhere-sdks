@@ -1,24 +1,58 @@
 # =============================================================================
-# Native Binaries (fetched from remote or built locally)
+# RunAnywhere Flutter SDK - Git Ignore
+# =============================================================================
+# This file ignores native binaries that are downloaded/built locally.
+# These binaries should NOT be committed - they are fetched automatically
+# during build or downloaded from GitHub releases.
 # =============================================================================
 
-# iOS XCFramework - downloaded from GitHub releases or built locally
-ios/Frameworks/*.xcframework
-ios/Frameworks/*.xcframework.zip
+# =============================================================================
+# Native Binaries - iOS XCFrameworks
+# Downloaded from GitHub releases or copied from runanywhere-commons builds
+# =============================================================================
+packages/*/ios/Frameworks/*.xcframework/
+packages/*/ios/Frameworks/*.xcframework.zip
 
-# Android native libraries - downloaded from GitHub releases or built locally
-android/src/main/jniLibs/arm64-v8a/
-android/src/main/jniLibs/armeabi-v7a/
-android/src/main/jniLibs/x86_64/
-android/src/main/jniLibs/include/
+# =============================================================================
+# Native Binaries - Android JNI Libraries
+# Downloaded from GitHub releases or copied from runanywhere-commons builds
+# =============================================================================
+packages/*/android/src/main/jniLibs/arm64-v8a/
+packages/*/android/src/main/jniLibs/armeabi-v7a/
+packages/*/android/src/main/jniLibs/x86/
+packages/*/android/src/main/jniLibs/x86_64/
+packages/*/android/src/main/jniLibs/include/
+
+# =============================================================================
+# Local Mode Markers
+# Created by build-flutter.sh to indicate local binary usage
+# =============================================================================
+packages/*/ios/.testlocal
+packages/*/android/.testlocal
+
+# =============================================================================
+# Version Files
+# Created by build scripts/podspecs to track downloaded versions
+# =============================================================================
+packages/*/ios/Frameworks/.*_version
+packages/*/ios/Frameworks/.racommons_version
+packages/*/ios/Frameworks/.llamacpp_version
+packages/*/ios/Frameworks/.onnx_version
+
+# =============================================================================
+# Downloaded Headers (ONNX Runtime)
+# These come with the onnxruntime.xcframework
+# =============================================================================
+packages/*/ios/Frameworks/Headers/
+packages/*/ios/Frameworks/LICENSE
 
 # =============================================================================
 # Build artifacts
 # =============================================================================
-android/build/
-ios/build/
-.dart_tool/
-build/
+packages/*/android/build/
+packages/*/ios/build/
+packages/*/.dart_tool/
+packages/*/build/
 
 # =============================================================================
 # IDE and editor files
@@ -33,7 +67,13 @@ build/
 # =============================================================================
 # Flutter/Dart
 # =============================================================================
+.dart_tool/
 .packages
 .flutter-plugins
 .flutter-plugins-dependencies
 pubspec.lock
+
+# =============================================================================
+# macOS
+# =============================================================================
+.DS_Store
