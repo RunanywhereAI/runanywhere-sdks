@@ -62,9 +62,10 @@ SHERPA_ONNX_VERSION_ANDROID=1.12.20
 SHERPA_ONNX_VERSION_MACOS=1.12.18
 
 # =============================================================================
-# llama.cpp (via runanywhere-core)
+# llama.cpp (LLM inference)
 # =============================================================================
-LLAMACPP_VERSION=b7199
+# b7658 - latest release with vulkan improvements and bug fixes
+LLAMACPP_VERSION=b7658
 
 # =============================================================================
 # nlohmann/json

@@ -103,6 +103,58 @@ Key differentiators:
 
 ---
 
+## Local Development Setup
+
+If you're contributing to the SDK or building from source:
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
+cd runanywhere-sdks/sdk/runanywhere-swift
+
+# 2. Run first-time setup (builds all native frameworks)
+./scripts/build-swift.sh --setup
+
+# 3. Open in Xcode
+open Package.swift
+```
+
+The `--setup` command will:
+- Download ONNX Runtime & Sherpa-ONNX dependencies
+- Build `RACommons.xcframework` (core infrastructure)
+- Build `RABackendLLAMACPP.xcframework` (LLM backend)
+- Build `RABackendONNX.xcframework` (STT/TTS/VAD backend)
+- Copy frameworks to `Binaries/`
+- Set `testLocal = true` in Package.swift
+
+> **Note:** First-time setup takes 5-15 minutes. After that, you only need to re-run if you modify runanywhere-commons.
+
+### Using the Sample App
+
+To run the iOS sample app with local SDK changes:
+
+```bash
+# 1. First, setup the Swift SDK
+cd sdk/runanywhere-swift
+./scripts/build-swift.sh --setup
+
+# 2. Open the sample app
+cd ../../examples/ios/RunAnywhereAI
+open RunAnywhereAI.xcodeproj
+
+# 3. In Xcode: File > Packages > Reset Package Caches
+# 4. Build & Run!
+```
+
+### After Making Changes to runanywhere-commons
+
+```bash
+cd sdk/runanywhere-swift
+./scripts/build-swift.sh --local --build-commons
+```
+
+---
+
 ## Installation
 
 ### Swift Package Manager (SPM)

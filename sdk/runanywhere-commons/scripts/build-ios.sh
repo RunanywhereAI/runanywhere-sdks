@@ -1,0 +1,506 @@
+#!/bin/bash
+# =============================================================================
+# RunAnywhere Commons - iOS Build Script
+# =============================================================================
+#
+# Builds everything for iOS: RACommons + Backend frameworks.
+#
+# USAGE:
+#   ./scripts/build-ios.sh [options]
+#
+# OPTIONS:
+#   --skip-download     Skip downloading dependencies
+#   --skip-backends     Build RACommons only, skip backend frameworks
+#   --backend NAME      Build specific backend: llamacpp, onnx, all (default: all)
+#   --clean             Clean build directories first
+#   --release           Release build (default)
+#   --debug             Debug build
+#   --package           Create release ZIP packages
+#   --help              Show this help
+#
+# OUTPUTS:
+#   dist/RACommons.xcframework
+#   dist/RABackendLLAMACPP.xcframework
+#   dist/RABackendONNX.xcframework
+#
+# EXAMPLES:
+#   ./scripts/build-ios.sh                    # Full build
+#   ./scripts/build-ios.sh --skip-download    # Use cached dependencies
+#   ./scripts/build-ios.sh --backend llamacpp # Build only LlamaCPP backend
+#   ./scripts/build-ios.sh --clean --package  # Clean build with packaging
+#
+# =============================================================================
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+BUILD_DIR="${PROJECT_ROOT}/build/ios"
+DIST_DIR="${PROJECT_ROOT}/dist"
+
+# Load versions
+source "${SCRIPT_DIR}/load-versions.sh"
+
+# Get version
+VERSION=$(cat "${PROJECT_ROOT}/VERSION" 2>/dev/null | head -1 || echo "0.1.0")
+
+# Options
+SKIP_DOWNLOAD=false
+SKIP_BACKENDS=false
+BUILD_BACKEND="all"
+CLEAN_BUILD=false
+BUILD_TYPE="Release"
+CREATE_PACKAGE=false
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+log_info()   { echo -e "${GREEN}[✓]${NC} $1"; }
+log_warn()   { echo -e "${YELLOW}[!]${NC} $1"; }
+log_error()  { echo -e "${RED}[✗]${NC} $1"; exit 1; }
+log_step()   { echo -e "${BLUE}==>${NC} $1"; }
+log_time()   { echo -e "${CYAN}[⏱]${NC} $1"; }
+log_header() { echo -e "\n${GREEN}═══════════════════════════════════════════${NC}"; echo -e "${GREEN} $1${NC}"; echo -e "${GREEN}═══════════════════════════════════════════${NC}"; }
+
+show_help() {
+    head -35 "$0" | tail -30
+    exit 0
+}
+
+# =============================================================================
+# Parse Arguments
+# =============================================================================
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --skip-download) SKIP_DOWNLOAD=true; shift ;;
+        --skip-backends) SKIP_BACKENDS=true; shift ;;
+        --backend) BUILD_BACKEND="$2"; shift 2 ;;
+        --clean) CLEAN_BUILD=true; shift ;;
+        --release) BUILD_TYPE="Release"; shift ;;
+        --debug) BUILD_TYPE="Debug"; shift ;;
+        --package) CREATE_PACKAGE=true; shift ;;
+        --help|-h) show_help ;;
+        *) log_error "Unknown option: $1" ;;
+    esac
+done
+
+# Timing
+TOTAL_START=$(date +%s)
+
+# =============================================================================
+# Download Dependencies
+# =============================================================================
+
+download_deps() {
+    log_header "Downloading iOS Dependencies"
+
+    # ONNX Runtime
+    if [[ ! -d "${PROJECT_ROOT}/third_party/onnxruntime-ios/onnxruntime.xcframework" ]]; then
+        log_step "Downloading ONNX Runtime..."
+        "${SCRIPT_DIR}/ios/download-onnx.sh"
+    else
+        log_info "ONNX Runtime already present"
+    fi
+
+    # Sherpa-ONNX
+    if [[ ! -d "${PROJECT_ROOT}/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework" ]]; then
+        log_step "Downloading Sherpa-ONNX..."
+        "${SCRIPT_DIR}/ios/download-sherpa-onnx.sh"
+    else
+        log_info "Sherpa-ONNX already present"
+    fi
+}
+
+# =============================================================================
+# Build for iOS Platform
+# =============================================================================
+
+build_platform() {
+    local PLATFORM=$1
+    local PLATFORM_DIR="${BUILD_DIR}/${PLATFORM}"
+
+    log_step "Building for ${PLATFORM}..."
+    mkdir -p "${PLATFORM_DIR}"
+    cd "${PLATFORM_DIR}"
+
+    # Determine backend flags
+    local BACKEND_FLAGS=""
+    if [[ "$SKIP_BACKENDS" == true ]]; then
+        BACKEND_FLAGS="-DRAC_BUILD_BACKENDS=OFF"
+    else
+        BACKEND_FLAGS="-DRAC_BUILD_BACKENDS=ON"
+        case "$BUILD_BACKEND" in
+            llamacpp)
+                BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=ON -DRAC_BACKEND_ONNX=OFF -DRAC_BACKEND_WHISPERCPP=OFF"
+                ;;
+            onnx)
+                BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=OFF -DRAC_BACKEND_ONNX=ON -DRAC_BACKEND_WHISPERCPP=OFF"
+                ;;
+            all|*)
+                BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=ON -DRAC_BACKEND_ONNX=ON -DRAC_BACKEND_WHISPERCPP=OFF"
+                ;;
+        esac
+    fi
+
+    cmake "${PROJECT_ROOT}" \
+        -DCMAKE_TOOLCHAIN_FILE="${PROJECT_ROOT}/cmake/ios.toolchain.cmake" \
+        -DIOS_PLATFORM="${PLATFORM}" \
+        -DIOS_DEPLOYMENT_TARGET="${IOS_DEPLOYMENT_TARGET}" \
+        -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+        -DRAC_BUILD_PLATFORM=ON \
+        -DRAC_BUILD_SHARED=OFF \
+        -DRAC_BUILD_JNI=OFF \
+        $BACKEND_FLAGS
+
+    cmake --build . --config "${BUILD_TYPE}" -j$(sysctl -n hw.ncpu)
+
+    cd "${PROJECT_ROOT}"
+    log_info "Built ${PLATFORM}"
+}
+
+# =============================================================================
+# Create XCFramework
+# =============================================================================
+
+create_xcframework() {
+    local LIB_NAME=$1
+    local FRAMEWORK_NAME=$2
+
+    log_step "Creating ${FRAMEWORK_NAME}.xcframework..."
+
+    # Create framework for each platform
+    for PLATFORM in OS SIMULATORARM64 SIMULATOR; do
+        local PLATFORM_DIR="${BUILD_DIR}/${PLATFORM}"
+        local FRAMEWORK_DIR="${PLATFORM_DIR}/${FRAMEWORK_NAME}.framework"
+
+        mkdir -p "${FRAMEWORK_DIR}/Headers"
+        mkdir -p "${FRAMEWORK_DIR}/Modules"
+
+        # Find the library
+        local LIB_PATH="${PLATFORM_DIR}/lib${LIB_NAME}.a"
+        [[ ! -f "${LIB_PATH}" ]] && LIB_PATH="${PLATFORM_DIR}/src/backends/${BUILD_BACKEND}/lib${LIB_NAME}.a"
+
+        if [[ ! -f "${LIB_PATH}" ]]; then
+            log_warn "Library not found: ${LIB_PATH}"
+            return 1
+        fi
+
+        cp "${LIB_PATH}" "${FRAMEWORK_DIR}/${FRAMEWORK_NAME}"
+
+        # Copy headers
+        if [[ "$FRAMEWORK_NAME" == "RACommons" ]]; then
+            find "${PROJECT_ROOT}/include/rac" -name "*.h" | while read -r header; do
+                local filename=$(basename "$header")
+                sed -e 's|#include "rac/[^"]*\/\([^"]*\)"|#include <RACommons/\1>|g' \
+                    "$header" > "${FRAMEWORK_DIR}/Headers/${filename}"
+            done
+        else
+            # Backend headers
+            local backend_name=$(echo "$LIB_NAME" | sed 's/rac_backend_//')
+            local header_src="${PROJECT_ROOT}/include/rac/backends/rac_${backend_name}.h"
+            [[ -f "$header_src" ]] && cp "$header_src" "${FRAMEWORK_DIR}/Headers/"
+        fi
+
+        # Module map
+        cat > "${FRAMEWORK_DIR}/Modules/module.modulemap" << EOF
+framework module ${FRAMEWORK_NAME} {
+    umbrella header "${FRAMEWORK_NAME}.h"
+    export *
+    module * { export * }
+}
+EOF
+
+        # Umbrella header
+        echo "// ${FRAMEWORK_NAME} Umbrella Header" > "${FRAMEWORK_DIR}/Headers/${FRAMEWORK_NAME}.h"
+        echo "#ifndef ${FRAMEWORK_NAME}_h" >> "${FRAMEWORK_DIR}/Headers/${FRAMEWORK_NAME}.h"
+        echo "#define ${FRAMEWORK_NAME}_h" >> "${FRAMEWORK_DIR}/Headers/${FRAMEWORK_NAME}.h"
+        for h in "${FRAMEWORK_DIR}/Headers/"*.h; do
+            [[ "$(basename "$h")" != "${FRAMEWORK_NAME}.h" ]] && \
+                echo "#include \"$(basename "$h")\"" >> "${FRAMEWORK_DIR}/Headers/${FRAMEWORK_NAME}.h"
+        done
+        echo "#endif" >> "${FRAMEWORK_DIR}/Headers/${FRAMEWORK_NAME}.h"
+
+        # Info.plist
+        cat > "${FRAMEWORK_DIR}/Info.plist" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key><string>${FRAMEWORK_NAME}</string>
+    <key>CFBundleIdentifier</key><string>ai.runanywhere.${FRAMEWORK_NAME}</string>
+    <key>CFBundlePackageType</key><string>FMWK</string>
+    <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+    <key>MinimumOSVersion</key><string>${IOS_DEPLOYMENT_TARGET}</string>
+</dict>
+</plist>
+EOF
+    done
+
+    # Create fat simulator
+    local SIM_FAT="${BUILD_DIR}/SIMULATOR_FAT_${FRAMEWORK_NAME}"
+    mkdir -p "${SIM_FAT}"
+    cp -R "${BUILD_DIR}/SIMULATORARM64/${FRAMEWORK_NAME}.framework" "${SIM_FAT}/"
+
+    lipo -create \
+        "${BUILD_DIR}/SIMULATORARM64/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" \
+        "${BUILD_DIR}/SIMULATOR/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" \
+        -output "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
+
+    # Create XCFramework
+    local XCFW_PATH="${DIST_DIR}/${FRAMEWORK_NAME}.xcframework"
+    rm -rf "${XCFW_PATH}"
+
+    xcodebuild -create-xcframework \
+        -framework "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework" \
+        -framework "${SIM_FAT}/${FRAMEWORK_NAME}.framework" \
+        -output "${XCFW_PATH}"
+
+    log_info "Created: ${XCFW_PATH}"
+    echo "  Size: $(du -sh "${XCFW_PATH}" | cut -f1)"
+}
+
+# =============================================================================
+# Create Backend XCFramework (bundles dependencies)
+# =============================================================================
+
+create_backend_xcframework() {
+    local BACKEND_NAME=$1
+    local FRAMEWORK_NAME=$2
+
+    log_step "Creating ${FRAMEWORK_NAME}.xcframework (bundled)..."
+
+    local FOUND_ANY=false
+
+    for PLATFORM in OS SIMULATORARM64 SIMULATOR; do
+        local PLATFORM_DIR="${BUILD_DIR}/${PLATFORM}"
+        local FRAMEWORK_DIR="${PLATFORM_DIR}/${FRAMEWORK_NAME}.framework"
+
+        mkdir -p "${FRAMEWORK_DIR}/Headers"
+        mkdir -p "${FRAMEWORK_DIR}/Modules"
+
+        # Collect all libraries to bundle
+        local LIBS_TO_BUNDLE=()
+
+        # Backend library - check multiple possible locations
+        local BACKEND_LIB=""
+        for possible_path in \
+            "${PLATFORM_DIR}/src/backends/${BACKEND_NAME}/librac_backend_${BACKEND_NAME}.a" \
+            "${PLATFORM_DIR}/librac_backend_${BACKEND_NAME}.a" \
+            "${PLATFORM_DIR}/backends/${BACKEND_NAME}/librac_backend_${BACKEND_NAME}.a"; do
+            if [[ -f "$possible_path" ]]; then
+                BACKEND_LIB="$possible_path"
+                break
+            fi
+        done
+        [[ -n "$BACKEND_LIB" ]] && LIBS_TO_BUNDLE+=("$BACKEND_LIB")
+
+        if [[ "$BACKEND_NAME" == "llamacpp" ]]; then
+            # Bundle llama.cpp libraries
+            local LLAMA_BUILD="${PLATFORM_DIR}/src/backends/llamacpp/_deps/llamacpp-build"
+            [[ ! -d "$LLAMA_BUILD" ]] && LLAMA_BUILD="${PLATFORM_DIR}/_deps/llamacpp-build"
+
+            for lib in llama common ggml ggml-base ggml-cpu ggml-metal ggml-blas; do
+                local lib_path=""
+                for possible in \
+                    "${LLAMA_BUILD}/src/lib${lib}.a" \
+                    "${LLAMA_BUILD}/common/lib${lib}.a" \
+                    "${LLAMA_BUILD}/ggml/src/lib${lib}.a" \
+                    "${LLAMA_BUILD}/ggml/src/ggml-metal/lib${lib}.a" \
+                    "${LLAMA_BUILD}/ggml/src/ggml-blas/lib${lib}.a" \
+                    "${LLAMA_BUILD}/ggml/src/ggml-cpu/lib${lib}.a"; do
+                    if [[ -f "$possible" ]]; then
+                        lib_path="$possible"
+                        break
+                    fi
+                done
+                [[ -n "$lib_path" ]] && LIBS_TO_BUNDLE+=("$lib_path")
+            done
+        elif [[ "$BACKEND_NAME" == "onnx" ]]; then
+            # Bundle Sherpa-ONNX
+            local SHERPA_XCFW="${PROJECT_ROOT}/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework"
+            local SHERPA_ARCH
+            case $PLATFORM in
+                OS) SHERPA_ARCH="ios-arm64" ;;
+                *) SHERPA_ARCH="ios-arm64_x86_64-simulator" ;;
+            esac
+            # Try both .a and framework binary
+            for possible in \
+                "${SHERPA_XCFW}/${SHERPA_ARCH}/libsherpa-onnx.a" \
+                "${SHERPA_XCFW}/${SHERPA_ARCH}/sherpa-onnx.framework/sherpa-onnx"; do
+                if [[ -f "$possible" ]]; then
+                    LIBS_TO_BUNDLE+=("$possible")
+                    break
+                fi
+            done
+        fi
+
+        # Bundle all libraries
+        if [[ ${#LIBS_TO_BUNDLE[@]} -gt 0 ]]; then
+            log_info "  ${PLATFORM}: Bundling ${#LIBS_TO_BUNDLE[@]} libraries"
+            libtool -static -o "${FRAMEWORK_DIR}/${FRAMEWORK_NAME}" "${LIBS_TO_BUNDLE[@]}"
+            FOUND_ANY=true
+        else
+            log_warn "No libraries found for ${BACKEND_NAME} on ${PLATFORM}"
+            continue
+        fi
+
+        # Headers
+        local header_src="${PROJECT_ROOT}/include/rac/backends/rac_${BACKEND_NAME}.h"
+        [[ -f "$header_src" ]] && cp "$header_src" "${FRAMEWORK_DIR}/Headers/"
+
+        # Module map and umbrella header
+        cat > "${FRAMEWORK_DIR}/Modules/module.modulemap" << EOF
+framework module ${FRAMEWORK_NAME} {
+    umbrella header "${FRAMEWORK_NAME}.h"
+    export *
+    module * { export * }
+}
+EOF
+        echo "// ${FRAMEWORK_NAME}" > "${FRAMEWORK_DIR}/Headers/${FRAMEWORK_NAME}.h"
+        echo "#include \"rac_${BACKEND_NAME}.h\"" >> "${FRAMEWORK_DIR}/Headers/${FRAMEWORK_NAME}.h"
+
+        # Info.plist
+        cat > "${FRAMEWORK_DIR}/Info.plist" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key><string>${FRAMEWORK_NAME}</string>
+    <key>CFBundleIdentifier</key><string>ai.runanywhere.${FRAMEWORK_NAME}</string>
+    <key>CFBundlePackageType</key><string>FMWK</string>
+    <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+    <key>MinimumOSVersion</key><string>${IOS_DEPLOYMENT_TARGET}</string>
+</dict>
+</plist>
+EOF
+    done
+
+    if [[ "$FOUND_ANY" == false ]]; then
+        log_warn "Skipping ${FRAMEWORK_NAME}.xcframework - no libraries found"
+        return 0
+    fi
+
+    # Create fat simulator
+    local SIM_FAT="${BUILD_DIR}/SIMULATOR_FAT_${FRAMEWORK_NAME}"
+    rm -rf "${SIM_FAT}"
+    mkdir -p "${SIM_FAT}"
+    cp -R "${BUILD_DIR}/SIMULATORARM64/${FRAMEWORK_NAME}.framework" "${SIM_FAT}/"
+
+    lipo -create \
+        "${BUILD_DIR}/SIMULATORARM64/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" \
+        "${BUILD_DIR}/SIMULATOR/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" \
+        -output "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" 2>/dev/null || true
+
+    # Create XCFramework
+    local XCFW_PATH="${DIST_DIR}/${FRAMEWORK_NAME}.xcframework"
+    rm -rf "${XCFW_PATH}"
+
+    if [[ -f "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" ]]; then
+        xcodebuild -create-xcframework \
+            -framework "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework" \
+            -framework "${SIM_FAT}/${FRAMEWORK_NAME}.framework" \
+            -output "${XCFW_PATH}"
+
+        log_info "Created: ${XCFW_PATH}"
+        echo "  Size: $(du -sh "${XCFW_PATH}" | cut -f1)"
+    else
+        log_warn "Could not create ${FRAMEWORK_NAME}.xcframework"
+    fi
+}
+
+# =============================================================================
+# Package for Release
+# =============================================================================
+
+create_packages() {
+    log_header "Creating Release Packages"
+
+    local PKG_DIR="${DIST_DIR}/packages"
+    mkdir -p "${PKG_DIR}"
+
+    for xcfw in "${DIST_DIR}"/*.xcframework; do
+        if [[ -d "$xcfw" ]]; then
+            local name=$(basename "$xcfw" .xcframework)
+            local pkg_name="${name}-ios-v${VERSION}.zip"
+            log_step "Packaging ${name}..."
+            cd "${DIST_DIR}"
+            zip -r "packages/${pkg_name}" "$(basename "$xcfw")"
+            cd "${PKG_DIR}"
+            shasum -a 256 "${pkg_name}" > "${pkg_name}.sha256"
+            cd "${PROJECT_ROOT}"
+            log_info "Created: ${pkg_name}"
+        fi
+    done
+}
+
+# =============================================================================
+# Main
+# =============================================================================
+
+main() {
+    log_header "RunAnywhere Commons - iOS Build"
+    echo "Version:        ${VERSION}"
+    echo "Build Type:     ${BUILD_TYPE}"
+    echo "Backends:       ${BUILD_BACKEND}"
+    echo "Skip Download:  ${SKIP_DOWNLOAD}"
+    echo "Skip Backends:  ${SKIP_BACKENDS}"
+    echo ""
+
+    # Clean if requested
+    if [[ "$CLEAN_BUILD" == true ]]; then
+        log_step "Cleaning build directory..."
+        rm -rf "${BUILD_DIR}"
+        rm -rf "${DIST_DIR}"
+    fi
+
+    mkdir -p "${DIST_DIR}"
+
+    # Step 1: Download dependencies
+    if [[ "$SKIP_DOWNLOAD" != true ]]; then
+        download_deps
+    fi
+
+    # Step 2: Build for all platforms
+    log_header "Building for iOS"
+    build_platform "OS"
+    build_platform "SIMULATORARM64"
+    build_platform "SIMULATOR"
+
+    # Step 3: Create RACommons.xcframework
+    log_header "Creating XCFrameworks"
+    create_xcframework "rac_commons" "RACommons"
+
+    # Step 4: Create backend XCFrameworks
+    if [[ "$SKIP_BACKENDS" != true ]]; then
+        if [[ "$BUILD_BACKEND" == "all" || "$BUILD_BACKEND" == "llamacpp" ]]; then
+            create_backend_xcframework "llamacpp" "RABackendLLAMACPP"
+        fi
+        if [[ "$BUILD_BACKEND" == "all" || "$BUILD_BACKEND" == "onnx" ]]; then
+            create_backend_xcframework "onnx" "RABackendONNX"
+        fi
+    fi
+
+    # Step 5: Package if requested
+    if [[ "$CREATE_PACKAGE" == true ]]; then
+        create_packages
+    fi
+
+    # Summary
+    local TOTAL_TIME=$(($(date +%s) - TOTAL_START))
+    log_header "Build Complete!"
+    echo ""
+    echo "Output: ${DIST_DIR}/"
+    for xcfw in "${DIST_DIR}"/*.xcframework; do
+        [[ -d "$xcfw" ]] && echo "  $(du -sh "$xcfw" | cut -f1)  $(basename "$xcfw")"
+    done
+    echo ""
+    log_time "Total build time: ${TOTAL_TIME}s"
+}
+
+main "$@"

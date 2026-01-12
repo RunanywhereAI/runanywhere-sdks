@@ -5,6 +5,27 @@
 message(STATUS "Configuring ONNX backend...")
 
 # =============================================================================
+# Dependencies
+# =============================================================================
+
+include(FetchContent)
+include(LoadVersions)
+
+# Fetch nlohmann_json for JSON parsing
+if(NOT DEFINED NLOHMANN_JSON_VERSION)
+    set(NLOHMANN_JSON_VERSION "3.11.3")
+endif()
+
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG        v${NLOHMANN_JSON_VERSION}
+    GIT_SHALLOW    TRUE
+)
+set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(nlohmann_json)
+
+# =============================================================================
 # ONNX Runtime
 # =============================================================================
 
@@ -124,11 +145,13 @@ endif()
 target_include_directories(rac_backend_onnx PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/include/rac/backends
 )
 
 target_link_libraries(rac_backend_onnx PUBLIC
     rac_commons
     onnxruntime
+    nlohmann_json::nlohmann_json
 )
 
 if(SHERPA_ONNX_AVAILABLE)

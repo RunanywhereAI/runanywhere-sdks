@@ -16,10 +16,16 @@ let onnxRuntimeMacOSPath = "\(packageDir)/Binaries/onnxruntime-macos"
 // =============================================================================
 //
 // testLocal = true  → Use local XCFrameworks from Binaries/ directory
-//                     (for local development when building runanywhere-commons)
+//                     For local development. Run first-time setup:
+//                       ./scripts/build-swift.sh --setup
 //
 // testLocal = false → Download XCFrameworks from GitHub releases (PRODUCTION)
-//                     (default for end users and CI/CD)
+//                     For end users and CI/CD. No setup needed.
+//
+// FIRST TIME SETUP (when testLocal = true):
+//   1. Run: ./scripts/build-swift.sh --setup
+//   2. Open Xcode: open Package.swift
+//   3. If needed: File > Packages > Reset Package Caches
 //
 // =============================================================================
 let testLocal = true  // LOCAL: use XCFrameworks from Binaries/ directory

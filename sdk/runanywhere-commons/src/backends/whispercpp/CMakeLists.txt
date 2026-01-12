@@ -5,11 +5,30 @@
 message(STATUS "Configuring WhisperCPP backend...")
 
 # =============================================================================
-# Fetch whisper.cpp
+# Dependencies
 # =============================================================================
 
 include(FetchContent)
 include(LoadVersions)
+
+# Fetch nlohmann_json for JSON parsing (if not already available)
+if(NOT TARGET nlohmann_json::nlohmann_json)
+    if(NOT DEFINED NLOHMANN_JSON_VERSION)
+        set(NLOHMANN_JSON_VERSION "3.11.3")
+    endif()
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG        v${NLOHMANN_JSON_VERSION}
+        GIT_SHALLOW    TRUE
+    )
+    set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(nlohmann_json)
+endif()
+
+# =============================================================================
+# Fetch whisper.cpp
+# =============================================================================
 
 if(NOT DEFINED WHISPERCPP_VERSION)
     set(WHISPERCPP_VERSION "v1.8.2")
@@ -80,6 +99,7 @@ endif()
 target_include_directories(rac_backend_whispercpp PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/include/rac/backends
     ${whispercpp_SOURCE_DIR}/include
     ${whispercpp_SOURCE_DIR}/ggml/include
 )
@@ -87,6 +107,7 @@ target_include_directories(rac_backend_whispercpp PUBLIC
 target_link_libraries(rac_backend_whispercpp PUBLIC
     rac_commons
     whisper
+    nlohmann_json::nlohmann_json
 )
 
 target_compile_features(rac_backend_whispercpp PUBLIC cxx_std_17)

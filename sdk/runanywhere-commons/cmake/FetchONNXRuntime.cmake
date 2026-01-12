@@ -27,8 +27,8 @@ if(IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
 
     set(ONNX_IOS_VERSION "${ONNX_VERSION_IOS}")
 
-    # third_party is at the parent level (runanywhere-commons/third_party/)
-    set(ONNX_LOCAL_PATH "${CMAKE_SOURCE_DIR}/../third_party/onnxruntime-ios")
+    # third_party is inside runanywhere-commons
+    set(ONNX_LOCAL_PATH "${CMAKE_SOURCE_DIR}/third_party/onnxruntime-ios")
 
     message(STATUS "Using local ONNX Runtime iOS xcframework v${ONNX_IOS_VERSION}")
     message(STATUS "ONNX Runtime path: ${ONNX_LOCAL_PATH}")
@@ -101,7 +101,7 @@ elseif(ANDROID)
     # Sherpa-ONNX version is defined in VERSIONS file: SHERPA_ONNX_VERSION_ANDROID
     # Sherpa-ONNX bundles a compatible version of ONNX Runtime
     # Downloaded by: ./scripts/android/download-sherpa-onnx.sh
-    set(SHERPA_ONNX_DIR "${CMAKE_SOURCE_DIR}/../third_party/sherpa-onnx-android")
+    set(SHERPA_ONNX_DIR "${CMAKE_SOURCE_DIR}/third_party/sherpa-onnx-android")
 
     # Check if Sherpa-ONNX libraries exist
     if(EXISTS "${SHERPA_ONNX_DIR}/jniLibs/${ANDROID_ABI}/libonnxruntime.so")
@@ -127,7 +127,7 @@ elseif(APPLE)
     # Downloaded by: ./scripts/macos/download-onnx.sh
 
     set(ONNX_MACOS_VERSION "${ONNX_VERSION_MACOS}")
-    set(ONNX_MACOS_DIR "${CMAKE_SOURCE_DIR}/../third_party/onnxruntime-macos")
+    set(ONNX_MACOS_DIR "${CMAKE_SOURCE_DIR}/third_party/onnxruntime-macos")
 
     if(EXISTS "${ONNX_MACOS_DIR}/lib/libonnxruntime.dylib")
         # Use local ONNX Runtime
