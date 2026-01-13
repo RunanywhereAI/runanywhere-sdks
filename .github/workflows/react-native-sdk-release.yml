@@ -229,9 +229,19 @@ jobs:
 
       - name: Setup Yarn 3.x
         run: |
-          corepack enable
-          corepack prepare yarn@3.6.1 --activate
-          yarn --version
+          # Enable corepack (ships with Node 16.10+)
+          corepack enable || sudo corepack enable || {
+            echo "corepack not available, installing yarn via npm"
+            npm install -g yarn@3.6.1
+          }
+          
+          # Check if yarn is now available
+          which yarn
+          yarn --version || {
+            echo "Yarn still not available, fallback to npm install"
+            npm install -g yarn@3.6.1
+            yarn --version
+          }
 
       - name: Download iOS Frameworks
         uses: actions/download-artifact@v4
@@ -366,24 +376,29 @@ jobs:
         working-directory: ${{ env.SDK_DIR }}
         run: |
           set -x  # Enable debug output
-          echo "=== Yarn version ==="
-          yarn --version
-          echo "=== Node version ==="
+          echo "=== Environment ==="
+          yarn --version || echo "Yarn not found!"
           node --version
-          echo "=== Checking yarn configuration ==="
+          
+          echo "=== Checking configuration ==="
           cat .yarnrc.yml || echo "No .yarnrc.yml"
-          echo "=== Checking package.json workspaces ==="
-          cat package.json | grep -A5 '"workspaces"' || echo "No workspaces"
-          echo "=== Listing packages directory ==="
-          ls -la packages/ || echo "No packages directory"
-          echo "=== Installing dependencies (verbose) ==="
-          yarn install 2>&1 || {
-            echo "=== Yarn install failed, trying with --immutable-cache ==="
-            yarn install --immutable-cache 2>&1 || {
-              echo "=== Still failing, trying npm fallback ==="
-              npm install 2>&1 || exit 1
-            }
-          }
+          cat package.json | grep -A5 '"workspaces"'
+          
+          echo "=== Listing packages ==="
+          ls -la packages/
+          
+          echo "=== Installing dependencies ==="
+          # Remove any stale node_modules first
+          rm -rf node_modules packages/*/node_modules
+          
+          # Try yarn install
+          if yarn install; then
+            echo "✅ yarn install succeeded"
+          else
+            echo "❌ yarn install failed, trying npm"
+            # Fallback to npm with legacy peer deps
+            npm install --legacy-peer-deps || exit 1
+          fi
 
       - name: Build TypeScript
         working-directory: ${{ env.SDK_DIR }}
