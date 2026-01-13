@@ -152,12 +152,23 @@ jobs:
             echo "✅ RABackendONNX.xcframework"
           fi
 
+      - name: Prepare LlamaCPP Artifact
+        if: steps.backends.outputs.backends == 'all' || steps.backends.outputs.backends == 'llamacpp'
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          # Create a marker file to prevent GitHub Actions from flattening the directory structure
+          # When uploading a single directory, actions/upload-artifact flattens it
+          # Adding a second file forces it to preserve directory names
+          touch dist/.llamacpp-ios-marker
+
       - name: Upload LlamaCPP Backend (iOS)
         if: steps.backends.outputs.backends == 'all' || steps.backends.outputs.backends == 'llamacpp'
         uses: actions/upload-artifact@v4
         with:
           name: backend-llamacpp-ios-${{ steps.version.outputs.version }}
-          path: ${{ env.COMMONS_DIR }}/dist/RABackendLLAMACPP.xcframework
+          path: |
+            ${{ env.COMMONS_DIR }}/dist/RABackendLLAMACPP.xcframework
+            ${{ env.COMMONS_DIR }}/dist/.llamacpp-ios-marker
           retention-days: 30
 
       - name: Upload ONNX Backend (iOS)
