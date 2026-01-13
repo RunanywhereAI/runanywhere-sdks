@@ -43,7 +43,7 @@
   "devDependencies": {
     "@commitlint/config-conventional": "^17.0.2",
     "@evilmartians/lefthook": "^1.5.0",
-    "@types/node": "^24.10.2",
+    "@types/node": "^20.10.0",
     "@types/react": "^18.2.44",
     "@typescript-eslint/eslint-plugin": "^8.50.0",
     "@typescript-eslint/parser": "^8.50.0",
