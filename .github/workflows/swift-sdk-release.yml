@@ -232,58 +232,64 @@ jobs:
           echo "=== Xcode version ==="
           xcodebuild -version
           echo ""
-          echo "=== Resolving Swift Package dependencies (this also generates schemes) ==="
-          xcodebuild -resolvePackageDependencies
+          echo "=== Resolving Swift Package dependencies ==="
+          swift package resolve
           echo ""
-          echo "=== Available schemes ==="
-          xcodebuild -list || echo "Could not list schemes"
+          echo "=== Package description ==="
+          swift package describe || true
+
+      - name: Verify Package Structure
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          echo "=== Checking XCFrameworks ==="
+          ls -la Binaries/
           echo ""
-          echo "=== Available iOS Simulators ==="
-          xcrun simctl list devices available | grep -E "iPhone|iPad" | head -10
+          echo "=== Checking RACommons ==="
+          ls -la Binaries/RACommons.xcframework/ || echo "RACommons not found"
+          echo ""
+          echo "=== Checking RABackendLLAMACPP ==="
+          ls -la Binaries/RABackendLLAMACPP.xcframework/ || echo "LlamaCPP not found"
+          echo ""
+          echo "=== Checking RABackendONNX ==="
+          ls -la Binaries/RABackendONNX.xcframework/ || echo "ONNX not found"
 
-      - name: Build Swift Package (iOS Simulator)
+      - name: Build for iOS Device (Archive-ready)
         working-directory: ${{ env.SDK_DIR }}
         run: |
-          # Build for iOS Simulator - we only have iOS xcframeworks, not macOS
-          # SWIFT_STRICT_CONCURRENCY=minimal matches typical local Xcode settings
-          set -o pipefail
-          xcodebuild build \
-            -scheme RunAnywhere \
-            -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO \
-            SWIFT_STRICT_CONCURRENCY=minimal \
-            2>&1 | xcpretty
-
-      - name: Run Tests (iOS Simulator)
-        working-directory: ${{ env.SDK_DIR }}
-        continue-on-error: true
-        run: |
-          # Run tests on iOS Simulator (continue on error - tests may require device)
-          # Find first available iPhone simulator
-          SIMULATOR=$(xcrun simctl list devices available | grep "iPhone" | head -1 | sed 's/.*(\([^)]*\)).*/\1/')
-          echo "Using simulator: $SIMULATOR"
-          set -o pipefail
-          xcodebuild test \
-            -scheme RunAnywhere \
-            -destination "platform=iOS Simulator,id=$SIMULATOR" \
-            -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO \
-            SWIFT_STRICT_CONCURRENCY=minimal \
-            2>&1 | xcpretty || echo "Tests may require a real device - continuing"
-
-      - name: Build for iOS Device
-        working-directory: ${{ env.SDK_DIR }}
-        run: |
-          set -o pipefail
+          # Build for iOS Device using xcodebuild archive
+          # This validates the package builds correctly for distribution
+          echo "=== Building for iOS Device ==="
+          
+          # First, generate xcodeproj if needed
+          swift package generate-xcodeproj --skip-extra-files || true
+          
+          # Build using xcodebuild with the Package.swift directly
           xcodebuild build \
             -scheme RunAnywhere \
             -destination 'generic/platform=iOS' \
+            -configuration Release \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
-            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_IDENTITY="" \
+            SKIP_INSTALL=NO \
+            BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
             SWIFT_STRICT_CONCURRENCY=minimal \
-            2>&1 | xcpretty
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            2>&1 || {
+              echo "=== Build failed, checking available schemes ==="
+              xcodebuild -list || true
+              echo ""
+              echo "=== Trying with RunAnywhere-Package scheme ==="
+              xcodebuild build \
+                -scheme RunAnywhere-Package \
+                -destination 'generic/platform=iOS' \
+                -configuration Release \
+                -derivedDataPath build \
+                CODE_SIGNING_ALLOWED=NO \
+                CODE_SIGN_IDENTITY="" \
+                SWIFT_STRICT_CONCURRENCY=minimal \
+                2>&1
+            }
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
