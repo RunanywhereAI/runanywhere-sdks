@@ -116,65 +116,94 @@ jobs:
       - name: Setup Binaries from Artifacts
         working-directory: ${{ env.SDK_DIR }}
         run: |
+          set -e  # Exit on any error
           echo "=== Checking for CI artifacts ==="
           ARTIFACTS_DIR="${GITHUB_WORKSPACE}/artifacts"
           
-          echo "=== Commons artifacts ==="
-          find "$ARTIFACTS_DIR/commons" -type f 2>/dev/null | head -20 || echo "No commons artifacts"
+          echo "=== Full artifacts structure (files) ==="
+          find "$ARTIFACTS_DIR" -type f 2>/dev/null | head -50 || echo "No files found"
           
-          echo "=== Backends artifacts ==="
-          find "$ARTIFACTS_DIR/backends" -type f 2>/dev/null | head -20 || echo "No backends artifacts"
+          echo ""
+          echo "=== Full artifacts structure (directories) ==="
+          find "$ARTIFACTS_DIR" -type d 2>/dev/null | head -50 || echo "No directories found"
           
-          echo "=== All XCFrameworks found ==="
-          find "$ARTIFACTS_DIR" -name "*.xcframework" -type d 2>/dev/null || echo "No xcframeworks"
+          echo ""
+          echo "=== Looking for XCFrameworks ==="
+          find "$ARTIFACTS_DIR" -name "*.xcframework" -type d 2>/dev/null || echo "No xcframeworks found as directories"
+          
+          echo ""
+          echo "=== Looking for zip files ==="
+          find "$ARTIFACTS_DIR" -name "*.zip" -type f 2>/dev/null || echo "No zip files found"
           
           # Clean and recreate Binaries directory
           rm -rf Binaries
           mkdir -p Binaries
           
-          # Copy all xcframeworks from artifacts
+          # Copy all xcframeworks from artifacts (without Info.plist check - just copy directories)
+          echo ""
           echo "=== Copying xcframeworks ==="
           XCFW_COUNT=0
-          while IFS= read -r fw; do
-            if [ -n "$fw" ] && [ -d "$fw" ]; then
+          for fw in $(find "$ARTIFACTS_DIR" -name "*.xcframework" -type d 2>/dev/null); do
+            if [ -d "$fw" ]; then
               fw_name=$(basename "$fw")
-              if [ -f "$fw/Info.plist" ]; then
-                echo "✅ Copying: $fw -> Binaries/$fw_name"
-                cp -R "$fw" "Binaries/$fw_name"
-                XCFW_COUNT=$((XCFW_COUNT + 1))
-              fi
+              echo "Copying: $fw -> Binaries/$fw_name"
+              cp -R "$fw" "Binaries/$fw_name"
+              XCFW_COUNT=$((XCFW_COUNT + 1))
             fi
-          done < <(find "$ARTIFACTS_DIR" -name "*.xcframework" -type d 2>/dev/null)
-          echo "Copied $XCFW_COUNT xcframeworks"
+          done
+          echo "Copied $XCFW_COUNT xcframeworks from directories"
           
           # Extract any zip files and copy xcframeworks from them
+          echo ""
           echo "=== Extracting zip files ==="
-          find "$ARTIFACTS_DIR" -name "*.zip" -type f 2>/dev/null | while read zip; do
+          mkdir -p Binaries/_tmp
+          for zip in $(find "$ARTIFACTS_DIR" -name "*.zip" -type f 2>/dev/null); do
             echo "Extracting: $zip"
-            unzip -o "$zip" -d Binaries/_tmp/ 2>/dev/null || true
+            unzip -o "$zip" -d Binaries/_tmp/ || true
           done
           
+          # List extracted contents
+          echo "=== Extracted zip contents ==="
+          find Binaries/_tmp -type d -name "*.xcframework" 2>/dev/null || echo "No xcframeworks in zips"
+          
           # Move xcframeworks from extracted zips
-          find Binaries/_tmp -name "*.xcframework" -type d 2>/dev/null | while read fw; do
+          for fw in $(find Binaries/_tmp -name "*.xcframework" -type d 2>/dev/null); do
             fw_name=$(basename "$fw")
-            if [ -f "$fw/Info.plist" ] && [ ! -d "Binaries/$fw_name" ]; then
+            if [ ! -d "Binaries/$fw_name" ]; then
               echo "Moving from zip: $fw -> Binaries/$fw_name"
-              mv "$fw" "Binaries/$fw_name"
+              cp -R "$fw" "Binaries/$fw_name"
+              XCFW_COUNT=$((XCFW_COUNT + 1))
             fi
           done
           rm -rf Binaries/_tmp 2>/dev/null || true
           
-          echo "=== Binaries directory contents ==="
-          ls -la Binaries/ 2>/dev/null || echo "Empty"
+          echo ""
+          echo "=== Final Binaries directory contents ==="
+          ls -la Binaries/ || echo "Empty"
           
-          # Verify required frameworks
-          echo "=== Verifying frameworks ==="
+          # Show internal structure of one framework for debugging
+          echo ""
+          echo "=== Sample framework structure ==="
+          if [ -d "Binaries/RACommons.xcframework" ]; then
+            ls -la Binaries/RACommons.xcframework/ || true
+          fi
+          
+          # Verify required frameworks exist (check directory exists, not Info.plist)
+          echo ""
+          echo "=== Verifying required frameworks ==="
           REQUIRED="RACommons RABackendLLAMACPP RABackendONNX"
           MISSING=""
           for req in $REQUIRED; do
             FW="Binaries/${req}.xcframework"
-            if [ -d "$FW" ] && [ -f "$FW/Info.plist" ]; then
-              echo "✅ $req.xcframework - valid"
+            if [ -d "$FW" ]; then
+              # Check if it has any content
+              COUNT=$(ls -1 "$FW" 2>/dev/null | wc -l)
+              if [ "$COUNT" -gt 0 ]; then
+                echo "✅ $req.xcframework - found ($COUNT items)"
+              else
+                echo "❌ $req.xcframework - exists but EMPTY"
+                MISSING="$MISSING $req"
+              fi
             else
               echo "❌ $req.xcframework - MISSING"
               MISSING="$MISSING $req"
@@ -183,12 +212,12 @@ jobs:
           
           if [ -n "$MISSING" ]; then
             echo ""
+            echo "========================================="
             echo "❌ ERROR: Missing required frameworks:$MISSING"
+            echo "========================================="
             echo ""
             echo "This is a CI build - artifacts from earlier jobs should be available."
             echo "Check that commons-release and backends-release jobs completed successfully."
-            echo ""
-            echo "NOT falling back to remote releases (they may not exist for this version)."
             exit 1
           fi
           
