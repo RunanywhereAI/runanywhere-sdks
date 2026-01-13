@@ -90,7 +90,7 @@ jobs:
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '15.4'
+          xcode-version: '16.1'
 
       - name: Install SwiftLint and xcpretty
         run: |
