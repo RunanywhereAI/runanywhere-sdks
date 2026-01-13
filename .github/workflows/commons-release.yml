@@ -310,7 +310,24 @@ jobs:
         working-directory: ${{ env.COMMONS_DIR }}
         run: |
           chmod +x scripts/android/download-sherpa-onnx.sh
+          # Force fresh download by removing any existing partial downloads
+          rm -rf third_party/sherpa-onnx-android
           ./scripts/android/download-sherpa-onnx.sh
+          
+          # Verify required files exist
+          echo "=== Verifying downloaded files ==="
+          ls -la third_party/sherpa-onnx-android/ || echo "Directory not found!"
+          ls -la third_party/sherpa-onnx-android/jniLibs/ || echo "jniLibs not found!"
+          ls -la "third_party/sherpa-onnx-android/jniLibs/${{ matrix.abi }}/" || echo "ABI directory not found!"
+          
+          # Check for required .so files
+          for lib in libsherpa-onnx-jni.so libsherpa-onnx-c-api.so libonnxruntime.so; do
+            if [ -f "third_party/sherpa-onnx-android/jniLibs/${{ matrix.abi }}/$lib" ]; then
+              echo "✅ Found: $lib"
+            else
+              echo "❌ Missing: $lib"
+            fi
+          done
 
       - name: Build Android ${{ matrix.abi }}
         working-directory: ${{ env.COMMONS_DIR }}
