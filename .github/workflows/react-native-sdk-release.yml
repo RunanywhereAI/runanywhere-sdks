@@ -1,0 +1,454 @@
+name: React Native SDK Release
+
+# =============================================================================
+# React Native SDK Release Workflow
+#
+# Builds and publishes the RunAnywhere React Native SDK.
+# The SDK uses a monorepo structure with Yarn workspaces:
+#   - @runanywhere/core: Core SDK (required)
+#   - @runanywhere/llamacpp: LLM backend
+#   - @runanywhere/onnx: STT/TTS/VAD backend
+#
+# Distribution:
+#   - npm (future)
+#   - GitHub Release with native binaries
+#   - Direct Git dependency via package.json
+# =============================================================================
+
+on:
+  push:
+    tags:
+      - 'react-native-v*'
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to release'
+        required: true
+        type: string
+      publish_npm:
+        description: 'Publish to npm'
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: 'Dry run'
+        required: false
+        default: false
+        type: boolean
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.15.0)'
+        required: true
+        type: string
+      publish_npm:
+        description: 'Publish to npm'
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: 'Dry run (build only)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  SDK_DIR: sdk/runanywhere-react-native
+  COMMONS_DIR: sdk/runanywhere-commons
+
+jobs:
+  # ===========================================================================
+  # Build iOS Native Libraries
+  # ===========================================================================
+  build-ios-native:
+    name: Build iOS Native
+    runs-on: macos-14
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/react-native-v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.4'
+
+      - name: Install Dependencies
+        run: brew install cmake ninja
+
+      - name: Download iOS Dependencies
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/ios/download-sherpa-onnx.sh
+          chmod +x scripts/ios/download-onnx.sh
+          ./scripts/ios/download-sherpa-onnx.sh
+          ./scripts/ios/download-onnx.sh
+
+      - name: Build iOS Frameworks
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/build-ios.sh
+          ./scripts/build-ios.sh --backend all --release
+
+      - name: Upload iOS Frameworks
+        uses: actions/upload-artifact@v4
+        with:
+          name: rn-ios-frameworks-${{ steps.version.outputs.version }}
+          path: |
+            ${{ env.COMMONS_DIR }}/dist/RACommons.xcframework
+            ${{ env.COMMONS_DIR }}/dist/RABackendLLAMACPP.xcframework
+            ${{ env.COMMONS_DIR }}/dist/RABackendONNX.xcframework
+            ${{ env.COMMONS_DIR }}/third_party/onnxruntime-ios/onnxruntime.xcframework
+            ${{ env.COMMONS_DIR }}/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework
+          retention-days: 7
+
+  # ===========================================================================
+  # Build Android Native Libraries
+  # ===========================================================================
+  build-android-native:
+    name: Build Android Native (${{ matrix.abi }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86_64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/react-native-v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup NDK
+        run: |
+          NDK_VERSION="27.0.12077973"
+          echo "y" | sdkmanager --install "ndk;${NDK_VERSION}" --sdk_root=${ANDROID_SDK_ROOT}
+          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> $GITHUB_ENV
+
+      - name: Download Dependencies
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/android/download-sherpa-onnx.sh
+          ./scripts/android/download-sherpa-onnx.sh
+
+      - name: Build Android Native
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/build-android.sh
+          ./scripts/build-android.sh all ${{ matrix.abi }}
+
+      - name: Upload Android Native
+        uses: actions/upload-artifact@v4
+        with:
+          name: rn-android-native-${{ matrix.abi }}-${{ steps.version.outputs.version }}
+          path: |
+            ${{ env.COMMONS_DIR }}/dist/android/unified/${{ matrix.abi }}/
+            ${{ env.COMMONS_DIR }}/dist/android/llamacpp/${{ matrix.abi }}/
+            ${{ env.COMMONS_DIR }}/dist/android/onnx/${{ matrix.abi }}/
+            ${{ env.COMMONS_DIR }}/dist/android/include/
+          retention-days: 7
+
+  # ===========================================================================
+  # Build React Native SDK
+  # ===========================================================================
+  build-react-native-sdk:
+    name: Build React Native SDK
+    needs: [build-ios-native, build-android-native]
+    runs-on: macos-14
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/react-native-v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Yarn
+        run: npm install -g yarn
+
+      - name: Download iOS Frameworks
+        uses: actions/download-artifact@v4
+        with:
+          name: rn-ios-frameworks-${{ steps.version.outputs.version }}
+          path: ios-frameworks
+
+      - name: Download Android Native
+        uses: actions/download-artifact@v4
+        with:
+          pattern: rn-android-native-*
+          path: android-native
+          merge-multiple: false
+
+      - name: Setup Native Libraries
+        run: |
+          # Setup iOS frameworks
+          CORE_IOS="${{ env.SDK_DIR }}/packages/core/ios/Frameworks"
+          LLAMA_IOS="${{ env.SDK_DIR }}/packages/llamacpp/ios/Frameworks"
+          ONNX_IOS="${{ env.SDK_DIR }}/packages/onnx/ios/Frameworks"
+          
+          mkdir -p "$CORE_IOS" "$LLAMA_IOS" "$ONNX_IOS"
+          
+          cp -r ios-frameworks/RACommons.xcframework "$CORE_IOS/" 2>/dev/null || true
+          cp -r ios-frameworks/RABackendLLAMACPP.xcframework "$LLAMA_IOS/" 2>/dev/null || true
+          cp -r ios-frameworks/RABackendONNX.xcframework "$ONNX_IOS/" 2>/dev/null || true
+          cp -r ios-frameworks/onnxruntime.xcframework "$ONNX_IOS/" 2>/dev/null || true
+          cp -r ios-frameworks/sherpa-onnx.xcframework "$ONNX_IOS/" 2>/dev/null || true
+          
+          # Setup Android jniLibs
+          CORE_ANDROID="${{ env.SDK_DIR }}/packages/core/android/src/main/jniLibs"
+          LLAMA_ANDROID="${{ env.SDK_DIR }}/packages/llamacpp/android/src/main/jniLibs"
+          ONNX_ANDROID="${{ env.SDK_DIR }}/packages/onnx/android/src/main/jniLibs"
+          
+          mkdir -p "$CORE_ANDROID" "$LLAMA_ANDROID" "$ONNX_ANDROID"
+          
+          for artifact_dir in android-native/rn-android-native-*/; do
+            if [ -d "$artifact_dir" ]; then
+              for abi_dir in "${artifact_dir}unified/"*/; do
+                if [ -d "$abi_dir" ]; then
+                  abi=$(basename "$abi_dir")
+                  mkdir -p "${CORE_ANDROID}/${abi}"
+                  cp "${abi_dir}"*.so "${CORE_ANDROID}/${abi}/" 2>/dev/null || true
+                fi
+              done
+              
+              for abi_dir in "${artifact_dir}llamacpp/"*/; do
+                if [ -d "$abi_dir" ]; then
+                  abi=$(basename "$abi_dir")
+                  mkdir -p "${LLAMA_ANDROID}/${abi}"
+                  cp "${abi_dir}"*.so "${LLAMA_ANDROID}/${abi}/" 2>/dev/null || true
+                fi
+              done
+              
+              for abi_dir in "${artifact_dir}onnx/"*/; do
+                if [ -d "$abi_dir" ]; then
+                  abi=$(basename "$abi_dir")
+                  mkdir -p "${ONNX_ANDROID}/${abi}"
+                  cp "${abi_dir}"*.so "${ONNX_ANDROID}/${abi}/" 2>/dev/null || true
+                fi
+              done
+            fi
+          done
+          
+          # Copy headers
+          mkdir -p "${{ env.SDK_DIR }}/packages/core/android/src/main/include"
+          mkdir -p "${{ env.SDK_DIR }}/packages/llamacpp/android/src/main/include"
+          mkdir -p "${{ env.SDK_DIR }}/packages/onnx/android/src/main/include"
+          
+          INCLUDE_DIR=$(find android-native -name "include" -type d | head -1)
+          if [ -n "$INCLUDE_DIR" ]; then
+            cp -r "$INCLUDE_DIR"/* "${{ env.SDK_DIR }}/packages/core/android/src/main/include/" 2>/dev/null || true
+          fi
+          
+          echo "=== iOS Frameworks ==="
+          find ${{ env.SDK_DIR }}/packages -name "*.xcframework" -type d
+          
+          echo "=== Android jniLibs ==="
+          find ${{ env.SDK_DIR }}/packages -name "*.so" -type f | head -20
+
+      - name: Update Package Versions
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          
+          # Update version in all package.json files
+          for pkg in packages/*/package.json; do
+            node -e "
+              const fs = require('fs');
+              const pkg = JSON.parse(fs.readFileSync('$pkg'));
+              pkg.version = '$VERSION';
+              fs.writeFileSync('$pkg', JSON.stringify(pkg, null, 2) + '\n');
+            "
+          done
+          
+          # Update root package.json
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json'));
+            pkg.version = '$VERSION';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+      - name: Install Dependencies
+        working-directory: ${{ env.SDK_DIR }}
+        run: yarn install
+
+      - name: Build TypeScript
+        working-directory: ${{ env.SDK_DIR }}
+        run: yarn build
+        continue-on-error: true
+
+      - name: Run Tests
+        working-directory: ${{ env.SDK_DIR }}
+        run: yarn test
+        continue-on-error: true
+
+      - name: Package React Native SDK
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mkdir -p rn-release
+          
+          cd ${{ env.SDK_DIR }}
+          zip -r "../../rn-release/runanywhere-react-native-${VERSION}.zip" \
+            packages/ \
+            lerna.json \
+            package.json \
+            tsconfig.base.json \
+            README.md \
+            -x "*.git*" \
+            -x "*node_modules/*" \
+            -x "*build/*" \
+            -x "*.tsbuildinfo"
+
+      - name: Upload React Native SDK Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: react-native-sdk-package-${{ steps.version.outputs.version }}
+          path: rn-release/
+          retention-days: 30
+
+  # ===========================================================================
+  # Publish Release
+  # ===========================================================================
+  publish:
+    name: Publish React Native SDK Release
+    needs: build-react-native-sdk
+    if: |
+      (startsWith(github.ref, 'refs/tags/react-native-v') || github.event_name == 'workflow_dispatch') &&
+      github.event.inputs.dry_run != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download React Native SDK Package
+        uses: actions/download-artifact@v4
+        with:
+          name: react-native-sdk-package-${{ needs.build-react-native-sdk.outputs.version }}
+          path: release-assets
+
+      - name: Generate Checksums
+        run: |
+          cd release-assets
+          for f in *.zip; do
+            if [ -f "$f" ]; then
+              shasum -a 256 "$f" > "${f}.sha256"
+            fi
+          done
+          ls -la
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: react-native-v${{ needs.build-react-native-sdk.outputs.version }}
+          name: RunAnywhere React Native SDK v${{ needs.build-react-native-sdk.outputs.version }}
+          files: |
+            release-assets/*
+          body: |
+            ## RunAnywhere React Native SDK v${{ needs.build-react-native-sdk.outputs.version }}
+
+            Privacy-first, on-device AI SDK for React Native (iOS & Android).
+
+            ### Installation
+
+            **Git Dependency (package.json):**
+            ```json
+            {
+              "dependencies": {
+                "@runanywhere/core": "github:RunanywhereAI/runanywhere-sdks#react-native-v${{ needs.build-react-native-sdk.outputs.version }}",
+                "@runanywhere/llamacpp": "github:RunanywhereAI/runanywhere-sdks#react-native-v${{ needs.build-react-native-sdk.outputs.version }}",
+                "@runanywhere/onnx": "github:RunanywhereAI/runanywhere-sdks#react-native-v${{ needs.build-react-native-sdk.outputs.version }}"
+              }
+            }
+            ```
+
+            **Download Package:**
+            Download `runanywhere-react-native-${{ needs.build-react-native-sdk.outputs.version }}.zip` which includes native binaries.
+
+            ### Packages
+
+            | Package | Description |
+            |---------|-------------|
+            | `@runanywhere/core` | Core SDK (required) |
+            | `@runanywhere/llamacpp` | LLM backend (llama.cpp) |
+            | `@runanywhere/onnx` | STT/TTS/VAD backend (Sherpa-ONNX) |
+
+            ### Features
+            - 🧠 **LLM**: On-device text generation via llama.cpp
+            - 🎤 **STT**: Speech-to-text via Sherpa-ONNX Whisper
+            - 🔊 **TTS**: Text-to-speech via Sherpa-ONNX Piper
+            - 🎯 **VAD**: Voice activity detection
+            - 🔒 **Privacy**: All processing happens on-device
+
+            ### Requirements
+            - React Native >= 0.72
+            - iOS 13.0+ / Android API 24+
+            - Node.js 18+
+
+            ### Post-Install Setup
+
+            **iOS:**
+            ```bash
+            cd ios && pod install
+            ```
+
+            **Android:**
+            ```bash
+            cp android/gradle.properties.example android/gradle.properties
+            ```
+
+            ### Documentation
+            See [README](https://github.com/RunanywhereAI/runanywhere-sdks/tree/main/sdk/runanywhere-react-native)
+
+            ---
+            Built from runanywhere-sdks @ ${{ github.sha }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
