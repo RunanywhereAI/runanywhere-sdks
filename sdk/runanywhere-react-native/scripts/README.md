@@ -17,11 +17,14 @@ cd sdk/runanywhere-react-native
 cd ../../examples/react-native/RunAnywhereAI
 yarn install
 
-# 3. Run on iOS
+# 3. Setup Android (one-time)
+cp android/gradle.properties.example android/gradle.properties
+
+# 4. Run on iOS
 cd ios && pod install && cd ..
 npx react-native run-ios --simulator="iPhone 16 Pro"
 
-# 4. Run on Android (in separate terminal or after iOS)
+# 5. Run on Android
 npx react-native run-android
 ```
 
