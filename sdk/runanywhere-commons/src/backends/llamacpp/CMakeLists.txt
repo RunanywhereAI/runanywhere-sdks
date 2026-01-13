@@ -40,9 +40,28 @@ if(RAC_PLATFORM_IOS)
     set(GGML_NEON ON CACHE BOOL "" FORCE)
     set(GGML_METAL_EMBED_LIBRARY ON CACHE BOOL "" FORCE)  # Embed precompiled Metal shaders
 elseif(RAC_PLATFORM_ANDROID)
+    # Disable features not available on Android
     set(GGML_METAL OFF CACHE BOOL "" FORCE)
+    set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
+    set(GGML_CUDA OFF CACHE BOOL "" FORCE)
+    set(GGML_OPENCL OFF CACHE BOOL "" FORCE)
+    set(GGML_HIPBLAS OFF CACHE BOOL "" FORCE)
+    set(GGML_SYCL OFF CACHE BOOL "" FORCE)
+    set(GGML_KOMPUTE OFF CACHE BOOL "" FORCE)
+    set(GGML_RPC OFF CACHE BOOL "" FORCE)
+    
+    # CRITICAL: Disable native CPU detection (fails during cross-compilation)
+    set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
+    
+    # Enable ARM NEON for ARM devices
     set(GGML_NEON ON CACHE BOOL "" FORCE)
+    
+    # Android-specific settings
     set(ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES ON CACHE BOOL "" FORCE)
+    set(GGML_CPU_HBM OFF CACHE BOOL "" FORCE)
+    
+    # Disable openmp to avoid Android threading issues
+    set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
 elseif(RAC_PLATFORM_MACOS)
     set(GGML_METAL ON CACHE BOOL "" FORCE)
     set(GGML_ACCELERATE ON CACHE BOOL "" FORCE)
