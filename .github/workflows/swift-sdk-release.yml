@@ -231,34 +231,42 @@ jobs:
         run: |
           # Build for iOS Simulator - we only have iOS xcframeworks, not macOS
           # swift build defaults to macOS which requires macOS ONNX Runtime dylib
+          # SWIFT_STRICT_CONCURRENCY=minimal matches typical local Xcode settings
+          set -o pipefail
           xcodebuild build \
             -scheme RunAnywhere \
             -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
-            | xcpretty || true
+            SWIFT_STRICT_CONCURRENCY=minimal \
+            | xcpretty
 
       - name: Run Tests (iOS Simulator)
         working-directory: ${{ env.SDK_DIR }}
+        continue-on-error: true
         run: |
-          # Run tests on iOS Simulator
+          # Run tests on iOS Simulator (continue on error - tests may require device)
+          set -o pipefail
           xcodebuild test \
             -scheme RunAnywhere \
             -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.1' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
-            | xcpretty || true
+            SWIFT_STRICT_CONCURRENCY=minimal \
+            | xcpretty
 
       - name: Build for iOS Device
         working-directory: ${{ env.SDK_DIR }}
         run: |
+          set -o pipefail
           xcodebuild build \
             -scheme RunAnywhere \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             ONLY_ACTIVE_ARCH=NO \
-            | xcpretty || true
+            SWIFT_STRICT_CONCURRENCY=minimal \
+            | xcpretty
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
