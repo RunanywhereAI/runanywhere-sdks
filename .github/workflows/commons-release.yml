@@ -333,9 +333,8 @@ jobs:
         working-directory: ${{ env.COMMONS_DIR }}
         run: |
           chmod +x scripts/build-android.sh
-          # Build ONNX backend only for now (llamacpp has Android build issues)
-          # TODO: Add llamacpp build once fixed
-          ./scripts/build-android.sh onnx ${{ matrix.abi }}
+          # Build all backends - ONNX (STT/TTS/VAD) + LlamaCPP (LLM)
+          ./scripts/build-android.sh all ${{ matrix.abi }}
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
