@@ -16,6 +16,17 @@ on:
   push:
     tags:
       - 'commons-v*'
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.2.0)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Dry run (build only, do not publish)'
+        required: false
+        default: false
+        type: boolean
   workflow_dispatch:
     inputs:
       version:
@@ -143,8 +154,8 @@ jobs:
       - name: Build RACommons XCFramework
         working-directory: ${{ env.COMMONS_DIR }}
         run: |
-          chmod +x scripts/build-rac-commons.sh
-          ./scripts/build-rac-commons.sh --ios --release --package
+          chmod +x scripts/build-ios.sh
+          ./scripts/build-ios.sh --skip-backends --release --package
 
       - name: List Artifacts
         working-directory: ${{ env.COMMONS_DIR }}
@@ -284,8 +295,9 @@ jobs:
       - name: Build Android ${{ matrix.abi }}
         working-directory: ${{ env.COMMONS_DIR }}
         run: |
-          chmod +x scripts/build-rac-commons.sh
-          ./scripts/build-rac-commons.sh --android --abi ${{ matrix.abi }} --release
+          chmod +x scripts/build-android.sh
+          # Build with all backends - artifacts contain RACommons + JNI bridge
+          ./scripts/build-android.sh all ${{ matrix.abi }}
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
