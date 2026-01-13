@@ -111,9 +111,24 @@ jobs:
         working-directory: ${{ env.SDK_DIR }}
         run: |
           echo "=== Checking for CI artifacts ==="
-          if [ -d "../../artifacts" ] && ls ../../artifacts/*.zip 2>/dev/null; then
-            echo "Found CI artifacts, extracting to Binaries/"
-            mkdir -p Binaries
+          echo "Current directory: $(pwd)"
+          echo "Artifacts directory contents:"
+          ls -la ../../artifacts/ 2>/dev/null || echo "No artifacts directory"
+          find ../../artifacts -type f 2>/dev/null | head -20 || echo "No files found"
+          find ../../artifacts -name "*.xcframework" -type d 2>/dev/null | head -10 || echo "No xcframeworks found"
+          
+          mkdir -p Binaries
+          
+          # Copy xcframeworks directly (artifacts are directories, not zips)
+          if find ../../artifacts -name "*.xcframework" -type d 2>/dev/null | head -1 | grep -q xcframework; then
+            echo "Found xcframeworks in artifacts"
+            find ../../artifacts -name "*.xcframework" -type d | while read fw; do
+              echo "Copying: $fw -> Binaries/"
+              cp -r "$fw" Binaries/ 2>/dev/null || true
+            done
+          # Try extracting if they are zip files
+          elif ls ../../artifacts/*.zip 2>/dev/null; then
+            echo "Found zip files, extracting..."
             for zip in ../../artifacts/*.zip; do
               echo "Extracting: $zip"
               unzip -o "$zip" -d Binaries/ || true
@@ -124,14 +139,14 @@ jobs:
                 mv "$fw" Binaries/ 2>/dev/null || true
               fi
             done
-            echo "=== Binaries directory ==="
-            ls -la Binaries/
-            echo "Using testLocal = true with CI artifacts"
           else
             echo "No CI artifacts found, using remote releases"
             # Set testLocal = false to download XCFrameworks from GitHub releases
             sed -i '' 's/let testLocal = true/let testLocal = false/' Package.swift
           fi
+          
+          echo "=== Binaries directory ==="
+          ls -la Binaries/ || echo "Binaries directory is empty"
           echo "=== Package.swift testLocal setting ==="
           grep "let testLocal" Package.swift
 

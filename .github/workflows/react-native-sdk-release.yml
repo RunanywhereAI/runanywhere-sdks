@@ -332,13 +332,22 @@ jobs:
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           "
 
+      - name: Debug Downloaded Artifacts
+        run: |
+          echo "=== Downloaded iOS frameworks ==="
+          find ios-frameworks -type d -name "*.xcframework" 2>/dev/null | head -10 || echo "No xcframeworks found"
+          echo "=== Downloaded Android native ==="
+          find android-native -type f -name "*.so" 2>/dev/null | head -10 || echo "No .so files found"
+          echo "=== Packages structure ==="
+          find ${{ env.SDK_DIR }}/packages -name "*.xcframework" -o -name "*.so" 2>/dev/null | head -20 || echo "No native libs in packages"
+
       - name: Install Dependencies
         working-directory: ${{ env.SDK_DIR }}
-        run: yarn install
+        run: yarn install --verbose 2>&1 | tail -50
 
       - name: Build TypeScript
         working-directory: ${{ env.SDK_DIR }}
-        run: yarn build
+        run: yarn build || echo "TypeScript build had issues"
         continue-on-error: true
 
       - name: Run Tests

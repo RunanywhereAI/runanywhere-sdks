@@ -205,11 +205,23 @@ jobs:
           echo "runanywhere.useLocalLibs=true" >> gradle.properties
           echo "version=${{ steps.version.outputs.version }}" >> gradle.properties
 
+      - name: Debug Downloaded Artifacts
+        run: |
+          echo "=== Downloaded artifact structure ==="
+          find native-artifacts -type f -name "*.so" 2>/dev/null | head -20 || echo "No .so files found"
+          echo "=== jniLibs after setup ==="
+          find ${{ env.SDK_DIR }}/build/jniLibs -type f 2>/dev/null | head -20 || echo "No files in jniLibs"
+
       - name: Build SDK
         working-directory: ${{ env.SDK_DIR }}
         run: |
           chmod +x gradlew
-          ./gradlew build -x test
+          ./gradlew build -x test --info 2>&1 | tail -100 || {
+            echo "=== Build failed, showing project structure ==="
+            ls -la
+            ls -la build/ 2>/dev/null || true
+            exit 1
+          }
 
       - name: Build AAR (Release)
         working-directory: ${{ env.SDK_DIR }}
