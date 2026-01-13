@@ -226,24 +226,26 @@ jobs:
           echo ""
           echo "✅ All frameworks ready for build"
 
-      - name: List Available Simulators
+      - name: Resolve Package Dependencies
+        working-directory: ${{ env.SDK_DIR }}
         run: |
-          echo "=== Available iOS Simulators ==="
-          xcrun simctl list devices available | grep -E "iPhone|iPad" | head -20
-          echo ""
           echo "=== Xcode version ==="
           xcodebuild -version
           echo ""
-          echo "=== Available SDKs ==="
-          xcodebuild -showsdks | grep -i simulator
+          echo "=== Resolving Swift Package dependencies (this also generates schemes) ==="
+          xcodebuild -resolvePackageDependencies
+          echo ""
+          echo "=== Available schemes ==="
+          xcodebuild -list || echo "Could not list schemes"
+          echo ""
+          echo "=== Available iOS Simulators ==="
+          xcrun simctl list devices available | grep -E "iPhone|iPad" | head -10
 
       - name: Build Swift Package (iOS Simulator)
         working-directory: ${{ env.SDK_DIR }}
         run: |
           # Build for iOS Simulator - we only have iOS xcframeworks, not macOS
-          # swift build defaults to macOS which requires macOS ONNX Runtime dylib
           # SWIFT_STRICT_CONCURRENCY=minimal matches typical local Xcode settings
-          # Use generic destination which works with any available simulator
           set -o pipefail
           xcodebuild build \
             -scheme RunAnywhere \
@@ -251,7 +253,7 @@ jobs:
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             SWIFT_STRICT_CONCURRENCY=minimal \
-            | xcpretty
+            2>&1 | xcpretty
 
       - name: Run Tests (iOS Simulator)
         working-directory: ${{ env.SDK_DIR }}
@@ -268,7 +270,7 @@ jobs:
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             SWIFT_STRICT_CONCURRENCY=minimal \
-            | xcpretty || echo "Tests may require a real device - continuing"
+            2>&1 | xcpretty || echo "Tests may require a real device - continuing"
 
       - name: Build for iOS Device
         working-directory: ${{ env.SDK_DIR }}
@@ -281,7 +283,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             ONLY_ACTIVE_ARCH=NO \
             SWIFT_STRICT_CONCURRENCY=minimal \
-            | xcpretty
+            2>&1 | xcpretty
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
