@@ -365,10 +365,25 @@ jobs:
       - name: Install Dependencies
         working-directory: ${{ env.SDK_DIR }}
         run: |
+          set -x  # Enable debug output
           echo "=== Yarn version ==="
           yarn --version
-          echo "=== Installing dependencies ==="
-          yarn install
+          echo "=== Node version ==="
+          node --version
+          echo "=== Checking yarn configuration ==="
+          cat .yarnrc.yml || echo "No .yarnrc.yml"
+          echo "=== Checking package.json workspaces ==="
+          cat package.json | grep -A5 '"workspaces"' || echo "No workspaces"
+          echo "=== Listing packages directory ==="
+          ls -la packages/ || echo "No packages directory"
+          echo "=== Installing dependencies (verbose) ==="
+          yarn install 2>&1 || {
+            echo "=== Yarn install failed, trying with --immutable-cache ==="
+            yarn install --immutable-cache 2>&1 || {
+              echo "=== Still failing, trying npm fallback ==="
+              npm install 2>&1 || exit 1
+            }
+          }
 
       - name: Build TypeScript
         working-directory: ${{ env.SDK_DIR }}
