@@ -99,12 +99,39 @@ jobs:
         working-directory: ${{ env.SDK_DIR }}
         run: swiftlint --strict
 
-      - name: Configure for Remote XCFrameworks
+      - name: Download iOS Artifacts (if available)
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-ios-*"
+          path: artifacts/
+          merge-multiple: true
+
+      - name: Setup Binaries from Artifacts
         working-directory: ${{ env.SDK_DIR }}
         run: |
-          # Set testLocal = false to download XCFrameworks from GitHub releases
-          # This avoids needing local Binaries/ directory in CI
-          sed -i '' 's/let testLocal = true/let testLocal = false/' Package.swift
+          echo "=== Checking for CI artifacts ==="
+          if [ -d "../../artifacts" ] && ls ../../artifacts/*.zip 2>/dev/null; then
+            echo "Found CI artifacts, extracting to Binaries/"
+            mkdir -p Binaries
+            for zip in ../../artifacts/*.zip; do
+              echo "Extracting: $zip"
+              unzip -o "$zip" -d Binaries/ || true
+            done
+            # Move any nested xcframeworks to top level
+            find Binaries -name "*.xcframework" -type d | while read fw; do
+              if [ "$(dirname "$fw")" != "Binaries" ]; then
+                mv "$fw" Binaries/ 2>/dev/null || true
+              fi
+            done
+            echo "=== Binaries directory ==="
+            ls -la Binaries/
+            echo "Using testLocal = true with CI artifacts"
+          else
+            echo "No CI artifacts found, using remote releases"
+            # Set testLocal = false to download XCFrameworks from GitHub releases
+            sed -i '' 's/let testLocal = true/let testLocal = false/' Package.swift
+          fi
           echo "=== Package.swift testLocal setting ==="
           grep "let testLocal" Package.swift
 
