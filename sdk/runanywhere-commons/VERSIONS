@@ -64,9 +64,9 @@ SHERPA_ONNX_VERSION_MACOS=1.12.18
 # =============================================================================
 # llama.cpp (LLM inference)
 # =============================================================================
-# b7199 - stable release with Android cross-compilation support
-# NOTE: b7658 has Android build issues, needs investigation
-LLAMACPP_VERSION=b7199
+# b7650 - recent stable release (8 versions before b7658)
+# NOTE: b7658 has Android cross-compilation issues, needs investigation
+LLAMACPP_VERSION=b7650
 
 # =============================================================================
 # nlohmann/json
