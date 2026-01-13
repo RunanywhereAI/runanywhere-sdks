@@ -159,44 +159,61 @@ jobs:
 
       - name: Setup Native Libraries
         run: |
+          echo "=== Downloaded artifact structure ==="
+          find native-artifacts -type d | head -20
+          echo "=== All .so files in artifacts ==="
+          find native-artifacts -name "*.so" -type f 2>/dev/null || echo "No .so files found yet"
+          
           # Create jniLibs structure
           mkdir -p ${{ env.SDK_DIR }}/build/jniLibs
           
           for artifact_dir in native-artifacts/native-libs-*/; do
             if [ -d "$artifact_dir" ]; then
               echo "Processing $artifact_dir"
+              echo "Contents: $(ls -la "$artifact_dir" 2>/dev/null || echo 'empty')"
               
               # Copy unified libraries
-              for abi_dir in "${artifact_dir}unified/"*/; do
+              for abi_dir in "${artifact_dir}"unified/*/; do
                 if [ -d "$abi_dir" ]; then
                   abi=$(basename "$abi_dir")
+                  echo "Found unified ABI: $abi at $abi_dir"
                   mkdir -p "${{ env.SDK_DIR }}/build/jniLibs/${abi}"
-                  cp -r "${abi_dir}"*.so "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" 2>/dev/null || true
+                  find "$abi_dir" -name "*.so" -exec cp -v {} "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" \;
                 fi
               done
               
               # Copy llamacpp libraries
-              for abi_dir in "${artifact_dir}llamacpp/"*/; do
+              for abi_dir in "${artifact_dir}"llamacpp/*/; do
                 if [ -d "$abi_dir" ]; then
                   abi=$(basename "$abi_dir")
+                  echo "Found llamacpp ABI: $abi at $abi_dir"
                   mkdir -p "${{ env.SDK_DIR }}/build/jniLibs/${abi}"
-                  cp -r "${abi_dir}"*.so "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" 2>/dev/null || true
+                  find "$abi_dir" -name "*.so" -exec cp -v {} "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" \;
                 fi
               done
               
               # Copy onnx libraries
-              for abi_dir in "${artifact_dir}onnx/"*/; do
+              for abi_dir in "${artifact_dir}"onnx/*/; do
                 if [ -d "$abi_dir" ]; then
                   abi=$(basename "$abi_dir")
+                  echo "Found onnx ABI: $abi at $abi_dir"
                   mkdir -p "${{ env.SDK_DIR }}/build/jniLibs/${abi}"
-                  cp -r "${abi_dir}"*.so "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" 2>/dev/null || true
+                  find "$abi_dir" -name "*.so" -exec cp -v {} "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" \;
                 fi
               done
             fi
           done
           
-          echo "=== jniLibs structure ==="
-          find ${{ env.SDK_DIR }}/build/jniLibs -name "*.so" | head -20
+          echo "=== Final jniLibs structure ==="
+          find ${{ env.SDK_DIR }}/build/jniLibs -type f -name "*.so" || echo "No .so files in jniLibs!"
+          
+          # Verify we have libraries
+          SO_COUNT=$(find ${{ env.SDK_DIR }}/build/jniLibs -name "*.so" | wc -l)
+          if [ "$SO_COUNT" -eq 0 ]; then
+            echo "❌ ERROR: No native libraries found!"
+            exit 1
+          fi
+          echo "✅ Found $SO_COUNT native libraries"
 
       - name: Setup Gradle Properties
         working-directory: ${{ env.SDK_DIR }}
@@ -204,13 +221,6 @@ jobs:
           cp gradle.properties.example gradle.properties 2>/dev/null || true
           echo "runanywhere.useLocalLibs=true" >> gradle.properties
           echo "version=${{ steps.version.outputs.version }}" >> gradle.properties
-
-      - name: Debug Downloaded Artifacts
-        run: |
-          echo "=== Downloaded artifact structure ==="
-          find native-artifacts -type f -name "*.so" 2>/dev/null | head -20 || echo "No .so files found"
-          echo "=== jniLibs after setup ==="
-          find ${{ env.SDK_DIR }}/build/jniLibs -type f 2>/dev/null | head -20 || echo "No files in jniLibs"
 
       - name: Build SDK
         working-directory: ${{ env.SDK_DIR }}

@@ -245,6 +245,12 @@ jobs:
 
       - name: Setup Native Libraries
         run: |
+          echo "=== Downloaded iOS frameworks ==="
+          find ios-frameworks -type d -name "*.xcframework" || echo "No xcframeworks found"
+          
+          echo "=== Downloaded Android native ==="
+          find android-native -name "*.so" -type f || echo "No .so files found"
+          
           # Setup iOS frameworks for each package
           CORE_IOS="${{ env.SDK_DIR }}/packages/runanywhere/ios/Frameworks"
           LLAMA_IOS="${{ env.SDK_DIR }}/packages/runanywhere_llamacpp/ios/Frameworks"
@@ -252,16 +258,33 @@ jobs:
           
           mkdir -p "$CORE_IOS" "$LLAMA_IOS" "$ONNX_IOS"
           
-          # Copy RACommons to core
-          cp -r ios-frameworks/RACommons.xcframework "$CORE_IOS/" 2>/dev/null || true
+          # Copy iOS frameworks with verbose output
+          echo "=== Copying iOS frameworks ==="
           
-          # Copy LlamaCPP backend
-          cp -r ios-frameworks/RABackendLLAMACPP.xcframework "$LLAMA_IOS/" 2>/dev/null || true
+          # RACommons to core
+          if [ -d "ios-frameworks/RACommons.xcframework" ]; then
+            cp -rv ios-frameworks/RACommons.xcframework "$CORE_IOS/"
+          else
+            # Try finding it anywhere in ios-frameworks
+            find ios-frameworks -name "RACommons.xcframework" -type d -exec cp -rv {} "$CORE_IOS/" \;
+          fi
           
-          # Copy ONNX backend and dependencies
-          cp -r ios-frameworks/RABackendONNX.xcframework "$ONNX_IOS/" 2>/dev/null || true
-          cp -r ios-frameworks/onnxruntime.xcframework "$ONNX_IOS/" 2>/dev/null || true
-          cp -r ios-frameworks/sherpa-onnx.xcframework "$ONNX_IOS/" 2>/dev/null || true
+          # LlamaCPP backend
+          if [ -d "ios-frameworks/RABackendLLAMACPP.xcframework" ]; then
+            cp -rv ios-frameworks/RABackendLLAMACPP.xcframework "$LLAMA_IOS/"
+          else
+            find ios-frameworks -name "RABackendLLAMACPP.xcframework" -type d -exec cp -rv {} "$LLAMA_IOS/" \;
+          fi
+          
+          # ONNX backend and dependencies
+          if [ -d "ios-frameworks/RABackendONNX.xcframework" ]; then
+            cp -rv ios-frameworks/RABackendONNX.xcframework "$ONNX_IOS/"
+          else
+            find ios-frameworks -name "RABackendONNX.xcframework" -type d -exec cp -rv {} "$ONNX_IOS/" \;
+          fi
+          
+          find ios-frameworks -name "onnxruntime.xcframework" -type d -exec cp -rv {} "$ONNX_IOS/" \;
+          find ios-frameworks -name "sherpa-onnx.xcframework" -type d -exec cp -rv {} "$ONNX_IOS/" \;
           
           # Setup Android jniLibs for each package
           CORE_ANDROID="${{ env.SDK_DIR }}/packages/runanywhere/android/src/main/jniLibs"
@@ -270,40 +293,48 @@ jobs:
           
           mkdir -p "$CORE_ANDROID" "$LLAMA_ANDROID" "$ONNX_ANDROID"
           
+          echo "=== Copying Android native libraries ==="
           for artifact_dir in android-native/flutter-android-native-*/; do
             if [ -d "$artifact_dir" ]; then
-              # Extract ABI from directory name
-              for abi_dir in "${artifact_dir}unified/"*/; do
+              echo "Processing $artifact_dir"
+              
+              # Copy unified libraries
+              for abi_dir in "${artifact_dir}"unified/*/; do
                 if [ -d "$abi_dir" ]; then
                   abi=$(basename "$abi_dir")
+                  echo "Copying unified for $abi"
                   mkdir -p "${CORE_ANDROID}/${abi}"
-                  cp "${abi_dir}"*.so "${CORE_ANDROID}/${abi}/" 2>/dev/null || true
+                  find "$abi_dir" -name "*.so" -exec cp -v {} "${CORE_ANDROID}/${abi}/" \;
                 fi
               done
               
-              for abi_dir in "${artifact_dir}llamacpp/"*/; do
+              # Copy llamacpp libraries  
+              for abi_dir in "${artifact_dir}"llamacpp/*/; do
                 if [ -d "$abi_dir" ]; then
                   abi=$(basename "$abi_dir")
+                  echo "Copying llamacpp for $abi"
                   mkdir -p "${LLAMA_ANDROID}/${abi}"
-                  cp "${abi_dir}"*.so "${LLAMA_ANDROID}/${abi}/" 2>/dev/null || true
+                  find "$abi_dir" -name "*.so" -exec cp -v {} "${LLAMA_ANDROID}/${abi}/" \;
                 fi
               done
               
-              for abi_dir in "${artifact_dir}onnx/"*/; do
+              # Copy onnx libraries
+              for abi_dir in "${artifact_dir}"onnx/*/; do
                 if [ -d "$abi_dir" ]; then
                   abi=$(basename "$abi_dir")
+                  echo "Copying onnx for $abi"
                   mkdir -p "${ONNX_ANDROID}/${abi}"
-                  cp "${abi_dir}"*.so "${ONNX_ANDROID}/${abi}/" 2>/dev/null || true
+                  find "$abi_dir" -name "*.so" -exec cp -v {} "${ONNX_ANDROID}/${abi}/" \;
                 fi
               done
             fi
           done
           
-          echo "=== iOS Frameworks ==="
-          find ${{ env.SDK_DIR }}/packages -name "*.xcframework" -type d
+          echo "=== Final iOS Frameworks ==="
+          find ${{ env.SDK_DIR }}/packages -name "*.xcframework" -type d || echo "No frameworks!"
           
-          echo "=== Android jniLibs ==="
-          find ${{ env.SDK_DIR }}/packages -name "*.so" -type f | head -20
+          echo "=== Final Android jniLibs ==="
+          find ${{ env.SDK_DIR }}/packages -name "*.so" -type f | head -30 || echo "No .so files!"
 
       - name: Update Package Versions
         working-directory: ${{ env.SDK_DIR }}
