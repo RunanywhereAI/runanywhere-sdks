@@ -162,6 +162,14 @@ The native AI inference libraries are provided by `runanywhere-core`. Run the se
 - Dart SDK >= 3.0.0
 - iOS 13.0+ / Android API 24+
 
+## Example App
+
+See the [Flutter example app](../../examples/flutter/RunAnywhereAI/) for a complete implementation demonstrating all SDK features including chat, voice, and model management.
+
+## Contributing
+
+See [CONTRIBUTING.md](../../CONTRIBUTING.md) for development guidelines.
+
 ## License
 
-See LICENSE file for details.
+Apache License 2.0 - See [LICENSE](../../LICENSE)

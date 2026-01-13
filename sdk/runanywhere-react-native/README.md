@@ -299,6 +299,14 @@ cd examples/react-native/RunAnywhereAI
 npx react-native run-android
 ```
 
+## Example App
+
+See the [React Native example app](../../examples/react-native/RunAnywhereAI/) for a complete implementation demonstrating all SDK features.
+
+## Contributing
+
+See [CONTRIBUTING.md](../../CONTRIBUTING.md) for development guidelines.
+
 ## License
 
-MIT
+Apache License 2.0 - See [LICENSE](../../LICENSE)
