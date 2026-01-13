@@ -5,11 +5,11 @@
 # Unified Android build script - builds JNI bridge + selected backends
 #
 # Usage: ./build-android.sh [options] [backends] [abis]
-#        backends: onnx | llamacpp | whispercpp | tflite | all (default: all)
+#        backends: onnx | llamacpp | all (default: all)
 #                  - onnx: STT/TTS/VAD (Sherpa-ONNX models)
 #                  - llamacpp: LLM text generation (GGUF models)
-#                  - whispercpp: Legacy STT (deprecated, use onnx)
-#                  - all: All backends (default)
+#                  - all: onnx + llamacpp (default)
+#        NOTE: whispercpp is deprecated (use onnx for STT)
 #        abis: comma-separated list (default: arm64-v8a)
 #              Supported: arm64-v8a, armeabi-v7a, x86_64, x86
 #
@@ -213,9 +213,11 @@ BUILD_TFLITE=OFF
 
 case "$BACKENDS" in
     all)
+        # NOTE: WhisperCPP is deprecated - use ONNX for STT instead
+        # WhisperCPP has build issues with newer ggml versions (GGML_KQ_MASK_PAD)
         BUILD_ONNX=ON
         BUILD_LLAMACPP=ON
-        BUILD_WHISPERCPP=ON
+        BUILD_WHISPERCPP=OFF
         DIST_SUBDIR="unified"
         ;;
     onnx)
