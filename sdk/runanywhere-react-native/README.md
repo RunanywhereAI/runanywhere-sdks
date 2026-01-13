@@ -285,6 +285,17 @@ Native binaries (XCFramework for iOS, .so libraries for Android) are **automatic
 
 The version is controlled by `native-version.txt` in the native package.
 
+### Local Development (Build from Source)
+
+To build native libraries locally and test the SDK end-to-end:
+
+```bash
+# First-time setup (builds iOS + Android native libs)
+./scripts/build-react-native.sh --setup
+```
+
+See `./scripts/build-react-native.sh --help` for all options.
+
 ### Build Commands
 
 ```bash

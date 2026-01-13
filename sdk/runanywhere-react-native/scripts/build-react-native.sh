@@ -4,7 +4,7 @@
 # =============================================================================
 #
 # Single entry point for building the React Native SDK and its native dependencies.
-# Similar to iOS's build-swift.sh and Android's build-kotlin.sh.
+# Builds native C++ libraries for both iOS (XCFrameworks) and Android (JNI .so libs).
 #
 # USAGE:
 #   ./scripts/build-react-native.sh [options]
@@ -18,20 +18,58 @@
 #   --android           Build for Android only (default: both)
 #   --clean             Clean build directories before building
 #   --skip-build        Skip native build (only setup frameworks/libs)
+#   --abis=ABIS         Android ABIs to build (default: arm64-v8a)
+#                       Multiple: Use comma-separated (e.g., arm64-v8a,armeabi-v7a)
 #   --help              Show this help message
 #
-# EXAMPLES:
-#   # First-time setup (downloads + builds + copies everything)
+# ANDROID ABI GUIDE:
+#   arm64-v8a        64-bit ARM (modern devices, ~85% coverage)
+#   armeabi-v7a      32-bit ARM (older devices, ~12% coverage)
+#   x86_64           64-bit Intel (emulators on Intel Macs)
+#
+# WHAT GETS BUILT:
+#   iOS Output (in packages/*/ios/):
+#     • core/ios/Binaries/RACommons.xcframework
+#     • llamacpp/ios/Frameworks/RABackendLLAMACPP.xcframework
+#     • onnx/ios/Frameworks/RABackendONNX.xcframework + onnxruntime.xcframework
+#
+#   Android Output (in packages/*/android/src/main/jniLibs/{ABI}/):
+#     • core: librunanywhere_jni.so, librac_commons.so, libc++_shared.so, libomp.so
+#     • llamacpp: librunanywhere_llamacpp.so, librac_backend_llamacpp_jni.so
+#     • onnx: librunanywhere_onnx.so, libonnxruntime.so, libsherpa-onnx-*.so
+#
+# FRESH CLONE TO RUNNING APP:
+#   # 1. Build SDK with native libraries (~15-20 min)
+#   cd sdk/runanywhere-react-native
 #   ./scripts/build-react-native.sh --setup
 #
-#   # Rebuild only commons (after C++ code changes)
+#   # 2. Run sample app on iOS
+#   cd ../../examples/react-native/RunAnywhereAI
+#   yarn install
+#   cd ios && pod install && cd ..
+#   npx react-native run-ios
+#
+#   # 3. Run sample app on Android
+#   npx react-native run-android
+#
+# EXAMPLES:
+#   # First-time setup (iOS + Android, all backends)
+#   ./scripts/build-react-native.sh --setup
+#
+#   # iOS only setup (~10 min)
+#   ./scripts/build-react-native.sh --setup --ios
+#
+#   # Android only (~7 min)
+#   ./scripts/build-react-native.sh --setup --android
+#
+#   # Android with multiple ABIs for production (97% device coverage)
+#   ./scripts/build-react-native.sh --setup --android --abis=arm64-v8a,armeabi-v7a
+#
+#   # Rebuild after C++ changes
 #   ./scripts/build-react-native.sh --local --rebuild-commons
 #
 #   # Just switch to local mode (uses cached libs)
 #   ./scripts/build-react-native.sh --local --skip-build
-#
-#   # iOS only setup
-#   ./scripts/build-react-native.sh --setup --ios
 #
 # =============================================================================
 
@@ -106,7 +144,7 @@ log_error() {
 # =============================================================================
 
 show_help() {
-    head -38 "$0" | tail -35
+    head -75 "$0" | tail -70
     exit 0
 }
 
@@ -333,16 +371,16 @@ copy_android_jnilibs() {
 
         # =======================================================================
         # LlamaCPP Package: RABackendLlamaCPP
-        # Rename to librunanywhere_llamacpp.so as expected by RN SDK
+        # Keep original library name (bridge libs depend on it)
         # =======================================================================
 
-        # Copy and rename backend library
+        # Copy backend library with original name
         if [[ -f "${COMMONS_DIST}/llamacpp/${ABI}/librac_backend_llamacpp.so" ]]; then
-            cp "${COMMONS_DIST}/llamacpp/${ABI}/librac_backend_llamacpp.so" "${LLAMACPP_ANDROID_JNILIBS}/${ABI}/librunanywhere_llamacpp.so"
-            log_info "LlamaCPP: librunanywhere_llamacpp.so"
+            cp "${COMMONS_DIST}/llamacpp/${ABI}/librac_backend_llamacpp.so" "${LLAMACPP_ANDROID_JNILIBS}/${ABI}/librac_backend_llamacpp.so"
+            log_info "LlamaCPP: librac_backend_llamacpp.so"
         elif [[ -f "${COMMONS_BUILD}/${ABI}/src/backends/llamacpp/librac_backend_llamacpp.so" ]]; then
-            cp "${COMMONS_BUILD}/${ABI}/src/backends/llamacpp/librac_backend_llamacpp.so" "${LLAMACPP_ANDROID_JNILIBS}/${ABI}/librunanywhere_llamacpp.so"
-            log_info "LlamaCPP: librunanywhere_llamacpp.so (from build)"
+            cp "${COMMONS_BUILD}/${ABI}/src/backends/llamacpp/librac_backend_llamacpp.so" "${LLAMACPP_ANDROID_JNILIBS}/${ABI}/librac_backend_llamacpp.so"
+            log_info "LlamaCPP: librac_backend_llamacpp.so (from build)"
         fi
 
         # Copy JNI bridge
@@ -356,16 +394,16 @@ copy_android_jnilibs() {
 
         # =======================================================================
         # ONNX Package: RABackendONNX
-        # Rename to librunanywhere_onnx.so as expected by RN SDK
+        # Keep original library name (bridge libs depend on it)
         # =======================================================================
 
-        # Copy and rename backend library
+        # Copy backend library with original name
         if [[ -f "${COMMONS_DIST}/onnx/${ABI}/librac_backend_onnx.so" ]]; then
-            cp "${COMMONS_DIST}/onnx/${ABI}/librac_backend_onnx.so" "${ONNX_ANDROID_JNILIBS}/${ABI}/librunanywhere_onnx.so"
-            log_info "ONNX: librunanywhere_onnx.so"
+            cp "${COMMONS_DIST}/onnx/${ABI}/librac_backend_onnx.so" "${ONNX_ANDROID_JNILIBS}/${ABI}/librac_backend_onnx.so"
+            log_info "ONNX: librac_backend_onnx.so"
         elif [[ -f "${COMMONS_BUILD}/${ABI}/src/backends/onnx/librac_backend_onnx.so" ]]; then
-            cp "${COMMONS_BUILD}/${ABI}/src/backends/onnx/librac_backend_onnx.so" "${ONNX_ANDROID_JNILIBS}/${ABI}/librunanywhere_onnx.so"
-            log_info "ONNX: librunanywhere_onnx.so (from build)"
+            cp "${COMMONS_BUILD}/${ABI}/src/backends/onnx/librac_backend_onnx.so" "${ONNX_ANDROID_JNILIBS}/${ABI}/librac_backend_onnx.so"
+            log_info "ONNX: librac_backend_onnx.so (from build)"
         fi
 
         # Copy JNI bridge

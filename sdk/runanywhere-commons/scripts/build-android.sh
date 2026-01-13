@@ -6,16 +6,42 @@
 #
 # Usage: ./build-android.sh [options] [backends] [abis]
 #        backends: onnx | llamacpp | whispercpp | tflite | all (default: all)
+#                  - onnx: STT/TTS/VAD (Sherpa-ONNX models)
+#                  - llamacpp: LLM text generation (GGUF models)
+#                  - whispercpp: Legacy STT (deprecated, use onnx)
+#                  - all: All backends (default)
 #        abis: comma-separated list (default: arm64-v8a)
+#              Supported: arm64-v8a, armeabi-v7a, x86_64, x86
 #
 # Options:
 #   --check   Check 16KB alignment of existing libraries in dist/
 #   --help    Show this help message
 #
+# ABI Guide:
+#   arm64-v8a        64-bit ARM (modern devices, ~85% coverage)
+#   armeabi-v7a      32-bit ARM (older devices, ~12% coverage)
+#   x86_64           64-bit Intel (emulators on Intel Macs, ~2%)
+#   x86              32-bit Intel (old emulators, ~1%)
+#
 # Examples:
-#   ./build-android.sh                    # Build all backends
-#   ./build-android.sh --check            # Verify 16KB alignment
-#   ./build-android.sh onnx               # Build only ONNX backend
+#   # Quick start (modern devices only, ~4min build)
+#   ./build-android.sh
+#
+#   # RECOMMENDED for production (97% device coverage, ~7min build)
+#   ./build-android.sh all arm64-v8a,armeabi-v7a
+#
+#   # Full compatibility (all devices + emulators, ~12min build)
+#   ./build-android.sh all arm64-v8a,armeabi-v7a,x86_64,x86
+#
+#   # Development with emulator support (device + emulator)
+#   ./build-android.sh all arm64-v8a,x86_64
+#
+#   # Single backend with multiple ABIs
+#   ./build-android.sh llamacpp arm64-v8a,armeabi-v7a
+#   ./build-android.sh onnx arm64-v8a,armeabi-v7a
+#
+#   # Verify 16KB alignment
+#   ./build-android.sh --check
 #
 # 16KB Page Size Alignment (Google Play deadline: November 1, 2025):
 #   ✅ Sherpa-ONNX v1.12.20+ pre-built binaries ARE 16KB aligned!
@@ -83,7 +109,7 @@ while [[ "$1" == --* ]]; do
             shift
             ;;
         --help|-h)
-            head -25 "$0" | tail -20
+            head -55 "$0" | tail -50
             exit 0
             ;;
         *)
