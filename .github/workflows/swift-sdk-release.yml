@@ -400,7 +400,12 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "chore(swift): update version for v${{ steps.version.outputs.version }}"
-            git push
+            
+            # Get the default branch name and push to it
+            # (we may be in detached HEAD state from tag checkout)
+            DEFAULT_BRANCH=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
+            echo "Pushing to branch: $DEFAULT_BRANCH"
+            git push origin HEAD:$DEFAULT_BRANCH
           fi
 
   # ===========================================================================
