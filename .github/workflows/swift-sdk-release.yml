@@ -333,7 +333,7 @@ jobs:
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Download Latest Backend Release
+      - name: Download and Update Binaries
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -342,6 +342,8 @@ jobs:
           
           if [ -z "$LATEST_TAG" ]; then
             echo "No backend releases found, using existing binaries"
+            echo "=== Current Binaries ==="
+            ls -la ${{ env.SDK_DIR }}/Binaries/ || echo "No Binaries directory"
             exit 0
           fi
           
@@ -355,13 +357,11 @@ jobs:
             --pattern "RACommons-ios-*.zip" \
             --dir downloads || echo "Some downloads may have failed"
           
+          echo "=== Downloaded files ==="
           ls -la downloads/
-
-      - name: Extract and Update Binaries
-        run: |
-          cd downloads
           
           # Extract and copy to SDK Binaries folder
+          cd downloads
           for zip in *.zip; do
             if [ -f "$zip" ]; then
               echo "Extracting $zip..."
