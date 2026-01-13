@@ -227,8 +227,10 @@ jobs:
           flutter-version: '3.24.0'
           channel: 'stable'
 
-      - name: Install Melos
-        run: dart pub global activate melos
+      - name: Install Melos 2.9.0
+        run: |
+          dart pub global activate melos 2.9.0
+          echo "${HOME}/.pub-cache/bin" >> $GITHUB_PATH
 
       - name: Download iOS Frameworks
         uses: actions/download-artifact@v4

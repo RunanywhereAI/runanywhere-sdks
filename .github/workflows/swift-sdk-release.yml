@@ -117,69 +117,84 @@ jobs:
           # Artifacts are downloaded to GITHUB_WORKSPACE/artifacts/
           ARTIFACTS_DIR="${GITHUB_WORKSPACE}/artifacts"
           
-          echo "=== Artifacts directory contents ==="
-          ls -la "$ARTIFACTS_DIR" 2>/dev/null || echo "No artifacts directory at $ARTIFACTS_DIR"
+          echo "=== Artifacts directory structure ==="
+          find "$ARTIFACTS_DIR" -type d 2>/dev/null | head -30 || echo "No artifacts directory"
           
-          echo "=== All files in artifacts ==="
-          find "$ARTIFACTS_DIR" -type f 2>/dev/null | head -30 || echo "No files found"
+          echo "=== All files in artifacts (first 50) ==="
+          find "$ARTIFACTS_DIR" -type f 2>/dev/null | head -50 || echo "No files found"
           
           echo "=== XCFrameworks in artifacts ==="
           find "$ARTIFACTS_DIR" -name "*.xcframework" -type d 2>/dev/null || echo "No xcframeworks found"
           
+          # Clean and recreate Binaries directory
+          rm -rf Binaries
           mkdir -p Binaries
-          FOUND_FRAMEWORKS=0
           
-          # Copy xcframeworks directly (artifacts are directories, not zips)
+          # Copy xcframeworks - they might be nested in various subdirectories
+          echo "=== Copying xcframeworks ==="
+          XCFW_COUNT=0
           while IFS= read -r fw; do
-            if [ -n "$fw" ]; then
+            if [ -n "$fw" ] && [ -d "$fw" ]; then
               fw_name=$(basename "$fw")
-              echo "Copying: $fw -> Binaries/$fw_name"
-              cp -r "$fw" "Binaries/$fw_name"
-              FOUND_FRAMEWORKS=$((FOUND_FRAMEWORKS + 1))
+              # Check if it's a valid xcframework (has Info.plist)
+              if [ -f "$fw/Info.plist" ]; then
+                echo "✅ Copying valid xcframework: $fw -> Binaries/$fw_name"
+                cp -R "$fw" "Binaries/$fw_name"
+                XCFW_COUNT=$((XCFW_COUNT + 1))
+              else
+                echo "⚠️ Skipping invalid xcframework (no Info.plist): $fw"
+              fi
             fi
           done < <(find "$ARTIFACTS_DIR" -name "*.xcframework" -type d 2>/dev/null)
           
-          # Also try extracting zip files if any
-          for zip in "$ARTIFACTS_DIR"/*.zip; do
-            if [ -f "$zip" ]; then
-              echo "Found zip: $zip, extracting..."
-              unzip -o "$zip" -d Binaries/ || true
-              FOUND_FRAMEWORKS=$((FOUND_FRAMEWORKS + 1))
+          echo "Copied $XCFW_COUNT xcframeworks"
+          
+          # Also try extracting any zip files
+          echo "=== Checking for zip files ==="
+          find "$ARTIFACTS_DIR" -name "*.zip" -type f 2>/dev/null | while read zip; do
+            echo "Extracting: $zip"
+            unzip -o "$zip" -d Binaries/ 2>/dev/null || true
+          done
+          
+          # Move any nested xcframeworks to top level of Binaries
+          echo "=== Flattening nested xcframeworks ==="
+          find Binaries -mindepth 2 -name "*.xcframework" -type d 2>/dev/null | while read fw; do
+            fw_name=$(basename "$fw")
+            if [ -f "$fw/Info.plist" ] && [ ! -d "Binaries/$fw_name" ]; then
+              echo "Moving nested: $fw -> Binaries/$fw_name"
+              mv "$fw" "Binaries/$fw_name"
             fi
           done
           
-          # Move any nested xcframeworks to top level
-          while IFS= read -r fw; do
-            if [ -n "$fw" ]; then
-              fw_name=$(basename "$fw")
-              fw_parent=$(dirname "$fw")
-              if [ "$fw_parent" != "Binaries" ]; then
-                echo "Moving nested: $fw -> Binaries/$fw_name"
-                mv "$fw" "Binaries/$fw_name" 2>/dev/null || true
-              fi
-            fi
-          done < <(find Binaries -name "*.xcframework" -type d 2>/dev/null)
+          echo "=== Binaries directory contents ==="
+          ls -la Binaries/ 2>/dev/null || echo "Binaries directory is empty"
           
-          echo "=== Binaries directory after setup ==="
-          ls -la Binaries/ || echo "Binaries directory is empty"
-          
-          # Check if we have the required frameworks
+          # Verify each required framework exists AND has content
+          echo "=== Verifying frameworks ==="
           REQUIRED_FRAMEWORKS="RACommons RABackendLLAMACPP RABackendONNX"
-          MISSING=""
+          ALL_VALID=true
           for req in $REQUIRED_FRAMEWORKS; do
-            if [ ! -d "Binaries/${req}.xcframework" ]; then
-              MISSING="$MISSING $req"
+            FW_PATH="Binaries/${req}.xcframework"
+            if [ -d "$FW_PATH" ] && [ -f "$FW_PATH/Info.plist" ]; then
+              echo "✅ $req.xcframework is valid"
+              ls "$FW_PATH/"
+            else
+              echo "❌ $req.xcframework is missing or invalid"
+              ALL_VALID=false
             fi
           done
           
-          if [ -n "$MISSING" ]; then
-            echo "⚠️ Missing frameworks:$MISSING"
-            echo "Setting testLocal = false to download from releases"
+          if [ "$ALL_VALID" = false ]; then
+            echo ""
+            echo "⚠️ Some frameworks are missing. Setting testLocal = false"
+            echo "   This will download frameworks from GitHub releases instead."
             sed -i '' 's/let testLocal = true/let testLocal = false/' Package.swift
           else
-            echo "✅ All required frameworks found"
+            echo ""
+            echo "✅ All required frameworks found and valid"
           fi
           
+          echo ""
           echo "=== Package.swift testLocal setting ==="
           grep "let testLocal" Package.swift
 
