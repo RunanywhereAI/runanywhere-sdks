@@ -53,8 +53,15 @@ elseif(RAC_PLATFORM_ANDROID)
     # CRITICAL: Disable native CPU detection (fails during cross-compilation)
     set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
     
-    # Enable ARM NEON for ARM devices
-    set(GGML_NEON ON CACHE BOOL "" FORCE)
+    # Enable ARM NEON only for ARM architectures (not x86/x86_64)
+    if(ANDROID_ABI MATCHES "arm64-v8a|armeabi-v7a")
+        set(GGML_NEON ON CACHE BOOL "" FORCE)
+        message(STATUS "Enabling NEON for ARM ABI: ${ANDROID_ABI}")
+    else()
+        set(GGML_NEON OFF CACHE BOOL "" FORCE)
+        # x86/x86_64 will use SSE/AVX automatically
+        message(STATUS "Disabling NEON for non-ARM ABI: ${ANDROID_ABI}")
+    endif()
     
     # Android-specific settings
     set(ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES ON CACHE BOOL "" FORCE)
