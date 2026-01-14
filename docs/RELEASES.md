@@ -112,18 +112,28 @@ All SDKs are released as a **single unified release** with all assets attached:
 
 Every unified release (`v*`) includes:
 
+#### Core Libraries (always needed)
 | Asset | Platform | Description |
 |-------|----------|-------------|
 | `RACommons-ios-v*.zip` | iOS/macOS | Core infrastructure (XCFramework) |
 | `RACommons-android-v*.zip` | Android | Core infrastructure (native libs) |
-| `RABackendLLAMACPP-ios-v*.zip` | iOS/macOS | LLM backend - llama.cpp |
-| `RABackendONNX-ios-v*.zip` | iOS/macOS | STT/TTS/VAD backend - Sherpa-ONNX |
-| `RABackends-android-v*.zip` | Android | All backends (arm64-v8a, armeabi-v7a, x86_64) |
-| `RunAnywhere-Swift-SDK-v*.zip` | iOS/macOS | Swift SDK build artifacts |
+
+#### Backend Libraries (pick what you need)
+| Asset | Platform | Use Case |
+|-------|----------|----------|
+| `RABackendLLAMACPP-ios-v*.zip` | iOS/macOS | LLM text generation |
+| `RABackendLLAMACPP-android-v*.zip` | Android | LLM text generation |
+| `RABackendONNX-ios-v*.zip` | iOS/macOS | STT / TTS / VAD |
+| `RABackendONNX-android-v*.zip` | Android | STT / TTS / VAD |
+
+#### SDK Packages
+| Asset | Platform | Description |
+|-------|----------|-------------|
+| `RunAnywhere-Swift-SDK-v*.zip` | iOS/macOS | Swift SDK |
 | `RunAnywhere-Kotlin-SDK-v*.aar` | Android | Kotlin SDK (AAR) |
-| `RunAnywhere-Flutter-SDK-v*.zip` | Cross-platform | Flutter SDK package |
-| `RunAnywhere-ReactNative-SDK-v*.zip` | Cross-platform | React Native SDK package |
-| `checksums.sha256` | All | SHA256 checksums for all assets |
+| `RunAnywhere-Flutter-SDK-v*.zip` | Cross-platform | Flutter SDK (3 packages) |
+| `RunAnywhere-ReactNative-SDK-v*.zip` | Cross-platform | React Native SDK (3 packages) |
+| `checksums.sha256` | All | SHA256 checksums |
 
 ### Native Libraries
 

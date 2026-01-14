@@ -302,18 +302,38 @@ jobs:
             cd ../..
           fi
           
-          # Android backends (combine all ABIs)
-          mkdir -p android-backends
+          # Android backends - SPLIT into separate LlamaCPP and ONNX zips
+          # LlamaCPP Android
+          mkdir -p android-llamacpp/jniLibs
           for abi in arm64-v8a armeabi-v7a x86_64; do
             if [ -d "all-artifacts/backends-android-${abi}-${VERSION}" ]; then
-              mkdir -p "android-backends/${abi}"
-              cp -r "all-artifacts/backends-android-${abi}-${VERSION}"/* "android-backends/${abi}/" 2>/dev/null || true
+              # Copy llamacpp libraries
+              if [ -d "all-artifacts/backends-android-${abi}-${VERSION}/llamacpp/${abi}" ]; then
+                mkdir -p "android-llamacpp/jniLibs/${abi}"
+                cp -r "all-artifacts/backends-android-${abi}-${VERSION}/llamacpp/${abi}"/*.so "android-llamacpp/jniLibs/${abi}/" 2>/dev/null || true
+              fi
             fi
           done
-          if [ "$(ls -A android-backends 2>/dev/null)" ]; then
-            cd android-backends && zip -r "../release-assets/RABackends-android-v${VERSION}.zip" . && cd ..
+          if [ "$(find android-llamacpp -name '*.so' 2>/dev/null | head -1)" ]; then
+            cd android-llamacpp && zip -r "../release-assets/RABackendLLAMACPP-android-v${VERSION}.zip" . && cd ..
           fi
-          rm -rf android-backends
+          rm -rf android-llamacpp
+          
+          # ONNX Android
+          mkdir -p android-onnx/jniLibs
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            if [ -d "all-artifacts/backends-android-${abi}-${VERSION}" ]; then
+              # Copy onnx libraries
+              if [ -d "all-artifacts/backends-android-${abi}-${VERSION}/onnx/${abi}" ]; then
+                mkdir -p "android-onnx/jniLibs/${abi}"
+                cp -r "all-artifacts/backends-android-${abi}-${VERSION}/onnx/${abi}"/*.so "android-onnx/jniLibs/${abi}/" 2>/dev/null || true
+              fi
+            fi
+          done
+          if [ "$(find android-onnx -name '*.so' 2>/dev/null | head -1)" ]; then
+            cd android-onnx && zip -r "../release-assets/RABackendONNX-android-v${VERSION}.zip" . && cd ..
+          fi
+          rm -rf android-onnx
           
           # ─────────────────────────────────────────────────────────────
           # Swift SDK
@@ -375,17 +395,27 @@ jobs:
             
             ### 📦 Release Assets
             
+            #### Core Libraries
             | Asset | Platform | Description |
             |-------|----------|-------------|
             | `RACommons-ios-v${{ needs.setup.outputs.version }}.zip` | iOS/macOS | Core infrastructure (XCFramework) |
             | `RACommons-android-v${{ needs.setup.outputs.version }}.zip` | Android | Core infrastructure (native libs) |
-            | `RABackendLLAMACPP-ios-v${{ needs.setup.outputs.version }}.zip` | iOS/macOS | LLM backend - llama.cpp (XCFramework) |
-            | `RABackendONNX-ios-v${{ needs.setup.outputs.version }}.zip` | iOS/macOS | STT/TTS/VAD backend - Sherpa-ONNX (XCFramework) |
-            | `RABackends-android-v${{ needs.setup.outputs.version }}.zip` | Android | All backends (arm64-v8a, armeabi-v7a, x86_64) |
-            | `RunAnywhere-Swift-SDK-v${{ needs.setup.outputs.version }}.zip` | iOS/macOS | Swift SDK build artifacts |
+            
+            #### Backend Libraries (pick what you need)
+            | Asset | Platform | Description |
+            |-------|----------|-------------|
+            | `RABackendLLAMACPP-ios-v${{ needs.setup.outputs.version }}.zip` | iOS/macOS | LLM backend - llama.cpp |
+            | `RABackendLLAMACPP-android-v${{ needs.setup.outputs.version }}.zip` | Android | LLM backend - llama.cpp |
+            | `RABackendONNX-ios-v${{ needs.setup.outputs.version }}.zip` | iOS/macOS | STT/TTS/VAD - Sherpa-ONNX |
+            | `RABackendONNX-android-v${{ needs.setup.outputs.version }}.zip` | Android | STT/TTS/VAD - Sherpa-ONNX |
+            
+            #### SDK Packages
+            | Asset | Platform | Description |
+            |-------|----------|-------------|
+            | `RunAnywhere-Swift-SDK-v${{ needs.setup.outputs.version }}.zip` | iOS/macOS | Swift SDK |
             | `RunAnywhere-Kotlin-SDK-v${{ needs.setup.outputs.version }}.aar` | Android | Kotlin SDK (AAR) |
-            | `RunAnywhere-Flutter-SDK-v${{ needs.setup.outputs.version }}.zip` | Cross-platform | Flutter SDK package |
-            | `RunAnywhere-ReactNative-SDK-v${{ needs.setup.outputs.version }}.zip` | Cross-platform | React Native SDK package |
+            | `RunAnywhere-Flutter-SDK-v${{ needs.setup.outputs.version }}.zip` | Cross-platform | Flutter SDK (3 packages) |
+            | `RunAnywhere-ReactNative-SDK-v${{ needs.setup.outputs.version }}.zip` | Cross-platform | React Native SDK (3 packages) |
             
             ---
             
