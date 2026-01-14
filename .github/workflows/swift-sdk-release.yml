@@ -1,0 +1,516 @@
+name: Swift SDK Release
+
+# =============================================================================
+# Swift SDK Release Workflow
+#
+# Publishes the RunAnywhere Swift SDK for iOS/macOS.
+# The Swift SDK is distributed via Swift Package Manager (SPM).
+#
+# This workflow:
+#   1. Updates the Binaries/ folder with latest backend frameworks
+#   2. Creates a release tag
+#   3. Updates Package.swift binary targets if needed
+#
+# Users consume via:
+#   .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "1.0.0")
+# =============================================================================
+
+on:
+  push:
+    tags:
+      - 'swift-v*'
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to release'
+        required: true
+        type: string
+      update_binaries:
+        description: 'Update binaries from latest backend release'
+        required: false
+        default: true
+        type: boolean
+      dry_run:
+        description: 'Dry run'
+        required: false
+        default: false
+        type: boolean
+      skip_publish:
+        description: 'Skip creating individual release (for unified release)'
+        required: false
+        default: false
+        type: boolean
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.0)'
+        required: true
+        type: string
+      update_binaries:
+        description: 'Update binaries from latest backend release'
+        required: false
+        default: true
+        type: boolean
+      dry_run:
+        description: 'Dry run (test build only)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  SDK_DIR: sdk/runanywhere-swift
+
+jobs:
+  # ===========================================================================
+  # Build and Test Swift SDK
+  # ===========================================================================
+  build-test:
+    name: Build & Test Swift SDK
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "$GITHUB_REF" == refs/tags/swift-v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/swift-v}"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION="0.0.0-$(git rev-parse --short HEAD)"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building Swift SDK v$VERSION"
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.1'
+
+      - name: Install SwiftLint and xcpretty
+        run: |
+          brew install swiftlint
+          gem install xcpretty
+
+      - name: Run SwiftLint
+        working-directory: ${{ env.SDK_DIR }}
+        run: swiftlint --strict
+
+      - name: Download iOS Artifacts from Commons
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "racommons-ios-*"
+          path: artifacts/commons
+          merge-multiple: true
+
+      - name: Download iOS Artifacts from Backends
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "backend-*-ios-*"
+          path: artifacts/backends
+          merge-multiple: true
+
+      - name: Setup Binaries from Artifacts
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          set -e  # Exit on any error
+          echo "=== Checking for CI artifacts ==="
+          ARTIFACTS_DIR="${GITHUB_WORKSPACE}/artifacts"
+          
+          echo "=== Full artifacts structure (files) ==="
+          find "$ARTIFACTS_DIR" -type f 2>/dev/null | head -50 || echo "No files found"
+          
+          echo ""
+          echo "=== Full artifacts structure (directories) ==="
+          find "$ARTIFACTS_DIR" -type d 2>/dev/null | head -50 || echo "No directories found"
+          
+          echo ""
+          echo "=== Looking for XCFrameworks ==="
+          find "$ARTIFACTS_DIR" -name "*.xcframework" -type d 2>/dev/null || echo "No xcframeworks found as directories"
+          
+          echo ""
+          echo "=== Looking for zip files ==="
+          find "$ARTIFACTS_DIR" -name "*.zip" -type f 2>/dev/null || echo "No zip files found"
+          
+          # Clean and recreate Binaries directory
+          rm -rf Binaries
+          mkdir -p Binaries
+          
+          # Copy all xcframeworks from artifacts (without Info.plist check - just copy directories)
+          echo ""
+          echo "=== Copying xcframeworks ==="
+          XCFW_COUNT=0
+          for fw in $(find "$ARTIFACTS_DIR" -name "*.xcframework" -type d 2>/dev/null); do
+            if [ -d "$fw" ]; then
+              fw_name=$(basename "$fw")
+              echo "Copying: $fw -> Binaries/$fw_name"
+              cp -R "$fw" "Binaries/$fw_name"
+              XCFW_COUNT=$((XCFW_COUNT + 1))
+            fi
+          done
+          echo "Copied $XCFW_COUNT xcframeworks from directories"
+          
+          # Extract any zip files and copy xcframeworks from them
+          echo ""
+          echo "=== Extracting zip files ==="
+          mkdir -p Binaries/_tmp
+          for zip in $(find "$ARTIFACTS_DIR" -name "*.zip" -type f 2>/dev/null); do
+            echo "Extracting: $zip"
+            unzip -o "$zip" -d Binaries/_tmp/ || true
+          done
+          
+          # List extracted contents
+          echo "=== Extracted zip contents ==="
+          find Binaries/_tmp -type d -name "*.xcframework" 2>/dev/null || echo "No xcframeworks in zips"
+          
+          # Move xcframeworks from extracted zips
+          for fw in $(find Binaries/_tmp -name "*.xcframework" -type d 2>/dev/null); do
+            fw_name=$(basename "$fw")
+            if [ ! -d "Binaries/$fw_name" ]; then
+              echo "Moving from zip: $fw -> Binaries/$fw_name"
+              cp -R "$fw" "Binaries/$fw_name"
+              XCFW_COUNT=$((XCFW_COUNT + 1))
+            fi
+          done
+          rm -rf Binaries/_tmp 2>/dev/null || true
+          
+          echo ""
+          echo "=== Final Binaries directory contents ==="
+          ls -la Binaries/ || echo "Empty"
+          
+          # Show internal structure of one framework for debugging
+          echo ""
+          echo "=== Sample framework structure ==="
+          if [ -d "Binaries/RACommons.xcframework" ]; then
+            ls -la Binaries/RACommons.xcframework/ || true
+          fi
+          
+          # Verify required frameworks exist (check directory exists, not Info.plist)
+          echo ""
+          echo "=== Verifying required frameworks ==="
+          REQUIRED="RACommons RABackendLLAMACPP RABackendONNX"
+          MISSING=""
+          for req in $REQUIRED; do
+            FW="Binaries/${req}.xcframework"
+            if [ -d "$FW" ]; then
+              # Check if it has any content
+              COUNT=$(ls -1 "$FW" 2>/dev/null | wc -l)
+              if [ "$COUNT" -gt 0 ]; then
+                echo "✅ $req.xcframework - found ($COUNT items)"
+              else
+                echo "❌ $req.xcframework - exists but EMPTY"
+                MISSING="$MISSING $req"
+              fi
+            else
+              echo "❌ $req.xcframework - MISSING"
+              MISSING="$MISSING $req"
+            fi
+          done
+          
+          if [ -n "$MISSING" ]; then
+            echo ""
+            echo "========================================="
+            echo "❌ ERROR: Missing required frameworks:$MISSING"
+            echo "========================================="
+            echo ""
+            echo "This is a CI build - artifacts from earlier jobs should be available."
+            echo "Check that commons-release and backends-release jobs completed successfully."
+            exit 1
+          fi
+          
+          echo ""
+          echo "✅ All frameworks ready for build"
+
+      - name: Resolve Package Dependencies
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          echo "=== Xcode version ==="
+          xcodebuild -version
+          echo ""
+          echo "=== Resolving Swift Package dependencies ==="
+          swift package resolve
+          echo ""
+          echo "=== Package description ==="
+          swift package describe || true
+
+      - name: Verify Package Structure
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          echo "=== Checking XCFrameworks ==="
+          ls -la Binaries/
+          echo ""
+          echo "=== Checking RACommons ==="
+          ls -la Binaries/RACommons.xcframework/ || echo "RACommons not found"
+          echo ""
+          echo "=== Checking RABackendLLAMACPP ==="
+          ls -la Binaries/RABackendLLAMACPP.xcframework/ || echo "LlamaCPP not found"
+          echo ""
+          echo "=== Checking RABackendONNX ==="
+          ls -la Binaries/RABackendONNX.xcframework/ || echo "ONNX not found"
+
+      - name: Build for iOS Device (Archive-ready)
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          # Build for iOS Device using xcodebuild archive
+          # This validates the package builds correctly for distribution
+          echo "=== Building for iOS Device ==="
+          
+          # First, generate xcodeproj if needed
+          swift package generate-xcodeproj --skip-extra-files || true
+          
+          # Build using xcodebuild with the Package.swift directly
+          xcodebuild build \
+            -scheme RunAnywhere \
+            -destination 'generic/platform=iOS' \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            SKIP_INSTALL=NO \
+            BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+            SWIFT_STRICT_CONCURRENCY=minimal \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            2>&1 || {
+              echo "=== Build failed, checking available schemes ==="
+              xcodebuild -list || true
+              echo ""
+              echo "=== Trying with RunAnywhere-Package scheme ==="
+              xcodebuild build \
+                -scheme RunAnywhere-Package \
+                -destination 'generic/platform=iOS' \
+                -configuration Release \
+                -derivedDataPath build \
+                CODE_SIGNING_ALLOWED=NO \
+                CODE_SIGN_IDENTITY="" \
+                SWIFT_STRICT_CONCURRENCY=minimal \
+                2>&1
+            }
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: swift-sdk-build-${{ steps.version.outputs.version }}
+          path: ${{ env.SDK_DIR }}/build/Build/Products/
+          retention-days: 7
+
+  # ===========================================================================
+  # Update Binaries (Downloads from current CI run artifacts)
+  # ===========================================================================
+  update-binaries:
+    name: Update Binaries
+    needs: build-test
+    if: inputs.update_binaries == true || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "$GITHUB_REF" == refs/tags/swift-v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/swift-v}"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION="0.0.0-$(git rev-parse --short HEAD)"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION"
+
+      # Download RACommons iOS artifact
+      - name: Download RACommons iOS
+        uses: actions/download-artifact@v4
+        with:
+          name: racommons-ios-${{ steps.version.outputs.version }}
+          path: artifacts/racommons
+
+      # Download LlamaCPP iOS artifact
+      - name: Download LlamaCPP iOS
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-llamacpp-ios-${{ steps.version.outputs.version }}
+          path: artifacts/llamacpp
+
+      # Download ONNX iOS artifact
+      - name: Download ONNX iOS
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-onnx-ios-${{ steps.version.outputs.version }}
+          path: artifacts/onnx
+
+      - name: Setup Binaries from Artifacts
+        run: |
+          mkdir -p "${{ env.SDK_DIR }}/Binaries"
+          
+          echo "=== Downloaded artifacts ==="
+          find artifacts -type f | head -20
+          find artifacts -type d -name "*.xcframework"
+          
+          # Copy all XCFrameworks to SDK Binaries
+          find artifacts -name "*.xcframework" -type d | while read fw; do
+            fw_name=$(basename "$fw")
+            echo "Copying $fw_name to SDK Binaries/"
+            rm -rf "${{ env.SDK_DIR }}/Binaries/$fw_name"
+            cp -r "$fw" "${{ env.SDK_DIR }}/Binaries/"
+          done
+          
+          echo "=== Final Binaries ==="
+          ls -la "${{ env.SDK_DIR }}/Binaries/"
+          
+          # Verify we have the required frameworks
+          REQUIRED_FRAMEWORKS="RACommons.xcframework RABackendLLAMACPP.xcframework RABackendONNX.xcframework"
+          for fw in $REQUIRED_FRAMEWORKS; do
+            if [ ! -d "${{ env.SDK_DIR }}/Binaries/$fw" ]; then
+              echo "❌ Missing required framework: $fw"
+              exit 1
+            fi
+            echo "✅ Found: $fw"
+          done
+
+      - name: Update VERSION file
+        run: |
+          echo "${{ steps.version.outputs.version }}" > ${{ env.SDK_DIR }}/VERSION
+
+      - name: Commit VERSION Update
+        # This step is optional - for tag-triggered releases, VERSION is just metadata
+        # The actual version comes from the git tag
+        continue-on-error: true
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add ${{ env.SDK_DIR }}/VERSION || true
+          
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          
+          git commit -m "chore(swift): update version for v${{ steps.version.outputs.version }}"
+          
+          # Try to push to main branch (may fail for tag-triggered runs, which is OK)
+          git push origin HEAD:main || git push origin HEAD:master || echo "Push skipped (tag-triggered release)"
+
+  # ===========================================================================
+  # Create Release
+  # ===========================================================================
+  publish:
+    name: Publish Swift SDK Release
+    needs: [build-test, update-binaries]
+    # Skip if dry_run or skip_publish (for unified release)
+    # Use always() to run even if update-binaries had continue-on-error steps fail
+    if: |
+      always() &&
+      needs.build-test.result == 'success' &&
+      (needs.update-binaries.result == 'success' || needs.update-binaries.result == 'skipped') &&
+      inputs.dry_run != true &&
+      inputs.skip_publish != true &&
+      (
+        startsWith(github.ref, 'refs/tags/swift-v') ||
+        startsWith(github.ref, 'refs/tags/v') ||
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'push'
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: version
+        run: |
+          # Get version from update-binaries output or derive from tag/input
+          VERSION="${{ needs.update-binaries.outputs.version }}"
+          if [ -z "$VERSION" ]; then
+            if [ -n "${{ inputs.version }}" ]; then
+              VERSION="${{ inputs.version }}"
+            elif [[ "$GITHUB_REF" == refs/tags/swift-v* ]]; then
+              VERSION="${GITHUB_REF#refs/tags/swift-v}"
+            elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+              VERSION="${GITHUB_REF#refs/tags/v}"
+            else
+              VERSION="0.0.0-$(git rev-parse --short HEAD)"
+            fi
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: swift-v${{ steps.version.outputs.version }}
+          name: RunAnywhere Swift SDK v${{ steps.version.outputs.version }}
+          body: |
+            ## RunAnywhere Swift SDK v${{ steps.version.outputs.version }}
+
+            Privacy-first, on-device AI SDK for iOS and macOS.
+
+            ### Installation
+
+            **Swift Package Manager:**
+            ```swift
+            dependencies: [
+                .package(
+                    url: "https://github.com/RunanywhereAI/runanywhere-sdks",
+                    from: "${{ steps.version.outputs.version }}"
+                )
+            ]
+            ```
+
+            Then add the products you need:
+            ```swift
+            .target(
+                name: "YourApp",
+                dependencies: [
+                    .product(name: "RunAnywhere", package: "runanywhere-sdks"),
+                    // Optional: Add specific backends
+                    .product(name: "LlamaCPPRuntime", package: "runanywhere-sdks"),
+                    .product(name: "ONNXRuntime", package: "runanywhere-sdks"),
+                ]
+            )
+            ```
+
+            ### Features
+            - 🧠 **LLM**: On-device text generation via llama.cpp
+            - 🎤 **STT**: Speech-to-text via Sherpa-ONNX Whisper
+            - 🔊 **TTS**: Text-to-speech via Sherpa-ONNX Piper
+            - 🎯 **VAD**: Voice activity detection
+            - 🔒 **Privacy**: All processing happens on-device
+
+            ### Requirements
+            - iOS 13.0+ / macOS 10.15+
+            - Swift 5.9+
+            - Xcode 15.0+
+
+            ### Documentation
+            See [README](https://github.com/RunanywhereAI/runanywhere-sdks/tree/main/sdk/runanywhere-swift)
+
+            ---
+            Built from runanywhere-sdks @ ${{ github.sha }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
