@@ -16,6 +16,22 @@ on:
   push:
     tags:
       - 'commons-v*'
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.2.0)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Dry run (build only, do not publish)'
+        required: false
+        default: false
+        type: boolean
+      skip_publish:
+        description: 'Skip creating individual release (for unified release)'
+        required: false
+        default: false
+        type: boolean
   workflow_dispatch:
     inputs:
       version:
@@ -51,10 +67,17 @@ jobs:
       - name: Determine Version
         id: version
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          # Handle workflow_call (from release-all.yml) and workflow_dispatch
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             VERSION="${{ github.event.inputs.version }}"
-          else
+          elif [[ "$GITHUB_REF" == refs/tags/commons-v* ]]; then
             VERSION="${GITHUB_REF#refs/tags/commons-v}"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION="0.0.0-$(git rev-parse --short HEAD)"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building RACommons v$VERSION"
@@ -143,8 +166,8 @@ jobs:
       - name: Build RACommons XCFramework
         working-directory: ${{ env.COMMONS_DIR }}
         run: |
-          chmod +x scripts/build-rac-commons.sh
-          ./scripts/build-rac-commons.sh --ios --release --package
+          chmod +x scripts/build-ios.sh
+          ./scripts/build-ios.sh --skip-backends --release --package
 
       - name: List Artifacts
         working-directory: ${{ env.COMMONS_DIR }}
@@ -187,10 +210,17 @@ jobs:
       - name: Determine Version
         id: version
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          # Handle workflow_call (from release-all.yml) and workflow_dispatch
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             VERSION="${{ github.event.inputs.version }}"
-          else
+          elif [[ "$GITHUB_REF" == refs/tags/commons-v* ]]; then
             VERSION="${GITHUB_REF#refs/tags/commons-v}"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION="0.0.0-$(git rev-parse --short HEAD)"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
@@ -281,11 +311,35 @@ jobs:
           
           echo "=== Generated development_config.cpp for Android ==="
 
+      - name: Download Dependencies
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/android/download-sherpa-onnx.sh
+          # Force fresh download by removing any existing partial downloads
+          rm -rf third_party/sherpa-onnx-android
+          ./scripts/android/download-sherpa-onnx.sh
+          
+          # Verify required files exist
+          echo "=== Verifying downloaded files ==="
+          ls -la third_party/sherpa-onnx-android/ || echo "Directory not found!"
+          ls -la third_party/sherpa-onnx-android/jniLibs/ || echo "jniLibs not found!"
+          ls -la "third_party/sherpa-onnx-android/jniLibs/${{ matrix.abi }}/" || echo "ABI directory not found!"
+          
+          # Check for required .so files
+          for lib in libsherpa-onnx-jni.so libsherpa-onnx-c-api.so libonnxruntime.so; do
+            if [ -f "third_party/sherpa-onnx-android/jniLibs/${{ matrix.abi }}/$lib" ]; then
+              echo "✅ Found: $lib"
+            else
+              echo "❌ Missing: $lib"
+            fi
+          done
+
       - name: Build Android ${{ matrix.abi }}
         working-directory: ${{ env.COMMONS_DIR }}
         run: |
-          chmod +x scripts/build-rac-commons.sh
-          ./scripts/build-rac-commons.sh --android --abi ${{ matrix.abi }} --release
+          chmod +x scripts/build-android.sh
+          # Build all backends - ONNX (STT/TTS/VAD) + LlamaCPP (LLM)
+          ./scripts/build-android.sh all ${{ matrix.abi }}
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -301,7 +355,10 @@ jobs:
   publish:
     name: Publish Release
     needs: [build-ios, build-android]
-    if: github.event.inputs.dry_run != 'true'
+    # Skip if dry_run or skip_publish (for unified release)
+    if: |
+      inputs.dry_run != true &&
+      inputs.skip_publish != true
     runs-on: ubuntu-latest
     permissions:
       contents: write

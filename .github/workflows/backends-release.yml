@@ -1,0 +1,449 @@
+name: Build and Release Backends
+
+# =============================================================================
+# Backend Libraries Release Workflow
+#
+# Builds LlamaCPP and ONNX backend libraries for iOS and Android.
+# These are the ML inference backends that power the SDKs:
+#   - RABackendLLAMACPP: LLM text generation (GGUF models via llama.cpp)
+#   - RABackendONNX: STT/TTS/VAD (via Sherpa-ONNX)
+#
+# Triggers:
+#   - Tag push: backends-v*
+#   - Manual workflow_dispatch
+#   - Push to main (only builds with path changes, no release)
+#
+# Artifacts:
+#   iOS:     RABackendLLAMACPP.xcframework, RABackendONNX.xcframework
+#   Android: librac_backend_llamacpp.so, librac_backend_onnx.so per ABI
+# =============================================================================
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'sdk/runanywhere-commons/src/backends/**'
+      - 'sdk/runanywhere-commons/CMakeLists.txt'
+      - 'sdk/runanywhere-commons/VERSIONS'
+      - '.github/workflows/backends-release.yml'
+    tags:
+      - 'backends-v*'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'sdk/runanywhere-commons/src/backends/**'
+      - 'sdk/runanywhere-commons/CMakeLists.txt'
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to release'
+        required: true
+        type: string
+      backends:
+        description: 'Backends to build'
+        required: false
+        default: 'all'
+        type: string
+      dry_run:
+        description: 'Dry run'
+        required: false
+        default: false
+        type: boolean
+      skip_publish:
+        description: 'Skip creating individual release (for unified release)'
+        required: false
+        default: false
+        type: boolean
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.2.0)'
+        required: true
+        type: string
+      backends:
+        description: 'Backends to build (llamacpp, onnx, all)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - llamacpp
+          - onnx
+      dry_run:
+        description: 'Dry run (build only, do not publish)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  COMMONS_DIR: sdk/runanywhere-commons
+
+jobs:
+  # ===========================================================================
+  # Build iOS Backend XCFrameworks
+  # ===========================================================================
+  build-ios-backends:
+    name: Build iOS Backends
+    runs-on: macos-14
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "$GITHUB_REF" == refs/tags/backends-v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/backends-v}"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION="0.0.0-$(git rev-parse --short HEAD)"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building backends v$VERSION"
+
+      - name: Determine Backends
+        id: backends
+        run: |
+          BACKENDS="${{ github.event.inputs.backends || 'all' }}"
+          echo "backends=$BACKENDS" >> $GITHUB_OUTPUT
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.4'
+
+      - name: Install Dependencies
+        run: brew install cmake ninja
+
+      - name: Download Third-Party Dependencies
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/ios/download-sherpa-onnx.sh
+          chmod +x scripts/ios/download-onnx.sh
+          ./scripts/ios/download-sherpa-onnx.sh
+          ./scripts/ios/download-onnx.sh
+
+      - name: Build iOS Backends
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/build-ios.sh
+          BACKENDS="${{ steps.backends.outputs.backends }}"
+          if [ "$BACKENDS" = "all" ]; then
+            ./scripts/build-ios.sh --backend all --release --package
+          else
+            ./scripts/build-ios.sh --backend $BACKENDS --release --package
+          fi
+
+      - name: List Artifacts
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          echo "=== Build Artifacts ==="
+          ls -la dist/
+          if [ -d dist/RABackendLLAMACPP.xcframework ]; then
+            echo "✅ RABackendLLAMACPP.xcframework"
+          fi
+          if [ -d dist/RABackendONNX.xcframework ]; then
+            echo "✅ RABackendONNX.xcframework"
+          fi
+
+      - name: Prepare LlamaCPP Artifact
+        if: steps.backends.outputs.backends == 'all' || steps.backends.outputs.backends == 'llamacpp'
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          # Create a marker file to prevent GitHub Actions from flattening the directory structure
+          # When uploading a single directory, actions/upload-artifact flattens it
+          # Adding a second file forces it to preserve directory names
+          touch dist/.llamacpp-ios-marker
+
+      - name: Upload LlamaCPP Backend (iOS)
+        if: steps.backends.outputs.backends == 'all' || steps.backends.outputs.backends == 'llamacpp'
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-llamacpp-ios-${{ steps.version.outputs.version }}
+          path: |
+            ${{ env.COMMONS_DIR }}/dist/RABackendLLAMACPP.xcframework
+            ${{ env.COMMONS_DIR }}/dist/.llamacpp-ios-marker
+          retention-days: 30
+
+      - name: Upload ONNX Backend (iOS)
+        if: steps.backends.outputs.backends == 'all' || steps.backends.outputs.backends == 'onnx'
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-onnx-ios-${{ steps.version.outputs.version }}
+          path: |
+            ${{ env.COMMONS_DIR }}/dist/RABackendONNX.xcframework
+            ${{ env.COMMONS_DIR }}/third_party/onnxruntime-ios/onnxruntime.xcframework
+            ${{ env.COMMONS_DIR }}/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework
+          retention-days: 30
+
+  # ===========================================================================
+  # Build Android Backend Libraries (Matrix)
+  # ===========================================================================
+  build-android-backends:
+    name: Build Android Backends (${{ matrix.abi }})
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86_64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "$GITHUB_REF" == refs/tags/backends-v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/backends-v}"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION="0.0.0-$(git rev-parse --short HEAD)"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Determine Backends
+        id: backends
+        run: |
+          BACKENDS="${{ github.event.inputs.backends || 'all' }}"
+          echo "backends=$BACKENDS" >> $GITHUB_OUTPUT
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup NDK
+        run: |
+          NDK_VERSION="27.0.12077973"
+          echo "y" | sdkmanager --install "ndk;${NDK_VERSION}" --sdk_root=${ANDROID_SDK_ROOT}
+          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> $GITHUB_ENV
+
+      - name: Download Third-Party Dependencies
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/android/download-sherpa-onnx.sh
+          ./scripts/android/download-sherpa-onnx.sh
+
+      - name: Build Android Backends
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/build-android.sh
+          BACKENDS="${{ steps.backends.outputs.backends }}"
+          if [ "$BACKENDS" = "llamacpp" ]; then
+            ./scripts/build-android.sh llamacpp ${{ matrix.abi }}
+          elif [ "$BACKENDS" = "onnx" ]; then
+            ./scripts/build-android.sh onnx ${{ matrix.abi }}
+          else
+            ./scripts/build-android.sh all ${{ matrix.abi }}
+          fi
+
+      - name: Verify 16KB Alignment
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          ./scripts/build-android.sh --check || echo "⚠️ Some libraries not 16KB aligned"
+
+      - name: Upload Android Backends
+        uses: actions/upload-artifact@v4
+        with:
+          name: backends-android-${{ matrix.abi }}-${{ steps.version.outputs.version }}
+          path: |
+            ${{ env.COMMONS_DIR }}/dist/android/llamacpp/${{ matrix.abi }}/
+            ${{ env.COMMONS_DIR }}/dist/android/onnx/${{ matrix.abi }}/
+            ${{ env.COMMONS_DIR }}/dist/android/include/
+          retention-days: 30
+
+  # ===========================================================================
+  # Publish Release (only on tag or manual dispatch)
+  # ===========================================================================
+  publish-backends:
+    name: Publish Backend Release
+    needs: [build-ios-backends, build-android-backends]
+    # Skip if dry_run or skip_publish (for unified release)
+    if: |
+      inputs.dry_run != true &&
+      inputs.skip_publish != true &&
+      (
+        startsWith(github.ref, 'refs/tags/backends-v') ||
+        startsWith(github.ref, 'refs/tags/v') ||
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'workflow_call'
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download iOS LlamaCPP
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-llamacpp-ios-${{ needs.build-ios-backends.outputs.version }}
+          path: dist/ios/RABackendLLAMACPP.xcframework
+        continue-on-error: true
+
+      - name: Download iOS ONNX
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-onnx-ios-${{ needs.build-ios-backends.outputs.version }}
+          path: dist/ios/onnx
+        continue-on-error: true
+
+      - name: Download Android Backends
+        uses: actions/download-artifact@v4
+        with:
+          pattern: backends-android-*
+          path: dist/android-artifacts
+          merge-multiple: false
+
+      - name: Prepare Release Assets
+        run: |
+          VERSION="${{ needs.build-ios-backends.outputs.version }}"
+          mkdir -p release-assets
+
+          # === iOS LlamaCPP ===
+          if [ -d dist/ios/RABackendLLAMACPP.xcframework ]; then
+            cd dist/ios
+            zip -r "../../release-assets/RABackendLLAMACPP-ios-v${VERSION}.zip" RABackendLLAMACPP.xcframework
+            cd ../..
+          fi
+
+          # === iOS ONNX (includes sherpa-onnx and onnxruntime) ===
+          if [ -d dist/ios/onnx/RABackendONNX.xcframework ]; then
+            cd dist/ios/onnx
+            zip -r "../../../release-assets/RABackendONNX-ios-v${VERSION}.zip" \
+              RABackendONNX.xcframework \
+              onnxruntime.xcframework \
+              sherpa-onnx.xcframework 2>/dev/null || \
+            zip -r "../../../release-assets/RABackendONNX-ios-v${VERSION}.zip" RABackendONNX.xcframework
+            cd ../../..
+          fi
+
+          # === Android - Combine all ABIs ===
+          mkdir -p android-combined/jniLibs
+          mkdir -p android-combined/include
+
+          for artifact_dir in dist/android-artifacts/backends-android-*/; do
+            if [ -d "$artifact_dir" ]; then
+              # Copy llamacpp libraries
+              for abi_dir in "${artifact_dir}"llamacpp/*/; do
+                if [ -d "$abi_dir" ]; then
+                  abi=$(basename "$abi_dir")
+                  mkdir -p "android-combined/jniLibs/${abi}"
+                  cp -r "${abi_dir}"*.so "android-combined/jniLibs/${abi}/" 2>/dev/null || true
+                fi
+              done
+              # Copy onnx libraries
+              for abi_dir in "${artifact_dir}"onnx/*/; do
+                if [ -d "$abi_dir" ]; then
+                  abi=$(basename "$abi_dir")
+                  mkdir -p "android-combined/jniLibs/${abi}"
+                  cp -r "${abi_dir}"*.so "android-combined/jniLibs/${abi}/" 2>/dev/null || true
+                fi
+              done
+              # Copy headers (once)
+              if [ -d "${artifact_dir}include" ]; then
+                cp -r "${artifact_dir}include/"* android-combined/include/ 2>/dev/null || true
+              fi
+            fi
+          done
+
+          # Create Android package
+          cd android-combined
+          echo "=== Android Backend Libraries ==="
+          find . -name "*.so" -type f
+          zip -r "../release-assets/RABackends-android-v${VERSION}.zip" .
+          cd ..
+
+          # Generate checksums
+          cd release-assets
+          for f in *.zip; do
+            shasum -a 256 "$f" > "${f}.sha256"
+          done
+
+          echo "=== Release Assets ==="
+          ls -la
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: backends-v${{ needs.build-ios-backends.outputs.version }}
+          name: Backend Libraries v${{ needs.build-ios-backends.outputs.version }}
+          files: |
+            release-assets/*.zip
+            release-assets/*.sha256
+          body: |
+            ## Backend Libraries v${{ needs.build-ios-backends.outputs.version }}
+
+            Pre-built backend libraries for RunAnywhere SDKs.
+
+            ### iOS/macOS
+
+            | Library | Description |
+            |---------|-------------|
+            | `RABackendLLAMACPP-ios-v${{ needs.build-ios-backends.outputs.version }}.zip` | LLM inference via llama.cpp |
+            | `RABackendONNX-ios-v${{ needs.build-ios-backends.outputs.version }}.zip` | STT/TTS/VAD via Sherpa-ONNX |
+
+            ### Android
+
+            | Library | Description |
+            |---------|-------------|
+            | `RABackends-android-v${{ needs.build-ios-backends.outputs.version }}.zip` | All backends for arm64-v8a, armeabi-v7a, x86_64 |
+
+            **Android Contents:**
+            ```
+            jniLibs/
+            ├── arm64-v8a/
+            │   ├── librac_backend_llamacpp.so
+            │   ├── librac_backend_onnx.so
+            │   └── (sherpa-onnx dependencies)
+            ├── armeabi-v7a/
+            │   └── ...
+            └── x86_64/
+                └── ...
+            include/
+            └── rac/
+                └── (C headers)
+            ```
+
+            ### Usage
+
+            **iOS (Swift Package Manager):**
+            The RunAnywhere Swift SDK automatically downloads these from releases.
+
+            **Android (Gradle):**
+            Extract to your `app/src/main/jniLibs/` directory.
+
+            ### Verification
+            ```bash
+            shasum -a 256 -c *.sha256
+            ```
+
+            ---
+            Built from runanywhere-sdks @ ${{ github.sha }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

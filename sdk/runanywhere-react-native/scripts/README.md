@@ -2,6 +2,39 @@
 
 Build scripts for the RunAnywhere React Native SDK.
 
+---
+
+## 🚀 Fresh Clone to Running App
+
+If you just cloned the repository and want to test the React Native SDK end-to-end:
+
+```bash
+# 1. Build SDK with native libraries (~15-20 min for both platforms)
+cd sdk/runanywhere-react-native
+./scripts/build-react-native.sh --setup
+
+# 2. Navigate to sample app
+cd ../../examples/react-native/RunAnywhereAI
+yarn install
+
+# 3. Setup Android (one-time)
+cp android/gradle.properties.example android/gradle.properties
+
+# 4. Run on iOS
+cd ios && pod install && cd ..
+npx react-native run-ios --simulator="iPhone 16 Pro"
+
+# 5. Run on Android
+npx react-native run-android
+```
+
+**That's it!** The sample app will launch with:
+- ✅ LlamaCPP backend (LLM text generation)
+- ✅ ONNX backend (STT/TTS)
+- ✅ All features working (Chat, Voice, etc.)
+
+---
+
 ## build-react-native.sh
 
 Single entry point for building the React Native SDK and its native dependencies.
@@ -18,7 +51,12 @@ This will:
 2. Build `runanywhere-commons` for iOS and Android
 3. Copy XCFrameworks to iOS packages
 4. Copy JNI libraries to Android packages
-5. Set local mode for development
+5. Create `.testlocal` marker files
+6. Set local mode for development (`RA_TEST_LOCAL=1`)
+
+**Output:**
+- iOS: 3 XCFrameworks (RACommons, RABackendLLAMACPP, RABackendONNX)
+- Android: 13 .so libraries (for arm64-v8a by default)
 
 ### Commands
 
@@ -64,11 +102,37 @@ yarn install
 
 # iOS
 cd ios && pod install && cd ..
-npx react-native run-ios
+npx react-native run-ios --simulator="iPhone 16 Pro"
 
 # Android
+# First time: Copy gradle.properties template
+cp android/gradle.properties.example android/gradle.properties
+
+# Make sure device/emulator is connected
+adb devices
+
+# Run app
 npx react-native run-android
 ```
+
+### Verify Sample App Works
+
+The app should launch and show 5 tabs:
+- **Chat**: Send messages to LLM, stream responses
+- **STT**: Record and transcribe speech
+- **TTS**: Synthesize text to speech
+- **Voice**: Full voice conversation (VAD → STT → LLM → TTS)
+- **Settings**: Model management, downloads, storage
+
+### Testing Checklist
+
+After app launches:
+- [ ] SDK initializes without errors (check Metro logs)
+- [ ] Can navigate between tabs
+- [ ] Settings shows LlamaCPP and ONNX backends available
+- [ ] Can register and download models
+- [ ] Chat functionality works with LLM
+- [ ] STT/TTS features work
 
 ## Package Structure
 
