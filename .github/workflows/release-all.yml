@@ -61,6 +61,11 @@ on:
         required: false
         default: true
         type: boolean
+      publish_npm:
+        description: 'Publish React Native SDK to npm'
+        required: false
+        default: false
+        type: boolean
       dry_run:
         description: 'Dry run (build only, no publish)'
         required: false
@@ -85,6 +90,7 @@ jobs:
       release_kotlin: ${{ steps.flags.outputs.release_kotlin }}
       release_flutter: ${{ steps.flags.outputs.release_flutter }}
       release_react_native: ${{ steps.flags.outputs.release_react_native }}
+      publish_npm: ${{ steps.flags.outputs.publish_npm }}
       dry_run: ${{ steps.flags.outputs.dry_run }}
 
     steps:
@@ -112,15 +118,17 @@ jobs:
             echo "release_kotlin=${{ github.event.inputs.release_kotlin }}" >> $GITHUB_OUTPUT
             echo "release_flutter=${{ github.event.inputs.release_flutter }}" >> $GITHUB_OUTPUT
             echo "release_react_native=${{ github.event.inputs.release_react_native }}" >> $GITHUB_OUTPUT
+            echo "publish_npm=${{ github.event.inputs.publish_npm }}" >> $GITHUB_OUTPUT
             echo "dry_run=${{ github.event.inputs.dry_run }}" >> $GITHUB_OUTPUT
           else
-            # Tag push releases everything
+            # Tag push releases everything (but npm publish requires manual trigger)
             echo "release_commons=true" >> $GITHUB_OUTPUT
             echo "release_backends=true" >> $GITHUB_OUTPUT
             echo "release_swift=true" >> $GITHUB_OUTPUT
             echo "release_kotlin=true" >> $GITHUB_OUTPUT
             echo "release_flutter=true" >> $GITHUB_OUTPUT
             echo "release_react_native=true" >> $GITHUB_OUTPUT
+            echo "publish_npm=false" >> $GITHUB_OUTPUT
             echo "dry_run=false" >> $GITHUB_OUTPUT
           fi
 
@@ -218,7 +226,7 @@ jobs:
     uses: ./.github/workflows/react-native-sdk-release.yml
     with:
       version: ${{ needs.setup.outputs.version }}
-      publish_npm: false
+      publish_npm: ${{ needs.setup.outputs.publish_npm == 'true' }}
       dry_run: ${{ needs.setup.outputs.dry_run == 'true' }}
     secrets: inherit
 
