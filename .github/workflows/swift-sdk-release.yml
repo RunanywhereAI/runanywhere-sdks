@@ -415,13 +415,17 @@ jobs:
     name: Publish Swift SDK Release
     needs: [build-test, update-binaries]
     # Publish when: tag push (swift-v* or v*), workflow_dispatch, or workflow_call
+    # Use always() to run even if update-binaries had continue-on-error steps fail
     if: |
+      always() &&
+      needs.build-test.result == 'success' &&
+      (needs.update-binaries.result == 'success' || needs.update-binaries.result == 'skipped') &&
       inputs.dry_run != true &&
       (
         startsWith(github.ref, 'refs/tags/swift-v') ||
         startsWith(github.ref, 'refs/tags/v') ||
         github.event_name == 'workflow_dispatch' ||
-        github.event_name == 'workflow_call'
+        github.event_name == 'push'
       )
     runs-on: ubuntu-latest
     permissions:
@@ -431,13 +435,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Determine Version
+        id: version
+        run: |
+          # Get version from update-binaries output or derive from tag/input
+          VERSION="${{ needs.update-binaries.outputs.version }}"
+          if [ -z "$VERSION" ]; then
+            if [ -n "${{ inputs.version }}" ]; then
+              VERSION="${{ inputs.version }}"
+            elif [[ "$GITHUB_REF" == refs/tags/swift-v* ]]; then
+              VERSION="${GITHUB_REF#refs/tags/swift-v}"
+            elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+              VERSION="${GITHUB_REF#refs/tags/v}"
+            else
+              VERSION="0.0.0-$(git rev-parse --short HEAD)"
+            fi
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: swift-v${{ needs.update-binaries.outputs.version }}
-          name: RunAnywhere Swift SDK v${{ needs.update-binaries.outputs.version }}
+          tag_name: swift-v${{ steps.version.outputs.version }}
+          name: RunAnywhere Swift SDK v${{ steps.version.outputs.version }}
           body: |
-            ## RunAnywhere Swift SDK v${{ needs.update-binaries.outputs.version }}
+            ## RunAnywhere Swift SDK v${{ steps.version.outputs.version }}
 
             Privacy-first, on-device AI SDK for iOS and macOS.
 
@@ -448,7 +471,7 @@ jobs:
             dependencies: [
                 .package(
                     url: "https://github.com/RunanywhereAI/runanywhere-sdks",
-                    from: "${{ needs.update-binaries.outputs.version }}"
+                    from: "${{ steps.version.outputs.version }}"
                 )
             ]
             ```
