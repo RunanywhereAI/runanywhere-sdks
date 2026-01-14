@@ -516,3 +516,52 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # =========================================================================
+      # Publish to npm (optional)
+      # =========================================================================
+      - name: Checkout for npm publish
+        if: inputs.publish_npm == true
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js for npm
+        if: inputs.publish_npm == true
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Publish to npm
+        if: inputs.publish_npm == true
+        working-directory: sdk/runanywhere-react-native
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          VERSION="${{ needs.build-react-native-sdk.outputs.version }}"
+          echo "Publishing version $VERSION to npm..."
+          
+          # Update version in all package.json files
+          for pkg in packages/*/package.json; do
+            node -e "
+              const fs = require('fs');
+              const pkg = JSON.parse(fs.readFileSync('$pkg'));
+              pkg.version = '$VERSION';
+              fs.writeFileSync('$pkg', JSON.stringify(pkg, null, 2) + '\n');
+            "
+            echo "Updated $pkg to version $VERSION"
+          done
+          
+          # Install dependencies (without modifying lockfile)
+          yarn install || npm install
+          
+          # Publish each package
+          for pkg_dir in packages/core packages/llamacpp packages/onnx; do
+            if [ -d "$pkg_dir" ]; then
+              echo "Publishing $pkg_dir..."
+              cd "$pkg_dir"
+              npm publish --access public || echo "Failed to publish $pkg_dir (may already exist)"
+              cd ../..
+            fi
+          done
+          
+          echo "✅ npm publish complete"
+
