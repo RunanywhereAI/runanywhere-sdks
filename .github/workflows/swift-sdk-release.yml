@@ -35,6 +35,11 @@ on:
         required: false
         default: false
         type: boolean
+      skip_publish:
+        description: 'Skip creating individual release (for unified release)'
+        required: false
+        default: false
+        type: boolean
   workflow_dispatch:
     inputs:
       version:
@@ -414,13 +419,14 @@ jobs:
   publish:
     name: Publish Swift SDK Release
     needs: [build-test, update-binaries]
-    # Publish when: tag push (swift-v* or v*), workflow_dispatch, or workflow_call
+    # Skip if dry_run or skip_publish (for unified release)
     # Use always() to run even if update-binaries had continue-on-error steps fail
     if: |
       always() &&
       needs.build-test.result == 'success' &&
       (needs.update-binaries.result == 'success' || needs.update-binaries.result == 'skipped') &&
       inputs.dry_run != true &&
+      inputs.skip_publish != true &&
       (
         startsWith(github.ref, 'refs/tags/swift-v') ||
         startsWith(github.ref, 'refs/tags/v') ||

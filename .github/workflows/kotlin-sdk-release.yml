@@ -35,6 +35,11 @@ on:
         required: false
         default: false
         type: boolean
+      skip_publish:
+        description: 'Skip creating individual release (for unified release)'
+        required: false
+        default: false
+        type: boolean
   workflow_dispatch:
     inputs:
       version:
@@ -262,9 +267,10 @@ jobs:
   publish:
     name: Publish Kotlin SDK Release
     needs: build-sdk
-    # Publish when: tag push (kotlin-v* or v*), workflow_dispatch, or workflow_call
+    # Skip if dry_run or skip_publish (for unified release)
     if: |
       inputs.dry_run != true &&
+      inputs.skip_publish != true &&
       (
         startsWith(github.ref, 'refs/tags/kotlin-v') ||
         startsWith(github.ref, 'refs/tags/v') ||

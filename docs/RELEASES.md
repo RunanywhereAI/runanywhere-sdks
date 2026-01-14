@@ -102,39 +102,67 @@ cp android/gradle.properties.example android/gradle.properties
 
 ## Release Components
 
-The repository produces several release artifacts:
+All SDKs are released as a **single unified release** with all assets attached:
 
-| Tag Pattern | Component | Contents |
-|-------------|-----------|----------|
-| `v1.0.0` | Unified Release | All SDKs at same version |
-| `commons-v1.0.0` | RACommons | Core infrastructure library |
-| `backends-v1.0.0` | Backends | LlamaCPP + ONNX native libs |
-| `swift-v1.0.0` | Swift SDK | iOS/macOS SDK |
-| `kotlin-v1.0.0` | Kotlin SDK | Android AAR + JVM JAR |
-| `flutter-v1.0.0` | Flutter SDK | Dart packages with natives |
-| `react-native-v1.0.0` | React Native SDK | npm packages with natives |
+| Tag | Example |
+|-----|---------|
+| `v1.0.0` | [v1.0.0 Release](https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/v1.0.0) |
+
+### Assets in Each Release
+
+Every unified release (`v*`) includes:
+
+| Asset | Platform | Description |
+|-------|----------|-------------|
+| `RACommons-ios-v*.zip` | iOS/macOS | Core infrastructure (XCFramework) |
+| `RACommons-android-v*.zip` | Android | Core infrastructure (native libs) |
+| `RABackendLLAMACPP-ios-v*.zip` | iOS/macOS | LLM backend - llama.cpp |
+| `RABackendONNX-ios-v*.zip` | iOS/macOS | STT/TTS/VAD backend - Sherpa-ONNX |
+| `RABackends-android-v*.zip` | Android | All backends (arm64-v8a, armeabi-v7a, x86_64) |
+| `RunAnywhere-Swift-SDK-v*.zip` | iOS/macOS | Swift SDK build artifacts |
+| `RunAnywhere-Kotlin-SDK-v*.aar` | Android | Kotlin SDK (AAR) |
+| `RunAnywhere-Flutter-SDK-v*.zip` | Cross-platform | Flutter SDK package |
+| `RunAnywhere-ReactNative-SDK-v*.zip` | Cross-platform | React Native SDK package |
+| `checksums.sha256` | All | SHA256 checksums for all assets |
 
 ### Native Libraries
 
 For advanced users who want to integrate at the C/C++ level:
 
-| Release | File | Platforms |
-|---------|------|-----------|
-| `backends-v*` | `RABackendLLAMACPP-ios-*.zip` | iOS (XCFramework) |
-| `backends-v*` | `RABackendONNX-ios-*.zip` | iOS (XCFramework) |
-| `backends-v*` | `RABackends-android-*.zip` | Android (arm64-v8a, armeabi-v7a, x86_64) |
-| `commons-v*` | `RACommons-ios-*.zip` | iOS (XCFramework) |
-| `commons-v*` | `RACommons-android-*.zip` | Android (all ABIs) |
+| File | Platforms | Contents |
+|------|-----------|----------|
+| `RABackendLLAMACPP-ios-*.zip` | iOS | XCFramework with llama.cpp |
+| `RABackendONNX-ios-*.zip` | iOS | XCFramework with Sherpa-ONNX |
+| `RABackends-android-*.zip` | Android | LlamaCPP + ONNX .so files for all ABIs |
+| `RACommons-ios-*.zip` | iOS | Core XCFramework |
+| `RACommons-android-*.zip` | Android | Core native libs |
 
 ---
 
 ## CI/CD Workflows
 
-### Release Triggers
+### Unified Release (Recommended)
+
+The primary release workflow creates a **single release** with all SDK assets:
 
 | Workflow | Trigger | Description |
 |----------|---------|-------------|
-| `release-all.yml` | Tag `v*` | Release all SDKs at once |
+| `release-all.yml` | Tag `v*` or Manual | Creates unified release with all SDKs |
+
+**To create a unified release:**
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+This creates ONE release (`v1.0.0`) with all assets attached.
+
+### Individual SDK Releases (Optional)
+
+For standalone releases of individual SDKs:
+
+| Workflow | Trigger | Description |
+|----------|---------|-------------|
 | `commons-release.yml` | Tag `commons-v*` | Release RACommons only |
 | `backends-release.yml` | Tag `backends-v*` | Release backend libraries |
 | `swift-sdk-release.yml` | Tag `swift-v*` | Release Swift SDK |
@@ -147,7 +175,7 @@ For advanced users who want to integrate at the C/C++ level:
 All workflows support `workflow_dispatch` for manual releases from the GitHub Actions UI:
 
 1. Go to **Actions** tab
-2. Select a release workflow
+2. Select **Release All SDKs**
 3. Click **Run workflow**
 4. Enter version and options
 5. Click **Run workflow**
@@ -168,35 +196,41 @@ We use [Semantic Versioning](https://semver.org/):
 
 ### Coordinated Releases
 
-When pushing a unified tag (`v1.0.0`), all SDKs are released with the same version:
-- `commons-v1.0.0`
-- `backends-v1.0.0`
-- `swift-v1.0.0`
-- `kotlin-v1.0.0`
-- `flutter-v1.0.0`
-- `react-native-v1.0.0`
+When pushing a unified tag (`v1.0.0`), all SDKs are built and combined into a **single release**:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+This creates:
+- **One release page** at `https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/v1.0.0`
+- **All SDK assets** attached to that single release
+- **Comprehensive release notes** with build status and quick start guides
 
 ### Independent Releases
 
-Individual SDKs can be released independently by pushing their specific tag:
+Individual SDKs can still be released independently by pushing their specific tag:
 ```bash
 git tag swift-v1.0.1
 git push origin swift-v1.0.1
 ```
 
+This creates a separate release for just that SDK.
+
 ---
 
 ## Verifying Downloads
 
-All release artifacts include SHA256 checksums:
+All unified releases include a `checksums.sha256` file:
 
 ```bash
-# Download artifact and checksum
-wget https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/backends-v1.0.0/RABackends-android-v1.0.0.zip
-wget https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/backends-v1.0.0/RABackends-android-v1.0.0.zip.sha256
+# Download artifact and checksums
+wget https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v1.0.0/RABackends-android-v1.0.0.zip
+wget https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v1.0.0/checksums.sha256
 
 # Verify
-shasum -a 256 -c RABackends-android-v1.0.0.zip.sha256
+shasum -a 256 -c checksums.sha256
 ```
 
 ---
