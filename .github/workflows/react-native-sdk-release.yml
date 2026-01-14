@@ -371,7 +371,8 @@ jobs:
           yarn --version
           
           echo "=== Installing dependencies ==="
-          yarn install --immutable || yarn install
+          # Don't use --immutable as lockfile may need updates
+          yarn install
           
           echo "✅ Dependencies installed"
 
