@@ -8,22 +8,50 @@ Brief description of the changes made.
 - [ ] Refactoring
 
 ## Testing
-- [ ] Tests pass locally
-- [ ] Tested on Macbook if swift changes
-- [ ] Tested on Tablet/iPad if swift changes
+- [ ] Lint passes locally
 - [ ] Added/updated tests for changes
+
+### Platform-Specific Testing (check all that apply)
+**Swift SDK / iOS Sample:**
+- [ ] Tested on iPhone (Simulator or Device)
+- [ ] Tested on iPad / Tablet
+- [ ] Tested on Mac (macOS target)
+
+**Kotlin SDK / Android Sample:**
+- [ ] Tested on Android Phone (Emulator or Device)
+- [ ] Tested on Android Tablet
+
+**Flutter SDK / Flutter Sample:**
+- [ ] Tested on iOS
+- [ ] Tested on Android
+
+**React Native SDK / React Native Sample:**
+- [ ] Tested on iOS
+- [ ] Tested on Android
 
 ## Labels
 Please add the appropriate label(s):
-- [ ] `iOS SDK` - Changes to iOS/Swift SDK
-- [ ] `Android SDK` - Changes to Android/Kotlin SDK
-- [ ] `iOS Sample` - Changes to iOS example app
-- [ ] `Android Sample` - Changes to Android example app
+
+**SDKs:**
+- [ ] `Swift SDK` - Changes to Swift SDK (`sdk/runanywhere-swift`)
+- [ ] `Kotlin SDK` - Changes to Kotlin SDK (`sdk/runanywhere-kotlin`)
+- [ ] `Flutter SDK` - Changes to Flutter SDK (`sdk/runanywhere-flutter`)
+- [ ] `React Native SDK` - Changes to React Native SDK (`sdk/runanywhere-react-native`)
+- [ ] `Commons` - Changes to shared native code (`sdk/runanywhere-commons`)
+
+**Sample Apps:**
+- [ ] `iOS Sample` - Changes to iOS example app (`examples/ios`)
+- [ ] `Android Sample` - Changes to Android example app (`examples/android`)
+- [ ] `Flutter Sample` - Changes to Flutter example app (`examples/flutter`)
+- [ ] `React Native Sample` - Changes to React Native example app (`examples/react-native`)
 
 ## Checklist
 - [ ] Code follows project style guidelines
 - [ ] Self-review completed
 - [ ] Documentation updated (if needed)
 
-## Screenshots - Attach all the relevant UI changes screenshots for iOS/Android and MacOS/Tablet/large screen sizes
--
+## Screenshots
+Attach relevant UI screenshots for changes (if applicable):
+- Mobile (Phone)
+- Tablet / iPad
+- Desktop / Mac

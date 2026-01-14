@@ -56,7 +56,7 @@ post_install do |installer|
 end
 ```
 
-> ⚠️ **Without `use_frameworks! :linkage => :static`, you will see "symbol not found" errors at runtime.**
+> **Important:** Without `use_frameworks! :linkage => :static`, you will see "symbol not found" errors at runtime.
 
 ### 2. Update `ios/Runner/Info.plist`
 
