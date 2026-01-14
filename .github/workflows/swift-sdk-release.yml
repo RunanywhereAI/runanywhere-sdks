@@ -387,26 +387,26 @@ jobs:
         run: |
           echo "${{ steps.version.outputs.version }}" > ${{ env.SDK_DIR }}/VERSION
 
-      - name: Commit Binary Updates
+      - name: Commit VERSION Update
+        # This step is optional - for tag-triggered releases, VERSION is just metadata
+        # The actual version comes from the git tag
+        continue-on-error: true
         if: github.event.inputs.dry_run != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Only add VERSION file (Binaries are gitignored and downloaded at build time)
-          git add ${{ env.SDK_DIR }}/VERSION
+          git add ${{ env.SDK_DIR }}/VERSION || true
           
           if git diff --staged --quiet; then
             echo "No changes to commit"
-          else
-            git commit -m "chore(swift): update version for v${{ steps.version.outputs.version }}"
-            
-            # Get the default branch name and push to it
-            # (we may be in detached HEAD state from tag checkout)
-            DEFAULT_BRANCH=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
-            echo "Pushing to branch: $DEFAULT_BRANCH"
-            git push origin HEAD:$DEFAULT_BRANCH
+            exit 0
           fi
+          
+          git commit -m "chore(swift): update version for v${{ steps.version.outputs.version }}"
+          
+          # Try to push to main branch (may fail for tag-triggered runs, which is OK)
+          git push origin HEAD:main || git push origin HEAD:master || echo "Push skipped (tag-triggered release)"
 
   # ===========================================================================
   # Create Release
