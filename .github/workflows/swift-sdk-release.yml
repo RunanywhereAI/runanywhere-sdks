@@ -304,12 +304,12 @@ jobs:
           retention-days: 7
 
   # ===========================================================================
-  # Update Binaries (Optional)
+  # Update Binaries (Downloads from current CI run or previous releases)
   # ===========================================================================
   update-binaries:
     name: Update Binaries
     needs: build-test
-    if: github.event.inputs.update_binaries == 'true' || github.event_name == 'push'
+    if: inputs.update_binaries == true || github.event_name == 'push'
     runs-on: macos-14
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -337,35 +337,99 @@ jobs:
             VERSION="0.0.0-$(git rev-parse --short HEAD)"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION"
 
-      - name: Download and Update Binaries
+      # Try to download artifacts from current CI run first (unified release)
+      - name: Download iOS Artifacts from Current Run
+        id: download-artifacts
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-ios-${{ steps.version.outputs.version }}"
+          path: ci-artifacts
+          merge-multiple: false
+
+      - name: Check Downloaded Artifacts
+        id: check-artifacts
+        run: |
+          echo "=== Checking CI artifacts ==="
+          if [ -d "ci-artifacts" ] && [ "$(find ci-artifacts -name '*.xcframework' -type d 2>/dev/null | wc -l)" -gt 0 ]; then
+            echo "Found artifacts from current CI run"
+            find ci-artifacts -type d -name "*.xcframework"
+            echo "artifacts_found=true" >> $GITHUB_OUTPUT
+          else
+            echo "No artifacts from current CI run, will try GitHub releases"
+            echo "artifacts_found=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Binaries from CI Artifacts
+        if: steps.check-artifacts.outputs.artifacts_found == 'true'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mkdir -p "${{ env.SDK_DIR }}/Binaries"
+          
+          echo "=== Setting up binaries from CI artifacts ==="
+          
+          # Copy XCFrameworks from CI artifacts
+          find ci-artifacts -name "*.xcframework" -type d | while read fw; do
+            fw_name=$(basename "$fw")
+            echo "Copying $fw_name to SDK Binaries/"
+            rm -rf "${{ env.SDK_DIR }}/Binaries/$fw_name"
+            cp -r "$fw" "${{ env.SDK_DIR }}/Binaries/"
+          done
+          
+          echo "=== Updated Binaries ==="
+          ls -la "${{ env.SDK_DIR }}/Binaries/"
+
+      - name: Download from GitHub Releases (Fallback)
+        if: steps.check-artifacts.outputs.artifacts_found != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Find latest backends release
-          LATEST_TAG=$(gh release list --limit 10 | grep "backends-v" | head -1 | awk '{print $1}')
+          echo "=== Trying to download from GitHub releases ==="
           
-          if [ -z "$LATEST_TAG" ]; then
-            echo "No backend releases found, using existing binaries"
-            echo "=== Current Binaries ==="
-            ls -la ${{ env.SDK_DIR }}/Binaries/ || echo "No Binaries directory"
-            exit 0
-          fi
+          # Try unified release first (v*), then individual backend release (backends-v*)
+          UNIFIED_TAG="v${{ steps.version.outputs.version }}"
+          BACKEND_TAG=$(gh release list --limit 20 | grep -E "^backends-v" | head -1 | awk '{print $1}')
           
-          echo "Downloading backends from $LATEST_TAG"
           mkdir -p downloads
+          DOWNLOADED=false
           
-          # Download iOS backends
-          gh release download "$LATEST_TAG" \
+          # Try unified release
+          echo "Trying unified release: $UNIFIED_TAG"
+          if gh release download "$UNIFIED_TAG" \
             --pattern "RABackendLLAMACPP-ios-*.zip" \
             --pattern "RABackendONNX-ios-*.zip" \
             --pattern "RACommons-ios-*.zip" \
-            --dir downloads || echo "Some downloads may have failed"
+            --dir downloads 2>/dev/null; then
+            echo "Downloaded from unified release"
+            DOWNLOADED=true
+          fi
+          
+          # Try individual backend release
+          if [ "$DOWNLOADED" = "false" ] && [ -n "$BACKEND_TAG" ]; then
+            echo "Trying backend release: $BACKEND_TAG"
+            if gh release download "$BACKEND_TAG" \
+              --pattern "RABackendLLAMACPP-ios-*.zip" \
+              --pattern "RABackendONNX-ios-*.zip" \
+              --pattern "RACommons-ios-*.zip" \
+              --dir downloads 2>/dev/null; then
+              echo "Downloaded from backend release"
+              DOWNLOADED=true
+            fi
+          fi
+          
+          if [ "$DOWNLOADED" = "false" ]; then
+            echo "⚠️ No releases found to download from"
+            echo "This is OK if running standalone Swift SDK release with existing binaries"
+            ls -la "${{ env.SDK_DIR }}/Binaries/" 2>/dev/null || echo "No existing binaries"
+            exit 0
+          fi
           
           echo "=== Downloaded files ==="
           ls -la downloads/
           
-          # Extract and copy to SDK Binaries folder
+          # Extract and copy
           cd downloads
           for zip in *.zip; do
             if [ -f "$zip" ]; then
@@ -374,7 +438,6 @@ jobs:
             fi
           done
           
-          # Copy XCFrameworks to SDK
           if [ -d extracted ]; then
             find extracted -name "*.xcframework" -type d | while read fw; do
               fw_name=$(basename "$fw")
@@ -386,7 +449,7 @@ jobs:
           
           cd ..
           echo "=== Updated Binaries ==="
-          ls -la ${{ env.SDK_DIR }}/Binaries/
+          ls -la "${{ env.SDK_DIR }}/Binaries/"
 
       - name: Update VERSION file
         run: |
