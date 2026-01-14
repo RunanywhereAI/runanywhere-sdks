@@ -227,21 +227,13 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Setup Yarn 3.x
+      - name: Setup Yarn
+        working-directory: ${{ env.SDK_DIR }}
         run: |
-          # Enable corepack (ships with Node 16.10+)
-          corepack enable || sudo corepack enable || {
-            echo "corepack not available, installing yarn via npm"
-            npm install -g yarn@3.6.1
-          }
-          
-          # Check if yarn is now available
-          which yarn
-          yarn --version || {
-            echo "Yarn still not available, fallback to npm install"
-            npm install -g yarn@3.6.1
-            yarn --version
-          }
+          # Use corepack to activate the exact yarn version from package.json
+          corepack enable
+          corepack install
+          yarn --version
 
       - name: Download iOS Frameworks
         uses: actions/download-artifact@v4
@@ -375,30 +367,13 @@ jobs:
       - name: Install Dependencies
         working-directory: ${{ env.SDK_DIR }}
         run: |
-          set -x  # Enable debug output
-          echo "=== Environment ==="
-          yarn --version || echo "Yarn not found!"
-          node --version
-          
-          echo "=== Checking configuration ==="
-          cat .yarnrc.yml || echo "No .yarnrc.yml"
-          cat package.json | grep -A5 '"workspaces"'
-          
-          echo "=== Listing packages ==="
-          ls -la packages/
+          echo "=== Yarn version ==="
+          yarn --version
           
           echo "=== Installing dependencies ==="
-          # Remove any stale node_modules first
-          rm -rf node_modules packages/*/node_modules
+          yarn install --immutable || yarn install
           
-          # Try yarn install
-          if yarn install; then
-            echo "✅ yarn install succeeded"
-          else
-            echo "❌ yarn install failed, trying npm"
-            # Fallback to npm with legacy peer deps
-            npm install --legacy-peer-deps || exit 1
-          fi
+          echo "✅ Dependencies installed"
 
       - name: Build TypeScript
         working-directory: ${{ env.SDK_DIR }}
