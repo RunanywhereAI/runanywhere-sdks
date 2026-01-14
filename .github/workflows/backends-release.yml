@@ -276,9 +276,15 @@ jobs:
   publish-backends:
     name: Publish Backend Release
     needs: [build-ios-backends, build-android-backends]
+    # Publish when: tag push (backends-v* or v*), workflow_dispatch, or workflow_call
     if: |
-      (startsWith(github.ref, 'refs/tags/backends-v') || github.event_name == 'workflow_dispatch') &&
-      github.event.inputs.dry_run != 'true'
+      inputs.dry_run != true &&
+      (
+        startsWith(github.ref, 'refs/tags/backends-v') ||
+        startsWith(github.ref, 'refs/tags/v') ||
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'workflow_call'
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: write
