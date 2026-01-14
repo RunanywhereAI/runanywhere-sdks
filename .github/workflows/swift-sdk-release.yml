@@ -304,23 +304,19 @@ jobs:
           retention-days: 7
 
   # ===========================================================================
-  # Update Binaries (Downloads from current CI run or previous releases)
+  # Update Binaries (Downloads from current CI run artifacts)
   # ===========================================================================
   update-binaries:
     name: Update Binaries
     needs: build-test
     if: inputs.update_binaries == true || github.event_name == 'push'
-    runs-on: macos-14
+    runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
-    permissions:
-      contents: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Determine Version
         id: version
@@ -339,117 +335,55 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Using version: $VERSION"
 
-      # Try to download artifacts from current CI run first (unified release)
-      - name: Download iOS Artifacts from Current Run
-        id: download-artifacts
-        continue-on-error: true
+      # Download RACommons iOS artifact
+      - name: Download RACommons iOS
         uses: actions/download-artifact@v4
         with:
-          pattern: "*-ios-${{ steps.version.outputs.version }}"
-          path: ci-artifacts
-          merge-multiple: false
+          name: racommons-ios-${{ steps.version.outputs.version }}
+          path: artifacts/racommons
 
-      - name: Check Downloaded Artifacts
-        id: check-artifacts
-        run: |
-          echo "=== Checking CI artifacts ==="
-          if [ -d "ci-artifacts" ] && [ "$(find ci-artifacts -name '*.xcframework' -type d 2>/dev/null | wc -l)" -gt 0 ]; then
-            echo "Found artifacts from current CI run"
-            find ci-artifacts -type d -name "*.xcframework"
-            echo "artifacts_found=true" >> $GITHUB_OUTPUT
-          else
-            echo "No artifacts from current CI run, will try GitHub releases"
-            echo "artifacts_found=false" >> $GITHUB_OUTPUT
-          fi
+      # Download LlamaCPP iOS artifact
+      - name: Download LlamaCPP iOS
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-llamacpp-ios-${{ steps.version.outputs.version }}
+          path: artifacts/llamacpp
 
-      - name: Setup Binaries from CI Artifacts
-        if: steps.check-artifacts.outputs.artifacts_found == 'true'
+      # Download ONNX iOS artifact
+      - name: Download ONNX iOS
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-onnx-ios-${{ steps.version.outputs.version }}
+          path: artifacts/onnx
+
+      - name: Setup Binaries from Artifacts
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
           mkdir -p "${{ env.SDK_DIR }}/Binaries"
           
-          echo "=== Setting up binaries from CI artifacts ==="
+          echo "=== Downloaded artifacts ==="
+          find artifacts -type f | head -20
+          find artifacts -type d -name "*.xcframework"
           
-          # Copy XCFrameworks from CI artifacts
-          find ci-artifacts -name "*.xcframework" -type d | while read fw; do
+          # Copy all XCFrameworks to SDK Binaries
+          find artifacts -name "*.xcframework" -type d | while read fw; do
             fw_name=$(basename "$fw")
             echo "Copying $fw_name to SDK Binaries/"
             rm -rf "${{ env.SDK_DIR }}/Binaries/$fw_name"
             cp -r "$fw" "${{ env.SDK_DIR }}/Binaries/"
           done
           
-          echo "=== Updated Binaries ==="
+          echo "=== Final Binaries ==="
           ls -la "${{ env.SDK_DIR }}/Binaries/"
-
-      - name: Download from GitHub Releases (Fallback)
-        if: steps.check-artifacts.outputs.artifacts_found != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "=== Trying to download from GitHub releases ==="
           
-          # Try unified release first (v*), then individual backend release (backends-v*)
-          UNIFIED_TAG="v${{ steps.version.outputs.version }}"
-          BACKEND_TAG=$(gh release list --limit 20 | grep -E "^backends-v" | head -1 | awk '{print $1}')
-          
-          mkdir -p downloads
-          DOWNLOADED=false
-          
-          # Try unified release
-          echo "Trying unified release: $UNIFIED_TAG"
-          if gh release download "$UNIFIED_TAG" \
-            --pattern "RABackendLLAMACPP-ios-*.zip" \
-            --pattern "RABackendONNX-ios-*.zip" \
-            --pattern "RACommons-ios-*.zip" \
-            --dir downloads 2>/dev/null; then
-            echo "Downloaded from unified release"
-            DOWNLOADED=true
-          fi
-          
-          # Try individual backend release
-          if [ "$DOWNLOADED" = "false" ] && [ -n "$BACKEND_TAG" ]; then
-            echo "Trying backend release: $BACKEND_TAG"
-            if gh release download "$BACKEND_TAG" \
-              --pattern "RABackendLLAMACPP-ios-*.zip" \
-              --pattern "RABackendONNX-ios-*.zip" \
-              --pattern "RACommons-ios-*.zip" \
-              --dir downloads 2>/dev/null; then
-              echo "Downloaded from backend release"
-              DOWNLOADED=true
+          # Verify we have the required frameworks
+          REQUIRED_FRAMEWORKS="RACommons.xcframework RABackendLLAMACPP.xcframework RABackendONNX.xcframework"
+          for fw in $REQUIRED_FRAMEWORKS; do
+            if [ ! -d "${{ env.SDK_DIR }}/Binaries/$fw" ]; then
+              echo "❌ Missing required framework: $fw"
+              exit 1
             fi
-          fi
-          
-          if [ "$DOWNLOADED" = "false" ]; then
-            echo "⚠️ No releases found to download from"
-            echo "This is OK if running standalone Swift SDK release with existing binaries"
-            ls -la "${{ env.SDK_DIR }}/Binaries/" 2>/dev/null || echo "No existing binaries"
-            exit 0
-          fi
-          
-          echo "=== Downloaded files ==="
-          ls -la downloads/
-          
-          # Extract and copy
-          cd downloads
-          for zip in *.zip; do
-            if [ -f "$zip" ]; then
-              echo "Extracting $zip..."
-              unzip -o "$zip" -d extracted/
-            fi
+            echo "✅ Found: $fw"
           done
-          
-          if [ -d extracted ]; then
-            find extracted -name "*.xcframework" -type d | while read fw; do
-              fw_name=$(basename "$fw")
-              echo "Copying $fw_name to SDK Binaries/"
-              rm -rf "../${{ env.SDK_DIR }}/Binaries/$fw_name"
-              cp -r "$fw" "../${{ env.SDK_DIR }}/Binaries/"
-            done
-          fi
-          
-          cd ..
-          echo "=== Updated Binaries ==="
-          ls -la "${{ env.SDK_DIR }}/Binaries/"
 
       - name: Update VERSION file
         run: |
