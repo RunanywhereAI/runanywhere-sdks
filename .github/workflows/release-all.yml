@@ -273,20 +273,17 @@ jobs:
             cd ../..
           fi
           
-          # Android (combine all ABIs)
-          mkdir -p android-commons
+          # Android - SPLIT by ABI for smaller downloads
           for abi in arm64-v8a armeabi-v7a x86_64; do
             if [ -d "all-artifacts/racommons-android-${abi}-${VERSION}" ]; then
-              cp -r "all-artifacts/racommons-android-${abi}-${VERSION}"/* android-commons/ 2>/dev/null || true
+              cd "all-artifacts/racommons-android-${abi}-${VERSION}"
+              zip -r "../../release-assets/RACommons-android-${abi}-v${VERSION}.zip" .
+              cd ../..
             fi
           done
-          if [ "$(ls -A android-commons 2>/dev/null)" ]; then
-            cd android-commons && zip -r "../release-assets/RACommons-android-v${VERSION}.zip" . && cd ..
-          fi
-          rm -rf android-commons
           
           # ─────────────────────────────────────────────────────────────
-          # Backend Libraries
+          # Backend Libraries - ALL SPLIT by ABI
           # ─────────────────────────────────────────────────────────────
           # LlamaCPP iOS
           if [ -d "all-artifacts/backend-llamacpp-ios-$VERSION" ]; then
@@ -302,38 +299,33 @@ jobs:
             cd ../..
           fi
           
-          # Android backends - SPLIT into separate LlamaCPP and ONNX zips
-          # LlamaCPP Android
-          mkdir -p android-llamacpp/jniLibs
+          # LlamaCPP Android - SPLIT by ABI
           for abi in arm64-v8a armeabi-v7a x86_64; do
             if [ -d "all-artifacts/backends-android-${abi}-${VERSION}" ]; then
-              # Copy llamacpp libraries
               if [ -d "all-artifacts/backends-android-${abi}-${VERSION}/llamacpp/${abi}" ]; then
-                mkdir -p "android-llamacpp/jniLibs/${abi}"
-                cp -r "all-artifacts/backends-android-${abi}-${VERSION}/llamacpp/${abi}"/*.so "android-llamacpp/jniLibs/${abi}/" 2>/dev/null || true
+                mkdir -p "android-llamacpp-${abi}/jniLibs/${abi}"
+                cp -r "all-artifacts/backends-android-${abi}-${VERSION}/llamacpp/${abi}"/*.so "android-llamacpp-${abi}/jniLibs/${abi}/" 2>/dev/null || true
+                if [ "$(find android-llamacpp-${abi} -name '*.so' 2>/dev/null | head -1)" ]; then
+                  cd "android-llamacpp-${abi}" && zip -r "../release-assets/RABackendLLAMACPP-android-${abi}-v${VERSION}.zip" . && cd ..
+                fi
+                rm -rf "android-llamacpp-${abi}"
               fi
             fi
           done
-          if [ "$(find android-llamacpp -name '*.so' 2>/dev/null | head -1)" ]; then
-            cd android-llamacpp && zip -r "../release-assets/RABackendLLAMACPP-android-v${VERSION}.zip" . && cd ..
-          fi
-          rm -rf android-llamacpp
           
-          # ONNX Android
-          mkdir -p android-onnx/jniLibs
+          # ONNX Android - SPLIT by ABI
           for abi in arm64-v8a armeabi-v7a x86_64; do
             if [ -d "all-artifacts/backends-android-${abi}-${VERSION}" ]; then
-              # Copy onnx libraries
               if [ -d "all-artifacts/backends-android-${abi}-${VERSION}/onnx/${abi}" ]; then
-                mkdir -p "android-onnx/jniLibs/${abi}"
-                cp -r "all-artifacts/backends-android-${abi}-${VERSION}/onnx/${abi}"/*.so "android-onnx/jniLibs/${abi}/" 2>/dev/null || true
+                mkdir -p "android-onnx-${abi}/jniLibs/${abi}"
+                cp -r "all-artifacts/backends-android-${abi}-${VERSION}/onnx/${abi}"/*.so "android-onnx-${abi}/jniLibs/${abi}/" 2>/dev/null || true
+                if [ "$(find android-onnx-${abi} -name '*.so' 2>/dev/null | head -1)" ]; then
+                  cd "android-onnx-${abi}" && zip -r "../release-assets/RABackendONNX-android-${abi}-v${VERSION}.zip" . && cd ..
+                fi
+                rm -rf "android-onnx-${abi}"
               fi
             fi
           done
-          if [ "$(find android-onnx -name '*.so' 2>/dev/null | head -1)" ]; then
-            cd android-onnx && zip -r "../release-assets/RABackendONNX-android-v${VERSION}.zip" . && cd ..
-          fi
-          rm -rf android-onnx
           
           # ─────────────────────────────────────────────────────────────
           # Swift SDK
@@ -396,26 +388,34 @@ jobs:
             ### 📦 Release Assets
             
             #### Core Libraries
-            | Asset | Platform | Description |
-            |-------|----------|-------------|
-            | `RACommons-ios-v${{ needs.setup.outputs.version }}.zip` | iOS/macOS | Core infrastructure (XCFramework) |
-            | `RACommons-android-v${{ needs.setup.outputs.version }}.zip` | Android | Core infrastructure (native libs) |
+            | Asset | Platform | Size |
+            |-------|----------|------|
+            | `RACommons-ios-v${{ needs.setup.outputs.version }}.zip` | iOS/macOS | ~2 MB |
+            | `RACommons-android-arm64-v8a-v${{ needs.setup.outputs.version }}.zip` | Android arm64 | ~61 MB |
+            | `RACommons-android-armeabi-v7a-v${{ needs.setup.outputs.version }}.zip` | Android armv7 | ~57 MB |
+            | `RACommons-android-x86_64-v${{ needs.setup.outputs.version }}.zip` | Android x86_64 | ~64 MB |
             
             #### Backend Libraries (pick what you need)
-            | Asset | Platform | Description |
-            |-------|----------|-------------|
-            | `RABackendLLAMACPP-ios-v${{ needs.setup.outputs.version }}.zip` | iOS/macOS | LLM backend - llama.cpp |
-            | `RABackendLLAMACPP-android-v${{ needs.setup.outputs.version }}.zip` | Android | LLM backend - llama.cpp |
-            | `RABackendONNX-ios-v${{ needs.setup.outputs.version }}.zip` | iOS/macOS | STT/TTS/VAD - Sherpa-ONNX |
-            | `RABackendONNX-android-v${{ needs.setup.outputs.version }}.zip` | Android | STT/TTS/VAD - Sherpa-ONNX |
+            | Asset | Platform | Use Case |
+            |-------|----------|----------|
+            | `RABackendLLAMACPP-ios-v${{ needs.setup.outputs.version }}.zip` | iOS/macOS | LLM |
+            | `RABackendLLAMACPP-android-arm64-v8a-v${{ needs.setup.outputs.version }}.zip` | Android arm64 | LLM |
+            | `RABackendLLAMACPP-android-armeabi-v7a-v${{ needs.setup.outputs.version }}.zip` | Android armv7 | LLM |
+            | `RABackendLLAMACPP-android-x86_64-v${{ needs.setup.outputs.version }}.zip` | Android x86_64 | LLM |
+            | `RABackendONNX-ios-v${{ needs.setup.outputs.version }}.zip` | iOS/macOS | STT/TTS/VAD |
+            | `RABackendONNX-android-arm64-v8a-v${{ needs.setup.outputs.version }}.zip` | Android arm64 | STT/TTS/VAD |
+            | `RABackendONNX-android-armeabi-v7a-v${{ needs.setup.outputs.version }}.zip` | Android armv7 | STT/TTS/VAD |
+            | `RABackendONNX-android-x86_64-v${{ needs.setup.outputs.version }}.zip` | Android x86_64 | STT/TTS/VAD |
             
             #### SDK Packages
             | Asset | Platform | Description |
             |-------|----------|-------------|
             | `RunAnywhere-Swift-SDK-v${{ needs.setup.outputs.version }}.zip` | iOS/macOS | Swift SDK |
             | `RunAnywhere-Kotlin-SDK-v${{ needs.setup.outputs.version }}.aar` | Android | Kotlin SDK (AAR) |
-            | `RunAnywhere-Flutter-SDK-v${{ needs.setup.outputs.version }}.zip` | Cross-platform | Flutter SDK (3 packages) |
-            | `RunAnywhere-ReactNative-SDK-v${{ needs.setup.outputs.version }}.zip` | Cross-platform | React Native SDK (3 packages) |
+            | `RunAnywhere-Flutter-SDK-v${{ needs.setup.outputs.version }}.zip` | Cross-platform | Flutter SDK |
+            | `RunAnywhere-ReactNative-SDK-v${{ needs.setup.outputs.version }}.zip` | Cross-platform | React Native SDK |
+            
+            > 💡 **Tip:** Most Android apps only need `arm64-v8a` (85% of devices)
             
             ---
             

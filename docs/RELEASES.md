@@ -110,29 +110,33 @@ All SDKs are released as a **single unified release** with all assets attached:
 
 ### Assets in Each Release
 
-Every unified release (`v*`) includes:
+Every unified release (`v*`) includes assets split by platform and ABI for smaller downloads.
 
 #### Core Libraries (always needed)
-| Asset | Platform | Description |
-|-------|----------|-------------|
-| `RACommons-ios-v*.zip` | iOS/macOS | Core infrastructure (XCFramework) |
-| `RACommons-android-v*.zip` | Android | Core infrastructure (native libs) |
+| Asset | Platform | Size |
+|-------|----------|------|
+| `RACommons-ios-v*.zip` | iOS/macOS | ~2 MB |
+| `RACommons-android-arm64-v8a-v*.zip` | Android arm64 | ~61 MB |
+| `RACommons-android-armeabi-v7a-v*.zip` | Android armv7 | ~57 MB |
+| `RACommons-android-x86_64-v*.zip` | Android x86_64 (emulator) | ~64 MB |
 
 #### Backend Libraries (pick what you need)
 | Asset | Platform | Use Case |
 |-------|----------|----------|
 | `RABackendLLAMACPP-ios-v*.zip` | iOS/macOS | LLM text generation |
-| `RABackendLLAMACPP-android-v*.zip` | Android | LLM text generation |
+| `RABackendLLAMACPP-android-{abi}-v*.zip` | Android | LLM text generation |
 | `RABackendONNX-ios-v*.zip` | iOS/macOS | STT / TTS / VAD |
-| `RABackendONNX-android-v*.zip` | Android | STT / TTS / VAD |
+| `RABackendONNX-android-{abi}-v*.zip` | Android | STT / TTS / VAD |
+
+> 💡 **Tip:** Most Android apps only need `arm64-v8a` (85% of devices). Only add other ABIs if you need legacy device support (`armeabi-v7a`) or emulator support (`x86_64`).
 
 #### SDK Packages
 | Asset | Platform | Description |
 |-------|----------|-------------|
 | `RunAnywhere-Swift-SDK-v*.zip` | iOS/macOS | Swift SDK |
 | `RunAnywhere-Kotlin-SDK-v*.aar` | Android | Kotlin SDK (AAR) |
-| `RunAnywhere-Flutter-SDK-v*.zip` | Cross-platform | Flutter SDK (3 packages) |
-| `RunAnywhere-ReactNative-SDK-v*.zip` | Cross-platform | React Native SDK (3 packages) |
+| `RunAnywhere-Flutter-SDK-v*.zip` | Cross-platform | Flutter SDK |
+| `RunAnywhere-ReactNative-SDK-v*.zip` | Cross-platform | React Native SDK |
 | `checksums.sha256` | All | SHA256 checksums |
 
 ### Native Libraries
