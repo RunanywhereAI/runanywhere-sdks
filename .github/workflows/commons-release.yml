@@ -27,6 +27,11 @@ on:
         required: false
         default: false
         type: boolean
+      skip_publish:
+        description: 'Skip creating individual release (for unified release)'
+        required: false
+        default: false
+        type: boolean
   workflow_dispatch:
     inputs:
       version:
@@ -350,7 +355,10 @@ jobs:
   publish:
     name: Publish Release
     needs: [build-ios, build-android]
-    if: github.event.inputs.dry_run != 'true'
+    # Skip if dry_run or skip_publish (for unified release)
+    if: |
+      inputs.dry_run != true &&
+      inputs.skip_publish != true
     runs-on: ubuntu-latest
     permissions:
       contents: write

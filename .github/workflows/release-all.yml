@@ -143,6 +143,7 @@ jobs:
     with:
       version: ${{ needs.setup.outputs.version }}
       dry_run: ${{ needs.setup.outputs.dry_run == 'true' }}
+      skip_publish: true  # Skip individual release, use unified release
     secrets: inherit
 
   # ===========================================================================
@@ -160,6 +161,7 @@ jobs:
       version: ${{ needs.setup.outputs.version }}
       backends: all
       dry_run: ${{ needs.setup.outputs.dry_run == 'true' }}
+      skip_publish: true  # Skip individual release, use unified release
     secrets: inherit
 
   # ===========================================================================
@@ -177,6 +179,7 @@ jobs:
       version: ${{ needs.setup.outputs.version }}
       update_binaries: true
       dry_run: ${{ needs.setup.outputs.dry_run == 'true' }}
+      skip_publish: true  # Skip individual release, use unified release
     secrets: inherit
 
   # ===========================================================================
@@ -194,6 +197,7 @@ jobs:
       version: ${{ needs.setup.outputs.version }}
       publish_maven: false
       dry_run: ${{ needs.setup.outputs.dry_run == 'true' }}
+      skip_publish: true  # Skip individual release, use unified release
     secrets: inherit
 
   # ===========================================================================
@@ -211,6 +215,7 @@ jobs:
       version: ${{ needs.setup.outputs.version }}
       publish_pubdev: false
       dry_run: ${{ needs.setup.outputs.dry_run == 'true' }}
+      skip_publish: true  # Skip individual release, use unified release
     secrets: inherit
 
   # ===========================================================================
@@ -228,70 +233,193 @@ jobs:
       version: ${{ needs.setup.outputs.version }}
       publish_npm: ${{ needs.setup.outputs.publish_npm == 'true' }}
       dry_run: ${{ needs.setup.outputs.dry_run == 'true' }}
+      skip_publish: true  # Skip individual release, use unified release
     secrets: inherit
 
   # ===========================================================================
-  # Create Unified Release Summary
+  # Create Unified Release (Single release with all assets)
   # ===========================================================================
-  create-summary:
-    name: Create Release Summary
+  create-unified-release:
+    name: Create Unified Release
     needs: [setup, release-commons, release-backends, release-swift, release-kotlin, release-flutter, release-react-native]
     if: |
       always() &&
       needs.setup.outputs.dry_run != 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
-      - name: Create Summary Release
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-artifacts
+
+      - name: Prepare Release Assets
+        run: |
+          VERSION="${{ needs.setup.outputs.version }}"
+          mkdir -p release-assets
+          
+          echo "=== Downloaded artifacts ==="
+          find all-artifacts -type f | head -50
+          
+          # ─────────────────────────────────────────────────────────────
+          # RACommons
+          # ─────────────────────────────────────────────────────────────
+          # iOS
+          if [ -d "all-artifacts/racommons-ios-$VERSION" ]; then
+            cd "all-artifacts/racommons-ios-$VERSION"
+            zip -r "../../release-assets/RACommons-ios-v${VERSION}.zip" .
+            cd ../..
+          fi
+          
+          # Android (combine all ABIs)
+          mkdir -p android-commons
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            if [ -d "all-artifacts/racommons-android-${abi}-${VERSION}" ]; then
+              cp -r "all-artifacts/racommons-android-${abi}-${VERSION}"/* android-commons/ 2>/dev/null || true
+            fi
+          done
+          if [ "$(ls -A android-commons 2>/dev/null)" ]; then
+            cd android-commons && zip -r "../release-assets/RACommons-android-v${VERSION}.zip" . && cd ..
+          fi
+          rm -rf android-commons
+          
+          # ─────────────────────────────────────────────────────────────
+          # Backend Libraries
+          # ─────────────────────────────────────────────────────────────
+          # LlamaCPP iOS
+          if [ -d "all-artifacts/backend-llamacpp-ios-$VERSION" ]; then
+            cd "all-artifacts/backend-llamacpp-ios-$VERSION"
+            zip -r "../../release-assets/RABackendLLAMACPP-ios-v${VERSION}.zip" .
+            cd ../..
+          fi
+          
+          # ONNX iOS
+          if [ -d "all-artifacts/backend-onnx-ios-$VERSION" ]; then
+            cd "all-artifacts/backend-onnx-ios-$VERSION"
+            zip -r "../../release-assets/RABackendONNX-ios-v${VERSION}.zip" .
+            cd ../..
+          fi
+          
+          # Android backends (combine all ABIs)
+          mkdir -p android-backends
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            if [ -d "all-artifacts/backends-android-${abi}-${VERSION}" ]; then
+              mkdir -p "android-backends/${abi}"
+              cp -r "all-artifacts/backends-android-${abi}-${VERSION}"/* "android-backends/${abi}/" 2>/dev/null || true
+            fi
+          done
+          if [ "$(ls -A android-backends 2>/dev/null)" ]; then
+            cd android-backends && zip -r "../release-assets/RABackends-android-v${VERSION}.zip" . && cd ..
+          fi
+          rm -rf android-backends
+          
+          # ─────────────────────────────────────────────────────────────
+          # Swift SDK
+          # ─────────────────────────────────────────────────────────────
+          if [ -d "all-artifacts/swift-sdk-build-$VERSION" ]; then
+            cd "all-artifacts/swift-sdk-build-$VERSION"
+            zip -r "../../release-assets/RunAnywhere-Swift-SDK-v${VERSION}.zip" .
+            cd ../..
+          fi
+          
+          # ─────────────────────────────────────────────────────────────
+          # Kotlin SDK
+          # ─────────────────────────────────────────────────────────────
+          if [ -d "all-artifacts/kotlin-sdk-aar-$VERSION" ]; then
+            cp "all-artifacts/kotlin-sdk-aar-$VERSION"/*.aar "release-assets/RunAnywhere-Kotlin-SDK-v${VERSION}.aar" 2>/dev/null || true
+          fi
+          
+          # ─────────────────────────────────────────────────────────────
+          # Flutter SDK
+          # ─────────────────────────────────────────────────────────────
+          if [ -d "all-artifacts/flutter-sdk-package-$VERSION" ]; then
+            cp "all-artifacts/flutter-sdk-package-$VERSION"/*.zip "release-assets/RunAnywhere-Flutter-SDK-v${VERSION}.zip" 2>/dev/null || true
+          fi
+          
+          # ─────────────────────────────────────────────────────────────
+          # React Native SDK
+          # ─────────────────────────────────────────────────────────────
+          if [ -d "all-artifacts/react-native-sdk-package-$VERSION" ]; then
+            cp "all-artifacts/react-native-sdk-package-$VERSION"/*.zip "release-assets/RunAnywhere-ReactNative-SDK-v${VERSION}.zip" 2>/dev/null || true
+          fi
+          
+          # ─────────────────────────────────────────────────────────────
+          # Generate Checksums
+          # ─────────────────────────────────────────────────────────────
+          cd release-assets
+          echo "=== Release Assets ==="
+          ls -la
+          
+          echo "" > checksums.sha256
+          for f in *.zip *.aar; do
+            if [ -f "$f" ]; then
+              shasum -a 256 "$f" >> checksums.sha256
+            fi
+          done
+          cat checksums.sha256
+
+      - name: Create Unified GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.setup.outputs.version }}
           name: RunAnywhere SDKs v${{ needs.setup.outputs.version }}
+          files: release-assets/*
           body: |
             ## RunAnywhere SDKs v${{ needs.setup.outputs.version }}
-
-            This is a coordinated release of all RunAnywhere SDK components.
-
-            ### Released Components
-
-            | Component | Tag | Status |
-            |-----------|-----|--------|
-            | RACommons | `commons-v${{ needs.setup.outputs.version }}` | ${{ needs.release-commons.result == 'success' && '✅' || needs.release-commons.result == 'skipped' && '⏭️' || '❌' }} |
-            | Backends | `backends-v${{ needs.setup.outputs.version }}` | ${{ needs.release-backends.result == 'success' && '✅' || needs.release-backends.result == 'skipped' && '⏭️' || '❌' }} |
-            | Swift SDK | `swift-v${{ needs.setup.outputs.version }}` | ${{ needs.release-swift.result == 'success' && '✅' || needs.release-swift.result == 'skipped' && '⏭️' || '❌' }} |
-            | Kotlin SDK | `kotlin-v${{ needs.setup.outputs.version }}` | ${{ needs.release-kotlin.result == 'success' && '✅' || needs.release-kotlin.result == 'skipped' && '⏭️' || '❌' }} |
-            | Flutter SDK | `flutter-v${{ needs.setup.outputs.version }}` | ${{ needs.release-flutter.result == 'success' && '✅' || needs.release-flutter.result == 'skipped' && '⏭️' || '❌' }} |
-            | React Native SDK | `react-native-v${{ needs.setup.outputs.version }}` | ${{ needs.release-react-native.result == 'success' && '✅' || needs.release-react-native.result == 'skipped' && '⏭️' || '❌' }} |
-
-            ### Quick Start
-
+            
+            **Privacy-first, on-device AI SDKs** for iOS, Android, Flutter, and React Native.
+            
+            ---
+            
+            ### 📦 Release Assets
+            
+            | Asset | Platform | Description |
+            |-------|----------|-------------|
+            | `RACommons-ios-v${{ needs.setup.outputs.version }}.zip` | iOS/macOS | Core infrastructure (XCFramework) |
+            | `RACommons-android-v${{ needs.setup.outputs.version }}.zip` | Android | Core infrastructure (native libs) |
+            | `RABackendLLAMACPP-ios-v${{ needs.setup.outputs.version }}.zip` | iOS/macOS | LLM backend - llama.cpp (XCFramework) |
+            | `RABackendONNX-ios-v${{ needs.setup.outputs.version }}.zip` | iOS/macOS | STT/TTS/VAD backend - Sherpa-ONNX (XCFramework) |
+            | `RABackends-android-v${{ needs.setup.outputs.version }}.zip` | Android | All backends (arm64-v8a, armeabi-v7a, x86_64) |
+            | `RunAnywhere-Swift-SDK-v${{ needs.setup.outputs.version }}.zip` | iOS/macOS | Swift SDK build artifacts |
+            | `RunAnywhere-Kotlin-SDK-v${{ needs.setup.outputs.version }}.aar` | Android | Kotlin SDK (AAR) |
+            | `RunAnywhere-Flutter-SDK-v${{ needs.setup.outputs.version }}.zip` | Cross-platform | Flutter SDK package |
+            | `RunAnywhere-ReactNative-SDK-v${{ needs.setup.outputs.version }}.zip` | Cross-platform | React Native SDK package |
+            
+            ---
+            
+            ### 🚀 Quick Start
+            
             <details>
             <summary><b>Swift (iOS/macOS)</b></summary>
-
+            
             ```swift
             // Package.swift
             dependencies: [
                 .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "${{ needs.setup.outputs.version }}")
             ]
             ```
+            
+            Or download the XCFrameworks directly from this release.
             </details>
-
+            
             <details>
             <summary><b>Kotlin (Android)</b></summary>
-
+            
             ```kotlin
             // build.gradle.kts
             dependencies {
                 implementation("ai.runanywhere:runanywhere-kotlin:${{ needs.setup.outputs.version }}")
             }
             ```
-
-            Or download `runanywhere-kotlin-${{ needs.setup.outputs.version }}.aar` from the kotlin release.
+            
+            Or download `RunAnywhere-Kotlin-SDK-v${{ needs.setup.outputs.version }}.aar` from this release.
             </details>
-
+            
             <details>
             <summary><b>Flutter</b></summary>
-
+            
             ```yaml
             # pubspec.yaml
             dependencies:
@@ -299,30 +427,58 @@ jobs:
                 git:
                   url: https://github.com/RunanywhereAI/runanywhere-sdks
                   path: sdk/runanywhere-flutter/packages/runanywhere
-                  ref: flutter-v${{ needs.setup.outputs.version }}
+                  ref: v${{ needs.setup.outputs.version }}
             ```
             </details>
-
+            
             <details>
             <summary><b>React Native</b></summary>
-
+            
             ```json
-            // package.json
             {
               "dependencies": {
-                "@runanywhere/core": "github:RunanywhereAI/runanywhere-sdks#react-native-v${{ needs.setup.outputs.version }}"
+                "@runanywhere/core": "github:RunanywhereAI/runanywhere-sdks#v${{ needs.setup.outputs.version }}"
               }
             }
             ```
             </details>
-
-            ### What's New
-            See individual release notes for detailed changes.
-
+            
             ---
-            🔐 All SDKs provide **privacy-first, on-device AI** processing.
+            
+            ### ✨ Features
+            
+            - 🧠 **LLM**: On-device text generation via llama.cpp
+            - 🎤 **STT**: Speech-to-text via Sherpa-ONNX Whisper
+            - 🔊 **TTS**: Text-to-speech via Sherpa-ONNX Piper
+            - 🎯 **VAD**: Voice activity detection
+            - 🔒 **Privacy**: All processing happens on-device
+            
+            ---
+            
+            ### 📋 Build Status
+            
+            | Component | Status |
+            |-----------|--------|
+            | RACommons | ${{ needs.release-commons.result == 'success' && '✅' || '❌' }} |
+            | Backends | ${{ needs.release-backends.result == 'success' && '✅' || '❌' }} |
+            | Swift SDK | ${{ needs.release-swift.result == 'success' && '✅' || '❌' }} |
+            | Kotlin SDK | ${{ needs.release-kotlin.result == 'success' && '✅' || '❌' }} |
+            | Flutter SDK | ${{ needs.release-flutter.result == 'success' && '✅' || '❌' }} |
+            | React Native SDK | ${{ needs.release-react-native.result == 'success' && '✅' || '❌' }} |
+            
+            ---
+            
+            ### 🔐 Verification
+            
+            ```bash
+            shasum -a 256 -c checksums.sha256
+            ```
+            
+            ---
+            
+            Built from commit: ${{ github.sha }}
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(needs.setup.outputs.version, 'test') || contains(needs.setup.outputs.version, 'beta') || contains(needs.setup.outputs.version, 'alpha') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
