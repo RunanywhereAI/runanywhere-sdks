@@ -335,7 +335,11 @@ jobs:
         working-directory: ${{ env.SDK_DIR }}
         run: |
           chmod +x gradlew
-          ./gradlew publish
+          # Only publish Android AAR (skip JVM due to Android-specific code in jvmAndroidMain)
+          ./gradlew publishAndroidReleasePublicationToGitHubPackagesRepository \
+            :modules:runanywhere-core-llamacpp:publishAndroidReleasePublicationToGitHubPackagesRepository \
+            :modules:runanywhere-core-onnx:publishAndroidReleasePublicationToGitHubPackagesRepository \
+            --no-daemon
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
