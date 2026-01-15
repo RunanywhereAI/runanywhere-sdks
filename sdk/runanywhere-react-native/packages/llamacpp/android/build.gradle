@@ -49,8 +49,19 @@ apply from: '../nitrogen/generated/android/runanywherellama+autolinking.gradle'
 apply plugin: 'com.facebook.react'
 
 // Configure node path for Android Studio builds
-// Access the react extension and set nodeExecutableAndArgs
-project.extensions.findByName('react')?.nodeExecutableAndArgs?.set([findNodeBinary()])
+// Set the react extension's nodeExecutableAndArgs after plugin is applied
+def nodeBinary = findNodeBinary()
+logger.lifecycle("[RunAnywhereLlama] Using node binary: ${nodeBinary}")
+
+// Configure all codegen tasks to use the detected node binary
+afterEvaluate {
+    tasks.withType(com.facebook.react.tasks.GenerateCodegenSchemaTask).configureEach {
+        nodeExecutableAndArgs.set([nodeBinary])
+    }
+    tasks.withType(com.facebook.react.tasks.GenerateCodegenArtifactsTask).configureEach {
+        nodeExecutableAndArgs.set([nodeBinary])
+    }
+}
 
 def getExtOrIntegerDefault(name) {
     if (rootProject.ext.has(name)) {
@@ -315,14 +326,17 @@ if (!useLocalBuild) {
     }
 }
 
+// NOTE: cleanNativeLibs is NOT attached to clean task because npm-bundled libs should persist
+// Only use this task manually when needed during development
 task cleanNativeLibs(type: Delete) {
-    description = "Removes downloaded native libraries"
+    description = "Removes downloaded native libraries (use manually, not during normal clean)"
     group = "build"
-    delete jniLibsDir
     delete downloadedLibsDir
+    // DO NOT delete jniLibsDir - it contains npm-bundled libraries
 }
 
-clean.dependsOn cleanNativeLibs
+// DO NOT add: clean.dependsOn cleanNativeLibs
+// This would delete bundled .so files from the npm package
 
 repositories {
     mavenCentral()
