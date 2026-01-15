@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/llamacpp",
-  "version": "0.16.3",
+  "version": "0.16.4",
   "description": "LlamaCpp backend for RunAnywhere React Native SDK - GGUF model support for on-device LLM",
   "main": "src/index.ts",
   "types": "src/index.ts",

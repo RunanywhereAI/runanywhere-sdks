@@ -1,3 +1,39 @@
+// =============================================================================
+// Node Binary Detection for Android Studio Compatibility
+// Android Studio doesn't inherit terminal PATH, so we need to find node explicitly
+// =============================================================================
+def findNodeBinary() {
+    // Check local.properties first (user can override)
+    def localProperties = new Properties()
+    def localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.withInputStream { localProperties.load(it) }
+        def nodePath = localProperties.getProperty("node.path")
+        if (nodePath && new File(nodePath).exists()) {
+            return nodePath
+        }
+    }
+    
+    // Check common node installation paths
+    def homeDir = System.getProperty("user.home")
+    def nodePaths = [
+        "/opt/homebrew/bin/node",                    // macOS ARM (Apple Silicon)
+        "/usr/local/bin/node",                       // macOS Intel / Linux
+        "/usr/bin/node",                             // Linux system
+        "${homeDir}/.nvm/current/bin/node",          // nvm
+        "${homeDir}/.volta/bin/node",                // volta
+        "${homeDir}/.asdf/shims/node"                // asdf
+    ]
+    for (path in nodePaths) {
+        if (new File(path).exists()) {
+            return path
+        }
+    }
+    
+    // Fallback to 'node' (works if PATH is set correctly in terminal builds)
+    return "node"
+}
+
 def getExtOrDefault(name) {
     return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties['RunAnywhereLlama_' + name]
 }
@@ -11,6 +47,11 @@ apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 apply from: '../nitrogen/generated/android/runanywherellama+autolinking.gradle'
 apply plugin: 'com.facebook.react'
+
+// Configure node path for Android Studio builds
+react {
+    nodeExecutableAndArgs = [findNodeBinary()]
+}
 
 def getExtOrIntegerDefault(name) {
     if (rootProject.ext.has(name)) {
@@ -146,6 +187,14 @@ task downloadNativeLibs {
     doLast {
         if (useLocalBuild) {
             logger.lifecycle("[RunAnywhereLlama] Skipping download - using local build mode")
+            return
+        }
+
+        // Check if libs are already bundled (npm install case)
+        def bundledLibsDir = file("${jniLibsDir}/arm64-v8a")
+        def bundledLibs = bundledLibsDir.exists() ? bundledLibsDir.listFiles()?.findAll { it.name.endsWith(".so") } : []
+        if (bundledLibs?.size() > 0) {
+            logger.lifecycle("[RunAnywhereLlama] ✅ Using bundled native libraries from npm package (${bundledLibs.size()} .so files)")
             return
         }
 
