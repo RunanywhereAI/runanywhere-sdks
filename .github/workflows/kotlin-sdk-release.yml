@@ -263,92 +263,16 @@ jobs:
           retention-days: 30
 
   # ===========================================================================
-  # Publish to GitHub Packages (Maven)
-  # ===========================================================================
-  publish-maven:
-    name: Publish to GitHub Packages
-    needs: build-sdk
-    if: inputs.dry_run != true
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Download Native Libraries
-        uses: actions/download-artifact@v4
-        with:
-          pattern: native-libs-*
-          path: native-artifacts
-          merge-multiple: false
-
-      - name: Setup Native Libraries
-        run: |
-          mkdir -p ${{ env.SDK_DIR }}/build/jniLibs
-
-          for artifact_dir in native-artifacts/native-libs-*/; do
-            if [ -d "$artifact_dir" ]; then
-              for abi_dir in "${artifact_dir}"unified/*/; do
-                if [ -d "$abi_dir" ]; then
-                  abi=$(basename "$abi_dir")
-                  mkdir -p "${{ env.SDK_DIR }}/build/jniLibs/${abi}"
-                  find "$abi_dir" -name "*.so" -exec cp {} "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" \;
-                fi
-              done
-              for abi_dir in "${artifact_dir}"llamacpp/*/; do
-                if [ -d "$abi_dir" ]; then
-                  abi=$(basename "$abi_dir")
-                  mkdir -p "${{ env.SDK_DIR }}/build/jniLibs/${abi}"
-                  find "$abi_dir" -name "*.so" -exec cp {} "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" \;
-                fi
-              done
-              for abi_dir in "${artifact_dir}"onnx/*/; do
-                if [ -d "$abi_dir" ]; then
-                  abi=$(basename "$abi_dir")
-                  mkdir -p "${{ env.SDK_DIR }}/build/jniLibs/${abi}"
-                  find "$abi_dir" -name "*.so" -exec cp {} "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" \;
-                fi
-              done
-            fi
-          done
-
-          echo "✅ Native libraries setup complete"
-          find ${{ env.SDK_DIR }}/build/jniLibs -name "*.so" | wc -l
-
-      - name: Setup Gradle Properties
-        working-directory: ${{ env.SDK_DIR }}
-        run: |
-          cp gradle.properties.example gradle.properties 2>/dev/null || true
-          echo "runanywhere.useLocalLibs=true" >> gradle.properties
-          echo "version=${{ needs.build-sdk.outputs.version }}" >> gradle.properties
-
-      - name: Publish to GitHub Packages
-        working-directory: ${{ env.SDK_DIR }}
-        run: |
-          chmod +x gradlew
-          # Only publish Android AAR (skip JVM due to Android-specific code in jvmAndroidMain)
-          ./gradlew publishAndroidReleasePublicationToGitHubPackagesRepository \
-            :modules:runanywhere-core-llamacpp:publishAndroidReleasePublicationToGitHubPackagesRepository \
-            :modules:runanywhere-core-onnx:publishAndroidReleasePublicationToGitHubPackagesRepository \
-            --no-daemon
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # ===========================================================================
   # Publish Release
   # ===========================================================================
+  # NOTE: GitHub Packages publishing is disabled because the SDK has Android-specific
+  # code in jvmAndroidMain that prevents JVM compilation. Consumers should use JitPack
+  # instead (no authentication required): maven { url = uri("https://jitpack.io") }
+  # See: jitpack.yml in repo root for build configuration.
+
   publish:
     name: Publish Kotlin SDK Release
-    needs: [build-sdk, publish-maven]
+    needs: [build-sdk]
     # Skip if dry_run or skip_publish (for unified release)
     if: |
       always() &&
