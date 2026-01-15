@@ -26,9 +26,8 @@ android/build/
 android/.gradle/
 android/.cxx/
 android/libs/
-# Downloaded native libraries and headers (from runanywhere-sdks/runanywhere-binaries releases)
-# These are automatically downloaded during gradle build - DO NOT commit
-**/android/src/main/jniLibs/
+# NOTE: jniLibs are now bundled in npm package - DO NOT gitignore them
+# **/android/src/main/jniLibs/   # REMOVED - libs are bundled for npm publish
 **/android/src/main/include/
 **/android/include/
 *.aar

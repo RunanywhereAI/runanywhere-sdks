@@ -267,6 +267,9 @@ sdk/runanywhere-kotlin/modules/runanywhere-llm-llamacpp/src/jvmMain/resources/na
 *.dll
 *.a
 
+# EXCEPTION: Include React Native jniLibs .so files (bundled in npm packages)
+!sdk/runanywhere-react-native/packages/*/android/src/main/jniLibs/**/*.so
+
 # Backup directories
 examples/android/RunAnywhereAI/app/src/main/cpp/llama.cpp.backup/
 comments/
