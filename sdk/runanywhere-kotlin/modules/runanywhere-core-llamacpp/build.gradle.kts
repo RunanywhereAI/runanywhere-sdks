@@ -278,6 +278,7 @@ tasks.named<Jar>("jvmJar") {
 // Use JitPack-compatible group when building on JitPack
 val isJitPack = System.getenv("JITPACK") == "true"
 group = if (isJitPack) "com.github.RunanywhereAI.runanywhere-sdks" else "com.runanywhere.sdk"
+version = System.getenv("SDK_VERSION")?.removePrefix("v") ?: "0.1.5-SNAPSHOT"
 
 publishing {
     publications.withType<MavenPublication> {

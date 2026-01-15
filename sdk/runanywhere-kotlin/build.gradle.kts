@@ -42,7 +42,10 @@ ktlint {
 // Use JitPack-compatible group when building on JitPack, otherwise use standard group
 val isJitPack = System.getenv("JITPACK") == "true"
 group = if (isJitPack) "com.github.RunanywhereAI.runanywhere-sdks" else "com.runanywhere.sdk"
-version = "0.1.4"
+
+// Version can be overridden via environment variable (for CI/CD) or defaults to local dev version
+// CI/CD sets SDK_VERSION from the git tag (e.g., v0.16.0-test.40 -> 0.16.0-test.40)
+version = System.getenv("SDK_VERSION")?.removePrefix("v") ?: "0.1.5-SNAPSHOT"
 
 // =============================================================================
 // Local vs Remote JNI Library Configuration
