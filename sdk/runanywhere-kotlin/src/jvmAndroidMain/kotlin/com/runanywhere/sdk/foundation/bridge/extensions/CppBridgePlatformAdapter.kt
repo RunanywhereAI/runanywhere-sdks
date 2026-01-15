@@ -10,9 +10,6 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
-import android.content.Context
-import android.content.SharedPreferences
-import android.util.Base64
 import com.runanywhere.sdk.foundation.SDKLogger
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
@@ -21,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap
  * Platform adapter that provides JNI callbacks for C++ core operations.
  *
  * CRITICAL: This MUST be registered FIRST before any C++ calls.
- * CRITICAL: [setContext] MUST be called before secure storage operations on Android.
+ * On Android, call [setAndroidContext] before secure storage operations for persistence.
  *
  * Provides callbacks for:
  * - Logging: Route C++ logs to Kotlin logging system
@@ -48,29 +45,14 @@ object CppBridgePlatformAdapter {
     private val lock = Any()
 
     /**
-     * Application context for Android-specific operations.
-     * Must be set via [setContext] before secure storage operations.
+     * Platform-specific storage delegate for Android persistent storage.
+     * Set via [setAndroidContext] on Android platform.
      */
     @Volatile
-    private var appContext: Context? = null
+    private var platformStorage: PlatformSecureStorage? = null
 
     /**
-     * SharedPreferences for persistent secure storage on Android.
-     * Initialized when context is set.
-     *
-     * @Volatile ensures visibility across threads - reads will see the latest
-     * value written by setContext() even without explicit synchronization.
-     */
-    @Volatile
-    private var sharedPreferences: SharedPreferences? = null
-
-    /**
-     * SharedPreferences file name for secure storage.
-     */
-    private const val PREFS_NAME = "runanywhere_secure_storage"
-
-    /**
-     * In-memory fallback storage for JVM environments or when context is not available.
+     * In-memory fallback storage for JVM environments or when platform storage is not available.
      */
     private val inMemoryStorage = ConcurrentHashMap<String, ByteArray>()
 
@@ -80,18 +62,26 @@ object CppBridgePlatformAdapter {
     private const val TAG = "CppBridge"
 
     /**
-     * Set the Android application context.
-     *
-     * MUST be called during SDK initialization before any secure storage operations.
-     * Uses application context to avoid memory leaks.
-     *
-     * @param context The Android context (will use applicationContext internally)
+     * Interface for platform-specific secure storage.
+     * Implemented differently on Android vs JVM.
      */
-    fun setContext(context: Context) {
+    interface PlatformSecureStorage {
+        fun get(key: String): ByteArray?
+        fun set(key: String, value: ByteArray): Boolean
+        fun delete(key: String): Boolean
+        fun clear()
+    }
+
+    /**
+     * Set the platform-specific storage implementation.
+     * On Android, this should be called with an AndroidSecureStorage instance.
+     *
+     * @param storage The platform storage implementation
+     */
+    fun setPlatformStorage(storage: PlatformSecureStorage) {
         synchronized(lock) {
-            appContext = context.applicationContext
-            sharedPreferences = appContext?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            logCallback(LogLevel.DEBUG, TAG, "Context set, SharedPreferences initialized for persistent storage")
+            platformStorage = storage
+            logCallback(LogLevel.DEBUG, TAG, "Platform storage initialized for persistent storage")
         }
     }
 
@@ -315,8 +305,8 @@ object CppBridgePlatformAdapter {
     /**
      * Get a value from secure storage.
      *
-     * On Android with context set: Uses SharedPreferences (persistent across app restarts)
-     * On JVM or without context: Uses in-memory storage (non-persistent)
+     * On Android with platform storage set: Uses persistent storage (SharedPreferences)
+     * On JVM or without platform storage: Uses in-memory storage (non-persistent)
      *
      * @param key The key to retrieve
      * @return The stored value as ByteArray, or null if not found
@@ -326,14 +316,12 @@ object CppBridgePlatformAdapter {
     @JvmStatic
     fun secureGetCallback(key: String): ByteArray? {
         return try {
-            // Take a thread-safe local copy of the volatile reference
-            val prefs = sharedPreferences
-
-            // Try SharedPreferences first (persistent storage)
-            if (prefs != null) {
-                val base64Value = prefs.getString(key, null)
-                if (base64Value != null) {
-                    return Base64.decode(base64Value, Base64.NO_WRAP)
+            // Try platform storage first (persistent storage)
+            val storage = platformStorage
+            if (storage != null) {
+                val result = storage.get(key)
+                if (result != null) {
+                    return result
                 }
             }
             // Fall back to in-memory storage
@@ -347,8 +335,8 @@ object CppBridgePlatformAdapter {
     /**
      * Store a value in secure storage.
      *
-     * On Android with context set: Uses SharedPreferences (persistent across app restarts)
-     * On JVM or without context: Uses in-memory storage (non-persistent)
+     * On Android with platform storage set: Uses persistent storage (SharedPreferences)
+     * On JVM or without platform storage: Uses in-memory storage (non-persistent)
      *
      * @param key The key to store under
      * @param value The value to store
@@ -359,19 +347,17 @@ object CppBridgePlatformAdapter {
     @JvmStatic
     fun secureSetCallback(key: String, value: ByteArray): Boolean {
         return try {
-            // Take a thread-safe local copy of the volatile reference
-            val prefs = sharedPreferences
-
-            // Try SharedPreferences first (persistent storage)
-            if (prefs != null) {
-                val base64Value = Base64.encodeToString(value, Base64.NO_WRAP)
-                prefs.edit().putString(key, base64Value).apply()
-                logCallback(LogLevel.DEBUG, "SecureStorage", "Persisted key '$key' to SharedPreferences")
-                return true
+            // Try platform storage first (persistent storage)
+            val storage = platformStorage
+            if (storage != null) {
+                if (storage.set(key, value)) {
+                    logCallback(LogLevel.DEBUG, "SecureStorage", "Persisted key '$key' to platform storage")
+                    return true
+                }
             }
             // Fall back to in-memory storage
             inMemoryStorage[key] = value.copyOf()
-            logCallback(LogLevel.WARN, "SecureStorage", "Using in-memory storage for key '$key' (context not set)")
+            logCallback(LogLevel.WARN, "SecureStorage", "Using in-memory storage for key '$key' (platform storage not set)")
             true
         } catch (e: Exception) {
             logCallback(LogLevel.ERROR, "SecureStorage", "secureSet failed for key '$key': ${e.message}")
@@ -390,11 +376,8 @@ object CppBridgePlatformAdapter {
     @JvmStatic
     fun secureDeleteCallback(key: String): Boolean {
         return try {
-            // Take a thread-safe local copy of the volatile reference
-            val prefs = sharedPreferences
-
-            // Remove from SharedPreferences if available
-            prefs?.edit()?.remove(key)?.apply()
+            // Remove from platform storage if available
+            platformStorage?.delete(key)
             // Also remove from in-memory
             inMemoryStorage.remove(key)
             true
@@ -476,8 +459,8 @@ object CppBridgePlatformAdapter {
      * Useful for testing or when user requests data deletion.
      */
     fun clearSecureStorage() {
-        // Clear SharedPreferences
-        sharedPreferences?.edit()?.clear()?.apply()
+        // Clear platform storage
+        platformStorage?.clear()
         // Clear in-memory storage
         inMemoryStorage.clear()
         logCallback(LogLevel.INFO, "SecureStorage", "All secure storage cleared")
