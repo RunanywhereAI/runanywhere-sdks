@@ -599,6 +599,24 @@ First-time setup takes 10-20 minutes depending on your machine (mostly building 
 
 ### Testing with the Sample App
 
+- **iOS**: Downloaded during `pod install` via the podspec's `prepare_command`
+- **Android**: Downloaded during Gradle's `preBuild` phase via `downloadNativeLibs` task
+
+The version is controlled by `native-version.txt` in the native package.
+
+### Local Development (Build from Source)
+
+To build native libraries locally and test the SDK end-to-end:
+
+```bash
+# First-time setup (builds iOS + Android native libs)
+./scripts/build-react-native.sh --setup
+```
+
+See `./scripts/build-react-native.sh --help` for all options.
+
+### Build Commands
+
 The best way to test SDK changes is with the React Native sample app:
 
 ```bash

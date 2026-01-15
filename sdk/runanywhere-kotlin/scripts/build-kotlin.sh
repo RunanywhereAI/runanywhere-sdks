@@ -17,14 +17,30 @@
 #   --clean             Clean build directories before building
 #   --skip-build        Skip Gradle build (only setup native libs)
 #   --abis=ABIS         ABIs to build (default: arm64-v8a)
+#                       Supported: arm64-v8a, armeabi-v7a, x86_64, x86
+#                       Multiple: Use comma-separated (e.g., arm64-v8a,armeabi-v7a)
 #   --help              Show this help message
 #
+# ABI Guide:
+#   arm64-v8a        64-bit ARM (modern devices, ~85% coverage)
+#   armeabi-v7a      32-bit ARM (older devices, ~12% coverage)
+#   x86_64           64-bit Intel (emulators on Intel Macs, ~2%)
+#
 # EXAMPLES:
-#   # First-time setup (downloads + builds + copies everything)
+#   # First-time setup (modern devices only, ~4min build)
 #   ./scripts/build-kotlin.sh --setup
+#
+#   # RECOMMENDED for production (97% device coverage, ~7min build)
+#   ./scripts/build-kotlin.sh --setup --abis=arm64-v8a,armeabi-v7a
+#
+#   # Development with emulator support (device + Intel Mac emulator)
+#   ./scripts/build-kotlin.sh --setup --abis=arm64-v8a,x86_64
 #
 #   # Rebuild only commons (after C++ code changes)
 #   ./scripts/build-kotlin.sh --local --rebuild-commons
+#
+#   # Rebuild with multiple ABIs
+#   ./scripts/build-kotlin.sh --local --rebuild-commons --abis=arm64-v8a,armeabi-v7a
 #
 #   # Just switch to local mode (uses cached libs)
 #   ./scripts/build-kotlin.sh --local --skip-build
@@ -98,7 +114,7 @@ log_error() {
 # =============================================================================
 
 show_help() {
-    head -35 "$0" | tail -30
+    head -50 "$0" | tail -45
     exit 0
 }
 

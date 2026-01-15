@@ -1,0 +1,378 @@
+name: Kotlin SDK Release
+
+# =============================================================================
+# Kotlin SDK Release Workflow
+#
+# Builds and publishes the RunAnywhere Kotlin SDK (Android/JVM).
+# Outputs:
+#   - Android AAR (Maven artifact)
+#   - JVM JAR (Maven artifact)
+#   - GitHub Release with downloadable artifacts
+#
+# Distribution:
+#   - Maven Central (future)
+#   - GitHub Packages
+#   - Direct download from releases
+# =============================================================================
+
+on:
+  push:
+    tags:
+      - 'kotlin-v*'
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to release'
+        required: true
+        type: string
+      publish_maven:
+        description: 'Publish to Maven Central'
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: 'Dry run'
+        required: false
+        default: false
+        type: boolean
+      skip_publish:
+        description: 'Skip creating individual release (for unified release)'
+        required: false
+        default: false
+        type: boolean
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.0)'
+        required: true
+        type: string
+      publish_maven:
+        description: 'Publish to Maven Central'
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: 'Dry run (build only)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  SDK_DIR: sdk/runanywhere-kotlin
+  COMMONS_DIR: sdk/runanywhere-commons
+
+jobs:
+  # ===========================================================================
+  # Build Native Libraries (Android)
+  # ===========================================================================
+  build-native:
+    name: Build Native Libraries (${{ matrix.abi }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86_64]
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup NDK
+        run: |
+          NDK_VERSION="27.0.12077973"
+          echo "y" | sdkmanager --install "ndk;${NDK_VERSION}" --sdk_root=${ANDROID_SDK_ROOT}
+          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> $GITHUB_ENV
+
+      - name: Download Dependencies
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/android/download-sherpa-onnx.sh
+          ./scripts/android/download-sherpa-onnx.sh
+
+      - name: Build Native Libraries
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/build-android.sh
+          ./scripts/build-android.sh all ${{ matrix.abi }}
+
+      - name: Upload Native Libraries
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-libs-${{ matrix.abi }}
+          path: |
+            ${{ env.COMMONS_DIR }}/dist/android/unified/${{ matrix.abi }}/
+            ${{ env.COMMONS_DIR }}/dist/android/llamacpp/${{ matrix.abi }}/
+            ${{ env.COMMONS_DIR }}/dist/android/onnx/${{ matrix.abi }}/
+            ${{ env.COMMONS_DIR }}/dist/android/include/
+          retention-days: 7
+
+  # ===========================================================================
+  # Build Kotlin SDK
+  # ===========================================================================
+  build-sdk:
+    name: Build Kotlin SDK
+    needs: build-native
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "$GITHUB_REF" == refs/tags/kotlin-v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/kotlin-v}"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION="0.0.0-$(git rev-parse --short HEAD)"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building Kotlin SDK v$VERSION"
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Download Native Libraries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-libs-*
+          path: native-artifacts
+          merge-multiple: false
+
+      - name: Setup Native Libraries
+        run: |
+          echo "=== Downloaded artifact structure ==="
+          find native-artifacts -type d | head -20
+          echo "=== All .so files in artifacts ==="
+          find native-artifacts -name "*.so" -type f 2>/dev/null || echo "No .so files found yet"
+          
+          # Create jniLibs structure
+          mkdir -p ${{ env.SDK_DIR }}/build/jniLibs
+          
+          for artifact_dir in native-artifacts/native-libs-*/; do
+            if [ -d "$artifact_dir" ]; then
+              echo "Processing $artifact_dir"
+              echo "Contents: $(ls -la "$artifact_dir" 2>/dev/null || echo 'empty')"
+              
+              # Copy unified libraries
+              for abi_dir in "${artifact_dir}"unified/*/; do
+                if [ -d "$abi_dir" ]; then
+                  abi=$(basename "$abi_dir")
+                  echo "Found unified ABI: $abi at $abi_dir"
+                  mkdir -p "${{ env.SDK_DIR }}/build/jniLibs/${abi}"
+                  find "$abi_dir" -name "*.so" -exec cp -v {} "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" \;
+                fi
+              done
+              
+              # Copy llamacpp libraries
+              for abi_dir in "${artifact_dir}"llamacpp/*/; do
+                if [ -d "$abi_dir" ]; then
+                  abi=$(basename "$abi_dir")
+                  echo "Found llamacpp ABI: $abi at $abi_dir"
+                  mkdir -p "${{ env.SDK_DIR }}/build/jniLibs/${abi}"
+                  find "$abi_dir" -name "*.so" -exec cp -v {} "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" \;
+                fi
+              done
+              
+              # Copy onnx libraries
+              for abi_dir in "${artifact_dir}"onnx/*/; do
+                if [ -d "$abi_dir" ]; then
+                  abi=$(basename "$abi_dir")
+                  echo "Found onnx ABI: $abi at $abi_dir"
+                  mkdir -p "${{ env.SDK_DIR }}/build/jniLibs/${abi}"
+                  find "$abi_dir" -name "*.so" -exec cp -v {} "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" \;
+                fi
+              done
+            fi
+          done
+          
+          echo "=== Final jniLibs structure ==="
+          find ${{ env.SDK_DIR }}/build/jniLibs -type f -name "*.so" || echo "No .so files in jniLibs!"
+          
+          # Verify we have libraries
+          SO_COUNT=$(find ${{ env.SDK_DIR }}/build/jniLibs -name "*.so" | wc -l)
+          if [ "$SO_COUNT" -eq 0 ]; then
+            echo "❌ ERROR: No native libraries found!"
+            exit 1
+          fi
+          echo "✅ Found $SO_COUNT native libraries"
+
+      - name: Setup Gradle Properties
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          cp gradle.properties.example gradle.properties 2>/dev/null || true
+          echo "runanywhere.useLocalLibs=true" >> gradle.properties
+          echo "version=${{ steps.version.outputs.version }}" >> gradle.properties
+
+      - name: Build SDK
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          chmod +x gradlew
+          ./gradlew build -x test --info 2>&1 | tail -100 || {
+            echo "=== Build failed, showing project structure ==="
+            ls -la
+            ls -la build/ 2>/dev/null || true
+            exit 1
+          }
+
+      - name: Build AAR (Release)
+        working-directory: ${{ env.SDK_DIR }}
+        run: ./gradlew assembleRelease
+
+      - name: Run Tests
+        working-directory: ${{ env.SDK_DIR }}
+        run: ./gradlew test
+        continue-on-error: true
+
+      - name: Upload AAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: kotlin-sdk-aar-${{ steps.version.outputs.version }}
+          path: ${{ env.SDK_DIR }}/build/outputs/aar/*.aar
+          retention-days: 30
+
+      - name: Upload JVM JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: kotlin-sdk-jvm-${{ steps.version.outputs.version }}
+          path: ${{ env.SDK_DIR }}/build/libs/*.jar
+          retention-days: 30
+
+  # ===========================================================================
+  # Publish Release
+  # ===========================================================================
+  publish:
+    name: Publish Kotlin SDK Release
+    needs: build-sdk
+    # Skip if dry_run or skip_publish (for unified release)
+    if: |
+      inputs.dry_run != true &&
+      inputs.skip_publish != true &&
+      (
+        startsWith(github.ref, 'refs/tags/kotlin-v') ||
+        startsWith(github.ref, 'refs/tags/v') ||
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'workflow_call'
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download AAR
+        uses: actions/download-artifact@v4
+        with:
+          name: kotlin-sdk-aar-${{ needs.build-sdk.outputs.version }}
+          path: dist/aar
+
+      - name: Download JVM JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: kotlin-sdk-jvm-${{ needs.build-sdk.outputs.version }}
+          path: dist/jvm
+        continue-on-error: true
+
+      - name: Prepare Release Assets
+        run: |
+          VERSION="${{ needs.build-sdk.outputs.version }}"
+          mkdir -p release-assets
+          
+          # Rename and copy artifacts
+          for aar in dist/aar/*.aar; do
+            if [ -f "$aar" ]; then
+              cp "$aar" "release-assets/runanywhere-kotlin-${VERSION}.aar"
+            fi
+          done
+          
+          for jar in dist/jvm/*.jar; do
+            if [ -f "$jar" ]; then
+              cp "$jar" "release-assets/runanywhere-kotlin-jvm-${VERSION}.jar"
+            fi
+          done
+          
+          # Generate checksums
+          cd release-assets
+          for f in *; do
+            if [ -f "$f" ]; then
+              shasum -a 256 "$f" > "${f}.sha256"
+            fi
+          done
+          
+          echo "=== Release Assets ==="
+          ls -la
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: kotlin-v${{ needs.build-sdk.outputs.version }}
+          name: RunAnywhere Kotlin SDK v${{ needs.build-sdk.outputs.version }}
+          files: |
+            release-assets/*
+          body: |
+            ## RunAnywhere Kotlin SDK v${{ needs.build-sdk.outputs.version }}
+
+            Privacy-first, on-device AI SDK for Android and JVM.
+
+            ### Installation
+
+            **Gradle (Kotlin DSL):**
+            ```kotlin
+            // Add to your module's build.gradle.kts
+            dependencies {
+                implementation("ai.runanywhere:runanywhere-kotlin:${{ needs.build-sdk.outputs.version }}")
+            }
+            ```
+
+            **Direct AAR:**
+            Download `runanywhere-kotlin-${{ needs.build-sdk.outputs.version }}.aar` and add to your `libs/` folder.
+
+            ### Features
+            - 🧠 **LLM**: On-device text generation via llama.cpp
+            - 🎤 **STT**: Speech-to-text via Sherpa-ONNX Whisper
+            - 🔊 **TTS**: Text-to-speech via Sherpa-ONNX Piper
+            - 🎯 **VAD**: Voice activity detection
+            - 🔒 **Privacy**: All processing happens on-device
+
+            ### Supported ABIs
+            - `arm64-v8a` (64-bit ARM, ~85% devices)
+            - `armeabi-v7a` (32-bit ARM, ~12% devices)
+            - `x86_64` (Intel emulators)
+
+            ### Requirements
+            - Android API 24+ (Android 7.0+)
+            - Kotlin 2.0+
+            - Gradle 8.0+
+
+            ### Documentation
+            See [README](https://github.com/RunanywhereAI/runanywhere-sdks/tree/main/sdk/runanywhere-kotlin)
+
+            ---
+            Built from runanywhere-sdks @ ${{ github.sha }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

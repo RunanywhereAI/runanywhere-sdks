@@ -1,0 +1,508 @@
+name: Flutter SDK Release
+
+# =============================================================================
+# Flutter SDK Release Workflow
+#
+# Builds and publishes the RunAnywhere Flutter SDK.
+# The Flutter SDK uses a multi-package architecture:
+#   - runanywhere: Core SDK (required)
+#   - runanywhere_llamacpp: LLM backend
+#   - runanywhere_onnx: STT/TTS/VAD backend
+#
+# Distribution:
+#   - pub.dev (future)
+#   - GitHub Release with native binaries
+#   - Direct Git dependency
+# =============================================================================
+
+on:
+  push:
+    tags:
+      - 'flutter-v*'
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to release'
+        required: true
+        type: string
+      publish_pubdev:
+        description: 'Publish to pub.dev'
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: 'Dry run'
+        required: false
+        default: false
+        type: boolean
+      skip_publish:
+        description: 'Skip creating individual release (for unified release)'
+        required: false
+        default: false
+        type: boolean
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.15.0)'
+        required: true
+        type: string
+      publish_pubdev:
+        description: 'Publish to pub.dev'
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: 'Dry run (build only)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  SDK_DIR: sdk/runanywhere-flutter
+  COMMONS_DIR: sdk/runanywhere-commons
+
+jobs:
+  # ===========================================================================
+  # Build iOS Native Libraries
+  # ===========================================================================
+  build-ios-native:
+    name: Build iOS Native
+    runs-on: macos-14
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "$GITHUB_REF" == refs/tags/flutter-v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/flutter-v}"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION="0.0.0-$(git rev-parse --short HEAD)"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.4'
+
+      - name: Install Dependencies
+        run: brew install cmake ninja
+
+      - name: Download iOS Dependencies
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/ios/download-sherpa-onnx.sh
+          chmod +x scripts/ios/download-onnx.sh
+          ./scripts/ios/download-sherpa-onnx.sh
+          ./scripts/ios/download-onnx.sh
+
+      - name: Build iOS Frameworks
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/build-ios.sh
+          ./scripts/build-ios.sh --backend all --release
+
+      - name: Upload iOS Frameworks
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-ios-frameworks-${{ steps.version.outputs.version }}
+          path: |
+            ${{ env.COMMONS_DIR }}/dist/RACommons.xcframework
+            ${{ env.COMMONS_DIR }}/dist/RABackendLLAMACPP.xcframework
+            ${{ env.COMMONS_DIR }}/dist/RABackendONNX.xcframework
+            ${{ env.COMMONS_DIR }}/third_party/onnxruntime-ios/onnxruntime.xcframework
+            ${{ env.COMMONS_DIR }}/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework
+          retention-days: 7
+
+  # ===========================================================================
+  # Build Android Native Libraries
+  # ===========================================================================
+  build-android-native:
+    name: Build Android Native (${{ matrix.abi }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86_64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "$GITHUB_REF" == refs/tags/flutter-v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/flutter-v}"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION="0.0.0-$(git rev-parse --short HEAD)"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup NDK
+        run: |
+          NDK_VERSION="27.0.12077973"
+          echo "y" | sdkmanager --install "ndk;${NDK_VERSION}" --sdk_root=${ANDROID_SDK_ROOT}
+          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> $GITHUB_ENV
+
+      - name: Download Dependencies
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/android/download-sherpa-onnx.sh
+          ./scripts/android/download-sherpa-onnx.sh
+
+      - name: Build Android Native
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/build-android.sh
+          ./scripts/build-android.sh all ${{ matrix.abi }}
+
+      - name: Upload Android Native
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-android-native-${{ matrix.abi }}-${{ steps.version.outputs.version }}
+          path: |
+            ${{ env.COMMONS_DIR }}/dist/android/unified/${{ matrix.abi }}/
+            ${{ env.COMMONS_DIR }}/dist/android/llamacpp/${{ matrix.abi }}/
+            ${{ env.COMMONS_DIR }}/dist/android/onnx/${{ matrix.abi }}/
+          retention-days: 7
+
+  # ===========================================================================
+  # Build Flutter SDK
+  # ===========================================================================
+  build-flutter-sdk:
+    name: Build Flutter SDK
+    needs: [build-ios-native, build-android-native]
+    runs-on: macos-14
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "$GITHUB_REF" == refs/tags/flutter-v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/flutter-v}"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION="0.0.0-$(git rev-parse --short HEAD)"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+
+      - name: Install Melos 2.9.0
+        run: |
+          dart pub global activate melos 2.9.0
+          echo "${HOME}/.pub-cache/bin" >> $GITHUB_PATH
+
+      - name: Download iOS Frameworks
+        uses: actions/download-artifact@v4
+        with:
+          name: flutter-ios-frameworks-${{ steps.version.outputs.version }}
+          path: ios-frameworks
+
+      - name: Download Android Native
+        uses: actions/download-artifact@v4
+        with:
+          pattern: flutter-android-native-*
+          path: android-native
+          merge-multiple: false
+
+      - name: Setup Native Libraries
+        run: |
+          echo "=== Downloaded iOS frameworks ==="
+          find ios-frameworks -type d -name "*.xcframework" || echo "No xcframeworks found"
+          
+          echo "=== Downloaded Android native ==="
+          find android-native -name "*.so" -type f || echo "No .so files found"
+          
+          # Setup iOS frameworks for each package
+          CORE_IOS="${{ env.SDK_DIR }}/packages/runanywhere/ios/Frameworks"
+          LLAMA_IOS="${{ env.SDK_DIR }}/packages/runanywhere_llamacpp/ios/Frameworks"
+          ONNX_IOS="${{ env.SDK_DIR }}/packages/runanywhere_onnx/ios/Frameworks"
+          
+          mkdir -p "$CORE_IOS" "$LLAMA_IOS" "$ONNX_IOS"
+          
+          # Copy iOS frameworks with verbose output
+          echo "=== Copying iOS frameworks ==="
+          
+          # RACommons to core
+          if [ -d "ios-frameworks/RACommons.xcframework" ]; then
+            cp -rv ios-frameworks/RACommons.xcframework "$CORE_IOS/"
+          else
+            # Try finding it anywhere in ios-frameworks
+            find ios-frameworks -name "RACommons.xcframework" -type d -exec cp -rv {} "$CORE_IOS/" \;
+          fi
+          
+          # LlamaCPP backend
+          if [ -d "ios-frameworks/RABackendLLAMACPP.xcframework" ]; then
+            cp -rv ios-frameworks/RABackendLLAMACPP.xcframework "$LLAMA_IOS/"
+          else
+            find ios-frameworks -name "RABackendLLAMACPP.xcframework" -type d -exec cp -rv {} "$LLAMA_IOS/" \;
+          fi
+          
+          # ONNX backend and dependencies
+          if [ -d "ios-frameworks/RABackendONNX.xcframework" ]; then
+            cp -rv ios-frameworks/RABackendONNX.xcframework "$ONNX_IOS/"
+          else
+            find ios-frameworks -name "RABackendONNX.xcframework" -type d -exec cp -rv {} "$ONNX_IOS/" \;
+          fi
+          
+          find ios-frameworks -name "onnxruntime.xcframework" -type d -exec cp -rv {} "$ONNX_IOS/" \;
+          find ios-frameworks -name "sherpa-onnx.xcframework" -type d -exec cp -rv {} "$ONNX_IOS/" \;
+          
+          # Setup Android jniLibs for each package
+          CORE_ANDROID="${{ env.SDK_DIR }}/packages/runanywhere/android/src/main/jniLibs"
+          LLAMA_ANDROID="${{ env.SDK_DIR }}/packages/runanywhere_llamacpp/android/src/main/jniLibs"
+          ONNX_ANDROID="${{ env.SDK_DIR }}/packages/runanywhere_onnx/android/src/main/jniLibs"
+          
+          mkdir -p "$CORE_ANDROID" "$LLAMA_ANDROID" "$ONNX_ANDROID"
+          
+          echo "=== Copying Android native libraries ==="
+          for artifact_dir in android-native/flutter-android-native-*/; do
+            if [ -d "$artifact_dir" ]; then
+              echo "Processing $artifact_dir"
+              
+              # Copy unified libraries
+              for abi_dir in "${artifact_dir}"unified/*/; do
+                if [ -d "$abi_dir" ]; then
+                  abi=$(basename "$abi_dir")
+                  echo "Copying unified for $abi"
+                  mkdir -p "${CORE_ANDROID}/${abi}"
+                  find "$abi_dir" -name "*.so" -exec cp -v {} "${CORE_ANDROID}/${abi}/" \;
+                fi
+              done
+              
+              # Copy llamacpp libraries  
+              for abi_dir in "${artifact_dir}"llamacpp/*/; do
+                if [ -d "$abi_dir" ]; then
+                  abi=$(basename "$abi_dir")
+                  echo "Copying llamacpp for $abi"
+                  mkdir -p "${LLAMA_ANDROID}/${abi}"
+                  find "$abi_dir" -name "*.so" -exec cp -v {} "${LLAMA_ANDROID}/${abi}/" \;
+                fi
+              done
+              
+              # Copy onnx libraries
+              for abi_dir in "${artifact_dir}"onnx/*/; do
+                if [ -d "$abi_dir" ]; then
+                  abi=$(basename "$abi_dir")
+                  echo "Copying onnx for $abi"
+                  mkdir -p "${ONNX_ANDROID}/${abi}"
+                  find "$abi_dir" -name "*.so" -exec cp -v {} "${ONNX_ANDROID}/${abi}/" \;
+                fi
+              done
+            fi
+          done
+          
+          echo "=== Final iOS Frameworks ==="
+          find ${{ env.SDK_DIR }}/packages -name "*.xcframework" -type d || echo "No frameworks!"
+          
+          echo "=== Final Android jniLibs ==="
+          find ${{ env.SDK_DIR }}/packages -name "*.so" -type f | head -30 || echo "No .so files!"
+
+      - name: Update Package Versions
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          
+          # Update version in all pubspec.yaml files
+          for pubspec in packages/*/pubspec.yaml; do
+            sed -i '' "s/^version:.*/version: $VERSION/" "$pubspec"
+          done
+
+      - name: Bootstrap Packages
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          echo "=== Current directory structure ==="
+          ls -la packages/
+          echo "=== melos.yaml ==="
+          cat melos.yaml
+          echo "=== Running melos bootstrap ==="
+          melos bootstrap --verbose || {
+            echo "=== melos bootstrap failed, showing pubspec files ==="
+            for f in packages/*/pubspec.yaml; do echo "--- $f ---"; cat "$f"; done
+            exit 1
+          }
+
+      - name: Analyze Packages
+        working-directory: ${{ env.SDK_DIR }}
+        run: melos analyze || echo "Analyze had warnings/errors"
+        continue-on-error: true
+
+      - name: Run Tests
+        working-directory: ${{ env.SDK_DIR }}
+        run: melos test || echo "Tests had failures"
+        continue-on-error: true
+
+      - name: Package Flutter SDK
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          mkdir -p flutter-release
+          
+          # Create release package with native libraries included
+          cd ${{ env.SDK_DIR }}
+          zip -r "../../flutter-release/runanywhere-flutter-${VERSION}.zip" \
+            packages/ \
+            melos.yaml \
+            README.md \
+            -x "*.git*" \
+            -x "*build/*" \
+            -x "*.dart_tool/*"
+
+      - name: Upload Flutter SDK Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-sdk-package-${{ steps.version.outputs.version }}
+          path: flutter-release/
+          retention-days: 30
+
+  # ===========================================================================
+  # Publish Release
+  # ===========================================================================
+  publish:
+    name: Publish Flutter SDK Release
+    needs: build-flutter-sdk
+    # Skip if dry_run or skip_publish (for unified release)
+    if: |
+      inputs.dry_run != true &&
+      inputs.skip_publish != true &&
+      (
+        startsWith(github.ref, 'refs/tags/flutter-v') ||
+        startsWith(github.ref, 'refs/tags/v') ||
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'workflow_call'
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Flutter SDK Package
+        uses: actions/download-artifact@v4
+        with:
+          name: flutter-sdk-package-${{ needs.build-flutter-sdk.outputs.version }}
+          path: release-assets
+
+      - name: Generate Checksums
+        run: |
+          cd release-assets
+          for f in *.zip; do
+            if [ -f "$f" ]; then
+              shasum -a 256 "$f" > "${f}.sha256"
+            fi
+          done
+          ls -la
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: flutter-v${{ needs.build-flutter-sdk.outputs.version }}
+          name: RunAnywhere Flutter SDK v${{ needs.build-flutter-sdk.outputs.version }}
+          files: |
+            release-assets/*
+          body: |
+            ## RunAnywhere Flutter SDK v${{ needs.build-flutter-sdk.outputs.version }}
+
+            Privacy-first, on-device AI SDK for Flutter (iOS & Android).
+
+            ### Installation
+
+            **Git Dependency (Recommended):**
+            ```yaml
+            dependencies:
+              runanywhere:
+                git:
+                  url: https://github.com/RunanywhereAI/runanywhere-sdks
+                  path: sdk/runanywhere-flutter/packages/runanywhere
+                  ref: flutter-v${{ needs.build-flutter-sdk.outputs.version }}
+              
+              # Add backends you need:
+              runanywhere_llamacpp:
+                git:
+                  url: https://github.com/RunanywhereAI/runanywhere-sdks
+                  path: sdk/runanywhere-flutter/packages/runanywhere_llamacpp
+                  ref: flutter-v${{ needs.build-flutter-sdk.outputs.version }}
+              
+              runanywhere_onnx:
+                git:
+                  url: https://github.com/RunanywhereAI/runanywhere-sdks
+                  path: sdk/runanywhere-flutter/packages/runanywhere_onnx
+                  ref: flutter-v${{ needs.build-flutter-sdk.outputs.version }}
+            ```
+
+            **Download Package:**
+            Download `runanywhere-flutter-${{ needs.build-flutter-sdk.outputs.version }}.zip` which includes native binaries.
+
+            ### Packages
+
+            | Package | Description |
+            |---------|-------------|
+            | `runanywhere` | Core SDK (required) |
+            | `runanywhere_llamacpp` | LLM backend (llama.cpp) |
+            | `runanywhere_onnx` | STT/TTS/VAD backend (Sherpa-ONNX) |
+
+            ### Features
+            - 🧠 **LLM**: On-device text generation via llama.cpp
+            - 🎤 **STT**: Speech-to-text via Sherpa-ONNX Whisper
+            - 🔊 **TTS**: Text-to-speech via Sherpa-ONNX Piper
+            - 🎯 **VAD**: Voice activity detection
+            - 🔒 **Privacy**: All processing happens on-device
+
+            ### Requirements
+            - Flutter SDK >= 3.10.0
+            - Dart SDK >= 3.0.0
+            - iOS 13.0+ / Android API 24+
+
+            ### Documentation
+            See [README](https://github.com/RunanywhereAI/runanywhere-sdks/tree/main/sdk/runanywhere-flutter)
+
+            ---
+            Built from runanywhere-sdks @ ${{ github.sha }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

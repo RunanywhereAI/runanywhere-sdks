@@ -12,6 +12,9 @@
 #   --skip-download     Skip downloading dependencies
 #   --skip-backends     Build RACommons only, skip backend frameworks
 #   --backend NAME      Build specific backend: llamacpp, onnx, all (default: all)
+#                       - llamacpp: LLM text generation (GGUF models)
+#                       - onnx: STT/TTS/VAD (Sherpa-ONNX models)
+#                       - all: Both backends (default)
 #   --clean             Clean build directories first
 #   --release           Release build (default)
 #   --debug             Debug build
@@ -19,14 +22,25 @@
 #   --help              Show this help
 #
 # OUTPUTS:
-#   dist/RACommons.xcframework
-#   dist/RABackendLLAMACPP.xcframework
-#   dist/RABackendONNX.xcframework
+#   dist/RACommons.xcframework                 (always built)
+#   dist/RABackendLLAMACPP.xcframework         (if --backend llamacpp or all)
+#   dist/RABackendONNX.xcframework             (if --backend onnx or all)
 #
 # EXAMPLES:
-#   ./scripts/build-ios.sh                    # Full build
+#   # Full build (all backends)
+#   ./scripts/build-ios.sh
+#
+#   # Build only LlamaCPP backend (LLM/text generation)
+#   ./scripts/build-ios.sh --backend llamacpp
+#
+#   # Build only ONNX backend (speech-to-text/text-to-speech)
+#   ./scripts/build-ios.sh --backend onnx
+#
+#   # Build only RACommons (no backends)
+#   ./scripts/build-ios.sh --skip-backends
+#
+#   # Other useful combinations
 #   ./scripts/build-ios.sh --skip-download    # Use cached dependencies
-#   ./scripts/build-ios.sh --backend llamacpp # Build only LlamaCPP backend
 #   ./scripts/build-ios.sh --clean --package  # Clean build with packaging
 #
 # =============================================================================
@@ -68,7 +82,7 @@ log_time()   { echo -e "${CYAN}[⏱]${NC} $1"; }
 log_header() { echo -e "\n${GREEN}═══════════════════════════════════════════${NC}"; echo -e "${GREEN} $1${NC}"; echo -e "${GREEN}═══════════════════════════════════════════${NC}"; }
 
 show_help() {
-    head -35 "$0" | tail -30
+    head -45 "$0" | tail -40
     exit 0
 }
 
