@@ -652,7 +652,14 @@ tasks.named<Jar>("jvmJar") {
 // Configure publishing to include license acknowledgments
 publishing {
     publications.withType<MavenPublication> {
-        artifactId = "runanywhere-kotlin"
+        // Use different artifact IDs to avoid conflicts between KMP publications
+        artifactId = when (name) {
+            "kotlinMultiplatform" -> "runanywhere-kotlin"
+            "androidRelease" -> "runanywhere-kotlin-android"
+            "androidDebug" -> "runanywhere-kotlin-android-debug"
+            "jvm" -> "runanywhere-kotlin-jvm"
+            else -> "runanywhere-kotlin-$name"
+        }
 
         pom {
             name.set("RunAnywhere Kotlin SDK")
@@ -692,5 +699,13 @@ publishing {
                 password = project.findProperty("gpr.token") as String? ?: System.getenv("GITHUB_TOKEN")
             }
         }
+    }
+}
+
+// Disable JVM and debug publications - only publish Android release and metadata
+tasks.withType<PublishToMavenRepository>().configureEach {
+    onlyIf {
+        val dominated = publication.name in listOf("jvm", "androidDebug")
+        !dominated
     }
 }

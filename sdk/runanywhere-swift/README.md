@@ -114,7 +114,7 @@ Some optional modules have higher runtime requirements:
 
 ## Installation
 
-### Swift Package Manager
+### Swift Package Manager (Recommended)
 
 Add the RunAnywhere SDK to your project using Xcode:
 
@@ -124,7 +124,7 @@ Add the RunAnywhere SDK to your project using Xcode:
    ```
    https://github.com/RunanywhereAI/runanywhere-sdks
    ```
-4. Select the version (e.g., `from: "0.16.0"`)
+4. Select the version (e.g., `from: "1.0.0"`)
 5. Choose the products you need:
    - **RunAnywhere** (required) - Core SDK
    - **RunAnywhereONNX** - ONNX Runtime for STT/TTS/VAD
@@ -134,7 +134,7 @@ Add the RunAnywhere SDK to your project using Xcode:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.16.0")
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "1.0.0")
 ],
 targets: [
     .target(
@@ -142,11 +142,24 @@ targets: [
         dependencies: [
             .product(name: "RunAnywhere", package: "runanywhere-sdks"),
             .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-sdks"),
-            // Add other modules as needed
+            .product(name: "RunAnywhereONNX", package: "runanywhere-sdks"),
         ]
     )
 ]
 ```
+
+### Package Structure
+
+This repository contains **two** `Package.swift` files for different use cases:
+
+| File | Location | Purpose |
+|------|----------|---------|
+| **Root Package.swift** | `runanywhere-sdks/Package.swift` | For external SPM consumers. Downloads pre-built XCFrameworks from GitHub releases. |
+| **Local Package.swift** | `runanywhere-sdks/sdk/runanywhere-swift/Package.swift` | For SDK developers. Uses local XCFrameworks from `Binaries/` directory. |
+
+**For app developers:** Use the root-level package via the GitHub URL (as shown above).
+
+**For SDK contributors:** Use the local package with `testLocal = true` after running the setup script.
 
 ---
 
@@ -657,17 +670,22 @@ We welcome contributions to the RunAnywhere Swift SDK. This section explains how
    - Build `RABackendLLAMACPP.xcframework` (LLM backend)
    - Build `RABackendONNX.xcframework` (STT/TTS/VAD backend)
    - Copy frameworks to `Binaries/`
-   - Set `testLocal = true` in Package.swift
+   - Ensure `testLocal = true` in the local Package.swift
 
    First-time setup takes approximately 5-15 minutes depending on your machine.
 
-3. **Open the SDK in Xcode:**
+3. **Open the LOCAL SDK package in Xcode:**
 
    ```bash
+   # IMPORTANT: Open the local Package.swift, NOT the root one
    open Package.swift
    ```
 
    If you encounter package resolution issues, go to **File > Packages > Reset Package Caches**.
+
+> **Note:** The repository has two Package.swift files:
+> - `sdk/runanywhere-swift/Package.swift` - **Use this for local development** (has `testLocal = true`)
+> - `runanywhere-sdks/Package.swift` - For external SPM consumers (downloads from releases)
 
 ### Testing with the Sample App
 
