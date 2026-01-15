@@ -1,36 +1,35 @@
 # ONNXRuntime Module
 
-> Speech-to-Text (STT), Text-to-Speech (TTS), and Voice Activity Detection (VAD) using ONNX Runtime.
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Swift-5.9+-FA7343?style=flat-square&logo=swift&logoColor=white" alt="Swift 5.9+" />
-  <img src="https://img.shields.io/badge/ONNX-Runtime%201.17-blue?style=flat-square" alt="ONNX Runtime" />
-  <img src="https://img.shields.io/badge/CoreML-Supported-green?style=flat-square" alt="CoreML" />
-</p>
-
----
+The ONNXRuntime module provides speech-to-text (STT), text-to-speech (TTS), and voice activity detection (VAD) capabilities for the RunAnywhere Swift SDK using ONNX Runtime with models like Whisper, Piper, and Silero.
 
 ## Overview
 
-The **ONNXRuntime** module provides speech AI capabilities to the RunAnywhere SDK using [ONNX Runtime](https://onnxruntime.ai/) as the inference engine. It enables on-device speech recognition (Whisper), voice synthesis (Piper TTS), and voice activity detection (Silero VAD).
+This module enables on-device voice processing with support for:
 
-### Key Features
+- Speech-to-text transcription (Whisper, Zipformer, Paraformer models)
+- Text-to-speech synthesis (Piper, VITS voices)
+- Voice activity detection (Silero VAD)
+- Streaming and batch processing
+- CoreML acceleration on Apple devices
 
-- **Speech-to-Text** — Real-time and batch transcription with Whisper models
-- **Text-to-Speech** — Neural voice synthesis with Piper TTS
-- **Voice Activity Detection** — Speech detection with Silero VAD
-- **Multi-language support** — Whisper supports 100+ languages
-- **Streaming capabilities** — Real-time audio processing
-- **CoreML acceleration** — Native Apple hardware optimization
+## Requirements
 
----
+| Platform | Minimum Version |
+|----------|-----------------|
+| iOS      | 17.0+           |
+| macOS    | 14.0+           |
+
+The module requires:
+- `RABackendONNX.xcframework` (included in SDK)
+- ONNX Runtime (automatically linked)
 
 ## Installation
 
-The ONNXRuntime module is included with the RunAnywhere Swift SDK:
+The ONNXRuntime module is included in the RunAnywhere SDK. Add it to your target:
+
+### Swift Package Manager
 
 ```swift
-// Package.swift
 dependencies: [
     .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.16.0")
 ],
@@ -45,401 +44,385 @@ targets: [
 ]
 ```
 
----
+### Xcode
 
-## Quick Start
+1. Go to **File > Add Package Dependencies...**
+2. Enter: `https://github.com/RunanywhereAI/runanywhere-sdks`
+3. Select version and add `RunAnywhereONNX` to your target
 
-### 1. Register the Module
+## Usage
+
+### Registration
+
+Register the module at app startup before using STT, TTS, or VAD capabilities:
 
 ```swift
 import RunAnywhere
 import ONNXRuntime
 
-@MainActor
-func setupSDK() async {
-    // Initialize SDK
-    try RunAnywhere.initialize()
+@main
+struct MyApp: App {
+    init() {
+        Task { @MainActor in
+            ONNX.register()
 
-    // Register ONNX backend (provides STT, TTS, VAD)
-    ONNX.register()
+            try RunAnywhere.initialize(
+                apiKey: "<YOUR_API_KEY>",
+                baseURL: "https://api.runanywhere.ai",
+                environment: .production
+            )
+        }
+    }
+
+    var body: some Scene {
+        WindowGroup { ContentView() }
+    }
 }
 ```
 
-### 2. Speech-to-Text
+### Speech-to-Text (STT)
+
+#### Loading a Model
 
 ```swift
-// Download and load STT model
-for try await progress in RunAnywhere.downloadModel("sherpa-onnx-whisper-tiny.en") {
-    print("Progress: \(Int(progress.overallProgress * 100))%")
-}
-try await RunAnywhere.loadSTTModel("sherpa-onnx-whisper-tiny.en")
+try await RunAnywhere.loadSTTModel("whisper-base-onnx")
 
-// Transcribe audio
-let transcription = try await RunAnywhere.transcribe(audioData)
-print("Transcribed: \(transcription)")
+let isLoaded = await RunAnywhere.isSTTModelLoaded
 ```
 
-### 3. Text-to-Speech
+#### Simple Transcription
 
 ```swift
-// Download and load TTS voice
-for try await progress in RunAnywhere.downloadModel("piper-en-us-amy-medium") {
-    print("Progress: \(Int(progress.overallProgress * 100))%")
-}
-try await RunAnywhere.loadTTSVoice("piper-en-us-amy-medium")
-
-// Synthesize speech
-let result = try await RunAnywhere.synthesize(
-    "Hello, welcome to RunAnywhere!",
-    options: TTSOptions(speakingRate: 1.0, pitch: 1.0)
-)
-// result.audioData contains WAV audio bytes
+let audioData: Data = // your audio data (16kHz, mono, Float32)
+let text = try await RunAnywhere.transcribe(audioData)
+print("Transcribed: \(text)")
 ```
 
-### 4. Voice Activity Detection
-
-```swift
-// Initialize VAD
-try await RunAnywhere.initializeVAD(
-    options: VADOptions(sensitivity: 0.5)
-)
-
-// Detect speech in audio samples
-let result = try await RunAnywhere.detectSpeech(audioSamples)
-print("Is speech: \(result.isSpeech)")
-print("Probability: \(result.probability)")
-```
-
----
-
-## Supported Models
-
-### Speech-to-Text (Whisper)
-
-| Model | Size | Languages | Speed | Quality |
-|-------|------|-----------|-------|---------|
-| whisper-tiny.en | ~75MB | English | Fastest | Good |
-| whisper-base.en | ~150MB | English | Fast | Better |
-| whisper-small | ~500MB | Multilingual | Medium | Good |
-| whisper-medium | ~1.5GB | Multilingual | Slower | High |
-
-### Text-to-Speech (Piper)
-
-| Voice | Size | Language | Description |
-|-------|------|----------|-------------|
-| piper-en-us-amy-medium | ~65MB | English (US) | Natural female voice |
-| piper-en-us-lessac-medium | ~65MB | English (US) | Clear male voice |
-| piper-en-gb-alan-medium | ~65MB | English (UK) | British male voice |
-| piper-de-thorsten-medium | ~65MB | German | German male voice |
-| piper-es-carlfm-medium | ~65MB | Spanish | Spanish male voice |
-
-### Voice Activity Detection
-
-| Model | Size | Description |
-|-------|------|-------------|
-| silero-vad | ~2MB | Silero VAD v4 (built-in) |
-
----
-
-## Configuration
-
-### STT Options
+#### Transcription with Options
 
 ```swift
 let options = STTOptions(
-    language: "en-US",           // Language code
-    enableTimestamps: true       // Word-level timestamps
+    language: "en-US",
+    sampleRate: 16000,
+    enableWordTimestamps: true
 )
 
-let result = try await RunAnywhere.transcribeWithTimestamps(
-    audioData,
-    options: options
-)
-
-// Access word timestamps
-for word in result.words ?? [] {
-    print("\(word.word): \(word.start)s - \(word.end)s")
+let result = try await RunAnywhere.transcribeWithOptions(audioData, options: options)
+print("Text: \(result.text)")
+print("Confidence: \(result.confidence ?? 0)")
+if let language = result.detectedLanguage {
+    print("Detected language: \(language)")
 }
 ```
 
-### TTS Options
+#### Streaming Transcription
 
 ```swift
-let options = TTSOptions(
-    speakingRate: 1.0,   // Speed (0.5–2.0)
-    pitch: 1.0,          // Pitch (0.5–2.0)
-    volume: 0.8          // Volume (0.0–1.0)
+let output = try await RunAnywhere.transcribeStream(
+    audioData: audioData,
+    options: STTOptions(language: "en")
+) { partialResult in
+    print("Partial: \(partialResult.transcript)")
+}
+
+print("Final: \(output.text)")
+```
+
+#### Unloading
+
+```swift
+try await RunAnywhere.unloadSTTModel()
+```
+
+### Text-to-Speech (TTS)
+
+#### Loading a Voice
+
+```swift
+try await RunAnywhere.loadTTSVoice("piper-en-us-amy")
+
+let isLoaded = await RunAnywhere.isTTSVoiceLoaded
+```
+
+#### Simple Synthesis
+
+```swift
+let output = try await RunAnywhere.synthesize(
+    "Hello! Welcome to RunAnywhere.",
+    options: TTSOptions(rate: 1.0, pitch: 1.0, volume: 0.8)
 )
 
-let result = try await RunAnywhere.synthesize(text, options: options)
+// output.audioData contains the synthesized audio
+// output.duration contains the audio length in seconds
 ```
 
-### VAD Options
+#### Speak with Automatic Playback
 
 ```swift
-let options = VADOptions(
-    sensitivity: 0.5,            // Detection sensitivity (0.0–1.0)
-    frameDurationMs: 30,         // Frame size in milliseconds
-    minSpeechDurationMs: 250,    // Minimum speech duration
-    minSilenceDurationMs: 500    // Minimum silence to end speech
+// Synthesize and play through device speakers
+try await RunAnywhere.speak("Hello world")
+
+// With options
+let result = try await RunAnywhere.speak(
+    "Hello",
+    options: TTSOptions(rate: 1.2, pitch: 1.0)
 )
-
-try await RunAnywhere.initializeVAD(options: options)
+print("Duration: \(result.duration)s")
 ```
 
----
-
-## Architecture
-
-The ONNXRuntime module wraps the C++ ONNX backend:
-
-```
-┌─────────────────────────────────────────────────┐
-│              Your Application                    │
-├─────────────────────────────────────────────────┤
-│         RunAnywhere Public API                   │
-│  (RunAnywhere.transcribe(), .synthesize(), etc.)│
-├─────────────────────────────────────────────────┤
-│           ONNXRuntime Module                     │
-│    ┌─────────────────────────────────────────┐  │
-│    │  ONNX.swift (registration)              │  │
-│    └─────────────────────────────────────────┘  │
-├─────────────────────────────────────────────────┤
-│            C Bridge (ONNXBackend)                │
-│    rac_backend_onnx_register()                  │
-│    rac_stt_*() / rac_tts_*() / rac_vad_*()     │
-├─────────────────────────────────────────────────┤
-│          RABackendONNX.xcframework              │
-│    (Sherpa-ONNX + ONNX Runtime)                 │
-├─────────────────────────────────────────────────┤
-│         ONNXRuntime.xcframework                  │
-│    (Official ONNX Runtime with CoreML)          │
-└─────────────────────────────────────────────────┘
-```
-
-### Binary Dependencies
-
-| Framework | Size | Description |
-|-----------|------|-------------|
-| `RABackendONNX.xcframework` | ~50-70MB | Sherpa-ONNX models |
-| `ONNXRuntimeBinary` | ~20MB | Official ONNX Runtime |
-| `RACommons.xcframework` | ~2MB | Shared infrastructure |
-
----
-
-## Audio Format Requirements
-
-### Input Audio (STT)
-
-| Parameter | Requirement |
-|-----------|-------------|
-| Sample Rate | 16,000 Hz |
-| Channels | Mono (1) |
-| Format | Float32 or PCM Int16 |
-| Encoding | Raw samples |
-
-### Output Audio (TTS)
-
-| Parameter | Value |
-|-----------|-------|
-| Sample Rate | 22,050 Hz (typical) |
-| Channels | Mono (1) |
-| Format | Float32 |
-| Container | WAV |
-
-### Converting Audio
+#### Streaming Synthesis
 
 ```swift
-import AVFoundation
-
-// Convert recorded audio to required format
-func convertToSTTFormat(fileURL: URL) async throws -> Data {
-    let file = try AVAudioFile(forReading: fileURL)
-    let format = AVAudioFormat(
-        commonFormat: .pcmFormatFloat32,
-        sampleRate: 16000,
-        channels: 1,
-        interleaved: false
-    )!
-
-    // ... conversion logic
-    return audioData
+let output = try await RunAnywhere.synthesizeStream(
+    "Long text to synthesize...",
+    options: TTSOptions()
+) { chunk in
+    // Process audio chunk as it's generated
+    playAudioChunk(chunk)
 }
 ```
 
----
-
-## Performance
-
-### Benchmarks
-
-| Operation | Device | Model | Latency |
-|-----------|--------|-------|---------|
-| STT (10s audio) | iPhone 15 Pro | whisper-tiny.en | ~2.5s |
-| STT (10s audio) | M1 Mac | whisper-tiny.en | ~1.5s |
-| TTS (50 words) | iPhone 15 Pro | piper-amy | ~1.0s |
-| TTS (50 words) | M1 Mac | piper-amy | ~0.5s |
-| VAD (100ms) | Any | silero-vad | ~5ms |
-
-### Optimization Tips
-
-1. **Use smaller models** for real-time applications
-2. **Enable CoreML** for Apple Silicon optimization
-3. **Process audio in chunks** for streaming
-4. **Preload models** during app startup
-
----
-
-## Error Handling
+#### Available Voices
 
 ```swift
-do {
-    let transcription = try await RunAnywhere.transcribe(audioData)
-} catch let error as SDKError {
-    switch error.code {
-    case .modelNotFound:
-        print("STT model not downloaded.")
-    case .modelLoadFailed:
-        print("Failed to load STT model.")
-    case .transcriptionFailed:
-        print("Transcription failed: \(error.message)")
-    case .invalidInput:
-        print("Invalid audio format.")
-    default:
-        print("Error: \(error.localizedDescription)")
+let voices = await RunAnywhere.availableTTSVoices
+for voice in voices {
+    print("Voice: \(voice)")
+}
+```
+
+#### Stopping Synthesis
+
+```swift
+await RunAnywhere.stopSynthesis()
+await RunAnywhere.stopSpeaking()
+```
+
+### Voice Activity Detection (VAD)
+
+#### Initialization
+
+```swift
+// Default configuration
+try await RunAnywhere.initializeVAD()
+
+// Custom configuration
+try await RunAnywhere.initializeVAD(VADConfiguration(
+    sampleRate: 16000,
+    frameLength: 0.032,
+    energyThreshold: 0.5
+))
+```
+
+#### Detection
+
+```swift
+// From audio samples
+let samples: [Float] = // your audio samples
+let speechDetected = try await RunAnywhere.detectSpeech(in: samples)
+
+// From AVAudioPCMBuffer
+let buffer: AVAudioPCMBuffer = // your audio buffer
+let speechDetected = try await RunAnywhere.detectSpeech(in: buffer)
+```
+
+#### Callbacks
+
+```swift
+// Speech activity callback
+await RunAnywhere.setVADSpeechActivityCallback { event in
+    switch event {
+    case .started:
+        print("Speech started")
+    case .ended:
+        print("Speech ended")
     }
 }
 
-do {
-    let result = try await RunAnywhere.synthesize(text)
-} catch let error as SDKError {
-    switch error.code {
-    case .modelNotFound:
-        print("TTS voice not loaded.")
-    case .synthesisFailed:
-        print("Synthesis failed: \(error.message)")
-    default:
-        print("Error: \(error.localizedDescription)")
-    }
+// Audio buffer callback
+await RunAnywhere.setVADAudioBufferCallback { samples in
+    // Process audio samples
 }
 ```
 
----
+#### Control
+
+```swift
+try await RunAnywhere.startVAD()
+try await RunAnywhere.stopVAD()
+await RunAnywhere.cleanupVAD()
+```
 
 ## API Reference
 
-### `ONNX` Module
+### ONNX Module
 
 ```swift
 public enum ONNX: RunAnywhereModule {
     /// Module identifier
-    static let moduleId: String = "onnx"
+    public static let moduleId = "onnx"
 
-    /// Human-readable name
-    static let moduleName: String = "ONNX Runtime"
+    /// Human-readable module name
+    public static let moduleName = "ONNX Runtime"
 
-    /// Supported capabilities
-    static let capabilities: Set<SDKComponent> = [.stt, .tts, .vad]
+    /// Capabilities provided by this module
+    public static let capabilities: Set<SDKComponent> = [.stt, .tts, .vad]
 
-    /// Inference framework identifier
-    static let inferenceFramework: InferenceFramework = .onnx
+    /// Default registration priority
+    public static let defaultPriority: Int = 100
 
-    /// Current module version
-    static let version: String = "2.0.0"
+    /// Inference framework used
+    public static let inferenceFramework: InferenceFramework = .onnx
+
+    /// Module version
+    public static let version = "2.0.0"
 
     /// Underlying ONNX Runtime version
-    static let onnxRuntimeVersion: String = "1.23.2"
+    public static let onnxRuntimeVersion = "1.23.2"
 
-    /// Register the module with the SDK
+    /// Register the module with the service registry
     @MainActor
-    static func register(priority: Int = 100)
+    public static func register(priority: Int = 100)
 
     /// Unregister the module
-    static func unregister()
+    public static func unregister()
 
-    /// Check if this module can handle a model for STT
-    static func canHandleSTT(modelId: String?) -> Bool
+    /// Check if the module can handle a given STT model
+    public static func canHandleSTT(modelId: String?) -> Bool
 
-    /// Check if this module can handle a model for TTS
-    static func canHandleTTS(modelId: String?) -> Bool
+    /// Check if the module can handle a given TTS model
+    public static func canHandleTTS(modelId: String?) -> Bool
 
-    /// Check if this module can handle VAD
-    static func canHandleVAD(modelId: String?) -> Bool
+    /// Check if the module can handle VAD
+    public static func canHandleVAD(modelId: String?) -> Bool
 }
 ```
 
-### Auto-Registration
+### Model Compatibility
 
-```swift
-// Trigger registration automatically when module is imported
-_ = ONNX.autoRegister
+#### STT Models
+
+The ONNX module handles STT models containing:
+- `whisper` (Whisper variants)
+- `zipformer` (Zipformer ASR)
+- `paraformer` (Paraformer ASR)
+
+#### TTS Models
+
+The ONNX module handles TTS models containing:
+- `piper` (Piper TTS voices)
+- `vits` (VITS TTS models)
+
+#### VAD
+
+The module uses Silero VAD by default for voice activity detection.
+
+### STT Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `language` | String | "en" | Language code for transcription |
+| `sampleRate` | Int | 16000 | Audio sample rate in Hz |
+| `enableWordTimestamps` | Bool | false | Include word-level timestamps |
+| `enableVAD` | Bool | true | Enable voice activity detection |
+
+### TTS Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `rate` | Float | 1.0 | Speaking rate multiplier |
+| `pitch` | Float | 1.0 | Voice pitch multiplier |
+| `volume` | Float | 1.0 | Output volume (0.0 - 1.0) |
+| `language` | String | "en-US" | Voice language |
+| `sampleRate` | Int | 22050 | Output sample rate |
+| `audioFormat` | AudioFormat | .wav | Output audio format |
+
+### VAD Configuration
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `sampleRate` | Int | 16000 | Audio sample rate in Hz |
+| `frameLength` | Double | 0.032 | Frame length in seconds |
+| `energyThreshold` | Double | 0.5 | Energy threshold for detection |
+
+## Architecture
+
+The module follows a thin wrapper pattern:
+
+```
+ONNX.swift (Swift wrapper)
+       |
+ONNXBackend (C headers)
+       |
+RABackendONNX.xcframework (C++ implementation)
+       |
++---------------+----------------+
+|               |                |
+ONNX Runtime   Sherpa-ONNX     Silero VAD
 ```
 
----
+The Swift code registers the backend with the C++ service registry, which handles all model loading and inference operations internally.
+
+## Performance
+
+### STT Performance
+
+| Device | Model | Real-time Factor |
+|--------|-------|------------------|
+| iPhone 15 Pro | Whisper Base | 0.3x (3x faster than real-time) |
+| iPhone 15 Pro | Whisper Small | 0.5x |
+| M1 MacBook | Whisper Base | 0.2x |
+| M1 MacBook | Whisper Small | 0.3x |
+
+### TTS Performance
+
+| Device | Voice | Characters/sec |
+|--------|-------|----------------|
+| iPhone 15 Pro | Piper Amy | 200-300 |
+| M1 MacBook | Piper Amy | 400-500 |
+
+Performance varies based on model size and device thermal state.
+
+## Audio Format Requirements
+
+### STT Input
+
+- Sample rate: 16000 Hz (default, configurable)
+- Channels: Mono
+- Format: Float32 PCM
+
+### TTS Output
+
+- Sample rate: 22050 Hz (default, configurable)
+- Channels: Mono
+- Format: Float32 PCM or WAV
 
 ## Troubleshooting
 
-### Transcription Returns Empty
+### Model Load Fails
 
-**Symptoms:** Empty string returned from `transcribe()`
+1. Ensure the model is downloaded: check `ModelInfo.isDownloaded`
+2. Verify the model format matches the capability (Whisper for STT, Piper for TTS)
+3. Check available memory
 
-**Solutions:**
-1. Verify audio is not silent (check levels)
-2. Ensure correct sample rate (16kHz)
-3. Check audio is mono channel
-4. Verify model is fully loaded
+### Poor Transcription Quality
 
-### TTS Audio Sounds Robotic
+1. Ensure audio is 16kHz mono
+2. Check audio levels (too quiet or clipped)
+3. Try a larger Whisper model
 
-**Symptoms:** Low-quality synthesized speech
+### TTS Audio Issues
 
-**Solutions:**
-1. Ensure using neural TTS model (Piper)
-2. Check `speakingRate` isn't too high
-3. Verify model downloaded completely
-4. Try a different voice model
+1. Verify the voice model is fully downloaded
+2. Check audio output route
+3. Ensure sample rate matches expectations
 
-### VAD Not Detecting Speech
+### Registration Not Working
 
-**Symptoms:** `isSpeech` always false
-
-**Solutions:**
-1. Increase `sensitivity` option
-2. Reduce `minSpeechDurationMs`
-3. Check audio levels (not too quiet)
-4. Verify correct audio format
-
-### Memory Issues
-
-**Symptoms:** App crashes or memory warnings
-
-**Solutions:**
-1. Unload unused models
-2. Don't load STT and TTS simultaneously if memory-constrained
-3. Use smaller model variants
-4. Process shorter audio segments
-
----
-
-## Version History
-
-| Version | ONNX Runtime | Changes |
-|---------|--------------|---------|
-| 2.0.0 | 1.23.2 | Modular architecture, C++ backend |
-| 1.0.0 | 1.17.1 | Initial release |
-
----
-
-## See Also
-
-- [RunAnywhere SDK](../../README.md) — Main SDK documentation
-- [API Reference](../../Docs/Documentation.md) — Complete API documentation
-- [LlamaCPP Module](../LlamaCPPRuntime/README.md) — LLM backend
-- [ONNX Runtime](https://onnxruntime.ai/) — Upstream project
-- [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx) — Speech models
-
----
+1. Ensure `register()` is called on the main actor
+2. Call `register()` before `RunAnywhere.initialize()`
+3. Check for registration errors in logs
 
 ## License
 
-Copyright © 2025 RunAnywhere AI. All rights reserved.
+Copyright 2025 RunAnywhere AI. All rights reserved.

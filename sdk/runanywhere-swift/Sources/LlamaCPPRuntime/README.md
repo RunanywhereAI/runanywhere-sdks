@@ -1,36 +1,33 @@
 # LlamaCPPRuntime Module
 
-> LLM text generation backend using llama.cpp with GGUF models and Metal GPU acceleration.
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Swift-5.9+-FA7343?style=flat-square&logo=swift&logoColor=white" alt="Swift 5.9+" />
-  <img src="https://img.shields.io/badge/Metal-GPU%20Accelerated-8A2BE2?style=flat-square" alt="Metal GPU" />
-  <img src="https://img.shields.io/badge/Models-GGUF-green?style=flat-square" alt="GGUF Models" />
-</p>
-
----
+The LlamaCPPRuntime module provides large language model (LLM) text generation capabilities for the RunAnywhere Swift SDK using llama.cpp with GGUF models and Metal acceleration.
 
 ## Overview
 
-The **LlamaCPPRuntime** module provides large language model (LLM) capabilities to the RunAnywhere SDK using [llama.cpp](https://github.com/ggerganov/llama.cpp) as the inference engine. It supports GGUF-format models with Metal GPU acceleration on Apple Silicon devices.
+This module enables on-device text generation with support for:
 
-### Key Features
+- GGUF model format (Llama, Mistral, Phi, Qwen, and other llama.cpp-compatible models)
+- Streaming and non-streaming generation
+- Metal GPU acceleration on Apple Silicon
+- Configurable generation parameters (temperature, top-p, max tokens)
+- System prompts and structured output
 
-- **On-device LLM inference** — Run models locally with no internet required
-- **Metal GPU acceleration** — 3-5x faster inference on Apple Silicon
-- **GGUF model support** — Works with any GGUF-quantized model
-- **Streaming generation** — Real-time token-by-token output
-- **Structured output** — JSON schema-constrained generation
-- **Thinking models** — Support for `<think>...</think>` reasoning tags
+## Requirements
 
----
+| Platform | Minimum Version |
+|----------|-----------------|
+| iOS      | 17.0+           |
+| macOS    | 14.0+           |
+
+The module requires the `RABackendLlamaCPP.xcframework` binary, which is automatically included when you add the SDK as a dependency.
 
 ## Installation
 
-The LlamaCPPRuntime module is included with the RunAnywhere Swift SDK:
+The LlamaCPPRuntime module is included in the RunAnywhere SDK. Add it to your target:
+
+### Swift Package Manager
 
 ```swift
-// Package.swift
 dependencies: [
     .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.16.0")
 ],
@@ -45,289 +42,239 @@ targets: [
 ]
 ```
 
----
+### Xcode
 
-## Quick Start
+1. Go to **File > Add Package Dependencies...**
+2. Enter: `https://github.com/RunanywhereAI/runanywhere-sdks`
+3. Select version and add `RunAnywhereLlamaCPP` to your target
 
-### 1. Register the Module
+## Usage
+
+### Registration
+
+Register the module at app startup before using LLM capabilities:
 
 ```swift
 import RunAnywhere
 import LlamaCPPRuntime
 
-@MainActor
-func setupSDK() async {
-    // Initialize SDK
-    try RunAnywhere.initialize()
+@main
+struct MyApp: App {
+    init() {
+        Task { @MainActor in
+            LlamaCPP.register()
 
-    // Register LlamaCPP backend
-    LlamaCPP.register()
-}
-```
+            try RunAnywhere.initialize(
+                apiKey: "<YOUR_API_KEY>",
+                baseURL: "https://api.runanywhere.ai",
+                environment: .production
+            )
+        }
+    }
 
-### 2. Load a Model
-
-```swift
-// Download model if needed
-for try await progress in RunAnywhere.downloadModel("smollm2-360m-q8_0") {
-    print("Progress: \(Int(progress.overallProgress * 100))%")
-}
-
-// Load into memory
-try await RunAnywhere.loadModel("smollm2-360m-q8_0")
-```
-
-### 3. Generate Text
-
-```swift
-// Simple chat
-let response = try await RunAnywhere.chat("What is Swift?")
-print(response)
-
-// Streaming generation
-let result = try await RunAnywhere.generateStream(
-    "Explain machine learning",
-    options: LLMGenerationOptions(maxTokens: 200, temperature: 0.7)
-)
-
-for try await token in result.stream {
-    print(token, terminator: "")
-}
-```
-
----
-
-## Supported Models
-
-LlamaCPPRuntime supports any GGUF-format model. Common options include:
-
-| Model | Size | Memory | Use Case |
-|-------|------|--------|----------|
-| SmolLM2 360M Q8_0 | ~400MB | 500MB | Fast, lightweight chat |
-| Qwen 2.5 0.5B Q6_K | ~500MB | 600MB | Multilingual, efficient |
-| LFM2 350M Q4_K_M | ~200MB | 250MB | Ultra-compact |
-| Llama 2 7B Q4_K_M | ~4GB | 4GB | High quality |
-| Mistral 7B Instruct Q4_K_M | ~4GB | 4GB | Instruction following |
-| Llama 3.2 1B Q4_K_M | ~700MB | 1GB | Latest Llama, compact |
-| Phi-3 Mini Q4_K_M | ~2GB | 2.5GB | Microsoft, reasoning |
-
-### Quantization Levels
-
-| Quantization | Quality | Speed | Size |
-|--------------|---------|-------|------|
-| Q8_0 | Highest | Slower | Largest |
-| Q6_K | High | Medium | Medium |
-| Q5_K_M | Good | Medium | Medium |
-| Q4_K_M | Good | Fast | Small |
-| Q4_0 | Acceptable | Fastest | Smallest |
-
----
-
-## Configuration
-
-### Generation Options
-
-```swift
-let options = LLMGenerationOptions(
-    maxTokens: 256,           // Maximum output length
-    temperature: 0.7,         // Randomness (0.0–2.0)
-    topP: 0.95,              // Nucleus sampling
-    topK: 40,                // Top-K filtering
-    stopSequences: ["</s>"], // Stop generation triggers
-    systemPrompt: "You are a helpful assistant."
-)
-
-let result = try await RunAnywhere.generate(prompt, options: options)
-```
-
-### Temperature Guide
-
-| Temperature | Behavior |
-|-------------|----------|
-| 0.0–0.3 | Deterministic, factual |
-| 0.4–0.7 | Balanced creativity |
-| 0.8–1.0 | More creative, varied |
-| 1.0–2.0 | Highly random |
-
----
-
-## Architecture
-
-The LlamaCPPRuntime module is a thin Swift wrapper around the C++ backend:
-
-```
-┌─────────────────────────────────────────────────┐
-│              Your Application                    │
-├─────────────────────────────────────────────────┤
-│         RunAnywhere Public API                   │
-│    (RunAnywhere.generate(), .chat(), etc.)      │
-├─────────────────────────────────────────────────┤
-│          LlamaCPPRuntime Module                  │
-│    ┌─────────────────────────────────────────┐  │
-│    │  LlamaCPP.swift (registration)          │  │
-│    └─────────────────────────────────────────┘  │
-├─────────────────────────────────────────────────┤
-│           C Bridge (LlamaCPPBackend)             │
-│    rac_backend_llamacpp_register()              │
-│    rac_text_generate() / rac_text_load_model()  │
-├─────────────────────────────────────────────────┤
-│         RABackendLLAMACPP.xcframework           │
-│    (Native C++ llama.cpp with Metal)            │
-└─────────────────────────────────────────────────┘
-```
-
-### Binary Dependencies
-
-| Framework | Size | Description |
-|-----------|------|-------------|
-| `RABackendLLAMACPP.xcframework` | ~15-25MB | llama.cpp with Metal acceleration |
-| `RACommons.xcframework` | ~2MB | Shared C++ infrastructure |
-
----
-
-## Performance
-
-### Benchmarks (Apple Silicon)
-
-| Device | Model | Tokens/sec |
-|--------|-------|------------|
-| M1 MacBook | SmolLM2 360M Q8 | ~45 tok/s |
-| M1 MacBook | Llama 2 7B Q4 | ~12 tok/s |
-| iPhone 15 Pro | SmolLM2 360M Q8 | ~35 tok/s |
-| iPhone 15 Pro | Mistral 7B Q4 | ~8 tok/s |
-| iPad Pro M2 | Llama 3.2 1B Q4 | ~30 tok/s |
-
-### Optimization Tips
-
-1. **Use Metal** — Ensure you're on Apple Silicon for GPU acceleration
-2. **Choose appropriate quantization** — Q4_K_M is often the best balance
-3. **Limit context length** — Shorter contexts = faster inference
-4. **Preload models** — Load during app startup, not on-demand
-
----
-
-## Error Handling
-
-```swift
-do {
-    let result = try await RunAnywhere.generate(prompt)
-} catch let error as SDKError {
-    switch error.code {
-    case .modelNotFound:
-        print("Model not downloaded. Download it first.")
-    case .modelLoadFailed:
-        print("Failed to load model. Check file integrity.")
-    case .insufficientMemory:
-        print("Not enough RAM. Try a smaller model.")
-    case .generationFailed:
-        print("Generation failed: \(error.message)")
-    case .generationTimeout:
-        print("Generation timed out.")
-    default:
-        print("Error: \(error.localizedDescription)")
+    var body: some Scene {
+        WindowGroup { ContentView() }
     }
 }
 ```
 
----
+### Loading a Model
+
+```swift
+// Load a GGUF model by ID
+try await RunAnywhere.loadModel("llama-3.2-1b-instruct-q4")
+
+// Check if model is loaded
+let isLoaded = await RunAnywhere.isModelLoaded
+```
+
+### Text Generation
+
+```swift
+// Simple chat
+let response = try await RunAnywhere.chat("What is the capital of France?")
+print(response)
+
+// Generation with options and metrics
+let result = try await RunAnywhere.generate(
+    "Explain quantum computing in simple terms",
+    options: LLMGenerationOptions(
+        maxTokens: 200,
+        temperature: 0.7,
+        systemPrompt: "You are a helpful assistant."
+    )
+)
+
+print("Response: \(result.text)")
+print("Tokens used: \(result.tokensUsed)")
+print("Speed: \(result.tokensPerSecond) tok/s")
+```
+
+### Streaming Generation
+
+```swift
+let result = try await RunAnywhere.generateStream(
+    "Write a short poem about technology",
+    options: LLMGenerationOptions(maxTokens: 150)
+)
+
+// Display tokens in real-time
+for try await token in result.stream {
+    print(token, terminator: "")
+}
+
+// Get complete metrics after streaming finishes
+let metrics = try await result.result.value
+print("\nSpeed: \(metrics.tokensPerSecond) tok/s")
+print("Total tokens: \(metrics.tokensUsed)")
+```
+
+### Structured Output
+
+```swift
+struct QuizQuestion: Generatable {
+    let question: String
+    let options: [String]
+    let correctAnswer: Int
+
+    static var jsonSchema: String {
+        """
+        {
+          "type": "object",
+          "properties": {
+            "question": { "type": "string" },
+            "options": { "type": "array", "items": { "type": "string" } },
+            "correctAnswer": { "type": "integer" }
+          },
+          "required": ["question", "options", "correctAnswer"]
+        }
+        """
+    }
+}
+
+let quiz: QuizQuestion = try await RunAnywhere.generateStructured(
+    QuizQuestion.self,
+    prompt: "Create a quiz question about Swift programming"
+)
+```
+
+### Unloading
+
+```swift
+try await RunAnywhere.unloadModel()
+```
 
 ## API Reference
 
-### `LlamaCPP` Module
+### LlamaCPP Module
 
 ```swift
 public enum LlamaCPP: RunAnywhereModule {
     /// Module identifier
-    static let moduleId: String = "llamacpp"
+    public static let moduleId = "llamacpp"
 
-    /// Human-readable name
-    static let moduleName: String = "LlamaCPP"
+    /// Human-readable module name
+    public static let moduleName = "LlamaCPP"
 
-    /// Supported capabilities
-    static let capabilities: Set<SDKComponent> = [.llm]
+    /// Capabilities provided by this module
+    public static let capabilities: Set<SDKComponent> = [.llm]
 
-    /// Inference framework identifier
-    static let inferenceFramework: InferenceFramework = .llamaCpp
+    /// Default registration priority
+    public static let defaultPriority: Int = 100
 
-    /// Current module version
-    static let version: String = "2.0.0"
+    /// Inference framework used
+    public static let inferenceFramework: InferenceFramework = .llamaCpp
+
+    /// Module version
+    public static let version = "2.0.0"
 
     /// Underlying llama.cpp library version
-    static let llamaCppVersion: String = "b7199"
+    public static let llamaCppVersion = "b7199"
 
-    /// Register the module with the SDK
+    /// Register the module with the service registry
     @MainActor
-    static func register(priority: Int = 100)
+    public static func register(priority: Int = 100)
 
     /// Unregister the module
-    static func unregister()
+    public static func unregister()
 
-    /// Check if this module can handle a model
-    static func canHandle(modelId: String?) -> Bool
+    /// Check if the module can handle a given model
+    public static func canHandle(modelId: String?) -> Bool
 }
 ```
 
-### Auto-Registration
+### Model Compatibility
 
-```swift
-// Trigger registration automatically when module is imported
-_ = LlamaCPP.autoRegister
+The LlamaCPP module handles models with the `.gguf` file extension. Compatible model families include:
+
+- Llama (1B, 3B, 7B, etc.)
+- Mistral
+- Phi
+- Qwen
+- DeepSeek
+- Other llama.cpp-compatible architectures
+
+### Generation Options
+
+Key options for LLM generation:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `maxTokens` | Int | 100 | Maximum tokens to generate |
+| `temperature` | Float | 0.8 | Sampling temperature (0.0 - 2.0) |
+| `topP` | Float | 1.0 | Top-p sampling parameter |
+| `stopSequences` | [String] | [] | Stop generation at these sequences |
+| `systemPrompt` | String? | nil | System prompt for generation |
+
+## Architecture
+
+The module follows a thin wrapper pattern:
+
+```
+LlamaCPP.swift (Swift wrapper)
+       |
+LlamaCPPBackend (C headers)
+       |
+RABackendLlamaCPP.xcframework (C++ implementation)
+       |
+llama.cpp (Core inference engine)
 ```
 
----
+The Swift code registers the backend with the C++ service registry, which handles all model loading and inference operations internally.
+
+## Performance
+
+Typical performance on Apple Silicon:
+
+| Device | Model | Tokens/sec |
+|--------|-------|------------|
+| iPhone 15 Pro | Llama 3.2 1B Q4 | 25-35 |
+| iPhone 15 Pro | Llama 3.2 3B Q4 | 15-20 |
+| M1 MacBook | Llama 3.2 1B Q4 | 40-50 |
+| M1 MacBook | Llama 3.2 7B Q4 | 20-30 |
+
+Performance varies based on model size, quantization, context length, and device thermal state.
 
 ## Troubleshooting
 
-### Model Won't Load
+### Model Load Fails
 
-**Symptoms:** `modelLoadFailed` error
-
-**Solutions:**
-1. Verify model file exists and isn't corrupted
-2. Check available memory (need ~1.5x model size)
-3. Ensure model is GGUF format
-4. Try re-downloading the model
+1. Ensure the model is downloaded: check `ModelInfo.isDownloaded`
+2. Verify the model format is GGUF
+3. Check available memory (large models require significant RAM)
 
 ### Slow Generation
 
-**Symptoms:** < 5 tokens/second
+1. Use smaller quantization (Q4 vs Q8)
+2. Reduce context length
+3. Ensure device is not thermally throttled
 
-**Solutions:**
-1. Verify Metal is being used (Apple Silicon only)
-2. Use smaller quantization (Q4_K_M instead of Q8)
-3. Reduce `maxTokens`
-4. Close other memory-intensive apps
+### Registration Not Working
 
-### Out of Memory
-
-**Symptoms:** App crashes or `insufficientMemory` error
-
-**Solutions:**
-1. Use a smaller model
-2. Unload other models first
-3. Reduce context length
-4. Test on device with more RAM
-
----
-
-## Version History
-
-| Version | llama.cpp | Changes |
-|---------|-----------|---------|
-| 2.0.0 | b7199 | Modular architecture, C++ backend |
-| 1.0.0 | b6000 | Initial release |
-
----
-
-## See Also
-
-- [RunAnywhere SDK](../../README.md) — Main SDK documentation
-- [API Reference](../../Docs/Documentation.md) — Complete API documentation
-- [ONNX Runtime Module](../ONNXRuntime/README.md) — STT/TTS backend
-- [llama.cpp](https://github.com/ggerganov/llama.cpp) — Upstream project
-
----
+1. Ensure `register()` is called on the main actor
+2. Call `register()` before `RunAnywhere.initialize()`
+3. Check for registration errors in logs
 
 ## License
 
-Copyright © 2025 RunAnywhere AI. All rights reserved.
+Copyright 2025 RunAnywhere AI. All rights reserved.

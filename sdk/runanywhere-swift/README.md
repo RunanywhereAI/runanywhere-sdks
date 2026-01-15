@@ -1,111 +1,134 @@
 # RunAnywhere Swift SDK
 
-<p align="center">
-  <img src="../../examples/logo.svg" alt="RunAnywhere Logo" width="140"/>
-</p>
+A production-grade, on-device AI SDK for iOS, macOS, tvOS, and watchOS. The SDK enables low-latency, privacy-preserving inference for large language models, speech recognition, and voice synthesis with modular backend support.
 
-<p align="center">
-  <strong>On-Device AI for Apple Platforms</strong><br/>
-  Run LLMs, Speech-to-Text, Text-to-Speech, and Voice AI pipelines locally—privacy-first, offline-capable, production-ready.
-</p>
+## Table of Contents
 
-<p align="center">
-  <a href="https://swift.org"><img src="https://img.shields.io/badge/Swift-5.9+-FA7343?style=flat-square&logo=swift&logoColor=white" alt="Swift 5.9+" /></a>
-  <a href="#"><img src="https://img.shields.io/badge/iOS-17.0+-000000?style=flat-square&logo=apple&logoColor=white" alt="iOS 17.0+" /></a>
-  <a href="#"><img src="https://img.shields.io/badge/macOS-14.0+-000000?style=flat-square&logo=apple&logoColor=white" alt="macOS 14.0+" /></a>
-  <a href="#"><img src="https://img.shields.io/badge/Metal-GPU%20Accelerated-8A2BE2?style=flat-square" alt="Metal GPU" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Proprietary-blue?style=flat-square" alt="License" /></a>
-</p>
+- [Overview](#overview)
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [Usage Examples](#usage-examples)
+- [Architecture](#architecture)
+- [Logging and Observability](#logging-and-observability)
+- [Error Handling](#error-handling)
+- [Performance Guidelines](#performance-guidelines)
+- [FAQ](#faq)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## Quick Links
+## Overview
 
-- [Architecture Overview](#architecture-overview) — How the SDK works
-- [Quick Start](#quick-start) — Get running in 2 minutes
-- [API Reference](Docs/Documentation.md) — Complete public API documentation
-- [iOS Sample App](../../examples/ios/RunAnywhereAI/) — Full working demo
-- [FAQ](#faq) — Common questions answered
-- [Troubleshooting](#troubleshooting) — Problems & solutions
-- [Contributing](#contributing) — How to contribute
+The RunAnywhere Swift SDK enables developers to run AI models directly on Apple devices without requiring network connectivity for inference. By keeping data on-device, the SDK ensures minimal latency and maximum privacy for your users.
+
+The SDK provides a unified interface to multiple AI capabilities, including large language models (LLMs), speech-to-text (STT), text-to-speech (TTS), voice activity detection (VAD), and speaker diarization. These capabilities are delivered through pluggable backend modules that can be included as needed.
+
+### Key Capabilities
+
+- **Multi-backend architecture** - Choose from LlamaCPP (GGUF models), ONNX Runtime, or Apple Foundation Models
+- **Metal acceleration** - GPU-accelerated inference on Apple Silicon
+- **Event-driven design** - Subscribe to SDK events for reactive UI updates
+- **Production-ready** - Built-in analytics, logging, device registration, and model lifecycle management
 
 ---
 
 ## Features
 
-### Large Language Models (LLM)
+### Language Models (LLM)
+
 - On-device text generation with streaming support
-- Multiple backends: **LlamaCPP** (GGUF models), **Apple Intelligence** (iOS 26+)
-- Metal GPU acceleration on Apple Silicon
 - Structured output generation with `Generatable` protocol
 - System prompts and customizable generation parameters
-- Support for thinking/reasoning models
+- Support for thinking/reasoning models with token extraction
+- Multiple framework backends (LlamaCPP, Apple Foundation Models)
 
 ### Speech-to-Text (STT)
+
 - Real-time streaming transcription
 - Batch audio transcription
-- Multi-language support with Whisper models via ONNX Runtime
-- Word-level timestamps and confidence scores
+- Multi-language support
+- Whisper-based models via ONNX Runtime
 
 ### Text-to-Speech (TTS)
-- Neural voice synthesis with Piper TTS
+
+- Neural voice synthesis with ONNX models
 - System voices via AVSpeechSynthesizer
 - Streaming audio generation for long text
 - Customizable voice, pitch, rate, and volume
 
 ### Voice Activity Detection (VAD)
-- Energy-based speech detection with Silero VAD
+
+- Energy-based speech detection
 - Configurable sensitivity thresholds
 - Real-time audio stream processing
 
-### Voice Agent Pipeline
-- Full VAD → STT → LLM → TTS orchestration
-- Complete voice conversation flow
-- Push-to-talk and hands-free modes
+### Speaker Diarization
 
-### Infrastructure
-- Automatic model discovery and download with progress tracking
+- Identify multiple speakers in audio
+- Speaker segmentation and labeling
+- Integration with FluidAudio
+
+### Voice Agent Pipeline
+
+- Full VAD to STT to LLM to TTS orchestration
+- Complete voice conversation flow
+- Streaming and batch processing modes
+
+### Model Management
+
+- Automatic model discovery and catalog sync
+- Download with progress tracking (download, extract, validate stages)
+- In-memory model storage with file system caching
+- Framework-specific model assignment
+
+### Observability
+
 - Comprehensive event system via `EventBus`
-- Built-in analytics and telemetry
-- Structured logging with Sentry integration
-- Keychain-persisted device identity
+- Analytics and telemetry integration
+- Structured logging with Pulse support
+- Performance metrics (tokens per second, latency, memory)
 
 ---
 
-## System Requirements
+## Requirements
 
-| Component | Minimum | Recommended |
-|-----------|---------|-------------|
-| **iOS** | 17.0+ | 17.0+ |
-| **macOS** | 14.0+ | 14.0+ |
-| **tvOS** | 17.0+ | 17.0+ |
-| **watchOS** | 10.0+ | 10.0+ |
-| **Xcode** | 15.2+ | 16.0+ |
-| **Swift** | 5.9+ | 5.10+ |
-| **RAM** | 3GB | 6GB+ for 7B models |
-| **Storage** | Variable | Models: 200MB–8GB |
+| Platform | Minimum Version |
+|----------|-----------------|
+| iOS      | 17.0+           |
+| macOS    | 14.0+           |
+| tvOS     | 17.0+           |
+| watchOS  | 10.0+           |
 
-> **Note:** Apple Silicon devices (M1/M2/M3, A14+) recommended for best performance. Metal GPU acceleration provides 3-5x speedup over CPU-only inference.
+**Swift Version:** 5.9+
+
+**Xcode:** 15.2+
+
+Some optional modules have higher runtime requirements:
+- Apple Foundation Models (`RunAnywhereAppleAI`): iOS 26+ / macOS 26+ at runtime
 
 ---
 
 ## Installation
 
-### Swift Package Manager (Recommended)
+### Swift Package Manager
 
-Add the RunAnywhere SDK to your project in Xcode:
+Add the RunAnywhere SDK to your project using Xcode:
 
 1. Open your project in Xcode
-2. Go to **File → Add Package Dependencies...**
+2. Go to **File > Add Package Dependencies...**
 3. Enter the repository URL:
    ```
    https://github.com/RunanywhereAI/runanywhere-sdks
    ```
-4. Select version `0.16.0` or later
+4. Select the version (e.g., `from: "0.16.0"`)
 5. Choose the products you need:
-   - **RunAnywhere** (required) — Core SDK
-   - **RunAnywhereONNX** — ONNX Runtime for STT/TTS/VAD
-   - **RunAnywhereLlamaCPP** — LLM text generation with GGUF models
+   - **RunAnywhere** (required) - Core SDK
+   - **RunAnywhereONNX** - ONNX Runtime for STT/TTS/VAD
+   - **RunAnywhereLlamaCPP** - LLM text generation with GGUF models
 
 ### Package.swift
 
@@ -119,7 +142,7 @@ targets: [
         dependencies: [
             .product(name: "RunAnywhere", package: "runanywhere-sdks"),
             .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-sdks"),
-            .product(name: "RunAnywhereONNX", package: "runanywhere-sdks"),
+            // Add other modules as needed
         ]
     )
 ]
@@ -133,33 +156,31 @@ targets: [
 
 ```swift
 import RunAnywhere
-import LlamaCPPRuntime  // For LLM capabilities
-import ONNXRuntime     // For STT/TTS capabilities
+import LlamaCPPRuntime
 
 @main
 struct MyApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-        }
-        .task {
-            await initializeSDK()
+    init() {
+        Task { @MainActor in
+            // Register the LlamaCPP module for LLM support
+            LlamaCPP.register()
+
+            // Initialize the SDK
+            do {
+                try RunAnywhere.initialize(
+                    apiKey: "<YOUR_API_KEY>",
+                    baseURL: "https://api.runanywhere.ai",
+                    environment: .production
+                )
+            } catch {
+                print("SDK initialization failed: \(error)")
+            }
         }
     }
 
-    @MainActor
-    private func initializeSDK() async {
-        do {
-            // 1. Initialize SDK (development mode - no API key needed)
-            try RunAnywhere.initialize()
-
-            // 2. Register backend modules
-            LlamaCPP.register()  // LLM backend (GGUF models)
-            ONNX.register()      // STT/TTS backend (Whisper, Piper)
-
-            print("RunAnywhere SDK initialized")
-        } catch {
-            print("SDK initialization failed: \(error)")
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
         }
     }
 }
@@ -181,98 +202,19 @@ let result = try await RunAnywhere.generate(
     )
 )
 print("Response: \(result.text)")
+print("Tokens used: \(result.tokensUsed)")
 print("Speed: \(result.tokensPerSecond) tok/s")
-print("Latency: \(result.latencyMs)ms")
 ```
 
-### 3. Streaming Generation
+### 3. Load a Model
 
 ```swift
-let result = try await RunAnywhere.generateStream(
-    "Write a short poem about AI",
-    options: LLMGenerationOptions(maxTokens: 150)
-)
+// Load an LLM model by ID
+try await RunAnywhere.loadModel("llama-3.2-1b-instruct-q4")
 
-// Display tokens in real-time
-for try await token in result.stream {
-    print(token, terminator: "")
-}
-
-// Get final metrics
-let metrics = try await result.result.value
-print("\nSpeed: \(metrics.tokensPerSecond) tok/s")
+// Check if model is loaded
+let isLoaded = await RunAnywhere.isModelLoaded
 ```
-
-### 4. Speech-to-Text
-
-```swift
-// Load STT model
-try await RunAnywhere.loadSTTModel("sherpa-onnx-whisper-tiny.en")
-
-// Transcribe audio data
-let transcription = try await RunAnywhere.transcribe(audioData)
-print("Transcription: \(transcription)")
-```
-
-### 5. Text-to-Speech
-
-```swift
-// Load TTS voice
-try await RunAnywhere.loadTTSVoice("piper-en-us-amy")
-
-// Synthesize speech
-let output = try await RunAnywhere.synthesize(
-    "Hello! Welcome to RunAnywhere.",
-    options: TTSOptions(speakingRate: 1.0, pitch: 1.0)
-)
-// output.audioData contains WAV audio bytes
-```
-
----
-
-## Architecture Overview
-
-The RunAnywhere SDK follows a **modular, provider-based architecture** with a C++ commons layer for cross-platform performance:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Your Application                          │
-├─────────────────────────────────────────────────────────────────┤
-│                    RunAnywhere Swift SDK                         │
-│  ┌──────────────┐  ┌───────────────┐  ┌──────────────────────┐  │
-│  │ Public APIs  │  │  EventBus     │  │  ServiceRegistry     │  │
-│  │ (generate,   │  │  (events,     │  │  (module discovery,  │  │
-│  │  transcribe) │  │   analytics)  │  │   service routing)   │  │
-│  └──────────────┘  └───────────────┘  └──────────────────────┘  │
-├─────────────────────────────────────────────────────────────────┤
-│                     C++ Bridge Layer                             │
-│              CRACommons (runanywhere-commons)                    │
-├────────────┬─────────────┬──────────────┬───────────────────────┤
-│  LlamaCPP  │    ONNX     │  Apple AI    │   Future Backends...  │
-│  Backend   │   Backend   │   Backend    │                       │
-│  (LLM)     │ (STT/TTS)   │  (iOS 26+)   │                       │
-└────────────┴─────────────┴──────────────┴───────────────────────┘
-```
-
-### Key Components
-
-| Component | Description |
-|-----------|-------------|
-| **RunAnywhere** | Static enum providing all public SDK methods |
-| **EventBus** | Combine-based event subscription for reactive UI |
-| **ServiceRegistry** | Routes capability requests to registered backends |
-| **ModuleRegistry** | Discovers and tracks registered backend modules |
-| **CppBridge** | Swift-to-C++ interop for native performance |
-
-### XCFramework Composition
-
-| Framework | Size | Provides |
-|-----------|------|----------|
-| `RACommons.xcframework` | ~2MB | Core C++ commons, registries, events |
-| `RABackendLLAMACPP.xcframework` | ~15-25MB | LLM capability (GGUF models) |
-| `RABackendONNX.xcframework` | ~50-70MB | STT, TTS, VAD (ONNX models) |
-
-> For detailed architecture documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 
@@ -281,10 +223,6 @@ The RunAnywhere SDK follows a **modular, provider-based architecture** with a C+
 ### SDK Initialization Parameters
 
 ```swift
-// Development mode (default) - no API key needed
-try RunAnywhere.initialize()
-
-// Production mode - requires API key and backend URL
 try RunAnywhere.initialize(
     apiKey: "<YOUR_API_KEY>",
     baseURL: "https://api.runanywhere.ai",
@@ -294,43 +232,297 @@ try RunAnywhere.initialize(
 
 ### Environment Modes
 
-| Environment | Description |
-|-------------|-------------|
-| `.development` | Verbose logging, local backend, no auth required |
-| `.staging` | Testing with real services |
-| `.production` | Minimal logging, full authentication, telemetry |
+| Environment     | Description                                      |
+|-----------------|--------------------------------------------------|
+| `.development`  | Verbose logging, mock services, local analytics  |
+| `.staging`      | Testing with real services                       |
+| `.production`   | Minimal logging, full authentication, telemetry  |
 
 ### Generation Options
 
 ```swift
 let options = LLMGenerationOptions(
-    maxTokens: 256,              // Maximum tokens to generate
-    temperature: 0.7,            // Sampling temperature (0.0–2.0)
-    topP: 0.95,                  // Top-p sampling parameter
-    stopSequences: ["END"],      // Stop generation at these sequences
+    maxTokens: 100,
+    temperature: 0.8,
+    topP: 1.0,
+    stopSequences: ["END"],
+    streamingEnabled: false,
+    preferredFramework: .llamaCpp,
     systemPrompt: "You are a helpful assistant."
 )
 ```
+
+### Module Registration
+
+Register modules at app startup before using their capabilities:
+
+```swift
+import RunAnywhere
+import LlamaCPPRuntime
+import ONNXRuntime
+
+@MainActor
+func setupSDK() {
+    LlamaCPP.register()   // LLM (priority: 100)
+    ONNX.register()       // STT + TTS (priority: 100)
+}
+```
+
+---
+
+## Usage Examples
+
+### Streaming Text Generation
+
+```swift
+let result = try await RunAnywhere.generateStream(
+    "Write a short poem about AI",
+    options: LLMGenerationOptions(maxTokens: 150)
+)
+
+for try await token in result.stream {
+    print(token, terminator: "")
+}
+
+let metrics = try await result.result.value
+print("\nSpeed: \(metrics.tokensPerSecond) tok/s")
+```
+
+### Structured Output Generation
+
+```swift
+struct QuizQuestion: Generatable {
+    let question: String
+    let options: [String]
+    let correctAnswer: Int
+
+    static var jsonSchema: String {
+        """
+        {
+          "type": "object",
+          "properties": {
+            "question": { "type": "string" },
+            "options": { "type": "array", "items": { "type": "string" } },
+            "correctAnswer": { "type": "integer" }
+          },
+          "required": ["question", "options", "correctAnswer"]
+        }
+        """
+    }
+}
+
+let quiz: QuizQuestion = try await RunAnywhere.generateStructured(
+    QuizQuestion.self,
+    prompt: "Create a quiz question about Swift programming"
+)
+```
+
+### Speech-to-Text Transcription
+
+```swift
+import RunAnywhere
+import ONNXRuntime
+
+await ONNX.register()
+try await RunAnywhere.loadSTTModel("whisper-base-onnx")
+
+let audioData: Data = // your audio data (16kHz, mono, Float32)
+let transcription = try await RunAnywhere.transcribe(audioData)
+print("Transcribed: \(transcription)")
+```
+
+### Text-to-Speech Synthesis
+
+```swift
+try await RunAnywhere.loadTTSVoice("piper-en-us-amy")
+
+let output = try await RunAnywhere.synthesize(
+    "Hello! Welcome to RunAnywhere.",
+    options: TTSOptions(
+        speakingRate: 1.0,
+        pitch: 1.0,
+        volume: 0.8
+    )
+)
+```
+
+### Voice Agent Pipeline
+
+```swift
+try await RunAnywhere.initializeVoiceAgent(
+    sttModelId: "whisper-base-onnx",
+    llmModelId: "llama-3.2-1b-instruct-q4",
+    ttsVoice: "com.apple.ttsbundle.siri_female_en-US_compact"
+)
+
+let audioData: Data = // recorded audio
+let result = try await RunAnywhere.processVoiceTurn(audioData)
+
+print("User said: \(result.transcription)")
+print("AI response: \(result.response)")
+
+await RunAnywhere.cleanupVoiceAgent()
+```
+
+### Subscribing to Events
+
+```swift
+import Combine
+
+class ViewModel: ObservableObject {
+    private var cancellables = Set<AnyCancellable>()
+
+    init() {
+        RunAnywhere.events.events
+            .receive(on: DispatchQueue.main)
+            .sink { event in
+                print("Event: \(event.type)")
+            }
+            .store(in: &cancellables)
+
+        RunAnywhere.events.events(for: .llm)
+            .sink { event in
+                print("LLM Event: \(event.type)")
+            }
+            .store(in: &cancellables)
+    }
+}
+```
+
+### Model Download with Progress
+
+```swift
+let models = try await RunAnywhere.availableModels()
+let model = models.first { $0.id == "llama-3.2-1b-instruct-q4" }!
+
+let task = try await Download.shared.downloadModel(model)
+
+for await progress in task.progress {
+    let percent = Int(progress.overallProgress * 100)
+    print("\(progress.stage.displayName): \(percent)%")
+}
+```
+
+---
+
+## Architecture
+
+The RunAnywhere SDK follows a modular, provider-based architecture that separates core functionality from specific backend implementations:
+
+```
++------------------------------------------------------------------+
+|                         Public API                                |
+|        RunAnywhere.generate() / transcribe() / synthesize()       |
++------------------------------------------------------------------+
+                               |
++------------------------------------------------------------------+
+|                      Capability Layer                             |
+|     LLMCapability  |  STTCapability  |  TTSCapability  |  ...    |
++------------------------------------------------------------------+
+                               |
++------------------------------------------------------------------+
+|                     ServiceRegistry                               |
+|          Routes requests to registered service providers          |
++------------------------------------------------------------------+
+                               |
+          +--------------------+--------------------+
+          v                    v                    v
++------------------+  +------------------+  +------------------+
+|  LlamaCPP Module |  |   ONNX Module    |  | AppleAI Module   |
+|   (LLM: GGUF)    |  |  (STT + TTS)     |  |  (LLM: iOS 26+)  |
++------------------+  +------------------+  +------------------+
+          |                    |                    |
+          v                    v                    v
++------------------------------------------------------------------+
+|               Native Runtime / XCFramework                        |
+|          RunAnywhereCore (C++ with Metal acceleration)            |
++------------------------------------------------------------------+
+```
+
+**Key Components:**
+
+- **ModuleRegistry** - Discovers and tracks registered modules
+- **ServiceRegistry** - Routes capability requests to the appropriate provider
+- **Capability Classes** - Handle business logic, events, and analytics
+- **EventBus** - Pub/sub system for SDK-wide events
+- **ServiceContainer** - Dependency injection container
+
+For detailed architecture documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+---
+
+## Logging and Observability
+
+### Configure Log Level
+
+```swift
+RunAnywhere.setLogLevel(.debug)
+RunAnywhere.configureLocalLogging(enabled: true)
+RunAnywhere.setDebugMode(true)
+await RunAnywhere.flushAll()
+```
+
+### Log Levels
+
+| Level      | Description                                    |
+|------------|------------------------------------------------|
+| `.debug`   | Detailed information for debugging             |
+| `.info`    | General operational information                |
+| `.warning` | Potential issues that don't prevent operation  |
+| `.error`   | Errors that affect specific operations         |
+| `.fault`   | Critical errors indicating serious problems    |
+
+### Analytics
+
+The SDK automatically tracks key metrics:
+
+- Generation latency and tokens per second
+- Model load times and memory usage
+- Error rates by category
+- User session analytics (opt-in)
 
 ---
 
 ## Error Handling
 
-The SDK provides comprehensive error handling through `SDKError`:
+All SDK errors are represented by `SDKError`, which provides:
+
+- Typed error cases for each error category
+- Detailed error descriptions
+- Recovery suggestions
+- Underlying error information when applicable
+
+### Error Categories
+
+```swift
+case notInitialized
+case invalidAPIKey(String?)
+case invalidConfiguration(String)
+case modelNotFound(String)
+case modelLoadFailed(String, Error?)
+case modelIncompatible(String, String)
+case generationFailed(String)
+case generationTimeout(String?)
+case contextTooLong(Int, Int)
+case networkUnavailable
+case downloadFailed(String, Error?)
+case insufficientStorage(Int64, Int64)
+case storageFull
+```
+
+### Handling Errors
 
 ```swift
 do {
-    let response = try await RunAnywhere.generate("Hello!")
+    let result = try await RunAnywhere.generate("Hello")
 } catch let error as SDKError {
     switch error.code {
     case .notInitialized:
-        print("SDK not initialized. Call RunAnywhere.initialize() first.")
+        print("Please call RunAnywhere.initialize() first")
     case .modelNotFound:
         print("Model not found. Download it first.")
-    case .insufficientMemory:
-        print("Not enough memory. Try a smaller model.")
-    case .networkUnavailable:
-        print("Network unavailable. Models work offline once downloaded.")
+    case .generationFailed:
+        print("Generation failed: \(error.message)")
     default:
         print("Error: \(error.localizedDescription)")
         if let suggestion = error.recoverySuggestion {
@@ -340,69 +532,15 @@ do {
 }
 ```
 
-### Error Categories
-
-| Category | Description |
-|----------|-------------|
-| `.general` | General SDK errors |
-| `.llm` | LLM generation errors |
-| `.stt` | Speech-to-text errors |
-| `.tts` | Text-to-speech errors |
-| `.vad` | Voice activity detection errors |
-| `.voiceAgent` | Voice pipeline errors |
-| `.download` | Model download errors |
-| `.network` | Network-related errors |
-| `.authentication` | Auth and API key errors |
-
 ---
 
-## Logging & Observability
-
-### Configure Logging
-
-```swift
-// Set minimum log level
-RunAnywhere.setLogLevel(.debug)  // .debug, .info, .warning, .error, .fault
-
-// Enable debug mode for verbose output
-RunAnywhere.setDebugMode(true)
-
-// Flush all pending logs
-await RunAnywhere.flushAll()
-```
-
-### Subscribe to Events
-
-```swift
-import Combine
-
-// Subscribe to all events
-RunAnywhere.events.events
-    .receive(on: DispatchQueue.main)
-    .sink { event in
-        print("Event: \(event.type)")
-    }
-    .store(in: &cancellables)
-
-// Subscribe to specific category
-RunAnywhere.events.events(for: .llm)
-    .sink { event in
-        print("LLM Event: \(event.type)")
-    }
-    .store(in: &cancellables)
-```
-
----
-
-## Performance & Best Practices
+## Performance Guidelines
 
 ### Model Selection
 
-| Model Size | RAM Required | Use Case |
-|------------|--------------|----------|
-| 360M–500M (Q8) | ~500MB | Fast, lightweight chat |
-| 1B–3B (Q4/Q6) | 1–2GB | Balanced quality/speed |
-| 7B (Q4) | 4–5GB | High quality, slower |
+- Smaller models (1-3B parameters) work well for most on-device use cases
+- Q4/Q5 quantization provides good balance of quality and speed
+- Test on target devices; performance varies significantly by hardware
 
 ### Memory Management
 
@@ -412,170 +550,183 @@ try await RunAnywhere.unloadModel()
 
 // Check storage before downloading
 let storageInfo = await RunAnywhere.getStorageInfo()
-if storageInfo.availableBytes > modelSize {
+if storageInfo.availableBytes > model.downloadSize ?? 0 {
     // Safe to download
 }
 
-// Clean up temporary files
+// Clean up temporary files periodically
 try await RunAnywhere.cleanTempFiles()
 ```
 
-### Best Practices
+### Threading
 
-1. **Prefer streaming** for better perceived latency
-2. **Unload unused models** to free memory
-3. **Handle errors gracefully** with user-friendly messages
-4. **Test on target devices** — performance varies by hardware
-5. **Use smaller models** for faster iteration during development
+- SDK methods are async and safe to call from any context
+- Heavy operations (model loading, generation) run on background threads
+- UI updates from event subscriptions should dispatch to main thread
 
----
+### Streaming for Responsiveness
 
-## Troubleshooting
-
-### Model Download Fails
-
-**Symptoms:** Download stuck or fails with network error
-
-**Solutions:**
-1. Check internet connection
-2. Verify sufficient storage (need 2x model size)
-3. Try on WiFi instead of cellular
-4. Check if model URL is accessible
-
-### Out of Memory
-
-**Symptoms:** App crashes during model loading or inference
-
-**Solutions:**
-1. Use a smaller model (360M instead of 7B)
-2. Unload unused models first
-3. Close other memory-intensive apps
-4. Test on device with more RAM
-
-### Inference Too Slow
-
-**Symptoms:** Generation takes 10+ seconds per token
-
-**Solutions:**
-1. Use Apple Silicon device for Metal acceleration
-2. Reduce `maxTokens` for shorter responses
-3. Use quantized models (Q4 instead of Q8)
-4. Check device thermal state
-
-### Model Not Found After Download
-
-**Symptoms:** `modelNotFound` error even though download completed
-
-**Solutions:**
-1. Call `RunAnywhere.discoverDownloadedModels()` to refresh registry
-2. Check model path in storage
-3. Delete and re-download the model
+```swift
+let result = try await RunAnywhere.generateStream(prompt)
+for try await token in result.stream {
+    await MainActor.run { self.text += token }
+}
+```
 
 ---
 
 ## FAQ
 
-### Q: Do I need an internet connection?
-**A:** Only for initial model download. Once downloaded, all inference runs 100% on-device with no network required.
+### Do I need an internet connection to use the SDK?
 
-### Q: How much storage do models need?
-**A:** Varies by model:
-- Small LLMs (360M–1B): 200MB–1GB
-- Medium LLMs (3B–7B Q4): 2–5GB
-- STT models: 50–200MB
-- TTS voices: 20–100MB
+No, once models are downloaded, all inference happens on-device. You only need internet for:
+- Initial SDK authentication
+- Downloading models
+- Syncing analytics (optional)
 
-### Q: Is user data sent to the cloud?
-**A:** No. All inference happens on-device. Only anonymous analytics (latency, error rates) are collected, and this can be disabled.
+### Which models are supported?
 
-### Q: Which devices are supported?
-**A:** iPhone/iPad with iOS 17+ and Mac with macOS 14+. Apple Silicon devices (M1/M2/M3, A14+) are recommended for best performance.
+The SDK supports:
+- **GGUF models** via LlamaCPP (Llama, Mistral, Phi, Qwen, etc.)
+- **ONNX models** for STT (Whisper variants) and TTS (Piper voices)
+- **Apple Foundation Models** on iOS 26+ (built-in, no download)
 
-### Q: Can I use custom models?
-**A:** Yes! Any GGUF model works with LlamaCPP backend. ONNX models work for STT/TTS.
+### How much storage do models require?
+
+Model sizes vary significantly:
+- Small LLMs (1-3B Q4): 500MB - 2GB
+- Medium LLMs (7B Q4): 3-5GB
+- STT models: 50-500MB
+- TTS voices: 20-100MB
+
+### Can I use multiple models simultaneously?
+
+Currently, one LLM can be loaded at a time. STT and TTS models can be loaded alongside LLM models. Use `unloadModel()` before loading a different LLM.
+
+### How do I handle model updates?
+
+Call `fetchModelAssignments(forceRefresh: true)` to sync the latest model catalog. New versions can be downloaded alongside existing models.
+
+### Is user data sent to the cloud?
+
+By default, only anonymous analytics (latency, error rates) are collected. Actual prompts, responses, and audio data never leave the device.
+
+### How do I debug issues?
+
+1. Enable debug mode: `RunAnywhere.setDebugMode(true)`
+2. Check logs with Pulse integration
+3. Subscribe to error events: `RunAnywhere.events.on(.error) { ... }`
+
+### What's the difference between chat() and generate()?
+
+- `chat(_:)` returns just the text string
+- `generate(_:options:)` returns `LLMGenerationResult` with full metrics
 
 ---
 
 ## Contributing
 
-We welcome contributions! The easiest way to get started is to run the iOS sample app with local SDK changes.
+We welcome contributions to the RunAnywhere Swift SDK. This section explains how to set up your development environment and test your changes.
+
+### Prerequisites
+
+- macOS 14.0 or later
+- Xcode 15.2 or later
+- CMake 3.21+ (for building native frameworks)
 
 ### First-Time Setup
 
-```bash
-# 1. Clone the repository
-git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
-cd runanywhere-sdks/sdk/runanywhere-swift
+1. **Clone the repository:**
 
-# 2. Run first-time setup (builds all native frameworks)
-# This downloads dependencies and builds:
-#   - RACommons.xcframework (core infrastructure)
-#   - RABackendLLAMACPP.xcframework (LLM backend)
-#   - RABackendONNX.xcframework (STT/TTS/VAD backend)
-./scripts/build-swift.sh --setup
+   ```bash
+   git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
+   cd runanywhere-sdks/sdk/runanywhere-swift
+   ```
 
-# 3. Open the Swift SDK in Xcode
-open Package.swift
+2. **Run the setup script:**
 
-# 4. If needed, reset package caches
-# In Xcode: File > Packages > Reset Package Caches
-```
+   This downloads dependencies, builds all native frameworks, and configures the SDK for local development:
 
-> **Note:** First-time setup takes 5–15 minutes depending on your machine. After that, rebuilds are much faster.
+   ```bash
+   ./scripts/build-swift.sh --setup
+   ```
 
-### Testing with the iOS Sample App
+   The setup process will:
+   - Download ONNX Runtime and Sherpa-ONNX dependencies
+   - Build `RACommons.xcframework` (core infrastructure)
+   - Build `RABackendLLAMACPP.xcframework` (LLM backend)
+   - Build `RABackendONNX.xcframework` (STT/TTS/VAD backend)
+   - Copy frameworks to `Binaries/`
+   - Set `testLocal = true` in Package.swift
 
-The best way to test SDK changes is with the iOS/macOS sample app:
+   First-time setup takes approximately 5-15 minutes depending on your machine.
 
-```bash
-# 1. Ensure SDK is built (from previous step)
-cd sdk/runanywhere-swift
-./scripts/build-swift.sh --setup
+3. **Open the SDK in Xcode:**
 
-# 2. Open the sample app
-cd ../../examples/ios/RunAnywhereAI
-open RunAnywhereAI.xcodeproj
+   ```bash
+   open Package.swift
+   ```
 
-# 3. In Xcode: File > Packages > Reset Package Caches
-# 4. Select your device/simulator and click Run (Cmd+R)
-```
+   If you encounter package resolution issues, go to **File > Packages > Reset Package Caches**.
 
-The sample app demonstrates all SDK features:
-- AI Chat with streaming
-- Speech-to-Text transcription
-- Text-to-Speech synthesis
-- Voice Assistant pipeline
-- Model management
+### Testing with the Sample App
 
-### After Making Changes to runanywhere-commons
+The iOS/macOS sample app is the recommended way to test SDK changes:
 
-If you modify the C++ commons layer:
+1. **Ensure the SDK is set up** (complete the First-Time Setup above)
+
+2. **Open the sample app:**
+
+   ```bash
+   cd ../../examples/ios/RunAnywhereAI
+   open RunAnywhereAI.xcodeproj
+   ```
+
+3. **Reset package caches if needed:** File > Packages > Reset Package Caches
+
+4. **Build and run** on your device or simulator
+
+### Rebuilding After Changes
+
+**After modifying Swift SDK code:**
+
+No rebuild needed. Xcode will pick up the changes automatically.
+
+**After modifying runanywhere-commons (C++ code):**
 
 ```bash
 cd sdk/runanywhere-swift
 ./scripts/build-swift.sh --local --build-commons
 ```
 
-### Build Script Options
+### Build Script Reference
 
-| Command | Description |
-|---------|-------------|
-| `--setup` | First-time setup: downloads deps, builds all frameworks |
-| `--local` | Use local frameworks from `Binaries/` |
-| `--remote` | Use remote frameworks from GitHub releases |
-| `--build-commons` | Rebuild runanywhere-commons from source |
-| `--clean` | Clean build artifacts before building |
-| `--release` | Build in release mode (default: debug) |
+The `build-swift.sh` script supports the following commands:
+
+| Command           | Description                                               |
+|-------------------|-----------------------------------------------------------|
+| `--setup`         | First-time setup: downloads deps, builds all frameworks   |
+| `--local`         | Use local frameworks from `Binaries/`                     |
+| `--remote`        | Use remote frameworks from GitHub releases                |
+| `--build-commons` | Rebuild runanywhere-commons from source                   |
+| `--clean`         | Clean build artifacts before building                     |
+| `--release`       | Build in release mode (default: debug)                    |
+| `--skip-build`    | Only setup frameworks, skip swift build                   |
+| `--set-local`     | Set `testLocal = true` in Package.swift                   |
+| `--set-remote`    | Set `testLocal = false` in Package.swift                  |
+
+### Running Tests
+
+```bash
+swift test
+```
 
 ### Code Style
 
-We use SwiftLint for code style enforcement:
+The project uses SwiftLint for code style enforcement:
 
 ```bash
-# Install SwiftLint
 brew install swiftlint
-
-# Run linter
 swiftlint
 ```
 
@@ -592,37 +743,22 @@ swiftlint
 ### Reporting Issues
 
 Open an issue on GitHub with:
-- SDK version: `RunAnywhere.version`
+- SDK version (check with `RunAnywhere.version`)
 - Platform and OS version
-- Device model
 - Steps to reproduce
 - Expected vs actual behavior
 - Relevant logs (with sensitive info redacted)
 
----
+### Contact
 
-## Support & Community
-
-- **Discord**: [Join our community](https://discord.gg/pxRkYmWh)
-- **GitHub Issues**: [Report bugs](https://github.com/RunanywhereAI/runanywhere-sdks/issues)
-- **Email**: san@runanywhere.ai
-- **Twitter**: [@RunanywhereAI](https://twitter.com/RunanywhereAI)
+- **Discord:** https://discord.gg/pxRkYmWh
+- **Email:** san@runanywhere.ai
+- **GitHub Issues:** https://github.com/RunanywhereAI/runanywhere-sdks/issues
 
 ---
 
 ## License
 
-Copyright © 2025 RunAnywhere AI. All rights reserved.
+Copyright 2025 RunAnywhere AI. All rights reserved.
 
-For commercial licensing inquiries, contact san@runanywhere.ai.
-
----
-
-## Related Documentation
-
-- [Architecture Overview](ARCHITECTURE.md) — Detailed system design
-- [API Reference](Docs/Documentation.md) — Complete public API documentation
-- [iOS Sample App](../../examples/ios/RunAnywhereAI/) — Production-ready demo
-- [Android SDK](../runanywhere-kotlin/) — Android counterpart
-- [React Native SDK](../runanywhere-react-native/) — Cross-platform option
-- [Flutter SDK](../runanywhere-flutter/) — Flutter integration
+See the repository for license terms. For commercial licensing inquiries, contact san@runanywhere.ai.

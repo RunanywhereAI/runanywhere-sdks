@@ -351,16 +351,22 @@ print('TTS loaded: ${RunAnywhere.isTTSVoiceLoaded}');
 
 ---
 
+## Related Packages
+
+- [runanywhere](https://pub.dev/packages/runanywhere) — Core SDK (required)
+- [runanywhere_llamacpp](https://pub.dev/packages/runanywhere_llamacpp) — LLM backend
+- [runanywhere_onnx](https://pub.dev/packages/runanywhere_onnx) — STT/TTS/VAD backend (this package)
+
+## Resources
+
+- [Flutter Starter Example](https://github.com/RunanywhereAI/flutter-starter-example)
+- [Documentation](https://runanywhere.ai/docs)
+- [GitHub Issues](https://github.com/RunanywhereAI/runanywhere-sdks/issues)
+
+---
+
 ## License
 
 This software is licensed under the RunAnywhere License, which is based on Apache 2.0 with additional terms for commercial use. See [LICENSE](https://github.com/RunanywhereAI/runanywhere-sdks/blob/main/LICENSE) for details.
 
 For commercial licensing inquiries, contact: san@runanywhere.ai
-
----
-
-## Support
-
-- [GitHub Issues](https://github.com/RunanywhereAI/runanywhere-sdks/issues)
-- [Documentation](https://runanywhere.ai/docs)
-- Email: san@runanywhere.ai
