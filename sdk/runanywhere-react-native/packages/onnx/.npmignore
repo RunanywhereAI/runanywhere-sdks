@@ -1,7 +1,7 @@
 # Test local flags - should not be published
+**/.testlocal
+*.testlocal
 .testlocal
-ios/.testlocal
-android/.testlocal
 
 # Build artifacts
 *.log
