@@ -269,6 +269,28 @@ suspend fun cleanup() {
 - **Gradle**: 8.11.1+
 - **Java**: 17
 
+## 📥 Releases & Distribution
+
+All SDKs are automatically built and released via GitHub Actions. See the full [Release & Distribution Guide](docs/RELEASES.md) for details.
+
+### Release Tags
+
+| Tag | SDK | Description |
+|-----|-----|-------------|
+| `v1.0.0` | All SDKs | Unified release of all components |
+| `swift-v1.0.0` | Swift | iOS/macOS SDK |
+| `kotlin-v1.0.0` | Kotlin | Android/JVM SDK |
+| `flutter-v1.0.0` | Flutter | Cross-platform Dart SDK |
+| `react-native-v1.0.0` | React Native | Cross-platform TypeScript SDK |
+
+### Download Pre-built Artifacts
+
+Go to [**Releases**](https://github.com/RunanywhereAI/runanywhere-sdks/releases) to download:
+- Android AARs
+- iOS XCFrameworks
+- Flutter packages
+- React Native packages
+
 ## 🛠️ Installation
 
 ### iOS SDK
