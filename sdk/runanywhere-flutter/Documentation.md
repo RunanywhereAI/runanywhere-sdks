@@ -1153,4 +1153,10 @@ Future<void> main() async {
 
 - [README.md](README.md) – Getting started guide
 - [ARCHITECTURE.md](ARCHITECTURE.md) – Architecture overview
-- [Example App](../../examples/flutter/RunAnywhereAI/) – Full example application
+- [Flutter Starter Example](https://github.com/RunanywhereAI/flutter-starter-example) – Minimal starter project
+
+## Packages on pub.dev
+
+- [runanywhere](https://pub.dev/packages/runanywhere) – Core SDK
+- [runanywhere_llamacpp](https://pub.dev/packages/runanywhere_llamacpp) – LLM backend
+- [runanywhere_onnx](https://pub.dev/packages/runanywhere_onnx) – STT/TTS/VAD backend

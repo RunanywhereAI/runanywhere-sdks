@@ -24,7 +24,7 @@
 - [Architecture Overview](#architecture-overview) — How the SDK works
 - [Quick Start](#quick-start) — Get running in 5 minutes
 - [API Reference](Documentation.md) — Complete public API documentation
-- [Flutter Sample App](../../examples/flutter/RunAnywhereAI/) — Full working demo
+- [Flutter Starter Example](https://github.com/RunanywhereAI/flutter-starter-example) — Minimal starter project
 - [FAQ](#faq) — Common questions answered
 - [Troubleshooting](#troubleshooting) — Problems & solutions
 - [Contributing](#contributing) — How to contribute
@@ -761,7 +761,13 @@ For commercial licensing inquiries, contact san@runanywhere.ai.
 
 - [Architecture Overview](ARCHITECTURE.md) — Detailed system design
 - [API Reference](Documentation.md) — Complete public API documentation
-- [Flutter Sample App](../../examples/flutter/RunAnywhereAI/) — Production-ready demo
+- [Flutter Starter Example](https://github.com/RunanywhereAI/flutter-starter-example) — Minimal starter project
 - [Swift SDK](../runanywhere-swift/) — iOS/macOS native SDK
 - [Kotlin SDK](../runanywhere-kotlin/) — Android native SDK
 - [React Native SDK](../runanywhere-react-native/) — Cross-platform option
+
+## Packages on pub.dev
+
+- [runanywhere](https://pub.dev/packages/runanywhere) — Core SDK
+- [runanywhere_llamacpp](https://pub.dev/packages/runanywhere_llamacpp) — LLM backend
+- [runanywhere_onnx](https://pub.dev/packages/runanywhere_onnx) — STT/TTS/VAD backend
