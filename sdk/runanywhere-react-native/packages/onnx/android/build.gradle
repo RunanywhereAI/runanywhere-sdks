@@ -49,9 +49,8 @@ apply from: '../nitrogen/generated/android/runanywhereonnx+autolinking.gradle'
 apply plugin: 'com.facebook.react'
 
 // Configure node path for Android Studio builds
-react {
-    nodeExecutableAndArgs = [findNodeBinary()]
-}
+// Access the react extension and set nodeExecutableAndArgs
+project.extensions.findByName('react')?.nodeExecutableAndArgs?.set([findNodeBinary()])
 
 def getExtOrIntegerDefault(name) {
     if (rootProject.ext.has(name)) {
