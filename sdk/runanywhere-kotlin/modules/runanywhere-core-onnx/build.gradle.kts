@@ -295,7 +295,14 @@ version = System.getenv("SDK_VERSION")?.removePrefix("v") ?: "0.1.5-SNAPSHOT"
 
 publishing {
     publications.withType<MavenPublication> {
-        artifactId = "runanywhere-onnx"
+        // Use different artifact IDs to avoid conflicts between KMP publications
+        artifactId = when (name) {
+            "kotlinMultiplatform" -> "runanywhere-onnx"
+            "androidRelease" -> "runanywhere-onnx-android"
+            "androidDebug" -> "runanywhere-onnx-android-debug"
+            "jvm" -> "runanywhere-onnx-jvm"
+            else -> "runanywhere-onnx-$name"
+        }
 
         pom {
             name.set("RunAnywhere ONNX Backend")
@@ -334,5 +341,13 @@ publishing {
                 password = project.findProperty("gpr.token") as String? ?: System.getenv("GITHUB_TOKEN")
             }
         }
+    }
+}
+
+// Disable JVM and debug publications - only publish Android release and metadata
+tasks.withType<PublishToMavenRepository>().configureEach {
+    onlyIf {
+        val dominated = publication.name in listOf("jvm", "androidDebug")
+        !dominated
     }
 }
