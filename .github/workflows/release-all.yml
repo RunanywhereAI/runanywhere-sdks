@@ -251,30 +251,56 @@ jobs:
       contents: write
 
     steps:
+      - name: Checkout for Package.swift Update
+        uses: actions/checkout@v4
+
       - name: Download All Artifacts
         uses: actions/download-artifact@v4
         with:
           path: all-artifacts
 
-      - name: Checkout for Package.swift Update
-        uses: actions/checkout@v4
+      - name: Debug - List Downloaded Artifacts
+        run: |
+          echo "=== All artifacts directory structure ==="
+          ls -la all-artifacts/ || echo "all-artifacts/ does not exist"
+          echo ""
+          echo "=== Full tree (first 100 entries) ==="
+          find all-artifacts -type d | head -100
+          echo ""
+          echo "=== Files (first 50) ==="
+          find all-artifacts -type f | head -50
 
       - name: Prepare Release Assets
         run: |
           VERSION="${{ needs.setup.outputs.version }}"
           mkdir -p release-assets
           
-          echo "=== Downloaded artifacts ==="
-          find all-artifacts -type f | head -50
+          echo "=== Looking for artifacts with VERSION=$VERSION ==="
+          echo ""
+          
+          # List what we're looking for vs what exists
+          echo "Expected: all-artifacts/racommons-ios-$VERSION"
+          ls -la "all-artifacts/racommons-ios-$VERSION" 2>&1 || echo "NOT FOUND"
+          echo ""
+          echo "Expected: all-artifacts/backend-llamacpp-ios-$VERSION"
+          ls -la "all-artifacts/backend-llamacpp-ios-$VERSION" 2>&1 || echo "NOT FOUND"
+          echo ""
+          echo "Expected: all-artifacts/backend-onnx-ios-$VERSION"
+          ls -la "all-artifacts/backend-onnx-ios-$VERSION" 2>&1 || echo "NOT FOUND"
+          echo ""
           
           # ─────────────────────────────────────────────────────────────
           # RACommons
           # ─────────────────────────────────────────────────────────────
           # iOS
           if [ -d "all-artifacts/racommons-ios-$VERSION" ]; then
+            echo "✅ Found racommons-ios-$VERSION, creating zip..."
             cd "all-artifacts/racommons-ios-$VERSION"
             zip -r "../../release-assets/RACommons-ios-v${VERSION}.zip" .
             cd ../..
+            echo "Created: RACommons-ios-v${VERSION}.zip"
+          else
+            echo "❌ racommons-ios-$VERSION NOT FOUND"
           fi
           
           # Android - SPLIT by ABI for smaller downloads
@@ -291,16 +317,24 @@ jobs:
           # ─────────────────────────────────────────────────────────────
           # LlamaCPP iOS
           if [ -d "all-artifacts/backend-llamacpp-ios-$VERSION" ]; then
+            echo "✅ Found backend-llamacpp-ios-$VERSION, creating zip..."
             cd "all-artifacts/backend-llamacpp-ios-$VERSION"
             zip -r "../../release-assets/RABackendLLAMACPP-ios-v${VERSION}.zip" .
             cd ../..
+            echo "Created: RABackendLLAMACPP-ios-v${VERSION}.zip"
+          else
+            echo "❌ backend-llamacpp-ios-$VERSION NOT FOUND"
           fi
           
           # ONNX iOS
           if [ -d "all-artifacts/backend-onnx-ios-$VERSION" ]; then
+            echo "✅ Found backend-onnx-ios-$VERSION, creating zip..."
             cd "all-artifacts/backend-onnx-ios-$VERSION"
             zip -r "../../release-assets/RABackendONNX-ios-v${VERSION}.zip" .
             cd ../..
+            echo "Created: RABackendONNX-ios-v${VERSION}.zip"
+          else
+            echo "❌ backend-onnx-ios-$VERSION NOT FOUND"
           fi
           
           # LlamaCPP Android - SPLIT by ABI
@@ -364,9 +398,26 @@ jobs:
           # ─────────────────────────────────────────────────────────────
           # Generate Checksums
           # ─────────────────────────────────────────────────────────────
+          echo ""
+          echo "=========================================="
+          echo "=== FINAL: Release Assets Created ==="
+          echo "=========================================="
           cd release-assets
-          echo "=== Release Assets ==="
           ls -la
+          
+          # Count files
+          ZIP_COUNT=$(ls -1 *.zip 2>/dev/null | wc -l || echo "0")
+          AAR_COUNT=$(ls -1 *.aar 2>/dev/null | wc -l || echo "0")
+          echo ""
+          echo "Total ZIP files: $ZIP_COUNT"
+          echo "Total AAR files: $AAR_COUNT"
+          
+          if [ "$ZIP_COUNT" -eq "0" ] && [ "$AAR_COUNT" -eq "0" ]; then
+            echo ""
+            echo "⚠️  WARNING: No release assets were created!"
+            echo "This likely means the artifact directories were not found."
+            echo "Check the debug output above for missing directories."
+          fi
           
           echo "" > checksums.sha256
           for f in *.zip *.aar; do
@@ -374,6 +425,8 @@ jobs:
               shasum -a 256 "$f" >> checksums.sha256
             fi
           done
+          echo ""
+          echo "=== Checksums ==="
           cat checksums.sha256
 
       - name: Update Root Package.swift Checksums

@@ -43,9 +43,17 @@ ktlint {
 val isJitPack = System.getenv("JITPACK") == "true"
 group = if (isJitPack) "com.github.RunanywhereAI.runanywhere-sdks" else "com.runanywhere.sdk"
 
-// Version can be overridden via environment variable (for CI/CD) or defaults to local dev version
-// CI/CD sets SDK_VERSION from the git tag (e.g., v0.16.0-test.40 -> 0.16.0-test.40)
-version = System.getenv("SDK_VERSION")?.removePrefix("v") ?: "0.1.5-SNAPSHOT"
+// Version resolution priority:
+// 1. SDK_VERSION env var (set by our CI/CD from git tag)
+// 2. VERSION env var (set by JitPack from git tag)
+// 3. Default fallback for local development
+val resolvedVersion = System.getenv("SDK_VERSION")?.removePrefix("v")
+    ?: System.getenv("VERSION")?.removePrefix("v")
+    ?: "0.1.5-SNAPSHOT"
+version = resolvedVersion
+
+// Log version for debugging
+logger.lifecycle("RunAnywhere SDK version: $resolvedVersion (JitPack=$isJitPack)")
 
 // =============================================================================
 // Local vs Remote JNI Library Configuration
