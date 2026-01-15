@@ -336,6 +336,7 @@ jobs:
           ./gradlew publish --no-daemon
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SDK_VERSION: ${{ needs.build-sdk.outputs.version }}
 
   # ===========================================================================
   # Publish Release
