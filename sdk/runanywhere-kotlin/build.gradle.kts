@@ -39,7 +39,9 @@ ktlint {
     }
 }
 
-group = "com.runanywhere.sdk"
+// Use JitPack-compatible group when building on JitPack, otherwise use standard group
+val isJitPack = System.getenv("JITPACK") == "true"
+group = if (isJitPack) "com.github.RunanywhereAI.runanywhere-sdks" else "com.runanywhere.sdk"
 version = "0.1.4"
 
 // =============================================================================
@@ -647,6 +649,8 @@ tasks.named<Jar>("jvmJar") {
 // Configure publishing to include license acknowledgments
 publishing {
     publications.withType<MavenPublication> {
+        artifactId = "runanywhere-kotlin"
+
         pom {
             name.set("RunAnywhere Kotlin SDK")
             description.set("Privacy-first, on-device AI SDK for Kotlin/JVM and Android")

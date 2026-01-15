@@ -1,0 +1,14 @@
+# JitPack build configuration for RunAnywhere Kotlin SDK
+# https://jitpack.io/docs/BUILDING/
+#
+# The Kotlin SDK is in subdirectory: sdk/runanywhere-kotlin/
+# Build all modules (main SDK + LlamaCPP + ONNX backends)
+
+jdk:
+  - openjdk17
+
+before_install:
+  - chmod +x sdk/runanywhere-kotlin/gradlew
+
+install:
+  - cd sdk/runanywhere-kotlin && ./gradlew publishToMavenLocal -Prunanywhere.testLocal=false --no-daemon
