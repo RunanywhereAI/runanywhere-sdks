@@ -396,9 +396,9 @@ jobs:
             COMMONS_CHECKSUM=$(shasum -a 256 "RACommons-ios-v${VERSION}.zip" | cut -d ' ' -f 1)
             echo "RACommons checksum: $COMMONS_CHECKSUM"
             cd ..
-            sed -i '' "s|checksum: \"[a-f0-9]*\" // RACommons|checksum: \"$COMMONS_CHECKSUM\" // RACommons|" "$ROOT_PACKAGE" || true
+            sed -i "s|checksum: \"[a-f0-9]*\" // RACommons|checksum: \"$COMMONS_CHECKSUM\" // RACommons|" "$ROOT_PACKAGE" || true
             # Also update by URL pattern
-            sed -i '' "/RACommons-ios-v/{ n; s/checksum: \"[a-f0-9]*\"/checksum: \"$COMMONS_CHECKSUM\"/; }" "$ROOT_PACKAGE" || true
+            sed -i "/RACommons-ios-v/{ n; s/checksum: \"[a-f0-9]*\"/checksum: \"$COMMONS_CHECKSUM\"/; }" "$ROOT_PACKAGE" || true
             cd release-assets
           fi
           
@@ -407,7 +407,7 @@ jobs:
             LLAMACPP_CHECKSUM=$(shasum -a 256 "RABackendLLAMACPP-ios-v${VERSION}.zip" | cut -d ' ' -f 1)
             echo "RABackendLlamaCPP checksum: $LLAMACPP_CHECKSUM"
             cd ..
-            sed -i '' "/RABackendLlamaCPP-ios-v/{ n; s/checksum: \"[a-f0-9]*\"/checksum: \"$LLAMACPP_CHECKSUM\"/; }" "$ROOT_PACKAGE" || true
+            sed -i "/RABackendLlamaCPP-ios-v/{ n; s/checksum: \"[a-f0-9]*\"/checksum: \"$LLAMACPP_CHECKSUM\"/; }" "$ROOT_PACKAGE" || true
             cd release-assets
           fi
           
@@ -416,15 +416,15 @@ jobs:
             ONNX_CHECKSUM=$(shasum -a 256 "RABackendONNX-ios-v${VERSION}.zip" | cut -d ' ' -f 1)
             echo "RABackendONNX checksum: $ONNX_CHECKSUM"
             cd ..
-            sed -i '' "/RABackendONNX-ios-v/{ n; s/checksum: \"[a-f0-9]*\"/checksum: \"$ONNX_CHECKSUM\"/; }" "$ROOT_PACKAGE" || true
+            sed -i "/RABackendONNX-ios-v/{ n; s/checksum: \"[a-f0-9]*\"/checksum: \"$ONNX_CHECKSUM\"/; }" "$ROOT_PACKAGE" || true
             cd release-assets
           fi
           
           cd ..
           
           # Update version constants
-          sed -i '' "s/let commonsVersion = \"[^\"]*\"/let commonsVersion = \"$VERSION\"/" "$ROOT_PACKAGE"
-          sed -i '' "s/let coreVersion = \"[^\"]*\"/let coreVersion = \"$VERSION\"/" "$ROOT_PACKAGE"
+          sed -i 's/let commonsVersion = "[^"]*"/let commonsVersion = "'"$VERSION"'"/' "$ROOT_PACKAGE"
+          sed -i 's/let coreVersion = "[^"]*"/let coreVersion = "'"$VERSION"'"/' "$ROOT_PACKAGE"
           
           echo "=== Updated Package.swift ==="
           grep -A1 "binaryTarget" "$ROOT_PACKAGE" | head -30 || true

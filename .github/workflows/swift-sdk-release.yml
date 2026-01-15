@@ -397,16 +397,20 @@ jobs:
           ROOT_PACKAGE="Package.swift"
           if [ -f "$ROOT_PACKAGE" ]; then
             echo "Updating root Package.swift with version $VERSION"
-            sed -i '' "s/let commonsVersion = \"[^\"]*\"/let commonsVersion = \"$VERSION\"/" "$ROOT_PACKAGE"
-            sed -i '' "s/let coreVersion = \"[^\"]*\"/let coreVersion = \"$VERSION\"/" "$ROOT_PACKAGE"
+            sed -i 's/let commonsVersion = "[^"]*"/let commonsVersion = "'"$VERSION"'"/' "$ROOT_PACKAGE"
+            sed -i 's/let coreVersion = "[^"]*"/let coreVersion = "'"$VERSION"'"/' "$ROOT_PACKAGE"
+          else
+            echo "Root Package.swift not found, skipping"
           fi
           
           # Update nested Package.swift (for local dev reference)
           NESTED_PACKAGE="${{ env.SDK_DIR }}/Package.swift"
           if [ -f "$NESTED_PACKAGE" ]; then
             echo "Updating nested Package.swift with version $VERSION"
-            sed -i '' "s/let commonsVersion = \"[^\"]*\"/let commonsVersion = \"$VERSION\"/" "$NESTED_PACKAGE"
-            sed -i '' "s/let coreVersion = \"[^\"]*\"/let coreVersion = \"$VERSION\"/" "$NESTED_PACKAGE"
+            sed -i 's/let commonsVersion = "[^"]*"/let commonsVersion = "'"$VERSION"'"/' "$NESTED_PACKAGE"
+            sed -i 's/let coreVersion = "[^"]*"/let coreVersion = "'"$VERSION"'"/' "$NESTED_PACKAGE"
+          else
+            echo "Nested Package.swift not found, skipping"
           fi
 
       - name: Commit Version Updates
