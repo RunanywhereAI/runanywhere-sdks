@@ -275,11 +275,17 @@ tasks.named<Jar>("jvmJar") {
 // Publishing Configuration
 // =============================================================================
 
+// Use JitPack-compatible group when building on JitPack
+val isJitPack = System.getenv("JITPACK") == "true"
+group = if (isJitPack) "com.github.RunanywhereAI.runanywhere-sdks" else "com.runanywhere.sdk"
+
 publishing {
     publications.withType<MavenPublication> {
+        artifactId = "runanywhere-llamacpp"
+
         pom {
-            name.set("RunAnywhere Core LlamaCPP Module")
-            description.set("LlamaCPP backend for RunAnywhere SDK - LLM text generation (~34MB native libs)")
+            name.set("RunAnywhere LlamaCPP Backend")
+            description.set("LlamaCPP backend for RunAnywhere SDK - LLM text generation")
             url.set("https://github.com/RunanywhereAI/runanywhere-sdks")
 
             licenses {
@@ -301,6 +307,17 @@ publishing {
                 connection.set("scm:git:git://github.com/RunanywhereAI/runanywhere-sdks.git")
                 developerConnection.set("scm:git:ssh://github.com/RunanywhereAI/runanywhere-sdks.git")
                 url.set("https://github.com/RunanywhereAI/runanywhere-sdks")
+            }
+        }
+    }
+
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/RunanywhereAI/runanywhere-sdks")
+            credentials {
+                username = project.findProperty("gpr.user") as String? ?: System.getenv("GITHUB_ACTOR")
+                password = project.findProperty("gpr.token") as String? ?: System.getenv("GITHUB_TOKEN")
             }
         }
     }
