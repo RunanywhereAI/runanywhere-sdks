@@ -59,6 +59,7 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 env:
   SDK_DIR: sdk/runanywhere-kotlin
