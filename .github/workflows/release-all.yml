@@ -8,12 +8,15 @@ name: Release All SDKs
 #
 # Tag Format: v1.0.0
 # This will release:
-#   - commons-v1.0.0 (RACommons infrastructure)
-#   - backends-v1.0.0 (LlamaCPP + ONNX backends)
-#   - swift-v1.0.0 (Swift SDK)
-#   - kotlin-v1.0.0 (Kotlin SDK)
-#   - flutter-v1.0.0 (Flutter SDK)
-#   - react-native-v1.0.0 (React Native SDK)
+#   - RACommons (core infrastructure)
+#   - Backend Libraries (LlamaCPP + ONNX)
+#   - Swift SDK (iOS/macOS)
+#   - Kotlin SDK (Android)
+#
+# NOTE: Flutter SDK and React Native SDK are NOT included in this workflow.
+# They are published separately:
+#   - Flutter → pub.dev
+#   - React Native → npm
 #
 # Alternatively, release individual SDKs with their prefixed tags:
 #   - swift-v1.0.0 → Swift SDK only
@@ -51,21 +54,23 @@ on:
         required: false
         default: true
         type: boolean
-      release_flutter:
-        description: 'Release Flutter SDK'
-        required: false
-        default: true
-        type: boolean
-      release_react_native:
-        description: 'Release React Native SDK'
-        required: false
-        default: true
-        type: boolean
-      publish_npm:
-        description: 'Publish React Native SDK to npm'
-        required: false
-        default: false
-        type: boolean
+      # Flutter SDK is published to pub.dev separately - not needed in this workflow
+      # release_flutter:
+      #   description: 'Release Flutter SDK'
+      #   required: false
+      #   default: true
+      #   type: boolean
+      # React Native SDK is published to npm separately - not needed in this workflow
+      # release_react_native:
+      #   description: 'Release React Native SDK'
+      #   required: false
+      #   default: true
+      #   type: boolean
+      # publish_npm:
+      #   description: 'Publish React Native SDK to npm'
+      #   required: false
+      #   default: false
+      #   type: boolean
       dry_run:
         description: 'Dry run (build only, no publish)'
         required: false
@@ -89,9 +94,10 @@ jobs:
       release_backends: ${{ steps.flags.outputs.release_backends }}
       release_swift: ${{ steps.flags.outputs.release_swift }}
       release_kotlin: ${{ steps.flags.outputs.release_kotlin }}
-      release_flutter: ${{ steps.flags.outputs.release_flutter }}
-      release_react_native: ${{ steps.flags.outputs.release_react_native }}
-      publish_npm: ${{ steps.flags.outputs.publish_npm }}
+      # Flutter/React Native use pub.dev/npm - outputs not needed
+      # release_flutter: ${{ steps.flags.outputs.release_flutter }}
+      # release_react_native: ${{ steps.flags.outputs.release_react_native }}
+      # publish_npm: ${{ steps.flags.outputs.publish_npm }}
       dry_run: ${{ steps.flags.outputs.dry_run }}
 
     steps:
@@ -117,19 +123,21 @@ jobs:
             echo "release_backends=${{ github.event.inputs.release_backends }}" >> $GITHUB_OUTPUT
             echo "release_swift=${{ github.event.inputs.release_swift }}" >> $GITHUB_OUTPUT
             echo "release_kotlin=${{ github.event.inputs.release_kotlin }}" >> $GITHUB_OUTPUT
-            echo "release_flutter=${{ github.event.inputs.release_flutter }}" >> $GITHUB_OUTPUT
-            echo "release_react_native=${{ github.event.inputs.release_react_native }}" >> $GITHUB_OUTPUT
-            echo "publish_npm=${{ github.event.inputs.publish_npm }}" >> $GITHUB_OUTPUT
+            # Flutter/React Native use pub.dev/npm separately
+            # echo "release_flutter=${{ github.event.inputs.release_flutter }}" >> $GITHUB_OUTPUT
+            # echo "release_react_native=${{ github.event.inputs.release_react_native }}" >> $GITHUB_OUTPUT
+            # echo "publish_npm=${{ github.event.inputs.publish_npm }}" >> $GITHUB_OUTPUT
             echo "dry_run=${{ github.event.inputs.dry_run }}" >> $GITHUB_OUTPUT
           else
-            # Tag push releases everything (but npm publish requires manual trigger)
+            # Tag push releases everything
             echo "release_commons=true" >> $GITHUB_OUTPUT
             echo "release_backends=true" >> $GITHUB_OUTPUT
             echo "release_swift=true" >> $GITHUB_OUTPUT
             echo "release_kotlin=true" >> $GITHUB_OUTPUT
-            echo "release_flutter=true" >> $GITHUB_OUTPUT
-            echo "release_react_native=true" >> $GITHUB_OUTPUT
-            echo "publish_npm=false" >> $GITHUB_OUTPUT
+            # Flutter/React Native use pub.dev/npm separately
+            # echo "release_flutter=true" >> $GITHUB_OUTPUT
+            # echo "release_react_native=true" >> $GITHUB_OUTPUT
+            # echo "publish_npm=false" >> $GITHUB_OUTPUT
             echo "dry_run=false" >> $GITHUB_OUTPUT
           fi
 
@@ -202,47 +210,48 @@ jobs:
     secrets: inherit
 
   # ===========================================================================
-  # Release Flutter SDK (depends on Backends)
+  # Release Flutter SDK - DISABLED (published to pub.dev separately)
   # ===========================================================================
-  release-flutter:
-    name: Release Flutter SDK
-    needs: [setup, release-backends]
-    if: |
-      always() &&
-      needs.setup.outputs.release_flutter == 'true' &&
-      (needs.release-backends.result == 'success' || needs.release-backends.result == 'skipped')
-    uses: ./.github/workflows/flutter-sdk-release.yml
-    with:
-      version: ${{ needs.setup.outputs.version }}
-      publish_pubdev: false
-      dry_run: ${{ needs.setup.outputs.dry_run == 'true' }}
-      skip_publish: true  # Skip individual release, use unified release
-    secrets: inherit
+  # release-flutter:
+  #   name: Release Flutter SDK
+  #   needs: [setup, release-backends]
+  #   if: |
+  #     always() &&
+  #     needs.setup.outputs.release_flutter == 'true' &&
+  #     (needs.release-backends.result == 'success' || needs.release-backends.result == 'skipped')
+  #   uses: ./.github/workflows/flutter-sdk-release.yml
+  #   with:
+  #     version: ${{ needs.setup.outputs.version }}
+  #     publish_pubdev: false
+  #     dry_run: ${{ needs.setup.outputs.dry_run == 'true' }}
+  #     skip_publish: true  # Skip individual release, use unified release
+  #   secrets: inherit
 
   # ===========================================================================
-  # Release React Native SDK (depends on Backends)
+  # Release React Native SDK - DISABLED (published to npm separately)
   # ===========================================================================
-  release-react-native:
-    name: Release React Native SDK
-    needs: [setup, release-backends]
-    if: |
-      always() &&
-      needs.setup.outputs.release_react_native == 'true' &&
-      (needs.release-backends.result == 'success' || needs.release-backends.result == 'skipped')
-    uses: ./.github/workflows/react-native-sdk-release.yml
-    with:
-      version: ${{ needs.setup.outputs.version }}
-      publish_npm: ${{ needs.setup.outputs.publish_npm == 'true' }}
-      dry_run: ${{ needs.setup.outputs.dry_run == 'true' }}
-      skip_publish: true  # Skip individual release, use unified release
-    secrets: inherit
+  # release-react-native:
+  #   name: Release React Native SDK
+  #   needs: [setup, release-backends]
+  #   if: |
+  #     always() &&
+  #     needs.setup.outputs.release_react_native == 'true' &&
+  #     (needs.release-backends.result == 'success' || needs.release-backends.result == 'skipped')
+  #   uses: ./.github/workflows/react-native-sdk-release.yml
+  #   with:
+  #     version: ${{ needs.setup.outputs.version }}
+  #     publish_npm: ${{ needs.setup.outputs.publish_npm == 'true' }}
+  #     dry_run: ${{ needs.setup.outputs.dry_run == 'true' }}
+  #     skip_publish: true  # Skip individual release, use unified release
+  #   secrets: inherit
 
   # ===========================================================================
   # Create Unified Release (Single release with all assets)
   # ===========================================================================
   create-unified-release:
     name: Create Unified Release
-    needs: [setup, release-commons, release-backends, release-swift, release-kotlin, release-flutter, release-react-native]
+    needs: [setup, release-commons, release-backends, release-swift, release-kotlin]
+    # NOTE: Flutter/React Native removed - they use pub.dev/npm separately
     if: |
       always() &&
       needs.setup.outputs.dry_run != 'true'
@@ -382,18 +391,18 @@ jobs:
           fi
           
           # ─────────────────────────────────────────────────────────────
-          # Flutter SDK
+          # Flutter SDK - DISABLED (published to pub.dev separately)
           # ─────────────────────────────────────────────────────────────
-          if [ -d "all-artifacts/flutter-sdk-package-$VERSION" ]; then
-            cp "all-artifacts/flutter-sdk-package-$VERSION"/*.zip "release-assets/RunAnywhere-Flutter-SDK-v${VERSION}.zip" 2>/dev/null || true
-          fi
+          # if [ -d "all-artifacts/flutter-sdk-package-$VERSION" ]; then
+          #   cp "all-artifacts/flutter-sdk-package-$VERSION"/*.zip "release-assets/RunAnywhere-Flutter-SDK-v${VERSION}.zip" 2>/dev/null || true
+          # fi
           
           # ─────────────────────────────────────────────────────────────
-          # React Native SDK
+          # React Native SDK - DISABLED (published to npm separately)
           # ─────────────────────────────────────────────────────────────
-          if [ -d "all-artifacts/react-native-sdk-package-$VERSION" ]; then
-            cp "all-artifacts/react-native-sdk-package-$VERSION"/*.zip "release-assets/RunAnywhere-ReactNative-SDK-v${VERSION}.zip" 2>/dev/null || true
-          fi
+          # if [ -d "all-artifacts/react-native-sdk-package-$VERSION" ]; then
+          #   cp "all-artifacts/react-native-sdk-package-$VERSION"/*.zip "release-assets/RunAnywhere-ReactNative-SDK-v${VERSION}.zip" 2>/dev/null || true
+          # fi
           
           # ─────────────────────────────────────────────────────────────
           # Generate Checksums
@@ -439,9 +448,13 @@ jobs:
             exit 0
           fi
           
-          echo "=== Updating Package.swift checksums for v$VERSION ==="
+          echo "=== Updating Package.swift for v$VERSION ==="
           
-          # Compute checksums from release assets
+          # Update the SDK version
+          sed -i 's/let sdkVersion = "[^"]*"/let sdkVersion = "'"$VERSION"'"/' "$ROOT_PACKAGE"
+          echo "Updated sdkVersion to: $VERSION"
+          
+          # Compute and update checksums from release assets
           cd release-assets
           
           # RACommons checksum
@@ -449,10 +462,10 @@ jobs:
             COMMONS_CHECKSUM=$(shasum -a 256 "RACommons-ios-v${VERSION}.zip" | cut -d ' ' -f 1)
             echo "RACommons checksum: $COMMONS_CHECKSUM"
             cd ..
-            sed -i "s|checksum: \"[a-f0-9]*\" // RACommons|checksum: \"$COMMONS_CHECKSUM\" // RACommons|" "$ROOT_PACKAGE" || true
-            # Also update by URL pattern
-            sed -i "/RACommons-ios-v/{ n; s/checksum: \"[a-f0-9]*\"/checksum: \"$COMMONS_CHECKSUM\"/; }" "$ROOT_PACKAGE" || true
+            sed -i 's/checksum: "CHECKSUM_RACOMMONS"/checksum: "'"$COMMONS_CHECKSUM"'"/' "$ROOT_PACKAGE"
             cd release-assets
+          else
+            echo "⚠️  RACommons-ios-v${VERSION}.zip not found, checksum not updated"
           fi
           
           # RABackendLlamaCPP checksum
@@ -460,8 +473,10 @@ jobs:
             LLAMACPP_CHECKSUM=$(shasum -a 256 "RABackendLLAMACPP-ios-v${VERSION}.zip" | cut -d ' ' -f 1)
             echo "RABackendLlamaCPP checksum: $LLAMACPP_CHECKSUM"
             cd ..
-            sed -i "/RABackendLlamaCPP-ios-v/{ n; s/checksum: \"[a-f0-9]*\"/checksum: \"$LLAMACPP_CHECKSUM\"/; }" "$ROOT_PACKAGE" || true
+            sed -i 's/checksum: "CHECKSUM_LLAMACPP"/checksum: "'"$LLAMACPP_CHECKSUM"'"/' "$ROOT_PACKAGE"
             cd release-assets
+          else
+            echo "⚠️  RABackendLLAMACPP-ios-v${VERSION}.zip not found, checksum not updated"
           fi
           
           # RABackendONNX checksum
@@ -469,22 +484,22 @@ jobs:
             ONNX_CHECKSUM=$(shasum -a 256 "RABackendONNX-ios-v${VERSION}.zip" | cut -d ' ' -f 1)
             echo "RABackendONNX checksum: $ONNX_CHECKSUM"
             cd ..
-            sed -i "/RABackendONNX-ios-v/{ n; s/checksum: \"[a-f0-9]*\"/checksum: \"$ONNX_CHECKSUM\"/; }" "$ROOT_PACKAGE" || true
+            sed -i 's/checksum: "CHECKSUM_ONNX"/checksum: "'"$ONNX_CHECKSUM"'"/' "$ROOT_PACKAGE"
             cd release-assets
+          else
+            echo "⚠️  RABackendONNX-ios-v${VERSION}.zip not found, checksum not updated"
           fi
           
           cd ..
           
-          # Update version constants
-          sed -i 's/let commonsVersion = "[^"]*"/let commonsVersion = "'"$VERSION"'"/' "$ROOT_PACKAGE"
-          sed -i 's/let coreVersion = "[^"]*"/let coreVersion = "'"$VERSION"'"/' "$ROOT_PACKAGE"
-          
-          echo "=== Updated Package.swift ==="
-          grep -A1 "binaryTarget" "$ROOT_PACKAGE" | head -30 || true
+          echo ""
+          echo "=== Updated Package.swift binaryTargets ==="
+          grep -A2 "binaryTarget" "$ROOT_PACKAGE" | head -30 || true
 
-      - name: Commit Package.swift Updates
-        continue-on-error: true
+      - name: Commit Package.swift and Update Tag
         run: |
+          VERSION="${{ needs.setup.outputs.version }}"
+          
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
@@ -492,11 +507,28 @@ jobs:
           
           if git diff --staged --quiet; then
             echo "No Package.swift changes to commit"
-            exit 0
+          else
+            git commit -m "chore: update Package.swift checksums for v$VERSION"
+            
+            # Push to main/master
+            git push origin HEAD:main || git push origin HEAD:master || echo "Push to default branch skipped"
+            
+            echo "=== Updating tag v$VERSION to include Package.swift changes ==="
+            
+            # Delete the remote tag
+            git push origin :refs/tags/v$VERSION || echo "Remote tag deletion skipped (may not exist)"
+            
+            # Delete local tag
+            git tag -d v$VERSION || echo "Local tag deletion skipped"
+            
+            # Create new tag pointing to current commit (with updated Package.swift)
+            git tag -a v$VERSION -m "Release v$VERSION"
+            
+            # Push the new tag
+            git push origin v$VERSION
+            
+            echo "✅ Tag v$VERSION updated to point to commit with correct checksums"
           fi
-          
-          git commit -m "chore: update Package.swift for v${{ needs.setup.outputs.version }}"
-          git push origin HEAD:main || git push origin HEAD:master || echo "Push skipped"
 
       - name: Create Unified GitHub Release
         uses: softprops/action-gh-release@v2
@@ -538,8 +570,8 @@ jobs:
             |-------|----------|-------------|
             | `RunAnywhere-Swift-SDK-v${{ needs.setup.outputs.version }}.zip` | iOS/macOS | Swift SDK |
             | `RunAnywhere-Kotlin-SDK-v${{ needs.setup.outputs.version }}.aar` | Android | Kotlin SDK (AAR) |
-            | `RunAnywhere-Flutter-SDK-v${{ needs.setup.outputs.version }}.zip` | Cross-platform | Flutter SDK |
-            | `RunAnywhere-ReactNative-SDK-v${{ needs.setup.outputs.version }}.zip` | Cross-platform | React Native SDK |
+            
+            > **Note:** Flutter SDK is available on [pub.dev](https://pub.dev/packages/runanywhere), React Native SDK is available on [npm](https://www.npmjs.com/package/@runanywhere/core)
             
             > 💡 **Tip:** Most Android apps only need `arm64-v8a` (85% of devices)
             
@@ -577,26 +609,23 @@ jobs:
             <summary><b>Flutter</b></summary>
             
             ```yaml
-            # pubspec.yaml
+            # pubspec.yaml - Install from pub.dev
             dependencies:
-              runanywhere:
-                git:
-                  url: https://github.com/RunanywhereAI/runanywhere-sdks
-                  path: sdk/runanywhere-flutter/packages/runanywhere
-                  ref: v${{ needs.setup.outputs.version }}
+              runanywhere: ^${{ needs.setup.outputs.version }}
             ```
+            
+            Or visit [pub.dev/packages/runanywhere](https://pub.dev/packages/runanywhere)
             </details>
             
             <details>
             <summary><b>React Native</b></summary>
             
-            ```json
-            {
-              "dependencies": {
-                "@runanywhere/core": "github:RunanywhereAI/runanywhere-sdks#v${{ needs.setup.outputs.version }}"
-              }
-            }
+            ```bash
+            # Install from npm
+            npm install @runanywhere/core
             ```
+            
+            Or visit [npmjs.com/package/@runanywhere/core](https://www.npmjs.com/package/@runanywhere/core)
             </details>
             
             ---
@@ -619,8 +648,6 @@ jobs:
             | Backends | ${{ needs.release-backends.result == 'success' && '✅' || '❌' }} |
             | Swift SDK | ${{ needs.release-swift.result == 'success' && '✅' || '❌' }} |
             | Kotlin SDK | ${{ needs.release-kotlin.result == 'success' && '✅' || '❌' }} |
-            | Flutter SDK | ${{ needs.release-flutter.result == 'success' && '✅' || '❌' }} |
-            | React Native SDK | ${{ needs.release-react-native.result == 'success' && '✅' || '❌' }} |
             
             ---
             
