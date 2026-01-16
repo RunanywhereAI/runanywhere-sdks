@@ -170,8 +170,10 @@ jobs:
           echo "=== All .so files in artifacts ==="
           find native-artifacts -name "*.so" -type f 2>/dev/null || echo "No .so files found yet"
 
-          # Create jniLibs structure
-          mkdir -p ${{ env.SDK_DIR }}/build/jniLibs
+          # Copy to STANDARD KMP location (src/androidMain/jniLibs/)
+          # This is the default location that Android Gradle Plugin recognizes
+          JNILIBS_DIR="${{ env.SDK_DIR }}/src/androidMain/jniLibs"
+          mkdir -p "$JNILIBS_DIR"
 
           for artifact_dir in native-artifacts/native-libs-*/; do
             if [ -d "$artifact_dir" ]; then
@@ -183,8 +185,8 @@ jobs:
                 if [ -d "$abi_dir" ]; then
                   abi=$(basename "$abi_dir")
                   echo "Found unified ABI: $abi at $abi_dir"
-                  mkdir -p "${{ env.SDK_DIR }}/build/jniLibs/${abi}"
-                  find "$abi_dir" -name "*.so" -exec cp -v {} "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" \;
+                  mkdir -p "$JNILIBS_DIR/${abi}"
+                  find "$abi_dir" -name "*.so" -exec cp -v {} "$JNILIBS_DIR/${abi}/" \;
                 fi
               done
 
@@ -193,8 +195,8 @@ jobs:
                 if [ -d "$abi_dir" ]; then
                   abi=$(basename "$abi_dir")
                   echo "Found llamacpp ABI: $abi at $abi_dir"
-                  mkdir -p "${{ env.SDK_DIR }}/build/jniLibs/${abi}"
-                  find "$abi_dir" -name "*.so" -exec cp -v {} "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" \;
+                  mkdir -p "$JNILIBS_DIR/${abi}"
+                  find "$abi_dir" -name "*.so" -exec cp -v {} "$JNILIBS_DIR/${abi}/" \;
                 fi
               done
 
@@ -203,23 +205,23 @@ jobs:
                 if [ -d "$abi_dir" ]; then
                   abi=$(basename "$abi_dir")
                   echo "Found onnx ABI: $abi at $abi_dir"
-                  mkdir -p "${{ env.SDK_DIR }}/build/jniLibs/${abi}"
-                  find "$abi_dir" -name "*.so" -exec cp -v {} "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" \;
+                  mkdir -p "$JNILIBS_DIR/${abi}"
+                  find "$abi_dir" -name "*.so" -exec cp -v {} "$JNILIBS_DIR/${abi}/" \;
                 fi
               done
             fi
           done
 
           echo "=== Final jniLibs structure ==="
-          find ${{ env.SDK_DIR }}/build/jniLibs -type f -name "*.so" || echo "No .so files in jniLibs!"
+          find "$JNILIBS_DIR" -type f -name "*.so" || echo "No .so files in jniLibs!"
 
           # Verify we have libraries
-          SO_COUNT=$(find ${{ env.SDK_DIR }}/build/jniLibs -name "*.so" | wc -l)
+          SO_COUNT=$(find "$JNILIBS_DIR" -name "*.so" | wc -l)
           if [ "$SO_COUNT" -eq 0 ]; then
             echo "❌ ERROR: No native libraries found!"
             exit 1
           fi
-          echo "✅ Found $SO_COUNT native libraries"
+          echo "✅ Found $SO_COUNT native libraries in $JNILIBS_DIR"
 
       - name: Setup Gradle Properties
         working-directory: ${{ env.SDK_DIR }}
@@ -295,34 +297,36 @@ jobs:
 
       - name: Setup Native Libraries
         run: |
-          mkdir -p ${{ env.SDK_DIR }}/build/jniLibs
+          # Use standard KMP location for jniLibs
+          JNILIBS_DIR="${{ env.SDK_DIR }}/src/androidMain/jniLibs"
+          mkdir -p "$JNILIBS_DIR"
           for artifact_dir in native-artifacts/native-libs-*/; do
             if [ -d "$artifact_dir" ]; then
               for abi_dir in "${artifact_dir}"unified/*/; do
                 if [ -d "$abi_dir" ]; then
                   abi=$(basename "$abi_dir")
-                  mkdir -p "${{ env.SDK_DIR }}/build/jniLibs/${abi}"
-                  find "$abi_dir" -name "*.so" -exec cp {} "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" \;
+                  mkdir -p "$JNILIBS_DIR/${abi}"
+                  find "$abi_dir" -name "*.so" -exec cp {} "$JNILIBS_DIR/${abi}/" \;
                 fi
               done
               for abi_dir in "${artifact_dir}"llamacpp/*/; do
                 if [ -d "$abi_dir" ]; then
                   abi=$(basename "$abi_dir")
-                  mkdir -p "${{ env.SDK_DIR }}/build/jniLibs/${abi}"
-                  find "$abi_dir" -name "*.so" -exec cp {} "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" \;
+                  mkdir -p "$JNILIBS_DIR/${abi}"
+                  find "$abi_dir" -name "*.so" -exec cp {} "$JNILIBS_DIR/${abi}/" \;
                 fi
               done
               for abi_dir in "${artifact_dir}"onnx/*/; do
                 if [ -d "$abi_dir" ]; then
                   abi=$(basename "$abi_dir")
-                  mkdir -p "${{ env.SDK_DIR }}/build/jniLibs/${abi}"
-                  find "$abi_dir" -name "*.so" -exec cp {} "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" \;
+                  mkdir -p "$JNILIBS_DIR/${abi}"
+                  find "$abi_dir" -name "*.so" -exec cp {} "$JNILIBS_DIR/${abi}/" \;
                 fi
               done
             fi
           done
           echo "✅ Native libraries setup complete"
-          find ${{ env.SDK_DIR }}/build/jniLibs -name "*.so" | wc -l
+          find "$JNILIBS_DIR" -name "*.so" | wc -l
 
       - name: Setup Gradle Properties
         working-directory: ${{ env.SDK_DIR }}

@@ -297,15 +297,9 @@ android {
     //   - libonnxruntime.so - ONNX Runtime
     //   - libsherpa-onnx-*.so - Sherpa ONNX (STT/TTS/VAD)
     // ==========================================================================
-    sourceSets {
-        getByName("main") {
-            // IMPORTANT: Use only ONE jniLibs directory to avoid duplicates
-            // Clear any default directories and set only the one we want
-            jniLibs.setSrcDirs(
-                listOf(if (testLocal) "src/androidMain/jniLibs" else "build/jniLibs"),
-            )
-        }
-    }
+    // JNI libs are placed in src/androidMain/jniLibs/ (standard KMP location)
+    // This is automatically included by the KMP Android plugin
+    // ==========================================================================
 
     // Prevent packaging duplicates
     packaging {
@@ -513,7 +507,8 @@ tasks.register("downloadJniLibs") {
     // Only run when NOT using local libs
     onlyIf { !testLocal }
 
-    val outputDir = file("build/jniLibs")
+    // Use standard KMP location for jniLibs
+    val outputDir = file("src/androidMain/jniLibs")
     val tempDir = file("${layout.buildDirectory.get()}/jni-temp")
 
     // GitHub unified release URL - all assets are in one release
