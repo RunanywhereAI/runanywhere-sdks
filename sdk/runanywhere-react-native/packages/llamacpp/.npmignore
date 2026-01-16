@@ -1,0 +1,16 @@
+# Test local flags - should not be published
+**/.testlocal
+*.testlocal
+.testlocal
+
+# Build artifacts
+*.log
+.cxx/
+build/
+
+# IDE
+.idea/
+*.iml
+
+# macOS
+.DS_Store

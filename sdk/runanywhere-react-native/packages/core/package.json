@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/core",
-  "version": "0.2.0",
+  "version": "0.16.11",
   "description": "Core SDK for RunAnywhere React Native - includes RACommons bindings, native bridges, and public API",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -28,8 +28,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
-    "nitrogen": "nitrogen",
-    "prepare": "nitrogen"
+    "nitrogen": "nitrogen && node scripts/fix-nitrogen-output.js",
+    "prepare": "npm run nitrogen",
+    "prepublishOnly": "node scripts/fix-nitrogen-output.js"
   },
   "keywords": [
     "react-native",
