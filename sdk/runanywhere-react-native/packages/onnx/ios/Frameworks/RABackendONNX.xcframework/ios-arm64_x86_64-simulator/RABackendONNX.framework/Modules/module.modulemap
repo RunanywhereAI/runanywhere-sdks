@@ -1,5 +1,0 @@
-framework module RABackendONNX {
-    umbrella header "RABackendONNX.h"
-    export *
-    module * { export * }
-}

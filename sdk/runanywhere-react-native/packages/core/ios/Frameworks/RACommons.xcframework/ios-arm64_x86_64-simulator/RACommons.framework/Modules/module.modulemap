@@ -1,5 +1,0 @@
-framework module RACommons {
-    umbrella header "RACommons.h"
-    export *
-    module * { export * }
-}

@@ -1,5 +1,0 @@
-framework module RABackendLLAMACPP {
-    umbrella header "RABackendLLAMACPP.h"
-    export *
-    module * { export * }
-}
