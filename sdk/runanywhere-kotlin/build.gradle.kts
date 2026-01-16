@@ -539,7 +539,14 @@ tasks.register("downloadJniLibs") {
             return@doLast
         }
 
-        // Clean output directories
+        // Check if libs already exist (CI pre-populates build/jniLibs/)
+        val existingLibs = outputDir.walkTopDown().filter { it.extension == "so" }.count()
+        if (existingLibs > 0) {
+            logger.lifecycle("Skipping JNI download: $existingLibs .so files already in $outputDir (CI mode)")
+            return@doLast
+        }
+
+        // Clean output directories (only if empty)
         outputDir.deleteRecursively()
         tempDir.deleteRecursively()
         outputDir.mkdirs()

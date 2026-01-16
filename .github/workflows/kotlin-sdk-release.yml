@@ -225,7 +225,9 @@ jobs:
         working-directory: ${{ env.SDK_DIR }}
         run: |
           cp gradle.properties.example gradle.properties 2>/dev/null || true
-          echo "runanywhere.testLocal=true" >> gradle.properties
+          # NOTE: We do NOT set testLocal=true here. Instead:
+          # - testLocal=false (default) uses build/jniLibs/ as source dir
+          # - downloadJniLibs task will skip because libs already exist (CI copied them)
           echo "version=${{ steps.version.outputs.version }}" >> gradle.properties
 
       - name: Build SDK
@@ -326,7 +328,7 @@ jobs:
         working-directory: ${{ env.SDK_DIR }}
         run: |
           cp gradle.properties.example gradle.properties 2>/dev/null || true
-          echo "runanywhere.testLocal=true" >> gradle.properties
+          # NOTE: testLocal=false (default) - downloadJniLibs will skip since libs exist
           echo "version=${{ needs.build-sdk.outputs.version }}" >> gradle.properties
 
       - name: Publish to GitHub Packages
