@@ -3,6 +3,7 @@ package com.runanywhere.sdk.storage
 import android.content.Context
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
+import com.runanywhere.sdk.foundation.bridge.extensions.setContext
 import com.runanywhere.sdk.security.AndroidSecureStorage
 
 /**

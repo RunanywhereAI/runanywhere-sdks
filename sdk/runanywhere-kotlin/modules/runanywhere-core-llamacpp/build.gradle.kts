@@ -275,11 +275,28 @@ tasks.named<Jar>("jvmJar") {
 // Publishing Configuration
 // =============================================================================
 
+// Use JitPack-compatible group when building on JitPack
+val isJitPack = System.getenv("JITPACK") == "true"
+group = if (isJitPack) "com.github.RunanywhereAI.runanywhere-sdks" else "com.runanywhere.sdk"
+// Version: SDK_VERSION (our CI), VERSION (JitPack), or fallback
+version = System.getenv("SDK_VERSION")?.removePrefix("v")
+    ?: System.getenv("VERSION")?.removePrefix("v")
+    ?: "0.1.5-SNAPSHOT"
+
 publishing {
     publications.withType<MavenPublication> {
+        // Use different artifact IDs to avoid conflicts between KMP publications
+        artifactId = when (name) {
+            "kotlinMultiplatform" -> "runanywhere-llamacpp"
+            "androidRelease" -> "runanywhere-llamacpp-android"
+            "androidDebug" -> "runanywhere-llamacpp-android-debug"
+            "jvm" -> "runanywhere-llamacpp-jvm"
+            else -> "runanywhere-llamacpp-$name"
+        }
+
         pom {
-            name.set("RunAnywhere Core LlamaCPP Module")
-            description.set("LlamaCPP backend for RunAnywhere SDK - LLM text generation (~34MB native libs)")
+            name.set("RunAnywhere LlamaCPP Backend")
+            description.set("LlamaCPP backend for RunAnywhere SDK - LLM text generation")
             url.set("https://github.com/RunanywhereAI/runanywhere-sdks")
 
             licenses {
@@ -303,5 +320,24 @@ publishing {
                 url.set("https://github.com/RunanywhereAI/runanywhere-sdks")
             }
         }
+    }
+
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/RunanywhereAI/runanywhere-sdks")
+            credentials {
+                username = project.findProperty("gpr.user") as String? ?: System.getenv("GITHUB_ACTOR")
+                password = project.findProperty("gpr.token") as String? ?: System.getenv("GITHUB_TOKEN")
+            }
+        }
+    }
+}
+
+// Disable JVM and debug publications - only publish Android release and metadata
+tasks.withType<PublishToMavenRepository>().configureEach {
+    onlyIf {
+        val dominated = publication.name in listOf("jvm", "androidDebug")
+        !dominated
     }
 }

@@ -611,7 +611,8 @@ for ABI in "${ABI_ARRAY[@]}"; do
 
     # RAC Commons (shared library for logging, error handling, events)
     # This is built from runanywhere-commons and linked by all backends
-    RAC_COMMONS_LIB="${ABI_BUILD_DIR}/rac_commons/librac_commons.so"
+    # CMake outputs to build dir root (not a subdirectory)
+    RAC_COMMONS_LIB="${ABI_BUILD_DIR}/librac_commons.so"
     if [ -f "${RAC_COMMONS_LIB}" ]; then
         mkdir -p "${DIST_DIR}/commons/${ABI}"
         cp "${RAC_COMMONS_LIB}" "${DIST_DIR}/commons/${ABI}/"

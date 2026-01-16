@@ -59,6 +59,7 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 env:
   SDK_DIR: sdk/runanywhere-kotlin
@@ -75,7 +76,7 @@ jobs:
       fail-fast: false
       matrix:
         abi: [arm64-v8a, armeabi-v7a, x86_64]
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -168,15 +169,15 @@ jobs:
           find native-artifacts -type d | head -20
           echo "=== All .so files in artifacts ==="
           find native-artifacts -name "*.so" -type f 2>/dev/null || echo "No .so files found yet"
-          
+
           # Create jniLibs structure
           mkdir -p ${{ env.SDK_DIR }}/build/jniLibs
-          
+
           for artifact_dir in native-artifacts/native-libs-*/; do
             if [ -d "$artifact_dir" ]; then
               echo "Processing $artifact_dir"
               echo "Contents: $(ls -la "$artifact_dir" 2>/dev/null || echo 'empty')"
-              
+
               # Copy unified libraries
               for abi_dir in "${artifact_dir}"unified/*/; do
                 if [ -d "$abi_dir" ]; then
@@ -186,7 +187,7 @@ jobs:
                   find "$abi_dir" -name "*.so" -exec cp -v {} "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" \;
                 fi
               done
-              
+
               # Copy llamacpp libraries
               for abi_dir in "${artifact_dir}"llamacpp/*/; do
                 if [ -d "$abi_dir" ]; then
@@ -196,7 +197,7 @@ jobs:
                   find "$abi_dir" -name "*.so" -exec cp -v {} "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" \;
                 fi
               done
-              
+
               # Copy onnx libraries
               for abi_dir in "${artifact_dir}"onnx/*/; do
                 if [ -d "$abi_dir" ]; then
@@ -208,10 +209,10 @@ jobs:
               done
             fi
           done
-          
+
           echo "=== Final jniLibs structure ==="
           find ${{ env.SDK_DIR }}/build/jniLibs -type f -name "*.so" || echo "No .so files in jniLibs!"
-          
+
           # Verify we have libraries
           SO_COUNT=$(find ${{ env.SDK_DIR }}/build/jniLibs -name "*.so" | wc -l)
           if [ "$SO_COUNT" -eq 0 ]; then
@@ -224,7 +225,9 @@ jobs:
         working-directory: ${{ env.SDK_DIR }}
         run: |
           cp gradle.properties.example gradle.properties 2>/dev/null || true
-          echo "runanywhere.useLocalLibs=true" >> gradle.properties
+          # NOTE: We do NOT set testLocal=true here. Instead:
+          # - testLocal=false (default) uses build/jniLibs/ as source dir
+          # - downloadJniLibs task will skip because libs already exist (CI copied them)
           echo "version=${{ steps.version.outputs.version }}" >> gradle.properties
 
       - name: Build SDK
@@ -262,15 +265,93 @@ jobs:
           retention-days: 30
 
   # ===========================================================================
+  # Publish to GitHub Packages (Maven)
+  # ===========================================================================
+  publish-maven:
+    name: Publish to GitHub Packages
+    needs: build-sdk
+    if: inputs.dry_run != true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Download Native Libraries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-libs-*
+          path: native-artifacts
+          merge-multiple: false
+
+      - name: Setup Native Libraries
+        run: |
+          mkdir -p ${{ env.SDK_DIR }}/build/jniLibs
+          for artifact_dir in native-artifacts/native-libs-*/; do
+            if [ -d "$artifact_dir" ]; then
+              for abi_dir in "${artifact_dir}"unified/*/; do
+                if [ -d "$abi_dir" ]; then
+                  abi=$(basename "$abi_dir")
+                  mkdir -p "${{ env.SDK_DIR }}/build/jniLibs/${abi}"
+                  find "$abi_dir" -name "*.so" -exec cp {} "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" \;
+                fi
+              done
+              for abi_dir in "${artifact_dir}"llamacpp/*/; do
+                if [ -d "$abi_dir" ]; then
+                  abi=$(basename "$abi_dir")
+                  mkdir -p "${{ env.SDK_DIR }}/build/jniLibs/${abi}"
+                  find "$abi_dir" -name "*.so" -exec cp {} "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" \;
+                fi
+              done
+              for abi_dir in "${artifact_dir}"onnx/*/; do
+                if [ -d "$abi_dir" ]; then
+                  abi=$(basename "$abi_dir")
+                  mkdir -p "${{ env.SDK_DIR }}/build/jniLibs/${abi}"
+                  find "$abi_dir" -name "*.so" -exec cp {} "${{ env.SDK_DIR }}/build/jniLibs/${abi}/" \;
+                fi
+              done
+            fi
+          done
+          echo "✅ Native libraries setup complete"
+          find ${{ env.SDK_DIR }}/build/jniLibs -name "*.so" | wc -l
+
+      - name: Setup Gradle Properties
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          cp gradle.properties.example gradle.properties 2>/dev/null || true
+          # NOTE: testLocal=false (default) - downloadJniLibs will skip since libs exist
+          echo "version=${{ needs.build-sdk.outputs.version }}" >> gradle.properties
+
+      - name: Publish to GitHub Packages
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          chmod +x gradlew
+          ./gradlew publish --no-daemon
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SDK_VERSION: ${{ needs.build-sdk.outputs.version }}
+
+  # ===========================================================================
   # Publish Release
   # ===========================================================================
   publish:
     name: Publish Kotlin SDK Release
-    needs: build-sdk
+    needs: [build-sdk, publish-maven]
     # Skip if dry_run or skip_publish (for unified release)
     if: |
+      always() &&
       inputs.dry_run != true &&
       inputs.skip_publish != true &&
+      needs.build-sdk.result == 'success' &&
       (
         startsWith(github.ref, 'refs/tags/kotlin-v') ||
         startsWith(github.ref, 'refs/tags/v') ||
@@ -299,20 +380,20 @@ jobs:
         run: |
           VERSION="${{ needs.build-sdk.outputs.version }}"
           mkdir -p release-assets
-          
+
           # Rename and copy artifacts
           for aar in dist/aar/*.aar; do
             if [ -f "$aar" ]; then
               cp "$aar" "release-assets/runanywhere-kotlin-${VERSION}.aar"
             fi
           done
-          
+
           for jar in dist/jvm/*.jar; do
             if [ -f "$jar" ]; then
               cp "$jar" "release-assets/runanywhere-kotlin-jvm-${VERSION}.jar"
             fi
           done
-          
+
           # Generate checksums
           cd release-assets
           for f in *; do
@@ -320,7 +401,7 @@ jobs:
               shasum -a 256 "$f" > "${f}.sha256"
             fi
           done
-          
+
           echo "=== Release Assets ==="
           ls -la
 
@@ -340,11 +421,34 @@ jobs:
 
             **Gradle (Kotlin DSL):**
             ```kotlin
-            // Add to your module's build.gradle.kts
+            // settings.gradle.kts - Add GitHub Packages repository
+            dependencyResolutionManagement {
+                repositories {
+                    google()
+                    mavenCentral()
+                    maven {
+                        url = uri("https://maven.pkg.github.com/RunanywhereAI/runanywhere-sdks")
+                        credentials {
+                            username = providers.gradleProperty("gpr.user").orNull
+                            password = providers.gradleProperty("gpr.token").orNull
+                        }
+                    }
+                }
+            }
+
+            // build.gradle.kts - Add dependencies
             dependencies {
                 implementation("ai.runanywhere:runanywhere-kotlin:${{ needs.build-sdk.outputs.version }}")
+                implementation("ai.runanywhere:runanywhere-llamacpp:${{ needs.build-sdk.outputs.version }}")
+                implementation("ai.runanywhere:runanywhere-onnx:${{ needs.build-sdk.outputs.version }}")
             }
             ```
+
+            > ⚠️ GitHub Packages requires authentication. Add to `~/.gradle/gradle.properties`:
+            > ```
+            > gpr.user=YOUR_GITHUB_USERNAME
+            > gpr.token=YOUR_GITHUB_TOKEN
+            > ```
 
             **Direct AAR:**
             Download `runanywhere-kotlin-${{ needs.build-sdk.outputs.version }}.aar` and add to your `libs/` folder.
@@ -375,4 +479,3 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-

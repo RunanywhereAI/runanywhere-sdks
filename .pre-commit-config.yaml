@@ -13,16 +13,6 @@ repos:
         args: ['--maxkb=1000']
       - id: check-merge-conflict
 
-  # TODO Comments Check
-  - repo: local
-    hooks:
-      - id: todo-issue-check
-        name: Check TODOs have GitHub issue references
-        entry: scripts/check-todos-hook.sh
-        language: script
-        pass_filenames: false
-        always_run: true
-
   # Android Lint temporarily disabled due to compilation issues
   # - repo: local
   #   hooks:

@@ -389,16 +389,38 @@ jobs:
         run: |
           echo "${{ steps.version.outputs.version }}" > ${{ env.SDK_DIR }}/VERSION
 
-      - name: Commit VERSION Update
-        # This step is optional - for tag-triggered releases, VERSION is just metadata
-        # The actual version comes from the git tag
+      - name: Update Package.swift Versions
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          
+          # Update root Package.swift (for external consumers)
+          ROOT_PACKAGE="Package.swift"
+          if [ -f "$ROOT_PACKAGE" ]; then
+            echo "Updating root Package.swift with version $VERSION"
+            sed -i 's/let commonsVersion = "[^"]*"/let commonsVersion = "'"$VERSION"'"/' "$ROOT_PACKAGE"
+            sed -i 's/let coreVersion = "[^"]*"/let coreVersion = "'"$VERSION"'"/' "$ROOT_PACKAGE"
+          else
+            echo "Root Package.swift not found, skipping"
+          fi
+          
+          # Update nested Package.swift (for local dev reference)
+          NESTED_PACKAGE="${{ env.SDK_DIR }}/Package.swift"
+          if [ -f "$NESTED_PACKAGE" ]; then
+            echo "Updating nested Package.swift with version $VERSION"
+            sed -i 's/let commonsVersion = "[^"]*"/let commonsVersion = "'"$VERSION"'"/' "$NESTED_PACKAGE"
+            sed -i 's/let coreVersion = "[^"]*"/let coreVersion = "'"$VERSION"'"/' "$NESTED_PACKAGE"
+          else
+            echo "Nested Package.swift not found, skipping"
+          fi
+
+      - name: Commit Version Updates
         continue-on-error: true
         if: github.event.inputs.dry_run != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          git add ${{ env.SDK_DIR }}/VERSION || true
+          git add ${{ env.SDK_DIR }}/VERSION Package.swift ${{ env.SDK_DIR }}/Package.swift || true
           
           if git diff --staged --quiet; then
             echo "No changes to commit"

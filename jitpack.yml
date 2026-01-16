@@ -1,0 +1,29 @@
+# JitPack build configuration for RunAnywhere Kotlin SDK
+# https://jitpack.io/docs/BUILDING/
+#
+# The Kotlin SDK is in subdirectory: sdk/runanywhere-kotlin/
+# Build all modules (main SDK + LlamaCPP + ONNX backends)
+#
+# IMPORTANT: For Android libraries, we must:
+# 1. Set up Android SDK
+# 2. Build Android targets explicitly
+# 3. Download native libs before building
+
+jdk:
+  - openjdk17
+
+# Install Android SDK (required for AAR builds)
+before_install:
+  - chmod +x sdk/runanywhere-kotlin/gradlew
+  - export ANDROID_HOME=$HOME/android-sdk
+  - mkdir -p $ANDROID_HOME/cmdline-tools
+  - wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O /tmp/cmdline-tools.zip
+  - unzip -q /tmp/cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools
+  - mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
+  - yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
+  - $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-35" "build-tools;35.0.0" > /dev/null
+
+install:
+  - export ANDROID_HOME=$HOME/android-sdk
+  - export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+  - cd sdk/runanywhere-kotlin && ./gradlew downloadJniLibs publishToMavenLocal -Prunanywhere.testLocal=false --no-daemon
