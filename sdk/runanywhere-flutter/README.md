@@ -621,46 +621,66 @@ await RunAnywhere.deleteStoredModel('old-model-id');
 
 ---
 
-## Contributing
+## Local Development & Contributing
 
-Contributions are welcome. The easiest way to get started is to run the Flutter sample app with local SDK changes.
+Contributions are welcome. This section explains how to set up your development environment to build the SDK from source and test your changes with the sample app.
 
-### First-Time Setup
+### Prerequisites
+
+- **Flutter** 3.10.0 or later
+- **Xcode** 14+ (for iOS builds)
+- **Android Studio** with NDK (for Android builds)
+- **CMake** 3.21+
+
+### First-Time Setup (Build from Source)
+
+The SDK depends on native C++ libraries from `runanywhere-commons`. The setup script builds these locally so you can develop and test the SDK end-to-end.
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
-cd runanywhere-sdks
+cd runanywhere-sdks/sdk/runanywhere-flutter
 
-# 2. Run first-time setup (builds all native libraries)
-# This downloads dependencies and builds:
-#   - RACommons (core infrastructure)
-#   - RABackendLLAMACPP (LLM backend)
-#   - RABackendONNX (STT/TTS/VAD backend)
-cd sdk/runanywhere-flutter
+# 2. Run first-time setup (~10-20 minutes)
 ./scripts/build-flutter.sh --setup
 
-# 3. Bootstrap Flutter packages (if melos is installed)
-melos bootstrap
+# 3. Bootstrap Flutter packages
+melos bootstrap   # If melos is installed
 # OR manually:
 cd packages/runanywhere && flutter pub get && cd ..
 cd packages/runanywhere_llamacpp && flutter pub get && cd ..
 cd packages/runanywhere_onnx && flutter pub get && cd ..
 ```
 
-> **Note:** First-time setup takes 10–20 minutes depending on your machine and internet speed.
+**What the setup script does:**
+1. Downloads dependencies (ONNX Runtime, Sherpa-ONNX)
+2. Builds `RACommons.xcframework` and JNI libraries
+3. Builds `RABackendLLAMACPP` (LLM backend)
+4. Builds `RABackendONNX` (STT/TTS/VAD backend)
+5. Copies frameworks to `ios/Frameworks/` and JNI libs to `android/src/main/jniLibs/`
+6. Creates `.testlocal` marker files (enables local library consumption)
+
+### Understanding testLocal
+
+The SDK has two modes:
+
+| Mode | Description |
+|------|-------------|
+| **Local** | Uses frameworks/JNI libs from package directories (for development) |
+| **Remote** | Downloads from GitHub releases during `pod install`/Gradle sync (for end users) |
+
+When you run `--setup`, the script automatically enables local mode via:
+- **iOS**: `.testlocal` marker files in `ios/` directories
+- **Android**: `testLocal = true` in `binary_config.gradle` files
 
 ### Testing with the Flutter Sample App
 
-The best way to test SDK changes is with the Flutter sample app:
+The recommended way to test SDK changes is with the sample app:
 
 ```bash
-# 1. Ensure SDK is built (from previous step)
-cd sdk/runanywhere-flutter
-./scripts/build-flutter.sh --setup --ios  # For iOS
-./scripts/build-flutter.sh --setup --android  # For Android
+# 1. Ensure SDK is set up (from previous step)
 
-# 2. Open the sample app
+# 2. Navigate to the sample app
 cd ../../examples/flutter/RunAnywhereAI
 
 # 3. Install dependencies
@@ -674,33 +694,40 @@ flutter run
 flutter run
 ```
 
-The sample app demonstrates all SDK features:
-- AI Chat with streaming
-- Speech-to-Text transcription
-- Text-to-Speech synthesis
-- Voice Assistant pipeline
-- Model management
+You can open the sample app in **Android Studio** or **VS Code** for development.
 
-### After Making Changes to runanywhere-commons
+The sample app's `pubspec.yaml` uses path dependencies to reference the local SDK packages:
 
-If you modify the C++ commons layer:
+```
+Sample App → Local Flutter SDK Packages → Local Frameworks/JNI libs
+                                                ↑
+                               Built by build-flutter.sh --setup
+```
+
+### Development Workflow
+
+**After modifying Dart SDK code:**
+- Changes are picked up automatically when you run `flutter run`
+
+**After modifying runanywhere-commons (C++ code):**
 
 ```bash
 cd sdk/runanywhere-flutter
 ./scripts/build-flutter.sh --local --rebuild-commons
 ```
 
-### Build Script Options
+### Build Script Reference
 
 | Command | Description |
 |---------|-------------|
-| `--setup` | First-time setup: downloads deps, builds all libraries |
-| `--local` | Use local libraries from build output |
+| `--setup` | First-time setup: downloads deps, builds all libraries, enables local mode |
+| `--local` | Use local libraries from package directories |
 | `--remote` | Use remote libraries from GitHub releases |
 | `--rebuild-commons` | Rebuild runanywhere-commons from source |
 | `--ios` | Build for iOS only |
 | `--android` | Build for Android only |
 | `--clean` | Clean build artifacts before building |
+| `--abis=ABIS` | Android ABIs to build (default: `arm64-v8a`) |
 
 ### Code Style
 

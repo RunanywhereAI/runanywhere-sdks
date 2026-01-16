@@ -422,74 +422,108 @@ See the [examples/android/RunAnywhereAI](../../examples/android/RunAnywhereAI) d
 
 ---
 
-## Development & Contributing
+## Local Development & Contributing
 
-### First-Time Setup
+This section explains how to set up your development environment to build the SDK from source and test your changes with the sample app.
 
-To develop and test the Kotlin SDK locally, you'll need to:
-1. Build the native C++ libraries from `runanywhere-commons`
-2. Open the Android sample app in Android Studio
-
-#### Prerequisites
+### Prerequisites
 
 - **Android Studio** (latest stable)
 - **Android NDK** (v27+ recommended, installed via Android Studio SDK Manager)
 - **CMake** (installed via Android Studio SDK Manager)
 - **Bash** (macOS/Linux terminal)
 
-#### Step 1: Clone the Repository
+### First-Time Setup (Build from Source)
+
+The SDK depends on native C++ libraries from `runanywhere-commons`. The setup script builds these locally so you can develop and test the SDK end-to-end.
 
 ```bash
+# 1. Clone the repository
 git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
-cd runanywhere-sdks
+cd runanywhere-sdks/sdk/runanywhere-kotlin
+
+# 2. Run first-time setup (~10-15 minutes)
+./scripts/build-kotlin.sh --setup
 ```
 
-#### Step 2: Run First-Time Setup
+**What the setup script does:**
+1. Downloads dependencies (Sherpa-ONNX, ~500MB)
+2. Builds `runanywhere-commons` for Android (arm64-v8a by default)
+3. Copies JNI libraries (`.so` files) to module `jniLibs/` directories
+4. Sets `runanywhere.testLocal=true` in `gradle.properties`
 
-The setup script downloads dependencies (Sherpa-ONNX, etc.), builds the C++ libraries, and copies JNI binaries to the correct locations:
+### Understanding testLocal
+
+The SDK has two modes controlled by `runanywhere.testLocal` in `gradle.properties`:
+
+| Mode | Setting | Description |
+|------|---------|-------------|
+| **Local** | `runanywhere.testLocal=true` | Uses JNI libs from `src/androidMain/jniLibs/` (for development) |
+| **Remote** | `runanywhere.testLocal=false` | Downloads JNI libs from GitHub releases (for end users) |
+
+When you run `--setup`, the script automatically sets `testLocal=true`.
+
+### Testing with the Android Sample App
+
+The recommended way to test SDK changes is with the sample app:
+
+```bash
+# 1. Ensure SDK is set up (from previous step)
+
+# 2. Open Android Studio
+# 3. Select Open → Navigate to examples/android/RunAnywhereAI
+# 4. Wait for Gradle sync to complete
+# 5. Connect an Android device (ARM64 recommended) or emulator
+# 6. Click Run
+```
+
+The sample app's `settings.gradle.kts` references the local SDK via `includeBuild()`, which in turn uses the local JNI libraries. This creates a complete local development loop:
+
+```
+Sample App → Local Kotlin SDK → Local JNI Libraries (jniLibs/)
+                                       ↑
+                          Built by build-kotlin.sh --setup
+```
+
+### Development Workflow
+
+**After modifying Kotlin SDK code:**
+- Rebuild in Android Studio or run `./gradlew assembleDebug`
+
+**After modifying runanywhere-commons (C++ code):**
 
 ```bash
 cd sdk/runanywhere-kotlin
-./scripts/build-kotlin.sh --setup
+./scripts/build-kotlin.sh --local --rebuild-commons
 ```
 
-This will:
-1. Download Sherpa-ONNX and other dependencies (~500MB)
-2. Build `runanywhere-commons` for Android (arm64-v8a)
-3. Copy JNI libraries to module `jniLibs/` directories
-4. Set `runanywhere.testLocal=true` in `gradle.properties`
+### Build Script Reference
 
-> **Note:** First-time setup takes 10-15 minutes depending on your machine.
+| Command | Description |
+|---------|-------------|
+| `--setup` | First-time setup: downloads deps, builds all libs, sets `testLocal=true` |
+| `--local` | Use locally built libs from `jniLibs/` |
+| `--remote` | Use remote libs from GitHub releases |
+| `--rebuild-commons` | Force rebuild of runanywhere-commons |
+| `--clean` | Clean build directories before building |
+| `--abis=ABIS` | ABIs to build (default: `arm64-v8a`, use `arm64-v8a,armeabi-v7a` for 97% device coverage) |
+| `--skip-build` | Skip Gradle build (only setup native libs) |
 
-#### Step 3: Open the Android Sample App
+### Project Structure
 
-The best way to test the Kotlin SDK is via the sample app:
-
-1. Open **Android Studio**
-2. Select **Open** → Navigate to `examples/android/RunAnywhereAI`
-3. Wait for Gradle sync to complete
-4. Connect an Android device (ARM64 recommended) or use an emulator
-5. Click **Run**
-
-The sample app includes the SDK as a local dependency and demonstrates all features (LLM chat, STT, TTS, voice agent).
-
-### Build Commands
-
-```bash
-# First-time setup (downloads + builds everything)
-./scripts/build-kotlin.sh --setup
-
-# Rebuild after C++ code changes
-./scripts/build-kotlin.sh --local --rebuild-commons
-
-# Switch to remote mode (download pre-built libs from GitHub releases)
-./scripts/build-kotlin.sh --remote
-
-# Clean build
-./scripts/build-kotlin.sh --setup --clean
-
-# Build SDK only (skip native lib setup)
-./gradlew assembleDebug
+```
+sdk/runanywhere-kotlin/
+├── src/
+│   ├── commonMain/          # Cross-platform Kotlin code
+│   ├── jvmAndroidMain/      # Shared JVM/Android (JNI bridges)
+│   ├── androidMain/         # Android-specific (jniLibs, platform code)
+│   └── jvmMain/             # Desktop JVM support
+├── modules/
+│   ├── runanywhere-core-llamacpp/   # LLM backend module
+│   └── runanywhere-core-onnx/       # STT/TTS/VAD backend module
+├── scripts/
+│   └── build-kotlin.sh      # Build automation script
+└── gradle.properties        # testLocal flag controls local vs remote libs
 ```
 
 ### Code Quality
@@ -505,23 +539,6 @@ Run linting before submitting PRs:
 
 # Auto-fix formatting issues
 ./gradlew ktlintFormat
-```
-
-### Project Structure for Contributors
-
-```
-sdk/runanywhere-kotlin/
-├── src/
-│   ├── commonMain/          # Cross-platform Kotlin code
-│   ├── jvmAndroidMain/      # Shared JVM/Android (JNI bridges)
-│   ├── androidMain/         # Android-specific (jniLibs, platform code)
-│   └── jvmMain/             # Desktop JVM support
-├── modules/
-│   ├── runanywhere-core-llamacpp/   # LLM backend module
-│   └── runanywhere-core-onnx/       # STT/TTS/VAD backend module
-├── scripts/
-│   └── build-kotlin.sh      # Build automation script
-└── gradle.properties        # testLocal flag controls local vs remote libs
 ```
 
 ### Testing the SDK

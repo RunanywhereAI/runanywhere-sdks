@@ -637,9 +637,9 @@ By default, only anonymous analytics (latency, error rates) are collected. Actua
 
 ---
 
-## Contributing
+## Local Development & Contributing
 
-We welcome contributions to the RunAnywhere Swift SDK. This section explains how to set up your development environment and test your changes.
+We welcome contributions to the RunAnywhere Swift SDK. This section explains how to set up your development environment to build the SDK from source and test your changes with the sample app.
 
 ### Prerequisites
 
@@ -647,68 +647,69 @@ We welcome contributions to the RunAnywhere Swift SDK. This section explains how
 - Xcode 15.2 or later
 - CMake 3.21+ (for building native frameworks)
 
-### First-Time Setup
+### First-Time Setup (Build from Source)
 
-1. **Clone the repository:**
+The SDK depends on native C++ libraries from `runanywhere-commons`. The setup script builds these locally so you can develop and test the SDK end-to-end.
 
-   ```bash
-   git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
-   cd runanywhere-sdks/sdk/runanywhere-swift
-   ```
+```bash
+# 1. Clone the repository
+git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
+cd runanywhere-sdks/sdk/runanywhere-swift
 
-2. **Run the setup script:**
+# 2. Run first-time setup (~5-15 minutes)
+./scripts/build-swift.sh --setup
+```
 
-   This downloads dependencies, builds all native frameworks, and configures the SDK for local development:
+**What the setup script does:**
+1. Downloads dependencies (ONNX Runtime, Sherpa-ONNX)
+2. Builds `RACommons.xcframework` (core infrastructure)
+3. Builds `RABackendLLAMACPP.xcframework` (LLM backend)
+4. Builds `RABackendONNX.xcframework` (STT/TTS/VAD backend)
+5. Copies frameworks to `Binaries/`
+6. Sets `testLocal = true` in Package.swift (enables local framework consumption)
 
-   ```bash
-   ./scripts/build-swift.sh --setup
-   ```
+### Understanding testLocal
 
-   The setup process will:
-   - Download ONNX Runtime and Sherpa-ONNX dependencies
-   - Build `RACommons.xcframework` (core infrastructure)
-   - Build `RABackendLLAMACPP.xcframework` (LLM backend)
-   - Build `RABackendONNX.xcframework` (STT/TTS/VAD backend)
-   - Copy frameworks to `Binaries/`
-   - Ensure `testLocal = true` in the local Package.swift
+The SDK has two modes controlled by `testLocal` in `Package.swift`:
 
-   First-time setup takes approximately 5-15 minutes depending on your machine.
+| Mode | Setting | Description |
+|------|---------|-------------|
+| **Local** | `testLocal = true` | Uses XCFrameworks from `Binaries/` (for development) |
+| **Remote** | `testLocal = false` | Downloads XCFrameworks from GitHub releases (for end users) |
 
-3. **Open the LOCAL SDK package in Xcode:**
+When you run `--setup`, the script automatically sets `testLocal = true`.
 
-   ```bash
-   # IMPORTANT: Open the local Package.swift, NOT the root one
-   open Package.swift
-   ```
+### Testing with the iOS Sample App
 
-   If you encounter package resolution issues, go to **File > Packages > Reset Package Caches**.
+The recommended way to test SDK changes is with the sample app:
 
-> **Note:** The repository has two Package.swift files:
-> - `sdk/runanywhere-swift/Package.swift` - **Use this for local development** (has `testLocal = true`)
-> - `runanywhere-sdks/Package.swift` - For external SPM consumers (downloads from releases)
+```bash
+# 1. Ensure SDK is set up (from previous step)
 
-### Testing with the Sample App
+# 2. Navigate to the sample app
+cd ../../examples/ios/RunAnywhereAI
 
-The iOS/macOS sample app is the recommended way to test SDK changes:
+# 3. Open in Xcode
+open RunAnywhereAI.xcodeproj
 
-1. **Ensure the SDK is set up** (complete the First-Time Setup above)
+# 4. If Xcode shows package errors, reset caches:
+#    File > Packages > Reset Package Caches
 
-2. **Open the sample app:**
+# 5. Build and Run (⌘+R)
+```
 
-   ```bash
-   cd ../../examples/ios/RunAnywhereAI
-   open RunAnywhereAI.xcodeproj
-   ```
+The sample app's `Package.swift` references the local SDK, which in turn uses the local frameworks from `Binaries/`. This creates a complete local development loop:
 
-3. **Reset package caches if needed:** File > Packages > Reset Package Caches
+```
+Sample App → Local Swift SDK → Local XCFrameworks (Binaries/)
+                                      ↑
+                         Built by build-swift.sh --setup
+```
 
-4. **Build and run** on your device or simulator
-
-### Rebuilding After Changes
+### Development Workflow
 
 **After modifying Swift SDK code:**
-
-No rebuild needed. Xcode will pick up the changes automatically.
+- No rebuild needed—Xcode picks up changes automatically
 
 **After modifying runanywhere-commons (C++ code):**
 
@@ -719,19 +720,17 @@ cd sdk/runanywhere-swift
 
 ### Build Script Reference
 
-The `build-swift.sh` script supports the following commands:
-
-| Command           | Description                                               |
-|-------------------|-----------------------------------------------------------|
-| `--setup`         | First-time setup: downloads deps, builds all frameworks   |
-| `--local`         | Use local frameworks from `Binaries/`                     |
-| `--remote`        | Use remote frameworks from GitHub releases                |
-| `--build-commons` | Rebuild runanywhere-commons from source                   |
-| `--clean`         | Clean build artifacts before building                     |
-| `--release`       | Build in release mode (default: debug)                    |
-| `--skip-build`    | Only setup frameworks, skip swift build                   |
-| `--set-local`     | Set `testLocal = true` in Package.swift                   |
-| `--set-remote`    | Set `testLocal = false` in Package.swift                  |
+| Command | Description |
+|---------|-------------|
+| `--setup` | First-time setup: downloads deps, builds all frameworks, sets `testLocal = true` |
+| `--local` | Use local frameworks from `Binaries/` |
+| `--remote` | Use remote frameworks from GitHub releases |
+| `--build-commons` | Rebuild runanywhere-commons from source |
+| `--clean` | Clean build artifacts before building |
+| `--release` | Build in release mode (default: debug) |
+| `--skip-build` | Only setup frameworks, skip swift build |
+| `--set-local` | Set `testLocal = true` in Package.swift |
+| `--set-remote` | Set `testLocal = false` in Package.swift |
 
 ### Running Tests
 

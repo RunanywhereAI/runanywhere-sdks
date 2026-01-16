@@ -15,6 +15,65 @@
 
 ---
 
+## 🚀 Running This App (Local Development)
+
+> **Important:** This sample app consumes the [RunAnywhere Flutter SDK](../../../sdk/runanywhere-flutter/) as local path dependencies. Before opening this project, you must first build the SDK's native libraries.
+
+### First-Time Setup
+
+```bash
+# 1. Navigate to the Flutter SDK directory
+cd runanywhere-sdks/sdk/runanywhere-flutter
+
+# 2. Run the setup script (~10-20 minutes on first run)
+#    This builds the native C++ frameworks/libraries and enables local mode
+./scripts/build-flutter.sh --setup
+
+# 3. Navigate to this sample app
+cd ../../examples/flutter/RunAnywhereAI
+
+# 4. Install dependencies
+flutter pub get
+
+# 5. For iOS: Install pods
+cd ios && pod install && cd ..
+
+# 6. Run the app
+flutter run
+
+# Or open in Android Studio / VS Code and run from there
+```
+
+### How It Works
+
+This sample app's `pubspec.yaml` uses path dependencies to reference the local Flutter SDK packages:
+
+```
+This Sample App → Local Flutter SDK packages (sdk/runanywhere-flutter/packages/)
+                          ↓
+              Local XCFrameworks/JNI libs (in each package's ios/Frameworks/ and android/jniLibs/)
+                          ↑
+           Built by: ./scripts/build-flutter.sh --setup
+```
+
+The `build-flutter.sh --setup` script:
+1. Downloads dependencies (ONNX Runtime, Sherpa-ONNX)
+2. Builds the native C++ libraries from `runanywhere-commons`
+3. Copies XCFrameworks to `packages/*/ios/Frameworks/`
+4. Copies JNI `.so` files to `packages/*/android/src/main/jniLibs/`
+5. Creates `.testlocal` marker files (enables local library consumption)
+
+### After Modifying the SDK
+
+- **Dart SDK code changes**: Run `flutter run` again (hot reload works for most changes)
+- **C++ code changes** (in `runanywhere-commons`):
+  ```bash
+  cd sdk/runanywhere-flutter
+  ./scripts/build-flutter.sh --local --rebuild-commons
+  ```
+
+---
+
 ## See It In Action
 
 <p align="center">
