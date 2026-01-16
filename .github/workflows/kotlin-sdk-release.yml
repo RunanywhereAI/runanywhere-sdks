@@ -225,7 +225,7 @@ jobs:
         working-directory: ${{ env.SDK_DIR }}
         run: |
           cp gradle.properties.example gradle.properties 2>/dev/null || true
-          echo "runanywhere.useLocalLibs=true" >> gradle.properties
+          echo "runanywhere.testLocal=true" >> gradle.properties
           echo "version=${{ steps.version.outputs.version }}" >> gradle.properties
 
       - name: Build SDK
@@ -326,7 +326,7 @@ jobs:
         working-directory: ${{ env.SDK_DIR }}
         run: |
           cp gradle.properties.example gradle.properties 2>/dev/null || true
-          echo "runanywhere.useLocalLibs=true" >> gradle.properties
+          echo "runanywhere.testLocal=true" >> gradle.properties
           echo "version=${{ needs.build-sdk.outputs.version }}" >> gradle.properties
 
       - name: Publish to GitHub Packages
