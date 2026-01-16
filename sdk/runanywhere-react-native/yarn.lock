@@ -1848,15 +1848,15 @@
     rimraf "^3.0.2"
 
 "@runanywhere/core@^0.16.0", "@runanywhere/core@file:/Users/shubhammalhotra/Desktop/test-fresh/runanywhere-sdks/sdk/runanywhere-react-native/packages/core":
-  version "0.16.3"
+  version "0.16.11"
   resolved "file:packages/core"
 
 "@runanywhere/llamacpp@file:/Users/shubhammalhotra/Desktop/test-fresh/runanywhere-sdks/sdk/runanywhere-react-native/packages/llamacpp":
-  version "0.16.1"
+  version "0.16.11"
   resolved "file:packages/llamacpp"
 
 "@runanywhere/onnx@file:/Users/shubhammalhotra/Desktop/test-fresh/runanywhere-sdks/sdk/runanywhere-react-native/packages/onnx":
-  version "0.16.1"
+  version "0.16.11"
   resolved "file:packages/onnx"
 
 "@sideway/address@^4.1.5":
