@@ -271,24 +271,12 @@ sdk/runanywhere-kotlin/modules/runanywhere-llm-llamacpp/src/jvmMain/resources/na
 # REACT NATIVE SDK - Native Binaries (npm publish workflow)
 # =============================================================================
 #
-# The native binaries (.so, .xcframework) contain BAKED-IN CREDENTIALS:
-#   - Supabase URL
-#   - Supabase Anon Key  
-#   - Build Token
-#
-# These credentials are compiled from:
-#   sdk/runanywhere-commons/src/infrastructure/network/development_config.cpp
-#
 # IMPORTANT: Binaries are IGNORED by git but INCLUDED in npm packages.
 #
 # =============================================================================
 # NPM PUBLISH WORKFLOW (follow these steps for each release):
 # =============================================================================
 #
-# 1. FILL IN CREDENTIALS (if not already done):
-#    cp sdk/runanywhere-commons/src/infrastructure/network/development_config.cpp.template \
-#       sdk/runanywhere-commons/src/infrastructure/network/development_config.cpp
-#    # Edit the .cpp file with real Supabase URL, anon key, and build token
 #
 # 2. REBUILD NATIVE BINARIES with credentials baked in:
 #    cd sdk/runanywhere-commons
