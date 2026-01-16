@@ -288,11 +288,28 @@ tasks.named<Jar>("jvmJar") {
 // Publishing Configuration
 // =============================================================================
 
+// Use JitPack-compatible group when building on JitPack
+val isJitPack = System.getenv("JITPACK") == "true"
+group = if (isJitPack) "com.github.RunanywhereAI.runanywhere-sdks" else "com.runanywhere.sdk"
+// Version: SDK_VERSION (our CI), VERSION (JitPack), or fallback
+version = System.getenv("SDK_VERSION")?.removePrefix("v")
+    ?: System.getenv("VERSION")?.removePrefix("v")
+    ?: "0.1.5-SNAPSHOT"
+
 publishing {
     publications.withType<MavenPublication> {
+        // Use different artifact IDs to avoid conflicts between KMP publications
+        artifactId = when (name) {
+            "kotlinMultiplatform" -> "runanywhere-onnx"
+            "androidRelease" -> "runanywhere-onnx-android"
+            "androidDebug" -> "runanywhere-onnx-android-debug"
+            "jvm" -> "runanywhere-onnx-jvm"
+            else -> "runanywhere-onnx-$name"
+        }
+
         pom {
-            name.set("RunAnywhere Core ONNX Module")
-            description.set("ONNX Runtime backend for RunAnywhere SDK - STT, TTS, VAD (~25MB native libs)")
+            name.set("RunAnywhere ONNX Backend")
+            description.set("ONNX Runtime backend for RunAnywhere SDK - STT, TTS, VAD")
             url.set("https://github.com/RunanywhereAI/runanywhere-sdks")
 
             licenses {
@@ -316,5 +333,24 @@ publishing {
                 url.set("https://github.com/RunanywhereAI/runanywhere-sdks")
             }
         }
+    }
+
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/RunanywhereAI/runanywhere-sdks")
+            credentials {
+                username = project.findProperty("gpr.user") as String? ?: System.getenv("GITHUB_ACTOR")
+                password = project.findProperty("gpr.token") as String? ?: System.getenv("GITHUB_TOKEN")
+            }
+        }
+    }
+}
+
+// Disable JVM and debug publications - only publish Android release and metadata
+tasks.withType<PublishToMavenRepository>().configureEach {
+    onlyIf {
+        val dominated = publication.name in listOf("jvm", "androidDebug")
+        !dominated
     }
 }

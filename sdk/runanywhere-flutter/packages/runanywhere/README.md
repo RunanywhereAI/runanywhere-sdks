@@ -56,7 +56,7 @@ post_install do |installer|
 end
 ```
 
-> ⚠️ **Without `use_frameworks! :linkage => :static`, you will see "symbol not found" errors at runtime.**
+> **Important:** Without `use_frameworks! :linkage => :static`, you will see "symbol not found" errors at runtime.
 
 ### 2. Update `ios/Runner/Info.plist`
 
@@ -131,7 +131,14 @@ print(result.text);
 
 ## Documentation
 
-For full documentation: [runanywhere.ai](https://runanywhere.ai)
+- [Full Documentation](https://runanywhere.ai)
+- [Flutter Starter Example](https://github.com/RunanywhereAI/flutter-starter-example)
+
+## Related Packages
+
+- [runanywhere](https://pub.dev/packages/runanywhere) — Core SDK (this package)
+- [runanywhere_llamacpp](https://pub.dev/packages/runanywhere_llamacpp) — LLM backend
+- [runanywhere_onnx](https://pub.dev/packages/runanywhere_onnx) — STT/TTS/VAD backend
 
 ## License
 

@@ -28,7 +28,7 @@ let onnxRuntimeMacOSPath = "\(packageDir)/Binaries/onnxruntime-macos"
 //   3. If needed: File > Packages > Reset Package Caches
 //
 // =============================================================================
-let testLocal = true  // LOCAL: use XCFrameworks from Binaries/ directory
+let testLocal = true  // LOCAL DEV: use XCFrameworks from Binaries/ directory
 
 // Version constants for remote XCFrameworks (must be defined before package)
 // These versions must match the GitHub releases:
