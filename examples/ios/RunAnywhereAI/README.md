@@ -22,6 +22,60 @@
 
 ---
 
+## 🚀 Running This App (Local Development)
+
+> **Important:** This sample app consumes the [RunAnywhere Swift SDK](../../../sdk/runanywhere-swift/) as a local Swift package. Before opening this project, you must first build the SDK's native libraries.
+
+### First-Time Setup
+
+```bash
+# 1. Navigate to the Swift SDK directory
+cd runanywhere-sdks/sdk/runanywhere-swift
+
+# 2. Run the setup script (~5-15 minutes on first run)
+#    This builds the native C++ frameworks and sets testLocal=true
+./scripts/build-swift.sh --setup
+
+# 3. Navigate to this sample app
+cd ../../examples/ios/RunAnywhereAI
+
+# 4. Open in Xcode
+open RunAnywhereAI.xcodeproj
+
+# 5. If Xcode shows package errors, reset caches:
+#    File > Packages > Reset Package Caches
+
+# 6. Build and Run (⌘+R)
+```
+
+### How It Works
+
+This sample app uses `Package.swift` to reference the local Swift SDK:
+
+```
+This Sample App → Local Swift SDK (sdk/runanywhere-swift/)
+                          ↓
+              Local XCFrameworks (sdk/runanywhere-swift/Binaries/)
+                          ↑
+           Built by: ./scripts/build-swift.sh --setup
+```
+
+The `build-swift.sh --setup` script:
+1. Builds the native C++ frameworks from `runanywhere-commons`
+2. Copies them to `sdk/runanywhere-swift/Binaries/`
+3. Sets `testLocal = true` in the SDK's `Package.swift`
+
+### After Modifying the SDK
+
+- **Swift SDK code changes**: Xcode picks them up automatically
+- **C++ code changes** (in `runanywhere-commons`):
+  ```bash
+  cd sdk/runanywhere-swift
+  ./scripts/build-swift.sh --local --build-commons
+  ```
+
+---
+
 ## Try It Now
 
 <p align="center">

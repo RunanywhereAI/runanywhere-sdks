@@ -570,59 +570,60 @@ await RunAnywhere.cleanTempFiles();
 
 ---
 
-## Contributing
+## Local Development & Contributing
 
-Contributions are welcome. The easiest way to get started is to run the React Native sample app with local SDK changes.
+Contributions are welcome. This section explains how to set up your development environment to build the SDK from source and test your changes with the sample app.
 
-### First-Time Setup
+### Prerequisites
+
+- **Node.js** 18+
+- **Xcode** 15+ (for iOS builds)
+- **Android Studio** with NDK (for Android builds)
+- **CMake** 3.21+
+
+### First-Time Setup (Build from Source)
+
+The SDK depends on native C++ libraries from `runanywhere-commons`. The setup script builds these locally so you can develop and test the SDK end-to-end.
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
-cd runanywhere-sdks
+cd runanywhere-sdks/sdk/runanywhere-react-native
 
-# 2. Navigate to the React Native SDK
-cd sdk/runanywhere-react-native
-
-# 3. Run first-time setup (builds native frameworks and installs dependencies)
-# This downloads dependencies and builds:
-#   - RACommons (core infrastructure)
-#   - RABackendLLAMACPP (LLM backend)
-#   - RABackendONNX (STT/TTS/VAD backend)
+# 2. Run first-time setup (~15-20 minutes)
 ./scripts/build-react-native.sh --setup
 
-# 4. Install JavaScript dependencies
+# 3. Install JavaScript dependencies
 yarn install
 ```
 
-First-time setup takes 10-20 minutes depending on your machine (mostly building C++ native code). After that, incremental builds are faster.
+**What the setup script does:**
+1. Downloads dependencies (ONNX Runtime, Sherpa-ONNX)
+2. Builds `RACommons.xcframework` and JNI libraries
+3. Builds `RABackendLLAMACPP` (LLM backend)
+4. Builds `RABackendONNX` (STT/TTS/VAD backend)
+5. Copies frameworks to `ios/Binaries/` and JNI libs to `android/src/main/jniLibs/`
+6. Creates `.testlocal` marker files (enables local library consumption)
 
-### Testing with the Sample App
+### Understanding testLocal
 
-- **iOS**: Downloaded during `pod install` via the podspec's `prepare_command`
-- **Android**: Downloaded during Gradle's `preBuild` phase via `downloadNativeLibs` task
+The SDK has two modes:
 
-The version is controlled by `native-version.txt` in the native package.
+| Mode | Description |
+|------|-------------|
+| **Local** | Uses frameworks/JNI libs from package directories (for development) |
+| **Remote** | Downloads from GitHub releases during `pod install`/Gradle sync (for end users) |
 
-### Local Development (Build from Source)
+When you run `--setup`, the script automatically enables local mode via:
+- **iOS**: `.testlocal` marker files in `ios/` directories
+- **Android**: `RA_TEST_LOCAL=1` environment variable or `runanywhere.testLocal=true` in `gradle.properties`
 
-To build native libraries locally and test the SDK end-to-end:
+### Testing with the React Native Sample App
+
+The recommended way to test SDK changes is with the sample app:
 
 ```bash
-# First-time setup (builds iOS + Android native libs)
-./scripts/build-react-native.sh --setup
-```
-
-See `./scripts/build-react-native.sh --help` for all options.
-
-### Build Commands
-
-The best way to test SDK changes is with the React Native sample app:
-
-```bash
-# 1. Ensure SDK is built (from previous step)
-cd sdk/runanywhere-react-native
-./scripts/build-react-native.sh --setup
+# 1. Ensure SDK is set up (from previous step)
 
 # 2. Navigate to the sample app
 cd ../../examples/react-native/RunAnywhereAI
@@ -638,49 +639,50 @@ npx react-native run-ios
 npx react-native run-android
 ```
 
-The sample app demonstrates the SDK features:
-- AI Chat with streaming
-- Speech-to-Text transcription
-- Text-to-Speech synthesis
-- Voice Assistant pipeline
-- Model management
+You can open the sample app in **VS Code** or **Cursor** for development.
 
-### After Making Changes to runanywhere-commons (C++ Core)
+The sample app's `package.json` uses workspace dependencies to reference the local SDK packages:
 
-If you modify the C++ commons layer:
+```
+Sample App → Local RN SDK Packages → Local Frameworks/JNI libs
+                                           ↑
+                          Built by build-react-native.sh --setup
+```
+
+### Development Workflow
+
+**After modifying TypeScript SDK code:**
+
+```bash
+# Type check all packages
+yarn typecheck
+
+# Run ESLint
+yarn lint
+
+# Build all packages
+yarn build
+```
+
+**After modifying runanywhere-commons (C++ code):**
 
 ```bash
 cd sdk/runanywhere-react-native
 ./scripts/build-react-native.sh --local --rebuild-commons
 ```
 
-### Build Script Options
+### Build Script Reference
 
 | Command | Description |
 |---------|-------------|
-| `--setup` | First-time setup: downloads deps, builds all frameworks |
-| `--local` | Use local frameworks from built output |
+| `--setup` | First-time setup: downloads deps, builds all frameworks, enables local mode |
+| `--local` | Use local frameworks from package directories |
 | `--remote` | Use remote frameworks from GitHub releases |
 | `--rebuild-commons` | Rebuild runanywhere-commons from source |
 | `--ios` | Build for iOS only |
 | `--android` | Build for Android only |
 | `--clean` | Clean build artifacts before building |
-
-### Development Workflow
-
-```bash
-# After making TypeScript changes
-yarn typecheck  # Type check all packages
-yarn lint       # Run ESLint
-yarn build      # Build all packages
-
-# After making native changes
-./scripts/build-react-native.sh --local --rebuild-commons
-
-# Run tests in sample app
-cd examples/react-native/RunAnywhereAI
-npm run ios  # or android
-```
+| `--abis=ABIS` | Android ABIs to build (default: `arm64-v8a`) |
 
 ### Code Style
 

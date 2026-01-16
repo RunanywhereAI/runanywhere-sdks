@@ -25,6 +25,68 @@
 
 ---
 
+## 🚀 Running This App (Local Development)
+
+> **Important:** This sample app consumes the [RunAnywhere React Native SDK](../../../sdk/runanywhere-react-native/) as local workspace dependencies. Before opening this project, you must first build the SDK's native libraries.
+
+### First-Time Setup
+
+```bash
+# 1. Navigate to the React Native SDK directory
+cd runanywhere-sdks/sdk/runanywhere-react-native
+
+# 2. Run the setup script (~15-20 minutes on first run)
+#    This builds the native C++ frameworks/libraries and enables local mode
+./scripts/build-react-native.sh --setup
+
+# 3. Navigate to this sample app
+cd ../../examples/react-native/RunAnywhereAI
+
+# 4. Install dependencies
+npm install
+
+# 5. For iOS: Install pods
+cd ios && pod install && cd ..
+
+# 6a. Run on iOS
+npx react-native run-ios
+
+# 6b. Or run on Android
+npx react-native run-android
+
+# Or open in VS Code / Cursor and run from there
+```
+
+### How It Works
+
+This sample app's `package.json` uses workspace dependencies to reference the local React Native SDK packages:
+
+```
+This Sample App → Local RN SDK packages (sdk/runanywhere-react-native/packages/)
+                          ↓
+              Local XCFrameworks/JNI libs (in each package's ios/ and android/ directories)
+                          ↑
+           Built by: ./scripts/build-react-native.sh --setup
+```
+
+The `build-react-native.sh --setup` script:
+1. Downloads dependencies (ONNX Runtime, Sherpa-ONNX)
+2. Builds the native C++ libraries from `runanywhere-commons`
+3. Copies XCFrameworks to `packages/*/ios/Binaries/` and `packages/*/ios/Frameworks/`
+4. Copies JNI `.so` files to `packages/*/android/src/main/jniLibs/`
+5. Creates `.testlocal` marker files (enables local library consumption)
+
+### After Modifying the SDK
+
+- **TypeScript SDK code changes**: Metro bundler picks them up automatically (Fast Refresh)
+- **C++ code changes** (in `runanywhere-commons`):
+  ```bash
+  cd sdk/runanywhere-react-native
+  ./scripts/build-react-native.sh --local --rebuild-commons
+  ```
+
+---
+
 ## Try It Now
 
 <p align="center">

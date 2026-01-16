@@ -21,6 +21,59 @@
 
 ---
 
+## 🚀 Running This App (Local Development)
+
+> **Important:** This sample app consumes the [RunAnywhere Kotlin SDK](../../../sdk/runanywhere-kotlin/) as a local Gradle included build. Before opening this project, you must first build the SDK's native libraries.
+
+### First-Time Setup
+
+```bash
+# 1. Navigate to the Kotlin SDK directory
+cd runanywhere-sdks/sdk/runanywhere-kotlin
+
+# 2. Run the setup script (~10-15 minutes on first run)
+#    This builds the native C++ JNI libraries and sets testLocal=true
+./scripts/build-kotlin.sh --setup
+
+# 3. Open this sample app in Android Studio
+#    File > Open > examples/android/RunAnywhereAI
+
+# 4. Wait for Gradle sync to complete
+
+# 5. Connect an Android device (ARM64 recommended) or use an emulator
+
+# 6. Click Run
+```
+
+### How It Works
+
+This sample app uses `settings.gradle.kts` with `includeBuild()` to reference the local Kotlin SDK:
+
+```
+This Sample App → Local Kotlin SDK (sdk/runanywhere-kotlin/)
+                          ↓
+              Local JNI Libraries (sdk/runanywhere-kotlin/src/androidMain/jniLibs/)
+                          ↑
+           Built by: ./scripts/build-kotlin.sh --setup
+```
+
+The `build-kotlin.sh --setup` script:
+1. Downloads dependencies (Sherpa-ONNX, ~500MB)
+2. Builds the native C++ libraries from `runanywhere-commons`
+3. Copies JNI `.so` files to `sdk/runanywhere-kotlin/src/androidMain/jniLibs/`
+4. Sets `runanywhere.testLocal=true` in `gradle.properties`
+
+### After Modifying the SDK
+
+- **Kotlin SDK code changes**: Rebuild in Android Studio or run `./gradlew assembleDebug`
+- **C++ code changes** (in `runanywhere-commons`):
+  ```bash
+  cd sdk/runanywhere-kotlin
+  ./scripts/build-kotlin.sh --local --rebuild-commons
+  ```
+
+---
+
 ## Try It Now
 
 <p align="center">
