@@ -82,25 +82,25 @@ val rebuildCommons: Boolean =
         ?: project.findProperty("runanywhere.rebuildCommons")?.toString()?.toBoolean()
         ?: false
 
-// Version constants for remote downloads (mirrors Swift's Package.swift)
-// These should match the releases at:
-// - https://github.com/RunanywhereAI/runanywhere-sdks/releases (Android JNI libs for backends)
-// - https://github.com/RunanywhereAI/runanywhere-sdks/releases (Android JNI libs for commons)
-// IMPORTANT: Check rootProject first to support composite builds
-// Version defaults must match GitHub releases:
-// - Commons: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/commons-v{commonsVersion}
-// - Backends: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/core-v{coreVersion}
-val coreVersion: String =
-    rootProject.findProperty("runanywhere.coreVersion")?.toString()
-        ?: project.findProperty("runanywhere.coreVersion")?.toString()
-        ?: "0.1.4"
-val commonsVersion: String =
-    rootProject.findProperty("runanywhere.commonsVersion")?.toString()
-        ?: project.findProperty("runanywhere.commonsVersion")?.toString()
-        ?: "0.1.4"
+// =============================================================================
+// Native Library Version for Downloads
+// =============================================================================
+// When testLocal=false, native libraries are downloaded from GitHub unified releases.
+// The native lib version should match the SDK version for consistency.
+// Format: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/v{version}
+//
+// Assets per ABI:
+//   - RACommons-android-{abi}-v{version}.zip
+//   - RABackendLLAMACPP-android-{abi}-v{version}.zip
+//   - RABackendONNX-android-{abi}-v{version}.zip
+// =============================================================================
+val nativeLibVersion: String =
+    rootProject.findProperty("runanywhere.nativeLibVersion")?.toString()
+        ?: project.findProperty("runanywhere.nativeLibVersion")?.toString()
+        ?: resolvedVersion  // Default to SDK version
 
 // Log the build mode
-logger.lifecycle("RunAnywhere SDK: testLocal=$testLocal, coreVersion=$coreVersion")
+logger.lifecycle("RunAnywhere SDK: testLocal=$testLocal, nativeLibVersion=$nativeLibVersion")
 
 // =============================================================================
 // Project Path Resolution
@@ -516,20 +516,20 @@ tasks.register("downloadJniLibs") {
     val outputDir = file("build/jniLibs")
     val tempDir = file("${layout.buildDirectory.get()}/jni-temp")
 
-    // GitHub release URLs
-    val binariesBaseUrl = "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/core-v$coreVersion"
-    val commonsBaseUrl = "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/commons-v$commonsVersion"
+    // GitHub unified release URL - all assets are in one release
+    // Format: https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v{version}/{asset}
+    val releaseBaseUrl = "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v$nativeLibVersion"
 
-    // Packages to download - ORDER MATTERS: Commons first, then backends
-    val packages =
-        listOf(
-            // Commons (RAC infrastructure - must be downloaded first)
-            "$commonsBaseUrl/RACommons-android-v$commonsVersion.zip",
-            // LlamaCPP backend (LLM inference)
-            "$binariesBaseUrl/RABackendLlamaCPP-android-v$coreVersion.zip",
-            // ONNX backend (STT/TTS/VAD)
-            "$binariesBaseUrl/RABackendONNX-android-v$coreVersion.zip",
-        )
+    // ABIs to download - arm64-v8a covers ~85% of devices
+    // Add more ABIs here if needed: "armeabi-v7a", "x86_64"
+    val targetAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+
+    // Package types to download for each ABI
+    val packageTypes = listOf(
+        "RACommons-android",      // Core infrastructure + JNI bridge
+        "RABackendLLAMACPP-android", // LLM inference (llama.cpp)
+        "RABackendONNX-android"   // STT/TTS/VAD (Sherpa ONNX)
+    )
 
     outputs.dir(outputDir)
 
@@ -550,60 +550,56 @@ tasks.register("downloadJniLibs") {
         logger.lifecycle(" Downloading JNI libraries (testLocal=false)")
         logger.lifecycle("═══════════════════════════════════════════════════════════════")
         logger.lifecycle("")
-        logger.lifecycle("Core version: $coreVersion")
-        logger.lifecycle("Commons version: $commonsVersion")
+        logger.lifecycle("Native lib version: v$nativeLibVersion")
+        logger.lifecycle("Target ABIs: ${targetAbis.joinToString(", ")}")
         logger.lifecycle("")
 
         var totalDownloaded = 0
 
-        packages.forEach { zipUrl ->
-            val packageName = zipUrl.substringAfterLast("/")
-            val tempZip = file("$tempDir/$packageName")
+        targetAbis.forEach { abi ->
+            val abiOutputDir = file("$outputDir/$abi")
+            abiOutputDir.mkdirs()
 
-            logger.lifecycle("▶ Downloading: $packageName")
-            logger.lifecycle("  URL: $zipUrl")
+            packageTypes.forEach { packageType ->
+                // Asset naming: {PackageType}-{abi}-v{version}.zip
+                val packageName = "$packageType-$abi-v$nativeLibVersion.zip"
+                val zipUrl = "$releaseBaseUrl/$packageName"
+                val tempZip = file("$tempDir/$packageName")
 
-            try {
-                // Download the zip
-                ant.withGroovyBuilder {
-                    "get"("src" to zipUrl, "dest" to tempZip, "verbose" to false)
-                }
+                logger.lifecycle("▶ Downloading: $packageName")
 
-                // Extract to temp directory
-                val extractDir = file("$tempDir/extracted-${packageName.replace(".zip", "")}")
-                extractDir.mkdirs()
-                ant.withGroovyBuilder {
-                    "unzip"("src" to tempZip, "dest" to extractDir)
-                }
+                try {
+                    // Download the zip
+                    ant.withGroovyBuilder {
+                        "get"("src" to zipUrl, "dest" to tempZip, "verbose" to false)
+                    }
 
-                // Copy all .so files from ABI directories
-                extractDir
-                    .walkTopDown()
-                    .filter { it.isDirectory && it.name in listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86") }
-                    .forEach { abiDir ->
-                        val targetAbiDir = file("$outputDir/${abiDir.name}")
-                        targetAbiDir.mkdirs()
+                    // Extract to temp directory
+                    val extractDir = file("$tempDir/extracted-${packageName.replace(".zip", "")}")
+                    extractDir.mkdirs()
+                    ant.withGroovyBuilder {
+                        "unzip"("src" to tempZip, "dest" to extractDir)
+                    }
 
-                        abiDir.listFiles()?.filter { it.extension == "so" }?.forEach { soFile ->
-                            val targetFile = file("$targetAbiDir/${soFile.name}")
+                    // Copy all .so files (they may be in subdirectories like jni/, onnx/, llamacpp/)
+                    extractDir.walkTopDown()
+                        .filter { it.extension == "so" }
+                        .forEach { soFile ->
+                            val targetFile = file("$abiOutputDir/${soFile.name}")
                             if (!targetFile.exists()) {
                                 soFile.copyTo(targetFile, overwrite = true)
-                                logger.lifecycle("    ✓ ${abiDir.name}/${soFile.name}")
+                                logger.lifecycle("  ✓ ${soFile.name}")
                                 totalDownloaded++
                             }
                         }
-                    }
 
-                // Clean up temp zip
-                tempZip.delete()
-
-                logger.lifecycle("  ✓ $packageName extracted")
-                logger.lifecycle("")
-            } catch (e: Exception) {
-                logger.warn("  ⚠ Failed to download $packageName: ${e.message}")
-                logger.warn("    URL: $zipUrl")
-                logger.lifecycle("")
+                    // Clean up temp zip
+                    tempZip.delete()
+                } catch (e: Exception) {
+                    logger.warn("  ⚠ Failed to download $packageName: ${e.message}")
+                }
             }
+            logger.lifecycle("")
         }
 
         // Clean up temp directory
@@ -618,7 +614,6 @@ tasks.register("downloadJniLibs") {
         logger.lifecycle("  ABIs: ${abiDirs.joinToString(", ")}")
         logger.lifecycle("  Output: $outputDir")
         logger.lifecycle("═══════════════════════════════════════════════════════════════")
-        logger.lifecycle("")
 
         // List libraries per ABI
         abiDirs.forEach { abi ->
