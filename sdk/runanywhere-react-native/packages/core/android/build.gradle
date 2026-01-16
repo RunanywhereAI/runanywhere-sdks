@@ -1,3 +1,39 @@
+// =============================================================================
+// Node Binary Detection for Android Studio Compatibility
+// Android Studio doesn't inherit terminal PATH, so we need to find node explicitly
+// =============================================================================
+def findNodeBinary() {
+    // Check local.properties first (user can override)
+    def localProperties = new Properties()
+    def localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.withInputStream { localProperties.load(it) }
+        def nodePath = localProperties.getProperty("node.path")
+        if (nodePath && new File(nodePath).exists()) {
+            return nodePath
+        }
+    }
+    
+    // Check common node installation paths
+    def homeDir = System.getProperty("user.home")
+    def nodePaths = [
+        "/opt/homebrew/bin/node",                    // macOS ARM (Apple Silicon)
+        "/usr/local/bin/node",                       // macOS Intel / Linux
+        "/usr/bin/node",                             // Linux system
+        "${homeDir}/.nvm/current/bin/node",          // nvm
+        "${homeDir}/.volta/bin/node",                // volta
+        "${homeDir}/.asdf/shims/node"                // asdf
+    ]
+    for (path in nodePaths) {
+        if (new File(path).exists()) {
+            return path
+        }
+    }
+    
+    // Fallback to 'node' (works if PATH is set correctly in terminal builds)
+    return "node"
+}
+
 def getExtOrDefault(name) {
     return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties['RunAnywhereCore_' + name]
 }
@@ -11,6 +47,21 @@ apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 apply from: '../nitrogen/generated/android/runanywherecore+autolinking.gradle'
 apply plugin: 'com.facebook.react'
+
+// Configure node path for Android Studio builds
+// Set the react extension's nodeExecutableAndArgs after plugin is applied
+def nodeBinary = findNodeBinary()
+logger.lifecycle("[RunAnywhereCore] Using node binary: ${nodeBinary}")
+
+// Configure all codegen tasks to use the detected node binary
+afterEvaluate {
+    tasks.withType(com.facebook.react.tasks.GenerateCodegenSchemaTask).configureEach {
+        nodeExecutableAndArgs.set([nodeBinary])
+    }
+    tasks.withType(com.facebook.react.tasks.GenerateCodegenArtifactsTask).configureEach {
+        nodeExecutableAndArgs.set([nodeBinary])
+    }
+}
 
 def getExtOrIntegerDefault(name) {
     if (rootProject.ext.has(name)) {
@@ -68,7 +119,9 @@ android {
         externalNativeBuild {
             cmake {
                 cppFlags "-frtti -fexceptions -Wall -fstack-protector-all"
-                arguments "-DANDROID_STL=c++_shared"
+                arguments "-DANDROID_STL=c++_shared",
+                          // Fix NitroModules prefab path - use app's build directory
+                          "-DREACT_NATIVE_NITRO_BUILD_DIR=${rootProject.buildDir}"
                 abiFilters 'arm64-v8a'
             }
         }
@@ -164,6 +217,14 @@ task downloadNativeLibs {
     doLast {
         if (useLocalBuild) {
             logger.lifecycle("[RunAnywhereCore] Skipping download - using local build mode")
+            return
+        }
+
+        // Check if libs are already bundled (npm install case)
+        def bundledLibsDir = file("${jniLibsDir}/arm64-v8a")
+        def bundledLibs = bundledLibsDir.exists() ? bundledLibsDir.listFiles()?.findAll { it.name.endsWith(".so") } : []
+        if (bundledLibs?.size() > 0) {
+            logger.lifecycle("[RunAnywhereCore] ✅ Using bundled native libraries from npm package (${bundledLibs.size()} .so files)")
             return
         }
 
@@ -294,15 +355,18 @@ if (!useLocalBuild) {
     }
 }
 
+// NOTE: cleanNativeLibs is NOT attached to clean task because npm-bundled libs should persist
+// Only use this task manually when needed during development
 task cleanNativeLibs(type: Delete) {
-    description = "Removes downloaded native libraries"
+    description = "Removes downloaded native libraries (use manually, not during normal clean)"
     group = "build"
-    delete jniLibsDir
     delete downloadedLibsDir
     delete includeDir
+    // DO NOT delete jniLibsDir - it contains npm-bundled libraries
 }
 
-clean.dependsOn cleanNativeLibs
+// DO NOT add: clean.dependsOn cleanNativeLibs
+// This would delete bundled .so files from the npm package
 
 repositories {
     mavenCentral()
