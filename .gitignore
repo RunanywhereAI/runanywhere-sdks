@@ -267,8 +267,63 @@ sdk/runanywhere-kotlin/modules/runanywhere-llm-llamacpp/src/jvmMain/resources/na
 *.dll
 *.a
 
-# EXCEPTION: Include React Native jniLibs .so files (bundled in npm packages)
-!sdk/runanywhere-react-native/packages/*/android/src/main/jniLibs/**/*.so
+# =============================================================================
+# REACT NATIVE SDK - Native Binaries (npm publish workflow)
+# =============================================================================
+#
+# The native binaries (.so, .xcframework) contain BAKED-IN CREDENTIALS:
+#   - Supabase URL
+#   - Supabase Anon Key  
+#   - Build Token
+#
+# These credentials are compiled from:
+#   sdk/runanywhere-commons/src/infrastructure/network/development_config.cpp
+#
+# IMPORTANT: Binaries are IGNORED by git but INCLUDED in npm packages.
+#
+# =============================================================================
+# NPM PUBLISH WORKFLOW (follow these steps for each release):
+# =============================================================================
+#
+# 1. FILL IN CREDENTIALS (if not already done):
+#    cp sdk/runanywhere-commons/src/infrastructure/network/development_config.cpp.template \
+#       sdk/runanywhere-commons/src/infrastructure/network/development_config.cpp
+#    # Edit the .cpp file with real Supabase URL, anon key, and build token
+#
+# 2. REBUILD NATIVE BINARIES with credentials baked in:
+#    cd sdk/runanywhere-commons
+#    ./scripts/build-android.sh all arm64-v8a    # Android
+#    ./scripts/build-ios.sh --skip-backends       # iOS (RACommons only)
+#
+# 3. COPY BINARIES to React Native packages:
+#    # Android
+#    cp build/android/unified/arm64-v8a/librac_commons.so \
+#       ../runanywhere-react-native/packages/core/android/src/main/jniLibs/arm64-v8a/
+#
+#    # iOS  
+#    rm -rf ../runanywhere-react-native/packages/core/ios/Frameworks/RACommons.xcframework
+#    cp -R dist/RACommons.xcframework \
+#       ../runanywhere-react-native/packages/core/ios/Frameworks/
+#
+# 4. VERIFY credentials are baked in:
+#    strings sdk/runanywhere-react-native/packages/core/android/src/main/jniLibs/arm64-v8a/librac_commons.so | grep supabase
+#    # Should show your Supabase URL, NOT "YOUR_SUPABASE_PROJECT_URL"
+#
+# 5. PUBLISH to npm (binaries will be included in tarball):
+#    cd sdk/runanywhere-react-native/packages/core
+#    npm version patch && npm publish
+#    # Repeat for llamacpp and onnx packages
+#
+# 6. BINARIES stay git-ignored (never commit to GitHub)
+#    The .so and .xcframework files only live in:
+#    - Your local machine (for building)
+#    - npm registry (published packages)
+#
+# =============================================================================
+
+# React Native native binaries (git-ignored, npm-included)
+sdk/runanywhere-react-native/packages/*/android/src/main/jniLibs/
+sdk/runanywhere-react-native/packages/*/ios/Frameworks/*.xcframework
 
 # Backup directories
 examples/android/RunAnywhereAI/app/src/main/cpp/llama.cpp.backup/
