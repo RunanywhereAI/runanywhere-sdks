@@ -733,20 +733,20 @@ publishing {
     }
 
     repositories {
-        // Maven Central (Sonatype Central Portal)
+        // Maven Central (Sonatype Central Portal - new API)
         maven {
             name = "MavenCentral"
-            url = uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/")
+            url = uri("https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/")
             credentials {
                 username = mavenCentralUsername
                 password = mavenCentralPassword
             }
         }
 
-        // Sonatype Snapshots
+        // Sonatype Snapshots (Central Portal)
         maven {
             name = "SonatypeSnapshots"
-            url = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
+            url = uri("https://central.sonatype.com/repository/maven-snapshots/")
             credentials {
                 username = mavenCentralUsername
                 password = mavenCentralPassword
