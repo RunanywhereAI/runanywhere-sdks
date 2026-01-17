@@ -283,10 +283,10 @@ jobs:
         run: |
           VERSION="${{ needs.setup.outputs.version }}"
           mkdir -p release-assets
-          
+
           echo "=== Looking for artifacts with VERSION=$VERSION ==="
           echo ""
-          
+
           # List what we're looking for vs what exists
           echo "Expected: all-artifacts/racommons-ios-$VERSION"
           ls -la "all-artifacts/racommons-ios-$VERSION" 2>&1 || echo "NOT FOUND"
@@ -297,21 +297,37 @@ jobs:
           echo "Expected: all-artifacts/backend-onnx-ios-$VERSION"
           ls -la "all-artifacts/backend-onnx-ios-$VERSION" 2>&1 || echo "NOT FOUND"
           echo ""
-          
+
           # ─────────────────────────────────────────────────────────────
           # RACommons
           # ─────────────────────────────────────────────────────────────
-          # iOS
+          # iOS - Find XCFramework and zip it at root level for SPM compatibility
           if [ -d "all-artifacts/racommons-ios-$VERSION" ]; then
             echo "✅ Found racommons-ios-$VERSION, creating zip..."
-            cd "all-artifacts/racommons-ios-$VERSION"
-            zip -r "../../release-assets/RACommons-ios-v${VERSION}.zip" .
-            cd ../..
-            echo "Created: RACommons-ios-v${VERSION}.zip"
+            COMMONS_DIR="all-artifacts/racommons-ios-$VERSION"
+
+            # Find the RACommons.xcframework (may be nested in dist/ or elsewhere)
+            XCFW_PATH=$(find "$COMMONS_DIR" -name "RACommons.xcframework" -type d | head -1)
+
+            if [ -n "$XCFW_PATH" ] && [ -d "$XCFW_PATH" ]; then
+              echo "Found XCFramework at: $XCFW_PATH"
+              mkdir -p commons-package
+              cp -R "$XCFW_PATH" commons-package/
+              cd commons-package
+              zip -r "../release-assets/RACommons-ios-v${VERSION}.zip" RACommons.xcframework
+              cd ..
+              rm -rf commons-package
+              echo "Created: RACommons-ios-v${VERSION}.zip (XCFramework at root)"
+            else
+              echo "⚠️  XCFramework not found in artifact, zipping entire directory"
+              cd "$COMMONS_DIR"
+              zip -r "../../release-assets/RACommons-ios-v${VERSION}.zip" .
+              cd ../..
+            fi
           else
             echo "❌ racommons-ios-$VERSION NOT FOUND"
           fi
-          
+
           # Android - SPLIT by ABI for smaller downloads
           for abi in arm64-v8a armeabi-v7a x86_64; do
             if [ -d "all-artifacts/racommons-android-${abi}-${VERSION}" ]; then
@@ -320,32 +336,65 @@ jobs:
               cd ../..
             fi
           done
-          
+
           # ─────────────────────────────────────────────────────────────
           # Backend Libraries - ALL SPLIT by ABI
           # ─────────────────────────────────────────────────────────────
-          # LlamaCPP iOS
+          # LlamaCPP iOS - Find XCFramework and zip it at root level for SPM compatibility
           if [ -d "all-artifacts/backend-llamacpp-ios-$VERSION" ]; then
             echo "✅ Found backend-llamacpp-ios-$VERSION, creating zip..."
-            cd "all-artifacts/backend-llamacpp-ios-$VERSION"
-            zip -r "../../release-assets/RABackendLLAMACPP-ios-v${VERSION}.zip" .
-            cd ../..
-            echo "Created: RABackendLLAMACPP-ios-v${VERSION}.zip"
+            LLAMA_DIR="all-artifacts/backend-llamacpp-ios-$VERSION"
+
+            # Find the RABackendLLAMACPP.xcframework (may be nested in dist/ or elsewhere)
+            XCFW_PATH=$(find "$LLAMA_DIR" -name "RABackendLLAMACPP.xcframework" -type d | head -1)
+
+            if [ -n "$XCFW_PATH" ] && [ -d "$XCFW_PATH" ]; then
+              echo "Found XCFramework at: $XCFW_PATH"
+              mkdir -p llama-package
+              cp -R "$XCFW_PATH" llama-package/
+              cd llama-package
+              zip -r "../release-assets/RABackendLLAMACPP-ios-v${VERSION}.zip" RABackendLLAMACPP.xcframework
+              cd ..
+              rm -rf llama-package
+              echo "Created: RABackendLLAMACPP-ios-v${VERSION}.zip (XCFramework at root)"
+            else
+              echo "⚠️  XCFramework not found in artifact, zipping entire directory"
+              cd "$LLAMA_DIR"
+              zip -r "../../release-assets/RABackendLLAMACPP-ios-v${VERSION}.zip" .
+              cd ../..
+            fi
           else
             echo "❌ backend-llamacpp-ios-$VERSION NOT FOUND"
           fi
-          
-          # ONNX iOS
+
+          # ONNX iOS - Find XCFramework and zip it at root level for SPM compatibility
           if [ -d "all-artifacts/backend-onnx-ios-$VERSION" ]; then
             echo "✅ Found backend-onnx-ios-$VERSION, creating zip..."
-            cd "all-artifacts/backend-onnx-ios-$VERSION"
-            zip -r "../../release-assets/RABackendONNX-ios-v${VERSION}.zip" .
-            cd ../..
-            echo "Created: RABackendONNX-ios-v${VERSION}.zip"
+            ONNX_DIR="all-artifacts/backend-onnx-ios-$VERSION"
+
+            # Find the RABackendONNX.xcframework (may be nested in dist/ or elsewhere)
+            XCFW_PATH=$(find "$ONNX_DIR" -name "RABackendONNX.xcframework" -type d | head -1)
+
+            if [ -n "$XCFW_PATH" ] && [ -d "$XCFW_PATH" ]; then
+              echo "Found XCFramework at: $XCFW_PATH"
+              # Create temp directory with correct structure
+              mkdir -p onnx-package
+              cp -R "$XCFW_PATH" onnx-package/
+              cd onnx-package
+              zip -r "../release-assets/RABackendONNX-ios-v${VERSION}.zip" RABackendONNX.xcframework
+              cd ..
+              rm -rf onnx-package
+              echo "Created: RABackendONNX-ios-v${VERSION}.zip (XCFramework at root)"
+            else
+              echo "⚠️  XCFramework not found in artifact, zipping entire directory"
+              cd "$ONNX_DIR"
+              zip -r "../../release-assets/RABackendONNX-ios-v${VERSION}.zip" .
+              cd ../..
+            fi
           else
             echo "❌ backend-onnx-ios-$VERSION NOT FOUND"
           fi
-          
+
           # LlamaCPP Android - SPLIT by ABI
           for abi in arm64-v8a armeabi-v7a x86_64; do
             if [ -d "all-artifacts/backends-android-${abi}-${VERSION}" ]; then
@@ -359,7 +408,7 @@ jobs:
               fi
             fi
           done
-          
+
           # ONNX Android - SPLIT by ABI
           for abi in arm64-v8a armeabi-v7a x86_64; do
             if [ -d "all-artifacts/backends-android-${abi}-${VERSION}" ]; then
@@ -373,7 +422,7 @@ jobs:
               fi
             fi
           done
-          
+
           # ─────────────────────────────────────────────────────────────
           # Swift SDK
           # ─────────────────────────────────────────────────────────────
@@ -382,28 +431,28 @@ jobs:
             zip -r "../../release-assets/RunAnywhere-Swift-SDK-v${VERSION}.zip" .
             cd ../..
           fi
-          
+
           # ─────────────────────────────────────────────────────────────
           # Kotlin SDK
           # ─────────────────────────────────────────────────────────────
           if [ -d "all-artifacts/kotlin-sdk-aar-$VERSION" ]; then
             cp "all-artifacts/kotlin-sdk-aar-$VERSION"/*.aar "release-assets/RunAnywhere-Kotlin-SDK-v${VERSION}.aar" 2>/dev/null || true
           fi
-          
+
           # ─────────────────────────────────────────────────────────────
           # Flutter SDK - DISABLED (published to pub.dev separately)
           # ─────────────────────────────────────────────────────────────
           # if [ -d "all-artifacts/flutter-sdk-package-$VERSION" ]; then
           #   cp "all-artifacts/flutter-sdk-package-$VERSION"/*.zip "release-assets/RunAnywhere-Flutter-SDK-v${VERSION}.zip" 2>/dev/null || true
           # fi
-          
+
           # ─────────────────────────────────────────────────────────────
           # React Native SDK - DISABLED (published to npm separately)
           # ─────────────────────────────────────────────────────────────
           # if [ -d "all-artifacts/react-native-sdk-package-$VERSION" ]; then
           #   cp "all-artifacts/react-native-sdk-package-$VERSION"/*.zip "release-assets/RunAnywhere-ReactNative-SDK-v${VERSION}.zip" 2>/dev/null || true
           # fi
-          
+
           # ─────────────────────────────────────────────────────────────
           # Generate Checksums
           # ─────────────────────────────────────────────────────────────
@@ -413,21 +462,21 @@ jobs:
           echo "=========================================="
           cd release-assets
           ls -la
-          
+
           # Count files
           ZIP_COUNT=$(ls -1 *.zip 2>/dev/null | wc -l || echo "0")
           AAR_COUNT=$(ls -1 *.aar 2>/dev/null | wc -l || echo "0")
           echo ""
           echo "Total ZIP files: $ZIP_COUNT"
           echo "Total AAR files: $AAR_COUNT"
-          
+
           if [ "$ZIP_COUNT" -eq "0" ] && [ "$AAR_COUNT" -eq "0" ]; then
             echo ""
             echo "⚠️  WARNING: No release assets were created!"
             echo "This likely means the artifact directories were not found."
             echo "Check the debug output above for missing directories."
           fi
-          
+
           echo "" > checksums.sha256
           for f in *.zip *.aar; do
             if [ -f "$f" ]; then
@@ -442,21 +491,21 @@ jobs:
         run: |
           VERSION="${{ needs.setup.outputs.version }}"
           ROOT_PACKAGE="Package.swift"
-          
+
           if [ ! -f "$ROOT_PACKAGE" ]; then
             echo "Root Package.swift not found, skipping checksum update"
             exit 0
           fi
-          
+
           echo "=== Updating Package.swift for v$VERSION ==="
-          
+
           # Update the SDK version
           sed -i 's/let sdkVersion = "[^"]*"/let sdkVersion = "'"$VERSION"'"/' "$ROOT_PACKAGE"
           echo "Updated sdkVersion to: $VERSION"
-          
+
           # Compute and update checksums from release assets
           cd release-assets
-          
+
           # RACommons checksum
           if [ -f "RACommons-ios-v${VERSION}.zip" ]; then
             COMMONS_CHECKSUM=$(shasum -a 256 "RACommons-ios-v${VERSION}.zip" | cut -d ' ' -f 1)
@@ -467,7 +516,7 @@ jobs:
           else
             echo "⚠️  RACommons-ios-v${VERSION}.zip not found, checksum not updated"
           fi
-          
+
           # RABackendLlamaCPP checksum
           if [ -f "RABackendLLAMACPP-ios-v${VERSION}.zip" ]; then
             LLAMACPP_CHECKSUM=$(shasum -a 256 "RABackendLLAMACPP-ios-v${VERSION}.zip" | cut -d ' ' -f 1)
@@ -478,7 +527,7 @@ jobs:
           else
             echo "⚠️  RABackendLLAMACPP-ios-v${VERSION}.zip not found, checksum not updated"
           fi
-          
+
           # RABackendONNX checksum
           if [ -f "RABackendONNX-ios-v${VERSION}.zip" ]; then
             ONNX_CHECKSUM=$(shasum -a 256 "RABackendONNX-ios-v${VERSION}.zip" | cut -d ' ' -f 1)
@@ -489,9 +538,9 @@ jobs:
           else
             echo "⚠️  RABackendONNX-ios-v${VERSION}.zip not found, checksum not updated"
           fi
-          
+
           cd ..
-          
+
           echo ""
           echo "=== Updated Package.swift binaryTargets ==="
           grep -A2 "binaryTarget" "$ROOT_PACKAGE" | head -30 || true
@@ -499,34 +548,34 @@ jobs:
       - name: Commit Package.swift and Update Tag
         run: |
           VERSION="${{ needs.setup.outputs.version }}"
-          
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
+
           git add Package.swift || true
-          
+
           if git diff --staged --quiet; then
             echo "No Package.swift changes to commit"
           else
             git commit -m "chore: update Package.swift checksums for v$VERSION"
-            
+
             # Push to main/master
             git push origin HEAD:main || git push origin HEAD:master || echo "Push to default branch skipped"
-            
+
             echo "=== Updating tag v$VERSION to include Package.swift changes ==="
-            
+
             # Delete the remote tag
             git push origin :refs/tags/v$VERSION || echo "Remote tag deletion skipped (may not exist)"
-            
+
             # Delete local tag
             git tag -d v$VERSION || echo "Local tag deletion skipped"
-            
+
             # Create new tag pointing to current commit (with updated Package.swift)
             git tag -a v$VERSION -m "Release v$VERSION"
-            
+
             # Push the new tag
             git push origin v$VERSION
-            
+
             echo "✅ Tag v$VERSION updated to point to commit with correct checksums"
           fi
 
@@ -538,13 +587,13 @@ jobs:
           files: release-assets/*
           body: |
             ## RunAnywhere SDKs v${{ needs.setup.outputs.version }}
-            
+
             **Privacy-first, on-device AI SDKs** for iOS, Android, Flutter, and React Native.
-            
+
             ---
-            
+
             ### 📦 Release Assets
-            
+
             #### Core Libraries
             | Asset | Platform | Size |
             |-------|----------|------|
@@ -552,7 +601,7 @@ jobs:
             | `RACommons-android-arm64-v8a-v${{ needs.setup.outputs.version }}.zip` | Android arm64 | ~61 MB |
             | `RACommons-android-armeabi-v7a-v${{ needs.setup.outputs.version }}.zip` | Android armv7 | ~57 MB |
             | `RACommons-android-x86_64-v${{ needs.setup.outputs.version }}.zip` | Android x86_64 | ~64 MB |
-            
+
             #### Backend Libraries (pick what you need)
             | Asset | Platform | Use Case |
             |-------|----------|----------|
@@ -564,104 +613,103 @@ jobs:
             | `RABackendONNX-android-arm64-v8a-v${{ needs.setup.outputs.version }}.zip` | Android arm64 | STT/TTS/VAD |
             | `RABackendONNX-android-armeabi-v7a-v${{ needs.setup.outputs.version }}.zip` | Android armv7 | STT/TTS/VAD |
             | `RABackendONNX-android-x86_64-v${{ needs.setup.outputs.version }}.zip` | Android x86_64 | STT/TTS/VAD |
-            
+
             #### SDK Packages
             | Asset | Platform | Description |
             |-------|----------|-------------|
             | `RunAnywhere-Swift-SDK-v${{ needs.setup.outputs.version }}.zip` | iOS/macOS | Swift SDK |
             | `RunAnywhere-Kotlin-SDK-v${{ needs.setup.outputs.version }}.aar` | Android | Kotlin SDK (AAR) |
-            
+
             > **Note:** Flutter SDK is available on [pub.dev](https://pub.dev/packages/runanywhere), React Native SDK is available on [npm](https://www.npmjs.com/package/@runanywhere/core)
-            
+
             > 💡 **Tip:** Most Android apps only need `arm64-v8a` (85% of devices)
-            
+
             ---
-            
+
             ### 🚀 Quick Start
-            
+
             <details>
             <summary><b>Swift (iOS/macOS)</b></summary>
-            
+
             ```swift
             // Package.swift
             dependencies: [
                 .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "${{ needs.setup.outputs.version }}")
             ]
             ```
-            
+
             Or download the XCFrameworks directly from this release.
             </details>
-            
+
             <details>
             <summary><b>Kotlin (Android)</b></summary>
-            
+
             ```kotlin
             // build.gradle.kts
             dependencies {
                 implementation("ai.runanywhere:runanywhere-kotlin:${{ needs.setup.outputs.version }}")
             }
             ```
-            
+
             Or download `RunAnywhere-Kotlin-SDK-v${{ needs.setup.outputs.version }}.aar` from this release.
             </details>
-            
+
             <details>
             <summary><b>Flutter</b></summary>
-            
+
             ```yaml
             # pubspec.yaml - Install from pub.dev
             dependencies:
               runanywhere: ^${{ needs.setup.outputs.version }}
             ```
-            
+
             Or visit [pub.dev/packages/runanywhere](https://pub.dev/packages/runanywhere)
             </details>
-            
+
             <details>
             <summary><b>React Native</b></summary>
-            
+
             ```bash
             # Install from npm
             npm install @runanywhere/core
             ```
-            
+
             Or visit [npmjs.com/package/@runanywhere/core](https://www.npmjs.com/package/@runanywhere/core)
             </details>
-            
+
             ---
-            
+
             ### ✨ Features
-            
+
             - 🧠 **LLM**: On-device text generation via llama.cpp
             - 🎤 **STT**: Speech-to-text via Sherpa-ONNX Whisper
             - 🔊 **TTS**: Text-to-speech via Sherpa-ONNX Piper
             - 🎯 **VAD**: Voice activity detection
             - 🔒 **Privacy**: All processing happens on-device
-            
+
             ---
-            
+
             ### 📋 Build Status
-            
+
             | Component | Status |
             |-----------|--------|
             | RACommons | ${{ needs.release-commons.result == 'success' && '✅' || '❌' }} |
             | Backends | ${{ needs.release-backends.result == 'success' && '✅' || '❌' }} |
             | Swift SDK | ${{ needs.release-swift.result == 'success' && '✅' || '❌' }} |
             | Kotlin SDK | ${{ needs.release-kotlin.result == 'success' && '✅' || '❌' }} |
-            
+
             ---
-            
+
             ### 🔐 Verification
-            
+
             ```bash
             shasum -a 256 -c checksums.sha256
             ```
-            
+
             ---
-            
+
             Built from commit: ${{ github.sha }}
           draft: false
           prerelease: ${{ contains(needs.setup.outputs.version, 'test') || contains(needs.setup.outputs.version, 'beta') || contains(needs.setup.outputs.version, 'alpha') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
