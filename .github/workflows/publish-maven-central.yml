@@ -51,8 +51,11 @@ jobs:
       - name: Import GPG key
         run: |
           echo "${{ secrets.GPG_SIGNING_KEY }}" | gpg --batch --import
-          # Trust the key
-          echo "${{ secrets.GPG_KEY_ID }}:6:" | gpg --import-ownertrust
+          # Get the key fingerprint and set trust
+          KEY_FP=$(gpg --list-secret-keys --keyid-format LONG | grep -A1 "sec" | tail -1 | tr -d ' ')
+          echo "${KEY_FP}:6:" | gpg --import-ownertrust || true
+          # List imported keys for debugging
+          gpg --list-secret-keys --keyid-format LONG
 
       - name: Configure Gradle for GPG signing
         run: |
