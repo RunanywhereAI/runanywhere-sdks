@@ -24,19 +24,15 @@ plugins {
 }
 
 // =============================================================================
-// Local vs Remote JNI Library Configuration (mirrors main SDK)
+// Configuration
 // =============================================================================
-// Read from root project to ensure consistency with main SDK
+// Note: This module does NOT handle native libs - main SDK bundles everything
 val testLocal: Boolean =
     rootProject.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
         ?: project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
         ?: false
-val coreVersion: String =
-    rootProject.findProperty("runanywhere.coreVersion")?.toString()
-        ?: project.findProperty("runanywhere.coreVersion")?.toString()
-        ?: "0.1.4"
 
-logger.lifecycle("LlamaCPP Module: testLocal=$testLocal, coreVersion=$coreVersion")
+logger.lifecycle("LlamaCPP Module: testLocal=$testLocal (native libs handled by main SDK)")
 
 // =============================================================================
 // Detekt Configuration
@@ -161,105 +157,33 @@ android {
     }
 
     // ==========================================================================
-    // JNI Libraries Configuration - LlamaCPP Backend
+    // JNI Libraries - Handled by Main SDK
     // ==========================================================================
-    // This module bundles LlamaCPP-specific native libraries (~34MB):
-    //   - librunanywhere_llamacpp.so (llama.cpp LLM inference)
-    //
-    // When testLocal=true: Use libs from src/androidMain/jniLibs/
-    // When testLocal=false: Use libs from build/jniLibs/ (downloaded)
+    // Backend modules do NOT bundle their own native libs.
+    // All native libs are bundled by the main SDK (runanywhere-kotlin).
+    // This module only contains Kotlin code for the LlamaCPP backend.
     // ==========================================================================
-    sourceSets {
-        getByName("main") {
-            // IMPORTANT: Use setSrcDirs to REPLACE (not add to) default jniLibs locations
-            jniLibs.setSrcDirs(
-                listOf(if (testLocal) "src/androidMain/jniLibs" else "build/jniLibs"),
-            )
-        }
-    }
 }
 
 // =============================================================================
-// JNI Library Download Task (for testLocal=false mode)
+// JNI Library Download Task - DISABLED for backend modules
+// =============================================================================
+// Backend modules do NOT download their own native libs.
+// The main SDK's downloadJniLibs task downloads ALL native libs (including backend libs)
+// to src/androidMain/jniLibs/ which is shared across all modules.
+//
+// This task is kept as a no-op for backwards compatibility.
 // =============================================================================
 tasks.register("downloadJniLibs") {
     group = "runanywhere"
-    description = "Download LlamaCPP JNI libraries from GitHub releases"
-
-    val outputDir = file("build/jniLibs")
-    val tempDir = file("${layout.buildDirectory.get()}/jni-temp")
-    val releaseBaseUrl = "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/core-v$coreVersion"
-    val packageName = "RABackendLlamaCPP-android-v$coreVersion.zip"
-
-    outputs.dir(outputDir)
+    description = "No-op: Main SDK handles all native library downloads"
 
     doLast {
-        if (testLocal) {
-            logger.lifecycle("Skipping JNI download: testLocal=true")
-            return@doLast
-        }
-
-        outputDir.deleteRecursively()
-        tempDir.deleteRecursively()
-        outputDir.mkdirs()
-        tempDir.mkdirs()
-
-        val zipUrl = "$releaseBaseUrl/$packageName"
-        val tempZip = file("$tempDir/$packageName")
-
-        logger.lifecycle("Downloading LlamaCPP JNI libraries...")
-        logger.lifecycle("  URL: $zipUrl")
-
-        try {
-            ant.withGroovyBuilder {
-                "get"("src" to zipUrl, "dest" to tempZip, "verbose" to false)
-            }
-
-            val extractDir = file("$tempDir/extracted")
-            extractDir.mkdirs()
-            ant.withGroovyBuilder {
-                "unzip"("src" to tempZip, "dest" to extractDir)
-            }
-
-            // Copy all backend .so files except common libs that are in main SDK
-            // Common libs (from RACommons) are: libc++_shared.so, librac_commons*.so
-            val commonLibs = setOf("libc++_shared.so", "librac_commons.so", "librac_commons_jni.so")
-
-            extractDir
-                .walkTopDown()
-                .filter { it.isDirectory && it.name in listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86") }
-                .forEach { abiDir ->
-                    val targetAbiDir = file("$outputDir/${abiDir.name}")
-                    targetAbiDir.mkdirs()
-
-                    abiDir.listFiles()?.filter { it.extension == "so" && it.name !in commonLibs }?.forEach { soFile ->
-                        val targetFile = file("$targetAbiDir/${soFile.name}")
-                        soFile.copyTo(targetFile, overwrite = true)
-                        logger.lifecycle("  Copied: ${abiDir.name}/${soFile.name}")
-                    }
-                }
-
-            tempDir.deleteRecursively()
-            logger.lifecycle("✓ LlamaCPP JNI libraries ready")
-        } catch (e: Exception) {
-            logger.error("✗ Failed to download LlamaCPP libs: ${e.message}")
-        }
+        logger.lifecycle("LlamaCPP Module: Skipping downloadJniLibs (main SDK handles all native libs)")
     }
 }
 
-// Ensure JNI libs are available before Android build
-tasks.matching { it.name.contains("merge") && it.name.contains("JniLibFolders") }.configureEach {
-    if (testLocal) {
-        // When using local libs, depend on the main SDK's buildLocalJniLibs task
-        // which runs build-local.sh and populates all module jniLibs directories
-        val mainSdkProject = project.parent?.parent
-        mainSdkProject?.tasks?.findByName("buildLocalJniLibs")?.let { buildTask ->
-            dependsOn(buildTask)
-        }
-    } else {
-        dependsOn("downloadJniLibs")
-    }
-}
+// Note: JNI libs are handled by the main SDK, not by backend modules
 
 // =============================================================================
 // Include third-party licenses in JVM JAR
