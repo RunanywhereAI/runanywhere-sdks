@@ -296,15 +296,19 @@ publishing {
 
 // Configure signing
 signing {
-    if (signingKey != null) {
+    if (signingKey != null && signingKey.contains("BEGIN PGP")) {
         useInMemoryPgpKeys(signingKeyId, signingKey, signingPassword)
+    } else {
+        useGpgCmd()
     }
     sign(publishing.publications)
 }
 
 // Only sign when needed
 tasks.withType<Sign>().configureEach {
-    onlyIf { signingKey != null }
+    onlyIf {
+        project.hasProperty("signing.gnupg.keyName") || signingKey != null
+    }
 }
 
 // Disable debug publications
