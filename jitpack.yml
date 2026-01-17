@@ -27,4 +27,5 @@ before_install:
 
 install:
   # Chain all commands so environment variables persist
-  - export ANDROID_HOME=$HOME/android-sdk && export ANDROID_SDK_ROOT=$HOME/android-sdk && export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools && cd sdk/runanywhere-kotlin && ./gradlew downloadJniLibs assembleRelease publishAllPublicationsToMavenLocal -Prunanywhere.testLocal=false --no-daemon --info 2>&1 | tail -200
+  # Use publishToMavenLocal (not publishAllPublicationsToMavenLocal which doesn't exist)
+  - export ANDROID_HOME=$HOME/android-sdk && export ANDROID_SDK_ROOT=$HOME/android-sdk && export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools && cd sdk/runanywhere-kotlin && ./gradlew downloadJniLibs -Prunanywhere.testLocal=false --no-daemon && ./gradlew assembleRelease publishToMavenLocal -Prunanywhere.testLocal=false --no-daemon --info 2>&1 | tail -300
