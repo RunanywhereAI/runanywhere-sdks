@@ -25,6 +25,7 @@ plugins {
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
     `maven-publish`
+    signing
 }
 
 // =============================================================================
@@ -205,37 +206,59 @@ tasks.named<Jar>("jvmJar") {
 }
 
 // =============================================================================
-// Publishing Configuration
+// Maven Central Publishing Configuration
+// =============================================================================
+// Consumer usage (after publishing):
+//   implementation("com.runanywhere:runanywhere-onnx:1.0.0")
 // =============================================================================
 
-// Use JitPack-compatible group when building on JitPack
+// Maven Central group ID - using verified namespace
 val isJitPack = System.getenv("JITPACK") == "true"
-group = if (isJitPack) "com.github.RunanywhereAI.runanywhere-sdks" else "com.runanywhere.sdk"
+val usePendingNamespace = System.getenv("USE_RUNANYWHERE_NAMESPACE")?.toBoolean() ?: false
+group = when {
+    isJitPack -> "com.github.RunanywhereAI.runanywhere-sdks"
+    usePendingNamespace -> "com.runanywhere"
+    else -> "io.github.sanchitmonga22"  // Currently verified namespace
+}
+
 // Version: SDK_VERSION (our CI), VERSION (JitPack), or fallback
 version = System.getenv("SDK_VERSION")?.removePrefix("v")
     ?: System.getenv("VERSION")?.removePrefix("v")
     ?: "0.1.5-SNAPSHOT"
 
+// Get publishing credentials
+val mavenCentralUsername: String? = System.getenv("MAVEN_CENTRAL_USERNAME")
+    ?: project.findProperty("mavenCentral.username") as String?
+val mavenCentralPassword: String? = System.getenv("MAVEN_CENTRAL_PASSWORD")
+    ?: project.findProperty("mavenCentral.password") as String?
+val signingKeyId: String? = System.getenv("GPG_KEY_ID")
+    ?: project.findProperty("signing.keyId") as String?
+val signingPassword: String? = System.getenv("GPG_SIGNING_PASSWORD")
+    ?: project.findProperty("signing.password") as String?
+val signingKey: String? = System.getenv("GPG_SIGNING_KEY")
+    ?: project.findProperty("signing.key") as String?
+
 publishing {
     publications.withType<MavenPublication> {
-        // Use different artifact IDs to avoid conflicts between KMP publications
+        // Maven Central artifact naming
         artifactId = when (name) {
             "kotlinMultiplatform" -> "runanywhere-onnx"
             "androidRelease" -> "runanywhere-onnx-android"
-            "androidDebug" -> "runanywhere-onnx-android-debug"
             "jvm" -> "runanywhere-onnx-jvm"
             else -> "runanywhere-onnx-$name"
         }
 
         pom {
             name.set("RunAnywhere ONNX Backend")
-            description.set("ONNX Runtime backend for RunAnywhere SDK - STT, TTS, VAD")
-            url.set("https://github.com/RunanywhereAI/runanywhere-sdks")
+            description.set("ONNX Runtime backend for RunAnywhere SDK - enables on-device STT, TTS, and VAD using Sherpa-ONNX. Includes ONNX-specific native libraries.")
+            url.set("https://runanywhere.ai")
+            inceptionYear.set("2024")
 
             licenses {
                 license {
                     name.set("The Apache License, Version 2.0")
-                    url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+                    url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+                    distribution.set("repo")
                 }
             }
 
@@ -244,6 +267,8 @@ publishing {
                     id.set("runanywhere")
                     name.set("RunAnywhere Team")
                     email.set("founders@runanywhere.ai")
+                    organization.set("RunAnywhere AI")
+                    organizationUrl.set("https://runanywhere.ai")
                 }
             }
 
@@ -256,6 +281,17 @@ publishing {
     }
 
     repositories {
+        // Maven Central
+        maven {
+            name = "MavenCentral"
+            url = uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/")
+            credentials {
+                username = mavenCentralUsername
+                password = mavenCentralPassword
+            }
+        }
+
+        // GitHub Packages (backup)
         maven {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/RunanywhereAI/runanywhere-sdks")
@@ -267,10 +303,20 @@ publishing {
     }
 }
 
-// Disable JVM and debug publications - only publish Android release and metadata
-tasks.withType<PublishToMavenRepository>().configureEach {
-    onlyIf {
-        val dominated = publication.name in listOf("jvm", "androidDebug")
-        !dominated
+// Configure signing
+signing {
+    if (signingKey != null) {
+        useInMemoryPgpKeys(signingKeyId, signingKey, signingPassword)
     }
+    sign(publishing.publications)
+}
+
+// Only sign when needed
+tasks.withType<Sign>().configureEach {
+    onlyIf { signingKey != null }
+}
+
+// Disable debug publications
+tasks.withType<PublishToMavenRepository>().configureEach {
+    onlyIf { publication.name !in listOf("androidDebug") }
 }
