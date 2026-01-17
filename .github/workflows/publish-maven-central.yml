@@ -38,11 +38,7 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           cmdline-tools-version: 11076708
-          packages: |
-            platform-tools
-            platforms;android-35
-            build-tools;35.0.0
-            ndk;27.0.12077973
+          packages: platform-tools platforms;android-35 build-tools;35.0.0 ndk;27.0.12077973
 
       - name: Download native libraries
         working-directory: sdk/runanywhere-kotlin
