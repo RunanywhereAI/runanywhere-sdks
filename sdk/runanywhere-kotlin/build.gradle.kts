@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
     id("maven-publish")
+    signing
 }
 
 // =============================================================================
@@ -39,9 +40,16 @@ ktlint {
     }
 }
 
-// Use JitPack-compatible group when building on JitPack, otherwise use standard group
+// Maven Central group ID - must match verified Sonatype namespace
+// Using io.github.sanchitmonga22 (verified) until com.runanywhere is verified
+// Once com.runanywhere is verified, change to: "com.runanywhere"
 val isJitPack = System.getenv("JITPACK") == "true"
-group = if (isJitPack) "com.github.RunanywhereAI.runanywhere-sdks" else "com.runanywhere.sdk"
+val usePendingNamespace = System.getenv("USE_RUNANYWHERE_NAMESPACE")?.toBoolean() ?: false
+group = when {
+    isJitPack -> "com.github.RunanywhereAI.runanywhere-sdks"
+    usePendingNamespace -> "com.runanywhere"  // Use after DNS verification completes
+    else -> "io.github.sanchitmonga22"  // Currently verified namespace
+}
 
 // Version resolution priority:
 // 1. SDK_VERSION env var (set by our CI/CD from git tag)
@@ -297,15 +305,9 @@ android {
     //   - libonnxruntime.so - ONNX Runtime
     //   - libsherpa-onnx-*.so - Sherpa ONNX (STT/TTS/VAD)
     // ==========================================================================
-    sourceSets {
-        getByName("main") {
-            // IMPORTANT: Use only ONE jniLibs directory to avoid duplicates
-            // Clear any default directories and set only the one we want
-            jniLibs.setSrcDirs(
-                listOf(if (testLocal) "src/androidMain/jniLibs" else "build/jniLibs"),
-            )
-        }
-    }
+    // JNI libs are placed in src/androidMain/jniLibs/ (standard KMP location)
+    // This is automatically included by the KMP Android plugin
+    // ==========================================================================
 
     // Prevent packaging duplicates
     packaging {
@@ -513,7 +515,8 @@ tasks.register("downloadJniLibs") {
     // Only run when NOT using local libs
     onlyIf { !testLocal }
 
-    val outputDir = file("build/jniLibs")
+    // Use standard KMP location for jniLibs
+    val outputDir = file("src/androidMain/jniLibs")
     val tempDir = file("${layout.buildDirectory.get()}/jni-temp")
 
     // GitHub unified release URL - all assets are in one release
@@ -659,27 +662,50 @@ tasks.named<Jar>("jvmJar") {
     }
 }
 
-// Configure publishing to include license acknowledgments
+// =============================================================================
+// Maven Central Publishing Configuration
+// =============================================================================
+// Consumer usage (after publishing):
+//   implementation("com.runanywhere:runanywhere-sdk:1.0.0")
+// =============================================================================
+
+// Get publishing credentials from environment or gradle.properties
+val mavenCentralUsername: String? = System.getenv("MAVEN_CENTRAL_USERNAME")
+    ?: project.findProperty("mavenCentral.username") as String?
+val mavenCentralPassword: String? = System.getenv("MAVEN_CENTRAL_PASSWORD")
+    ?: project.findProperty("mavenCentral.password") as String?
+
+// GPG signing configuration
+val signingKeyId: String? = System.getenv("GPG_KEY_ID")
+    ?: project.findProperty("signing.keyId") as String?
+val signingPassword: String? = System.getenv("GPG_SIGNING_PASSWORD")
+    ?: project.findProperty("signing.password") as String?
+val signingKey: String? = System.getenv("GPG_SIGNING_KEY")
+    ?: project.findProperty("signing.key") as String?
+
 publishing {
     publications.withType<MavenPublication> {
-        // Use different artifact IDs to avoid conflicts between KMP publications
+        // Artifact naming for Maven Central
+        // Main artifact: com.runanywhere:runanywhere-sdk:1.0.0
         artifactId = when (name) {
-            "kotlinMultiplatform" -> "runanywhere-kotlin"
-            "androidRelease" -> "runanywhere-kotlin-android"
-            "androidDebug" -> "runanywhere-kotlin-android-debug"
-            "jvm" -> "runanywhere-kotlin-jvm"
-            else -> "runanywhere-kotlin-$name"
+            "kotlinMultiplatform" -> "runanywhere-sdk"
+            "androidRelease" -> "runanywhere-sdk-android"
+            "jvm" -> "runanywhere-sdk-jvm"
+            else -> "runanywhere-sdk-$name"
         }
 
+        // POM metadata (required by Maven Central)
         pom {
-            name.set("RunAnywhere Kotlin SDK")
-            description.set("Privacy-first, on-device AI SDK for Kotlin/JVM and Android")
-            url.set("https://github.com/RunanywhereAI/runanywhere-sdks")
+            name.set("RunAnywhere SDK")
+            description.set("Privacy-first, on-device AI SDK for Kotlin/JVM and Android. Includes core infrastructure and common native libraries.")
+            url.set("https://runanywhere.ai")
+            inceptionYear.set("2024")
 
             licenses {
                 license {
                     name.set("The Apache License, Version 2.0")
-                    url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+                    url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+                    distribution.set("repo")
                 }
             }
 
@@ -688,6 +714,8 @@ publishing {
                     id.set("runanywhere")
                     name.set("RunAnywhere Team")
                     email.set("founders@runanywhere.ai")
+                    organization.set("RunAnywhere AI")
+                    organizationUrl.set("https://runanywhere.ai")
                 }
             }
 
@@ -696,11 +724,36 @@ publishing {
                 developerConnection.set("scm:git:ssh://github.com/RunanywhereAI/runanywhere-sdks.git")
                 url.set("https://github.com/RunanywhereAI/runanywhere-sdks")
             }
+
+            issueManagement {
+                system.set("GitHub Issues")
+                url.set("https://github.com/RunanywhereAI/runanywhere-sdks/issues")
+            }
         }
     }
 
-    // GitHub Packages repository configuration
     repositories {
+        // Maven Central (Sonatype Central Portal)
+        maven {
+            name = "MavenCentral"
+            url = uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/")
+            credentials {
+                username = mavenCentralUsername
+                password = mavenCentralPassword
+            }
+        }
+
+        // Sonatype Snapshots
+        maven {
+            name = "SonatypeSnapshots"
+            url = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
+            credentials {
+                username = mavenCentralUsername
+                password = mavenCentralPassword
+            }
+        }
+
+        // GitHub Packages (backup/alternative)
         maven {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/RunanywhereAI/runanywhere-sdks")
@@ -709,6 +762,25 @@ publishing {
                 password = project.findProperty("gpr.token") as String? ?: System.getenv("GITHUB_TOKEN")
             }
         }
+    }
+}
+
+// Configure signing (required for Maven Central)
+signing {
+    // Use in-memory key from CI environment
+    if (signingKey != null) {
+        useInMemoryPgpKeys(signingKeyId, signingKey, signingPassword)
+    }
+    // Sign all publications
+    sign(publishing.publications)
+}
+
+// Only sign when publishing to Maven Central (not for local builds)
+tasks.withType<Sign>().configureEach {
+    onlyIf {
+        gradle.taskGraph.hasTask(":publishToMavenCentral") ||
+        gradle.taskGraph.hasTask(":publish") ||
+        signingKey != null
     }
 }
 

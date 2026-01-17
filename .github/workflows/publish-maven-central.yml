@@ -1,0 +1,113 @@
+name: Publish to Maven Central
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 1.0.0)'
+        required: true
+        type: string
+
+env:
+  JAVA_VERSION: '17'
+  JAVA_DISTRIBUTION: 'temurin'
+
+jobs:
+  publish:
+    name: Publish to Maven Central
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v3
+        with:
+          gradle-version: 8.13
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: 11076708
+          packages: |
+            platform-tools
+            platforms;android-35
+            build-tools;35.0.0
+            ndk;27.0.12077973
+
+      - name: Download native libraries
+        working-directory: sdk/runanywhere-kotlin
+        run: |
+          chmod +x gradlew
+          ./gradlew downloadJniLibs -Prunanywhere.nativeLibVersion=v${{ inputs.version }}
+        env:
+          SDK_VERSION: ${{ inputs.version }}
+
+      - name: Publish main SDK to Maven Central
+        working-directory: sdk/runanywhere-kotlin
+        run: |
+          ./gradlew publishAllPublicationsToMavenCentralRepository --no-daemon --info
+        env:
+          SDK_VERSION: ${{ inputs.version }}
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+          GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
+          GPG_SIGNING_PASSWORD: ${{ secrets.GPG_SIGNING_PASSWORD }}
+
+      - name: Publish LlamaCPP module
+        working-directory: sdk/runanywhere-kotlin
+        run: |
+          ./gradlew :modules:runanywhere-core-llamacpp:publishAllPublicationsToMavenCentralRepository --no-daemon --info
+        env:
+          SDK_VERSION: ${{ inputs.version }}
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+          GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
+          GPG_SIGNING_PASSWORD: ${{ secrets.GPG_SIGNING_PASSWORD }}
+
+      - name: Publish ONNX module
+        working-directory: sdk/runanywhere-kotlin
+        run: |
+          ./gradlew :modules:runanywhere-core-onnx:publishAllPublicationsToMavenCentralRepository --no-daemon --info
+        env:
+          SDK_VERSION: ${{ inputs.version }}
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+          GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
+          GPG_SIGNING_PASSWORD: ${{ secrets.GPG_SIGNING_PASSWORD }}
+
+      - name: Summary
+        run: |
+          echo "## Published to Maven Central" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Version: \`${{ inputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifacts:" >> $GITHUB_STEP_SUMMARY
+          echo "- \`io.github.sanchitmonga22:runanywhere-sdk:${{ inputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`io.github.sanchitmonga22:runanywhere-llamacpp:${{ inputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`io.github.sanchitmonga22:runanywhere-onnx:${{ inputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Consumer Usage:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`kotlin" >> $GITHUB_STEP_SUMMARY
+          echo "// settings.gradle.kts" >> $GITHUB_STEP_SUMMARY
+          echo "repositories {" >> $GITHUB_STEP_SUMMARY
+          echo "    mavenCentral()" >> $GITHUB_STEP_SUMMARY
+          echo "}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "// build.gradle.kts" >> $GITHUB_STEP_SUMMARY
+          echo "implementation(\"io.github.sanchitmonga22:runanywhere-sdk:${{ inputs.version }}\")" >> $GITHUB_STEP_SUMMARY
+          echo "implementation(\"io.github.sanchitmonga22:runanywhere-llamacpp:${{ inputs.version }}\") // Optional: LLM" >> $GITHUB_STEP_SUMMARY
+          echo "implementation(\"io.github.sanchitmonga22:runanywhere-onnx:${{ inputs.version }}\") // Optional: STT/TTS" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

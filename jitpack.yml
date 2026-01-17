@@ -4,15 +4,16 @@
 # The Kotlin SDK is in subdirectory: sdk/runanywhere-kotlin/
 # Build all modules (main SDK + LlamaCPP + ONNX backends)
 #
-# IMPORTANT: For Android libraries, we must:
-# 1. Set up Android SDK
-# 2. Build Android targets explicitly
-# 3. Download native libs before building
+# IMPORTANT: For Android libraries with native libs, we must:
+# 1. Set up Android SDK (JitPack doesn't have it by default)
+# 2. Download native libs FIRST (they're built by our CI/CD)
+# 3. Build Android targets explicitly
+# 4. Publish to Maven Local
 
 jdk:
   - openjdk17
 
-# Install Android SDK (required for AAR builds)
+# Install Android SDK and NDK (required for AAR builds)
 before_install:
   - chmod +x sdk/runanywhere-kotlin/gradlew
   - export ANDROID_HOME=$HOME/android-sdk
@@ -21,9 +22,10 @@ before_install:
   - unzip -q /tmp/cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools
   - mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
   - yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
-  - $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-35" "build-tools;35.0.0" > /dev/null
+  - $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-35" "platforms;android-36" "build-tools;35.0.0" > /dev/null
+  - echo "ANDROID_HOME=$HOME/android-sdk" >> $HOME/.bashrc
 
 install:
-  - export ANDROID_HOME=$HOME/android-sdk
-  - export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
-  - cd sdk/runanywhere-kotlin && ./gradlew downloadJniLibs publishToMavenLocal -Prunanywhere.testLocal=false --no-daemon
+  # Chain all commands so environment variables persist
+  # Use publishToMavenLocal (not publishAllPublicationsToMavenLocal which doesn't exist)
+  - export ANDROID_HOME=$HOME/android-sdk && export ANDROID_SDK_ROOT=$HOME/android-sdk && export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools && cd sdk/runanywhere-kotlin && ./gradlew downloadJniLibs -Prunanywhere.testLocal=false --no-daemon && ./gradlew assembleRelease publishToMavenLocal -Prunanywhere.testLocal=false --no-daemon --info 2>&1 | tail -300
