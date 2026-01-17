@@ -48,16 +48,6 @@ jobs:
         env:
           SDK_VERSION: ${{ inputs.version }}
 
-      - name: Decode GPG signing key
-        id: gpg
-        run: |
-          # Decode base64 GPG key and set as environment variable
-          GPG_KEY_DECODED=$(echo "${{ secrets.GPG_SIGNING_KEY }}" | base64 --decode)
-          # Use delimiter to handle multiline
-          echo "GPG_KEY<<EOF" >> $GITHUB_ENV
-          echo "$GPG_KEY_DECODED" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-
       - name: Publish main SDK to Maven Central
         working-directory: sdk/runanywhere-kotlin
         run: |
@@ -67,7 +57,7 @@ jobs:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
-          GPG_SIGNING_KEY: ${{ env.GPG_KEY }}
+          GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
           GPG_SIGNING_PASSWORD: ${{ secrets.GPG_SIGNING_PASSWORD }}
 
       - name: Publish LlamaCPP module
@@ -79,7 +69,7 @@ jobs:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
-          GPG_SIGNING_KEY: ${{ env.GPG_KEY }}
+          GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
           GPG_SIGNING_PASSWORD: ${{ secrets.GPG_SIGNING_PASSWORD }}
 
       - name: Publish ONNX module
@@ -91,7 +81,7 @@ jobs:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
-          GPG_SIGNING_KEY: ${{ env.GPG_KEY }}
+          GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
           GPG_SIGNING_PASSWORD: ${{ secrets.GPG_SIGNING_PASSWORD }}
 
       - name: Summary
