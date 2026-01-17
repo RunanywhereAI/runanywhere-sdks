@@ -26,13 +26,5 @@ before_install:
   - echo "ANDROID_HOME=$HOME/android-sdk" >> $HOME/.bashrc
 
 install:
-  - export ANDROID_HOME=$HOME/android-sdk
-  - export ANDROID_SDK_ROOT=$HOME/android-sdk
-  - export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
-  - cd sdk/runanywhere-kotlin
-  # Step 1: Download native libs from GitHub release (main SDK handles ALL libs)
-  - ./gradlew downloadJniLibs -Prunanywhere.testLocal=false --no-daemon
-  # Step 2: Build Android AAR explicitly to ensure it's compiled
-  - ./gradlew assembleRelease --no-daemon
-  # Step 3: Publish all artifacts to Maven Local
-  - ./gradlew publishToMavenLocal -Prunanywhere.testLocal=false --no-daemon
+  # Chain all commands so environment variables persist
+  - export ANDROID_HOME=$HOME/android-sdk && export ANDROID_SDK_ROOT=$HOME/android-sdk && export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools && cd sdk/runanywhere-kotlin && ./gradlew downloadJniLibs assembleRelease publishAllPublicationsToMavenLocal -Prunanywhere.testLocal=false --no-daemon --info 2>&1 | tail -200
