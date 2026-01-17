@@ -767,9 +767,12 @@ publishing {
 
 // Configure signing (required for Maven Central)
 signing {
-    // Use in-memory key from CI environment
-    if (signingKey != null) {
+    // Use in-memory key if provided via environment, otherwise use system GPG
+    if (signingKey != null && signingKey.contains("BEGIN PGP")) {
         useInMemoryPgpKeys(signingKeyId, signingKey, signingPassword)
+    } else {
+        // Use system GPG (configured via gradle.properties)
+        useGpgCmd()
     }
     // Sign all publications
     sign(publishing.publications)
@@ -778,8 +781,9 @@ signing {
 // Only sign when publishing to Maven Central (not for local builds)
 tasks.withType<Sign>().configureEach {
     onlyIf {
-        gradle.taskGraph.hasTask(":publishToMavenCentral") ||
+        gradle.taskGraph.hasTask(":publishAllPublicationsToMavenCentralRepository") ||
         gradle.taskGraph.hasTask(":publish") ||
+        project.hasProperty("signing.gnupg.keyName") ||
         signingKey != null
     }
 }

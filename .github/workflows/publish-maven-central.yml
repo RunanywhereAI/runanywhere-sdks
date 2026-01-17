@@ -48,6 +48,22 @@ jobs:
         env:
           SDK_VERSION: ${{ inputs.version }}
 
+      - name: Import GPG key
+        run: |
+          echo "${{ secrets.GPG_SIGNING_KEY }}" | gpg --batch --import
+          # Trust the key
+          echo "${{ secrets.GPG_KEY_ID }}:6:" | gpg --import-ownertrust
+
+      - name: Configure Gradle for GPG signing
+        run: |
+          mkdir -p ~/.gradle
+          cat >> ~/.gradle/gradle.properties << EOF
+          signing.gnupg.executable=gpg
+          signing.gnupg.useLegacyGpg=false
+          signing.gnupg.keyName=${{ secrets.GPG_KEY_ID }}
+          signing.gnupg.passphrase=${{ secrets.GPG_SIGNING_PASSWORD }}
+          EOF
+
       - name: Publish main SDK to Maven Central
         working-directory: sdk/runanywhere-kotlin
         run: |
@@ -56,9 +72,6 @@ jobs:
           SDK_VERSION: ${{ inputs.version }}
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
-          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
-          GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
-          GPG_SIGNING_PASSWORD: ${{ secrets.GPG_SIGNING_PASSWORD }}
 
       - name: Publish LlamaCPP module
         working-directory: sdk/runanywhere-kotlin
@@ -68,9 +81,6 @@ jobs:
           SDK_VERSION: ${{ inputs.version }}
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
-          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
-          GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
-          GPG_SIGNING_PASSWORD: ${{ secrets.GPG_SIGNING_PASSWORD }}
 
       - name: Publish ONNX module
         working-directory: sdk/runanywhere-kotlin
@@ -80,9 +90,6 @@ jobs:
           SDK_VERSION: ${{ inputs.version }}
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
-          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
-          GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
-          GPG_SIGNING_PASSWORD: ${{ secrets.GPG_SIGNING_PASSWORD }}
 
       - name: Summary
         run: |
