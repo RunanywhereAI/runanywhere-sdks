@@ -6,6 +6,7 @@ import 'package:runanywhere/capabilities/voice/models/voice_session.dart';
 import 'package:runanywhere/capabilities/voice/models/voice_session_handle.dart';
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/core/types/storage_types.dart';
+import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
 import 'package:runanywhere/foundation/dependency_injection/service_container.dart'
     hide SDKInitParams;
@@ -160,6 +161,12 @@ class RunAnywhere {
       _isInitialized = true;
       logger.info('✅ SDK initialized (${params.environment.description})');
       EventBus.shared.publish(SDKInitializationCompleted());
+
+      // Track successful SDK initialization
+      TelemetryService.shared.trackSDKInit(
+        environment: params.environment.name,
+        success: true,
+      );
     } catch (e) {
       logger.error('❌ SDK initialization failed: $e');
       _initParams = null;
@@ -167,6 +174,17 @@ class RunAnywhere {
       _isInitialized = false;
       _hasRunDiscovery = false;
       EventBus.shared.publish(SDKInitializationFailed(e));
+
+      // Track failed SDK initialization
+      TelemetryService.shared.trackSDKInit(
+        environment: params.environment.name,
+        success: false,
+      );
+      TelemetryService.shared.trackError(
+        errorCode: 'sdk_init_failed',
+        errorMessage: e.toString(),
+      );
+
       rethrow;
     }
   }
@@ -317,6 +335,7 @@ class RunAnywhere {
 
     final logger = SDKLogger('RunAnywhere.LoadModel');
     logger.info('Loading model: $modelId');
+    final startTime = DateTime.now().millisecondsSinceEpoch;
 
     // Emit load started event
     EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId));
@@ -367,13 +386,34 @@ class RunAnywhere {
         );
       }
 
+      final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
       logger.info(
           'Model loaded successfully: ${model.name} (isLoaded=${DartBridge.llm.isLoaded})');
+
+      // Track model load success
+      TelemetryService.shared.trackModelLoad(
+        modelId: modelId,
+        modelType: 'llm',
+        success: true,
+        loadTimeMs: loadTimeMs,
+      );
 
       // Emit load completed event
       EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
     } catch (e) {
       logger.error('Failed to load model: $e');
+
+      // Track model load failure
+      TelemetryService.shared.trackModelLoad(
+        modelId: modelId,
+        modelType: 'llm',
+        success: false,
+      );
+      TelemetryService.shared.trackError(
+        errorCode: 'model_load_failed',
+        errorMessage: e.toString(),
+        context: {'model_id': modelId},
+      );
 
       // Emit load failed event
       EventBus.shared.publish(SDKModelEvent.loadFailed(
@@ -393,6 +433,7 @@ class RunAnywhere {
 
     final logger = SDKLogger('RunAnywhere.LoadSTTModel');
     logger.info('Loading STT model: $modelId');
+    final startTime = DateTime.now().millisecondsSinceEpoch;
 
     EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId));
 
@@ -434,10 +475,33 @@ class RunAnywhere {
         );
       }
 
+      final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
+
+      // Track STT model load success
+      TelemetryService.shared.trackModelLoad(
+        modelId: modelId,
+        modelType: 'stt',
+        success: true,
+        loadTimeMs: loadTimeMs,
+      );
+
       EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
       logger.info('STT model loaded: ${model.name}');
     } catch (e) {
       logger.error('Failed to load STT model: $e');
+
+      // Track STT model load failure
+      TelemetryService.shared.trackModelLoad(
+        modelId: modelId,
+        modelType: 'stt',
+        success: false,
+      );
+      TelemetryService.shared.trackError(
+        errorCode: 'stt_model_load_failed',
+        errorMessage: e.toString(),
+        context: {'model_id': modelId},
+      );
+
       EventBus.shared.publish(SDKModelEvent.loadFailed(
         modelId: modelId,
         error: e.toString(),
@@ -485,13 +549,52 @@ class RunAnywhere {
 
     final logger = SDKLogger('RunAnywhere.Transcribe');
     logger.debug('Transcribing ${audioData.length} bytes of audio...');
+    final startTime = DateTime.now().millisecondsSinceEpoch;
+    final modelId = currentSTTModelId ?? 'unknown';
+    
+    // Get model name for telemetry
+    final modelInfo = await DartBridgeModelRegistry.instance.getPublicModel(modelId);
+    final modelName = modelInfo?.name;
+    
+    // Calculate audio duration from bytes (PCM16 at 16kHz mono)
+    // Duration = bytes / 2 (16-bit = 2 bytes) / 16000 Hz * 1000 ms
+    final calculatedDurationMs = (audioData.length / 32).round();
 
     try {
       final result = await DartBridge.stt.transcribe(audioData);
+      final latencyMs = DateTime.now().millisecondsSinceEpoch - startTime;
+      
+      // Use calculated duration if C++ returns 0
+      final audioDurationMs = result.durationMs > 0 ? result.durationMs : calculatedDurationMs;
+      
+      // Count words in transcription
+      final wordCount = result.text.trim().isEmpty 
+          ? 0 
+          : result.text.trim().split(RegExp(r'\s+')).length;
+
+      // Track transcription success with full metrics
+      TelemetryService.shared.trackTranscription(
+        modelId: modelId,
+        modelName: modelName,
+        audioDurationMs: audioDurationMs,
+        latencyMs: latencyMs,
+        wordCount: wordCount,
+        confidence: result.confidence,
+        language: result.language,
+        isStreaming: false, // Batch transcription
+      );
+
       logger.info(
           'Transcription complete: ${result.text.length} chars, confidence: ${result.confidence}');
       return result.text;
     } catch (e) {
+      // Track transcription failure
+      TelemetryService.shared.trackError(
+        errorCode: 'transcription_failed',
+        errorMessage: e.toString(),
+        context: {'model_id': modelId},
+      );
+
       logger.error('Transcription failed: $e');
       rethrow;
     }
@@ -517,18 +620,56 @@ class RunAnywhere {
 
     final logger = SDKLogger('RunAnywhere.Transcribe');
     logger.debug('Transcribing ${audioData.length} bytes with details...');
+    final startTime = DateTime.now().millisecondsSinceEpoch;
+    final modelId = currentSTTModelId ?? 'unknown';
+    
+    // Get model name for telemetry
+    final modelInfo = await DartBridgeModelRegistry.instance.getPublicModel(modelId);
+    final modelName = modelInfo?.name;
+    
+    // Calculate audio duration from bytes (PCM16 at 16kHz mono)
+    final calculatedDurationMs = (audioData.length / 32).round();
 
     try {
       final result = await DartBridge.stt.transcribe(audioData);
+      final latencyMs = DateTime.now().millisecondsSinceEpoch - startTime;
+      
+      // Use calculated duration if C++ returns 0
+      final audioDurationMs = result.durationMs > 0 ? result.durationMs : calculatedDurationMs;
+      
+      // Count words in transcription
+      final wordCount = result.text.trim().isEmpty 
+          ? 0 
+          : result.text.trim().split(RegExp(r'\s+')).length;
+
+      // Track transcription success with full metrics
+      TelemetryService.shared.trackTranscription(
+        modelId: modelId,
+        modelName: modelName,
+        audioDurationMs: audioDurationMs,
+        latencyMs: latencyMs,
+        wordCount: wordCount,
+        confidence: result.confidence,
+        language: result.language,
+        isStreaming: false, // Batch transcription
+      );
+
       logger.info(
           'Transcription complete: ${result.text.length} chars, confidence: ${result.confidence}');
       return STTResult(
         text: result.text,
         confidence: result.confidence,
-        durationMs: result.durationMs,
+        durationMs: audioDurationMs,
         language: result.language,
       );
     } catch (e) {
+      // Track transcription failure
+      TelemetryService.shared.trackError(
+        errorCode: 'transcription_failed',
+        errorMessage: e.toString(),
+        context: {'model_id': modelId},
+      );
+
       logger.error('Transcription failed: $e');
       rethrow;
     }
@@ -542,6 +683,7 @@ class RunAnywhere {
 
     final logger = SDKLogger('RunAnywhere.LoadTTSVoice');
     logger.info('Loading TTS voice: $voiceId');
+    final startTime = DateTime.now().millisecondsSinceEpoch;
 
     EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: voiceId));
 
@@ -583,10 +725,33 @@ class RunAnywhere {
         );
       }
 
+      final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
+
+      // Track TTS voice load success
+      TelemetryService.shared.trackModelLoad(
+        modelId: voiceId,
+        modelType: 'tts',
+        success: true,
+        loadTimeMs: loadTimeMs,
+      );
+
       EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: voiceId));
       logger.info('TTS voice loaded: ${model.name}');
     } catch (e) {
       logger.error('Failed to load TTS voice: $e');
+
+      // Track TTS voice load failure
+      TelemetryService.shared.trackModelLoad(
+        modelId: voiceId,
+        modelType: 'tts',
+        success: false,
+      );
+      TelemetryService.shared.trackError(
+        errorCode: 'tts_voice_load_failed',
+        errorMessage: e.toString(),
+        context: {'voice_id': voiceId},
+      );
+
       EventBus.shared.publish(SDKModelEvent.loadFailed(
         modelId: voiceId,
         error: e.toString(),
@@ -645,6 +810,12 @@ class RunAnywhere {
     final logger = SDKLogger('RunAnywhere.Synthesize');
     logger.debug(
         'Synthesizing: "${text.substring(0, text.length.clamp(0, 50))}..."');
+    final startTime = DateTime.now().millisecondsSinceEpoch;
+    final voiceId = currentTTSVoiceId ?? 'unknown';
+    
+    // Get model name for telemetry
+    final modelInfo = await DartBridgeModelRegistry.instance.getPublicModel(voiceId);
+    final modelName = modelInfo?.name;
 
     try {
       final result = await DartBridge.tts.synthesize(
@@ -653,6 +824,22 @@ class RunAnywhere {
         pitch: pitch,
         volume: volume,
       );
+      final latencyMs = DateTime.now().millisecondsSinceEpoch - startTime;
+      
+      // Calculate audio size in bytes (Float32 samples = 4 bytes each)
+      final audioSizeBytes = result.samples.length * 4;
+
+      // Track synthesis success with full metrics
+      TelemetryService.shared.trackSynthesis(
+        voiceId: voiceId,
+        modelName: modelName,
+        textLength: text.length,
+        audioDurationMs: result.durationMs,
+        latencyMs: latencyMs,
+        sampleRate: result.sampleRate,
+        audioSizeBytes: audioSizeBytes,
+      );
+
       logger.info(
           'Synthesis complete: ${result.samples.length} samples, ${result.sampleRate} Hz');
       return TTSResult(
@@ -661,6 +848,13 @@ class RunAnywhere {
         durationMs: result.durationMs,
       );
     } catch (e) {
+      // Track synthesis failure
+      TelemetryService.shared.trackError(
+        errorCode: 'synthesis_failed',
+        errorMessage: e.toString(),
+        context: {'voice_id': voiceId, 'text_length': text.length},
+      );
+
       logger.error('Synthesis failed: $e');
       rethrow;
     }
@@ -900,6 +1094,10 @@ class RunAnywhere {
     }
 
     final modelId = DartBridge.llm.currentModelId ?? 'unknown';
+    
+    // Get model name from registry for telemetry
+    final modelInfo = await DartBridgeModelRegistry.instance.getPublicModel(modelId);
+    final modelName = modelInfo?.name;
 
     try {
       // Generate directly via DartBridgeLLM (calls rac_llm_component_generate)
@@ -911,6 +1109,23 @@ class RunAnywhere {
 
       final endTime = DateTime.now();
       final latencyMs = endTime.difference(startTime).inMicroseconds / 1000.0;
+      final tokensPerSecond = result.totalTimeMs > 0
+          ? (result.completionTokens / result.totalTimeMs) * 1000
+          : 0.0;
+
+      // Track generation success with full metrics (mirrors other SDKs)
+      TelemetryService.shared.trackGeneration(
+        modelId: modelId,
+        modelName: modelName,
+        promptTokens: result.promptTokens,
+        completionTokens: result.completionTokens,
+        latencyMs: latencyMs.round(),
+        temperature: opts.temperature,
+        maxTokens: opts.maxTokens,
+        contextLength: 8192, // Default context length for LlamaCpp
+        tokensPerSecond: tokensPerSecond,
+        isStreaming: false,
+      );
 
       return LLMGenerationResult(
         text: result.text,
@@ -919,11 +1134,15 @@ class RunAnywhere {
         modelUsed: modelId,
         latencyMs: latencyMs,
         framework: 'llamacpp',
-        tokensPerSecond: result.totalTimeMs > 0
-            ? (result.completionTokens / result.totalTimeMs) * 1000
-            : 0,
+        tokensPerSecond: tokensPerSecond,
       );
     } catch (e) {
+      // Track generation failure
+      TelemetryService.shared.trackError(
+        errorCode: 'generation_failed',
+        errorMessage: e.toString(),
+        context: {'model_id': modelId},
+      );
       throw SDKError.generationFailed('$e');
     }
   }
@@ -962,6 +1181,7 @@ class RunAnywhere {
 
     final opts = options ?? const LLMGenerationOptions();
     final startTime = DateTime.now();
+    DateTime? firstTokenTime;
 
     // Verify model is loaded via DartBridgeLLM (mirrors Swift CppBridge.LLM pattern)
     if (!DartBridge.llm.isLoaded) {
@@ -971,6 +1191,10 @@ class RunAnywhere {
     }
 
     final modelId = DartBridge.llm.currentModelId ?? 'unknown';
+    
+    // Get model name from registry for telemetry
+    final modelInfo = await DartBridgeModelRegistry.instance.getPublicModel(modelId);
+    final modelName = modelInfo?.name;
 
     // Create a broadcast stream controller for the tokens
     final controller = StreamController<String>.broadcast();
@@ -987,12 +1211,20 @@ class RunAnywhere {
     DartBridge.llm.setActiveStreamSubscription(
       tokenStream.listen(
         (token) {
+          // Track first token time
+          firstTokenTime ??= DateTime.now();
           allTokens.add(token);
           if (!controller.isClosed) {
             controller.add(token);
           }
         },
         onError: (Object error) {
+          // Track streaming generation error
+          TelemetryService.shared.trackError(
+            errorCode: 'streaming_generation_failed',
+            errorMessage: error.toString(),
+            context: {'model_id': modelId},
+          );
           if (!controller.isClosed) {
             controller.addError(error);
           }
@@ -1014,11 +1246,35 @@ class RunAnywhere {
       final tokensPerSecond =
           latencyMs > 0 ? allTokens.length / (latencyMs / 1000) : 0.0;
 
+      // Calculate time to first token
+      int? timeToFirstTokenMs;
+      if (firstTokenTime != null) {
+        timeToFirstTokenMs = firstTokenTime!.difference(startTime).inMilliseconds;
+      }
+
+      // Estimate tokens (~4 chars per token)
+      final promptTokens = (prompt.length / 4).ceil();
+      final completionTokens = allTokens.length;
+
+      // Track streaming generation success with full metrics (mirrors other SDKs)
+      TelemetryService.shared.trackGeneration(
+        modelId: modelId,
+        modelName: modelName,
+        promptTokens: promptTokens,
+        completionTokens: completionTokens,
+        latencyMs: latencyMs.round(),
+        temperature: opts.temperature,
+        maxTokens: opts.maxTokens,
+        contextLength: 8192, // Default context length for LlamaCpp
+        tokensPerSecond: tokensPerSecond,
+        timeToFirstTokenMs: timeToFirstTokenMs,
+        isStreaming: true,
+      );
+
       return LLMGenerationResult(
         text: allTokens.join(),
-        // TODO: Use actual tokenizer - this is a rough estimate (~4 chars per token)
-        inputTokens: (prompt.length / 4).ceil(),
-        tokensUsed: allTokens.length,
+        inputTokens: promptTokens,
+        tokensUsed: completionTokens,
         modelUsed: modelId,
         latencyMs: latencyMs,
         framework: 'llamacpp',
@@ -1059,6 +1315,7 @@ class RunAnywhere {
 
     final logger = SDKLogger('RunAnywhere.Download');
     logger.info('📥 Starting download for model: $modelId');
+    final startTime = DateTime.now().millisecondsSinceEpoch;
 
     await for (final progress
         in ModelDownloadService.shared.downloadModel(modelId)) {
@@ -1079,9 +1336,29 @@ class RunAnywhere {
       } else if (progress.stage == ModelDownloadStage.extracting) {
         logger.info('Extracting model...');
       } else if (progress.stage == ModelDownloadStage.completed) {
+        final downloadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
         logger.info('✅ Download completed for model: $modelId');
+
+        // Track download success
+        TelemetryService.shared.trackModelDownload(
+          modelId: modelId,
+          success: true,
+          downloadTimeMs: downloadTimeMs,
+          sizeBytes: progress.totalBytes,
+        );
       } else if (progress.stage == ModelDownloadStage.failed) {
         logger.error('❌ Download failed: ${progress.error}');
+
+        // Track download failure
+        TelemetryService.shared.trackModelDownload(
+          modelId: modelId,
+          success: false,
+        );
+        TelemetryService.shared.trackError(
+          errorCode: 'download_failed',
+          errorMessage: progress.error ?? 'Unknown error',
+          context: {'model_id': modelId},
+        );
       }
     }
   }
@@ -1274,7 +1551,10 @@ class RunAnywhere {
   }
 
   /// Reset SDK state
-  static void reset() {
+  static Future<void> reset() async {
+    // Flush pending telemetry events before reset
+    await TelemetryService.shared.shutdown();
+
     _isInitialized = false;
     _hasRunDiscovery = false;
     _initParams = null;
