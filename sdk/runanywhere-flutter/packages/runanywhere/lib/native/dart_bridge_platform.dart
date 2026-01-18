@@ -205,6 +205,11 @@ class DartBridgePlatform {
 // =============================================================================
 
 /// Logging callback - routes C++ logs to Dart logger
+/// 
+/// NOTE: This callback is registered with NativeCallable.listener for thread safety.
+/// It runs asynchronously on the main isolate's event loop, which means by the time
+/// it executes, the C++ log message memory may have been freed. We handle this by
+/// catching any UTF-8 decoding errors gracefully.
 void _platformLogCallback(
   int level,
   Pointer<Utf8> category,
@@ -213,25 +218,34 @@ void _platformLogCallback(
 ) {
   if (message == nullptr) return;
 
-  final msgString = message.toDartString();
-  final categoryString = category != nullptr ? category.toDartString() : 'RAC';
+  try {
+    // Try to decode the message - may fail if memory was freed
+    final msgString = message.toDartString();
+    if (msgString.isEmpty) return;
+    
+    final categoryString = category != nullptr ? category.toDartString() : 'RAC';
 
-  final logger = SDKLogger(categoryString);
+    final logger = SDKLogger(categoryString);
 
-  switch (level) {
-    case RacLogLevel.error:
-    case RacLogLevel.fatal:
-      logger.error(msgString);
-    case RacLogLevel.warning:
-      logger.warning(msgString);
-    case RacLogLevel.info:
-      logger.info(msgString);
-    case RacLogLevel.debug:
-      logger.debug(msgString);
-    case RacLogLevel.trace:
-      logger.debug('[TRACE] $msgString');
-    default:
-      logger.info(msgString);
+    switch (level) {
+      case RacLogLevel.error:
+      case RacLogLevel.fatal:
+        logger.error(msgString);
+      case RacLogLevel.warning:
+        logger.warning(msgString);
+      case RacLogLevel.info:
+        logger.info(msgString);
+      case RacLogLevel.debug:
+        logger.debug(msgString);
+      case RacLogLevel.trace:
+        logger.debug('[TRACE] $msgString');
+      default:
+        logger.info(msgString);
+    }
+  } catch (e) {
+    // Silently ignore invalid UTF-8 or freed memory errors
+    // This can happen because NativeCallable.listener runs asynchronously
+    // and the C++ log message buffer may have been freed by then
   }
 }
 

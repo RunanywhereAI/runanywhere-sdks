@@ -90,8 +90,8 @@ class ServiceContainer {
       environment: environment,
     );
 
-    // Configure TelemetryService
-    _configureTelemetryService(
+    // Configure TelemetryService (fetch device ID properly)
+    await _configureTelemetryService(
       environment: environment,
     );
 
@@ -129,11 +129,15 @@ class ServiceContainer {
   }
 
   /// Configure the telemetry service
-  void _configureTelemetryService({
+  Future<void> _configureTelemetryService({
     required SDKEnvironment environment,
-  }) {
+  }) async {
+    // Properly fetch device ID - don't use "unknown"
+    // This matches Swift/Kotlin which use real device IDs for telemetry
+    final deviceId = await DartBridgeDevice.instance.getDeviceId();
+    
     TelemetryService.shared.configure(
-      deviceId: DartBridgeDevice.cachedDeviceId ?? 'unknown',
+      deviceId: deviceId,
       environment: environment,
     );
 

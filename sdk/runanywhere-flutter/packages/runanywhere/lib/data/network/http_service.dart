@@ -7,6 +7,7 @@ import 'package:runanywhere/data/network/network_configuration.dart';
 import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
 import 'package:runanywhere/foundation/error_types/sdk_error.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 /// HTTP Service - Core network implementation using dart:http
@@ -125,6 +126,60 @@ class HTTPService {
     return _baseURL.isNotEmpty && _apiKey.isNotEmpty;
   }
 
+  // ============================================================================
+  // Token Resolution (matches Swift's resolveToken)
+  // ============================================================================
+
+  /// Resolve valid token for request, refreshing if needed.
+  /// Matches Swift's HTTPService.resolveToken(requiresAuth:)
+  Future<String> _resolveToken({required bool requiresAuth}) async {
+    if (_environment == SDKEnvironment.development) {
+      // Development mode - use Supabase key directly
+      return _supabaseKey;
+    }
+
+    if (!requiresAuth) {
+      // Non-auth requests use API key
+      return _apiKey;
+    }
+
+    // Production/Staging - check for valid token, refresh if needed
+    final authBridge = DartBridgeAuth.instance;
+
+    // Check if we have a valid token
+    final currentToken = authBridge.getAccessToken();
+    if (currentToken != null && !authBridge.needsRefresh()) {
+      return currentToken;
+    }
+
+    // Try refresh if we have a refresh token
+    if (authBridge.isAuthenticated()) {
+      _logger.debug('Token needs refresh, attempting refresh...');
+      final result = await authBridge.refreshToken();
+      if (result.isSuccess) {
+        final newToken = authBridge.getAccessToken();
+        if (newToken != null) {
+          // Update internal access token
+          _accessToken = newToken;
+          _logger.info('Token refreshed successfully');
+          return newToken;
+        }
+      } else {
+        _logger.warning('Token refresh failed: ${result.error}');
+      }
+    }
+
+    // Fallback to access token or API key
+    if (_accessToken != null && _accessToken!.isNotEmpty) {
+      return _accessToken!;
+    }
+    if (_apiKey.isNotEmpty) {
+      return _apiKey;
+    }
+
+    throw SDKError.authenticationFailed('No valid authentication token');
+  }
+
   /// Get current base URL
   String get currentBaseURL {
     if (_environment == SDKEnvironment.development && _supabaseURL.isNotEmpty) {
@@ -162,7 +217,13 @@ class HTTPService {
       url = '$url${separator}on_conflict=device_id';
     }
 
-    final response = await _executeRequest('POST', url, headers, data);
+    final response = await _executeRequest(
+      'POST',
+      url,
+      headers,
+      data,
+      requiresAuth: requiresAuth,
+    );
 
     // Handle 409 as success for device registration (device already exists)
     if (isDeviceReg && response.statusCode == 409) {
@@ -227,7 +288,13 @@ class HTTPService {
     final url = _buildFullURL(path);
     final headers = _buildHeaders(false, requiresAuth);
 
-    final response = await _executeRequest('GET', url, headers, null);
+    final response = await _executeRequest(
+      'GET',
+      url,
+      headers,
+      null,
+      requiresAuth: requiresAuth,
+    );
     return _handleResponse<T>(response, path, fromJson);
   }
 
@@ -273,7 +340,13 @@ class HTTPService {
     final url = _buildFullURL(path);
     final headers = _buildHeaders(false, requiresAuth);
 
-    final response = await _executeRequest('PUT', url, headers, data);
+    final response = await _executeRequest(
+      'PUT',
+      url,
+      headers,
+      data,
+      requiresAuth: requiresAuth,
+    );
     return _handleResponse<T>(response, path, fromJson);
   }
 
@@ -289,7 +362,13 @@ class HTTPService {
     final url = _buildFullURL(path);
     final headers = _buildHeaders(false, requiresAuth);
 
-    final response = await _executeRequest('DELETE', url, headers, null);
+    final response = await _executeRequest(
+      'DELETE',
+      url,
+      headers,
+      null,
+      requiresAuth: requiresAuth,
+    );
     return _handleResponse<T>(response, path, fromJson);
   }
 
@@ -301,12 +380,22 @@ class HTTPService {
     String method,
     String url,
     Map<String, String> headers,
-    Object? data,
-  ) async {
+    Object? data, {
+    bool requiresAuth = false,
+    bool isRetry = false,
+  }) async {
     final uri = Uri.parse(url);
     _logger.debug('$method $url');
 
     try {
+      // Resolve auth token if required (matches Swift's resolveToken pattern)
+      if (requiresAuth && _environment != SDKEnvironment.development) {
+        final token = await _resolveToken(requiresAuth: requiresAuth);
+        if (token.isNotEmpty) {
+          headers['Authorization'] = 'Bearer $token';
+        }
+      }
+
       late http.Response response;
 
       switch (method) {
@@ -346,6 +435,35 @@ class HTTPService {
           break;
         default:
           throw SDKError.networkError('Unsupported HTTP method: $method');
+      }
+
+      // Handle 401 Unauthorized - attempt token refresh and retry once
+      if (response.statusCode == 401 && requiresAuth && !isRetry) {
+        _logger.debug('Received 401, attempting token refresh and retry...');
+        
+        final authBridge = DartBridgeAuth.instance;
+        final refreshResult = await authBridge.refreshToken();
+        
+        if (refreshResult.isSuccess) {
+          final newToken = authBridge.getAccessToken();
+          if (newToken != null) {
+            _accessToken = newToken;
+            _logger.info('Token refreshed, retrying request...');
+            
+            // Retry the request with new token
+            final retryHeaders = Map<String, String>.from(headers);
+            return _executeRequest(
+              method,
+              url,
+              retryHeaders,
+              data,
+              requiresAuth: requiresAuth,
+              isRetry: true,
+            );
+          }
+        } else {
+          _logger.warning('Token refresh failed: ${refreshResult.error}');
+        }
       }
 
       return response;
