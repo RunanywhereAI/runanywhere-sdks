@@ -12,6 +12,7 @@ import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
 // =============================================================================
 // Exceptional return constants for FFI callbacks
@@ -315,23 +316,9 @@ class DartBridgeDevice {
 
   /// Generate a proper UUID v4 string (matches backend expectations)
   /// Format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+  /// Uses cryptographically secure random bytes via the uuid package
   static String _generateUUID() {
-    final random = DateTime.now().millisecondsSinceEpoch;
-    final bytes = <int>[];
-
-    // Generate 16 random bytes
-    for (var i = 0; i < 16; i++) {
-      bytes.add((random + i * 17) % 256);
-    }
-
-    // Set version to 4 (random UUID)
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    // Set variant to RFC 4122
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-
-    // Format as UUID string
-    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}';
+    return const Uuid().v4();
   }
 
   /// Validate UUID format (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
