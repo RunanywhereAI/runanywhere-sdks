@@ -70,10 +70,12 @@
 #include <android/log.h>
 #define LOG_TAG "HybridRunAnywhereCore"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 #else
 #define LOGI(...) printf("[HybridRunAnywhereCore] "); printf(__VA_ARGS__); printf("\n")
+#define LOGW(...) printf("[HybridRunAnywhereCore WARN] "); printf(__VA_ARGS__); printf("\n")
 #define LOGE(...) printf("[HybridRunAnywhereCore ERROR] "); printf(__VA_ARGS__); printf("\n")
 #define LOGD(...) printf("[HybridRunAnywhereCore DEBUG] "); printf(__VA_ARGS__); printf("\n")
 #endif
