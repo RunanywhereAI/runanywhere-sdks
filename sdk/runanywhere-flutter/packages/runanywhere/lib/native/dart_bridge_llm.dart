@@ -6,13 +6,16 @@
 /// This is a thin wrapper around C++ LLM component functions.
 /// All business logic is in C++ - Dart only manages the handle.
 ///
-/// IMPORTANT: Generation runs in a separate isolate to avoid heap corruption
-/// from C++ background threads (Metal GPU operations).
+/// STREAMING ARCHITECTURE:
+/// Streaming runs in a background isolate to prevent ANR (Application Not Responding).
+/// The C++ logger callback uses NativeCallable.listener which is thread-safe and
+/// can be called from any isolate. Token callbacks in the background isolate send
+/// messages to the main isolate via a SendPort.
 library dart_bridge_llm;
 
 import 'dart:async';
 import 'dart:ffi';
-import 'dart:isolate';
+import 'dart:isolate'; // Keep for non-streaming generation
 
 import 'package:ffi/ffi.dart';
 
@@ -267,11 +270,13 @@ class DartBridgeLLM {
   /// Generate text with streaming.
   ///
   /// Returns a stream of tokens as they are generated.
-  /// Uses native C++ streaming via an isolate with ReceivePort for safe
-  /// communication between the FFI callbacks and the main isolate.
+  /// 
+  /// ARCHITECTURE: Runs in a background isolate to prevent ANR.
+  /// The logger callback uses NativeCallable.listener which is thread-safe.
+  /// Tokens are sent back to the main isolate via SendPort for UI updates.
   Stream<String> generateStream(
     String prompt, {
-    int maxTokens = 512,
+    int maxTokens = 512, // Can use higher values now since it's non-blocking
     double temperature = 0.7,
   }) {
     final handle = getHandle();
@@ -280,11 +285,11 @@ class DartBridgeLLM {
       throw StateError('No LLM model loaded. Call loadModel() first.');
     }
 
-    // Create stream controller for emitting tokens
+    // Create stream controller for emitting tokens to the caller
     final controller = StreamController<String>();
 
-    // Start streaming generation asynchronously (fire-and-forget, errors are sent to controller)
-    unawaited(_startStreamingGeneration(
+    // Start streaming generation in a background isolate
+    unawaited(_startBackgroundStreaming(
       handle.address,
       prompt,
       maxTokens,
@@ -295,51 +300,59 @@ class DartBridgeLLM {
     return controller.stream;
   }
 
-  /// Start the streaming generation using isolate with ReceivePort.
-  Future<void> _startStreamingGeneration(
+  /// Start streaming generation in a background isolate.
+  /// 
+  /// ARCHITECTURE NOTE:
+  /// The logger callback now uses NativeCallable.listener which is thread-safe.
+  /// This allows us to run the FFI streaming call in a background isolate
+  /// without crashing when C++ logs. Tokens are sent back to the main isolate
+  /// via a ReceivePort/SendPort pair.
+  Future<void> _startBackgroundStreaming(
     int handleAddress,
     String prompt,
     int maxTokens,
     double temperature,
     StreamController<String> controller,
   ) async {
-    // Create a ReceivePort to receive tokens from the isolate
+    // Create a ReceivePort to receive tokens from the background isolate
     final receivePort = ReceivePort();
-
-    // Listen for messages from the isolate
+    
+    // Listen for messages from the background isolate
     receivePort.listen((message) {
       if (controller.isClosed) return;
-
+      
       if (message is String) {
-        if (message == '__DONE__') {
-          unawaited(controller.close());
+        // It's a token
+        controller.add(message);
+      } else if (message is _StreamingMessage) {
+        if (message.isComplete) {
+          controller.close();
           receivePort.close();
-        } else if (message.startsWith('__ERROR__:')) {
-          controller.addError(StateError(message.substring(10)));
-          unawaited(controller.close());
+        } else if (message.error != null) {
+          controller.addError(StateError(message.error!));
+          controller.close();
           receivePort.close();
-        } else {
-          // It's a token
-          controller.add(message);
         }
       }
     });
 
-    // Run the streaming generation in an isolate
+    // Spawn background isolate for streaming
     try {
       await Isolate.spawn(
         _streamingIsolateEntry,
-        _StreamingParams(
+        _StreamingIsolateParams(
+          sendPort: receivePort.sendPort,
           handleAddress: handleAddress,
           prompt: prompt,
           maxTokens: maxTokens,
           temperature: temperature,
-          sendPort: receivePort.sendPort,
         ),
       );
     } catch (e) {
-      controller.addError(e);
-      await controller.close();
+      if (!controller.isClosed) {
+        controller.addError(e);
+        await controller.close();
+      }
       receivePort.close();
     }
   }
@@ -407,64 +420,43 @@ class _IsolateGenerationResult {
 }
 
 // =============================================================================
-// Streaming Generation via Isolate
+// Background Isolate Streaming Support
 // =============================================================================
 
-/// Parameters for streaming generation isolate.
-class _StreamingParams {
+/// Parameters for the streaming isolate
+class _StreamingIsolateParams {
+  final SendPort sendPort;
   final int handleAddress;
   final String prompt;
   final int maxTokens;
   final double temperature;
-  final SendPort sendPort;
 
-  const _StreamingParams({
+  _StreamingIsolateParams({
+    required this.sendPort,
     required this.handleAddress,
     required this.prompt,
     required this.maxTokens,
     required this.temperature,
-    required this.sendPort,
   });
 }
 
-/// Global SendPort for static callbacks (set before generation starts).
-/// This is needed because Pointer.fromFunction can only call static/top-level
-/// functions that can't capture variables.
-SendPort? _globalSendPort;
+/// Message sent from streaming isolate to main isolate
+class _StreamingMessage {
+  final bool isComplete;
+  final String? error;
 
-/// Token callback - called from C++ for each token.
-/// Must be static for Pointer.fromFunction.
-@pragma('vm:entry-point')
-int _tokenCallback(Pointer<Utf8> token, Pointer<Void> userData) {
-  if (token != nullptr && _globalSendPort != null) {
-    final tokenStr = token.toDartString();
-    _globalSendPort!.send(tokenStr);
-  }
-  return RAC_TRUE; // Continue generation
+  _StreamingMessage({this.isComplete = false, this.error});
 }
 
-/// Complete callback - called from C++ when generation finishes.
-@pragma('vm:entry-point')
-void _completeCallback(
-    Pointer<RacLlmResultStruct> result, Pointer<Void> userData) {
-  _globalSendPort?.send('__DONE__');
-}
+/// SendPort for the current streaming operation in the background isolate
+SendPort? _isolateSendPort;
 
-/// Error callback - called from C++ on error.
+/// Entry point for the streaming isolate
 @pragma('vm:entry-point')
-void _errorCallback(
-    int errorCode, Pointer<Utf8> errorMessage, Pointer<Void> userData) {
-  final message =
-      errorMessage != nullptr ? errorMessage.toDartString() : 'Unknown error';
-  _globalSendPort?.send('__ERROR__:$message (code: $errorCode)');
-}
-
-/// Isolate entry point for streaming generation.
-@pragma('vm:entry-point')
-void _streamingIsolateEntry(_StreamingParams params) {
-  // Set global SendPort for callbacks
-  _globalSendPort = params.sendPort;
-
+void _streamingIsolateEntry(_StreamingIsolateParams params) {
+  // Store the SendPort for callbacks to use
+  _isolateSendPort = params.sendPort;
+  
   final handle = Pointer<Void>.fromAddress(params.handleAddress);
   final promptPtr = params.prompt.toNativeUtf8();
   final optionsPtr = calloc<RacLlmOptionsStruct>();
@@ -481,15 +473,15 @@ void _streamingIsolateEntry(_StreamingParams params) {
 
     final lib = PlatformLoader.loadCommons();
 
-    // Get callback function pointers using Pointer.fromFunction
+    // Get callback function pointers
     final tokenCallbackPtr =
         Pointer.fromFunction<Int32 Function(Pointer<Utf8>, Pointer<Void>)>(
-            _tokenCallback, 0);
+            _isolateTokenCallback, 1);
     final completeCallbackPtr = Pointer.fromFunction<
         Void Function(
-            Pointer<RacLlmResultStruct>, Pointer<Void>)>(_completeCallback);
+            Pointer<RacLlmResultStruct>, Pointer<Void>)>(_isolateCompleteCallback);
     final errorCallbackPtr = Pointer.fromFunction<
-        Void Function(Int32, Pointer<Utf8>, Pointer<Void>)>(_errorCallback);
+        Void Function(Int32, Pointer<Utf8>, Pointer<Void>)>(_isolateErrorCallback);
 
     final generateStreamFn = lib.lookupFunction<
         Int32 Function(
@@ -519,6 +511,7 @@ void _streamingIsolateEntry(_StreamingParams params) {
           Pointer<Void>,
         )>('rac_llm_component_generate_stream');
 
+    // This FFI call blocks until generation is complete
     final status = generateStreamFn(
       handle,
       promptPtr,
@@ -530,16 +523,46 @@ void _streamingIsolateEntry(_StreamingParams params) {
     );
 
     if (status != RAC_SUCCESS) {
-      params.sendPort.send(
-          '__ERROR__:Failed to start streaming: ${RacResultCode.getMessage(status)}');
+      params.sendPort.send(_StreamingMessage(
+        error: 'Failed to start streaming: ${RacResultCode.getMessage(status)}',
+      ));
     }
   } catch (e) {
-    params.sendPort.send('__ERROR__:$e');
+    params.sendPort.send(_StreamingMessage(error: 'Streaming exception: $e'));
   } finally {
     calloc.free(promptPtr);
     calloc.free(optionsPtr);
-    _globalSendPort = null;
+    _isolateSendPort = null;
   }
+}
+
+/// Token callback for background isolate streaming
+@pragma('vm:entry-point')
+int _isolateTokenCallback(Pointer<Utf8> token, Pointer<Void> userData) {
+  try {
+    if (_isolateSendPort != null && token != nullptr) {
+      final tokenStr = token.toDartString();
+      _isolateSendPort!.send(tokenStr);
+    }
+    return 1; // RAC_TRUE = continue generation
+  } catch (e) {
+    return 1; // Continue even on error
+  }
+}
+
+/// Completion callback for background isolate streaming
+@pragma('vm:entry-point')
+void _isolateCompleteCallback(
+    Pointer<RacLlmResultStruct> result, Pointer<Void> userData) {
+  _isolateSendPort?.send(_StreamingMessage(isComplete: true));
+}
+
+/// Error callback for background isolate streaming
+@pragma('vm:entry-point')
+void _isolateErrorCallback(
+    int errorCode, Pointer<Utf8> errorMsg, Pointer<Void> userData) {
+  final message = errorMsg != nullptr ? errorMsg.toDartString() : 'Unknown error';
+  _isolateSendPort?.send(_StreamingMessage(error: 'Generation error ($errorCode): $message'));
 }
 
 // =============================================================================
