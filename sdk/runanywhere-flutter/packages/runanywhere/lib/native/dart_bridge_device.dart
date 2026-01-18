@@ -6,6 +6,7 @@ import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:ffi/ffi.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/ffi_types.dart';
@@ -260,30 +261,39 @@ class DartBridgeDevice {
   // Internal Helpers
   // ============================================================================
 
-  /// Key for storing persistent device UUID in SharedPreferences
+  /// Key for storing persistent device UUID in Keychain/EncryptedSharedPreferences
+  /// Matches Swift KeychainManager.KeychainKey.deviceUUID and React Native SecureStorageKeys.deviceUUID
   static const _keyDeviceUUID = 'com.runanywhere.sdk.device.uuid';
+
+  /// Secure storage for device UUID persistence
+  /// - iOS: Keychain (survives app reinstalls)
+  /// - Android: EncryptedSharedPreferences (survives app reinstalls)
+  static const _secureStorage = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+  );
 
   /// Get or create a persistent device UUID.
   /// Matches Swift's DeviceIdentity.persistentUUID behavior:
-  /// 1. Try to retrieve stored UUID from persistent storage
-  /// 2. If not found, generate a new UUID and store it
+  /// 1. Try to retrieve stored UUID from Keychain/EncryptedSharedPreferences (survives reinstalls)
+  /// 2. If not found, try iOS vendor ID
+  /// 3. If still not found, generate new UUID
   /// The UUID format is required by the backend for device registration.
   static Future<String> _getOrCreateDeviceId() async {
     if (_cachedDeviceId != null) return _cachedDeviceId!;
 
     try {
-      // Initialize SharedPreferences if needed
-      _prefs ??= await SharedPreferences.getInstance();
-
-      // Strategy 1: Try to get stored UUID from SharedPreferences
-      final storedUUID = _prefs?.getString(_keyDeviceUUID);
+      // Strategy 1: Try to get stored UUID from secure storage (Keychain/EncryptedSharedPreferences)
+      // This persists across app reinstalls (matches Swift KeychainManager behavior)
+      final storedUUID = await _secureStorage.read(key: _keyDeviceUUID);
       if (storedUUID != null && _isValidUUID(storedUUID)) {
         _cachedDeviceId = storedUUID;
-        _logger.debug('Using stored device UUID');
+        _logger.debug('Using stored device UUID from secure storage');
         return _cachedDeviceId!;
       }
 
       // Strategy 2: On iOS, try to use identifierForVendor (already a UUID)
+      // Matches Swift: DeviceIdentity.vendorUUID fallback
       if (Platform.isIOS) {
         try {
           final deviceInfo = DeviceInfoPlugin();
@@ -291,8 +301,8 @@ class DartBridgeDevice {
           final vendorId = iosInfo.identifierForVendor;
           if (vendorId != null && _isValidUUID(vendorId)) {
             _cachedDeviceId = vendorId;
-            await _prefs?.setString(_keyDeviceUUID, vendorId);
-            _logger.debug('Stored iOS vendor UUID');
+            await _secureStorage.write(key: _keyDeviceUUID, value: vendorId);
+            _logger.debug('Stored iOS vendor UUID in secure storage');
             return _cachedDeviceId!;
           }
         } catch (e) {
@@ -303,14 +313,37 @@ class DartBridgeDevice {
       // Strategy 3: Generate a new UUID (matches Swift's UUID().uuidString)
       final newUUID = _generateUUID();
       _cachedDeviceId = newUUID;
-      await _prefs?.setString(_keyDeviceUUID, newUUID);
-      _logger.debug('Generated and stored new device UUID');
+      await _secureStorage.write(key: _keyDeviceUUID, value: newUUID);
+      _logger.debug('Generated and stored new device UUID in secure storage');
       return _cachedDeviceId!;
     } catch (e) {
-      _logger.warning('Failed to get device ID: $e');
-      // Fallback: generate UUID without storing (will regenerate on next launch)
-      _cachedDeviceId = _generateUUID();
-      return _cachedDeviceId!;
+      _logger.warning('Failed to get device ID from secure storage: $e');
+      
+      // Fallback: try SharedPreferences (less secure, doesn't survive reinstalls)
+      try {
+        _prefs ??= await SharedPreferences.getInstance();
+        final prefsUUID = _prefs?.getString(_keyDeviceUUID);
+        if (prefsUUID != null && _isValidUUID(prefsUUID)) {
+          _cachedDeviceId = prefsUUID;
+          // Try to migrate to secure storage
+          try {
+            await _secureStorage.write(key: _keyDeviceUUID, value: prefsUUID);
+            _logger.debug('Migrated device UUID to secure storage');
+          } catch (_) {}
+          return _cachedDeviceId!;
+        }
+        
+        final newUUID = _generateUUID();
+        _cachedDeviceId = newUUID;
+        await _prefs?.setString(_keyDeviceUUID, newUUID);
+        _logger.debug('Stored device UUID in SharedPreferences (fallback)');
+        return _cachedDeviceId!;
+      } catch (e2) {
+        _logger.warning('SharedPreferences fallback failed: $e2');
+        // Last resort: generate UUID without storing
+        _cachedDeviceId = _generateUUID();
+        return _cachedDeviceId!;
+      }
     }
   }
 
