@@ -253,14 +253,19 @@ static void telemetryHttpCallback(
     std::string apiKey;
 
     if (env == RAC_ENV_DEVELOPMENT) {
-        // Development: Use Supabase from C++ dev config
+        // Development: Use Supabase from C++ dev config (development_config.cpp)
+        // NO FALLBACK - credentials must come from C++ config only
         const char* devUrl = rac_dev_config_get_supabase_url();
         const char* devKey = rac_dev_config_get_supabase_key();
 
-        baseURL = devUrl ? devUrl : "https://fhtgjtxuoikwwouxqzrn.supabase.co";
+        baseURL = devUrl ? devUrl : "";
         apiKey = devKey ? devKey : "";
 
-        LOGD("Telemetry using Supabase: %s", baseURL.c_str());
+        if (baseURL.empty()) {
+            LOGW("Development mode but Supabase URL not configured in C++ dev_config");
+        } else {
+            LOGD("Telemetry using Supabase: %s", baseURL.c_str());
+        }
     } else {
         // Production/Staging: Use configured Railway URL
         // These come from SDK initialization (App.tsx -> RunAnywhere.initialize)
