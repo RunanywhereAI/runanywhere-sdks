@@ -150,7 +150,13 @@ class RunAnywhere {
         environment: params.environment,
       );
 
-      // Step 2.4: Authenticate with backend (production/staging only)
+      // Step 2.4: Register device with backend (REQUIRED before authentication)
+      // Matches Swift: CppBridge.Device.registerIfNeeded(environment:)
+      // The device must be registered in the backend database before auth can work
+      logger.debug('Registering device with backend...');
+      await _registerDeviceIfNeeded(params, logger);
+
+      // Step 2.5: Authenticate with backend (production/staging only)
       // Matches Swift: CppBridge.Auth.authenticate(apiKey:) in setupHTTP()
       // This gets access_token and refresh_token from backend for subsequent API calls
       if (params.environment != SDKEnvironment.development) {
@@ -158,7 +164,7 @@ class RunAnywhere {
         await _authenticateWithBackend(params, logger);
       }
 
-      // Step 2.5: Initialize model registry
+      // Step 2.6: Initialize model registry
       // CRITICAL: Uses the GLOBAL C++ registry via rac_get_model_registry()
       // Models must be in the global registry for rac_llm_component_load_model to find them
       logger.debug('Initializing model registry...');
@@ -196,6 +202,30 @@ class RunAnywhere {
       );
 
       rethrow;
+    }
+  }
+
+  /// Register device with backend if not already registered.
+  /// Matches Swift: CppBridge.Device.registerIfNeeded(environment:)
+  /// This MUST happen before authentication.
+  static Future<void> _registerDeviceIfNeeded(
+    SDKInitParams params,
+    SDKLogger logger,
+  ) async {
+    try {
+      // First ensure DartBridgeDevice is fully registered with callbacks
+      await DartBridgeDevice.register(
+        environment: params.environment,
+        baseURL: params.baseURL.toString(),
+      );
+
+      // Then call the C++ device registration
+      await DartBridgeDevice.instance.registerIfNeeded();
+      logger.debug('Device registration check completed');
+    } catch (e) {
+      // Device registration failures are non-critical
+      // App can still work offline with local models
+      logger.warning('Device registration failed (non-critical): $e');
     }
   }
 
