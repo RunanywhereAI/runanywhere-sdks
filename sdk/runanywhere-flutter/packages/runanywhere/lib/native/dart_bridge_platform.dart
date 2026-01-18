@@ -53,6 +53,11 @@ class DartBridgePlatform {
   /// Pointer to the adapter struct (must persist for C++ to call)
   static Pointer<RacPlatformAdapterStruct>? _adapterPtr;
 
+  /// Thread-safe logger callback using NativeCallable.listener
+  /// This callback can be invoked from ANY thread/isolate and posts to our event loop
+  /// CRITICAL: Must be kept alive to prevent garbage collection
+  static NativeCallable<RacLogCallbackNative>? _loggerCallable;
+
   /// Secure storage for keychain operations
   // ignore: unused_field
   static const _secureStorage = FlutterSecureStorage(
@@ -75,10 +80,14 @@ class DartBridgePlatform {
       _adapterPtr = calloc<RacPlatformAdapterStruct>();
       final adapter = _adapterPtr!;
 
-      // Logging callback
-      adapter.ref.log = Pointer.fromFunction<RacLogCallbackNative>(
+      // Logging callback - MUST use NativeCallable.listener for thread safety
+      // This allows C++ to call the logger from any thread (including background
+      // threads used by LLM generation) without crashing with:
+      // "Cannot invoke native callback from a different isolate"
+      _loggerCallable = NativeCallable<RacLogCallbackNative>.listener(
         _platformLogCallback,
       );
+      adapter.ref.log = _loggerCallable!.nativeFunction;
 
       // File operations
       adapter.ref.fileExists =
@@ -176,6 +185,12 @@ class DartBridgePlatform {
     // Note: We can't actually unregister from C++ since it holds a pointer
     // Just mark as unregistered
     _isRegistered = false;
+
+    // Close the logger callable to release resources
+    // Note: Only do this during true shutdown - C++ may still try to log
+    // We keep it alive during normal operation
+    // _loggerCallable?.close();
+    // _loggerCallable = null;
 
     // Don't free _adapterPtr - C++ may still reference it
     // It will be cleaned up on process exit
