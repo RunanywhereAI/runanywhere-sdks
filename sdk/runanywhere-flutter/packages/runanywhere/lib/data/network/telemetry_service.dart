@@ -5,6 +5,7 @@ import 'package:runanywhere/data/network/http_service.dart';
 import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
+import 'package:uuid/uuid.dart';
 
 /// Telemetry event categories (matches C++/Swift/React Native categories)
 enum TelemetryCategory {
@@ -61,10 +62,11 @@ class TelemetryEvent {
         timestamp = timestamp ?? DateTime.now(),
         createdAt = DateTime.now();
 
+  /// Generate a proper UUID v4 string for event IDs.
+  /// Backend requires UUID format (xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx).
+  /// Uses the uuid package for proper RFC 4122 compliance.
   static String _generateEventId() {
-    final now = DateTime.now();
-    final random = now.microsecondsSinceEpoch % 10000;
-    return 'evt_${now.millisecondsSinceEpoch}_$random';
+    return const Uuid().v4();
   }
 
   /// Convert to JSON for Supabase (development)
@@ -155,14 +157,110 @@ class TelemetryEvent {
   }
 
   /// Convert to JSON for Production (Railway)
-  Map<String, dynamic> toProductionJson() => {
-        'id': id,
-        'event_type': type,
-        'timestamp': timestamp.toUtc().toIso8601String(),
-        'created_at': createdAt.toUtc().toIso8601String(),
-        'category': category.value,
-        'properties': properties,
-      };
+  /// Matches C++ telemetry_json.cpp rac_telemetry_manager_payload_to_json()
+  ///
+  /// Key differences from development:
+  /// - Uses "id" (not "sdk_event_id")
+  /// - Uses "timestamp" (not "event_timestamp")
+  /// - Does NOT include modality or device_id at event level (they're at batch level)
+  /// - All fields flattened (no 'properties' nesting)
+  /// - No 'category' field (extra='forbid')
+  Map<String, dynamic> toProductionJson() {
+    final json = <String, dynamic>{
+      // Required fields - match C++ exactly
+      'id': id, // UUID format
+      'timestamp': timestamp.toUtc().toIso8601String(),
+      'event_type': type,
+      'created_at': createdAt.toUtc().toIso8601String(),
+      // NOTE: modality and device_id are at BATCH level in production, not here
+    };
+
+    // Helper to add non-null/non-zero values only (matches C++ add_string/add_int behavior)
+    void addIfNotNull(String key, dynamic value) {
+      if (value == null) return;
+      // Skip zero values for numbers (matches C++ add_int behavior)
+      if (value is num && value == 0) return;
+      json[key] = value;
+    }
+
+    // Helper to get value from properties
+    dynamic getValue(String key, [String? fallbackKey]) {
+      return properties[key] ??
+          (fallbackKey != null ? properties[fallbackKey] : null);
+    }
+
+    // Session tracking
+    addIfNotNull('session_id', getValue('session_id'));
+
+    // Model info
+    addIfNotNull('model_id', getValue('model_id'));
+    addIfNotNull('model_name', getValue('model_name'));
+    addIfNotNull('framework', getValue('framework'));
+
+    // Device info (included at event level in production per C++ telemetry_json.cpp:218-221)
+    addIfNotNull('device', getValue('device'));
+    addIfNotNull('os_version', getValue('os_version'));
+    addIfNotNull('platform', getValue('platform'));
+    addIfNotNull('sdk_version', getValue('sdk_version'));
+
+    // Common metrics
+    addIfNotNull(
+        'processing_time_ms',
+        getValue('processing_time_ms') ??
+            getValue('load_time_ms') ??
+            getValue('latency_ms') ??
+            getValue('download_time_ms'));
+    addIfNotNull('success', getValue('success'));
+    addIfNotNull('error_message', getValue('error_message'));
+    addIfNotNull('error_code', getValue('error_code'));
+
+    // LLM fields (match C++ telemetry_json.cpp:229-239)
+    addIfNotNull('input_tokens', getValue('input_tokens', 'prompt_tokens'));
+    addIfNotNull('output_tokens', getValue('output_tokens', 'completion_tokens'));
+    addIfNotNull('total_tokens', getValue('total_tokens'));
+    addIfNotNull('tokens_per_second', getValue('tokens_per_second'));
+    addIfNotNull('time_to_first_token_ms', getValue('time_to_first_token_ms'));
+    addIfNotNull('prompt_eval_time_ms', getValue('prompt_eval_time_ms'));
+    addIfNotNull('generation_time_ms', getValue('generation_time_ms'));
+    addIfNotNull('context_length', getValue('context_length'));
+    addIfNotNull('temperature', getValue('temperature'));
+    addIfNotNull('max_tokens', getValue('max_tokens'));
+
+    // STT fields (match C++ telemetry_json.cpp:242-248)
+    addIfNotNull('audio_duration_ms', getValue('audio_duration_ms'));
+    addIfNotNull('real_time_factor', getValue('real_time_factor'));
+    addIfNotNull('word_count', getValue('word_count'));
+    addIfNotNull('confidence', getValue('confidence'));
+    addIfNotNull('language', getValue('language'));
+    addIfNotNull('is_streaming', getValue('is_streaming'));
+    addIfNotNull('segment_index', getValue('segment_index'));
+
+    // TTS fields (match C++ telemetry_json.cpp:251-256)
+    addIfNotNull('character_count', getValue('character_count', 'text_length'));
+    addIfNotNull('characters_per_second', getValue('characters_per_second'));
+    addIfNotNull('audio_size_bytes', getValue('audio_size_bytes'));
+    addIfNotNull('sample_rate', getValue('sample_rate'));
+    addIfNotNull('voice', getValue('voice', 'voice_id'));
+    addIfNotNull('output_duration_ms', getValue('output_duration_ms'));
+
+    // Model lifecycle (match C++ telemetry_json.cpp:259-260)
+    addIfNotNull('model_size_bytes', getValue('model_size_bytes'));
+    addIfNotNull('archive_type', getValue('archive_type'));
+
+    // VAD (match C++ telemetry_json.cpp:263)
+    addIfNotNull('speech_duration_ms', getValue('speech_duration_ms'));
+
+    // SDK lifecycle (match C++ telemetry_json.cpp:266)
+    addIfNotNull('count', getValue('count'));
+
+    // Storage (match C++ telemetry_json.cpp:269)
+    addIfNotNull('freed_bytes', getValue('freed_bytes'));
+
+    // Network (match C++ telemetry_json.cpp:272)
+    addIfNotNull('is_online', getValue('is_online'));
+
+    return json;
+  }
 }
 
 /// TelemetryService - Event tracking for RunAnywhere SDK
@@ -357,21 +455,53 @@ class TelemetryService {
         }
         _logger.debug('Flushed $successCount/${batch.length} events');
       } else {
-        // Production/Staging: Wrapped batch object for Railway
-        final payload = {
-          'device_id': _deviceId,
-          'sdk_version': SDKConstants.version,
-          'platform': SDKConstants.platform,
-          'timestamp': DateTime.now().toUtc().toIso8601String(),
-          'events': batch.map((e) => e.toProductionJson()).toList(),
-        };
+        // Production/Staging: Group events by modality and send separate batches
+        // This matches the C++ telemetry manager which groups by modality
+        // V2 modalities: llm, stt, tts, model (get modality field at batch level)
+        // V1 modality: system/null (SDK lifecycle, storage, device, network events)
+        final v2Modalities = {'llm', 'stt', 'tts', 'model'};
+        final Map<String?, List<TelemetryEvent>> byModality = {};
 
-        await HTTPService.shared.post<dynamic>(
-          endpoint,
-          payload,
-          requiresAuth: true,
-        );
-        _logger.debug('Flushed ${batch.length} events');
+        // Group events by modality
+        for (final event in batch) {
+          final modality = event.category.value;
+          // V2 modalities get their modality name, V1 events get null
+          final key = v2Modalities.contains(modality) ? modality : null;
+          byModality.putIfAbsent(key, () => []).add(event);
+        }
+
+        // Send batches by modality (matching C++ telemetry_manager.cpp)
+        int successCount = 0;
+        for (final entry in byModality.entries) {
+          final modality = entry.key;
+          final modalityEvents = entry.value;
+
+          final payload = <String, dynamic>{
+            'events': modalityEvents.map((e) => e.toProductionJson()).toList(),
+            'device_id': _deviceId,
+            'timestamp': DateTime.now().toUtc().toIso8601String(),
+          };
+
+          // Include modality at batch level for V2 events
+          if (modality != null) {
+            payload['modality'] = modality;
+          }
+
+          try {
+            await HTTPService.shared.post<dynamic>(
+              endpoint,
+              payload,
+              requiresAuth: true,
+            );
+            successCount += modalityEvents.length;
+            _logger.debug(
+                'Flushed ${modalityEvents.length} ${modality ?? "system"} events');
+          } catch (e) {
+            _logger.error(
+                'Failed to flush ${modality ?? "system"} events: $e');
+          }
+        }
+        _logger.debug('Flushed $successCount/${batch.length} events total');
       }
     } catch (e) {
       _logger.error('Failed to flush telemetry: $e');

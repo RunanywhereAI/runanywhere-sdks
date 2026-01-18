@@ -259,35 +259,95 @@ class DartBridgeDevice {
   // Internal Helpers
   // ============================================================================
 
+  /// Key for storing persistent device UUID in SharedPreferences
+  static const _keyDeviceUUID = 'com.runanywhere.sdk.device.uuid';
+
+  /// Get or create a persistent device UUID.
+  /// Matches Swift's DeviceIdentity.persistentUUID behavior:
+  /// 1. Try to retrieve stored UUID from persistent storage
+  /// 2. If not found, generate a new UUID and store it
+  /// The UUID format is required by the backend for device registration.
   static Future<String> _getOrCreateDeviceId() async {
     if (_cachedDeviceId != null) return _cachedDeviceId!;
 
     try {
-      final deviceInfo = DeviceInfoPlugin();
+      // Initialize SharedPreferences if needed
+      _prefs ??= await SharedPreferences.getInstance();
 
-      if (Platform.isIOS) {
-        final iosInfo = await deviceInfo.iosInfo;
-        _cachedDeviceId = iosInfo.identifierForVendor ?? _generateFallbackId();
-      } else if (Platform.isAndroid) {
-        final androidInfo = await deviceInfo.androidInfo;
-        _cachedDeviceId = androidInfo.id;
-      } else if (Platform.isMacOS) {
-        final macInfo = await deviceInfo.macOsInfo;
-        _cachedDeviceId = macInfo.systemGUID ?? _generateFallbackId();
-      } else {
-        _cachedDeviceId = _generateFallbackId();
+      // Strategy 1: Try to get stored UUID from SharedPreferences
+      final storedUUID = _prefs?.getString(_keyDeviceUUID);
+      if (storedUUID != null && _isValidUUID(storedUUID)) {
+        _cachedDeviceId = storedUUID;
+        _logger.debug('Using stored device UUID');
+        return _cachedDeviceId!;
       }
+
+      // Strategy 2: On iOS, try to use identifierForVendor (already a UUID)
+      if (Platform.isIOS) {
+        try {
+          final deviceInfo = DeviceInfoPlugin();
+          final iosInfo = await deviceInfo.iosInfo;
+          final vendorId = iosInfo.identifierForVendor;
+          if (vendorId != null && _isValidUUID(vendorId)) {
+            _cachedDeviceId = vendorId;
+            await _prefs?.setString(_keyDeviceUUID, vendorId);
+            _logger.debug('Stored iOS vendor UUID');
+            return _cachedDeviceId!;
+          }
+        } catch (e) {
+          _logger.debug('Failed to get iOS vendor ID: $e');
+        }
+      }
+
+      // Strategy 3: Generate a new UUID (matches Swift's UUID().uuidString)
+      final newUUID = _generateUUID();
+      _cachedDeviceId = newUUID;
+      await _prefs?.setString(_keyDeviceUUID, newUUID);
+      _logger.debug('Generated and stored new device UUID');
+      return _cachedDeviceId!;
     } catch (e) {
       _logger.warning('Failed to get device ID: $e');
-      _cachedDeviceId = _generateFallbackId();
+      // Fallback: generate UUID without storing (will regenerate on next launch)
+      _cachedDeviceId = _generateUUID();
+      return _cachedDeviceId!;
     }
-
-    return _cachedDeviceId!;
   }
 
-  static String _generateFallbackId() {
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    return 'flutter-$timestamp-${DateTime.now().hashCode.abs()}';
+  /// Generate a proper UUID v4 string (matches backend expectations)
+  /// Format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+  static String _generateUUID() {
+    final random = DateTime.now().millisecondsSinceEpoch;
+    final bytes = <int>[];
+
+    // Generate 16 random bytes
+    for (var i = 0; i < 16; i++) {
+      bytes.add((random + i * 17) % 256);
+    }
+
+    // Set version to 4 (random UUID)
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    // Set variant to RFC 4122
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+    // Format as UUID string
+    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}';
+  }
+
+  /// Validate UUID format (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+  static bool _isValidUUID(String uuid) {
+    if (uuid.length != 36) return false;
+    if (!uuid.contains('-')) return false;
+    final parts = uuid.split('-');
+    if (parts.length != 5) return false;
+    if (parts[0].length != 8 ||
+        parts[1].length != 4 ||
+        parts[2].length != 4 ||
+        parts[3].length != 4 ||
+        parts[4].length != 12) {
+      return false;
+    }
+    return true;
   }
 
   static int _environmentToInt(SDKEnvironment env) {
