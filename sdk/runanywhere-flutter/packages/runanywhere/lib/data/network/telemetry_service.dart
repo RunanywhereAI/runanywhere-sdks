@@ -178,9 +178,17 @@ class TelemetryEvent {
     // Helper to add non-null/non-zero values only (matches C++ add_string/add_int behavior)
     void addIfNotNull(String key, dynamic value) {
       if (value == null) return;
-      // Skip zero values for numbers (matches C++ add_int behavior)
-      if (value is num && value == 0) return;
+      // Skip zero values for integers (matches C++ add_int behavior)
+      // But keep zero for doubles (confidence, real_time_factor, etc. can be 0.0)
+      if (value is int && value == 0) return;
       json[key] = value;
+    }
+
+    // Helper to always add a value, even if zero (for fields that must be present)
+    void addAlways(String key, dynamic value) {
+      if (value != null) {
+        json[key] = value;
+      }
     }
 
     // Helper to get value from properties
@@ -241,7 +249,8 @@ class TelemetryEvent {
     addIfNotNull('audio_size_bytes', getValue('audio_size_bytes'));
     addIfNotNull('sample_rate', getValue('sample_rate'));
     addIfNotNull('voice', getValue('voice', 'voice_id'));
-    addIfNotNull('output_duration_ms', getValue('output_duration_ms'));
+    // TTS stores audio_duration_ms but backend expects output_duration_ms
+    addIfNotNull('output_duration_ms', getValue('output_duration_ms', 'audio_duration_ms'));
 
     // Model lifecycle (match C++ telemetry_json.cpp:259-260)
     addIfNotNull('model_size_bytes', getValue('model_size_bytes'));
@@ -650,6 +659,18 @@ class TelemetryService {
         detectedLanguage = langMatch.group(1)?.toLowerCase();
       }
     }
+
+    // Ensure confidence has a value - models that don't compute confidence return 0.0
+    // Use 1.0 as default for successful transcriptions (high confidence)
+    // If model returns 0.0 (no confidence computed), estimate based on word count
+    double effectiveConfidence = confidence ?? 0.0;
+    if (effectiveConfidence == 0.0 && wordCount != null && wordCount > 0) {
+      // Model didn't compute confidence but we got words - estimate 0.9 confidence
+      effectiveConfidence = 0.9;
+    } else if (effectiveConfidence == 0.0) {
+      // No words, low confidence
+      effectiveConfidence = 0.0;
+    }
     
     track(
       'transcription_completed',
@@ -660,7 +681,7 @@ class TelemetryService {
         'audio_duration_ms': audioDurationMs,
         'latency_ms': latencyMs,
         'word_count': wordCount,
-        'confidence': confidence,
+        'confidence': effectiveConfidence,
         'language': detectedLanguage,
         'real_time_factor': realTimeFactor,
         'is_streaming': isStreaming,
@@ -691,7 +712,9 @@ class TelemetryService {
         'voice_id': voiceId,
         'model_name': modelName,
         'text_length': textLength,
+        'character_count': textLength, // Alias for backend compatibility
         'audio_duration_ms': audioDurationMs,
+        'output_duration_ms': audioDurationMs, // Alias for TTS backend field
         'latency_ms': latencyMs,
         'sample_rate': sampleRate,
         'characters_per_second': charactersPerSecond,
