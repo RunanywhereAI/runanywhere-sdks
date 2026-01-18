@@ -6,6 +6,7 @@ import 'package:runanywhere/capabilities/voice/models/voice_session.dart';
 import 'package:runanywhere/capabilities/voice/models/voice_session_handle.dart';
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/core/types/storage_types.dart';
+import 'package:runanywhere/data/network/http_service.dart';
 import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
 import 'package:runanywhere/foundation/dependency_injection/service_container.dart'
@@ -14,6 +15,7 @@ import 'package:runanywhere/foundation/error_types/sdk_error.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/infrastructure/download/download_service.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
+import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_model_paths.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart'
@@ -148,7 +150,15 @@ class RunAnywhere {
         environment: params.environment,
       );
 
-      // Step 2.4: Initialize model registry
+      // Step 2.4: Authenticate with backend (production/staging only)
+      // Matches Swift: CppBridge.Auth.authenticate(apiKey:) in setupHTTP()
+      // This gets access_token and refresh_token from backend for subsequent API calls
+      if (params.environment != SDKEnvironment.development) {
+        logger.debug('Authenticating with backend...');
+        await _authenticateWithBackend(params, logger);
+      }
+
+      // Step 2.5: Initialize model registry
       // CRITICAL: Uses the GLOBAL C++ registry via rac_get_model_registry()
       // Models must be in the global registry for rac_llm_component_load_model to find them
       logger.debug('Initializing model registry...');
@@ -186,6 +196,53 @@ class RunAnywhere {
       );
 
       rethrow;
+    }
+  }
+
+  /// Authenticate with backend for production/staging environments.
+  /// Matches Swift: CppBridge.Auth.authenticate(apiKey:) in setupHTTP()
+  static Future<void> _authenticateWithBackend(
+    SDKInitParams params,
+    SDKLogger logger,
+  ) async {
+    try {
+      // Initialize auth manager first
+      await DartBridgeAuth.initialize(
+        environment: params.environment,
+        baseURL: params.baseURL.toString(),
+      );
+
+      // Get device ID - MUST fetch properly, not just check cache
+      // This matches Swift's DeviceIdentity.persistentUUID and Kotlin's CppBridgeDevice.getDeviceId()
+      final deviceId = await DartBridgeDevice.instance.getDeviceId();
+      logger.debug('Authenticating with device ID: $deviceId');
+
+      // Authenticate with backend to get JWT tokens
+      final result = await DartBridgeAuth.instance.authenticate(
+        apiKey: params.apiKey,
+        deviceId: deviceId,
+      );
+
+      if (result.isSuccess) {
+        logger.info('Authenticated for ${params.environment.description}');
+        // Set access token on HTTP service for subsequent requests
+        if (result.data?.accessToken != null) {
+          HTTPService.shared.setToken(result.data!.accessToken!);
+        }
+      } else {
+        // Log warning but don't fail - telemetry will fail silently
+        // and offline inference will still work
+        logger.warning(
+          'Authentication failed: ${result.error}',
+          metadata: {'environment': params.environment.name},
+        );
+      }
+    } catch (e) {
+      // Log warning but don't fail initialization
+      logger.warning(
+        'Authentication error: $e',
+        metadata: {'environment': params.environment.name},
+      );
     }
   }
 
