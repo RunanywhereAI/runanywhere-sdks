@@ -660,17 +660,11 @@ class TelemetryService {
       }
     }
 
-    // Ensure confidence has a value - models that don't compute confidence return 0.0
-    // Use 1.0 as default for successful transcriptions (high confidence)
-    // If model returns 0.0 (no confidence computed), estimate based on word count
-    double effectiveConfidence = confidence ?? 0.0;
-    if (effectiveConfidence == 0.0 && wordCount != null && wordCount > 0) {
-      // Model didn't compute confidence but we got words - estimate 0.9 confidence
-      effectiveConfidence = 0.9;
-    } else if (effectiveConfidence == 0.0) {
-      // No words, low confidence
-      effectiveConfidence = 0.0;
-    }
+    // Preserve original confidence value - don't fabricate estimates
+    // Track source to let analytics distinguish model-provided vs unknown confidence
+    final double? effectiveConfidence = confidence;
+    // 'model' = model returned a value (including 0.0), 'unknown' = null/not provided
+    final String confidenceSource = confidence != null ? 'model' : 'unknown';
     
     track(
       'transcription_completed',
@@ -682,6 +676,7 @@ class TelemetryService {
         'latency_ms': latencyMs,
         'word_count': wordCount,
         'confidence': effectiveConfidence,
+        'confidence_source': confidenceSource,
         'language': detectedLanguage,
         'real_time_factor': realTimeFactor,
         'is_streaming': isStreaming,
