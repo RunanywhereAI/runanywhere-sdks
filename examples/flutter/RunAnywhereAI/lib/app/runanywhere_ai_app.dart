@@ -50,29 +50,9 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       // Yield to allow UI to render before heavy work
       await Future<void>.delayed(Duration.zero);
 
-      // Initialize SDK based on build configuration
-      // Matches iOS pattern exactly
-      
-      // TESTING PRODUCTION MODE - Railway backend
-      // Temporarily bypassing kDebugMode check for testing
-      const testProduction = true; // Set to false to use development mode
-      
-      if (!testProduction && kDebugMode) {
-        // Development mode - uses Supabase, no API key needed
-        await RunAnywhere.initialize();
-        debugPrint('✅ SDK initialized in DEVELOPMENT mode');
-      } else {
-        // PRODUCTION mode - sends telemetry to Railway backend
-        const apiKey = 'runa_prod_klzsc-NVR-Js1Cs0kg4pxBuz3AM4Mm82vaX-f79Z3XE';
-        const baseURL = 'https://runanywhere-backend-development.up.railway.app';
-
-        await RunAnywhere.initialize(
-          apiKey: apiKey,
-          baseURL: baseURL,
-          environment: SDKEnvironment.production,
-        );
-        debugPrint('✅ SDK initialized in PRODUCTION mode (Railway backend)');
-      }
+      // Initialize SDK in development mode
+      await RunAnywhere.initialize();
+      debugPrint('✅ SDK initialized');
 
       // Yield to allow UI to update between heavy operations
       await Future<void>.delayed(Duration.zero);
