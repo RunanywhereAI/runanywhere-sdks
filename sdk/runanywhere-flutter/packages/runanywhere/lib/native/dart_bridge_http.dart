@@ -7,6 +7,7 @@ import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 import 'package:http/http.dart' as http;
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
@@ -184,6 +185,7 @@ class DartBridgeHTTP {
     Map<String, String>? headers,
     bool requiresAuth = true,
     Duration? timeout,
+    bool isRetry = false,
   }) async {
     if (!_isConfigured || _baseURL == null) {
       return HTTPResult.failure('HTTP not configured');
@@ -200,11 +202,14 @@ class DartBridgeHTTP {
         if (headers != null) ...headers,
       };
 
-      // Add auth header if required
-      if (requiresAuth && _accessToken != null) {
-        requestHeaders['Authorization'] = 'Bearer $_accessToken';
-      } else if (requiresAuth && _apiKey != null) {
-        requestHeaders['X-API-Key'] = _apiKey!;
+      // Resolve token if auth is required (matches Swift's resolveToken pattern)
+      if (requiresAuth) {
+        final token = await _resolveToken(requiresAuth: true);
+        if (token != null && token.isNotEmpty) {
+          requestHeaders['Authorization'] = 'Bearer $token';
+        } else if (_apiKey != null) {
+          requestHeaders['X-API-Key'] = _apiKey!;
+        }
       }
 
       // Encode body
@@ -236,6 +241,35 @@ class DartBridgeHTTP {
         client.close();
       }
 
+      // Handle 401 Unauthorized - attempt token refresh and retry once
+      if (response.statusCode == 401 && requiresAuth && !isRetry) {
+        _logger.debug('Received 401, attempting token refresh and retry...');
+        
+        final authBridge = DartBridgeAuth.instance;
+        final refreshResult = await authBridge.refreshToken();
+        
+        if (refreshResult.isSuccess) {
+          final newToken = authBridge.getAccessToken();
+          if (newToken != null) {
+            _accessToken = newToken;
+            _logger.info('Token refreshed, retrying request...');
+            
+            // Retry the request with new token
+            return _request(
+              method: method,
+              endpoint: endpoint,
+              body: body,
+              headers: headers,
+              requiresAuth: requiresAuth,
+              timeout: timeout,
+              isRetry: true,
+            );
+          }
+        } else {
+          _logger.warning('Token refresh failed: ${refreshResult.error}');
+        }
+      }
+
       // Parse response
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return HTTPResult.success(
@@ -260,6 +294,44 @@ class DartBridgeHTTP {
       });
       return HTTPResult.failure(e.toString());
     }
+  }
+
+  /// Resolve valid token for request, refreshing if needed.
+  /// Matches Swift's HTTPService.resolveToken(requiresAuth:)
+  Future<String?> _resolveToken({required bool requiresAuth}) async {
+    if (!requiresAuth) {
+      return _apiKey;
+    }
+
+    final authBridge = DartBridgeAuth.instance;
+
+    // Check if we have a valid token
+    final currentToken = authBridge.getAccessToken();
+    if (currentToken != null && !authBridge.needsRefresh()) {
+      return currentToken;
+    }
+
+    // Try refresh if authenticated
+    if (authBridge.isAuthenticated()) {
+      _logger.debug('Token needs refresh, attempting refresh...');
+      final result = await authBridge.refreshToken();
+      if (result.isSuccess) {
+        final newToken = authBridge.getAccessToken();
+        if (newToken != null) {
+          _accessToken = newToken;
+          _logger.info('Token refreshed successfully');
+          return newToken;
+        }
+      } else {
+        _logger.warning('Token refresh failed: ${result.error}');
+      }
+    }
+
+    // Fallback to access token or API key
+    if (_accessToken != null && _accessToken!.isNotEmpty) {
+      return _accessToken;
+    }
+    return _apiKey;
   }
 
   /// Download file

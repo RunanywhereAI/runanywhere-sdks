@@ -3,12 +3,15 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
+import 'dart:io' show Platform;
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
+import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_state.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
@@ -86,7 +89,7 @@ class DartBridgeAuth {
       initAuth(_storagePtr!);
 
       // Load stored tokens
-      instance._loadStoredTokens();
+      await instance._loadStoredTokens();
 
       _isInitialized = true;
       _logger.debug('Auth manager initialized');
@@ -138,6 +141,9 @@ class DartBridgeAuth {
       final baseURL = _baseURL ?? _getDefaultBaseURL();
       final url = Uri.parse('$baseURL$endpoint');
 
+      _logger.debug('Auth POST to: $url');
+      _logger.debug('Auth body: $requestJson');
+
       final response = await http.post(
         url,
         headers: {
@@ -147,11 +153,22 @@ class DartBridgeAuth {
         body: requestJson,
       );
 
+      _logger.debug('Auth response status: ${response.statusCode}');
+      _logger.debug('Auth response body: ${response.body}');
+
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // Parse response via C++
-        final success = _handleAuthenticateResponse(response.body);
-        if (success) {
-          return AuthResult.success(_parseAuthResponse(response.body));
+        // Parse response and store tokens
+        final authData = _parseAuthResponse(response.body);
+
+        // Try C++ handler first
+        final cppSuccess = _handleAuthenticateResponse(response.body);
+
+        // Also manually store tokens in secure storage (in case C++ handler unavailable)
+        await _storeAuthTokens(authData);
+
+        if (cppSuccess || authData.accessToken != null) {
+          _logger.info('Authentication successful');
+          return AuthResult.success(authData);
         } else {
           return AuthResult.failure('Failed to parse auth response');
         }
@@ -169,41 +186,84 @@ class DartBridgeAuth {
   /// Refresh access token
   Future<AuthResult> refreshToken() async {
     try {
-      // Build refresh request JSON via C++
-      final requestJson = _buildRefreshRequestJSON();
-
-      if (requestJson == null) {
+      // Get refresh token (try all sources)
+      final refreshToken = await getRefreshTokenAsync();
+      if (refreshToken == null || refreshToken.isEmpty) {
+        _logger.debug('No refresh token available');
         return AuthResult.failure('No refresh token available');
       }
+
+      // Get device ID (try all sources, matching getRefreshTokenAsync pattern)
+      var deviceId = getDeviceId();
+      if (deviceId == null || deviceId.isEmpty) {
+        // Try cache
+        deviceId = _secureCache['com.runanywhere.sdk.deviceId'];
+      }
+      if (deviceId == null || deviceId.isEmpty) {
+        // Try secure storage directly
+        try {
+          const storage = FlutterSecureStorage(
+            aOptions: AndroidOptions(encryptedSharedPreferences: true),
+            iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+          );
+          deviceId = await storage.read(key: 'com.runanywhere.sdk.deviceId');
+          if (deviceId != null && deviceId.isNotEmpty) {
+            _secureCache['com.runanywhere.sdk.deviceId'] = deviceId;
+          }
+        } catch (e) {
+          _logger.debug('Failed to read device ID from secure storage: $e');
+        }
+      }
+      if (deviceId == null || deviceId.isEmpty) {
+        // Fallback: get from DartBridgeDevice
+        deviceId = await DartBridgeDevice.instance.getDeviceId();
+        if (deviceId.isNotEmpty) {
+          _secureCache['com.runanywhere.sdk.deviceId'] = deviceId;
+        }
+      }
+      if (deviceId == null || deviceId.isEmpty) {
+        _logger.debug('No device ID available');
+        return AuthResult.failure('No device ID available');
+      }
+
+      // Build refresh request JSON
+      final requestJson = jsonEncode({
+        'device_id': deviceId,
+        'refresh_token': refreshToken,
+      });
+
+      _logger.debug('Refreshing token for device: $deviceId');
 
       // Make HTTP request
       final endpoint = _getRefreshEndpoint();
       final baseURL = _baseURL ?? _getDefaultBaseURL();
       final url = Uri.parse('$baseURL$endpoint');
 
-      // Get current token for auth header
-      final currentToken = getAccessToken();
-
       final headers = <String, String>{
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       };
 
-      if (currentToken != null) {
-        headers['Authorization'] = 'Bearer $currentToken';
-      }
-
       final response = await http.post(url, headers: headers, body: requestJson);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final success = _handleRefreshResponse(response.body);
-        if (success) {
-          return AuthResult.success(_parseAuthResponse(response.body));
+        final authData = _parseAuthResponse(response.body);
+
+        // Try C++ handler first
+        final cppSuccess = _handleRefreshResponse(response.body);
+
+        // Also manually store tokens in secure storage (in case C++ handler unavailable)
+        await _storeAuthTokens(authData);
+
+        if (cppSuccess || authData.accessToken != null) {
+          _logger.info('Token refresh successful');
+          return AuthResult.success(authData);
         } else {
           return AuthResult.failure('Failed to parse refresh response');
         }
       } else {
         final errorMsg = _parseAPIError(response.body, response.statusCode);
+        _logger.warning('Token refresh failed: $errorMsg');
         return AuthResult.failure(errorMsg);
       }
     } catch (e) {
@@ -214,7 +274,10 @@ class DartBridgeAuth {
 
   /// Get valid access token, refreshing if needed
   Future<String?> getValidToken() async {
-    if (!isAuthenticated()) {
+    // Check if we have a cached token first
+    final cachedToken = _secureCache['com.runanywhere.sdk.accessToken'];
+
+    if (!isAuthenticated() && cachedToken == null) {
       return null;
     }
 
@@ -223,11 +286,14 @@ class DartBridgeAuth {
       final result = await refreshToken();
       if (!result.isSuccess) {
         _logger.warning('Token refresh failed', metadata: {'error': result.error});
-        return null;
+        // Return cached token anyway, server will reject if invalid
+        return cachedToken ?? getAccessToken();
       }
+      // Return new token from refresh result
+      return result.data?.accessToken ?? getAccessToken() ?? cachedToken;
     }
 
-    return getAccessToken();
+    return getAccessToken() ?? cachedToken;
   }
 
   /// Clear all auth state
@@ -379,37 +445,104 @@ class DartBridgeAuth {
       }
     } catch (e) {
       _logger.debug('rac_auth_build_authenticate_request error: $e');
-      // Fallback: build JSON manually
-      return jsonEncode({
-        'apiKey': apiKey,
-        'deviceId': deviceId,
-        if (buildToken != null) 'buildToken': buildToken,
-      });
+      // Fallback: build JSON manually (must match C++ rac_auth_request_to_json format)
+      // Backend expects snake_case keys: api_key, device_id, platform, sdk_version
+      final platform = Platform.isAndroid ? 'android' : 'ios';
+      final json = {
+        'api_key': apiKey,
+        'device_id': deviceId,
+        'platform': platform,
+        'sdk_version': SDKConstants.version,
+      };
+      _logger.debug('Auth request JSON: $json');
+      return jsonEncode(json);
     }
   }
 
-  /// Build refresh request JSON via C++
+  /// Build refresh request JSON
+  /// Builds the JSON manually (same approach as React Native SDK)
   String? _buildRefreshRequestJSON() {
     try {
-      final lib = PlatformLoader.loadCommons();
-      final buildRequest = lib.lookupFunction<Pointer<Utf8> Function(),
-          Pointer<Utf8> Function()>('rac_auth_build_refresh_request');
+      // Get refresh token from C++ state or secure storage
+      final refreshToken = _getRefreshToken();
+      if (refreshToken == null || refreshToken.isEmpty) {
+        _logger.debug('No refresh token available for refresh request');
+        return null;
+      }
 
-      final result = buildRequest();
-      if (result == nullptr) return null;
+      // Get device ID
+      final deviceId = getDeviceId();
+      if (deviceId == null || deviceId.isEmpty) {
+        _logger.debug('No device ID available for refresh request');
+        return null;
+      }
 
-      final json = result.toDartString();
+      // Build JSON manually (matches Swift/React Native format)
+      final requestBody = {
+        'device_id': deviceId,
+        'refresh_token': refreshToken,
+      };
 
-      // Free C++ allocated string
-      final freeFn = lib.lookupFunction<Void Function(Pointer<Void>),
-          void Function(Pointer<Void>)>('rac_free');
-      freeFn(result.cast<Void>());
-
-      return json;
+      return jsonEncode(requestBody);
     } catch (e) {
-      _logger.debug('rac_auth_build_refresh_request error: $e');
+      _logger.debug('Failed to build refresh request: $e');
       return null;
     }
+  }
+
+  /// Get refresh token from C++ state or secure storage
+  String? _getRefreshToken() {
+    // First try C++ state
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final getToken = lib.lookupFunction<Pointer<Utf8> Function(),
+          Pointer<Utf8> Function()>('rac_auth_get_refresh_token');
+
+      final result = getToken();
+      if (result != nullptr) {
+        final token = result.toDartString();
+        if (token.isNotEmpty) {
+          return token;
+        }
+      }
+    } catch (e) {
+      _logger.debug('rac_auth_get_refresh_token not available: $e');
+    }
+
+    // Fallback: try to get from secure storage cache
+    final cachedToken = _secureCache['com.runanywhere.sdk.refreshToken'];
+    if (cachedToken != null && cachedToken.isNotEmpty) {
+      return cachedToken;
+    }
+
+    return null;
+  }
+
+  /// Get refresh token asynchronously from secure storage
+  Future<String?> getRefreshTokenAsync() async {
+    // Try sync method first
+    final syncToken = _getRefreshToken();
+    if (syncToken != null && syncToken.isNotEmpty) {
+      return syncToken;
+    }
+
+    // Fallback: read directly from secure storage
+    try {
+      const storage = FlutterSecureStorage(
+        aOptions: AndroidOptions(encryptedSharedPreferences: true),
+        iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+      );
+      final token = await storage.read(key: 'com.runanywhere.sdk.refreshToken');
+      if (token != null && token.isNotEmpty) {
+        // Update cache for next time
+        _secureCache['com.runanywhere.sdk.refreshToken'] = token;
+        return token;
+      }
+    } catch (e) {
+      _logger.debug('Failed to read refresh token from secure storage: $e');
+    }
+
+    return null;
   }
 
   /// Handle authenticate response via C++
@@ -456,16 +589,40 @@ class DartBridgeAuth {
   AuthData _parseAuthResponse(String json) {
     try {
       final data = jsonDecode(json) as Map<String, dynamic>;
+
+      // Parse tokens - API returns snake_case
+      final accessToken =
+          data['access_token'] as String? ?? data['accessToken'] as String?;
+      final refreshToken =
+          data['refresh_token'] as String? ?? data['refreshToken'] as String?;
+      final deviceId = data['device_id'] as String? ?? data['deviceId'] as String?;
+      final userId = data['user_id'] as String? ?? data['userId'] as String?;
+      final organizationId =
+          data['organization_id'] as String? ?? data['organizationId'] as String?;
+
+      // Parse expiry - API returns expires_in (seconds until expiry)
+      int? expiresAt;
+      final expiresIn = data['expires_in'] as int?;
+      if (expiresIn != null) {
+        expiresAt =
+            DateTime.now().millisecondsSinceEpoch ~/ 1000 + expiresIn;
+      } else {
+        expiresAt = data['expires_at'] as int? ?? data['expiresAt'] as int?;
+      }
+
+      _logger.debug(
+          'Parsed auth response: accessToken=${accessToken != null}, refreshToken=${refreshToken != null}, deviceId=$deviceId');
+
       return AuthData(
-        accessToken: data['accessToken'] as String? ?? data['access_token'] as String?,
-        refreshToken: data['refreshToken'] as String? ?? data['refresh_token'] as String?,
-        deviceId: data['deviceId'] as String? ?? data['device_id'] as String?,
-        userId: data['userId'] as String? ?? data['user_id'] as String?,
-        organizationId:
-            data['organizationId'] as String? ?? data['organization_id'] as String?,
-        expiresAt: data['expiresAt'] as int? ?? data['expires_at'] as int?,
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+        deviceId: deviceId,
+        userId: userId,
+        organizationId: organizationId,
+        expiresAt: expiresAt,
       );
     } catch (e) {
+      _logger.debug('Failed to parse auth response: $e');
       return const AuthData();
     }
   }
@@ -476,6 +633,7 @@ class DartBridgeAuth {
       final data = jsonDecode(json) as Map<String, dynamic>;
       final message = data['message'] as String? ??
           data['error'] as String? ??
+          data['detail'] as String? ??
           'Unknown error';
       return '$message (HTTP $statusCode)';
     } catch (e) {
@@ -483,15 +641,105 @@ class DartBridgeAuth {
     }
   }
 
+  /// Store auth tokens in secure storage
+  /// This ensures tokens are available even if C++ handler fails
+  Future<void> _storeAuthTokens(AuthData authData) async {
+    try {
+      const storage = FlutterSecureStorage(
+        aOptions: AndroidOptions(encryptedSharedPreferences: true),
+        iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+      );
+
+      var storedCount = 0;
+
+      if (authData.accessToken != null && authData.accessToken!.isNotEmpty) {
+        await storage.write(
+            key: 'com.runanywhere.sdk.accessToken', value: authData.accessToken);
+        _secureCache['com.runanywhere.sdk.accessToken'] = authData.accessToken!;
+        storedCount++;
+        _logger.debug('Stored access token (${authData.accessToken!.length} chars)');
+      }
+      if (authData.refreshToken != null && authData.refreshToken!.isNotEmpty) {
+        await storage.write(
+            key: 'com.runanywhere.sdk.refreshToken', value: authData.refreshToken);
+        _secureCache['com.runanywhere.sdk.refreshToken'] = authData.refreshToken!;
+        storedCount++;
+        _logger.debug('Stored refresh token (${authData.refreshToken!.length} chars)');
+      }
+      if (authData.deviceId != null && authData.deviceId!.isNotEmpty) {
+        await storage.write(
+            key: 'com.runanywhere.sdk.deviceId', value: authData.deviceId);
+        _secureCache['com.runanywhere.sdk.deviceId'] = authData.deviceId!;
+        storedCount++;
+        _logger.debug('Stored device ID: ${authData.deviceId}');
+      }
+      if (authData.userId != null && authData.userId!.isNotEmpty) {
+        await storage.write(key: 'com.runanywhere.sdk.userId', value: authData.userId);
+        _secureCache['com.runanywhere.sdk.userId'] = authData.userId!;
+        storedCount++;
+      }
+      if (authData.organizationId != null && authData.organizationId!.isNotEmpty) {
+        await storage.write(
+            key: 'com.runanywhere.sdk.organizationId', value: authData.organizationId);
+        _secureCache['com.runanywhere.sdk.organizationId'] =
+            authData.organizationId!;
+        storedCount++;
+      }
+
+      _logger.debug('Auth tokens stored in secure storage ($storedCount items)');
+    } catch (e) {
+      _logger.debug('Failed to store auth tokens: $e');
+    }
+  }
+
   /// Load stored tokens from secure storage
-  void _loadStoredTokens() {
+  Future<void> _loadStoredTokens() async {
+    // Try C++ method first
     try {
       final lib = PlatformLoader.loadCommons();
       final loadFn = lib.lookupFunction<Int32 Function(), int Function()>(
           'rac_auth_load_stored_tokens');
       loadFn();
     } catch (e) {
-      _logger.debug('rac_auth_load_stored_tokens error: $e');
+      _logger.debug('rac_auth_load_stored_tokens not available: $e');
+    }
+
+    // Also pre-load tokens into cache from Flutter secure storage
+    try {
+      const storage = FlutterSecureStorage(
+        aOptions: AndroidOptions(encryptedSharedPreferences: true),
+        iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+      );
+
+      final accessToken = await storage.read(key: 'com.runanywhere.sdk.accessToken');
+      final refreshToken = await storage.read(key: 'com.runanywhere.sdk.refreshToken');
+      final deviceId = await storage.read(key: 'com.runanywhere.sdk.deviceId');
+      final userId = await storage.read(key: 'com.runanywhere.sdk.userId');
+      final organizationId = await storage.read(key: 'com.runanywhere.sdk.organizationId');
+
+      if (accessToken != null) {
+        _secureCache['com.runanywhere.sdk.accessToken'] = accessToken;
+      }
+      if (refreshToken != null) {
+        _secureCache['com.runanywhere.sdk.refreshToken'] = refreshToken;
+      }
+      if (deviceId != null) {
+        _secureCache['com.runanywhere.sdk.deviceId'] = deviceId;
+      }
+      if (userId != null) {
+        _secureCache['com.runanywhere.sdk.userId'] = userId;
+      }
+      if (organizationId != null) {
+        _secureCache['com.runanywhere.sdk.organizationId'] = organizationId;
+      }
+
+      _logger.debug('Loaded tokens from secure storage', metadata: {
+        'hasAccessToken': accessToken != null,
+        'hasRefreshToken': refreshToken != null,
+        'hasDeviceId': deviceId != null,
+      });
+    } catch (e) {
+      _logger.debug('Failed to pre-load tokens from secure storage: $e');
     }
   }
 
