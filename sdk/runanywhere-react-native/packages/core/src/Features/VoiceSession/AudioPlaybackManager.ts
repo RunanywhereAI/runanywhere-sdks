@@ -8,10 +8,25 @@
  */
 
 import { Platform, NativeModules } from 'react-native';
-import { EventBus } from '../../Public/Events';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 
 const logger = new SDKLogger('AudioPlaybackManager');
+
+/**
+ * Safely publish an event to the EventBus
+ * Uses lazy loading to avoid circular dependency issues during module initialization
+ */
+function safePublish(eventType: string, event: Record<string, unknown>): void {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { EventBus } = require('../../Public/Events');
+    if (EventBus?.publish) {
+      EventBus.publish(eventType, event);
+    }
+  } catch {
+    // Ignore EventBus errors - events are non-critical for playback functionality
+  }
+}
 
 // Native iOS Audio Module
 const NativeAudioModule = Platform.OS === 'ios' ? NativeModules.NativeAudioModule : null;
@@ -151,7 +166,7 @@ export class AudioPlaybackManager {
       this.state = 'error';
       const err = error instanceof Error ? error : new Error(String(error));
       logger.error(`Playback failed: ${err.message}`);
-      EventBus.publish('Voice', { type: 'playbackFailed', error: err.message });
+      safePublish('Voice', { type: 'playbackFailed', error: err.message });
 
       if (this.errorCallback) {
         this.errorCallback(err);
@@ -168,7 +183,7 @@ export class AudioPlaybackManager {
     this.state = 'playing';
 
     logger.info(`Playing audio file: ${filePath}`);
-    EventBus.publish('Voice', { type: 'playbackStarted' });
+    safePublish('Voice', { type: 'playbackStarted' });
 
     if (Platform.OS === 'ios') {
       await this.playFileIOS(filePath);
@@ -196,7 +211,7 @@ export class AudioPlaybackManager {
       this.currentSound = null;
     }
 
-    EventBus.publish('Voice', { type: 'playbackStopped' });
+    safePublish('Voice', { type: 'playbackStopped' });
 
     if (this.completionCallback) {
       this.completionCallback();
@@ -217,7 +232,7 @@ export class AudioPlaybackManager {
       }
 
       logger.info('Playback paused');
-      EventBus.publish('Voice', { type: 'playbackPaused' });
+      safePublish('Voice', { type: 'playbackPaused' });
     }
   }
 
@@ -235,7 +250,7 @@ export class AudioPlaybackManager {
       }
 
       logger.info('Playback resumed');
-      EventBus.publish('Voice', { type: 'playbackResumed' });
+      safePublish('Voice', { type: 'playbackResumed' });
     }
   }
 
@@ -389,7 +404,7 @@ export class AudioPlaybackManager {
 
     logger.info(`Playback completed (${duration.toFixed(2)}s)`);
 
-    EventBus.publish('Voice', {
+    safePublish('Voice', {
       type: 'playbackCompleted',
       duration,
     });
