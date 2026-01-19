@@ -6,16 +6,439 @@ Complete API reference for the RunAnywhere Kotlin SDK. All public APIs are acces
 
 ## Table of Contents
 
-1. [Core API](#core-api)
-2. [Text Generation (LLM)](#text-generation-llm)
-3. [Speech-to-Text (STT)](#speech-to-text-stt)
-4. [Text-to-Speech (TTS)](#text-to-speech-tts)
-5. [Voice Activity Detection (VAD)](#voice-activity-detection-vad)
-6. [Voice Agent](#voice-agent)
-7. [Model Management](#model-management)
-8. [Event System](#event-system)
-9. [Types & Enums](#types--enums)
-10. [Error Handling](#error-handling)
+1. [Quick Start](#quick-start)
+2. [Core API](#core-api)
+3. [Text Generation (LLM)](#text-generation-llm)
+4. [Speech-to-Text (STT)](#speech-to-text-stt)
+5. [Text-to-Speech (TTS)](#text-to-speech-tts)
+6. [Voice Activity Detection (VAD)](#voice-activity-detection-vad)
+7. [Voice Agent](#voice-agent)
+8. [Model Management](#model-management)
+9. [Event System](#event-system)
+10. [Types & Enums](#types--enums)
+11. [Error Handling](#error-handling)
+
+---
+
+## Quick Start
+
+### Installation (Maven Central)
+
+```kotlin
+// build.gradle.kts
+dependencies {
+    // Core SDK with native libraries
+    implementation("io.github.sanchitmonga22:runanywhere-sdk-android:0.16.1")
+
+    // LlamaCPP backend for LLM text generation
+    implementation("io.github.sanchitmonga22:runanywhere-llamacpp-android:0.16.1")
+
+    // ONNX backend for STT/TTS/VAD
+    implementation("io.github.sanchitmonga22:runanywhere-onnx-android:0.16.1")
+}
+```
+
+```kotlin
+// settings.gradle.kts - add repositories
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        google()
+        mavenCentral()
+        // JitPack for transitive dependencies (android-vad, PRDownloader)
+        maven { url = uri("https://jitpack.io") }
+    }
+}
+```
+
+### Initialize SDK
+
+```kotlin
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.SDKEnvironment
+
+// In your Application.onCreate() or Activity
+RunAnywhere.initialize(environment = SDKEnvironment.DEVELOPMENT)
+```
+
+### Register & Load Models
+
+The starter app uses these specific model IDs and URLs:
+
+```kotlin
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.registerModel
+import com.runanywhere.sdk.public.extensions.downloadModel
+import com.runanywhere.sdk.public.extensions.loadLLMModel
+import com.runanywhere.sdk.public.extensions.loadSTTModel
+import com.runanywhere.sdk.public.extensions.loadTTSVoice
+import com.runanywhere.sdk.public.extensions.Models.ModelCategory
+import com.runanywhere.sdk.core.types.InferenceFramework
+
+// LLM Model - SmolLM2 360M (small, fast, good for demos)
+RunAnywhere.registerModel(
+    id = "smollm2-360m-instruct-q8_0",
+    name = "SmolLM2 360M Instruct Q8_0",
+    url = "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q8_0.gguf",
+    framework = InferenceFramework.LLAMA_CPP,
+    modality = ModelCategory.LANGUAGE,
+    memoryRequirement = 400_000_000 // ~400MB
+)
+
+// STT Model - Whisper Tiny English (fast transcription)
+RunAnywhere.registerModel(
+    id = "sherpa-onnx-whisper-tiny.en",
+    name = "Sherpa Whisper Tiny (ONNX)",
+    url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz",
+    framework = InferenceFramework.ONNX,
+    modality = ModelCategory.SPEECH_RECOGNITION
+)
+
+// TTS Model - Piper TTS (US English - Medium quality)
+RunAnywhere.registerModel(
+    id = "vits-piper-en_US-lessac-medium",
+    name = "Piper TTS (US English - Medium)",
+    url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz",
+    framework = InferenceFramework.ONNX,
+    modality = ModelCategory.SPEECH_SYNTHESIS
+)
+
+// Download model (returns Flow<DownloadProgress>)
+RunAnywhere.downloadModel("smollm2-360m-instruct-q8_0")
+    .catch { e -> println("Download failed: ${e.message}") }
+    .collect { progress ->
+        println("Download: ${(progress.progress * 100).toInt()}%")
+    }
+
+// Load model
+RunAnywhere.loadLLMModel("smollm2-360m-instruct-q8_0")
+```
+
+### Text Generation (LLM)
+
+```kotlin
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.chat
+
+// Simple chat - returns String directly
+val response = RunAnywhere.chat("What is AI?")
+println(response)
+```
+
+### Speech-to-Text (STT)
+
+```kotlin
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.transcribe
+
+// Load STT model
+RunAnywhere.loadSTTModel("sherpa-onnx-whisper-tiny.en")
+
+// Transcribe audio (16kHz, mono, 16-bit PCM ByteArray)
+val transcription = RunAnywhere.transcribe(audioData)
+println("You said: $transcription")
+```
+
+### Text-to-Speech (TTS)
+
+```kotlin
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.synthesize
+import com.runanywhere.sdk.public.extensions.TTS.TTSOptions
+
+// Load TTS voice
+RunAnywhere.loadTTSVoice("vits-piper-en_US-lessac-medium")
+
+// Synthesize audio - returns TTSOutput with audioData
+val output = RunAnywhere.synthesize("Hello, world!", TTSOptions())
+// output.audioData contains WAV audio bytes
+
+// Play with Android AudioTrack (see example below)
+```
+
+### Voice Pipeline (STT → LLM → TTS)
+
+#### Option 1: Streaming Voice Session (Recommended)
+
+The `streamVoiceSession()` API handles everything automatically:
+- Audio level calculation for visualization
+- Speech detection (when audio level > threshold)
+- Automatic silence detection (triggers processing after 1.5s of silence)
+- Full STT → LLM → TTS orchestration
+- Continuous conversation mode
+
+```kotlin
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.streamVoiceSession
+import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceSessionConfig
+import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceSessionEvent
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
+
+// Ensure all 3 models are loaded first
+RunAnywhere.loadSTTModel("sherpa-onnx-whisper-tiny.en")
+RunAnywhere.loadLLMModel("smollm2-360m-instruct-q8_0")
+RunAnywhere.loadTTSVoice("vits-piper-en_US-lessac-medium")
+
+// Your audio capture Flow (16kHz, mono, 16-bit PCM)
+// See AudioCaptureService example below
+val audioChunks: Flow<ByteArray> = audioCaptureService.startCapture()
+
+// Configure voice session
+val config = VoiceSessionConfig(
+    silenceDuration = 1.5,      // 1.5 seconds of silence triggers processing
+    speechThreshold = 0.1f,     // Audio level threshold for speech detection
+    autoPlayTTS = false,        // We'll handle playback ourselves
+    continuousMode = true       // Auto-resume listening after each turn
+)
+
+// Start the SDK voice session - all business logic is handled by the SDK
+sessionJob = scope.launch {
+    try {
+        RunAnywhere.streamVoiceSession(audioChunks, config).collect { event ->
+            when (event) {
+                is VoiceSessionEvent.Started -> {
+                    sessionState = VoiceSessionState.LISTENING
+                }
+
+                is VoiceSessionEvent.Listening -> {
+                    audioLevel = event.audioLevel
+                }
+
+                is VoiceSessionEvent.SpeechStarted -> {
+                    sessionState = VoiceSessionState.SPEECH_DETECTED
+                }
+
+                is VoiceSessionEvent.Processing -> {
+                    sessionState = VoiceSessionState.PROCESSING
+                    audioLevel = 0f
+                }
+
+                is VoiceSessionEvent.Transcribed -> {
+                    // User's speech was transcribed
+                    showTranscript(event.text)
+                }
+
+                is VoiceSessionEvent.Responded -> {
+                    // LLM generated a response
+                    showResponse(event.text)
+                }
+
+                is VoiceSessionEvent.Speaking -> {
+                    sessionState = VoiceSessionState.SPEAKING
+                }
+
+                is VoiceSessionEvent.TurnCompleted -> {
+                    // Play the synthesized audio
+                    event.audio?.let { audio ->
+                        sessionState = VoiceSessionState.SPEAKING
+                        playWavAudio(audio)
+                    }
+                    // Resume listening state
+                    sessionState = VoiceSessionState.LISTENING
+                    audioLevel = 0f
+                }
+
+                is VoiceSessionEvent.Stopped -> {
+                    sessionState = VoiceSessionState.IDLE
+                    audioLevel = 0f
+                }
+
+                is VoiceSessionEvent.Error -> {
+                    errorMessage = event.message
+                    sessionState = VoiceSessionState.IDLE
+                }
+            }
+        }
+    } catch (e: CancellationException) {
+        // Expected when stopping
+    } catch (e: Exception) {
+        errorMessage = "Session error: ${e.message}"
+        sessionState = VoiceSessionState.IDLE
+    }
+}
+
+// To stop the session:
+fun stopSession() {
+    sessionJob?.cancel()
+    sessionJob = null
+    audioCaptureService.stopCapture()
+    sessionState = VoiceSessionState.IDLE
+}
+```
+
+#### Audio Capture Service (Required for Voice Pipeline)
+
+```kotlin
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.*
+
+class AudioCaptureService {
+    private var audioRecord: AudioRecord? = null
+
+    @Volatile
+    private var isCapturing = false
+
+    companion object {
+        const val SAMPLE_RATE = 16000
+        const val CHUNK_SIZE_MS = 100 // Emit chunks every 100ms
+    }
+
+    fun startCapture(): Flow<ByteArray> = callbackFlow {
+        val bufferSize = AudioRecord.getMinBufferSize(
+            SAMPLE_RATE,
+            AudioFormat.CHANNEL_IN_MONO,
+            AudioFormat.ENCODING_PCM_16BIT
+        )
+        val chunkSize = (SAMPLE_RATE * 2 * CHUNK_SIZE_MS) / 1000
+
+        try {
+            audioRecord = AudioRecord(
+                MediaRecorder.AudioSource.MIC,
+                SAMPLE_RATE,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                maxOf(bufferSize, chunkSize * 2)
+            )
+
+            if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
+                close(IllegalStateException("AudioRecord initialization failed"))
+                return@callbackFlow
+            }
+
+            audioRecord?.startRecording()
+            isCapturing = true
+
+            val readJob = launch(Dispatchers.IO) {
+                val buffer = ByteArray(chunkSize)
+                while (isActive && isCapturing) {
+                    val bytesRead = audioRecord?.read(buffer, 0, chunkSize) ?: -1
+                    if (bytesRead > 0) {
+                        trySend(buffer.copyOf(bytesRead))
+                    }
+                }
+            }
+
+            awaitClose {
+                readJob.cancel()
+                stopCapture()
+            }
+        } catch (e: Exception) {
+            stopCapture()
+            close(e)
+        }
+    }
+
+    fun stopCapture() {
+        isCapturing = false
+        try {
+            audioRecord?.stop()
+            audioRecord?.release()
+        } catch (_: Exception) {}
+        audioRecord = null
+    }
+}
+```
+
+#### Play WAV Audio (Required for Voice Pipeline)
+
+```kotlin
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioTrack
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+
+suspend fun playWavAudio(wavData: ByteArray) = withContext(Dispatchers.IO) {
+    if (wavData.size < 44) return@withContext
+
+    val headerSize = if (wavData.size > 44 &&
+        wavData[0] == 'R'.code.toByte() &&
+        wavData[1] == 'I'.code.toByte()) 44 else 0
+
+    val pcmData = wavData.copyOfRange(headerSize, wavData.size)
+    val sampleRate = 22050 // Piper TTS default sample rate
+
+    val bufferSize = AudioTrack.getMinBufferSize(
+        sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT
+    )
+
+    val audioTrack = AudioTrack.Builder()
+        .setAudioAttributes(
+            AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build()
+        )
+        .setAudioFormat(
+            AudioFormat.Builder()
+                .setSampleRate(sampleRate)
+                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                .build()
+        )
+        .setBufferSizeInBytes(maxOf(bufferSize, pcmData.size))
+        .setTransferMode(AudioTrack.MODE_STATIC)
+        .build()
+
+    audioTrack.write(pcmData, 0, pcmData.size)
+    audioTrack.play()
+
+    val durationMs = (pcmData.size.toLong() * 1000) / (sampleRate * 2)
+    delay(durationMs + 100)
+
+    audioTrack.stop()
+    audioTrack.release()
+}
+```
+
+#### Option 2: Manual Processing
+
+For more control, use `processVoice()` with your own silence detection:
+
+```kotlin
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.processVoice
+
+// Record audio (app responsibility - use AudioRecord)
+val audioData: ByteArray = recordAudio() // 16kHz, mono, 16-bit PCM
+
+// Process through full pipeline - SDK handles orchestration
+val result = RunAnywhere.processVoice(audioData)
+
+if (result.speechDetected) {
+    println("You said: ${result.transcription}")
+    println("AI response: ${result.response}")
+
+    // Play synthesized audio (app responsibility)
+    result.synthesizedAudio?.let { playWavAudio(it) }
+}
+```
+
+### Voice Session Events
+
+| Event | Description |
+|-------|-------------|
+| `Started` | Session started and ready |
+| `Listening(audioLevel)` | Listening with real-time audio level (0.0 - 1.0) |
+| `SpeechStarted` | Speech detected, accumulating audio |
+| `Processing` | Silence detected, processing audio |
+| `Transcribed(text)` | STT completed |
+| `Responded(text)` | LLM response generated |
+| `Speaking` | Playing TTS audio |
+| `TurnCompleted(transcript, response, audio)` | Full turn complete with audio |
+| `Stopped` | Session ended |
+| `Error(message)` | Error occurred |
+
+### Complete Voice Pipeline Example
+
+See the Kotlin Starter Example app for a complete working implementation:
+`starter_apps/kotlinstarterexample/app/src/main/java/com/runanywhere/kotlin_starter_example/ui/screens/VoicePipelineScreen.kt`
 
 ---
 
@@ -714,12 +1137,38 @@ data class VoiceAgentConfiguration(
 
 ```kotlin
 sealed class VoiceSessionEvent {
-    object Listening : VoiceSessionEvent()
+    /** Session started and ready */
+    data object Started : VoiceSessionEvent()
+
+    /** Listening for speech with current audio level (0.0 - 1.0) */
+    data class Listening(val audioLevel: Float) : VoiceSessionEvent()
+
+    /** Speech detected, started accumulating audio */
+    data object SpeechStarted : VoiceSessionEvent()
+
+    /** Speech ended, processing audio */
+    data object Processing : VoiceSessionEvent()
+
+    /** Got transcription from STT */
     data class Transcribed(val text: String) : VoiceSessionEvent()
-    object Thinking : VoiceSessionEvent()
+
+    /** Got response from LLM */
     data class Responded(val text: String) : VoiceSessionEvent()
-    object Speaking : VoiceSessionEvent()
-    object Idle : VoiceSessionEvent()
+
+    /** Playing TTS audio */
+    data object Speaking : VoiceSessionEvent()
+
+    /** Complete turn result with transcript, response, and audio */
+    data class TurnCompleted(
+        val transcript: String,
+        val response: String,
+        val audio: ByteArray?
+    ) : VoiceSessionEvent()
+
+    /** Session stopped */
+    data object Stopped : VoiceSessionEvent()
+
+    /** Error occurred */
     data class Error(val message: String) : VoiceSessionEvent()
 }
 ```
@@ -728,13 +1177,14 @@ sealed class VoiceSessionEvent {
 
 ```kotlin
 data class VoiceAgentResult(
-    val transcription: String,
-    val response: String,
-    val audioData: ByteArray?,
-    val totalLatencyMs: Double,
-    val sttLatencyMs: Double,
-    val llmLatencyMs: Double,
-    val ttsLatencyMs: Double
+    /** Whether speech was detected in the input audio */
+    val speechDetected: Boolean = false,
+    /** Transcribed text from STT */
+    val transcription: String? = null,
+    /** Generated response text from LLM */
+    val response: String? = null,
+    /** Synthesized audio data from TTS (WAV format) */
+    val synthesizedAudio: ByteArray? = null
 )
 ```
 
@@ -1181,57 +1631,142 @@ Common error codes include:
 
 ## Usage Examples
 
-### Complete LLM Chat
+### Complete LLM Chat (Matching Starter App)
 
 ```kotlin
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.SDKEnvironment
+import com.runanywhere.sdk.public.extensions.*
+import com.runanywhere.sdk.public.extensions.Models.ModelCategory
+import com.runanywhere.sdk.core.types.InferenceFramework
+
 // Initialize
 RunAnywhere.initialize(environment = SDKEnvironment.DEVELOPMENT)
 
-// Register and download model
-val model = RunAnywhere.registerModel(
-    name = "Qwen 0.5B",
-    url = "https://huggingface.co/...",
-    framework = InferenceFramework.LLAMA_CPP
+// Register model (same as starter app)
+RunAnywhere.registerModel(
+    id = "smollm2-360m-instruct-q8_0",
+    name = "SmolLM2 360M Instruct Q8_0",
+    url = "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q8_0.gguf",
+    framework = InferenceFramework.LLAMA_CPP,
+    modality = ModelCategory.LANGUAGE,
+    memoryRequirement = 400_000_000
 )
 
-RunAnywhere.downloadModel(model.id).collect { progress ->
-    println("Download: ${(progress.progress * 100).toInt()}%")
-}
+// Download model
+RunAnywhere.downloadModel("smollm2-360m-instruct-q8_0")
+    .catch { e -> println("Download failed: ${e.message}") }
+    .collect { progress ->
+        println("Download: ${(progress.progress * 100).toInt()}%")
+    }
 
 // Load and use
-RunAnywhere.loadLLMModel(model.id)
+RunAnywhere.loadLLMModel("smollm2-360m-instruct-q8_0")
 
-val result = RunAnywhere.generate(
-    prompt = "Explain AI in simple terms",
-    options = LLMGenerationOptions(maxTokens = 200)
-)
-println("Response: ${result.text}")
-println("Speed: ${result.tokensPerSecond} tok/s")
+// Simple chat (returns String)
+val response = RunAnywhere.chat("Explain AI in simple terms")
+println("Response: $response")
 
 // Cleanup
 RunAnywhere.unloadLLMModel()
 ```
 
-### Voice Agent Session
+### Complete STT Example (Matching Starter App)
 
 ```kotlin
-// Configure
-RunAnywhere.configureVoiceAgent(VoiceAgentConfiguration(
-    sttModelId = "whisper-tiny",
-    llmModelId = "qwen-0.5b",
-    ttsVoiceId = "en-us-default"
-))
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.*
 
-// Start session
-lifecycleScope.launch {
-    RunAnywhere.startVoiceSession().collect { event ->
-        when (event) {
-            is VoiceSessionEvent.Listening -> updateUI("Listening...")
-            is VoiceSessionEvent.Transcribed -> updateUI("You: ${event.text}")
-            is VoiceSessionEvent.Thinking -> updateUI("Thinking...")
-            is VoiceSessionEvent.Responded -> updateUI("AI: ${event.text}")
-            is VoiceSessionEvent.Speaking -> updateUI("Speaking...")
-            is VoiceSessionEvent.Error -> showError(event.message)
+// Register STT model
+RunAnywhere.registerModel(
+    id = "sherpa-onnx-whisper-tiny.en",
+    name = "Sherpa Whisper Tiny (ONNX)",
+    url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz",
+    framework = InferenceFramework.ONNX,
+    modality = ModelCategory.SPEECH_RECOGNITION
+)
+
+// Download and load
+RunAnywhere.downloadModel("sherpa-onnx-whisper-tiny.en").collect { progress ->
+    println("Download: ${(progress.progress * 100).toInt()}%")
+}
+RunAnywhere.loadSTTModel("sherpa-onnx-whisper-tiny.en")
+
+// Transcribe audio (16kHz, mono, 16-bit PCM)
+val transcription = RunAnywhere.transcribe(audioData)
+println("You said: $transcription")
+```
+
+### Complete TTS Example (Matching Starter App)
+
+```kotlin
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.*
+import com.runanywhere.sdk.public.extensions.TTS.TTSOptions
+
+// Register TTS model
+RunAnywhere.registerModel(
+    id = "vits-piper-en_US-lessac-medium",
+    name = "Piper TTS (US English - Medium)",
+    url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz",
+    framework = InferenceFramework.ONNX,
+    modality = ModelCategory.SPEECH_SYNTHESIS
+)
+
+// Download and load
+RunAnywhere.downloadModel("vits-piper-en_US-lessac-medium").collect { progress ->
+    println("Download: ${(progress.progress * 100).toInt()}%")
+}
+RunAnywhere.loadTTSVoice("vits-piper-en_US-lessac-medium")
+
+// Synthesize audio
+val output = RunAnywhere.synthesize("Hello, world!", TTSOptions())
+// output.audioData contains WAV audio bytes
+
+// Play with playWavAudio() helper (see Voice Pipeline section)
+playWavAudio(output.audioData)
+```
+
+### Voice Pipeline Session (Matching Starter App)
+
+```kotlin
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.*
+import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceSessionConfig
+import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceSessionEvent
+
+// Ensure all 3 models are loaded
+val allModelsLoaded = RunAnywhere.isLLMModelLoaded() &&
+                     RunAnywhere.isSTTModelLoaded() &&
+                     RunAnywhere.isTTSVoiceLoaded()
+
+if (allModelsLoaded) {
+    // Create audio capture flow
+    val audioCaptureService = AudioCaptureService()
+    val audioChunks = audioCaptureService.startCapture()
+
+    // Configure and start session
+    val config = VoiceSessionConfig(
+        silenceDuration = 1.5,
+        speechThreshold = 0.1f,
+        autoPlayTTS = false,
+        continuousMode = true
+    )
+
+    scope.launch {
+        RunAnywhere.streamVoiceSession(audioChunks, config).collect { event ->
+            when (event) {
+                is VoiceSessionEvent.Listening -> updateAudioLevel(event.audioLevel)
+                is VoiceSessionEvent.SpeechStarted -> showSpeechDetected()
+                is VoiceSessionEvent.Processing -> showProcessing()
+                is VoiceSessionEvent.Transcribed -> showTranscript(event.text)
+                is VoiceSessionEvent.Responded -> showResponse(event.text)
+                is VoiceSessionEvent.TurnCompleted -> {
+                    event.audio?.let { playWavAudio(it) }
+                }
+                is VoiceSessionEvent.Error -> showError(event.message)
+                else -> { }
+            }
         }
     }
 }
