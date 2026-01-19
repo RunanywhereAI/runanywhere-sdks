@@ -163,6 +163,14 @@ kotlin {
 
     // Android target
     androidTarget {
+        // Enable publishing Android AAR to Maven
+        publishLibraryVariants("release")
+
+        // Set correct artifact ID for Android publication
+        mavenPublication {
+            artifactId = "runanywhere-sdk-android"
+        }
+
         compilations.all {
             compilerOptions.configure {
                 jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
