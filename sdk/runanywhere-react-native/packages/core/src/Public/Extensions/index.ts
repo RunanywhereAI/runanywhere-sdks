@@ -124,3 +124,28 @@ export {
   cancelDownload,
   deleteModel,
 } from './RunAnywhere+Models';
+
+// Audio Utilities
+export {
+  requestAudioPermission,
+  startRecording,
+  stopRecording,
+  cancelRecording,
+  playAudio,
+  stopPlayback,
+  pausePlayback,
+  resumePlayback,
+  createWavFromPCMFloat32,
+  cleanup as cleanupAudio,
+  formatDuration,
+  AUDIO_SAMPLE_RATE,
+  TTS_SAMPLE_RATE,
+} from './RunAnywhere+Audio';
+export type {
+  RecordingCallbacks,
+  PlaybackCallbacks,
+  RecordingResult,
+} from './RunAnywhere+Audio';
+
+// Re-export Audio as namespace for RunAnywhere.Audio access
+export * as Audio from './RunAnywhere+Audio';
