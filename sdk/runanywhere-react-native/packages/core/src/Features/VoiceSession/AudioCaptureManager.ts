@@ -8,10 +8,40 @@
  */
 
 import { Platform, PermissionsAndroid, NativeModules } from 'react-native';
-import { EventBus } from '../../Public/Events';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 
 const logger = new SDKLogger('AudioCaptureManager');
+
+// Lazy-load EventBus to avoid circular dependency issues during module initialization
+// The circular dependency: AudioCaptureManager -> EventBus -> SDKLogger -> ... -> AudioCaptureManager
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _eventBus: any = null;
+function getEventBus() {
+  if (!_eventBus) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      _eventBus = require('../../Public/Events').EventBus;
+    } catch {
+      logger.warning('EventBus not available');
+    }
+  }
+  return _eventBus;
+}
+
+/**
+ * Safely publish an event to the EventBus
+ * Handles cases where EventBus may not be fully initialized
+ */
+function safePublish(eventType: string, event: Record<string, unknown>): void {
+  try {
+    const eventBus = getEventBus();
+    if (eventBus?.publish) {
+      eventBus.publish(eventType, event);
+    }
+  } catch {
+    // Ignore EventBus errors - events are non-critical for audio functionality
+  }
+}
 
 // Native iOS Audio Module (provided by the app)
 const NativeAudioModule = Platform.OS === 'ios' ? NativeModules.NativeAudioModule : null;
@@ -156,7 +186,7 @@ export class AudioCaptureManager {
     this.state = 'recording';
 
     logger.info('Starting audio recording...');
-    EventBus.publish('Voice', { type: 'recordingStarted' });
+    safePublish('Voice', { type: 'recordingStarted' });
 
     if (Platform.OS === 'ios') {
       await this.startIOSRecording();
@@ -186,7 +216,7 @@ export class AudioCaptureManager {
       path = await this.stopAndroidRecording();
     }
 
-    EventBus.publish('Voice', { type: 'recordingStopped', duration: durationMs / 1000 });
+    safePublish('Voice', { type: 'recordingStopped', duration: durationMs / 1000 });
 
     this.audioDataCallback = null;
     this.recordingStartTime = null;

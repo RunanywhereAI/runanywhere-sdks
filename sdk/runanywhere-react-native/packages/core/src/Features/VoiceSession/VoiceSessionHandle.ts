@@ -28,9 +28,38 @@
  * ```
  */
 
-import { EventBus } from '../../Public/Events';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import { AudioCaptureManager } from './AudioCaptureManager';
+
+// Lazy-load EventBus to avoid circular dependency issues during module initialization
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _eventBus: any = null;
+function getEventBus() {
+  if (!_eventBus) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      _eventBus = require('../../Public/Events').EventBus;
+    } catch {
+      // EventBus not available
+    }
+  }
+  return _eventBus;
+}
+
+/**
+ * Safely publish an event to the EventBus
+ * Handles cases where EventBus may not be fully initialized due to circular dependencies
+ */
+function safePublish(eventType: string, event: Record<string, unknown>): void {
+  try {
+    const eventBus = getEventBus();
+    if (eventBus?.publish) {
+      eventBus.publish(eventType, event);
+    }
+  } catch {
+    // Ignore EventBus errors - events are non-critical for voice session functionality
+  }
+}
 import { AudioPlaybackManager } from './AudioPlaybackManager';
 import * as STT from '../../Public/Extensions/RunAnywhere+STT';
 import * as TextGeneration from '../../Public/Extensions/RunAnywhere+TextGeneration';
@@ -390,31 +419,31 @@ export class VoiceSessionHandle {
 
     switch (eventBusType) {
       case 'voiceSession_started':
-        EventBus.publish('Voice', { type: 'voiceSession_started' });
+        safePublish('Voice', { type: 'voiceSession_started' });
         break;
       case 'voiceSession_listening':
-        EventBus.publish('Voice', { type: 'voiceSession_listening', audioLevel: eventData.audioLevel });
+        safePublish('Voice', { type: 'voiceSession_listening', audioLevel: eventData.audioLevel });
         break;
       case 'voiceSession_speechStarted':
-        EventBus.publish('Voice', { type: 'voiceSession_speechStarted' });
+        safePublish('Voice', { type: 'voiceSession_speechStarted' });
         break;
       case 'voiceSession_speechEnded':
-        EventBus.publish('Voice', { type: 'voiceSession_speechEnded' });
+        safePublish('Voice', { type: 'voiceSession_speechEnded' });
         break;
       case 'voiceSession_processing':
-        EventBus.publish('Voice', { type: 'voiceSession_processing' });
+        safePublish('Voice', { type: 'voiceSession_processing' });
         break;
       case 'voiceSession_transcribed':
-        EventBus.publish('Voice', { type: 'voiceSession_transcribed', transcription: eventData.transcription });
+        safePublish('Voice', { type: 'voiceSession_transcribed', transcription: eventData.transcription });
         break;
       case 'voiceSession_responded':
-        EventBus.publish('Voice', { type: 'voiceSession_responded', response: eventData.response });
+        safePublish('Voice', { type: 'voiceSession_responded', response: eventData.response });
         break;
       case 'voiceSession_speaking':
-        EventBus.publish('Voice', { type: 'voiceSession_speaking' });
+        safePublish('Voice', { type: 'voiceSession_speaking' });
         break;
       case 'voiceSession_turnCompleted':
-        EventBus.publish('Voice', {
+        safePublish('Voice', {
           type: 'voiceSession_turnCompleted',
           transcription: eventData.transcription,
           response: eventData.response,
@@ -422,10 +451,10 @@ export class VoiceSessionHandle {
         });
         break;
       case 'voiceSession_stopped':
-        EventBus.publish('Voice', { type: 'voiceSession_stopped' });
+        safePublish('Voice', { type: 'voiceSession_stopped' });
         break;
       case 'voiceSession_error':
-        EventBus.publish('Voice', { type: 'voiceSession_error', error: eventData.error });
+        safePublish('Voice', { type: 'voiceSession_error', error: eventData.error });
         break;
     }
   }
