@@ -81,6 +81,14 @@ kotlin {
     }
 
     androidTarget {
+        // Enable publishing Android AAR to Maven
+        publishLibraryVariants("release")
+
+        // Set correct artifact ID for Android publication
+        mavenPublication {
+            artifactId = "runanywhere-onnx-android"
+        }
+
         compilations.all {
             kotlinOptions.jvmTarget = "17"
         }
