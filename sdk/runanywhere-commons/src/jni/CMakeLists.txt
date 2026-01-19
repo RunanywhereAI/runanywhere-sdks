@@ -55,6 +55,9 @@ if(ANDROID)
         CXX_VISIBILITY_PRESET hidden
         VISIBILITY_INLINES_HIDDEN YES
     )
+
+    # 16KB page alignment for Android 15+ (API 35) compliance - required Nov 2025
+    target_link_options(runanywhere_commons_jni PRIVATE -Wl,-z,max-page-size=16384)
 endif()
 
 # Set output name to match what Kotlin expects
