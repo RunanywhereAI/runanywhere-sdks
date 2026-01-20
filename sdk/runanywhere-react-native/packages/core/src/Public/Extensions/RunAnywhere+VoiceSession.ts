@@ -103,20 +103,23 @@ export async function startVoiceSession(
  * Start a voice session with callback-based event handling
  *
  * Alternative API using callbacks instead of async iterator.
+ * You can also pass `onEvent` directly in the config.
  *
  * Example:
  * ```typescript
- * const session = await startVoiceSessionWithCallback({}, (event) => {
- *   switch (event.type) {
- *     case 'listening':
- *       setAudioLevel(event.audioLevel ?? 0);
- *       break;
- *     case 'turnCompleted':
- *       setUserText(event.transcription ?? '');
- *       setAssistantText(event.response ?? '');
- *       break;
+ * // Using onEvent in config (preferred)
+ * const session = await startVoiceSession({
+ *   onEvent: (event) => {
+ *     switch (event.type) {
+ *       case 'listening': setAudioLevel(event.audioLevel ?? 0); break;
+ *       case 'transcribed': setUserText(event.transcription ?? ''); break;
+ *       case 'responded': setAssistantText(event.response ?? ''); break;
+ *     }
  *   }
  * });
+ *
+ * // Or using separate callback parameter
+ * const session = await startVoiceSessionWithCallback({}, (event) => { ... });
  *
  * // Later...
  * session.stop();
@@ -132,8 +135,9 @@ export async function startVoiceSessionWithCallback(
 ): Promise<VoiceSessionHandle> {
   logger.info('Starting voice session with callback...');
 
-  const session = new VoiceSessionHandle(config);
-  session.setEventCallback(onEvent);
+  // Merge the callback into config
+  const configWithCallback = { ...config, onEvent };
+  const session = new VoiceSessionHandle(configWithCallback);
   await session.start();
 
   logger.info('Voice session with callback started');

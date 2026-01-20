@@ -1,6 +1,6 @@
 {
   "name": "runanywhere-react-native-monorepo",
-  "version": "0.2.0",
+  "version": "0.17.0",
   "private": true,
   "description": "RunAnywhere React Native SDK - Multi-Package Monorepo",
   "workspaces": [
@@ -43,8 +43,8 @@
   "devDependencies": {
     "@commitlint/config-conventional": "^17.0.2",
     "@evilmartians/lefthook": "^1.5.0",
-    "@types/node": "^20.10.0",
-    "@types/react": "^18.2.44",
+    "@types/node": "^24.10.0",
+    "@types/react": "~19.1.0",
     "@typescript-eslint/eslint-plugin": "^8.50.0",
     "@typescript-eslint/parser": "^8.50.0",
     "commitlint": "^17.0.2",
@@ -54,9 +54,9 @@
     "eslint-plugin-prettier": "^5.0.1",
     "lerna": "^8.0.0",
     "prettier": "^3.0.3",
-    "react": "18.2.0",
-    "react-native": "0.74.0",
-    "typescript": "^5.2.2"
+    "react": "19.2.0",
+    "react-native": "0.83.1",
+    "typescript": "~5.9.2"
   },
   "packageManager": "yarn@3.6.1",
   "engines": {

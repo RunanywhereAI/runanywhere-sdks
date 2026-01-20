@@ -91,6 +91,16 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 endif()
 
 # =============================================================================
+# 16KB Page Alignment for Android 15+ (API 35) Compliance
+# Required starting November 1, 2025 for Google Play submissions
+# All shared libraries must have PT_LOAD segments aligned to 16KB
+# =============================================================================
+if(ANDROID)
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
+    message(STATUS "Enabled 16KB page alignment for Android (Google Play requirement)")
+endif()
+
+# =============================================================================
 # AUTO-GENERATE DEVELOPMENT CONFIG IF MISSING
 # =============================================================================
 # development_config.cpp is git-ignored because it can contain secrets.
