@@ -21,10 +21,12 @@
 #include <android/log.h>
 #define LOG_TAG "TelemetryBridge"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 #else
 #define LOGI(...) printf("[TelemetryBridge] "); printf(__VA_ARGS__); printf("\n")
+#define LOGW(...) printf("[TelemetryBridge WARN] "); printf(__VA_ARGS__); printf("\n")
 #define LOGE(...) printf("[TelemetryBridge ERROR] "); printf(__VA_ARGS__); printf("\n")
 #define LOGD(...) printf("[TelemetryBridge DEBUG] "); printf(__VA_ARGS__); printf("\n")
 #endif
@@ -253,14 +255,19 @@ static void telemetryHttpCallback(
     std::string apiKey;
 
     if (env == RAC_ENV_DEVELOPMENT) {
-        // Development: Use Supabase from C++ dev config
+        // Development: Use Supabase from C++ dev config (development_config.cpp)
+        // NO FALLBACK - credentials must come from C++ config only
         const char* devUrl = rac_dev_config_get_supabase_url();
         const char* devKey = rac_dev_config_get_supabase_key();
 
-        baseURL = devUrl ? devUrl : "https://fhtgjtxuoikwwouxqzrn.supabase.co";
+        baseURL = devUrl ? devUrl : "";
         apiKey = devKey ? devKey : "";
 
-        LOGD("Telemetry using Supabase: %s", baseURL.c_str());
+        if (baseURL.empty()) {
+            LOGW("Development mode but Supabase URL not configured in C++ dev_config");
+        } else {
+            LOGD("Telemetry using Supabase: %s", baseURL.c_str());
+        }
     } else {
         // Production/Staging: Use configured Railway URL
         // These come from SDK initialization (App.tsx -> RunAnywhere.initialize)

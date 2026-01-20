@@ -134,7 +134,8 @@ elseif(RAC_PLATFORM_ANDROID)
     target_link_libraries(rac_backend_whispercpp PRIVATE log)
     # Don't use -fvisibility=hidden here - JNI bridge needs these symbols
     target_compile_options(rac_backend_whispercpp PRIVATE -O3 -ffunction-sections -fdata-sections)
-    target_link_options(rac_backend_whispercpp PRIVATE -Wl,--gc-sections)
+    # 16KB page alignment for Android 15+ (API 35) compliance - required Nov 2025
+    target_link_options(rac_backend_whispercpp PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)
 
 elseif(RAC_PLATFORM_MACOS)
     message(STATUS "Configuring WhisperCPP backend for macOS")
@@ -169,7 +170,8 @@ if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED)
         )
 
         target_compile_options(rac_backend_whispercpp_jni PRIVATE -O3 -fvisibility=hidden -ffunction-sections -fdata-sections)
-        target_link_options(rac_backend_whispercpp_jni PRIVATE -Wl,--gc-sections)
+        # 16KB page alignment for Android 15+ (API 35) compliance - required Nov 2025
+        target_link_options(rac_backend_whispercpp_jni PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)
     endif()
 endif()
 

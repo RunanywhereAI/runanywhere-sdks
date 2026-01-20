@@ -6,12 +6,14 @@ import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:ffi/ffi.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
 // =============================================================================
 // Exceptional return constants for FFI callbacks
@@ -259,35 +261,113 @@ class DartBridgeDevice {
   // Internal Helpers
   // ============================================================================
 
+  /// Key for storing persistent device UUID in Keychain/EncryptedSharedPreferences
+  /// Matches Swift KeychainManager.KeychainKey.deviceUUID and React Native SecureStorageKeys.deviceUUID
+  static const _keyDeviceUUID = 'com.runanywhere.sdk.device.uuid';
+
+  /// Secure storage for device UUID persistence
+  /// - iOS: Keychain (survives app reinstalls)
+  /// - Android: EncryptedSharedPreferences (survives app reinstalls)
+  static const _secureStorage = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+  );
+
+  /// Get or create a persistent device UUID.
+  /// Matches Swift's DeviceIdentity.persistentUUID behavior:
+  /// 1. Try to retrieve stored UUID from Keychain/EncryptedSharedPreferences (survives reinstalls)
+  /// 2. If not found, try iOS vendor ID
+  /// 3. If still not found, generate new UUID
+  /// The UUID format is required by the backend for device registration.
   static Future<String> _getOrCreateDeviceId() async {
     if (_cachedDeviceId != null) return _cachedDeviceId!;
 
     try {
-      final deviceInfo = DeviceInfoPlugin();
-
-      if (Platform.isIOS) {
-        final iosInfo = await deviceInfo.iosInfo;
-        _cachedDeviceId = iosInfo.identifierForVendor ?? _generateFallbackId();
-      } else if (Platform.isAndroid) {
-        final androidInfo = await deviceInfo.androidInfo;
-        _cachedDeviceId = androidInfo.id;
-      } else if (Platform.isMacOS) {
-        final macInfo = await deviceInfo.macOsInfo;
-        _cachedDeviceId = macInfo.systemGUID ?? _generateFallbackId();
-      } else {
-        _cachedDeviceId = _generateFallbackId();
+      // Strategy 1: Try to get stored UUID from secure storage (Keychain/EncryptedSharedPreferences)
+      // This persists across app reinstalls (matches Swift KeychainManager behavior)
+      final storedUUID = await _secureStorage.read(key: _keyDeviceUUID);
+      if (storedUUID != null && _isValidUUID(storedUUID)) {
+        _cachedDeviceId = storedUUID;
+        _logger.debug('Using stored device UUID from secure storage');
+        return _cachedDeviceId!;
       }
-    } catch (e) {
-      _logger.warning('Failed to get device ID: $e');
-      _cachedDeviceId = _generateFallbackId();
-    }
 
-    return _cachedDeviceId!;
+      // Strategy 2: On iOS, try to use identifierForVendor (already a UUID)
+      // Matches Swift: DeviceIdentity.vendorUUID fallback
+      if (Platform.isIOS) {
+        try {
+          final deviceInfo = DeviceInfoPlugin();
+          final iosInfo = await deviceInfo.iosInfo;
+          final vendorId = iosInfo.identifierForVendor;
+          if (vendorId != null && _isValidUUID(vendorId)) {
+            _cachedDeviceId = vendorId;
+            await _secureStorage.write(key: _keyDeviceUUID, value: vendorId);
+            _logger.debug('Stored iOS vendor UUID in secure storage');
+            return _cachedDeviceId!;
+          }
+        } catch (e) {
+          _logger.debug('Failed to get iOS vendor ID: $e');
+        }
+      }
+
+      // Strategy 3: Generate a new UUID (matches Swift's UUID().uuidString)
+      final newUUID = _generateUUID();
+      _cachedDeviceId = newUUID;
+      await _secureStorage.write(key: _keyDeviceUUID, value: newUUID);
+      _logger.debug('Generated and stored new device UUID in secure storage');
+      return _cachedDeviceId!;
+    } catch (e) {
+      _logger.warning('Failed to get device ID from secure storage: $e');
+      
+      // Fallback: try SharedPreferences (less secure, doesn't survive reinstalls)
+      try {
+        _prefs ??= await SharedPreferences.getInstance();
+        final prefsUUID = _prefs?.getString(_keyDeviceUUID);
+        if (prefsUUID != null && _isValidUUID(prefsUUID)) {
+          _cachedDeviceId = prefsUUID;
+          // Try to migrate to secure storage
+          try {
+            await _secureStorage.write(key: _keyDeviceUUID, value: prefsUUID);
+            _logger.debug('Migrated device UUID to secure storage');
+          } catch (_) {}
+          return _cachedDeviceId!;
+        }
+        
+        final newUUID = _generateUUID();
+        _cachedDeviceId = newUUID;
+        await _prefs?.setString(_keyDeviceUUID, newUUID);
+        _logger.debug('Stored device UUID in SharedPreferences (fallback)');
+        return _cachedDeviceId!;
+      } catch (e2) {
+        _logger.warning('SharedPreferences fallback failed: $e2');
+        // Last resort: generate UUID without storing
+        _cachedDeviceId = _generateUUID();
+        return _cachedDeviceId!;
+      }
+    }
   }
 
-  static String _generateFallbackId() {
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    return 'flutter-$timestamp-${DateTime.now().hashCode.abs()}';
+  /// Generate a proper UUID v4 string (matches backend expectations)
+  /// Format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+  /// Uses cryptographically secure random bytes via the uuid package
+  static String _generateUUID() {
+    return const Uuid().v4();
+  }
+
+  /// Validate UUID format (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+  static bool _isValidUUID(String uuid) {
+    if (uuid.length != 36) return false;
+    if (!uuid.contains('-')) return false;
+    final parts = uuid.split('-');
+    if (parts.length != 5) return false;
+    if (parts[0].length != 8 ||
+        parts[1].length != 4 ||
+        parts[2].length != 4 ||
+        parts[3].length != 4 ||
+        parts[4].length != 12) {
+      return false;
+    }
+    return true;
   }
 
   static int _environmentToInt(SDKEnvironment env) {

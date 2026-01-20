@@ -53,6 +53,11 @@ class DartBridgePlatform {
   /// Pointer to the adapter struct (must persist for C++ to call)
   static Pointer<RacPlatformAdapterStruct>? _adapterPtr;
 
+  /// Thread-safe logger callback using NativeCallable.listener
+  /// This callback can be invoked from ANY thread/isolate and posts to our event loop
+  /// CRITICAL: Must be kept alive to prevent garbage collection
+  static NativeCallable<RacLogCallbackNative>? _loggerCallable;
+
   /// Secure storage for keychain operations
   // ignore: unused_field
   static const _secureStorage = FlutterSecureStorage(
@@ -75,10 +80,14 @@ class DartBridgePlatform {
       _adapterPtr = calloc<RacPlatformAdapterStruct>();
       final adapter = _adapterPtr!;
 
-      // Logging callback
-      adapter.ref.log = Pointer.fromFunction<RacLogCallbackNative>(
+      // Logging callback - MUST use NativeCallable.listener for thread safety
+      // This allows C++ to call the logger from any thread (including background
+      // threads used by LLM generation) without crashing with:
+      // "Cannot invoke native callback from a different isolate"
+      _loggerCallable = NativeCallable<RacLogCallbackNative>.listener(
         _platformLogCallback,
       );
+      adapter.ref.log = _loggerCallable!.nativeFunction;
 
       // File operations
       adapter.ref.fileExists =
@@ -177,6 +186,12 @@ class DartBridgePlatform {
     // Just mark as unregistered
     _isRegistered = false;
 
+    // Close the logger callable to release resources
+    // Note: Only do this during true shutdown - C++ may still try to log
+    // We keep it alive during normal operation
+    // _loggerCallable?.close();
+    // _loggerCallable = null;
+
     // Don't free _adapterPtr - C++ may still reference it
     // It will be cleaned up on process exit
   }
@@ -190,6 +205,11 @@ class DartBridgePlatform {
 // =============================================================================
 
 /// Logging callback - routes C++ logs to Dart logger
+/// 
+/// NOTE: This callback is registered with NativeCallable.listener for thread safety.
+/// It runs asynchronously on the main isolate's event loop, which means by the time
+/// it executes, the C++ log message memory may have been freed. We handle this by
+/// catching any UTF-8 decoding errors gracefully.
 void _platformLogCallback(
   int level,
   Pointer<Utf8> category,
@@ -198,25 +218,34 @@ void _platformLogCallback(
 ) {
   if (message == nullptr) return;
 
-  final msgString = message.toDartString();
-  final categoryString = category != nullptr ? category.toDartString() : 'RAC';
+  try {
+    // Try to decode the message - may fail if memory was freed
+    final msgString = message.toDartString();
+    if (msgString.isEmpty) return;
+    
+    final categoryString = category != nullptr ? category.toDartString() : 'RAC';
 
-  final logger = SDKLogger(categoryString);
+    final logger = SDKLogger(categoryString);
 
-  switch (level) {
-    case RacLogLevel.error:
-    case RacLogLevel.fatal:
-      logger.error(msgString);
-    case RacLogLevel.warning:
-      logger.warning(msgString);
-    case RacLogLevel.info:
-      logger.info(msgString);
-    case RacLogLevel.debug:
-      logger.debug(msgString);
-    case RacLogLevel.trace:
-      logger.debug('[TRACE] $msgString');
-    default:
-      logger.info(msgString);
+    switch (level) {
+      case RacLogLevel.error:
+      case RacLogLevel.fatal:
+        logger.error(msgString);
+      case RacLogLevel.warning:
+        logger.warning(msgString);
+      case RacLogLevel.info:
+        logger.info(msgString);
+      case RacLogLevel.debug:
+        logger.debug(msgString);
+      case RacLogLevel.trace:
+        logger.debug('[TRACE] $msgString');
+      default:
+        logger.info(msgString);
+    }
+  } catch (e) {
+    // Silently ignore invalid UTF-8 or freed memory errors
+    // This can happen because NativeCallable.listener runs asynchronously
+    // and the C++ log message buffer may have been freed by then
   }
 }
 

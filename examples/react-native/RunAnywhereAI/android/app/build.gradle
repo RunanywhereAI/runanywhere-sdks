@@ -33,6 +33,13 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+
+        // 16KB page size support for Android 15+ (API 35)
+        externalNativeBuild {
+            cmake {
+                arguments "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+            }
+        }
     }
     signingConfigs {
         debug {
@@ -64,6 +71,15 @@ android {
             "**/libfolly_runtime.so",
             "**/libreactnative.so"
         ]
+    }
+
+    // 16KB page size alignment for Android 15+ (API 35) compliance
+    // Required starting November 1, 2025 for Google Play submissions
+    // This ensures native libraries are properly aligned within the APK
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
     }
 }
 

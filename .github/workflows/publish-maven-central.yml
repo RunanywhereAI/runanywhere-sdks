@@ -38,11 +38,7 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           cmdline-tools-version: 11076708
-          packages: |
-            platform-tools
-            platforms;android-35
-            build-tools;35.0.0
-            ndk;27.0.12077973
+          packages: platform-tools platforms;android-35 build-tools;35.0.0 ndk;27.0.12077973
 
       - name: Download native libraries
         working-directory: sdk/runanywhere-kotlin
@@ -52,6 +48,25 @@ jobs:
         env:
           SDK_VERSION: ${{ inputs.version }}
 
+      - name: Import GPG key
+        run: |
+          echo "${{ secrets.GPG_SIGNING_KEY }}" | gpg --batch --import
+          # Get the key fingerprint and set trust
+          KEY_FP=$(gpg --list-secret-keys --keyid-format LONG | grep -A1 "sec" | tail -1 | tr -d ' ')
+          echo "${KEY_FP}:6:" | gpg --import-ownertrust || true
+          # List imported keys for debugging
+          gpg --list-secret-keys --keyid-format LONG
+
+      - name: Configure Gradle for GPG signing
+        run: |
+          mkdir -p ~/.gradle
+          cat >> ~/.gradle/gradle.properties << EOF
+          signing.gnupg.executable=gpg
+          signing.gnupg.useLegacyGpg=false
+          signing.gnupg.keyName=${{ secrets.GPG_KEY_ID }}
+          signing.gnupg.passphrase=${{ secrets.GPG_SIGNING_PASSWORD }}
+          EOF
+
       - name: Publish main SDK to Maven Central
         working-directory: sdk/runanywhere-kotlin
         run: |
@@ -60,9 +75,6 @@ jobs:
           SDK_VERSION: ${{ inputs.version }}
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
-          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
-          GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
-          GPG_SIGNING_PASSWORD: ${{ secrets.GPG_SIGNING_PASSWORD }}
 
       - name: Publish LlamaCPP module
         working-directory: sdk/runanywhere-kotlin
@@ -72,9 +84,6 @@ jobs:
           SDK_VERSION: ${{ inputs.version }}
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
-          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
-          GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
-          GPG_SIGNING_PASSWORD: ${{ secrets.GPG_SIGNING_PASSWORD }}
 
       - name: Publish ONNX module
         working-directory: sdk/runanywhere-kotlin
@@ -84,9 +93,6 @@ jobs:
           SDK_VERSION: ${{ inputs.version }}
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
-          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
-          GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
-          GPG_SIGNING_PASSWORD: ${{ secrets.GPG_SIGNING_PASSWORD }}
 
       - name: Summary
         run: |

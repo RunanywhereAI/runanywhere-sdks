@@ -37,7 +37,6 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import RNFS from 'react-native-fs';
-import * as AudioService from '../utils/AudioService';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
@@ -125,7 +124,7 @@ export const STTScreen: React.FC = () => {
         (sdk.stopStreamingSTT as () => Promise<boolean>)().catch(() => {});
       }
       // Stop batch mode recorder
-      AudioService.cleanup().catch(() => {});
+      RunAnywhere.Audio.cleanup().catch(() => {});
       // Clean up temp audio file
       if (recordingPath.current) {
         RNFS.unlink(recordingPath.current).catch(() => {});
@@ -357,7 +356,7 @@ export const STTScreen: React.FC = () => {
 
       // Start recording using expo-av
       console.warn('[STTScreen] Starting recorder...');
-      const uri = await AudioService.startRecording({
+      const uri = await RunAnywhere.Audio.startRecording({
         onProgress: (currentPositionMs, metering) => {
           setRecordingDuration(currentPositionMs);
           // Convert metering level to 0-1 range (metering is typically negative dB)
@@ -390,7 +389,7 @@ export const STTScreen: React.FC = () => {
       console.warn('[STTScreen] Stopping recording...');
 
       // Stop recording
-      const { uri } = await AudioService.stopRecording();
+      const { uri } = await RunAnywhere.Audio.stopRecording();
       setIsRecording(false);
       setIsProcessing(true);
 
@@ -527,7 +526,7 @@ export const STTScreen: React.FC = () => {
       console.warn(`[STTScreen] Starting live chunk #${chunkNum}...`);
 
       // Record with expo-av
-      const path = await AudioService.startRecording({
+      const path = await RunAnywhere.Audio.startRecording({
         onProgress: (currentPositionMs, metering) => {
           const duration = Math.floor(currentPositionMs / 1000);
           setRecordingDuration(duration);
@@ -566,7 +565,7 @@ export const STTScreen: React.FC = () => {
       setPartialTranscript('Processing...');
 
       // Stop current recording
-      const { uri: resultPath } = await AudioService.stopRecording();
+      const { uri: resultPath } = await RunAnywhere.Audio.stopRecording();
 
       // Get the path
       let audioPath = resultPath;
@@ -653,7 +652,7 @@ export const STTScreen: React.FC = () => {
       setPartialTranscript('Processing final chunk...');
 
       // Stop current recording
-      const { uri: resultPath } = await AudioService.stopRecording().catch(
+      const { uri: resultPath } = await RunAnywhere.Audio.stopRecording().catch(
         () => ({ uri: '', durationMs: 0 })
       );
 

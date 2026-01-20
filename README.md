@@ -17,16 +17,12 @@
   <a href="https://play.google.com/store/apps/details?id=com.runanywhere.runanywhereai">
     <img src="https://img.shields.io/badge/Google_Play-Download-34A853?style=for-the-badge&logo=google-play&logoColor=white" alt="Get it on Google Play" />
   </a>
-  &nbsp;
-  <a href="https://www.youtube.com/watch?v=GG100ijJHl4">
-    <img src="https://img.shields.io/badge/YouTube-Watch_Demo-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch Demo" />
-  </a>
 </p>
 
 <p align="center">
   <a href="https://github.com/RunanywhereAI/runanywhere-sdks/stargazers"><img src="https://img.shields.io/github/stars/RunanywhereAI/runanywhere-sdks?style=flat-square" alt="GitHub Stars" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square" alt="License" /></a>
-  <a href="https://discord.gg/N359FBbDVd"><img src="https://img.shields.io/discord/1234567890?style=flat-square&logo=discord&logoColor=white&label=Discord" alt="Discord" /></a>
+  <a href="https://discord.gg/N359FBbDVd"><img src="https://img.shields.io/badge/Discord-Join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord" /></a>
 </p>
 
 <p align="center">

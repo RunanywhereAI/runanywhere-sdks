@@ -49,10 +49,10 @@ elseif(RAC_PLATFORM_ANDROID)
     set(GGML_SYCL OFF CACHE BOOL "" FORCE)
     set(GGML_KOMPUTE OFF CACHE BOOL "" FORCE)
     set(GGML_RPC OFF CACHE BOOL "" FORCE)
-    
+
     # CRITICAL: Disable native CPU detection (fails during cross-compilation)
     set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
-    
+
     # Enable ARM NEON only for ARM architectures (not x86/x86_64)
     if(ANDROID_ABI MATCHES "arm64-v8a|armeabi-v7a")
         set(GGML_NEON ON CACHE BOOL "" FORCE)
@@ -62,11 +62,11 @@ elseif(RAC_PLATFORM_ANDROID)
         # x86/x86_64 will use SSE/AVX automatically
         message(STATUS "Disabling NEON for non-ARM ABI: ${ANDROID_ABI}")
     endif()
-    
+
     # Android-specific settings
     set(ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES ON CACHE BOOL "" FORCE)
     set(GGML_CPU_HBM OFF CACHE BOOL "" FORCE)
-    
+
     # Disable openmp to avoid Android threading issues
     set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
 elseif(RAC_PLATFORM_MACOS)
@@ -144,7 +144,8 @@ elseif(RAC_PLATFORM_ANDROID)
     target_link_libraries(rac_backend_llamacpp PRIVATE log)
     # Don't use -fvisibility=hidden here - JNI bridge needs these symbols
     target_compile_options(rac_backend_llamacpp PRIVATE -O3 -ffunction-sections -fdata-sections)
-    target_link_options(rac_backend_llamacpp PRIVATE -Wl,--gc-sections)
+    # 16KB page alignment for Android 15+ (API 35) compliance - required Nov 2025
+    target_link_options(rac_backend_llamacpp PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)
 
 elseif(RAC_PLATFORM_MACOS)
     message(STATUS "Configuring LlamaCPP backend for macOS")
@@ -179,7 +180,8 @@ if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED)
         )
 
         target_compile_options(rac_backend_llamacpp_jni PRIVATE -O3 -fvisibility=hidden -ffunction-sections -fdata-sections)
-        target_link_options(rac_backend_llamacpp_jni PRIVATE -Wl,--gc-sections)
+        # 16KB page alignment for Android 15+ (API 35) compliance - required Nov 2025
+        target_link_options(rac_backend_llamacpp_jni PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)
     endif()
 endif()
 

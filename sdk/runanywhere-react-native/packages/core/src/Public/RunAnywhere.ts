@@ -46,6 +46,7 @@ import * as Logging from './Extensions/RunAnywhere+Logging';
 import * as VoiceAgent from './Extensions/RunAnywhere+VoiceAgent';
 import * as VoiceSession from './Extensions/RunAnywhere+VoiceSession';
 import * as StructuredOutput from './Extensions/RunAnywhere+StructuredOutput';
+import * as Audio from './Extensions/RunAnywhere+Audio';
 
 const logger = new SDKLogger('RunAnywhere');
 
@@ -163,17 +164,17 @@ export const RunAnywhere = {
 
       // Configure network layer BEFORE native initialization
       // This ensures HTTP is ready when C++ callbacks need it
-      const envString = environment === SDKEnvironment.Development ? 'development' 
-        : environment === SDKEnvironment.Staging ? 'staging' 
+      const envString = environment === SDKEnvironment.Development ? 'development'
+        : environment === SDKEnvironment.Staging ? 'staging'
         : 'production';
-      
+
       // Map environment string to SDKEnvironment enum for HTTPService
-      const networkEnv = environment === SDKEnvironment.Development 
+      const networkEnv = environment === SDKEnvironment.Development
         ? NetworkSDKEnvironment.Development
         : environment === SDKEnvironment.Staging
-        ? NetworkSDKEnvironment.Staging  
+        ? NetworkSDKEnvironment.Staging
         : NetworkSDKEnvironment.Production;
-      
+
       // Configure HTTPService with network settings
       HTTPService.shared.configure({
         baseURL: options.baseURL || 'https://api.runanywhere.ai',
@@ -284,11 +285,11 @@ export const RunAnywhere = {
     try {
       const endpoint = '/api/v1/auth/sdk/authenticate';
       const fullUrl = baseURL.replace(/\/$/, '') + endpoint;
-      
+
       // Use actual platform (ios/android) as backend only accepts these values
       // This matches how Swift sends 'ios' and Kotlin sends 'android'
       const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-      
+
       const requestBody = JSON.stringify({
         api_key: apiKey,
         device_id: deviceId,
@@ -325,7 +326,7 @@ export const RunAnywhere = {
 
       // Store tokens in HTTPService for subsequent requests
       HTTPService.shared.setToken(authResponse.access_token);
-      
+
       // Store tokens in C++ AuthBridge for native HTTP requests (telemetry, device registration)
       try {
         const native = requireNativeModule();
@@ -339,7 +340,7 @@ export const RunAnywhere = {
         logger.warning(`Failed to set auth tokens in native: ${nativeErr}`);
         // Continue - tokens are still stored in HTTPService
       }
-      
+
       // Store tokens in secure storage for persistence
       try {
         const { SecureStorageService } = await import('../Foundation/Security/SecureStorageService');
@@ -366,13 +367,13 @@ export const RunAnywhere = {
     environment: SDKEnvironment,
     supabaseKey?: string
   ): Promise<void> {
-    const envString = environment === SDKEnvironment.Development ? 'development' 
-      : environment === SDKEnvironment.Staging ? 'staging' 
+    const envString = environment === SDKEnvironment.Development ? 'development'
+      : environment === SDKEnvironment.Staging ? 'staging'
       : 'production';
-    
+
     try {
       const native = requireNativeModule();
-      
+
       // Call native registerDevice which goes through:
       // JS → C++ DeviceBridge → rac_device_manager_register_if_needed → http_post callback → native HTTP
       // This exactly mirrors Swift's flow!
@@ -676,6 +677,27 @@ export const RunAnywhere = {
     // Delegate to storage clearCache for now
     await this.clearCache();
     return true;
+  },
+
+  // ============================================================================
+  // Audio Utilities (Delegated to Extension)
+  // ============================================================================
+
+  /** Audio recording and playback utilities */
+  Audio: {
+    requestPermission: Audio.requestAudioPermission,
+    startRecording: Audio.startRecording,
+    stopRecording: Audio.stopRecording,
+    cancelRecording: Audio.cancelRecording,
+    playAudio: Audio.playAudio,
+    stopPlayback: Audio.stopPlayback,
+    pausePlayback: Audio.pausePlayback,
+    resumePlayback: Audio.resumePlayback,
+    createWavFromPCMFloat32: Audio.createWavFromPCMFloat32,
+    cleanup: Audio.cleanup,
+    formatDuration: Audio.formatDuration,
+    SAMPLE_RATE: Audio.AUDIO_SAMPLE_RATE,
+    TTS_SAMPLE_RATE: Audio.TTS_SAMPLE_RATE,
   },
 
   // ============================================================================
