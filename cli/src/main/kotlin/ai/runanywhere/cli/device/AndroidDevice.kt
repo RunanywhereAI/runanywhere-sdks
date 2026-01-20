@@ -1,6 +1,7 @@
 package ai.runanywhere.cli.device
 
 import ai.runanywhere.cli.benchmark.BenchmarkConfig
+import java.io.BufferedReader
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.name
@@ -14,9 +15,75 @@ class AndroidDevice(
     
     private val packageName = "com.runanywhere.runanywhereai"
     private val benchmarkActivity = "$packageName/.benchmark.BenchmarkActivity"
+    private var benchmarkStartTime: Long = 0
     
     /**
-     * Launch the app with benchmark intent
+     * Launch app and auto-start benchmark (for CLI automation)
+     */
+    fun launchBenchmarkAuto(config: BenchmarkConfig, modelIds: List<String>?) {
+        benchmarkStartTime = System.currentTimeMillis()
+        
+        // Clear previous results
+        clearResults()
+        
+        val configArg = config.toJsonArg()
+        val modelsArg = modelIds?.joinToString(",") ?: "all"
+        
+        // Force stop app first
+        runAdb("shell", "am", "force-stop", packageName)
+        Thread.sleep(500)
+        
+        // Launch with intent extras for auto-benchmark
+        runAdb(
+            "shell", "am", "start",
+            "-n", "$packageName/.MainActivity",
+            "--ez", "benchmark_auto", "true",
+            "--es", "benchmark_config", configArg,
+            "--es", "benchmark_models", modelsArg
+        )
+    }
+    
+    /**
+     * Check if benchmark has completed by looking for new result files
+     */
+    fun isBenchmarkComplete(): Boolean {
+        // Check for completion marker file or new results
+        val checkMarker = runAdb(
+            "shell", "run-as", packageName,
+            "cat", "files/benchmark_complete.marker"
+        )
+        
+        if (checkMarker.contains("complete")) {
+            return true
+        }
+        
+        // Alternative: check for new result files
+        val filesOutput = runAdb(
+            "shell", "run-as", packageName,
+            "ls", "-la", "files/"
+        )
+        
+        // Look for benchmark files with recent timestamps
+        val hasNewResults = filesOutput.lines()
+            .any { line -> 
+                line.contains("benchmark_") && line.contains(".json")
+            }
+        
+        return hasNewResults && (System.currentTimeMillis() - benchmarkStartTime > 10000)
+    }
+    
+    private fun runAdb(vararg args: String): String {
+        val command = listOf("adb", "-s", serial) + args.toList()
+        val process = ProcessBuilder(command)
+            .redirectErrorStream(true)
+            .start()
+        val output = process.inputStream.bufferedReader().use(BufferedReader::readText)
+        process.waitFor()
+        return output
+    }
+    
+    /**
+     * Launch the app with benchmark intent (manual mode)
      */
     fun launchBenchmark(config: BenchmarkConfig, modelIds: List<String>) {
         val configJson = config.toJsonArg()
