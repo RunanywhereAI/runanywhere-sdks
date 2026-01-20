@@ -44,7 +44,15 @@ struct ContentView: View {
                 }
                 .tag(3)
 
-            // Tab 4: Combined Settings (includes Storage)
+            // Tab 4: Benchmark
+            BenchmarkView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .tabItem {
+                    Label("Benchmark", systemImage: "speedometer")
+                }
+                .tag(4)
+
+            // Tab 5: Combined Settings (includes Storage)
             Group {
                 #if os(macOS)
                 CombinedSettingsView()
@@ -59,7 +67,7 @@ struct ContentView: View {
             .tabItem {
                 Label("Settings", systemImage: "gear")
             }
-            .tag(4)
+            .tag(5)
         }
         .accentColor(AppColors.primaryAccent)
         #if os(macOS)

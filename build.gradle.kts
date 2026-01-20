@@ -156,6 +156,46 @@ tasks.register("publishSdkToMavenLocal") {
 }
 
 // ============================================================================
+// CLI TASKS
+// ============================================================================
+
+tasks.register("buildCli") {
+    group = "cli"
+    description = "Build the RunAnywhere CLI tool"
+    doLast {
+        println("📦 Building CLI...")
+        exec {
+            workingDir = projectDir
+            commandLine("./gradlew", ":cli:shadowJar")
+        }
+        println("✅ CLI built: cli/build/libs/runanywhere-cli-0.1.0.jar")
+    }
+}
+
+tasks.register("installCli") {
+    group = "cli"
+    description = "Install CLI to ~/.local/bin"
+    doLast {
+        println("📦 Building and installing CLI...")
+        exec {
+            workingDir = projectDir
+            commandLine("./gradlew", ":cli:installCli")
+        }
+    }
+}
+
+tasks.register("runCli") {
+    group = "cli"
+    description = "Run the CLI tool with arguments"
+    doLast {
+        exec {
+            workingDir = projectDir
+            commandLine("./gradlew", ":cli:run", "--args=${project.findProperty("args") ?: "--help"}")
+        }
+    }
+}
+
+// ============================================================================
 // CLEAN TASK
 // ============================================================================
 
