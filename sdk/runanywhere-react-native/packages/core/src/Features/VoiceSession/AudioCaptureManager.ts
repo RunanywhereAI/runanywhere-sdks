@@ -7,10 +7,62 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Features/STT/Services/AudioCaptureManager.swift
  */
 
-import { EventBus } from '../../Public/Events';
+import { Platform, PermissionsAndroid, NativeModules } from 'react-native';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 
 const logger = new SDKLogger('AudioCaptureManager');
+
+// Lazy-load EventBus to avoid circular dependency issues during module initialization
+// The circular dependency: AudioCaptureManager -> EventBus -> SDKLogger -> ... -> AudioCaptureManager
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _eventBus: any = null;
+function getEventBus() {
+  if (!_eventBus) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      _eventBus = require('../../Public/Events').EventBus;
+    } catch {
+      logger.warning('EventBus not available');
+    }
+  }
+  return _eventBus;
+}
+
+/**
+ * Safely publish an event to the EventBus
+ * Handles cases where EventBus may not be fully initialized
+ */
+function safePublish(eventType: string, event: Record<string, unknown>): void {
+  try {
+    const eventBus = getEventBus();
+    if (eventBus?.publish) {
+      eventBus.publish(eventType, event);
+    }
+  } catch {
+    // Ignore EventBus errors - events are non-critical for audio functionality
+  }
+}
+
+// Native iOS Audio Module (provided by the app)
+const NativeAudioModule = Platform.OS === 'ios' ? NativeModules.NativeAudioModule : null;
+
+// Lazy load LiveAudioStream for Android
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let LiveAudioStream: any = null;
+
+function getLiveAudioStream() {
+  if (Platform.OS !== 'android') return null;
+  if (!LiveAudioStream) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      LiveAudioStream = require('react-native-live-audio-stream').default;
+    } catch {
+      logger.warning('react-native-live-audio-stream not available');
+      return null;
+    }
+  }
+  return LiveAudioStream;
+}
 
 /**
  * Audio data callback type
@@ -18,7 +70,7 @@ const logger = new SDKLogger('AudioCaptureManager');
 export type AudioDataCallback = (audioData: ArrayBuffer) => void;
 
 /**
- * Audio level callback type
+ * Audio level callback type (level is 0.0 - 1.0)
  */
 export type AudioLevelCallback = (level: number) => void;
 
@@ -28,15 +80,10 @@ export type AudioLevelCallback = (level: number) => void;
 export interface AudioCaptureConfig {
   /** Sample rate in Hz (default: 16000) */
   sampleRate?: number;
-
   /** Number of channels (default: 1) */
   channels?: number;
-
   /** Bits per sample (default: 16) */
   bitsPerSample?: number;
-
-  /** Buffer size in samples */
-  bufferSize?: number;
 }
 
 /**
@@ -48,7 +95,9 @@ export type AudioCaptureState = 'idle' | 'requesting_permission' | 'recording' |
  * AudioCaptureManager
  *
  * Handles microphone recording with permission management and audio level monitoring.
- * Uses React Native's audio APIs or native modules for cross-platform support.
+ * Uses platform-native audio APIs:
+ * - iOS: NativeAudioModule (AVFoundation)
+ * - Android: react-native-live-audio-stream
  */
 export class AudioCaptureManager {
   private state: AudioCaptureState = 'idle';
@@ -59,13 +108,14 @@ export class AudioCaptureManager {
   private recordingStartTime: number | null = null;
   private audioBuffer: ArrayBuffer[] = [];
   private levelUpdateInterval: ReturnType<typeof setInterval> | null = null;
+  private recordingPath: string | null = null;
+  private androidAudioChunks: string[] = [];
 
   constructor(config: AudioCaptureConfig = {}) {
     this.config = {
       sampleRate: config.sampleRate ?? 16000,
       channels: config.channels ?? 1,
       bitsPerSample: config.bitsPerSample ?? 16,
-      bufferSize: config.bufferSize ?? 4096,
     };
   }
 
@@ -99,16 +149,18 @@ export class AudioCaptureManager {
     logger.info('Requesting microphone permission...');
 
     try {
-      // In React Native, permission handling depends on the platform
-      // This is a placeholder - actual implementation would use
-      // react-native-permissions or expo-permissions
+      if (Platform.OS === 'android') {
+        const grants = await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        ]);
+        const granted = grants[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] === PermissionsAndroid.RESULTS.GRANTED;
+        logger.info(`Android microphone permission: ${granted ? 'granted' : 'denied'}`);
+        this.state = granted ? 'idle' : 'error';
+        return granted;
+      }
 
-      // For now, assume permission is granted
-      // In production, integrate with actual permission APIs:
-      // - iOS: Uses AVAudioSession
-      // - Android: Uses RECORD_AUDIO permission
-
-      logger.info('Microphone permission granted');
+      // iOS: Permission is requested when starting recording
+      logger.info('Microphone permission granted (iOS)');
       this.state = 'idle';
       return true;
     } catch (error) {
@@ -122,78 +174,54 @@ export class AudioCaptureManager {
    * Start recording audio
    * @param onAudioData Callback for audio data chunks
    */
-  async startRecording(onAudioData: AudioDataCallback): Promise<void> {
+  async startRecording(onAudioData?: AudioDataCallback): Promise<void> {
     if (this.state === 'recording') {
       logger.warning('Already recording');
       return;
     }
 
-    this.audioDataCallback = onAudioData;
+    this.audioDataCallback = onAudioData ?? null;
     this.audioBuffer = [];
     this.recordingStartTime = Date.now();
     this.state = 'recording';
 
     logger.info('Starting audio recording...');
-    EventBus.publish('Voice', { type: 'recordingStarted' });
+    safePublish('Voice', { type: 'recordingStarted' });
 
-    // Start audio level monitoring simulation
-    // In production, this would come from actual audio stream
-    this.startAudioLevelMonitoring();
-
-    // In production, this would start actual audio recording using:
-    // - expo-av
-    // - react-native-audio-api
-    // - or a custom native module
-
-    // For now, we emit a started event and rely on the native implementation
-    // to provide audio data through the callback
+    if (Platform.OS === 'ios') {
+      await this.startIOSRecording();
+    } else {
+      await this.startAndroidRecording();
+    }
   }
 
   /**
-   * Stop recording
+   * Stop recording and return recorded audio file path
    */
-  stopRecording(): void {
+  async stopRecording(): Promise<{ path: string; durationMs: number }> {
     if (this.state !== 'recording') {
-      return;
+      throw new Error('Not recording');
     }
 
     logger.info('Stopping audio recording...');
     this.state = 'idle';
     this.stopAudioLevelMonitoring();
 
-    const duration = this.recordingStartTime
-      ? (Date.now() - this.recordingStartTime) / 1000
-      : 0;
+    const durationMs = this.recordingStartTime ? Date.now() - this.recordingStartTime : 0;
+    let path = '';
 
-    EventBus.publish('Voice', {
-      type: 'recordingStopped',
-      duration,
-    });
+    if (Platform.OS === 'ios') {
+      path = await this.stopIOSRecording();
+    } else {
+      path = await this.stopAndroidRecording();
+    }
+
+    safePublish('Voice', { type: 'recordingStopped', duration: durationMs / 1000 });
 
     this.audioDataCallback = null;
     this.recordingStartTime = null;
-  }
 
-  /**
-   * Pause recording
-   */
-  pauseRecording(): void {
-    if (this.state === 'recording') {
-      this.state = 'paused';
-      this.stopAudioLevelMonitoring();
-      logger.info('Recording paused');
-    }
-  }
-
-  /**
-   * Resume recording
-   */
-  resumeRecording(): void {
-    if (this.state === 'paused') {
-      this.state = 'recording';
-      this.startAudioLevelMonitoring();
-      logger.info('Recording resumed');
-    }
+    return { path, durationMs };
   }
 
   /**
@@ -204,61 +232,168 @@ export class AudioCaptureManager {
   }
 
   /**
-   * Get all recorded audio data
-   */
-  getRecordedData(): ArrayBuffer {
-    // Concatenate all audio buffers
-    const totalLength = this.audioBuffer.reduce((acc, buf) => acc + buf.byteLength, 0);
-    const result = new ArrayBuffer(totalLength);
-    const view = new Uint8Array(result);
-
-    let offset = 0;
-    for (const buffer of this.audioBuffer) {
-      view.set(new Uint8Array(buffer), offset);
-      offset += buffer.byteLength;
-    }
-
-    return result;
-  }
-
-  /**
-   * Process incoming audio data from native
-   * Called by native audio module when data is available
-   */
-  processAudioData(data: ArrayBuffer): void {
-    if (this.state !== 'recording') return;
-
-    this.audioBuffer.push(data);
-
-    // Calculate audio level from the data
-    this.updateAudioLevel(data);
-
-    // Forward to callback
-    if (this.audioDataCallback) {
-      this.audioDataCallback(data);
-    }
-  }
-
-  /**
    * Cleanup resources
    */
   cleanup(): void {
-    this.stopRecording();
+    if (this.state === 'recording') {
+      this.stopRecording().catch(() => {});
+    }
     this.audioBuffer = [];
     this.audioDataCallback = null;
     this.audioLevelCallback = null;
+    this.stopAudioLevelMonitoring();
     logger.info('AudioCaptureManager cleaned up');
   }
 
-  // Private methods
+  // iOS Implementation
+
+  private async startIOSRecording(): Promise<void> {
+    if (!NativeAudioModule) {
+      throw new Error('NativeAudioModule not available on iOS');
+    }
+
+    try {
+      const result = await NativeAudioModule.startRecording();
+      this.recordingPath = result.path;
+      logger.info(`iOS recording started: ${result.path}`);
+
+      // Start audio level polling
+      this.startAudioLevelMonitoring();
+    } catch (error) {
+      this.state = 'error';
+      throw error;
+    }
+  }
+
+  private async stopIOSRecording(): Promise<string> {
+    if (!NativeAudioModule) {
+      throw new Error('NativeAudioModule not available');
+    }
+
+    const result = await NativeAudioModule.stopRecording();
+    return result.path;
+  }
+
+  // Android Implementation
+
+  private async startAndroidRecording(): Promise<void> {
+    const audioStream = getLiveAudioStream();
+    if (!audioStream) {
+      throw new Error('LiveAudioStream not available on Android');
+    }
+
+    this.androidAudioChunks = [];
+
+    audioStream.init({
+      sampleRate: this.config.sampleRate,
+      channels: this.config.channels,
+      bitsPerSample: this.config.bitsPerSample,
+      audioSource: 6, // VOICE_RECOGNITION
+      bufferSize: 4096,
+    });
+
+    audioStream.on('data', (data: string) => {
+      this.androidAudioChunks.push(data);
+
+      // Calculate audio level from chunk
+      const level = this.calculateAudioLevelFromBase64(data);
+      this.currentAudioLevel = level;
+
+      if (this.audioLevelCallback) {
+        this.audioLevelCallback(level);
+      }
+
+      // Convert to ArrayBuffer and forward to callback
+      if (this.audioDataCallback) {
+        const buffer = this.base64ToArrayBuffer(data);
+        this.audioDataCallback(buffer);
+      }
+    });
+
+    audioStream.start();
+    logger.info('Android recording started');
+  }
+
+  private async stopAndroidRecording(): Promise<string> {
+    const audioStream = getLiveAudioStream();
+    if (audioStream) {
+      audioStream.stop();
+    }
+
+    // Create WAV file from chunks
+    const path = await this.createWavFileFromChunks();
+    this.androidAudioChunks = [];
+    return path;
+  }
+
+  private async createWavFileFromChunks(): Promise<string> {
+    // Combine all audio chunks into PCM data
+    let totalLength = 0;
+    const decodedChunks: Uint8Array[] = [];
+
+    for (const chunk of this.androidAudioChunks) {
+      const decoded = Uint8Array.from(atob(chunk), c => c.charCodeAt(0));
+      decodedChunks.push(decoded);
+      totalLength += decoded.length;
+    }
+
+    // Create combined PCM buffer
+    const pcmData = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of decodedChunks) {
+      pcmData.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    // Create WAV header
+    const wavHeader = this.createWavHeader(totalLength);
+    const headerBytes = new Uint8Array(wavHeader);
+
+    // Combine header and PCM data
+    const wavData = new Uint8Array(headerBytes.length + pcmData.length);
+    wavData.set(headerBytes, 0);
+    wavData.set(pcmData, headerBytes.length);
+
+    // Write to file using RNFS
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const RNFS = require('react-native-fs');
+      const fileName = `recording_${Date.now()}.wav`;
+      const filePath = `${RNFS.CachesDirectoryPath}/${fileName}`;
+
+      const wavBase64 = this.arrayBufferToBase64(wavData.buffer);
+      await RNFS.writeFile(filePath, wavBase64, 'base64');
+
+      logger.info(`Android WAV file created: ${filePath}`);
+      return filePath;
+    } catch (error) {
+      logger.error(`Failed to create WAV file: ${error}`);
+      throw error;
+    }
+  }
+
+  // Audio Level Monitoring
 
   private startAudioLevelMonitoring(): void {
-    // Poll audio level at 50ms intervals
-    this.levelUpdateInterval = setInterval(() => {
-      if (this.audioLevelCallback) {
-        this.audioLevelCallback(this.currentAudioLevel);
-      }
-    }, 50);
+    if (Platform.OS === 'ios' && NativeAudioModule) {
+      // Poll audio level from native module
+      this.levelUpdateInterval = setInterval(async () => {
+        if (this.state !== 'recording') return;
+
+        try {
+          const result = await NativeAudioModule.getAudioLevel();
+          // Convert linear level (0-1) to normalized (0-1)
+          this.currentAudioLevel = result.level;
+
+          if (this.audioLevelCallback) {
+            this.audioLevelCallback(this.currentAudioLevel);
+          }
+        } catch {
+          // Ignore errors
+        }
+      }, 50);
+    }
+    // Android audio level is calculated inline in the data callback
   }
 
   private stopAudioLevelMonitoring(): void {
@@ -269,18 +404,78 @@ export class AudioCaptureManager {
     this.currentAudioLevel = 0;
   }
 
-  private updateAudioLevel(data: ArrayBuffer): void {
-    // Calculate RMS (root mean square) of audio samples
-    const samples = new Int16Array(data);
-    let sum = 0;
+  // Utilities
 
-    for (let i = 0; i < samples.length; i++) {
-      const sample = samples[i]!;
-      sum += sample * sample;
+  private calculateAudioLevelFromBase64(base64Data: string): number {
+    try {
+      const bytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+      const samples = new Int16Array(bytes.buffer);
+
+      if (samples.length === 0) return 0;
+
+      let sumSquares = 0;
+      for (let i = 0; i < samples.length; i++) {
+        const normalized = samples[i]! / 32768.0;
+        sumSquares += normalized * normalized;
+      }
+
+      const rms = Math.sqrt(sumSquares / samples.length);
+      return Math.min(1, rms * 3); // Amplify slightly for visibility
+    } catch {
+      return 0;
     }
+  }
 
-    const rms = Math.sqrt(sum / samples.length);
-    // Normalize to 0-1 range (16-bit audio max is 32767)
-    this.currentAudioLevel = Math.min(1, rms / 32767);
+  private base64ToArrayBuffer(base64: string): ArrayBuffer {
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+  }
+
+  private arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]!);
+    }
+    return btoa(binary);
+  }
+
+  private createWavHeader(dataLength: number): ArrayBuffer {
+    const buffer = new ArrayBuffer(44);
+    const view = new DataView(buffer);
+    const { sampleRate, channels, bitsPerSample } = this.config;
+    const byteRate = sampleRate * channels * (bitsPerSample / 8);
+    const blockAlign = channels * (bitsPerSample / 8);
+
+    // RIFF header
+    this.writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + dataLength, true);
+    this.writeString(view, 8, 'WAVE');
+
+    // fmt chunk
+    this.writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, channels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitsPerSample, true);
+
+    // data chunk
+    this.writeString(view, 36, 'data');
+    view.setUint32(40, dataLength, true);
+
+    return buffer;
+  }
+
+  private writeString(view: DataView, offset: number, str: string): void {
+    for (let i = 0; i < str.length; i++) {
+      view.setUint8(offset + i, str.charCodeAt(i));
+    }
   }
 }

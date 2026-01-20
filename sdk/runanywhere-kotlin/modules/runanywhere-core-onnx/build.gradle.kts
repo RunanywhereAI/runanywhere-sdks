@@ -289,10 +289,10 @@ publishing {
     }
 
     repositories {
-        // Maven Central
+        // Maven Central (Sonatype Central Portal - new API)
         maven {
             name = "MavenCentral"
-            url = uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/")
+            url = uri("https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/")
             credentials {
                 username = mavenCentralUsername
                 password = mavenCentralPassword
@@ -313,15 +313,19 @@ publishing {
 
 // Configure signing
 signing {
-    if (signingKey != null) {
+    if (signingKey != null && signingKey.contains("BEGIN PGP")) {
         useInMemoryPgpKeys(signingKeyId, signingKey, signingPassword)
+    } else {
+        useGpgCmd()
     }
     sign(publishing.publications)
 }
 
 // Only sign when needed
 tasks.withType<Sign>().configureEach {
-    onlyIf { signingKey != null }
+    onlyIf {
+        project.hasProperty("signing.gnupg.keyName") || signingKey != null
+    }
 }
 
 // Disable debug publications

@@ -25,4 +25,8 @@ android.defaults.buildfeatures.buildconfig=true
 android.nonTransitiveRClass=false
 android.nonFinalResIds=false
 
-
+# =============================================================================
+# 16KB Page Alignment for Android 15+ (API 35) Compliance
+# Required for Google Play submissions starting November 2025
+# =============================================================================
+android.bundle.pageAlignSharedLibs=true

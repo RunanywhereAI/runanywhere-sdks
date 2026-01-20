@@ -4,20 +4,76 @@
  * High-level voice session API for simplified voice assistant integration.
  * Handles audio capture, VAD, and processing internally.
  *
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VoiceAgent/RunAnywhere+VoiceSession.swift
+ * Matches Swift SDK: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VoiceAgent/RunAnywhere+VoiceSession.swift
+ *
+ * Usage:
+ * ```typescript
+ * // Start a voice session
+ * const session = await RunAnywhere.startVoiceSession();
+ *
+ * // Consume events
+ * for await (const event of session.events()) {
+ *   switch (event.type) {
+ *     case 'listening': updateAudioMeter(event.audioLevel); break;
+ *     case 'transcribed': showUserText(event.transcription); break;
+ *     case 'responded': showAssistantText(event.response); break;
+ *     case 'speaking': showSpeakingIndicator(); break;
+ *   }
+ * }
+ *
+ * // Or use callback
+ * const session = await RunAnywhere.startVoiceSession({
+ *   onEvent: (event) => { ... }
+ * });
+ * ```
  */
 
-import { EventBus } from '../../Public/Events';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import { AudioCaptureManager } from './AudioCaptureManager';
+
+// Lazy-load EventBus to avoid circular dependency issues during module initialization
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _eventBus: any = null;
+function getEventBus() {
+  if (!_eventBus) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      _eventBus = require('../../Public/Events').EventBus;
+    } catch {
+      // EventBus not available
+    }
+  }
+  return _eventBus;
+}
+
+/**
+ * Safely publish an event to the EventBus
+ * Handles cases where EventBus may not be fully initialized due to circular dependencies
+ */
+function safePublish(eventType: string, event: Record<string, unknown>): void {
+  try {
+    const eventBus = getEventBus();
+    if (eventBus?.publish) {
+      eventBus.publish(eventType, event);
+    }
+  } catch {
+    // Ignore EventBus errors - events are non-critical for voice session functionality
+  }
+}
 import { AudioPlaybackManager } from './AudioPlaybackManager';
-import * as VoiceAgent from '../../Public/Extensions/RunAnywhere+VoiceAgent';
-import type { VoiceTurnResult } from '../../types/VoiceAgentTypes';
+import * as STT from '../../Public/Extensions/RunAnywhere+STT';
+import * as TextGeneration from '../../Public/Extensions/RunAnywhere+TextGeneration';
+import * as TTS from '../../Public/Extensions/RunAnywhere+TTS';
 
 const logger = new SDKLogger('VoiceSession');
 
+// ============================================================================
+// Types
+// ============================================================================
+
 /**
  * Voice session configuration
+ * Matches Swift: VoiceSessionConfig
  */
 export interface VoiceSessionConfig {
   /** Silence duration (seconds) before processing speech (default: 1.5) */
@@ -32,17 +88,20 @@ export interface VoiceSessionConfig {
   /** Whether to auto-resume listening after TTS playback (default: true) */
   continuousMode?: boolean;
 
-  /** Language code (default: 'en') */
+  /** Language code for STT (default: 'en') */
   language?: string;
 
   /** System prompt for LLM */
   systemPrompt?: string;
+
+  /** Event callback (alternative to using events() iterator) */
+  onEvent?: VoiceSessionEventCallback;
 }
 
 /**
- * Default voice session configuration
+ * Default configuration
  */
-export const DEFAULT_VOICE_SESSION_CONFIG: Required<VoiceSessionConfig> = {
+export const DEFAULT_VOICE_SESSION_CONFIG: Required<Omit<VoiceSessionConfig, 'onEvent'>> = {
   silenceDuration: 1.5,
   speechThreshold: 0.1,
   autoPlayTTS: true,
@@ -53,6 +112,7 @@ export const DEFAULT_VOICE_SESSION_CONFIG: Required<VoiceSessionConfig> = {
 
 /**
  * Voice session event types
+ * Matches Swift: VoiceSessionEvent
  */
 export type VoiceSessionEventType =
   | 'started'
@@ -73,19 +133,14 @@ export type VoiceSessionEventType =
 export interface VoiceSessionEvent {
   type: VoiceSessionEventType;
   timestamp: number;
-
-  /** Audio level (for 'listening' events) */
+  /** Audio level (for 'listening' events, 0.0 - 1.0) */
   audioLevel?: number;
-
-  /** Transcription text (for 'transcribed' events) */
+  /** User's transcribed text (for 'transcribed' and 'turnCompleted' events) */
   transcription?: string;
-
-  /** Response text (for 'responded' events) */
+  /** Assistant's response (for 'responded' and 'turnCompleted' events) */
   response?: string;
-
-  /** Audio data base64 (for 'turnCompleted' events) */
+  /** TTS audio data (for 'turnCompleted' events) */
   audio?: string;
-
   /** Error message (for 'error' events) */
   error?: string;
 }
@@ -107,30 +162,45 @@ export type VoiceSessionState =
   | 'stopped'
   | 'error';
 
+// ============================================================================
+// VoiceSessionHandle
+// ============================================================================
+
 /**
  * VoiceSessionHandle
  *
  * Handle to control an active voice session.
  * Manages the full voice interaction loop: listen -> transcribe -> respond -> speak.
+ *
+ * Matches Swift SDK: VoiceSessionHandle actor
  */
 export class VoiceSessionHandle {
-  private config: Required<VoiceSessionConfig>;
+  private config: Required<Omit<VoiceSessionConfig, 'onEvent'>>;
   private audioCapture: AudioCaptureManager;
   private audioPlayback: AudioPlaybackManager;
   private eventCallback: VoiceSessionEventCallback | null = null;
   private eventListeners: VoiceSessionEventCallback[] = [];
 
   private state: VoiceSessionState = 'idle';
-  private audioBuffer: ArrayBuffer[] = [];
-  private lastSpeechTime: number | null = null;
   private isSpeechActive = false;
-  private silenceCheckInterval: ReturnType<typeof setInterval> | null = null;
+  private lastSpeechTime: number | null = null;
+  private vadInterval: ReturnType<typeof setInterval> | null = null;
+  private currentAudioLevel = 0;
 
   constructor(config: VoiceSessionConfig = {}) {
-    this.config = { ...DEFAULT_VOICE_SESSION_CONFIG, ...config };
+    const { onEvent, ...rest } = config;
+    this.config = { ...DEFAULT_VOICE_SESSION_CONFIG, ...rest };
     this.audioCapture = new AudioCaptureManager({ sampleRate: 16000 });
     this.audioPlayback = new AudioPlaybackManager();
+
+    if (onEvent) {
+      this.eventCallback = onEvent;
+    }
   }
+
+  // ============================================================================
+  // Public Properties
+  // ============================================================================
 
   /**
    * Current session state
@@ -157,8 +227,12 @@ export class VoiceSessionHandle {
    * Current audio level (0.0 - 1.0)
    */
   get audioLevel(): number {
-    return this.audioCapture.audioLevel;
+    return this.currentAudioLevel;
   }
+
+  // ============================================================================
+  // Public Methods
+  // ============================================================================
 
   /**
    * Start the voice session
@@ -173,14 +247,15 @@ export class VoiceSessionHandle {
     logger.info('Starting voice session...');
 
     try {
-      // Check if voice agent is ready
-      const isReady = await VoiceAgent.isVoiceAgentReady();
-      if (!isReady) {
-        logger.info('Voice agent not ready, attempting to initialize with loaded models...');
-        const initialized = await VoiceAgent.initializeVoiceAgentWithLoadedModels();
-        if (!initialized) {
-          throw new Error('Voice agent not ready. Load STT, LLM, and TTS models first.');
-        }
+      // Check if models are loaded
+      const sttLoaded = await STT.isSTTModelLoaded();
+      const llmLoaded = await TextGeneration.isModelLoaded();
+      const ttsLoaded = await TTS.isTTSModelLoaded();
+
+      if (!sttLoaded || !llmLoaded || !ttsLoaded) {
+        throw new Error(
+          `Voice agent not ready. Models loaded: STT=${sttLoaded}, LLM=${llmLoaded}, TTS=${ttsLoaded}`
+        );
       }
 
       // Request microphone permission
@@ -189,7 +264,6 @@ export class VoiceSessionHandle {
         throw new Error('Microphone permission denied');
       }
 
-      // Start listening
       this.emit({ type: 'started', timestamp: Date.now() });
       await this.startListening();
 
@@ -213,18 +287,16 @@ export class VoiceSessionHandle {
     logger.info('Stopping voice session');
     this.state = 'stopped';
 
-    // Stop audio capture and playback
-    this.audioCapture.stopRecording();
+    // Stop audio
+    this.audioCapture.cleanup();
     this.audioPlayback.stop();
 
-    // Clear timers
-    if (this.silenceCheckInterval) {
-      clearInterval(this.silenceCheckInterval);
-      this.silenceCheckInterval = null;
+    // Clear VAD
+    if (this.vadInterval) {
+      clearInterval(this.vadInterval);
+      this.vadInterval = null;
     }
 
-    // Clear state
-    this.audioBuffer = [];
     this.isSpeechActive = false;
     this.lastSpeechTime = null;
 
@@ -267,6 +339,7 @@ export class VoiceSessionHandle {
 
   /**
    * Create async iterator for events
+   * Matches Swift's AsyncStream pattern
    */
   async *events(): AsyncGenerator<VoiceSessionEvent> {
     const queue: VoiceSessionEvent[] = [];
@@ -320,7 +393,9 @@ export class VoiceSessionHandle {
     logger.info('VoiceSessionHandle cleaned up');
   }
 
-  // Private methods
+  // ============================================================================
+  // Private Methods
+  // ============================================================================
 
   private emit(event: VoiceSessionEvent): void {
     // Call single callback
@@ -337,144 +412,142 @@ export class VoiceSessionHandle {
       }
     }
 
-    // Also publish to EventBus
-    // Map internal event type to EventBus voice session event type
-    switch (event.type) {
-      case 'started':
-        EventBus.publish('Voice', { type: 'voiceSession_started' });
+    // Publish to EventBus for app-wide observation
+    // Map event type to EventBus type (note: we avoid spreading 'type' twice)
+    const { type, ...eventData } = event;
+    const eventBusType = `voiceSession_${type}` as const;
+
+    switch (eventBusType) {
+      case 'voiceSession_started':
+        safePublish('Voice', { type: 'voiceSession_started' });
         break;
-      case 'listening':
-        EventBus.publish('Voice', { type: 'voiceSession_listening', audioLevel: event.audioLevel });
+      case 'voiceSession_listening':
+        safePublish('Voice', { type: 'voiceSession_listening', audioLevel: eventData.audioLevel });
         break;
-      case 'speechStarted':
-        EventBus.publish('Voice', { type: 'voiceSession_speechStarted' });
+      case 'voiceSession_speechStarted':
+        safePublish('Voice', { type: 'voiceSession_speechStarted' });
         break;
-      case 'speechEnded':
-        EventBus.publish('Voice', { type: 'voiceSession_speechEnded' });
+      case 'voiceSession_speechEnded':
+        safePublish('Voice', { type: 'voiceSession_speechEnded' });
         break;
-      case 'processing':
-        EventBus.publish('Voice', { type: 'voiceSession_processing' });
+      case 'voiceSession_processing':
+        safePublish('Voice', { type: 'voiceSession_processing' });
         break;
-      case 'transcribed':
-        EventBus.publish('Voice', { type: 'voiceSession_transcribed', transcription: event.transcription });
+      case 'voiceSession_transcribed':
+        safePublish('Voice', { type: 'voiceSession_transcribed', transcription: eventData.transcription });
         break;
-      case 'responded':
-        EventBus.publish('Voice', { type: 'voiceSession_responded', response: event.response });
+      case 'voiceSession_responded':
+        safePublish('Voice', { type: 'voiceSession_responded', response: eventData.response });
         break;
-      case 'speaking':
-        EventBus.publish('Voice', { type: 'voiceSession_speaking' });
+      case 'voiceSession_speaking':
+        safePublish('Voice', { type: 'voiceSession_speaking' });
         break;
-      case 'turnCompleted':
-        EventBus.publish('Voice', {
+      case 'voiceSession_turnCompleted':
+        safePublish('Voice', {
           type: 'voiceSession_turnCompleted',
-          transcription: event.transcription,
-          response: event.response,
-          audio: event.audio
+          transcription: eventData.transcription,
+          response: eventData.response,
+          audio: eventData.audio,
         });
         break;
-      case 'stopped':
-        EventBus.publish('Voice', { type: 'voiceSession_stopped' });
+      case 'voiceSession_stopped':
+        safePublish('Voice', { type: 'voiceSession_stopped' });
         break;
-      case 'error':
-        EventBus.publish('Voice', { type: 'voiceSession_error', error: event.error });
+      case 'voiceSession_error':
+        safePublish('Voice', { type: 'voiceSession_error', error: eventData.error });
         break;
     }
   }
 
   private async startListening(): Promise<void> {
     this.state = 'listening';
-    this.audioBuffer = [];
-    this.lastSpeechTime = null;
     this.isSpeechActive = false;
+    this.lastSpeechTime = null;
 
     // Set up audio level callback
     this.audioCapture.setAudioLevelCallback((level) => {
+      this.currentAudioLevel = level;
       this.emit({ type: 'listening', timestamp: Date.now(), audioLevel: level });
-      this.checkSpeechState(level);
     });
 
     // Start recording
-    await this.audioCapture.startRecording((data) => {
-      this.handleAudioData(data);
-    });
+    await this.audioCapture.startRecording();
 
-    // Start silence check interval
-    this.silenceCheckInterval = setInterval(() => {
-      this.checkSilenceTimeout();
-    }, 100);
+    // Start VAD monitoring loop (matches Swift's startAudioLevelMonitoring)
+    this.startVADMonitoring();
   }
 
-  private handleAudioData(data: ArrayBuffer): void {
-    if (!this.isRunning) return;
-    this.audioBuffer.push(data);
+  /**
+   * VAD monitoring loop - runs every 50ms
+   * Matches Swift: startAudioLevelMonitoring()
+   */
+  private startVADMonitoring(): void {
+    this.vadInterval = setInterval(() => {
+      this.checkSpeechState(this.currentAudioLevel);
+    }, 50);
   }
 
+  /**
+   * Check speech state based on audio level
+   * Matches Swift: checkSpeechState(level:)
+   */
   private checkSpeechState(level: number): void {
-    if (!this.isRunning) return;
+    if (!this.isRunning || this.state === 'processing' || this.state === 'speaking') {
+      return;
+    }
 
     if (level > this.config.speechThreshold) {
+      // Speech detected
       if (!this.isSpeechActive) {
         logger.debug('Speech started');
         this.isSpeechActive = true;
         this.emit({ type: 'speechStarted', timestamp: Date.now() });
       }
       this.lastSpeechTime = Date.now();
-    }
-  }
 
-  private checkSilenceTimeout(): void {
-    if (!this.isRunning || !this.isSpeechActive) return;
+    } else if (this.isSpeechActive) {
+      // Was speaking, now silent - check if silence is long enough
+      if (this.lastSpeechTime) {
+        const silenceDuration = (Date.now() - this.lastSpeechTime) / 1000;
 
-    if (this.lastSpeechTime) {
-      const silenceDuration = (Date.now() - this.lastSpeechTime) / 1000;
+        if (silenceDuration > this.config.silenceDuration) {
+          logger.debug(`Speech ended (silence: ${silenceDuration.toFixed(2)}s)`);
+          this.isSpeechActive = false;
+          this.emit({ type: 'speechEnded', timestamp: Date.now() });
 
-      if (silenceDuration > this.config.silenceDuration) {
-        logger.debug('Speech ended (silence detected)');
-        this.isSpeechActive = false;
-        this.emit({ type: 'speechEnded', timestamp: Date.now() });
-
-        // Only process if we have enough audio (at least 0.5s at 16kHz)
-        const totalBytes = this.audioBuffer.reduce((sum, buf) => sum + buf.byteLength, 0);
-        if (totalBytes > 16000) {
+          // Process the audio
           this.processCurrentAudio();
-        } else {
-          this.audioBuffer = [];
         }
       }
     }
   }
 
+  /**
+   * Process current audio through the pipeline: STT -> LLM -> TTS
+   */
   private async processCurrentAudio(): Promise<void> {
-    // Gather audio data
-    const totalLength = this.audioBuffer.reduce((acc, buf) => acc + buf.byteLength, 0);
-    const audioData = new ArrayBuffer(totalLength);
-    const view = new Uint8Array(audioData);
-    let offset = 0;
-    for (const buffer of this.audioBuffer) {
-      view.set(new Uint8Array(buffer), offset);
-      offset += buffer.byteLength;
-    }
-
-    this.audioBuffer = [];
-
-    if (totalLength === 0) return;
-
-    // Stop listening during processing
-    this.audioCapture.stopRecording();
-    if (this.silenceCheckInterval) {
-      clearInterval(this.silenceCheckInterval);
-      this.silenceCheckInterval = null;
+    // Stop VAD and recording
+    if (this.vadInterval) {
+      clearInterval(this.vadInterval);
+      this.vadInterval = null;
     }
 
     this.state = 'processing';
     this.emit({ type: 'processing', timestamp: Date.now() });
 
     try {
-      // Process the voice turn
-      const result = await VoiceAgent.processVoiceTurn(audioData);
+      // Stop recording and get audio file
+      const { path: audioPath } = await this.audioCapture.stopRecording();
+      logger.info(`Audio recorded: ${audioPath}`);
 
-      if (!result.speechDetected) {
-        logger.info('No speech detected');
+      // Transcribe using STT
+      const sttResult = await STT.transcribeFile(audioPath, {
+        language: this.config.language,
+      });
+      const transcription = sttResult.text?.trim() || '';
+
+      if (!transcription) {
+        logger.info('No speech detected in audio');
         if (this.config.continuousMode && this.isRunning) {
           await this.startListening();
         }
@@ -482,43 +555,66 @@ export class VoiceSessionHandle {
       }
 
       // Emit transcription
-      if (result.transcription) {
-        this.emit({
-          type: 'transcribed',
-          timestamp: Date.now(),
-          transcription: result.transcription
-        });
-      }
+      this.emit({
+        type: 'transcribed',
+        timestamp: Date.now(),
+        transcription,
+      });
+      logger.info(`Transcribed: "${transcription}"`);
+
+      // Generate response using LLM
+      const prompt = this.config.systemPrompt
+        ? `${this.config.systemPrompt}\n\nUser: ${transcription}\nAssistant:`
+        : transcription;
+
+      const llmResult = await TextGeneration.generate(prompt, {
+        maxTokens: 500,
+        temperature: 0.7,
+      });
+      const response = llmResult.text || '';
 
       // Emit response
-      if (result.response) {
-        this.emit({
-          type: 'responded',
-          timestamp: Date.now(),
-          response: result.response
-        });
-      }
+      this.emit({
+        type: 'responded',
+        timestamp: Date.now(),
+        response,
+      });
+      logger.info(`Response: "${response.substring(0, 100)}..."`);
 
-      // Play TTS if enabled
-      if (this.config.autoPlayTTS && result.synthesizedAudio) {
+      // Synthesize and play TTS if enabled
+      let synthesizedAudio: string | undefined;
+
+      if (this.config.autoPlayTTS && response) {
         this.state = 'speaking';
         this.emit({ type: 'speaking', timestamp: Date.now() });
-        await this.audioPlayback.play(result.synthesizedAudio);
+
+        try {
+          const ttsResult = await TTS.synthesize(response);
+          synthesizedAudio = ttsResult.audioData;
+
+          if (synthesizedAudio) {
+            await this.audioPlayback.play(synthesizedAudio, ttsResult.sampleRate);
+          }
+        } catch (ttsError) {
+          logger.warning(`TTS failed: ${ttsError}`);
+        }
       }
 
       // Emit complete result
       this.emit({
         type: 'turnCompleted',
         timestamp: Date.now(),
-        transcription: result.transcription,
-        response: result.response,
-        audio: result.synthesizedAudio,
+        transcription,
+        response,
+        audio: synthesizedAudio,
       });
 
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
+      this.state = 'error';
       logger.error(`Processing failed: ${errorMsg}`);
       this.emit({ type: 'error', timestamp: Date.now(), error: errorMsg });
+      return; // Don't resume listening on error
     }
 
     // Resume listening if continuous mode

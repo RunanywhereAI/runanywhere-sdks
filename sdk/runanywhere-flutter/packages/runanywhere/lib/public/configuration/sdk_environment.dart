@@ -1,4 +1,5 @@
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/dart_bridge_dev_config.dart';
 
 /// SDK Environment mode - determines how data is handled
 enum SDKEnvironment {
@@ -104,13 +105,26 @@ class SupabaseConfig {
   });
 
   /// Get configuration for environment
+  /// 
+  /// For development mode, reads from C++ dev config (development_config.cpp).
+  /// This ensures credentials are stored in a single git-ignored location.
   static SupabaseConfig? configuration(SDKEnvironment environment) {
     switch (environment) {
       case SDKEnvironment.development:
+        // Read from C++ dev config - credentials stored in development_config.cpp (git-ignored)
+        final supabaseUrl = DartBridgeDevConfig.supabaseURL;
+        final supabaseKey = DartBridgeDevConfig.supabaseKey;
+        
+        if (supabaseUrl == null || supabaseUrl.isEmpty ||
+            supabaseKey == null || supabaseKey.isEmpty) {
+          // Dev config not available - this is expected if development_config.cpp 
+          // hasn't been filled in. Telemetry will be disabled in dev mode.
+          return null;
+        }
+        
         return SupabaseConfig(
-          projectURL: Uri.parse('https://fhtgjtxuoikwwouxqzrn.supabase.co'),
-          anonKey:
-              'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZodGdqdHh1b2lrd3dvdXhxenJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjExOTkwNzIsImV4cCI6MjA3Njc3NTA3Mn0.aIssX-t8CIqt8zoctNhMS8fm3wtH-DzsQiy9FunqD9E',
+          projectURL: Uri.parse(supabaseUrl),
+          anonKey: supabaseKey,
         );
       case SDKEnvironment.staging:
       case SDKEnvironment.production:

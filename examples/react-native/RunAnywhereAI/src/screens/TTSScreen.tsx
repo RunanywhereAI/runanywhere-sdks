@@ -388,90 +388,6 @@ export const TTSScreen: React.FC = () => {
   );
 
   /**
-   * Convert base64 PCM float32 audio to WAV file
-   * The audio data from TTS is base64-encoded float32 PCM samples
-   */
-  const createWavFile = async (
-    audioBase64: string,
-    audioSampleRate: number
-  ): Promise<string> => {
-    // Decode base64 to get raw bytes
-    const binaryString = atob(audioBase64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-
-    // Convert float32 samples to int16
-    const floatView = new Float32Array(bytes.buffer);
-    const numSamples = floatView.length;
-    const int16Samples = new Int16Array(numSamples);
-
-    for (let i = 0; i < numSamples; i++) {
-      // Clamp and convert to int16 range
-      const floatSample = floatView[i] ?? 0;
-      const sample = Math.max(-1, Math.min(1, floatSample));
-      int16Samples[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
-    }
-
-    // Create WAV header
-    const wavDataSize = int16Samples.length * 2;
-    const wavBuffer = new ArrayBuffer(44 + wavDataSize);
-    const wavView = new DataView(wavBuffer);
-
-    // RIFF header
-    wavView.setUint8(0, 0x52); // R
-    wavView.setUint8(1, 0x49); // I
-    wavView.setUint8(2, 0x46); // F
-    wavView.setUint8(3, 0x46); // F
-    wavView.setUint32(4, 36 + wavDataSize, true); // File size - 8
-    wavView.setUint8(8, 0x57); // W
-    wavView.setUint8(9, 0x41); // A
-    wavView.setUint8(10, 0x56); // V
-    wavView.setUint8(11, 0x45); // E
-
-    // fmt chunk
-    wavView.setUint8(12, 0x66); // f
-    wavView.setUint8(13, 0x6d); // m
-    wavView.setUint8(14, 0x74); // t
-    wavView.setUint8(15, 0x20); // (space)
-    wavView.setUint32(16, 16, true); // fmt chunk size
-    wavView.setUint16(20, 1, true); // Audio format (PCM = 1)
-    wavView.setUint16(22, 1, true); // Number of channels (mono = 1)
-    wavView.setUint32(24, audioSampleRate, true); // Sample rate
-    wavView.setUint32(28, audioSampleRate * 2, true); // Byte rate
-    wavView.setUint16(32, 2, true); // Block align
-    wavView.setUint16(34, 16, true); // Bits per sample
-
-    // data chunk
-    wavView.setUint8(36, 0x64); // d
-    wavView.setUint8(37, 0x61); // a
-    wavView.setUint8(38, 0x74); // t
-    wavView.setUint8(39, 0x61); // a
-    wavView.setUint32(40, wavDataSize, true); // Data size
-
-    // Copy audio data
-    const wavBytes = new Uint8Array(wavBuffer);
-    const int16Bytes = new Uint8Array(int16Samples.buffer);
-    for (let i = 0; i < int16Bytes.length; i++) {
-      wavBytes[44 + i] = int16Bytes[i] ?? 0;
-    }
-
-    // Convert to base64 and write to file
-    let wavBase64 = '';
-    for (let i = 0; i < wavBytes.length; i++) {
-      wavBase64 += String.fromCharCode(wavBytes[i] ?? 0);
-    }
-    wavBase64 = btoa(wavBase64);
-
-    const fileName = `tts_${Date.now()}.wav`;
-    const filePath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
-    await RNFS.writeFile(filePath, wavBase64, 'base64');
-
-    return filePath;
-  };
-
-  /**
    * Generate speech using System TTS (AVSpeechSynthesizer on iOS)
    * iOS: Uses NativeAudioModule directly
    * Android: Uses react-native-tts
@@ -649,7 +565,7 @@ export const TTSScreen: React.FC = () => {
             await RNFS.unlink(audioFilePath).catch(() => {});
           }
 
-          const wavPath = await createWavFile(
+          const wavPath = await RunAnywhere.Audio.createWavFromPCMFloat32(
             result.audio,
             result.sampleRate || 22050
           );

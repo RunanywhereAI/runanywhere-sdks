@@ -5,6 +5,12 @@ set(PACKAGE_NAME runanywherecore)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 20)
 
+# =============================================================================
+# 16KB Page Alignment for Android 15+ (API 35) Compliance
+# Required starting November 1, 2025 for Google Play submissions
+# =============================================================================
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
+
 # Path to pre-built native libraries (downloaded from runanywhere-sdks)
 set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
 
@@ -104,6 +110,9 @@ target_link_libraries(
 # Link RACommons - REQUIRED for core functionality
 target_link_libraries(${PACKAGE_NAME} rac_commons)
 target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_RACOMMONS=1)
+
+# 16KB page alignment - MUST be on target for Android 15+ compliance
+target_link_options(${PACKAGE_NAME} PRIVATE -Wl,-z,max-page-size=16384)
 
 # NOTE: No LlamaCPP or ONNX linking here
 # Those are in @runanywhere/llamacpp and @runanywhere/onnx packages respectively
