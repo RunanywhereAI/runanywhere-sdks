@@ -7,10 +7,48 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Features/TTS/Services/AudioPlaybackManager.swift
  */
 
-import { EventBus } from '../../Public/Events';
+import { Platform, NativeModules } from 'react-native';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 
 const logger = new SDKLogger('AudioPlaybackManager');
+
+/**
+ * Safely publish an event to the EventBus
+ * Uses lazy loading to avoid circular dependency issues during module initialization
+ */
+function safePublish(eventType: string, event: Record<string, unknown>): void {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { EventBus } = require('../../Public/Events');
+    if (EventBus?.publish) {
+      EventBus.publish(eventType, event);
+    }
+  } catch {
+    // Ignore EventBus errors - events are non-critical for playback functionality
+  }
+}
+
+// Native iOS Audio Module
+const NativeAudioModule = Platform.OS === 'ios' ? NativeModules.NativeAudioModule : null;
+
+// Lazy load react-native-sound for Android
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let Sound: any = null;
+
+function getSound() {
+  if (Platform.OS === 'ios') return null;
+  if (!Sound) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      Sound = require('react-native-sound').default;
+      Sound.setCategory('Playback');
+    } catch {
+      logger.warning('react-native-sound not available');
+      return null;
+    }
+  }
+  return Sound;
+}
 
 /**
  * Playback state
@@ -33,7 +71,6 @@ export type PlaybackErrorCallback = (error: Error) => void;
 export interface PlaybackConfig {
   /** Volume (0.0 - 1.0) */
   volume?: number;
-
   /** Playback rate multiplier */
   rate?: number;
 }
@@ -42,7 +79,9 @@ export interface PlaybackConfig {
  * AudioPlaybackManager
  *
  * Handles audio playback for TTS and other audio output needs.
- * Uses React Native's audio APIs or native modules for cross-platform support.
+ * Uses platform-native audio APIs:
+ * - iOS: NativeAudioModule (AVAudioPlayer)
+ * - Android: react-native-sound
  */
 export class AudioPlaybackManager {
   private state: PlaybackState = 'idle';
@@ -50,9 +89,10 @@ export class AudioPlaybackManager {
   private rate = 1.0;
   private completionCallback: PlaybackCompletionCallback | null = null;
   private errorCallback: PlaybackErrorCallback | null = null;
-  private currentAudioData: ArrayBuffer | null = null;
   private playbackStartTime: number | null = null;
   private playbackDuration: number | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private currentSound: any = null;
 
   constructor(config: PlaybackConfig = {}) {
     this.volume = config.volume ?? 1.0;
@@ -95,11 +135,12 @@ export class AudioPlaybackManager {
   }
 
   /**
-   * Play audio data
-   * @param audioData Audio data to play (WAV format expected)
+   * Play audio data (base64 PCM float32 from TTS)
+   * @param audioData Base64 encoded audio data from TTS synthesis
+   * @param sampleRate Sample rate of the audio (default: 22050)
    * @returns Promise that resolves when playback completes
    */
-  async play(audioData: ArrayBuffer | string): Promise<void> {
+  async play(audioData: ArrayBuffer | string, sampleRate = 22050): Promise<void> {
     if (this.state === 'playing') {
       this.stop();
     }
@@ -108,69 +149,47 @@ export class AudioPlaybackManager {
     logger.info('Loading audio for playback...');
 
     try {
-      // Convert base64 string to ArrayBuffer if needed
-      let data: ArrayBuffer;
+      // Convert base64 PCM to WAV file
+      let wavPath: string;
       if (typeof audioData === 'string') {
-        // Decode base64
-        const binaryString = atob(audioData);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        data = bytes.buffer;
+        wavPath = await this.createWavFromPCMFloat32(audioData, sampleRate);
       } else {
-        data = audioData;
+        // ArrayBuffer - convert to base64 first
+        const base64 = this.arrayBufferToBase64(audioData);
+        wavPath = await this.createWavFromPCMFloat32(base64, sampleRate);
       }
 
-      this.currentAudioData = data;
-      this.playbackStartTime = Date.now();
-
-      // Estimate duration from audio data
-      // Assuming 16-bit PCM at 22050 Hz (common TTS output)
-      this.playbackDuration = data.byteLength / (22050 * 2);
-
-      this.state = 'playing';
-      logger.info(`Playing audio (${(data.byteLength / 1024).toFixed(1)} KB)`);
-
-      EventBus.publish('Voice', {
-        type: 'playbackStarted',
-        duration: this.playbackDuration,
-      });
-
-      // In production, this would use actual audio playback APIs:
-      // - expo-av Audio.Sound
-      // - react-native-audio-api
-      // - or a custom native module
-
-      // For now, simulate playback completion after estimated duration
-      return new Promise((resolve, reject) => {
-        const timeoutMs = (this.playbackDuration ?? 1) * 1000 / this.rate;
-
-        setTimeout(() => {
-          if (this.state === 'playing') {
-            this.handlePlaybackComplete();
-            resolve();
-          } else if (this.state === 'error') {
-            reject(new Error('Playback failed'));
-          } else {
-            resolve(); // Stopped or paused
-          }
-        }, timeoutMs);
-      });
+      // Play the WAV file
+      await this.playFile(wavPath);
 
     } catch (error) {
       this.state = 'error';
-      logger.error(`Playback failed: ${error}`);
-      EventBus.publish('Voice', { type: 'playbackFailed', error: String(error) });
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error(`Playback failed: ${err.message}`);
+      safePublish('Voice', { type: 'playbackFailed', error: err.message });
+
+      if (this.errorCallback) {
+        this.errorCallback(err);
+      }
       throw error;
     }
   }
 
   /**
-   * Play audio from base64 string
+   * Play audio from file path
    */
-  async playBase64(base64Audio: string): Promise<void> {
-    return this.play(base64Audio);
+  async playFile(filePath: string): Promise<void> {
+    this.playbackStartTime = Date.now();
+    this.state = 'playing';
+
+    logger.info(`Playing audio file: ${filePath}`);
+    safePublish('Voice', { type: 'playbackStarted' });
+
+    if (Platform.OS === 'ios') {
+      await this.playFileIOS(filePath);
+    } else {
+      await this.playFileAndroid(filePath);
+    }
   }
 
   /**
@@ -183,9 +202,16 @@ export class AudioPlaybackManager {
 
     logger.info('Stopping playback');
     this.state = 'stopped';
-    this.currentAudioData = null;
 
-    EventBus.publish('Voice', { type: 'playbackStopped' });
+    if (Platform.OS === 'ios' && NativeAudioModule) {
+      NativeAudioModule.stopPlayback().catch(() => {});
+    } else if (this.currentSound) {
+      this.currentSound.stop();
+      this.currentSound.release();
+      this.currentSound = null;
+    }
+
+    safePublish('Voice', { type: 'playbackStopped' });
 
     if (this.completionCallback) {
       this.completionCallback();
@@ -198,8 +224,15 @@ export class AudioPlaybackManager {
   pause(): void {
     if (this.state === 'playing') {
       this.state = 'paused';
+
+      if (Platform.OS === 'ios' && NativeAudioModule) {
+        NativeAudioModule.pausePlayback().catch(() => {});
+      } else if (this.currentSound) {
+        this.currentSound.pause();
+      }
+
       logger.info('Playback paused');
-      EventBus.publish('Voice', { type: 'playbackPaused' });
+      safePublish('Voice', { type: 'playbackPaused' });
     }
   }
 
@@ -209,8 +242,15 @@ export class AudioPlaybackManager {
   resume(): void {
     if (this.state === 'paused') {
       this.state = 'playing';
+
+      if (Platform.OS === 'ios' && NativeAudioModule) {
+        NativeAudioModule.resumePlayback().catch(() => {});
+      } else if (this.currentSound) {
+        this.currentSound.play();
+      }
+
       logger.info('Playback resumed');
-      EventBus.publish('Voice', { type: 'playbackResumed' });
+      safePublish('Voice', { type: 'playbackResumed' });
     }
   }
 
@@ -220,6 +260,9 @@ export class AudioPlaybackManager {
    */
   setVolume(volume: number): void {
     this.volume = Math.max(0, Math.min(1, volume));
+    if (this.currentSound) {
+      this.currentSound.setVolume(this.volume);
+    }
     logger.debug(`Volume set to ${this.volume}`);
   }
 
@@ -270,12 +313,86 @@ export class AudioPlaybackManager {
     this.stop();
     this.completionCallback = null;
     this.errorCallback = null;
-    this.currentAudioData = null;
     this.state = 'idle';
     logger.info('AudioPlaybackManager cleaned up');
   }
 
   // Private methods
+
+  private async playFileIOS(filePath: string): Promise<void> {
+    if (!NativeAudioModule) {
+      throw new Error('NativeAudioModule not available');
+    }
+
+    return new Promise((resolve, reject) => {
+      NativeAudioModule.playAudio(filePath)
+        .then((result: { duration: number }) => {
+          this.playbackDuration = result.duration;
+
+          // Wait for playback to complete
+          const checkInterval = setInterval(async () => {
+            if (this.state !== 'playing') {
+              clearInterval(checkInterval);
+              resolve();
+              return;
+            }
+
+            try {
+              const status = await NativeAudioModule.getPlaybackStatus();
+              if (!status.isPlaying) {
+                clearInterval(checkInterval);
+                this.handlePlaybackComplete();
+                resolve();
+              }
+            } catch {
+              clearInterval(checkInterval);
+              this.handlePlaybackComplete();
+              resolve();
+            }
+          }, 100);
+        })
+        .catch((error: Error) => {
+          this.state = 'error';
+          reject(error);
+        });
+    });
+  }
+
+  private async playFileAndroid(filePath: string): Promise<void> {
+    const SoundClass = getSound();
+    if (!SoundClass) {
+      throw new Error('react-native-sound not available');
+    }
+
+    return new Promise((resolve, reject) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      this.currentSound = new SoundClass(filePath, '', (error: any) => {
+        if (error) {
+          this.state = 'error';
+          reject(error);
+          return;
+        }
+
+        this.playbackDuration = this.currentSound.getDuration();
+        this.currentSound.setVolume(this.volume);
+
+        this.currentSound.play((success: boolean) => {
+          if (this.currentSound) {
+            this.currentSound.release();
+            this.currentSound = null;
+          }
+
+          if (success) {
+            this.handlePlaybackComplete();
+            resolve();
+          } else {
+            this.state = 'error';
+            reject(new Error('Playback failed'));
+          }
+        });
+      });
+    });
+  }
 
   private handlePlaybackComplete(): void {
     const duration = this.playbackStartTime
@@ -283,12 +400,11 @@ export class AudioPlaybackManager {
       : 0;
 
     this.state = 'idle';
-    this.currentAudioData = null;
     this.playbackStartTime = null;
 
     logger.info(`Playback completed (${duration.toFixed(2)}s)`);
 
-    EventBus.publish('Voice', {
+    safePublish('Voice', {
       type: 'playbackCompleted',
       duration,
     });
@@ -296,5 +412,92 @@ export class AudioPlaybackManager {
     if (this.completionCallback) {
       this.completionCallback();
     }
+  }
+
+  /**
+   * Convert base64 PCM float32 audio to WAV file
+   * TTS output is base64-encoded float32 PCM samples
+   */
+  private async createWavFromPCMFloat32(audioBase64: string, sampleRate: number): Promise<string> {
+    // Decode base64 to get raw bytes
+    const binaryString = atob(audioBase64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    // Convert float32 samples to int16 (WAV compatible)
+    const floatView = new Float32Array(bytes.buffer);
+    const numSamples = floatView.length;
+    const int16Samples = new Int16Array(numSamples);
+
+    for (let i = 0; i < numSamples; i++) {
+      const floatSample = floatView[i] ?? 0;
+      const sample = Math.max(-1, Math.min(1, floatSample));
+      int16Samples[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+    }
+
+    // Create WAV header (44 bytes)
+    const wavDataSize = int16Samples.length * 2;
+    const wavBuffer = new ArrayBuffer(44 + wavDataSize);
+    const wavView = new DataView(wavBuffer);
+
+    // RIFF header
+    this.writeString(wavView, 0, 'RIFF');
+    wavView.setUint32(4, 36 + wavDataSize, true);
+    this.writeString(wavView, 8, 'WAVE');
+
+    // fmt chunk
+    this.writeString(wavView, 12, 'fmt ');
+    wavView.setUint32(16, 16, true);
+    wavView.setUint16(20, 1, true); // PCM
+    wavView.setUint16(22, 1, true); // mono
+    wavView.setUint32(24, sampleRate, true);
+    wavView.setUint32(28, sampleRate * 2, true);
+    wavView.setUint16(32, 2, true);
+    wavView.setUint16(34, 16, true);
+
+    // data chunk
+    this.writeString(wavView, 36, 'data');
+    wavView.setUint32(40, wavDataSize, true);
+
+    // Copy audio data
+    const wavBytes = new Uint8Array(wavBuffer);
+    const int16Bytes = new Uint8Array(int16Samples.buffer);
+    for (let i = 0; i < int16Bytes.length; i++) {
+      wavBytes[44 + i] = int16Bytes[i]!;
+    }
+
+    // Write to file
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const RNFS = require('react-native-fs');
+      const fileName = `tts_${Date.now()}.wav`;
+      const filePath = `${RNFS.CachesDirectoryPath}/${fileName}`;
+
+      const wavBase64 = this.arrayBufferToBase64(wavBuffer);
+      await RNFS.writeFile(filePath, wavBase64, 'base64');
+
+      logger.info(`WAV file created: ${filePath}`);
+      return filePath;
+    } catch (error) {
+      logger.error(`Failed to create WAV file: ${error}`);
+      throw error;
+    }
+  }
+
+  private writeString(view: DataView, offset: number, str: string): void {
+    for (let i = 0; i < str.length; i++) {
+      view.setUint8(offset + i, str.charCodeAt(i));
+    }
+  }
+
+  private arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]!);
+    }
+    return btoa(binary);
   }
 }

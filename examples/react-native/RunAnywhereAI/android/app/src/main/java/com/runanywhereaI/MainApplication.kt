@@ -35,19 +35,14 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
-    
+
     // Initialize SoLoader first
     SoLoader.init(this, OpenSourceMergedSoMapping)
-    
-    // CRITICAL: Disable bridgeless mode for NitroModules/Nitrogen compatibility
-    // This must be called BEFORE the default loadReactNative
-    // Matches iOS AppDelegate.swift: bridgelessEnabled() -> false
+
+    // Load New Architecture (required for React Native 0.83+)
+    // Note: bridgeless mode is now required and enabled by default
     if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
-      DefaultNewArchitectureEntryPoint.load(
-        turboModulesEnabled = true,
-        fabricEnabled = true,
-        bridgelessEnabled = false  // DISABLE bridgeless for Nitro compatibility
-      )
+      DefaultNewArchitectureEntryPoint.load()
     }
   }
 }
