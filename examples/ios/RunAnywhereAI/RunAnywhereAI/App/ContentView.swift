@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var selectedTab = 0
+    @EnvironmentObject private var benchmarkLaunchHandler: BenchmarkLaunchHandler
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -70,6 +71,20 @@ struct ContentView: View {
             .tag(5)
         }
         .accentColor(AppColors.primaryAccent)
+        .onAppear {
+            // Auto-navigate to benchmark tab if launched from CLI
+            if benchmarkLaunchHandler.shouldAutoStart || benchmarkLaunchHandler.navigateToBenchmark {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    selectedTab = 4 // Benchmark tab
+                }
+            }
+        }
+        .onChange(of: benchmarkLaunchHandler.navigateToBenchmark) { _, shouldNavigate in
+            // Handle URL scheme trigger (for physical devices)
+            if shouldNavigate {
+                selectedTab = 4 // Navigate to Benchmark tab
+            }
+        }
         #if os(macOS)
         .frame(
             minWidth: 800,

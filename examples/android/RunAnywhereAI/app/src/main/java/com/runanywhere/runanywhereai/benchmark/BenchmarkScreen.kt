@@ -43,6 +43,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,6 +66,47 @@ fun BenchmarkScreen(
     val progress by viewModel.benchmarkService.progress.collectAsState()
     val results by viewModel.benchmarkService.results.collectAsState()
     val error by viewModel.benchmarkService.error.collectAsState()
+    
+    // Auto-launch support
+    val shouldAutoStart by BenchmarkLaunchHandler.shouldAutoStart.collectAsState()
+    val autoConfig by BenchmarkLaunchHandler.autoConfig.collectAsState()
+    val autoModelIds by BenchmarkLaunchHandler.autoModelIds.collectAsState()
+    var hasAutoStarted by remember { mutableStateOf(false) }
+    
+    // Auto-start benchmark if launched from CLI
+    LaunchedEffect(shouldAutoStart, uiState.availableModels) {
+        if (shouldAutoStart && !hasAutoStarted && uiState.availableModels.isNotEmpty()) {
+            hasAutoStarted = true
+            
+            // Apply config
+            autoConfig?.let { config ->
+                val configOption = when {
+                    config.testIterations <= 3 -> ConfigOption.QUICK
+                    config.testIterations >= 10 -> ConfigOption.COMPREHENSIVE
+                    else -> ConfigOption.DEFAULT
+                }
+                viewModel.setSelectedConfig(configOption)
+            }
+            
+            // Select models
+            autoModelIds?.let { modelIds ->
+                modelIds.forEach { modelId ->
+                    uiState.availableModels.find { 
+                        it.id.contains(modelId, ignoreCase = true) || 
+                        it.name.contains(modelId, ignoreCase = true) 
+                    }?.let { model ->
+                        viewModel.toggleModelSelection(model.id)
+                    }
+                }
+            } ?: viewModel.selectAllModels()
+            
+            // Start benchmark
+            kotlinx.coroutines.delay(1000) // Wait for selection to apply
+            if (uiState.canStartBenchmark) {
+                viewModel.startBenchmark()
+            }
+        }
+    }
     
     Scaffold(
         topBar = {

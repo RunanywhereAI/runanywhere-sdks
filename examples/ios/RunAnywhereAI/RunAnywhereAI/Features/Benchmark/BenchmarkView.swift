@@ -11,11 +11,18 @@ import RunAnywhere
 struct BenchmarkView: View {
     @State private var viewModel = BenchmarkViewModel()
     @State private var availableModels: [ModelInfo] = []
+    @ObservedObject private var launchHandler = BenchmarkLaunchHandler.shared
+    @State private var hasAutoStarted = false
     
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: AppSpacing.large) {
+                    // Auto-launch banner
+                    if launchHandler.shouldAutoStart && !hasAutoStarted {
+                        autoBenchmarkBanner
+                    }
+                    
                     // Configuration Section
                     configurationSection
                     
@@ -45,7 +52,128 @@ struct BenchmarkView: View {
             .navigationTitle("Benchmark")
             .task {
                 availableModels = await viewModel.availableLLMModels
+                
+                // Auto-start benchmark if launched from CLI
+                if launchHandler.shouldAutoStart && !hasAutoStarted {
+                    await autoStartBenchmark()
+                }
             }
+        }
+    }
+    
+    // MARK: - Auto Benchmark Banner
+    
+    private var autoBenchmarkBanner: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Image(systemName: "terminal")
+                    .foregroundStyle(.blue)
+                Text("CLI Auto-Benchmark Mode")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                Spacer()
+                if !launchHandler.isDownloadingModel {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                }
+            }
+            
+            // Show download progress if downloading
+            if launchHandler.isDownloadingModel {
+                VStack(spacing: 4) {
+                    HStack {
+                        Text("Downloading: \(launchHandler.pendingModelName ?? "Model")")
+                            .font(.caption2)
+                        Spacer()
+                        Text("\(Int(launchHandler.downloadProgress * 100))%")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                    }
+                    ProgressView(value: launchHandler.downloadProgress)
+                        .progressViewStyle(.linear)
+                }
+            }
+            
+            // Show error if any
+            if let error = launchHandler.downloadError {
+                Text("Error: \(error)")
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+            }
+        }
+        .padding()
+        .background(Color.blue.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+    
+    // MARK: - Auto Start
+    
+    private func autoStartBenchmark() async {
+        guard !hasAutoStarted else { return }
+        hasAutoStarted = true
+        
+        print("🚀 Auto-starting benchmark...")
+        
+        // If a model URL was provided, download it first
+        if launchHandler.pendingModelURL != nil {
+            print("📥 Model URL provided, downloading first...")
+            
+            if let downloadedModelId = await launchHandler.downloadAndBenchmarkModel() {
+                print("✅ Model downloaded: \(downloadedModelId)")
+                
+                // Wait for model list to refresh
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                availableModels = await viewModel.availableLLMModels
+                
+                // Select the downloaded model
+                viewModel.selectedModelIds.insert(downloadedModelId)
+            } else {
+                print("❌ Model download failed")
+                return
+            }
+        } else {
+            // Wait for models to load
+            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+            
+            // Refresh models
+            availableModels = await viewModel.availableLLMModels
+            
+            // Select models
+            if let modelIds = launchHandler.autoModelIds {
+                // Select specified models
+                for modelId in modelIds {
+                    if let model = availableModels.first(where: { $0.id.contains(modelId) || $0.name.lowercased().contains(modelId.lowercased()) }) {
+                        viewModel.selectedModelIds.insert(model.id)
+                    }
+                }
+            } else {
+                // Select all downloaded models
+                viewModel.selectAllModels(availableModels)
+            }
+        }
+        
+        // Apply CLI config if provided
+        if let config = launchHandler.autoConfig {
+            // Map config to UI selection
+            if config.testIterations <= 3 {
+                viewModel.selectedConfig = .quick
+            } else if config.testIterations >= 10 {
+                viewModel.selectedConfig = .comprehensive
+            } else {
+                viewModel.selectedConfig = .default
+            }
+        } else {
+            viewModel.selectedConfig = .quick // Default to quick for auto
+        }
+        
+        print("📊 Selected \(viewModel.selectedModelIds.count) models for benchmark")
+        
+        // Start benchmark if we have models
+        if viewModel.canStartBenchmark {
+            print("▶️ Starting benchmark now...")
+            await viewModel.startBenchmark()
+        } else {
+            print("⚠️ Cannot start: no models selected or available")
         }
     }
     
@@ -189,10 +317,46 @@ struct BenchmarkView: View {
     
     // MARK: - Results Section
     
+    @State private var showCopiedToast = false
+    @State private var showShareSheet = false
+    
     private var resultsSection: some View {
         VStack(alignment: .leading, spacing: AppSpacing.medium) {
-            Text("Results")
-                .font(.headline)
+            HStack {
+                Text("Results")
+                    .font(.headline)
+                
+                Spacer()
+                
+                // Export buttons
+                Button(action: copyResultsToClipboard) {
+                    Label("Copy", systemImage: "doc.on.doc")
+                        .font(.caption)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                
+                Button(action: { showShareSheet = true }) {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                        .font(.caption)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+            
+            // Copied toast
+            if showCopiedToast {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    Text("Results copied to clipboard!")
+                        .font(.caption)
+                }
+                .padding(8)
+                .background(Color.green.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .transition(.opacity)
+            }
             
             ForEach(viewModel.results) { result in
                 BenchmarkResultCard(result: result, viewModel: viewModel)
@@ -201,6 +365,42 @@ struct BenchmarkView: View {
         .padding()
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .sheet(isPresented: $showShareSheet) {
+            ShareSheet(items: [getResultsJSON()])
+        }
+    }
+    
+    private func copyResultsToClipboard() {
+        let json = getResultsJSON()
+        #if os(iOS)
+        UIPasteboard.general.string = json
+        #endif
+        
+        withAnimation {
+            showCopiedToast = true
+        }
+        
+        // Hide toast after 2 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation {
+                showCopiedToast = false
+            }
+        }
+    }
+    
+    private func getResultsJSON() -> String {
+        let export = BenchmarkExport(results: viewModel.results)
+        
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        
+        if let data = try? encoder.encode(export),
+           let json = String(data: data, encoding: .utf8) {
+            return json
+        }
+        
+        return "{ \"error\": \"Failed to encode results\" }"
     }
     
     // MARK: - Error Section
@@ -392,6 +592,21 @@ struct MetricItem: View {
         }
     }
 }
+
+// MARK: - Share Sheet
+
+#if os(iOS)
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        return controller
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+#endif
 
 #Preview {
     BenchmarkView()

@@ -2,7 +2,6 @@ package ai.runanywhere.cli
 
 import ai.runanywhere.cli.commands.*
 import com.github.ajalt.clikt.core.CliktCommand
-import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.mordant.rendering.TextColors.*
 import com.github.ajalt.mordant.terminal.Terminal
@@ -36,13 +35,11 @@ class RunAnywhereCli : CliktCommand(
     }
 }
 
-fun main(args: Array<String>) {
-    RunAnywhereCli()
-        .subcommands(
-            BuildCommand(),
-            LintCommand(),
-            BenchmarkCommand(),
-            ModelsCommand(),
-        )
-        .main(args)
-}
+fun main(args: Array<String>) = RunAnywhereCli()
+    .subcommands(
+        BuildCommand(),
+        LintCommand(),
+        BenchmarkCommand(),
+        ModelsCommand(),
+    )
+    .main(args)

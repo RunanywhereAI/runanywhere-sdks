@@ -180,14 +180,38 @@ final class BenchmarkService {
             temperature: 0.7
         )
         
-        let result = try await RunAnywhere.generate(prompt.text, options: options)
+        // Use streaming to measure TTFT (Time to First Token)
+        let startTime = Date()
+        var firstTokenTime: Date?
+        
+        let streamingResult = try await RunAnywhere.generateStream(prompt.text, options: options)
+        
+        // Consume the token stream to measure TTFT
+        for try await _ in streamingResult.stream {
+            if firstTokenTime == nil {
+                firstTokenTime = Date()
+            }
+        }
+        
+        // Get the final result with metrics
+        let result = try await streamingResult.result.value
+        
+        // Calculate TTFT - use our measurement or SDK's if available
+        let ttftMs: Double?
+        if let sdkTtft = result.timeToFirstTokenMs, sdkTtft > 0 {
+            ttftMs = sdkTtft
+        } else if let firstToken = firstTokenTime {
+            ttftMs = firstToken.timeIntervalSince(startTime) * 1000
+        } else {
+            ttftMs = nil
+        }
         
         return SingleRunResult(
             promptId: prompt.id,
             maxTokens: maxTokens,
             tokensPerSecond: result.tokensPerSecond,
             latencyMs: result.latencyMs,
-            ttftMs: result.timeToFirstTokenMs,
+            ttftMs: ttftMs,
             outputTokens: result.tokensUsed,
             inputTokens: result.inputTokens,
             timestamp: Date()

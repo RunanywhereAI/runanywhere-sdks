@@ -21,6 +21,7 @@ import AppKit
 struct RunAnywhereAIApp: App {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "RunAnywhereAIApp")
     @StateObject private var modelManager = ModelManager.shared
+    @StateObject private var benchmarkLaunchHandler = BenchmarkLaunchHandler.shared
     @State private var isSDKInitialized = false
     @State private var initializationError: Error?
 
@@ -30,6 +31,7 @@ struct RunAnywhereAIApp: App {
                 if isSDKInitialized {
                     ContentView()
                         .environmentObject(modelManager)
+                        .environmentObject(benchmarkLaunchHandler)
                         .onAppear {
                             logger.info("🎉 App is ready to use!")
                         }
@@ -47,6 +49,10 @@ struct RunAnywhereAIApp: App {
             .task {
                 logger.info("🏁 App launched, initializing SDK...")
                 await initializeSDK()
+            }
+            .onOpenURL { url in
+                // Handle URL scheme: runanywhere://benchmark?config=default&models=all
+                handleDeepLink(url)
             }
         }
         #if os(macOS)
@@ -113,6 +119,19 @@ struct RunAnywhereAIApp: App {
             initializationError = nil
         }
         await initializeSDK()
+    }
+    
+    /// Handle deep links for CLI automation
+    /// URL format: runanywhere://benchmark?config=quick&model_url=https://...
+    private func handleDeepLink(_ url: URL) {
+        logger.info("📲 Received deep link: \(url.absoluteString)")
+        
+        guard url.scheme == "runanywhere" else { return }
+        
+        // Delegate to BenchmarkLaunchHandler
+        Task { @MainActor in
+            benchmarkLaunchHandler.handleURL(url)
+        }
     }
 
     /// Register modules with their associated models
