@@ -1,7 +1,7 @@
 package com.runanywhere.sdk.features.tts
 
 internal actual object TtsAudioPlayback {
-    private val audioPlaybackManager = AudioPlaybackManager()
+    private val audioPlaybackManager by lazy { AudioPlaybackManager() }
 
     actual val isPlaying: Boolean
         get() = audioPlaybackManager.isPlaying

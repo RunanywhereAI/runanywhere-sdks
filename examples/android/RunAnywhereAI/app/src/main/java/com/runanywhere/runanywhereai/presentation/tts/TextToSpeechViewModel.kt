@@ -699,8 +699,6 @@ class TextToSpeechViewModel(
     }
 
     private suspend fun ensureSystemTtsReady(): Boolean {
-        systemTts?.let { return true }
-
         val deferred =
             systemTtsInit
                 ?: CompletableDeferred<Boolean>().also { init ->
@@ -709,7 +707,14 @@ class TextToSpeechViewModel(
                         systemTts =
                             TextToSpeech(getApplication()) { status ->
                                 val ready = status == TextToSpeech.SUCCESS
-                                init.complete(ready)
+                                if (ready) {
+                                    init.complete(true)
+                                } else {
+                                    systemTts?.shutdown()
+                                    systemTts = null
+                                    systemTtsInit = null
+                                    init.complete(false)
+                                }
                             }
                     }
                 }
