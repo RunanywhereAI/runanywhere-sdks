@@ -151,9 +151,17 @@ android {
             // when using AGP < 8.5.1. With AGP 8.5.1+, this ensures proper extraction
             // and 16KB alignment during packaging.
             useLegacyPackaging = true
-            // NOTE: pickFirsts no longer needed!
-            // All native libraries now come from the unified runanywhere-core-native module,
-            // so there are no duplicates when using multiple backend modules.
+            
+            // Handle duplicate native libraries from multiple backend modules
+            // (ONNX and LlamaCPP both include some common libraries)
+            pickFirsts += listOf(
+                "lib/arm64-v8a/libomp.so",
+                "lib/arm64-v8a/libc++_shared.so",
+                "lib/arm64-v8a/librac_commons.so",
+                "lib/armeabi-v7a/libomp.so",
+                "lib/armeabi-v7a/libc++_shared.so",
+                "lib/armeabi-v7a/librac_commons.so",
+            )
         }
     }
 

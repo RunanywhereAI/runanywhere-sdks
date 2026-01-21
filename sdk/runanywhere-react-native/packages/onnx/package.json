@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/onnx",
-  "version": "0.17.0",
+  "version": "0.17.6",
   "description": "ONNX Runtime backend for RunAnywhere React Native SDK - Speech-to-Text, Text-to-Speech, and VAD",
   "main": "src/index.ts",
   "types": "src/index.ts",

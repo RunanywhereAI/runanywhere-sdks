@@ -18,32 +18,17 @@ set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
 # RABackendONNX - STT/TTS/VAD backend (REQUIRED)
 # Downloaded via Gradle downloadNativeLibs task
 # =============================================================================
-if(NOT EXISTS "${JNILIB_DIR}/librunanywhere_onnx.so")
-    message(FATAL_ERROR "[RunAnywhereONNX] RABackendONNX not found at ${JNILIB_DIR}/librunanywhere_onnx.so\n"
+if(NOT EXISTS "${JNILIB_DIR}/librac_backend_onnx.so")
+    message(FATAL_ERROR "[RunAnywhereONNX] RABackendONNX not found at ${JNILIB_DIR}/librac_backend_onnx.so\n"
                         "Run: ./gradlew :runanywhere_onnx:downloadNativeLibs")
 endif()
 
-add_library(runanywhere_onnx SHARED IMPORTED)
-set_target_properties(runanywhere_onnx PROPERTIES
-    IMPORTED_LOCATION "${JNILIB_DIR}/librunanywhere_onnx.so"
+add_library(rac_backend_onnx SHARED IMPORTED)
+set_target_properties(rac_backend_onnx PROPERTIES
+    IMPORTED_LOCATION "${JNILIB_DIR}/librac_backend_onnx.so"
     IMPORTED_NO_SONAME TRUE
 )
-message(STATUS "[RunAnywhereONNX] Found RABackendONNX at ${JNILIB_DIR}/librunanywhere_onnx.so")
-
-# =============================================================================
-# RABackendONNX JNI - contains rac_backend_onnx_register/unregister (REQUIRED)
-# =============================================================================
-if(NOT EXISTS "${JNILIB_DIR}/librac_backend_onnx_jni.so")
-    message(FATAL_ERROR "[RunAnywhereONNX] RABackendONNX JNI not found at ${JNILIB_DIR}/librac_backend_onnx_jni.so\n"
-                        "Run: ./gradlew :runanywhere_onnx:downloadNativeLibs")
-endif()
-
-add_library(rac_backend_onnx_jni SHARED IMPORTED)
-set_target_properties(rac_backend_onnx_jni PROPERTIES
-    IMPORTED_LOCATION "${JNILIB_DIR}/librac_backend_onnx_jni.so"
-    IMPORTED_NO_SONAME TRUE
-)
-message(STATUS "[RunAnywhereONNX] Found RABackendONNX JNI at ${JNILIB_DIR}/librac_backend_onnx_jni.so")
+message(STATUS "[RunAnywhereONNX] Found RABackendONNX at ${JNILIB_DIR}/librac_backend_onnx.so")
 
 # =============================================================================
 # ONNX Runtime (REQUIRED)
@@ -176,8 +161,7 @@ target_link_libraries(
     ${LOG_LIB}
     android
     rac_commons
-    runanywhere_onnx
-    rac_backend_onnx_jni
+    rac_backend_onnx
     onnxruntime
 )
 
