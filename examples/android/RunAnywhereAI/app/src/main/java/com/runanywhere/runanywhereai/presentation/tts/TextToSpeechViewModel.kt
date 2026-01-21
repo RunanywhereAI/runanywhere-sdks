@@ -385,7 +385,7 @@ class TextToSpeechViewModel(
 
             _uiState.update {
                 it.copy(
-                    isGenerating = true,
+                    isGenerating = !isSystem,
                     isSpeaking = isSystem,
                     hasGeneratedAudio = false,
                     errorMessage = null,
@@ -621,7 +621,7 @@ class TextToSpeechViewModel(
             RunAnywhere.stopSynthesis()
         }
         systemTts?.stop()
-        _uiState.update { it.copy(isGenerating = false) }
+        _uiState.update { it.copy(isGenerating = false, isSpeaking = false) }
     }
 
     override fun onCleared() {
