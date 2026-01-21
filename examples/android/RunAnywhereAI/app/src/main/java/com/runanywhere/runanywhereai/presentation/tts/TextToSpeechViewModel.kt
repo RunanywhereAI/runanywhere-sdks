@@ -19,7 +19,6 @@ import com.runanywhere.sdk.public.extensions.TTS.TTSOptions
 import com.runanywhere.sdk.public.extensions.currentTTSVoiceId
 import com.runanywhere.sdk.public.extensions.isTTSVoiceLoadedSync
 import com.runanywhere.sdk.public.extensions.loadTTSVoice
-import com.runanywhere.sdk.public.extensions.speak
 import com.runanywhere.sdk.public.extensions.stopSynthesis
 import com.runanywhere.sdk.public.extensions.synthesize
 import kotlinx.coroutines.CompletableDeferred
@@ -468,78 +467,6 @@ class TextToSpeechViewModel(
                         isGenerating = false,
                         isSpeaking = false,
                         errorMessage = "Speech generation failed: ${e.message}",
-                    )
-                }
-            }
-        }
-    }
-
-    /**
-     * Speak text using SDK playback integration.
-     */
-    fun speakWithSdk() {
-        viewModelScope.launch {
-            val text = _uiState.value.inputText
-            if (text.isEmpty()) return@launch
-
-            if (_uiState.value.isSystemTTS) {
-                _uiState.update {
-                    it.copy(errorMessage = "System TTS is selected. Use the Speak button to play with system TTS.")
-                }
-                return@launch
-            }
-
-            if (!RunAnywhere.isTTSVoiceLoadedSync) {
-                _uiState.update {
-                    it.copy(errorMessage = "No TTS model loaded. Please select a voice first.")
-                }
-                return@launch
-            }
-
-            _uiState.update {
-                it.copy(
-                    isSpeaking = true,
-                    errorMessage = null,
-                )
-            }
-
-            try {
-                Log.i(TAG, "Speaking via SDK for text: ${text.take(50)}...")
-
-                val startTime = System.currentTimeMillis()
-
-                val options =
-                    TTSOptions(
-                        voice = _uiState.value.selectedModelId,
-                        language = "en-US",
-                        rate = _uiState.value.speed,
-                        pitch = _uiState.value.pitch,
-                        volume = 1.0f,
-                    )
-
-                val result =
-                    withContext(Dispatchers.IO) {
-                        RunAnywhere.speak(text, options)
-                    }
-
-                val processingTimeMs = System.currentTimeMillis() - startTime
-
-                _uiState.update {
-                    it.copy(
-                        isSpeaking = false,
-                        audioDuration = result.duration,
-                        audioSize = result.audioSizeBytes.takeIf { size -> size > 0 },
-                        sampleRate = null,
-                        processingTimeMs = processingTimeMs,
-                        hasGeneratedAudio = false,
-                    )
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "SDK speak failed: ${e.message}", e)
-                _uiState.update {
-                    it.copy(
-                        isSpeaking = false,
-                        errorMessage = "SDK speak failed: ${e.message}",
                     )
                 }
             }

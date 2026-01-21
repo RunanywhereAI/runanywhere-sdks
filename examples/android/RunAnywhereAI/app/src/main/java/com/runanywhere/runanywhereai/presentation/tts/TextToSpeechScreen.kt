@@ -135,7 +135,6 @@ fun TextToSpeechScreen(viewModel: TextToSpeechViewModel = viewModel()) {
                     duration = uiState.audioDuration ?: 0.0,
                     errorMessage = uiState.errorMessage,
                     onGenerate = { viewModel.generateSpeech() },
-                    onSpeak = { viewModel.speakWithSdk() },
                     onTogglePlayback = { viewModel.togglePlayback() },
                 )
             } else {
@@ -522,7 +521,6 @@ private fun ControlsSection(
     duration: Double,
     errorMessage: String?,
     onGenerate: () -> Unit,
-    onSpeak: () -> Unit,
     onTogglePlayback: () -> Unit,
 ) {
     Column(
@@ -639,40 +637,11 @@ private fun ControlsSection(
             }
         }
 
-        Button(
-            onClick = onSpeak,
-            enabled = !isTextEmpty && isModelSelected && !isGenerating && !isSpeaking,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-            shape = RoundedCornerShape(25.dp),
-            colors =
-                ButtonDefaults.buttonColors(
-                    containerColor = AppColors.primaryPurple,
-                    contentColor = Color.White,
-                    disabledContainerColor = Color.Gray,
-                ),
-        ) {
-            Icon(
-                imageVector = Icons.Filled.VolumeUp,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-                tint = Color.White,
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "Speak (SDK)",
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White,
-            )
-        }
-
         // Status text
         Text(
             text =
                 when {
-                    isSpeaking -> "Speaking via SDK..."
+                    isSpeaking -> "Speaking..."
                     isSystemTTS && isGenerating -> "Speaking..."
                     isSystemTTS -> "System TTS plays directly"
                     isGenerating -> "Generating speech..."
