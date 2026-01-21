@@ -664,7 +664,6 @@ private fun ControlsSection(
             text =
                 when {
                     isSpeaking -> "Speaking..."
-                    isSystemTTS && isGenerating -> "Speaking..."
                     isSystemTTS -> "System TTS plays directly"
                     isGenerating -> "Generating speech..."
                     isPlaying -> "Playing..."

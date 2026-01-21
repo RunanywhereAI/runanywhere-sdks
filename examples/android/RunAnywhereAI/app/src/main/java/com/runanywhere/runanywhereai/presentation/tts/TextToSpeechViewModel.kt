@@ -679,7 +679,11 @@ class TextToSpeechViewModel(
 
                     override fun onStop(utteranceId: String?, interrupted: Boolean) {
                         if (continuation.isActive) {
-                            continuation.resumeWithException(IllegalStateException("System TTS stopped"))
+                            if (interrupted) {
+                                continuation.resume(Unit)
+                            } else {
+                                continuation.resumeWithException(IllegalStateException("System TTS stopped"))
+                            }
                         }
                     }
                 },
