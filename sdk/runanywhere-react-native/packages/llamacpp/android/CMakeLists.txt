@@ -18,17 +18,17 @@ set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
 # RABackendLlamaCPP - Llama LLM backend (REQUIRED)
 # Downloaded via Gradle downloadNativeLibs task
 # =============================================================================
-if(NOT EXISTS "${JNILIB_DIR}/librunanywhere_llamacpp.so")
-    message(FATAL_ERROR "[RunAnywhereLlama] RABackendLlamaCPP not found at ${JNILIB_DIR}/librunanywhere_llamacpp.so\n"
+if(NOT EXISTS "${JNILIB_DIR}/librac_backend_llamacpp.so")
+    message(FATAL_ERROR "[RunAnywhereLlama] RABackendLlamaCPP not found at ${JNILIB_DIR}/librac_backend_llamacpp.so\n"
                         "Run: ./gradlew :runanywhere_llamacpp:downloadNativeLibs")
 endif()
 
-add_library(runanywhere_llamacpp SHARED IMPORTED)
-set_target_properties(runanywhere_llamacpp PROPERTIES
-    IMPORTED_LOCATION "${JNILIB_DIR}/librunanywhere_llamacpp.so"
+add_library(rac_backend_llamacpp SHARED IMPORTED)
+set_target_properties(rac_backend_llamacpp PROPERTIES
+    IMPORTED_LOCATION "${JNILIB_DIR}/librac_backend_llamacpp.so"
     IMPORTED_NO_SONAME TRUE
 )
-message(STATUS "[RunAnywhereLlama] Found RABackendLlamaCPP at ${JNILIB_DIR}/librunanywhere_llamacpp.so")
+message(STATUS "[RunAnywhereLlama] Found RABackendLlamaCPP at ${JNILIB_DIR}/librac_backend_llamacpp.so")
 
 # =============================================================================
 # Source files - Llama bridges
@@ -121,7 +121,7 @@ target_link_libraries(
     ${LOG_LIB}
     android
     rac_commons
-    runanywhere_llamacpp
+    rac_backend_llamacpp
 )
 
 # HAS_LLAMACPP and HAS_RACOMMONS are always defined since backends are required
