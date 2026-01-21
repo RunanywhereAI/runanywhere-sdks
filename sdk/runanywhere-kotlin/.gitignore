@@ -42,3 +42,7 @@ build/jniLibs/
 
 # Local environment
 local.properties
+
+# Secrets (NEVER commit real credentials)
+secrets.properties
+*.secrets.properties
