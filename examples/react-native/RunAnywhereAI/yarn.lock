@@ -1515,15 +1515,15 @@
     nanoid "^3.3.11"
 
 "@runanywhere/core@file:../../../sdk/runanywhere-react-native/packages/core":
-  version "0.17.0"
+  version "0.17.6"
   resolved "file:../../../sdk/runanywhere-react-native/packages/core"
 
 "@runanywhere/llamacpp@file:../../../sdk/runanywhere-react-native/packages/llamacpp":
-  version "0.17.0"
+  version "0.17.6"
   resolved "file:../../../sdk/runanywhere-react-native/packages/llamacpp"
 
 "@runanywhere/onnx@file:../../../sdk/runanywhere-react-native/packages/onnx":
-  version "0.17.5"
+  version "0.17.6"
   resolved "file:../../../sdk/runanywhere-react-native/packages/onnx"
 
 "@sideway/address@^4.1.5":
