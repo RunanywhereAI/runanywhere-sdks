@@ -125,6 +125,7 @@ fun TextToSpeechScreen(viewModel: TextToSpeechViewModel = viewModel()) {
                 ControlsSection(
                     isGenerating = uiState.isGenerating,
                     isPlaying = uiState.isPlaying,
+                    isSpeaking = uiState.isSpeaking,
                     hasGeneratedAudio = uiState.hasGeneratedAudio,
                     isSystemTTS = uiState.isSystemTTS,
                     isTextEmpty = uiState.inputText.isEmpty(),
@@ -134,6 +135,7 @@ fun TextToSpeechScreen(viewModel: TextToSpeechViewModel = viewModel()) {
                     duration = uiState.audioDuration ?: 0.0,
                     errorMessage = uiState.errorMessage,
                     onGenerate = { viewModel.generateSpeech() },
+                    onSpeak = { viewModel.speakWithSdk() },
                     onTogglePlayback = { viewModel.togglePlayback() },
                 )
             } else {
@@ -510,6 +512,7 @@ private fun AudioInfoRow(
 private fun ControlsSection(
     isGenerating: Boolean,
     isPlaying: Boolean,
+    isSpeaking: Boolean,
     hasGeneratedAudio: Boolean,
     isSystemTTS: Boolean,
     isTextEmpty: Boolean,
@@ -519,6 +522,7 @@ private fun ControlsSection(
     duration: Double,
     errorMessage: String?,
     onGenerate: () -> Unit,
+    onSpeak: () -> Unit,
     onTogglePlayback: () -> Unit,
 ) {
     Column(
@@ -572,7 +576,7 @@ private fun ControlsSection(
             // Generate/Speak button
             Button(
                 onClick = onGenerate,
-                enabled = !isTextEmpty && isModelSelected && !isGenerating,
+                enabled = !isTextEmpty && isModelSelected && !isGenerating && !isSpeaking,
                 modifier =
                     Modifier
                         .width(140.dp)
@@ -610,7 +614,7 @@ private fun ControlsSection(
             // Play/Stop button (only for non-System TTS)
             Button(
                 onClick = onTogglePlayback,
-                enabled = hasGeneratedAudio && !isSystemTTS,
+                enabled = hasGeneratedAudio && !isSystemTTS && !isSpeaking,
                 modifier =
                     Modifier
                         .width(140.dp)
@@ -635,10 +639,40 @@ private fun ControlsSection(
             }
         }
 
+        Button(
+            onClick = onSpeak,
+            enabled = !isTextEmpty && isModelSelected && !isGenerating && !isSpeaking,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+            shape = RoundedCornerShape(25.dp),
+            colors =
+                ButtonDefaults.buttonColors(
+                    containerColor = AppColors.primaryPurple,
+                    contentColor = Color.White,
+                    disabledContainerColor = Color.Gray,
+                ),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.VolumeUp,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = Color.White,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Speak (SDK)",
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+            )
+        }
+
         // Status text
         Text(
             text =
                 when {
+                    isSpeaking -> "Speaking via SDK..."
                     isSystemTTS && isGenerating -> "Speaking..."
                     isSystemTTS -> "System TTS plays directly"
                     isGenerating -> "Generating speech..."

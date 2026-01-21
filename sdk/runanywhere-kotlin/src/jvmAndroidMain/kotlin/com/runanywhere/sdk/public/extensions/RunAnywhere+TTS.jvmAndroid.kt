@@ -7,6 +7,7 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import com.runanywhere.sdk.features.tts.TtsAudioPlayback
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
@@ -18,6 +19,7 @@ import com.runanywhere.sdk.public.extensions.TTS.TTSSpeakResult
 import com.runanywhere.sdk.public.extensions.TTS.TTSSynthesisMetadata
 
 private val ttsLogger = SDKLogger.tts
+private val ttsAudioPlayback = TtsAudioPlayback
 
 actual suspend fun RunAnywhere.loadTTSVoice(voiceId: String) {
     if (!isInitialized) {
@@ -162,16 +164,24 @@ actual suspend fun RunAnywhere.speak(
 
     val output = synthesize(text, options)
 
-    // Platform-specific audio playback would happen here
-    // TODO: Integrate with platform audio playback
+    if (output.audioData.isNotEmpty()) {
+        try {
+            ttsAudioPlayback.play(output.audioData)
+            ttsLogger.debug("Audio playback completed")
+        } catch (e: Exception) {
+            ttsLogger.error("Audio playback failed: ${e.message}", throwable = e)
+            throw if (e is SDKError) e else SDKError.tts("Failed to play audio: ${e.message}")
+        }
+    }
 
     return TTSSpeakResult.from(output)
 }
 
 actual suspend fun RunAnywhere.isSpeaking(): Boolean {
-    return false // TODO: Implement with platform audio playback
+    return ttsAudioPlayback.isPlaying
 }
 
 actual suspend fun RunAnywhere.stopSpeaking() {
+    ttsAudioPlayback.stop()
     stopSynthesis()
 }

@@ -155,13 +155,10 @@ fun ModelSelectionBottomSheet(
                                     scope.launch {
                                         viewModel.setLoadingModel(true)
                                         try {
-                                            // Load System TTS via SDK to trigger lifecycle tracker
-                                            RunAnywhere.loadTTSVoice("system-tts")
-
-                                            // Create pseudo ModelInfo for System TTS (matches iOS)
+                                            // System TTS doesn't require SDK model loading.
                                             val systemTTSModel =
                                                 ModelInfo(
-                                                    id = "system-tts",
+                                                    id = SYSTEM_TTS_MODEL_ID,
                                                     name = "System TTS",
                                                     downloadURL = null,
                                                     format = ModelFormat.UNKNOWN,
@@ -169,11 +166,8 @@ fun ModelSelectionBottomSheet(
                                                     framework = InferenceFramework.SYSTEM_TTS,
                                                 )
 
-                                            kotlinx.coroutines.delay(300)
                                             onModelSelected(systemTTSModel)
                                             onDismiss()
-                                        } catch (e: Exception) {
-                                            android.util.Log.e("ModelSelectionSheet", "Failed to load System TTS: ${e.message}")
                                         } finally {
                                             viewModel.setLoadingModel(false)
                                         }
@@ -833,6 +827,8 @@ private fun SystemTTSRow(
         }
     }
 }
+
+private const val SYSTEM_TTS_MODEL_ID = "system-tts"
 
 // ====================
 // UTILITY FUNCTIONS
