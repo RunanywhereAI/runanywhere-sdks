@@ -44,7 +44,7 @@ let useLocalBinaries = false  // Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when testLocal = false)
 // Updated automatically by CI/CD during releases
-let sdkVersion = "0.17.0"
+let sdkVersion = "0.17.1"
 
 let package = Package(
     name: "runanywhere-sdks",
