@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.ktlint)
     id("maven-publish")
     signing
+    id("runanywhere.conventions") // Shared build utilities (module path resolution, etc.)
 }
 
 // =============================================================================
@@ -113,37 +114,9 @@ logger.lifecycle("RunAnywhere SDK: testLocal=$testLocal, nativeLibVersion=$nativ
 // =============================================================================
 // Project Path Resolution
 // =============================================================================
-// When included as a subproject in composite builds (e.g., from example app or Android Studio),
-// the module path changes. This function constructs the full absolute path for sibling modules
-// based on the current project's location in the hierarchy.
-//
-// Examples:
-// - When SDK is root project: path = ":" → module path = ":modules:$moduleName"
-// - When SDK is at ":sdk:runanywhere-kotlin": path → ":sdk:runanywhere-kotlin:modules:$moduleName"
-fun resolveModulePath(moduleName: String): String {
-    val basePath = project.path
-    val computedPath =
-        if (basePath == ":") {
-            ":modules:$moduleName"
-        } else {
-            "$basePath:modules:$moduleName"
-        }
-
-    // Try to find the project using rootProject to handle Android Studio sync ordering
-    val foundProject = rootProject.findProject(computedPath)
-    if (foundProject != null) {
-        return computedPath
-    }
-
-    // Fallback: Try just :modules:$moduleName (when SDK is at non-root but modules are siblings)
-    val simplePath = ":modules:$moduleName"
-    if (rootProject.findProject(simplePath) != null) {
-        return simplePath
-    }
-
-    // Return computed path (will fail with clear error if not found)
-    return computedPath
-}
+// Module path resolution is handled by the runanywhere.module-path convention plugin.
+// Use resolveModulePath("module-name") to get the correct path in composite builds.
+// See: build-logic/src/main/kotlin/runanywhere.module-path.gradle.kts
 
 kotlin {
     // Use Java 17 toolchain across targets
