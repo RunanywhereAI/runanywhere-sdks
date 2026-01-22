@@ -6,19 +6,16 @@ import Foundation
 // RunAnywhere SDK - Swift Package Manager Distribution
 // =============================================================================
 //
-// This is the ROOT-LEVEL Package.swift for external SPM consumption.
-// 
-// Users add this package via:
-//   .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "1.0.0")
+// This is the SINGLE Package.swift for both local development and SPM consumption.
 //
-// Then import the products they need:
-//   .product(name: "RunAnywhere", package: "runanywhere-sdks"),
-//   .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-sdks"),  // LLM
-//   .product(name: "RunAnywhereONNX", package: "runanywhere-sdks"),      // STT/TTS/VAD
+// FOR EXTERNAL USERS (consuming via GitHub):
+//   .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.17.0")
 //
-// =============================================================================
-// NOTE: For local SDK development, use sdk/runanywhere-swift/Package.swift
-//       with testLocal = true instead.
+// FOR LOCAL DEVELOPMENT:
+//   1. Run: cd sdk/runanywhere-swift && ./scripts/build-swift.sh --setup
+//   2. Open the example app in Xcode
+//   3. The app references this package via relative path
+//
 // =============================================================================
 
 // Get the package directory for relative path resolution
@@ -28,12 +25,26 @@ let packageDir = URL(fileURLWithPath: #file).deletingLastPathComponent().path
 let onnxRuntimeMacOSPath = "\(packageDir)/sdk/runanywhere-swift/Binaries/onnxruntime-macos"
 
 // =============================================================================
-// VERSION CONFIGURATION
+// BINARY TARGET CONFIGURATION
 // =============================================================================
-// These versions must match the GitHub releases.
-// Updated automatically by CI/CD during releases.
-// All binaries are now released under a unified tag: v{version}
-let sdkVersion = "0.16.0-test.45"
+//
+// useLocalBinaries = true  → Use local XCFrameworks from sdk/runanywhere-swift/Binaries/
+//                            For local development. Run first-time setup:
+//                              cd sdk/runanywhere-swift && ./scripts/build-swift.sh --setup
+//
+// useLocalBinaries = false → Download XCFrameworks from GitHub releases (PRODUCTION)
+//                            For external users via SPM. No setup needed.
+//
+// To toggle this value, use:
+//   ./scripts/build-swift.sh --set-local   (sets useLocalBinaries = true)
+//   ./scripts/build-swift.sh --set-remote  (sets useLocalBinaries = false)
+//
+// =============================================================================
+let useLocalBinaries = false  // Toggle: true for local dev, false for release
+
+// Version for remote XCFrameworks (used when testLocal = false)
+// Updated automatically by CI/CD during releases
+let sdkVersion = "0.17.0"
 
 let package = Package(
     name: "runanywhere-sdks",
@@ -179,29 +190,65 @@ let package = Package(
             ]
         ),
 
-        // =================================================================
-        // Binary Targets - Downloaded from GitHub releases
-        // All binaries are now released under unified tag: v{sdkVersion}
-        // =================================================================
-        .binaryTarget(
-            name: "RACommonsBinary",
-            url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-            checksum: "CHECKSUM_RACOMMONS" // Updated by CI/CD
-        ),
-        .binaryTarget(
-            name: "RABackendLlamaCPPBinary",
-            url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
-            checksum: "CHECKSUM_LLAMACPP" // Updated by CI/CD
-        ),
-        .binaryTarget(
-            name: "RABackendONNXBinary",
-            url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
-            checksum: "CHECKSUM_ONNX" // Updated by CI/CD
-        ),
-        .binaryTarget(
-            name: "ONNXRuntimeBinary",
-            url: "https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.17.1.zip",
-            checksum: "9a2d54d4f503fbb82d2f86361a1d22d4fe015e2b5e9fb419767209cc9ab6372c"
-        ),
-    ]
+    ] + binaryTargets()
 )
+
+// =============================================================================
+// BINARY TARGET SELECTION
+// =============================================================================
+// Returns local or remote binary targets based on useLocalBinaries setting
+func binaryTargets() -> [Target] {
+    if useLocalBinaries {
+        // =====================================================================
+        // LOCAL DEVELOPMENT MODE
+        // Use XCFrameworks from sdk/runanywhere-swift/Binaries/
+        // Run: cd sdk/runanywhere-swift && ./scripts/build-swift.sh --setup
+        // =====================================================================
+        return [
+            .binaryTarget(
+                name: "RACommonsBinary",
+                path: "sdk/runanywhere-swift/Binaries/RACommons.xcframework"
+            ),
+            .binaryTarget(
+                name: "RABackendLlamaCPPBinary",
+                path: "sdk/runanywhere-swift/Binaries/RABackendLLAMACPP.xcframework"
+            ),
+            .binaryTarget(
+                name: "RABackendONNXBinary",
+                path: "sdk/runanywhere-swift/Binaries/RABackendONNX.xcframework"
+            ),
+            .binaryTarget(
+                name: "ONNXRuntimeBinary",
+                url: "https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.17.1.zip",
+                checksum: "9a2d54d4f503fbb82d2f86361a1d22d4fe015e2b5e9fb419767209cc9ab6372c"
+            ),
+        ]
+    } else {
+        // =====================================================================
+        // PRODUCTION MODE (for external SPM consumers)
+        // Download XCFrameworks from GitHub releases
+        // =====================================================================
+        return [
+            .binaryTarget(
+                name: "RACommonsBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
+                checksum: "e8a7262c70cee320aaaeed1650fa47f397760daa378e15e5fb1ff81a0b0eec8b"
+            ),
+            .binaryTarget(
+                name: "RABackendLlamaCPPBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
+                checksum: "0f922277606d48a2238154146c6ab05c214c4063dc8d8f44a446a841dcd63a05"
+            ),
+            .binaryTarget(
+                name: "RABackendONNXBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
+                checksum: "947fc2e6e854243c0a5f00d558cedf4bc6b138e0c64a1567233ec2fa970e5cdd"
+            ),
+            .binaryTarget(
+                name: "ONNXRuntimeBinary",
+                url: "https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.17.1.zip",
+                checksum: "9a2d54d4f503fbb82d2f86361a1d22d4fe015e2b5e9fb419767209cc9ab6372c"
+            ),
+        ]
+    }
+}

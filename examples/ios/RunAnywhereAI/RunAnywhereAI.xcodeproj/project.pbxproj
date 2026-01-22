@@ -222,7 +222,7 @@
 			mainGroup = 5480A1E72E2F250200337F2F;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */,
+				58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../.." */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5480A1F12E2F250200337F2F /* Products */;
@@ -676,26 +676,26 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */ = {
+		58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../.." */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = "../../../sdk/runanywhere-swift";
+			relativePath = "../../..";
 		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		541C59D92E63772A00DD7839 /* RunAnywhere */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */;
+			package = 58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../.." */;
 			productName = RunAnywhere;
 		};
 		58ABEDD12ED16DA40058D033 /* RunAnywhereONNX */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */;
+			package = 58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../.." */;
 			productName = RunAnywhereONNX;
 		};
 		58LLAMACPP02ED16DA40058D0 /* RunAnywhereLlamaCPP */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */;
+			package = 58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../.." */;
 			productName = RunAnywhereLlamaCPP;
 		};
 /* End XCSwiftPackageProductDependency section */
