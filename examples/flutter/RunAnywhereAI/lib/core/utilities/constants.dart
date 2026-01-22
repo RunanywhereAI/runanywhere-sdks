@@ -74,7 +74,9 @@ class KeychainKeys {
   KeychainKeys._();
 
   static const String apiKey = 'runanywhere_api_key';
+  static const String baseURL = 'runanywhere_base_url';
   static const String analyticsLogToLocal = 'analyticsLogToLocal';
+  static const String deviceRegistered = 'com.runanywhere.sdk.deviceRegistered';
 }
 
 /// UserDefaults keys for preferences

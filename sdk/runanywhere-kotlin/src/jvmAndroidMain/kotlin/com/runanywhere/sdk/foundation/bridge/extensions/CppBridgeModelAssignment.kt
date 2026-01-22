@@ -292,6 +292,7 @@ object CppBridgeModelAssignment {
          * @param requiresAuth Whether auth header is required
          * @return JSON response or "ERROR:message" on failure
          */
+        @Suppress("unused") // Called from JNI
         fun httpGet(endpoint: String, requiresAuth: Boolean): String {
             return try {
                 // Get base URL from telemetry config or use default
@@ -306,7 +307,7 @@ object CppBridgeModelAssignment {
 
                 if (requiresAuth) {
                     // Get access token from auth manager
-                    val accessToken = CppBridgeAuth.getAccessToken()
+                    val accessToken = CppBridgeAuth.getValidToken()
                     if (!accessToken.isNullOrEmpty()) {
                         headers["Authorization"] = "Bearer $accessToken"
                     }
@@ -346,16 +347,6 @@ object CppBridgeModelAssignment {
                 "ERROR:${e.message}"
             }
         }
-
-        /**
-         * Get device info for model assignments.
-         * @return "deviceType|platform" string
-         */
-        fun getDeviceInfo(): String {
-            val deviceModel = CppBridgeDevice.deviceInfoProvider?.getDeviceModel() ?: "unknown"
-            val platform = "Android"
-            return "$deviceModel|$platform"
-        }
     }
 
     /**
@@ -363,24 +354,27 @@ object CppBridgeModelAssignment {
      *
      * This must be called during SDK initialization, after [CppBridgeModelRegistry.register].
      * It is safe to call multiple times; subsequent calls are no-ops.
+     *
+     * @param autoFetch Whether to auto-fetch models after registration.
+     *                  Should be false for development mode, true for staging/production.
      */
-    fun register() {
+    fun register(autoFetch: Boolean = false) {
         synchronized(lock) {
             if (isRegistered) {
                 return
             }
 
             // Register the model assignment callbacks with C++ via JNI
-            // auto_fetch = true: automatically fetch models after registration
+            // auto_fetch controls whether models are fetched immediately after registration
             try {
                 val result = com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-                    .racModelAssignmentSetCallbacks(nativeCallbackHandler, true)
+                    .racModelAssignmentSetCallbacks(nativeCallbackHandler, autoFetch)
 
                 if (result == 0) { // RAC_SUCCESS
                     CppBridgePlatformAdapter.logCallback(
                         CppBridgePlatformAdapter.LogLevel.INFO,
                         TAG,
-                        "Model assignment callbacks registered with auto-fetch enabled",
+                        "Model assignment callbacks registered (autoFetch: $autoFetch)",
                     )
                 } else {
                     CppBridgePlatformAdapter.logCallback(

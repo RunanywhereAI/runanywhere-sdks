@@ -8,6 +8,8 @@ import 'package:runanywhere_ai/app/content_view.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/services/model_manager.dart';
+import 'package:runanywhere_ai/core/utilities/constants.dart';
+import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
 import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 
@@ -37,6 +39,16 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     });
   }
 
+  /// Normalize base URL by adding https:// if no scheme is present
+  String _normalizeBaseURL(String url) {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) return trimmed;
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    return 'https://$trimmed';
+  }
+
   Future<void> _initializeSDK() async {
     final stopwatch = Stopwatch()..start();
 
@@ -50,13 +62,36 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       // Yield to allow UI to render before heavy work
       await Future<void>.delayed(Duration.zero);
 
-      // Initialize SDK in development mode
-      await RunAnywhere.initialize();
-      debugPrint('✅ SDK initialized');
+      // Check for custom API configuration (stored via Settings screen)
+      final customApiKey = await KeychainHelper.loadString(KeychainKeys.apiKey);
+      final customBaseURL =
+          await KeychainHelper.loadString(KeychainKeys.baseURL);
+      final hasCustomConfig = customApiKey != null &&
+          customApiKey.isNotEmpty &&
+          customBaseURL != null &&
+          customBaseURL.isNotEmpty;
+
+      if (hasCustomConfig) {
+        final normalizedURL = _normalizeBaseURL(customBaseURL);
+        debugPrint('🔧 Found custom API configuration');
+        debugPrint('   Base URL: $normalizedURL');
+
+        // Custom configuration mode - use stored API key and base URL
+        await RunAnywhere.initialize(
+          apiKey: customApiKey,
+          baseURL: normalizedURL,
+          environment: SDKEnvironment.production,
+        );
+        debugPrint('✅ SDK initialized with CUSTOM configuration (production)');
+      } else {
+        // Initialize SDK in development mode (default)
+        await RunAnywhere.initialize();
+        debugPrint('✅ SDK initialized in DEVELOPMENT mode');
+      }
 
       // Yield to allow UI to update between heavy operations
       await Future<void>.delayed(Duration.zero);
-      
+
       setState(() {
         _initializationStatus = 'Registering modules...';
       });
@@ -66,7 +101,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
 
       // Yield before model discovery
       await Future<void>.delayed(Duration.zero);
-      
+
       setState(() {
         _initializationStatus = 'Discovering models...';
       });
@@ -108,10 +143,10 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     // LlamaCPP module with LLM models
     // Using explicit IDs ensures models are recognized after download across app restarts
     await LlamaCpp.register();
-    
+
     // Yield after heavy backend registration
     await Future<void>.delayed(Duration.zero);
-    
+
     LlamaCpp.addModel(
       id: 'smollm2-360m-q8_0',
       name: 'SmolLM2 360M Q8_0',
@@ -163,7 +198,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     // Using tar.gz format hosted on RunanywhereAI/sherpa-onnx for fast native extraction
     // Using explicit IDs ensures models are recognized after download across app restarts
     await Onnx.register();
-    
+
     // Yield after heavy backend registration
     await Future<void>.delayed(Duration.zero);
 

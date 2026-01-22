@@ -136,10 +136,28 @@ public enum CppBridge {
             lock.unlock()
             return
         }
+        let currentEnv = _environment
         lock.unlock()
 
         // Model assignment (needs HTTP for API calls)
-        ModelAssignment.register()
+        // Only auto-fetch in staging/production, not development
+        // IMPORTANT: Register WITHOUT auto-fetch first to avoid MainActor deadlock
+        // The HTTP callback uses semaphore.wait() which would block MainActor
+        // while the Task{} inside needs MainActor access
+        let shouldAutoFetch = currentEnv != .development
+        ModelAssignment.register(autoFetch: false)
+
+        // If auto-fetch is needed, trigger it asynchronously off MainActor
+        if shouldAutoFetch {
+            Task.detached {
+                do {
+                    _ = try await ModelAssignment.fetch(forceRefresh: true)
+                    SDKLogger(category: "CppBridge").info("Auto-fetched model assignments successfully")
+                } catch {
+                    SDKLogger(category: "CppBridge").warning("Auto-fetch model assignments failed: \(error.localizedDescription)")
+                }
+            }
+        }
 
         // Platform services (Foundation Models, System TTS)
         Platform.register()
@@ -148,7 +166,7 @@ public enum CppBridge {
         _servicesInitialized = true
         lock.unlock()
 
-        SDKLogger(category: "CppBridge").debug("Service bridges initialized")
+        SDKLogger(category: "CppBridge").debug("Service bridges initialized (env: \(currentEnv), autoFetch: \(shouldAutoFetch))")
     }
 
     // MARK: - Shutdown

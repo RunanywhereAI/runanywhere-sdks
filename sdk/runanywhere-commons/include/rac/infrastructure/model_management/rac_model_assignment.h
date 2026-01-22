@@ -35,16 +35,8 @@ typedef struct rac_assignment_http_response {
 } rac_assignment_http_response_t;
 
 /**
- * @brief Device info for model assignment request
- */
-typedef struct rac_assignment_device_info {
-    const char* device_type;  // e.g., "iPhone15,2"
-    const char* platform;     // e.g., "iOS"
-} rac_assignment_device_info_t;
-
-/**
  * Make HTTP GET request for model assignments
- * @param endpoint Full endpoint URL with query params
+ * @param endpoint Endpoint path (e.g., "/api/v1/model-assignments/for-sdk")
  * @param requires_auth Whether authentication header is required
  * @param out_response Output parameter for response
  * @param user_data User-provided context
@@ -55,22 +47,11 @@ typedef rac_result_t (*rac_assignment_http_get_fn)(const char* endpoint, rac_boo
                                                    void* user_data);
 
 /**
- * Get device info for model assignment request
- * @param out_info Output parameter for device info
- * @param user_data User-provided context
- */
-typedef void (*rac_assignment_get_device_info_fn)(rac_assignment_device_info_t* out_info,
-                                                  void* user_data);
-
-/**
  * @brief Callback structure for model assignment operations
  */
 typedef struct rac_assignment_callbacks {
     /** Make HTTP GET request */
     rac_assignment_http_get_fn http_get;
-
-    /** Get device info for request */
-    rac_assignment_get_device_info_fn get_device_info;
 
     /** User data passed to all callbacks */
     void* user_data;

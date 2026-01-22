@@ -48,8 +48,12 @@ class DartBridgeModelAssignment {
   // ============================================================================
 
   /// Register model assignment callbacks with C++
+  ///
+  /// [autoFetch] Whether to auto-fetch models after registration.
+  ///             Should be false for development mode, true for staging/production.
   static Future<void> register({
     required SDKEnvironment environment,
+    bool autoFetch = false,
     String? baseURL,
     String? accessToken,
   }) async {
@@ -67,12 +71,9 @@ class DartBridgeModelAssignment {
       _callbacksPtr!.ref.httpGet =
           Pointer.fromFunction<RacAssignmentHttpGetCallbackNative>(
               _httpGetCallback, _exceptionalReturnInt32);
-      _callbacksPtr!.ref.getDeviceInfo =
-          Pointer.fromFunction<RacAssignmentGetDeviceInfoCallbackNative>(
-              _getDeviceInfoCallback);
       _callbacksPtr!.ref.userData = nullptr;
-      _callbacksPtr!.ref.autoFetch =
-          1; // Auto-fetch models when callbacks are registered
+      // Only auto-fetch in staging/production, not development
+      _callbacksPtr!.ref.autoFetch = autoFetch ? 1 : 0;
 
       // Register with C++
       final setCallbacks = lib.lookupFunction<
@@ -90,7 +91,8 @@ class DartBridgeModelAssignment {
       }
 
       _isRegistered = true;
-      _logger.debug('Model assignment callbacks registered');
+      _logger.debug(
+          'Model assignment callbacks registered (autoFetch: $autoFetch)');
     } catch (e) {
       _logger.debug('Model assignment registration error: $e');
       _isRegistered = true; // Avoid retry loops
@@ -340,52 +342,6 @@ void _performHttpGet(
 }
 
 // =============================================================================
-// Device Info Callback
-// =============================================================================
-
-/// Cached device type for sync access
-String? _cachedDeviceType;
-
-void _getDeviceInfoCallback(
-  Pointer<RacAssignmentDeviceInfoStruct> outInfo,
-  Pointer<Void> userData,
-) {
-  if (outInfo == nullptr) return;
-
-  try {
-    // Use cached or fallback
-    final deviceType =
-        _cachedDeviceType ?? (Platform.isIOS ? 'iPhone' : 'Android');
-    final platform = Platform.isIOS ? 'iOS' : 'Android';
-
-    final deviceTypePtr = deviceType.toNativeUtf8();
-    final platformPtr = platform.toNativeUtf8();
-
-    outInfo.ref.deviceType = deviceTypePtr;
-    outInfo.ref.platform = platformPtr;
-  } catch (e) {
-    // Ignore
-  }
-}
-
-/// Pre-cache device info (call during init)
-Future<void> cacheDeviceInfo() async {
-  try {
-    final deviceInfo = DeviceInfoPlugin();
-
-    if (Platform.isIOS) {
-      final iosInfo = await deviceInfo.iosInfo;
-      _cachedDeviceType = iosInfo.utsname.machine;
-    } else if (Platform.isAndroid) {
-      final androidInfo = await deviceInfo.androidInfo;
-      _cachedDeviceType = androidInfo.model;
-    }
-  } catch (e) {
-    // Ignore
-  }
-}
-
-// =============================================================================
 // FFI Types
 // =============================================================================
 
@@ -393,15 +349,9 @@ Future<void> cacheDeviceInfo() async {
 typedef RacAssignmentHttpGetCallbackNative = Int32 Function(Pointer<Utf8>,
     Int32, Pointer<RacAssignmentHttpResponseStruct>, Pointer<Void>);
 
-/// Device info callback
-typedef RacAssignmentGetDeviceInfoCallbackNative = Void Function(
-    Pointer<RacAssignmentDeviceInfoStruct>, Pointer<Void>);
-
 /// Callbacks struct
 base class RacAssignmentCallbacksStruct extends Struct {
   external Pointer<NativeFunction<RacAssignmentHttpGetCallbackNative>> httpGet;
-  external Pointer<NativeFunction<RacAssignmentGetDeviceInfoCallbackNative>>
-      getDeviceInfo;
   external Pointer<Void> userData;
   @Int32()
   external int autoFetch; // If non-zero, auto-fetch models after registration
@@ -421,10 +371,4 @@ base class RacAssignmentHttpResponseStruct extends Struct {
   external int responseLength;
 
   external Pointer<Utf8> errorMessage;
-}
-
-/// Device info struct
-base class RacAssignmentDeviceInfoStruct extends Struct {
-  external Pointer<Utf8> deviceType;
-  external Pointer<Utf8> platform;
 }

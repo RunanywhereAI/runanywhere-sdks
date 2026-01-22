@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -19,8 +20,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -66,6 +69,48 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 text = "Settings",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
+            )
+        }
+
+        // API Configuration Section
+        SettingsSection(title = "API Configuration (Testing)") {
+            ApiConfigurationRow(
+                label = "API Key",
+                isConfigured = uiState.isApiKeyConfigured,
+            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            ApiConfigurationRow(
+                label = "Base URL",
+                isConfigured = uiState.isBaseURLConfigured,
+            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    onClick = { viewModel.showApiConfigSheet() },
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = AppColors.primaryAccent,
+                    ),
+                ) {
+                    Text("Configure")
+                }
+                if (uiState.isApiKeyConfigured && uiState.isBaseURLConfigured) {
+                    OutlinedButton(
+                        onClick = { viewModel.clearApiConfiguration() },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = AppColors.primaryRed,
+                        ),
+                    ) {
+                        Text("Clear")
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Configure custom API key and base URL for testing. Requires app restart.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
@@ -237,6 +282,43 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 TextButton(onClick = { showDeleteConfirmDialog = null }) {
                     Text("Cancel")
                 }
+            },
+        )
+    }
+
+    // API Configuration Dialog
+    if (uiState.showApiConfigSheet) {
+        ApiConfigurationDialog(
+            apiKey = uiState.apiKey,
+            baseURL = uiState.baseURL,
+            onApiKeyChange = { viewModel.updateApiKey(it) },
+            onBaseURLChange = { viewModel.updateBaseURL(it) },
+            onSave = { viewModel.saveApiConfiguration() },
+            onDismiss = { viewModel.hideApiConfigSheet() },
+        )
+    }
+
+    // Restart Required Dialog
+    if (uiState.showRestartDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissRestartDialog() },
+            title = { Text("Restart Required") },
+            text = {
+                Text("API configuration has been updated. Please restart the app for changes to take effect.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.dismissRestartDialog() },
+                ) {
+                    Text("OK")
+                }
+            },
+            icon = {
+                Icon(
+                    imageVector = Icons.Outlined.RestartAlt,
+                    contentDescription = null,
+                    tint = AppColors.primaryOrange,
+                )
             },
         )
     }
@@ -420,4 +502,132 @@ private fun StorageManagementButton(
             )
         }
     }
+}
+
+/**
+ * API Configuration Row
+ */
+@Composable
+private fun ApiConfigurationRow(
+    label: String,
+    isConfigured: Boolean,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Text(
+            text = if (isConfigured) "Configured" else "Not Set",
+            style = MaterialTheme.typography.bodySmall,
+            color = if (isConfigured) AppColors.primaryGreen else AppColors.primaryOrange,
+        )
+    }
+}
+
+/**
+ * API Configuration Dialog
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ApiConfigurationDialog(
+    apiKey: String,
+    baseURL: String,
+    onApiKeyChange: (String) -> Unit,
+    onBaseURLChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var showPassword by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("API Configuration") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                // API Key Input
+                OutlinedTextField(
+                    value = apiKey,
+                    onValueChange = onApiKeyChange,
+                    label = { Text("API Key") },
+                    placeholder = { Text("Enter your API key") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    trailingIcon = {
+                        IconButton(onClick = { showPassword = !showPassword }) {
+                            Icon(
+                                imageVector = if (showPassword) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                contentDescription = if (showPassword) "Hide password" else "Show password",
+                            )
+                        }
+                    },
+                    supportingText = {
+                        Text("Your API key for authenticating with the backend")
+                    },
+                )
+
+                // Base URL Input
+                OutlinedTextField(
+                    value = baseURL,
+                    onValueChange = onBaseURLChange,
+                    label = { Text("Base URL") },
+                    placeholder = { Text("https://api.example.com") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    supportingText = {
+                        Text("The backend API URL (https:// added automatically if missing)")
+                    },
+                )
+
+                // Warning
+                Surface(
+                    color = AppColors.primaryOrange.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Warning,
+                            contentDescription = null,
+                            tint = AppColors.primaryOrange,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Text(
+                            text = "After saving, you must restart the app for changes to take effect. The SDK will reinitialize with your custom configuration.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onSave,
+                enabled = apiKey.isNotEmpty() && baseURL.isNotEmpty(),
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
 }

@@ -24,7 +24,9 @@ public extension CppBridge {
 
         /// Register callbacks with C++ model assignment manager
         /// Called during SDK initialization
-        static func register() {
+        /// - Parameter autoFetch: Whether to auto-fetch models after registration.
+        ///                        Should be false for development mode, true for staging/production.
+        static func register(autoFetch: Bool = false) {
             guard !isRegistered else { return }
 
             var callbacks = rac_assignment_callbacks_t()
@@ -77,30 +79,14 @@ public extension CppBridge {
                 return result
             }
 
-            // Device info callback
-            callbacks.get_device_info = { outInfo, _ in
-                guard let outInfo = outInfo else { return }
-
-                let deviceInfo = DeviceInfo.current
-
-                // Device type (e.g., "iPhone15,2")
-                deviceInfo.deviceModel.withCString { cStr in
-                    outInfo.pointee.device_type = UnsafePointer(strdup(cStr))
-                }
-
-                // Platform (e.g., "iOS")
-                deviceInfo.platform.withCString { cStr in
-                    outInfo.pointee.platform = UnsafePointer(strdup(cStr))
-                }
-            }
-
             callbacks.user_data = nil
-            callbacks.auto_fetch = RAC_TRUE  // Auto-fetch models when callbacks are registered
+            // Only auto-fetch in staging/production, not development
+            callbacks.auto_fetch = autoFetch ? RAC_TRUE : RAC_FALSE
 
             let result = rac_model_assignment_set_callbacks(&callbacks)
             if result == RAC_SUCCESS {
                 isRegistered = true
-                logger.debug("Model assignment callbacks registered (auto-fetch enabled)")
+                logger.debug("Model assignment callbacks registered (autoFetch: \(autoFetch))")
             } else {
                 logger.error("Failed to register model assignment callbacks: \(result)")
             }

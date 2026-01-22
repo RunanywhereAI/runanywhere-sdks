@@ -1902,10 +1902,9 @@ static struct {
     JavaVM* jvm;
     jobject callback_obj;
     jmethodID http_get_method;
-    jmethodID get_device_info_method;
     std::mutex mutex;
     bool callbacks_registered;
-} g_model_assignment_state = {nullptr, nullptr, nullptr, nullptr, {}, false};
+} g_model_assignment_state = {nullptr, nullptr, nullptr, {}, false};
 
 // HTTP GET callback for model assignment (called from C++)
 static rac_result_t model_assignment_http_get_callback(const char* endpoint,
@@ -1992,63 +1991,6 @@ static rac_result_t model_assignment_http_get_callback(const char* endpoint,
     return result;
 }
 
-// Device info callback for model assignment (called from C++)
-static void model_assignment_get_device_info_callback(rac_assignment_device_info_t* out_info,
-                                                       void* user_data) {
-    std::lock_guard<std::mutex> lock(g_model_assignment_state.mutex);
-
-    if (!out_info) return;
-
-    // Default values
-    out_info->device_type = "unknown";
-    out_info->platform = "Android";
-
-    if (!g_model_assignment_state.jvm || !g_model_assignment_state.callback_obj) {
-        return;
-    }
-
-    JNIEnv* env = nullptr;
-    bool did_attach = false;
-    jint get_result = g_model_assignment_state.jvm->GetEnv((void**)&env, JNI_VERSION_1_6);
-
-    if (get_result == JNI_EDETACHED) {
-        if (g_model_assignment_state.jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
-            did_attach = true;
-        } else {
-            return;
-        }
-    }
-
-    // Call Kotlin callback: getDeviceInfo(): String (returns "deviceType|platform")
-    jstring jInfo =
-        (jstring)env->CallObjectMethod(g_model_assignment_state.callback_obj,
-                                       g_model_assignment_state.get_device_info_method);
-
-    if (!env->ExceptionCheck() && jInfo) {
-        const char* info_str = env->GetStringUTFChars(jInfo, nullptr);
-        if (info_str) {
-            // Parse "deviceType|platform"
-            const char* delimiter = strchr(info_str, '|');
-            if (delimiter) {
-                size_t device_len = delimiter - info_str;
-                char* device_type = (char*)malloc(device_len + 1);
-                strncpy(device_type, info_str, device_len);
-                device_type[device_len] = '\0';
-                out_info->device_type = device_type;
-                out_info->platform = strdup(delimiter + 1);
-            }
-            env->ReleaseStringUTFChars(jInfo, info_str);
-        }
-        env->DeleteLocalRef(jInfo);
-    } else if (env->ExceptionCheck()) {
-        env->ExceptionClear();
-    }
-
-    if (did_attach) {
-        g_model_assignment_state.jvm->DetachCurrentThread();
-    }
-}
-
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelAssignmentSetCallbacks(
     JNIEnv* env, jclass clazz, jobject callback, jboolean autoFetch) {
@@ -2083,13 +2025,10 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelAssignmentSetCa
     jclass callback_class = env->GetObjectClass(callback);
     g_model_assignment_state.http_get_method =
         env->GetMethodID(callback_class, "httpGet", "(Ljava/lang/String;Z)Ljava/lang/String;");
-    g_model_assignment_state.get_device_info_method =
-        env->GetMethodID(callback_class, "getDeviceInfo", "()Ljava/lang/String;");
     env->DeleteLocalRef(callback_class);
 
-    if (!g_model_assignment_state.http_get_method ||
-        !g_model_assignment_state.get_device_info_method) {
-        LOGe("racModelAssignmentSetCallbacks: failed to get method IDs");
+    if (!g_model_assignment_state.http_get_method) {
+        LOGe("racModelAssignmentSetCallbacks: failed to get httpGet method ID");
         env->DeleteGlobalRef(g_model_assignment_state.callback_obj);
         g_model_assignment_state.callback_obj = nullptr;
         return RAC_ERROR_INVALID_ARGUMENT;
@@ -2098,7 +2037,6 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelAssignmentSetCa
     // Set up C++ callbacks
     rac_assignment_callbacks_t callbacks = {};
     callbacks.http_get = model_assignment_http_get_callback;
-    callbacks.get_device_info = model_assignment_get_device_info_callback;
     callbacks.user_data = nullptr;
     callbacks.auto_fetch = autoFetch ? RAC_TRUE : RAC_FALSE;
 
