@@ -417,18 +417,24 @@ object CppBridge {
             // Step 2: Register model assignment callbacks
             // Only auto-fetch in staging/production, not development
             val shouldAutoFetch = _environment != Environment.DEVELOPMENT
+            logger.warn("🔍 About to register model assignment callbacks (autoFetch=$shouldAutoFetch)")
             CppBridgeModelAssignment.register(autoFetch = shouldAutoFetch)
+            logger.warn("✅ Model assignment callbacks registered")
 
             // Register platform services callbacks
+            logger.warn("🔍 About to register platform services")
             CppBridgePlatform.register()
+            logger.warn("✅ Platform services registered")
 
             // Flush any queued telemetry events now that HTTP should be configured
             // This ensures events queued during Phase 1 initialization are sent
+            logger.warn("🔍 About to flush telemetry")
             CppBridgeTelemetry.flush()
-            logger.debug("Flushed queued telemetry events after services initialization")
+            logger.warn("✅ Telemetry flushed")
 
             // Trigger device registration with backend (non-blocking, best-effort)
             // Mirrors Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
+            logger.warn("🔍 About to trigger device registration")
             try {
                 val deviceId = CppBridgeDevice.getDeviceIdCallback()
 
@@ -473,7 +479,7 @@ object CppBridge {
             }
 
             _servicesInitialized = true
-            logger.info("✅ Services initialization complete")
+            logger.warn("✅ Services initialization complete")
         }
     }
 
