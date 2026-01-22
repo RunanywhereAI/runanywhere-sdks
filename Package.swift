@@ -44,7 +44,7 @@ let useLocalBinaries = false  // Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when testLocal = false)
 // Updated automatically by CI/CD during releases
-let sdkVersion = "0.17.3"
+let sdkVersion = "0.17.4"
 
 let package = Package(
     name: "runanywhere-sdks",
@@ -161,12 +161,6 @@ let package = Package(
                 .linkedFramework("CoreML"),
                 .linkedLibrary("archive"),
                 .linkedLibrary("bz2"),
-                .unsafeFlags(["-ObjC"]),
-                .unsafeFlags([
-                    "-L\(onnxRuntimeMacOSPath)",
-                    "-lonnxruntime",
-                    "-Wl,-rpath,\(onnxRuntimeMacOSPath)"
-                ], .when(platforms: [.macOS])),
             ]
         ),
 
@@ -186,7 +180,6 @@ let package = Package(
                 .linkedFramework("Accelerate"),
                 .linkedFramework("Metal"),
                 .linkedFramework("MetalKit"),
-                .unsafeFlags(["-ObjC"])
             ]
         ),
 
