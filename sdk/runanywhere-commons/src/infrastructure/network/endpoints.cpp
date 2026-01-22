@@ -31,35 +31,8 @@ const char* rac_endpoint_telemetry(rac_environment_t env) {
     }
 }
 
-int rac_endpoint_model_assignments(const char* device_type, const char* platform, char* out_buffer,
-                                   size_t buffer_size) {
-    if (!device_type || !platform || !out_buffer || buffer_size == 0) {
-        return -1;
-    }
-
-    int written = snprintf(out_buffer, buffer_size,
-                           "/api/v1/model-assignments/for-sdk?device_type=%s&platform=%s",
-                           device_type, platform);
-
-    if (written < 0 || (size_t)written >= buffer_size) {
-        return -1;
-    }
-
-    return written;
-}
-
-int rac_endpoint_model_download(const char* model_id, char* out_buffer, size_t buffer_size) {
-    if (!model_id || !out_buffer || buffer_size == 0) {
-        return -1;
-    }
-
-    int written = snprintf(out_buffer, buffer_size, "/api/v1/models/%s/download", model_id);
-
-    if (written < 0 || (size_t)written >= buffer_size) {
-        return -1;
-    }
-
-    return written;
+const char* rac_endpoint_model_assignments(void) {
+    return "/api/v1/model-assignments/for-sdk";
 }
 
 int rac_build_url(const char* base_url, const char* endpoint, char* out_buffer,

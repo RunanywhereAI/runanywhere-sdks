@@ -284,10 +284,36 @@ rac_result_t rac_model_assignment_set_callbacks(const rac_assignment_callbacks_t
     if (!callbacks)
         return RAC_ERROR_NULL_POINTER;
 
-    std::lock_guard<std::mutex> lock(g_mutex);
-    g_callbacks = *callbacks;
+    rac_bool_t should_auto_fetch = RAC_FALSE;
 
-    RAC_LOG_DEBUG(LOG_CAT, "Model assignment callbacks set");
+    {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        g_callbacks = *callbacks;
+        should_auto_fetch = callbacks->auto_fetch;
+        RAC_LOG_DEBUG(LOG_CAT, "Model assignment callbacks set");
+    }
+
+    // Auto-fetch if requested (outside lock to avoid deadlock with fetch)
+    if (should_auto_fetch == RAC_TRUE) {
+        RAC_LOG_INFO(LOG_CAT, "Auto-fetching model assignments...");
+        rac_model_info_t** models = nullptr;
+        size_t count = 0;
+        rac_result_t fetch_result = rac_model_assignment_fetch(RAC_FALSE, &models, &count);
+
+        if (fetch_result == RAC_SUCCESS) {
+            char msg[128];
+            snprintf(msg, sizeof(msg), "Auto-fetch completed: %zu models", count);
+            RAC_LOG_INFO(LOG_CAT, msg);
+        } else {
+            RAC_LOG_WARNING(LOG_CAT, "Auto-fetch failed (non-fatal, models can be fetched later)");
+        }
+
+        // Free the returned models array (data is already cached internally)
+        if (models) {
+            rac_model_info_array_free(models, count);
+        }
+    }
+
     return RAC_SUCCESS;
 }
 
@@ -317,16 +343,8 @@ rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info
     rac_assignment_device_info_t device_info = {};
     g_callbacks.get_device_info(&device_info, g_callbacks.user_data);
 
-    // Build endpoint URL using existing endpoint builder
-    char endpoint[512];
-    int len = rac_endpoint_model_assignments(
-        device_info.device_type ? device_info.device_type : "unknown",
-        device_info.platform ? device_info.platform : "unknown", endpoint, sizeof(endpoint));
-
-    if (len < 0) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to build endpoint URL");
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
+    // Get endpoint path
+    const char* endpoint = rac_endpoint_model_assignments();
 
     snprintf(msg, sizeof(msg), "Fetching model assignments from: %s", endpoint);
     RAC_LOG_INFO(LOG_CAT, msg);

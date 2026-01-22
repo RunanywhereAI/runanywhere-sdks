@@ -85,7 +85,6 @@ object SDKConstants {
 
         // Models
         const val MODELS = "/v1/models"
-        const val MODEL_DOWNLOAD = "/v1/models/{id}/download"
         const val MODEL_INFO = "/v1/models/{id}"
 
         // Device & Health

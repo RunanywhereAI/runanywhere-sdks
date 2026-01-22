@@ -95,11 +95,12 @@ public extension CppBridge {
             }
 
             callbacks.user_data = nil
+            callbacks.auto_fetch = RAC_TRUE  // Auto-fetch models when callbacks are registered
 
             let result = rac_model_assignment_set_callbacks(&callbacks)
             if result == RAC_SUCCESS {
                 isRegistered = true
-                logger.debug("Model assignment callbacks registered")
+                logger.debug("Model assignment callbacks registered (auto-fetch enabled)")
             } else {
                 logger.error("Failed to register model assignment callbacks: \(result)")
             }
@@ -210,17 +211,6 @@ public extension CppBridge {
             }
 
             return modelInfos
-        }
-
-        /// Clear the model assignment cache
-        public static func clearCache() {
-            rac_model_assignment_clear_cache()
-            logger.debug("Model assignment cache cleared")
-        }
-
-        /// Set cache timeout in seconds
-        public static func setCacheTimeout(_ seconds: UInt32) {
-            rac_model_assignment_set_cache_timeout(seconds)
         }
 
         // MARK: - Private Helpers
