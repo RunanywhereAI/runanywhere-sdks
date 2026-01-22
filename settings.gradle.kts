@@ -22,6 +22,7 @@ dependencyResolutionManagement {
     }
 }
 
+
 rootProject.name = "RunAnywhere-Android"
 
 // Include SDK modules
