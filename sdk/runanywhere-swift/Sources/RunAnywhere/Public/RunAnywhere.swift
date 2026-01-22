@@ -147,9 +147,6 @@ public enum RunAnywhere {
         CppBridge.shutdown()
         CppBridge.State.shutdown()
 
-        // Clear model assignment cache
-        CppBridge.ModelAssignment.clearCache()
-
         logger.info("SDK state reset completed")
     }
 
@@ -323,7 +320,7 @@ public enum RunAnywhere {
 
             // Step 1: Configure HTTP transport
             try await setupHTTP(params: params, environment: environment, logger: logger)
-            
+
             // Step 1.5: Flush any queued telemetry events now that HTTP is configured
             // This ensures events queued during initialization are sent
             CppBridge.Telemetry.flush()

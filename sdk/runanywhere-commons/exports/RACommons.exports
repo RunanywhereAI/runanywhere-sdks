@@ -148,6 +148,14 @@ _rac_model_registry_save
 _rac_model_registry_update_download_status
 _rac_model_registry_update_last_used
 
+# Model Assignment
+_rac_model_assignment_set_callbacks
+_rac_model_assignment_fetch
+_rac_model_assignment_get_by_framework
+_rac_model_assignment_get_by_category
+_rac_model_assignment_clear_cache
+_rac_model_assignment_set_cache_timeout
+
 # Framework Utilities
 _rac_framework_analytics_key
 _rac_framework_display_name

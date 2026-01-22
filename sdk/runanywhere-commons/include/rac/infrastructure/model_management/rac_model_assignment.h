@@ -74,6 +74,9 @@ typedef struct rac_assignment_callbacks {
 
     /** User data passed to all callbacks */
     void* user_data;
+
+    /** If true, automatically fetch models after callbacks are registered */
+    rac_bool_t auto_fetch;
 } rac_assignment_callbacks_t;
 
 // =============================================================================

@@ -74,28 +74,13 @@ extension APIEndpointPath on APIEndpoint {
       case APIEndpoint.userPreferences:
         return '/api/v1/preferences';
       case APIEndpoint.modelAssignments:
-        return '/api/v1/model-assignments';
+        return '/api/v1/model-assignments/for-sdk';
 
       // Development-specific (Supabase REST API format)
       case APIEndpoint.devModelAssignments:
         return '/rest/v1/sdk_model_assignments';
     }
   }
-}
-
-/// Model assignments endpoint with query parameters.
-/// Separate because it requires runtime parameters.
-class ModelAssignmentsEndpoint {
-  final String deviceType;
-  final String platform;
-
-  const ModelAssignmentsEndpoint({
-    required this.deviceType,
-    required this.platform,
-  });
-
-  String get path =>
-      '/api/v1/model-assignments/for-sdk?device_type=$deviceType&platform=$platform';
 }
 
 // MARK: - Environment-Based Endpoint Selection

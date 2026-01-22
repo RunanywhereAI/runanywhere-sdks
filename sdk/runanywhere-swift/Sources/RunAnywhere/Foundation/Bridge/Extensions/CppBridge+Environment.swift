@@ -142,23 +142,8 @@ extension CppBridge {
         }
 
         /// Get model assignments endpoint
-        public static func modelAssignments(deviceType: String, platform: String) -> String {
-            var buffer = [CChar](repeating: 0, count: 512)
-            deviceType.withCString { dt in
-                platform.withCString { plat in
-                    _ = rac_endpoint_model_assignments(dt, plat, &buffer, buffer.count)
-                }
-            }
-            return String(cString: buffer)
-        }
-
-        /// Get model download endpoint
-        public static func modelDownload(modelId: String) -> String {
-            var buffer = [CChar](repeating: 0, count: 512)
-            modelId.withCString { mid in
-                _ = rac_endpoint_model_download(mid, &buffer, buffer.count)
-            }
-            return String(cString: buffer)
+        public static func modelAssignments() -> String {
+            return String(cString: rac_endpoint_model_assignments())
         }
     }
 }

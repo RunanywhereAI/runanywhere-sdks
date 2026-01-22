@@ -183,15 +183,4 @@ extension RunAnywhere {
         // Use C++ bridge for filtering (uses cached data)
         return CppBridge.ModelAssignment.getByCategory(category)
     }
-
-    /// Clear cached model assignments
-    public static func clearModelAssignmentsCache() {
-        // Ensure SDK is initialized
-        guard isSDKInitialized else {
-            return
-        }
-
-        // Clear cache via C++ bridge
-        CppBridge.ModelAssignment.clearCache()
-    }
 }

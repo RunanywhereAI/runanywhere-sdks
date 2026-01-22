@@ -24,11 +24,7 @@ export 'network_configuration.dart'
 
 // API endpoints
 export 'api_endpoint.dart'
-    show
-        APIEndpoint,
-        APIEndpointPath,
-        APIEndpointEnvironment,
-        ModelAssignmentsEndpoint;
+    show APIEndpoint, APIEndpointPath, APIEndpointEnvironment;
 
 // Network service protocol
 export 'network_service.dart' show NetworkService;

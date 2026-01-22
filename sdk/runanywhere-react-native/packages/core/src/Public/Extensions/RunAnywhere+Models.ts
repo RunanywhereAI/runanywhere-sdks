@@ -135,7 +135,11 @@ export async function getDownloadedModels(): Promise<ModelInfo[]> {
 // ============================================================================
 
 /**
- * Fetch model assignments for the current device from the backend
+ * Fetch model assignments for the current device from the backend.
+ *
+ * Note: Model assignments are automatically fetched during SDK initialization
+ * (auto-fetch is enabled in the C++ layer). This method retrieves the cached
+ * models from the registry.
  */
 export async function fetchModelAssignments(
   forceRefresh = false,
@@ -150,7 +154,7 @@ export async function fetchModelAssignments(
 
   logger.info('Fetching model assignments...');
 
-  // Fetch model assignments via native or fallback to ModelRegistry
+  // Models are auto-fetched at SDK initialization and saved to the registry
   try {
     const models = await ModelRegistry.getAllModels();
     logger.info(`Successfully fetched ${models.length} model assignments`);
@@ -181,7 +185,8 @@ export async function getModelsForCategory(
 }
 
 /**
- * Clear cached model assignments
+ * Clear cached model assignments.
+ * Resets local state; next fetch will get fresh data from the registry.
  */
 export async function clearModelAssignmentsCache(
   initState: { isCoreInitialized: boolean }
@@ -190,8 +195,6 @@ export async function clearModelAssignmentsCache(
     return;
   }
 
-  // Cache clearing is handled by native commons
-  // Reset local state if needed
   ModelRegistry.reset();
 }
 

@@ -44,7 +44,7 @@ export const APIEndpoints = {
   MODEL_INFO: '/api/v1/models',
 
   /** Model assignments */
-  MODEL_ASSIGNMENTS: '/api/v1/model-assignments',
+  MODEL_ASSIGNMENTS: '/api/v1/model-assignments/for-sdk',
 
   /** Model assignments (development - Supabase) */
   DEV_MODEL_ASSIGNMENTS: '/rest/v1/sdk_model_assignments',

@@ -878,3 +878,146 @@ actual suspend fun RunAnywhere.loadSTTModel(modelId: String) {
         throw SDKError.stt("Failed to load STT model '$modelId' (error code: $result)")
     }
 }
+
+// ============================================================================
+// MODEL ASSIGNMENTS API
+// ============================================================================
+
+/**
+ * Fetch model assignments for the current device from the backend.
+ *
+ * This method fetches models assigned to this device based on device type and platform.
+ * Results are cached and saved to the model registry automatically.
+ *
+ * Note: Model assignments are automatically fetched during SDK initialization
+ * when services are initialized (Phase 2). This method allows manual refresh.
+ *
+ * @param forceRefresh If true, bypass cache and fetch fresh data from backend
+ * @return List of ModelInfo objects assigned to this device
+ */
+actual suspend fun RunAnywhere.fetchModelAssignments(forceRefresh: Boolean): List<ModelInfo> =
+    withContext(Dispatchers.IO) {
+        if (!isInitialized) {
+            throw SDKError.notInitialized("SDK not initialized")
+        }
+
+        ensureServicesReady()
+
+        modelsLogger.info("Fetching model assignments (forceRefresh=$forceRefresh)...")
+
+        try {
+            val jsonResult = com.runanywhere.sdk.foundation.bridge.extensions
+                .CppBridgeModelAssignment.fetchModelAssignments(forceRefresh)
+
+            // Parse JSON result to ModelInfo list
+            val models = parseModelAssignmentsJson(jsonResult)
+            modelsLogger.info("Fetched ${models.size} model assignments")
+            models
+        } catch (e: Exception) {
+            modelsLogger.error("Failed to fetch model assignments: ${e.message}")
+            emptyList()
+        }
+    }
+
+/**
+ * Parse model assignments JSON to list of ModelInfo.
+ */
+private fun parseModelAssignmentsJson(json: String): List<ModelInfo> {
+    if (json.isEmpty() || json == "[]") {
+        return emptyList()
+    }
+
+    val models = mutableListOf<ModelInfo>()
+
+    // Simple JSON parsing (without external library dependency)
+    // Expected format: [{"id":"...", "name":"...", ...}, ...]
+    try {
+        // Remove array brackets and split by },{
+        val trimmed = json.trim().removePrefix("[").removeSuffix("]")
+        if (trimmed.isEmpty()) return models
+
+        val objects = trimmed.split("},\\s*\\{".toRegex())
+
+        for ((index, obj) in objects.withIndex()) {
+            try {
+                // Add back braces
+                var jsonObj = obj
+                if (!jsonObj.startsWith("{")) jsonObj = "{$jsonObj"
+                if (!jsonObj.endsWith("}")) jsonObj = "$jsonObj}"
+
+                // Extract fields (simple approach)
+                val id = extractJsonString(jsonObj, "id") ?: continue
+                val name = extractJsonString(jsonObj, "name") ?: id
+                val categoryInt = extractJsonInt(jsonObj, "category") ?: 0
+                val formatInt = extractJsonInt(jsonObj, "format") ?: 0
+                val frameworkInt = extractJsonInt(jsonObj, "framework") ?: 0
+                val downloadUrl = extractJsonString(jsonObj, "downloadUrl")
+                val downloadSize = extractJsonLong(jsonObj, "downloadSize") ?: 0L
+                val contextLength = extractJsonInt(jsonObj, "contextLength") ?: 0
+                val supportsThinking = extractJsonBool(jsonObj, "supportsThinking") ?: false
+
+                val modelInfo = ModelInfo(
+                    id = id,
+                    name = name,
+                    category = when (categoryInt) {
+                        0 -> ModelCategory.LANGUAGE
+                        1 -> ModelCategory.SPEECH_RECOGNITION
+                        2 -> ModelCategory.SPEECH_SYNTHESIS
+                        3 -> ModelCategory.AUDIO
+                        else -> ModelCategory.LANGUAGE
+                    },
+                    format = when (formatInt) {
+                        1 -> ModelFormat.GGUF
+                        2 -> ModelFormat.ONNX
+                        3 -> ModelFormat.ORT
+                        else -> ModelFormat.UNKNOWN
+                    },
+                    framework = when (frameworkInt) {
+                        1 -> InferenceFramework.LLAMA_CPP
+                        2 -> InferenceFramework.ONNX
+                        3 -> InferenceFramework.FOUNDATION_MODELS
+                        4 -> InferenceFramework.SYSTEM_TTS
+                        else -> InferenceFramework.UNKNOWN
+                    },
+                    downloadURL = downloadUrl,
+                    localPath = null,
+                    downloadSize = if (downloadSize > 0) downloadSize else null,
+                    contextLength = if (contextLength > 0) contextLength else null,
+                    supportsThinking = supportsThinking,
+                    description = null,
+                )
+                models.add(modelInfo)
+            } catch (e: Exception) {
+                modelsLogger.warn("Failed to parse model at index $index: ${e.message}")
+            }
+        }
+    } catch (e: Exception) {
+        modelsLogger.error("Failed to parse model assignments JSON: ${e.message}")
+    }
+
+    return models
+}
+
+private fun extractJsonString(json: String, key: String): String? {
+    val pattern = "\"$key\"\\s*:\\s*\"([^\"]*)\""
+    val regex = pattern.toRegex()
+    return regex.find(json)?.groupValues?.get(1)
+}
+
+private fun extractJsonInt(json: String, key: String): Int? {
+    val pattern = "\"$key\"\\s*:\\s*(\\d+)"
+    val regex = pattern.toRegex()
+    return regex.find(json)?.groupValues?.get(1)?.toIntOrNull()
+}
+
+private fun extractJsonLong(json: String, key: String): Long? {
+    val pattern = "\"$key\"\\s*:\\s*(\\d+)"
+    val regex = pattern.toRegex()
+    return regex.find(json)?.groupValues?.get(1)?.toLongOrNull()
+}
+
+private fun extractJsonBool(json: String, key: String): Boolean? {
+    val pattern = "\"$key\"\\s*:\\s*(true|false)"
+    val regex = pattern.toRegex()
+    return regex.find(json)?.groupValues?.get(1)?.let { it == "true" }
+}

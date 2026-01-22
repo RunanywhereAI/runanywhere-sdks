@@ -373,6 +373,76 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
             }
         }
 
+        // 9. Initialize model assignments with auto-fetch
+        // Set up callbacks for HTTP GET and device info, then auto-fetch models
+        {
+            rac_assignment_callbacks_t callbacks = {};
+
+            // HTTP GET callback - uses HTTPBridge for network requests
+            callbacks.http_get = [](const char* endpoint, rac_bool_t requires_auth,
+                                    rac_assignment_http_response_t* out_response, void* user_data) -> rac_result_t {
+                if (!out_response) return RAC_ERROR_NULL_POINTER;
+
+                try {
+                    std::string endpointStr = endpoint ? endpoint : "";
+                    LOGD("Model assignment HTTP GET: %s", endpointStr.c_str());
+
+                    // Use HTTPBridge::execute which calls the registered JS executor
+                    auto responseOpt = HTTPBridge::shared().execute("GET", endpointStr, "", requires_auth == RAC_TRUE);
+
+                    if (!responseOpt.has_value()) {
+                        LOGE("HTTP executor not registered");
+                        out_response->result = RAC_ERROR_HTTP_REQUEST_FAILED;
+                        out_response->error_message = strdup("HTTP executor not registered");
+                        return RAC_ERROR_HTTP_REQUEST_FAILED;
+                    }
+
+                    const auto& response = responseOpt.value();
+                    if (response.success && !response.body.empty()) {
+                        out_response->result = RAC_SUCCESS;
+                        out_response->status_code = response.statusCode;
+                        out_response->response_body = strdup(response.body.c_str());
+                        out_response->response_length = response.body.length();
+                        return RAC_SUCCESS;
+                    } else {
+                        out_response->result = RAC_ERROR_HTTP_REQUEST_FAILED;
+                        out_response->status_code = response.statusCode;
+                        if (!response.error.empty()) {
+                            out_response->error_message = strdup(response.error.c_str());
+                        }
+                        return RAC_ERROR_HTTP_REQUEST_FAILED;
+                    }
+                } catch (const std::exception& e) {
+                    LOGE("Model assignment HTTP GET failed: %s", e.what());
+                    out_response->result = RAC_ERROR_HTTP_REQUEST_FAILED;
+                    out_response->error_message = strdup(e.what());
+                    return RAC_ERROR_HTTP_REQUEST_FAILED;
+                }
+            };
+
+            // Device info callback
+            callbacks.get_device_info = [](rac_assignment_device_info_t* out_info, void* user_data) {
+                if (!out_info) return;
+
+                std::string deviceModel = InitBridge::shared().getDeviceModel();
+                std::string platform = InitBridge::shared().getPlatform();
+
+                out_info->device_type = strdup(deviceModel.c_str());
+                out_info->platform = strdup(platform.c_str());
+            };
+
+            callbacks.user_data = nullptr;
+            callbacks.auto_fetch = RAC_TRUE;  // Auto-fetch models after registration
+
+            result = rac_model_assignment_set_callbacks(&callbacks);
+            if (result == RAC_SUCCESS) {
+                LOGI("Model assignment callbacks registered with auto-fetch enabled");
+            } else {
+                LOGE("Failed to register model assignment callbacks: %d", result);
+                // Continue - not fatal, models can be fetched later
+            }
+        }
+
         LOGI("Core SDK initialized successfully");
         return true;
     });
@@ -406,10 +476,10 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getBackendInfo() {
     return Promise<std::string>::async([]() {
         // Check if SDK is initialized using the actual InitBridge state
         bool isInitialized = InitBridge::shared().isInitialized();
-        
+
         std::string status = isInitialized ? "initialized" : "not_initialized";
         std::string name = isInitialized ? "RunAnywhere Core" : "Not initialized";
-        
+
         return buildJsonObject({
             {"name", jsonString(name)},
             {"status", jsonString(status)},
@@ -496,8 +566,8 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::setAuthTokens(
             // IMPORTANT: Actually store the tokens in AuthBridge!
             // handleAuthResponse only parses, setAuth stores them
             AuthBridge::shared().setAuth(response);
-            
-            LOGI("Auth tokens set successfully. Token expires in %lld seconds", 
+
+            LOGI("Auth tokens set successfully. Token expires in %lld seconds",
                  static_cast<long long>(response.expiresIn));
             LOGD("Access token stored (length=%zu)", response.accessToken.length());
             return true;
@@ -526,7 +596,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::registerDevice(
 
         std::string buildToken = extractStringValue(environmentJson, "buildToken", "");
         std::string supabaseKey = extractStringValue(environmentJson, "supabaseKey", "");
-        
+
         // For development mode, get build token from C++ dev config if not provided
         // This matches Swift's CppBridge.DevConfig.buildToken behavior
         if (buildToken.empty() && env == RAC_ENV_DEVELOPMENT) {
@@ -544,7 +614,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::registerDevice(
         // Matches Swift's CppBridge+Device.swift get_device_info callback
         callbacks.getDeviceInfo = []() -> DeviceInfo {
             DeviceInfo info;
-            
+
             // Core identification
             info.deviceId = InitBridge::shared().getPersistentDeviceUUID();
             // Use actual platform (ios/android) as backend only accepts these values
@@ -557,7 +627,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::registerDevice(
 #endif
             // Use centralized SDK version from InitBridge (set from TypeScript SDKConstants)
             info.sdkVersion = InitBridge::shared().getSdkVersion();
-            
+
             // Device hardware info from platform-specific code
             info.deviceModel = InitBridge::shared().getDeviceModel();
             info.deviceName = info.deviceModel; // Use model as name (React Native doesn't expose device name)
@@ -567,12 +637,12 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::registerDevice(
             info.totalMemory = InitBridge::shared().getTotalMemory();
             info.availableMemory = InitBridge::shared().getAvailableMemory();
             info.coreCount = InitBridge::shared().getCoreCount();
-            
+
             // Form factor detection (matches Swift SDK: device.userInterfaceIdiom == .pad)
             // Uses platform-specific detection via InitBridge::isTablet()
             bool isTabletDevice = InitBridge::shared().isTablet();
             info.formFactor = isTabletDevice ? "tablet" : "phone";
-            
+
             // Platform-specific values
             #if defined(__APPLE__)
             info.osName = "iOS";
@@ -590,16 +660,16 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::registerDevice(
             info.hasNeuralEngine = false;
             info.neuralEngineCores = 0;
             #endif
-            
+
             // Battery info (not available in React Native easily, use defaults)
             info.batteryLevel = -1.0; // Unknown
             info.batteryState = ""; // Unknown
             info.isLowPowerMode = false;
-            
+
             // Core distribution (approximate for mobile devices)
             info.performanceCores = info.coreCount > 4 ? 2 : 1;
             info.efficiencyCores = info.coreCount - info.performanceCores;
-            
+
             return info;
         };
 
@@ -641,10 +711,10 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::registerDevice(
                 // NO FALLBACK - credentials must come from C++ config only
                 const char* devUrl = rac_dev_config_get_supabase_url();
                 const char* devKey = rac_dev_config_get_supabase_key();
-                
+
                 baseURL = devUrl ? devUrl : "";
                 apiKey = devKey ? devKey : "";
-                
+
                 if (baseURL.empty()) {
                     LOGW("Development mode but Supabase URL not configured in C++ dev_config");
                 } else {
@@ -654,7 +724,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::registerDevice(
                 // Production/Staging: Use configured Railway URL
                 // These come from SDK initialization (App.tsx -> RunAnywhere.initialize)
                 baseURL = InitBridge::shared().getBaseURL();
-                
+
                 // For production mode, prefer JWT access token (from authentication)
                 // over raw API key. This matches Swift/Kotlin behavior.
                 std::string accessToken = AuthBridge::shared().getAccessToken();
@@ -666,12 +736,12 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::registerDevice(
                     apiKey = InitBridge::shared().getApiKey();
                     LOGD("Using API key for device registration (not authenticated)");
                 }
-                
+
                 // Fallback to default if not configured
                 if (baseURL.empty()) {
                     baseURL = "https://api.runanywhere.ai";
                 }
-                
+
                 LOGD("Using production config: %s", baseURL.c_str());
             }
 
