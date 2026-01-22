@@ -44,7 +44,7 @@ let useLocalBinaries = true  // Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when testLocal = false)
 // Updated automatically by CI/CD during releases
-let sdkVersion = "0.17.1"
+let sdkVersion = "0.17.2"
 
 let package = Package(
     name: "runanywhere-sdks",
@@ -232,17 +232,17 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "e8a7262c70cee320aaaeed1650fa47f397760daa378e15e5fb1ff81a0b0eec8b"
+                checksum: "89d130815aa6a3807d5f0855c654415deb01edbe5997b846336f9a161fa08b65"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
-                checksum: "0f922277606d48a2238154146c6ab05c214c4063dc8d8f44a446a841dcd63a05"
+                checksum: "9e58e33e2984f5f0498bdad69387aec306fd2d31e6690eab38b9f1d1a21fb0ca"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
-                checksum: "947fc2e6e854243c0a5f00d558cedf4bc6b138e0c64a1567233ec2fa970e5cdd"
+                checksum: "e760044abfe97d2bde9386d801b0e11421c3782980f4088edce6d6d976f48a84"
             ),
             .binaryTarget(
                 name: "ONNXRuntimeBinary",
