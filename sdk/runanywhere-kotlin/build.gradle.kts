@@ -114,9 +114,9 @@ logger.lifecycle("RunAnywhere SDK: testLocal=$testLocal, nativeLibVersion=$nativ
 // =============================================================================
 // Project Path Resolution
 // =============================================================================
-// Module path resolution is handled by the runanywhere.module-path convention plugin.
-// Use resolveModulePath("module-name") to get the correct path in composite builds.
-// See: build-logic/src/main/kotlin/runanywhere.module-path.gradle.kts
+// Module path resolution is handled by the runanywhere.conventions plugin.
+// Use resolveModulePath("runanywhere-core-onnx") to get the correct path in composite builds.
+// See: build-logic/src/main/kotlin/runanywhere.conventions.gradle.kts
 
 kotlin {
     // Use Java 17 toolchain across targets
