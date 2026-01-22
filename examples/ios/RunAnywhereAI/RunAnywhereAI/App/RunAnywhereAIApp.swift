@@ -72,15 +72,16 @@ struct RunAnywhereAIApp: App {
 
             if let apiKey = customApiKey, let baseURL = customBaseURL {
                 // Custom configuration mode - use stored credentials
+                // Always use .production for custom backends (model assignment auto-fetch enabled)
                 logger.info("🔧 Found custom API configuration")
                 logger.info("   Base URL: \(baseURL, privacy: .public)")
 
                 try RunAnywhere.initialize(
                     apiKey: apiKey,
                     baseURL: baseURL,
-                    environment: .production  // Custom config always uses production mode
+                    environment: .production
                 )
-                logger.info("✅ SDK initialized with CUSTOM configuration")
+                logger.info("✅ SDK initialized with CUSTOM configuration (production)")
             } else {
                 // Default mode based on build configuration
                 #if DEBUG

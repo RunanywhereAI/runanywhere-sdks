@@ -65,13 +65,19 @@ class SettingsViewModel: ObservableObject {
     }
 
     /// Get stored base URL (for use at app launch)
+    /// Automatically adds https:// if no scheme is present
     static func getStoredBaseURL() -> String? {
         guard let data = try? KeychainService.shared.retrieve(key: "runanywhere_base_url"),
               let value = String(data: data, encoding: .utf8),
               !value.isEmpty else {
             return nil
         }
-        return value
+        // Normalize URL by adding https:// if no scheme present
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") {
+            return trimmed
+        }
+        return "https://\(trimmed)"
     }
 
     /// Check if custom configuration is set
@@ -185,6 +191,22 @@ class SettingsViewModel: ObservableObject {
 
     // MARK: - API Configuration Management
 
+    /// Normalize base URL by adding https:// if no scheme is present
+    private func normalizeBaseURL(_ url: String) -> String {
+        let trimmed = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return trimmed
+        }
+
+        // Check if URL already has a scheme
+        if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") {
+            return trimmed
+        }
+
+        // Add https:// prefix
+        return "https://\(trimmed)"
+    }
+
     /// Save API key and Base URL to secure storage
     func saveApiConfiguration() {
         var hasError = false
@@ -203,13 +225,16 @@ class SettingsViewModel: ObservableObject {
             }
         }
 
-        // Save Base URL if provided
+        // Save Base URL if provided (normalize to add https:// if missing)
         if !baseURL.isEmpty {
-            if let baseURLData = baseURL.data(using: .utf8) {
+            let normalizedURL = normalizeBaseURL(baseURL)
+            baseURL = normalizedURL  // Update the displayed value too
+
+            if let baseURLData = normalizedURL.data(using: .utf8) {
                 do {
                     try keychainService.save(key: baseURLStorageKey, data: baseURLData)
                     isBaseURLConfigured = true
-                    print("Settings: Base URL saved successfully")
+                    print("Settings: Base URL saved successfully: \(normalizedURL)")
                 } catch {
                     errorMessage = "Failed to save Base URL: \(error.localizedDescription)"
                     hasError = true

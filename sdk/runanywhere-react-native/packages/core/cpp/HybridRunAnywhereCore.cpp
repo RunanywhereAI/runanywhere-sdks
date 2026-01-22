@@ -374,7 +374,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
         }
 
         // 9. Initialize model assignments with auto-fetch
-        // Set up callbacks for HTTP GET and device info, then auto-fetch models
+        // Set up HTTP GET callback for fetching models from backend
         {
             rac_assignment_callbacks_t callbacks = {};
 
@@ -420,23 +420,14 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
                 }
             };
 
-            // Device info callback
-            callbacks.get_device_info = [](rac_assignment_device_info_t* out_info, void* user_data) {
-                if (!out_info) return;
-
-                std::string deviceModel = InitBridge::shared().getDeviceModel();
-                std::string platform = InitBridge::shared().getPlatform();
-
-                out_info->device_type = strdup(deviceModel.c_str());
-                out_info->platform = strdup(platform.c_str());
-            };
-
             callbacks.user_data = nullptr;
-            callbacks.auto_fetch = RAC_TRUE;  // Auto-fetch models after registration
+            // Only auto-fetch in staging/production, not development
+            bool shouldAutoFetch = (env != SDKEnvironment::Development);
+            callbacks.auto_fetch = shouldAutoFetch ? RAC_TRUE : RAC_FALSE;
 
             result = rac_model_assignment_set_callbacks(&callbacks);
             if (result == RAC_SUCCESS) {
-                LOGI("Model assignment callbacks registered with auto-fetch enabled");
+                LOGI("Model assignment callbacks registered (autoFetch: %s)", shouldAutoFetch ? "true" : "false");
             } else {
                 LOGE("Failed to register model assignment callbacks: %d", result);
                 // Continue - not fatal, models can be fetched later

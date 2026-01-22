@@ -30,7 +30,10 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  TextInput,
+  Modal,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
@@ -46,6 +49,51 @@ import { LLMFramework, FrameworkDisplayNames } from '../types/model';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
 import { RunAnywhere, type ModelInfo } from '@runanywhere/core';
+
+// Storage keys for API configuration
+const STORAGE_KEYS = {
+  API_KEY: '@runanywhere_api_key',
+  BASE_URL: '@runanywhere_base_url',
+  DEVICE_REGISTERED: '@runanywhere_device_registered',
+};
+
+/**
+ * Get stored API key (for use at app launch)
+ */
+export const getStoredApiKey = async (): Promise<string | null> => {
+  try {
+    return await AsyncStorage.getItem(STORAGE_KEYS.API_KEY);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Get stored base URL (for use at app launch)
+ * Automatically adds https:// if no scheme is present
+ */
+export const getStoredBaseURL = async (): Promise<string | null> => {
+  try {
+    const value = await AsyncStorage.getItem(STORAGE_KEYS.BASE_URL);
+    if (!value) return null;
+    const trimmed = value.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    return `https://${trimmed}`;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Check if custom configuration is set
+ */
+export const hasCustomConfiguration = async (): Promise<boolean> => {
+  const apiKey = await getStoredApiKey();
+  const baseURL = await getStoredBaseURL();
+  return apiKey !== null && baseURL !== null && apiKey !== '' && baseURL !== '';
+};
 
 // Default storage info
 const DEFAULT_STORAGE_INFO: StorageInfo = {
@@ -75,6 +123,13 @@ export const SettingsScreen: React.FC = () => {
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(10000);
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
+
+  // API Configuration state
+  const [apiKey, setApiKey] = useState('');
+  const [baseURL, setBaseURL] = useState('');
+  const [isBaseURLConfigured, setIsBaseURLConfigured] = useState(false);
+  const [showApiConfigModal, setShowApiConfigModal] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Storage state
   const [storageInfo, setStorageInfo] =
@@ -114,7 +169,87 @@ export const SettingsScreen: React.FC = () => {
   // Load data on mount
   useEffect(() => {
     loadData();
+    loadApiConfiguration();
   }, []);
+
+  /**
+   * Load API configuration from AsyncStorage
+   */
+  const loadApiConfiguration = async () => {
+    try {
+      const storedApiKey = await AsyncStorage.getItem(STORAGE_KEYS.API_KEY);
+      const storedBaseURL = await AsyncStorage.getItem(STORAGE_KEYS.BASE_URL);
+
+      setApiKey(storedApiKey || '');
+      setBaseURL(storedBaseURL || '');
+      setApiKeyConfigured(!!storedApiKey && storedApiKey !== '');
+      setIsBaseURLConfigured(!!storedBaseURL && storedBaseURL !== '');
+    } catch (error) {
+      console.error('[Settings] Failed to load API configuration:', error);
+    }
+  };
+
+  /**
+   * Normalize base URL by adding https:// if no scheme is present
+   */
+  const normalizeBaseURL = (url: string): string => {
+    const trimmed = url.trim();
+    if (!trimmed) return trimmed;
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    return `https://${trimmed}`;
+  };
+
+  /**
+   * Save API configuration to AsyncStorage
+   */
+  const saveApiConfiguration = async () => {
+    try {
+      const normalizedURL = normalizeBaseURL(baseURL);
+      await AsyncStorage.setItem(STORAGE_KEYS.API_KEY, apiKey);
+      await AsyncStorage.setItem(STORAGE_KEYS.BASE_URL, normalizedURL);
+
+      setBaseURL(normalizedURL);
+      setApiKeyConfigured(!!apiKey);
+      setIsBaseURLConfigured(!!normalizedURL);
+      setShowApiConfigModal(false);
+
+      Alert.alert(
+        'Restart Required',
+        'API configuration has been updated. Please restart the app for changes to take effect.',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      Alert.alert('Error', `Failed to save API configuration: ${error}`);
+    }
+  };
+
+  /**
+   * Clear API configuration from AsyncStorage
+   */
+  const clearApiConfiguration = async () => {
+    try {
+      await AsyncStorage.multiRemove([
+        STORAGE_KEYS.API_KEY,
+        STORAGE_KEYS.BASE_URL,
+        STORAGE_KEYS.DEVICE_REGISTERED,
+      ]);
+
+      setApiKey('');
+      setBaseURL('');
+      setApiKeyConfigured(false);
+      setIsBaseURLConfigured(false);
+
+      Alert.alert(
+        'Restart Required',
+        'API configuration has been cleared. Please restart the app for changes to take effect.',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      Alert.alert('Error', `Failed to clear API configuration: ${error}`);
+    }
+  };
 
   const loadData = async () => {
     setIsRefreshing(true);
@@ -130,7 +265,7 @@ export const SettingsScreen: React.FC = () => {
       // Get backend info for storage data
       const backendInfo = await RunAnywhere.getBackendInfo();
       console.log('[Settings] Backend info:', backendInfo);
-      
+
       // Override name with actual init status
       const updatedBackendInfo = {
         ...backendInfo,
@@ -240,26 +375,18 @@ export const SettingsScreen: React.FC = () => {
   }, []);
 
   /**
-   * Handle API key configuration
+   * Handle API key configuration - open modal
    */
   const handleConfigureApiKey = useCallback(() => {
-    Alert.prompt(
-      'API Key',
-      'Enter your RunAnywhere API key',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Save',
-          onPress: (key?: string) => {
-            if (key && key.trim()) {
-              setApiKeyConfigured(true);
-              // In a real implementation, reinitialize SDK with the new key
-            }
-          },
-        },
-      ],
-      'secure-text'
-    );
+    setShowApiConfigModal(true);
+  }, []);
+
+  /**
+   * Cancel API configuration modal
+   */
+  const handleCancelApiConfig = useCallback(() => {
+    loadApiConfiguration(); // Reset to stored values
+    setShowApiConfigModal(false);
   }, []);
 
   /**
@@ -520,8 +647,8 @@ export const SettingsScreen: React.FC = () => {
   const renderStorageBar = () => {
     // Show app storage as portion of (app storage + free space)
     const totalAvailable = storageInfo.appStorage + storageInfo.freeSpace;
-    const usedPercent = totalAvailable > 0 
-      ? (storageInfo.appStorage / totalAvailable) * 100 
+    const usedPercent = totalAvailable > 0
+      ? (storageInfo.appStorage / totalAvailable) * 100
       : 0;
     return (
       <View style={styles.storageBar}>
@@ -678,15 +805,48 @@ export const SettingsScreen: React.FC = () => {
           )}
         </View>
 
-        {/* API Configuration */}
-        {renderSectionHeader('API Configuration')}
+        {/* API Configuration (Testing) */}
+        {renderSectionHeader('API Configuration (Testing)')}
         <View style={styles.section}>
-          {renderSettingRow(
-            'key-outline',
-            'API Key',
-            apiKeyConfigured ? 'Configured' : 'Not Set',
-            handleConfigureApiKey
-          )}
+          <View style={styles.apiConfigRow}>
+            <Text style={styles.apiConfigLabel}>API Key</Text>
+            <Text style={[
+              styles.apiConfigValue,
+              { color: apiKeyConfigured ? Colors.primaryGreen : Colors.primaryOrange }
+            ]}>
+              {apiKeyConfigured ? 'Configured' : 'Not Set'}
+            </Text>
+          </View>
+          <View style={styles.apiConfigDivider} />
+          <View style={styles.apiConfigRow}>
+            <Text style={styles.apiConfigLabel}>Base URL</Text>
+            <Text style={[
+              styles.apiConfigValue,
+              { color: isBaseURLConfigured ? Colors.primaryGreen : Colors.primaryOrange }
+            ]}>
+              {isBaseURLConfigured ? 'Configured' : 'Not Set'}
+            </Text>
+          </View>
+          <View style={styles.apiConfigDivider} />
+          <View style={styles.apiConfigButtons}>
+            <TouchableOpacity
+              style={styles.apiConfigButton}
+              onPress={handleConfigureApiKey}
+            >
+              <Text style={styles.apiConfigButtonText}>Configure</Text>
+            </TouchableOpacity>
+            {apiKeyConfigured && isBaseURLConfigured && (
+              <TouchableOpacity
+                style={[styles.apiConfigButton, styles.apiConfigButtonClear]}
+                onPress={clearApiConfiguration}
+              >
+                <Text style={[styles.apiConfigButtonText, styles.apiConfigButtonTextClear]}>Clear</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <Text style={styles.apiConfigHint}>
+            Configure custom API key and base URL for testing. Requires app restart.
+          </Text>
         </View>
 
         {/* Storage Overview - Matches iOS CombinedSettingsView */}
@@ -772,6 +932,100 @@ export const SettingsScreen: React.FC = () => {
           <Text style={styles.versionSubtext}>SDK v{sdkVersion}</Text>
         </View>
       </ScrollView>
+
+      {/* API Configuration Modal */}
+      <Modal
+        visible={showApiConfigModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={handleCancelApiConfig}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>API Configuration</Text>
+
+            {/* API Key Input */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>API Key</Text>
+              <View style={styles.passwordInputContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  value={apiKey}
+                  onChangeText={setApiKey}
+                  placeholder="Enter your API key"
+                  placeholderTextColor={Colors.textTertiary}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  style={styles.passwordToggle}
+                  onPress={() => setShowPassword(!showPassword)}
+                >
+                  <Icon
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color={Colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.inputHint}>
+                Your API key for authenticating with the backend
+              </Text>
+            </View>
+
+            {/* Base URL Input */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Base URL</Text>
+              <TextInput
+                style={styles.input}
+                value={baseURL}
+                onChangeText={setBaseURL}
+                placeholder="https://api.example.com"
+                placeholderTextColor={Colors.textTertiary}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+              />
+              <Text style={styles.inputHint}>
+                The backend API URL (https:// added automatically if missing)
+              </Text>
+            </View>
+
+            {/* Warning */}
+            <View style={styles.warningBox}>
+              <Icon name="warning-outline" size={20} color={Colors.primaryOrange} />
+              <Text style={styles.warningText}>
+                After saving, you must restart the app for changes to take effect. The SDK will reinitialize with your custom configuration.
+              </Text>
+            </View>
+
+            {/* Buttons */}
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={handleCancelApiConfig}
+              >
+                <Text style={styles.modalButtonTextCancel}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.modalButtonSave,
+                  (!apiKey || !baseURL) && styles.modalButtonDisabled,
+                ]}
+                onPress={saveApiConfiguration}
+                disabled={!apiKey || !baseURL}
+              >
+                <Text style={[
+                  styles.modalButtonTextSave,
+                  (!apiKey || !baseURL) && styles.modalButtonTextDisabled,
+                ]}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -1168,6 +1422,161 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     minWidth: 40,
     textAlign: 'right',
+  },
+  // API Configuration styles
+  apiConfigRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Padding.padding16,
+  },
+  apiConfigLabel: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+  },
+  apiConfigValue: {
+    ...Typography.body,
+    fontWeight: '500',
+  },
+  apiConfigDivider: {
+    height: 1,
+    backgroundColor: Colors.borderLight,
+    marginHorizontal: Padding.padding16,
+  },
+  apiConfigButtons: {
+    flexDirection: 'row',
+    padding: Padding.padding16,
+    gap: Spacing.small,
+  },
+  apiConfigButton: {
+    paddingHorizontal: Padding.padding16,
+    paddingVertical: Spacing.small,
+    borderRadius: BorderRadius.small,
+    borderWidth: 1,
+    borderColor: Colors.primaryBlue,
+  },
+  apiConfigButtonClear: {
+    borderColor: Colors.primaryRed,
+  },
+  apiConfigButtonText: {
+    ...Typography.subheadline,
+    color: Colors.primaryBlue,
+    fontWeight: '600',
+  },
+  apiConfigButtonTextClear: {
+    color: Colors.primaryRed,
+  },
+  apiConfigHint: {
+    ...Typography.footnote,
+    color: Colors.textSecondary,
+    paddingHorizontal: Padding.padding16,
+    paddingBottom: Padding.padding16,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Padding.padding24,
+  },
+  modalContent: {
+    backgroundColor: Colors.backgroundPrimary,
+    borderRadius: BorderRadius.large,
+    padding: Padding.padding24,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    ...Typography.title2,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.large,
+    textAlign: 'center',
+  },
+  inputGroup: {
+    marginBottom: Spacing.large,
+  },
+  inputLabel: {
+    ...Typography.subheadline,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.small,
+  },
+  input: {
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: BorderRadius.small,
+    padding: Padding.padding12,
+    ...Typography.body,
+    color: Colors.textPrimary,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  passwordInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: BorderRadius.small,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  passwordInput: {
+    flex: 1,
+    padding: Padding.padding12,
+    ...Typography.body,
+    color: Colors.textPrimary,
+  },
+  passwordToggle: {
+    padding: Padding.padding12,
+  },
+  inputHint: {
+    ...Typography.caption,
+    color: Colors.textTertiary,
+    marginTop: Spacing.xSmall,
+  },
+  warningBox: {
+    flexDirection: 'row',
+    backgroundColor: Colors.badgeOrange,
+    borderRadius: BorderRadius.small,
+    padding: Padding.padding12,
+    gap: Spacing.small,
+    marginBottom: Spacing.large,
+  },
+  warningText: {
+    ...Typography.footnote,
+    color: Colors.textSecondary,
+    flex: 1,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: Spacing.medium,
+  },
+  modalButton: {
+    paddingHorizontal: Padding.padding16,
+    paddingVertical: Spacing.smallMedium,
+    borderRadius: BorderRadius.small,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  modalButtonCancel: {
+    backgroundColor: 'transparent',
+  },
+  modalButtonSave: {
+    backgroundColor: Colors.primaryBlue,
+  },
+  modalButtonDisabled: {
+    backgroundColor: Colors.backgroundGray5,
+  },
+  modalButtonTextCancel: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+  },
+  modalButtonTextSave: {
+    ...Typography.body,
+    color: Colors.textWhite,
+    fontWeight: '600',
+  },
+  modalButtonTextDisabled: {
+    color: Colors.textTertiary,
   },
 });
 

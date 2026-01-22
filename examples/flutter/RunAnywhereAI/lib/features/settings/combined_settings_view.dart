@@ -31,6 +31,12 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
   int _modelStorageSize = 0;
   List<sdk.StoredModel> _storedModels = [];
 
+  // API Configuration
+  String _apiKey = '';
+  String _baseURL = '';
+  bool _isApiKeyConfigured = false;
+  bool _isBaseURLConfigured = false;
+
   // Loading state
   bool _isRefreshingStorage = false;
 
@@ -38,6 +44,7 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
   void initState() {
     super.initState();
     unawaited(_loadSettings());
+    unawaited(_loadApiConfiguration());
     unawaited(_loadStorageData());
   }
 
@@ -48,6 +55,209 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     if (mounted) {
       setState(() {});
     }
+  }
+
+  /// Load API configuration from keychain
+  Future<void> _loadApiConfiguration() async {
+    final storedApiKey = await KeychainHelper.loadString(KeychainKeys.apiKey);
+    final storedBaseURL = await KeychainHelper.loadString(KeychainKeys.baseURL);
+
+    if (mounted) {
+      setState(() {
+        _apiKey = storedApiKey ?? '';
+        _baseURL = storedBaseURL ?? '';
+        _isApiKeyConfigured = storedApiKey != null && storedApiKey.isNotEmpty;
+        _isBaseURLConfigured =
+            storedBaseURL != null && storedBaseURL.isNotEmpty;
+      });
+    }
+  }
+
+  /// Normalize base URL by adding https:// if no scheme is present
+  String _normalizeBaseURL(String url) {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) return trimmed;
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    return 'https://$trimmed';
+  }
+
+  /// Save API configuration to keychain
+  Future<void> _saveApiConfiguration(String apiKey, String baseURL) async {
+    final normalizedURL = _normalizeBaseURL(baseURL);
+
+    await KeychainHelper.saveString(key: KeychainKeys.apiKey, data: apiKey);
+    await KeychainHelper.saveString(
+        key: KeychainKeys.baseURL, data: normalizedURL);
+
+    if (mounted) {
+      setState(() {
+        _apiKey = apiKey;
+        _baseURL = normalizedURL;
+        _isApiKeyConfigured = apiKey.isNotEmpty;
+        _isBaseURLConfigured = normalizedURL.isNotEmpty;
+      });
+
+      _showRestartDialog();
+    }
+  }
+
+  /// Clear API configuration from keychain
+  Future<void> _clearApiConfiguration() async {
+    await KeychainHelper.delete(KeychainKeys.apiKey);
+    await KeychainHelper.delete(KeychainKeys.baseURL);
+    await KeychainHelper.delete(KeychainKeys.deviceRegistered);
+
+    if (mounted) {
+      setState(() {
+        _apiKey = '';
+        _baseURL = '';
+        _isApiKeyConfigured = false;
+        _isBaseURLConfigured = false;
+      });
+
+      _showRestartDialog();
+    }
+  }
+
+  /// Show restart required dialog
+  void _showRestartDialog() {
+    unawaited(showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.restart_alt,
+            color: AppColors.primaryOrange, size: 32),
+        title: const Text('Restart Required'),
+        content: const Text(
+          'API configuration has been updated. Please restart the app for changes to take effect.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    ));
+  }
+
+  /// Show API configuration dialog
+  void _showApiConfigDialog() {
+    final apiKeyController = TextEditingController(text: _apiKey);
+    final baseURLController = TextEditingController(text: _baseURL);
+    bool showPassword = false;
+
+    unawaited(showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('API Configuration'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // API Key Input
+                Text('API Key', style: AppTypography.caption(context)),
+                const SizedBox(height: AppSpacing.xSmall),
+                TextField(
+                  controller: apiKeyController,
+                  obscureText: !showPassword,
+                  decoration: InputDecoration(
+                    hintText: 'Enter your API key',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(showPassword
+                          ? Icons.visibility_off
+                          : Icons.visibility),
+                      onPressed: () {
+                        setDialogState(() => showPassword = !showPassword);
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xSmall),
+                Text(
+                  'Your API key for authenticating with the backend',
+                  style: AppTypography.caption2(context).copyWith(
+                    color: AppColors.textSecondary(context),
+                  ),
+                ),
+
+                const SizedBox(height: AppSpacing.mediumLarge),
+
+                // Base URL Input
+                Text('Base URL', style: AppTypography.caption(context)),
+                const SizedBox(height: AppSpacing.xSmall),
+                TextField(
+                  controller: baseURLController,
+                  keyboardType: TextInputType.url,
+                  decoration: const InputDecoration(
+                    hintText: 'https://api.example.com',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xSmall),
+                Text(
+                  'The backend API URL (https:// added automatically if missing)',
+                  style: AppTypography.caption2(context).copyWith(
+                    color: AppColors.textSecondary(context),
+                  ),
+                ),
+
+                const SizedBox(height: AppSpacing.mediumLarge),
+
+                // Warning Box
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.mediumLarge),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryOrange.withValues(alpha: 0.1),
+                    borderRadius:
+                        BorderRadius.circular(AppSpacing.cornerRadiusRegular),
+                    border: Border.all(
+                        color: AppColors.primaryOrange.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.warning_amber,
+                          color: AppColors.primaryOrange, size: 20),
+                      const SizedBox(width: AppSpacing.smallMedium),
+                      Expanded(
+                        child: Text(
+                          'After saving, you must restart the app for changes to take effect. The SDK will reinitialize with your custom configuration.',
+                          style: AppTypography.caption2(context).copyWith(
+                            color: AppColors.textSecondary(context),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                if (apiKeyController.text.isNotEmpty &&
+                    baseURLController.text.isNotEmpty) {
+                  Navigator.pop(dialogContext);
+                  unawaited(_saveApiConfiguration(
+                      apiKeyController.text, baseURLController.text));
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    ));
   }
 
   /// Load storage data using RunAnywhere SDK
@@ -171,6 +381,11 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.large),
         children: [
+          // API Configuration Section
+          _buildSectionHeader('API Configuration (Testing)'),
+          _buildApiConfigurationCard(),
+          const SizedBox(height: AppSpacing.large),
+
           // Storage Overview Section
           _buildSectionHeader('Storage Overview',
               trailing: _buildRefreshButton()),
@@ -230,6 +445,81 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
       label: Text(
         'Refresh',
         style: AppTypography.caption(context),
+      ),
+    );
+  }
+
+  Widget _buildApiConfigurationCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.large),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // API Key Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('API Key', style: AppTypography.subheadline(context)),
+                Text(
+                  _isApiKeyConfigured ? 'Configured' : 'Not Set',
+                  style: AppTypography.caption(context).copyWith(
+                    color: _isApiKeyConfigured
+                        ? AppColors.statusGreen
+                        : AppColors.primaryOrange,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(),
+            // Base URL Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Base URL', style: AppTypography.subheadline(context)),
+                Text(
+                  _isBaseURLConfigured ? 'Configured' : 'Not Set',
+                  style: AppTypography.caption(context).copyWith(
+                    color: _isBaseURLConfigured
+                        ? AppColors.statusGreen
+                        : AppColors.primaryOrange,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(),
+            const SizedBox(height: AppSpacing.smallMedium),
+            // Buttons
+            Row(
+              children: [
+                OutlinedButton(
+                  onPressed: _showApiConfigDialog,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primaryBlue,
+                  ),
+                  child: const Text('Configure'),
+                ),
+                if (_isApiKeyConfigured && _isBaseURLConfigured) ...[
+                  const SizedBox(width: AppSpacing.smallMedium),
+                  OutlinedButton(
+                    onPressed: _clearApiConfiguration,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primaryRed,
+                    ),
+                    child: const Text('Clear'),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: AppSpacing.smallMedium),
+            Text(
+              'Configure custom API key and base URL for testing. Requires app restart.',
+              style: AppTypography.caption2(context).copyWith(
+                color: AppColors.textSecondary(context),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
