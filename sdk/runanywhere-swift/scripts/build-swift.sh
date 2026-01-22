@@ -44,15 +44,19 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-SDK_ROOT="$(cd "${PROJECT_ROOT}/.." && pwd)"
+SWIFT_SDK_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+SDK_DIR="$(cd "${SWIFT_SDK_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${SDK_DIR}/.." && pwd)"
 
 # Source paths
-COMMONS_DIR="$SDK_ROOT/runanywhere-commons"
+COMMONS_DIR="$SDK_DIR/runanywhere-commons"
 COMMONS_BUILD_SCRIPT="$COMMONS_DIR/scripts/build-ios.sh"
 
-# Destination paths
-BINARIES_DIR="$PROJECT_ROOT/Binaries"
+# Destination paths (XCFrameworks go here)
+BINARIES_DIR="$SWIFT_SDK_DIR/Binaries"
+
+# Root Package.swift (single source of truth)
+PACKAGE_FILE="$REPO_ROOT/Package.swift"
 
 # Build configuration
 BUILD_MODE="debug"
@@ -151,34 +155,33 @@ fi
 
 set_package_mode() {
     local mode=$1
-    local package_file="$PROJECT_ROOT/Package.swift"
 
-    if [[ ! -f "$package_file" ]]; then
-        log_error "Package.swift not found: $package_file"
+    if [[ ! -f "$PACKAGE_FILE" ]]; then
+        log_error "Package.swift not found: $PACKAGE_FILE"
         exit 1
     fi
 
     if [[ "$mode" == "local" ]]; then
-        log_step "Setting testLocal = true in Package.swift"
-        if grep -q 'let testLocal = true' "$package_file"; then
+        log_step "Setting useLocalBinaries = true in Package.swift"
+        if grep -q 'let useLocalBinaries = true' "$PACKAGE_FILE"; then
             log_info "Already in local mode"
             return 0
         fi
-        sed -i '' 's/let testLocal = false/let testLocal = true/' "$package_file"
-        if grep -q 'let testLocal = true' "$package_file"; then
+        sed -i '' 's/let useLocalBinaries = false/let useLocalBinaries = true/' "$PACKAGE_FILE"
+        if grep -q 'let useLocalBinaries = true' "$PACKAGE_FILE"; then
             log_info "✓ Local mode enabled"
         else
             log_error "Failed to enable local mode"
             exit 1
         fi
     elif [[ "$mode" == "remote" ]]; then
-        log_step "Setting testLocal = false in Package.swift"
-        if grep -q 'let testLocal = false' "$package_file"; then
+        log_step "Setting useLocalBinaries = false in Package.swift"
+        if grep -q 'let useLocalBinaries = false' "$PACKAGE_FILE"; then
             log_info "Already in remote mode"
             return 0
         fi
-        sed -i '' 's/let testLocal = true/let testLocal = false/' "$package_file"
-        if grep -q 'let testLocal = false' "$package_file"; then
+        sed -i '' 's/let useLocalBinaries = true/let useLocalBinaries = false/' "$PACKAGE_FILE"
+        if grep -q 'let useLocalBinaries = false' "$PACKAGE_FILE"; then
             log_info "✓ Remote mode enabled"
         else
             log_error "Failed to enable remote mode"
@@ -252,7 +255,7 @@ install_frameworks() {
 build_sdk() {
     log_header "Building Swift SDK"
 
-    cd "$PROJECT_ROOT"
+    cd "$REPO_ROOT"
 
     if $CLEAN_BUILD; then
         log_step "Cleaning build..."
@@ -288,14 +291,16 @@ main() {
         echo "  3. Build RABackendLLAMACPP.xcframework"
         echo "  4. Build RABackendONNX.xcframework"
         echo "  5. Copy frameworks to Binaries/"
-        echo "  6. Set testLocal = true in Package.swift"
+        echo "  6. Set useLocalBinaries = true in Package.swift"
         echo ""
         echo "This may take 5-15 minutes..."
         echo ""
     else
         log_header "RunAnywhere Swift SDK - Build"
-        echo "Project:        $PROJECT_ROOT"
+        echo "Repo Root:      $REPO_ROOT"
+        echo "Swift SDK:      $SWIFT_SDK_DIR"
         echo "Commons:        $COMMONS_DIR"
+        echo "Package.swift:  $PACKAGE_FILE"
         echo "Mode:           $MODE"
         echo "Build Commons:  $BUILD_COMMONS"
         echo ""
@@ -340,13 +345,13 @@ main() {
     fi
 
     echo ""
-    echo "Package.swift: $(grep 'let testLocal' "$PROJECT_ROOT/Package.swift" | head -1 | xargs)"
+    echo "Package.swift: $(grep 'let useLocalBinaries' "$PACKAGE_FILE" | head -1 | xargs)"
     echo ""
 
     if $SETUP_MODE; then
         echo "Next steps:"
-        echo "  1. Open Xcode: open Package.swift"
-        echo "  2. If needed: File > Packages > Reset Package Caches"
+        echo "  1. Open the example app in Xcode"
+        echo "  2. File > Packages > Reset Package Caches (if needed)"
         echo "  3. Build & Run!"
         echo ""
     fi
