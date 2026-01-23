@@ -53,6 +53,8 @@ extension CppBridge {
             let response = try decoder.decode(AuthenticationResponse.self, from: responseData)
 
             // 4. Store in C++ state
+            // Use our device ID if API doesn't return one (API deviceId is optional)
+            let effectiveDeviceId = response.deviceId ?? deviceId
             let expiresAt = Date().addingTimeInterval(TimeInterval(response.expiresIn))
             State.setAuth(
                 accessToken: response.accessToken,
@@ -60,11 +62,11 @@ extension CppBridge {
                 expiresAt: expiresAt,
                 userId: response.userId,
                 organizationId: response.organizationId,
-                deviceId: response.deviceId
+                deviceId: effectiveDeviceId
             )
 
             // 5. Store in Keychain
-            try storeTokensInKeychain(response)
+            try storeTokensInKeychain(response, deviceId: effectiveDeviceId)
 
             logger.info("Authentication successful")
             return response
@@ -103,6 +105,8 @@ extension CppBridge {
             let response = try decoder.decode(AuthenticationResponse.self, from: responseData)
 
             // 4. Store in C++ state
+            // Use our device ID if API doesn't return one (API deviceId is optional)
+            let effectiveDeviceId = response.deviceId ?? deviceId
             let expiresAt = Date().addingTimeInterval(TimeInterval(response.expiresIn))
             State.setAuth(
                 accessToken: response.accessToken,
@@ -110,11 +114,11 @@ extension CppBridge {
                 expiresAt: expiresAt,
                 userId: response.userId,
                 organizationId: response.organizationId,
-                deviceId: response.deviceId
+                deviceId: effectiveDeviceId
             )
 
             // 5. Store in Keychain
-            try storeTokensInKeychain(response)
+            try storeTokensInKeychain(response, deviceId: effectiveDeviceId)
 
             logger.info("Token refresh successful")
             return response.accessToken
@@ -159,10 +163,10 @@ extension CppBridge {
 
         // MARK: - Keychain Storage
 
-        private static func storeTokensInKeychain(_ response: AuthenticationResponse) throws {
+        private static func storeTokensInKeychain(_ response: AuthenticationResponse, deviceId: String) throws {
             try KeychainManager.shared.store(response.accessToken, for: "com.runanywhere.sdk.accessToken")
             try KeychainManager.shared.store(response.refreshToken, for: "com.runanywhere.sdk.refreshToken")
-            try KeychainManager.shared.store(response.deviceId, for: "com.runanywhere.sdk.deviceId")
+            try KeychainManager.shared.store(deviceId, for: "com.runanywhere.sdk.deviceId")
             if let userId = response.userId {
                 try KeychainManager.shared.store(userId, for: "com.runanywhere.sdk.userId")
             }
