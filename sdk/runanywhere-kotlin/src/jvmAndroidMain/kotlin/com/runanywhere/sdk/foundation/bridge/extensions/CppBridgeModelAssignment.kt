@@ -313,12 +313,6 @@ object CppBridgeModelAssignment {
                     }
                 }
 
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.DEBUG,
-                    TAG,
-                    "Fetching model assignments from: $fullUrl",
-                )
-
                 // Make HTTP request
                 val response = CppBridgeHTTP.get(fullUrl, headers)
 
