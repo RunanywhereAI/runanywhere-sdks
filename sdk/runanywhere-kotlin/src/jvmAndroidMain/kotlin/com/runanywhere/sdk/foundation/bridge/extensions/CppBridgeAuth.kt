@@ -219,9 +219,9 @@ object CppBridgeAuth {
         _apiKey.set(apiKey)
 
         CppBridgePlatformAdapter.logCallback(
-            CppBridgePlatformAdapter.LogLevel.WARN,
+            CppBridgePlatformAdapter.LogLevel.INFO,
             TAG,
-            "🔐 Starting authentication with backend at $baseUrl...",
+            "Starting authentication with backend...",
         )
 
         // Build request body
@@ -238,9 +238,9 @@ object CppBridgeAuth {
         val fullUrl = baseUrl.trimEnd('/') + ENDPOINT_AUTHENTICATE
 
         CppBridgePlatformAdapter.logCallback(
-            CppBridgePlatformAdapter.LogLevel.WARN,
+            CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
-            "🔐 Auth request to: $fullUrl",
+            "Auth request to: $fullUrl",
         )
 
         // Make HTTP request
@@ -275,9 +275,9 @@ object CppBridgeAuth {
                 storeAuthState(response)
 
                 CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.WARN,
+                    CppBridgePlatformAdapter.LogLevel.INFO,
                     TAG,
-                    "✅ Authentication successful! Token expires in ${response.expiresIn}s",
+                    "Authentication successful, token expires in ${response.expiresIn}s",
                 )
 
                 return response
