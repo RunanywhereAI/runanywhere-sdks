@@ -82,6 +82,16 @@ class JsonBuilder {
         }
     }
 
+    // Outputs double if is_valid is true, otherwise outputs null
+    void add_double_or_null(const char* key, double value, bool is_valid) {
+        comma();
+        if (is_valid) {
+            ss_ << "\"" << key << "\":" << value;
+        } else {
+            ss_ << "\"" << key << "\":null";
+        }
+    }
+
     void add_double(const char* key, double value) {
         if (value == 0.0)
             return;  // Skip zero values
@@ -455,7 +465,8 @@ rac_result_t rac_device_registration_to_json(const rac_device_registration_reque
         json.add_string_always("gpu_family", info->gpu_family ? info->gpu_family : "unknown");
 
         // Battery info (may be unavailable - use nullable methods)
-        json.add_int_or_null("battery_level", info->battery_level, info->battery_level >= 0);
+        // battery_level is a double (0.0-1.0), negative if unavailable
+        json.add_double_or_null("battery_level", info->battery_level, info->battery_level >= 0);
         json.add_string_or_null("battery_state", info->battery_state);
 
         // More boolean and integer fields

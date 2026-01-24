@@ -21,6 +21,11 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
 import com.runanywhere.sdk.foundation.logging.SentryDestination
 import com.runanywhere.sdk.foundation.logging.SentryManager
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * CppBridge is the central coordinator for all C++ interop via JNI.
@@ -67,6 +72,9 @@ object CppBridge {
     private var _nativeLibraryLoaded: Boolean = false
 
     private val lock = Any()
+
+    /** Coroutine scope for async SDK operations, cancelled on shutdown */
+    private val sdkScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
      * Current SDK environment.
@@ -159,27 +167,15 @@ object CppBridge {
             // In development mode, we use Supabase URL from C++ dev config
             // NOTE: Authentication is deferred to Phase 2 (initializeServices) to avoid blocking
             // This matches Swift SDK where authentication is done in completeServicesInitialization()
-            // Using warn() for debug logs to ensure visibility in PRODUCTION mode (which filters INFO)
-            logger.warn("🔍 CppBridge.initialize: environment=$environment, apiKey=${if (apiKey.isNullOrEmpty()) "EMPTY" else "SET (${apiKey?.length} chars)"}, baseURL=${baseURL?.take(50)}")
             if (environment != Environment.DEVELOPMENT) {
                 if (!baseURL.isNullOrEmpty()) {
                     CppBridgeTelemetry.setBaseUrl(baseURL)
-                    logger.warn("✅ Telemetry base URL set: ${baseURL.take(50)}...")
-                } else {
-                    logger.warn("⚠️ baseURL is null or empty, not setting telemetry base URL")
+                    logger.debug("Telemetry base URL configured")
                 }
                 if (!apiKey.isNullOrEmpty()) {
                     CppBridgeTelemetry.setApiKey(apiKey)
-                    logger.warn("✅ Telemetry API key set (${apiKey.length} chars)")
-                } else {
-                    logger.warn("⚠️ apiKey is null or empty, not setting telemetry API key")
+                    logger.debug("Telemetry API key configured")
                 }
-                // Verify values were stored correctly
-                val storedBaseUrl = CppBridgeTelemetry.getBaseUrl()
-                val storedApiKey = CppBridgeTelemetry.getApiKey()
-                logger.warn("🔍 Verification: storedBaseUrl=${storedBaseUrl?.take(50)}, storedApiKey=${if (storedApiKey.isNullOrEmpty()) "EMPTY" else "SET (${storedApiKey?.length} chars)"}")
-                // Store credentials for Phase 2 authentication
-                // Authentication is deferred to initializeServices() which runs on background thread
                 logger.debug("Production/staging mode: authentication will occur in Phase 2 (initializeServices)")
             } else {
                 logger.debug("Development mode: using Supabase URL from C++ dev config")
@@ -382,18 +378,14 @@ object CppBridge {
             // Step 1: Authenticate with backend for production/staging mode
             // This is done in Phase 2 (not Phase 1) to avoid blocking main thread
             // Mirrors Swift SDK's CppBridge.Auth.authenticate() in completeServicesInitialization()
-            // Using warn() for debug logs to ensure visibility in PRODUCTION mode (which filters INFO)
-            logger.warn("🔍 initializeServices: environment=$_environment")
             if (_environment != Environment.DEVELOPMENT) {
                 val baseUrl = CppBridgeTelemetry.getBaseUrl()
                 val apiKey = CppBridgeTelemetry.getApiKey()
-                logger.warn("🔍 initializeServices: baseUrl=${baseUrl?.take(50)}, apiKey=${if (apiKey.isNullOrEmpty()) "EMPTY" else "SET (${apiKey.length} chars)"}")
 
                 if (!apiKey.isNullOrEmpty() && !baseUrl.isNullOrEmpty()) {
                     try {
-                        logger.warn("🔐 Authenticating with backend at $baseUrl...")
+                        logger.info("Authenticating with backend...")
                         val deviceId = CppBridgeDevice.getDeviceId() ?: CppBridgeDevice.getDeviceIdCallback()
-                        logger.warn("🔐 Using deviceId: $deviceId")
                         CppBridgeAuth.authenticate(
                             apiKey = apiKey,
                             baseUrl = baseUrl,
@@ -401,40 +393,64 @@ object CppBridge {
                             platform = "android",
                             sdkVersion = com.runanywhere.sdk.utils.SDKConstants.SDK_VERSION,
                         )
-                        logger.warn("✅ Authentication successful!")
+                        logger.info("Authentication successful")
                     } catch (e: Exception) {
-                        logger.error("❌ Authentication failed: ${e.message}")
-                        logger.error("❌ Exception type: ${e.javaClass.simpleName}")
-                        e.printStackTrace()
-                        logger.warn("SDK will continue but API requests may fail")
+                        logger.error("Authentication failed: ${e.message}")
                         // Non-fatal: continue with services initialization
                     }
                 } else {
-                    logger.warn("⚠️ Missing API key or base URL for authentication - apiKey=${apiKey?.length}, baseUrl=${baseUrl?.length}")
+                    logger.warn("Missing API key or base URL for authentication")
                 }
             }
 
             // Step 2: Register model assignment callbacks
-            // Only auto-fetch in staging/production, not development
-            val shouldAutoFetch = _environment != Environment.DEVELOPMENT
-            logger.warn("🔍 About to register model assignment callbacks (autoFetch=$shouldAutoFetch)")
-            CppBridgeModelAssignment.register(autoFetch = shouldAutoFetch)
-            logger.warn("✅ Model assignment callbacks registered")
+            // IMPORTANT: Register WITHOUT auto-fetch first to avoid threading issues
+            // The C++ auto-fetch mechanism can cause state issues when called during JNI registration
+            // This mirrors Swift SDK which always registers with autoFetch: false
+            logger.info("========== STEP 2: MODEL ASSIGNMENT REGISTRATION ==========")
+            val shouldFetchModels = _environment != Environment.DEVELOPMENT
+            logger.info("📦 Environment: ${_environment.name}, shouldFetchModels: $shouldFetchModels")
+            logger.info("📦 Registering model assignment callbacks (autoFetch: false)")
+            val registrationSucceeded = CppBridgeModelAssignment.register(autoFetch = false)  // Always false!
+            logger.info("📦 Registration result: $registrationSucceeded")
+            
+            // If auto-fetch is needed, trigger it asynchronously off the synchronized block
+            // This mirrors Swift SDK's Task.detached pattern:
+            //   Task.detached {
+            //       _ = try await ModelAssignment.fetch(forceRefresh: true)
+            //   }
+            // By fetching asynchronously, we:
+            // 1. Avoid blocking the initialization thread
+            // 2. Ensure callbacks are fully registered before HTTP fetch begins
+            if (shouldFetchModels && registrationSucceeded) {
+                logger.info("📦 Will fetch model assignments asynchronously...")
+                sdkScope.launch {
+                    try {
+                        logger.info("📦 [Async] Fetching model assignments from backend (forceRefresh=true)...")
+                        val assignmentsJson = CppBridgeModelAssignment.fetchModelAssignments(forceRefresh = true)
+                        logger.info("📦 [Async] Model assignments fetched successfully (${assignmentsJson.length} chars)")
+                        logger.info("📦 [Async] Response: ${assignmentsJson.take(500)}...")
+                    } catch (e: Exception) {
+                        logger.warn("📦 [Async] Model assignment fetch failed (non-critical): ${e.message}")
+                    }
+                }
+            } else if (!registrationSucceeded) {
+                logger.error("📦 Skipping model assignment fetch - callback registration failed")
+                logger.error("📦 This may indicate a JNI method signature mismatch or native library issue")
+            } else {
+                logger.info("📦 Skipping model fetch (development mode)")
+            }
+            logger.info("========== STEP 2 COMPLETE ==========")
 
             // Register platform services callbacks
-            logger.warn("🔍 About to register platform services")
             CppBridgePlatform.register()
-            logger.warn("✅ Platform services registered")
 
             // Flush any queued telemetry events now that HTTP should be configured
             // This ensures events queued during Phase 1 initialization are sent
-            logger.warn("🔍 About to flush telemetry")
             CppBridgeTelemetry.flush()
-            logger.warn("✅ Telemetry flushed")
 
             // Trigger device registration with backend (non-blocking, best-effort)
             // Mirrors Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
-            logger.warn("🔍 About to trigger device registration")
             try {
                 val deviceId = CppBridgeDevice.getDeviceIdCallback()
 
@@ -479,7 +495,7 @@ object CppBridge {
             }
 
             _servicesInitialized = true
-            logger.warn("✅ Services initialization complete")
+            logger.info("✅ Phase 2 services initialization complete")
         }
     }
 
@@ -493,6 +509,9 @@ object CppBridge {
             if (!_isInitialized) {
                 return
             }
+
+            // Cancel any pending async operations
+            sdkScope.cancel()
 
             // Unregister Phase 2 services (reverse order)
             if (_servicesInitialized) {

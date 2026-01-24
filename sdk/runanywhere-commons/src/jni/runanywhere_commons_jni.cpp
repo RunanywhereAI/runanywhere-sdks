@@ -1898,11 +1898,14 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryUpdateD
 // Mirrors Swift SDK's CppBridge+ModelAssignment.swift
 
 // Global state for model assignment callbacks
+// NOTE: Using recursive_mutex to allow callback re-entry during auto_fetch
+// The flow is: setCallbacks() -> rac_model_assignment_set_callbacks() -> fetch() -> http_get_callback()
+// All on the same thread, so a recursive mutex is required
 static struct {
     JavaVM* jvm;
     jobject callback_obj;
     jmethodID http_get_method;
-    std::mutex mutex;
+    std::recursive_mutex mutex;  // Must be recursive to allow callback during auto_fetch
     bool callbacks_registered;
 } g_model_assignment_state = {nullptr, nullptr, nullptr, {}, false};
 
@@ -1911,7 +1914,7 @@ static rac_result_t model_assignment_http_get_callback(const char* endpoint,
                                                         rac_bool_t requires_auth,
                                                         rac_assignment_http_response_t* out_response,
                                                         void* user_data) {
-    std::lock_guard<std::mutex> lock(g_model_assignment_state.mutex);
+    std::lock_guard<std::recursive_mutex> lock(g_model_assignment_state.mutex);
 
     if (!g_model_assignment_state.jvm || !g_model_assignment_state.callback_obj) {
         LOGe("model_assignment_http_get_callback: callbacks not registered");
@@ -1996,7 +1999,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelAssignmentSetCa
     JNIEnv* env, jclass clazz, jobject callback, jboolean autoFetch) {
     LOGi("racModelAssignmentSetCallbacks called, autoFetch=%d", autoFetch);
 
-    std::lock_guard<std::mutex> lock(g_model_assignment_state.mutex);
+    std::lock_guard<std::recursive_mutex> lock(g_model_assignment_state.mutex);
 
     // Clear previous callback if any
     if (g_model_assignment_state.callback_obj) {

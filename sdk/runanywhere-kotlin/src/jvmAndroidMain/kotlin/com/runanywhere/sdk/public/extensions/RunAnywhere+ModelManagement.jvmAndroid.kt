@@ -286,9 +286,11 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
         }
         downloadLogger.debug("Network status: $networkDescription")
 
-        // 1. Get model info from registered models
+        // 1. Get model info from registered models or bridge models
+        // First check registered models, then fall back to bridge models (from remote API)
         val modelInfo =
             getRegisteredModels().find { it.id == modelId }
+                ?: getAllBridgeModels().find { it.modelId == modelId }?.toPublicModelInfo()
                 ?: throw SDKError.model("Model '$modelId' not found in registry")
 
         val downloadUrl =
