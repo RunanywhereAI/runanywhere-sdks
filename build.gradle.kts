@@ -57,7 +57,7 @@ tasks.register("buildAll") {
         // Ensure local.properties exists in all necessary locations
         val locations = listOf(
             projectDir,  // Root
-            file("RunAnywhereAI/sdk/runanywhere-kotlin"),  // SDK
+            file("sdk/runanywhere-kotlin"),  // SDK
             file("examples/android/RunAnywhereAI")  // Android app
         )
 
@@ -132,7 +132,7 @@ tasks.register("buildAll") {
         println("=".repeat(70))
         println()
         println("SDK artifacts:")
-        println("  - Debug AAR: RunAnywhereAI/sdk/runanywhere-kotlin/build/outputs/aar/")
+        println("  - Debug AAR: sdk/runanywhere-kotlin/build/outputs/aar/")
         println("  - Maven Local: ~/.m2/repository/com/runanywhere/runanywhere-sdk/")
         println()
         println("Example apps:")
@@ -151,7 +151,7 @@ tasks.register("buildSdk") {
     description = "Build SDK only (creates local.properties if needed)"
 
     doFirst {
-        val sdkDir = file("RunAnywhereAI/sdk/runanywhere-kotlin")
+        val sdkDir = file("sdk/runanywhere-kotlin")
         val localProps = sdkDir.resolve("local.properties")
 
         if (!localProps.exists()) {
@@ -245,7 +245,7 @@ tasks.register("runAndroidApp") {
                 "am",
                 "start",
                 "-n",
-                "com.runanywhere.runanywhereai.debug/.MainActivity"
+                "com.runanywhere.runanywhereai.debug/com.runanywhere.runanywhereai.MainActivity"
             )
         }
 
@@ -329,7 +329,7 @@ tasks.register("cleanAll") {
         // Clean SDK
         println("Cleaning SDK...")
         delete(layout.buildDirectory)
-        file("RunAnywhereAI/sdk/runanywhere-kotlin/build").deleteRecursively()
+        file("sdk/runanywhere-kotlin/build").deleteRecursively()
 
         // Clean Android app
         println("Cleaning Android app...")
@@ -367,7 +367,7 @@ tasks.register("setupLocalProperties") {
 
         val locations = mapOf(
             "Root" to projectDir,
-            "SDK" to file("RunAnywhereAI/sdk/runanywhere-kotlin"),
+            "SDK" to file("sdk/runanywhere-kotlin"),
             "Android App" to file("examples/android/RunAnywhereAI")
         )
 
@@ -434,7 +434,7 @@ tasks.register("checkEnvironment") {
         println("local.properties files:")
         val locations = mapOf(
             "Root" to projectDir,
-            "SDK" to file("RunAnywhereAI/sdk/runanywhere-kotlin"),
+            "SDK" to file("sdk/runanywhere-kotlin"),
             "Android App" to file("examples/android/RunAnywhereAI")
         )
 
