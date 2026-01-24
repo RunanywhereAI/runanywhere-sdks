@@ -445,6 +445,34 @@ object RunAnywhereBridge {
     external fun racModelRegistryUpdateDownloadStatus(modelId: String, localPath: String?): Int
 
     // ========================================================================
+    // MODEL ASSIGNMENT (rac_model_assignment.h)
+    // Mirrors Swift SDK's CppBridge+ModelAssignment.swift
+    // ========================================================================
+
+    /**
+     * Set model assignment callbacks.
+     * The callback object must implement:
+     * - httpGet(endpoint: String, requiresAuth: Boolean): String (returns JSON response or "ERROR:message")
+     * - getDeviceInfo(): String (returns "deviceType|platform")
+     *
+     * @param callback Callback object implementing the required methods
+     * @param autoFetch If true, automatically fetch models after registration
+     * @return RAC_SUCCESS on success, error code on failure
+     */
+    @JvmStatic
+    external fun racModelAssignmentSetCallbacks(callback: Any, autoFetch: Boolean): Int
+
+    /**
+     * Fetch model assignments from backend.
+     * Results are cached and saved to the model registry.
+     *
+     * @param forceRefresh If true, bypass cache and fetch fresh data
+     * @return JSON array of model assignments
+     */
+    @JvmStatic
+    external fun racModelAssignmentFetch(forceRefresh: Boolean): String
+
+    // ========================================================================
     // AUDIO UTILS (rac_audio_utils.h)
     // ========================================================================
 

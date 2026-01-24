@@ -4,6 +4,7 @@ import android.app.Application
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.runanywhere.runanywhereai.presentation.settings.SettingsViewModel
 import com.runanywhere.sdk.core.onnx.ONNX
 import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
@@ -105,22 +106,43 @@ class RunAnywhereApplication : Application() {
 
         val startTime = System.currentTimeMillis()
 
+        // Check for custom API configuration (stored via Settings screen)
+        val customApiKey = SettingsViewModel.getStoredApiKey(this@RunAnywhereApplication)
+        val customBaseURL = SettingsViewModel.getStoredBaseURL(this@RunAnywhereApplication)
+        val hasCustomConfig = customApiKey != null && customBaseURL != null
+
+        if (hasCustomConfig) {
+            Log.i("RunAnywhereApp", "🔧 Found custom API configuration")
+            Log.i("RunAnywhereApp", "   Base URL: $customBaseURL")
+        }
+
         // Determine environment based on DEBUG_MODE (NOT BuildConfig.DEBUG!)
         // BuildConfig.DEBUG is tied to isDebuggable flag, which we set to true for release builds
         // to allow logging. BuildConfig.DEBUG_MODE correctly reflects debug vs release build type.
-        val environment =
+        val defaultEnvironment =
             if (BuildConfig.DEBUG_MODE) {
                 SDKEnvironment.DEVELOPMENT
             } else {
                 SDKEnvironment.PRODUCTION
             }
 
+        // If custom config is set, use production environment to enable the custom backend
+        val environment = if (hasCustomConfig) SDKEnvironment.PRODUCTION else defaultEnvironment
+
         // Initialize platform context first
         AndroidPlatformContext.initialize(this@RunAnywhereApplication)
 
         // Try to initialize SDK - log failures but continue regardless
         try {
-            if (environment == SDKEnvironment.DEVELOPMENT) {
+            if (hasCustomConfig) {
+                // Custom configuration mode - use stored API key and base URL
+                RunAnywhere.initialize(
+                    apiKey = customApiKey!!,
+                    baseURL = customBaseURL!!,
+                    environment = environment,
+                )
+                Log.i("RunAnywhereApp", "✅ SDK initialized with CUSTOM configuration (${environment.name.lowercase()})")
+            } else if (environment == SDKEnvironment.DEVELOPMENT) {
                 // DEVELOPMENT mode: Don't pass baseURL - SDK uses Supabase URL from C++ dev config
                 RunAnywhere.initialize(
                     environment = SDKEnvironment.DEVELOPMENT,

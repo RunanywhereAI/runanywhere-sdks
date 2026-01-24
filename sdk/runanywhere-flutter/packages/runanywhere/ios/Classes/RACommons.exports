@@ -83,7 +83,6 @@ _rac_download_task_free
 _rac_download_task_ids_free
 _rac_endpoint_device_registration
 _rac_endpoint_model_assignments
-_rac_endpoint_model_download
 _rac_endpoint_telemetry
 _rac_energy_vad_calculate_rms
 _rac_energy_vad_create

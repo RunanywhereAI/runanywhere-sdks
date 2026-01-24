@@ -94,7 +94,7 @@ object CppBridgeAuth {
     /**
      * Check if we're on the main thread and warn if so.
      * Network operations should use coroutines with Dispatchers.IO.
-     * 
+     *
      * Note: This is a soft check - callers should use proper coroutine dispatchers.
      */
     @Suppress("unused")
@@ -219,9 +219,9 @@ object CppBridgeAuth {
         _apiKey.set(apiKey)
 
         CppBridgePlatformAdapter.logCallback(
-            CppBridgePlatformAdapter.LogLevel.INFO,
+            CppBridgePlatformAdapter.LogLevel.WARN,
             TAG,
-            "🔐 Starting authentication with backend...",
+            "🔐 Starting authentication with backend at $baseUrl...",
         )
 
         // Build request body
@@ -238,9 +238,9 @@ object CppBridgeAuth {
         val fullUrl = baseUrl.trimEnd('/') + ENDPOINT_AUTHENTICATE
 
         CppBridgePlatformAdapter.logCallback(
-            CppBridgePlatformAdapter.LogLevel.DEBUG,
+            CppBridgePlatformAdapter.LogLevel.WARN,
             TAG,
-            "Auth request to: $fullUrl",
+            "🔐 Auth request to: $fullUrl",
         )
 
         // Make HTTP request
@@ -275,7 +275,7 @@ object CppBridgeAuth {
                 storeAuthState(response)
 
                 CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.INFO,
+                    CppBridgePlatformAdapter.LogLevel.WARN,
                     TAG,
                     "✅ Authentication successful! Token expires in ${response.expiresIn}s",
                 )

@@ -159,15 +159,25 @@ object CppBridge {
             // In development mode, we use Supabase URL from C++ dev config
             // NOTE: Authentication is deferred to Phase 2 (initializeServices) to avoid blocking
             // This matches Swift SDK where authentication is done in completeServicesInitialization()
+            // Using warn() for debug logs to ensure visibility in PRODUCTION mode (which filters INFO)
+            logger.warn("🔍 CppBridge.initialize: environment=$environment, apiKey=${if (apiKey.isNullOrEmpty()) "EMPTY" else "SET (${apiKey?.length} chars)"}, baseURL=${baseURL?.take(50)}")
             if (environment != Environment.DEVELOPMENT) {
                 if (!baseURL.isNullOrEmpty()) {
                     CppBridgeTelemetry.setBaseUrl(baseURL)
-                    logger.info("Telemetry base URL configured: ${baseURL.take(50)}...")
+                    logger.warn("✅ Telemetry base URL set: ${baseURL.take(50)}...")
+                } else {
+                    logger.warn("⚠️ baseURL is null or empty, not setting telemetry base URL")
                 }
                 if (!apiKey.isNullOrEmpty()) {
                     CppBridgeTelemetry.setApiKey(apiKey)
-                    logger.info("Telemetry API key configured")
+                    logger.warn("✅ Telemetry API key set (${apiKey.length} chars)")
+                } else {
+                    logger.warn("⚠️ apiKey is null or empty, not setting telemetry API key")
                 }
+                // Verify values were stored correctly
+                val storedBaseUrl = CppBridgeTelemetry.getBaseUrl()
+                val storedApiKey = CppBridgeTelemetry.getApiKey()
+                logger.warn("🔍 Verification: storedBaseUrl=${storedBaseUrl?.take(50)}, storedApiKey=${if (storedApiKey.isNullOrEmpty()) "EMPTY" else "SET (${storedApiKey?.length} chars)"}")
                 // Store credentials for Phase 2 authentication
                 // Authentication is deferred to initializeServices() which runs on background thread
                 logger.debug("Production/staging mode: authentication will occur in Phase 2 (initializeServices)")
@@ -372,14 +382,18 @@ object CppBridge {
             // Step 1: Authenticate with backend for production/staging mode
             // This is done in Phase 2 (not Phase 1) to avoid blocking main thread
             // Mirrors Swift SDK's CppBridge.Auth.authenticate() in completeServicesInitialization()
+            // Using warn() for debug logs to ensure visibility in PRODUCTION mode (which filters INFO)
+            logger.warn("🔍 initializeServices: environment=$_environment")
             if (_environment != Environment.DEVELOPMENT) {
                 val baseUrl = CppBridgeTelemetry.getBaseUrl()
                 val apiKey = CppBridgeTelemetry.getApiKey()
+                logger.warn("🔍 initializeServices: baseUrl=${baseUrl?.take(50)}, apiKey=${if (apiKey.isNullOrEmpty()) "EMPTY" else "SET (${apiKey.length} chars)"}")
 
                 if (!apiKey.isNullOrEmpty() && !baseUrl.isNullOrEmpty()) {
                     try {
-                        logger.info("🔐 Authenticating with backend...")
+                        logger.warn("🔐 Authenticating with backend at $baseUrl...")
                         val deviceId = CppBridgeDevice.getDeviceId() ?: CppBridgeDevice.getDeviceIdCallback()
+                        logger.warn("🔐 Using deviceId: $deviceId")
                         CppBridgeAuth.authenticate(
                             apiKey = apiKey,
                             baseUrl = baseUrl,
@@ -387,30 +401,40 @@ object CppBridge {
                             platform = "android",
                             sdkVersion = com.runanywhere.sdk.utils.SDKConstants.SDK_VERSION,
                         )
-                        logger.info("✅ Authentication successful!")
+                        logger.warn("✅ Authentication successful!")
                     } catch (e: Exception) {
                         logger.error("❌ Authentication failed: ${e.message}")
+                        logger.error("❌ Exception type: ${e.javaClass.simpleName}")
+                        e.printStackTrace()
                         logger.warn("SDK will continue but API requests may fail")
                         // Non-fatal: continue with services initialization
                     }
                 } else {
-                    logger.warn("Missing API key or base URL for authentication")
+                    logger.warn("⚠️ Missing API key or base URL for authentication - apiKey=${apiKey?.length}, baseUrl=${baseUrl?.length}")
                 }
             }
 
             // Step 2: Register model assignment callbacks
-            CppBridgeModelAssignment.register()
+            // Only auto-fetch in staging/production, not development
+            val shouldAutoFetch = _environment != Environment.DEVELOPMENT
+            logger.warn("🔍 About to register model assignment callbacks (autoFetch=$shouldAutoFetch)")
+            CppBridgeModelAssignment.register(autoFetch = shouldAutoFetch)
+            logger.warn("✅ Model assignment callbacks registered")
 
             // Register platform services callbacks
+            logger.warn("🔍 About to register platform services")
             CppBridgePlatform.register()
+            logger.warn("✅ Platform services registered")
 
             // Flush any queued telemetry events now that HTTP should be configured
             // This ensures events queued during Phase 1 initialization are sent
+            logger.warn("🔍 About to flush telemetry")
             CppBridgeTelemetry.flush()
-            logger.debug("Flushed queued telemetry events after services initialization")
+            logger.warn("✅ Telemetry flushed")
 
             // Trigger device registration with backend (non-blocking, best-effort)
             // Mirrors Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
+            logger.warn("🔍 About to trigger device registration")
             try {
                 val deviceId = CppBridgeDevice.getDeviceIdCallback()
 
@@ -455,7 +479,7 @@ object CppBridge {
             }
 
             _servicesInitialized = true
-            logger.info("✅ Services initialization complete")
+            logger.warn("✅ Services initialization complete")
         }
     }
 

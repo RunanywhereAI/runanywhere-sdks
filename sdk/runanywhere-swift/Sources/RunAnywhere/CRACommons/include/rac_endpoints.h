@@ -62,24 +62,10 @@ const char* rac_endpoint_device_registration(rac_environment_t env);
 const char* rac_endpoint_telemetry(rac_environment_t env);
 
 /**
- * @brief Build model assignments endpoint with query params
- * @param device_type Device type (e.g., "iphone", "android_phone")
- * @param platform Platform (e.g., "ios", "android")
- * @param out_buffer Buffer to write endpoint path
- * @param buffer_size Size of buffer
- * @return Length of written string, or -1 on error
+ * @brief Get model assignments endpoint
+ * @return Endpoint path string
  */
-int rac_endpoint_model_assignments(const char* device_type, const char* platform, char* out_buffer,
-                                   size_t buffer_size);
-
-/**
- * @brief Build model download endpoint
- * @param model_id The model ID
- * @param out_buffer Buffer to write endpoint path
- * @param buffer_size Size of buffer
- * @return Length of written string, or -1 on error
- */
-int rac_endpoint_model_download(const char* model_id, char* out_buffer, size_t buffer_size);
+const char* rac_endpoint_model_assignments(void);
 
 // =============================================================================
 // Full URL Building

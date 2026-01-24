@@ -79,10 +79,9 @@ enum class APIEndpoint(
             }
 
         /**
-         * Get model assignments endpoint with query parameters
-         * Matches iOS: APIEndpoint.modelAssignments(deviceType:platform:)
+         * Get model assignments endpoint
+         * Matches iOS: APIEndpoint.modelAssignments()
          */
-        fun modelAssignments(deviceType: String, platform: String): String =
-            "/api/v1/model-assignments/for-sdk?device_type=$deviceType&platform=$platform"
+        fun modelAssignments(): String = "/api/v1/model-assignments/for-sdk"
     }
 }

@@ -1,7 +1,17 @@
 // swift-tools-version: 5.9
-// Modern SPM setup for RunAnywhere iOS Example App
-// This Package.swift provides a clean dependency manifest for the iOS app.
-// The app still uses the Xcode project for building, but dependencies are managed here.
+// =============================================================================
+// RunAnywhereAI - iOS Example App
+// =============================================================================
+//
+// This example app demonstrates how to use the RunAnywhere SDK.
+//
+// SETUP (first time):
+//   cd ../../sdk/runanywhere-swift
+//   ./scripts/build-swift.sh --setup
+//
+// Then open this project in Xcode and build.
+//
+// =============================================================================
 
 import PackageDescription
 
@@ -13,7 +23,6 @@ let package = Package(
         .macOS(.v14)
     ],
     products: [
-        // The main app library
         .library(
             name: "RunAnywhereAI",
             targets: ["RunAnywhereAI"]
@@ -21,42 +30,24 @@ let package = Package(
     ],
     dependencies: [
         // ===================================
-        // SINGLE SDK DEPENDENCY
+        // RunAnywhere SDK (local path to repo root)
         // ===================================
-        // All modules are now consolidated in the main RunAnywhere SDK.
-        // Users pick which products they need from this single package.
-        .package(path: "../../../sdk/runanywhere-swift"),
-
-        // ===================================
-        // TRANSITIVE DEPENDENCIES (auto-included)
-        // ===================================
-        // The following dependencies are automatically pulled in
-        // by the RunAnywhere SDK and its modules:
-        //
-        // Via RunAnywhere SDK:
-        // - Alamofire 5.10.2 (networking)
-        // - DeviceKit 5.6.0 (device info)
-        // - Files 4.3.0 (file management)
-        // - ZIPFoundation 0.9.19 (archive handling)
-        // - GRDB 7.6.1 (database)
-        // - swift-crypto 3.14.0 (cryptography)
-        // - Pulse 4.2.7 (logging)
-        //
-        // Via Optional Modules:
-        // - ONNX Runtime binary (via RunAnywhereONNX)
-        // - LlamaCPP binary (via RunAnywhereLlamaCPP)
-        // ===================================
+        // Points to the root Package.swift which contains:
+        //   - RunAnywhere (core)
+        //   - RunAnywhereONNX (STT/TTS/VAD)
+        //   - RunAnywhereLlamaCPP (LLM)
+        .package(path: "../../.."),
     ],
     targets: [
         .target(
             name: "RunAnywhereAI",
             dependencies: [
                 // Core SDK (always needed)
-                .product(name: "RunAnywhere", package: "runanywhere-swift"),
+                .product(name: "RunAnywhere", package: "runanywhere-sdks"),
 
                 // Optional modules - pick what you need:
-                .product(name: "RunAnywhereONNX", package: "runanywhere-swift"),           // ONNX STT/TTS/VAD
-                .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-swift"),       // LlamaCPP LLM (runanywhere-core backend)
+                .product(name: "RunAnywhereONNX", package: "runanywhere-sdks"),       // STT/TTS/VAD
+                .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-sdks"),   // LLM
             ],
             path: "RunAnywhereAI",
             exclude: [

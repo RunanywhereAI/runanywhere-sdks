@@ -195,16 +195,11 @@ public struct SDKInitParams {
     ) throws {
         let logger = SDKLogger(category: "SDKInitParams")
 
-        // 1. Swift-only: Check DEBUG build for production (compile-time check)
-        if environment == .production {
-            #if DEBUG
-            throw SDKError.general(.environmentMismatch,
-                "Production environment cannot be used in DEBUG builds. " +
-                "Use .development or .staging for testing, or build in Release mode.")
-            #endif
-        }
+        // Note: We allow any environment in DEBUG builds to support developer testing
+        // with custom backends. The environment parameter is informational for
+        // logging and behavior configuration, not a security boundary.
 
-        // 2. Call C++ validation for API key and URL
+        // Call C++ validation for API key and URL
         let cEnv = environment.cEnvironment
 
         // Validate API key via C++

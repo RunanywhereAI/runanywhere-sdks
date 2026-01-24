@@ -23,7 +23,7 @@ struct CombinedSettingsView: View {
             #endif
         }
         .sheet(isPresented: $viewModel.showApiKeyEntry) {
-            ApiKeySheet(viewModel: viewModel)
+            ApiConfigurationSheet(viewModel: viewModel)
         }
         .task {
             await viewModel.loadStorageData()
@@ -36,6 +36,13 @@ struct CombinedSettingsView: View {
             if let error = viewModel.errorMessage {
                 Text(error)
             }
+        }
+        .alert("Restart Required", isPresented: $viewModel.showRestartAlert) {
+            Button("OK") {
+                viewModel.showRestartAlert = false
+            }
+        } message: {
+            Text("Please restart the app for the new API configuration to take effect. The SDK will be reinitialized with your custom settings.")
         }
     }
 }
@@ -64,8 +71,8 @@ private struct IOSSettingsContent: View {
                 )
             }
 
-            // API Configuration
-            Section("API Configuration") {
+            // API Configuration (for testing custom backend)
+            Section {
                 Button(
                     action: { viewModel.showApiKeySheet() },
                     label: {
@@ -84,6 +91,39 @@ private struct IOSSettingsContent: View {
                         }
                     }
                 )
+
+                HStack {
+                    Text("Base URL")
+                    Spacer()
+                    if viewModel.isBaseURLConfigured {
+                        Text("Configured")
+                            .foregroundColor(AppColors.statusGreen)
+                            .font(AppTypography.caption)
+                    } else {
+                        Text("Using Default")
+                            .foregroundColor(AppColors.textSecondary)
+                            .font(AppTypography.caption)
+                    }
+                }
+
+                if viewModel.isApiConfigurationComplete {
+                    Button(
+                        action: { viewModel.clearApiConfiguration() },
+                        label: {
+                            HStack {
+                                Image(systemName: "trash")
+                                    .foregroundColor(AppColors.primaryRed)
+                                Text("Clear Custom Configuration")
+                                    .foregroundColor(AppColors.primaryRed)
+                            }
+                        }
+                    )
+                }
+            } header: {
+                Text("API Configuration (Testing)")
+            } footer: {
+                Text("Configure custom API key and base URL for testing. Requires app restart to take effect.")
+                    .font(AppTypography.caption)
             }
 
             // Storage Overview Section
@@ -260,7 +300,7 @@ private struct APIConfigurationCard: View {
     @ObservedObject var viewModel: SettingsViewModel
 
     var body: some View {
-        SettingsCard(title: "API Configuration") {
+        SettingsCard(title: "API Configuration (Testing)") {
             VStack(alignment: .leading, spacing: AppSpacing.padding15) {
                 HStack {
                     Text("API Key")
@@ -277,13 +317,44 @@ private struct APIConfigurationCard: View {
                     }
 
                     Spacer()
+                }
 
+                HStack {
+                    Text("Base URL")
+                        .frame(width: 150, alignment: .leading)
+
+                    if viewModel.isBaseURLConfigured {
+                        Text("Configured")
+                            .foregroundColor(AppColors.statusGreen)
+                            .font(AppTypography.caption)
+                    } else {
+                        Text("Using Default")
+                            .foregroundColor(AppColors.textSecondary)
+                            .font(AppTypography.caption)
+                    }
+
+                    Spacer()
+                }
+
+                HStack {
                     Button("Configure") {
                         viewModel.showApiKeySheet()
                     }
                     .buttonStyle(.bordered)
                     .tint(AppColors.primaryAccent)
+
+                    if viewModel.isApiConfigurationComplete {
+                        Button("Clear") {
+                            viewModel.clearApiConfiguration()
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(AppColors.primaryRed)
+                    }
                 }
+
+                Text("Configure custom API key and base URL for testing. Requires app restart.")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
             }
         }
     }
@@ -559,7 +630,7 @@ private struct StorageManagementButton: View {
     }
 }
 
-private struct ApiKeySheet: View {
+private struct ApiConfigurationSheet: View {
     @ObservedObject var viewModel: SettingsViewModel
 
     var body: some View {
@@ -572,17 +643,43 @@ private struct ApiKeySheet: View {
                         .autocapitalization(.none)
                         #endif
                 } header: {
-                    Text("RunAnywhere API Key")
+                    Text("API Key")
                 } footer: {
-                    Text("Your API key is stored securely in the keychain")
+                    Text("Your API key for authenticating with the backend")
                         .font(AppTypography.caption)
+                }
+
+                Section {
+                    TextField("https://api.example.com", text: $viewModel.baseURL)
+                        .textContentType(.URL)
+                        #if os(iOS)
+                        .autocapitalization(.none)
+                        .keyboardType(.URL)
+                        #endif
+                } header: {
+                    Text("Base URL")
+                } footer: {
+                    Text("The backend API URL (e.g., https://api.runanywhere.ai)")
+                        .font(AppTypography.caption)
+                }
+
+                Section {
+                    VStack(alignment: .leading, spacing: AppSpacing.small) {
+                        Label("Important", systemImage: "exclamationmark.triangle")
+                            .foregroundColor(AppColors.primaryOrange)
+                            .font(AppTypography.subheadlineMedium)
+
+                        Text("After saving, you must restart the app for changes to take effect. The SDK will reinitialize with your custom configuration.")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.textSecondary)
+                    }
                 }
             }
             #if os(macOS)
             .formStyle(.grouped)
-            .frame(minWidth: AppLayout.macOSMinWidth, idealWidth: 450, minHeight: 200, idealHeight: 250)
+            .frame(minWidth: AppLayout.macOSMinWidth, idealWidth: 500, minHeight: 350, idealHeight: 400)
             #endif
-            .navigationTitle("API Key")
+            .navigationTitle("API Configuration")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -595,9 +692,9 @@ private struct ApiKeySheet: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
-                        viewModel.saveApiKey()
+                        viewModel.saveApiConfiguration()
                     }
-                    .disabled(viewModel.apiKey.isEmpty)
+                    .disabled(viewModel.apiKey.isEmpty || viewModel.baseURL.isEmpty)
                 }
                 #else
                 ToolbarItem(placement: .cancellationAction) {
@@ -608,9 +705,9 @@ private struct ApiKeySheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        viewModel.saveApiKey()
+                        viewModel.saveApiConfiguration()
                     }
-                    .disabled(viewModel.apiKey.isEmpty)
+                    .disabled(viewModel.apiKey.isEmpty || viewModel.baseURL.isEmpty)
                     .keyboardShortcut(.return)
                 }
                 #endif

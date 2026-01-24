@@ -21,7 +21,9 @@ class SettingsViewModel: ObservableObject {
 
     // API Configuration
     @Published var apiKey: String = ""
+    @Published var baseURL: String = ""
     @Published var isApiKeyConfigured: Bool = false
+    @Published var isBaseURLConfigured: Bool = false
 
     // Logging Configuration
     @Published var analyticsLogToLocal: Bool = false
@@ -36,15 +38,52 @@ class SettingsViewModel: ObservableObject {
     @Published var showApiKeyEntry: Bool = false
     @Published var isLoadingStorage: Bool = false
     @Published var errorMessage: String?
+    @Published var showRestartAlert: Bool = false
 
     // MARK: - Private Properties
 
     private var cancellables = Set<AnyCancellable>()
     private let keychainService = KeychainService.shared
     private let apiKeyStorageKey = "runanywhere_api_key"
+    private let baseURLStorageKey = "runanywhere_base_url"
     private let temperatureDefaultsKey = "defaultTemperature"
     private let maxTokensDefaultsKey = "defaultMaxTokens"
     private let analyticsLogKey = "analyticsLogToLocal"
+    private let deviceRegisteredKey = "com.runanywhere.sdk.deviceRegistered"
+
+    // MARK: - Static helpers for app initialization
+    static let shared = SettingsViewModel()
+
+    /// Get stored API key (for use at app launch)
+    static func getStoredApiKey() -> String? {
+        guard let data = try? KeychainService.shared.retrieve(key: "runanywhere_api_key"),
+              let value = String(data: data, encoding: .utf8),
+              !value.isEmpty else {
+            return nil
+        }
+        return value
+    }
+
+    /// Get stored base URL (for use at app launch)
+    /// Automatically adds https:// if no scheme is present
+    static func getStoredBaseURL() -> String? {
+        guard let data = try? KeychainService.shared.retrieve(key: "runanywhere_base_url"),
+              let value = String(data: data, encoding: .utf8),
+              !value.isEmpty else {
+            return nil
+        }
+        // Normalize URL by adding https:// if no scheme present
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") {
+            return trimmed
+        }
+        return "https://\(trimmed)"
+    }
+
+    /// Check if custom configuration is set
+    static var hasCustomConfiguration: Bool {
+        getStoredApiKey() != nil && getStoredBaseURL() != nil
+    }
 
     // MARK: - Initialization
 
@@ -105,12 +144,24 @@ class SettingsViewModel: ObservableObject {
     private func loadApiKeyConfiguration() {
         // Load API key from keychain
         if let apiKeyData = try? keychainService.retrieve(key: apiKeyStorageKey),
-           let savedApiKey = String(data: apiKeyData, encoding: .utf8) {
+           let savedApiKey = String(data: apiKeyData, encoding: .utf8),
+           !savedApiKey.isEmpty {
             apiKey = savedApiKey
             isApiKeyConfigured = true
         } else {
             apiKey = ""
             isApiKeyConfigured = false
+        }
+
+        // Load Base URL from keychain
+        if let baseURLData = try? keychainService.retrieve(key: baseURLStorageKey),
+           let savedBaseURL = String(data: baseURLData, encoding: .utf8),
+           !savedBaseURL.isEmpty {
+            baseURL = savedBaseURL
+            isBaseURLConfigured = true
+        } else {
+            baseURL = ""
+            isBaseURLConfigured = false
         }
     }
 
@@ -138,51 +189,109 @@ class SettingsViewModel: ObservableObject {
         )
     }
 
-    // MARK: - API Key Management
+    // MARK: - API Configuration Management
 
-    /// Save API key to secure storage
-    func saveApiKey() {
-        guard !apiKey.isEmpty else {
-            errorMessage = "API key cannot be empty"
-            return
+    /// Normalize base URL by adding https:// if no scheme is present
+    private func normalizeBaseURL(_ url: String) -> String {
+        let trimmed = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return trimmed
         }
 
-        if let apiKeyData = apiKey.data(using: .utf8) {
-            do {
-                try keychainService.save(key: apiKeyStorageKey, data: apiKeyData)
-                isApiKeyConfigured = true
-                showApiKeyEntry = false
-                errorMessage = nil
-                print("Settings: API key saved successfully")
-            } catch {
-                errorMessage = "Failed to save API key: \(error.localizedDescription)"
+        // Check if URL already has a scheme
+        if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") {
+            return trimmed
+        }
+
+        // Add https:// prefix
+        return "https://\(trimmed)"
+    }
+
+    /// Save API key and Base URL to secure storage
+    func saveApiConfiguration() {
+        var hasError = false
+
+        // Save API key if provided
+        if !apiKey.isEmpty {
+            if let apiKeyData = apiKey.data(using: .utf8) {
+                do {
+                    try keychainService.save(key: apiKeyStorageKey, data: apiKeyData)
+                    isApiKeyConfigured = true
+                    print("Settings: API key saved successfully")
+                } catch {
+                    errorMessage = "Failed to save API key: \(error.localizedDescription)"
+                    hasError = true
+                }
             }
         }
-    }
 
-    /// Delete API key from secure storage
-    func deleteApiKey() {
-        do {
-            try keychainService.delete(key: apiKeyStorageKey)
-            apiKey = ""
-            isApiKeyConfigured = false
+        // Save Base URL if provided (normalize to add https:// if missing)
+        if !baseURL.isEmpty {
+            let normalizedURL = normalizeBaseURL(baseURL)
+            baseURL = normalizedURL  // Update the displayed value too
+
+            if let baseURLData = normalizedURL.data(using: .utf8) {
+                do {
+                    try keychainService.save(key: baseURLStorageKey, data: baseURLData)
+                    isBaseURLConfigured = true
+                    print("Settings: Base URL saved successfully: \(normalizedURL)")
+                } catch {
+                    errorMessage = "Failed to save Base URL: \(error.localizedDescription)"
+                    hasError = true
+                }
+            }
+        }
+
+        if !hasError {
+            showApiKeyEntry = false
             errorMessage = nil
-            print("Settings: API key deleted successfully")
-        } catch {
-            errorMessage = "Failed to delete API key: \(error.localizedDescription)"
+            // Show restart alert
+            showRestartAlert = true
         }
     }
 
-    /// Show the API key entry sheet
+    /// Delete API configuration from secure storage
+    func clearApiConfiguration() {
+        do {
+            try keychainService.delete(key: apiKeyStorageKey)
+            try keychainService.delete(key: baseURLStorageKey)
+            apiKey = ""
+            baseURL = ""
+            isApiKeyConfigured = false
+            isBaseURLConfigured = false
+            errorMessage = nil
+
+            // Also clear device registration so it re-registers with new config
+            clearDeviceRegistration()
+
+            print("Settings: API configuration cleared successfully")
+            showRestartAlert = true
+        } catch {
+            errorMessage = "Failed to clear API configuration: \(error.localizedDescription)"
+        }
+    }
+
+    /// Clear device registration status (forces re-registration on next launch)
+    func clearDeviceRegistration() {
+        UserDefaults.standard.removeObject(forKey: deviceRegisteredKey)
+        print("Settings: Device registration cleared - will re-register on next launch")
+    }
+
+    /// Show the API configuration sheet
     func showApiKeySheet() {
         showApiKeyEntry = true
     }
 
     /// Cancel API key entry
     func cancelApiKeyEntry() {
-        // Reload the saved API key if canceling
+        // Reload the saved configuration if canceling
         loadApiKeyConfiguration()
         showApiKeyEntry = false
+    }
+
+    /// Check if API configuration is complete (both key and URL set)
+    var isApiConfigurationComplete: Bool {
+        isApiKeyConfigured && isBaseURLConfigured
     }
 
     // MARK: - Logging Configuration

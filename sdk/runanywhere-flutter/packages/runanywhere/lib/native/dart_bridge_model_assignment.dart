@@ -33,7 +33,8 @@ class DartBridgeModelAssignment {
   DartBridgeModelAssignment._();
 
   static final _logger = SDKLogger('DartBridge.ModelAssignment');
-  static final DartBridgeModelAssignment instance = DartBridgeModelAssignment._();
+  static final DartBridgeModelAssignment instance =
+      DartBridgeModelAssignment._();
 
   static bool _isRegistered = false;
   static Pointer<RacAssignmentCallbacksStruct>? _callbacksPtr;
@@ -47,8 +48,12 @@ class DartBridgeModelAssignment {
   // ============================================================================
 
   /// Register model assignment callbacks with C++
+  ///
+  /// [autoFetch] Whether to auto-fetch models after registration.
+  ///             Should be false for development mode, true for staging/production.
   static Future<void> register({
     required SDKEnvironment environment,
+    bool autoFetch = false,
     String? baseURL,
     String? accessToken,
   }) async {
@@ -66,16 +71,15 @@ class DartBridgeModelAssignment {
       _callbacksPtr!.ref.httpGet =
           Pointer.fromFunction<RacAssignmentHttpGetCallbackNative>(
               _httpGetCallback, _exceptionalReturnInt32);
-      _callbacksPtr!.ref.getDeviceInfo =
-          Pointer.fromFunction<RacAssignmentGetDeviceInfoCallbackNative>(
-              _getDeviceInfoCallback);
       _callbacksPtr!.ref.userData = nullptr;
+      // Only auto-fetch in staging/production, not development
+      _callbacksPtr!.ref.autoFetch = autoFetch ? 1 : 0;
 
       // Register with C++
       final setCallbacks = lib.lookupFunction<
-          Int32 Function(Pointer<RacAssignmentCallbacksStruct>),
-          int Function(
-              Pointer<RacAssignmentCallbacksStruct>)>('rac_model_assignment_set_callbacks');
+              Int32 Function(Pointer<RacAssignmentCallbacksStruct>),
+              int Function(Pointer<RacAssignmentCallbacksStruct>)>(
+          'rac_model_assignment_set_callbacks');
 
       final result = setCallbacks(_callbacksPtr!);
       if (result != RacResultCode.success) {
@@ -87,7 +91,8 @@ class DartBridgeModelAssignment {
       }
 
       _isRegistered = true;
-      _logger.debug('Model assignment callbacks registered');
+      _logger.debug(
+          'Model assignment callbacks registered (autoFetch: $autoFetch)');
     } catch (e) {
       _logger.debug('Model assignment registration error: $e');
       _isRegistered = true; // Avoid retry loops
@@ -108,7 +113,8 @@ class DartBridgeModelAssignment {
     try {
       final lib = PlatformLoader.loadCommons();
       final fetchFn = lib.lookupFunction<
-          Int32 Function(Int32, Pointer<Pointer<Pointer<RacModelInfoStruct>>>, Pointer<IntPtr>),
+          Int32 Function(Int32, Pointer<Pointer<Pointer<RacModelInfoStruct>>>,
+              Pointer<IntPtr>),
           int Function(int, Pointer<Pointer<Pointer<RacModelInfoStruct>>>,
               Pointer<IntPtr>)>('rac_model_assignment_fetch');
 
@@ -118,7 +124,8 @@ class DartBridgeModelAssignment {
       try {
         final result = fetchFn(forceRefresh ? 1 : 0, outModelsPtr, outCountPtr);
         if (result != RacResultCode.success) {
-          _logger.warning('Fetch assignments failed', metadata: {'code': result});
+          _logger
+              .warning('Fetch assignments failed', metadata: {'code': result});
           return [];
         }
 
@@ -158,7 +165,8 @@ class DartBridgeModelAssignment {
     try {
       final lib = PlatformLoader.loadCommons();
       final getByFn = lib.lookupFunction<
-          Int32 Function(Int32, Pointer<Pointer<Pointer<RacModelInfoStruct>>>, Pointer<IntPtr>),
+          Int32 Function(Int32, Pointer<Pointer<Pointer<RacModelInfoStruct>>>,
+              Pointer<IntPtr>),
           int Function(int, Pointer<Pointer<Pointer<RacModelInfoStruct>>>,
               Pointer<IntPtr>)>('rac_model_assignment_get_by_framework');
 
@@ -198,7 +206,8 @@ class DartBridgeModelAssignment {
     try {
       final lib = PlatformLoader.loadCommons();
       final getByFn = lib.lookupFunction<
-          Int32 Function(Int32, Pointer<Pointer<Pointer<RacModelInfoStruct>>>, Pointer<IntPtr>),
+          Int32 Function(Int32, Pointer<Pointer<Pointer<RacModelInfoStruct>>>,
+              Pointer<IntPtr>),
           int Function(int, Pointer<Pointer<Pointer<RacModelInfoStruct>>>,
               Pointer<IntPtr>)>('rac_model_assignment_get_by_category');
 
@@ -233,30 +242,6 @@ class DartBridgeModelAssignment {
     }
   }
 
-  /// Clear cache
-  void clearCache() {
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final clearFn = lib.lookupFunction<Void Function(), void Function()>(
-          'rac_model_assignment_clear_cache');
-      clearFn();
-    } catch (e) {
-      _logger.debug('rac_model_assignment_clear_cache error: $e');
-    }
-  }
-
-  /// Set cache timeout
-  void setCacheTimeout(int seconds) {
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final setTimeoutFn = lib.lookupFunction<Void Function(Uint32),
-          void Function(int)>('rac_model_assignment_set_cache_timeout');
-      setTimeoutFn(seconds);
-    } catch (e) {
-      _logger.debug('rac_model_assignment_set_cache_timeout error: $e');
-    }
-  }
-
   // ============================================================================
   // Helpers
   // ============================================================================
@@ -270,9 +255,15 @@ class DartBridgeModelAssignment {
       framework: struct.ref.framework,
       source: struct.ref.source,
       sizeBytes: struct.ref.sizeBytes,
-      downloadURL: struct.ref.downloadURL != nullptr ? struct.ref.downloadURL.toDartString() : null,
-      localPath: struct.ref.localPath != nullptr ? struct.ref.localPath.toDartString() : null,
-      version: struct.ref.version != nullptr ? struct.ref.version.toDartString() : null,
+      downloadURL: struct.ref.downloadURL != nullptr
+          ? struct.ref.downloadURL.toDartString()
+          : null,
+      localPath: struct.ref.localPath != nullptr
+          ? struct.ref.localPath.toDartString()
+          : null,
+      version: struct.ref.version != nullptr
+          ? struct.ref.version.toDartString()
+          : null,
     );
   }
 }
@@ -309,7 +300,8 @@ void _performHttpGet(
   bool requiresAuth,
   Pointer<RacAssignmentHttpResponseStruct> outResponse,
 ) {
-  final baseURL = DartBridgeModelAssignment._baseURL ?? 'https://api.runanywhere.ai';
+  final baseURL =
+      DartBridgeModelAssignment._baseURL ?? 'https://api.runanywhere.ai';
   final url = Uri.parse('$baseURL$endpoint');
 
   final headers = <String, String>{
@@ -317,16 +309,18 @@ void _performHttpGet(
   };
 
   if (requiresAuth && DartBridgeModelAssignment._accessToken != null) {
-    headers['Authorization'] = 'Bearer ${DartBridgeModelAssignment._accessToken}';
+    headers['Authorization'] =
+        'Bearer ${DartBridgeModelAssignment._accessToken}';
   }
 
   unawaited(Future.microtask(() async {
     try {
       final response = await http.get(url, headers: headers);
 
-      outResponse.ref.result = response.statusCode >= 200 && response.statusCode < 300
-          ? RacResultCode.success
-          : RacResultCode.errorNetworkError;
+      outResponse.ref.result =
+          response.statusCode >= 200 && response.statusCode < 300
+              ? RacResultCode.success
+              : RacResultCode.errorNetworkError;
       outResponse.ref.statusCode = response.statusCode;
 
       if (response.body.isNotEmpty) {
@@ -348,67 +342,19 @@ void _performHttpGet(
 }
 
 // =============================================================================
-// Device Info Callback
-// =============================================================================
-
-/// Cached device type for sync access
-String? _cachedDeviceType;
-
-void _getDeviceInfoCallback(
-  Pointer<RacAssignmentDeviceInfoStruct> outInfo,
-  Pointer<Void> userData,
-) {
-  if (outInfo == nullptr) return;
-
-  try {
-    // Use cached or fallback
-    final deviceType = _cachedDeviceType ?? (Platform.isIOS ? 'iPhone' : 'Android');
-    final platform = Platform.isIOS ? 'iOS' : 'Android';
-
-    final deviceTypePtr = deviceType.toNativeUtf8();
-    final platformPtr = platform.toNativeUtf8();
-
-    outInfo.ref.deviceType = deviceTypePtr;
-    outInfo.ref.platform = platformPtr;
-  } catch (e) {
-    // Ignore
-  }
-}
-
-/// Pre-cache device info (call during init)
-Future<void> cacheDeviceInfo() async {
-  try {
-    final deviceInfo = DeviceInfoPlugin();
-
-    if (Platform.isIOS) {
-      final iosInfo = await deviceInfo.iosInfo;
-      _cachedDeviceType = iosInfo.utsname.machine;
-    } else if (Platform.isAndroid) {
-      final androidInfo = await deviceInfo.androidInfo;
-      _cachedDeviceType = androidInfo.model;
-    }
-  } catch (e) {
-    // Ignore
-  }
-}
-
-// =============================================================================
 // FFI Types
 // =============================================================================
 
 /// HTTP GET callback
-typedef RacAssignmentHttpGetCallbackNative = Int32 Function(
-    Pointer<Utf8>, Int32, Pointer<RacAssignmentHttpResponseStruct>, Pointer<Void>);
-
-/// Device info callback
-typedef RacAssignmentGetDeviceInfoCallbackNative = Void Function(
-    Pointer<RacAssignmentDeviceInfoStruct>, Pointer<Void>);
+typedef RacAssignmentHttpGetCallbackNative = Int32 Function(Pointer<Utf8>,
+    Int32, Pointer<RacAssignmentHttpResponseStruct>, Pointer<Void>);
 
 /// Callbacks struct
 base class RacAssignmentCallbacksStruct extends Struct {
   external Pointer<NativeFunction<RacAssignmentHttpGetCallbackNative>> httpGet;
-  external Pointer<NativeFunction<RacAssignmentGetDeviceInfoCallbackNative>> getDeviceInfo;
   external Pointer<Void> userData;
+  @Int32()
+  external int autoFetch; // If non-zero, auto-fetch models after registration
 }
 
 /// HTTP response struct
@@ -425,10 +371,4 @@ base class RacAssignmentHttpResponseStruct extends Struct {
   external int responseLength;
 
   external Pointer<Utf8> errorMessage;
-}
-
-/// Device info struct
-base class RacAssignmentDeviceInfoStruct extends Struct {
-  external Pointer<Utf8> deviceType;
-  external Pointer<Utf8> platform;
 }

@@ -37,6 +37,7 @@ import {
 import { RunAnywhere, SDKEnvironment, ModelCategory } from '@runanywhere/core';
 import { LlamaCPP } from '@runanywhere/llamacpp';
 import { ONNX, ModelArtifactType } from '@runanywhere/onnx';
+import { getStoredApiKey, getStoredBaseURL, hasCustomConfiguration } from './src/screens/SettingsScreen';
 
 /**
  * App initialization state
@@ -192,31 +193,33 @@ const App: React.FC = () => {
     try {
       const startTime = Date.now();
 
-      // =========================================================================
-      // SDK Initialization - Choose ONE mode below
-      // =========================================================================
+      // Check for custom API configuration (stored via Settings screen)
+      const customApiKey = await getStoredApiKey();
+      const customBaseURL = await getStoredBaseURL();
+      const hasCustomConfig = await hasCustomConfiguration();
 
-      // DEVELOPMENT mode (default) - uses Supabase directly
-      // Credentials come from runanywhere-commons/development_config.cpp (git-ignored)
-      // This is the safest option for committing to git
-      await RunAnywhere.initialize({
-        apiKey: '', // Empty in development mode - uses C++ dev config
-        baseURL: 'https://api.runanywhere.ai',
-        environment: SDKEnvironment.Development,
-      });
-      console.log('✅ SDK initialized in DEVELOPMENT mode (Supabase via C++ config)');
+      if (hasCustomConfig && customApiKey && customBaseURL) {
+        console.log('🔧 Found custom API configuration');
+        console.log(`   Base URL: ${customBaseURL}`);
 
-      // PRODUCTION mode - uncomment below and set your credentials
-      // WARNING: Do NOT commit real API keys to git!
-      // For production testing, set credentials via environment variables or config file
-      // const apiKey = process.env.RUNANYWHERE_API_KEY || '';
-      // const baseURL = process.env.RUNANYWHERE_BASE_URL || 'https://api.runanywhere.ai';
-      // await RunAnywhere.initialize({
-      //   apiKey: apiKey,
-      //   baseURL: baseURL,
-      //   environment: SDKEnvironment.Production,
-      // });
-      // console.log('✅ SDK initialized in PRODUCTION mode');
+        // Custom configuration mode - use stored API key and base URL
+        await RunAnywhere.initialize({
+          apiKey: customApiKey,
+          baseURL: customBaseURL,
+          environment: SDKEnvironment.Production,
+        });
+        console.log('✅ SDK initialized with CUSTOM configuration (production)');
+      } else {
+        // DEVELOPMENT mode (default) - uses Supabase directly
+        // Credentials come from runanywhere-commons/development_config.cpp (git-ignored)
+        // This is the safest option for committing to git
+        await RunAnywhere.initialize({
+          apiKey: '', // Empty in development mode - uses C++ dev config
+          baseURL: 'https://api.runanywhere.ai',
+          environment: SDKEnvironment.Development,
+        });
+        console.log('✅ SDK initialized in DEVELOPMENT mode (Supabase via C++ config)');
+      }
 
       // Register modules and models (await to ensure models are ready before UI)
       await registerModulesAndModels();

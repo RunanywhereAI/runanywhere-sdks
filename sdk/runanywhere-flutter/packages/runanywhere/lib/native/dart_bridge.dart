@@ -6,10 +6,12 @@ import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/dart_bridge_auth.dart' hide RacSdkConfigStruct;
+import 'package:runanywhere/native/dart_bridge_auth.dart'
+    hide RacSdkConfigStruct;
 import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_download.dart';
-import 'package:runanywhere/native/dart_bridge_environment.dart' show RacSdkConfigStruct;
+import 'package:runanywhere/native/dart_bridge_environment.dart'
+    show RacSdkConfigStruct;
 import 'package:runanywhere/native/dart_bridge_events.dart';
 import 'package:runanywhere/native/dart_bridge_http.dart';
 import 'package:runanywhere/native/dart_bridge_llm.dart';
@@ -196,8 +198,14 @@ class DartBridge {
     // Matches Swift: CppBridge.initializeServices()
 
     // Step 3a: Model assignment callbacks
-    await DartBridgeModelAssignment.register(environment: _environment);
-    _logger.debug('Model assignment callbacks registered');
+    // Only auto-fetch in staging/production, not development
+    final shouldAutoFetch = _environment != SDKEnvironment.development;
+    await DartBridgeModelAssignment.register(
+      environment: _environment,
+      autoFetch: shouldAutoFetch,
+    );
+    _logger.debug(
+        'Model assignment callbacks registered (autoFetch: $shouldAutoFetch)');
 
     // Step 3b: Platform services (Foundation Models, System TTS)
     await DartBridgePlatformServices.register();

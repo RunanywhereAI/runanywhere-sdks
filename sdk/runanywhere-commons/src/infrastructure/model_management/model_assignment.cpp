@@ -281,63 +281,103 @@ static rac_result_t copy_models_to_output(const std::vector<rac_model_info_t*>& 
 // =============================================================================
 
 rac_result_t rac_model_assignment_set_callbacks(const rac_assignment_callbacks_t* callbacks) {
-    if (!callbacks)
+    RAC_LOG_INFO(LOG_CAT, "rac_model_assignment_set_callbacks called");
+
+    if (!callbacks) {
+        RAC_LOG_ERROR(LOG_CAT, "callbacks is NULL");
         return RAC_ERROR_NULL_POINTER;
+    }
 
-    std::lock_guard<std::mutex> lock(g_mutex);
-    g_callbacks = *callbacks;
+    rac_bool_t should_auto_fetch = RAC_FALSE;
 
-    RAC_LOG_DEBUG(LOG_CAT, "Model assignment callbacks set");
+    {
+        std::lock_guard<std::mutex> lock(g_mutex);
+        g_callbacks = *callbacks;
+        should_auto_fetch = callbacks->auto_fetch;
+
+        char msg[128];
+        snprintf(msg, sizeof(msg), "Model assignment callbacks set (http_get=%p, auto_fetch=%d)",
+                 (void*)callbacks->http_get, callbacks->auto_fetch);
+        RAC_LOG_INFO(LOG_CAT, msg);
+    }
+
+    // Auto-fetch if requested (outside lock to avoid deadlock with fetch)
+    if (should_auto_fetch == RAC_TRUE) {
+        RAC_LOG_INFO(LOG_CAT, "Auto-fetching model assignments...");
+        rac_model_info_t** models = nullptr;
+        size_t count = 0;
+        rac_result_t fetch_result = rac_model_assignment_fetch(RAC_FALSE, &models, &count);
+
+        if (fetch_result == RAC_SUCCESS) {
+            char msg[128];
+            snprintf(msg, sizeof(msg), "Auto-fetch completed: %zu models", count);
+            RAC_LOG_INFO(LOG_CAT, msg);
+        } else {
+            char msg[128];
+            snprintf(msg, sizeof(msg), "Auto-fetch failed with code: %d", fetch_result);
+            RAC_LOG_WARNING(LOG_CAT, msg);
+        }
+
+        // Free the returned models array (data is already cached internally)
+        if (models) {
+            rac_model_info_array_free(models, count);
+        }
+    } else {
+        RAC_LOG_INFO(LOG_CAT, "Auto-fetch disabled, models will be fetched on demand");
+    }
+
     return RAC_SUCCESS;
 }
 
 rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info_t*** out_models,
                                         size_t* out_count) {
+    RAC_LOG_INFO(LOG_CAT, ">>> rac_model_assignment_fetch called");
+
     std::lock_guard<std::mutex> lock(g_mutex);
     char msg[256];
 
-    if (!out_models || !out_count)
+    if (!out_models || !out_count) {
+        RAC_LOG_ERROR(LOG_CAT, "out_models or out_count is NULL");
         return RAC_ERROR_NULL_POINTER;
+    }
+
+    snprintf(msg, sizeof(msg), "force_refresh=%d, cache_valid=%d, cached_count=%zu",
+             force_refresh, is_cache_valid() ? 1 : 0, g_cached_models.size());
+    RAC_LOG_INFO(LOG_CAT, msg);
 
     // Check cache first
     if (!force_refresh && is_cache_valid()) {
         snprintf(msg, sizeof(msg), "Returning cached model assignments (%zu models)",
                  g_cached_models.size());
-        RAC_LOG_DEBUG(LOG_CAT, msg);
+        RAC_LOG_INFO(LOG_CAT, msg);
         return copy_models_to_output(g_cached_models, out_models, out_count);
     }
 
     // Need to fetch from backend
-    if (!g_callbacks.http_get || !g_callbacks.get_device_info) {
-        RAC_LOG_ERROR(LOG_CAT, "Callbacks not set");
+    if (!g_callbacks.http_get) {
+        RAC_LOG_ERROR(LOG_CAT, "HTTP callback not set - cannot fetch models");
         return RAC_ERROR_INVALID_STATE;
     }
 
-    // Get device info
-    rac_assignment_device_info_t device_info = {};
-    g_callbacks.get_device_info(&device_info, g_callbacks.user_data);
+    // Get endpoint path (no query params - backend uses JWT token for filtering)
+    const char* endpoint = rac_endpoint_model_assignments();
 
-    // Build endpoint URL using existing endpoint builder
-    char endpoint[512];
-    int len = rac_endpoint_model_assignments(
-        device_info.device_type ? device_info.device_type : "unknown",
-        device_info.platform ? device_info.platform : "unknown", endpoint, sizeof(endpoint));
-
-    if (len < 0) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to build endpoint URL");
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-
-    snprintf(msg, sizeof(msg), "Fetching model assignments from: %s", endpoint);
+    snprintf(msg, sizeof(msg), ">>> Making HTTP GET to: %s", endpoint);
     RAC_LOG_INFO(LOG_CAT, msg);
 
     // Make HTTP request
+    RAC_LOG_INFO(LOG_CAT, ">>> Calling http_get callback...");
     rac_assignment_http_response_t response = {};
     rac_result_t result =
         g_callbacks.http_get(endpoint, RAC_TRUE, &response, g_callbacks.user_data);
 
+    snprintf(msg, sizeof(msg), "<<< http_get returned: result=%d, response.result=%d, status=%d, body_len=%zu",
+             result, response.result, response.status_code, response.response_length);
+    RAC_LOG_INFO(LOG_CAT, msg);
+
     if (result != RAC_SUCCESS || response.result != RAC_SUCCESS) {
-        snprintf(msg, sizeof(msg), "HTTP request failed: %s",
+        snprintf(msg, sizeof(msg), "HTTP request failed: result=%d, response.result=%d, error=%s",
+                 result, response.result,
                  response.error_message ? response.error_message : "unknown error");
         RAC_LOG_ERROR(LOG_CAT, msg);
 

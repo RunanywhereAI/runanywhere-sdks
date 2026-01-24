@@ -33,6 +33,7 @@
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/infrastructure/device/rac_device_manager.h"
+#include "rac/infrastructure/model_management/rac_model_assignment.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 #include "rac/infrastructure/network/rac_dev_config.h"
@@ -1889,6 +1890,214 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryUpdateD
         env->ReleaseStringUTFChars(localPath, path_str);
 
     return static_cast<jint>(result);
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Model Assignment (rac_model_assignment.h)
+// =============================================================================
+// Mirrors Swift SDK's CppBridge+ModelAssignment.swift
+
+// Global state for model assignment callbacks
+static struct {
+    JavaVM* jvm;
+    jobject callback_obj;
+    jmethodID http_get_method;
+    std::mutex mutex;
+    bool callbacks_registered;
+} g_model_assignment_state = {nullptr, nullptr, nullptr, {}, false};
+
+// HTTP GET callback for model assignment (called from C++)
+static rac_result_t model_assignment_http_get_callback(const char* endpoint,
+                                                        rac_bool_t requires_auth,
+                                                        rac_assignment_http_response_t* out_response,
+                                                        void* user_data) {
+    std::lock_guard<std::mutex> lock(g_model_assignment_state.mutex);
+
+    if (!g_model_assignment_state.jvm || !g_model_assignment_state.callback_obj) {
+        LOGe("model_assignment_http_get_callback: callbacks not registered");
+        if (out_response) {
+            out_response->result = RAC_ERROR_INVALID_STATE;
+        }
+        return RAC_ERROR_INVALID_STATE;
+    }
+
+    JNIEnv* env = nullptr;
+    bool did_attach = false;
+    jint get_result = g_model_assignment_state.jvm->GetEnv((void**)&env, JNI_VERSION_1_6);
+
+    if (get_result == JNI_EDETACHED) {
+        if (g_model_assignment_state.jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
+            did_attach = true;
+        } else {
+            LOGe("model_assignment_http_get_callback: failed to attach thread");
+            if (out_response) {
+                out_response->result = RAC_ERROR_INVALID_STATE;
+            }
+            return RAC_ERROR_INVALID_STATE;
+        }
+    }
+
+    // Call Kotlin callback: httpGet(endpoint: String, requiresAuth: Boolean): String
+    jstring jEndpoint = env->NewStringUTF(endpoint ? endpoint : "");
+    jboolean jRequiresAuth = requires_auth == RAC_TRUE ? JNI_TRUE : JNI_FALSE;
+
+    jstring jResponse =
+        (jstring)env->CallObjectMethod(g_model_assignment_state.callback_obj,
+                                       g_model_assignment_state.http_get_method, jEndpoint, jRequiresAuth);
+
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        LOGe("model_assignment_http_get_callback: exception in Kotlin callback");
+        env->DeleteLocalRef(jEndpoint);
+        if (did_attach) {
+            g_model_assignment_state.jvm->DetachCurrentThread();
+        }
+        if (out_response) {
+            out_response->result = RAC_ERROR_HTTP_REQUEST_FAILED;
+        }
+        return RAC_ERROR_HTTP_REQUEST_FAILED;
+    }
+
+    rac_result_t result = RAC_SUCCESS;
+    if (jResponse) {
+        const char* response_str = env->GetStringUTFChars(jResponse, nullptr);
+        if (response_str && out_response) {
+            // Check if response is an error (starts with "ERROR:")
+            if (strncmp(response_str, "ERROR:", 6) == 0) {
+                out_response->result = RAC_ERROR_HTTP_REQUEST_FAILED;
+                out_response->error_message = strdup(response_str + 6);
+                result = RAC_ERROR_HTTP_REQUEST_FAILED;
+            } else {
+                out_response->result = RAC_SUCCESS;
+                out_response->status_code = 200;
+                out_response->response_body = strdup(response_str);
+                out_response->response_length = strlen(response_str);
+            }
+        }
+        env->ReleaseStringUTFChars(jResponse, response_str);
+        env->DeleteLocalRef(jResponse);
+    } else {
+        if (out_response) {
+            out_response->result = RAC_ERROR_HTTP_REQUEST_FAILED;
+        }
+        result = RAC_ERROR_HTTP_REQUEST_FAILED;
+    }
+
+    env->DeleteLocalRef(jEndpoint);
+    if (did_attach) {
+        g_model_assignment_state.jvm->DetachCurrentThread();
+    }
+
+    return result;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelAssignmentSetCallbacks(
+    JNIEnv* env, jclass clazz, jobject callback, jboolean autoFetch) {
+    LOGi("racModelAssignmentSetCallbacks called, autoFetch=%d", autoFetch);
+
+    std::lock_guard<std::mutex> lock(g_model_assignment_state.mutex);
+
+    // Clear previous callback if any
+    if (g_model_assignment_state.callback_obj) {
+        JNIEnv* env_local = nullptr;
+        if (g_model_assignment_state.jvm &&
+            g_model_assignment_state.jvm->GetEnv((void**)&env_local, JNI_VERSION_1_6) == JNI_OK) {
+            env_local->DeleteGlobalRef(g_model_assignment_state.callback_obj);
+        }
+        g_model_assignment_state.callback_obj = nullptr;
+    }
+
+    if (!callback) {
+        // Just clearing callbacks
+        g_model_assignment_state.callbacks_registered = false;
+        LOGi("racModelAssignmentSetCallbacks: callbacks cleared");
+        return RAC_SUCCESS;
+    }
+
+    // Store JVM reference
+    env->GetJavaVM(&g_model_assignment_state.jvm);
+
+    // Create global reference to callback object
+    g_model_assignment_state.callback_obj = env->NewGlobalRef(callback);
+
+    // Get method IDs
+    jclass callback_class = env->GetObjectClass(callback);
+    g_model_assignment_state.http_get_method =
+        env->GetMethodID(callback_class, "httpGet", "(Ljava/lang/String;Z)Ljava/lang/String;");
+    env->DeleteLocalRef(callback_class);
+
+    if (!g_model_assignment_state.http_get_method) {
+        LOGe("racModelAssignmentSetCallbacks: failed to get httpGet method ID");
+        env->DeleteGlobalRef(g_model_assignment_state.callback_obj);
+        g_model_assignment_state.callback_obj = nullptr;
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    // Set up C++ callbacks
+    rac_assignment_callbacks_t callbacks = {};
+    callbacks.http_get = model_assignment_http_get_callback;
+    callbacks.user_data = nullptr;
+    callbacks.auto_fetch = autoFetch ? RAC_TRUE : RAC_FALSE;
+
+    rac_result_t result = rac_model_assignment_set_callbacks(&callbacks);
+
+    if (result == RAC_SUCCESS) {
+        g_model_assignment_state.callbacks_registered = true;
+        LOGi("racModelAssignmentSetCallbacks: registered successfully");
+    } else {
+        LOGe("racModelAssignmentSetCallbacks: failed with code %d", result);
+        env->DeleteGlobalRef(g_model_assignment_state.callback_obj);
+        g_model_assignment_state.callback_obj = nullptr;
+    }
+
+    return static_cast<jint>(result);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelAssignmentFetch(
+    JNIEnv* env, jclass clazz, jboolean forceRefresh) {
+    LOGi("racModelAssignmentFetch called, forceRefresh=%d", forceRefresh);
+
+    rac_model_info_t** models = nullptr;
+    size_t count = 0;
+
+    rac_result_t result =
+        rac_model_assignment_fetch(forceRefresh ? RAC_TRUE : RAC_FALSE, &models, &count);
+
+    if (result != RAC_SUCCESS) {
+        LOGe("racModelAssignmentFetch: failed with code %d", result);
+        return env->NewStringUTF("[]");
+    }
+
+    // Build JSON array of models
+    std::string json = "[";
+    for (size_t i = 0; i < count; i++) {
+        if (i > 0) json += ",";
+
+        rac_model_info_t* m = models[i];
+        json += "{";
+        json += "\"id\":\"" + std::string(m->id ? m->id : "") + "\",";
+        json += "\"name\":\"" + std::string(m->name ? m->name : "") + "\",";
+        json += "\"category\":" + std::to_string(m->category) + ",";
+        json += "\"format\":" + std::to_string(m->format) + ",";
+        json += "\"framework\":" + std::to_string(m->framework) + ",";
+        json += "\"downloadUrl\":\"" + std::string(m->download_url ? m->download_url : "") + "\",";
+        json += "\"downloadSize\":" + std::to_string(m->download_size) + ",";
+        json += "\"contextLength\":" + std::to_string(m->context_length) + ",";
+        json +=
+            "\"supportsThinking\":" + std::string(m->supports_thinking == RAC_TRUE ? "true" : "false");
+        json += "}";
+    }
+    json += "]";
+
+    // Free models array
+    if (models) {
+        rac_model_info_array_free(models, count);
+    }
+
+    LOGi("racModelAssignmentFetch: returned %zu models", count);
+    return env->NewStringUTF(json.c_str());
 }
 
 // =============================================================================

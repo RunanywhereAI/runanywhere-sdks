@@ -264,3 +264,19 @@ expect suspend fun RunAnywhere.currentSTTModel(): ModelInfo?
  * @param modelId Model identifier
  */
 expect suspend fun RunAnywhere.loadSTTModel(modelId: String)
+
+// MARK: - Model Assignments
+
+/**
+ * Fetch model assignments for the current device from the backend.
+ *
+ * This method fetches models assigned to this device based on device type and platform.
+ * Results are cached and saved to the model registry automatically.
+ *
+ * Note: Model assignments are automatically fetched during SDK initialization
+ * when services are initialized (Phase 2). This method allows manual refresh.
+ *
+ * @param forceRefresh If true, bypass cache and fetch fresh data from backend
+ * @return List of ModelInfo objects assigned to this device
+ */
+expect suspend fun RunAnywhere.fetchModelAssignments(forceRefresh: Boolean = false): List<ModelInfo>
