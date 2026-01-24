@@ -1,10 +1,13 @@
 package com.runanywhere.runanywhereai.presentation.tts
 
+import android.app.Application
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.util.Log
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.public.RunAnywhere
@@ -18,6 +21,7 @@ import com.runanywhere.sdk.public.extensions.isTTSVoiceLoadedSync
 import com.runanywhere.sdk.public.extensions.loadTTSVoice
 import com.runanywhere.sdk.public.extensions.stopSynthesis
 import com.runanywhere.sdk.public.extensions.synthesize
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -26,9 +30,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import java.util.Locale
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 private const val TAG = "TTSViewModel"
+private const val SYSTEM_TTS_MODEL_ID = "system-tts"
 
 /**
  * Collection of funny sample texts for TTS demo
@@ -100,6 +109,7 @@ data class TTSUiState(
     val selectedModelId: String? = null,
     val isGenerating: Boolean = false,
     val isPlaying: Boolean = false,
+    val isSpeaking: Boolean = false,
     val hasGeneratedAudio: Boolean = false,
     val isSystemTTS: Boolean = false,
     val speed: Float = 1.0f,
@@ -129,7 +139,9 @@ data class TTSUiState(
  * - Model loading via RunAnywhere.loadTTSVoice()
  * - Event subscription via RunAnywhere.events.events
  */
-class TextToSpeechViewModel : ViewModel() {
+class TextToSpeechViewModel(
+    application: Application,
+) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(TTSUiState())
     val uiState: StateFlow<TTSUiState> = _uiState.asStateFlow()
 
@@ -137,6 +149,10 @@ class TextToSpeechViewModel : ViewModel() {
     private var audioTrack: AudioTrack? = null
     private var generatedAudioData: ByteArray? = null
     private var playbackJob: Job? = null
+
+    // System TTS playback
+    private var systemTts: TextToSpeech? = null
+    private var systemTtsInit: CompletableDeferred<Boolean>? = null
 
     init {
         Log.i(TAG, "Initializing TTS ViewModel...")
@@ -280,7 +296,7 @@ class TextToSpeechViewModel : ViewModel() {
     ) {
         Log.i(TAG, "Model loaded notification: $modelName (id: $modelId, framework: ${framework?.displayName})")
 
-        val isSystem = modelId == "system" || framework == null
+        val isSystem = modelId == SYSTEM_TTS_MODEL_ID || framework == InferenceFramework.SYSTEM_TTS
 
         _uiState.update {
             it.copy(
@@ -359,7 +375,8 @@ class TextToSpeechViewModel : ViewModel() {
             val text = _uiState.value.inputText
             if (text.isEmpty()) return@launch
 
-            if (!RunAnywhere.isTTSVoiceLoadedSync) {
+            val isSystem = _uiState.value.isSystemTTS
+            if (!isSystem && !RunAnywhere.isTTSVoiceLoadedSync) {
                 _uiState.update {
                     it.copy(errorMessage = "No TTS model loaded. Please select a voice first.")
                 }
@@ -368,7 +385,8 @@ class TextToSpeechViewModel : ViewModel() {
 
             _uiState.update {
                 it.copy(
-                    isGenerating = true,
+                    isGenerating = !isSystem,
+                    isSpeaking = isSystem,
                     hasGeneratedAudio = false,
                     errorMessage = null,
                 )
@@ -389,43 +407,57 @@ class TextToSpeechViewModel : ViewModel() {
                         volume = 1.0f,
                     )
 
-                // Use RunAnywhere.synthesize() via SDK extension function
-                val result =
-                    withContext(Dispatchers.IO) {
-                        RunAnywhere.synthesize(text, options)
-                    }
-
-                val processingTime = System.currentTimeMillis() - startTime
-
-                val isSystem = _uiState.value.isSystemTTS
-
-                if (isSystem || result.audioData.isEmpty()) {
-                    // System TTS plays directly - no audio data returned
-                    Log.i(TAG, "System TTS playback completed (direct playback)")
+                if (isSystem) {
+                    speakSystemTts(text, options)
+                    val processingTime = System.currentTimeMillis() - startTime
                     _uiState.update {
                         it.copy(
                             isGenerating = false,
-                            audioDuration = result.duration,
+                            isSpeaking = false,
+                            audioDuration = null,
                             audioSize = null,
                             sampleRate = null,
                             processingTimeMs = processingTime,
                         )
                     }
                 } else {
-                    // ONNX/Piper TTS returns audio data for playback
-                    Log.i(TAG, "✅ Speech generation complete: ${result.audioData.size} bytes, duration: ${result.duration}s")
+                    // Use RunAnywhere.synthesize() via SDK extension function
+                    val result =
+                        withContext(Dispatchers.IO) {
+                            RunAnywhere.synthesize(text, options)
+                        }
 
-                    generatedAudioData = result.audioData
+                    val processingTime = System.currentTimeMillis() - startTime
 
-                    _uiState.update {
-                        it.copy(
-                            isGenerating = false,
-                            hasGeneratedAudio = true,
-                            audioDuration = result.duration,
-                            audioSize = result.audioData.size,
-                            sampleRate = null,
-                            processingTimeMs = processingTime,
-                        )
+                    if (result.audioData.isEmpty()) {
+                        Log.i(TAG, "TTS synthesis returned empty audio")
+                        _uiState.update {
+                            it.copy(
+                                isGenerating = false,
+                                isSpeaking = false,
+                                audioDuration = result.duration,
+                                audioSize = null,
+                                sampleRate = null,
+                                processingTimeMs = processingTime,
+                            )
+                        }
+                    } else {
+                        // ONNX/Piper TTS returns audio data for playback
+                        Log.i(TAG, "✅ Speech generation complete: ${result.audioData.size} bytes, duration: ${result.duration}s")
+
+                        generatedAudioData = result.audioData
+
+                        _uiState.update {
+                            it.copy(
+                                isGenerating = false,
+                                isSpeaking = false,
+                                hasGeneratedAudio = true,
+                                audioDuration = result.duration,
+                                audioSize = result.audioData.size,
+                                sampleRate = null,
+                                processingTimeMs = processingTime,
+                            )
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -433,6 +465,7 @@ class TextToSpeechViewModel : ViewModel() {
                 _uiState.update {
                     it.copy(
                         isGenerating = false,
+                        isSpeaking = false,
                         errorMessage = "Speech generation failed: ${e.message}",
                     )
                 }
@@ -587,7 +620,8 @@ class TextToSpeechViewModel : ViewModel() {
         viewModelScope.launch {
             RunAnywhere.stopSynthesis()
         }
-        _uiState.update { it.copy(isGenerating = false) }
+        systemTts?.stop()
+        _uiState.update { it.copy(isGenerating = false, isSpeaking = false) }
     }
 
     override fun onCleared() {
@@ -595,5 +629,100 @@ class TextToSpeechViewModel : ViewModel() {
         Log.i(TAG, "ViewModel cleared, cleaning up resources")
         stopPlayback()
         generatedAudioData = null
+        systemTts?.shutdown()
+        systemTts = null
+        systemTtsInit = null
+    }
+
+    private suspend fun speakSystemTts(
+        text: String,
+        options: TTSOptions,
+    ) {
+        val ready = ensureSystemTtsReady()
+        if (!ready) {
+            throw IllegalStateException("System TTS not available")
+        }
+
+        withContext(Dispatchers.Main) {
+            val tts = systemTts ?: throw IllegalStateException("System TTS not initialized")
+            val locale = Locale.forLanguageTag(options.language.ifBlank { "en-US" })
+            tts.language = locale
+            tts.setSpeechRate(options.rate)
+            tts.setPitch(options.pitch)
+        }
+
+        suspendCancellableCoroutine { continuation ->
+            val tts = systemTts
+            if (tts == null) {
+                continuation.resumeWithException(IllegalStateException("System TTS not initialized"))
+                return@suspendCancellableCoroutine
+            }
+
+            val utteranceId = "system-tts-${System.currentTimeMillis()}"
+            tts.setOnUtteranceProgressListener(
+                object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {
+                        Log.d(TAG, "System TTS started")
+                    }
+
+                    override fun onDone(utteranceId: String?) {
+                        if (continuation.isActive) {
+                            continuation.resume(Unit)
+                        }
+                    }
+
+                    override fun onError(utteranceId: String?) {
+                        if (continuation.isActive) {
+                            continuation.resumeWithException(IllegalStateException("System TTS error"))
+                        }
+                    }
+
+                    override fun onStop(utteranceId: String?, interrupted: Boolean) {
+                        if (continuation.isActive) {
+                            if (interrupted) {
+                                continuation.resume(Unit)
+                            } else {
+                                continuation.resumeWithException(IllegalStateException("System TTS stopped"))
+                            }
+                        }
+                    }
+                },
+            )
+
+            val result =
+                tts.speak(
+                    text,
+                    TextToSpeech.QUEUE_FLUSH,
+                    null,
+                    utteranceId,
+                )
+            if (result != TextToSpeech.SUCCESS) {
+                continuation.resumeWithException(IllegalStateException("System TTS speak failed"))
+            }
+        }
+    }
+
+    private suspend fun ensureSystemTtsReady(): Boolean {
+        val deferred =
+            systemTtsInit
+                ?: CompletableDeferred<Boolean>().also { init ->
+                    systemTtsInit = init
+                    withContext(Dispatchers.Main) {
+                        systemTts =
+                            TextToSpeech(getApplication()) { status ->
+                                val ready = status == TextToSpeech.SUCCESS
+                                if (ready) {
+                                    init.complete(true)
+                                } else {
+                                    systemTts?.shutdown()
+                                    systemTts = null
+                                    systemTtsInit = null
+                                    init.complete(false)
+                                }
+                            }
+                    }
+                }
+
+        return deferred.await()
     }
 }
