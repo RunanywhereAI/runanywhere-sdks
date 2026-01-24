@@ -332,7 +332,7 @@ object CppBridgeModelAssignment {
                         CppBridgePlatformAdapter.logCallback(
                             CppBridgePlatformAdapter.LogLevel.INFO,
                             TAG,
-                            "Added Authorization header (token length: ${accessToken.length}, starts: ${accessToken.take(30)}...)",
+                            "Added Authorization header (token length: ${accessToken.length})",
                         )
                     } else {
                         // Fallback to API key if no OAuth token available

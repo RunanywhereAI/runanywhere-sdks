@@ -23,6 +23,8 @@ import com.runanywhere.sdk.foundation.logging.SentryManager
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
@@ -70,6 +72,9 @@ object CppBridge {
     private var _nativeLibraryLoaded: Boolean = false
 
     private val lock = Any()
+
+    /** Coroutine scope for async SDK operations, cancelled on shutdown */
+    private val sdkScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
      * Current SDK environment.
@@ -419,7 +424,7 @@ object CppBridge {
             // 2. Ensure callbacks are fully registered before HTTP fetch begins
             if (shouldFetchModels && registrationSucceeded) {
                 logger.info("📦 Will fetch model assignments asynchronously...")
-                CoroutineScope(Dispatchers.IO).launch {
+                sdkScope.launch {
                     try {
                         logger.info("📦 [Async] Fetching model assignments from backend (forceRefresh=true)...")
                         val assignmentsJson = CppBridgeModelAssignment.fetchModelAssignments(forceRefresh = true)
@@ -504,6 +509,9 @@ object CppBridge {
             if (!_isInitialized) {
                 return
             }
+
+            // Cancel any pending async operations
+            sdkScope.cancel()
 
             // Unregister Phase 2 services (reverse order)
             if (_servicesInitialized) {
