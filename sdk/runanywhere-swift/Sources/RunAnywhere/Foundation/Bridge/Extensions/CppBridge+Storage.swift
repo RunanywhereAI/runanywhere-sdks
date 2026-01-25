@@ -232,7 +232,6 @@ private func storageGetTotalSpaceCallback(userData _: UnsafeMutableRawPointer?) 
 
 /// Calculate directory size (recursive)
 private func calculateDirectorySize(at url: URL) -> Int64 {
-    let logger = SDKLogger(category: "ExtractionService")
     let fm = FileManager.default
 
     // Check if it's a directory
