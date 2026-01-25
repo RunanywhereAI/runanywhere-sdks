@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	=============================================================================
+	BUNDLE IDENTIFICATION
+	=============================================================================
+	Required keys for iOS app bundle identification.
+	Values are injected from build settings at compile time.
+	=============================================================================
+	-->
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundleDisplayName</key>
+	<string>LocalAI Playground</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>arm64</string>
+	</array>
+	
+	<!--
+	=============================================================================
+	PRIVACY PERMISSIONS
+	=============================================================================
+	These keys are required for the app to access device capabilities.
+	iOS will show these descriptions to users when requesting permission.
+	=============================================================================
+	-->
+	
+	<!-- Microphone Access - Required for Speech-to-Text -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>LocalAI Playground needs microphone access to transcribe your speech using on-device AI. All audio is processed locally and never leaves your device.</string>
+	
+	<!-- Speech Recognition - Optional, for system STT fallback -->
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Speech recognition is used to convert your voice to text. All processing happens on your device for complete privacy.</string>
+	
+	<!--
+	=============================================================================
+	APP TRANSPORT SECURITY
+	=============================================================================
+	Allow downloads from model hosting services (HuggingFace, GitHub).
+	In production, you may want to restrict this to specific domains.
+	=============================================================================
+	-->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	
+	<!--
+	=============================================================================
+	BACKGROUND MODES (Optional)
+	=============================================================================
+	Enable if you want audio to continue playing in background.
+	=============================================================================
+	-->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
+</dict>
+</plist>
