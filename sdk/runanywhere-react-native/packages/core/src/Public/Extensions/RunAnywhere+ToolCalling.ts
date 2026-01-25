@@ -10,7 +10,7 @@
  */
 
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import { generateStream } from './RunAnywhere+TextGeneration';
+import { generate } from './RunAnywhere+TextGeneration';
 import {
   requireNativeModule,
   isNativeModuleAvailable,
@@ -254,16 +254,12 @@ export async function generateWithTools(
     iterations++;
     logger.debug(`[ToolCalling] === Iteration ${iterations} ===`);
 
-    // Generate response
-    let responseText = '';
-    const streamResult = await generateStream(fullPrompt, {
+    // Generate response (using non-streaming API to avoid streaming crash)
+    const generateResult = await generate(fullPrompt, {
       maxTokens: options?.maxTokens,
       temperature: options?.temperature,
     });
-
-    for await (const token of streamResult.stream) {
-      responseText += token;
-    }
+    const responseText = generateResult.text;
 
     logger.debug(`[ToolCalling] Raw response (${responseText.length} chars): ${responseText.substring(0, 300)}`);
 

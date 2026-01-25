@@ -11,6 +11,7 @@
 #include <nlohmann/json.hpp>
 #include <sstream>
 #include <cstring>
+#include <cctype>
 
 using json = nlohmann::json;
 
@@ -131,8 +132,51 @@ std::string ToolCallingBridge::formatToolsPrompt(const std::string& toolsJson) {
 }
 
 std::string ToolCallingBridge::parseToolCall(const std::string& llmOutput) {
-    // Find tool call tags
+    // Find tool call tags (primary format)
     size_t tagStart = llmOutput.find(TOOL_CALL_START_TAG);
+
+    // If no <tool_call> tag, check for alternate format: <tool_name {json}>
+    // Some smaller models use the tool name as the tag instead of <tool_call>
+    bool usingAlternateFormat = false;
+    std::string alternateToolName;
+    
+    if (tagStart == std::string::npos) {
+        // Look for pattern: <word followed by space/{ and JSON
+        size_t ltPos = 0;
+        while ((ltPos = llmOutput.find('<', ltPos)) != std::string::npos) {
+            size_t nameStart = ltPos + 1;
+            size_t nameEnd = nameStart;
+            while (nameEnd < llmOutput.size() && 
+                   (std::isalnum(static_cast<unsigned char>(llmOutput[nameEnd])) || 
+                    llmOutput[nameEnd] == '_' || llmOutput[nameEnd] == '-')) {
+                nameEnd++;
+            }
+            
+            if (nameEnd > nameStart) {
+                std::string tagName = llmOutput.substr(nameStart, nameEnd - nameStart);
+                
+                // Skip common HTML-like tags
+                if (tagName != "p" && tagName != "br" && tagName != "div" && 
+                    tagName != "span" && tagName != "a" && tagName.length() > 2) {
+                    
+                    size_t jsonStartCheck = nameEnd;
+                    while (jsonStartCheck < llmOutput.size() && 
+                           (llmOutput[jsonStartCheck] == ' ' || llmOutput[jsonStartCheck] == '\t' || 
+                            llmOutput[jsonStartCheck] == '\n' || llmOutput[jsonStartCheck] == '>')) {
+                        jsonStartCheck++;
+                    }
+                    
+                    if (jsonStartCheck < llmOutput.size() && llmOutput[jsonStartCheck] == '{') {
+                        tagStart = ltPos;
+                        usingAlternateFormat = true;
+                        alternateToolName = tagName;
+                        break;
+                    }
+                }
+            }
+            ltPos++;
+        }
+    }
 
     if (tagStart == std::string::npos) {
         // No tool call found - return clean text with hasToolCall = false
@@ -142,9 +186,21 @@ std::string ToolCallingBridge::parseToolCall(const std::string& llmOutput) {
         return result.dump();
     }
 
-    // Find end tag
-    size_t jsonStart = tagStart + strlen(TOOL_CALL_START_TAG);
-    size_t tagEnd = llmOutput.find(TOOL_CALL_END_TAG, jsonStart);
+    // Find JSON start position
+    size_t jsonStart;
+    if (usingAlternateFormat) {
+        jsonStart = tagStart + 1 + alternateToolName.length();
+        while (jsonStart < llmOutput.size() && 
+               (llmOutput[jsonStart] == ' ' || llmOutput[jsonStart] == '\t' || 
+                llmOutput[jsonStart] == '\n' || llmOutput[jsonStart] == '>')) {
+            jsonStart++;
+        }
+    } else {
+        jsonStart = tagStart + strlen(TOOL_CALL_START_TAG);
+    }
+    
+    // Find end tag (only for standard format)
+    size_t tagEnd = usingAlternateFormat ? std::string::npos : llmOutput.find(TOOL_CALL_END_TAG, jsonStart);
     bool hasClosingTag = (tagEnd != std::string::npos);
 
     if (!hasClosingTag) {
@@ -204,12 +260,15 @@ std::string ToolCallingBridge::parseToolCall(const std::string& llmOutput) {
         return result.dump();
     }
 
-    // Extract tool name (try "tool" first, then "name")
+    // Extract tool name (try "tool" first, then "name", then use alternate format tag name)
     std::string toolName;
     if (toolJson.contains("tool") && toolJson["tool"].is_string()) {
         toolName = toolJson["tool"].get<std::string>();
     } else if (toolJson.contains("name") && toolJson["name"].is_string()) {
         toolName = toolJson["name"].get<std::string>();
+    } else if (usingAlternateFormat && !alternateToolName.empty()) {
+        // Use the tag name as tool name (e.g., <search_restaurants {args}> -> "search_restaurants")
+        toolName = alternateToolName;
     } else {
         // Could not find tool name
         json result;
@@ -219,11 +278,16 @@ std::string ToolCallingBridge::parseToolCall(const std::string& llmOutput) {
     }
 
     // Extract arguments (try "arguments" first, then "params")
+    // For alternate format without explicit arguments, the JSON itself might be the arguments
     json arguments = json::object();
     if (toolJson.contains("arguments") && toolJson["arguments"].is_object()) {
         arguments = toolJson["arguments"];
     } else if (toolJson.contains("params") && toolJson["params"].is_object()) {
         arguments = toolJson["params"];
+    } else if (usingAlternateFormat && !toolJson.contains("tool") && !toolJson.contains("name")) {
+        // In alternate format like <search_restaurants {"query": "food"}>,
+        // the entire JSON is the arguments
+        arguments = toolJson;
     }
 
     // Build the clean text (everything except the tool call tags)
