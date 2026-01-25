@@ -149,15 +149,16 @@ class RunAnywhereApplication : Application() {
                 )
                 Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode (using Supabase from dev config)")
             } else {
-                // PRODUCTION mode - requires valid API key and base URL
-                // These should be provided via BuildConfig or secure configuration
-                // For now, fall back to development mode if not configured
-                Log.w("RunAnywhereApp", "⚠️ PRODUCTION mode requires API key configuration")
-                Log.w("RunAnywhereApp", "   Falling back to DEVELOPMENT mode")
+                // PRODUCTION mode - requires API key and base URL
+                // Configure these via Settings screen or set environment variables
+                val apiKey = "YOUR_API_KEY_HERE"
+                val baseURL = "YOUR_BASE_URL_HERE"
                 RunAnywhere.initialize(
-                    environment = SDKEnvironment.DEVELOPMENT,
+                    apiKey = apiKey,
+                    baseURL = baseURL,
+                    environment = SDKEnvironment.PRODUCTION,
                 )
-                Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode (production config not set)")
+                Log.i("RunAnywhereApp", "✅ SDK initialized in PRODUCTION mode")
             }
 
             // Phase 2: Complete services initialization (device registration, etc.)
