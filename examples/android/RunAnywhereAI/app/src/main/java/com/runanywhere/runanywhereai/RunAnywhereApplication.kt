@@ -153,12 +153,25 @@ class RunAnywhereApplication : Application() {
                 // Configure these via Settings screen or set environment variables
                 val apiKey = "YOUR_API_KEY_HERE"
                 val baseURL = "YOUR_BASE_URL_HERE"
-                RunAnywhere.initialize(
-                    apiKey = apiKey,
-                    baseURL = baseURL,
-                    environment = SDKEnvironment.PRODUCTION,
-                )
-                Log.i("RunAnywhereApp", "✅ SDK initialized in PRODUCTION mode")
+
+                // Detect placeholder credentials and abort production initialization
+                if (apiKey.startsWith("YOUR_") || baseURL.startsWith("YOUR_")) {
+                    Log.e(
+                        "RunAnywhereApp",
+                        "❌ RunAnywhere.initialize with SDKEnvironment.PRODUCTION failed: " +
+                            "placeholder credentials detected. Configure via Settings screen or replace placeholders.",
+                    )
+                    // Fall back to development mode
+                    RunAnywhere.initialize(environment = SDKEnvironment.DEVELOPMENT)
+                    Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode (production credentials not configured)")
+                } else {
+                    RunAnywhere.initialize(
+                        apiKey = apiKey,
+                        baseURL = baseURL,
+                        environment = SDKEnvironment.PRODUCTION,
+                    )
+                    Log.i("RunAnywhereApp", "✅ SDK initialized in PRODUCTION mode")
+                }
             }
 
             // Phase 2: Complete services initialization (device registration, etc.)
