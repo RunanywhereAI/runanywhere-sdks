@@ -18,13 +18,15 @@ export * from './voice';
 export * from './settings';
 
 // Navigation types - matching Swift sample app (ContentView.swift)
-// Tab 0: Chat (LLM)
-// Tab 1: Speech-to-Text
-// Tab 2: Text-to-Speech
-// Tab 3: Voice Assistant (STT + LLM + TTS)
-// Tab 4: Tools (Tool Calling Demo)
-// Tab 5: Settings
+// Tab 0: Food (AI Food Ordering Demo - DoorDash Clone)
+// Tab 1: Chat (LLM)
+// Tab 2: Speech-to-Text
+// Tab 3: Text-to-Speech
+// Tab 4: Voice Assistant (STT + LLM + TTS)
+// Tab 5: Tools (Tool Calling Demo)
+// Tab 6: Settings
 export type RootTabParamList = {
+  Food: undefined;
   Chat: undefined;
   STT: undefined;
   TTS: undefined;
