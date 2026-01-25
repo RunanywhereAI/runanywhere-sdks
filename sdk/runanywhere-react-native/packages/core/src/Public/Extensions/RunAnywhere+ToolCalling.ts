@@ -5,9 +5,8 @@
  * Allows LLMs to request external actions (API calls, device functions, etc.)
  *
  * ARCHITECTURE:
- * - C++ (ToolCallingBridge) is the SINGLE SOURCE OF TRUTH for parsing logic
- * - TypeScript handles: tool registration, executor storage, orchestration
- * - C++ handles: parseToolCall(), formatToolsPrompt()
+ * - C++ (ToolCallingBridge) handles: parsing <tool_call> tags (single source of truth)
+ * - TypeScript handles: tool registration, executor storage, prompt formatting, orchestration
  */
 
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
@@ -100,9 +99,17 @@ async function parseToolCallViaCpp(llmOutput: string): Promise<{
       return { text: result.cleanText || llmOutput, toolCall: null };
     }
 
+    // Parse argumentsJson if it's a string, otherwise use as-is
+    let args: Record<string, unknown> = {};
+    if (result.argumentsJson) {
+      args = typeof result.argumentsJson === 'string'
+        ? JSON.parse(result.argumentsJson)
+        : result.argumentsJson;
+    }
+
     const toolCall: ToolCall = {
       toolName: result.toolName,
-      arguments: result.argumentsJson || {},
+      arguments: args,
       callId: `call_${result.callId || Date.now()}`,
     };
 
@@ -204,8 +211,8 @@ export async function generateWithTools(
   prompt: string,
   options?: ToolCallingOptions
 ): Promise<ToolCallingResult> {
-  const tools = options?.tools || getRegisteredTools();
-  const maxToolCalls = options?.maxToolCalls || 5;
+  const tools = options?.tools ?? getRegisteredTools();
+  const maxToolCalls = options?.maxToolCalls ?? 5;
   const autoExecute = options?.autoExecute ?? true;
 
   // Build system prompt with tools
@@ -224,7 +231,7 @@ export async function generateWithTools(
 
   while (iterations < maxToolCalls) {
     iterations++;
-    console.log(`[ToolCalling] === Iteration ${iterations} ===`);
+    logger.debug(`[ToolCalling] === Iteration ${iterations} ===`);
 
     // Generate response
     let responseText = '';
@@ -237,20 +244,20 @@ export async function generateWithTools(
       responseText += token;
     }
 
-    console.log(`[ToolCalling] Raw response (${responseText.length} chars): ${responseText.substring(0, 300)}`);
+    logger.debug(`[ToolCalling] Raw response (${responseText.length} chars): ${responseText.substring(0, 300)}`);
 
     // Parse for tool calls using C++ (single source of truth)
     const { text, toolCall } = await parseToolCallViaCpp(responseText);
     finalText = text;
-    console.log(`[ToolCalling] Parsed - hasToolCall: ${!!toolCall}, cleanText (${finalText.length} chars): "${finalText.substring(0, 150)}"`);
+    logger.debug(`[ToolCalling] Parsed - hasToolCall: ${!!toolCall}, cleanText (${finalText.length} chars): "${finalText.substring(0, 150)}"`);
 
     if (!toolCall) {
       // No tool call, we're done
-      console.log('[ToolCalling] No tool call found, breaking loop with finalText');
+      logger.debug('[ToolCalling] No tool call found, breaking loop with finalText');
       break;
     }
 
-    console.log(`[ToolCalling] Tool call: ${toolCall.toolName}(${JSON.stringify(toolCall.arguments)})`);
+    logger.debug(`[ToolCalling] Tool call: ${toolCall.toolName}(${JSON.stringify(toolCall.arguments)})`);
     allToolCalls.push(toolCall);
 
     if (!autoExecute) {
@@ -264,14 +271,14 @@ export async function generateWithTools(
     }
 
     // Execute the tool (in TypeScript - needs JS APIs)
-    console.log(`[ToolCalling] Executing tool: ${toolCall.toolName}...`);
+    logger.debug(`[ToolCalling] Executing tool: ${toolCall.toolName}...`);
     const result = await executeTool(toolCall);
     allToolResults.push(result);
-    console.log(`[ToolCalling] Tool result success: ${result.success}`);
+    logger.debug(`[ToolCalling] Tool result success: ${result.success}`);
     if (result.success) {
-      console.log(`[ToolCalling] Tool data: ${JSON.stringify(result.result)}`);
+      logger.debug(`[ToolCalling] Tool data: ${JSON.stringify(result.result)}`);
     } else {
-      console.log(`[ToolCalling] Tool error: ${result.error}`);
+      logger.debug(`[ToolCalling] Tool error: ${result.error}`);
     }
 
     // Add tool result to context and continue with a clear prompt
@@ -285,11 +292,11 @@ You used the ${toolCall.toolName} tool and received this data:
 ${JSON.stringify(resultData, null, 2)}
 
 Now provide a helpful, natural response to the user based on this information. Do NOT use any tools - just respond conversationally.`;
-    console.log(`[ToolCalling] Continuing to iteration ${iterations + 1} with tool result...`);
+    logger.debug(`[ToolCalling] Continuing to iteration ${iterations + 1} with tool result...`);
   }
 
-  console.log(`[ToolCalling] === DONE === finalText (${finalText.length} chars): "${finalText.substring(0, 200)}"`);
-  console.log(`[ToolCalling] toolCalls: ${allToolCalls.length}, toolResults: ${allToolResults.length}`);
+  logger.debug(`[ToolCalling] === DONE === finalText (${finalText.length} chars): "${finalText.substring(0, 200)}"`);
+  logger.debug(`[ToolCalling] toolCalls: ${allToolCalls.length}, toolResults: ${allToolResults.length}`);
 
   return {
     text: finalText,
@@ -316,7 +323,7 @@ export async function continueWithToolResult(
 
   return generateWithTools(continuedPrompt, {
     ...options,
-    maxToolCalls: (options?.maxToolCalls || 5) - 1,
+    maxToolCalls: (options?.maxToolCalls ?? 5) - 1,
   });
 }
 

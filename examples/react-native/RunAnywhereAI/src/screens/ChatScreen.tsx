@@ -395,8 +395,6 @@ export const ChatScreen: React.FC = () => {
           wasThinkingMode: false,
           wasInterrupted: false,
           retryCount: 0,
-          // Track tool usage
-          toolsUsed: result.toolCalls.map(t => t.toolName),
         },
       };
 

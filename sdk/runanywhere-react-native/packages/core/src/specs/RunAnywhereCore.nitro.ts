@@ -628,8 +628,10 @@ export interface RunAnywhereCore
   // ============================================================================
   // Tool Calling Capability (Backend-Agnostic)
   // Enables LLMs to request external actions (API calls, device functions, etc.)
-  // C++ handles: tool registry, prompt formatting, parsing <tool_call> tags
-  // Platform handles: actual tool execution (HTTP, device APIs, etc.)
+  // Current architecture:
+  //   - C++ handles: parsing <tool_call> tags from LLM output (single source of truth)
+  //   - TypeScript handles: tool registry, prompt formatting, orchestration, execution
+  // Note: Registry methods below are placeholders; actual registry is in TypeScript
   // ============================================================================
 
   /**
@@ -667,7 +669,8 @@ export interface RunAnywhereCore
   /**
    * Parse LLM output for tool call
    * @param llmOutput Raw LLM output text
-   * @returns JSON with {text, toolCall} where toolCall is null if none found
+   * @returns JSON with {hasToolCall, cleanText, toolName, argumentsJson, callId}
+   *          TypeScript layer converts this to {text, toolCall} format
    */
   parseToolCallFromOutput(llmOutput: string): Promise<string>;
 }
