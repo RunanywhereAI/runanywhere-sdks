@@ -2,14 +2,17 @@
  * @file ToolCallingBridge.cpp
  * @brief Tool Calling bridge implementation
  *
- * Implements tool call parsing and prompt formatting directly.
+ * Implements tool call parsing using nlohmann/json for robust JSON handling.
  * This avoids dependency on rac_tool_calling.h which may not be in the
  * pre-built xcframework.
  */
 
 #include "ToolCallingBridge.hpp"
+#include <nlohmann/json.hpp>
 #include <sstream>
 #include <cstring>
+
+using json = nlohmann::json;
 
 namespace runanywhere {
 namespace bridges {
@@ -24,37 +27,33 @@ ToolCallingBridge& ToolCallingBridge::shared() {
 }
 
 std::string ToolCallingBridge::escapeJsonString(const std::string& input) {
-    std::string escaped;
-    escaped.reserve(input.size() + 16);
-
-    for (char c : input) {
-        switch (c) {
-            case '"':  escaped += "\\\""; break;
-            case '\\': escaped += "\\\\"; break;
-            case '\n': escaped += "\\n"; break;
-            case '\r': escaped += "\\r"; break;
-            case '\t': escaped += "\\t"; break;
-            default:   escaped += c; break;
-        }
+    // Use nlohmann/json for proper escaping
+    json j = input;
+    std::string escaped = j.dump();
+    // Remove surrounding quotes added by dump()
+    if (escaped.size() >= 2 && escaped.front() == '"' && escaped.back() == '"') {
+        return escaped.substr(1, escaped.size() - 2);
     }
-
     return escaped;
 }
 
 /**
- * Normalize JSON by adding quotes around unquoted keys
+ * Normalize JSON by adding quotes around unquoted keys.
  * Handles: {tool: "name"} -> {"tool": "name"}
+ *
+ * This handles common LLM output patterns where keys may not be quoted.
+ * After normalization, the JSON can be parsed by nlohmann/json.
  */
-std::string ToolCallingBridge::normalizeJson(const std::string& json) {
+std::string ToolCallingBridge::normalizeJson(const std::string& jsonStr) {
     std::string result;
-    result.reserve(json.size() + 32);
+    result.reserve(jsonStr.size() + 32);
 
     bool inString = false;
-    for (size_t i = 0; i < json.size(); i++) {
-        char c = json[i];
+    for (size_t i = 0; i < jsonStr.size(); i++) {
+        char c = jsonStr[i];
 
         // Track if we're inside a string
-        if (c == '"' && (i == 0 || json[i-1] != '\\')) {
+        if (c == '"' && (i == 0 || jsonStr[i-1] != '\\')) {
             inString = !inString;
             result += c;
             continue;
@@ -66,28 +65,28 @@ std::string ToolCallingBridge::normalizeJson(const std::string& json) {
         }
 
         // Look for unquoted keys: { key: or , key:
-        if ((c == '{' || c == ',') && i + 1 < json.size()) {
+        if ((c == '{' || c == ',') && i + 1 < jsonStr.size()) {
             result += c;
             // Skip whitespace
             size_t j = i + 1;
-            while (j < json.size() && (json[j] == ' ' || json[j] == '\t' || json[j] == '\n')) {
-                result += json[j];
+            while (j < jsonStr.size() && (jsonStr[j] == ' ' || jsonStr[j] == '\t' || jsonStr[j] == '\n')) {
+                result += jsonStr[j];
                 j++;
             }
             // Check if next is an unquoted identifier followed by colon
-            if (j < json.size() && json[j] != '"' && json[j] != '{' && json[j] != '[') {
+            if (j < jsonStr.size() && jsonStr[j] != '"' && jsonStr[j] != '{' && jsonStr[j] != '[') {
                 size_t keyStart = j;
-                while (j < json.size() && json[j] != ':' && json[j] != ' ' && json[j] != '\t') {
+                while (j < jsonStr.size() && jsonStr[j] != ':' && jsonStr[j] != ' ' && jsonStr[j] != '\t') {
                     j++;
                 }
-                if (j < json.size()) {
+                if (j < jsonStr.size()) {
                     // Skip whitespace to find colon
                     size_t keyEnd = j;
-                    while (j < json.size() && (json[j] == ' ' || json[j] == '\t')) j++;
-                    if (j < json.size() && json[j] == ':') {
+                    while (j < jsonStr.size() && (jsonStr[j] == ' ' || jsonStr[j] == '\t')) j++;
+                    if (j < jsonStr.size() && jsonStr[j] == ':') {
                         // This is an unquoted key - add quotes
                         result += '"';
-                        result += json.substr(keyStart, keyEnd - keyStart);
+                        result += jsonStr.substr(keyStart, keyEnd - keyStart);
                         result += '"';
                         i = keyEnd - 1; // -1 because loop will increment
                         continue;
@@ -102,96 +101,6 @@ std::string ToolCallingBridge::normalizeJson(const std::string& json) {
     }
 
     return result;
-}
-
-bool ToolCallingBridge::extractJsonString(const std::string& json, const std::string& key, std::string& outValue) {
-    // Normalize JSON first to handle unquoted keys
-    std::string normalizedJson = normalizeJson(json);
-
-    // Build search pattern: "key"
-    std::string pattern = "\"" + key + "\"";
-
-    size_t keyPos = normalizedJson.find(pattern);
-    if (keyPos == std::string::npos) {
-        return false;
-    }
-
-    // Find the colon after the key
-    size_t colonPos = normalizedJson.find(':', keyPos + pattern.length());
-    if (colonPos == std::string::npos) {
-        return false;
-    }
-
-    // Skip whitespace after colon
-    size_t valueStart = colonPos + 1;
-    while (valueStart < normalizedJson.size() && (normalizedJson[valueStart] == ' ' || normalizedJson[valueStart] == '\t' || normalizedJson[valueStart] == '\n')) {
-        valueStart++;
-    }
-
-    // Check if value is a string (starts with quote)
-    if (valueStart >= normalizedJson.size() || normalizedJson[valueStart] != '"') {
-        return false;
-    }
-    valueStart++; // Skip opening quote
-
-    // Find closing quote (handle escaped quotes)
-    size_t valueEnd = valueStart;
-    while (valueEnd < normalizedJson.size()) {
-        if (normalizedJson[valueEnd] == '"' && (valueEnd == 0 || normalizedJson[valueEnd - 1] != '\\')) {
-            break;
-        }
-        valueEnd++;
-    }
-
-    if (valueEnd >= normalizedJson.size()) {
-        return false;
-    }
-
-    outValue = normalizedJson.substr(valueStart, valueEnd - valueStart);
-    return true;
-}
-
-bool ToolCallingBridge::extractJsonObject(const std::string& json, const std::string& key, std::string& outValue) {
-    // Build search pattern: "key"
-    std::string pattern = "\"" + key + "\"";
-
-    size_t keyPos = json.find(pattern);
-    if (keyPos == std::string::npos) {
-        return false;
-    }
-
-    // Find the colon after the key
-    size_t colonPos = json.find(':', keyPos + pattern.length());
-    if (colonPos == std::string::npos) {
-        return false;
-    }
-
-    // Skip whitespace after colon
-    size_t valueStart = colonPos + 1;
-    while (valueStart < json.size() && (json[valueStart] == ' ' || json[valueStart] == '\t' || json[valueStart] == '\n')) {
-        valueStart++;
-    }
-
-    // Check if value is an object (starts with brace)
-    if (valueStart >= json.size() || json[valueStart] != '{') {
-        return false;
-    }
-
-    // Find matching closing brace
-    int braceCount = 1;
-    size_t pos = valueStart + 1;
-    while (pos < json.size() && braceCount > 0) {
-        if (json[pos] == '{') braceCount++;
-        else if (json[pos] == '}') braceCount--;
-        pos++;
-    }
-
-    if (braceCount != 0) {
-        return false; // Unmatched braces
-    }
-
-    outValue = json.substr(valueStart, pos - valueStart);
-    return true;
 }
 
 std::string ToolCallingBridge::formatToolsPrompt(const std::string& toolsJson) {
@@ -227,12 +136,10 @@ std::string ToolCallingBridge::parseToolCall(const std::string& llmOutput) {
 
     if (tagStart == std::string::npos) {
         // No tool call found - return clean text with hasToolCall = false
-        std::ostringstream ss;
-        ss << "{";
-        ss << "\"hasToolCall\":false,";
-        ss << "\"cleanText\":\"" << escapeJsonString(llmOutput) << "\"";
-        ss << "}";
-        return ss.str();
+        json result;
+        result["hasToolCall"] = false;
+        result["cleanText"] = llmOutput;
+        return result.dump();
     }
 
     // Find end tag
@@ -246,58 +153,77 @@ std::string ToolCallingBridge::parseToolCall(const std::string& llmOutput) {
         // without the closing </tool_call>
         std::string jsonPart = llmOutput.substr(jsonStart);
         int braceCount = 0;
+        bool inStr = false;
         size_t jsonEndIndex = std::string::npos;
 
         for (size_t i = 0; i < jsonPart.size(); i++) {
-            if (jsonPart[i] == '{') braceCount++;
-            else if (jsonPart[i] == '}') {
-                braceCount--;
-                if (braceCount == 0) {
-                    jsonEndIndex = i + 1;
-                    break;
+            char c = jsonPart[i];
+            
+            // Track string boundaries to ignore braces inside strings
+            if (c == '"' && (i == 0 || jsonPart[i-1] != '\\')) {
+                inStr = !inStr;
+            }
+            
+            if (!inStr) {
+                if (c == '{') braceCount++;
+                else if (c == '}') {
+                    braceCount--;
+                    if (braceCount == 0) {
+                        jsonEndIndex = i + 1;
+                        break;
+                    }
                 }
             }
         }
 
         if (jsonEndIndex == std::string::npos) {
             // Can't find valid JSON object
-            std::ostringstream ss;
-            ss << "{";
-            ss << "\"hasToolCall\":false,";
-            ss << "\"cleanText\":\"" << escapeJsonString(llmOutput) << "\"";
-            ss << "}";
-            return ss.str();
+            json result;
+            result["hasToolCall"] = false;
+            result["cleanText"] = llmOutput;
+            return result.dump();
         }
         tagEnd = jsonStart + jsonEndIndex;
     }
 
     // Extract JSON between tags
-    std::string toolJson = llmOutput.substr(jsonStart, tagEnd - jsonStart);
+    std::string toolJsonStr = llmOutput.substr(jsonStart, tagEnd - jsonStart);
+    
+    // Normalize JSON (handle unquoted keys from LLMs)
+    std::string normalizedJson = normalizeJson(toolJsonStr);
 
-    // Parse tool name from JSON
-    // Looking for: {"tool": "tool_name", "arguments": {...}}
-    std::string toolName;
-    if (!extractJsonString(toolJson, "tool", toolName)) {
-        // Try alternative key "name"
-        if (!extractJsonString(toolJson, "name", toolName)) {
-            // Could not parse tool name
-            std::ostringstream ss;
-            ss << "{";
-            ss << "\"hasToolCall\":false,";
-            ss << "\"cleanText\":\"" << escapeJsonString(llmOutput) << "\"";
-            ss << "}";
-            return ss.str();
-        }
+    // Parse with nlohmann/json
+    json toolJson;
+    try {
+        toolJson = json::parse(normalizedJson);
+    } catch (const json::parse_error& e) {
+        // JSON parsing failed - return as no tool call
+        json result;
+        result["hasToolCall"] = false;
+        result["cleanText"] = llmOutput;
+        return result.dump();
     }
 
-    // Parse arguments from JSON
-    std::string arguments;
-    if (!extractJsonObject(toolJson, "arguments", arguments)) {
-        // Try alternative key "params"
-        if (!extractJsonObject(toolJson, "params", arguments)) {
-            // No arguments - use empty object
-            arguments = "{}";
-        }
+    // Extract tool name (try "tool" first, then "name")
+    std::string toolName;
+    if (toolJson.contains("tool") && toolJson["tool"].is_string()) {
+        toolName = toolJson["tool"].get<std::string>();
+    } else if (toolJson.contains("name") && toolJson["name"].is_string()) {
+        toolName = toolJson["name"].get<std::string>();
+    } else {
+        // Could not find tool name
+        json result;
+        result["hasToolCall"] = false;
+        result["cleanText"] = llmOutput;
+        return result.dump();
+    }
+
+    // Extract arguments (try "arguments" first, then "params")
+    json arguments = json::object();
+    if (toolJson.contains("arguments") && toolJson["arguments"].is_object()) {
+        arguments = toolJson["arguments"];
+    } else if (toolJson.contains("params") && toolJson["params"].is_object()) {
+        arguments = toolJson["params"];
     }
 
     // Build the clean text (everything except the tool call tags)
@@ -319,17 +245,15 @@ std::string ToolCallingBridge::parseToolCall(const std::string& llmOutput) {
         cleanText = "";
     }
 
-    // Build JSON response
-    std::ostringstream ss;
-    ss << "{";
-    ss << "\"hasToolCall\":true,";
-    ss << "\"cleanText\":\"" << escapeJsonString(cleanText) << "\",";
-    ss << "\"toolName\":\"" << escapeJsonString(toolName) << "\",";
-    ss << "\"argumentsJson\":" << arguments << ",";
-    ss << "\"callId\":0";
-    ss << "}";
+    // Build JSON response using nlohmann/json
+    json result;
+    result["hasToolCall"] = true;
+    result["cleanText"] = cleanText;
+    result["toolName"] = toolName;
+    result["argumentsJson"] = arguments;
+    result["callId"] = 0;
 
-    return ss.str();
+    return result.dump();
 }
 
 } // namespace bridges

@@ -146,8 +146,22 @@ export interface ToolCallingOptions {
   /** Maximum tokens to generate */
   maxTokens?: number;
 
-  /** System prompt to use */
+  /** System prompt to use (will be merged with tool instructions by default) */
   systemPrompt?: string;
+
+  /**
+   * If true, replaces the system prompt entirely instead of appending tool instructions.
+   * Use this if your system prompt already includes tool-calling instructions.
+   * Default: false (tool instructions are appended to systemPrompt)
+   */
+  replaceSystemPrompt?: boolean;
+
+  /**
+   * If true, keeps tool definitions available after the first tool call.
+   * This allows the LLM to make multiple sequential tool calls if needed.
+   * Default: false (tool definitions are removed after first call to encourage natural response)
+   */
+  keepToolsAvailable?: boolean;
 }
 
 // =============================================================================
@@ -174,34 +188,3 @@ export interface ToolCallingResult {
   conversationId?: string;
 }
 
-// =============================================================================
-// Built-in Tool Types (for common tools like weather, search, etc.)
-// =============================================================================
-
-/**
- * Weather data result
- */
-export interface WeatherData {
-  temperature: number;
-  condition: string;
-  humidity?: number;
-  windSpeed?: number;
-  location: string;
-}
-
-/**
- * Web search result
- */
-export interface SearchResult {
-  title: string;
-  url: string;
-  snippet: string;
-}
-
-/**
- * Search results response
- */
-export interface SearchResponse {
-  query: string;
-  results: SearchResult[];
-}

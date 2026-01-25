@@ -2572,52 +2572,25 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isTelemetryInitialized() {
 
 // ============================================================================
 // Tool Calling
-// Parses <tool_call> tags from LLM output - single source of truth in C++
+//
+// ARCHITECTURE:
+// - C++ (ToolCallingBridge): Parses <tool_call> tags from LLM output.
+//   This is the SINGLE SOURCE OF TRUTH for parsing, ensuring consistency.
+//
+// - TypeScript (RunAnywhere+ToolCalling.ts): Handles tool registry, executor
+//   storage, prompt formatting, and orchestration. Executors MUST stay in
+//   TypeScript because they need JavaScript APIs (fetch, device APIs, etc.).
+//
+// Only parseToolCallFromOutput is implemented in C++. All other tool calling
+// functionality (registration, execution, prompt formatting) is in TypeScript.
 // ============================================================================
-
-std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::registerToolDefinition(const std::string& toolJson) {
-    return Promise<bool>::async([toolJson]() -> bool {
-        LOGI("registerToolDefinition: %s", toolJson.c_str());
-        // Tool definitions are stored in TypeScript for executor access
-        // This is a placeholder for potential future C++ tool registry
-        return true;
-    });
-}
-
-std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::unregisterToolDefinition(const std::string& toolName) {
-    return Promise<bool>::async([toolName]() -> bool {
-        LOGI("unregisterToolDefinition: %s", toolName.c_str());
-        return true;
-    });
-}
-
-std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getRegisteredToolDefinitions() {
-    return Promise<std::string>::async([]() -> std::string {
-        // Tool definitions stored in TypeScript
-        return "[]";
-    });
-}
-
-std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::clearToolDefinitions() {
-    return Promise<bool>::async([]() -> bool {
-        LOGI("clearToolDefinitions");
-        return true;
-    });
-}
-
-std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::formatToolsPrompt() {
-    return Promise<std::string>::async([]() -> std::string {
-        // Tool prompt formatting done in TypeScript
-        // This could be moved here in the future
-        return "";
-    });
-}
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::parseToolCallFromOutput(const std::string& llmOutput) {
     return Promise<std::string>::async([llmOutput]() -> std::string {
         LOGD("parseToolCallFromOutput: input length=%zu", llmOutput.length());
 
         // Use ToolCallingBridge for parsing - single source of truth
+        // This ensures consistent <tool_call> tag parsing across all platforms
         return ::runanywhere::bridges::ToolCallingBridge::shared().parseToolCall(llmOutput);
     });
 }

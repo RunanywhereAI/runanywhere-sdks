@@ -86,11 +86,6 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("voiceAgentGenerateResponse", &HybridRunAnywhereCoreSpec::voiceAgentGenerateResponse);
       prototype.registerHybridMethod("voiceAgentSynthesizeSpeech", &HybridRunAnywhereCoreSpec::voiceAgentSynthesizeSpeech);
       prototype.registerHybridMethod("cleanupVoiceAgent", &HybridRunAnywhereCoreSpec::cleanupVoiceAgent);
-      prototype.registerHybridMethod("registerToolDefinition", &HybridRunAnywhereCoreSpec::registerToolDefinition);
-      prototype.registerHybridMethod("unregisterToolDefinition", &HybridRunAnywhereCoreSpec::unregisterToolDefinition);
-      prototype.registerHybridMethod("getRegisteredToolDefinitions", &HybridRunAnywhereCoreSpec::getRegisteredToolDefinitions);
-      prototype.registerHybridMethod("clearToolDefinitions", &HybridRunAnywhereCoreSpec::clearToolDefinitions);
-      prototype.registerHybridMethod("formatToolsPrompt", &HybridRunAnywhereCoreSpec::formatToolsPrompt);
       prototype.registerHybridMethod("parseToolCallFromOutput", &HybridRunAnywhereCoreSpec::parseToolCallFromOutput);
     });
   }

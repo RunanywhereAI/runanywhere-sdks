@@ -206,6 +206,11 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
 /**
  * Generate a response with tool calling support
  * Uses C++ for parsing, TypeScript for execution
+ *
+ * ARCHITECTURE:
+ * - Parsing: C++ ToolCallingBridge (single source of truth)
+ * - Registry & Execution: TypeScript (needs JS APIs like fetch)
+ * - Orchestration: This function manages the generate-parse-execute loop
  */
 export async function generateWithTools(
   prompt: string,
@@ -214,15 +219,31 @@ export async function generateWithTools(
   const tools = options?.tools ?? getRegisteredTools();
   const maxToolCalls = options?.maxToolCalls ?? 5;
   const autoExecute = options?.autoExecute ?? true;
+  const replaceSystemPrompt = options?.replaceSystemPrompt ?? false;
+  const keepToolsAvailable = options?.keepToolsAvailable ?? false;
 
   // Build system prompt with tools
   const toolsPrompt = formatToolsForPrompt(tools);
-  const systemPrompt = options?.systemPrompt
-    ? `${options.systemPrompt}\n\n${toolsPrompt}`
-    : toolsPrompt;
 
-  // First generation
+  // Handle system prompt based on replaceSystemPrompt option
+  let systemPrompt: string;
+  if (replaceSystemPrompt && options?.systemPrompt) {
+    // Use user's system prompt as-is (they handle tool instructions themselves)
+    systemPrompt = options.systemPrompt;
+  } else if (options?.systemPrompt) {
+    // Merge user's system prompt with tool instructions (default behavior)
+    systemPrompt = `${options.systemPrompt}\n\n${toolsPrompt}`;
+  } else {
+    // Use only tool instructions
+    systemPrompt = toolsPrompt;
+  }
+
+  // Build conversation history for context preservation
+  const conversationHistory: Array<{ role: string; content: string }> = [];
+
+  // Initial prompt with system context
   let fullPrompt = systemPrompt ? `${systemPrompt}\n\nUser: ${prompt}` : prompt;
+  conversationHistory.push({ role: 'user', content: prompt });
 
   const allToolCalls: ToolCall[] = [];
   const allToolResults: ToolResult[] = [];
@@ -252,8 +273,9 @@ export async function generateWithTools(
     logger.debug(`[ToolCalling] Parsed - hasToolCall: ${!!toolCall}, cleanText (${finalText.length} chars): "${finalText.substring(0, 150)}"`);
 
     if (!toolCall) {
-      // No tool call, we're done
+      // No tool call, we're done - LLM provided a natural response
       logger.debug('[ToolCalling] No tool call found, breaking loop with finalText');
+      conversationHistory.push({ role: 'assistant', content: finalText });
       break;
     }
 
@@ -281,17 +303,33 @@ export async function generateWithTools(
       logger.debug(`[ToolCalling] Tool error: ${result.error}`);
     }
 
-    // Add tool result to context and continue with a clear prompt
-    // IMPORTANT: Don't include tool definitions again - just ask for natural response
+    // Add tool interaction to conversation history
+    conversationHistory.push({ role: 'assistant', content: `[Tool: ${toolCall.toolName}]` });
+    conversationHistory.push({ role: 'tool', content: JSON.stringify(result.success ? result.result : { error: result.error }) });
+
+    // Build follow-up prompt based on keepToolsAvailable option
     const resultData = result.success ? result.result : { error: result.error };
 
-    // Format a clear follow-up prompt for the LLM (WITHOUT tool definitions)
-    fullPrompt = `The user asked: "${prompt}"
+    if (keepToolsAvailable) {
+      // Keep tool definitions available for potential additional tool calls
+      fullPrompt = `${systemPrompt}
+
+User: ${prompt}
+
+You previously used the ${toolCall.toolName} tool and received:
+${JSON.stringify(resultData, null, 2)}
+
+Based on this tool result, either use another tool if needed, or provide a helpful response to the user.`;
+    } else {
+      // Default: Remove tool definitions to encourage natural response
+      fullPrompt = `The user asked: "${prompt}"
 
 You used the ${toolCall.toolName} tool and received this data:
 ${JSON.stringify(resultData, null, 2)}
 
 Now provide a helpful, natural response to the user based on this information. Do NOT use any tools - just respond conversationally.`;
+    }
+
     logger.debug(`[ToolCalling] Continuing to iteration ${iterations + 1} with tool result...`);
   }
 
