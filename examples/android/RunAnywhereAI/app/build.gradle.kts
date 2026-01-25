@@ -31,8 +31,8 @@ android {
         applicationId = "com.runanywhere.runanywhereai"
         minSdk = 24
         targetSdk = 36
-        versionCode = 11
-        versionName = "0.1.2"
+        versionCode = 13
+        versionName = "0.1.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -151,7 +151,7 @@ android {
             // when using AGP < 8.5.1. With AGP 8.5.1+, this ensures proper extraction
             // and 16KB alignment during packaging.
             useLegacyPackaging = true
-            
+
             // Handle duplicate native libraries from multiple backend modules
             // (ONNX and LlamaCPP both include some common libraries)
             pickFirsts += listOf(

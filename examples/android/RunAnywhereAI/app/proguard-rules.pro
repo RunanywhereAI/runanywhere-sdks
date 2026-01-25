@@ -293,6 +293,9 @@
 # R8 Generated Missing Rules
 # ========================================================================================
 
+# Apache Commons Lang3 (uses Java 8+ reflection API not available on Android)
+-dontwarn java.lang.reflect.AnnotatedType
+
 # Zstd compression library
 -dontwarn com.github.luben.zstd.ZstdInputStream
 -dontwarn com.github.luben.zstd.ZstdOutputStream
