@@ -1612,8 +1612,8 @@ __metadata:
   resolution: "@runanywhere/core@workspace:packages/core"
   dependencies:
     "@types/react": ~19.1.0
-    nitrogen: ^0.31.10
-    react-native-nitro-modules: ^0.31.10
+    nitrogen: ^0.33.2
+    react-native-nitro-modules: 0.33.2
     typescript: ~5.9.2
   peerDependencies:
     react: ">=18.0.0"
@@ -1639,8 +1639,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@runanywhere/llamacpp@workspace:packages/llamacpp"
   dependencies:
-    nitrogen: ^0.31.10
-    react-native-nitro-modules: ^0.31.10
+    nitrogen: ^0.33.2
+    react-native-nitro-modules: 0.33.2
     typescript: ~5.9.2
   peerDependencies:
     "@runanywhere/core": ">=0.16.0"
@@ -1654,8 +1654,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@runanywhere/onnx@workspace:packages/onnx"
   dependencies:
-    nitrogen: ^0.31.10
-    react-native-nitro-modules: ^0.31.10
+    nitrogen: ^0.33.2
+    react-native-nitro-modules: 0.33.2
     typescript: ~5.9.2
   peerDependencies:
     "@runanywhere/core": ">=0.16.0"
@@ -6571,18 +6571,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"nitrogen@npm:^0.31.10":
-  version: 0.31.10
-  resolution: "nitrogen@npm:0.31.10"
+"nitrogen@npm:^0.33.2":
+  version: 0.33.2
+  resolution: "nitrogen@npm:0.33.2"
   dependencies:
     chalk: ^5.3.0
-    react-native-nitro-modules: ^0.31.10
+    react-native-nitro-modules: ^0.33.2
     ts-morph: ^27.0.0
     yargs: ^18.0.0
     zod: ^4.0.5
   bin:
     nitrogen: lib/index.js
-  checksum: 6bba165b334172d6ea060affefc14aded38294cd9ef23f58a3aff9fc89f41d7b62e6ae9897bec5d8ce181bb9656d387c67f2649b91ad133041db0aa04826ff71
+  checksum: bf0572f1550e626971453396e6d50ceb182bcea12f741034aaa653bb0d7ffb8a3cd689d354dc370cf91ecdb8f8a600ef3c3211651268a2ecb301523d63455291
   languageName: node
   linkType: hard
 
@@ -7615,13 +7615,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-native-nitro-modules@npm:^0.31.10":
-  version: 0.31.10
-  resolution: "react-native-nitro-modules@npm:0.31.10"
+"react-native-nitro-modules@npm:0.33.2, react-native-nitro-modules@npm:^0.33.2":
+  version: 0.33.2
+  resolution: "react-native-nitro-modules@npm:0.33.2"
   peerDependencies:
     react: "*"
     react-native: "*"
-  checksum: 1c8d2f12ff29b6733c784c5fd0dedcbec4ceec9f82eb49f49e7734f31b9367346938010dcacf69bf695a352e36fec5aa23fd57b8091f6acd78c3d9a61e14ea7f
+  checksum: 2c1f4d4d40172a3d756e71d7ecf61d754ed79a4fde102e24b953df980282096fb3a1e04381f9aaefa8c62dfc89b29f098cc22747786c3feddc0087721961b3dd
   languageName: node
   linkType: hard
 

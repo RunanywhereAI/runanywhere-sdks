@@ -67,8 +67,8 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
-    "nitrogen": "^0.31.10",
-    "react-native-nitro-modules": "^0.31.10",
+    "nitrogen": "^0.33.2",
+    "react-native-nitro-modules": "0.33.2",
     "typescript": "~5.9.2"
   },
   "create-react-native-library": {
