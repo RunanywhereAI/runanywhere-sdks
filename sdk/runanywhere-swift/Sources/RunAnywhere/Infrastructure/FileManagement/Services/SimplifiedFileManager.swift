@@ -73,10 +73,44 @@ public class SimplifiedFileManager {
     /// Delete a model folder and all its contents
     public func deleteModel(modelId: String, framework: InferenceFramework) throws {
         let folderURL = try CppBridge.ModelPaths.getModelFolder(modelId: modelId, framework: framework)
+
+        print("🗑️ Delete called for: \(modelId)")
+        print("🗑️ Path to delete: \(folderURL.path)")
+
+        // List what's in the folder we're about to delete
+        if let contents = try? FileManager.default.contentsOfDirectory(atPath: folderURL.path) {
+            print("🗑️ Files in folder to delete:")
+            for file in contents {
+                let filePath = folderURL.appendingPathComponent(file).path
+                let attrs = try? FileManager.default.attributesOfItem(atPath: filePath)
+                let size = (attrs?[.size] as? Int64) ?? 0
+                print("   - \(file) (\(size / 1024 / 1024) MB)")
+            }
+    }
+
+            // Search for actual model files anywhere in Documents
+        let docsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let enumerator = FileManager.default.enumerator(atPath: docsURL.path)
+
+        print("🔍 Searching for .gguf files containing '\(modelId)':")
+        while let file = enumerator?.nextObject() as? String {
+            if file.contains(".gguf") || file.contains(modelId) {
+                let fullPath = docsURL.appendingPathComponent(file).path
+                let attrs = try? FileManager.default.attributesOfItem(atPath: fullPath)
+                let size = (attrs?[.size] as? Int64) ?? 0
+                print("   📦 Found: \(file) (\(size / 1024 / 1024) MB)")
+            }
+        }
+
         if FileManager.default.fileExists(atPath: folderURL.path) {
             try FileManager.default.removeItem(at: folderURL)
             logger.info("Deleted model: \(modelId) from \(framework.rawValue)")
-        }
+            print("File exist at path: \(folderURL.path)")
+        } else {
+            logger.info("\(modelId) does NOT exist in \(framework.rawValue)")
+            print("❌ File does NOT exist at path: \(folderURL.path)")
+
+    }
     }
 
     // MARK: - Model Discovery
