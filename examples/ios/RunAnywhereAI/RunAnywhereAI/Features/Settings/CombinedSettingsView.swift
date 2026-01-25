@@ -728,6 +728,12 @@ private struct StoredModelRow: View {
     @State private var showingDeleteConfirmation = false
     @State private var isDeleting = false
 
+    private var isDeletable: Bool {
+        // Platform models (built-in) can't be deleted
+        guard let framework = model.framework else { return false }
+        return framework != .foundationModels && framework != .systemTTS
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
             HStack {
@@ -757,20 +763,23 @@ private struct StoredModelRow: View {
                         .tint(AppColors.primaryAccent)
                         .controlSize(.mini)
 
-                        Button(
-                            action: {
-                                showingDeleteConfirmation = true
-                            },
-                            label: {
-                                Image(systemName: "trash")
-                                    .foregroundColor(AppColors.primaryRed)
-                            }
-                        )
-                        .font(AppTypography.caption2)
-                        .buttonStyle(.bordered)
-                        .tint(AppColors.primaryRed)
-                        .controlSize(.mini)
-                        .disabled(isDeleting)
+                        // ONLY show delete button if deletable
+                        if isDeletable {
+                            Button(
+                                action: {
+                                    showingDeleteConfirmation = true
+                                },
+                                label: {
+                                    Image(systemName: "trash")
+                                        .foregroundColor(AppColors.primaryRed)
+                                }
+                            )
+                            .font(AppTypography.caption2)
+                            .buttonStyle(.bordered)
+                            .tint(AppColors.primaryRed)
+                            .controlSize(.mini)
+                            .disabled(isDeleting)
+                        }
                     }
                 }
             }
