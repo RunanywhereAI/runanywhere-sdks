@@ -624,4 +624,50 @@ export interface RunAnywhereCore
    * Cleanup voice agent resources
    */
   cleanupVoiceAgent(): Promise<void>;
+
+  // ============================================================================
+  // Tool Calling Capability (Backend-Agnostic)
+  // Enables LLMs to request external actions (API calls, device functions, etc.)
+  // C++ handles: tool registry, prompt formatting, parsing <tool_call> tags
+  // Platform handles: actual tool execution (HTTP, device APIs, etc.)
+  // ============================================================================
+
+  /**
+   * Register a tool definition
+   * @param toolJson JSON with {name, description, parameters}
+   * @returns true if registered successfully
+   */
+  registerToolDefinition(toolJson: string): Promise<boolean>;
+
+  /**
+   * Unregister a tool by name
+   * @param toolName Tool name to unregister
+   * @returns true if unregistered successfully
+   */
+  unregisterToolDefinition(toolName: string): Promise<boolean>;
+
+  /**
+   * Get all registered tool definitions
+   * @returns JSON array of tool definitions
+   */
+  getRegisteredToolDefinitions(): Promise<string>;
+
+  /**
+   * Clear all registered tools
+   * @returns true if cleared successfully
+   */
+  clearToolDefinitions(): Promise<boolean>;
+
+  /**
+   * Format tools for LLM system prompt
+   * @returns Formatted string describing available tools
+   */
+  formatToolsPrompt(): Promise<string>;
+
+  /**
+   * Parse LLM output for tool call
+   * @param llmOutput Raw LLM output text
+   * @returns JSON with {text, toolCall} where toolCall is null if none found
+   */
+  parseToolCallFromOutput(llmOutput: string): Promise<string>;
 }

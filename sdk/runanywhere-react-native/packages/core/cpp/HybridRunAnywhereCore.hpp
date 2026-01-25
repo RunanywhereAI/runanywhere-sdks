@@ -257,6 +257,18 @@ public:
   std::shared_ptr<Promise<std::string>> voiceAgentSynthesizeSpeech(const std::string& text) override;
   std::shared_ptr<Promise<void>> cleanupVoiceAgent() override;
 
+  // ============================================================================
+  // Tool Calling - Delegates to ToolCallingBridge
+  // Single source of truth for parsing <tool_call> tags from LLM output
+  // ============================================================================
+
+  std::shared_ptr<Promise<bool>> registerToolDefinition(const std::string& toolJson) override;
+  std::shared_ptr<Promise<bool>> unregisterToolDefinition(const std::string& toolName) override;
+  std::shared_ptr<Promise<std::string>> getRegisteredToolDefinitions() override;
+  std::shared_ptr<Promise<bool>> clearToolDefinitions() override;
+  std::shared_ptr<Promise<std::string>> formatToolsPrompt() override;
+  std::shared_ptr<Promise<std::string>> parseToolCallFromOutput(const std::string& llmOutput) override;
+
 private:
   // Thread safety
   std::mutex initMutex_;
