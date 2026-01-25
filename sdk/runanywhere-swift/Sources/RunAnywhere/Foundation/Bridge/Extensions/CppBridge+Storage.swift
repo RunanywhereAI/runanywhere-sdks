@@ -232,14 +232,30 @@ private func storageGetTotalSpaceCallback(userData _: UnsafeMutableRawPointer?) 
 
 /// Calculate directory size (recursive)
 private func calculateDirectorySize(at url: URL) -> Int64 {
+    let logger = SDKLogger(category: "ExtractionService")
     let fm = FileManager.default
+
+    // Check if it's a directory
+    var isDirectory: ObjCBool = false
+    if fm.fileExists(atPath: url.path, isDirectory: &isDirectory) {
+        if !isDirectory.boolValue {
+            // It's a file
+            if let attrs = try? fm.attributesOfItem(atPath: url.path),
+               let fileSize = attrs[.size] as? Int64 {
+                return fileSize
+            } else {
+                return 0
+            }
+        }
+    }
+
+    // It's a directory
     guard let enumerator = fm.enumerator(
         at: url,
         includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey],
         options: [.skipsHiddenFiles]
     ) else {
-        // Maybe it's a file, not a directory
-        return FileOperationsUtilities.fileSize(at: url) ?? 0
+        return 0
     }
 
     var totalSize: Int64 = 0
