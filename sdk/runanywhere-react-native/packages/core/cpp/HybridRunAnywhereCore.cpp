@@ -421,13 +421,12 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
             };
 
             callbacks.user_data = nullptr;
-            // Only auto-fetch in staging/production, not development
-            bool shouldAutoFetch = (env != SDKEnvironment::Development);
-            callbacks.auto_fetch = shouldAutoFetch ? RAC_TRUE : RAC_FALSE;
+            // Note: auto_fetch was removed from rac_assignment_callbacks struct
+            // Fetching is now controlled manually via rac_model_assignment_fetch()
 
             result = rac_model_assignment_set_callbacks(&callbacks);
             if (result == RAC_SUCCESS) {
-                LOGI("Model assignment callbacks registered (autoFetch: %s)", shouldAutoFetch ? "true" : "false");
+                LOGI("Model assignment callbacks registered");
             } else {
                 LOGE("Failed to register model assignment callbacks: %d", result);
                 // Continue - not fatal, models can be fetched later

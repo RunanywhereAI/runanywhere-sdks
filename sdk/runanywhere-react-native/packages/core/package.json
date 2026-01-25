@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/core",
-  "version": "0.17.7",
+  "version": "0.17.8",
   "description": "Core SDK for RunAnywhere React Native - includes RACommons bindings, native bridges, and public API",
   "main": "src/index.ts",
   "types": "src/index.ts",
