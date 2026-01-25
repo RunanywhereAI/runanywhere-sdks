@@ -626,49 +626,28 @@ export interface RunAnywhereCore
   cleanupVoiceAgent(): Promise<void>;
 
   // ============================================================================
-  // Tool Calling Capability (Backend-Agnostic)
-  // Enables LLMs to request external actions (API calls, device functions, etc.)
-  // Current architecture:
-  //   - C++ handles: parsing <tool_call> tags from LLM output (single source of truth)
-  //   - TypeScript handles: tool registry, prompt formatting, orchestration, execution
-  // Note: Registry methods below are placeholders; actual registry is in TypeScript
+  // Tool Calling Capability
+  //
+  // ARCHITECTURE:
+  // - C++ (ToolCallingBridge): Parses <tool_call> tags from LLM output.
+  //   This is the SINGLE SOURCE OF TRUTH for parsing, ensuring consistency.
+  //
+  // - TypeScript (RunAnywhere+ToolCalling.ts): Handles tool registry, executor
+  //   storage, prompt formatting, and orchestration. Executors MUST stay in
+  //   TypeScript because they need JavaScript APIs (fetch, device APIs, etc.).
+  //
+  // Only parseToolCallFromOutput is implemented in C++. All other tool calling
+  // functionality (registerTool, unregisterTool, clearTools, formatToolsForPrompt)
+  // is provided by the TypeScript layer in RunAnywhere+ToolCalling.ts.
   // ============================================================================
 
   /**
-   * Register a tool definition
-   * @param toolJson JSON with {name, description, parameters}
-   * @returns true if registered successfully
-   */
-  registerToolDefinition(toolJson: string): Promise<boolean>;
-
-  /**
-   * Unregister a tool by name
-   * @param toolName Tool name to unregister
-   * @returns true if unregistered successfully
-   */
-  unregisterToolDefinition(toolName: string): Promise<boolean>;
-
-  /**
-   * Get all registered tool definitions
-   * @returns JSON array of tool definitions
-   */
-  getRegisteredToolDefinitions(): Promise<string>;
-
-  /**
-   * Clear all registered tools
-   * @returns true if cleared successfully
-   */
-  clearToolDefinitions(): Promise<boolean>;
-
-  /**
-   * Format tools for LLM system prompt
-   * @returns Formatted string describing available tools
-   */
-  formatToolsPrompt(): Promise<string>;
-
-  /**
-   * Parse LLM output for tool call
-   * @param llmOutput Raw LLM output text
+   * Parse LLM output for tool call (IMPLEMENTED in C++ ToolCallingBridge)
+   *
+   * This is the single source of truth for parsing <tool_call> tags from LLM output.
+   * Ensures consistent parsing behavior across all platforms.
+   *
+   * @param llmOutput Raw LLM output text that may contain <tool_call> tags
    * @returns JSON with {hasToolCall, cleanText, toolName, argumentsJson, callId}
    *          TypeScript layer converts this to {text, toolCall} format
    */

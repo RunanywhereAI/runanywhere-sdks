@@ -3,11 +3,23 @@
  * @brief Tool Calling bridge for React Native
  *
  * Matches Swift's RunAnywhere+ToolCalling.swift pattern, providing:
- * - Tool call parsing from LLM output
+ * - Tool call parsing from LLM output (SINGLE SOURCE OF TRUTH for parsing)
  * - Tool definitions formatting for prompts
  *
- * Note: Implements parsing logic directly rather than depending on RACommons
- * rac_tool_calling.h, which allows building without rebuilding the xcframework.
+ * ARCHITECTURE:
+ * This bridge handles ONLY the parsing of <tool_call> tags from LLM output.
+ * Tool registration, execution, and prompt formatting are handled in TypeScript
+ * (RunAnywhere+ToolCalling.ts) because executors need JavaScript APIs.
+ *
+ * JSON PARSING:
+ * Uses nlohmann/json (https://github.com/nlohmann/json) for robust JSON parsing.
+ * This handles:
+ * - Properly escaped strings and special characters
+ * - Nested objects and arrays
+ * - Edge cases that simple string parsing would miss
+ *
+ * The normalizeJson() helper handles LLM quirks like unquoted keys:
+ *   {tool: "name"} -> {"tool": "name"}
  */
 
 #pragma once
@@ -32,6 +44,7 @@ struct ToolCallParseResult {
  * @brief Tool Calling bridge singleton
  *
  * Parses LLM output for tool calls and formats tools for prompts.
+ * Uses nlohmann/json for robust JSON parsing.
  */
 class ToolCallingBridge {
 public:
@@ -65,19 +78,9 @@ private:
 
     /**
      * Normalize JSON by adding quotes around unquoted keys
-     * Handles: {tool: "name"} -> {"tool": "name"}
+     * Handles common LLM output patterns: {tool: "name"} -> {"tool": "name"}
      */
     std::string normalizeJson(const std::string& json);
-
-    /**
-     * Extract a string value from JSON
-     */
-    bool extractJsonString(const std::string& json, const std::string& key, std::string& outValue);
-
-    /**
-     * Extract an object value from JSON
-     */
-    bool extractJsonObject(const std::string& json, const std::string& key, std::string& outValue);
 };
 
 } // namespace bridges

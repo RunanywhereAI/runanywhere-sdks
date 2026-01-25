@@ -156,7 +156,4 @@ export type {
   RegisteredTool,
   ToolCallingOptions,
   ToolCallingResult,
-  WeatherData,
-  SearchResult,
-  SearchResponse,
 } from './ToolCallingTypes';

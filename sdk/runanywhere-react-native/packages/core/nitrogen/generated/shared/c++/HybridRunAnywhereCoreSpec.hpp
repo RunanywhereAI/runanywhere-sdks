@@ -125,11 +125,6 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::string>> voiceAgentGenerateResponse(const std::string& prompt) = 0;
       virtual std::shared_ptr<Promise<std::string>> voiceAgentSynthesizeSpeech(const std::string& text) = 0;
       virtual std::shared_ptr<Promise<void>> cleanupVoiceAgent() = 0;
-      virtual std::shared_ptr<Promise<bool>> registerToolDefinition(const std::string& toolJson) = 0;
-      virtual std::shared_ptr<Promise<bool>> unregisterToolDefinition(const std::string& toolName) = 0;
-      virtual std::shared_ptr<Promise<std::string>> getRegisteredToolDefinitions() = 0;
-      virtual std::shared_ptr<Promise<bool>> clearToolDefinitions() = 0;
-      virtual std::shared_ptr<Promise<std::string>> formatToolsPrompt() = 0;
       virtual std::shared_ptr<Promise<std::string>> parseToolCallFromOutput(const std::string& llmOutput) = 0;
 
     protected:
