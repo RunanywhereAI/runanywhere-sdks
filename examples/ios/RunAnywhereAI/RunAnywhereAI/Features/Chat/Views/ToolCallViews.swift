@@ -189,8 +189,8 @@ struct ToolCallingActiveIndicator: View {
         ToolCallIndicator(
             toolCallInfo: ToolCallInfo(
                 toolName: "get_weather",
-                arguments: ["location": "San Francisco"],
-                result: ["temp": 72, "condition": "Sunny"],
+                arguments: ["location": .string("San Francisco")],
+                result: ["temp": .number(72), "condition": .string("Sunny")],
                 success: true
             )
         ) {}
@@ -198,7 +198,7 @@ struct ToolCallingActiveIndicator: View {
         ToolCallIndicator(
             toolCallInfo: ToolCallInfo(
                 toolName: "search_web",
-                arguments: ["query": "Swift concurrency"],
+                arguments: ["query": .string("Swift concurrency")],
                 success: false,
                 error: "Network timeout"
             )
