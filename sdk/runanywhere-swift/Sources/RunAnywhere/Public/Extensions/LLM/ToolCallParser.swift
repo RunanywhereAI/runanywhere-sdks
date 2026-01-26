@@ -144,29 +144,44 @@ internal enum ToolCallParser {
     /// Extract tool name and arguments from parsed JSON using multiple strategies.
     ///
     /// Strategies in order of priority:
-    /// 1. Standard format: `{"tool": "name", "arguments": {...}}`
-    /// 2. Name variant: `{"name": "name", "params": {...}}`
-    /// 3. Fallback: `{"tool_name": value}` - tool name as key, value as arguments
+    /// 1. Standard format: `{"tool": "name", "arguments": {...}}` (case-insensitive key)
+    /// 2. Name/function variant: `{"name": "name", "params": {...}}`
+    /// 3. Placeholder key: `{"TOOL": "tool_name"}` - placeholder key with tool name as value
+    /// 4. Fallback: `{"tool_name": value}` - tool name as key, value as arguments
     private static func extractToolNameAndArguments(
         from jsonObject: [String: ToolValue]
     ) -> (toolName: String?, arguments: [String: ToolValue]) {
-        // Strategy 1: Standard format with "tool" key
-        if let name = jsonObject["tool"]?.stringValue {
-            let args = jsonObject["arguments"]?.objectValue ?? jsonObject["params"]?.objectValue ?? [:]
+        // Strategy 1: Standard format with "tool" key (case-insensitive)
+        // Handles: {"tool": "name"}, {"Tool": "name"}, {"TOOL": "name", "arguments": {...}}
+        if let toolEntry = jsonObject.first(where: { $0.key.lowercased() == "tool" }),
+           let name = toolEntry.value.stringValue {
+            let args = findArguments(in: jsonObject)
             return (name, args)
         }
 
-        // Strategy 2: "name" key variant
-        if let name = jsonObject["name"]?.stringValue {
-            let args = jsonObject["arguments"]?.objectValue ?? jsonObject["params"]?.objectValue ?? [:]
+        // Strategy 2: "name" or "function" key variant (case-insensitive)
+        if let nameEntry = jsonObject.first(where: { $0.key.lowercased() == "name" || $0.key.lowercased() == "function" }),
+           let name = nameEntry.value.stringValue {
+            let args = findArguments(in: jsonObject)
             return (name, args)
         }
 
-        // Strategy 3: Fallback - tool name used directly as key
-        // e.g., {"calculate": "5 * 100"} or {"get_weather": {"location": "Paris"}}
-        // Common LLM mistake - use the first non-standard key as tool name
-        let standardKeys = Set(["tool", "name", "arguments", "params", "function"])
-        for (key, value) in jsonObject where !standardKeys.contains(key) {
+        // Strategy 3: Placeholder key with tool name as string value
+        // Handles: {"TOOL": "get_current_time"}, {"Function": "calculate"}
+        // These are LLM mistakes where the key is a placeholder and the value is the tool name
+        let placeholderKeys = Set(["tool", "function", "func", "method", "action", "command"])
+        for (key, value) in jsonObject {
+            if placeholderKeys.contains(key.lowercased()), case .string(let toolName) = value {
+                // The value is the actual tool name, arguments are elsewhere or empty
+                let args = findArguments(in: jsonObject)
+                return (toolName, args)
+            }
+        }
+
+        // Strategy 4: Fallback - tool name used directly as key
+        // Handles: {"calculate": "5 * 100"}, {"get_weather": {"location": "Paris"}}
+        let standardKeys = Set(["tool", "name", "arguments", "params", "function", "func", "method", "action", "command"])
+        for (key, value) in jsonObject where !standardKeys.contains(key.lowercased()) {
             // Found a non-standard key - treat it as the tool name
             var arguments: [String: ToolValue] = [:]
 
@@ -191,6 +206,22 @@ internal enum ToolCallParser {
         }
 
         return (nil, [:])
+    }
+
+    /// Find arguments object in JSON using common key names
+    private static func findArguments(in jsonObject: [String: ToolValue]) -> [String: ToolValue] {
+        // Try common argument key names (case-insensitive)
+        let argKeys = ["arguments", "args", "params", "parameters", "input"]
+        for argKey in argKeys {
+            if let entry = jsonObject.first(where: { $0.key.lowercased() == argKey }) {
+                if let obj = entry.value.objectValue {
+                    return obj
+                }
+                // If it's a scalar value, wrap it
+                return ["input": entry.value]
+            }
+        }
+        return [:]
     }
 
     /// Find the matching closing brace for a JSON object starting at the given index.
