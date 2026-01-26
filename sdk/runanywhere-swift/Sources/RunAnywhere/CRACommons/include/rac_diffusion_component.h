@@ -15,9 +15,9 @@
 #ifndef RAC_DIFFUSION_COMPONENT_H
 #define RAC_DIFFUSION_COMPONENT_H
 
-#include "rac/core/capabilities/rac_lifecycle.h"
-#include "rac/core/rac_error.h"
-#include "rac/features/diffusion/rac_diffusion_types.h"
+#include "rac_lifecycle.h"
+#include "rac_error.h"
+#include "rac_diffusion_types.h"
 
 #ifdef __cplusplus
 extern "C" {
