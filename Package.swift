@@ -40,7 +40,7 @@ let onnxRuntimeMacOSPath = "\(packageDir)/sdk/runanywhere-swift/Binaries/onnxrun
 //   ./scripts/build-swift.sh --set-remote  (sets useLocalBinaries = false)
 //
 // =============================================================================
-let useLocalBinaries = false  // Toggle: true for local dev, false for release
+let useLocalBinaries = true  // Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when testLocal = false)
 // Updated automatically by CI/CD during releases
@@ -134,6 +134,7 @@ let package = Package(
                 .product(name: "DeviceKit", package: "DeviceKit"),
                 .product(name: "SWCompression", package: "SWCompression"),
                 .product(name: "Sentry", package: "sentry-cocoa"),
+                .product(name: "StableDiffusion", package: "ml-stable-diffusion"),
                 "CRACommons",
             ],
             path: "sdk/runanywhere-swift/Sources/RunAnywhere",

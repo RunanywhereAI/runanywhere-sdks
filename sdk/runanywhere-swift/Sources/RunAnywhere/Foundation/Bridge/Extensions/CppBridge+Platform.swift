@@ -8,6 +8,7 @@
 
 import CRACommons
 import Foundation
+import StableDiffusion
 
 // MARK: - Platform Bridge
 
@@ -312,7 +313,7 @@ extension CppBridge {
 
         // MARK: - Diffusion Callbacks (CoreML Stable Diffusion)
 
-        // swiftlint:disable:next function_body_length
+        // swiftlint:disable:next function_body_length cyclomatic_complexity
         private static func registerDiffusionCallbacks() {
             var callbacks = rac_platform_diffusion_callbacks_t()
 
@@ -347,45 +348,213 @@ extension CppBridge {
                     return nil
                 }
 
-                let modelPath = modelPathPtr.map { String(cString: $0) }
+                guard let modelPathPtr = modelPathPtr else {
+                    Platform.logger.error("Model path is required for diffusion")
+                    return nil
+                }
 
-                // Create placeholder - actual service creation happens later
-                // The real ml-stable-diffusion integration would be done here
-                // For now, return nil to indicate the backend is not yet available
-                Platform.logger.warning("CoreML Diffusion service not yet implemented - ml-stable-diffusion integration required")
-                return nil
+                let modelPath = String(cString: modelPathPtr)
+
+                // Parse config
+                var reduceMemory = true
+                var disableSafety = false
+
+                if let configPtr = configPtr {
+                    reduceMemory = configPtr.pointee.reduce_memory == RAC_TRUE
+                    disableSafety = configPtr.pointee.enable_safety_checker == RAC_FALSE
+                }
+
+                // Create service asynchronously but wait for completion
+                var serviceHandle: rac_handle_t?
+                let group = DispatchGroup()
+                group.enter()
+
+                Task {
+                    do {
+                        let service = DiffusionPlatformService()
+                        try await service.initialize(
+                            modelPath: modelPath,
+                            reduceMemory: reduceMemory,
+                            disableSafetyChecker: disableSafety
+                        )
+                        Platform.diffusionService = service
+
+                        // Return a marker handle
+                        serviceHandle = UnsafeMutableRawPointer(bitPattern: 0xD1FF0510)
+                        Platform.logger.info("CoreML Diffusion service created")
+                    } catch {
+                        Platform.logger.error("Failed to create diffusion service: \(error)")
+                        serviceHandle = nil
+                    }
+                    group.leave()
+                }
+
+                group.wait()
+                return serviceHandle
             }
 
-            callbacks.generate = { handle, optionsPtr, outResultPtr, _ -> rac_result_t in
+            callbacks.generate = { _, optionsPtr, outResultPtr, _ -> rac_result_t in
                 guard #available(iOS 16.2, macOS 13.1, *) else {
                     return RAC_ERROR_NOT_SUPPORTED
                 }
 
-                guard optionsPtr != nil, outResultPtr != nil else {
+                guard let optionsPtr = optionsPtr, let outResultPtr = outResultPtr else {
                     return RAC_ERROR_INVALID_PARAMETER
                 }
 
-                // Placeholder - actual generation would use ml-stable-diffusion
-                Platform.logger.warning("CoreML Diffusion generate not yet implemented")
-                return RAC_ERROR_NOT_SUPPORTED
+                guard let service = Platform.diffusionService as? DiffusionPlatformService else {
+                    return RAC_ERROR_NOT_INITIALIZED
+                }
+
+                // Extract options
+                let prompt = optionsPtr.pointee.prompt.map { String(cString: $0) } ?? ""
+                let negativePrompt = optionsPtr.pointee.negative_prompt.map { String(cString: $0) } ?? ""
+                let width = Int(optionsPtr.pointee.width)
+                let height = Int(optionsPtr.pointee.height)
+                let steps = Int(optionsPtr.pointee.steps)
+                let guidanceScale = optionsPtr.pointee.guidance_scale
+                let seed = optionsPtr.pointee.seed
+
+                var result: rac_result_t = RAC_ERROR_INTERNAL
+                let group = DispatchGroup()
+                group.enter()
+
+                Task {
+                    do {
+                        let genResult = try await service.generate(
+                            prompt: prompt,
+                            negativePrompt: negativePrompt,
+                            width: width,
+                            height: height,
+                            stepCount: steps,
+                            guidanceScale: guidanceScale,
+                            seed: seed >= 0 ? UInt32(seed) : nil
+                        )
+
+                        // Copy result to output
+                        outResultPtr.pointee.width = Int32(genResult.width)
+                        outResultPtr.pointee.height = Int32(genResult.height)
+                        outResultPtr.pointee.seed_used = genResult.seedUsed
+                        outResultPtr.pointee.safety_triggered = genResult.safetyTriggered ? RAC_TRUE : RAC_FALSE
+
+                        if let imageData = genResult.imageData {
+                            let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: imageData.count)
+                            imageData.copyBytes(to: buffer, count: imageData.count)
+                            outResultPtr.pointee.image_data = buffer
+                            outResultPtr.pointee.image_size = imageData.count
+                        }
+
+                        result = RAC_SUCCESS
+                    } catch {
+                        Platform.logger.error("Diffusion generate failed: \(error)")
+                        result = RAC_ERROR_INTERNAL
+                    }
+                    group.leave()
+                }
+
+                group.wait()
+                return result
             }
 
-            callbacks.generate_with_progress = { handle, optionsPtr, progressCallback, progressUserData, outResultPtr, _ -> rac_result_t in
+            callbacks.generate_with_progress = { _, optionsPtr, progressCallback, progressUserData, outResultPtr, _ -> rac_result_t in
                 guard #available(iOS 16.2, macOS 13.1, *) else {
                     return RAC_ERROR_NOT_SUPPORTED
                 }
 
-                // Placeholder - actual generation with progress would use ml-stable-diffusion
-                Platform.logger.warning("CoreML Diffusion generate_with_progress not yet implemented")
-                return RAC_ERROR_NOT_SUPPORTED
+                guard let optionsPtr = optionsPtr, let outResultPtr = outResultPtr else {
+                    return RAC_ERROR_INVALID_PARAMETER
+                }
+
+                guard let service = Platform.diffusionService as? DiffusionPlatformService else {
+                    return RAC_ERROR_NOT_INITIALIZED
+                }
+
+                // Extract options
+                let prompt = optionsPtr.pointee.prompt.map { String(cString: $0) } ?? ""
+                let negativePrompt = optionsPtr.pointee.negative_prompt.map { String(cString: $0) } ?? ""
+                let width = Int(optionsPtr.pointee.width)
+                let height = Int(optionsPtr.pointee.height)
+                let steps = Int(optionsPtr.pointee.steps)
+                let guidanceScale = optionsPtr.pointee.guidance_scale
+                let seed = optionsPtr.pointee.seed
+
+                var result: rac_result_t = RAC_ERROR_INTERNAL
+                let group = DispatchGroup()
+                group.enter()
+
+                Task {
+                    do {
+                        let genResult = try await service.generate(
+                            prompt: prompt,
+                            negativePrompt: negativePrompt,
+                            width: width,
+                            height: height,
+                            stepCount: steps,
+                            guidanceScale: guidanceScale,
+                            seed: seed >= 0 ? UInt32(seed) : nil,
+                            progressHandler: { progressInfo in
+                                // Call C++ progress callback if provided
+                                if let callback = progressCallback {
+                                    let shouldContinue = callback(
+                                        progressInfo.progress,
+                                        Int32(progressInfo.step),
+                                        Int32(progressInfo.totalSteps),
+                                        progressUserData
+                                    )
+                                    return shouldContinue == RAC_TRUE
+                                }
+                                return true
+                            }
+                        )
+
+                        // Copy result to output
+                        outResultPtr.pointee.width = Int32(genResult.width)
+                        outResultPtr.pointee.height = Int32(genResult.height)
+                        outResultPtr.pointee.seed_used = genResult.seedUsed
+                        outResultPtr.pointee.safety_triggered = genResult.safetyTriggered ? RAC_TRUE : RAC_FALSE
+
+                        if let imageData = genResult.imageData {
+                            let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: imageData.count)
+                            imageData.copyBytes(to: buffer, count: imageData.count)
+                            outResultPtr.pointee.image_data = buffer
+                            outResultPtr.pointee.image_size = imageData.count
+                        }
+
+                        result = RAC_SUCCESS
+                    } catch {
+                        Platform.logger.error("Diffusion generate_with_progress failed: \(error)")
+                        result = RAC_ERROR_INTERNAL
+                    }
+                    group.leave()
+                }
+
+                group.wait()
+                return result
             }
 
-            callbacks.cancel = { handle, _ -> rac_result_t in
-                // Placeholder
+            callbacks.cancel = { _, _ -> rac_result_t in
+                guard #available(iOS 16.2, macOS 13.1, *) else {
+                    return RAC_SUCCESS
+                }
+
+                if let service = Platform.diffusionService as? DiffusionPlatformService {
+                    Task {
+                        await service.cancel()
+                    }
+                }
                 return RAC_SUCCESS
             }
 
-            callbacks.destroy = { handle, _ in
+            callbacks.destroy = { _, _ in
+                guard #available(iOS 16.2, macOS 13.1, *) else {
+                    return
+                }
+
+                if let service = Platform.diffusionService as? DiffusionPlatformService {
+                    Task {
+                        await service.unload()
+                    }
+                }
                 Platform.diffusionService = nil
                 Platform.logger.debug("CoreML Diffusion service destroyed")
             }
@@ -394,7 +563,7 @@ extension CppBridge {
 
             let result = rac_platform_diffusion_set_callbacks(&callbacks)
             if result == RAC_SUCCESS {
-                logger.debug("Diffusion callbacks registered (implementation pending)")
+                logger.debug("Diffusion callbacks registered")
             } else {
                 logger.error("Failed to register Diffusion callbacks: \(result)")
             }
@@ -411,6 +580,12 @@ extension CppBridge {
         /// Get the cached System TTS service (if created)
         public static func getSystemTTSService() -> SystemTTSService? {
             return systemTTSService
+        }
+
+        /// Get the cached Diffusion service (if created)
+        @available(iOS 16.2, macOS 13.1, *)
+        public static func getDiffusionService() -> DiffusionPlatformService? {
+            return diffusionService as? DiffusionPlatformService
         }
 
         /// Check if CoreML Diffusion is available on this platform
