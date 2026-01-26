@@ -32,7 +32,7 @@
 #include "rac_sdk_state.h"
 
 // =============================================================================
-// FEATURES - LLM, STT, TTS, VAD, Voice Agent
+// FEATURES - LLM, STT, TTS, VAD, Diffusion, Voice Agent
 // =============================================================================
 
 // LLM (Large Language Model)
@@ -44,6 +44,12 @@
 #include "rac_llm_analytics.h"
 #include "rac_llm_events.h"
 #include "rac_llm_structured_output.h"
+
+// Diffusion (Image Generation)
+#include "rac_diffusion.h"
+#include "rac_diffusion_types.h"
+#include "rac_diffusion_service.h"
+#include "rac_diffusion_component.h"
 
 // STT (Speech-to-Text)
 #include "rac_stt.h"

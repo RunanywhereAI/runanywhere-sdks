@@ -163,7 +163,7 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/device/rac_device_manager.cpp
 )
 
-# Feature sources - LLM, STT, TTS, VAD service interfaces
+# Feature sources - LLM, STT, TTS, VAD, Diffusion service interfaces
 set(RAC_FEATURES_SOURCES
     # LLM
     src/features/llm/llm_component.cpp
@@ -183,6 +183,9 @@ set(RAC_FEATURES_SOURCES
     src/features/vad/vad_component.cpp
     src/features/vad/energy_vad.cpp
     src/features/vad/vad_analytics.cpp
+    # Diffusion (Image Generation)
+    src/features/diffusion/diffusion_component.cpp
+    src/features/diffusion/rac_diffusion_service.cpp
     # Voice Agent
     src/features/voice_agent/voice_agent.cpp
     # Result memory management
@@ -332,7 +335,7 @@ message(STATUS "Components:")
 message(STATUS "  Core:         Logging, errors, events, memory")
 message(STATUS "  Registry:     Service & module registration")
 message(STATUS "  Models:       Download strategies, storage")
-message(STATUS "  Services:     LLM, STT, TTS, VAD interfaces")
+message(STATUS "  Services:     LLM, STT, TTS, VAD, Diffusion interfaces")
 if(APPLE AND RAC_BUILD_PLATFORM)
     message(STATUS "  Platform:     Apple Foundation Models, System TTS")
 endif()
