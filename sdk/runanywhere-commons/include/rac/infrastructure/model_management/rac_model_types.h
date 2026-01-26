@@ -182,6 +182,7 @@ typedef enum rac_inference_framework {
     RAC_FRAMEWORK_FLUID_AUDIO = 4,       /**< FluidAudio */
     RAC_FRAMEWORK_BUILTIN = 5,           /**< Built-in (e.g., energy VAD) */
     RAC_FRAMEWORK_NONE = 6,              /**< No framework needed */
+    RAC_FRAMEWORK_MLX = 7,               /**< MLX C++ (Apple Silicon VLM) */
     RAC_FRAMEWORK_UNKNOWN = 99           /**< Unknown framework */
 } rac_inference_framework_t;
 

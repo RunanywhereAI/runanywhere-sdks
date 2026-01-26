@@ -163,7 +163,7 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/device/rac_device_manager.cpp
 )
 
-# Feature sources - LLM, STT, TTS, VAD service interfaces
+# Feature sources - LLM, STT, TTS, VAD, VLM service interfaces
 set(RAC_FEATURES_SOURCES
     # LLM
     src/features/llm/llm_component.cpp
@@ -183,10 +183,18 @@ set(RAC_FEATURES_SOURCES
     src/features/vad/vad_component.cpp
     src/features/vad/energy_vad.cpp
     src/features/vad/vad_analytics.cpp
+    # VLM (Vision Language Model)
+    src/features/vlm/vlm_component.cpp
+    src/features/vlm/rac_vlm_service.cpp
     # Voice Agent
     src/features/voice_agent/voice_agent.cpp
     # Result memory management
     src/features/result_free.cpp
+)
+
+# Image utilities (for VLM)
+set(RAC_UTILS_SOURCES
+    src/utils/rac_image_utils.cpp
 )
 
 # Platform services (Apple Foundation Models + System TTS)
@@ -206,6 +214,7 @@ set(RAC_COMMONS_SOURCES
     ${RAC_CORE_SOURCES}
     ${RAC_INFRASTRUCTURE_SOURCES}
     ${RAC_FEATURES_SOURCES}
+    ${RAC_UTILS_SOURCES}
     ${RAC_PLATFORM_SOURCES}
 )
 

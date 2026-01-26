@@ -70,6 +70,12 @@
 #include "rac_vad_analytics.h"
 #include "rac_vad_events.h"
 
+// VLM (Vision Language Model)
+#include "rac_vlm.h"
+#include "rac_vlm_types.h"
+#include "rac_vlm_service.h"
+#include "rac_vlm_component.h"
+
 // Voice Agent
 #include "rac_voice_agent.h"
 
@@ -100,6 +106,13 @@
 
 #include "rac_llm_platform.h"
 #include "rac_tts_platform.h"
+
+// =============================================================================
+// LLAMACPP BACKENDS - LLM, VLM (Vision Language Model)
+// =============================================================================
+
+#include "rac_llm_llamacpp.h"
+#include "rac_vlm_llamacpp.h"
 
 // =============================================================================
 // NETWORK - Environment, Auth, API Types, Dev Config

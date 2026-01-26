@@ -166,12 +166,13 @@ typedef struct rac_memory_info {
  */
 typedef enum rac_capability {
     RAC_CAPABILITY_UNKNOWN = 0,
-    RAC_CAPABILITY_TEXT_GENERATION = 1, /**< LLM text generation */
-    RAC_CAPABILITY_EMBEDDINGS = 2,      /**< Text embeddings */
-    RAC_CAPABILITY_STT = 3,             /**< Speech-to-text */
-    RAC_CAPABILITY_TTS = 4,             /**< Text-to-speech */
-    RAC_CAPABILITY_VAD = 5,             /**< Voice activity detection */
-    RAC_CAPABILITY_DIARIZATION = 6,     /**< Speaker diarization */
+    RAC_CAPABILITY_TEXT_GENERATION = 1,   /**< LLM text generation */
+    RAC_CAPABILITY_EMBEDDINGS = 2,        /**< Text embeddings */
+    RAC_CAPABILITY_STT = 3,               /**< Speech-to-text */
+    RAC_CAPABILITY_TTS = 4,               /**< Text-to-speech */
+    RAC_CAPABILITY_VAD = 5,               /**< Voice activity detection */
+    RAC_CAPABILITY_DIARIZATION = 6,       /**< Speaker diarization */
+    RAC_CAPABILITY_VISION_LANGUAGE = 7,   /**< Vision-language model (VLM) */
 } rac_capability_t;
 
 /**
