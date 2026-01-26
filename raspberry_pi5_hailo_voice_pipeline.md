@@ -1,7 +1,7 @@
 # Raspberry Pi 5 Voice AI Pipeline Plan (CPU-Only)
 
-**Target Device:** Raspberry Pi 5 (8GB) + External Audio Hardware
-**Goal:** Run complete voice AI pipeline (VAD → STT → LLM → TTS) on-device using CPU
+**Target Device:** Raspberry Pi 5 (8GB) + External Audio Hardware + Billy Bass Animatronic Fish
+**Goal:** Run complete voice AI pipeline (VAD → STT → LLM → TTS) on-device using CPU, driving a Billy Bass fish's mouth motor via GPIO + L298N motor driver
 **SDK:** `runanywhere-commons` (C++ core library) + thin application layer
 **Branch:** `smonga/rasp`
 **Pi Details:** IP `192.168.1.91`, username `runanywhere`, OS: Raspberry Pi OS 64-bit Bookworm (Linux 6.12 aarch64)
@@ -15,6 +15,7 @@
 │              Thin Application Layer (NEW)                    │
 │  • Audio capture/playback via ALSA                          │
 │  • Voice pipeline orchestration                              │
+│  • Motor control via GPIO (Billy Bass fish)                  │
 │  • Simple command-line interface                             │
 ├─────────────────────────────────────────────────────────────┤
 │              runanywhere-commons (EXISTING)                  │
@@ -25,9 +26,10 @@
 │  │ TTS (CPU) - Sherpa-ONNX VITS/Piper                      ││
 │  └─────────────────────────────────────────────────────────┘│
 ├─────────────────────────────────────────────────────────────┤
-│              External Audio Hardware                         │
+│              External Hardware                               │
 │  • USB Microphone (input)                                    │
 │  • USB Speaker / DAC (output)                                │
+│  • Billy Bass Fish (motor via L298N driver + GPIO)           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -362,6 +364,92 @@ The app uses `rac_voice_agent_create_standalone()` which orchestrates the full p
 | **Storage** | microSD (32GB+) |
 | **Audio Input** | USB Microphone |
 | **Audio Output** | USB Speaker / DAC |
+| **Animatronic** | Billy Bass fish (mouth motor) |
+| **Motor Driver** | L298N dual H-bridge module |
+| **Motor Power** | Billy Bass AA battery pack (original fish batteries) |
+
+---
+
+## Billy Bass Hardware Integration
+
+### Overview
+
+The project drives a Big Mouth Billy Bass animatronic fish using the Raspberry Pi 5. The Pi controls the fish's mouth motor through an L298N motor driver board, while the fish's original AA battery pack provides motor power. The Pi does **not** power the motor directly — it only sends GPIO control signals. The goal is to sync the fish's mouth movement with TTS audio output, making the fish "speak" the LLM's response.
+
+### Wiring Diagram
+
+```
+┌──────────────────┐         ┌──────────────────┐         ┌──────────────┐
+│  Raspberry Pi 5  │         │   L298N Motor     │         │  Billy Bass  │
+│                  │         │   Driver Board    │         │  Fish Motor  │
+│                  │         │                   │         │              │
+│  Pin 11 (GPIO17) ├────────►│ IN1              │         │              │
+│  Pin 12 (GPIO18) ├────────►│ IN2              │         │              │
+│                  │         │                   │         │              │
+│  Pin 6  (GND)   ├────────►│ GND    OUT1 ─────├────────►│ Motor Wire 1 │
+│                  │         │        OUT2 ─────├────────►│ Motor Wire 2 │
+│                  │         │                   │         │              │
+└──────────────────┘         │  12V/VIN ◄───────┤         └──────────────┘
+                             │  GND     ◄───────┤
+                             └──────────────────┘
+                                     ▲
+                             ┌───────┴───────┐
+                             │ AA Battery Pack│
+                             │  (from fish)   │
+                             │  + → 12V/VIN   │
+                             │  - → GND       │
+                             └───────────────┘
+```
+
+### Wiring Connections (Exact)
+
+#### Pi → L298N (control signals + shared ground)
+
+| Pi Pin | Pi Function | L298N Pin | Purpose |
+| --- | --- | --- | --- |
+| **Pin 6** | GND | GND | Common ground (required for GPIO signals to work) |
+| **Pin 11** | GPIO17 | IN1 | Motor direction control line 1 |
+| **Pin 12** | GPIO18 | IN2 | Motor direction control line 2 |
+
+#### Battery → L298N (motor power)
+
+| Battery | L298N Pin | Purpose |
+| --- | --- | --- |
+| **+ (positive)** | 12V / VIN | Motor power supply input |
+| **- (negative)** | GND | Motor power ground (shared with Pi GND) |
+
+#### L298N → Fish Motor (output)
+
+| L298N Pin | Motor | Purpose |
+| --- | --- | --- |
+| **OUT1** | Motor wire 1 | Motor output A |
+| **OUT2** | Motor wire 2 | Motor output B |
+
+### How It Works
+
+1. **Power isolation**: The Pi is powered by its own USB-C supply. The fish motor is powered by the fish's original AA battery pack through the L298N. They share a common ground so GPIO signals have a correct voltage reference.
+
+2. **Motor control via IN1/IN2**: The L298N interprets the two input lines to control the motor:
+   - `IN1=HIGH, IN2=LOW` → Motor spins one direction (mouth open)
+   - `IN1=LOW, IN2=HIGH` → Motor spins other direction (mouth close)
+   - `IN1=LOW, IN2=LOW` → Motor stopped (coast)
+   - `IN1=HIGH, IN2=HIGH` → Motor braked
+
+3. **Direction note**: If the mouth moves the wrong way (e.g., opens when it should close), either swap the two motor wires on OUT1/OUT2, or swap the IN1/IN2 logic in software.
+
+4. **ENA/ENB jumper**: The L298N has enable jumpers (ENA for Motor A channel). With the jumper in place (default), the channel is always enabled at full speed. Removing the jumper and connecting it to a PWM-capable GPIO pin would allow speed control.
+
+5. **5V pin on L298N**: Not connected in this setup. The Pi stays powered from USB-C. The L298N's onboard voltage regulator handles its own logic-level power from the battery input (when VIN > 7V and the 5V jumper is in place).
+
+### Ground Chain
+
+All three ground references are tied together for the circuit to function:
+
+```
+Battery (-) ──► L298N GND ──► Pi Pin 6 (GND)
+```
+
+Without this common ground, the Pi's GPIO HIGH/LOW signals would have no reference relative to the L298N's logic inputs, causing erratic or no motor response.
 
 ---
 
@@ -387,4 +475,4 @@ The Raspberry Pi AI Kit (Hailo 8L) can accelerate the STT encoder (~2x speedup).
 
 **Last Updated:** 2026-01-26
 **Branch:** `smonga/rasp`
-**Status:** Full pipeline verified on Pi 5. STT→LLM→TTS working end-to-end with synthetic audio. Live mic mode has VAD audio accumulation issue (sends too-small chunks to STT).
+**Status:** Full pipeline verified on Pi 5. STT→LLM→TTS working end-to-end with synthetic audio. VAD debouncing fix applied (iOS-style 1.5s silence timeout). Billy Bass fish wired via L298N motor driver (GPIO17/GPIO18 → IN1/IN2, OUT1/OUT2 → motor, AA battery pack for motor power).
