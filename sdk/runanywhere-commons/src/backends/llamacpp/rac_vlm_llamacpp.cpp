@@ -11,6 +11,7 @@
 #include "rac/backends/rac_vlm_llamacpp.h"
 
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
@@ -42,6 +43,9 @@ namespace {
 /**
  * Internal VLM backend state.
  */
+// Forward declaration
+enum class VLMModelType;
+
 struct LlamaCppVLMBackend {
     // llama.cpp model and context
     llama_model* model = nullptr;
@@ -66,6 +70,9 @@ struct LlamaCppVLMBackend {
     int context_size = 0;
     llama_pos n_past = 0;
 
+    // Detected model type for chat template
+    VLMModelType model_type = static_cast<VLMModelType>(0); // Unknown
+
     // Thread safety
     mutable std::mutex mutex;
 };
@@ -84,6 +91,143 @@ int get_num_threads(int config_threads) {
     if (threads > 8)
         threads = 8;  // Cap for mobile devices
     return threads;
+}
+
+// =============================================================================
+// CHAT TEMPLATE HELPERS
+// =============================================================================
+
+/**
+ * VLM model type for chat template selection.
+ */
+enum class VLMModelType {
+    Unknown,
+    SmolVLM,    // SmolVLM uses "User:" / "Assistant:" format
+    Qwen2VL,    // Qwen2-VL uses chatml with <|im_start|>user format
+    LLaVA,      // LLaVA uses "USER:" / "ASSISTANT:" format
+    Generic     // Generic chatml fallback
+};
+
+/**
+ * Detect VLM model type from model name metadata.
+ */
+VLMModelType detect_vlm_model_type(llama_model* model) {
+    if (!model) return VLMModelType::Generic;
+
+    // Try to get model name from metadata
+    char name_buf[256] = {0};
+    int32_t len = llama_model_meta_val_str(model, "general.name", name_buf, sizeof(name_buf));
+    if (len <= 0) {
+        len = llama_model_meta_val_str(model, "general.basename", name_buf, sizeof(name_buf));
+    }
+
+    if (len > 0) {
+        std::string name(name_buf);
+        // Convert to lowercase for comparison
+        for (auto& c : name) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+        RAC_LOG_DEBUG(LOG_CAT, "Model name from metadata: %s", name.c_str());
+
+        if (name.find("smolvlm") != std::string::npos ||
+            name.find("smol") != std::string::npos) {
+            RAC_LOG_DEBUG(LOG_CAT, "Detected SmolVLM model type");
+            return VLMModelType::SmolVLM;
+        }
+        if (name.find("qwen") != std::string::npos) {
+            RAC_LOG_DEBUG(LOG_CAT, "Detected Qwen2-VL model type");
+            return VLMModelType::Qwen2VL;
+        }
+        if (name.find("llava") != std::string::npos) {
+            RAC_LOG_DEBUG(LOG_CAT, "Detected LLaVA model type");
+            return VLMModelType::LLaVA;
+        }
+    }
+
+    // Check chat template as fallback
+    const char* chat_template = llama_model_chat_template(model, nullptr);
+    if (chat_template) {
+        std::string tmpl(chat_template);
+        if (tmpl.find("User:") != std::string::npos &&
+            tmpl.find("Assistant:") != std::string::npos) {
+            RAC_LOG_DEBUG(LOG_CAT, "Detected SmolVLM model type from chat template");
+            return VLMModelType::SmolVLM;
+        }
+    }
+
+    RAC_LOG_DEBUG(LOG_CAT, "Using generic chat template");
+    return VLMModelType::Generic;
+}
+
+/**
+ * Format prompt with appropriate chat template for VLM.
+ * The image marker will be replaced by mtmd_tokenize.
+ */
+std::string format_vlm_prompt(VLMModelType model_type, const std::string& user_prompt,
+                               const char* image_marker, bool has_image) {
+    std::string formatted;
+
+    switch (model_type) {
+        case VLMModelType::SmolVLM:
+            // SmolVLM format based on tokenizer_config.json chat_template:
+            // - <|im_start|> is BOS token (added once at start)
+            // - Role capitalized (User, Assistant)
+            // - If content starts with image: just ":" after role, then image marker
+            // - If content starts with text: ": " after role, then text
+            // - Messages end with " \n" (space + newline)
+            // - Generation prompt: "Assistant:"
+            formatted = "<|im_start|>User:";
+            if (has_image) {
+                // Image first: no space after colon, marker directly
+                formatted += image_marker;
+            } else {
+                // Text only: space after colon
+                formatted += " ";
+            }
+            formatted += user_prompt;
+            formatted += " \nAssistant:";
+            break;
+
+        case VLMModelType::Qwen2VL:
+            // Qwen2-VL format with system prompt
+            // <|im_start|>system\nYou are a helpful assistant.<|im_end|>\n
+            // <|im_start|>user\n<|vision_start|><|image_pad|><|vision_end|>prompt<|im_end|>\n
+            // <|im_start|>assistant\n
+            formatted = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n";
+            formatted += "<|im_start|>user\n";
+            if (has_image) {
+                // Qwen2-VL uses its own vision markers, but mtmd should handle this
+                formatted += image_marker;
+            }
+            formatted += user_prompt;
+            formatted += "<|im_end|>\n<|im_start|>assistant\n";
+            break;
+
+        case VLMModelType::LLaVA:
+            // LLaVA/Vicuna format
+            formatted = "USER: ";
+            if (has_image) {
+                formatted += image_marker;
+                formatted += "\n";
+            }
+            formatted += user_prompt;
+            formatted += "\nASSISTANT:";
+            break;
+
+        case VLMModelType::Generic:
+        default:
+            // Generic chatml format
+            formatted = "<|im_start|>user\n";
+            if (has_image) {
+                formatted += image_marker;
+            }
+            formatted += user_prompt;
+            formatted += "<|im_end|>\n<|im_start|>assistant\n";
+            break;
+    }
+
+    RAC_LOG_DEBUG(LOG_CAT, "Formatted prompt (%d chars): %.100s...",
+                  (int)formatted.length(), formatted.c_str());
+    return formatted;
 }
 
 }  // namespace
@@ -211,6 +355,9 @@ rac_result_t rac_vlm_llamacpp_load_model(rac_handle_t handle, const char* model_
     backend->model_loaded = true;
     backend->n_past = 0;
 
+    // Detect model type for chat template
+    backend->model_type = detect_vlm_model_type(backend->model);
+
     RAC_LOG_INFO(LOG_CAT, "VLM model loaded successfully (ctx=%d, threads=%d)", ctx_size, n_threads);
     return RAC_SUCCESS;
 }
@@ -297,16 +444,14 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
     }
     backend->n_past = 0;
 
-    // Build the prompt with image marker if we have an image
+    // Build the prompt with proper chat template formatting
     std::string full_prompt;
+    bool has_image = false;
 
 #ifdef RAC_VLM_USE_MTMD
     mtmd_bitmap* bitmap = nullptr;
 
     if (image && backend->mtmd_ctx) {
-        // Add image marker to prompt
-        full_prompt = std::string(mtmd_default_marker()) + "\n" + prompt;
-
         // Load image based on format
         if (image->format == RAC_VLM_IMAGE_FORMAT_FILE_PATH && image->file_path) {
             bitmap = mtmd_helper_bitmap_init_from_file(backend->mtmd_ctx, image->file_path);
@@ -316,16 +461,19 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
             // Decode base64 first
             // For now, skip base64 - would need base64 decoder
             RAC_LOG_WARNING(LOG_CAT, "Base64 image format not yet supported, using text-only");
-            full_prompt = prompt;
         }
 
-        if (!bitmap && image->format != RAC_VLM_IMAGE_FORMAT_BASE64) {
+        has_image = (bitmap != nullptr);
+        if (!has_image && image->format != RAC_VLM_IMAGE_FORMAT_BASE64) {
             RAC_LOG_ERROR(LOG_CAT, "Failed to load image");
             return RAC_ERROR_INVALID_INPUT;
         }
-    } else {
-        full_prompt = prompt;
     }
+
+    // Format prompt with appropriate chat template
+    full_prompt = format_vlm_prompt(backend->model_type, prompt, mtmd_default_marker(), has_image);
+    RAC_LOG_DEBUG(LOG_CAT, "Formatted prompt for model type %d: %s",
+                  static_cast<int>(backend->model_type), full_prompt.c_str());
 
     // Tokenize and evaluate
     if (backend->mtmd_ctx && bitmap) {
@@ -371,8 +519,9 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
     } else
 #endif
     {
-        // Text-only mode - tokenize with llama
-        full_prompt = prompt;
+        // Text-only mode - still apply chat template for consistent formatting
+        full_prompt = format_vlm_prompt(backend->model_type, prompt, mtmd_default_marker(), false);
+        RAC_LOG_DEBUG(LOG_CAT, "Text-only formatted prompt: %s", full_prompt.c_str());
 
         const llama_vocab* vocab = llama_model_get_vocab(backend->model);
         std::vector<llama_token> tokens(full_prompt.size() + 16);
@@ -480,16 +629,14 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
     backend->n_past = 0;
     RAC_LOG_DEBUG(LOG_CAT, "Cleared KV cache for new request");
 
-    // Build the prompt with image marker if we have an image
+    // Build the prompt with proper chat template formatting
     std::string full_prompt;
+    bool has_image = false;
 
 #ifdef RAC_VLM_USE_MTMD
     mtmd_bitmap* bitmap = nullptr;
 
     if (image && backend->mtmd_ctx) {
-        // Add image marker to prompt
-        full_prompt = std::string(mtmd_default_marker()) + "\n" + prompt;
-
         // Load image based on format
         if (image->format == RAC_VLM_IMAGE_FORMAT_FILE_PATH && image->file_path) {
             bitmap = mtmd_helper_bitmap_init_from_file(backend->mtmd_ctx, image->file_path);
@@ -497,13 +644,16 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
             bitmap = mtmd_bitmap_init(image->width, image->height, image->pixel_data);
         }
 
-        if (!bitmap) {
+        has_image = (bitmap != nullptr);
+        if (!has_image) {
             RAC_LOG_WARNING(LOG_CAT, "Failed to load image, using text-only");
-            full_prompt = prompt;
         }
-    } else {
-        full_prompt = prompt;
     }
+
+    // Format prompt with appropriate chat template
+    full_prompt = format_vlm_prompt(backend->model_type, prompt, mtmd_default_marker(), has_image);
+    RAC_LOG_DEBUG(LOG_CAT, "Formatted prompt for model type %d: %s",
+                  static_cast<int>(backend->model_type), full_prompt.c_str());
 
     // Tokenize and evaluate
     if (backend->mtmd_ctx && bitmap) {
@@ -549,8 +699,9 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
     } else
 #endif
     {
-        // Text-only mode
-        full_prompt = prompt;
+        // Text-only mode - still apply chat template for consistent formatting
+        full_prompt = format_vlm_prompt(backend->model_type, prompt, mtmd_default_marker(), false);
+        RAC_LOG_DEBUG(LOG_CAT, "Text-only formatted prompt: %s", full_prompt.c_str());
 
         const llama_vocab* vocab = llama_model_get_vocab(backend->model);
         std::vector<llama_token> tokens(full_prompt.size() + 16);
