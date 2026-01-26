@@ -290,6 +290,8 @@ extension SDKComponent {
         case .embedding:
             // Embeddings use text generation capability
             return RAC_CAPABILITY_TEXT_GENERATION
+        case .diffusion:
+            return RAC_CAPABILITY_DIFFUSION
         }
     }
 

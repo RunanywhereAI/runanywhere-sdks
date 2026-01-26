@@ -468,7 +468,7 @@ public extension SDKError {
 
     /// Create a diffusion error
     static func diffusion(_ code: DiffusionErrorCode, _ message: String) -> SDKError {
-        SDKError.general(.componentError, "[\(code.rawValue)] \(message)")
+        SDKError.general(.generationFailed, "[\(code.rawValue)] \(message)")
     }
 }
 

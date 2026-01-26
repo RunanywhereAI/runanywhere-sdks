@@ -49,6 +49,8 @@ public extension RunAnywhere {
         case .embedding:
             // Embedding models could be language or multimodal
             relevantCategories = [.language, .multimodal]
+        case .diffusion:
+            relevantCategories = [.imageGeneration]
         }
 
         for model in allModels where relevantCategories.contains(model.category) {
