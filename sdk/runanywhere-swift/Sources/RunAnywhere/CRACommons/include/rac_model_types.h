@@ -19,8 +19,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "rac/core/rac_error.h"
-#include "rac/core/rac_types.h"
+#include "rac_error.h"
+#include "rac_types.h"
 
 #ifdef __cplusplus
 extern "C" {
