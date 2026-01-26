@@ -358,16 +358,25 @@ extension CppBridge {
                 // Parse config
                 var reduceMemory = true
                 var disableSafety = false
+                var modelVariant: DiffusionModelVariant = .sd15
 
                 if let configPtr = configPtr {
                     reduceMemory = configPtr.pointee.reduce_memory == RAC_TRUE
                     disableSafety = configPtr.pointee.enable_safety_checker == RAC_FALSE
+                    modelVariant = DiffusionModelVariant(cValue: configPtr.pointee.model_variant)
                 }
 
+                // Determine tokenizer source from model variant
+                let tokenizerSource = modelVariant.defaultTokenizerSource
+
                 // Create service asynchronously but wait for completion
+                // NOTE: First-time model loading can take 5-15 minutes as Core ML compiles for the device
                 var serviceHandle: rac_handle_t?
                 let group = DispatchGroup()
                 group.enter()
+
+                Platform.logger.info("Starting async diffusion service creation...")
+                Platform.logger.info("⏳ First-time Core ML compilation may take 5-15 minutes. Please wait...")
 
                 Task {
                     do {
@@ -375,15 +384,16 @@ extension CppBridge {
                         try await service.initialize(
                             modelPath: modelPath,
                             reduceMemory: reduceMemory,
-                            disableSafetyChecker: disableSafety
+                            disableSafetyChecker: disableSafety,
+                            tokenizerSource: tokenizerSource
                         )
                         Platform.diffusionService = service
 
                         // Return a marker handle
                         serviceHandle = UnsafeMutableRawPointer(bitPattern: 0xD1FF0510)
-                        Platform.logger.info("CoreML Diffusion service created")
+                        Platform.logger.info("✅ CoreML Diffusion service created successfully")
                     } catch {
-                        Platform.logger.error("Failed to create diffusion service: \(error)")
+                        Platform.logger.error("❌ Failed to create diffusion service: \(error)")
                         serviceHandle = nil
                     }
                     group.leave()

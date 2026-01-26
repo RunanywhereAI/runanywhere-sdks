@@ -47,12 +47,15 @@ public actor DiffusionPlatformService {
     ///   - modelPath: Path to the directory containing Core ML model files
     ///   - reduceMemory: Whether to use reduced memory mode (recommended for iOS)
     ///   - disableSafetyChecker: Whether to disable the safety checker
+    ///   - tokenizerSource: Source for downloading missing tokenizer files (defaults to SD 1.5)
     public func initialize(
         modelPath: String,
         reduceMemory: Bool = true,
-        disableSafetyChecker: Bool = false
+        disableSafetyChecker: Bool = false,
+        tokenizerSource: DiffusionTokenizerSource = .sd15
     ) async throws {
         logger.info("Initializing diffusion pipeline from: \(modelPath)")
+        logger.info("Tokenizer source: \(tokenizerSource.description)")
 
         let resourceURL = URL(fileURLWithPath: modelPath)
 
@@ -61,10 +64,15 @@ public actor DiffusionPlatformService {
             throw SDKError.diffusion(.modelNotFound, "Model directory not found: \(modelPath)")
         }
 
+        // Ensure tokenizer files exist (Apple's compiled models don't include them)
+        try await ensureTokenizerFiles(at: resourceURL, source: tokenizerSource)
+
         do {
             // Create pipeline configuration
             let config = MLModelConfiguration()
             config.computeUnits = .cpuAndNeuralEngine
+
+            logger.info("Creating StableDiffusionPipeline... (this may take a few minutes on first run)")
 
             // Create the pipeline
             pipeline = try StableDiffusionPipeline(
@@ -75,14 +83,64 @@ public actor DiffusionPlatformService {
                 reduceMemory: reduceMemory
             )
 
-            // Load resources
+            logger.info("Pipeline created, loading resources... (Core ML model compilation in progress, please wait)")
+            logger.info("⏳ First-time model compilation can take 5-15 minutes. Subsequent loads will be faster.")
+
+            // Load resources - this triggers Core ML compilation on first run
+            // WARNING: This can take 5-15 minutes on first run as Core ML compiles the model for the device's ANE
             try pipeline?.loadResources()
 
             self.modelPath = modelPath
-            logger.info("Diffusion pipeline initialized successfully")
+            logger.info("✅ Diffusion pipeline initialized successfully")
         } catch {
-            logger.error("Failed to initialize pipeline: \(error)")
+            logger.error("❌ Failed to initialize pipeline: \(error)")
             throw SDKError.diffusion(.initializationFailed, "Failed to initialize: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - Tokenizer Files
+
+    /// Required tokenizer files for CLIP-based models
+    private static let requiredTokenizerFiles = ["merges.txt", "vocab.json"]
+
+    /// Ensure tokenizer files exist in the model directory
+    /// Apple's compiled CoreML models don't include tokenizer files, so we download them if missing
+    /// - Parameters:
+    ///   - modelURL: The model directory URL
+    ///   - source: The tokenizer source to use (defaults to SD 1.5)
+    private func ensureTokenizerFiles(at modelURL: URL, source: DiffusionTokenizerSource = .sd15) async throws {
+        let fileManager = FileManager.default
+
+        for filename in Self.requiredTokenizerFiles {
+            let fileURL = modelURL.appendingPathComponent(filename)
+
+            if fileManager.fileExists(atPath: fileURL.path) {
+                logger.debug("Tokenizer file exists: \(filename)")
+                continue
+            }
+
+            logger.info("Downloading missing tokenizer file: \(filename) from \(source.description)")
+
+            guard let remoteURL = URL(string: "\(source.baseURL)/\(filename)") else {
+                throw SDKError.diffusion(.initializationFailed, "Invalid tokenizer URL for: \(filename)")
+            }
+
+            do {
+                let (data, response) = try await URLSession.shared.data(from: remoteURL)
+
+                guard let httpResponse = response as? HTTPURLResponse,
+                      httpResponse.statusCode == 200 else {
+                    let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+                    throw SDKError.diffusion(.initializationFailed, "Failed to download \(filename): HTTP \(statusCode)")
+                }
+
+                try data.write(to: fileURL)
+                logger.info("Downloaded tokenizer file: \(filename) (\(data.count) bytes)")
+            } catch let error as SDKError {
+                throw error
+            } catch {
+                throw SDKError.diffusion(.initializationFailed, "Failed to download \(filename): \(error.localizedDescription)")
+            }
         }
     }
 

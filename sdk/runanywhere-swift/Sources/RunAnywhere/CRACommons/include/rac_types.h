@@ -31,21 +31,30 @@ extern "C" {
 // =============================================================================
 // API VISIBILITY MACROS
 // =============================================================================
+//
+// RAC_API marks functions that must be visible to FFI (dlsym).
+//
+// CRITICAL: For iOS/Android Flutter FFI, symbols MUST have public visibility
+// even when statically linked. dlsym(RTLD_DEFAULT, ...) can only find symbols
+// with "external" visibility, not "private external".
+//
+// Without visibility("default"), static library symbols get "private external"
+// visibility (due to -fvisibility=hidden), which becomes "non-external" (local)
+// in the final binary - breaking FFI symbol lookup.
+// =============================================================================
 
+#if defined(_WIN32)
 #if defined(RAC_BUILDING_SHARED)
-#if defined(_WIN32)
 #define RAC_API __declspec(dllexport)
-#elif defined(__GNUC__) || defined(__clang__)
-#define RAC_API __attribute__((visibility("default")))
-#else
-#define RAC_API
-#endif
 #elif defined(RAC_USING_SHARED)
-#if defined(_WIN32)
 #define RAC_API __declspec(dllimport)
 #else
 #define RAC_API
 #endif
+#elif defined(__GNUC__) || defined(__clang__)
+// Always use default visibility for FFI compatibility
+// This ensures dlsym() can find symbols even in static libraries
+#define RAC_API __attribute__((visibility("default")))
 #else
 #define RAC_API
 #endif
@@ -163,7 +172,7 @@ typedef enum rac_capability {
     RAC_CAPABILITY_TTS = 4,             /**< Text-to-speech */
     RAC_CAPABILITY_VAD = 5,             /**< Voice activity detection */
     RAC_CAPABILITY_DIARIZATION = 6,     /**< Speaker diarization */
-    RAC_CAPABILITY_DIFFUSION = 7,       /**< Image generation (diffusion) */
+    RAC_CAPABILITY_DIFFUSION = 7,       /**< Image generation (Stable Diffusion) */
 } rac_capability_t;
 
 /**
