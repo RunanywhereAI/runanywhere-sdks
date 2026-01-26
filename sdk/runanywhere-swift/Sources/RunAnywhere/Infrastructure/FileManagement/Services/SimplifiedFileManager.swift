@@ -73,9 +73,12 @@ public class SimplifiedFileManager {
     /// Delete a model folder and all its contents
     public func deleteModel(modelId: String, framework: InferenceFramework) throws {
         let folderURL = try CppBridge.ModelPaths.getModelFolder(modelId: modelId, framework: framework)
+
         if FileManager.default.fileExists(atPath: folderURL.path) {
             try FileManager.default.removeItem(at: folderURL)
             logger.info("Deleted model: \(modelId) from \(framework.rawValue)")
+        } else {
+            logger.info("\(modelId) does NOT exist in \(framework.rawValue)")
         }
     }
 

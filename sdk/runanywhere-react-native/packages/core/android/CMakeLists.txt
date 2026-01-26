@@ -6,6 +6,19 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 20)
 
 # =============================================================================
+# nlohmann/json - Header-only JSON library for robust JSON parsing
+# Used by ToolCallingBridge for parsing tool call JSON from LLM output
+# =============================================================================
+include(FetchContent)
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.3
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
+# =============================================================================
 # 16KB Page Alignment for Android 15+ (API 35) Compliance
 # Required starting November 1, 2025 for Google Play submissions
 # =============================================================================
@@ -73,6 +86,7 @@ include_directories(
     "src/main/cpp"
     "../cpp"
     "../cpp/bridges"
+    "../cpp/third_party"
     "${CMAKE_SOURCE_DIR}/include"
     # RAC API headers from runanywhere-commons (flat access)
     "${RAC_INCLUDE_DIR}"
@@ -110,6 +124,9 @@ target_link_libraries(
 # Link RACommons - REQUIRED for core functionality
 target_link_libraries(${PACKAGE_NAME} rac_commons)
 target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_RACOMMONS=1)
+
+# Link nlohmann_json for ToolCallingBridge
+target_link_libraries(${PACKAGE_NAME} nlohmann_json::nlohmann_json)
 
 # 16KB page alignment - MUST be on target for Android 15+ compliance
 target_link_options(${PACKAGE_NAME} PRIVATE -Wl,-z,max-page-size=16384)
