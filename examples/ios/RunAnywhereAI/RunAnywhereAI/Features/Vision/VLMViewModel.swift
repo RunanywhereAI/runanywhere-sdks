@@ -96,6 +96,12 @@ final class VLMViewModel: NSObject {
         if session.canAddInput(input) { session.addInput(input) }
 
         let output = AVCaptureVideoDataOutput()
+        // CRITICAL: Request BGRA format explicitly!
+        // Default iOS camera output is YUV, which our pixel conversion code doesn't handle.
+        // The SDK's VLMTypes.swift assumes BGRA (offset+2=R, offset+1=G, offset+0=B)
+        output.videoSettings = [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+        ]
         output.setSampleBufferDelegate(self, queue: DispatchQueue(label: "camera.queue"))
         output.alwaysDiscardsLateVideoFrames = true
 

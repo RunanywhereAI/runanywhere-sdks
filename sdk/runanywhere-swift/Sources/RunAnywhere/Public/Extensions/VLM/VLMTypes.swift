@@ -157,13 +157,22 @@ public struct VLMImage: Sendable {
             CVPixelBufferLockBaseAddress(buffer, .readOnly)
             defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
 
+            // Verify pixel format - we only support BGRA
+            // iOS cameras default to YUV format if not explicitly configured
+            let pixelFormat = CVPixelBufferGetPixelFormatType(buffer)
+            guard pixelFormat == kCVPixelFormatType_32BGRA else {
+                SDKLogger.shared.error("[VLMImage] Unsupported pixel format \(pixelFormat). Expected BGRA.")
+                SDKLogger.shared.error("Configure camera: videoSettings = [kCVPixelBufferPixelFormatTypeKey: 32BGRA]")
+                return nil
+            }
+
             let width = CVPixelBufferGetWidth(buffer)
             let height = CVPixelBufferGetHeight(buffer)
             let bytesPerRow = CVPixelBufferGetBytesPerRow(buffer)
 
             guard let baseAddress = CVPixelBufferGetBaseAddress(buffer) else { return nil }
 
-            // Assume BGRA format from camera
+            // Convert BGRA to RGB (mtmd API expects RGB format: nx * ny * 3 bytes)
             var rgbData = Data(capacity: width * height * 3)
             let pixelBuffer = baseAddress.assumingMemoryBound(to: UInt8.self)
 
@@ -173,6 +182,7 @@ public struct VLMImage: Sendable {
                     rgbData.append(pixelBuffer[offset + 2]) // R (from BGRA)
                     rgbData.append(pixelBuffer[offset + 1]) // G
                     rgbData.append(pixelBuffer[offset])     // B
+                    // Skip alpha at offset + 3
                 }
             }
 
