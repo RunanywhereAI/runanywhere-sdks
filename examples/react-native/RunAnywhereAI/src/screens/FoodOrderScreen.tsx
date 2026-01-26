@@ -32,13 +32,23 @@ import {
 import {
   RESTAURANTS,
   FOOD_CATEGORIES,
-  searchRestaurants,
+  searchRestaurants as searchRestaurantsMock,
   getRestaurantById,
   calculateCartTotals,
   type Restaurant,
   type MenuItem,
   type CartItem,
 } from '../data/foodData';
+import {
+  searchRestaurantsApi,
+  isApiConfigured,
+  mapCuisineQuery,
+  getApiSetupInstructions,
+  getDemoLocation,
+  DEMO_LOCATIONS,
+  setDemoLocation,
+  type RestaurantSearchResult,
+} from '../services/restaurantApi';
 import { RestaurantCard } from '../components/food/RestaurantCard';
 import { MenuItemCard } from '../components/food/MenuItemCard';
 import { AIAgentOverlay, type AgentStep } from '../components/food/AIAgentOverlay';
@@ -111,6 +121,9 @@ export const FoodOrderScreen: React.FC = () => {
   const [showInputModal, setShowInputModal] = useState(false);
   const [inputText, setInputText] = useState('');
   
+  // Location state
+  const [currentLocation, setCurrentLocation] = useState(getDemoLocation());
+  
   // Animations
   const fabScale = React.useRef(new Animated.Value(1)).current;
   
@@ -137,7 +150,7 @@ export const FoodOrderScreen: React.FC = () => {
   const registerFoodTools = () => {
     console.log('[FoodOrder] 🔧 Registering food ordering tools...');
     
-    // Search restaurants tool
+    // Search restaurants tool - uses REAL API when configured, falls back to mock
     RunAnywhere.registerTool(
       {
         name: 'search_restaurants',
@@ -145,13 +158,52 @@ export const FoodOrderScreen: React.FC = () => {
         parameters: FOOD_TOOLS[0].parameters,
       },
       async (args) => {
-        const results = searchRestaurants(
-          args.query as string,
-          { maxDeliveryFee: args.max_delivery_fee as number }
-        );
+        const query = args.query as string;
+        const maxDeliveryFee = args.max_delivery_fee as number | undefined;
+        
+        // Try real API first
+        if (isApiConfigured()) {
+          console.log('[FoodOrder] 🌐 Using REAL Foursquare API for:', query);
+          try {
+            const mappedQuery = mapCuisineQuery(query);
+            const apiResults = await searchRestaurantsApi({
+              query: mappedQuery,
+              limit: 8,
+              openNow: true,
+            });
+            
+            if (apiResults.length > 0) {
+              console.log('[FoodOrder] ✅ Found', apiResults.length, 'REAL restaurants');
+              return {
+                found: apiResults.length,
+                source: 'foursquare',
+                restaurants: apiResults.map(r => ({
+                  id: r.id,
+                  name: r.name,
+                  cuisine: r.cuisine.join(', '),
+                  rating: r.rating.toFixed(1),
+                  distance: r.distance,
+                  address: r.address,
+                  priceLevel: r.priceLevel,
+                  isOpen: r.isOpen,
+                  delivery: r.deliveryProviders?.join(', ') || 'Available',
+                })),
+              };
+            }
+          } catch (error) {
+            console.warn('[FoodOrder] API failed, falling back to mock:', error);
+          }
+        } else {
+          console.log('[FoodOrder] 📦 No API key - using mock data');
+          console.log('[FoodOrder] 💡 Tip:', getApiSetupInstructions().split('\n')[0]);
+        }
+        
+        // Fallback to mock data
+        const mockResults = searchRestaurantsMock(query, { maxDeliveryFee });
         return {
-          found: results.length,
-          restaurants: results.map(r => ({
+          found: mockResults.length,
+          source: 'mock',
+          restaurants: mockResults.map(r => ({
             id: r.id,
             name: r.name,
             cuisine: r.cuisine.join(', '),
@@ -336,21 +388,24 @@ After adding items to cart, use view_cart to show the summary.`,
       
       console.log('[FoodOrder] 📥 Got result:', JSON.stringify(result, null, 2));
       
-      // Process the result and update steps
-      if (result.toolCalls && result.toolCalls.length > 0) {
-        console.log('[FoodOrder] 🔧 Processing', result.toolCalls.length, 'tool calls');
-        for (const toolCall of result.toolCalls) {
-          console.log('[FoodOrder] Tool call:', toolCall.toolName);
-          await processToolCall(toolCall);
+      // Process the tool results (not toolCalls - those just have the call info, toolResults has actual results)
+      if (result.toolResults && result.toolResults.length > 0) {
+        console.log('[FoodOrder] 🔧 Processing', result.toolResults.length, 'tool results');
+        for (const toolResult of result.toolResults) {
+          console.log('[FoodOrder] Tool result:', toolResult.toolName);
+          await processToolCall(toolResult);
         }
+      } else if (result.toolCalls && result.toolCalls.length > 0) {
+        console.log('[FoodOrder] ⚠️ Tool calls made but no results available');
       } else {
         console.log('[FoodOrder] ⚠️ No tool calls in result');
       }
       
-      // Add final response
-      if (result.finalResponse) {
-        console.log('[FoodOrder] ✅ Final response:', result.finalResponse.substring(0, 100) + '...');
-        addAgentStep('success', 'Here\'s what I found!', result.finalResponse, true);
+      // Add final response - check both .text and .finalResponse for compatibility
+      const finalText = result.text || result.finalResponse;
+      if (finalText) {
+        console.log('[FoodOrder] ✅ Final response:', finalText.substring(0, 100) + '...');
+        addAgentStep('success', 'Here\'s what I found!', finalText, true);
       } else {
         console.log('[FoodOrder] ⚠️ No final response');
         addAgentStep('success', 'Done!', 'Order processing complete', true);
@@ -390,10 +445,15 @@ After adding items to cart, use view_cart to show the summary.`,
     
     switch (toolCall.toolName) {
       case 'search_restaurants':
+        const isRealApi = result.source === 'foursquare';
+        const sourceLabel = isRealApi ? '🌐 LIVE from Foursquare' : '📦 Demo data';
+        const restaurants = result.restaurants as Array<{ name: string; rating: string | number; distance?: string }>;
+        const topRestaurants = restaurants?.slice(0, 3).map(r => r.name).join(', ') || '';
+        
         addAgentStep(
           'searching',
-          'Searching restaurants...',
-          `Found ${result.found || 0} restaurants matching your criteria`,
+          isRealApi ? 'Found REAL restaurants nearby!' : 'Searching restaurants...',
+          `${sourceLabel}\n\nFound ${result.found || 0} restaurants:\n${topRestaurants}${restaurants?.length > 3 ? '...' : ''}`,
           true
         );
         break;
@@ -475,6 +535,25 @@ After adding items to cart, use view_cart to show the summary.`,
       return;
     }
     
+    // Show API setup hint if not configured
+    if (!isApiConfigured()) {
+      Alert.alert(
+        '🍕 Demo Mode',
+        'Using mock restaurant data.\n\nWant REAL restaurant results near you?\n\n' + getApiSetupInstructions(),
+        [
+          { text: 'Continue with Demo', style: 'cancel', onPress: () => {
+            setInputText('');
+            setShowInputModal(true);
+          }},
+          { text: 'Got it!', onPress: () => {
+            setInputText('');
+            setShowInputModal(true);
+          }},
+        ]
+      );
+      return;
+    }
+    
     // Show input modal
     setInputText('');
     setShowInputModal(true);
@@ -491,13 +570,26 @@ After adding items to cart, use view_cart to show the summary.`,
     handleVoiceInput(query);
   };
   
-  // Quick demo presets
+  // Quick demo presets - queries that work great with real API
+  // Fun, viral demo prompts - YC founder energy meets real life chaos 🔥
   const DEMO_QUERIES = [
-    "Order me spicy Thai food under $20",
-    "I want a pepperoni pizza",
-    "Get me a burger with fries",
-    "Order sushi - something with salmon",
-    "I want tacos and churros",
+    // YC Founder Survival Kit (Grok-inspired)
+    "3am YC dorms, pivoted twice, need founder fuel 🚀",
+    "47% caffeine, 53% impostor syndrome, feed me 💀",
+    "Co-founder ate my ramen, order something bougie 🍜",
+    "Demo Day in 6hrs, my only metric is cholesterol 📈",
+    "Pretending to be post-Series A, fancy sushi please 🍣",
+    
+    // Chaotic energy
+    "Midnight hackathon mode, 69 nuggets NOW 🐔",
+    "Investor update due, stress-eating pizza 🍕",
+    "Bootstrapping but make it fine dining 🥂",
+    
+    // Universal relatability  
+    "Wife is mad, strongest drinks nearby 🍺",
+    "Got dumped, emergency ice cream run 🍦",
+    "Diet starts Monday, double cheeseburger 🍔",
+    "Hungover AF, greasiest breakfast ASAP 🥓",
   ];
   
   // Handle restaurant selection
@@ -566,13 +658,29 @@ After adding items to cart, use view_cart to show the summary.`,
       
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.locationRow}>
+        <TouchableOpacity 
+          style={styles.locationRow}
+          onPress={() => {
+            // Show location picker
+            Alert.alert(
+              '📍 Set Your Location',
+              'Choose a city for restaurant search:',
+              Object.entries(DEMO_LOCATIONS).map(([key, loc]) => ({
+                text: loc.name,
+                onPress: () => {
+                  setDemoLocation(loc);
+                  setCurrentLocation(loc);
+                },
+              }))
+            );
+          }}
+        >
           <Icon name="location" size={20} color={DoorDashColors.primary} />
           <View style={styles.locationText}>
             <Text style={styles.deliverTo}>Deliver to</Text>
-            <Text style={styles.address}>123 Main Street ▾</Text>
+            <Text style={styles.address}>{currentLocation.name || 'Select Location'} ▾</Text>
           </View>
-        </View>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.profileButton}>
           <Icon name="person-circle-outline" size={32} color={DoorDashColors.textPrimary} />
         </TouchableOpacity>
