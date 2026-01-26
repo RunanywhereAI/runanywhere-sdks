@@ -37,22 +37,21 @@
 
 ---
 
-## 🔥 See It In Action: AI Ordering Sushi On-Device
+## See It In Action
 
 <p align="center">
-  <img src="demo.gif" alt="On-device tool calling demo - Llama 3.2 3B ordering sushi" width="280"/>
+  <img src="demo.gif" alt="On-device tool calling demo" width="260"/>
 </p>
 
 <p align="center">
-  <strong>Llama 3.2 3B running entirely on iPhone 16 Pro Max</strong><br/>
-  Tool calling + LLM reasoning = 100% on-device. No cloud AI.<br/>
-  <em>The brain is local, it just reaches out for restaurant data.</em>
+  <strong>Llama 3.2 3B on iPhone 16 Pro Max</strong><br/>
+  Tool calling + LLM reasoning — 100% on-device
 </p>
 
 <p align="center">
-  <a href="https://github.com/RunanywhereAI/runanywhere-sdks/pull/296">View the code →</a>
-  &nbsp;•&nbsp;
-  <strong>🚀 Full tool calling support coming soon to all 4 SDKs</strong>
+  <a href="https://github.com/RunanywhereAI/runanywhere-sdks/pull/296">View the code</a>
+  &nbsp;·&nbsp;
+  <em>Full tool calling support coming soon</em>
 </p>
 
 ---
