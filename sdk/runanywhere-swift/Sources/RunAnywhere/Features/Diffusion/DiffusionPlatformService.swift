@@ -295,20 +295,4 @@ public struct DiffusionGenerationResult: Sendable {
     }
 }
 
-// MARK: - SDKError Extension
-
-extension SDKError {
-    /// Diffusion-specific errors
-    public enum DiffusionErrorCode: String, Sendable {
-        case notInitialized = "DIFFUSION_NOT_INITIALIZED"
-        case modelNotFound = "DIFFUSION_MODEL_NOT_FOUND"
-        case initializationFailed = "DIFFUSION_INIT_FAILED"
-        case generationFailed = "DIFFUSION_GENERATION_FAILED"
-        case cancelled = "DIFFUSION_CANCELLED"
-    }
-
-    /// Create a diffusion error
-    public static func diffusion(_ code: DiffusionErrorCode, _ message: String) -> SDKError {
-        return SDKError.operationFailed(message)
-    }
-}
+// MARK: - SDKError Extension (uses DiffusionErrorCode from DiffusionTypes.swift)

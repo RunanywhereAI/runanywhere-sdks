@@ -375,7 +375,7 @@ private extension RunAnywhere {
 
                 let ctx = Unmanaged<CallbackContext>.fromOpaque(userData).takeRetainedValue()
                 let message = errorMessage.map { String(cString: $0) } ?? "Unknown error"
-                let error = SDKError.diffusion(.generationFailed, "Generation failed: \(message)")
+                let error = SDKError.diffusion(SDKError.DiffusionErrorCode.generationFailed, "Generation failed: \(message)")
                 ctx.completion?.resume(throwing: error)
             }
 
