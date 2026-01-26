@@ -19,6 +19,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.runanywhere.runanywhereai.benchmark.BenchmarkScreen
 import com.runanywhere.runanywhereai.presentation.chat.ChatScreen
 import com.runanywhere.runanywhereai.presentation.settings.SettingsScreen
 import com.runanywhere.runanywhereai.presentation.stt.SpeechToTextScreen
@@ -66,6 +67,10 @@ fun AppNavigation() {
             composable(NavigationRoute.SETTINGS) {
                 SettingsScreen()
             }
+
+            composable(NavigationRoute.BENCHMARK) {
+                BenchmarkScreen()
+            }
         }
     }
 }
@@ -111,6 +116,12 @@ fun RunAnywhereBottomNav(navController: NavController) {
                 label = "Voice",
                 icon = Icons.Outlined.Mic,
                 selectedIcon = Icons.Filled.Mic,
+            ),
+            BottomNavItem(
+                route = NavigationRoute.BENCHMARK,
+                label = "Benchmark",
+                icon = Icons.Outlined.Speed,
+                selectedIcon = Icons.Filled.Speed,
             ),
             BottomNavItem(
                 route = NavigationRoute.SETTINGS,
@@ -174,6 +185,7 @@ object NavigationRoute {
     const val STT = "stt"
     const val TTS = "tts"
     const val VOICE = "voice"
+    const val BENCHMARK = "benchmark"
     const val SETTINGS = "settings"
 }
 

@@ -29,6 +29,9 @@ rootProject.name = "RunAnywhere-Android"
 include(":runanywhere-kotlin")
 include(":runanywhere-kotlin:jni")
 
+// Include CLI tool
+include(":cli")
+
 // Include example apps as composite builds to keep them self-contained
 includeBuild("examples/android/RunAnywhereAI")
 includeBuild("examples/intellij-plugin-demo/plugin")

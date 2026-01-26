@@ -1,0 +1,133 @@
+{
+  "version": "1.0",
+  "description": "RunAnywhere Benchmark Configuration - Edit this file to customize benchmark prompts and settings",
+  
+  "configurations": {
+    "quick": {
+      "description": "Fast benchmark for quick testing",
+      "warmupIterations": 1,
+      "testIterations": 3,
+      "maxTokensList": [50],
+      "promptIds": ["short-1"]
+    },
+    "default": {
+      "description": "Balanced benchmark for regular use",
+      "warmupIterations": 3,
+      "testIterations": 5,
+      "maxTokensList": [50, 100],
+      "promptIds": ["short-1", "medium-1", "reasoning-1"]
+    },
+    "comprehensive": {
+      "description": "Thorough benchmark for detailed analysis",
+      "warmupIterations": 3,
+      "testIterations": 10,
+      "maxTokensList": [50, 100, 256],
+      "promptIds": ["short-1", "medium-1", "reasoning-1", "long-1", "code-1"]
+    }
+  },
+  
+  "prompts": [
+    {
+      "id": "short-1",
+      "text": "What is 2+2?",
+      "category": "short",
+      "expectedMinTokens": 5,
+      "description": "Simple arithmetic - tests basic inference speed"
+    },
+    {
+      "id": "medium-1",
+      "text": "Explain quantum computing in simple terms.",
+      "category": "medium",
+      "expectedMinTokens": 50,
+      "description": "General knowledge explanation - tests content generation"
+    },
+    {
+      "id": "reasoning-1",
+      "text": "If a train travels at 60 mph for 2.5 hours, how far does it travel? Show your work.",
+      "category": "reasoning",
+      "expectedMinTokens": 30,
+      "description": "Math word problem - tests reasoning capability"
+    },
+    {
+      "id": "long-1",
+      "text": "Write a short story about a robot learning to paint. Include a beginning, middle, and end.",
+      "category": "long",
+      "expectedMinTokens": 150,
+      "description": "Creative writing - tests sustained generation"
+    },
+    {
+      "id": "code-1",
+      "text": "Write a Python function that checks if a string is a palindrome. Include comments.",
+      "category": "code",
+      "expectedMinTokens": 50,
+      "description": "Code generation - tests structured output"
+    },
+    {
+      "id": "translation-1",
+      "text": "Translate 'Hello, how are you today?' to Spanish, French, and German.",
+      "category": "translation",
+      "expectedMinTokens": 20,
+      "description": "Translation - tests multilingual capability"
+    },
+    {
+      "id": "summarization-1",
+      "text": "Summarize in one sentence: Machine learning is a subset of artificial intelligence that enables systems to learn and improve from experience without being explicitly programmed. It focuses on developing algorithms that can access data and use it to learn for themselves.",
+      "category": "summarization",
+      "expectedMinTokens": 20,
+      "description": "Summarization - tests comprehension and conciseness"
+    },
+    {
+      "id": "qa-context-1",
+      "text": "Context: The Eiffel Tower was built in 1889 as the entrance arch for the World's Fair. It stands 330 meters tall and is located in Paris, France.\n\nQuestion: When was the Eiffel Tower built and how tall is it?",
+      "category": "qa",
+      "expectedMinTokens": 15,
+      "description": "Question answering with context - tests information extraction"
+    }
+  ],
+  
+  "categories": {
+    "short": {
+      "description": "Quick responses, minimal output",
+      "typicalTokens": "5-20"
+    },
+    "medium": {
+      "description": "Moderate length explanations",
+      "typicalTokens": "50-100"
+    },
+    "long": {
+      "description": "Extended content generation",
+      "typicalTokens": "150-300"
+    },
+    "reasoning": {
+      "description": "Logic and math problems",
+      "typicalTokens": "30-80"
+    },
+    "code": {
+      "description": "Programming tasks",
+      "typicalTokens": "50-150"
+    },
+    "translation": {
+      "description": "Multilingual tasks",
+      "typicalTokens": "20-50"
+    },
+    "summarization": {
+      "description": "Text compression tasks",
+      "typicalTokens": "20-50"
+    },
+    "qa": {
+      "description": "Question answering with context",
+      "typicalTokens": "15-50"
+    }
+  },
+  
+  "contributing": {
+    "howToAdd": "Add new prompts to the 'prompts' array with a unique id",
+    "guidelines": [
+      "Use descriptive ids like 'category-number' (e.g., 'math-2', 'code-3')",
+      "Set expectedMinTokens to a reasonable estimate for the task",
+      "Add a description explaining what the prompt tests",
+      "Test your prompt with multiple models before submitting"
+    ],
+    "pullRequest": "Submit a PR to add your prompts to the official benchmark suite"
+  }
+}
