@@ -40,11 +40,11 @@ let onnxRuntimeMacOSPath = "\(packageDir)/sdk/runanywhere-swift/Binaries/onnxrun
 //   ./scripts/build-swift.sh --set-remote  (sets useLocalBinaries = false)
 //
 // =============================================================================
-let useLocalBinaries = true  // Toggle: true for local dev, false for release
+let useLocalBinaries = false  // Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when testLocal = false)
 // Updated automatically by CI/CD during releases
-let sdkVersion = "0.17.4"
+let sdkVersion = "0.17.5"
 
 let package = Package(
     name: "runanywhere-sdks",
@@ -225,7 +225,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "89d130815aa6a3807d5f0855c654415deb01edbe5997b846336f9a161fa08b65"
+                checksum: "ba367c89a468513b33fb167b5996574a8797bf2c00a21e01579ec59458813559"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
