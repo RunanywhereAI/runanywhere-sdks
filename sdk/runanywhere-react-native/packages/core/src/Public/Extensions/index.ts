@@ -149,3 +149,16 @@ export type {
 
 // Re-export Audio as namespace for RunAnywhere.Audio access
 export * as Audio from './RunAnywhere+Audio';
+
+// Tool Calling
+export {
+  registerTool,
+  unregisterTool,
+  getRegisteredTools,
+  clearTools,
+  parseToolCall,
+  executeTool,
+  formatToolsForPrompt,
+  generateWithTools,
+  continueWithToolResult,
+} from './RunAnywhere+ToolCalling';
