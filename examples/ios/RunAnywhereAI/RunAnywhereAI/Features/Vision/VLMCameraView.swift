@@ -219,20 +219,26 @@ struct VLMCameraView: View {
 struct CameraPreview: UIViewRepresentable {
     let session: AVCaptureSession
 
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView()
+    func makeUIView(context: Context) -> PreviewView {
+        let view = PreviewView()
         view.backgroundColor = .black
-        let layer = AVCaptureVideoPreviewLayer(session: session)
-        layer.videoGravity = .resizeAspectFill
-        view.layer.addSublayer(layer)
-        context.coordinator.layer = layer
+        view.previewLayer.session = session
+        view.previewLayer.videoGravity = .resizeAspectFill
         return view
     }
 
-    func updateUIView(_ view: UIView, context: Context) {
-        context.coordinator.layer?.frame = view.bounds
+    func updateUIView(_ view: PreviewView, context: Context) {
+        // PreviewView handles its own layout via layoutSubviews
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
-    class Coordinator { var layer: AVCaptureVideoPreviewLayer? }
+    // Custom UIView that properly sizes AVCaptureVideoPreviewLayer
+    class PreviewView: UIView {
+        override class var layerClass: AnyClass {
+            AVCaptureVideoPreviewLayer.self
+        }
+
+        var previewLayer: AVCaptureVideoPreviewLayer {
+            layer as! AVCaptureVideoPreviewLayer // swiftlint:disable:this force_cast
+        }
+    }
 }

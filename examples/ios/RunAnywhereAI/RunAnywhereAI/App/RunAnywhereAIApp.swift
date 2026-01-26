@@ -207,26 +207,36 @@ struct RunAnywhereAIApp: App {
         logger.info("✅ LLM models registered")
 
         // Register VLM (Vision Language) models
-        // SmolVLM 500M - Ultra-lightweight VLM for mobile
-        if let smolVLMURL = URL(string: "https://huggingface.co/ggml-org/SmolVLM-500M-Instruct-GGUF/resolve/main/SmolVLM-500M-Instruct-Q8_0.gguf") {
+        // VLM models require 2 files: main model + mmproj (vision projector)
+        // Bundled as tar.gz archives for easy download/extraction
+
+        // SmolVLM 500M - Ultra-lightweight VLM for mobile (~500MB total)
+        if let smolVLMURL = URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz") {
             RunAnywhere.registerModel(
                 id: "smolvlm-500m-instruct-q8_0",
                 name: "SmolVLM 500M Instruct",
                 url: smolVLMURL,
                 framework: .llamaCpp,
                 modality: .multimodal,
+                artifactType: .archive(.tarGz, structure: .directoryBased),
                 memoryRequirement: 600_000_000
             )
         }
-        // Qwen2-VL 2B - Small but capable VLM
-        if let qwenVLURL = URL(string: "https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/Qwen2-VL-2B-Instruct-Q4_K_M.gguf") {
-            RunAnywhere.registerModel(
+        // Qwen2-VL 2B - Small but capable VLM (~1.6GB total)
+        // Uses multi-file download: main model (986MB) + mmproj (710MB)
+        // Downloaded separately to avoid memory-intensive tar.gz extraction on iOS
+        if let qwenMainURL = URL(string: "https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/Qwen2-VL-2B-Instruct-Q4_K_M.gguf"),
+           let qwenMmprojURL = URL(string: "https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf") {
+            RunAnywhere.registerMultiFileModel(
                 id: "qwen2-vl-2b-instruct-q4_k_m",
                 name: "Qwen2-VL 2B Instruct",
-                url: qwenVLURL,
+                files: [
+                    ModelFileDescriptor(url: qwenMainURL, filename: "Qwen2-VL-2B-Instruct-Q4_K_M.gguf"),
+                    ModelFileDescriptor(url: qwenMmprojURL, filename: "mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf")
+                ],
                 framework: .llamaCpp,
                 modality: .multimodal,
-                memoryRequirement: 1_500_000_000
+                memoryRequirement: 1_800_000_000
             )
         }
         logger.info("✅ VLM models registered")

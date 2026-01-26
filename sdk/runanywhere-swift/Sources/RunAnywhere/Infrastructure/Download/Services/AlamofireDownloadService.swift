@@ -110,6 +110,17 @@ public class AlamofireDownloadService: @unchecked Sendable {
 
     /// Download model using artifact-type-based approach
     func downloadModelWithArtifactType(_ model: ModelInfo) async throws -> DownloadTask {
+        // Handle multi-file models (like VLMs with separate main model + mmproj)
+        if case .multiFile(var files) = model.artifactType {
+            // If files are empty, try to get them from the cache
+            // (C++ registry doesn't preserve file descriptors)
+            if files.isEmpty, let cachedFiles = RunAnywhere.getMultiFileDescriptors(forModelId: model.id) {
+                files = cachedFiles
+                logger.info("Retrieved \(files.count) file descriptors from cache for model: \(model.id)")
+            }
+            return try await downloadMultiFileModel(model, files: files)
+        }
+
         guard let downloadURL = model.downloadURL else {
             let downloadError = SDKError.download(.invalidInput, "Invalid download URL for model: \(model.id)")
             CppBridge.Events.emitDownloadFailed(modelId: model.id, error: downloadError)
@@ -173,6 +184,92 @@ public class AlamofireDownloadService: @unchecked Sendable {
                         taskId: taskId,
                         error: SDKError.from(error, category: .download)
                     )
+                    progressContinuation.yield(.failed(error, bytesDownloaded: 0, totalBytes: model.downloadSize ?? 0))
+                    throw error
+                }
+            }
+        )
+
+        return task
+    }
+
+    // MARK: - Multi-File Download
+
+    /// Download a model that consists of multiple separate files (e.g., VLM with main model + mmproj)
+    private func downloadMultiFileModel(_ model: ModelInfo, files: [ModelFileDescriptor]) async throws -> DownloadTask {
+        guard !files.isEmpty else {
+            throw SDKError.download(.invalidInput, "No files specified for multi-file model: \(model.id)")
+        }
+
+        logger.info("Starting multi-file download for \(model.id) with \(files.count) files")
+        CppBridge.Events.emitDownloadStarted(modelId: model.id, totalBytes: model.downloadSize ?? 0)
+
+        let downloadStartTime = Date()
+        let (progressStream, progressContinuation) = AsyncStream<DownloadProgress>.makeStream()
+        let destinationFolder = try CppBridge.ModelPaths.getModelFolder(modelId: model.id, framework: model.framework)
+        let taskId = "download-multifile-\(model.id)-\(UUID().uuidString.prefix(8))"
+
+        // Create download task
+        let task = DownloadTask(
+            id: taskId,
+            modelId: model.id,
+            progress: progressStream,
+            result: Task {
+                defer {
+                    progressContinuation.finish()
+                    self.activeDownloadRequests.removeValue(forKey: taskId)
+                }
+
+                do {
+                    // Download each file sequentially
+                    var totalBytesDownloaded: Int64 = 0
+                    let fileCount = files.count
+
+                    for (index, fileDescriptor) in files.enumerated() {
+                        let fileDestination = destinationFolder.appendingPathComponent(fileDescriptor.filename)
+                        logger.info("Downloading file \(index + 1)/\(fileCount): \(fileDescriptor.filename)")
+
+                        // Download this file
+                        _ = try await self.performDownload(
+                            url: fileDescriptor.url,
+                            destination: fileDestination,
+                            model: model,
+                            taskId: "\(taskId)-\(index)",
+                            progressContinuation: progressContinuation,
+                            progressOffset: Double(index) / Double(fileCount),
+                            progressScale: 1.0 / Double(fileCount)
+                        )
+
+                        // Get file size for logging
+                        if let attrs = try? FileManager.default.attributesOfItem(atPath: fileDestination.path),
+                           let size = attrs[.size] as? Int64 {
+                            totalBytesDownloaded += size
+                        }
+
+                        logger.info("Completed file \(index + 1)/\(fileCount): \(fileDescriptor.filename)")
+                    }
+
+                    // All files downloaded - mark complete
+                    CppBridge.Events.emitDownloadCompleted(
+                        modelId: model.id,
+                        durationMs: Date().timeIntervalSince(downloadStartTime) * 1000,
+                        sizeBytes: totalBytesDownloaded
+                    )
+
+                    // Update model registry with local path
+                    try await CppBridge.ModelRegistry.shared.updateDownloadStatus(
+                        modelId: model.id,
+                        localPath: destinationFolder
+                    )
+
+                    let totalTime = Date().timeIntervalSince(downloadStartTime)
+                    logger.info("Multi-file download complete for \(model.id): \(files.count) files in \(String(format: "%.1f", totalTime))s")
+
+                    progressContinuation.yield(.completed(totalBytes: totalBytesDownloaded))
+
+                    return destinationFolder
+                } catch {
+                    CppBridge.Events.emitDownloadFailed(modelId: model.id, error: SDKError.from(error, category: .download))
                     progressContinuation.yield(.failed(error, bytesDownloaded: 0, totalBytes: model.downloadSize ?? 0))
                     throw error
                 }
