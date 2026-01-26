@@ -37,6 +37,26 @@
 
 ---
 
+## 🔥 See It In Action: AI Ordering Sushi On-Device
+
+<p align="center">
+  <img src="demo.gif" alt="On-device tool calling demo - Llama 3.2 3B ordering sushi" width="280"/>
+</p>
+
+<p align="center">
+  <strong>Llama 3.2 3B running entirely on iPhone 16 Pro Max</strong><br/>
+  Tool calling + LLM reasoning = 100% on-device. No cloud AI.<br/>
+  <em>The brain is local, it just reaches out for restaurant data.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/RunanywhereAI/runanywhere-sdks/pull/296">View the code →</a>
+  &nbsp;•&nbsp;
+  <strong>🚀 Full tool calling support coming soon to all 4 SDKs</strong>
+</p>
+
+---
+
 ## What is RunAnywhere?
 
 RunAnywhere lets you add AI features to your mobile app that run entirely on-device:
