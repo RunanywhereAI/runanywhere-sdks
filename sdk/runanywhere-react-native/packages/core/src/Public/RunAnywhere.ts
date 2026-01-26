@@ -47,6 +47,7 @@ import * as VoiceAgent from './Extensions/RunAnywhere+VoiceAgent';
 import * as VoiceSession from './Extensions/RunAnywhere+VoiceSession';
 import * as StructuredOutput from './Extensions/RunAnywhere+StructuredOutput';
 import * as Audio from './Extensions/RunAnywhere+Audio';
+import * as ToolCalling from './Extensions/RunAnywhere+ToolCalling';
 
 const logger = new SDKLogger('RunAnywhere');
 
@@ -597,6 +598,20 @@ export const RunAnywhere = {
   generateStructuredStream: StructuredOutput.generateStructuredStream,
   extractEntities: StructuredOutput.extractEntities,
   classify: StructuredOutput.classify,
+
+  // ============================================================================
+  // Tool Calling (Delegated to Extension)
+  // ============================================================================
+
+  registerTool: ToolCalling.registerTool,
+  unregisterTool: ToolCalling.unregisterTool,
+  getRegisteredTools: ToolCalling.getRegisteredTools,
+  clearTools: ToolCalling.clearTools,
+  parseToolCall: ToolCalling.parseToolCall,
+  executeTool: ToolCalling.executeTool,
+  formatToolsForPrompt: ToolCalling.formatToolsForPrompt,
+  generateWithTools: ToolCalling.generateWithTools,
+  continueWithToolResult: ToolCalling.continueWithToolResult,
 
   // ============================================================================
   // Storage Management (Delegated to Extension)
