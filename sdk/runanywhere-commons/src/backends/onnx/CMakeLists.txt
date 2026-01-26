@@ -120,6 +120,40 @@ elseif(RAC_PLATFORM_MACOS)
             endif()
         endforeach()
     endif()
+
+elseif(RAC_PLATFORM_LINUX)
+    set(SHERPA_ONNX_ROOT "${RUNANYWHERE_COMMONS_ROOT}/third_party/sherpa-onnx-linux")
+
+    if(EXISTS "${SHERPA_ONNX_ROOT}/lib/libsherpa-onnx-c-api.so")
+        set(SHERPA_ONNX_AVAILABLE ON)
+        set(SHERPA_LIB_PATH "${SHERPA_ONNX_ROOT}/lib/libsherpa-onnx-c-api.so")
+        set(SHERPA_HEADER_PATH "${SHERPA_ONNX_ROOT}/include")
+
+        add_library(sherpa_onnx SHARED IMPORTED GLOBAL)
+        set_target_properties(sherpa_onnx PROPERTIES
+            IMPORTED_LOCATION "${SHERPA_LIB_PATH}"
+            INTERFACE_INCLUDE_DIRECTORIES "${SHERPA_HEADER_PATH}"
+        )
+
+        # Link supporting libraries if present
+        set(SHERPA_ONNX_DEPS
+            "sherpa-onnx-core" "sherpa-onnx-fst" "sherpa-onnx-fstfar"
+            "sherpa-onnx-kaldifst-core" "kaldi-decoder-core" "kaldi-native-fbank-core"
+            "piper_phonemize" "espeak-ng" "ucd"
+        )
+
+        foreach(dep ${SHERPA_ONNX_DEPS})
+            if(EXISTS "${SHERPA_ONNX_ROOT}/lib/lib${dep}.so")
+                add_library(sherpa_${dep} SHARED IMPORTED GLOBAL)
+                set_target_properties(sherpa_${dep} PROPERTIES IMPORTED_LOCATION "${SHERPA_ONNX_ROOT}/lib/lib${dep}.so")
+                target_link_libraries(sherpa_onnx INTERFACE sherpa_${dep})
+            endif()
+        endforeach()
+
+        message(STATUS "Found Sherpa-ONNX Linux: ${SHERPA_LIB_PATH}")
+    else()
+        message(STATUS "Sherpa-ONNX not found. Run: ./scripts/linux/download-sherpa-onnx.sh")
+    endif()
 endif()
 
 # =============================================================================
@@ -191,6 +225,9 @@ elseif(RAC_PLATFORM_MACOS)
         "-framework CoreML"
         "-framework Accelerate"
     )
+
+elseif(RAC_PLATFORM_LINUX)
+    target_link_libraries(rac_backend_onnx PUBLIC pthread dl)
 endif()
 
 # =============================================================================
