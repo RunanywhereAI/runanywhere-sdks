@@ -9,6 +9,7 @@
  * Do NOT add features not present in the Swift code.
  */
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <mutex>

@@ -71,7 +71,7 @@ bool VoicePipeline::initialize() {
 
     // Create standalone voice agent
     rac_result_t result = rac_voice_agent_create_standalone(&impl_->voice_agent);
-    if (result != RAC_RESULT_SUCCESS) {
+    if (result != RAC_SUCCESS) {
         last_error_ = "Failed to create voice agent";
         return false;
     }
@@ -91,7 +91,7 @@ bool VoicePipeline::initialize() {
         STT_MODEL_ID,
         "Whisper Tiny English"
     );
-    if (result != RAC_RESULT_SUCCESS) {
+    if (result != RAC_SUCCESS) {
         last_error_ = "Failed to load STT model: " + stt_path;
         return false;
     }
@@ -104,7 +104,7 @@ bool VoicePipeline::initialize() {
         LLM_MODEL_ID,
         "Qwen2.5 0.5B"
     );
-    if (result != RAC_RESULT_SUCCESS) {
+    if (result != RAC_SUCCESS) {
         last_error_ = "Failed to load LLM model: " + llm_path;
         return false;
     }
@@ -115,16 +115,16 @@ bool VoicePipeline::initialize() {
         impl_->voice_agent,
         tts_path.c_str(),
         TTS_MODEL_ID,
-        "Piper Amy US"
+        "Piper Lessac US"
     );
-    if (result != RAC_RESULT_SUCCESS) {
+    if (result != RAC_SUCCESS) {
         last_error_ = "Failed to load TTS voice: " + tts_path;
         return false;
     }
 
     // Initialize with loaded models
     result = rac_voice_agent_initialize_with_loaded_models(impl_->voice_agent);
-    if (result != RAC_RESULT_SUCCESS) {
+    if (result != RAC_SUCCESS) {
         last_error_ = "Failed to initialize voice agent";
         return false;
     }
@@ -215,7 +215,7 @@ bool VoicePipeline::process_voice_turn(const int16_t* samples, size_t num_sample
         &result
     );
 
-    if (status != RAC_RESULT_SUCCESS) {
+    if (status != RAC_SUCCESS) {
         if (config_.on_error) {
             config_.on_error("Voice processing failed");
         }

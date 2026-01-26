@@ -13,7 +13,7 @@
 #   - Silero VAD (~2MB) - Voice Activity Detection
 #   - Whisper Tiny English (~150MB) - Speech-to-Text
 #   - Qwen2.5 0.5B Instruct Q4 (~400MB) - Language Model
-#   - VITS Piper English US Amy (~50MB) - Text-to-Speech
+#   - VITS Piper English US Lessac (~65MB) - Text-to-Speech
 # =============================================================================
 
 set -e
@@ -153,10 +153,10 @@ fi
 # 4. VITS Piper English US Amy (~50MB)
 # =============================================================================
 
-TTS_DIR="${MODEL_DIR}/ONNX/vits-piper-en-us"
-TTS_FILE="${TTS_DIR}/en_US-amy-medium.onnx"
+TTS_DIR="${MODEL_DIR}/ONNX/vits-piper-en_US-lessac-medium"
+TTS_FILE="${TTS_DIR}/en_US-lessac-medium.onnx"
 
-print_step "Downloading VITS Piper English US (Amy)..."
+print_step "Downloading VITS Piper English US (Lessac)..."
 
 if [ -f "${TTS_FILE}" ] && [ "${FORCE_DOWNLOAD}" = false ]; then
     print_success "VITS Piper English already exists, skipping"
@@ -165,15 +165,15 @@ else
     TEMP_DIR=$(mktemp -d)
     trap "rm -rf ${TEMP_DIR}" EXIT
 
-    # Download Sherpa-ONNX piper model
-    curl -L -o "${TEMP_DIR}/piper.tar.bz2" \
-        "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-amy-medium.tar.bz2"
+    # Download from RunanywhereAI hosted models
+    curl -L -o "${TEMP_DIR}/piper.tar.gz" \
+        "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz"
 
     # Extract to temp directory
-    tar -xjf "${TEMP_DIR}/piper.tar.bz2" -C "${TEMP_DIR}"
+    tar -xzf "${TEMP_DIR}/piper.tar.gz" -C "${TEMP_DIR}"
 
     # Copy model files to destination
-    cp -r "${TEMP_DIR}/vits-piper-en_US-amy-medium/"* "${TTS_DIR}/"
+    cp -r "${TEMP_DIR}/vits-piper-en_US-lessac-medium/"* "${TTS_DIR}/"
 
     print_success "VITS Piper English downloaded"
 fi
