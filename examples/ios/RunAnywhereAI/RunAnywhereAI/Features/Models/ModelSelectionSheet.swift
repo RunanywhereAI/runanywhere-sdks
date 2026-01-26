@@ -263,8 +263,8 @@ extension ModelSelectionSheet {
             (context == .voice && [.language, .multimodal].contains(model.category))
 
         if isLLM {
-            await viewModel.setCurrentModel(model)
             await MainActor.run {
+                viewModel.setCurrentModel(model)
                 NotificationCenter.default.post(
                     name: Notification.Name("ModelLoaded"),
                     object: model
