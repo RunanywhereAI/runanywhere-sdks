@@ -15,8 +15,19 @@
 #include <vector>
 #include <mutex>
 #include <iostream>
+#include <chrono>
 
 namespace runanywhere {
+
+// =============================================================================
+// Constants (matching iOS VoiceSession behavior)
+// =============================================================================
+
+// Minimum silence duration before treating speech as ended (iOS uses 1.5s)
+static constexpr double SILENCE_DURATION_SEC = 1.5;
+
+// Minimum accumulated speech samples before processing (iOS uses 16000 = 0.5s at 16kHz)
+static constexpr size_t MIN_SPEECH_SAMPLES = 16000;
 
 // =============================================================================
 // Implementation
@@ -25,13 +36,13 @@ namespace runanywhere {
 struct VoicePipeline::Impl {
     rac_voice_agent_handle_t voice_agent = nullptr;
 
-    // Audio accumulation buffer for VAD
-    std::vector<float> audio_buffer;
-    std::mutex buffer_mutex;
-
     // State
     bool speech_active = false;
     std::vector<int16_t> speech_buffer;
+
+    // Timestamp-based silence tracking (matches iOS VoiceSession pattern)
+    std::chrono::steady_clock::time_point last_speech_time;
+    bool speech_callback_fired = false;  // Whether we notified "listening"
 };
 
 VoicePipeline::VoicePipeline()
@@ -154,7 +165,7 @@ void VoicePipeline::process_audio(const int16_t* samples, size_t num_samples) {
         float_samples[i] = samples[i] / 32768.0f;
     }
 
-    // Detect speech
+    // Detect speech via VAD
     rac_bool_t is_speech = RAC_FALSE;
     rac_voice_agent_detect_speech(
         impl_->voice_agent,
@@ -164,38 +175,61 @@ void VoicePipeline::process_audio(const int16_t* samples, size_t num_samples) {
     );
 
     bool speech_detected = (is_speech == RAC_TRUE);
+    auto now = std::chrono::steady_clock::now();
 
-    // Handle state transitions
-    if (speech_detected && !impl_->speech_active) {
-        // Speech started
-        impl_->speech_active = true;
-        impl_->speech_buffer.clear();
-        if (config_.on_voice_activity) {
-            config_.on_voice_activity(true);
+    if (speech_detected) {
+        // Update last speech timestamp
+        impl_->last_speech_time = now;
+
+        if (!impl_->speech_active) {
+            // Speech just started — begin accumulating
+            impl_->speech_active = true;
+            impl_->speech_buffer.clear();
+            impl_->speech_callback_fired = false;
+        }
+
+        // Fire "listening" callback once we have enough samples
+        if (!impl_->speech_callback_fired
+            && impl_->speech_buffer.size() + num_samples >= MIN_SPEECH_SAMPLES) {
+            impl_->speech_callback_fired = true;
+            if (config_.on_voice_activity) {
+                config_.on_voice_activity(true);
+            }
         }
     }
 
+    // Accumulate audio while speech session is active (including silence grace period)
     if (impl_->speech_active) {
-        // Accumulate speech audio
         impl_->speech_buffer.insert(
             impl_->speech_buffer.end(),
             samples, samples + num_samples
         );
     }
 
-    if (!speech_detected && impl_->speech_active) {
-        // Speech ended - process the utterance
-        impl_->speech_active = false;
-        if (config_.on_voice_activity) {
-            config_.on_voice_activity(false);
-        }
+    // Check if silence has lasted long enough to end the speech session
+    if (impl_->speech_active && !speech_detected) {
+        double silence_elapsed = std::chrono::duration<double>(
+            now - impl_->last_speech_time
+        ).count();
 
-        // Process the accumulated speech
-        if (!impl_->speech_buffer.empty()) {
-            process_voice_turn(
-                impl_->speech_buffer.data(),
-                impl_->speech_buffer.size()
-            );
+        if (silence_elapsed >= SILENCE_DURATION_SEC) {
+            // Silence timeout reached — end speech session
+            impl_->speech_active = false;
+
+            if (config_.on_voice_activity) {
+                config_.on_voice_activity(false);
+            }
+
+            // Only process if we accumulated enough speech
+            if (impl_->speech_buffer.size() >= MIN_SPEECH_SAMPLES) {
+                process_voice_turn(
+                    impl_->speech_buffer.data(),
+                    impl_->speech_buffer.size()
+                );
+            }
+
+            impl_->speech_buffer.clear();
+            impl_->speech_callback_fired = false;
         }
     }
 }
@@ -256,6 +290,7 @@ void VoicePipeline::stop() {
     running_ = false;
     impl_->speech_active = false;
     impl_->speech_buffer.clear();
+    impl_->speech_callback_fired = false;
 }
 
 bool VoicePipeline::is_running() const {
@@ -267,6 +302,7 @@ void VoicePipeline::cancel() {
     // Note: Voice agent API may not support mid-generation cancellation
     impl_->speech_active = false;
     impl_->speech_buffer.clear();
+    impl_->speech_callback_fired = false;
 }
 
 void VoicePipeline::set_config(const VoicePipelineConfig& config) {

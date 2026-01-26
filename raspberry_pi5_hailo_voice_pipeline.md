@@ -273,7 +273,7 @@ With USB mic + speaker connected, run `./build/voice-assistant` and speak. Expec
 | STT fails with file path (decoder.onnx not found) | Pass directory path to STT (ONNX backend scans for encoder/decoder/tokens) |
 | Missing `#include <cstring>` for `strdup` | Added include |
 | Missing `#include <sys/stat.h>` for `stat` | Added include |
-| VAD triggers on tiny chunks → empty transcription | Pipeline issue: speech buffer only accumulates 512 samples (needs audio accumulation fix for live mode) |
+| VAD triggers on tiny chunks → empty transcription | Rewrote `process_audio()` with iOS-style debouncing: 1.5s silence timeout + 16,000 sample minimum buffer (matches `VoiceSession.swift`) |
 
 ## Build & Test Results (Phase 4)
 
