@@ -45,7 +45,8 @@ typedef enum rac_resource_type {
     RAC_RESOURCE_TYPE_STT_MODEL = 1,
     RAC_RESOURCE_TYPE_TTS_VOICE = 2,
     RAC_RESOURCE_TYPE_VAD_MODEL = 3,
-    RAC_RESOURCE_TYPE_DIARIZATION_MODEL = 4
+    RAC_RESOURCE_TYPE_DIARIZATION_MODEL = 4,
+    RAC_RESOURCE_TYPE_VLM_MODEL = 5  /**< Vision Language Model */
 } rac_resource_type_t;
 
 /**
