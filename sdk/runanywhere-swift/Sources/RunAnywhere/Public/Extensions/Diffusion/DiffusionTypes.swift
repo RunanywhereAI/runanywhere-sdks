@@ -454,7 +454,9 @@ public extension SDKError {
     /// Diffusion error codes
     enum DiffusionErrorCode: String, Sendable {
         case notInitialized = "diffusion_not_initialized"
+        case modelNotFound = "diffusion_model_not_found"
         case modelLoadFailed = "diffusion_model_load_failed"
+        case initializationFailed = "diffusion_initialization_failed"
         case generationFailed = "diffusion_generation_failed"
         case cancelled = "diffusion_cancelled"
         case invalidOptions = "diffusion_invalid_options"
