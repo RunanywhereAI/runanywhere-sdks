@@ -114,14 +114,14 @@ All code written and committed to `smonga/rasp`.
 - [x] **1.4** Update `src/backends/llamacpp/CMakeLists.txt` — added Linux block with NEON, no GPU
 - [x] **1.5** Update `VERSIONS` — `SHERPA_ONNX_VERSION_LINUX=1.12.23`
 
-### Phase 2: Pi 5 Setup — PARTIALLY DONE
+### Phase 2: Pi 5 Setup — COMPLETED
 
 - [x] **2.1** Pi 5 hardware ready (monitor, keyboard, mouse connected)
 - [x] **2.2** Pi OS booted, IP: `192.168.1.91`, user: `runanywhere`
 - [x] **2.3** SSH set up from Mac (key: `~/.ssh/id_pi`)
 - [x] **2.4** Prerequisites installed: `build-essential cmake git curl wget libasound2-dev libpulse-dev`
 - [x] **2.5** Sherpa-ONNX v1.12.23 downloaded successfully (verified: `lib/libsherpa-onnx-c-api.so` + `include/sherpa-onnx/c-api/c-api.h`)
-- [ ] **2.6** Clone repo via git on Pi (use this going forward instead of rsync)
+- [x] **2.6** Repo cloned on Pi via git
 
 ### Phase 3: Application Layer — COMPLETED
 
@@ -136,9 +136,9 @@ All code written and committed to `smonga/rasp`.
 - [x] **3.7** Main entry point (main.cpp) — CLI with device selection
 - [x] **3.8** README.md
 
-### Phase 4: Build & Test on Pi 5 — REMAINING
+### Phase 4: Build & Test on Pi 5 — COMPLETED
 
-These steps should be run **on the Raspberry Pi 5 directly** (via coding agent or terminal).
+All steps completed on Raspberry Pi 5 directly. Full pipeline verified.
 
 #### 4.1 Clone the repo on Pi
 
@@ -266,6 +266,48 @@ With USB mic + speaker connected, run `./build/voice-assistant` and speak. Expec
 | Sherpa-ONNX v1.12.23 uses `-shared-cpu` suffix | Updated download URL in `download-sherpa-onnx.sh` |
 | Sherpa-ONNX v1.12.23 doesn't include headers | Script downloads C API header from GitHub raw |
 | rsync excluded `build-linux.sh` (matched `build*`) | Clone via git instead of rsync |
+| Missing `#include <algorithm>` in `model_paths.cpp` | Added include for `std::find` |
+| Code used `RAC_RESULT_SUCCESS` (doesn't exist) | Changed to `RAC_SUCCESS` (defined in `rac_types.h`) |
+| Backends not registered (no providers for STT/LLM/TTS) | Added `rac_backend_onnx_register()` + `rac_backend_llamacpp_register()` in `main.cpp` |
+| TTS model URL 404 (k2-fsa Amy model removed) | Switched to Lessac model from `RunanywhereAI/sherpa-onnx` releases (tar.gz) |
+| STT fails with file path (decoder.onnx not found) | Pass directory path to STT (ONNX backend scans for encoder/decoder/tokens) |
+| Missing `#include <cstring>` for `strdup` | Added include |
+| Missing `#include <sys/stat.h>` for `stat` | Added include |
+| VAD triggers on tiny chunks → empty transcription | Pipeline issue: speech buffer only accumulates 512 samples (needs audio accumulation fix for live mode) |
+
+## Build & Test Results (Phase 4)
+
+**Date:** 2026-01-26
+**Platform:** Raspberry Pi 5 (8GB), Debian Bookworm aarch64, GCC 12.2, CMake 3.25.1
+
+### Build Output
+
+```
+dist/linux/aarch64/
+  librac_commons.so         574K
+  librac_backend_onnx.so    167K
+  librac_backend_llamacpp.so 4.1M
+  libsherpa-onnx-c-api.so   4.6M
+  libonnxruntime.so          30M
+```
+
+### End-to-End Pipeline Test (synthetic WAV input)
+
+```
+Input:  espeak-ng "Hello, how are you doing today?" → 16kHz mono WAV (2.0s)
+STT:    " Hello, how are you doing today?"   (Whisper Tiny, loaded in 861ms)
+LLM:    "Hello! I'm just a computer program, so I don't have feelings.
+         How can I assist you today?"          (Qwen2.5 0.5B Q4, 23 tokens)
+TTS:    106,387 samples / 4.82s at 22050Hz    (Piper Lessac, synthesis ~4.8s)
+```
+
+### Test Tool
+
+`test-pipeline` binary reads a WAV file and runs the full pipeline without ALSA:
+```bash
+./build/test-pipeline /path/to/input.wav
+# Outputs: transcription, LLM response, TTS audio saved to /tmp/tts_output.wav
+```
 
 ---
 
@@ -343,6 +385,6 @@ The Raspberry Pi AI Kit (Hailo 8L) can accelerate the STT encoder (~2x speedup).
 
 ---
 
-**Last Updated:** 2026-01-25
+**Last Updated:** 2026-01-26
 **Branch:** `smonga/rasp`
-**Status:** Code complete. Ready for build & test on Pi 5 (Phase 4).
+**Status:** Full pipeline verified on Pi 5. STT→LLM→TTS working end-to-end with synthetic audio. Live mic mode has VAD audio accumulation issue (sends too-small chunks to STT).
