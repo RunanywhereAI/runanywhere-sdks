@@ -9,6 +9,54 @@
 import CRACommons
 import Foundation
 
+// MARK: - Diffusion Tokenizer Source
+
+/// Tokenizer source for Stable Diffusion models.
+/// Apple's compiled CoreML models don't include tokenizer files, so they must be downloaded separately.
+/// This specifies which HuggingFace repository to download them from.
+public enum DiffusionTokenizerSource: Sendable, Equatable {
+    /// Stable Diffusion 1.x tokenizer (CLIP ViT-L/14)
+    /// Source: runwayml/stable-diffusion-v1-5
+    case sd15
+
+    /// Stable Diffusion 2.x tokenizer (OpenCLIP ViT-H/14)
+    /// Source: stabilityai/stable-diffusion-2-1
+    case sd2
+
+    /// Stable Diffusion XL tokenizer (dual tokenizers)
+    /// Source: stabilityai/stable-diffusion-xl-base-1.0
+    case sdxl
+
+    /// Custom tokenizer from a specified base URL
+    /// The URL should be a directory containing merges.txt and vocab.json
+    /// Example: "https://huggingface.co/my-org/my-model/resolve/main/tokenizer"
+    case custom(baseURL: String)
+
+    /// The base URL for downloading tokenizer files
+    public var baseURL: String {
+        switch self {
+        case .sd15:
+            return "https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/tokenizer"
+        case .sd2:
+            return "https://huggingface.co/stabilityai/stable-diffusion-2-1/resolve/main/tokenizer"
+        case .sdxl:
+            return "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/tokenizer"
+        case .custom(let url):
+            return url
+        }
+    }
+
+    /// Human-readable description
+    public var description: String {
+        switch self {
+        case .sd15: return "Stable Diffusion 1.5 (CLIP)"
+        case .sd2: return "Stable Diffusion 2.x (OpenCLIP)"
+        case .sdxl: return "Stable Diffusion XL"
+        case .custom(let url): return "Custom (\(url))"
+        }
+    }
+}
+
 // MARK: - Diffusion Model Variant
 
 /// Stable Diffusion model variants
@@ -39,6 +87,15 @@ public enum DiffusionModelVariant: String, Sendable, CaseIterable {
         switch self {
         case .sd15, .sd21, .sdxl: return 28
         case .sdxlTurbo: return 4
+        }
+    }
+
+    /// Default tokenizer source for this model variant
+    public var defaultTokenizerSource: DiffusionTokenizerSource {
+        switch self {
+        case .sd15: return .sd15
+        case .sd21: return .sd2
+        case .sdxl, .sdxlTurbo: return .sdxl
         }
     }
 
@@ -167,6 +224,11 @@ public struct DiffusionConfiguration: ComponentConfiguration, Sendable {
     /// Reduce memory footprint (may reduce quality)
     public let reduceMemory: Bool
 
+    /// Tokenizer source for downloading missing tokenizer files
+    /// Apple's compiled CoreML models don't include tokenizer files (merges.txt, vocab.json).
+    /// If nil, defaults to the tokenizer matching the model variant.
+    public let tokenizerSource: DiffusionTokenizerSource?
+
     // MARK: - Initialization
 
     public init(
@@ -174,13 +236,20 @@ public struct DiffusionConfiguration: ComponentConfiguration, Sendable {
         modelVariant: DiffusionModelVariant = .sd15,
         enableSafetyChecker: Bool = true,
         reduceMemory: Bool = false,
-        preferredFramework: InferenceFramework? = nil
+        preferredFramework: InferenceFramework? = nil,
+        tokenizerSource: DiffusionTokenizerSource? = nil
     ) {
         self.modelId = modelId
         self.modelVariant = modelVariant
         self.enableSafetyChecker = enableSafetyChecker
         self.reduceMemory = reduceMemory
         self.preferredFramework = preferredFramework
+        self.tokenizerSource = tokenizerSource
+    }
+
+    /// The effective tokenizer source (uses model variant default if not specified)
+    public var effectiveTokenizerSource: DiffusionTokenizerSource {
+        tokenizerSource ?? modelVariant.defaultTokenizerSource
     }
 
     // MARK: - Validation

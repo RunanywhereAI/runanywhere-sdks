@@ -20,6 +20,15 @@ class DiffusionViewModel: ObservableObject {
     @Published var currentModelId: String?
     @Published var currentModelName: String?
 
+    // Available Models
+    @Published var availableModels: [ModelInfo] = []
+    @Published var selectedModel: ModelInfo?
+
+    // Download State
+    @Published var isDownloading = false
+    @Published var downloadProgress: Double = 0.0
+    @Published var downloadStatus: String = ""
+
     // Generation State
     @Published var isGenerating = false
     @Published var progress: Float = 0.0
@@ -59,7 +68,11 @@ class DiffusionViewModel: ObservableObject {
     // MARK: - Computed Properties
 
     var canGenerate: Bool {
-        !prompt.isEmpty && !isGenerating
+        !prompt.isEmpty && !isGenerating && isModelLoaded
+    }
+
+    var hasDownloadedModels: Bool {
+        availableModels.contains { $0.isDownloaded }
     }
 
     var progressPercentage: String {
@@ -78,8 +91,37 @@ class DiffusionViewModel: ObservableObject {
 
         logger.info("Initializing Diffusion view model")
 
+        // Load available diffusion models
+        await loadAvailableModels()
+
         // Check if diffusion model is already loaded
         await checkModelState()
+    }
+
+    // MARK: - Model Discovery
+
+    /// Load available diffusion models from registry
+    func loadAvailableModels() async {
+        do {
+            let allModels = try await RunAnywhere.availableModels()
+            // Filter to image generation models that are not built-in (built-in models don't need downloading)
+            // Built-in models like "coreml-diffusion" are placeholders and shouldn't appear in the list
+            availableModels = allModels.filter {
+                $0.category == ModelCategory.imageGeneration &&
+                !$0.isBuiltIn &&
+                $0.artifactType.requiresDownload
+            }
+            logger.info("Found \(self.availableModels.count) diffusion model(s)")
+
+            // Auto-select first downloaded model, or first model if none downloaded
+            if let downloaded = availableModels.first(where: { $0.isDownloaded }) {
+                selectedModel = downloaded
+            } else if let first = availableModels.first {
+                selectedModel = first
+            }
+        } catch {
+            logger.error("Failed to load available models: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - Model Management
@@ -98,17 +140,83 @@ class DiffusionViewModel: ObservableObject {
         }
     }
 
-    /// Load a diffusion model
-    func loadModel(modelPath: String, modelId: String, modelName: String) async {
-        logger.info("Loading diffusion model: \(modelName)")
-        statusMessage = "Loading model..."
+    /// Download a diffusion model
+    func downloadModel(_ model: ModelInfo) async {
+        guard !isDownloading else { return }
+
+        // Don't try to download built-in models
+        guard !model.isBuiltIn && model.artifactType.requiresDownload else {
+            logger.warning("Attempted to download built-in model: \(model.name)")
+            errorMessage = "This model doesn't require downloading"
+            return
+        }
+
+        logger.info("Starting download for: \(model.name)")
+        isDownloading = true
+        downloadProgress = 0.0
+        downloadStatus = "Starting download..."
         errorMessage = nil
 
         do {
+            let progressStream = try await RunAnywhere.downloadModel(model.id)
+
+            for await progress in progressStream {
+                self.downloadProgress = progress.overallProgress
+                self.downloadStatus = "Downloading: \(Int(progress.overallProgress * 100))%"
+
+                if progress.stage == .completed {
+                    self.downloadStatus = "Download complete!"
+                    logger.info("Download completed for: \(model.name)")
+                    break
+                }
+            }
+
+            // Reload models to update downloaded status
+            await loadAvailableModels()
+            selectedModel = availableModels.first { $0.id == model.id }
+
+        } catch {
+            logger.error("Download failed: \(error.localizedDescription)")
+            errorMessage = "Download failed: \(error.localizedDescription)"
+            downloadStatus = "Download failed"
+        }
+
+        isDownloading = false
+    }
+
+    /// Load the selected model
+    func loadSelectedModel() async {
+        guard let model = selectedModel else {
+            errorMessage = "No model selected"
+            return
+        }
+
+        guard model.isDownloaded, let localPath = model.localPath else {
+            errorMessage = "Model not downloaded. Please download first."
+            return
+        }
+
+        await loadModel(modelPath: localPath.path, modelId: model.id, modelName: model.name)
+    }
+
+    /// Load a diffusion model
+    /// Note: First-time loading can take 5-15 minutes as Core ML compiles the model for the device's Neural Engine.
+    /// Subsequent loads will be much faster.
+    func loadModel(modelPath: String, modelId: String, modelName: String) async {
+        logger.info("Loading diffusion model: \(modelName)")
+        statusMessage = "Loading model... (first load may take 5-15 minutes for Core ML compilation)"
+        errorMessage = nil
+
+        do {
+            // Configure the diffusion model
+            // tokenizerSource defaults to the model variant's tokenizer (SD 1.5 in this case)
+            // For custom fine-tuned models, you can specify a custom tokenizer:
+            // tokenizerSource: .custom(baseURL: "https://huggingface.co/your-org/your-model/resolve/main/tokenizer")
             let config = DiffusionConfiguration(
                 modelVariant: .sd15,
                 enableSafetyChecker: true,
-                reduceMemory: true
+                reduceMemory: true,
+                tokenizerSource: nil  // Uses default SD 1.5 tokenizer
             )
 
             try await RunAnywhere.loadDiffusionModel(
@@ -154,7 +262,7 @@ class DiffusionViewModel: ObservableObject {
             return
         }
 
-        logger.info("Generating image for prompt: \(prompt.prefix(50))...")
+        logger.info("Generating image for prompt: \(self.prompt.prefix(50))...")
         isGenerating = true
         progress = 0.0
         currentStep = 0
@@ -197,17 +305,13 @@ class DiffusionViewModel: ObservableObject {
             let result = try await RunAnywhere.generateImage(prompt: prompt, options: options)
             lastSeedUsed = result.seedUsed
 
-            if let imageData = result.imageData {
-                if let uiImage = createImage(from: imageData, width: result.width, height: result.height) {
-                    generatedImage = Image(uiImage: uiImage)
-                    statusMessage = "Generation complete"
-                    logger.info("Image generated successfully, seed: \(result.seedUsed)")
-                } else {
-                    errorMessage = "Failed to create image from data"
-                    statusMessage = "Failed"
-                }
+            let imageData = result.imageData
+            if let uiImage = createImage(from: imageData, width: result.width, height: result.height) {
+                generatedImage = Image(uiImage: uiImage)
+                statusMessage = "Generation complete"
+                logger.info("Image generated successfully, seed: \(result.seedUsed)")
             } else {
-                errorMessage = "No image data returned"
+                errorMessage = "Failed to create image from data"
                 statusMessage = "Failed"
             }
 
@@ -320,17 +424,5 @@ class DiffusionViewModel: ObservableObject {
 }
 
 // MARK: - Platform Image Extension
-
-#if os(iOS)
-extension Image {
-    init(uiImage: UIImage) {
-        self.init(uiImage: uiImage)
-    }
-}
-#elseif os(macOS)
-extension Image {
-    init(uiImage: NSImage) {
-        self.init(nsImage: uiImage)
-    }
-}
-#endif
+// Note: SwiftUI already provides Image(uiImage:) on iOS and Image(nsImage:) on macOS
+// No custom extensions needed - use the built-in initializers directly

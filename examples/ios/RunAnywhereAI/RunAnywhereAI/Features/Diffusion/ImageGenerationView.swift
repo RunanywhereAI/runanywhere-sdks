@@ -57,6 +57,9 @@ struct ImageGenerationView: View {
         .onDisappear {
             viewModel.cleanup()
         }
+        .sheet(isPresented: $showModelPicker) {
+            DiffusionModelPickerView(viewModel: viewModel, isPresented: $showModelPicker)
+        }
     }
 
     // MARK: - Model Status Section
@@ -88,8 +91,8 @@ struct ImageGenerationView: View {
             }
         }
         .padding()
-        .background(AppColors.secondaryBackground)
-        .cornerRadius(AppSpacing.cornerRadius)
+        .background(AppColors.backgroundSecondary)
+        .cornerRadius(AppSpacing.cornerRadiusLarge)
     }
 
     // MARK: - Image Display Section
@@ -100,8 +103,8 @@ struct ImageGenerationView: View {
         return VStack(spacing: AppSpacing.medium) {
             ZStack {
                 // Background
-                RoundedRectangle(cornerRadius: AppSpacing.cornerRadius)
-                    .fill(AppColors.secondaryBackground)
+                RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusLarge)
+                    .fill(AppColors.backgroundSecondary)
                     .frame(width: imageSize, height: imageSize)
 
                 if let image = viewModel.generatedImage {
@@ -110,7 +113,7 @@ struct ImageGenerationView: View {
                         .resizable()
                         .scaledToFit()
                         .frame(width: imageSize, height: imageSize)
-                        .cornerRadius(AppSpacing.cornerRadius)
+                        .cornerRadius(AppSpacing.cornerRadiusLarge)
                 } else if viewModel.isGenerating {
                     // Loading state with progress
                     VStack(spacing: AppSpacing.medium) {
@@ -171,10 +174,10 @@ struct ImageGenerationView: View {
             TextEditor(text: $viewModel.prompt)
                 .frame(minHeight: 80)
                 .padding(8)
-                .background(AppColors.secondaryBackground)
-                .cornerRadius(AppSpacing.cornerRadius)
+                .background(AppColors.backgroundSecondary)
+                .cornerRadius(AppSpacing.cornerRadiusLarge)
                 .overlay(
-                    RoundedRectangle(cornerRadius: AppSpacing.cornerRadius)
+                    RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusLarge)
                         .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
                 )
 
@@ -208,7 +211,7 @@ struct ImageGenerationView: View {
                                 .lineLimit(1)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
-                                .background(AppColors.secondaryBackground)
+                                .background(AppColors.backgroundSecondary)
                                 .cornerRadius(16)
                         }
                         .buttonStyle(.plain)
@@ -221,47 +224,49 @@ struct ImageGenerationView: View {
     // MARK: - Generate Button Section
 
     private var generateButtonSection: some View {
-        HStack(spacing: AppSpacing.medium) {
-            if viewModel.isGenerating {
-                Button {
-                    Task {
-                        await viewModel.cancelGeneration()
+        VStack(spacing: AppSpacing.small) {
+            HStack(spacing: AppSpacing.medium) {
+                if viewModel.isGenerating {
+                    Button {
+                        Task {
+                            await viewModel.cancelGeneration()
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "xmark.circle.fill")
+                            Text("Cancel")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
                     }
-                } label: {
-                    HStack {
-                        Image(systemName: "xmark.circle.fill")
-                        Text("Cancel")
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+                } else {
+                    Button {
+                        Task {
+                            await viewModel.generateImage()
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "wand.and.stars")
+                            Text("Generate")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding()
+                    .buttonStyle(.borderedProminent)
+                    .tint(AppColors.primaryAccent)
+                    .disabled(!viewModel.canGenerate)
                 }
-                .buttonStyle(.bordered)
-                .tint(.red)
-            } else {
-                Button {
-                    Task {
-                        await viewModel.generateImage()
-                    }
-                } label: {
-                    HStack {
-                        Image(systemName: "wand.and.stars")
-                        Text("Generate")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(AppColors.primaryAccent)
-                .disabled(!viewModel.canGenerate)
             }
-        }
 
-        // Error message
-        if let error = viewModel.errorMessage {
-            Text(error)
-                .font(.caption)
-                .foregroundColor(.red)
-                .multilineTextAlignment(.center)
+            // Error message
+            if let error = viewModel.errorMessage {
+                Text(error)
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .multilineTextAlignment(.center)
+            }
         }
     }
 
@@ -358,8 +363,168 @@ struct ImageGenerationView: View {
             }
         }
         .padding()
-        .background(AppColors.secondaryBackground)
-        .cornerRadius(AppSpacing.cornerRadius)
+        .background(AppColors.backgroundSecondary)
+        .cornerRadius(AppSpacing.cornerRadiusLarge)
+    }
+}
+
+// MARK: - Diffusion Model Picker View
+
+struct DiffusionModelPickerView: View {
+    @ObservedObject var viewModel: DiffusionViewModel
+    @Binding var isPresented: Bool
+
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                if viewModel.availableModels.isEmpty {
+                    emptyStateView
+                } else {
+                    modelListView
+                }
+
+                // Download progress section
+                if viewModel.isDownloading {
+                    downloadProgressView
+                }
+            }
+            .navigationTitle("Diffusion Models")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        isPresented = false
+                    }
+                }
+            }
+        }
+    }
+
+    private var emptyStateView: some View {
+        VStack(spacing: AppSpacing.large) {
+            Image(systemName: "photo.artframe")
+                .font(.system(size: 60))
+                .foregroundColor(.secondary)
+
+            Text("No Diffusion Models")
+                .font(.headline)
+
+            Text("No image generation models are registered.\nAdd models in the app configuration.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding()
+    }
+
+    private var modelListView: some View {
+        List {
+            ForEach(viewModel.availableModels, id: \.id) { model in
+                DiffusionModelRow(
+                    model: model,
+                    isSelected: viewModel.selectedModel?.id == model.id,
+                    isDownloading: viewModel.isDownloading,
+                    onSelect: {
+                        viewModel.selectedModel = model
+                    },
+                    onDownload: {
+                        Task {
+                            await viewModel.downloadModel(model)
+                        }
+                    },
+                    onLoad: {
+                        Task {
+                            await viewModel.loadSelectedModel()
+                            if viewModel.isModelLoaded {
+                                isPresented = false
+                            }
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    private var downloadProgressView: some View {
+        VStack(spacing: AppSpacing.small) {
+            ProgressView(value: viewModel.downloadProgress)
+                .progressViewStyle(.linear)
+
+            Text(viewModel.downloadStatus)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .background(AppColors.backgroundSecondary)
+    }
+}
+
+// MARK: - Diffusion Model Row
+
+struct DiffusionModelRow: View {
+    let model: ModelInfo
+    let isSelected: Bool
+    let isDownloading: Bool
+    let onSelect: () -> Void
+    let onDownload: () -> Void
+    let onLoad: () -> Void
+
+    var body: some View {
+        HStack {
+            // Selection indicator
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .foregroundColor(isSelected ? AppColors.primaryAccent : .secondary)
+                .onTapGesture { onSelect() }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(model.name)
+                    .font(.headline)
+
+                HStack {
+                    Text(model.framework.displayName)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    if let size = model.downloadSize {
+                        Text("•")
+                            .foregroundColor(.secondary)
+                        Text(formatSize(size))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+
+            Spacer()
+
+            // Action button
+            if model.isDownloaded {
+                Button("Load") {
+                    onSelect()
+                    onLoad()
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(AppColors.primaryAccent)
+                .disabled(isDownloading)
+            } else {
+                Button("Download") {
+                    onSelect()
+                    onDownload()
+                }
+                .buttonStyle(.bordered)
+                .tint(AppColors.primaryBlue)
+                .disabled(isDownloading)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func formatSize(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
     }
 }
 
