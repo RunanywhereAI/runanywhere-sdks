@@ -132,6 +132,13 @@ const App: React.FC = () => {
       url: 'https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf',
       memoryRequirement: 600_000_000,
     });
+    // Llama 3.2 3B - Ideal for tool calling on mobile (3B params, ~1.8GB)
+    await LlamaCPP.addModel({
+      id: 'llama-3.2-3b-instruct-q4_k_m',
+      name: 'Llama 3.2 3B Instruct Q4_K_M (Tool Calling)',
+      url: 'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
+      memoryRequirement: 2_000_000_000,
+    });
     await LlamaCPP.addModel({
       id: 'lfm2-350m-q4_k_m',
       name: 'LiquidAI LFM2 350M Q4_K_M',

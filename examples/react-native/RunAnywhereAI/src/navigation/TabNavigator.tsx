@@ -1,11 +1,13 @@
 /**
  * TabNavigator - Bottom Tab Navigation
  *
- * Reference: iOS ContentView.swift with 5 tabs:
+ * Reference: iOS ContentView.swift with 7 tabs:
+ * - Food (AI Food Ordering Demo - DoorDash Clone) ⭐ FEATURED
  * - Chat (LLM)
  * - STT (Speech-to-Text)
  * - TTS (Text-to-Speech)
  * - Voice (Voice Assistant - STT + LLM + TTS)
+ * - Tools (Tool Calling Demo)
  * - Settings
  */
 
@@ -17,10 +19,12 @@ import { Typography } from '../theme/typography';
 import type { RootTabParamList } from '../types';
 
 // Screens
+import FoodOrderScreen from '../screens/FoodOrderScreen';
 import ChatScreen from '../screens/ChatScreen';
 import STTScreen from '../screens/STTScreen';
 import TTSScreen from '../screens/TTSScreen';
 import VoiceAssistantScreen from '../screens/VoiceAssistantScreen';
+import ToolsScreen from '../screens/ToolsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -32,22 +36,26 @@ const tabIcons: Record<
   keyof RootTabParamList,
   { focused: string; unfocused: string }
 > = {
+  Food: { focused: 'fast-food', unfocused: 'fast-food-outline' }, // DoorDash clone demo
   Chat: { focused: 'chatbubble', unfocused: 'chatbubble-outline' },
   STT: { focused: 'pulse', unfocused: 'pulse-outline' }, // waveform equivalent
   TTS: { focused: 'volume-high', unfocused: 'volume-high-outline' }, // speaker.wave.2
   Voice: { focused: 'mic', unfocused: 'mic-outline' }, // mic for voice assistant
+  Tools: { focused: 'construct', unfocused: 'construct-outline' }, // tool calling demo
   Settings: { focused: 'settings', unfocused: 'settings-outline' },
 };
 
 /**
  * Tab display names - matching iOS Swift sample app (ContentView.swift)
- * iOS uses: Chat, Transcribe, Speak, Voice, Settings
+ * iOS uses: Food, Chat, Transcribe, Speak, Voice, Tools, Settings
  */
 const tabLabels: Record<keyof RootTabParamList, string> = {
+  Food: 'Food',
   Chat: 'Chat',
   STT: 'Transcribe',
   TTS: 'Speak',
   Voice: 'Voice',
+  Tools: 'Tools',
   Settings: 'Settings',
 };
 
@@ -84,31 +92,43 @@ export const TabNavigator: React.FC = () => {
         headerShown: false,
       })}
     >
-      {/* Tab 0: Chat (LLM) */}
+      {/* Tab 0: Food (AI Food Ordering Demo - DoorDash Clone) */}
+      <Tab.Screen
+        name="Food"
+        component={FoodOrderScreen}
+        options={{ tabBarLabel: tabLabels.Food }}
+      />
+      {/* Tab 1: Chat (LLM) */}
       <Tab.Screen
         name="Chat"
         component={ChatScreen}
         options={{ tabBarLabel: tabLabels.Chat }}
       />
-      {/* Tab 1: Speech-to-Text */}
+      {/* Tab 2: Speech-to-Text */}
       <Tab.Screen
         name="STT"
         component={STTScreen}
         options={{ tabBarLabel: tabLabels.STT }}
       />
-      {/* Tab 2: Text-to-Speech */}
+      {/* Tab 3: Text-to-Speech */}
       <Tab.Screen
         name="TTS"
         component={TTSScreen}
         options={{ tabBarLabel: tabLabels.TTS }}
       />
-      {/* Tab 3: Voice Assistant (STT + LLM + TTS) */}
+      {/* Tab 4: Voice Assistant (STT + LLM + TTS) */}
       <Tab.Screen
         name="Voice"
         component={VoiceAssistantScreen}
         options={{ tabBarLabel: tabLabels.Voice }}
       />
-      {/* Tab 4: Settings */}
+      {/* Tab 5: Tools (Tool Calling Demo) */}
+      <Tab.Screen
+        name="Tools"
+        component={ToolsScreen}
+        options={{ tabBarLabel: tabLabels.Tools }}
+      />
+      {/* Tab 6: Settings */}
       <Tab.Screen
         name="Settings"
         component={SettingsScreen}

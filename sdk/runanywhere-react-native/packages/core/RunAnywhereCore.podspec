@@ -35,6 +35,7 @@ Pod::Spec.new do |s|
     "HEADER_SEARCH_PATHS" => [
       "$(PODS_TARGET_SRCROOT)/cpp",
       "$(PODS_TARGET_SRCROOT)/cpp/bridges",
+      "$(PODS_TARGET_SRCROOT)/cpp/third_party",
       "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64/RACommons.framework/Headers",
       "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64_x86_64-simulator/RACommons.framework/Headers",
       "$(PODS_ROOT)/Headers/Public",

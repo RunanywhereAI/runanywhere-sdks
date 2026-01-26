@@ -354,3 +354,7 @@ sdk/runanywhere-react-native/packages/*/prebuilt/
 # Flutter - Local builds
 sdk/runanywhere-flutter/ios/*.xcframework
 sdk/runanywhere-flutter/android/*.aar
+
+# Pre-built xcframeworks (build artifacts)
+sdk/runanywhere-react-native/packages/*/ios/xcframeworks/
+
