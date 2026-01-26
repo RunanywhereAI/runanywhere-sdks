@@ -159,57 +159,93 @@ VLMModelType detect_vlm_model_type(llama_model* model) {
 }
 
 /**
- * Format prompt with appropriate chat template for VLM.
- * The image marker will be replaced by mtmd_tokenize.
+ * Format prompt using model's built-in chat template via llama_chat_apply_template.
+ * Falls back to manual formatting if template application fails.
+ */
+std::string format_vlm_prompt_with_template(llama_model* model, const std::string& user_prompt,
+                                            const char* image_marker, bool has_image) {
+    // Build user content with image marker if present
+    std::string user_content;
+    if (has_image) {
+        user_content = std::string(image_marker) + user_prompt;
+    } else {
+        user_content = user_prompt;
+    }
+
+    // Get the model's chat template
+    const char* tmpl = llama_model_chat_template(model, nullptr);
+
+    // Try to use llama_chat_apply_template
+    if (tmpl) {
+        RAC_LOG_DEBUG(LOG_CAT, "Using model chat template: %.80s...", tmpl);
+
+        llama_chat_message messages[1];
+        messages[0].role = "user";
+        messages[0].content = user_content.c_str();
+
+        // First call to get required buffer size
+        int32_t size = llama_chat_apply_template(tmpl, messages, 1, true, nullptr, 0);
+        if (size > 0) {
+            std::vector<char> buf(size + 1);
+            int32_t result = llama_chat_apply_template(tmpl, messages, 1, true, buf.data(), buf.size());
+            if (result > 0) {
+                std::string formatted(buf.data(), result);
+                RAC_LOG_DEBUG(LOG_CAT, "Template-formatted prompt (%d chars): %s",
+                              (int)formatted.length(), formatted.c_str());
+                return formatted;
+            }
+        }
+        RAC_LOG_WARNING(LOG_CAT, "llama_chat_apply_template failed (size=%d), falling back to manual", size);
+    } else {
+        RAC_LOG_DEBUG(LOG_CAT, "No chat template in model, using manual formatting");
+    }
+
+    // Fallback: manual chatml format (works for most models)
+    std::string formatted = "<|im_start|>user\n";
+    formatted += user_content;
+    formatted += "<|im_end|>\n<|im_start|>assistant\n";
+
+    RAC_LOG_DEBUG(LOG_CAT, "Manual-formatted prompt (%d chars): %s",
+                  (int)formatted.length(), formatted.c_str());
+    return formatted;
+}
+
+/**
+ * Legacy format function for backward compatibility.
+ * Uses model type detection for manual template selection.
  */
 std::string format_vlm_prompt(VLMModelType model_type, const std::string& user_prompt,
                                const char* image_marker, bool has_image) {
     std::string formatted;
 
+    // Build user content with image marker
+    std::string user_content;
+    if (has_image) {
+        user_content = std::string(image_marker) + user_prompt;
+    } else {
+        user_content = user_prompt;
+    }
+
     switch (model_type) {
         case VLMModelType::SmolVLM:
-            // SmolVLM format based on tokenizer_config.json chat_template:
-            // - <|im_start|> is BOS token (added once at start)
-            // - Role capitalized (User, Assistant)
-            // - If content starts with image: just ":" after role, then image marker
-            // - If content starts with text: ": " after role, then text
-            // - Messages end with " \n" (space + newline)
-            // - Generation prompt: "Assistant:"
-            formatted = "<|im_start|>User:";
-            if (has_image) {
-                // Image first: no space after colon, marker directly
-                formatted += image_marker;
-            } else {
-                // Text only: space after colon
-                formatted += " ";
-            }
-            formatted += user_prompt;
+            // SmolVLM format: <|im_start|>User: content \nAssistant:
+            formatted = "<|im_start|>User: ";
+            formatted += user_content;
             formatted += " \nAssistant:";
             break;
 
         case VLMModelType::Qwen2VL:
-            // Qwen2-VL format with system prompt
-            // <|im_start|>system\nYou are a helpful assistant.<|im_end|>\n
-            // <|im_start|>user\n<|vision_start|><|image_pad|><|vision_end|>prompt<|im_end|>\n
-            // <|im_start|>assistant\n
+            // Qwen2-VL chatml format
             formatted = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n";
             formatted += "<|im_start|>user\n";
-            if (has_image) {
-                // Qwen2-VL uses its own vision markers, but mtmd should handle this
-                formatted += image_marker;
-            }
-            formatted += user_prompt;
+            formatted += user_content;
             formatted += "<|im_end|>\n<|im_start|>assistant\n";
             break;
 
         case VLMModelType::LLaVA:
             // LLaVA/Vicuna format
             formatted = "USER: ";
-            if (has_image) {
-                formatted += image_marker;
-                formatted += "\n";
-            }
-            formatted += user_prompt;
+            formatted += user_content;
             formatted += "\nASSISTANT:";
             break;
 
@@ -217,10 +253,7 @@ std::string format_vlm_prompt(VLMModelType model_type, const std::string& user_p
         default:
             // Generic chatml format
             formatted = "<|im_start|>user\n";
-            if (has_image) {
-                formatted += image_marker;
-            }
-            formatted += user_prompt;
+            formatted += user_content;
             formatted += "<|im_end|>\n<|im_start|>assistant\n";
             break;
     }
@@ -470,10 +503,8 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
         }
     }
 
-    // Format prompt with appropriate chat template
-    full_prompt = format_vlm_prompt(backend->model_type, prompt, mtmd_default_marker(), has_image);
-    RAC_LOG_DEBUG(LOG_CAT, "Formatted prompt for model type %d: %s",
-                  static_cast<int>(backend->model_type), full_prompt.c_str());
+    // Format prompt using model's built-in chat template
+    full_prompt = format_vlm_prompt_with_template(backend->model, prompt, mtmd_default_marker(), has_image);
 
     // Tokenize and evaluate
     if (backend->mtmd_ctx && bitmap) {
@@ -520,8 +551,7 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
 #endif
     {
         // Text-only mode - still apply chat template for consistent formatting
-        full_prompt = format_vlm_prompt(backend->model_type, prompt, mtmd_default_marker(), false);
-        RAC_LOG_DEBUG(LOG_CAT, "Text-only formatted prompt: %s", full_prompt.c_str());
+        full_prompt = format_vlm_prompt_with_template(backend->model, prompt, mtmd_default_marker(), false);
 
         const llama_vocab* vocab = llama_model_get_vocab(backend->model);
         std::vector<llama_token> tokens(full_prompt.size() + 16);
@@ -650,10 +680,8 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
         }
     }
 
-    // Format prompt with appropriate chat template
-    full_prompt = format_vlm_prompt(backend->model_type, prompt, mtmd_default_marker(), has_image);
-    RAC_LOG_DEBUG(LOG_CAT, "Formatted prompt for model type %d: %s",
-                  static_cast<int>(backend->model_type), full_prompt.c_str());
+    // Format prompt using model's built-in chat template
+    full_prompt = format_vlm_prompt_with_template(backend->model, prompt, mtmd_default_marker(), has_image);
 
     // Tokenize and evaluate
     if (backend->mtmd_ctx && bitmap) {
@@ -700,8 +728,7 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
 #endif
     {
         // Text-only mode - still apply chat template for consistent formatting
-        full_prompt = format_vlm_prompt(backend->model_type, prompt, mtmd_default_marker(), false);
-        RAC_LOG_DEBUG(LOG_CAT, "Text-only formatted prompt: %s", full_prompt.c_str());
+        full_prompt = format_vlm_prompt_with_template(backend->model, prompt, mtmd_default_marker(), false);
 
         const llama_vocab* vocab = llama_model_get_vocab(backend->model);
         std::vector<llama_token> tokens(full_prompt.size() + 16);
