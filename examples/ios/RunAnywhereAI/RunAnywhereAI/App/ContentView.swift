@@ -20,31 +20,39 @@ struct ContentView: View {
                 }
                 .tag(0)
 
-            // Tab 1: Speech-to-Text
+            // Tab 1: Image Generation (Diffusion)
+            ImageGenerationView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .tabItem {
+                    Label("Image", systemImage: "photo.artframe")
+                }
+                .tag(1)
+
+            // Tab 2: Speech-to-Text
             SpeechToTextView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .tabItem {
                     Label("Transcribe", systemImage: "waveform")
                 }
-                .tag(1)
+                .tag(2)
 
-            // Tab 2: Text-to-Speech
+            // Tab 3: Text-to-Speech
             TextToSpeechView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .tabItem {
                     Label("Speak", systemImage: "speaker.wave.2")
                 }
-                .tag(2)
+                .tag(3)
 
-            // Tab 3: Voice Assistant (STT + LLM + TTS)
+            // Tab 4: Voice Assistant (STT + LLM + TTS)
             VoiceAssistantView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .tabItem {
                     Label("Voice", systemImage: "mic")
                 }
-                .tag(3)
+                .tag(4)
 
-            // Tab 4: Combined Settings (includes Storage)
+            // Tab 5: Combined Settings (includes Storage)
             Group {
                 #if os(macOS)
                 CombinedSettingsView()
@@ -59,7 +67,7 @@ struct ContentView: View {
             .tabItem {
                 Label("Settings", systemImage: "gear")
             }
-            .tag(4)
+            .tag(5)
         }
         .accentColor(AppColors.primaryAccent)
         #if os(macOS)

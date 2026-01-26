@@ -101,11 +101,12 @@
 #include "rac_storage_analyzer.h"
 
 // =============================================================================
-// PLATFORM BACKEND - Apple Foundation Models, System TTS
+// PLATFORM BACKEND - Apple Foundation Models, System TTS, CoreML Diffusion
 // =============================================================================
 
 #include "rac_llm_platform.h"
 #include "rac_tts_platform.h"
+#include "rac_diffusion_platform.h"
 
 // =============================================================================
 // NETWORK - Environment, Auth, API Types, Dev Config

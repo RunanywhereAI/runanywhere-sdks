@@ -2,7 +2,7 @@
 //  CppBridge+Platform.swift
 //  RunAnywhere SDK
 //
-//  Bridge extension for Platform backend (Apple Foundation Models + System TTS).
+//  Bridge extension for Platform backend (Apple Foundation Models + System TTS + CoreML Diffusion).
 //  This file registers Swift callbacks with the C++ platform backend.
 //
 
@@ -13,7 +13,7 @@ import Foundation
 
 extension CppBridge {
 
-    /// Bridge for platform-native services (Foundation Models, System TTS)
+    /// Bridge for platform-native services (Foundation Models, System TTS, CoreML Diffusion)
     ///
     /// This bridge connects the C++ platform backend to Swift implementations.
     /// The C++ side handles registration with the service registry, while Swift
@@ -31,6 +31,10 @@ extension CppBridge {
 
         /// Cached System TTS service instance
         private static var systemTTSService: SystemTTSService?
+
+        /// Cached CoreML Diffusion service (type-erased for availability)
+        // swiftlint:disable:next avoid_any_type
+        private static var diffusionService: Any?
 
         // MARK: - Initialization
 
@@ -51,6 +55,9 @@ extension CppBridge {
             // Register Swift callbacks for TTS (System TTS)
             registerTTSCallbacks()
 
+            // Register Swift callbacks for Diffusion (CoreML)
+            registerDiffusionCallbacks()
+
             // Register the backend module and service providers
             let result = rac_backend_platform_register()
             if result == RAC_SUCCESS || result == RAC_ERROR_MODULE_ALREADY_REGISTERED {
@@ -68,6 +75,7 @@ extension CppBridge {
             _ = rac_backend_platform_unregister()
             foundationModelsService = nil
             systemTTSService = nil
+            diffusionService = nil
             isInitialized = false
             logger.info("Platform backend unregistered")
         }
@@ -302,6 +310,96 @@ extension CppBridge {
             }
         }
 
+        // MARK: - Diffusion Callbacks (CoreML Stable Diffusion)
+
+        // swiftlint:disable:next function_body_length
+        private static func registerDiffusionCallbacks() {
+            var callbacks = rac_platform_diffusion_callbacks_t()
+
+            callbacks.can_handle = { modelIdPtr, _ -> rac_bool_t in
+                let modelId = modelIdPtr.map { String(cString: $0) }
+
+                // Check if CoreML diffusion can handle this model
+                guard #available(iOS 16.2, macOS 13.1, *) else {
+                    return RAC_FALSE
+                }
+
+                guard let modelId = modelId, !modelId.isEmpty else {
+                    // Accept nil for default diffusion model
+                    return RAC_TRUE
+                }
+
+                let lowercased = modelId.lowercased()
+                if lowercased.contains("coreml") ||
+                   lowercased.contains("stable-diffusion") ||
+                   lowercased.contains("diffusion") ||
+                   lowercased.contains("sd-") ||
+                   lowercased.contains("sdxl") {
+                    return RAC_TRUE
+                }
+
+                return RAC_FALSE
+            }
+
+            callbacks.create = { modelPathPtr, configPtr, _ -> rac_handle_t? in
+                guard #available(iOS 16.2, macOS 13.1, *) else {
+                    Platform.logger.error("CoreML Diffusion requires iOS 16.2+ or macOS 13.1+")
+                    return nil
+                }
+
+                let modelPath = modelPathPtr.map { String(cString: $0) }
+
+                // Create placeholder - actual service creation happens later
+                // The real ml-stable-diffusion integration would be done here
+                // For now, return nil to indicate the backend is not yet available
+                Platform.logger.warning("CoreML Diffusion service not yet implemented - ml-stable-diffusion integration required")
+                return nil
+            }
+
+            callbacks.generate = { handle, optionsPtr, outResultPtr, _ -> rac_result_t in
+                guard #available(iOS 16.2, macOS 13.1, *) else {
+                    return RAC_ERROR_NOT_SUPPORTED
+                }
+
+                guard optionsPtr != nil, outResultPtr != nil else {
+                    return RAC_ERROR_INVALID_PARAMETER
+                }
+
+                // Placeholder - actual generation would use ml-stable-diffusion
+                Platform.logger.warning("CoreML Diffusion generate not yet implemented")
+                return RAC_ERROR_NOT_SUPPORTED
+            }
+
+            callbacks.generate_with_progress = { handle, optionsPtr, progressCallback, progressUserData, outResultPtr, _ -> rac_result_t in
+                guard #available(iOS 16.2, macOS 13.1, *) else {
+                    return RAC_ERROR_NOT_SUPPORTED
+                }
+
+                // Placeholder - actual generation with progress would use ml-stable-diffusion
+                Platform.logger.warning("CoreML Diffusion generate_with_progress not yet implemented")
+                return RAC_ERROR_NOT_SUPPORTED
+            }
+
+            callbacks.cancel = { handle, _ -> rac_result_t in
+                // Placeholder
+                return RAC_SUCCESS
+            }
+
+            callbacks.destroy = { handle, _ in
+                Platform.diffusionService = nil
+                Platform.logger.debug("CoreML Diffusion service destroyed")
+            }
+
+            callbacks.user_data = nil
+
+            let result = rac_platform_diffusion_set_callbacks(&callbacks)
+            if result == RAC_SUCCESS {
+                logger.debug("Diffusion callbacks registered (implementation pending)")
+            } else {
+                logger.error("Failed to register Diffusion callbacks: \(result)")
+            }
+        }
+
         // MARK: - Service Access
 
         /// Get the cached Foundation Models service (if created)
@@ -313,6 +411,14 @@ extension CppBridge {
         /// Get the cached System TTS service (if created)
         public static func getSystemTTSService() -> SystemTTSService? {
             return systemTTSService
+        }
+
+        /// Check if CoreML Diffusion is available on this platform
+        public static var isDiffusionAvailable: Bool {
+            if #available(iOS 16.2, macOS 13.1, *) {
+                return true
+            }
+            return false
         }
     }
 }
