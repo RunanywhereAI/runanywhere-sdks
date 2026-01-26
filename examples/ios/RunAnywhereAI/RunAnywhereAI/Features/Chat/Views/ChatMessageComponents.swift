@@ -432,17 +432,18 @@ extension MessageBubbleView {
         // Only show message bubble if there's content
         if !message.content.isEmpty {
             // Intelligent adaptive rendering: Content analysis → Best renderer
+            // System messages use same styling as assistant (black text on gray background)
             Group {
-                if message.role == .assistant {
+                if message.role == .user {
+                    Text(message.content)
+                        .foregroundColor(AppColors.textWhite)
+                } else {
                     AdaptiveMarkdownText(
                         message.content,
                         font: AppTypography.body,
                         color: AppColors.textPrimary
                     )
                     .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    Text(message.content)
-                        .foregroundColor(AppColors.textWhite)
                 }
             }
             .padding(.horizontal, AppSpacing.large)

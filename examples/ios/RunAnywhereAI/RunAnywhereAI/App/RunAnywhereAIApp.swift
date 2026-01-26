@@ -206,6 +206,31 @@ struct RunAnywhereAIApp: App {
         }
         logger.info("✅ LLM models registered")
 
+        // Register VLM (Vision Language) models
+        // SmolVLM 500M - Ultra-lightweight VLM for mobile
+        if let smolVLMURL = URL(string: "https://huggingface.co/ggml-org/SmolVLM-500M-Instruct-GGUF/resolve/main/SmolVLM-500M-Instruct-Q8_0.gguf") {
+            RunAnywhere.registerModel(
+                id: "smolvlm-500m-instruct-q8_0",
+                name: "SmolVLM 500M Instruct",
+                url: smolVLMURL,
+                framework: .llamaCpp,
+                modality: .multimodal,
+                memoryRequirement: 600_000_000
+            )
+        }
+        // Qwen2-VL 2B - Small but capable VLM
+        if let qwenVLURL = URL(string: "https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/Qwen2-VL-2B-Instruct-Q4_K_M.gguf") {
+            RunAnywhere.registerModel(
+                id: "qwen2-vl-2b-instruct-q4_k_m",
+                name: "Qwen2-VL 2B Instruct",
+                url: qwenVLURL,
+                framework: .llamaCpp,
+                modality: .multimodal,
+                memoryRequirement: 1_500_000_000
+            )
+        }
+        logger.info("✅ VLM models registered")
+
         // Register ONNX STT and TTS models
         // Using tar.gz format hosted on RunanywhereAI/sherpa-onnx for fast native extraction
         if let whisperURL = URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz") {
