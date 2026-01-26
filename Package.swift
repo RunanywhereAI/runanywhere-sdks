@@ -87,6 +87,8 @@ let package = Package(
         .package(url: "https://github.com/devicekit/DeviceKit.git", from: "5.6.0"),
         .package(url: "https://github.com/tsolomko/SWCompression.git", from: "4.8.0"),
         .package(url: "https://github.com/getsentry/sentry-cocoa", from: "8.40.0"),
+        // ml-stable-diffusion for CoreML-based image generation
+        .package(url: "https://github.com/apple/ml-stable-diffusion.git", from: "1.1.0"),
     ],
     targets: [
         // =================================================================
