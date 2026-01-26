@@ -98,6 +98,9 @@ set(HEADERS
 
 add_executable(voice-assistant ${SOURCES} ${HEADERS})
 
+# Test pipeline binary (feeds WAV file through the full pipeline)
+add_executable(test-pipeline test_pipeline.cpp)
+
 # =============================================================================
 # Include Directories
 # =============================================================================
@@ -166,6 +169,37 @@ target_compile_options(voice-assistant PRIVATE
     -Wpedantic
     -O2
 )
+
+# =============================================================================
+# Test Pipeline Configuration
+# =============================================================================
+
+target_include_directories(test-pipeline PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${RAC_COMMONS_DIR}/include
+    ${RAC_COMMONS_DIST}/include
+)
+
+target_link_directories(test-pipeline PRIVATE
+    ${RAC_COMMONS_DIST}
+    ${RAC_COMMONS_DIR}/third_party/sherpa-onnx-linux/lib
+)
+
+target_link_libraries(test-pipeline PRIVATE
+    rac_commons
+    rac_backend_onnx
+    rac_backend_llamacpp
+    sherpa-onnx-c-api
+    onnxruntime
+    Threads::Threads
+    dl
+)
+
+set_target_properties(test-pipeline PROPERTIES
+    BUILD_RPATH "${RAC_COMMONS_DIST};${RAC_COMMONS_DIR}/third_party/sherpa-onnx-linux/lib"
+)
+
+target_compile_options(test-pipeline PRIVATE -Wall -O2)
 
 # =============================================================================
 # Installation
