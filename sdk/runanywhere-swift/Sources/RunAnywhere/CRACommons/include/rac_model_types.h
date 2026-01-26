@@ -80,11 +80,11 @@ typedef struct rac_expected_model_files {
  * Mirrors Swift's ModelFileDescriptor struct.
  */
 typedef struct rac_model_file_descriptor {
-    /** Relative path from base URL to this file */
-    const char* relative_path;
+    /** Full URL to download this file from */
+    const char* url;
 
-    /** Destination path relative to model folder */
-    const char* destination_path;
+    /** Filename to save as (e.g., "model.gguf") */
+    const char* filename;
 
     /** Whether this file is required (vs optional) */
     rac_bool_t is_required;

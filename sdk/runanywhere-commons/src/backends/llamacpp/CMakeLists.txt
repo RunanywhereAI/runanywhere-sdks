@@ -95,7 +95,7 @@ set(LLAMACPP_BACKEND_HEADERS
 )
 
 # Option to enable VLM multimodal support (requires mtmd from llama.cpp)
-option(RAC_VLM_USE_MTMD "Enable VLM multimodal support via llama.cpp mtmd" OFF)
+option(RAC_VLM_USE_MTMD "Enable VLM multimodal support via llama.cpp mtmd" ON)
 if(RAC_VLM_USE_MTMD)
     message(STATUS "VLM multimodal support enabled")
     # Add VLM Backend sources (Vision Language Model)
@@ -106,7 +106,26 @@ if(RAC_VLM_USE_MTMD)
     # Add mtmd sources from llama.cpp tools directory
     list(APPEND LLAMACPP_BACKEND_SOURCES
         ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd-helper.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd-audio.cpp
         ${llamacpp_SOURCE_DIR}/tools/mtmd/clip.cpp
+    )
+    # Add mtmd model implementations (clip_graph_* classes)
+    list(APPEND LLAMACPP_BACKEND_SOURCES
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/llava.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/qwen2vl.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/qwen3vl.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/minicpmv.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/glm4v.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/cogvlm.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/internvl.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/kimivl.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/llama4.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/siglip.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/pixtral.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/youtuvl.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/conformer.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/whisper-enc.cpp
     )
 endif()
 
@@ -136,6 +155,7 @@ target_include_directories(rac_backend_llamacpp PUBLIC
 if(RAC_VLM_USE_MTMD)
     target_include_directories(rac_backend_llamacpp PRIVATE
         ${llamacpp_SOURCE_DIR}/tools/mtmd
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models
     )
 endif()
 
