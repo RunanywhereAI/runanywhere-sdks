@@ -20,6 +20,10 @@
 #include "audio_capture.h"
 #include "audio_playback.h"
 
+// Backend registration
+#include <rac/backends/rac_vad_onnx.h>
+#include <rac/backends/rac_llm_llamacpp.h>
+
 #include <iostream>
 #include <csignal>
 #include <atomic>
@@ -134,6 +138,26 @@ int main(int argc, char* argv[]) {
                   << std::endl;
         return 1;
     }
+
+    // =============================================================================
+    // Register Backends
+    // =============================================================================
+
+    std::cout << "Registering backends...\n";
+    rac_result_t reg_result = rac_backend_onnx_register();
+    if (reg_result != RAC_SUCCESS) {
+        std::cerr << "WARNING: Failed to register ONNX backend (code: " << reg_result << ")\n";
+    } else {
+        std::cout << "  ONNX backend registered (STT, TTS, VAD)\n";
+    }
+
+    reg_result = rac_backend_llamacpp_register();
+    if (reg_result != RAC_SUCCESS) {
+        std::cerr << "WARNING: Failed to register LlamaCPP backend (code: " << reg_result << ")\n";
+    } else {
+        std::cout << "  LlamaCPP backend registered (LLM)\n";
+    }
+    std::cout << std::endl;
 
     // =============================================================================
     // Initialize Audio

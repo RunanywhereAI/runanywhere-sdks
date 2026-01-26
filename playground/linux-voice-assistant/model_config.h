@@ -11,13 +11,15 @@
 //   ├── ONNX/
 //   │   ├── silero-vad/silero_vad.onnx
 //   │   ├── whisper-tiny-en/
-//   │   └── vits-piper-en-us/
+//   │   └── vits-piper-en_US-lessac-medium/
 //   └── LlamaCpp/
 //       └── qwen2.5-0.5b-instruct-q4/qwen2.5-0.5b-instruct-q4_k_m.gguf
 // =============================================================================
 
 #include <string>
 #include <cstdlib>
+#include <cstring>
+#include <sys/stat.h>
 
 // Include RAC headers
 #include <rac/infrastructure/model_management/rac_model_registry.h>
@@ -33,16 +35,17 @@ namespace runanywhere {
 constexpr const char* VAD_MODEL_ID = "silero-vad";
 constexpr const char* STT_MODEL_ID = "whisper-tiny-en";
 constexpr const char* LLM_MODEL_ID = "qwen2.5-0.5b-instruct-q4";
-constexpr const char* TTS_MODEL_ID = "vits-piper-en-us";
+constexpr const char* TTS_MODEL_ID = "vits-piper-en_US-lessac-medium";
 
 // =============================================================================
 // Model File Names
 // =============================================================================
 
 constexpr const char* VAD_MODEL_FILE = "silero_vad.onnx";
-constexpr const char* STT_MODEL_FILE = "whisper-tiny.en-encoder.onnx";
+// STT uses directory path (backend scans for encoder/decoder/tokens files)
+constexpr const char* STT_MODEL_FILE = "";
 constexpr const char* LLM_MODEL_FILE = "qwen2.5-0.5b-instruct-q4_k_m.gguf";
-constexpr const char* TTS_MODEL_FILE = "en_US-amy-medium.onnx";
+constexpr const char* TTS_MODEL_FILE = "en_US-lessac-medium.onnx";
 
 // =============================================================================
 // Model Configuration
@@ -97,7 +100,7 @@ inline const ModelConfig MODELS[] = {
     // TTS Model
     {
         .id = TTS_MODEL_ID,
-        .name = "VITS Piper English US (Amy)",
+        .name = "VITS Piper English US (Lessac)",
         .filename = TTS_MODEL_FILE,
         .category = RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS,
         .format = RAC_MODEL_FORMAT_ONNX,
@@ -126,7 +129,7 @@ inline std::string get_base_dir() {
 inline bool init_model_system() {
     std::string base_dir = get_base_dir();
     rac_result_t result = rac_model_paths_set_base_dir(base_dir.c_str());
-    return result == RAC_RESULT_SUCCESS;
+    return result == RAC_SUCCESS;
 }
 
 // =============================================================================
@@ -145,12 +148,17 @@ inline const char* get_framework_subdir(rac_inference_framework_t framework) {
     }
 }
 
-// Get the full path to a model file
+// Get the full path to a model file (or directory if filename is empty)
 inline std::string get_model_path(const ModelConfig& model) {
     std::string base_dir = get_base_dir();
     const char* framework_dir = get_framework_subdir(model.framework);
 
-    return base_dir + "/Models/" + framework_dir + "/" + model.id + "/" + model.filename;
+    std::string path = base_dir + "/Models/" + framework_dir + "/" + model.id;
+    if (model.filename[0] != '\0') {
+        path += "/";
+        path += model.filename;
+    }
+    return path;
 }
 
 // Convenience functions for each model type
@@ -199,7 +207,7 @@ inline bool register_models(rac_model_registry_handle_t registry) {
         rac_result_t result = rac_model_registry_save(registry, model);
         rac_model_info_free(model);
 
-        if (result != RAC_RESULT_SUCCESS) {
+        if (result != RAC_SUCCESS) {
             return false;
         }
     }
@@ -211,15 +219,11 @@ inline bool register_models(rac_model_registry_handle_t registry) {
 // Model Availability Check
 // =============================================================================
 
-// Check if a model file exists
+// Check if a model file or directory exists
 inline bool is_model_available(const ModelConfig& model) {
     std::string path = get_model_path(model);
-    FILE* f = fopen(path.c_str(), "r");
-    if (f) {
-        fclose(f);
-        return true;
-    }
-    return false;
+    struct stat st;
+    return stat(path.c_str(), &st) == 0;
 }
 
 // Check if all required models are available
