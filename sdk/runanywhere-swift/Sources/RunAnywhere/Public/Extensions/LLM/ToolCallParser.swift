@@ -43,7 +43,6 @@ internal enum ToolCallParser {
 
         // Find </tool_call> end tag
         let tagEndRange = llmOutput.range(of: toolCallEndTag, range: jsonStartIndex..<llmOutput.endIndex)
-        let hasClosingTag = tagEndRange != nil
 
         let jsonEndIndex: String.Index
 
@@ -70,24 +69,12 @@ internal enum ToolCallParser {
             return (llmOutput, nil)
         }
 
-        // Extract tool name (try "tool" first, then "name")
-        let toolName: String
-        if let name = jsonObject["tool"]?.stringValue {
-            toolName = name
-        } else if let name = jsonObject["name"]?.stringValue {
-            toolName = name
-        } else {
-            return (llmOutput, nil)
-        }
+        // Extract tool name and arguments with multiple fallback strategies
+        let (toolName, arguments) = extractToolNameAndArguments(from: jsonObject)
 
-        // Extract arguments (try "arguments" first, then "params")
-        let arguments: [String: ToolValue]
-        if let args = jsonObject["arguments"]?.objectValue {
-            arguments = args
-        } else if let args = jsonObject["params"]?.objectValue {
-            arguments = args
-        } else {
-            arguments = [:]
+        guard let toolName = toolName else {
+            // Could not parse tool call - return original text
+            return (llmOutput, nil)
         }
 
         // Build clean text (everything except the tool call tags)
@@ -153,6 +140,58 @@ internal enum ToolCallParser {
     }
 
     // MARK: - Private Helpers
+
+    /// Extract tool name and arguments from parsed JSON using multiple strategies.
+    ///
+    /// Strategies in order of priority:
+    /// 1. Standard format: `{"tool": "name", "arguments": {...}}`
+    /// 2. Name variant: `{"name": "name", "params": {...}}`
+    /// 3. Fallback: `{"tool_name": value}` - tool name as key, value as arguments
+    private static func extractToolNameAndArguments(
+        from jsonObject: [String: ToolValue]
+    ) -> (toolName: String?, arguments: [String: ToolValue]) {
+        // Strategy 1: Standard format with "tool" key
+        if let name = jsonObject["tool"]?.stringValue {
+            let args = jsonObject["arguments"]?.objectValue ?? jsonObject["params"]?.objectValue ?? [:]
+            return (name, args)
+        }
+
+        // Strategy 2: "name" key variant
+        if let name = jsonObject["name"]?.stringValue {
+            let args = jsonObject["arguments"]?.objectValue ?? jsonObject["params"]?.objectValue ?? [:]
+            return (name, args)
+        }
+
+        // Strategy 3: Fallback - tool name used directly as key
+        // e.g., {"calculate": "5 * 100"} or {"get_weather": {"location": "Paris"}}
+        // Common LLM mistake - use the first non-standard key as tool name
+        let standardKeys = Set(["tool", "name", "arguments", "params", "function"])
+        for (key, value) in jsonObject where !standardKeys.contains(key) {
+            // Found a non-standard key - treat it as the tool name
+            var arguments: [String: ToolValue] = [:]
+
+            switch value {
+            case .object(let obj):
+                // Value is an object - use as arguments directly
+                arguments = obj
+            case .string(let str):
+                // Value is a string - use as generic "input" parameter
+                arguments = ["input": .string(str)]
+            case .number(let num):
+                arguments = ["input": .number(num)]
+            case .bool(let boolVal):
+                arguments = ["input": .bool(boolVal)]
+            case .array(let arr):
+                arguments = ["input": .array(arr)]
+            case .null:
+                arguments = [:]
+            }
+
+            return (key, arguments)
+        }
+
+        return (nil, [:])
+    }
 
     /// Find the matching closing brace for a JSON object starting at the given index.
     /// Tracks string boundaries to ignore braces inside strings.
