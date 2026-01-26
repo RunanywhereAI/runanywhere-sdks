@@ -151,6 +151,14 @@ const App: React.FC = () => {
       url: 'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf',
       memoryRequirement: 400_000_000,
     });
+    // LFM2.5 1.2B - Best-in-class edge model from Liquid AI (1.2B params, ~700MB Q4)
+    // 239 tok/s on AMD CPU, designed for on-device deployment
+    await LlamaCPP.addModel({
+      id: 'lfm2.5-1.2b-instruct-q4_k_m',
+      name: 'LiquidAI LFM2.5 1.2B Instruct Q4_K_M',
+      url: 'https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf',
+      memoryRequirement: 900_000_000,
+    });
 
     // ONNX module with STT and TTS models
     // Using tar.gz format hosted on RunanywhereAI/sherpa-onnx for fast native extraction
