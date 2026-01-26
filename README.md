@@ -216,6 +216,17 @@ Full-featured demo applications demonstrating SDK capabilities:
 
 ---
 
+## Playground
+
+Standalone demo projects showcasing what you can build with RunAnywhere:
+
+| Project | Description | Platform |
+|---------|-------------|----------|
+| [swift-starter-app](Playground/swift-starter-app/) | Privacy-first AI demo — LLM Chat, STT, TTS, and Voice Pipeline | iOS (Swift/SwiftUI) |
+| [on-device-browser-agent](Playground/on-device-browser-agent/) | On-device AI browser automation — no cloud, no API keys | Chrome Extension |
+
+---
+
 ## Features
 
 | Feature | iOS | Android | React Native | Flutter |
@@ -274,6 +285,10 @@ runanywhere-sdks/
 │   ├── android/RunAnywhereAI/      # Android sample app
 │   ├── react-native/RunAnywhereAI/ # React Native sample app
 │   └── flutter/RunAnywhereAI/      # Flutter sample app
+│
+├── Playground/
+│   ├── swift-starter-app/          # iOS AI playground app
+│   └── on-device-browser-agent/    # Chrome browser automation agent
 │
 └── docs/                           # Documentation
 ```
