@@ -77,6 +77,7 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
     case foundationModels = "FoundationModels"
     case systemTTS = "SystemTTS"
     case fluidAudio = "FluidAudio"
+    case mlx = "MLX"              // MLX (Apple Silicon native) for VLM
 
     // Special cases
     case builtIn = "BuiltIn"      // For simple services (e.g., energy-based VAD)
@@ -91,6 +92,7 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
         case .foundationModels: return "Foundation Models"
         case .systemTTS: return "System TTS"
         case .fluidAudio: return "FluidAudio"
+        case .mlx: return "MLX"
         case .builtIn: return "Built-in"
         case .none: return "None"
         case .unknown: return "Unknown"
@@ -105,6 +107,7 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
         case .foundationModels: return "foundation_models"
         case .systemTTS: return "system_tts"
         case .fluidAudio: return "fluid_audio"
+        case .mlx: return "mlx"
         case .builtIn: return "built_in"
         case .none: return "none"
         case .unknown: return "unknown"
@@ -123,6 +126,7 @@ public extension InferenceFramework {
         case .foundationModels: return RAC_FRAMEWORK_FOUNDATION_MODELS
         case .systemTTS: return RAC_FRAMEWORK_SYSTEM_TTS
         case .fluidAudio: return RAC_FRAMEWORK_FLUID_AUDIO
+        case .mlx: return RAC_FRAMEWORK_MLX
         case .builtIn: return RAC_FRAMEWORK_BUILTIN
         case .none: return RAC_FRAMEWORK_NONE
         case .unknown: return RAC_FRAMEWORK_UNKNOWN
@@ -137,6 +141,7 @@ public extension InferenceFramework {
         case RAC_FRAMEWORK_FOUNDATION_MODELS: return .foundationModels
         case RAC_FRAMEWORK_SYSTEM_TTS: return .systemTTS
         case RAC_FRAMEWORK_FLUID_AUDIO: return .fluidAudio
+        case RAC_FRAMEWORK_MLX: return .mlx
         case RAC_FRAMEWORK_BUILTIN: return .builtIn
         case RAC_FRAMEWORK_NONE: return .none
         default: return .unknown

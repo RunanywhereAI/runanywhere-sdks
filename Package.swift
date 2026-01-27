@@ -87,6 +87,18 @@ let package = Package(
         .package(url: "https://github.com/devicekit/DeviceKit.git", from: "5.6.0"),
         .package(url: "https://github.com/tsolomko/SWCompression.git", from: "4.8.0"),
         .package(url: "https://github.com/getsentry/sentry-cocoa", from: "8.40.0"),
+        // =================================================================
+        // MLX - Apple Silicon native ML framework for VLM (OPTIONAL)
+        // =================================================================
+        // TODO: Move MLX to a separate "RunAnywhereMLX" module/product
+        // (similar to RunAnywhereONNX and RunAnywhereLlamaCPP) so these
+        // dependencies are not part of the core RunAnywhere SDK.
+        // This will allow users who don't need MLX VLM to avoid the
+        // extra dependency overhead.
+        //
+        // Note: mlx-swift and mlx-swift-examples versions are tightly coupled (0.29.x <-> 2.29.x)
+        .package(url: "https://github.com/ml-explore/mlx-swift.git", exact: "0.29.1"),
+        .package(url: "https://github.com/ml-explore/mlx-swift-examples.git", exact: "2.29.1"),
     ],
     targets: [
         // =================================================================
@@ -132,6 +144,14 @@ let package = Package(
                 .product(name: "DeviceKit", package: "DeviceKit"),
                 .product(name: "SWCompression", package: "SWCompression"),
                 .product(name: "Sentry", package: "sentry-cocoa"),
+                // MLX for Apple Silicon native VLM inference (OPTIONAL)
+                // TODO: Move to separate RunAnywhereMLX module to keep core SDK lean
+                .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "MLXNN", package: "mlx-swift"),
+                .product(name: "MLXFast", package: "mlx-swift"),
+                .product(name: "MLXRandom", package: "mlx-swift"),
+                .product(name: "MLXLLM", package: "mlx-swift-examples"),
+                .product(name: "MLXLMCommon", package: "mlx-swift-examples"),
                 "CRACommons",
             ],
             path: "sdk/runanywhere-swift/Sources/RunAnywhere",

@@ -107,6 +107,8 @@ extension InferenceFramework {
             return RAC_FRAMEWORK_SYSTEM_TTS
         case .fluidAudio:
             return RAC_FRAMEWORK_FLUID_AUDIO
+        case .mlx:
+            return RAC_FRAMEWORK_MLX
         case .builtIn:
             return RAC_FRAMEWORK_BUILTIN
         case .none:
@@ -129,6 +131,8 @@ extension InferenceFramework {
             self = .systemTTS
         case RAC_FRAMEWORK_FLUID_AUDIO:
             self = .fluidAudio
+        case RAC_FRAMEWORK_MLX:
+            self = .mlx
         case RAC_FRAMEWORK_BUILTIN:
             self = .builtIn
         case RAC_FRAMEWORK_NONE:

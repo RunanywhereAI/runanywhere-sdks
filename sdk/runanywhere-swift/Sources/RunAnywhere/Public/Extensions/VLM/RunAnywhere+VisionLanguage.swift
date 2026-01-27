@@ -3,11 +3,31 @@
 //  RunAnywhere SDK
 //
 //  Public API for Vision Language Model (VLM) operations.
-//  Calls C++ directly via CppBridge.VLM for all operations.
+//  Supports multiple backends:
+//  - llama.cpp (GGUF models) via C++ CppBridge.VLM
+//  - MLX (safetensors/HuggingFace) via Swift MLXVLMAdapter
+//
+//  Backend selection is automatic based on which model is loaded,
+//  or can be explicitly specified.
 //
 
 import CRACommons
 import Foundation
+
+// MARK: - VLM Backend Selection
+
+/// VLM backend selection for processing
+public enum VLMBackend: Sendable {
+    /// Automatically select based on which backend has a model loaded
+    /// Priority: MLX (if loaded) > llama.cpp (if loaded)
+    case auto
+
+    /// Use llama.cpp backend (GGUF models)
+    case llamaCpp
+
+    /// Use MLX backend (safetensors/HuggingFace models)
+    case mlx
+}
 
 // MARK: - Vision Language Model
 
@@ -16,42 +36,275 @@ public extension RunAnywhere {
     // MARK: - Simple API
 
     /// Describe an image with a simple text prompt
+    ///
+    /// Automatically selects the backend based on which model is loaded.
+    ///
     /// - Parameters:
     ///   - image: The image to analyze
     ///   - prompt: Text prompt describing what to analyze (e.g., "What's in this image?")
     /// - Returns: Generated text description
     static func describeImage(_ image: VLMImage, prompt: String = "What's in this image?") async throws -> String {
-        let result = try await processImage(image, prompt: prompt, options: nil)
+        let result = try await processImage(image, prompt: prompt, options: nil, backend: .auto)
         return result.text
     }
 
     /// Ask a question about an image
+    ///
+    /// Automatically selects the backend based on which model is loaded.
+    ///
     /// - Parameters:
     ///   - question: The question to ask about the image
     ///   - image: The image to analyze
     /// - Returns: Generated answer
     static func askAboutImage(_ question: String, image: VLMImage) async throws -> String {
-        let result = try await processImage(image, prompt: question, options: nil)
+        let result = try await processImage(image, prompt: question, options: nil, backend: .auto)
         return result.text
     }
 
-    // MARK: - Full API
+    // MARK: - Full API with Backend Selection
 
     /// Process an image with full metrics and options
+    ///
     /// - Parameters:
     ///   - image: The image to process
     ///   - prompt: Text prompt
     ///   - options: Generation options (optional)
+    ///   - backend: Backend selection (defaults to .auto)
     /// - Returns: VLMGenerationResult with full metrics
     static func processImage(
         _ image: VLMImage,
         prompt: String,
-        options: VLMGenerationOptions? = nil
+        options: VLMGenerationOptions? = nil,
+        backend: VLMBackend = .auto
     ) async throws -> VLMGenerationResult {
         guard isInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
+        let resolvedBackend = try await resolveBackend(backend)
+
+        switch resolvedBackend {
+        case .mlx:
+            return try await processImageWithMLX(image, prompt: prompt, options: options)
+        case .llamaCpp, .auto:
+            return try await processImageWithLlamaCpp(image, prompt: prompt, options: options)
+        }
+    }
+
+    /// Stream image processing with real-time token output
+    ///
+    /// Example usage:
+    /// ```swift
+    /// let result = try await RunAnywhere.processImageStream(image, prompt: "Describe this")
+    ///
+    /// // Display tokens in real-time
+    /// for try await token in result.stream {
+    ///     print(token, terminator: "")
+    /// }
+    ///
+    /// // Get complete analytics after streaming finishes
+    /// let metrics = try await result.result.value
+    /// print("Speed: \(metrics.tokensPerSecond) tok/s")
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - image: The image to process
+    ///   - prompt: Text prompt
+    ///   - options: Generation options (optional)
+    ///   - backend: Backend selection (defaults to .auto)
+    /// - Returns: VLMStreamingResult containing both the token stream and final metrics task
+    static func processImageStream(
+        _ image: VLMImage,
+        prompt: String,
+        options: VLMGenerationOptions? = nil,
+        backend: VLMBackend = .auto
+    ) async throws -> VLMStreamingResult {
+        guard isInitialized else {
+            throw SDKError.general(.notInitialized, "SDK not initialized")
+        }
+
+        let resolvedBackend = try await resolveBackend(backend)
+
+        switch resolvedBackend {
+        case .mlx:
+            return try await processImageStreamWithMLX(image, prompt: prompt, options: options)
+        case .llamaCpp, .auto:
+            return try await processImageStreamWithLlamaCpp(image, prompt: prompt, options: options)
+        }
+    }
+
+    // MARK: - Model Management
+
+    /// Load a VLM model (llama.cpp backend)
+    /// - Parameters:
+    ///   - modelPath: Path to the main model file (GGUF)
+    ///   - mmprojPath: Path to the vision projector file (required for llama.cpp)
+    ///   - modelId: Model identifier
+    ///   - modelName: Human-readable name
+    static func loadVLMModel(
+        _ modelPath: String,
+        mmprojPath: String?,
+        modelId: String,
+        modelName: String
+    ) async throws {
+        try await CppBridge.VLM.shared.loadModel(modelPath, mmprojPath: mmprojPath, modelId: modelId, modelName: modelName)
+    }
+
+    /// Unload the current VLM model (both backends)
+    static func unloadVLMModel() async {
+        // Unload llama.cpp backend
+        await CppBridge.VLM.shared.unload()
+
+        // Unload MLX backend
+        if #available(iOS 16.0, macOS 14.0, *) {
+            await MLXVLMAdapter.shared.unloadModel()
+        }
+    }
+
+    /// Check if any VLM model is loaded (either backend)
+    static var isVLMModelLoaded: Bool {
+        get async {
+            // Check llama.cpp backend
+            let llamaCppLoaded = await CppBridge.VLM.shared.isLoaded
+
+            // Check MLX backend
+            var mlxLoaded = false
+            if #available(iOS 16.0, macOS 14.0, *) {
+                mlxLoaded = await MLXVLMAdapter.shared.isLoaded
+            }
+
+            return llamaCppLoaded || mlxLoaded
+        }
+    }
+
+    /// Get the currently active VLM backend
+    static var activeVLMBackend: VLMBackend? {
+        get async {
+            if #available(iOS 16.0, macOS 14.0, *) {
+                if await MLXVLMAdapter.shared.isLoaded {
+                    return .mlx
+                }
+            }
+            if await CppBridge.VLM.shared.isLoaded {
+                return .llamaCpp
+            }
+            return nil
+        }
+    }
+
+    /// Cancel ongoing VLM generation (both backends)
+    static func cancelVLMGeneration() async {
+        // Cancel llama.cpp backend
+        await CppBridge.VLM.shared.cancel()
+
+        // Cancel MLX backend
+        if #available(iOS 16.0, macOS 14.0, *) {
+            await MLXVLMAdapter.shared.cancel()
+        }
+    }
+
+    // MARK: - Backend Resolution
+
+    /// Resolve which backend to use based on selection and loaded models
+    private static func resolveBackend(_ requested: VLMBackend) async throws -> VLMBackend {
+        switch requested {
+        case .auto:
+            // Check MLX first (preferred on Apple Silicon)
+            if #available(iOS 16.0, macOS 14.0, *) {
+                if await MLXVLMAdapter.shared.isLoaded {
+                    return .mlx
+                }
+            }
+            // Fall back to llama.cpp
+            if await CppBridge.VLM.shared.isLoaded {
+                return .llamaCpp
+            }
+            // No model loaded
+            throw SDKError.vlm(.notInitialized, "No VLM model loaded. Load a model first.")
+
+        case .mlx:
+            if #available(iOS 16.0, macOS 14.0, *) {
+                guard await MLXVLMAdapter.shared.isLoaded else {
+                    throw SDKError.vlm(.notInitialized, "MLX VLM model not loaded")
+                }
+                return .mlx
+            } else {
+                throw SDKError.vlm(.notInitialized, "MLX requires iOS 16+ or macOS 14+")
+            }
+
+        case .llamaCpp:
+            guard await CppBridge.VLM.shared.isLoaded else {
+                throw SDKError.vlm(.notInitialized, "llama.cpp VLM model not loaded")
+            }
+            return .llamaCpp
+        }
+    }
+
+    // MARK: - MLX Backend Processing
+
+    @available(iOS 16.0, macOS 14.0, *)
+    private static func processImageWithMLX(
+        _ image: VLMImage,
+        prompt: String,
+        options: VLMGenerationOptions?
+    ) async throws -> VLMGenerationResult {
+        let opts = options ?? VLMGenerationOptions()
+        return try await MLXVLMAdapter.shared.processImage(
+            image: image,
+            prompt: prompt,
+            options: opts
+        )
+    }
+
+    @available(iOS 16.0, macOS 14.0, *)
+    private static func processImageStreamWithMLX(
+        _ image: VLMImage,
+        prompt: String,
+        options: VLMGenerationOptions?
+    ) async throws -> VLMStreamingResult {
+        let opts = options ?? VLMGenerationOptions()
+        let modelId = await MLXVLMAdapter.shared.currentModelId ?? "unknown"
+
+        let collector = VLMStreamingMetricsCollector(modelId: modelId, promptLength: prompt.count)
+        await collector.markStart()
+
+        let rawStream = try await MLXVLMAdapter.shared.processImageStream(
+            image: image,
+            prompt: prompt,
+            options: opts
+        )
+
+        // Wrap stream to collect metrics
+        let metricsStream = AsyncThrowingStream<String, Error> { continuation in
+            Task {
+                do {
+                    for try await token in rawStream {
+                        await collector.recordToken(token)
+                        continuation.yield(token)
+                    }
+                    continuation.finish()
+                    await collector.markComplete()
+                } catch {
+                    continuation.finish(throwing: error)
+                    await collector.markFailed(error)
+                }
+            }
+        }
+
+        let resultTask = Task<VLMGenerationResult, Error> {
+            try await collector.waitForResult()
+        }
+
+        return VLMStreamingResult(stream: metricsStream, result: resultTask)
+    }
+
+    // MARK: - llama.cpp Backend Processing
+
+    private static func processImageWithLlamaCpp(
+        _ image: VLMImage,
+        prompt: String,
+        options: VLMGenerationOptions?
+    ) async throws -> VLMGenerationResult {
         try await ensureServicesReady()
 
         // Get handle from CppBridge.VLM
@@ -92,36 +345,11 @@ public extension RunAnywhere {
         return VLMGenerationResult(from: vlmResult, modelId: modelId)
     }
 
-    /// Stream image processing with real-time token output
-    ///
-    /// Example usage:
-    /// ```swift
-    /// let result = try await RunAnywhere.processImageStream(image, prompt: "Describe this")
-    ///
-    /// // Display tokens in real-time
-    /// for try await token in result.stream {
-    ///     print(token, terminator: "")
-    /// }
-    ///
-    /// // Get complete analytics after streaming finishes
-    /// let metrics = try await result.result.value
-    /// print("Speed: \(metrics.tokensPerSecond) tok/s")
-    /// ```
-    ///
-    /// - Parameters:
-    ///   - image: The image to process
-    ///   - prompt: Text prompt
-    ///   - options: Generation options (optional)
-    /// - Returns: VLMStreamingResult containing both the token stream and final metrics task
-    static func processImageStream(
+    private static func processImageStreamWithLlamaCpp(
         _ image: VLMImage,
         prompt: String,
-        options: VLMGenerationOptions? = nil
+        options: VLMGenerationOptions?
     ) async throws -> VLMStreamingResult {
-        guard isInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
-        }
-
         try await ensureServicesReady()
 
         let handle = try await CppBridge.VLM.shared.getHandle()
@@ -155,40 +383,6 @@ public extension RunAnywhere {
         }
 
         return VLMStreamingResult(stream: stream, result: resultTask)
-    }
-
-    // MARK: - Model Management
-
-    /// Load a VLM model
-    /// - Parameters:
-    ///   - modelPath: Path to the main model file (GGUF)
-    ///   - mmprojPath: Path to the vision projector file (required for llama.cpp)
-    ///   - modelId: Model identifier
-    ///   - modelName: Human-readable name
-    static func loadVLMModel(
-        _ modelPath: String,
-        mmprojPath: String?,
-        modelId: String,
-        modelName: String
-    ) async throws {
-        try await CppBridge.VLM.shared.loadModel(modelPath, mmprojPath: mmprojPath, modelId: modelId, modelName: modelName)
-    }
-
-    /// Unload the current VLM model
-    static func unloadVLMModel() async {
-        await CppBridge.VLM.shared.unload()
-    }
-
-    /// Check if a VLM model is loaded
-    static var isVLMModelLoaded: Bool {
-        get async {
-            await CppBridge.VLM.shared.isLoaded
-        }
-    }
-
-    /// Cancel ongoing VLM generation
-    static func cancelVLMGeneration() async {
-        await CppBridge.VLM.shared.cancel()
     }
 
     // MARK: - Private Streaming Helpers
