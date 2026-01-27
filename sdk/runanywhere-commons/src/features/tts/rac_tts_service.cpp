@@ -164,6 +164,9 @@ void rac_tts_destroy(rac_handle_t handle) {
     free(service);
 }
 
+#if !defined(_WIN32) || !defined(_MSC_VER)
+// On Windows/MSVC, this is defined in result_free.cpp (no weak symbol support)
+// On other platforms, this weak symbol can be overridden by backends
 void rac_tts_result_free(rac_tts_result_t* result) {
     if (!result)
         return;
@@ -172,5 +175,6 @@ void rac_tts_result_free(rac_tts_result_t* result) {
         result->audio_data = nullptr;
     }
 }
+#endif
 
 }  // extern "C"
