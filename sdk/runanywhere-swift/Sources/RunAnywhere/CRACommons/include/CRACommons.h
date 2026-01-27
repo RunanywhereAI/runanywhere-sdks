@@ -18,7 +18,6 @@
 #include "rac_types.h"
 #include "rac_error.h"
 #include "rac_structured_error.h"
-#include "rac_log.h"
 #include "rac_logger.h"
 #include "rac_core.h"
 #include "rac_platform_adapter.h"
@@ -32,7 +31,7 @@
 #include "rac_sdk_state.h"
 
 // =============================================================================
-// FEATURES - LLM, STT, TTS, VAD, Voice Agent
+// FEATURES - LLM, STT, TTS, VAD, VLM, Diffusion, Voice Agent
 // =============================================================================
 
 // LLM (Large Language Model)
@@ -75,6 +74,13 @@
 #include "rac_vlm_types.h"
 #include "rac_vlm_service.h"
 #include "rac_vlm_component.h"
+#include "rac_vlm_llamacpp.h"
+
+// Diffusion (Image Generation)
+#include "rac_diffusion.h"
+#include "rac_diffusion_types.h"
+#include "rac_diffusion_service.h"
+#include "rac_diffusion_component.h"
 
 // Voice Agent
 #include "rac_voice_agent.h"
@@ -92,27 +98,30 @@
 
 // Model management
 #include "rac_model_types.h"
-#include "rac_model_paths.h"
 #include "rac_model_registry.h"
+#include "rac_model_paths.h"
 #include "rac_model_strategy.h"
 #include "rac_model_assignment.h"
 
-// Storage analysis
+// Storage
 #include "rac_storage_analyzer.h"
 
+// Device
+#include "rac_device_manager.h"
+
 // =============================================================================
-// PLATFORM BACKEND - Apple Foundation Models, System TTS
+// PLATFORM BACKEND - Apple Foundation Models, System TTS, CoreML Diffusion
 // =============================================================================
 
 #include "rac_llm_platform.h"
 #include "rac_tts_platform.h"
+#include "rac_diffusion_platform.h"
 
 // =============================================================================
-// LLAMACPP BACKENDS - LLM, VLM (Vision Language Model)
+// ONNX/WHISPERCPP BACKENDS - STT
 // =============================================================================
 
-#include "rac_llm_llamacpp.h"
-#include "rac_vlm_llamacpp.h"
+#include "rac_stt_whispercpp.h"
 
 // =============================================================================
 // NETWORK - Environment, Auth, API Types, Dev Config
@@ -131,11 +140,5 @@
 
 #include "rac_telemetry_types.h"
 #include "rac_telemetry_manager.h"
-
-// =============================================================================
-// DEVICE - Device registration manager
-// =============================================================================
-
-#include "rac_device_manager.h"
 
 #endif /* CRACOMMONS_H */

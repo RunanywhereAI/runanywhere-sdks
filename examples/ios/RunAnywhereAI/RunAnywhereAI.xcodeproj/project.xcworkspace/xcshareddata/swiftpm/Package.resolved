@@ -1,5 +1,5 @@
 {
-  "originHash" : "71e2563cb2e0842bb2e3b7369d5bbd738fbf381de2bc340b49af7c369edd14e1",
+  "originHash" : "ca4900869f13fe8a468ed365f1f5f1ffef3e0a66f65ea24f176fd326c48ae5ce",
   "pins" : [
     {
       "identity" : "alamofire",
@@ -38,6 +38,15 @@
       }
     },
     {
+      "identity" : "ml-stable-diffusion",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/ml-stable-diffusion.git",
+      "state" : {
+        "revision" : "5a170d29cf38e674b80541d7ce22929c6a11cdde",
+        "version" : "1.1.1"
+      }
+    },
+    {
       "identity" : "sentry-cocoa",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/getsentry/sentry-cocoa",
@@ -53,6 +62,15 @@
       "state" : {
         "revision" : "390e0b0af8dd19a600005a242a89e570ff482e09",
         "version" : "4.8.6"
+      }
+    },
+    {
+      "identity" : "swift-argument-parser",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-argument-parser.git",
+      "state" : {
+        "revision" : "c5d11a805e765f52ba34ec7284bd4fcd6ba68615",
+        "version" : "1.7.0"
       }
     },
     {

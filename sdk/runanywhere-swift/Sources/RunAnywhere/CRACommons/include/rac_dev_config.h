@@ -22,6 +22,8 @@
 
 #include <stdbool.h>
 
+#include "rac_types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -34,31 +36,31 @@ extern "C" {
  * @brief Check if development config is available
  * @return true if development config is properly configured
  */
-bool rac_dev_config_is_available(void);
+RAC_API bool rac_dev_config_is_available(void);
 
 /**
  * @brief Get Supabase project URL for development mode
  * @return URL string (static, do not free)
  */
-const char* rac_dev_config_get_supabase_url(void);
+RAC_API const char* rac_dev_config_get_supabase_url(void);
 
 /**
  * @brief Get Supabase anon key for development mode
  * @return API key string (static, do not free)
  */
-const char* rac_dev_config_get_supabase_key(void);
+RAC_API const char* rac_dev_config_get_supabase_key(void);
 
 /**
  * @brief Get build token for development mode
  * @return Build token string (static, do not free)
  */
-const char* rac_dev_config_get_build_token(void);
+RAC_API const char* rac_dev_config_get_build_token(void);
 
 /**
  * @brief Get Sentry DSN for crash reporting (optional)
  * @return Sentry DSN string, or NULL if not configured
  */
-const char* rac_dev_config_get_sentry_dsn(void);
+RAC_API const char* rac_dev_config_get_sentry_dsn(void);
 
 // =============================================================================
 // Convenience Functions
@@ -68,13 +70,13 @@ const char* rac_dev_config_get_sentry_dsn(void);
  * @brief Check if Supabase config is valid
  * @return true if URL and key are non-empty
  */
-bool rac_dev_config_has_supabase(void);
+RAC_API bool rac_dev_config_has_supabase(void);
 
 /**
  * @brief Check if build token is valid
  * @return true if build token is non-empty
  */
-bool rac_dev_config_has_build_token(void);
+RAC_API bool rac_dev_config_has_build_token(void);
 
 #ifdef __cplusplus
 }

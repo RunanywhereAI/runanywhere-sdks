@@ -277,6 +277,23 @@ struct RunAnywhereAIApp: App {
             )
         }
         logger.info("✅ ONNX STT/TTS models registered")
+
+        // Register Diffusion models (Core ML Stable Diffusion)
+        // Using Apple's palettized model with split_einsum_v2 for optimized Apple Silicon performance (~1.5GB)
+        // Note: Archive extracts to nested directory (e.g., coreml-stable-diffusion-v1-5-palettized_split_einsum_v2_compiled/)
+        if let sd15URL = URL(string: "https://huggingface.co/apple/coreml-stable-diffusion-v1-5-palettized/resolve/main/coreml-stable-diffusion-v1-5-palettized_split_einsum_v2_compiled.zip") {
+            RunAnywhere.registerModel(
+                id: "sd15-coreml-palettized",
+                name: "Stable Diffusion 1.5 (Core ML)",
+                url: sd15URL,
+                framework: .coreml,
+                modality: .imageGeneration,
+                artifactType: .archive(.zip, structure: .nestedDirectory),
+                memoryRequirement: 1_600_000_000  // ~1.6GB
+            )
+        }
+        logger.info("✅ Diffusion models registered")
+
         logger.info("🎉 All modules and models registered")
     }
 }
