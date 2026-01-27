@@ -47,7 +47,10 @@ struct VLMCameraView: View {
             Task { await handlePhoto(item) }
         }
         .onAppear { setupCameraIfNeeded() }
-        .onDisappear { viewModel.stopCamera() }
+        .onDisappear {
+            viewModel.stopAutoStreaming()
+            viewModel.stopCamera()
+        }
     }
 
     // MARK: - Main Content
@@ -66,7 +69,7 @@ struct VLMCameraView: View {
     }
 
     private var cameraPreview: some View {
-        GeometryReader { geo in
+        GeometryReader { _ in
             ZStack {
                 if viewModel.isCameraAuthorized, let session = viewModel.captureSession {
                     CameraPreview(session: session)
@@ -107,59 +110,111 @@ struct VLMCameraView: View {
     }
 
     private var descriptionPanel: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Description").font(.headline).foregroundColor(.white)
+                HStack(spacing: 6) {
+                    Text("Description")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                    if viewModel.isAutoStreamingEnabled {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 8, height: 8)
+                            Text("LIVE")
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.green)
+                        }
+                    }
+                }
                 Spacer()
                 if !viewModel.currentDescription.isEmpty {
                     Button { UIPasteboard.general.string = viewModel.currentDescription } label: {
-                        Image(systemName: "doc.on.doc").font(.caption)
-                    }.foregroundColor(.gray)
+                        Image(systemName: "doc.on.doc").font(.subheadline)
+                    }.foregroundColor(.secondary)
                 }
             }
 
             ScrollView {
-                Text(viewModel.currentDescription.isEmpty ? "Tap the button to describe what your camera sees" : viewModel.currentDescription)
-                    .font(.body)
-                    .foregroundColor(viewModel.currentDescription.isEmpty ? .gray : .white)
+                Text(viewModel.currentDescription.isEmpty
+                     ? "Tap the button to describe what your camera sees"
+                     : viewModel.currentDescription)
+                    .font(.system(.body, design: .default))
+                    .fontWeight(.regular)
+                    .foregroundColor(viewModel.currentDescription.isEmpty ? .secondary : .primary)
+                    .lineSpacing(4)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxHeight: 120)
+            .frame(maxHeight: 150)
 
             if let error = viewModel.error {
-                Text(error.localizedDescription).font(.caption).foregroundColor(.red)
+                Text(error.localizedDescription)
+                    .font(.caption)
+                    .foregroundColor(.red)
             }
         }
-        .padding()
-        .background(Color(.systemGray6).opacity(0.95))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(Color(.systemBackground))
     }
 
     private var controlBar: some View {
-        HStack(spacing: 50) {
+        HStack(spacing: 32) {
             // Photos button
             Button { showingPhotos = true } label: {
-                Image(systemName: "photo").font(.title2).foregroundColor(.white)
+                VStack(spacing: 4) {
+                    Image(systemName: "photo").font(.title2)
+                    Text("Photos").font(.caption2)
+                }
+                .foregroundColor(.white)
             }
 
-            // Describe button
-            Button { Task { await viewModel.describeCurrentFrame() } } label: {
+            // Main action button - tap for single, or shows streaming state
+            Button {
+                if viewModel.isAutoStreamingEnabled {
+                    viewModel.stopAutoStreaming()
+                } else {
+                    Task { await viewModel.describeCurrentFrame() }
+                }
+            } label: {
                 ZStack {
-                    Circle().fill(viewModel.isProcessing ? Color.gray : Color.orange).frame(width: 64, height: 64)
+                    Circle()
+                        .fill(buttonColor)
+                        .frame(width: 64, height: 64)
                     if viewModel.isProcessing {
                         ProgressView().tint(.white)
+                    } else if viewModel.isAutoStreamingEnabled {
+                        Image(systemName: "stop.fill").font(.title2).foregroundColor(.white)
                     } else {
                         Image(systemName: "sparkles").font(.title).foregroundColor(.white)
                     }
                 }
             }
-            .disabled(viewModel.isProcessing)
+            .disabled(viewModel.isProcessing && !viewModel.isAutoStreamingEnabled)
+
+            // Auto-stream toggle
+            Button { viewModel.toggleAutoStreaming() } label: {
+                VStack(spacing: 4) {
+                    Image(systemName: viewModel.isAutoStreamingEnabled ? "livephoto" : "livephoto.slash")
+                        .font(.title2)
+                        .symbolEffect(.pulse, isActive: viewModel.isAutoStreamingEnabled)
+                    Text("Live").font(.caption2)
+                }
+                .foregroundColor(viewModel.isAutoStreamingEnabled ? .green : .white)
+            }
 
             // Model button
             Button { showingModelSelection = true } label: {
-                Image(systemName: "cube").font(.title2).foregroundColor(.white)
+                VStack(spacing: 4) {
+                    Image(systemName: "cube").font(.title2)
+                    Text("Model").font(.caption2)
+                }
+                .foregroundColor(.white)
             }
         }
-        .padding(.vertical, 20)
+        .padding(.vertical, 16)
         .background(Color.black)
     }
 
@@ -195,6 +250,16 @@ struct VLMCameraView: View {
     }
 
     // MARK: - Helpers
+
+    private var buttonColor: Color {
+        if viewModel.isAutoStreamingEnabled {
+            return .red
+        } else if viewModel.isProcessing {
+            return .gray
+        } else {
+            return .orange
+        }
+    }
 
     private func setupCameraIfNeeded() {
         Task {
