@@ -38,10 +38,22 @@ option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" ON)
 # C++ CONFIGURATION
 # =============================================================================
 
-set(CMAKE_CXX_STANDARD 17)
+# Use C++20 for Windows, C++17 for other platforms
+if(WIN32)
+    set(CMAKE_CXX_STANDARD 20)
+else()
+    set(CMAKE_CXX_STANDARD 17)
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# Set default build type for single-config generators (Unix Makefiles, Ninja)
+# Note: Multi-config generators (Visual Studio, Xcode) ignore this
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
 
 # Export compile commands for clang-tidy
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -68,6 +80,9 @@ elseif(ANDROID)
 elseif(APPLE)
     set(RAC_PLATFORM_MACOS TRUE)
     set(RAC_PLATFORM_NAME "macOS")
+elseif(WIN32)
+    set(RAC_PLATFORM_WINDOWS TRUE)
+    set(RAC_PLATFORM_NAME "Windows")
 elseif(UNIX)
     set(RAC_PLATFORM_LINUX TRUE)
     set(RAC_PLATFORM_NAME "Linux")
@@ -88,6 +103,18 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
         add_compile_options(-fvisibility=hidden)
         add_compile_options(-ffunction-sections -fdata-sections)
     endif()
+elseif(MSVC)
+    # MSVC compiler flags
+    add_compile_options(/W4 /WX- /wd4996 /wd4576 /FS)  # W4 = level 4 warnings, WX- = warnings as errors off, 4996 = deprecated function warnings, 4576 = non-standard cast syntax, FS = force synchronous PDB writes
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        add_compile_options(/O2 /DNDEBUG /GL)  # O2 = optimize for speed, GL = whole program optimization
+        add_compile_options(/MP)  # Multi-processor compilation
+    else()
+        add_compile_options(/Od /Zi)  # Od = disable optimizations, Zi = debug information
+    endif()
+    # Disable MSVC-specific warnings that are common in cross-platform code
+    add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
+    add_compile_definitions(NOMINMAX)  # Prevent Windows.h from defining min/max macros
 endif()
 
 # =============================================================================
@@ -233,11 +260,16 @@ target_include_directories(rac_commons PRIVATE
 # Symbol visibility for shared builds
 if(RAC_BUILD_SHARED)
     target_compile_definitions(rac_commons PRIVATE RAC_BUILDING_SHARED=1)
-    set_target_properties(rac_commons PROPERTIES
-        C_VISIBILITY_PRESET hidden
-        CXX_VISIBILITY_PRESET hidden
-        VISIBILITY_INLINES_HIDDEN ON
-    )
+    if(WIN32)
+        # Windows DLL export/import is handled via __declspec in headers
+        # No need for visibility presets on Windows
+    else()
+        set_target_properties(rac_commons PROPERTIES
+            C_VISIBILITY_PRESET hidden
+            CXX_VISIBILITY_PRESET hidden
+            VISIBILITY_INLINES_HIDDEN ON
+        )
+    endif()
 endif()
 
 # Platform-specific linking
@@ -256,7 +288,48 @@ if(RAC_PLATFORM_ANDROID)
     target_link_libraries(rac_commons PUBLIC log)
 endif()
 
-target_compile_features(rac_commons PUBLIC cxx_std_17)
+if(WIN32)
+    # Windows-specific libraries
+    # ws2_32 for networking (if needed)
+    # winmm for multimedia (if needed)
+    # No specific libraries required by default, add as needed
+    
+    # Set Windows-specific properties
+    if(MSVC)
+        # Set runtime library (use /MD for Release, /MDd for Debug)
+        if(CMAKE_BUILD_TYPE STREQUAL "Release")
+            set_property(TARGET rac_commons PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+            # Enable link-time code generation for Release builds
+            set_target_properties(rac_commons PROPERTIES
+                INTERPROCEDURAL_OPTIMIZATION ON
+            )
+        else()
+            set_property(TARGET rac_commons PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL")
+        endif()
+        
+        # Force synchronous PDB writes for parallel compilation and disable C4576 warning
+        target_compile_options(rac_commons PRIVATE /FS /wd4576)
+        
+        # Set output file names for Windows
+        if(RAC_BUILD_SHARED)
+            set_target_properties(rac_commons PROPERTIES
+                OUTPUT_NAME "rac_commons"
+                PREFIX ""
+            )
+        else()
+            set_target_properties(rac_commons PROPERTIES
+                OUTPUT_NAME "rac_commons"
+            )
+        endif()
+    endif()
+endif()
+
+# Set C++ standard based on platform
+if(WIN32)
+    target_compile_features(rac_commons PUBLIC cxx_std_20)
+else()
+    target_compile_features(rac_commons PUBLIC cxx_std_17)
+endif()
 
 # =============================================================================
 # JNI BRIDGE (Android/JVM)
@@ -298,7 +371,12 @@ endif()
 
 if(RAC_BUILD_TESTS)
     enable_testing()
-    add_subdirectory(tests)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
+        message(STATUS "Building unit tests")
+        add_subdirectory(tests)
+    else()
+        message(WARNING "RAC_BUILD_TESTS is ON but tests/CMakeLists.txt not found. Skipping tests.")
+    endif()
 endif()
 
 # =============================================================================
@@ -308,6 +386,7 @@ endif()
 install(TARGETS rac_commons
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
+    RUNTIME DESTINATION bin  # Windows DLLs go to bin
 )
 
 install(DIRECTORY include/
@@ -326,7 +405,11 @@ message(STATUS "====================================")
 message(STATUS "Platform:       ${RAC_PLATFORM_NAME}")
 message(STATUS "Build type:     ${CMAKE_BUILD_TYPE}")
 message(STATUS "Compiler:       ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+message(STATUS "C++ Standard:   C++${CMAKE_CXX_STANDARD}")
 message(STATUS "Shared libs:    ${RAC_BUILD_SHARED}")
+if(WIN32)
+    message(STATUS "Architecture:   ${CMAKE_SYSTEM_PROCESSOR}")
+endif()
 message(STATUS "")
 message(STATUS "Components:")
 message(STATUS "  Core:         Logging, errors, events, memory")
