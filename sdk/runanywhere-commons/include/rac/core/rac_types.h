@@ -173,6 +173,7 @@ typedef enum rac_capability {
     RAC_CAPABILITY_VAD = 5,               /**< Voice activity detection */
     RAC_CAPABILITY_DIARIZATION = 6,       /**< Speaker diarization */
     RAC_CAPABILITY_VISION_LANGUAGE = 7,   /**< Vision-language model (VLM) */
+    RAC_CAPABILITY_DIFFUSION = 8,         /**< Image generation (Stable Diffusion) */
 } rac_capability_t;
 
 /**
