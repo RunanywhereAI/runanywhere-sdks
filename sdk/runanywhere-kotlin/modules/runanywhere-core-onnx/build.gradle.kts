@@ -26,6 +26,7 @@ plugins {
     alias(libs.plugins.ktlint)
     `maven-publish`
     signing
+    id("runanywhere.conventions") // Shared build utilities (module path resolution, etc.)
 }
 
 // =============================================================================

@@ -1,4 +1,7 @@
 pluginManagement {
+    // Include build-logic for convention plugins (shared build utilities)
+    includeBuild("build-logic")
+
     repositories {
         google {
             content {
