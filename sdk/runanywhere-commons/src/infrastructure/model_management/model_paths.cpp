@@ -109,8 +109,12 @@ const char* rac_framework_raw_value(rac_inference_framework_t framework) {
             return "FluidAudio";
         case RAC_FRAMEWORK_BUILTIN:
             return "BuiltIn";
+        case RAC_FRAMEWORK_COREML:
+            return "CoreML";
         case RAC_FRAMEWORK_NONE:
             return "None";
+        case RAC_FRAMEWORK_UNKNOWN:
+            return "Unknown";
         default:
             return "Unknown";
     }

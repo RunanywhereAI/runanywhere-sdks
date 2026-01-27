@@ -67,6 +67,39 @@ extension CppBridge {
             logger.debug("Model saved: \(model.id)")
         }
 
+        /// Save model metadata synchronously (nonisolated for use from sync contexts)
+        /// Use this when registering models at app startup before SDK services initialize
+        /// Discovery will update localPath later if model files exist on disk
+        public nonisolated func saveSync(_ model: ModelInfo) throws {
+            // Get the global registry handle directly from C++
+            // This avoids actor isolation since we're accessing the C singleton
+            let registryHandle = rac_get_model_registry()
+            guard registryHandle != nil else {
+                throw SDKError.general(.initializationFailed, "Registry not initialized")
+            }
+
+            var cModel = model.toCModelInfo()
+            defer { Self.freeCModelInfoStatic(&cModel) }
+
+            let result = rac_model_registry_save(registryHandle, &cModel)
+            guard result == RAC_SUCCESS else {
+                throw SDKError.general(.processingFailed, "Failed to save model: \(model.id)")
+            }
+            
+            // Log successful registration
+            let staticLogger = SDKLogger(category: "CppBridge.ModelRegistry")
+            staticLogger.info("📝 Registered model: \(model.id), framework=\(model.framework.rawValue), localPath=\(model.localPath?.path ?? "nil")")
+        }
+
+        /// Static version of freeCModelInfo for use in nonisolated context
+        private nonisolated static func freeCModelInfoStatic(_ model: inout rac_model_info_t) {
+            if let id = model.id { free(UnsafeMutablePointer(mutating: id)) }
+            if let name = model.name { free(UnsafeMutablePointer(mutating: name)) }
+            if let desc = model.description { free(UnsafeMutablePointer(mutating: desc)) }
+            if let downloadUrl = model.download_url { free(UnsafeMutablePointer(mutating: downloadUrl)) }
+            if let localPath = model.local_path { free(UnsafeMutablePointer(mutating: localPath)) }
+        }
+
         /// Get model metadata by ID
         public func get(modelId: String) -> ModelInfo? {
             guard let handle = handle else { return nil }
@@ -227,7 +260,14 @@ extension CppBridge {
                 return ModelDiscoveryResult(discoveredCount: 0, unregisteredCount: 0)
             }
 
-            logger.info("Starting model discovery scan...")
+            logger.info("🔍 Starting model discovery scan...")
+            
+            // Log all registered models before discovery
+            logger.info("📋 Registered models before discovery:")
+            let allModels = getAll()
+            for model in allModels {
+                logger.info("  - \(model.id): framework=\(model.framework.rawValue), localPath=\(model.localPath?.path ?? "nil")")
+            }
 
             // Create callbacks struct
             var callbacks = rac_discovery_callbacks_t()
@@ -306,11 +346,17 @@ extension CppBridge {
                     return (ext == "gguf" || ext == "bin") ? RAC_TRUE : RAC_FALSE
                 case RAC_FRAMEWORK_ONNX:
                     return (ext == "onnx" || ext == "ort") ? RAC_TRUE : RAC_FALSE
+                case RAC_FRAMEWORK_COREML:
+                    // Core ML models are .mlmodelc directories
+                    return ext == "mlmodelc" ? RAC_TRUE : RAC_FALSE
                 case RAC_FRAMEWORK_FOUNDATION_MODELS, RAC_FRAMEWORK_SYSTEM_TTS:
                     // Built-in models don't need file check
                     return RAC_TRUE
+                case RAC_FRAMEWORK_UNKNOWN:
+                    // Unknown framework - check for any known model type including Core ML
+                    return (ext == "gguf" || ext == "onnx" || ext == "bin" || ext == "ort" || ext == "mlmodelc") ? RAC_TRUE : RAC_FALSE
                 default:
-                    return (ext == "gguf" || ext == "onnx" || ext == "bin" || ext == "ort") ? RAC_TRUE : RAC_FALSE
+                    return (ext == "gguf" || ext == "onnx" || ext == "bin" || ext == "ort" || ext == "mlmodelc") ? RAC_TRUE : RAC_FALSE
                 }
             }
 
@@ -324,7 +370,16 @@ extension CppBridge {
                 return ModelDiscoveryResult(discoveredCount: 0, unregisteredCount: 0)
             }
 
-            logger.info("Discovery complete: \(result.discovered_count) models found, \(result.unregistered_count) unregistered folders")
+            logger.info("✅ Discovery complete: \(result.discovered_count) models found, \(result.unregistered_count) unregistered folders")
+            
+            // Log all models after discovery to see which have localPath
+            logger.info("📋 Models after discovery:")
+            let updatedModels = getAll()
+            for model in updatedModels {
+                let downloadedStatus = model.localPath != nil ? "✅ DOWNLOADED" : "❌ not downloaded"
+                logger.info("  - \(model.id): \(downloadedStatus), localPath=\(model.localPath?.path ?? "nil")")
+            }
+            
             return ModelDiscoveryResult(
                 discoveredCount: Int(result.discovered_count),
                 unregisteredCount: Int(result.unregistered_count)

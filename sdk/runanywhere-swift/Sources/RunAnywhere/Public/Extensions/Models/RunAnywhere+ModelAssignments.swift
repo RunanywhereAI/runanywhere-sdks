@@ -33,7 +33,8 @@ public extension RunAnywhere {
         // Detect format from URL extension
         let format = detectFormat(from: url)
 
-        // Create ModelInfo
+        // Create ModelInfo with nil localPath initially
+        // The actual localPath will be preserved from existing registry if available
         let modelInfo = ModelInfo(
             id: modelId,
             name: name,
@@ -50,13 +51,18 @@ public extension RunAnywhere {
             source: .local
         )
 
-        // Save to C++ registry (fire-and-forget)
-        Task {
-            do {
-                try await CppBridge.ModelRegistry.shared.save(modelInfo)
-            } catch {
-                SDKLogger(category: "RunAnywhere.Models").error("Failed to register model: \(error)")
-            }
+        // Save to C++ registry using synchronous C API directly
+        // This avoids async/await which could cause timing issues with discovery
+        // Discovery will update the localPath if the model was previously downloaded
+        let logger = SDKLogger(category: "RunAnywhere.Models")
+        
+        do {
+            // Use synchronous save via the bridge
+            // Note: Discovery runs later and will update localPath if model exists on disk
+            try CppBridge.ModelRegistry.shared.saveSync(modelInfo)
+            logger.debug("Model registered: \(modelId)")
+        } catch {
+            logger.error("Failed to register model: \(error)")
         }
 
         return modelInfo

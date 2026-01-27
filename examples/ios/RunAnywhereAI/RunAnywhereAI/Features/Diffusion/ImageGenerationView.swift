@@ -1,6 +1,16 @@
 import SwiftUI
 import RunAnywhere
 
+// MARK: - Keyboard Dismissal Extension
+
+#if os(iOS)
+extension View {
+    func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+}
+#endif
+
 // MARK: - Image Generation View
 
 /// Main view for text-to-image generation using Diffusion models
@@ -35,6 +45,10 @@ struct ImageGenerationView: View {
                         }
                     }
                     .padding()
+                }
+                .onTapGesture {
+                    // Dismiss keyboard when tapping outside text fields
+                    hideKeyboard()
                 }
             }
             .navigationTitle("Image Generation")
@@ -243,6 +257,8 @@ struct ImageGenerationView: View {
                     .tint(.red)
                 } else {
                     Button {
+                        // Dismiss keyboard before generating
+                        hideKeyboard()
                         Task {
                             await viewModel.generateImage()
                         }

@@ -531,7 +531,7 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    RAC_LOG_INFO("ModelRegistry", "Starting model discovery scan...");
+    RAC_LOG_INFO("ModelRegistry", "🔍 Starting model discovery scan...");
 
     // Get models directory path
     char models_dir[1024];
@@ -540,16 +540,22 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
         return RAC_SUCCESS;  // Not an error, just nothing to discover
     }
 
+    RAC_LOG_INFO("ModelRegistry", "Discovery: Models directory = %s", models_dir);
+
     // Check if models directory exists
     if (callbacks->path_exists(models_dir, callbacks->user_data) != RAC_TRUE) {
-        RAC_LOG_DEBUG("ModelRegistry", "Discovery: Models directory does not exist yet");
+        RAC_LOG_INFO("ModelRegistry", "Discovery: Models directory does not exist yet: %s", models_dir);
         return RAC_SUCCESS;
     }
+    
+    RAC_LOG_INFO("ModelRegistry", "Discovery: Models directory EXISTS, proceeding with scan");
 
-    // Frameworks to scan
+    // Frameworks to scan (includes all frameworks that may have downloaded models)
     rac_inference_framework_t frameworks[] = {RAC_FRAMEWORK_LLAMACPP, RAC_FRAMEWORK_ONNX,
                                               RAC_FRAMEWORK_FOUNDATION_MODELS,
-                                              RAC_FRAMEWORK_SYSTEM_TTS};
+                                              RAC_FRAMEWORK_SYSTEM_TTS,
+                                              RAC_FRAMEWORK_COREML,
+                                              RAC_FRAMEWORK_UNKNOWN};  // Unknown for models without explicit framework
     size_t framework_count = sizeof(frameworks) / sizeof(frameworks[0]);
 
     // Collect discovered models
@@ -565,13 +571,17 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
         char framework_dir[1024];
         if (rac_model_paths_get_framework_directory(framework, framework_dir,
                                                     sizeof(framework_dir)) != RAC_SUCCESS) {
+            RAC_LOG_DEBUG("ModelRegistry", "Discovery: Failed to get directory for framework %d", framework);
             continue;
         }
 
         // Check if framework directory exists
         if (callbacks->path_exists(framework_dir, callbacks->user_data) != RAC_TRUE) {
+            RAC_LOG_DEBUG("ModelRegistry", "Discovery: Framework dir does not exist: %s", framework_dir);
             continue;
         }
+
+        RAC_LOG_INFO("ModelRegistry", "📂 Scanning framework directory: %s", framework_dir);
 
         // List model folders in this framework directory
         char** model_folders = nullptr;
@@ -579,8 +589,11 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
 
         if (callbacks->list_directory(framework_dir, &model_folders, &folder_count,
                                       callbacks->user_data) != RAC_SUCCESS) {
+            RAC_LOG_WARNING("ModelRegistry", "Discovery: Failed to list directory: %s", framework_dir);
             continue;
         }
+
+        RAC_LOG_INFO("ModelRegistry", "   Found %zu folders in %s", folder_count, framework_dir);
 
         for (size_t i = 0; i < folder_count; i++) {
             if (!model_folders[i])
@@ -595,24 +608,32 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
             // Build full path to model folder
             std::string model_path = std::string(framework_dir) + "/" + model_id;
 
+            RAC_LOG_INFO("ModelRegistry", "   Checking folder: %s", model_id);
+
             // Check if it's a directory
             if (callbacks->is_directory(model_path.c_str(), callbacks->user_data) != RAC_TRUE) {
+                RAC_LOG_DEBUG("ModelRegistry", "   -> Not a directory, skipping");
                 continue;
             }
 
             // Check if it contains valid model files
             if (!is_valid_model_folder(callbacks, model_path.c_str(), framework)) {
+                RAC_LOG_DEBUG("ModelRegistry", "   -> No valid model files found, skipping");
                 continue;
             }
+            
+            RAC_LOG_INFO("ModelRegistry", "   ✅ Valid model folder: %s", model_id);
 
             // Check if this model is registered
             auto it = handle->models.find(model_id);
             if (it != handle->models.end()) {
                 // Model is registered - check if it needs update
                 rac_model_info_t* model = it->second;
+                RAC_LOG_INFO("ModelRegistry", "   🎯 Model '%s' IS registered in registry", model_id);
 
                 if (!model->local_path || strlen(model->local_path) == 0) {
                     // Update the local path
+                    RAC_LOG_INFO("ModelRegistry", "   📝 Updating localPath to: %s", model_path.c_str());
                     if (model->local_path) {
                         free(model->local_path);
                     }
@@ -626,12 +647,14 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
                     disc.framework = framework;
                     discovered.push_back(disc);
 
-                    RAC_LOG_INFO("ModelRegistry", "Discovered downloaded model");
+                    RAC_LOG_INFO("ModelRegistry", "   ✅ DISCOVERED and UPDATED model: %s", model_id);
+                } else {
+                    RAC_LOG_INFO("ModelRegistry", "   ℹ️ Model already has localPath: %s", model->local_path);
                 }
             } else {
                 // Model folder exists but not registered
                 unregistered++;
-                RAC_LOG_DEBUG("ModelRegistry", "Found unregistered model folder");
+                RAC_LOG_INFO("ModelRegistry", "   ⚠️ Model folder '%s' NOT in registry (unregistered)", model_id);
             }
         }
 
