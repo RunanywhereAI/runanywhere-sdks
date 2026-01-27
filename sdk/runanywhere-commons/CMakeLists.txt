@@ -163,7 +163,7 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/device/rac_device_manager.cpp
 )
 
-# Feature sources - LLM, STT, TTS, VAD service interfaces
+# Feature sources - LLM, STT, TTS, VAD, VLM, Diffusion service interfaces
 set(RAC_FEATURES_SOURCES
     # LLM
     src/features/llm/llm_component.cpp
@@ -183,20 +183,32 @@ set(RAC_FEATURES_SOURCES
     src/features/vad/vad_component.cpp
     src/features/vad/energy_vad.cpp
     src/features/vad/vad_analytics.cpp
+    # VLM (Vision Language Model)
+    src/features/vlm/vlm_component.cpp
+    src/features/vlm/rac_vlm_service.cpp
+    # Diffusion (Image Generation)
+    src/features/diffusion/diffusion_component.cpp
+    src/features/diffusion/rac_diffusion_service.cpp
     # Voice Agent
     src/features/voice_agent/voice_agent.cpp
     # Result memory management
     src/features/result_free.cpp
 )
 
-# Platform services (Apple Foundation Models + System TTS)
+# Image utilities (for VLM)
+set(RAC_UTILS_SOURCES
+    src/utils/rac_image_utils.cpp
+)
+
+# Platform services (Apple Foundation Models + System TTS + CoreML Diffusion)
 if(APPLE AND RAC_BUILD_PLATFORM)
     set(RAC_PLATFORM_SOURCES
         src/features/platform/rac_llm_platform.cpp
         src/features/platform/rac_tts_platform.cpp
+        src/features/platform/rac_diffusion_platform.cpp
         src/features/platform/rac_backend_platform_register.cpp
     )
-    message(STATUS "Building platform services: Apple Foundation Models, System TTS")
+    message(STATUS "Building platform services: Apple Foundation Models, System TTS, CoreML Diffusion")
 else()
     set(RAC_PLATFORM_SOURCES "")
 endif()
@@ -206,6 +218,7 @@ set(RAC_COMMONS_SOURCES
     ${RAC_CORE_SOURCES}
     ${RAC_INFRASTRUCTURE_SOURCES}
     ${RAC_FEATURES_SOURCES}
+    ${RAC_UTILS_SOURCES}
     ${RAC_PLATFORM_SOURCES}
 )
 
@@ -332,7 +345,7 @@ message(STATUS "Components:")
 message(STATUS "  Core:         Logging, errors, events, memory")
 message(STATUS "  Registry:     Service & module registration")
 message(STATUS "  Models:       Download strategies, storage")
-message(STATUS "  Services:     LLM, STT, TTS, VAD interfaces")
+message(STATUS "  Services:     LLM, STT, TTS, VAD, Diffusion interfaces")
 if(APPLE AND RAC_BUILD_PLATFORM)
     message(STATUS "  Platform:     Apple Foundation Models, System TTS")
 endif()

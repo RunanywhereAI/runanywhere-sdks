@@ -475,6 +475,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = RunAnywhere;
+				INFOPLIST_KEY_NSCameraUsageDescription = "RunAnywhere AI needs access to your camera for vision language model features to analyze images.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "RunAnywhere AI needs access to your microphone to transcribe your voice input and provide voice-based interactions.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "RunAnywhere AI uses speech recognition to convert your voice to text for processing.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -517,6 +518,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = RunAnywhere;
+				INFOPLIST_KEY_NSCameraUsageDescription = "RunAnywhere AI needs access to your camera for vision language model features to analyze images.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "RunAnywhere AI needs access to your microphone to transcribe your voice input and provide voice-based interactions.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "RunAnywhere AI uses speech recognition to convert your voice to text for processing.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
