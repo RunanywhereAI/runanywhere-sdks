@@ -37,6 +37,25 @@
 
 ---
 
+## See It In Action
+
+<p align="center">
+  <img src="demo.gif" alt="On-device tool calling demo" width="260"/>
+</p>
+
+<p align="center">
+  <strong>Llama 3.2 3B on iPhone 16 Pro Max</strong><br/>
+  Tool calling + LLM reasoning — 100% on-device
+</p>
+
+<p align="center">
+  <a href="https://github.com/RunanywhereAI/runanywhere-sdks/pull/296">View the code</a>
+  &nbsp;·&nbsp;
+  <em>Full tool calling support coming soon</em>
+</p>
+
+---
+
 ## What is RunAnywhere?
 
 RunAnywhere lets you add AI features to your mobile app that run entirely on-device:
@@ -197,6 +216,17 @@ Full-featured demo applications demonstrating SDK capabilities:
 
 ---
 
+## Playground
+
+Standalone demo projects showcasing what you can build with RunAnywhere:
+
+| Project | Description | Platform |
+|---------|-------------|----------|
+| [swift-starter-app](Playground/swift-starter-app/) | Privacy-first AI demo — LLM Chat, STT, TTS, and Voice Pipeline | iOS (Swift/SwiftUI) |
+| [on-device-browser-agent](Playground/on-device-browser-agent/) | On-device AI browser automation — no cloud, no API keys | Chrome Extension |
+
+---
+
 ## Features
 
 | Feature | iOS | Android | React Native | Flutter |
@@ -255,6 +285,10 @@ runanywhere-sdks/
 │   ├── android/RunAnywhereAI/      # Android sample app
 │   ├── react-native/RunAnywhereAI/ # React Native sample app
 │   └── flutter/RunAnywhereAI/      # Flutter sample app
+│
+├── Playground/
+│   ├── swift-starter-app/          # iOS AI playground app
+│   └── on-device-browser-agent/    # Chrome browser automation agent
 │
 └── docs/                           # Documentation
 ```

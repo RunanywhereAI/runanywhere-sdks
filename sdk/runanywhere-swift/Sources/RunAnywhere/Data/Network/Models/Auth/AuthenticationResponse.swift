@@ -1,41 +1,42 @@
 import Foundation
 
-/// Response model for authentication
+/// Response model for SDK authentication
+/// Matches backend SDKAuthenticationResponse schema
 public struct AuthenticationResponse: Codable, Sendable {
     public let accessToken: String
-    public let deviceId: String
-    public let expiresIn: Int
-    public let organizationId: String
     public let refreshToken: String
+    public let expiresIn: Int
     public let tokenType: String
+    public let organizationId: String
     public let userId: String?
+    public let deviceId: String?
 
     public init(
         accessToken: String,
-        deviceId: String,
-        expiresIn: Int,
-        organizationId: String,
         refreshToken: String,
-        tokenType: String,
-        userId: String?
+        expiresIn: Int = 18000,
+        tokenType: String = "Bearer",
+        organizationId: String,
+        userId: String? = nil,
+        deviceId: String? = nil
     ) {
         self.accessToken = accessToken
-        self.deviceId = deviceId
-        self.expiresIn = expiresIn
-        self.organizationId = organizationId
         self.refreshToken = refreshToken
+        self.expiresIn = expiresIn
         self.tokenType = tokenType
+        self.organizationId = organizationId
         self.userId = userId
+        self.deviceId = deviceId
     }
 
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
-        case deviceId = "device_id"
-        case expiresIn = "expires_in"
-        case organizationId = "organization_id"
         case refreshToken = "refresh_token"
+        case expiresIn = "expires_in"
         case tokenType = "token_type"
+        case organizationId = "organization_id"
         case userId = "user_id"
+        case deviceId = "device_id"
     }
 }
 

@@ -125,6 +125,7 @@ fun TextToSpeechScreen(viewModel: TextToSpeechViewModel = viewModel()) {
                 ControlsSection(
                     isGenerating = uiState.isGenerating,
                     isPlaying = uiState.isPlaying,
+                    isSpeaking = uiState.isSpeaking,
                     hasGeneratedAudio = uiState.hasGeneratedAudio,
                     isSystemTTS = uiState.isSystemTTS,
                     isTextEmpty = uiState.inputText.isEmpty(),
@@ -134,6 +135,7 @@ fun TextToSpeechScreen(viewModel: TextToSpeechViewModel = viewModel()) {
                     duration = uiState.audioDuration ?: 0.0,
                     errorMessage = uiState.errorMessage,
                     onGenerate = { viewModel.generateSpeech() },
+                    onStopSpeaking = { viewModel.stopSynthesis() },
                     onTogglePlayback = { viewModel.togglePlayback() },
                 )
             } else {
@@ -510,6 +512,7 @@ private fun AudioInfoRow(
 private fun ControlsSection(
     isGenerating: Boolean,
     isPlaying: Boolean,
+    isSpeaking: Boolean,
     hasGeneratedAudio: Boolean,
     isSystemTTS: Boolean,
     isTextEmpty: Boolean,
@@ -519,6 +522,7 @@ private fun ControlsSection(
     duration: Double,
     errorMessage: String?,
     onGenerate: () -> Unit,
+    onStopSpeaking: () -> Unit,
     onTogglePlayback: () -> Unit,
 ) {
     Column(
@@ -569,9 +573,15 @@ private fun ControlsSection(
         Row(
             horizontalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            // Generate/Speak button
+            // Generate/Speak button (System TTS toggles Stop while speaking)
             Button(
-                onClick = onGenerate,
+                onClick = {
+                    if (isSystemTTS && isSpeaking) {
+                        onStopSpeaking()
+                    } else {
+                        onGenerate()
+                    }
+                },
                 enabled = !isTextEmpty && isModelSelected && !isGenerating,
                 modifier =
                     Modifier
@@ -593,7 +603,14 @@ private fun ControlsSection(
                     )
                 } else {
                     Icon(
-                        imageVector = if (isSystemTTS) Icons.Filled.VolumeUp else Icons.Filled.GraphicEq,
+                        imageVector =
+                            if (isSystemTTS && isSpeaking) {
+                                Icons.Filled.Stop
+                            } else if (isSystemTTS) {
+                                Icons.Filled.VolumeUp
+                            } else {
+                                Icons.Filled.GraphicEq
+                            },
                         contentDescription = null,
                         modifier = Modifier.size(20.dp),
                         tint = Color.White,
@@ -601,7 +618,14 @@ private fun ControlsSection(
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = if (isSystemTTS) "Speak" else "Generate",
+                    text =
+                        if (isSystemTTS && isSpeaking) {
+                            "Stop"
+                        } else if (isSystemTTS) {
+                            "Speak"
+                        } else {
+                            "Generate"
+                        },
                     fontWeight = FontWeight.SemiBold,
                     color = Color.White,
                 )
@@ -610,7 +634,7 @@ private fun ControlsSection(
             // Play/Stop button (only for non-System TTS)
             Button(
                 onClick = onTogglePlayback,
-                enabled = hasGeneratedAudio && !isSystemTTS,
+                enabled = hasGeneratedAudio && !isSystemTTS && !isSpeaking,
                 modifier =
                     Modifier
                         .width(140.dp)
@@ -639,7 +663,7 @@ private fun ControlsSection(
         Text(
             text =
                 when {
-                    isSystemTTS && isGenerating -> "Speaking..."
+                    isSpeaking -> "Speaking..."
                     isSystemTTS -> "System TTS plays directly"
                     isGenerating -> "Generating speech..."
                     isPlaying -> "Playing..."

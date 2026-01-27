@@ -90,8 +90,9 @@ struct RunAnywhereAIApp: App {
                 logger.info("✅ SDK initialized in DEVELOPMENT mode")
                 #else
                 // Production mode - requires API key and backend URL
-                let apiKey = "prod_api_key"  // Production: Get from secure storage
-                let baseURL = "https://api.runanywhere.ai"
+                // Configure these via Settings screen or set environment variables
+                let apiKey = "YOUR_API_KEY_HERE"
+                let baseURL = "YOUR_BASE_URL_HERE"
 
                 try RunAnywhere.initialize(
                     apiKey: apiKey,
