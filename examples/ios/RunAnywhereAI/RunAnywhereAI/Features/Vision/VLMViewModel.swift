@@ -29,6 +29,11 @@ final class VLMViewModel: NSObject {
     private(set) var error: Error?
     private(set) var isCameraAuthorized = false
 
+    // Auto-streaming mode
+    var isAutoStreamingEnabled = false
+    private var autoStreamTask: Task<Void, Never>?
+    private static let autoStreamInterval: TimeInterval = 2.5 // seconds between auto-captures
+
     // Camera
     private(set) var captureSession: AVCaptureSession?
     private var currentFrame: CVPixelBuffer?
@@ -175,6 +180,73 @@ final class VLMViewModel: NSObject {
 
     func cancel() {
         Task { await RunAnywhere.cancelVLMGeneration() }
+    }
+
+    // MARK: - Auto Streaming
+
+    func toggleAutoStreaming() {
+        isAutoStreamingEnabled.toggle()
+        if isAutoStreamingEnabled {
+            startAutoStreaming()
+        } else {
+            stopAutoStreaming()
+        }
+    }
+
+    func startAutoStreaming() {
+        guard autoStreamTask == nil else { return }
+
+        autoStreamTask = Task {
+            while !Task.isCancelled && isAutoStreamingEnabled {
+                // Wait for any current processing to finish
+                while isProcessing {
+                    try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
+                    if Task.isCancelled { return }
+                }
+
+                // Capture and describe
+                await describeCurrentFrameForAutoStream()
+
+                // Wait before next capture
+                try? await Task.sleep(nanoseconds: UInt64(Self.autoStreamInterval * 1_000_000_000))
+            }
+        }
+    }
+
+    func stopAutoStreaming() {
+        autoStreamTask?.cancel()
+        autoStreamTask = nil
+        isAutoStreamingEnabled = false
+    }
+
+    private func describeCurrentFrameForAutoStream() async {
+        guard let pixelBuffer = currentFrame, !isProcessing else { return }
+
+        isProcessing = true
+        error = nil
+
+        // For auto-stream, we replace the description instead of clearing first
+        // This gives a smoother visual transition
+        var newDescription = ""
+
+        do {
+            let image = VLMImage(pixelBuffer: pixelBuffer)
+            let result = try await RunAnywhere.processImageStream(
+                image,
+                prompt: "Describe what you see in one sentence.",
+                options: VLMGenerationOptions(maxTokens: 100)
+            )
+
+            for try await token in result.stream {
+                newDescription += token
+                currentDescription = newDescription
+            }
+        } catch {
+            // Don't show errors during auto-stream, just log
+            logger.error("Auto-stream VLM error: \(error.localizedDescription)")
+        }
+
+        isProcessing = false
     }
 }
 
