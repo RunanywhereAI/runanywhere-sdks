@@ -226,18 +226,6 @@ struct RunAnywhereAIApp: App {
             )
         }
 
-        // FunctionGemma 270M - Lightweight function calling model from Google
-        // Note: Uses different tool call format (call:func{args}) - may need system prompt adaptation
-        if let functionGemmaQ8URL = URL(string: "https://huggingface.co/ggml-org/functiongemma-270m-it-GGUF/resolve/main/functiongemma-270m-it-q8_0.gguf") {
-            RunAnywhere.registerModel(
-                id: "functiongemma-270m-it-q8_0",
-                name: "Google FunctionGemma 270M Q8_0",
-                url: functionGemmaQ8URL,
-                framework: .llamaCpp,
-                memoryRequirement: 350_000_000
-            )
-        }
-
         logger.info("✅ LLM models registered (including tool-calling optimized models)")
 
         // Register ONNX STT and TTS models

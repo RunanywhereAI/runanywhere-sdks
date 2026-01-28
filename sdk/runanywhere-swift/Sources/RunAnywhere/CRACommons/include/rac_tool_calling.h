@@ -12,9 +12,8 @@
  * - Platform SDKs handle ONLY: tool registry (closures), tool execution (needs platform APIs)
  *
  * Supported Tool Calling Formats:
- * - DEFAULT:  <tool_call>{"tool":"name","arguments":{}}</tool_call>
- * - LFM2:     <|tool_call_start|>[func(arg="val")]<|tool_call_end|> (Liquid AI)
- * - GEMMA:    <start_function_call>call:func{args}<end_function_call> (Google FunctionGemma)
+ * - DEFAULT:  <tool_call>{"tool":"name","arguments":{}}</tool_call> (Most general models)
+ * - LFM2:     <|tool_call_start|>[func(arg="val")]<|tool_call_end|> (Liquid AI models)
  * - AUTO:     Auto-detect format from output
  *
  * Ported from:
@@ -69,21 +68,12 @@ typedef enum rac_tool_call_format {
     RAC_TOOL_FORMAT_LFM2 = 2,
 
     /**
-     * @brief Google FunctionGemma format
-     *
-     * Format: <start_function_call>call:func_name{arg1:<escape>val1<escape>}<end_function_call>
-     * Used by: google/functiongemma-270m-it
-     * Note: Uses custom key-value syntax with <escape> delimiters for string values
-     */
-    RAC_TOOL_FORMAT_GEMMA = 3,
-
-    /**
      * @brief OpenAI-style function calling (future support)
      *
      * Format: JSON with "function_call" field
      * Reserved for future implementation
      */
-    RAC_TOOL_FORMAT_OPENAI = 4,
+    RAC_TOOL_FORMAT_OPENAI = 3,
 
     /** Number of formats (for iteration) */
     RAC_TOOL_FORMAT_COUNT
@@ -193,7 +183,6 @@ RAC_API rac_result_t rac_tool_call_parse(const char* llm_output, rac_tool_call_t
  * Supported formats:
  * - RAC_TOOL_FORMAT_DEFAULT: <tool_call>JSON</tool_call>
  * - RAC_TOOL_FORMAT_LFM2: <|tool_call_start|>[func(args)]<|tool_call_end|>
- * - RAC_TOOL_FORMAT_GEMMA: <start_function_call>call:func{args}<end_function_call>
  *
  * @param llm_output Raw LLM output text
  * @param format Tool calling format to use (RAC_TOOL_FORMAT_AUTO for auto-detect)

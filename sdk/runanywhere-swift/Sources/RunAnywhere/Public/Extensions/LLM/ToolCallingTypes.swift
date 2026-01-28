@@ -312,12 +312,8 @@ public enum ToolCallFormat: Int, Sendable, CaseIterable {
     /// Use for LFM2-1.2B-Tool and similar models.
     case lfm2 = 2
     
-    /// Google FunctionGemma format: `<start_function_call>func_name(arg=<escape>value<escape>)<end_function_call>`
-    /// Use for FunctionGemma-270M and similar models.
-    case gemma = 3
-    
     /// OpenAI-style format (reserved for future use)
-    case openai = 4
+    case openai = 3
     
     /// Human-readable name for the format
     public var name: String {
@@ -325,7 +321,6 @@ public enum ToolCallFormat: Int, Sendable, CaseIterable {
         case .auto: return "auto"
         case .default: return "default"
         case .lfm2: return "lfm2"
-        case .gemma: return "gemma"
         case .openai: return "openai"
         }
     }
@@ -364,7 +359,7 @@ public struct ToolCallingOptions: Sendable {
     /// Default: false (tool definitions are removed after first call to encourage natural response)
     public let keepToolsAvailable: Bool
     
-    /// Format for tool calls. Use `.lfm2` for LFM2-Tool models, `.gemma` for FunctionGemma.
+    /// Format for tool calls. Use `.lfm2` for LFM2-Tool models (Liquid AI).
     /// Default: `.default` which uses JSON-based format suitable for most models.
     public let format: ToolCallFormat
 

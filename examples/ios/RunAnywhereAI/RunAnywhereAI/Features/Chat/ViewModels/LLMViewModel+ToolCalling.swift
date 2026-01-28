@@ -24,11 +24,6 @@ extension LLMViewModel {
             return .lfm2
         }
 
-        // FunctionGemma models use custom format: <start_function_call>call:func{args}<end_function_call>
-        if name.contains("functiongemma") || name.contains("function-gemma") {
-            return .gemma
-        }
-
         // Default JSON format for general-purpose models
         return .default
     }
