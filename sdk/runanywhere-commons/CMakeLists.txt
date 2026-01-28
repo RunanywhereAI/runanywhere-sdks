@@ -33,6 +33,7 @@ option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, WhisperCPP)" OFF)
 option(RAC_BACKEND_LLAMACPP "Build LlamaCPP backend" ON)
 option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
 option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" ON)
+option(RAC_BUILD_SERVER "Build OpenAI-compatible HTTP server (runanywhere-server)" OFF)
 
 # =============================================================================
 # C++ CONFIGURATION
@@ -76,6 +77,36 @@ else()
 endif()
 
 message(STATUS "Platform: ${RAC_PLATFORM_NAME}")
+
+# =============================================================================
+# SERVER DEPENDENCIES (FetchContent)
+# =============================================================================
+# Only fetch if building the server - uses header-only libraries for minimal impact
+
+if(RAC_BUILD_SERVER)
+    include(FetchContent)
+
+    # cpp-httplib - header-only HTTP library (same as llama.cpp uses)
+    FetchContent_Declare(
+        cpp-httplib
+        GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
+        GIT_TAG v0.15.3
+        GIT_SHALLOW TRUE
+    )
+
+    # nlohmann/json - header-only JSON library
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.11.3
+        GIT_SHALLOW TRUE
+    )
+
+    # Make available (download on first configure)
+    message(STATUS "Fetching server dependencies (cpp-httplib, nlohmann_json)...")
+    FetchContent_MakeAvailable(cpp-httplib nlohmann_json)
+    message(STATUS "Server dependencies ready")
+endif()
 
 # =============================================================================
 # COMPILER FLAGS
@@ -293,6 +324,24 @@ if(RAC_BUILD_BACKENDS)
 endif()
 
 # =============================================================================
+# SERVER (OpenAI-compatible HTTP Server)
+# =============================================================================
+
+if(RAC_BUILD_SERVER)
+    message(STATUS "Building OpenAI-compatible HTTP server...")
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/server/CMakeLists.txt")
+        add_subdirectory(src/server)
+    else()
+        message(WARNING "Server source directory not found: src/server/")
+    endif()
+
+    # Also build the standalone server binary
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/CMakeLists.txt")
+        add_subdirectory(tools)
+    endif()
+endif()
+
+# =============================================================================
 # TESTS
 # =============================================================================
 
@@ -339,7 +388,11 @@ endif()
 if(RAC_BUILD_BACKENDS)
     message(STATUS "  Backends:     LlamaCPP=${RAC_BACKEND_LLAMACPP}, ONNX=${RAC_BACKEND_ONNX}, WhisperCPP=${RAC_BACKEND_WHISPERCPP}")
 endif()
+if(RAC_BUILD_SERVER)
+    message(STATUS "  Server:       OpenAI-compatible HTTP server (runanywhere-server)")
+endif()
 message(STATUS "")
 message(STATUS "JNI bridge:     ${RAC_BUILD_JNI}")
+message(STATUS "HTTP Server:    ${RAC_BUILD_SERVER}")
 message(STATUS "====================================")
 message(STATUS "")
