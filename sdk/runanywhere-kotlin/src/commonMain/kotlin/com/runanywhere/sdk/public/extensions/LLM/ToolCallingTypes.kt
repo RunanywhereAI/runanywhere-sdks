@@ -200,6 +200,26 @@ internal data class RegisteredTool(
 )
 
 // =============================================================================
+// TOOL CALL FORMAT NAMES
+// =============================================================================
+
+/**
+ * Format names for tool calling output.
+ * Different LLM models expect different formats for tool calls.
+ *
+ * The format logic is handled in C++ commons (single source of truth).
+ */
+object ToolCallFormatName {
+    /** JSON format: `<tool_call>{"tool":"name","arguments":{...}}</tool_call>`
+     * Use for most general-purpose models (Llama, Qwen, Mistral, etc.) */
+    const val DEFAULT = "default"
+    
+    /** Liquid AI format: `<|tool_call_start|>[func(args)]<|tool_call_end|>`
+     * Use for LFM2-Tool models */
+    const val LFM2 = "lfm2"
+}
+
+// =============================================================================
 // TOOL CALLING OPTIONS
 // =============================================================================
 
@@ -222,7 +242,14 @@ data class ToolCallingOptions(
     /** If true, replaces the system prompt entirely instead of appending tool instructions */
     val replaceSystemPrompt: Boolean = false,
     /** If true, keeps tool definitions available after the first tool call */
-    val keepToolsAvailable: Boolean = false
+    val keepToolsAvailable: Boolean = false,
+    /**
+     * Format for tool calls. Use "lfm2" for LFM2-Tool models (Liquid AI).
+     * Default: "default" which uses JSON-based format suitable for most models.
+     * Valid values: "auto", "default", "lfm2", "openai"
+     * See [ToolCallFormatName] for constants.
+     */
+    val format: String = ToolCallFormatName.DEFAULT
 )
 
 // =============================================================================

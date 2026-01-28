@@ -3332,6 +3332,50 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallFormatPrompt
 }
 
 JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallFormatPromptJsonWithFormat(
+    JNIEnv* env, jclass clazz, jstring toolsJson, jint format) {
+    std::string toolsStr = getCString(env, toolsJson);
+    char* prompt = nullptr;
+    
+    rac_result_t rc = rac_tool_call_format_prompt_json_with_format(
+        toolsStr.c_str(),
+        static_cast<rac_tool_call_format_t>(format),
+        &prompt
+    );
+    
+    if (rc != RAC_SUCCESS || prompt == nullptr) {
+        return nullptr;
+    }
+    
+    jstring result = env->NewStringUTF(prompt);
+    rac_free(prompt);
+    return result;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallFormatPromptJsonWithFormatName(
+    JNIEnv* env, jclass clazz, jstring toolsJson, jstring formatName) {
+    std::string toolsStr = getCString(env, toolsJson);
+    std::string formatStr = getCString(env, formatName);
+    char* prompt = nullptr;
+    
+    // Use string-based API (C++ is single source of truth for format names)
+    rac_result_t rc = rac_tool_call_format_prompt_json_with_format_name(
+        toolsStr.c_str(),
+        formatStr.c_str(),
+        &prompt
+    );
+    
+    if (rc != RAC_SUCCESS || prompt == nullptr) {
+        return nullptr;
+    }
+    
+    jstring result = env->NewStringUTF(prompt);
+    rac_free(prompt);
+    return result;
+}
+
+JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallBuildInitialPrompt(
     JNIEnv* env, jclass clazz, jstring userPrompt, jstring toolsJson, jstring optionsJson) {
     std::string userStr = getCString(env, userPrompt);
