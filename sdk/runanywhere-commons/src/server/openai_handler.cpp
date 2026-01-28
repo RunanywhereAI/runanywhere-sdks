@@ -1,11 +1,15 @@
 /**
  * @file openai_handler.cpp
  * @brief OpenAI API endpoint handlers implementation
+ *
+ * Uses Commons tool calling APIs via the translation layer.
  */
 
 #include "openai_handler.h"
 #include "json_utils.h"
+#include "openai_translation.h"
 #include "rac/core/rac_logger.h"
+#include "rac/features/llm/rac_tool_calling.h"
 
 #include <chrono>
 #include <sstream>
@@ -115,10 +119,14 @@ void OpenAIHandler::handleHealth(const httplib::Request& /*req*/, httplib::Respo
 void OpenAIHandler::processNonStreaming(const httplib::Request& /*req*/,
                                          httplib::Response& res,
                                          const nlohmann::json& requestJson) {
-    // Build prompt from messages
-    std::string prompt = buildPromptFromRequest(requestJson);
+    // Get messages and tools from request
+    const auto& messages = requestJson["messages"];
+    nlohmann::json tools = requestJson.value("tools", nlohmann::json::array());
 
-    // Parse options
+    // Build prompt using translation layer (which uses Commons APIs)
+    std::string prompt = translation::buildPromptFromOpenAI(messages, tools, nullptr);
+
+    // Parse LLM options
     rac_llm_options_t options = parseOptions(requestJson);
 
     // Generate response
@@ -133,6 +141,15 @@ void OpenAIHandler::processNonStreaming(const httplib::Request& /*req*/,
     // Update token count
     totalTokensGenerated_ += result.completion_tokens;
 
+    // Check if the response contains a tool call using Commons API
+    rac_tool_call_t toolCall = {};
+    bool hasToolCall = false;
+
+    if (result.text && !tools.empty()) {
+        rac_result_t parseResult = rac_tool_call_parse(result.text, &toolCall);
+        hasToolCall = (parseResult == RAC_SUCCESS && toolCall.has_tool_call);
+    }
+
     // Build response
     std::string requestId = generateId("chatcmpl-");
 
@@ -142,16 +159,40 @@ void OpenAIHandler::processNonStreaming(const httplib::Request& /*req*/,
     response.created = currentTimestamp();
     response.model = modelId_.c_str();
 
+    // Create message with potential tool calls
     rac_openai_assistant_message_t message = {};
     message.role = RAC_OPENAI_ROLE_ASSISTANT;
-    message.content = result.text;
-    message.tool_calls = nullptr;
-    message.num_tool_calls = 0;
+
+    // Tool call storage (for lifetime management)
+    rac_openai_tool_call_t openaiToolCall = {};
+    std::string toolCallId;
+    std::string toolName;
+    std::string toolArgs;
+
+    if (hasToolCall) {
+        // Convert Commons tool call to OpenAI format
+        toolCallId = translation::generateToolCallId();
+        toolName = toolCall.tool_name ? toolCall.tool_name : "";
+        toolArgs = toolCall.arguments_json ? toolCall.arguments_json : "{}";
+
+        openaiToolCall.id = toolCallId.c_str();
+        openaiToolCall.type = "function";
+        openaiToolCall.function_name = toolName.c_str();
+        openaiToolCall.function_arguments = toolArgs.c_str();
+
+        message.content = toolCall.clean_text; // Text without tool call tags
+        message.tool_calls = &openaiToolCall;
+        message.num_tool_calls = 1;
+    } else {
+        message.content = result.text;
+        message.tool_calls = nullptr;
+        message.num_tool_calls = 0;
+    }
 
     rac_openai_choice_t choice = {};
     choice.index = 0;
     choice.message = message;
-    choice.finish_reason = RAC_OPENAI_FINISH_STOP;
+    choice.finish_reason = hasToolCall ? RAC_OPENAI_FINISH_TOOL_CALLS : RAC_OPENAI_FINISH_STOP;
 
     response.choices = &choice;
     response.num_choices = 1;
@@ -164,6 +205,9 @@ void OpenAIHandler::processNonStreaming(const httplib::Request& /*req*/,
 
     // Clean up
     rac_llm_result_free(&result);
+    if (hasToolCall) {
+        rac_tool_call_free(&toolCall);
+    }
 
     res.set_content(jsonResponse.dump(), "application/json");
     res.status = 200;
@@ -172,8 +216,12 @@ void OpenAIHandler::processNonStreaming(const httplib::Request& /*req*/,
 void OpenAIHandler::processStreaming(const httplib::Request& /*req*/,
                                       httplib::Response& res,
                                       const nlohmann::json& requestJson) {
-    // Build prompt from messages
-    std::string prompt = buildPromptFromRequest(requestJson);
+    // Get messages and tools from request
+    const auto& messages = requestJson["messages"];
+    nlohmann::json tools = requestJson.value("tools", nlohmann::json::array());
+
+    // Build prompt using translation layer
+    std::string prompt = translation::buildPromptFromOpenAI(messages, tools, nullptr);
 
     // Parse options
     rac_llm_options_t options = parseOptions(requestJson);
@@ -240,20 +288,6 @@ void OpenAIHandler::processStreaming(const httplib::Request& /*req*/,
                 cbData.firstToken = false;
             }
 
-            // Generate with streaming callback
-            rac_llm_stream_params_t params = {};
-            params.prompt = prompt.c_str();
-            params.options = options;
-            params.user_data = &sink;
-            params.on_token = [](const char* token, void* userData) -> rac_bool_t {
-                auto* sinkPtr = static_cast<httplib::DataSink*>(userData);
-
-                // We can't easily access the full context here, so just send the token
-                // In a real implementation, we'd need to pass more context
-
-                return RAC_TRUE;  // Continue generation
-            };
-
             // Note: For a full implementation, we'd use rac_llm_generate_stream
             // For now, use non-streaming and send all at once
             rac_llm_result_t result = {};
@@ -307,57 +341,6 @@ void OpenAIHandler::processStreaming(const httplib::Request& /*req*/,
     );
 
     res.status = 200;
-}
-
-std::string OpenAIHandler::buildPromptFromRequest(const nlohmann::json& requestJson) {
-    std::ostringstream prompt;
-
-    const auto& messages = requestJson["messages"];
-
-    for (const auto& msg : messages) {
-        std::string role = msg.value("role", "user");
-        std::string content = msg.value("content", "");
-
-        if (role == "system") {
-            prompt << "System: " << content << "\n\n";
-        } else if (role == "user") {
-            prompt << "User: " << content << "\n\n";
-        } else if (role == "assistant") {
-            prompt << "Assistant: " << content << "\n\n";
-        } else if (role == "tool") {
-            std::string name = msg.value("name", "tool");
-            prompt << "Tool Result (" << name << "): " << content << "\n\n";
-        }
-    }
-
-    // Add tools if present
-    if (requestJson.contains("tools") && requestJson["tools"].is_array()) {
-        prompt << "You have access to the following tools:\n\n";
-
-        for (const auto& tool : requestJson["tools"]) {
-            if (tool.contains("function") && tool["function"].is_object()) {
-                const auto& func = tool["function"];
-                std::string name = func.value("name", "unknown");
-                std::string desc = func.value("description", "");
-
-                prompt << "- " << name;
-                if (!desc.empty()) {
-                    prompt << ": " << desc;
-                }
-                prompt << "\n";
-
-                if (func.contains("parameters")) {
-                    prompt << "  Parameters: " << func["parameters"].dump() << "\n";
-                }
-            }
-        }
-
-        prompt << "\nTo call a tool, respond with JSON: {\"tool_calls\": [{\"name\": \"...\", \"arguments\": {...}}]}\n\n";
-    }
-
-    prompt << "Assistant:";
-
-    return prompt.str();
 }
 
 rac_llm_options_t OpenAIHandler::parseOptions(const nlohmann::json& requestJson) {
