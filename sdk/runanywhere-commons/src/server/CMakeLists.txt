@@ -17,12 +17,14 @@
 set(RAC_SERVER_SOURCES
     http_server.cpp
     openai_handler.cpp
+    openai_translation.cpp
     json_utils.cpp
 )
 
 set(RAC_SERVER_HEADERS
     http_server.h
     openai_handler.h
+    openai_translation.h
     json_utils.h
 )
 

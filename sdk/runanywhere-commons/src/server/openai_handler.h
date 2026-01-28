@@ -75,11 +75,6 @@ private:
                           const nlohmann::json& requestJson);
 
     /**
-     * @brief Build the prompt from the request
-     */
-    std::string buildPromptFromRequest(const nlohmann::json& requestJson);
-
-    /**
      * @brief Parse generation options from request
      */
     rac_llm_options_t parseOptions(const nlohmann::json& requestJson);
