@@ -91,18 +91,24 @@ extension CppBridge {
         /// Format tool definitions into a system prompt using C++ implementation.
         ///
         /// Creates instruction text describing available tools and the expected
-        /// `<tool_call>` output format.
+        /// tool call output format.
         ///
-        /// - Parameter tools: Array of tool definitions
+        /// - Parameters:
+        ///   - tools: Array of tool definitions
+        ///   - format: Tool call format to use (default: .default)
         /// - Returns: Formatted system prompt string
-        public static func formatToolsForPrompt(_ tools: [ToolDefinition]) -> String {
+        public static func formatToolsForPrompt(
+            _ tools: [ToolDefinition],
+            format: ToolCallFormat = .default
+        ) -> String {
             guard !tools.isEmpty else { return "" }
 
             let toolsJson = serializeToolsToJson(tools)
             var promptPtr: UnsafeMutablePointer<CChar>?
             defer { if let p = promptPtr { rac_free(p) } }
 
-            let rc = rac_tool_call_format_prompt_json(toolsJson, &promptPtr)
+            let cFormat = rac_tool_call_format_t(rawValue: UInt32(format.rawValue))
+            let rc = rac_tool_call_format_prompt_json_with_format(toolsJson, cFormat, &promptPtr)
             guard rc == RAC_SUCCESS, let ptr = promptPtr else {
                 return ""
             }
@@ -138,6 +144,7 @@ extension CppBridge {
             cOptions.max_tokens = Int32(options.maxTokens ?? 1024)
             cOptions.replace_system_prompt = options.replaceSystemPrompt ? RAC_TRUE : RAC_FALSE
             cOptions.keep_tools_available = options.keepToolsAvailable ? RAC_TRUE : RAC_FALSE
+            cOptions.format = rac_tool_call_format_t(rawValue: UInt32(options.format.rawValue))
 
             // Handle system prompt
             if let systemPrompt = options.systemPrompt {

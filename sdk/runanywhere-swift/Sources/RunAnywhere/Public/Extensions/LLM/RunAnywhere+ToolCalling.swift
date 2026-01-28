@@ -219,7 +219,8 @@ public extension RunAnywhere {
         options: ToolCallingOptions
     ) -> String {
         // Use C++ implementation for prompt formatting (SINGLE SOURCE OF TRUTH)
-        let toolsPrompt = CppBridge.ToolCalling.formatToolsForPrompt(tools)
+        // Pass the format from options to generate model-specific instructions
+        let toolsPrompt = CppBridge.ToolCalling.formatToolsForPrompt(tools, format: options.format)
 
         if options.replaceSystemPrompt, let userPrompt = options.systemPrompt {
             return userPrompt

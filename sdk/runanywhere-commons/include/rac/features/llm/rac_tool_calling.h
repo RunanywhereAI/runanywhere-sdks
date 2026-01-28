@@ -11,6 +11,12 @@
  * - C++ handles: ALL parsing, prompt formatting, JSON handling, follow-up prompts
  * - Platform SDKs handle ONLY: tool registry (closures), tool execution (needs platform APIs)
  *
+ * Supported Tool Calling Formats:
+ * - DEFAULT:  <tool_call>{"tool":"name","arguments":{}}</tool_call>
+ * - LFM2:     <|tool_call_start|>[func(arg="val")]<|tool_call_end|> (Liquid AI)
+ * - GEMMA:    <start_function_call>call:func{args}<end_function_call> (Google FunctionGemma)
+ * - AUTO:     Auto-detect format from output
+ *
  * Ported from:
  * - Swift: ToolCallParser.swift
  * - React Native: ToolCallingBridge.cpp
@@ -25,6 +31,63 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+// =============================================================================
+// TOOL CALLING FORMATS - Different models use different formats
+// =============================================================================
+
+/**
+ * @brief Tool calling format identifiers
+ *
+ * Different LLM models use different tool calling formats. This enum allows
+ * specifying which format to use for parsing and prompt generation.
+ */
+typedef enum rac_tool_call_format {
+    /**
+     * @brief Auto-detect format from LLM output
+     *
+     * Tries all known formats in order of likelihood and returns the first match.
+     * Recommended when the model is unknown or may vary.
+     */
+    RAC_TOOL_FORMAT_AUTO = 0,
+
+    /**
+     * @brief SDK Default format: <tool_call>JSON</tool_call>
+     *
+     * Format: <tool_call>{"tool": "name", "arguments": {...}}</tool_call>
+     * Used by: Most general-purpose models when instructed via system prompt
+     */
+    RAC_TOOL_FORMAT_DEFAULT = 1,
+
+    /**
+     * @brief Liquid AI LFM2-Tool format
+     *
+     * Format: <|tool_call_start|>[func_name(arg1="val1", arg2="val2")]<|tool_call_end|>
+     * Used by: LiquidAI/LFM2-1.2B-Tool, LiquidAI/LFM2-350M-Tool
+     * Note: Uses Pythonic function call syntax
+     */
+    RAC_TOOL_FORMAT_LFM2 = 2,
+
+    /**
+     * @brief Google FunctionGemma format
+     *
+     * Format: <start_function_call>call:func_name{arg1:<escape>val1<escape>}<end_function_call>
+     * Used by: google/functiongemma-270m-it
+     * Note: Uses custom key-value syntax with <escape> delimiters for string values
+     */
+    RAC_TOOL_FORMAT_GEMMA = 3,
+
+    /**
+     * @brief OpenAI-style function calling (future support)
+     *
+     * Format: JSON with "function_call" field
+     * Reserved for future implementation
+     */
+    RAC_TOOL_FORMAT_OPENAI = 4,
+
+    /** Number of formats (for iteration) */
+    RAC_TOOL_FORMAT_COUNT
+} rac_tool_call_format_t;
 
 // =============================================================================
 // TYPES - Canonical definitions used by all SDKs
@@ -67,11 +130,12 @@ typedef struct rac_tool_definition {
  * @brief Parsed tool call from LLM output
  */
 typedef struct rac_tool_call {
-    rac_bool_t has_tool_call;   /**< Whether a tool call was found */
-    char* tool_name;            /**< Name of tool to execute (owned, must free) */
-    char* arguments_json;       /**< Arguments as JSON string (owned, must free) */
-    char* clean_text;           /**< Text without tool call tags (owned, must free) */
-    int64_t call_id;            /**< Unique call ID for tracking */
+    rac_bool_t has_tool_call;        /**< Whether a tool call was found */
+    char* tool_name;                 /**< Name of tool to execute (owned, must free) */
+    char* arguments_json;            /**< Arguments as JSON string (owned, must free) */
+    char* clean_text;                /**< Text without tool call tags (owned, must free) */
+    int64_t call_id;                 /**< Unique call ID for tracking */
+    rac_tool_call_format_t format;   /**< Format that was detected/used for parsing */
 } rac_tool_call_t;
 
 /**
@@ -85,6 +149,7 @@ typedef struct rac_tool_calling_options {
     const char* system_prompt;        /**< Optional system prompt */
     rac_bool_t replace_system_prompt; /**< Replace vs append tool instructions */
     rac_bool_t keep_tools_available;  /**< Keep tools after first call */
+    rac_tool_call_format_t format;    /**< Tool calling format (default: AUTO) */
 } rac_tool_calling_options_t;
 
 /**
@@ -98,7 +163,8 @@ typedef struct rac_tool_calling_options {
             1024,  /* max_tokens */                                                                \
             RAC_NULL, /* system_prompt */                                                          \
             0,     /* replace_system_prompt = false */                                             \
-            0      /* keep_tools_available = false */                                              \
+            0,     /* keep_tools_available = false */                                              \
+            RAC_TOOL_FORMAT_AUTO /* format = auto-detect */                                        \
     }
 
 // =============================================================================
@@ -106,17 +172,12 @@ typedef struct rac_tool_calling_options {
 // =============================================================================
 
 /**
- * @brief Parse LLM output for tool calls
+ * @brief Parse LLM output for tool calls (auto-detect format)
  *
  * *** THIS IS THE ONLY PARSING IMPLEMENTATION - ALL SDKS MUST USE THIS ***
  *
- * Looks for <tool_call>JSON</tool_call> pattern in output.
- * Handles ALL edge cases:
- * - Missing closing tags (brace-matching)
- * - Unquoted JSON keys ({tool: "name"} → {"tool": "name"})
- * - Multiple key naming conventions ("tool"/"name"/"function", "arguments"/"params"/"input")
- * - Placeholder keys with tool name as value
- * - Tool name as key pattern
+ * Auto-detects the tool calling format by trying all known formats.
+ * Handles ALL edge cases for each format.
  *
  * @param llm_output Raw LLM output text
  * @param out_result Output: Parsed result (caller must free with rac_tool_call_free)
@@ -125,24 +186,58 @@ typedef struct rac_tool_calling_options {
 RAC_API rac_result_t rac_tool_call_parse(const char* llm_output, rac_tool_call_t* out_result);
 
 /**
+ * @brief Parse LLM output for tool calls with specified format
+ *
+ * Parses using a specific format. Use RAC_TOOL_FORMAT_AUTO to auto-detect.
+ *
+ * Supported formats:
+ * - RAC_TOOL_FORMAT_DEFAULT: <tool_call>JSON</tool_call>
+ * - RAC_TOOL_FORMAT_LFM2: <|tool_call_start|>[func(args)]<|tool_call_end|>
+ * - RAC_TOOL_FORMAT_GEMMA: <start_function_call>call:func{args}<end_function_call>
+ *
+ * @param llm_output Raw LLM output text
+ * @param format Tool calling format to use (RAC_TOOL_FORMAT_AUTO for auto-detect)
+ * @param out_result Output: Parsed result (caller must free with rac_tool_call_free)
+ * @return RAC_SUCCESS on success, error code otherwise
+ */
+RAC_API rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
+                                                     rac_tool_call_format_t format,
+                                                     rac_tool_call_t* out_result);
+
+/**
  * @brief Free tool call result
  * @param result Result to free
  */
 RAC_API void rac_tool_call_free(rac_tool_call_t* result);
+
+/**
+ * @brief Get the human-readable name of a tool calling format
+ *
+ * @param format The format to get the name for
+ * @return Static string with the format name (do not free)
+ */
+RAC_API const char* rac_tool_call_format_name(rac_tool_call_format_t format);
+
+/**
+ * @brief Detect which format is present in LLM output
+ *
+ * Checks for format-specific markers without fully parsing.
+ * Returns RAC_TOOL_FORMAT_AUTO if no recognizable format is found.
+ *
+ * @param llm_output Raw LLM output text
+ * @return Detected format, or RAC_TOOL_FORMAT_AUTO if none detected
+ */
+RAC_API rac_tool_call_format_t rac_tool_call_detect_format(const char* llm_output);
 
 // =============================================================================
 // PROMPT FORMATTING API - All prompt building happens here
 // =============================================================================
 
 /**
- * @brief Format tool definitions into system prompt
+ * @brief Format tool definitions into system prompt (default format)
  *
  * Creates instruction text describing available tools and expected output format.
- * Includes:
- * - Tool descriptions and parameters
- * - <tool_call> format instructions
- * - Example usage
- * - Rules for when to use tools
+ * Uses RAC_TOOL_FORMAT_DEFAULT (<tool_call>JSON</tool_call>).
  *
  * @param definitions Array of tool definitions
  * @param num_definitions Number of definitions
@@ -153,7 +248,24 @@ RAC_API rac_result_t rac_tool_call_format_prompt(const rac_tool_definition_t* de
                                                  size_t num_definitions, char** out_prompt);
 
 /**
- * @brief Format tools from JSON array string
+ * @brief Format tool definitions with specified format
+ *
+ * Creates instruction text using the specified tool calling format.
+ * Each format has different tag patterns and syntax instructions.
+ *
+ * @param definitions Array of tool definitions
+ * @param num_definitions Number of definitions
+ * @param format Tool calling format to use for instructions
+ * @param out_prompt Output: Allocated prompt string (caller must free with rac_free)
+ * @return RAC_SUCCESS on success, error code otherwise
+ */
+RAC_API rac_result_t rac_tool_call_format_prompt_with_format(const rac_tool_definition_t* definitions,
+                                                             size_t num_definitions,
+                                                             rac_tool_call_format_t format,
+                                                             char** out_prompt);
+
+/**
+ * @brief Format tools from JSON array string (default format)
  *
  * Convenience function when tools are provided as JSON.
  *
@@ -162,6 +274,18 @@ RAC_API rac_result_t rac_tool_call_format_prompt(const rac_tool_definition_t* de
  * @return RAC_SUCCESS on success, error code otherwise
  */
 RAC_API rac_result_t rac_tool_call_format_prompt_json(const char* tools_json, char** out_prompt);
+
+/**
+ * @brief Format tools from JSON array string with specified format
+ *
+ * @param tools_json JSON array of tool definitions
+ * @param format Tool calling format to use for instructions
+ * @param out_prompt Output: Allocated prompt string (caller must free with rac_free)
+ * @return RAC_SUCCESS on success, error code otherwise
+ */
+RAC_API rac_result_t rac_tool_call_format_prompt_json_with_format(const char* tools_json,
+                                                                  rac_tool_call_format_t format,
+                                                                  char** out_prompt);
 
 /**
  * @brief Build the initial prompt with tools and user query
