@@ -1,0 +1,633 @@
+/* ============================================================================
+   Global Styles
+   ============================================================================ */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #1a1a1a;
+  background: #ffffff;
+}
+
+/* ============================================================================
+   App Container
+   ============================================================================ */
+
+.app {
+  width: 400px;
+  min-height: 300px;
+  max-height: 600px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ============================================================================
+   Header
+   ============================================================================ */
+
+.header {
+  padding: 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.header h1 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.header p {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+/* ============================================================================
+   Main Content
+   ============================================================================ */
+
+.main {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+/* ============================================================================
+   Task Input Component
+   ============================================================================ */
+
+.task-input {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.task-input textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color 0.2s;
+}
+
+.task-input textarea:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.task-input textarea::placeholder {
+  color: #999;
+}
+
+.task-input button {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.task-input button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.task-input button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.examples {
+  margin-top: 8px;
+}
+
+.examples-label {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 6px;
+}
+
+.examples-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.example-chip {
+  padding: 4px 10px;
+  background: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 16px;
+  font-size: 12px;
+  color: #555;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.example-chip:hover {
+  background: #eee;
+  border-color: #ccc;
+}
+
+/* ============================================================================
+   Model Status Component
+   ============================================================================ */
+
+.model-status {
+  text-align: center;
+  padding: 24px;
+}
+
+.model-status h2 {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 16px;
+  color: #333;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 12px;
+  color: #666;
+}
+
+.model-status .note {
+  margin-top: 16px;
+  font-size: 11px;
+  color: #999;
+}
+
+/* ============================================================================
+   Progress Display Component
+   ============================================================================ */
+
+.progress-display {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.progress-section {
+  background: #f9f9f9;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.progress-section h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.plan-list {
+  list-style: none;
+}
+
+.plan-list li {
+  padding: 6px 0;
+  font-size: 13px;
+  color: #333;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.plan-list li::before {
+  content: '•';
+  color: #667eea;
+  font-weight: bold;
+}
+
+.steps-list {
+  list-style: none;
+}
+
+.step-item {
+  padding: 8px;
+  margin-bottom: 4px;
+  background: white;
+  border-radius: 6px;
+  border-left: 3px solid #e0e0e0;
+}
+
+.step-item.running {
+  border-left-color: #667eea;
+  background: #f8f9ff;
+}
+
+.step-item.success {
+  border-left-color: #10b981;
+}
+
+.step-item.failed {
+  border-left-color: #ef4444;
+}
+
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.step-number {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e0e0e0;
+  border-radius: 50%;
+  font-size: 11px;
+  color: #666;
+}
+
+.step-item.running .step-number {
+  background: #667eea;
+  color: white;
+}
+
+.step-item.success .step-number {
+  background: #10b981;
+  color: white;
+}
+
+.step-item.failed .step-number {
+  background: #ef4444;
+  color: white;
+}
+
+.step-action {
+  color: #333;
+}
+
+.step-params {
+  font-size: 11px;
+  color: #666;
+  margin-top: 4px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+  word-break: break-all;
+}
+
+.step-result {
+  font-size: 12px;
+  color: #10b981;
+  margin-top: 4px;
+}
+
+.step-error {
+  font-size: 12px;
+  color: #ef4444;
+  margin-top: 4px;
+}
+
+.planning-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  background: #f8f9ff;
+  border-radius: 8px;
+  color: #667eea;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================================================
+   Result View Component
+   ============================================================================ */
+
+.result-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.result-view h2 {
+  font-size: 16px;
+  font-weight: 500;
+  color: #10b981;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.result-content {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 16px;
+  font-size: 14px;
+  color: #166534;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.result-view button {
+  padding: 10px 20px;
+  background: #f0f0f0;
+  color: #333;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.result-view button:hover {
+  background: #e8e8e8;
+}
+
+/* ============================================================================
+   Error View
+   ============================================================================ */
+
+.error-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.error-view h2 {
+  font-size: 16px;
+  font-weight: 500;
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.error-content {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 16px;
+  font-size: 14px;
+  color: #991b1b;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.error-view button {
+  padding: 10px 20px;
+  background: #f0f0f0;
+  color: #333;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.error-view button:hover {
+  background: #e8e8e8;
+}
+
+/* ============================================================================
+   Model Settings
+   ============================================================================ */
+
+.model-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  border: 1px solid #e8e8e8;
+}
+
+.model-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.model-select label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #555;
+  min-width: 32px;
+}
+
+.model-select select {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.model-select select:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.vlm-select {
+  padding-top: 8px;
+  border-top: 1px solid #e8e8e8;
+}
+
+/* ============================================================================
+   Vision Toggle
+   ============================================================================ */
+
+.vision-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.vision-toggle label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #555;
+  cursor: pointer;
+}
+
+.vision-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #667eea;
+}
+
+.vision-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #667eea;
+  background: rgba(102, 126, 234, 0.1);
+  border-radius: 10px;
+  cursor: help;
+}
+
+.vision-badge.vision-unavailable {
+  color: #999;
+  background: rgba(150, 150, 150, 0.1);
+}
+
+.vision-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vision-disabled input {
+  cursor: not-allowed;
+}
+
+/* ============================================================================
+   Stop Button
+   ============================================================================ */
+
+.stop-button {
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px 20px;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.stop-button:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+}
+
+.stop-button:active {
+  transform: translateY(0);
+}
+
+/* ============================================================================
+   Paused View (Obstacle Handling)
+   ============================================================================ */
+
+.paused-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.obstacle-icon {
+  font-size: 48px;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.paused-view h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #f59e0b;
+  text-align: center;
+  margin: 0;
+}
+
+.obstacle-message {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 16px;
+  font-size: 14px;
+  color: #92400e;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.paused-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.resume-button {
+  flex: 1;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.resume-button:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  transform: translateY(-1px);
+}
+
+.resume-button:active {
+  transform: translateY(0);
+}
+
+.paused-actions .stop-button {
+  flex: 1;
+}

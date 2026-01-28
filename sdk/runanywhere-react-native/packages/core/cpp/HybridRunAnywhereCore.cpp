@@ -35,6 +35,7 @@
 #include "bridges/HTTPBridge.hpp"
 #include "bridges/DownloadBridge.hpp"
 #include "bridges/TelemetryBridge.hpp"
+#include "bridges/ToolCallingBridge.hpp"
 
 // RACommons C API headers for capability methods
 // These are backend-agnostic - they work with any registered backend
@@ -2566,6 +2567,31 @@ std::shared_ptr<Promise<void>> HybridRunAnywhereCore::flushTelemetry() {
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isTelemetryInitialized() {
     return Promise<bool>::async([]() -> bool {
         return TelemetryBridge::shared().isInitialized();
+    });
+}
+
+// ============================================================================
+// Tool Calling
+//
+// ARCHITECTURE:
+// - C++ (ToolCallingBridge): Parses <tool_call> tags from LLM output.
+//   This is the SINGLE SOURCE OF TRUTH for parsing, ensuring consistency.
+//
+// - TypeScript (RunAnywhere+ToolCalling.ts): Handles tool registry, executor
+//   storage, prompt formatting, and orchestration. Executors MUST stay in
+//   TypeScript because they need JavaScript APIs (fetch, device APIs, etc.).
+//
+// Only parseToolCallFromOutput is implemented in C++. All other tool calling
+// functionality (registration, execution, prompt formatting) is in TypeScript.
+// ============================================================================
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::parseToolCallFromOutput(const std::string& llmOutput) {
+    return Promise<std::string>::async([llmOutput]() -> std::string {
+        LOGD("parseToolCallFromOutput: input length=%zu", llmOutput.length());
+
+        // Use ToolCallingBridge for parsing - single source of truth
+        // This ensures consistent <tool_call> tag parsing across all platforms
+        return ::runanywhere::bridges::ToolCallingBridge::shared().parseToolCall(llmOutput);
     });
 }
 

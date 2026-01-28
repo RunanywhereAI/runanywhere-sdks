@@ -624,4 +624,32 @@ export interface RunAnywhereCore
    * Cleanup voice agent resources
    */
   cleanupVoiceAgent(): Promise<void>;
+
+  // ============================================================================
+  // Tool Calling Capability
+  //
+  // ARCHITECTURE:
+  // - C++ (ToolCallingBridge): Parses <tool_call> tags from LLM output.
+  //   This is the SINGLE SOURCE OF TRUTH for parsing, ensuring consistency.
+  //
+  // - TypeScript (RunAnywhere+ToolCalling.ts): Handles tool registry, executor
+  //   storage, prompt formatting, and orchestration. Executors MUST stay in
+  //   TypeScript because they need JavaScript APIs (fetch, device APIs, etc.).
+  //
+  // Only parseToolCallFromOutput is implemented in C++. All other tool calling
+  // functionality (registerTool, unregisterTool, clearTools, formatToolsForPrompt)
+  // is provided by the TypeScript layer in RunAnywhere+ToolCalling.ts.
+  // ============================================================================
+
+  /**
+   * Parse LLM output for tool call (IMPLEMENTED in C++ ToolCallingBridge)
+   *
+   * This is the single source of truth for parsing <tool_call> tags from LLM output.
+   * Ensures consistent parsing behavior across all platforms.
+   *
+   * @param llmOutput Raw LLM output text that may contain <tool_call> tags
+   * @returns JSON with {hasToolCall, cleanText, toolName, argumentsJson, callId}
+   *          TypeScript layer converts this to {text, toolCall} format
+   */
+  parseToolCallFromOutput(llmOutput: string): Promise<string>;
 }
