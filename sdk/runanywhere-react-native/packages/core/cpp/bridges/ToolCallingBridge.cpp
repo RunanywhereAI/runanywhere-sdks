@@ -1,15 +1,16 @@
 /**
  * @file ToolCallingBridge.cpp
- * @brief Tool Calling bridge implementation
+ * @brief Tool Calling bridge implementation - THIN WRAPPER
  *
- * Implements tool call parsing using nlohmann/json for robust JSON handling.
- * This avoids dependency on rac_tool_calling.h which may not be in the
- * pre-built xcframework.
+ * *** ALL LOGIC IS IN runanywhere-commons (rac_tool_calling.h) ***
+ *
+ * This bridge just wraps the C API functions from commons.
+ * NO LOCAL PARSING LOGIC - everything calls through to commons.
  */
 
 #include "ToolCallingBridge.hpp"
+#include <rac/features/llm/rac_tool_calling.h>
 #include <nlohmann/json.hpp>
-#include <sstream>
 #include <cstring>
 
 using json = nlohmann::json;
@@ -17,243 +18,118 @@ using json = nlohmann::json;
 namespace runanywhere {
 namespace bridges {
 
-// Tool call tag definitions (matching RACommons tool_calling.cpp)
-static const char* TOOL_CALL_START_TAG = "<tool_call>";
-static const char* TOOL_CALL_END_TAG = "</tool_call>";
-
 ToolCallingBridge& ToolCallingBridge::shared() {
     static ToolCallingBridge instance;
     return instance;
 }
 
-std::string ToolCallingBridge::escapeJsonString(const std::string& input) {
-    // Use nlohmann/json for proper escaping
-    json j = input;
-    std::string escaped = j.dump();
-    // Remove surrounding quotes added by dump()
-    if (escaped.size() >= 2 && escaped.front() == '"' && escaped.back() == '"') {
-        return escaped.substr(1, escaped.size() - 2);
-    }
-    return escaped;
-}
-
-/**
- * Normalize JSON by adding quotes around unquoted keys.
- * Handles: {tool: "name"} -> {"tool": "name"}
- *
- * This handles common LLM output patterns where keys may not be quoted.
- * After normalization, the JSON can be parsed by nlohmann/json.
- */
-std::string ToolCallingBridge::normalizeJson(const std::string& jsonStr) {
-    std::string result;
-    result.reserve(jsonStr.size() + 32);
-
-    bool inString = false;
-    for (size_t i = 0; i < jsonStr.size(); i++) {
-        char c = jsonStr[i];
-
-        // Track if we're inside a string
-        if (c == '"' && (i == 0 || jsonStr[i-1] != '\\')) {
-            inString = !inString;
-            result += c;
-            continue;
-        }
-
-        if (inString) {
-            result += c;
-            continue;
-        }
-
-        // Look for unquoted keys: { key: or , key:
-        if ((c == '{' || c == ',') && i + 1 < jsonStr.size()) {
-            result += c;
-            // Skip whitespace
-            size_t j = i + 1;
-            while (j < jsonStr.size() && (jsonStr[j] == ' ' || jsonStr[j] == '\t' || jsonStr[j] == '\n')) {
-                result += jsonStr[j];
-                j++;
+std::string ToolCallingBridge::parseToolCall(const std::string& llmOutput) {
+    rac_tool_call_t result;
+    rac_result_t rc = rac_tool_call_parse(llmOutput.c_str(), &result);
+    
+    // Build JSON response using nlohmann/json
+    json response;
+    response["hasToolCall"] = result.has_tool_call == RAC_TRUE;
+    response["cleanText"] = result.clean_text ? result.clean_text : llmOutput;
+    
+    if (result.has_tool_call == RAC_TRUE) {
+        response["toolName"] = result.tool_name ? result.tool_name : "";
+        
+        if (result.arguments_json) {
+            try {
+                response["argumentsJson"] = json::parse(result.arguments_json);
+            } catch (...) {
+                response["argumentsJson"] = json::object();
             }
-            // Check if next is an unquoted identifier followed by colon
-            if (j < jsonStr.size() && jsonStr[j] != '"' && jsonStr[j] != '{' && jsonStr[j] != '[') {
-                size_t keyStart = j;
-                while (j < jsonStr.size() && jsonStr[j] != ':' && jsonStr[j] != ' ' && jsonStr[j] != '\t') {
-                    j++;
-                }
-                if (j < jsonStr.size()) {
-                    // Skip whitespace to find colon
-                    size_t keyEnd = j;
-                    while (j < jsonStr.size() && (jsonStr[j] == ' ' || jsonStr[j] == '\t')) j++;
-                    if (j < jsonStr.size() && jsonStr[j] == ':') {
-                        // This is an unquoted key - add quotes
-                        result += '"';
-                        result += jsonStr.substr(keyStart, keyEnd - keyStart);
-                        result += '"';
-                        i = keyEnd - 1; // -1 because loop will increment
-                        continue;
-                    }
-                }
-            }
-            i = j - 1; // -1 because loop will increment
-            continue;
+        } else {
+            response["argumentsJson"] = json::object();
         }
-
-        result += c;
+        response["callId"] = result.call_id;
     }
-
-    return result;
+    
+    rac_tool_call_free(&result);
+    return response.dump();
 }
 
 std::string ToolCallingBridge::formatToolsPrompt(const std::string& toolsJson) {
     if (toolsJson.empty() || toolsJson == "[]") {
         return "";
     }
-
-    // Build a comprehensive system prompt for tool calling
-    // This prompt is designed to work with models that support tool calling (3B+ recommended)
-    std::ostringstream ss;
-
-    ss << "# Available Tools\n\n";
-    ss << "You have access to the following tools. ONLY use them when the user specifically asks for information that requires them:\n\n";
-    ss << toolsJson << "\n\n";
-
-    ss << "# Tool Usage Instructions\n\n";
-    ss << "IMPORTANT RULES:\n";
-    ss << "- For normal conversation (greetings, questions, chat), respond naturally WITHOUT using any tools.\n";
-    ss << "- Only use a tool if the user explicitly asks for something the tool provides.\n";
-    ss << "- Do NOT use tools for general questions or conversation.\n\n";
-
-    ss << "When you DO need to use a tool, respond with:\n";
-    ss << "<tool_call>{\"tool\": \"tool_name\", \"arguments\": {\"param1\": \"value1\"}}</tool_call>\n\n";
-
-    ss << "If the user just says \"hello\" or asks a general question, respond normally without any tool calls.";
-
-    return ss.str();
+    
+    char* prompt = nullptr;
+    rac_result_t rc = rac_tool_call_format_prompt_json(toolsJson.c_str(), &prompt);
+    
+    if (rc != RAC_SUCCESS || !prompt) {
+        return "";
+    }
+    
+    std::string result(prompt);
+    rac_free(prompt);
+    return result;
 }
 
-std::string ToolCallingBridge::parseToolCall(const std::string& llmOutput) {
-    // Find tool call tags
-    size_t tagStart = llmOutput.find(TOOL_CALL_START_TAG);
-
-    if (tagStart == std::string::npos) {
-        // No tool call found - return clean text with hasToolCall = false
-        json result;
-        result["hasToolCall"] = false;
-        result["cleanText"] = llmOutput;
-        return result.dump();
-    }
-
-    // Find end tag
-    size_t jsonStart = tagStart + strlen(TOOL_CALL_START_TAG);
-    size_t tagEnd = llmOutput.find(TOOL_CALL_END_TAG, jsonStart);
-    bool hasClosingTag = (tagEnd != std::string::npos);
-
-    if (!hasClosingTag) {
-        // No closing tag - find JSON by matching braces
-        // This handles models that output: <tool_call>{"tool": "name", ...}
-        // without the closing </tool_call>
-        std::string jsonPart = llmOutput.substr(jsonStart);
-        int braceCount = 0;
-        bool inStr = false;
-        size_t jsonEndIndex = std::string::npos;
-
-        for (size_t i = 0; i < jsonPart.size(); i++) {
-            char c = jsonPart[i];
-            
-            // Track string boundaries to ignore braces inside strings
-            if (c == '"' && (i == 0 || jsonPart[i-1] != '\\')) {
-                inStr = !inStr;
-            }
-            
-            if (!inStr) {
-                if (c == '{') braceCount++;
-                else if (c == '}') {
-                    braceCount--;
-                    if (braceCount == 0) {
-                        jsonEndIndex = i + 1;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (jsonEndIndex == std::string::npos) {
-            // Can't find valid JSON object
-            json result;
-            result["hasToolCall"] = false;
-            result["cleanText"] = llmOutput;
-            return result.dump();
-        }
-        tagEnd = jsonStart + jsonEndIndex;
-    }
-
-    // Extract JSON between tags
-    std::string toolJsonStr = llmOutput.substr(jsonStart, tagEnd - jsonStart);
+std::string ToolCallingBridge::buildInitialPrompt(
+    const std::string& userPrompt,
+    const std::string& toolsJson,
+    const std::string& optionsJson
+) {
+    // Use default options for now
+    rac_tool_calling_options_t options = {5, RAC_TRUE, 0.7f, 1024, nullptr, RAC_FALSE, RAC_FALSE};
     
-    // Normalize JSON (handle unquoted keys from LLMs)
-    std::string normalizedJson = normalizeJson(toolJsonStr);
-
-    // Parse with nlohmann/json
-    json toolJson;
-    try {
-        toolJson = json::parse(normalizedJson);
-    } catch (const json::parse_error& e) {
-        // JSON parsing failed - return as no tool call
-        json result;
-        result["hasToolCall"] = false;
-        result["cleanText"] = llmOutput;
-        return result.dump();
+    char* prompt = nullptr;
+    rac_result_t rc = rac_tool_call_build_initial_prompt(
+        userPrompt.c_str(), 
+        toolsJson.c_str(), 
+        &options, 
+        &prompt
+    );
+    
+    if (rc != RAC_SUCCESS || !prompt) {
+        return userPrompt;
     }
+    
+    std::string result(prompt);
+    rac_free(prompt);
+    return result;
+}
 
-    // Extract tool name (try "tool" first, then "name")
-    std::string toolName;
-    if (toolJson.contains("tool") && toolJson["tool"].is_string()) {
-        toolName = toolJson["tool"].get<std::string>();
-    } else if (toolJson.contains("name") && toolJson["name"].is_string()) {
-        toolName = toolJson["name"].get<std::string>();
-    } else {
-        // Could not find tool name
-        json result;
-        result["hasToolCall"] = false;
-        result["cleanText"] = llmOutput;
-        return result.dump();
+std::string ToolCallingBridge::buildFollowupPrompt(
+    const std::string& originalPrompt,
+    const std::string& toolsPrompt,
+    const std::string& toolName,
+    const std::string& resultJson,
+    bool keepToolsAvailable
+) {
+    char* prompt = nullptr;
+    rac_result_t rc = rac_tool_call_build_followup_prompt(
+        originalPrompt.c_str(),
+        toolsPrompt.empty() ? nullptr : toolsPrompt.c_str(),
+        toolName.c_str(),
+        resultJson.c_str(),
+        keepToolsAvailable ? RAC_TRUE : RAC_FALSE,
+        &prompt
+    );
+    
+    if (rc != RAC_SUCCESS || !prompt) {
+        return "";
     }
+    
+    std::string result(prompt);
+    rac_free(prompt);
+    return result;
+}
 
-    // Extract arguments (try "arguments" first, then "params")
-    json arguments = json::object();
-    if (toolJson.contains("arguments") && toolJson["arguments"].is_object()) {
-        arguments = toolJson["arguments"];
-    } else if (toolJson.contains("params") && toolJson["params"].is_object()) {
-        arguments = toolJson["params"];
+std::string ToolCallingBridge::normalizeJson(const std::string& jsonStr) {
+    char* normalized = nullptr;
+    rac_result_t rc = rac_tool_call_normalize_json(jsonStr.c_str(), &normalized);
+    
+    if (rc != RAC_SUCCESS || !normalized) {
+        return jsonStr;
     }
-
-    // Build the clean text (everything except the tool call tags)
-    std::string cleanText;
-    cleanText = llmOutput.substr(0, tagStart);
-    if (hasClosingTag) {
-        cleanText += llmOutput.substr(tagEnd + strlen(TOOL_CALL_END_TAG));
-    } else {
-        // No closing tag - just take everything after the JSON
-        cleanText += llmOutput.substr(tagEnd);
-    }
-
-    // Trim whitespace from clean text
-    size_t start = cleanText.find_first_not_of(" \t\n\r");
-    size_t end = cleanText.find_last_not_of(" \t\n\r");
-    if (start != std::string::npos && end != std::string::npos) {
-        cleanText = cleanText.substr(start, end - start + 1);
-    } else {
-        cleanText = "";
-    }
-
-    // Build JSON response using nlohmann/json
-    json result;
-    result["hasToolCall"] = true;
-    result["cleanText"] = cleanText;
-    result["toolName"] = toolName;
-    result["argumentsJson"] = arguments;
-    result["callId"] = 0;
-
-    return result.dump();
+    
+    std::string result(normalized);
+    rac_free(normalized);
+    return result;
 }
 
 } // namespace bridges

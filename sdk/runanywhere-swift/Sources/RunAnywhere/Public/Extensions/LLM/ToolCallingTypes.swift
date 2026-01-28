@@ -296,6 +296,22 @@ internal struct RegisteredTool: Sendable {
     let executor: ToolExecutor
 }
 
+// MARK: - Tool Call Format
+
+/// Format names for tool calling output.
+/// Different LLM models expect different formats for tool calls.
+///
+/// The format logic is handled in C++ commons (single source of truth).
+public enum ToolCallFormatName {
+    /// JSON format: `<tool_call>{"tool":"name","arguments":{...}}</tool_call>`
+    /// Use for most general-purpose models (Llama, Qwen, Mistral, etc.)
+    public static let `default` = "default"
+    
+    /// Liquid AI format: `<|tool_call_start|>[func(args)]<|tool_call_end|>`
+    /// Use for LFM2-Tool models
+    public static let lfm2 = "lfm2"
+}
+
 // MARK: - Tool Calling Options
 
 /// Options for tool-enabled generation
@@ -328,6 +344,12 @@ public struct ToolCallingOptions: Sendable {
     /// This allows the LLM to make multiple sequential tool calls if needed.
     /// Default: false (tool definitions are removed after first call to encourage natural response)
     public let keepToolsAvailable: Bool
+    
+    /// Format for tool calls. Use "lfm2" for LFM2-Tool models (Liquid AI).
+    /// Default: "default" which uses JSON-based format suitable for most models.
+    /// Valid values: "auto", "default", "lfm2", "openai"
+    /// See `ToolCallFormatName` for constants.
+    public let format: String
 
     public init(
         tools: [ToolDefinition]? = nil,
@@ -337,7 +359,8 @@ public struct ToolCallingOptions: Sendable {
         maxTokens: Int? = nil,
         systemPrompt: String? = nil,
         replaceSystemPrompt: Bool = false,
-        keepToolsAvailable: Bool = false
+        keepToolsAvailable: Bool = false,
+        format: String = ToolCallFormatName.default
     ) {
         self.tools = tools
         self.maxToolCalls = maxToolCalls
@@ -347,6 +370,7 @@ public struct ToolCallingOptions: Sendable {
         self.systemPrompt = systemPrompt
         self.replaceSystemPrompt = replaceSystemPrompt
         self.keepToolsAvailable = keepToolsAvailable
+        self.format = format
     }
 }
 
