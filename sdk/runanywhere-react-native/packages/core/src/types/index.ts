@@ -144,3 +144,16 @@ export type {
   LLMStreamCompleteCallback,
   LLMStreamErrorCallback,
 } from './LLMTypes';
+
+// Tool Calling Types
+export type {
+  ParameterType,
+  ToolParameter,
+  ToolDefinition,
+  ToolCall,
+  ToolResult,
+  ToolExecutor,
+  RegisteredTool,
+  ToolCallingOptions,
+  ToolCallingResult,
+} from './ToolCallingTypes';

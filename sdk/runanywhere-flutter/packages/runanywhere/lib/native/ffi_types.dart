@@ -1013,6 +1013,57 @@ base class RacVadOnnxResultStruct extends Struct {
 }
 
 // =============================================================================
+// Tool Calling FFI Types (from rac_tool_calling.h)
+// =============================================================================
+
+/// Parsed tool call from LLM output - matches rac_tool_call_t
+base class RacToolCallStruct extends Struct {
+  @Int32()
+  external int hasToolCall;
+
+  external Pointer<Utf8> toolName;
+
+  external Pointer<Utf8> argumentsJson;
+
+  external Pointer<Utf8> cleanText;
+
+  @Int64()
+  external int callId;
+}
+
+/// Tool calling options - matches rac_tool_calling_options_t
+base class RacToolCallingOptionsStruct extends Struct {
+  @Int32()
+  external int maxToolCalls;
+
+  @Int32()
+  external int autoExecute;
+
+  @Float()
+  external double temperature;
+
+  @Int32()
+  external int maxTokens;
+
+  external Pointer<Utf8> systemPrompt;
+
+  @Int32()
+  external int replaceSystemPrompt;
+
+  @Int32()
+  external int keepToolsAvailable;
+}
+
+/// Tool parameter type enum values - matches rac_tool_param_type_t
+abstract class RacToolParamType {
+  static const int string = 0;
+  static const int number = 1;
+  static const int boolean = 2;
+  static const int object = 3;
+  static const int array = 4;
+}
+
+// =============================================================================
 // Backward Compatibility Aliases
 // =============================================================================
 

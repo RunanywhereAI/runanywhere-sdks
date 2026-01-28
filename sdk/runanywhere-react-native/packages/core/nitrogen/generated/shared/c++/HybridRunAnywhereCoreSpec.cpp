@@ -86,6 +86,7 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("voiceAgentGenerateResponse", &HybridRunAnywhereCoreSpec::voiceAgentGenerateResponse);
       prototype.registerHybridMethod("voiceAgentSynthesizeSpeech", &HybridRunAnywhereCoreSpec::voiceAgentSynthesizeSpeech);
       prototype.registerHybridMethod("cleanupVoiceAgent", &HybridRunAnywhereCoreSpec::cleanupVoiceAgent);
+      prototype.registerHybridMethod("parseToolCallFromOutput", &HybridRunAnywhereCoreSpec::parseToolCallFromOutput);
     });
   }
 
