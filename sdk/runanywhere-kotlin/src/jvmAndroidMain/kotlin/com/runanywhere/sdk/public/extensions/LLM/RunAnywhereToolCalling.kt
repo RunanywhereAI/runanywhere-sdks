@@ -226,7 +226,7 @@ object RunAnywhereToolCalling {
             
             fullPrompt = CppBridgeToolCalling.buildFollowupPrompt(
                 originalPrompt = prompt,
-                toolsPrompt = if (opts.keepToolsAvailable) CppBridgeToolCalling.formatToolsForPrompt(tools) else null,
+                toolsPrompt = if (opts.keepToolsAvailable) CppBridgeToolCalling.formatToolsForPrompt(tools, opts.format) else null,
                 toolName = toolCall.toolName,
                 toolResultJson = toolResultJson,
                 keepToolsAvailable = opts.keepToolsAvailable
@@ -279,7 +279,8 @@ object RunAnywhereToolCalling {
             maxTokens = options?.maxTokens,
             systemPrompt = options?.systemPrompt,
             replaceSystemPrompt = options?.replaceSystemPrompt ?: false,
-            keepToolsAvailable = options?.keepToolsAvailable ?: false
+            keepToolsAvailable = options?.keepToolsAvailable ?: false,
+            format = options?.format ?: ToolCallFormatName.DEFAULT
         )
         
         return generateWithTools(continuedPrompt, continuationOptions)
@@ -297,7 +298,8 @@ object RunAnywhereToolCalling {
         options: ToolCallingOptions
     ): String {
         // Use C++ implementation for prompt formatting (SINGLE SOURCE OF TRUTH)
-        val toolsPrompt = CppBridgeToolCalling.formatToolsForPrompt(tools)
+        // Pass the format from options to generate model-specific instructions
+        val toolsPrompt = CppBridgeToolCalling.formatToolsForPrompt(tools, options.format)
         
         return when {
             options.replaceSystemPrompt && options.systemPrompt != null -> {

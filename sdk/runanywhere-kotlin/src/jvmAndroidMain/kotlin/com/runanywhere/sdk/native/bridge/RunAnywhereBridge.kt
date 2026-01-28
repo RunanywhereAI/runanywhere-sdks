@@ -879,6 +879,31 @@ object RunAnywhereBridge {
     external fun racToolCallFormatPromptJson(toolsJson: String): String?
 
     /**
+     * Format tool definitions into system prompt with specified format (int).
+     *
+     * @param toolsJson JSON array of tool definitions
+     * @param format Tool calling format (0=AUTO, 1=DEFAULT, 2=LFM2, 3=OPENAI)
+     * @return Formatted prompt string, or null on error
+     */
+    @JvmStatic
+    external fun racToolCallFormatPromptJsonWithFormat(toolsJson: String, format: Int): String?
+
+    /**
+     * Format tool definitions into system prompt with format specified by name.
+     *
+     * *** PREFERRED API - Uses string format name ***
+     *
+     * Valid format names (case-insensitive): "auto", "default", "lfm2", "openai"
+     * C++ is single source of truth for format validation.
+     *
+     * @param toolsJson JSON array of tool definitions
+     * @param formatName Format name string (e.g., "lfm2", "default")
+     * @return Formatted prompt string, or null on error
+     */
+    @JvmStatic
+    external fun racToolCallFormatPromptJsonWithFormatName(toolsJson: String, formatName: String): String?
+
+    /**
      * Build initial prompt with tools and user query.
      *
      * @param userPrompt The user's question/request

@@ -40,10 +40,8 @@ static const char* TAG_LFM2_END = "<|tool_call_end|>";
 
 // Format names for logging/display
 static const char* FORMAT_NAMES[] = {
-    "Auto",           // RAC_TOOL_FORMAT_AUTO
     "Default",        // RAC_TOOL_FORMAT_DEFAULT
     "LFM2 (Liquid)",  // RAC_TOOL_FORMAT_LFM2
-    "OpenAI",         // RAC_TOOL_FORMAT_OPENAI (future)
 };
 
 // Legacy alias for backward compatibility
@@ -68,9 +66,31 @@ extern "C" const char* rac_tool_call_format_name(rac_tool_call_format_t format) 
     return "Unknown";
 }
 
+extern "C" rac_tool_call_format_t rac_tool_call_format_from_name(const char* name) {
+    if (!name) {
+        return RAC_TOOL_FORMAT_DEFAULT;
+    }
+    
+    // Case-insensitive comparison
+    std::string name_lower(name);
+    for (char& c : name_lower) {
+        c = static_cast<char>(tolower(c));
+    }
+    
+    if (name_lower == "default") {
+        return RAC_TOOL_FORMAT_DEFAULT;
+    } else if (name_lower == "lfm2" || name_lower == "lfm" || name_lower == "liquid") {
+        return RAC_TOOL_FORMAT_LFM2;
+    }
+    
+    // Unknown format - default to DEFAULT
+    RAC_LOG_WARNING("ToolCalling", "Unknown tool call format name: '%s', using default", name);
+    return RAC_TOOL_FORMAT_DEFAULT;
+}
+
 extern "C" rac_tool_call_format_t rac_tool_call_detect_format(const char* llm_output) {
     if (!llm_output) {
-        return RAC_TOOL_FORMAT_AUTO;
+        return RAC_TOOL_FORMAT_DEFAULT;
     }
 
     // Check for each format's start tag
@@ -82,13 +102,12 @@ extern "C" rac_tool_call_format_t rac_tool_call_detect_format(const char* llm_ou
     }
 
     // Check Default format: <tool_call>
-    // Note: GEMMA now uses the same tags as DEFAULT for reliability
     if (strstr(llm_output, TAG_DEFAULT_START) != nullptr) {
         return RAC_TOOL_FORMAT_DEFAULT;
     }
 
-    // No recognizable format detected
-    return RAC_TOOL_FORMAT_AUTO;
+    // No recognizable format detected - return DEFAULT
+    return RAC_TOOL_FORMAT_DEFAULT;
 }
 
 // =============================================================================
@@ -905,8 +924,9 @@ static bool parse_default_format(const char* llm_output, char** out_tool_name, c
 // =============================================================================
 
 extern "C" rac_result_t rac_tool_call_parse(const char* llm_output, rac_tool_call_t* out_result) {
-    // Delegate to format-aware parser with auto-detection
-    return rac_tool_call_parse_with_format(llm_output, RAC_TOOL_FORMAT_AUTO, out_result);
+    // Auto-detect format from output, then parse
+    rac_tool_call_format_t detected = rac_tool_call_detect_format(llm_output);
+    return rac_tool_call_parse_with_format(llm_output, detected, out_result);
 }
 
 /**
@@ -1017,25 +1037,9 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
     out_result->arguments_json = nullptr;
     out_result->clean_text = nullptr;
     out_result->call_id = 0;
-    out_result->format = RAC_TOOL_FORMAT_AUTO;
+    out_result->format = RAC_TOOL_FORMAT_DEFAULT;
 
     size_t output_len = strlen(llm_output);
-
-    // Determine which format to use
-    rac_tool_call_format_t actual_format = format;
-    if (format == RAC_TOOL_FORMAT_AUTO) {
-        // Auto-detect format
-        actual_format = rac_tool_call_detect_format(llm_output);
-
-        // If still AUTO (no format detected), return no tool call
-        if (actual_format == RAC_TOOL_FORMAT_AUTO) {
-            out_result->clean_text = static_cast<char*>(malloc(output_len + 1));
-            if (out_result->clean_text) {
-                strcpy(out_result->clean_text, llm_output);
-            }
-            return RAC_SUCCESS;
-        }
-    }
 
     // Parse using the appropriate format parser
     char* tool_name = nullptr;
@@ -1043,19 +1047,13 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
     char* clean_text = nullptr;
     bool parsed = false;
 
-    switch (actual_format) {
+    switch (format) {
     case RAC_TOOL_FORMAT_DEFAULT:
         parsed = parse_default_format(llm_output, &tool_name, &args_json, &clean_text);
         break;
 
     case RAC_TOOL_FORMAT_LFM2:
         parsed = parse_lfm2_format(llm_output, &tool_name, &args_json, &clean_text);
-        break;
-
-    case RAC_TOOL_FORMAT_OPENAI:
-        // Not yet implemented - fall through to default
-        // TODO: Implement OpenAI format parser
-        parsed = false;
         break;
 
     default:
@@ -1068,7 +1066,7 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
         out_result->tool_name = tool_name;
         out_result->arguments_json = args_json;
         out_result->clean_text = clean_text;
-        out_result->format = actual_format;
+        out_result->format = format;
         out_result->call_id = static_cast<int64_t>(time(nullptr)) * 1000 + (rand() % 1000);
     } else {
         // Parsing failed - clean up any partial results
@@ -1263,8 +1261,7 @@ extern "C" rac_result_t rac_tool_call_format_prompt_with_format(const rac_tool_d
         return RAC_SUCCESS;
     }
 
-    // Use DEFAULT format if AUTO is specified
-    rac_tool_call_format_t actual_format = (format == RAC_TOOL_FORMAT_AUTO) ? RAC_TOOL_FORMAT_DEFAULT : format;
+    rac_tool_call_format_t actual_format = format;
 
     std::string prompt;
     prompt.reserve(1024);
@@ -1326,8 +1323,7 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format(const char*
         return RAC_SUCCESS;
     }
 
-    // Use DEFAULT format if AUTO is specified
-    rac_tool_call_format_t actual_format = (format == RAC_TOOL_FORMAT_AUTO) ? RAC_TOOL_FORMAT_DEFAULT : format;
+    rac_tool_call_format_t actual_format = format;
 
     std::string prompt;
     prompt.reserve(1024 + strlen(tools_json));
@@ -1377,6 +1373,14 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json(const char* tools_json,
     return rac_tool_call_format_prompt_json_with_format(tools_json, RAC_TOOL_FORMAT_DEFAULT, out_prompt);
 }
 
+extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format_name(const char* tools_json,
+                                                                          const char* format_name,
+                                                                          char** out_prompt) {
+    // Convert format name to enum and delegate
+    rac_tool_call_format_t format = rac_tool_call_format_from_name(format_name);
+    return rac_tool_call_format_prompt_json_with_format(tools_json, format, out_prompt);
+}
+
 extern "C" rac_result_t rac_tool_call_build_initial_prompt(const char* user_prompt,
                                                            const char* tools_json,
                                                            const rac_tool_calling_options_t* options,
@@ -1385,10 +1389,8 @@ extern "C" rac_result_t rac_tool_call_build_initial_prompt(const char* user_prom
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    // Determine format from options (default to AUTO which becomes DEFAULT)
-    rac_tool_call_format_t format = (options && options->format != RAC_TOOL_FORMAT_AUTO)
-                                        ? options->format
-                                        : RAC_TOOL_FORMAT_DEFAULT;
+    // Get format from options (default to DEFAULT)
+    rac_tool_call_format_t format = options ? options->format : RAC_TOOL_FORMAT_DEFAULT;
 
     // Format tools prompt with the specified format
     char* tools_prompt = nullptr;

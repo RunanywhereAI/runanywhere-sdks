@@ -95,11 +95,11 @@ extension CppBridge {
         ///
         /// - Parameters:
         ///   - tools: Array of tool definitions
-        ///   - format: Tool call format to use (default: .default)
+        ///   - format: Tool call format name (e.g., "default", "lfm2"). See `ToolCallFormatName`.
         /// - Returns: Formatted system prompt string
         public static func formatToolsForPrompt(
             _ tools: [ToolDefinition],
-            format: ToolCallFormat = .default
+            format: String = ToolCallFormatName.default
         ) -> String {
             guard !tools.isEmpty else { return "" }
 
@@ -107,8 +107,8 @@ extension CppBridge {
             var promptPtr: UnsafeMutablePointer<CChar>?
             defer { if let p = promptPtr { rac_free(p) } }
 
-            let cFormat = rac_tool_call_format_t(rawValue: UInt32(format.rawValue))
-            let rc = rac_tool_call_format_prompt_json_with_format(toolsJson, cFormat, &promptPtr)
+            // Use string-based C++ API (single source of truth for format names)
+            let rc = rac_tool_call_format_prompt_json_with_format_name(toolsJson, format, &promptPtr)
             guard rc == RAC_SUCCESS, let ptr = promptPtr else {
                 return ""
             }
@@ -144,7 +144,8 @@ extension CppBridge {
             cOptions.max_tokens = Int32(options.maxTokens ?? 1024)
             cOptions.replace_system_prompt = options.replaceSystemPrompt ? RAC_TRUE : RAC_FALSE
             cOptions.keep_tools_available = options.keepToolsAvailable ? RAC_TRUE : RAC_FALSE
-            cOptions.format = rac_tool_call_format_t(rawValue: UInt32(options.format.rawValue))
+            // Convert string format to enum using C++ (single source of truth)
+            cOptions.format = rac_tool_call_format_from_name(options.format)
 
             // Handle system prompt
             if let systemPrompt = options.systemPrompt {

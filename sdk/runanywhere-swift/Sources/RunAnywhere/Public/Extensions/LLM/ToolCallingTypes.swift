@@ -298,32 +298,18 @@ internal struct RegisteredTool: Sendable {
 
 // MARK: - Tool Call Format
 
-/// Format for tool calling output.
+/// Format names for tool calling output.
 /// Different LLM models expect different formats for tool calls.
-public enum ToolCallFormat: Int, Sendable, CaseIterable {
-    /// Auto-detect format from LLM output (default)
-    case auto = 0
+///
+/// The format logic is handled in C++ commons (single source of truth).
+public enum ToolCallFormatName {
+    /// JSON format: `<tool_call>{"tool":"name","arguments":{...}}</tool_call>`
+    /// Use for most general-purpose models (Llama, Qwen, Mistral, etc.)
+    public static let `default` = "default"
     
-    /// Default SDK format: `<tool_call>{"name":"func","arguments":{...}}</tool_call>`
-    /// Works with most general-purpose models.
-    case `default` = 1
-    
-    /// Liquid AI LFM2 format: `<|tool_call_start|>[func_name(arg="value")]<|tool_call_end|>`
-    /// Use for LFM2-1.2B-Tool and similar models.
-    case lfm2 = 2
-    
-    /// OpenAI-style format (reserved for future use)
-    case openai = 3
-    
-    /// Human-readable name for the format
-    public var name: String {
-        switch self {
-        case .auto: return "auto"
-        case .default: return "default"
-        case .lfm2: return "lfm2"
-        case .openai: return "openai"
-        }
-    }
+    /// Liquid AI format: `<|tool_call_start|>[func(args)]<|tool_call_end|>`
+    /// Use for LFM2-Tool models
+    public static let lfm2 = "lfm2"
 }
 
 // MARK: - Tool Calling Options
@@ -359,9 +345,11 @@ public struct ToolCallingOptions: Sendable {
     /// Default: false (tool definitions are removed after first call to encourage natural response)
     public let keepToolsAvailable: Bool
     
-    /// Format for tool calls. Use `.lfm2` for LFM2-Tool models (Liquid AI).
-    /// Default: `.default` which uses JSON-based format suitable for most models.
-    public let format: ToolCallFormat
+    /// Format for tool calls. Use "lfm2" for LFM2-Tool models (Liquid AI).
+    /// Default: "default" which uses JSON-based format suitable for most models.
+    /// Valid values: "auto", "default", "lfm2", "openai"
+    /// See `ToolCallFormatName` for constants.
+    public let format: String
 
     public init(
         tools: [ToolDefinition]? = nil,
@@ -372,7 +360,7 @@ public struct ToolCallingOptions: Sendable {
         systemPrompt: String? = nil,
         replaceSystemPrompt: Bool = false,
         keepToolsAvailable: Bool = false,
-        format: ToolCallFormat = .default
+        format: String = ToolCallFormatName.default
     ) {
         self.tools = tools
         self.maxToolCalls = maxToolCalls
