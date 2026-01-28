@@ -246,7 +246,7 @@ data class ToolCallingOptions(
     /**
      * Format for tool calls. Use "lfm2" for LFM2-Tool models (Liquid AI).
      * Default: "default" which uses JSON-based format suitable for most models.
-     * Valid values: "auto", "default", "lfm2", "openai"
+     * Valid values: "default", "lfm2"
      * See [ToolCallFormatName] for constants.
      */
     val format: String = ToolCallFormatName.DEFAULT

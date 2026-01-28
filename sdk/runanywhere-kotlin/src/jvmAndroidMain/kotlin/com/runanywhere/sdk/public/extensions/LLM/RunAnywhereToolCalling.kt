@@ -17,7 +17,8 @@
 
 package com.runanywhere.sdk.public.extensions.LLM
 
-import com.runanywhere.sdk.RunAnywhere
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeToolCalling
 import kotlinx.coroutines.sync.Mutex
@@ -173,7 +174,7 @@ object RunAnywhereToolCalling {
         options: ToolCallingOptions? = null
     ): ToolCallingResult {
         // Ensure SDK is initialized
-        require(RunAnywhere.isInitialized()) { "SDK not initialized" }
+        require(RunAnywhere.isInitialized) { "SDK not initialized" }
         
         val opts = options ?: ToolCallingOptions()
         val registeredTools = ToolRegistry.getAll()
@@ -327,10 +328,10 @@ object RunAnywhereToolCalling {
             temperature = temperature ?: 0.7f
         )
         
-        val result = RunAnywhere.generateStream(prompt, genOptions)
+        val tokenFlow = RunAnywhere.generateStream(prompt, genOptions)
         
         val responseText = StringBuilder()
-        result.stream.collect { token ->
+        tokenFlow.collect { token ->
             responseText.append(token)
         }
         
