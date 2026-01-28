@@ -204,7 +204,29 @@ struct RunAnywhereAIApp: App {
                 memoryRequirement: 400_000_000
             )
         }
-        logger.info("✅ LLM models registered")
+
+        // Tool Calling Optimized Models
+        // LFM2-1.2B-Tool - Designed for concise and precise tool calling (Liquid AI)
+        if let lfm2ToolQ4URL = URL(string: "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf") {
+            RunAnywhere.registerModel(
+                id: "lfm2-1.2b-tool-q4_k_m",
+                name: "LiquidAI LFM2 1.2B Tool Q4_K_M",
+                url: lfm2ToolQ4URL,
+                framework: .llamaCpp,
+                memoryRequirement: 800_000_000
+            )
+        }
+        if let lfm2ToolQ8URL = URL(string: "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf") {
+            RunAnywhere.registerModel(
+                id: "lfm2-1.2b-tool-q8_0",
+                name: "LiquidAI LFM2 1.2B Tool Q8_0",
+                url: lfm2ToolQ8URL,
+                framework: .llamaCpp,
+                memoryRequirement: 1_400_000_000
+            )
+        }
+
+        logger.info("✅ LLM models registered (including tool-calling optimized models)")
 
         // Register ONNX STT and TTS models
         // Using tar.gz format hosted on RunanywhereAI/sherpa-onnx for fast native extraction

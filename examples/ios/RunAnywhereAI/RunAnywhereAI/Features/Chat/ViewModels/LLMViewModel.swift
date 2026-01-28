@@ -37,6 +37,10 @@ final class LLMViewModel {
 
     var currentInput = ""
     var useStreaming = true
+    var useToolCalling: Bool {
+        get { ToolSettingsViewModel.shared.toolCallingEnabled }
+        set { ToolSettingsViewModel.shared.toolCallingEnabled = newValue }
+    }
 
     // MARK: - Dependencies
 
@@ -236,6 +240,16 @@ final class LLMViewModel {
         options: LLMGenerationOptions,
         messageIndex: Int
     ) async throws {
+        // Check if tool calling is enabled and we have registered tools
+        let registeredTools = await RunAnywhere.getRegisteredTools()
+        let shouldUseToolCalling = useToolCalling && !registeredTools.isEmpty
+
+        if shouldUseToolCalling {
+            logger.info("Using tool calling with \(registeredTools.count) registered tools")
+            try await generateWithToolCalling(prompt: prompt, options: options, messageIndex: messageIndex)
+            return
+        }
+
         let modelSupportsStreaming = await RunAnywhere.supportsLLMStreaming
         let effectiveUseStreaming = useStreaming && modelSupportsStreaming
 

@@ -118,6 +118,19 @@ data class PerformanceSummary(
 )
 
 /**
+ * App-local tool call info.
+ * Matches iOS ToolCallInfo exactly.
+ */
+@Serializable
+data class ToolCallInfo(
+    val toolName: String,
+    val arguments: String,  // JSON string for display
+    val result: String? = null,  // JSON string for display
+    val success: Boolean,
+    val error: String? = null,
+)
+
+/**
  * App-specific ChatMessage for conversations.
  * Self-contained with app-local types.
  */
@@ -130,6 +143,7 @@ data class ChatMessage(
     val timestamp: Long = System.currentTimeMillis(),
     val analytics: MessageAnalytics? = null,
     val modelInfo: MessageModelInfo? = null,
+    val toolCallInfo: ToolCallInfo? = null,
     val metadata: Map<String, String>? = null,
 ) {
     val isFromUser: Boolean get() = role == MessageRole.USER
@@ -158,6 +172,7 @@ data class ChatMessage(
             thinkingContent: String? = null,
             analytics: MessageAnalytics? = null,
             modelInfo: MessageModelInfo? = null,
+            toolCallInfo: ToolCallInfo? = null,
             metadata: Map<String, String>? = null,
         ): ChatMessage =
             ChatMessage(
@@ -166,6 +181,7 @@ data class ChatMessage(
                 thinkingContent = thinkingContent,
                 analytics = analytics,
                 modelInfo = modelInfo,
+                toolCallInfo = toolCallInfo,
                 metadata = metadata,
             )
 
