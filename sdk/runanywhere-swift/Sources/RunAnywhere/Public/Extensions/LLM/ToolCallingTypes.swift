@@ -296,6 +296,41 @@ internal struct RegisteredTool: Sendable {
     let executor: ToolExecutor
 }
 
+// MARK: - Tool Call Format
+
+/// Format for tool calling output.
+/// Different LLM models expect different formats for tool calls.
+public enum ToolCallFormat: Int, Sendable, CaseIterable {
+    /// Auto-detect format from LLM output (default)
+    case auto = 0
+    
+    /// Default SDK format: `<tool_call>{"name":"func","arguments":{...}}</tool_call>`
+    /// Works with most general-purpose models.
+    case `default` = 1
+    
+    /// Liquid AI LFM2 format: `<|tool_call_start|>[func_name(arg="value")]<|tool_call_end|>`
+    /// Use for LFM2-1.2B-Tool and similar models.
+    case lfm2 = 2
+    
+    /// Google FunctionGemma format: `<start_function_call>func_name(arg=<escape>value<escape>)<end_function_call>`
+    /// Use for FunctionGemma-270M and similar models.
+    case gemma = 3
+    
+    /// OpenAI-style format (reserved for future use)
+    case openai = 4
+    
+    /// Human-readable name for the format
+    public var name: String {
+        switch self {
+        case .auto: return "auto"
+        case .default: return "default"
+        case .lfm2: return "lfm2"
+        case .gemma: return "gemma"
+        case .openai: return "openai"
+        }
+    }
+}
+
 // MARK: - Tool Calling Options
 
 /// Options for tool-enabled generation
@@ -328,6 +363,10 @@ public struct ToolCallingOptions: Sendable {
     /// This allows the LLM to make multiple sequential tool calls if needed.
     /// Default: false (tool definitions are removed after first call to encourage natural response)
     public let keepToolsAvailable: Bool
+    
+    /// Format for tool calls. Use `.lfm2` for LFM2-Tool models, `.gemma` for FunctionGemma.
+    /// Default: `.default` which uses JSON-based format suitable for most models.
+    public let format: ToolCallFormat
 
     public init(
         tools: [ToolDefinition]? = nil,
@@ -337,7 +376,8 @@ public struct ToolCallingOptions: Sendable {
         maxTokens: Int? = nil,
         systemPrompt: String? = nil,
         replaceSystemPrompt: Bool = false,
-        keepToolsAvailable: Bool = false
+        keepToolsAvailable: Bool = false,
+        format: ToolCallFormat = .default
     ) {
         self.tools = tools
         self.maxToolCalls = maxToolCalls
@@ -347,6 +387,7 @@ public struct ToolCallingOptions: Sendable {
         self.systemPrompt = systemPrompt
         self.replaceSystemPrompt = replaceSystemPrompt
         self.keepToolsAvailable = keepToolsAvailable
+        self.format = format
     }
 }
 
