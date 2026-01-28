@@ -149,15 +149,29 @@ class RunAnywhereApplication : Application() {
                 )
                 Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode (using Supabase from dev config)")
             } else {
-                // PRODUCTION mode - requires valid API key and base URL
-                // These should be provided via BuildConfig or secure configuration
-                // For now, fall back to development mode if not configured
-                Log.w("RunAnywhereApp", "⚠️ PRODUCTION mode requires API key configuration")
-                Log.w("RunAnywhereApp", "   Falling back to DEVELOPMENT mode")
-                RunAnywhere.initialize(
-                    environment = SDKEnvironment.DEVELOPMENT,
-                )
-                Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode (production config not set)")
+                // PRODUCTION mode - requires API key and base URL
+                // Configure these via Settings screen or set environment variables
+                val apiKey = "YOUR_API_KEY_HERE"
+                val baseURL = "YOUR_BASE_URL_HERE"
+
+                // Detect placeholder credentials and abort production initialization
+                if (apiKey.startsWith("YOUR_") || baseURL.startsWith("YOUR_")) {
+                    Log.e(
+                        "RunAnywhereApp",
+                        "❌ RunAnywhere.initialize with SDKEnvironment.PRODUCTION failed: " +
+                            "placeholder credentials detected. Configure via Settings screen or replace placeholders.",
+                    )
+                    // Fall back to development mode
+                    RunAnywhere.initialize(environment = SDKEnvironment.DEVELOPMENT)
+                    Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode (production credentials not configured)")
+                } else {
+                    RunAnywhere.initialize(
+                        apiKey = apiKey,
+                        baseURL = baseURL,
+                        environment = SDKEnvironment.PRODUCTION,
+                    )
+                    Log.i("RunAnywhereApp", "✅ SDK initialized in PRODUCTION mode")
+                }
             }
 
             // Phase 2: Complete services initialization (device registration, etc.)
@@ -298,6 +312,21 @@ class RunAnywhereApplication : Application() {
             url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
             framework = InferenceFramework.LLAMA_CPP,
             memoryRequirement = 400_000_000,
+        )
+        // LFM2-Tool models - For tool calling / function calling support
+        RunAnywhere.registerModel(
+            id = "lfm2-1.2b-tool-q4_k_m",
+            name = "LiquidAI LFM2 1.2B Tool Q4_K_M",
+            url = "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf",
+            framework = InferenceFramework.LLAMA_CPP,
+            memoryRequirement = 800_000_000,
+        )
+        RunAnywhere.registerModel(
+            id = "lfm2-1.2b-tool-q8_0",
+            name = "LiquidAI LFM2 1.2B Tool Q8_0",
+            url = "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf",
+            framework = InferenceFramework.LLAMA_CPP,
+            memoryRequirement = 1_400_000_000,
         )
         Log.i("RunAnywhereApp", "✅ LLM models registered")
 

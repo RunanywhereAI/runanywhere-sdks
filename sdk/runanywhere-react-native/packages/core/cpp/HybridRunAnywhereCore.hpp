@@ -257,6 +257,14 @@ public:
   std::shared_ptr<Promise<std::string>> voiceAgentSynthesizeSpeech(const std::string& text) override;
   std::shared_ptr<Promise<void>> cleanupVoiceAgent() override;
 
+  // ============================================================================
+  // Tool Calling - Delegates to ToolCallingBridge
+  // Single source of truth for parsing <tool_call> tags from LLM output
+  // Tool registry and execution are in TypeScript (RunAnywhere+ToolCalling.ts)
+  // ============================================================================
+
+  std::shared_ptr<Promise<std::string>> parseToolCallFromOutput(const std::string& llmOutput) override;
+
 private:
   // Thread safety
   std::mutex initMutex_;
