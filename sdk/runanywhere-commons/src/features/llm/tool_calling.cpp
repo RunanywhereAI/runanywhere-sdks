@@ -9,8 +9,13 @@
  * - React Native: ToolCallingBridge.cpp
  *
  * NO FALLBACKS - All SDKs must use these functions exclusively.
+ *
+ * Supported formats:
+ * - DEFAULT:  <tool_call>{"tool":"name","arguments":{}}</tool_call> (Most general models)
+ * - LFM2:     <|tool_call_start|>[func(arg="val")]<|tool_call_end|> (Liquid AI models)
  */
 
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -22,11 +27,28 @@
 #include "rac/features/llm/rac_tool_calling.h"
 
 // =============================================================================
-// CONSTANTS
+// CONSTANTS - Format-specific tags
 // =============================================================================
 
-static const char* TOOL_CALL_START_TAG = "<tool_call>";
-static const char* TOOL_CALL_END_TAG = "</tool_call>";
+// Format: DEFAULT (<tool_call>JSON</tool_call>)
+static const char* TAG_DEFAULT_START = "<tool_call>";
+static const char* TAG_DEFAULT_END = "</tool_call>";
+
+// Format: LFM2 (Liquid AI)
+static const char* TAG_LFM2_START = "<|tool_call_start|>";
+static const char* TAG_LFM2_END = "<|tool_call_end|>";
+
+// Format names for logging/display
+static const char* FORMAT_NAMES[] = {
+    "Auto",           // RAC_TOOL_FORMAT_AUTO
+    "Default",        // RAC_TOOL_FORMAT_DEFAULT
+    "LFM2 (Liquid)",  // RAC_TOOL_FORMAT_LFM2
+    "OpenAI",         // RAC_TOOL_FORMAT_OPENAI (future)
+};
+
+// Legacy alias for backward compatibility
+static const char* TOOL_CALL_START_TAG = TAG_DEFAULT_START;
+static const char* TOOL_CALL_END_TAG = TAG_DEFAULT_END;
 
 // Standard keys for tool name (case-insensitive matching)
 static const char* TOOL_NAME_KEYS[] = {"tool", "name", "function", "func", "method",
@@ -34,6 +56,40 @@ static const char* TOOL_NAME_KEYS[] = {"tool", "name", "function", "func", "meth
 
 // Standard keys for arguments (case-insensitive matching)
 static const char* ARGUMENT_KEYS[] = {"arguments", "args", "params", "parameters", "input", nullptr};
+
+// =============================================================================
+// FORMAT DETECTION AND NAMING
+// =============================================================================
+
+extern "C" const char* rac_tool_call_format_name(rac_tool_call_format_t format) {
+    if (format >= 0 && format < RAC_TOOL_FORMAT_COUNT) {
+        return FORMAT_NAMES[format];
+    }
+    return "Unknown";
+}
+
+extern "C" rac_tool_call_format_t rac_tool_call_detect_format(const char* llm_output) {
+    if (!llm_output) {
+        return RAC_TOOL_FORMAT_AUTO;
+    }
+
+    // Check for each format's start tag
+    // Order matters - check more specific formats first
+
+    // Check LFM2 format: <|tool_call_start|>
+    if (strstr(llm_output, TAG_LFM2_START) != nullptr) {
+        return RAC_TOOL_FORMAT_LFM2;
+    }
+
+    // Check Default format: <tool_call>
+    // Note: GEMMA now uses the same tags as DEFAULT for reliability
+    if (strstr(llm_output, TAG_DEFAULT_START) != nullptr) {
+        return RAC_TOOL_FORMAT_DEFAULT;
+    }
+
+    // No recognizable format detected
+    return RAC_TOOL_FORMAT_AUTO;
+}
 
 // =============================================================================
 // HELPER FUNCTIONS - String Operations
@@ -596,39 +652,287 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
 }
 
 // =============================================================================
-// PARSE TOOL CALL
+// FORMAT-SPECIFIC PARSERS
+// =============================================================================
+
+/**
+ * @brief Parse LFM2 (Liquid AI) format: <|tool_call_start|>[func(arg="val")]<|tool_call_end|>
+ *
+ * LFM2 uses Pythonic function call syntax:
+ * [func_name(arg1="value1", arg2="value2")]
+ *
+ * @return true if successfully parsed, false otherwise
+ */
+static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char** out_args_json,
+                              char** out_clean_text) {
+    *out_tool_name = nullptr;
+    *out_args_json = nullptr;
+    *out_clean_text = nullptr;
+
+    RAC_LOG_INFO("ToolCalling", "parse_lfm2_format: input='%.200s'%s", 
+                 llm_output, strlen(llm_output) > 200 ? "..." : "");
+
+    // Find start tag
+    const char* start_tag = strstr(llm_output, TAG_LFM2_START);
+    if (!start_tag) {
+        RAC_LOG_INFO("ToolCalling", "LFM2 start tag '%s' not found in output", TAG_LFM2_START);
+        return false;
+    }
+
+    RAC_LOG_INFO("ToolCalling", "Found LFM2 start tag at position: %zu", (size_t)(start_tag - llm_output));
+
+    size_t tag_start_pos = start_tag - llm_output;
+    const char* content_start = start_tag + strlen(TAG_LFM2_START);
+
+    // Find end tag
+    const char* end_tag = strstr(content_start, TAG_LFM2_END);
+    if (!end_tag) {
+        // Try to parse until end of line or end of string
+        const char* line_end = strchr(content_start, '\n');
+        if (line_end) {
+            end_tag = line_end;
+        } else {
+            end_tag = content_start + strlen(content_start);
+        }
+    }
+
+    // Extract content between tags
+    size_t content_len = end_tag - content_start;
+    std::string content(content_start, content_len);
+
+    // Parse Pythonic format: [func_name(arg1="val1", arg2="val2")]
+    // First, strip leading/trailing whitespace and brackets
+    size_t start = 0, end = content.size();
+    while (start < end && (content[start] == ' ' || content[start] == '\n' || content[start] == '[')) {
+        start++;
+    }
+    while (end > start && (content[end - 1] == ' ' || content[end - 1] == '\n' || content[end - 1] == ']')) {
+        end--;
+    }
+
+    if (start >= end) {
+        return false;
+    }
+
+    std::string call_str = content.substr(start, end - start);
+
+    RAC_LOG_INFO("ToolCalling", "LFM2 call_str: '%s'", call_str.c_str());
+
+    // Find function name (everything before '(')
+    size_t paren_pos = call_str.find('(');
+    if (paren_pos == std::string::npos) {
+        // No arguments - whole thing is function name
+        *out_tool_name = static_cast<char*>(malloc(call_str.size() + 1));
+        if (*out_tool_name) {
+            strcpy(*out_tool_name, call_str.c_str());
+        }
+        *out_args_json = static_cast<char*>(malloc(3));
+        if (*out_args_json) {
+            strcpy(*out_args_json, "{}");
+        }
+    } else {
+        std::string func_name = call_str.substr(0, paren_pos);
+
+        // Trim whitespace from function name
+        while (!func_name.empty() && func_name.back() == ' ') {
+            func_name.pop_back();
+        }
+
+        *out_tool_name = static_cast<char*>(malloc(func_name.size() + 1));
+        if (*out_tool_name) {
+            strcpy(*out_tool_name, func_name.c_str());
+        }
+
+        // Parse arguments: arg1="val1", arg2="val2", ...
+        // Convert to JSON format
+        size_t args_start = paren_pos + 1;
+        size_t args_end = call_str.rfind(')');
+        if (args_end == std::string::npos) {
+            args_end = call_str.size();
+        }
+
+        std::string args_str = call_str.substr(args_start, args_end - args_start);
+
+        RAC_LOG_INFO("ToolCalling", "LFM2 args_str: '%s' (paren=%zu, end=%zu)", 
+                     args_str.c_str(), paren_pos, args_end);
+
+        // Convert Python-style args to JSON
+        std::string json_args = "{";
+        bool first_arg = true;
+        bool in_string = false;
+        char string_char = 0;
+        std::string current_key;
+        std::string current_value;
+        bool parsing_key = true;
+
+        for (size_t i = 0; i < args_str.size(); i++) {
+            char c = args_str[i];
+
+            if (in_string) {
+                if (c == string_char && (i == 0 || args_str[i - 1] != '\\')) {
+                    in_string = false;
+                    // End of value
+                    if (!current_key.empty()) {
+                        if (!first_arg) {
+                            json_args += ",";
+                        }
+                        json_args += "\"" + current_key + "\":\"" + current_value + "\"";
+                        first_arg = false;
+                        current_key.clear();
+                        current_value.clear();
+                        parsing_key = true;
+                    }
+                } else {
+                    current_value += c;
+                }
+            } else {
+                if (c == '"' || c == '\'') {
+                    in_string = true;
+                    string_char = c;
+                    parsing_key = false;
+                } else if (c == '=') {
+                    parsing_key = false;
+                } else if (c == ',') {
+                    // Handle unquoted values or numeric values
+                    if (!current_key.empty() && !current_value.empty()) {
+                        if (!first_arg) {
+                            json_args += ",";
+                        }
+                        // Check if value is numeric
+                        bool is_numeric = true;
+                        for (char vc : current_value) {
+                            if (!isdigit(vc) && vc != '.' && vc != '-') {
+                                is_numeric = false;
+                                break;
+                            }
+                        }
+                        if (is_numeric) {
+                            json_args += "\"" + current_key + "\":" + current_value;
+                        } else {
+                            json_args += "\"" + current_key + "\":\"" + current_value + "\"";
+                        }
+                        first_arg = false;
+                    }
+                    current_key.clear();
+                    current_value.clear();
+                    parsing_key = true;
+                } else if (c != ' ' || in_string) {
+                    if (parsing_key) {
+                        current_key += c;
+                    } else {
+                        current_value += c;
+                    }
+                }
+            }
+        }
+
+        // Handle last argument
+        if (!current_key.empty() && !current_value.empty()) {
+            if (!first_arg) {
+                json_args += ",";
+            }
+            bool is_numeric = true;
+            for (char vc : current_value) {
+                if (!isdigit(vc) && vc != '.' && vc != '-') {
+                    is_numeric = false;
+                    break;
+                }
+            }
+            if (is_numeric) {
+                json_args += "\"" + current_key + "\":" + current_value;
+            } else {
+                json_args += "\"" + current_key + "\":\"" + current_value + "\"";
+            }
+        }
+
+        json_args += "}";
+
+        RAC_LOG_INFO("ToolCalling", "LFM2 parsed json_args: '%s'", json_args.c_str());
+
+        *out_args_json = static_cast<char*>(malloc(json_args.size() + 1));
+        if (*out_args_json) {
+            strcpy(*out_args_json, json_args.c_str());
+        }
+    }
+
+    RAC_LOG_INFO("ToolCalling", "LFM2 RESULT: tool='%s', args='%s'",
+                 *out_tool_name ? *out_tool_name : "(null)",
+                 *out_args_json ? *out_args_json : "(null)");
+
+    // Build clean text
+    std::string clean_text;
+    clean_text.append(llm_output, tag_start_pos);
+
+    const char* after_end = end_tag;
+    if (strstr(end_tag, TAG_LFM2_END) == end_tag) {
+        after_end = end_tag + strlen(TAG_LFM2_END);
+    }
+    if (*after_end) {
+        clean_text.append(after_end);
+    }
+
+    // Trim
+    size_t trim_start = 0, trim_end = clean_text.size();
+    while (trim_start < trim_end && (clean_text[trim_start] == ' ' || clean_text[trim_start] == '\n')) {
+        trim_start++;
+    }
+    while (trim_end > trim_start && (clean_text[trim_end - 1] == ' ' || clean_text[trim_end - 1] == '\n')) {
+        trim_end--;
+    }
+
+    *out_clean_text = static_cast<char*>(malloc(trim_end - trim_start + 1));
+    if (*out_clean_text) {
+        memcpy(*out_clean_text, clean_text.c_str() + trim_start, trim_end - trim_start);
+        (*out_clean_text)[trim_end - trim_start] = '\0';
+    }
+
+    return *out_tool_name != nullptr;
+}
+
+/**
+ * @brief Parse default format: <tool_call>JSON</tool_call>
+ *
+ * This is the original SDK format with JSON inside the tags.
+ * Handles edge cases like missing closing tags, unquoted keys, etc.
+ *
+ * @return true if successfully parsed, false otherwise
+ */
+static bool parse_default_format(const char* llm_output, char** out_tool_name, char** out_args_json,
+                                 char** out_clean_text);
+
+// =============================================================================
+// PARSE TOOL CALL - Main entry points
 // =============================================================================
 
 extern "C" rac_result_t rac_tool_call_parse(const char* llm_output, rac_tool_call_t* out_result) {
-    if (!llm_output || !out_result) {
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
+    // Delegate to format-aware parser with auto-detection
+    return rac_tool_call_parse_with_format(llm_output, RAC_TOOL_FORMAT_AUTO, out_result);
+}
 
-    // Initialize result
-    out_result->has_tool_call = RAC_FALSE;
-    out_result->tool_name = nullptr;
-    out_result->arguments_json = nullptr;
-    out_result->clean_text = nullptr;
-    out_result->call_id = 0;
+/**
+ * @brief Implementation of parse_default_format
+ *
+ * Parses the default <tool_call>JSON</tool_call> format.
+ */
+static bool parse_default_format(const char* llm_output, char** out_tool_name, char** out_args_json,
+                                 char** out_clean_text) {
+    *out_tool_name = nullptr;
+    *out_args_json = nullptr;
+    *out_clean_text = nullptr;
 
     size_t output_len = strlen(llm_output);
 
     // Find <tool_call> tag
-    const char* tag_start = find_str(llm_output, TOOL_CALL_START_TAG);
+    const char* tag_start = find_str(llm_output, TAG_DEFAULT_START);
     if (!tag_start) {
-        // No tool call - return clean text as-is
-        out_result->clean_text = static_cast<char*>(malloc(output_len + 1));
-        if (out_result->clean_text) {
-            strcpy(out_result->clean_text, llm_output);
-        }
-        return RAC_SUCCESS;
+        return false;
     }
 
     size_t tag_start_pos = tag_start - llm_output;
-    size_t json_start_pos = tag_start_pos + strlen(TOOL_CALL_START_TAG);
+    size_t json_start_pos = tag_start_pos + strlen(TAG_DEFAULT_START);
 
     // Find </tool_call> end tag
-    const char* tag_end = find_str(llm_output + json_start_pos, TOOL_CALL_END_TAG);
+    const char* tag_end = find_str(llm_output + json_start_pos, TAG_DEFAULT_END);
     size_t json_end_pos;
     bool has_closing_tag;
 
@@ -639,14 +943,9 @@ extern "C" rac_result_t rac_tool_call_parse(const char* llm_output, rac_tool_cal
         // No closing tag - find JSON by matching braces
         size_t brace_end;
         if (!find_matching_brace(llm_output, json_start_pos, &brace_end)) {
-            // Can't find valid JSON
-            out_result->clean_text = static_cast<char*>(malloc(output_len + 1));
-            if (out_result->clean_text) {
-                strcpy(out_result->clean_text, llm_output);
-            }
-            return RAC_SUCCESS;
+            return false;
         }
-        json_end_pos = brace_end + 1;  // Include closing brace
+        json_end_pos = brace_end + 1;
         has_closing_tag = false;
     }
 
@@ -654,7 +953,7 @@ extern "C" rac_result_t rac_tool_call_parse(const char* llm_output, rac_tool_cal
     size_t json_len = json_end_pos - json_start_pos;
     char* tool_json_str = static_cast<char*>(malloc(json_len + 1));
     if (!tool_json_str) {
-        return RAC_ERROR_OUT_OF_MEMORY;
+        return false;
     }
     memcpy(tool_json_str, llm_output + json_start_pos, json_len);
     tool_json_str[json_len] = '\0';
@@ -665,24 +964,13 @@ extern "C" rac_result_t rac_tool_call_parse(const char* llm_output, rac_tool_cal
     free(tool_json_str);
 
     if (norm_result != RAC_SUCCESS || !normalized_json) {
-        out_result->clean_text = static_cast<char*>(malloc(output_len + 1));
-        if (out_result->clean_text) {
-            strcpy(out_result->clean_text, llm_output);
-        }
-        return RAC_SUCCESS;
+        return false;
     }
 
     // Extract tool name and arguments
-    char* tool_name = nullptr;
-    char* args_json = nullptr;
-
-    if (!extract_tool_name_and_args(normalized_json, &tool_name, &args_json)) {
+    if (!extract_tool_name_and_args(normalized_json, out_tool_name, out_args_json)) {
         free(normalized_json);
-        out_result->clean_text = static_cast<char*>(malloc(output_len + 1));
-        if (out_result->clean_text) {
-            strcpy(out_result->clean_text, llm_output);
-        }
-        return RAC_SUCCESS;
+        return false;
     }
 
     free(normalized_json);
@@ -692,7 +980,7 @@ extern "C" rac_result_t rac_tool_call_parse(const char* llm_output, rac_tool_cal
     clean_text.append(llm_output, tag_start_pos);
 
     if (has_closing_tag) {
-        size_t after_tag = json_end_pos + strlen(TOOL_CALL_END_TAG);
+        size_t after_tag = json_end_pos + strlen(TAG_DEFAULT_END);
         if (after_tag < output_len) {
             clean_text.append(llm_output + after_tag);
         }
@@ -706,20 +994,94 @@ extern "C" rac_result_t rac_tool_call_parse(const char* llm_output, rac_tool_cal
     size_t trim_start, trim_end;
     trim_whitespace(clean_text.c_str(), clean_text.size(), &trim_start, &trim_end);
 
-    // Populate result
-    out_result->has_tool_call = RAC_TRUE;
-    out_result->tool_name = tool_name;
-    out_result->arguments_json = args_json;
-
     size_t clean_len = trim_end - trim_start;
-    out_result->clean_text = static_cast<char*>(malloc(clean_len + 1));
-    if (out_result->clean_text) {
-        memcpy(out_result->clean_text, clean_text.c_str() + trim_start, clean_len);
-        out_result->clean_text[clean_len] = '\0';
+    *out_clean_text = static_cast<char*>(malloc(clean_len + 1));
+    if (*out_clean_text) {
+        memcpy(*out_clean_text, clean_text.c_str() + trim_start, clean_len);
+        (*out_clean_text)[clean_len] = '\0';
     }
 
-    // Generate unique call ID based on timestamp
-    out_result->call_id = static_cast<int64_t>(time(nullptr)) * 1000 + (rand() % 1000);
+    return *out_tool_name != nullptr;
+}
+
+extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
+                                                        rac_tool_call_format_t format,
+                                                        rac_tool_call_t* out_result) {
+    if (!llm_output || !out_result) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    // Initialize result
+    out_result->has_tool_call = RAC_FALSE;
+    out_result->tool_name = nullptr;
+    out_result->arguments_json = nullptr;
+    out_result->clean_text = nullptr;
+    out_result->call_id = 0;
+    out_result->format = RAC_TOOL_FORMAT_AUTO;
+
+    size_t output_len = strlen(llm_output);
+
+    // Determine which format to use
+    rac_tool_call_format_t actual_format = format;
+    if (format == RAC_TOOL_FORMAT_AUTO) {
+        // Auto-detect format
+        actual_format = rac_tool_call_detect_format(llm_output);
+
+        // If still AUTO (no format detected), return no tool call
+        if (actual_format == RAC_TOOL_FORMAT_AUTO) {
+            out_result->clean_text = static_cast<char*>(malloc(output_len + 1));
+            if (out_result->clean_text) {
+                strcpy(out_result->clean_text, llm_output);
+            }
+            return RAC_SUCCESS;
+        }
+    }
+
+    // Parse using the appropriate format parser
+    char* tool_name = nullptr;
+    char* args_json = nullptr;
+    char* clean_text = nullptr;
+    bool parsed = false;
+
+    switch (actual_format) {
+    case RAC_TOOL_FORMAT_DEFAULT:
+        parsed = parse_default_format(llm_output, &tool_name, &args_json, &clean_text);
+        break;
+
+    case RAC_TOOL_FORMAT_LFM2:
+        parsed = parse_lfm2_format(llm_output, &tool_name, &args_json, &clean_text);
+        break;
+
+    case RAC_TOOL_FORMAT_OPENAI:
+        // Not yet implemented - fall through to default
+        // TODO: Implement OpenAI format parser
+        parsed = false;
+        break;
+
+    default:
+        parsed = false;
+        break;
+    }
+
+    if (parsed && tool_name) {
+        out_result->has_tool_call = RAC_TRUE;
+        out_result->tool_name = tool_name;
+        out_result->arguments_json = args_json;
+        out_result->clean_text = clean_text;
+        out_result->format = actual_format;
+        out_result->call_id = static_cast<int64_t>(time(nullptr)) * 1000 + (rand() % 1000);
+    } else {
+        // Parsing failed - clean up any partial results
+        if (tool_name) free(tool_name);
+        if (args_json) free(args_json);
+        if (clean_text) free(clean_text);
+
+        // Return original text as clean_text
+        out_result->clean_text = static_cast<char*>(malloc(output_len + 1));
+        if (out_result->clean_text) {
+            strcpy(out_result->clean_text, llm_output);
+        }
+    }
 
     return RAC_SUCCESS;
 }
@@ -810,8 +1172,85 @@ static const char* get_param_type_name(rac_tool_param_type_t type) {
     }
 }
 
-extern "C" rac_result_t rac_tool_call_format_prompt(const rac_tool_definition_t* definitions,
-                                                    size_t num_definitions, char** out_prompt) {
+/**
+ * @brief Generate format-specific tool calling instructions
+ *
+ * Returns the format-specific syntax, examples, and rules.
+ */
+static std::string get_format_instructions(rac_tool_call_format_t format) {
+    std::string instructions;
+
+    switch (format) {
+    case RAC_TOOL_FORMAT_LFM2:
+        // Liquid AI LFM2 format
+        instructions += "TOOL CALLING FORMAT (LFM2):\n";
+        instructions += "When you need to use a tool, output ONLY this format:\n";
+        instructions += "<|tool_call_start|>[TOOL_NAME(param1=\"value1\", param2=\"value2\")]<|tool_call_end|>\n\n";
+
+        instructions += "EXAMPLE - If user asks \"what's the weather in Paris\":\n";
+        instructions += "<|tool_call_start|>[get_weather(location=\"Paris\")]<|tool_call_end|>\n\n";
+
+        instructions += "RULES:\n";
+        instructions += "1. For greetings or general chat, respond normally without tools\n";
+        instructions += "2. Use Python-style function call syntax inside the tags\n";
+        instructions += "3. String values MUST be quoted with double quotes\n";
+        instructions += "4. Multiple arguments are separated by commas";
+        break;
+
+    case RAC_TOOL_FORMAT_DEFAULT:
+    default:
+        // Default SDK format
+        instructions += "TOOL CALLING FORMAT - YOU MUST USE THIS EXACT FORMAT:\n";
+        instructions += "When you need to use a tool, output ONLY this (no other text before or after):\n";
+        instructions += "<tool_call>{\"tool\": \"TOOL_NAME\", \"arguments\": {\"PARAM_NAME\": \"VALUE\"}}</tool_call>\n\n";
+
+        instructions += "EXAMPLE - If user asks \"what's the weather in Paris\":\n";
+        instructions += "<tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"Paris\"}}</tool_call>\n\n";
+
+        instructions += "RULES:\n";
+        instructions += "1. For greetings or general chat, respond normally without tools\n";
+        instructions += "2. When using a tool, output ONLY the <tool_call> tag, nothing else\n";
+        instructions += "3. Use the exact parameter names shown in the tool definitions above";
+        break;
+    }
+
+    return instructions;
+}
+
+/**
+ * @brief Generate format-specific example for JSON prompt
+ */
+static std::string get_format_example_json(rac_tool_call_format_t format) {
+    std::string example;
+
+    switch (format) {
+    case RAC_TOOL_FORMAT_LFM2:
+        example += "Tool call format:\n";
+        example += "<|tool_call_start|>[tool_name(param=\"extracted_value\")]<|tool_call_end|>\n\n";
+        example += "Example: User asks 'What is the weather in Paris?'\n";
+        example += "Response: <|tool_call_start|>[get_weather(location=\"Paris\")]<|tool_call_end|>\n";
+        break;
+
+    case RAC_TOOL_FORMAT_DEFAULT:
+    default:
+        example += "Tool call format:\n";
+        example += "<tool_call>{\"tool\": \"tool_name\", \"arguments\": {\"param\": \"extracted_value\"}}</tool_call>\n\n";
+        example += "Example: User asks 'What is the weather in Paris?'\n";
+        example += "Response: <tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"Paris\"}}</tool_call>\n";
+        break;
+    }
+
+    return example;
+}
+
+// =============================================================================
+// FORMAT-AWARE PROMPT GENERATION
+// =============================================================================
+
+extern "C" rac_result_t rac_tool_call_format_prompt_with_format(const rac_tool_definition_t* definitions,
+                                                                size_t num_definitions,
+                                                                rac_tool_call_format_t format,
+                                                                char** out_prompt) {
     if (!out_prompt) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -823,6 +1262,9 @@ extern "C" rac_result_t rac_tool_call_format_prompt(const rac_tool_definition_t*
         }
         return RAC_SUCCESS;
     }
+
+    // Use DEFAULT format if AUTO is specified
+    rac_tool_call_format_t actual_format = (format == RAC_TOOL_FORMAT_AUTO) ? RAC_TOOL_FORMAT_DEFAULT : format;
 
     std::string prompt;
     prompt.reserve(1024);
@@ -857,17 +1299,8 @@ extern "C" rac_result_t rac_tool_call_format_prompt(const rac_tool_definition_t*
         prompt += "\n";
     }
 
-    prompt += "TOOL CALLING FORMAT - YOU MUST USE THIS EXACT FORMAT:\n";
-    prompt += "When you need to use a tool, output ONLY this (no other text before or after):\n";
-    prompt += "<tool_call>{\"tool\": \"TOOL_NAME\", \"arguments\": {\"PARAM_NAME\": \"VALUE\"}}</tool_call>\n\n";
-
-    prompt += "EXAMPLE - If user asks \"what's the weather in Paris\":\n";
-    prompt += "<tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"Paris\"}}</tool_call>\n\n";
-
-    prompt += "RULES:\n";
-    prompt += "1. For greetings or general chat, respond normally without tools\n";
-    prompt += "2. When using a tool, output ONLY the <tool_call> tag, nothing else\n";
-    prompt += "3. Use the exact parameter names shown in the tool definitions above";
+    // Add format-specific instructions
+    prompt += get_format_instructions(actual_format);
 
     *out_prompt = static_cast<char*>(malloc(prompt.size() + 1));
     if (!*out_prompt) {
@@ -878,7 +1311,9 @@ extern "C" rac_result_t rac_tool_call_format_prompt(const rac_tool_definition_t*
     return RAC_SUCCESS;
 }
 
-extern "C" rac_result_t rac_tool_call_format_prompt_json(const char* tools_json, char** out_prompt) {
+extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format(const char* tools_json,
+                                                                     rac_tool_call_format_t format,
+                                                                     char** out_prompt) {
     if (!out_prompt) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -891,7 +1326,9 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json(const char* tools_json,
         return RAC_SUCCESS;
     }
 
-    // Build comprehensive prompt including the JSON
+    // Use DEFAULT format if AUTO is specified
+    rac_tool_call_format_t actual_format = (format == RAC_TOOL_FORMAT_AUTO) ? RAC_TOOL_FORMAT_DEFAULT : format;
+
     std::string prompt;
     prompt.reserve(1024 + strlen(tools_json));
 
@@ -901,15 +1338,19 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json(const char* tools_json,
     prompt += "\n\n";
 
     prompt += "# Tool Usage Instructions\n\n";
-    prompt += "IMPORTANT RULES:\n";
-    prompt += "- For normal conversation (greetings, questions, chat), respond naturally WITHOUT using any tools.\n";
+    prompt += "CRITICAL: When using a tool, you MUST extract and include ALL required arguments from the user's message.\n\n";
+    prompt += "RULES:\n";
+    prompt += "- For normal conversation (greetings, questions, chat), respond naturally WITHOUT using tools.\n";
     prompt += "- Only use a tool if the user explicitly asks for something the tool provides.\n";
-    prompt += "- Do NOT use tools for general questions or conversation.\n\n";
+    prompt += "- ALWAYS extract parameter values from the user's question. For example:\n";
+    prompt += "  - If user asks 'weather in Tokyo', use location=\"Tokyo\"\n";
+    prompt += "  - If user asks 'weather in India', use location=\"India\"\n";
+    prompt += "  - If user asks 'calculate 5 + 3', use expression=\"5 + 3\"\n\n";
 
-    prompt += "When you DO need to use a tool, respond with:\n";
-    prompt += "<tool_call>{\"tool\": \"tool_name\", \"arguments\": {\"param1\": \"value1\"}}</tool_call>\n\n";
+    // Add format-specific example
+    prompt += get_format_example_json(actual_format);
 
-    prompt += "If the user just says \"hello\" or asks a general question, respond normally without any tool calls.";
+    prompt += "\nNEVER use empty arguments. Always extract the value from the user's question.";
 
     *out_prompt = static_cast<char*>(malloc(prompt.size() + 1));
     if (!*out_prompt) {
@@ -920,6 +1361,22 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json(const char* tools_json,
     return RAC_SUCCESS;
 }
 
+// =============================================================================
+// LEGACY PROMPT GENERATION (uses DEFAULT format)
+// =============================================================================
+
+extern "C" rac_result_t rac_tool_call_format_prompt(const rac_tool_definition_t* definitions,
+                                                    size_t num_definitions, char** out_prompt) {
+    // Delegate to format-aware version with DEFAULT format
+    return rac_tool_call_format_prompt_with_format(definitions, num_definitions,
+                                                   RAC_TOOL_FORMAT_DEFAULT, out_prompt);
+}
+
+extern "C" rac_result_t rac_tool_call_format_prompt_json(const char* tools_json, char** out_prompt) {
+    // Delegate to format-aware version with DEFAULT format
+    return rac_tool_call_format_prompt_json_with_format(tools_json, RAC_TOOL_FORMAT_DEFAULT, out_prompt);
+}
+
 extern "C" rac_result_t rac_tool_call_build_initial_prompt(const char* user_prompt,
                                                            const char* tools_json,
                                                            const rac_tool_calling_options_t* options,
@@ -928,9 +1385,14 @@ extern "C" rac_result_t rac_tool_call_build_initial_prompt(const char* user_prom
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    // Format tools prompt
+    // Determine format from options (default to AUTO which becomes DEFAULT)
+    rac_tool_call_format_t format = (options && options->format != RAC_TOOL_FORMAT_AUTO)
+                                        ? options->format
+                                        : RAC_TOOL_FORMAT_DEFAULT;
+
+    // Format tools prompt with the specified format
     char* tools_prompt = nullptr;
-    rac_result_t result = rac_tool_call_format_prompt_json(tools_json, &tools_prompt);
+    rac_result_t result = rac_tool_call_format_prompt_json_with_format(tools_json, format, &tools_prompt);
     if (result != RAC_SUCCESS) {
         return result;
     }
