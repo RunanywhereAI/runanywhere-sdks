@@ -1,22 +1,109 @@
 # Raspberry Pi Setup & Run Instructions
 
-**Target:** Raspberry Pi 5 with `runanywhere-sdks` already cloned
-**Branch:** `smonga/rasp`
+**Target:** Raspberry Pi 5 with repositories already cloned
+**Date:** January 28, 2026
 
 ---
 
-## Prerequisites Check
+## Repository Information
+
+### 1. RunAnywhere SDKs
+
+| Property | Value |
+|----------|-------|
+| **Repo** | `RunanywhereAI/runanywhere-sdks` |
+| **Branch** | `smonga/rasp` |
+| **Local Path** | `~/runanywhere-sdks` |
+
+**Recent Changes:**
+- `37337630` - docs: Add Raspberry Pi setup and run instructions
+- `96c6b792` - feat(server): Add OpenAI-compatible HTTP server with Commons tool calling
+- `8ce9bb9c` - Merge tool-calling branch into server
+- Voice assistant pipeline (VAD → STT → LLM → TTS)
+- OpenAI-compatible HTTP server (`/v1/chat/completions`)
+
+**Key Components:**
+```
+sdk/runanywhere-commons/
+├── src/server/          # OpenAI-compatible HTTP server
+├── tools/               # runanywhere-server CLI
+└── dist/linux/aarch64/  # Built libraries
+
+playground/linux-voice-assistant/
+├── voice_pipeline.cpp   # Voice AI pipeline
+├── audio_capture.cpp    # ALSA microphone
+├── audio_playback.cpp   # ALSA speaker
+└── PI-SETUP.md          # This file
+```
+
+### 2. Moltbot (Clawdbot Fork)
+
+| Property | Value |
+|----------|-------|
+| **Repo** | `RunanywhereAI/clawdbot` |
+| **Branch** | `main` |
+| **Local Path** | `~/clawdbot` (optional) |
+
+**Recent Changes:**
+- `1fae7dcdf` - feat(runanywhere): Add RunAnywhere extension for local AI inference
+
+**Key Components:**
+```
+extensions/runanywhere/
+├── src/index.ts         # Extension entry point
+├── src/voice-bridge.ts  # Voice assistant ↔ Moltbot bridge
+└── README.md            # Extension documentation
+
+examples/
+└── runanywhere-local-config.yaml  # Moltbot config for local AI
+```
+
+---
+
+## Quick Start (If Already Built)
+
+### Option A: Voice Assistant Only
 
 ```bash
-# Verify you're on the correct branch
-cd ~/runanywhere-sdks  # or wherever the repo is
+cd ~/runanywhere-sdks
+git pull origin smonga/rasp
+
+cd playground/linux-voice-assistant
+./build/voice-assistant
+```
+
+### Option B: Voice Assistant + Server
+
+**Terminal 1 - Server:**
+```bash
+cd ~/runanywhere-sdks/sdk/runanywhere-commons
+./build-server/tools/runanywhere-server \
+    --model ~/.local/share/runanywhere/Models/LlamaCpp/qwen2.5-0.5b-instruct-q4/qwen2.5-0.5b-instruct-q4_k_m.gguf \
+    --port 8080
+```
+
+**Terminal 2 - Voice Assistant:**
+```bash
+cd ~/runanywhere-sdks/playground/linux-voice-assistant
+./build/voice-assistant
+```
+
+---
+
+## Full Setup Instructions
+
+### Prerequisites Check
+
+```bash
+# 1. Verify runanywhere-sdks branch
+cd ~/runanywhere-sdks
 git branch --show-current
 # Should show: smonga/rasp
 
-# Pull latest changes
+# 2. Pull latest changes
 git pull origin smonga/rasp
 
-# Check if models exist
+# 3. Check if models exist
 ls -la ~/.local/share/runanywhere/Models/
 ```
 
@@ -33,7 +120,7 @@ Expected model structure:
 
 ---
 
-## Step 1: Install Build Dependencies
+### Step 1: Install Build Dependencies
 
 ```bash
 sudo apt update
@@ -50,7 +137,7 @@ sudo apt install -y \
 
 ---
 
-## Step 2: Build RunAnywhere Commons
+### Step 2: Build RunAnywhere Commons
 
 ```bash
 cd ~/runanywhere-sdks/sdk/runanywhere-commons
@@ -70,7 +157,7 @@ ls -la dist/linux/aarch64/
 
 ---
 
-## Step 3: Build Voice Assistant
+### Step 3: Build Voice Assistant
 
 ```bash
 cd ~/runanywhere-sdks/playground/linux-voice-assistant
@@ -87,7 +174,7 @@ ls -la build/voice-assistant
 
 ---
 
-## Step 4: Build RunAnywhere Server (Optional - for Moltbot)
+### Step 4: Build RunAnywhere Server
 
 ```bash
 cd ~/runanywhere-sdks/sdk/runanywhere-commons
@@ -108,7 +195,7 @@ ls -la build-server/tools/runanywhere-server
 
 ---
 
-## Step 5: Download Models (if not present)
+### Step 5: Download Models (if not present)
 
 ```bash
 cd ~/runanywhere-sdks/playground/linux-voice-assistant
@@ -136,7 +223,7 @@ wget -O ~/.local/share/runanywhere/Models/LlamaCpp/qwen2.5-0.5b-instruct-q4/qwen
 
 ---
 
-## Step 6: Run Voice Assistant
+### Step 6: Run Voice Assistant
 
 ```bash
 cd ~/runanywhere-sdks/playground/linux-voice-assistant
@@ -157,7 +244,7 @@ cd ~/runanywhere-sdks/playground/linux-voice-assistant
 
 ---
 
-## Step 7: Run RunAnywhere Server (Optional)
+### Step 7: Run RunAnywhere Server
 
 In a separate terminal:
 
@@ -173,6 +260,55 @@ cd ~/runanywhere-sdks/sdk/runanywhere-commons
 # Test it
 curl http://localhost:8080/health
 curl http://localhost:8080/v1/models
+```
+
+---
+
+## Moltbot Integration (Optional)
+
+If you want to use Moltbot with local inference:
+
+### Clone Moltbot Fork
+
+```bash
+cd ~
+git clone https://github.com/RunanywhereAI/clawdbot.git moltbot
+cd moltbot
+```
+
+### Configure for Local AI
+
+```bash
+# Copy the RunAnywhere config
+cp examples/runanywhere-local-config.yaml ~/.moltbot/config.yaml
+
+# Or manually add to existing config:
+cat >> ~/.moltbot/config.yaml << 'EOF'
+models:
+  mode: merge
+  providers:
+    runanywhere:
+      baseUrl: "http://localhost:8080/v1"
+      apiKey: ""
+      api: openai-completions
+      models:
+        - id: "qwen2.5-0.5b-instruct-q4"
+          name: "Qwen2.5 0.5B (Local)"
+          reasoning: false
+          input: ["text"]
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
+          contextWindow: 4096
+          maxTokens: 2048
+EOF
+```
+
+### Start Moltbot
+
+```bash
+# Make sure runanywhere-server is running first!
+cd ~/moltbot
+npm install
+npm run start
 ```
 
 ---
@@ -223,7 +359,13 @@ sudo swapon /swapfile
 ## Quick Test Commands
 
 ```bash
-# Test LLM directly
+# Test server health
+curl http://localhost:8080/health
+
+# Test models endpoint
+curl http://localhost:8080/v1/models
+
+# Test chat completion
 curl -X POST http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
@@ -249,6 +391,7 @@ After=network.target
 Type=simple
 User=pi
 WorkingDirectory=/home/pi/runanywhere-sdks/sdk/runanywhere-commons
+Environment=LD_LIBRARY_PATH=/home/pi/runanywhere-sdks/sdk/runanywhere-commons/dist/linux/aarch64
 ExecStart=/home/pi/runanywhere-sdks/sdk/runanywhere-commons/build-server/tools/runanywhere-server --model /home/pi/.local/share/runanywhere/Models/LlamaCpp/qwen2.5-0.5b-instruct-q4/qwen2.5-0.5b-instruct-q4_k_m.gguf --port 8080
 Restart=on-failure
 RestartSec=5
@@ -281,7 +424,43 @@ sudo systemctl status runanywhere-server
 
 | Component | Location |
 |-----------|----------|
-| Voice Assistant | `playground/linux-voice-assistant/build/voice-assistant` |
-| Server | `sdk/runanywhere-commons/build-server/tools/runanywhere-server` |
-| Libraries | `sdk/runanywhere-commons/dist/linux/aarch64/` |
+| Voice Assistant | `~/runanywhere-sdks/playground/linux-voice-assistant/build/voice-assistant` |
+| Server | `~/runanywhere-sdks/sdk/runanywhere-commons/build-server/tools/runanywhere-server` |
+| Libraries | `~/runanywhere-sdks/sdk/runanywhere-commons/dist/linux/aarch64/` |
 | Models | `~/.local/share/runanywhere/Models/` |
+| Moltbot Config | `examples/runanywhere-local-config.yaml` |
+| Moltbot Extension | `extensions/runanywhere/` |
+
+---
+
+## Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Raspberry Pi 5                           │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │            Voice Assistant                           │   │
+│  │  Mic → VAD → STT → [LLM] → TTS → Speaker            │   │
+│  │         (Silero) (Whisper) (Qwen) (Piper)           │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                          │                                  │
+│                          ▼                                  │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │          RunAnywhere Server (:8080)                  │   │
+│  │  • /v1/chat/completions (OpenAI-compatible)         │   │
+│  │  • /v1/models                                        │   │
+│  │  • Tool calling support                              │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                          │                                  │
+│                          ▼                                  │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │              Moltbot (Optional)                      │   │
+│  │  • Task planning                                     │   │
+│  │  • Tool execution (shell, fs, gpio)                  │   │
+│  │  • Telegram/Discord/etc integration                  │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
