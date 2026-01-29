@@ -20,6 +20,7 @@
 #include "rac/features/stt/rac_stt_types.h"
 #include "rac/features/tts/rac_tts_types.h"
 #include "rac/features/vad/rac_vad_types.h"
+#include "rac/features/wakeword/rac_wakeword_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,6 +57,7 @@ extern "C" {
  */
 typedef enum rac_audio_pipeline_state {
     RAC_AUDIO_PIPELINE_IDLE = 0,                /**< System is idle, ready to start listening */
+    RAC_AUDIO_PIPELINE_WAITING_WAKEWORD = 7,    /**< Waiting for wake word activation */
     RAC_AUDIO_PIPELINE_LISTENING = 1,           /**< Actively listening for speech via VAD */
     RAC_AUDIO_PIPELINE_PROCESSING_SPEECH = 2,   /**< Processing detected speech with STT */
     RAC_AUDIO_PIPELINE_GENERATING_RESPONSE = 3, /**< Generating response with LLM */
@@ -82,7 +84,8 @@ typedef enum rac_voice_agent_event_type {
     RAC_VOICE_AGENT_EVENT_TRANSCRIPTION = 2,     /**< Transcription available from STT */
     RAC_VOICE_AGENT_EVENT_RESPONSE = 3,          /**< Response generated from LLM */
     RAC_VOICE_AGENT_EVENT_AUDIO_SYNTHESIZED = 4, /**< Audio synthesized from TTS */
-    RAC_VOICE_AGENT_EVENT_ERROR = 5              /**< Error occurred during processing */
+    RAC_VOICE_AGENT_EVENT_ERROR = 5,             /**< Error occurred during processing */
+    RAC_VOICE_AGENT_EVENT_WAKEWORD_DETECTED = 6  /**< Wake word detected */
 } rac_voice_agent_event_type_t;
 
 /**
@@ -146,6 +149,45 @@ typedef struct rac_voice_agent_tts_config {
 } rac_voice_agent_tts_config_t;
 
 /**
+ * @brief Wake word configuration for voice agent.
+ */
+typedef struct rac_voice_agent_wakeword_config {
+    /** Whether wake word detection is enabled */
+    rac_bool_t enabled;
+
+    /** Wake word model path (ONNX format, e.g., "hey_jarvis.onnx") */
+    const char* model_path;
+
+    /** Wake word model ID for telemetry */
+    const char* model_id;
+
+    /** Human-readable wake word phrase (e.g., "Hey Jarvis") */
+    const char* wake_word;
+
+    /** Detection threshold (0.0 - 1.0, default: 0.5) */
+    float threshold;
+
+    /** Path to embedding model (required for openWakeWord) */
+    const char* embedding_model_path;
+
+    /** Path to Silero VAD model for pre-filtering (optional) */
+    const char* vad_model_path;
+} rac_voice_agent_wakeword_config_t;
+
+/**
+ * @brief Default wake word configuration.
+ */
+static const rac_voice_agent_wakeword_config_t RAC_VOICE_AGENT_WAKEWORD_CONFIG_DEFAULT = {
+    .enabled = RAC_FALSE,
+    .model_path = RAC_NULL,
+    .model_id = RAC_NULL,
+    .wake_word = RAC_NULL,
+    .threshold = 0.5f,
+    .embedding_model_path = RAC_NULL,
+    .vad_model_path = RAC_NULL
+};
+
+/**
  * @brief Voice agent configuration.
  * Mirrors Swift's VoiceAgentConfiguration.
  */
@@ -161,6 +203,9 @@ typedef struct rac_voice_agent_config {
 
     /** TTS configuration */
     rac_voice_agent_tts_config_t tts_config;
+
+    /** Wake word configuration */
+    rac_voice_agent_wakeword_config_t wakeword_config;
 } rac_voice_agent_config_t;
 
 /**
@@ -170,7 +215,16 @@ static const rac_voice_agent_config_t RAC_VOICE_AGENT_CONFIG_DEFAULT = {
     .vad_config = {.sample_rate = 16000, .frame_length = 0.1f, .energy_threshold = 0.005f},
     .stt_config = {.model_path = RAC_NULL, .model_id = RAC_NULL, .model_name = RAC_NULL},
     .llm_config = {.model_path = RAC_NULL, .model_id = RAC_NULL, .model_name = RAC_NULL},
-    .tts_config = {.voice_path = RAC_NULL, .voice_id = RAC_NULL, .voice_name = RAC_NULL}};
+    .tts_config = {.voice_path = RAC_NULL, .voice_id = RAC_NULL, .voice_name = RAC_NULL},
+    .wakeword_config = {
+        .enabled = RAC_FALSE,
+        .model_path = RAC_NULL,
+        .model_id = RAC_NULL,
+        .wake_word = RAC_NULL,
+        .threshold = 0.5f,
+        .embedding_model_path = RAC_NULL,
+        .vad_model_path = RAC_NULL
+    }};
 
 // =============================================================================
 // AUDIO PIPELINE STATE MANAGER CONFIG - Mirrors Swift's AudioPipelineStateManager.Configuration
@@ -285,6 +339,13 @@ typedef struct rac_voice_agent_event {
 
         /** For ERROR event */
         rac_result_t error_code;
+
+        /** For WAKEWORD_DETECTED event */
+        struct {
+            const char* wake_word;
+            float confidence;
+            int64_t timestamp_ms;
+        } wakeword;
     } data;
 } rac_voice_agent_event_t;
 

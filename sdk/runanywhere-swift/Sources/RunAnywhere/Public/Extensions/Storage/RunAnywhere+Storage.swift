@@ -84,6 +84,8 @@ public extension RunAnywhere {
     ///   - framework: The framework the model belongs to
     static func deleteStoredModel(_ modelId: String, framework: InferenceFramework) async throws {
         try SimplifiedFileManager.shared.deleteModel(modelId: modelId, framework: framework)
+        // Mark the model as not downloaded (localPath: nil)
+        try await CppBridge.ModelRegistry.shared.updateDownloadStatus(modelId: modelId, localPath: nil)
         // Emit via C++ event system
         CppBridge.Events.emitModelDeleted(modelId: modelId)
     }

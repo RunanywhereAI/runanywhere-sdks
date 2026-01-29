@@ -155,6 +155,26 @@ elseif(RAC_PLATFORM_MACOS)
         "-framework Metal"
         "-framework MetalKit"
     )
+
+elseif(RAC_PLATFORM_LINUX)
+    message(STATUS "Configuring LlamaCPP backend for Linux")
+
+    # Enable ARM NEON for aarch64 (Raspberry Pi 5)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+        set(GGML_NEON ON CACHE BOOL "" FORCE)
+        message(STATUS "Enabling NEON for Linux aarch64")
+    endif()
+
+    # Disable GPU backends not typically available on Linux ARM
+    set(GGML_METAL OFF CACHE BOOL "" FORCE)
+    set(GGML_CUDA OFF CACHE BOOL "" FORCE)
+    set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
+    set(GGML_OPENCL OFF CACHE BOOL "" FORCE)
+    set(GGML_HIPBLAS OFF CACHE BOOL "" FORCE)
+    set(GGML_SYCL OFF CACHE BOOL "" FORCE)
+
+    # Linux-specific link libraries
+    target_link_libraries(rac_backend_llamacpp PUBLIC pthread dl)
 endif()
 
 # =============================================================================

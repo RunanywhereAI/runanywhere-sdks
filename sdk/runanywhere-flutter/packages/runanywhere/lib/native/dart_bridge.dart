@@ -24,6 +24,7 @@ import 'package:runanywhere/native/dart_bridge_state.dart';
 import 'package:runanywhere/native/dart_bridge_storage.dart';
 import 'package:runanywhere/native/dart_bridge_stt.dart';
 import 'package:runanywhere/native/dart_bridge_telemetry.dart';
+import 'package:runanywhere/native/dart_bridge_tool_calling.dart';
 import 'package:runanywhere/native/dart_bridge_tts.dart';
 import 'package:runanywhere/native/dart_bridge_vad.dart';
 import 'package:runanywhere/native/dart_bridge_voice_agent.dart';

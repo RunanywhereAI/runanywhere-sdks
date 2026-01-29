@@ -11,6 +11,7 @@ nitrogen/generated/
 # iOS
 ios/build/
 **/ios/Binaries/
+**/ios/xcframeworks/
 *.xcframework.zip
 
 # NOTE: iOS xcframeworks are now bundled in npm package - DO NOT gitignore them
