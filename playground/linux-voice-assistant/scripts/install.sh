@@ -148,7 +148,7 @@ if [ -d "$SDK_DIR" ]; then
     fi
 else
     log_info "Cloning RunAnywhere SDK..."
-    git clone https://github.com/RunanywhereAI/sdks.git "$SDK_DIR"
+    git clone https://github.com/RunanywhereAI/runanywhere-sdks.git "$SDK_DIR"
     cd "$SDK_DIR"
     git checkout smonga/rasp 2>/dev/null || true  # Use the branch with voice assistant
 fi
