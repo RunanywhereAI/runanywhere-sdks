@@ -194,7 +194,7 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/device/rac_device_manager.cpp
 )
 
-# Feature sources - LLM, STT, TTS, VAD service interfaces
+# Feature sources - LLM, STT, TTS, VAD, Wake Word service interfaces
 set(RAC_FEATURES_SOURCES
     # LLM
     src/features/llm/llm_component.cpp
@@ -215,6 +215,8 @@ set(RAC_FEATURES_SOURCES
     src/features/vad/vad_component.cpp
     src/features/vad/energy_vad.cpp
     src/features/vad/vad_analytics.cpp
+    # Wake Word
+    src/features/wakeword/wakeword_service.cpp
     # Voice Agent
     src/features/voice_agent/voice_agent.cpp
     # Result memory management

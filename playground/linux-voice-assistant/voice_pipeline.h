@@ -24,6 +24,9 @@ namespace runanywhere {
 // Callbacks
 // =============================================================================
 
+// Called when wake word is detected
+using WakeWordCallback = std::function<void(const std::string& wake_word, float confidence)>;
+
 // Called when speech is detected/ended
 using VoiceActivityCallback = std::function<void(bool is_speaking)>;
 
@@ -45,11 +48,17 @@ using ErrorCallback = std::function<void(const std::string& error)>;
 
 struct VoicePipelineConfig {
     // Callbacks (required)
+    WakeWordCallback on_wake_word;
     VoiceActivityCallback on_voice_activity;
     TranscriptionCallback on_transcription;
     ResponseCallback on_response;
     AudioOutputCallback on_audio_output;
     ErrorCallback on_error;
+
+    // Wake word settings (optional)
+    bool enable_wake_word = false;
+    std::string wake_word = "Hey Jarvis";
+    float wake_word_threshold = 0.5f;
 
     // VAD settings
     float vad_energy_threshold = 0.005f;

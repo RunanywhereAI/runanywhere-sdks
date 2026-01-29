@@ -113,7 +113,9 @@ Expected model structure:
 ├── ONNX/
 │   ├── silero-vad/silero_vad.onnx
 │   ├── whisper-tiny-en/
-│   └── vits-piper-en_US-lessac-medium/
+│   ├── vits-piper-en_US-lessac-medium/
+│   ├── openwakeword/embedding_model.onnx    # Optional (wake word)
+│   └── hey-jarvis/hey_jarvis_v0.1.onnx      # Optional (wake word)
 └── LlamaCpp/
     └── qwen2.5-0.5b-instruct-q4/qwen2.5-0.5b-instruct-q4_k_m.gguf
 ```
@@ -200,8 +202,11 @@ ls -la build-server/tools/runanywhere-server
 ```bash
 cd ~/runanywhere-sdks/playground/linux-voice-assistant
 
-# Run the download script
+# Download required models
 ./scripts/download-models.sh
+
+# Optional: Download wake word models for "Hey Jarvis" activation
+./scripts/download-models.sh --wakeword
 ```
 
 Or manually download:
@@ -219,6 +224,13 @@ wget -O ~/.local/share/runanywhere/Models/ONNX/silero-vad/silero_vad.onnx \
 mkdir -p ~/.local/share/runanywhere/Models/LlamaCpp/qwen2.5-0.5b-instruct-q4
 wget -O ~/.local/share/runanywhere/Models/LlamaCpp/qwen2.5-0.5b-instruct-q4/qwen2.5-0.5b-instruct-q4_k_m.gguf \
     https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf
+
+# Optional: openWakeWord models for "Hey Jarvis"
+mkdir -p ~/.local/share/runanywhere/Models/ONNX/{openwakeword,hey-jarvis}
+wget -O ~/.local/share/runanywhere/Models/ONNX/openwakeword/embedding_model.onnx \
+    https://github.com/dscripka/openWakeWord/releases/download/v0.5.0/embedding_model.onnx
+wget -O ~/.local/share/runanywhere/Models/ONNX/hey-jarvis/hey_jarvis_v0.1.onnx \
+    https://github.com/dscripka/openWakeWord/releases/download/v0.5.0/hey_jarvis_v0.1.onnx
 ```
 
 ---
@@ -231,15 +243,22 @@ cd ~/runanywhere-sdks/playground/linux-voice-assistant
 # List audio devices first
 ./build/voice-assistant --list-devices
 
-# Run with default devices
+# Run with default devices (always listening)
 ./build/voice-assistant
 
-# Or specify devices
+# Run with wake word detection (say "Hey Jarvis" to activate)
+./build/voice-assistant --wakeword
+
+# Specify audio devices
 ./build/voice-assistant --input plughw:1,0 --output plughw:0,0
+
+# Combined: wake word + specific devices
+./build/voice-assistant --wakeword --input plughw:1,0 --output plughw:0,0
 ```
 
 **Controls:**
-- Speak to interact
+- Without `--wakeword`: Speak anytime to interact
+- With `--wakeword`: Say "Hey Jarvis" to activate, then speak
 - `Ctrl+C` to exit
 
 ---
