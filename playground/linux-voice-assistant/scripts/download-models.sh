@@ -9,7 +9,7 @@
 # Options:
 #   --force        Re-download all models even if they exist
 #   --wakeword     Also download wake word detection models
-#   --llm <model>  Specify which LLM to download (default: qwen2.5-1.5b)
+#   --llm <model>  Specify which LLM to download (default: qwen3-1.7b)
 #   --all-llms     Download all available LLM models
 #   --list-llms    List available LLM models
 #
@@ -19,12 +19,11 @@
 #   - VITS Piper English US Lessac (~65MB) - Text-to-Speech
 #
 # LLM Models (choose one or more):
-#   - qwen2.5-0.5b   (~400MB)  - Smallest, fastest, basic quality
-#   - qwen2.5-1.5b   (~1.1GB)  - Good balance (DEFAULT)
-#   - qwen2.5-3b     (~2.2GB)  - Better quality, slower
-#   - llama-3.2-1b   (~750MB)  - Meta's efficient small model
-#   - llama-3.2-3b   (~2.0GB)  - Meta's efficient larger model
-#   - phi-3-mini     (~2.5GB)  - Microsoft's efficient model
+#   - qwen3-0.6b     (~639MB)  - Smallest, fastest, basic quality
+#   - lfm-1.2b       (~1.25GB) - Liquid AI, efficient architecture
+#   - qwen3-1.7b     (~1.83GB) - Good balance (DEFAULT)
+#   - llama-3.2-3b   (~2.0GB)  - Meta's efficient model
+#   - qwen3-4b       (~2.5GB)  - Best quality, needs 8GB Pi
 #
 # Optional Wake Word Models:
 #   - openWakeWord Embedding (~15MB) - Feature extraction
@@ -74,41 +73,41 @@ declare -A LLM_URLS
 declare -A LLM_SIZES
 declare -A LLM_DESCRIPTIONS
 
-# Qwen 2.5 Models (Alibaba)
-LLM_MODELS["qwen2.5-0.5b"]="qwen2.5-0.5b-instruct-q4_k_m.gguf"
-LLM_URLS["qwen2.5-0.5b"]="https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
-LLM_SIZES["qwen2.5-0.5b"]="~400MB"
-LLM_DESCRIPTIONS["qwen2.5-0.5b"]="Smallest, fastest, basic quality"
+# Qwen3 0.6B Q8 (Alibaba) - Smallest
+LLM_MODELS["qwen3-0.6b"]="Qwen3-0.6B-Q8_0.gguf"
+LLM_URLS["qwen3-0.6b"]="https://huggingface.co/Qwen/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf"
+LLM_SIZES["qwen3-0.6b"]="~639MB"
+LLM_DESCRIPTIONS["qwen3-0.6b"]="Smallest, fastest, 32K context"
 
-LLM_MODELS["qwen2.5-1.5b"]="qwen2.5-1.5b-instruct-q4_k_m.gguf"
-LLM_URLS["qwen2.5-1.5b"]="https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf"
-LLM_SIZES["qwen2.5-1.5b"]="~1.1GB"
-LLM_DESCRIPTIONS["qwen2.5-1.5b"]="Good balance of speed and quality (RECOMMENDED)"
+# Liquid AI LFM 1.2B Q8 - Efficient architecture
+LLM_MODELS["lfm-1.2b"]="LFM2.5-1.2B-Instruct-Q8_0.gguf"
+LLM_URLS["lfm-1.2b"]="https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q8_0.gguf"
+LLM_SIZES["lfm-1.2b"]="~1.25GB"
+LLM_DESCRIPTIONS["lfm-1.2b"]="Liquid AI, efficient new architecture"
 
-LLM_MODELS["qwen2.5-3b"]="qwen2.5-3b-instruct-q4_k_m.gguf"
-LLM_URLS["qwen2.5-3b"]="https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf"
-LLM_SIZES["qwen2.5-3b"]="~2.2GB"
-LLM_DESCRIPTIONS["qwen2.5-3b"]="Better quality, slower on Pi"
+# Qwen3 1.7B Q8 (Alibaba) - Good balance
+LLM_MODELS["qwen3-1.7b"]="Qwen3-1.7B-Q8_0.gguf"
+LLM_URLS["qwen3-1.7b"]="https://huggingface.co/Qwen/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf"
+LLM_SIZES["qwen3-1.7b"]="~1.83GB"
+LLM_DESCRIPTIONS["qwen3-1.7b"]="Good balance, 32K context (RECOMMENDED)"
 
-# Llama 3.2 Models (Meta)
-LLM_MODELS["llama-3.2-1b"]="Llama-3.2-1B-Instruct-Q4_K_M.gguf"
-LLM_URLS["llama-3.2-1b"]="https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf"
-LLM_SIZES["llama-3.2-1b"]="~750MB"
-LLM_DESCRIPTIONS["llama-3.2-1b"]="Meta's efficient small model"
-
+# Llama 3.2 3B Q4 (Meta) - Efficient
 LLM_MODELS["llama-3.2-3b"]="Llama-3.2-3B-Instruct-Q4_K_M.gguf"
 LLM_URLS["llama-3.2-3b"]="https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf"
 LLM_SIZES["llama-3.2-3b"]="~2.0GB"
-LLM_DESCRIPTIONS["llama-3.2-3b"]="Meta's efficient larger model"
+LLM_DESCRIPTIONS["llama-3.2-3b"]="Meta's efficient 3B model"
 
-# Phi-3 Mini (Microsoft)
-LLM_MODELS["phi-3-mini"]="Phi-3-mini-4k-instruct-q4.gguf"
-LLM_URLS["phi-3-mini"]="https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf"
-LLM_SIZES["phi-3-mini"]="~2.5GB"
-LLM_DESCRIPTIONS["phi-3-mini"]="Microsoft's efficient model, good reasoning"
+# Qwen3 4B Q4 (Alibaba) - Best quality
+LLM_MODELS["qwen3-4b"]="Qwen3-4B-Q4_K_M.gguf"
+LLM_URLS["qwen3-4b"]="https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf"
+LLM_SIZES["qwen3-4b"]="~2.5GB"
+LLM_DESCRIPTIONS["qwen3-4b"]="Best quality, 32K context, needs 8GB Pi"
 
-# Default LLM
-DEFAULT_LLM="qwen2.5-1.5b"
+# Default LLM - Qwen3 1.7B is the best balance for Pi 5
+DEFAULT_LLM="qwen3-1.7b"
+
+# Model order (recommended first)
+MODEL_ORDER="qwen3-0.6b lfm-1.2b qwen3-1.7b llama-3.2-3b qwen3-4b"
 
 # =============================================================================
 # Configuration
@@ -123,22 +122,24 @@ DOWNLOAD_ALL_LLMS=false
 # Function to list available LLMs
 list_llms() {
     echo ""
-    echo "Available LLM Models:"
-    echo "====================="
+    echo "Available LLM Models for Raspberry Pi:"
+    echo "======================================="
     echo ""
-    printf "%-16s %-10s %s\n" "MODEL ID" "SIZE" "DESCRIPTION"
-    printf "%-16s %-10s %s\n" "--------" "----" "-----------"
-    for model in qwen2.5-0.5b qwen2.5-1.5b qwen2.5-3b llama-3.2-1b llama-3.2-3b phi-3-mini; do
+    printf "%-14s %-10s %s\n" "MODEL ID" "SIZE" "DESCRIPTION"
+    printf "%-14s %-10s %s\n" "--------" "----" "-----------"
+    for model in $MODEL_ORDER; do
         local marker=""
         if [ "$model" = "$DEFAULT_LLM" ]; then
-            marker=" (default)"
+            marker=" ★"
         fi
-        printf "%-16s %-10s %s%s\n" "$model" "${LLM_SIZES[$model]}" "${LLM_DESCRIPTIONS[$model]}" "$marker"
+        printf "%-14s %-10s %s%s\n" "$model" "${LLM_SIZES[$model]}" "${LLM_DESCRIPTIONS[$model]}" "$marker"
     done
+    echo ""
+    echo "★ = Default/Recommended"
     echo ""
     echo "Usage examples:"
     echo "  ./download-models.sh                    # Download default (${DEFAULT_LLM})"
-    echo "  ./download-models.sh --llm qwen2.5-3b   # Download specific model"
+    echo "  ./download-models.sh --llm qwen3-4b     # Download specific model"
     echo "  ./download-models.sh --all-llms         # Download all models"
     echo ""
 }
@@ -222,7 +223,7 @@ if [ -f "${VAD_FILE}" ] && [ "${FORCE_DOWNLOAD}" = false ]; then
     print_success "Silero VAD already exists, skipping"
 else
     mkdir -p "${VAD_DIR}"
-    curl -L -o "${VAD_FILE}" \
+    curl -L --progress-bar -o "${VAD_FILE}" \
         "https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx"
     print_success "Silero VAD downloaded"
 fi
@@ -244,7 +245,7 @@ else
     trap "rm -rf ${TEMP_DIR}" EXIT
 
     # Download Sherpa-ONNX whisper model
-    curl -L -o "${TEMP_DIR}/whisper.tar.bz2" \
+    curl -L --progress-bar -o "${TEMP_DIR}/whisper.tar.bz2" \
         "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.en.tar.bz2"
 
     # Extract to temp directory
@@ -273,7 +274,7 @@ else
     trap "rm -rf ${TEMP_DIR}" EXIT
 
     # Download from RunanywhereAI hosted models
-    curl -L -o "${TEMP_DIR}/piper.tar.gz" \
+    curl -L --progress-bar -o "${TEMP_DIR}/piper.tar.gz" \
         "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz"
 
     # Extract to temp directory
@@ -320,7 +321,7 @@ download_llm() {
 
 if [ "${DOWNLOAD_ALL_LLMS}" = true ]; then
     print_header "Downloading All LLM Models"
-    for model in qwen2.5-0.5b qwen2.5-1.5b qwen2.5-3b llama-3.2-1b llama-3.2-3b phi-3-mini; do
+    for model in $MODEL_ORDER; do
         download_llm "$model"
     done
 else
@@ -344,7 +345,7 @@ if [ "${DOWNLOAD_WAKEWORD}" = true ]; then
     if [ -f "${EMBEDDING_FILE}" ] && [ "${FORCE_DOWNLOAD}" = false ]; then
         print_success "openWakeWord embedding model already exists, skipping"
     else
-        curl -L -o "${EMBEDDING_FILE}" \
+        curl -L --progress-bar -o "${EMBEDDING_FILE}" \
             "https://github.com/dscripka/openWakeWord/releases/download/v0.5.0/embedding_model.onnx"
         print_success "openWakeWord embedding model downloaded"
     fi
@@ -355,7 +356,7 @@ if [ "${DOWNLOAD_WAKEWORD}" = true ]; then
     if [ -f "${MELSPEC_FILE}" ] && [ "${FORCE_DOWNLOAD}" = false ]; then
         print_success "Melspectrogram model already exists, skipping"
     else
-        curl -L -o "${MELSPEC_FILE}" \
+        curl -L --progress-bar -o "${MELSPEC_FILE}" \
             "https://github.com/dscripka/openWakeWord/releases/download/v0.5.0/melspectrogram.onnx"
         print_success "Melspectrogram model downloaded"
     fi
@@ -369,7 +370,7 @@ if [ "${DOWNLOAD_WAKEWORD}" = true ]; then
     if [ -f "${JARVIS_FILE}" ] && [ "${FORCE_DOWNLOAD}" = false ]; then
         print_success "Hey Jarvis wake word model already exists, skipping"
     else
-        curl -L -o "${JARVIS_FILE}" \
+        curl -L --progress-bar -o "${JARVIS_FILE}" \
             "https://github.com/dscripka/openWakeWord/releases/download/v0.5.0/hey_jarvis_v0.1.onnx"
         print_success "Hey Jarvis wake word model downloaded"
     fi
@@ -381,8 +382,8 @@ fi
 
 print_header "Download Complete!"
 
-echo "Voice Pipeline Models:"
-echo "----------------------"
+echo "Voice Pipeline Models (fixed):"
+echo "------------------------------"
 echo ""
 
 echo "VAD (Silero):"
@@ -397,8 +398,8 @@ echo "TTS (VITS Piper):"
 ls -lh "${TTS_DIR}"/*.onnx 2>/dev/null | awk '{print "  " $NF ": " $5}' || echo "  (missing)"
 
 echo ""
-echo "LLM Models:"
-echo "-----------"
+echo "LLM Models (swappable):"
+echo "-----------------------"
 for model_dir in "${MODEL_DIR}/LlamaCpp/"*/; do
     if [ -d "$model_dir" ]; then
         model_name=$(basename "$model_dir")

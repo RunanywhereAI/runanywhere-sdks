@@ -42,9 +42,28 @@ For detailed Moltbot integration options, see [docs/MOLTBOT_INTEGRATION.md](docs
 ## Prerequisites
 
 ### Hardware
-- Raspberry Pi 5 (4GB+ RAM recommended)
-- USB microphone or audio HAT
+
+**Tested Configuration (Reference):**
+- **Device:** Raspberry Pi 5 Model B Rev 1.1
+- **RAM:** 8GB (7.9GB usable)
+- **Storage:** 128GB microSD (Class 10 / A2 recommended)
+- **OS:** Raspberry Pi OS Bookworm (64-bit)
+- **Kernel:** 6.12.47+rpt-rpi-2712 aarch64
+
+**Minimum Requirements:**
+- Raspberry Pi 5 (4GB RAM minimum, 8GB recommended for larger models)
+- USB microphone or audio HAT (e.g., ReSpeaker)
 - Speaker (3.5mm jack, HDMI, or USB)
+- 32GB+ microSD card (64GB+ recommended for multiple LLM models)
+
+**RAM Requirements by Model:**
+| LLM Model | Model Size | RAM @ Runtime | Pi 4GB | Pi 8GB |
+|-----------|------------|---------------|--------|--------|
+| qwen3-0.6b | 639 MB | ~1.5 GB | ✅ | ✅ |
+| lfm-1.2b | 1.25 GB | ~2.5 GB | ✅ | ✅ |
+| qwen3-1.7b | 1.83 GB | ~3 GB | ✅ | ✅ |
+| llama-3.2-3b | 2.0 GB | ~3.5 GB | ⚠️ | ✅ |
+| qwen3-4b | 2.5 GB | ~4.5 GB | ❌ | ✅ |
 
 ### Software Dependencies
 
