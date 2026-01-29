@@ -656,25 +656,15 @@ class _ToolsViewState extends State<ToolsView> {
   }
 
   void _showModelSelection(BuildContext context) {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (sheetContext) => DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (dragContext, scrollController) => ClipRRect(
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(20),
-          ),
-          child: ModelSelectionSheet(
-            onModelSelected: (model) async {
-              Navigator.pop(sheetContext);
-              unawaited(_syncModelState());
-            },
-          ),
-        ),
+      builder: (sheetContext) => ModelSelectionSheet(
+        onModelSelected: (model) async {
+          // ModelSelectionSheet handles closing itself, so just sync state
+          unawaited(_syncModelState());
+        },
       ),
     );
   }

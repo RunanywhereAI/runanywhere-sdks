@@ -278,6 +278,12 @@ class ToolCallingOptions {
   /// If true, keeps tool definitions available after the first tool call
   final bool keepToolsAvailable;
 
+  /// Tool calling format name (e.g., "default", "lfm2")
+  /// Different models are trained on different tool calling formats.
+  /// - "default": Standard JSON format for general-purpose models
+  /// - "lfm2": Pythonic format for LFM2-Tool models
+  final String formatName;
+
   const ToolCallingOptions({
     this.tools,
     this.maxToolCalls = 5,
@@ -287,6 +293,7 @@ class ToolCallingOptions {
     this.systemPrompt,
     this.replaceSystemPrompt = false,
     this.keepToolsAvailable = false,
+    this.formatName = 'default',
   });
 }
 

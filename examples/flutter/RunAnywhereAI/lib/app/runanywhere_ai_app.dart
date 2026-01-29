@@ -189,7 +189,24 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
           'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf',
       memoryRequirement: 400000000,
     );
-    debugPrint('✅ LlamaCPP module registered with LLM models');
+
+    // Tool Calling Optimized Models
+    // LFM2-1.2B-Tool - Designed for concise and precise tool calling (Liquid AI)
+    LlamaCpp.addModel(
+      id: 'lfm2-1.2b-tool-q4_k_m',
+      name: 'LiquidAI LFM2 1.2B Tool Q4_K_M',
+      url:
+          'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf',
+      memoryRequirement: 800000000,
+    );
+    LlamaCpp.addModel(
+      id: 'lfm2-1.2b-tool-q8_0',
+      name: 'LiquidAI LFM2 1.2B Tool Q8_0',
+      url:
+          'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf',
+      memoryRequirement: 1400000000,
+    );
+    debugPrint('✅ LlamaCPP module registered with LLM models (including tool-calling optimized models)');
 
     // Yield between module registrations
     await Future<void>.delayed(Duration.zero);
