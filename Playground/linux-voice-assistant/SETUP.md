@@ -9,6 +9,20 @@ This guide covers building and running the full voice AI stack on Raspberry Pi 5
 
 ---
 
+## Quick Install Options
+
+Choose the installation method that fits your situation:
+
+| Method | Best For | Command |
+|--------|----------|---------|
+| **One-liner (Fresh)** | New users | `curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/playground/linux-voice-assistant/scripts/install.sh \| bash` |
+| **Add to Moltbot** | Existing Moltbot users | `curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/playground/linux-voice-assistant/scripts/add-to-moltbot.sh \| bash` |
+| **Manual Setup** | Developers, custom configs | Follow this guide |
+
+For detailed Moltbot integration options, see [docs/MOLTBOT_INTEGRATION.md](docs/MOLTBOT_INTEGRATION.md).
+
+---
+
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)
