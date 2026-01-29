@@ -4,17 +4,27 @@
 # download-models.sh
 # Download pre-configured models for the Linux Voice Assistant
 #
-# Usage: ./download-models.sh [--force] [--wakeword]
+# Usage: ./download-models.sh [options]
 #
 # Options:
-#   --force     Re-download all models even if they exist
-#   --wakeword  Also download wake word detection models (optional)
+#   --force        Re-download all models even if they exist
+#   --wakeword     Also download wake word detection models
+#   --llm <model>  Specify which LLM to download (default: qwen2.5-1.5b)
+#   --all-llms     Download all available LLM models
+#   --list-llms    List available LLM models
 #
-# Required Models:
+# Voice Pipeline Models (always downloaded):
 #   - Silero VAD (~2MB) - Voice Activity Detection
 #   - Whisper Tiny English (~150MB) - Speech-to-Text
-#   - Qwen2.5 0.5B Instruct Q4 (~400MB) - Language Model
 #   - VITS Piper English US Lessac (~65MB) - Text-to-Speech
+#
+# LLM Models (choose one or more):
+#   - qwen2.5-0.5b   (~400MB)  - Smallest, fastest, basic quality
+#   - qwen2.5-1.5b   (~1.1GB)  - Good balance (DEFAULT)
+#   - qwen2.5-3b     (~2.2GB)  - Better quality, slower
+#   - llama-3.2-1b   (~750MB)  - Meta's efficient small model
+#   - llama-3.2-3b   (~2.0GB)  - Meta's efficient larger model
+#   - phi-3-mini     (~2.5GB)  - Microsoft's efficient model
 #
 # Optional Wake Word Models:
 #   - openWakeWord Embedding (~15MB) - Feature extraction
@@ -56,15 +66,85 @@ print_info() {
 }
 
 # =============================================================================
+# LLM Model Definitions
+# =============================================================================
+
+declare -A LLM_MODELS
+declare -A LLM_URLS
+declare -A LLM_SIZES
+declare -A LLM_DESCRIPTIONS
+
+# Qwen 2.5 Models (Alibaba)
+LLM_MODELS["qwen2.5-0.5b"]="qwen2.5-0.5b-instruct-q4_k_m.gguf"
+LLM_URLS["qwen2.5-0.5b"]="https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+LLM_SIZES["qwen2.5-0.5b"]="~400MB"
+LLM_DESCRIPTIONS["qwen2.5-0.5b"]="Smallest, fastest, basic quality"
+
+LLM_MODELS["qwen2.5-1.5b"]="qwen2.5-1.5b-instruct-q4_k_m.gguf"
+LLM_URLS["qwen2.5-1.5b"]="https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf"
+LLM_SIZES["qwen2.5-1.5b"]="~1.1GB"
+LLM_DESCRIPTIONS["qwen2.5-1.5b"]="Good balance of speed and quality (RECOMMENDED)"
+
+LLM_MODELS["qwen2.5-3b"]="qwen2.5-3b-instruct-q4_k_m.gguf"
+LLM_URLS["qwen2.5-3b"]="https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf"
+LLM_SIZES["qwen2.5-3b"]="~2.2GB"
+LLM_DESCRIPTIONS["qwen2.5-3b"]="Better quality, slower on Pi"
+
+# Llama 3.2 Models (Meta)
+LLM_MODELS["llama-3.2-1b"]="Llama-3.2-1B-Instruct-Q4_K_M.gguf"
+LLM_URLS["llama-3.2-1b"]="https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf"
+LLM_SIZES["llama-3.2-1b"]="~750MB"
+LLM_DESCRIPTIONS["llama-3.2-1b"]="Meta's efficient small model"
+
+LLM_MODELS["llama-3.2-3b"]="Llama-3.2-3B-Instruct-Q4_K_M.gguf"
+LLM_URLS["llama-3.2-3b"]="https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf"
+LLM_SIZES["llama-3.2-3b"]="~2.0GB"
+LLM_DESCRIPTIONS["llama-3.2-3b"]="Meta's efficient larger model"
+
+# Phi-3 Mini (Microsoft)
+LLM_MODELS["phi-3-mini"]="Phi-3-mini-4k-instruct-q4.gguf"
+LLM_URLS["phi-3-mini"]="https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf"
+LLM_SIZES["phi-3-mini"]="~2.5GB"
+LLM_DESCRIPTIONS["phi-3-mini"]="Microsoft's efficient model, good reasoning"
+
+# Default LLM
+DEFAULT_LLM="qwen2.5-1.5b"
+
+# =============================================================================
 # Configuration
 # =============================================================================
 
 MODEL_DIR="${HOME}/.local/share/runanywhere/Models"
 FORCE_DOWNLOAD=false
 DOWNLOAD_WAKEWORD=false
+SELECTED_LLM="${DEFAULT_LLM}"
+DOWNLOAD_ALL_LLMS=false
+
+# Function to list available LLMs
+list_llms() {
+    echo ""
+    echo "Available LLM Models:"
+    echo "====================="
+    echo ""
+    printf "%-16s %-10s %s\n" "MODEL ID" "SIZE" "DESCRIPTION"
+    printf "%-16s %-10s %s\n" "--------" "----" "-----------"
+    for model in qwen2.5-0.5b qwen2.5-1.5b qwen2.5-3b llama-3.2-1b llama-3.2-3b phi-3-mini; do
+        local marker=""
+        if [ "$model" = "$DEFAULT_LLM" ]; then
+            marker=" (default)"
+        fi
+        printf "%-16s %-10s %s%s\n" "$model" "${LLM_SIZES[$model]}" "${LLM_DESCRIPTIONS[$model]}" "$marker"
+    done
+    echo ""
+    echo "Usage examples:"
+    echo "  ./download-models.sh                    # Download default (${DEFAULT_LLM})"
+    echo "  ./download-models.sh --llm qwen2.5-3b   # Download specific model"
+    echo "  ./download-models.sh --all-llms         # Download all models"
+    echo ""
+}
 
 # Parse arguments
-while [[ "$1" == --* ]]; do
+while [[ "$#" -gt 0 ]]; do
     case "$1" in
         --force)
             FORCE_DOWNLOAD=true
@@ -74,10 +154,38 @@ while [[ "$1" == --* ]]; do
             DOWNLOAD_WAKEWORD=true
             shift
             ;;
+        --llm)
+            if [ -z "$2" ] || [[ "$2" == --* ]]; then
+                print_error "Missing model name after --llm"
+                list_llms
+                exit 1
+            fi
+            SELECTED_LLM="$2"
+            if [ -z "${LLM_MODELS[$SELECTED_LLM]}" ]; then
+                print_error "Unknown LLM model: $SELECTED_LLM"
+                list_llms
+                exit 1
+            fi
+            shift 2
+            ;;
+        --all-llms)
+            DOWNLOAD_ALL_LLMS=true
+            shift
+            ;;
+        --list-llms)
+            list_llms
+            exit 0
+            ;;
         --help|-h)
-            echo "Usage: $0 [--force] [--wakeword]"
-            echo "  --force     Re-download all models even if they exist"
-            echo "  --wakeword  Also download wake word detection models"
+            echo "Usage: $0 [options]"
+            echo ""
+            echo "Options:"
+            echo "  --force        Re-download all models even if they exist"
+            echo "  --wakeword     Also download wake word detection models"
+            echo "  --llm <model>  Specify which LLM to download (default: ${DEFAULT_LLM})"
+            echo "  --all-llms     Download all available LLM models"
+            echo "  --list-llms    List available LLM models"
+            echo "  --help         Show this help message"
             exit 0
             ;;
         *)
@@ -91,6 +199,11 @@ print_header "Downloading Voice Assistant Models"
 echo "Model directory: ${MODEL_DIR}"
 echo "Force download: ${FORCE_DOWNLOAD}"
 echo "Wake word models: ${DOWNLOAD_WAKEWORD}"
+if [ "${DOWNLOAD_ALL_LLMS}" = true ]; then
+    echo "LLM models: ALL"
+else
+    echo "LLM model: ${SELECTED_LLM}"
+fi
 
 # Create base directories
 mkdir -p "${MODEL_DIR}/ONNX"
@@ -144,25 +257,7 @@ else
 fi
 
 # =============================================================================
-# 3. Qwen2.5 0.5B Instruct Q4 (~400MB)
-# =============================================================================
-
-LLM_DIR="${MODEL_DIR}/LlamaCpp/qwen2.5-0.5b-instruct-q4"
-LLM_FILE="${LLM_DIR}/qwen2.5-0.5b-instruct-q4_k_m.gguf"
-
-print_step "Downloading Qwen2.5 0.5B Instruct Q4..."
-
-if [ -f "${LLM_FILE}" ] && [ "${FORCE_DOWNLOAD}" = false ]; then
-    print_success "Qwen2.5 0.5B already exists, skipping"
-else
-    mkdir -p "${LLM_DIR}"
-    curl -L -o "${LLM_FILE}" \
-        "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
-    print_success "Qwen2.5 0.5B downloaded"
-fi
-
-# =============================================================================
-# 4. VITS Piper English US Amy (~50MB)
+# 3. VITS Piper English US Lessac (~65MB)
 # =============================================================================
 
 TTS_DIR="${MODEL_DIR}/ONNX/vits-piper-en_US-lessac-medium"
@@ -191,25 +286,78 @@ else
 fi
 
 # =============================================================================
+# 4. LLM Model(s)
+# =============================================================================
+
+download_llm() {
+    local model_id="$1"
+    local model_file="${LLM_MODELS[$model_id]}"
+    local model_url="${LLM_URLS[$model_id]}"
+    local model_size="${LLM_SIZES[$model_id]}"
+    local model_desc="${LLM_DESCRIPTIONS[$model_id]}"
+
+    local LLM_DIR="${MODEL_DIR}/LlamaCpp/${model_id}"
+    local LLM_FILE="${LLM_DIR}/${model_file}"
+
+    print_step "Downloading ${model_id} (${model_size})..."
+    print_info "${model_desc}"
+
+    if [ -f "${LLM_FILE}" ] && [ "${FORCE_DOWNLOAD}" = false ]; then
+        print_success "${model_id} already exists, skipping"
+        return 0
+    fi
+
+    mkdir -p "${LLM_DIR}"
+
+    # Download with progress
+    if curl -L --progress-bar -o "${LLM_FILE}" "${model_url}"; then
+        print_success "${model_id} downloaded"
+    else
+        print_error "Failed to download ${model_id}"
+        return 1
+    fi
+}
+
+if [ "${DOWNLOAD_ALL_LLMS}" = true ]; then
+    print_header "Downloading All LLM Models"
+    for model in qwen2.5-0.5b qwen2.5-1.5b qwen2.5-3b llama-3.2-1b llama-3.2-3b phi-3-mini; do
+        download_llm "$model"
+    done
+else
+    print_header "Downloading LLM Model"
+    download_llm "${SELECTED_LLM}"
+fi
+
+# =============================================================================
 # 5. Wake Word Models (optional)
 # =============================================================================
 
 if [ "${DOWNLOAD_WAKEWORD}" = true ]; then
+    print_header "Downloading Wake Word Models"
+
     WAKEWORD_DIR="${MODEL_DIR}/ONNX/openwakeword"
-
-    print_step "Downloading openWakeWord models..."
-
     mkdir -p "${WAKEWORD_DIR}"
 
     # Download embedding model (shared backbone)
     EMBEDDING_FILE="${WAKEWORD_DIR}/embedding_model.onnx"
+    print_step "Downloading openWakeWord embedding model..."
     if [ -f "${EMBEDDING_FILE}" ] && [ "${FORCE_DOWNLOAD}" = false ]; then
         print_success "openWakeWord embedding model already exists, skipping"
     else
-        # Download from openWakeWord releases
         curl -L -o "${EMBEDDING_FILE}" \
             "https://github.com/dscripka/openWakeWord/releases/download/v0.5.0/embedding_model.onnx"
         print_success "openWakeWord embedding model downloaded"
+    fi
+
+    # Download melspectrogram model
+    MELSPEC_FILE="${WAKEWORD_DIR}/melspectrogram.onnx"
+    print_step "Downloading melspectrogram model..."
+    if [ -f "${MELSPEC_FILE}" ] && [ "${FORCE_DOWNLOAD}" = false ]; then
+        print_success "Melspectrogram model already exists, skipping"
+    else
+        curl -L -o "${MELSPEC_FILE}" \
+            "https://github.com/dscripka/openWakeWord/releases/download/v0.5.0/melspectrogram.onnx"
+        print_success "Melspectrogram model downloaded"
     fi
 
     # Download Hey Jarvis model
@@ -217,21 +365,13 @@ if [ "${DOWNLOAD_WAKEWORD}" = true ]; then
     JARVIS_FILE="${WAKEWORD_MODEL_DIR}/hey_jarvis_v0.1.onnx"
     mkdir -p "${WAKEWORD_MODEL_DIR}"
 
+    print_step "Downloading Hey Jarvis wake word model..."
     if [ -f "${JARVIS_FILE}" ] && [ "${FORCE_DOWNLOAD}" = false ]; then
         print_success "Hey Jarvis wake word model already exists, skipping"
     else
-        # Download from openWakeWord releases
         curl -L -o "${JARVIS_FILE}" \
             "https://github.com/dscripka/openWakeWord/releases/download/v0.5.0/hey_jarvis_v0.1.onnx"
         print_success "Hey Jarvis wake word model downloaded"
-    fi
-
-    # Also download Alexa as alternative (optional)
-    ALEXA_FILE="${WAKEWORD_MODEL_DIR}/../alexa/alexa_v0.1.onnx"
-    mkdir -p "$(dirname ${ALEXA_FILE})"
-    if [ ! -f "${ALEXA_FILE}" ]; then
-        curl -L -o "${ALEXA_FILE}" \
-            "https://github.com/dscripka/openWakeWord/releases/download/v0.5.0/alexa_v0.1.onnx" 2>/dev/null || true
     fi
 fi
 
@@ -241,29 +381,40 @@ fi
 
 print_header "Download Complete!"
 
-echo "Model locations:"
+echo "Voice Pipeline Models:"
+echo "----------------------"
 echo ""
 
 echo "VAD (Silero):"
-ls -lh "${VAD_DIR}"/*.onnx 2>/dev/null | awk '{print "  " $9 ": " $5}' || echo "  (missing)"
+ls -lh "${VAD_DIR}"/*.onnx 2>/dev/null | awk '{print "  " $NF ": " $5}' || echo "  (missing)"
 
 echo ""
 echo "STT (Whisper Tiny English):"
-ls -lh "${STT_DIR}"/*.onnx 2>/dev/null | head -3 | awk '{print "  " $9 ": " $5}' || echo "  (missing)"
-
-echo ""
-echo "LLM (Qwen2.5 0.5B):"
-ls -lh "${LLM_DIR}"/*.gguf 2>/dev/null | awk '{print "  " $9 ": " $5}' || echo "  (missing)"
+ls -lh "${STT_DIR}"/*.onnx 2>/dev/null | head -3 | awk '{print "  " $NF ": " $5}' || echo "  (missing)"
 
 echo ""
 echo "TTS (VITS Piper):"
-ls -lh "${TTS_DIR}"/*.onnx 2>/dev/null | awk '{print "  " $9 ": " $5}' || echo "  (missing)"
+ls -lh "${TTS_DIR}"/*.onnx 2>/dev/null | awk '{print "  " $NF ": " $5}' || echo "  (missing)"
+
+echo ""
+echo "LLM Models:"
+echo "-----------"
+for model_dir in "${MODEL_DIR}/LlamaCpp/"*/; do
+    if [ -d "$model_dir" ]; then
+        model_name=$(basename "$model_dir")
+        model_file=$(ls -1 "$model_dir"/*.gguf 2>/dev/null | head -1)
+        if [ -n "$model_file" ]; then
+            model_size=$(ls -lh "$model_file" | awk '{print $5}')
+            echo "  ${model_name}: ${model_size}"
+        fi
+    fi
+done
 
 if [ "${DOWNLOAD_WAKEWORD}" = true ]; then
     echo ""
     echo "Wake Word (openWakeWord):"
-    ls -lh "${MODEL_DIR}/ONNX/openwakeword"/*.onnx 2>/dev/null | awk '{print "  " $9 ": " $5}' || echo "  (missing)"
-    ls -lh "${MODEL_DIR}/ONNX/hey-jarvis"/*.onnx 2>/dev/null | awk '{print "  " $9 ": " $5}' || echo "  (missing)"
+    ls -lh "${MODEL_DIR}/ONNX/openwakeword"/*.onnx 2>/dev/null | awk '{print "  " $NF ": " $5}' || echo "  (missing)"
+    ls -lh "${MODEL_DIR}/ONNX/hey-jarvis"/*.onnx 2>/dev/null | awk '{print "  " $NF ": " $5}' || echo "  (missing)"
 fi
 
 echo ""
@@ -275,9 +426,25 @@ echo "Total model size: ${TOTAL_SIZE}"
 echo ""
 print_success "All models downloaded successfully!"
 echo ""
-echo "To verify models, run:"
-echo "  ls -la ${MODEL_DIR}/ONNX/"
-echo "  ls -la ${MODEL_DIR}/LlamaCpp/"
+
+# Show which LLM is the default
+if [ "${DOWNLOAD_ALL_LLMS}" = true ]; then
+    echo "To use a specific LLM, start the server with:"
+    echo "  runanywhere-server --model ~/.local/share/runanywhere/Models/LlamaCpp/<model-id>/<model>.gguf"
+    echo ""
+    echo "Available models:"
+    for model_dir in "${MODEL_DIR}/LlamaCpp/"*/; do
+        if [ -d "$model_dir" ]; then
+            echo "  - $(basename "$model_dir")"
+        fi
+    done
+else
+    echo "Default LLM configured: ${SELECTED_LLM}"
+    echo ""
+    echo "To download additional LLMs, run:"
+    echo "  ./download-models.sh --llm <model-id>"
+    echo "  ./download-models.sh --list-llms     # See available models"
+fi
 
 if [ "${DOWNLOAD_WAKEWORD}" = true ]; then
     echo ""
