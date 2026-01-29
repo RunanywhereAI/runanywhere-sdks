@@ -10,7 +10,6 @@ import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
-import 'package:runanywhere_ai/features/models/model_status_components.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// ToolsView - Demonstrates tool calling functionality
@@ -34,7 +33,6 @@ class _ToolsViewState extends State<ToolsView> {
   List<ToolDefinition> _registeredTools = [];
 
   // Results
-  String _llmOutput = '';
   String _toolExecutionLog = '';
   String _finalResponse = '';
 
@@ -288,7 +286,6 @@ class _ToolsViewState extends State<ToolsView> {
     setState(() {
       _isGenerating = true;
       _errorMessage = null;
-      _llmOutput = '';
       _toolExecutionLog = '';
       _finalResponse = '';
     });
@@ -344,54 +341,54 @@ class _ToolsViewState extends State<ToolsView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundPrimary,
+      backgroundColor: AppColors.backgroundPrimary(context),
       body: SafeArea(
         child: Column(
           children: [
             // Model status header
-            _buildHeader(),
+            _buildHeader(context),
 
             // Main content
             Expanded(
               child: SingleChildScrollView(
                 controller: _scrollController,
-                padding: const EdgeInsets.all(AppSpacing.md),
+                padding: const EdgeInsets.all(AppSpacing.padding16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Tool calling toggle
-                    _buildToolCallingToggle(),
+                    _buildToolCallingToggle(context),
 
-                    const SizedBox(height: AppSpacing.lg),
+                    const SizedBox(height: AppSpacing.large),
 
                     // Registered tools
-                    _buildRegisteredToolsSection(),
+                    _buildRegisteredToolsSection(context),
 
-                    const SizedBox(height: AppSpacing.lg),
+                    const SizedBox(height: AppSpacing.large),
 
                     // Prompt input
-                    _buildPromptInput(),
+                    _buildPromptInput(context),
 
-                    const SizedBox(height: AppSpacing.md),
+                    const SizedBox(height: AppSpacing.medium),
 
                     // Run button
-                    _buildRunButton(),
+                    _buildRunButton(context),
 
                     // Error message
                     if (_errorMessage != null) ...[
-                      const SizedBox(height: AppSpacing.md),
-                      _buildErrorMessage(),
+                      const SizedBox(height: AppSpacing.medium),
+                      _buildErrorMessage(context),
                     ],
 
                     // Results
                     if (_toolExecutionLog.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.lg),
-                      _buildExecutionLog(),
+                      const SizedBox(height: AppSpacing.large),
+                      _buildExecutionLog(context),
                     ],
 
                     if (_finalResponse.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.lg),
-                      _buildFinalResponse(),
+                      const SizedBox(height: AppSpacing.large),
+                      _buildFinalResponse(context),
                     ],
                   ],
                 ),
@@ -403,13 +400,13 @@ class _ToolsViewState extends State<ToolsView> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.padding16),
       decoration: BoxDecoration(
-        color: AppColors.backgroundSecondary,
+        color: AppColors.backgroundSecondary(context),
         border: Border(
-          bottom: BorderSide(color: AppColors.borderLight),
+          bottom: BorderSide(color: AppColors.separator(context)),
         ),
       ),
       child: Row(
@@ -420,20 +417,20 @@ class _ToolsViewState extends State<ToolsView> {
               children: [
                 Text(
                   'Tool Calling',
-                  style: AppTypography.headline,
+                  style: AppTypography.headline(context),
                 ),
                 const SizedBox(height: 4),
                 if (_loadedModelName != null)
                   Text(
                     'Model: $_loadedModelName',
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.textSecondary,
+                    style: AppTypography.caption(context).copyWith(
+                      color: AppColors.textSecondary(context),
                     ),
                   )
                 else
                   Text(
                     'No model loaded',
-                    style: AppTypography.caption.copyWith(
+                    style: AppTypography.caption(context).copyWith(
                       color: AppColors.primaryOrange,
                     ),
                   ),
@@ -450,7 +447,7 @@ class _ToolsViewState extends State<ToolsView> {
     );
   }
 
-  Widget _buildToolCallingToggle() {
+  Widget _buildToolCallingToggle(BuildContext context) {
     return Card(
       child: SwitchListTile(
         title: const Text('Enable Tool Calling'),
@@ -466,27 +463,27 @@ class _ToolsViewState extends State<ToolsView> {
     );
   }
 
-  Widget _buildRegisteredToolsSection() {
+  Widget _buildRegisteredToolsSection(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Registered Tools (${_registeredTools.length})',
-          style: AppTypography.subheadline.copyWith(
+          style: AppTypography.subheadline(context).copyWith(
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: AppSpacing.sm),
-        ...(_registeredTools.map(_buildToolCard)),
+        const SizedBox(height: AppSpacing.small),
+        ...(_registeredTools.map((tool) => _buildToolCard(context, tool))),
       ],
     );
   }
 
-  Widget _buildToolCard(ToolDefinition tool) {
+  Widget _buildToolCard(BuildContext context, ToolDefinition tool) {
     return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      margin: const EdgeInsets.only(bottom: AppSpacing.small),
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: const EdgeInsets.all(AppSpacing.padding16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -496,7 +493,7 @@ class _ToolsViewState extends State<ToolsView> {
                 const SizedBox(width: 8),
                 Text(
                   tool.name,
-                  style: AppTypography.body.copyWith(
+                  style: AppTypography.body(context).copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -505,16 +502,16 @@ class _ToolsViewState extends State<ToolsView> {
             const SizedBox(height: 4),
             Text(
               tool.description,
-              style: AppTypography.caption.copyWith(
-                color: AppColors.textSecondary,
+              style: AppTypography.caption(context).copyWith(
+                color: AppColors.textSecondary(context),
               ),
             ),
             if (tool.parameters.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
                 'Parameters: ${tool.parameters.map((p) => p.name).join(", ")}',
-                style: AppTypography.caption2.copyWith(
-                  color: AppColors.textTertiary,
+                style: AppTypography.caption2(context).copyWith(
+                  color: AppColors.textSecondary(context),
                 ),
               ),
             ],
@@ -524,17 +521,17 @@ class _ToolsViewState extends State<ToolsView> {
     );
   }
 
-  Widget _buildPromptInput() {
+  Widget _buildPromptInput(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Test Prompt',
-          style: AppTypography.subheadline.copyWith(
+          style: AppTypography.subheadline(context).copyWith(
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.small),
         TextField(
           controller: _promptController,
           maxLines: 3,
@@ -544,14 +541,14 @@ class _ToolsViewState extends State<ToolsView> {
               borderRadius: BorderRadius.circular(12),
             ),
             filled: true,
-            fillColor: AppColors.backgroundSecondary,
+            fillColor: AppColors.backgroundSecondary(context),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildRunButton() {
+  Widget _buildRunButton(BuildContext context) {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
@@ -576,9 +573,9 @@ class _ToolsViewState extends State<ToolsView> {
     );
   }
 
-  Widget _buildErrorMessage() {
+  Widget _buildErrorMessage(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.padding16),
       decoration: BoxDecoration(
         color: AppColors.primaryRed.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
@@ -598,29 +595,29 @@ class _ToolsViewState extends State<ToolsView> {
     );
   }
 
-  Widget _buildExecutionLog() {
+  Widget _buildExecutionLog(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Execution Log',
-          style: AppTypography.subheadline.copyWith(
+          style: AppTypography.subheadline(context).copyWith(
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.small),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(AppSpacing.md),
+          padding: const EdgeInsets.all(AppSpacing.padding16),
           decoration: BoxDecoration(
-            color: AppColors.backgroundSecondary,
+            color: AppColors.backgroundSecondary(context),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
             _toolExecutionLog,
-            style: AppTypography.caption.copyWith(
+            style: AppTypography.caption(context).copyWith(
               fontFamily: 'Menlo',
-              color: AppColors.textSecondary,
+              color: AppColors.textSecondary(context),
             ),
           ),
         ),
@@ -628,20 +625,20 @@ class _ToolsViewState extends State<ToolsView> {
     );
   }
 
-  Widget _buildFinalResponse() {
+  Widget _buildFinalResponse(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Final Response',
-          style: AppTypography.subheadline.copyWith(
+          style: AppTypography.subheadline(context).copyWith(
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.small),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(AppSpacing.md),
+          padding: const EdgeInsets.all(AppSpacing.padding16),
           decoration: BoxDecoration(
             color: AppColors.primaryAccent.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
@@ -651,7 +648,7 @@ class _ToolsViewState extends State<ToolsView> {
           ),
           child: Text(
             _finalResponse,
-            style: AppTypography.body,
+            style: AppTypography.body(context),
           ),
         ),
       ],
@@ -663,18 +660,17 @@ class _ToolsViewState extends State<ToolsView> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
+      builder: (sheetContext) => DraggableScrollableSheet(
         initialChildSize: 0.9,
         minChildSize: 0.5,
         maxChildSize: 0.95,
-        builder: (context, scrollController) => ClipRRect(
+        builder: (dragContext, scrollController) => ClipRRect(
           borderRadius: const BorderRadius.vertical(
             top: Radius.circular(20),
           ),
           child: ModelSelectionSheet(
-            scrollController: scrollController,
-            onModelLoaded: () {
-              Navigator.pop(context);
+            onModelSelected: (model) async {
+              Navigator.pop(sheetContext);
               unawaited(_syncModelState());
             },
           ),
