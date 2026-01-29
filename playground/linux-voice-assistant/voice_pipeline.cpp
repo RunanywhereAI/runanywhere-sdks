@@ -10,6 +10,7 @@
 #include <rac/features/tts/rac_tts_component.h>
 #include <rac/features/vad/rac_vad_component.h>
 #include <rac/features/llm/rac_llm_component.h>
+#include <rac/backends/rac_wakeword_onnx.h>
 #include <rac/core/rac_error.h>
 
 #include <vector>
@@ -29,12 +30,21 @@ static constexpr double SILENCE_DURATION_SEC = 1.5;
 // Minimum accumulated speech samples before processing (iOS uses 16000 = 0.5s at 16kHz)
 static constexpr size_t MIN_SPEECH_SAMPLES = 16000;
 
+// Wake word detection timeout - return to listening after this many seconds of silence
+static constexpr double WAKE_WORD_TIMEOUT_SEC = 10.0;
+
 // =============================================================================
 // Implementation
 // =============================================================================
 
 struct VoicePipeline::Impl {
     rac_voice_agent_handle_t voice_agent = nullptr;
+
+    // Wake word detector
+    rac_handle_t wakeword_handle = nullptr;
+    bool wakeword_enabled = false;
+    bool wakeword_activated = false;  // True after wake word detected, until command processed
+    std::chrono::steady_clock::time_point wakeword_activation_time;
 
     // State
     bool speech_active = false;
@@ -56,6 +66,10 @@ VoicePipeline::VoicePipeline(const VoicePipelineConfig& config)
 
 VoicePipeline::~VoicePipeline() {
     stop();
+    if (impl_->wakeword_handle) {
+        rac_wakeword_onnx_destroy(impl_->wakeword_handle);
+        impl_->wakeword_handle = nullptr;
+    }
     if (impl_->voice_agent) {
         rac_voice_agent_destroy(impl_->voice_agent);
         impl_->voice_agent = nullptr;
@@ -78,6 +92,18 @@ bool VoicePipeline::initialize() {
         last_error_ = "One or more models are missing. Run scripts/download-models.sh";
         print_model_status();
         return false;
+    }
+
+    // Initialize wake word detector if enabled
+    if (config_.enable_wake_word) {
+        if (!initialize_wakeword()) {
+            // Wake word init failed, but continue without it
+            std::cerr << "Wake word initialization failed, continuing without wake word\n";
+            impl_->wakeword_enabled = false;
+        } else {
+            impl_->wakeword_enabled = true;
+            std::cout << "  Wake word detection enabled: \"" << config_.wake_word << "\"\n";
+        }
     }
 
     // Create standalone voice agent
@@ -145,6 +171,61 @@ bool VoicePipeline::initialize() {
     return true;
 }
 
+bool VoicePipeline::initialize_wakeword() {
+    // Check if wake word models are available
+    if (!are_wakeword_models_available()) {
+        last_error_ = "Wake word models not available";
+        return false;
+    }
+
+    // Create wake word detector with default config
+    rac_wakeword_onnx_config_t ww_config = RAC_WAKEWORD_ONNX_CONFIG_DEFAULT;
+    ww_config.threshold = config_.wake_word_threshold;
+
+    rac_result_t result = rac_wakeword_onnx_create(&ww_config, &impl_->wakeword_handle);
+    if (result != RAC_SUCCESS) {
+        last_error_ = "Failed to create wake word detector";
+        return false;
+    }
+
+    // Get model paths
+    std::string embedding_path = get_wakeword_embedding_path();
+    std::string melspec_path = get_wakeword_melspec_path();
+    std::string wakeword_path = get_wakeword_model_path();
+
+    std::cout << "  Loading Wake Word models..." << std::endl;
+
+    // Initialize shared models (embedding + melspectrogram for openWakeWord pipeline)
+    result = rac_wakeword_onnx_init_shared_models(
+        impl_->wakeword_handle,
+        embedding_path.c_str(),
+        melspec_path.c_str()
+    );
+    if (result != RAC_SUCCESS) {
+        last_error_ = "Failed to load wake word embedding model: " + embedding_path;
+        rac_wakeword_onnx_destroy(impl_->wakeword_handle);
+        impl_->wakeword_handle = nullptr;
+        return false;
+    }
+
+    // Load the wake word model
+    result = rac_wakeword_onnx_load_model(
+        impl_->wakeword_handle,
+        wakeword_path.c_str(),
+        WAKEWORD_MODEL_ID,
+        config_.wake_word.c_str()
+    );
+    if (result != RAC_SUCCESS) {
+        last_error_ = "Failed to load wake word model: " + wakeword_path;
+        rac_wakeword_onnx_destroy(impl_->wakeword_handle);
+        impl_->wakeword_handle = nullptr;
+        return false;
+    }
+
+    std::cout << "  Wake word model loaded: " << config_.wake_word << std::endl;
+    return true;
+}
+
 bool VoicePipeline::is_ready() const {
     if (!impl_->voice_agent) {
         return false;
@@ -159,10 +240,58 @@ void VoicePipeline::process_audio(const int16_t* samples, size_t num_samples) {
         return;
     }
 
-    // Convert to float for VAD
+    // Convert to float for processing
     std::vector<float> float_samples(num_samples);
     for (size_t i = 0; i < num_samples; ++i) {
         float_samples[i] = samples[i] / 32768.0f;
+    }
+
+    auto now = std::chrono::steady_clock::now();
+
+    // If wake word is enabled and not yet activated, check for wake word first
+    if (impl_->wakeword_enabled && !impl_->wakeword_activated) {
+        int32_t detected_index = -1;
+        float confidence = 0.0f;
+
+        rac_result_t result = rac_wakeword_onnx_process(
+            impl_->wakeword_handle,
+            float_samples.data(),
+            num_samples,
+            &detected_index,
+            &confidence
+        );
+
+        if (result == RAC_SUCCESS && detected_index >= 0) {
+            // Wake word detected!
+            impl_->wakeword_activated = true;
+            impl_->wakeword_activation_time = now;
+            impl_->speech_buffer.clear();
+            impl_->speech_active = false;
+            impl_->speech_callback_fired = false;
+
+            // Fire wake word callback
+            if (config_.on_wake_word) {
+                config_.on_wake_word(config_.wake_word, confidence);
+            }
+        }
+
+        // Don't process further until wake word is detected
+        return;
+    }
+
+    // Check for wake word timeout (return to wake word listening mode)
+    if (impl_->wakeword_enabled && impl_->wakeword_activated && !impl_->speech_active) {
+        double elapsed = std::chrono::duration<double>(
+            now - impl_->wakeword_activation_time
+        ).count();
+
+        if (elapsed >= WAKE_WORD_TIMEOUT_SEC) {
+            // Timeout - go back to listening for wake word
+            impl_->wakeword_activated = false;
+            impl_->speech_buffer.clear();
+            impl_->speech_callback_fired = false;
+            return;
+        }
     }
 
     // Detect speech via VAD
@@ -175,11 +304,15 @@ void VoicePipeline::process_audio(const int16_t* samples, size_t num_samples) {
     );
 
     bool speech_detected = (is_speech == RAC_TRUE);
-    auto now = std::chrono::steady_clock::now();
 
     if (speech_detected) {
         // Update last speech timestamp
         impl_->last_speech_time = now;
+
+        // Also update wake word activation time to keep session alive
+        if (impl_->wakeword_enabled) {
+            impl_->wakeword_activation_time = now;
+        }
 
         if (!impl_->speech_active) {
             // Speech just started — begin accumulating
@@ -230,6 +363,12 @@ void VoicePipeline::process_audio(const int16_t* samples, size_t num_samples) {
 
             impl_->speech_buffer.clear();
             impl_->speech_callback_fired = false;
+
+            // After processing command, go back to wake word mode
+            if (impl_->wakeword_enabled) {
+                impl_->wakeword_activated = false;
+                rac_wakeword_onnx_reset(impl_->wakeword_handle);
+            }
         }
     }
 }
@@ -284,6 +423,7 @@ bool VoicePipeline::process_voice_turn(const int16_t* samples, size_t num_sample
 
 void VoicePipeline::start() {
     running_ = true;
+    impl_->wakeword_activated = false;  // Start in wake word listening mode
 }
 
 void VoicePipeline::stop() {
@@ -291,6 +431,7 @@ void VoicePipeline::stop() {
     impl_->speech_active = false;
     impl_->speech_buffer.clear();
     impl_->speech_callback_fired = false;
+    impl_->wakeword_activated = false;
 }
 
 bool VoicePipeline::is_running() const {
@@ -303,6 +444,14 @@ void VoicePipeline::cancel() {
     impl_->speech_active = false;
     impl_->speech_buffer.clear();
     impl_->speech_callback_fired = false;
+
+    // Return to wake word mode if enabled
+    if (impl_->wakeword_enabled) {
+        impl_->wakeword_activated = false;
+        if (impl_->wakeword_handle) {
+            rac_wakeword_onnx_reset(impl_->wakeword_handle);
+        }
+    }
 }
 
 void VoicePipeline::set_config(const VoicePipelineConfig& config) {
