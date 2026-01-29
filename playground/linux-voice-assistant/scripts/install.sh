@@ -115,7 +115,7 @@ else
     log_info "Cloning Moltbot (RunAnywhere fork)..."
     git clone https://github.com/RunanywhereAI/clawdbot.git "$MOLTBOT_DIR"
     cd "$MOLTBOT_DIR"
-    git checkout smonga/rasp 2>/dev/null || true  # Use the branch with voice extensions
+    # Extensions are on main branch
 fi
 
 cd "$MOLTBOT_DIR"
@@ -150,7 +150,7 @@ else
     log_info "Cloning RunAnywhere SDK..."
     git clone https://github.com/RunanywhereAI/runanywhere-sdks.git "$SDK_DIR"
     cd "$SDK_DIR"
-    git checkout smonga/rasp 2>/dev/null || true  # Use the branch with voice assistant
+    # Voice assistant is on main branch
 fi
 
 cd "$SDK_DIR/playground/linux-voice-assistant"
