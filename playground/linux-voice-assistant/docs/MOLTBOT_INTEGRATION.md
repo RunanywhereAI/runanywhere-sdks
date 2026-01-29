@@ -65,7 +65,7 @@ After Moltbot is running, set up the voice assistant:
 
 ```bash
 # Clone the voice assistant SDK
-git clone https://github.com/RunanywhereAI/sdks.git ~/runanywhere-sdks
+git clone https://github.com/RunanywhereAI/runanywhere-sdks.git ~/runanywhere-sdks
 cd ~/runanywhere-sdks && git checkout smonga/rasp
 cd ~/runanywhere-sdks/playground/linux-voice-assistant
 
@@ -166,7 +166,7 @@ Best for users who want the quickest path to a working setup.
 ### Full Installation (Fresh System)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/sdks/smonga/rasp/playground/linux-voice-assistant/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/smonga/rasp/playground/linux-voice-assistant/scripts/install.sh | bash
 ```
 
 This script will:
@@ -181,7 +181,7 @@ This script will:
 ### Add to Existing Moltbot
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/sdks/smonga/rasp/playground/linux-voice-assistant/scripts/add-to-moltbot.sh | bash
+curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/smonga/rasp/playground/linux-voice-assistant/scripts/add-to-moltbot.sh | bash
 ```
 
 This script will:
