@@ -164,6 +164,7 @@ set(ONNX_BACKEND_SOURCES
     onnx_backend.cpp
     rac_onnx.cpp
     rac_backend_onnx_register.cpp
+    wakeword_onnx.cpp
 )
 
 set(ONNX_BACKEND_HEADERS
@@ -183,7 +184,8 @@ target_include_directories(rac_backend_onnx PUBLIC
 )
 
 # Define RAC_ONNX_BUILDING to export symbols with visibility("default")
-target_compile_definitions(rac_backend_onnx PRIVATE RAC_ONNX_BUILDING)
+# Define RAC_HAS_ONNX to enable ONNX Runtime code paths
+target_compile_definitions(rac_backend_onnx PRIVATE RAC_ONNX_BUILDING RAC_HAS_ONNX)
 
 target_link_libraries(rac_backend_onnx PUBLIC
     rac_commons

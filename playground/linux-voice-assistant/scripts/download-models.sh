@@ -4,16 +4,21 @@
 # download-models.sh
 # Download pre-configured models for the Linux Voice Assistant
 #
-# Usage: ./download-models.sh [--force]
+# Usage: ./download-models.sh [--force] [--wakeword]
 #
 # Options:
-#   --force    Re-download all models even if they exist
+#   --force     Re-download all models even if they exist
+#   --wakeword  Also download wake word detection models (optional)
 #
-# Models downloaded:
+# Required Models:
 #   - Silero VAD (~2MB) - Voice Activity Detection
 #   - Whisper Tiny English (~150MB) - Speech-to-Text
 #   - Qwen2.5 0.5B Instruct Q4 (~400MB) - Language Model
 #   - VITS Piper English US Lessac (~65MB) - Text-to-Speech
+#
+# Optional Wake Word Models:
+#   - openWakeWord Embedding (~15MB) - Feature extraction
+#   - Hey Jarvis Model (~5MB) - Wake word detection
 # =============================================================================
 
 set -e
@@ -56,6 +61,7 @@ print_info() {
 
 MODEL_DIR="${HOME}/.local/share/runanywhere/Models"
 FORCE_DOWNLOAD=false
+DOWNLOAD_WAKEWORD=false
 
 # Parse arguments
 while [[ "$1" == --* ]]; do
@@ -64,9 +70,14 @@ while [[ "$1" == --* ]]; do
             FORCE_DOWNLOAD=true
             shift
             ;;
+        --wakeword)
+            DOWNLOAD_WAKEWORD=true
+            shift
+            ;;
         --help|-h)
-            echo "Usage: $0 [--force]"
-            echo "  --force    Re-download all models even if they exist"
+            echo "Usage: $0 [--force] [--wakeword]"
+            echo "  --force     Re-download all models even if they exist"
+            echo "  --wakeword  Also download wake word detection models"
             exit 0
             ;;
         *)
@@ -79,6 +90,7 @@ done
 print_header "Downloading Voice Assistant Models"
 echo "Model directory: ${MODEL_DIR}"
 echo "Force download: ${FORCE_DOWNLOAD}"
+echo "Wake word models: ${DOWNLOAD_WAKEWORD}"
 
 # Create base directories
 mkdir -p "${MODEL_DIR}/ONNX"
@@ -179,6 +191,51 @@ else
 fi
 
 # =============================================================================
+# 5. Wake Word Models (optional)
+# =============================================================================
+
+if [ "${DOWNLOAD_WAKEWORD}" = true ]; then
+    WAKEWORD_DIR="${MODEL_DIR}/ONNX/openwakeword"
+
+    print_step "Downloading openWakeWord models..."
+
+    mkdir -p "${WAKEWORD_DIR}"
+
+    # Download embedding model (shared backbone)
+    EMBEDDING_FILE="${WAKEWORD_DIR}/embedding_model.onnx"
+    if [ -f "${EMBEDDING_FILE}" ] && [ "${FORCE_DOWNLOAD}" = false ]; then
+        print_success "openWakeWord embedding model already exists, skipping"
+    else
+        # Download from openWakeWord releases
+        curl -L -o "${EMBEDDING_FILE}" \
+            "https://github.com/dscripka/openWakeWord/releases/download/v0.5.0/embedding_model.onnx"
+        print_success "openWakeWord embedding model downloaded"
+    fi
+
+    # Download Hey Jarvis model
+    WAKEWORD_MODEL_DIR="${MODEL_DIR}/ONNX/hey-jarvis"
+    JARVIS_FILE="${WAKEWORD_MODEL_DIR}/hey_jarvis_v0.1.onnx"
+    mkdir -p "${WAKEWORD_MODEL_DIR}"
+
+    if [ -f "${JARVIS_FILE}" ] && [ "${FORCE_DOWNLOAD}" = false ]; then
+        print_success "Hey Jarvis wake word model already exists, skipping"
+    else
+        # Download from openWakeWord releases
+        curl -L -o "${JARVIS_FILE}" \
+            "https://github.com/dscripka/openWakeWord/releases/download/v0.5.0/hey_jarvis_v0.1.onnx"
+        print_success "Hey Jarvis wake word model downloaded"
+    fi
+
+    # Also download Alexa as alternative (optional)
+    ALEXA_FILE="${WAKEWORD_MODEL_DIR}/../alexa/alexa_v0.1.onnx"
+    mkdir -p "$(dirname ${ALEXA_FILE})"
+    if [ ! -f "${ALEXA_FILE}" ]; then
+        curl -L -o "${ALEXA_FILE}" \
+            "https://github.com/dscripka/openWakeWord/releases/download/v0.5.0/alexa_v0.1.onnx" 2>/dev/null || true
+    fi
+fi
+
+# =============================================================================
 # Summary
 # =============================================================================
 
@@ -202,6 +259,13 @@ echo ""
 echo "TTS (VITS Piper):"
 ls -lh "${TTS_DIR}"/*.onnx 2>/dev/null | awk '{print "  " $9 ": " $5}' || echo "  (missing)"
 
+if [ "${DOWNLOAD_WAKEWORD}" = true ]; then
+    echo ""
+    echo "Wake Word (openWakeWord):"
+    ls -lh "${MODEL_DIR}/ONNX/openwakeword"/*.onnx 2>/dev/null | awk '{print "  " $9 ": " $5}' || echo "  (missing)"
+    ls -lh "${MODEL_DIR}/ONNX/hey-jarvis"/*.onnx 2>/dev/null | awk '{print "  " $9 ": " $5}' || echo "  (missing)"
+fi
+
 echo ""
 
 # Calculate total size
@@ -214,3 +278,9 @@ echo ""
 echo "To verify models, run:"
 echo "  ls -la ${MODEL_DIR}/ONNX/"
 echo "  ls -la ${MODEL_DIR}/LlamaCpp/"
+
+if [ "${DOWNLOAD_WAKEWORD}" = true ]; then
+    echo ""
+    echo "Wake word models downloaded. To enable, run:"
+    echo "  ./voice-assistant --wakeword"
+fi

@@ -9,6 +9,7 @@
 //   --list-devices    List available audio devices
 //   --input <device>  Audio input device (default: "default")
 //   --output <device> Audio output device (default: "default")
+//   --wakeword        Enable wake word detection ("Hey Jarvis")
 //   --help            Show this help message
 //
 // Controls:
@@ -23,6 +24,7 @@
 // Backend registration
 #include <rac/backends/rac_vad_onnx.h>
 #include <rac/backends/rac_llm_llamacpp.h>
+#include <rac/backends/rac_wakeword_onnx.h>
 
 #include <iostream>
 #include <csignal>
@@ -53,6 +55,7 @@ struct AppConfig {
     std::string output_device = "default";
     bool list_devices = false;
     bool show_help = false;
+    bool enable_wakeword = false;
 };
 
 void print_usage(const char* prog_name) {
@@ -61,6 +64,7 @@ void print_usage(const char* prog_name) {
               << "  --list-devices    List available audio devices\n"
               << "  --input <device>  Audio input device (default: \"default\")\n"
               << "  --output <device> Audio output device (default: \"default\")\n"
+              << "  --wakeword        Enable wake word detection (\"Hey Jarvis\")\n"
               << "  --help            Show this help message\n\n"
               << "Controls:\n"
               << "  Ctrl+C            Exit the application\n"
@@ -77,6 +81,8 @@ AppConfig parse_args(int argc, char* argv[]) {
             config.input_device = argv[++i];
         } else if (strcmp(argv[i], "--output") == 0 && i + 1 < argc) {
             config.output_device = argv[++i];
+        } else if (strcmp(argv[i], "--wakeword") == 0) {
+            config.enable_wakeword = true;
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             config.show_help = true;
         }
@@ -129,14 +135,23 @@ int main(int argc, char* argv[]) {
 
     // Check model availability
     std::cout << "Checking models...\n";
-    runanywhere::print_model_status();
+    runanywhere::print_model_status(app_config.enable_wakeword);
     std::cout << std::endl;
 
     if (!runanywhere::are_all_models_available()) {
-        std::cerr << "ERROR: Some models are missing!\n"
+        std::cerr << "ERROR: Some required models are missing!\n"
                   << "Please run: ./scripts/download-models.sh\n"
                   << std::endl;
         return 1;
+    }
+
+    // Check wake word models if enabled
+    if (app_config.enable_wakeword && !runanywhere::are_wakeword_models_available()) {
+        std::cerr << "WARNING: Wake word models are missing!\n"
+                  << "Please run: ./scripts/download-models.sh --wakeword\n"
+                  << "Disabling wake word detection.\n"
+                  << std::endl;
+        app_config.enable_wakeword = false;
     }
 
     // =============================================================================
@@ -156,6 +171,15 @@ int main(int argc, char* argv[]) {
         std::cerr << "WARNING: Failed to register LlamaCPP backend (code: " << reg_result << ")\n";
     } else {
         std::cout << "  LlamaCPP backend registered (LLM)\n";
+    }
+
+    if (app_config.enable_wakeword) {
+        reg_result = rac_backend_wakeword_onnx_register();
+        if (reg_result != RAC_SUCCESS) {
+            std::cerr << "WARNING: Failed to register Wake Word backend (code: " << reg_result << ")\n";
+        } else {
+            std::cout << "  Wake Word backend registered (openWakeWord)\n";
+        }
     }
     std::cout << std::endl;
 
@@ -201,10 +225,26 @@ int main(int argc, char* argv[]) {
 
     runanywhere::VoicePipelineConfig pipeline_config;
 
+    // Configure wake word (optional)
+    pipeline_config.enable_wake_word = app_config.enable_wakeword;
+    if (app_config.enable_wakeword) {
+        pipeline_config.wake_word = "Hey Jarvis";
+        pipeline_config.wake_word_threshold = 0.5f;
+
+        // Wake word callback
+        pipeline_config.on_wake_word = [](const std::string& wake_word, float confidence) {
+            std::cout << "\n*** Wake word detected: \"" << wake_word
+                      << "\" (confidence: " << confidence << ") ***\n"
+                      << "[Listening for command...]" << std::flush;
+        };
+    }
+
     // Voice activity callback
-    pipeline_config.on_voice_activity = [](bool is_speaking) {
+    pipeline_config.on_voice_activity = [&app_config](bool is_speaking) {
         if (is_speaking) {
-            std::cout << "\n[Listening...]" << std::flush;
+            if (!app_config.enable_wakeword) {
+                std::cout << "\n[Listening...]" << std::flush;
+            }
         } else {
             std::cout << " [Processing...]\n" << std::flush;
         }
@@ -266,8 +306,13 @@ int main(int argc, char* argv[]) {
     // =============================================================================
 
     std::cout << "========================================\n"
-              << "Voice Assistant is ready!\n"
-              << "Speak to interact. Press Ctrl+C to exit.\n"
+              << "Voice Assistant is ready!\n";
+    if (app_config.enable_wakeword) {
+        std::cout << "Say \"Hey Jarvis\" to activate.\n";
+    } else {
+        std::cout << "Speak to interact.\n";
+    }
+    std::cout << "Press Ctrl+C to exit.\n"
               << "========================================\n"
               << std::endl;
 

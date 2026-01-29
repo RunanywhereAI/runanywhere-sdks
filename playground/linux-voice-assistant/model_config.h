@@ -37,6 +37,10 @@ constexpr const char* STT_MODEL_ID = "whisper-tiny-en";
 constexpr const char* LLM_MODEL_ID = "qwen2.5-0.5b-instruct-q4";
 constexpr const char* TTS_MODEL_ID = "vits-piper-en_US-lessac-medium";
 
+// Wake word models (optional - enabled via command line)
+constexpr const char* WAKEWORD_MODEL_ID = "hey-jarvis";
+constexpr const char* WAKEWORD_EMBEDDING_ID = "openwakeword-embedding";
+
 // =============================================================================
 // Model File Names
 // =============================================================================
@@ -46,6 +50,10 @@ constexpr const char* VAD_MODEL_FILE = "silero_vad.onnx";
 constexpr const char* STT_MODEL_FILE = "";
 constexpr const char* LLM_MODEL_FILE = "qwen2.5-0.5b-instruct-q4_k_m.gguf";
 constexpr const char* TTS_MODEL_FILE = "en_US-lessac-medium.onnx";
+
+// Wake word model files
+constexpr const char* WAKEWORD_MODEL_FILE = "hey_jarvis_v0.1.onnx";
+constexpr const char* WAKEWORD_EMBEDDING_FILE = "embedding_model.onnx";
 
 // =============================================================================
 // Model Configuration
@@ -62,8 +70,8 @@ struct ModelConfig {
     int32_t context_length;   // for LLMs only
 };
 
-// Pre-configured models for the voice assistant
-inline const ModelConfig MODELS[] = {
+// Pre-configured models for the voice assistant (required)
+inline const ModelConfig REQUIRED_MODELS[] = {
     // VAD Model
     {
         .id = VAD_MODEL_ID,
@@ -110,7 +118,38 @@ inline const ModelConfig MODELS[] = {
     }
 };
 
-constexpr size_t NUM_MODELS = sizeof(MODELS) / sizeof(MODELS[0]);
+// Optional wake word models
+inline const ModelConfig WAKEWORD_MODELS[] = {
+    // Wake Word Detection Model (openWakeWord)
+    {
+        .id = WAKEWORD_MODEL_ID,
+        .name = "Hey Jarvis Wake Word",
+        .filename = WAKEWORD_MODEL_FILE,
+        .category = RAC_MODEL_CATEGORY_AUDIO,
+        .format = RAC_MODEL_FORMAT_ONNX,
+        .framework = RAC_FRAMEWORK_ONNX,
+        .memory_required = 5 * 1024 * 1024,  // ~5MB
+        .context_length = 0
+    },
+    // openWakeWord Embedding Model (shared backbone)
+    {
+        .id = WAKEWORD_EMBEDDING_ID,
+        .name = "openWakeWord Embedding",
+        .filename = WAKEWORD_EMBEDDING_FILE,
+        .category = RAC_MODEL_CATEGORY_AUDIO,
+        .format = RAC_MODEL_FORMAT_ONNX,
+        .framework = RAC_FRAMEWORK_ONNX,
+        .memory_required = 15 * 1024 * 1024,  // ~15MB
+        .context_length = 0
+    }
+};
+
+constexpr size_t NUM_REQUIRED_MODELS = sizeof(REQUIRED_MODELS) / sizeof(REQUIRED_MODELS[0]);
+constexpr size_t NUM_WAKEWORD_MODELS = sizeof(WAKEWORD_MODELS) / sizeof(WAKEWORD_MODELS[0]);
+
+// Backward compatibility alias
+inline const ModelConfig* MODELS = REQUIRED_MODELS;
+constexpr size_t NUM_MODELS = NUM_REQUIRED_MODELS;
 
 // =============================================================================
 // Model System Initialization
@@ -163,19 +202,28 @@ inline std::string get_model_path(const ModelConfig& model) {
 
 // Convenience functions for each model type
 inline std::string get_vad_model_path() {
-    return get_model_path(MODELS[0]);  // VAD is first
+    return get_model_path(REQUIRED_MODELS[0]);  // VAD is first
 }
 
 inline std::string get_stt_model_path() {
-    return get_model_path(MODELS[1]);  // STT is second
+    return get_model_path(REQUIRED_MODELS[1]);  // STT is second
 }
 
 inline std::string get_llm_model_path() {
-    return get_model_path(MODELS[2]);  // LLM is third
+    return get_model_path(REQUIRED_MODELS[2]);  // LLM is third
 }
 
 inline std::string get_tts_model_path() {
-    return get_model_path(MODELS[3]);  // TTS is fourth
+    return get_model_path(REQUIRED_MODELS[3]);  // TTS is fourth
+}
+
+// Wake word model paths (optional)
+inline std::string get_wakeword_model_path() {
+    return get_model_path(WAKEWORD_MODELS[0]);
+}
+
+inline std::string get_wakeword_embedding_path() {
+    return get_model_path(WAKEWORD_MODELS[1]);
 }
 
 // =============================================================================
@@ -228,8 +276,18 @@ inline bool is_model_available(const ModelConfig& model) {
 
 // Check if all required models are available
 inline bool are_all_models_available() {
-    for (size_t i = 0; i < NUM_MODELS; ++i) {
-        if (!is_model_available(MODELS[i])) {
+    for (size_t i = 0; i < NUM_REQUIRED_MODELS; ++i) {
+        if (!is_model_available(REQUIRED_MODELS[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Check if wake word models are available
+inline bool are_wakeword_models_available() {
+    for (size_t i = 0; i < NUM_WAKEWORD_MODELS; ++i) {
+        if (!is_model_available(WAKEWORD_MODELS[i])) {
             return false;
         }
     }
@@ -237,10 +295,10 @@ inline bool are_all_models_available() {
 }
 
 // Print model status
-inline void print_model_status() {
-    printf("Model Status:\n");
-    for (size_t i = 0; i < NUM_MODELS; ++i) {
-        const ModelConfig& model = MODELS[i];
+inline void print_model_status(bool include_wakeword = false) {
+    printf("Required Models:\n");
+    for (size_t i = 0; i < NUM_REQUIRED_MODELS; ++i) {
+        const ModelConfig& model = REQUIRED_MODELS[i];
         bool available = is_model_available(model);
         printf("  [%s] %s (%s)\n",
                available ? "OK" : "MISSING",
@@ -248,6 +306,21 @@ inline void print_model_status() {
                model.id);
         if (!available) {
             printf("       Expected at: %s\n", get_model_path(model).c_str());
+        }
+    }
+
+    if (include_wakeword) {
+        printf("\nWake Word Models (optional):\n");
+        for (size_t i = 0; i < NUM_WAKEWORD_MODELS; ++i) {
+            const ModelConfig& model = WAKEWORD_MODELS[i];
+            bool available = is_model_available(model);
+            printf("  [%s] %s (%s)\n",
+                   available ? "OK" : "MISSING",
+                   model.name,
+                   model.id);
+            if (!available) {
+                printf("       Expected at: %s\n", get_model_path(model).c_str());
+            }
         }
     }
 }
