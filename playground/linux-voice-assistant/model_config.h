@@ -40,6 +40,7 @@ constexpr const char* TTS_MODEL_ID = "vits-piper-en_US-lessac-medium";
 // Wake word models (optional - enabled via command line)
 constexpr const char* WAKEWORD_MODEL_ID = "hey-jarvis";
 constexpr const char* WAKEWORD_EMBEDDING_ID = "openwakeword-embedding";
+constexpr const char* WAKEWORD_MELSPEC_ID = "openwakeword-embedding";  // melspec is in same dir as embedding
 
 // =============================================================================
 // Model File Names
@@ -54,6 +55,7 @@ constexpr const char* TTS_MODEL_FILE = "en_US-lessac-medium.onnx";
 // Wake word model files
 constexpr const char* WAKEWORD_MODEL_FILE = "hey_jarvis_v0.1.onnx";
 constexpr const char* WAKEWORD_EMBEDDING_FILE = "embedding_model.onnx";
+constexpr const char* WAKEWORD_MELSPEC_FILE = "melspectrogram.onnx";
 
 // =============================================================================
 // Model Configuration
@@ -224,6 +226,12 @@ inline std::string get_wakeword_model_path() {
 
 inline std::string get_wakeword_embedding_path() {
     return get_model_path(WAKEWORD_MODELS[1]);
+}
+
+inline std::string get_wakeword_melspec_path() {
+    // Melspectrogram model is in the same directory as embedding model
+    std::string base_dir = get_base_dir();
+    return base_dir + "/Models/ONNX/" + WAKEWORD_MELSPEC_ID + "/" + WAKEWORD_MELSPEC_FILE;
 }
 
 // =============================================================================

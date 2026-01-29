@@ -122,6 +122,9 @@ public:
     std::string get_tts_model_id() const;
 
 private:
+    // Initialize wake word detector
+    bool initialize_wakeword();
+
     struct Impl;
     std::unique_ptr<Impl> impl_;
 
