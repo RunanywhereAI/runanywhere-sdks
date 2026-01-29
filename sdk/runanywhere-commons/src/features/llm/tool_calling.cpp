@@ -1183,10 +1183,11 @@ static std::string get_format_instructions(rac_tool_call_format_t format) {
         // Liquid AI LFM2 format
         instructions += "TOOL CALLING FORMAT (LFM2):\n";
         instructions += "When you need to use a tool, output ONLY this format:\n";
-        instructions += "<|tool_call_start|>[TOOL_NAME(param1=\"value1\", param2=\"value2\")]<|tool_call_end|>\n\n";
+        instructions += "<|tool_call_start|>[TOOL_NAME(param=\"VALUE_FROM_USER_QUERY\")]<|tool_call_end|>\n\n";
 
-        instructions += "EXAMPLE - If user asks \"what's the weather in Paris\":\n";
-        instructions += "<|tool_call_start|>[get_weather(location=\"Paris\")]<|tool_call_end|>\n\n";
+        instructions += "CRITICAL: Extract the EXACT value from the user's question:\n";
+        instructions += "- User asks 'weather in Tokyo' -> <|tool_call_start|>[get_weather(location=\"Tokyo\")]<|tool_call_end|>\n";
+        instructions += "- User asks 'weather in sf' -> <|tool_call_start|>[get_weather(location=\"San Francisco\")]<|tool_call_end|>\n\n";
 
         instructions += "RULES:\n";
         instructions += "1. For greetings or general chat, respond normally without tools\n";
@@ -1200,10 +1201,11 @@ static std::string get_format_instructions(rac_tool_call_format_t format) {
         // Default SDK format
         instructions += "TOOL CALLING FORMAT - YOU MUST USE THIS EXACT FORMAT:\n";
         instructions += "When you need to use a tool, output ONLY this (no other text before or after):\n";
-        instructions += "<tool_call>{\"tool\": \"TOOL_NAME\", \"arguments\": {\"PARAM_NAME\": \"VALUE\"}}</tool_call>\n\n";
+        instructions += "<tool_call>{\"tool\": \"TOOL_NAME\", \"arguments\": {\"PARAM_NAME\": \"VALUE_FROM_USER_QUERY\"}}</tool_call>\n\n";
 
-        instructions += "EXAMPLE - If user asks \"what's the weather in Paris\":\n";
-        instructions += "<tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"Paris\"}}</tool_call>\n\n";
+        instructions += "CRITICAL: Extract the EXACT value from the user's question:\n";
+        instructions += "- User asks 'weather in Tokyo' -> <tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"Tokyo\"}}</tool_call>\n";
+        instructions += "- User asks 'weather in sf' -> <tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"San Francisco\"}}</tool_call>\n\n";
 
         instructions += "RULES:\n";
         instructions += "1. For greetings or general chat, respond normally without tools\n";
@@ -1224,17 +1226,21 @@ static std::string get_format_example_json(rac_tool_call_format_t format) {
     switch (format) {
     case RAC_TOOL_FORMAT_LFM2:
         example += "Tool call format:\n";
-        example += "<|tool_call_start|>[tool_name(param=\"extracted_value\")]<|tool_call_end|>\n\n";
-        example += "Example: User asks 'What is the weather in Paris?'\n";
-        example += "Response: <|tool_call_start|>[get_weather(location=\"Paris\")]<|tool_call_end|>\n";
+        example += "<|tool_call_start|>[tool_name(param=\"VALUE_FROM_USER_QUERY\")]<|tool_call_end|>\n\n";
+        example += "CRITICAL: Extract the EXACT value from the user's question. Examples:\n";
+        example += "- User asks 'weather in Tokyo' -> <|tool_call_start|>[get_weather(location=\"Tokyo\")]<|tool_call_end|>\n";
+        example += "- User asks 'weather in sf' -> <|tool_call_start|>[get_weather(location=\"San Francisco\")]<|tool_call_end|>\n";
+        example += "- User asks 'calculate 5+3' -> <|tool_call_start|>[calculate(expression=\"5+3\")]<|tool_call_end|>\n";
         break;
 
     case RAC_TOOL_FORMAT_DEFAULT:
     default:
         example += "Tool call format:\n";
-        example += "<tool_call>{\"tool\": \"tool_name\", \"arguments\": {\"param\": \"extracted_value\"}}</tool_call>\n\n";
-        example += "Example: User asks 'What is the weather in Paris?'\n";
-        example += "Response: <tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"Paris\"}}</tool_call>\n";
+        example += "<tool_call>{\"tool\": \"tool_name\", \"arguments\": {\"param\": \"VALUE_FROM_USER_QUERY\"}}</tool_call>\n\n";
+        example += "CRITICAL: Extract the EXACT value from the user's question. Examples:\n";
+        example += "- User asks 'weather in Tokyo' -> <tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"Tokyo\"}}</tool_call>\n";
+        example += "- User asks 'weather in sf' -> <tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"San Francisco\"}}</tool_call>\n";
+        example += "- User asks 'calculate 5+3' -> <tool_call>{\"tool\": \"calculate\", \"arguments\": {\"expression\": \"5+3\"}}</tool_call>\n";
         break;
     }
 
@@ -1334,19 +1340,16 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format(const char*
     prompt += "\n\n";
 
     prompt += "# Tool Usage Instructions\n\n";
-    prompt += "CRITICAL: When using a tool, you MUST extract and include ALL required arguments from the user's message.\n\n";
+    prompt += "When using a tool, you MUST include ALL required arguments extracted from the user's message.\n\n";
     prompt += "RULES:\n";
-    prompt += "- For normal conversation (greetings, questions, chat), respond naturally WITHOUT using tools.\n";
-    prompt += "- Only use a tool if the user explicitly asks for something the tool provides.\n";
-    prompt += "- ALWAYS extract parameter values from the user's question. For example:\n";
-    prompt += "  - If user asks 'weather in Tokyo', use location=\"Tokyo\"\n";
-    prompt += "  - If user asks 'weather in India', use location=\"India\"\n";
-    prompt += "  - If user asks 'calculate 5 + 3', use expression=\"5 + 3\"\n\n";
+    prompt += "- Use tools for: weather queries, calculations, time queries\n";
+    prompt += "- For normal conversation, respond naturally without tools\n";
+    prompt += "- ALWAYS extract parameter values from the user's question\n\n";
 
     // Add format-specific example
     prompt += get_format_example_json(actual_format);
 
-    prompt += "\nNEVER use empty arguments. Always extract the value from the user's question.";
+    prompt += "\n\nNEVER use empty arguments. Always extract the value from the user's question.";
 
     *out_prompt = static_cast<char*>(malloc(prompt.size() + 1));
     if (!*out_prompt) {

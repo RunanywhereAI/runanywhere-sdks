@@ -111,12 +111,23 @@ class ToolSettingsViewModel extends ChangeNotifier {
   Future<Map<String, ToolValue>> _fetchWeather(
     Map<String, ToolValue> args,
   ) async {
-    final location = args['location']?.stringValue ?? 'San Francisco';
+    final rawLocation = args['location']?.stringValue;
+    
+    // Require location argument - no hardcoded defaults
+    if (rawLocation == null || rawLocation.isEmpty) {
+      return {
+        'error': const StringToolValue('Missing required argument: location'),
+      };
+    }
+    
+    // Clean up location string - Open-Meteo works better with just city names
+    // Remove common suffixes like ", CA", ", US", ", USA", etc.
+    final location = _cleanLocationString(rawLocation);
 
     try {
       // Step 1: Geocode the location
       final geocodeUrl = Uri.parse(
-        'https://geocoding-api.open-meteo.com/v1/search?name=${Uri.encodeComponent(location)}&count=1&language=en&format=json',
+        'https://geocoding-api.open-meteo.com/v1/search?name=${Uri.encodeComponent(location)}&count=5&language=en&format=json',
       );
 
       final geocodeResponse = await http.get(geocodeUrl);
@@ -223,6 +234,39 @@ class ToolSettingsViewModel extends ChangeNotifier {
     }
   }
 
+  /// Clean location string for better geocoding results
+  /// Removes common suffixes like ", CA", ", US", state abbreviations, etc.
+  String _cleanLocationString(String location) {
+    var cleaned = location.trim();
+    
+    // Common patterns to remove: ", CA", ", NY", ", US", ", USA", ", United States"
+    // Also handle variations like "CA" at the end
+    final patterns = [
+      RegExp(r',\s*(US|USA|United States)$', caseSensitive: false),
+      RegExp(r',\s*[A-Z]{2}$'), // State abbreviations like ", CA", ", NY"
+      RegExp(r',\s*[A-Z]{2},\s*(US|USA)$', caseSensitive: false), // ", CA, US"
+    ];
+    
+    for (final pattern in patterns) {
+      cleaned = cleaned.replaceAll(pattern, '');
+    }
+    
+    // Also handle "SF" -> "San Francisco" for common abbreviations
+    final abbreviations = {
+      'SF': 'San Francisco',
+      'NYC': 'New York City',
+      'LA': 'Los Angeles',
+      'DC': 'Washington DC',
+    };
+    
+    final upperCleaned = cleaned.toUpperCase();
+    if (abbreviations.containsKey(upperCleaned)) {
+      return abbreviations[upperCleaned]!;
+    }
+    
+    return cleaned;
+  }
+
   /// Time tool executor
   Future<Map<String, ToolValue>> _getCurrentTime(
     Map<String, ToolValue> args,
@@ -246,8 +290,14 @@ class ToolSettingsViewModel extends ChangeNotifier {
   Future<Map<String, ToolValue>> _calculate(
     Map<String, ToolValue> args,
   ) async {
-    final expression =
-        args['expression']?.stringValue ?? args['input']?.stringValue ?? '0';
+    // Try both 'expression' and 'input' keys - no hardcoded defaults
+    final expression = args['expression']?.stringValue ?? args['input']?.stringValue;
+    
+    if (expression == null || expression.isEmpty) {
+      return {
+        'error': const StringToolValue('Missing required argument: expression'),
+      };
+    }
 
     try {
       // Clean the expression
