@@ -1,0 +1,77 @@
+{
+  "$schema": "https://docs.molt.bot/schema/config.json",
+  "_comment": "Moltbot configuration for existing installations to use RunAnywhere as LLM backend",
+
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "runanywhere": {
+        "baseUrl": "http://localhost:8080/v1",
+        "apiKey": "",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "qwen2.5-0.5b-instruct-q4",
+            "name": "Qwen2.5 0.5B Instruct (Local, Q4)",
+            "reasoning": false,
+            "inputTypes": ["text"],
+            "costs": { "input": 0, "output": 0 },
+            "contextWindow": 4096,
+            "maxTokens": 2048
+          },
+          {
+            "id": "llama-3.2-3b-q4",
+            "name": "Llama 3.2 3B (Local, Q4)",
+            "reasoning": false,
+            "inputTypes": ["text"],
+            "costs": { "input": 0, "output": 0 },
+            "contextWindow": 8192,
+            "maxTokens": 4096
+          }
+        ]
+      }
+    }
+  },
+
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "runanywhere/qwen2.5-0.5b-instruct-q4",
+        "fallbacks": ["runanywhere/llama-3.2-3b-q4"]
+      }
+    }
+  },
+
+  "gateway": {
+    "bind": "loopback",
+    "port": 3000,
+    "auth": {
+      "mode": "token",
+      "token": "change-this-to-a-secure-token"
+    }
+  },
+
+  "channels": {
+    "voice-assistant": {
+      "_comment": "Voice assistant channel configuration (requires voice-assistant extension)",
+      "enabled": true,
+      "accounts": {
+        "default": {
+          "accountId": "default",
+          "name": "Pi Voice",
+          "enabled": true,
+          "piHostname": "localhost",
+          "piPort": 8081
+        }
+      }
+    }
+  },
+
+  "bindings": [
+    {
+      "_comment": "Route voice assistant to main agent (same as other channels)",
+      "match": { "channel": "voice-assistant" },
+      "agentId": "main"
+    }
+  ]
+}

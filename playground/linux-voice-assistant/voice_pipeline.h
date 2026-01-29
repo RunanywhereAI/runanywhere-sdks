@@ -71,6 +71,12 @@ struct VoicePipelineConfig {
 
     // TTS settings
     float speaking_rate = 1.0f;
+
+    // Moltbot integration (optional)
+    // When enabled, transcriptions are sent to Moltbot voice bridge instead of local LLM
+    bool enable_moltbot = false;
+    std::string moltbot_voice_bridge_url = "http://localhost:8081";
+    std::string moltbot_session_id = "voice-session";
 };
 
 // =============================================================================
@@ -121,9 +127,19 @@ public:
     std::string get_llm_model_id() const;
     std::string get_tts_model_id() const;
 
+    // Poll Moltbot voice bridge for speak commands (from other channels)
+    // Returns true if a message was spoken
+    bool poll_speak_queue();
+
+    // Synthesize and play text via TTS
+    bool speak_text(const std::string& text);
+
 private:
     // Initialize wake word detector
     bool initialize_wakeword();
+
+    // Process voice turn via Moltbot integration (STT -> Moltbot -> TTS)
+    bool process_voice_turn_moltbot(const int16_t* samples, size_t num_samples);
 
     struct Impl;
     std::unique_ptr<Impl> impl_;

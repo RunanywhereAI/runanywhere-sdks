@@ -372,11 +372,63 @@ Press Ctrl+C to exit.
 
 ---
 
-## Part 5: Moltbot Setup (Optional)
+## Part 5: Moltbot Integration (Optional)
 
-Moltbot provides task planning, tool execution, and messaging platform integration.
+Moltbot provides task planning, tool execution, and messaging platform integration. The voice assistant becomes **another channel** in Moltbot, just like WhatsApp, Telegram, or Discord.
 
-### 5.1 Clone Moltbot
+### 5.0 Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    CHANNELS (I/O Layer)                      │
+├─────────────┬─────────────┬─────────────┬───────────────────┤
+│  WhatsApp   │  Telegram   │   Discord   │ Voice Assistant   │
+│  (text)     │  (text)     │  (text)     │ (STT+TTS+Wake)    │
+└──────┬──────┴──────┬──────┴──────┬──────┴─────────┬─────────┘
+       │             │             │               │
+       └─────────────┴─────────────┴───────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│              MOLTBOT AGENT (Orchestration)                   │
+│  • Session management    • Tool execution                    │
+│  • Context memory        • Task planning                     │
+└──────────────────────────┬──────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│              RUNANYWHERE (Inference Layer)                   │
+│  • LLM inference (llama.cpp)   • Always running              │
+│  • Tool calling support        • OpenAI-compatible API       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Key Concepts:**
+- **Voice Assistant = Channel**: Like WhatsApp or Telegram, but with speech I/O
+  - STT (Whisper): Converts speech → text
+  - TTS (Piper): Converts text → speech
+  - Wake word ("Hey Jarvis"): Activates listening
+- **Moltbot = Agent**: Orchestrates conversations, executes tools
+- **RunAnywhere = Inference**: Always-running LLM backend (local, private, free)
+
+**All channels share the same conversation** - a message from WhatsApp and a voice command both go to the same agent with shared context.
+
+---
+
+### Two Integration Paths
+
+Choose based on your situation:
+
+| Path | Best For | Setup Complexity |
+|------|----------|------------------|
+| **A: Fresh Install** | New users, clean setup | Simple |
+| **B: Existing Moltbot** | Already have Moltbot with WhatsApp/Telegram/etc | Medium |
+
+---
+
+### Path A: Fresh Install (RunAnywhere Fork)
+
+Use this if you're starting fresh or want the pre-configured setup.
+
+#### A.1 Clone RunAnywhere Fork
 
 ```bash
 cd ~
@@ -384,24 +436,24 @@ git clone https://github.com/RunanywhereAI/clawdbot.git moltbot
 cd ~/moltbot
 ```
 
-### 5.2 Install Dependencies
+#### A.2 Install Dependencies
 
 ```bash
 cd ~/moltbot
 npm install
 ```
 
-### 5.3 Configure for Local AI
+#### A.3 Configure for Local AI
 
 ```bash
 # Create config directory
-mkdir -p ~/.moltbot
+mkdir -p ~/.clawdbot
 
-# Copy example config
-cp ~/moltbot/examples/runanywhere-local-config.yaml ~/.moltbot/config.yaml
+# Copy example config (includes RunAnywhere provider)
+cp ~/moltbot/examples/runanywhere-local-config.yaml ~/.clawdbot/moltbot.yaml
 ```
 
-**Key settings in `~/.moltbot/config.yaml`:**
+**Edit `~/.clawdbot/moltbot.yaml`:**
 ```yaml
 models:
   mode: merge
@@ -418,20 +470,18 @@ models:
 
 agents:
   defaults:
-    models:
-      default:
-        provider: runanywhere
-        model: qwen2.5-0.5b-instruct-q4
+    model:
+      primary: runanywhere/qwen2.5-0.5b-instruct-q4
 
 gateway:
   bind: loopback
   port: 3000
   auth:
     mode: token
-    token: "your-secure-token"  # Change this!
+    token: "change-this-to-secure-token"  # IMPORTANT: Change this!
 ```
 
-### 5.4 Start Moltbot
+#### A.4 Start Moltbot
 
 ```bash
 cd ~/moltbot
@@ -440,9 +490,337 @@ npm run start
 
 ---
 
+### Path B: Existing Moltbot Installation
+
+Use this if you already have Moltbot running with other channels (WhatsApp, Telegram, etc.) and want to add:
+1. **RunAnywhere as LLM backend** (local inference)
+2. **Voice assistant as a new channel**
+
+#### B.1 Add RunAnywhere Provider to Config
+
+Copy the sample config or merge with your existing config:
+
+```bash
+# Option 1: Copy sample config (review and merge manually)
+cp ~/runanywhere-sdks/playground/linux-voice-assistant/examples/moltbot-runanywhere-config.yaml \
+   ~/.clawdbot/runanywhere-provider.yaml
+
+# Option 2: Or use JSON format
+cp ~/runanywhere-sdks/playground/linux-voice-assistant/examples/moltbot-runanywhere-config.json \
+   ~/.clawdbot/runanywhere-provider.json
+```
+
+#### B.2 Merge with Existing Config
+
+Add this to your existing `~/.clawdbot/moltbot.yaml` or `moltbot.json`:
+
+```yaml
+# Add to models.providers section:
+models:
+  mode: merge  # Keep your existing providers!
+  providers:
+    # Your existing providers (anthropic, openai, etc.) stay here
+
+    # Add RunAnywhere as a new provider:
+    runanywhere:
+      baseUrl: "http://localhost:8080/v1"
+      apiKey: ""
+      api: openai-completions
+      models:
+        - id: "qwen2.5-0.5b-instruct-q4"
+          name: "Qwen2.5 0.5B (Local)"
+          costs: { input: 0, output: 0 }  # Free - local!
+          contextWindow: 4096
+          maxTokens: 2048
+
+# Option: Use RunAnywhere as primary (saves cloud API costs)
+agents:
+  defaults:
+    model:
+      primary: runanywhere/qwen2.5-0.5b-instruct-q4
+      fallbacks:
+        - anthropic/claude-sonnet-4-20250514  # Fallback to cloud if needed
+```
+
+#### B.3 Enable Webhooks (Required for Voice Bridge)
+
+Standard Moltbot uses webhooks for programmatic access. Add this to your config:
+
+```yaml
+# Enable webhook endpoint for voice bridge
+hooks:
+  enabled: true
+  token: "your-secure-webhook-token"  # Use this in --moltbot-token
+  path: "/hooks"  # Default path
+```
+
+This enables the `/hooks/agent` endpoint that the voice bridge uses.
+
+#### B.4 Verify Configuration
+
+```bash
+# Test that Moltbot recognizes RunAnywhere provider
+moltbot doctor
+
+# List available models (should show runanywhere/qwen2.5-0.5b-instruct-q4)
+moltbot models list
+
+# Test webhook endpoint (should return 401 without token, not 404)
+curl -s http://localhost:3000/hooks/agent
+```
+
+---
+
+### 5.1 Voice Bridge Setup
+
+The voice bridge receives transcriptions from the voice assistant and forwards them to Moltbot.
+
+```bash
+cd ~/runanywhere-sdks/playground/linux-voice-assistant
+
+# Start voice bridge (requires npx/tsx)
+npx tsx scripts/start-voice-bridge.ts \
+    --http-port 8081 \
+    --moltbot-url http://localhost:3000 \
+    --moltbot-token your-secure-token
+```
+
+**Voice Bridge Options:**
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--http-port` | 8081 | HTTP port for voice assistant to connect |
+| `--moltbot-url` | http://localhost:3000 | Moltbot gateway URL |
+| `--moltbot-token` | (none) | Auth token from Moltbot config |
+
+**API Compatibility:**
+The voice bridge automatically detects which Moltbot API to use:
+
+| Moltbot Version | Endpoint | Mode |
+|----------------|----------|------|
+| RunAnywhere Fork | `/api/chat` | Synchronous (recommended) |
+| Standard Moltbot | `/hooks/agent` | Webhook (requires `hooks.enabled: true`) |
+
+### 5.2 Run Voice Assistant with Moltbot
+
+```bash
+cd ~/runanywhere-sdks/playground/linux-voice-assistant
+
+# With Moltbot integration (no wake word)
+./build/voice-assistant --moltbot
+
+# With Moltbot AND wake word
+./build/voice-assistant --wakeword --moltbot
+
+# Custom Moltbot voice bridge URL
+./build/voice-assistant --moltbot --moltbot-url http://localhost:8081
+```
+
+### 5.3 Integration Pipeline
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                 VOICE ASSISTANT (Channel)                    │
+│  Microphone → Wake Word → VAD → STT (Whisper)               │
+└─────────────────────────┬───────────────────────────────────┘
+                          │ HTTP POST /transcription
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    VOICE BRIDGE (:8081)                      │
+│  Receives transcriptions, forwards to Moltbot               │
+└─────────────────────────┬───────────────────────────────────┘
+                          │ HTTP POST /api/chat
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    MOLTBOT (:3000)                           │
+│  Agent processing, tool execution, session management       │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │  WhatsApp   │  │  Telegram   │  │   Voice     │  ← All  │
+│  │  Channel    │  │  Channel    │  │  Channel    │  share  │
+│  └─────────────┘  └─────────────┘  └─────────────┘  context│
+└─────────────────────────┬───────────────────────────────────┘
+                          │ HTTP POST /v1/chat/completions
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 RUNANYWHERE SERVER (:8080)                   │
+│  Local LLM inference (Qwen, Llama, etc.)                    │
+│  Tool calling support                                        │
+└─────────────────────────┬───────────────────────────────────┘
+                          │ Response text
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 VOICE ASSISTANT (Output)                     │
+│  TTS (Piper) → Speaker                                      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 5.4 Multi-Channel Sync
+
+When voice assistant is configured as a channel, all channels stay synchronized:
+
+| Event | What Happens |
+|-------|--------------|
+| Voice: "What's on my todo list?" | Agent responds via TTS AND optionally to other channels |
+| WhatsApp: "Add milk to shopping list" | Agent updates list, voice can announce it |
+| Telegram: "Remind me in 5 minutes" | Timer set, voice plays reminder when triggered |
+
+**Configuration for channel sync** (in Moltbot config):
+```yaml
+# Route all channels to same agent
+bindings:
+  - match: { channel: voice-assistant }
+    agentId: main
+  - match: { channel: whatsapp }
+    agentId: main
+  - match: { channel: telegram }
+    agentId: main
+```
+
+### 5.5 Voice Assistant Channel Extension
+
+The voice assistant is implemented as a **first-class Moltbot channel** at:
+```
+~/moltbot/extensions/voice-assistant/
+```
+
+This extension provides:
+- **WebSocket server** (port 8082) for voice client connections
+- **Bidirectional communication**: transcriptions IN, speak commands OUT
+- **Multi-channel broadcast**: messages from ANY channel are spoken via TTS
+
+**WebSocket Protocol:**
+
+| Direction | Message Type | Purpose |
+|-----------|--------------|---------|
+| Voice → Moltbot | `transcription` | Send speech-to-text result |
+| Voice → Moltbot | `connect` | Identify device and capabilities |
+| Voice → Moltbot | `ping` | Keepalive |
+| Moltbot → Voice | `speak` | Text to synthesize via TTS |
+| Moltbot → Voice | `connected` | Handshake response |
+| Moltbot → Voice | `pong` | Keepalive response |
+
+**Example messages:**
+
+```json
+// Voice → Moltbot: Send transcription
+{
+  "type": "transcription",
+  "text": "What's the weather like?",
+  "sessionId": "main",
+  "isFinal": true
+}
+
+// Moltbot → Voice: Speak response (from any channel)
+{
+  "type": "speak",
+  "text": "The weather is sunny with a high of 72.",
+  "sourceChannel": "telegram",
+  "priority": 1
+}
+```
+
+### 5.6 Voice Bridge Modes
+
+The voice bridge (`scripts/start-voice-bridge.ts`) supports two modes:
+
+**WebSocket Mode (Recommended):**
+```bash
+npx tsx scripts/start-voice-bridge.ts --mode ws \
+    --ws-url ws://localhost:8082 \
+    --http-port 8081
+```
+- Connects to Moltbot voice channel via WebSocket
+- Receives speak commands for TTS playback
+- Real-time bidirectional communication
+
+**HTTP Mode (Legacy):**
+```bash
+npx tsx scripts/start-voice-bridge.ts --mode http \
+    --moltbot-url http://localhost:3000 \
+    --moltbot-token your-token
+```
+- Forwards transcriptions via HTTP
+- No real-time outbound streaming
+
+### 5.7 Message Flow with All Channels
+
+**When you speak to the voice assistant:**
+```
+Microphone → Wake Word → STT → "What's on my todo list?"
+                                        ↓
+                              Voice Bridge (WebSocket)
+                                        ↓
+                              Moltbot Voice Channel
+                                        ↓
+                              Agent processes message
+                                        ↓
+                              RunAnywhere LLM inference
+                                        ↓
+                              Response: "Your list has: milk, eggs"
+                                        ↓
+                              Voice Channel sends "speak" command
+                                        ↓
+                              Voice Bridge receives
+                                        ↓
+                              TTS → Speaker plays response
+```
+
+**When someone sends a WhatsApp message:**
+```
+WhatsApp User: "Add bread to shopping list"
+                    ↓
+              Moltbot WhatsApp Channel
+                    ↓
+              Agent processes message
+                    ↓
+              RunAnywhere LLM inference
+                    ↓
+              Response: "Added bread to shopping list"
+                    ↓
+    ┌───────────────┴───────────────┐
+    ↓                               ↓
+WhatsApp sends                Voice Channel sends
+text response                 "speak" command
+    ↓                               ↓
+WhatsApp User                 Voice Assistant
+sees message                  speaks response
+```
+
+---
+
 ## Running the Full Stack
 
-### Terminal 1: RunAnywhere Server
+### Option A: Local-Only Mode (No Moltbot)
+
+Simple standalone mode - voice assistant with local LLM, no external services.
+
+**Single Terminal:**
+
+```bash
+cd ~/runanywhere-sdks/playground/linux-voice-assistant
+
+# Without wake word (always listening)
+./build/voice-assistant
+
+# With wake word (say "Hey Jarvis")
+./build/voice-assistant --wakeword
+```
+
+### Option B: Full Moltbot Integration (4 Components)
+
+Full stack with Moltbot agent - enables tool execution, multi-channel sync, and task planning.
+
+**Start order matters!** Run these in separate terminals:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Terminal 1: RunAnywhere Server (must start first)           │
+│  Terminal 2: Moltbot Gateway                                 │
+│  Terminal 3: Voice Bridge                                    │
+│  Terminal 4: Voice Assistant                                 │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Terminal 1: RunAnywhere Server (Inference Layer)**
 
 ```bash
 cd ~/runanywhere-sdks/sdk/runanywhere-commons
@@ -454,24 +832,75 @@ export LD_LIBRARY_PATH=$PWD/dist/linux/aarch64:$LD_LIBRARY_PATH
     --threads 4
 ```
 
-### Terminal 2: Moltbot (Optional)
+**Terminal 2: Moltbot Gateway (Agent Layer)**
 
 ```bash
 cd ~/moltbot
 npm run start
 ```
 
-### Terminal 3: Voice Assistant
+**Terminal 3: Voice Bridge (Channel Bridge)**
 
 ```bash
 cd ~/runanywhere-sdks/playground/linux-voice-assistant
 
-# Without wake word (always listening)
-./build/voice-assistant
+# WebSocket mode (recommended) - connects to Moltbot voice channel
+npx tsx scripts/start-voice-bridge.ts \
+    --mode ws \
+    --ws-url ws://localhost:8082 \
+    --http-port 8081
 
-# With wake word (say "Hey Jarvis")
-./build/voice-assistant --wakeword
+# Or HTTP mode (legacy) - for older Moltbot without voice channel
+# npx tsx scripts/start-voice-bridge.ts \
+#     --mode http \
+#     --moltbot-url http://localhost:3000 \
+#     --moltbot-token change-this-to-secure-token
 ```
+
+**Terminal 4: Voice Assistant (Voice Channel)**
+
+```bash
+cd ~/runanywhere-sdks/playground/linux-voice-assistant
+
+# With Moltbot + Wake Word (recommended)
+./build/voice-assistant --wakeword --moltbot
+
+# Or always listening with Moltbot
+./build/voice-assistant --moltbot
+```
+
+### Option C: Existing Moltbot with Other Channels
+
+If you already have Moltbot running with WhatsApp, Telegram, etc., add voice:
+
+**Terminal 1: Ensure RunAnywhere Server is running**
+```bash
+# Check if running
+curl http://localhost:8080/health
+
+# If not running, start it (see Terminal 1 above)
+```
+
+**Terminal 2: Your existing Moltbot** (should already be running)
+```bash
+# Verify Moltbot sees RunAnywhere provider
+moltbot models list | grep runanywhere
+```
+
+**Terminal 3: Add Voice Bridge**
+```bash
+cd ~/runanywhere-sdks/playground/linux-voice-assistant
+npx tsx scripts/start-voice-bridge.ts \
+    --moltbot-url http://localhost:3000 \
+    --moltbot-token your-existing-token
+```
+
+**Terminal 4: Add Voice Assistant**
+```bash
+./build/voice-assistant --wakeword --moltbot
+```
+
+Now voice joins your existing WhatsApp/Telegram/Discord conversations!
 
 ### Test the Server
 
@@ -752,8 +1181,16 @@ sudo ufw allow 8080/tcp  # If using UFW
 |---------|-------------|
 | `./build/voice-assistant` | Run voice assistant (always listening) |
 | `./build/voice-assistant --wakeword` | Run with "Hey Jarvis" wake word |
+| `./build/voice-assistant --moltbot` | Run with Moltbot integration |
+| `./build/voice-assistant --wakeword --moltbot` | Wake word + Moltbot |
+| `./build/voice-assistant --moltbot-url URL` | Custom Moltbot voice bridge URL |
 | `./build/voice-assistant --list-devices` | List audio devices |
 | `./scripts/download-models.sh` | Download required models |
 | `./scripts/download-models.sh --wakeword` | Download wake word models |
-| `curl http://localhost:8080/health` | Check server health |
+| `npx tsx scripts/start-voice-bridge.ts --mode ws` | Start voice bridge (WebSocket mode) |
+| `npx tsx scripts/start-voice-bridge.ts --mode http` | Start voice bridge (HTTP mode) |
+| `curl http://localhost:8080/health` | Check RunAnywhere server health |
 | `curl http://localhost:8080/v1/models` | List available models |
+| `curl http://localhost:8081/health` | Check voice bridge health |
+| `curl http://localhost:8081/speak` | Get next message to speak (polling) |
+| `curl -X POST http://localhost:8081/transcription -d '{"text":"hello"}'` | Test voice bridge |

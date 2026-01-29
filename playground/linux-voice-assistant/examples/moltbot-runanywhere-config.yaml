@@ -1,0 +1,131 @@
+# Moltbot Configuration for RunAnywhere Integration
+#
+# This configuration allows EXISTING Moltbot installations to use
+# RunAnywhere as the local LLM inference backend.
+#
+# Copy this to: ~/.clawdbot/moltbot.yaml (or merge with existing config)
+#
+# For fresh installs, use the RunAnywhere fork which includes the
+# voice-assistant channel extension.
+
+# =============================================================================
+# MODEL PROVIDERS
+# =============================================================================
+# Add RunAnywhere as a custom OpenAI-compatible provider
+models:
+  mode: merge  # Merge with existing providers (keeps Anthropic, OpenAI, etc.)
+  providers:
+    runanywhere:
+      baseUrl: "http://localhost:8080/v1"  # RunAnywhere server endpoint
+      apiKey: ""                            # No API key needed for local
+      api: openai-completions               # Use OpenAI-compatible API
+      models:
+        # Small model for Raspberry Pi (fast, ~5-10 tok/s)
+        - id: "qwen2.5-0.5b-instruct-q4"
+          name: "Qwen2.5 0.5B Instruct (Local)"
+          reasoning: false
+          inputTypes: ["text"]
+          costs:
+            input: 0   # Free - local inference
+            output: 0
+          contextWindow: 4096
+          maxTokens: 2048
+
+        # Larger model for better quality (slower, ~2-5 tok/s on Pi)
+        - id: "llama-3.2-3b-q4"
+          name: "Llama 3.2 3B (Local)"
+          reasoning: false
+          inputTypes: ["text"]
+          costs:
+            input: 0
+            output: 0
+          contextWindow: 8192
+          maxTokens: 4096
+
+# =============================================================================
+# AGENT DEFAULTS
+# =============================================================================
+# Configure agents to use RunAnywhere by default
+agents:
+  defaults:
+    model:
+      # Use local model as primary (for privacy/offline)
+      primary: runanywhere/qwen2.5-0.5b-instruct-q4
+      # Fallback to larger local model if needed
+      fallbacks:
+        - runanywhere/llama-3.2-3b-q4
+        # Uncomment to fall back to cloud if local fails:
+        # - anthropic/claude-sonnet-4-20250514
+
+# =============================================================================
+# GATEWAY SETTINGS
+# =============================================================================
+gateway:
+  bind: loopback    # Only accept local connections
+  port: 3000        # Moltbot gateway port
+  auth:
+    mode: token
+    token: "change-this-to-a-secure-token"  # IMPORTANT: Change this!
+
+# =============================================================================
+# VOICE ASSISTANT CHANNEL (Optional)
+# =============================================================================
+# Enable voice assistant as a channel (requires voice-assistant extension)
+# The voice assistant becomes another input/output like WhatsApp or Telegram
+channels:
+  voice-assistant:
+    enabled: true
+    accounts:
+      default:
+        accountId: "default"
+        name: "Pi Voice"
+        enabled: true
+        # Voice assistant connection settings
+        piHostname: "localhost"  # Or "raspberrypi.local" for remote Pi
+        piPort: 8081             # Voice bridge HTTP port
+
+# =============================================================================
+# CHANNEL BINDINGS
+# =============================================================================
+# Route all channels to the same agent for unified conversations
+bindings:
+  # Voice assistant goes to main agent
+  - match:
+      channel: voice-assistant
+    agentId: main
+
+  # All other channels also go to main agent (default behavior)
+  # This means WhatsApp, Telegram, Discord, Voice all share context!
+
+# =============================================================================
+# ARCHITECTURE OVERVIEW
+# =============================================================================
+#
+# ┌─────────────────────────────────────────────────────────────┐
+# │                    CHANNELS (I/O Layer)                      │
+# ├─────────────┬─────────────┬─────────────┬───────────────────┤
+# │  WhatsApp   │  Telegram   │   Discord   │ Voice Assistant   │
+# │  (text)     │  (text)     │  (text)     │ (STT+TTS+Wake)    │
+# └──────┬──────┴──────┬──────┴──────┬──────┴─────────┬─────────┘
+#        │             │             │               │
+#        └─────────────┴─────────────┴───────────────┘
+#                             ↓
+# ┌─────────────────────────────────────────────────────────────┐
+# │              MOLTBOT AGENT (Orchestration)                   │
+# │  • Session management    • Tool execution                    │
+# │  • Context memory        • Task planning                     │
+# └──────────────────────────┬──────────────────────────────────┘
+#                            ↓
+# ┌─────────────────────────────────────────────────────────────┐
+# │              RUNANYWHERE (Inference Layer)                   │
+# │  • LLM inference (llama.cpp)   • Always running              │
+# │  • Tool calling support        • OpenAI-compatible API       │
+# └─────────────────────────────────────────────────────────────┘
+#
+# The Voice Assistant is just another channel, like WhatsApp:
+# - STT (Whisper) converts speech → text
+# - Text goes to Moltbot agent (same as any message)
+# - Agent uses RunAnywhere for inference + tool calling
+# - Response text comes back
+# - TTS (Piper) converts text → speech
+# - Wake word ("Hey Jarvis") activates listening
