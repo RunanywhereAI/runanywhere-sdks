@@ -114,15 +114,22 @@ if [ -d "$MOLTBOT_DIR" ]; then
 else
     log_info "Cloning Moltbot (RunAnywhere fork)..."
     git clone https://github.com/RunanywhereAI/clawdbot.git "$MOLTBOT_DIR"
+    cd "$MOLTBOT_DIR"
+    git checkout smonga/rasp 2>/dev/null || true  # Use the branch with voice extensions
 fi
 
 cd "$MOLTBOT_DIR"
 
+log_info "Installing pnpm (if needed)..."
+if ! command -v pnpm &> /dev/null; then
+    npm install -g pnpm
+fi
+
 log_info "Installing Moltbot dependencies..."
-npm install
+pnpm install
 
 log_info "Building Moltbot..."
-npm run build
+pnpm build
 
 log_success "Moltbot installed successfully"
 
@@ -141,7 +148,9 @@ if [ -d "$SDK_DIR" ]; then
     fi
 else
     log_info "Cloning RunAnywhere SDK..."
-    git clone https://github.com/RunanywhereAI/runanywhere-sdks.git "$SDK_DIR"
+    git clone https://github.com/RunanywhereAI/sdks.git "$SDK_DIR"
+    cd "$SDK_DIR"
+    git checkout smonga/rasp 2>/dev/null || true  # Use the branch with voice assistant
 fi
 
 cd "$SDK_DIR/playground/linux-voice-assistant"
@@ -191,7 +200,7 @@ echo "Starting voice assistant stack..."
 # Start Moltbot gateway in background
 echo "Starting Moltbot gateway..."
 cd ~/moltbot
-npm run moltbot -- gateway --port 18789 &
+pnpm moltbot gateway --port 18789 &
 MOLTBOT_PID=$!
 
 # Wait for gateway to start
@@ -321,7 +330,7 @@ echo ""
 log_info "Next steps:"
 echo ""
 echo "  1. Run Moltbot onboarding (first time only):"
-echo "     cd $MOLTBOT_DIR && npm run moltbot -- onboard"
+echo "     cd $MOLTBOT_DIR && pnpm moltbot onboard"
 echo ""
 echo "  2. Start the voice assistant stack:"
 echo "     cd $SDK_DIR/playground/linux-voice-assistant"
@@ -329,7 +338,7 @@ echo "     ./start.sh"
 echo ""
 echo "  Or start components individually:"
 echo "     # Terminal 1: Moltbot gateway"
-echo "     cd $MOLTBOT_DIR && npm run moltbot -- gateway --port 18789"
+echo "     cd $MOLTBOT_DIR && pnpm moltbot gateway --port 18789"
 echo ""
 echo "     # Terminal 2: Voice bridge"
 echo "     cd $SDK_DIR/playground/linux-voice-assistant"
