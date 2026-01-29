@@ -131,12 +131,22 @@ class _ToolsViewState extends State<ToolsView> {
   Future<Map<String, ToolValue>> _fetchWeather(
     Map<String, ToolValue> args,
   ) async {
-    final location = args['location']?.stringValue ?? 'Unknown';
+    final rawLocation = args['location']?.stringValue;
+
+    // Require location argument - no hardcoded defaults
+    if (rawLocation == null || rawLocation.isEmpty) {
+      return {
+        'error': const StringToolValue('Missing required argument: location'),
+      };
+    }
+
+    // Clean up location string for better geocoding
+    final location = _cleanLocationString(rawLocation);
 
     try {
       // Use Open-Meteo API (no key required)
       final geocodeUrl = Uri.parse(
-        'https://geocoding-api.open-meteo.com/v1/search?name=${Uri.encodeComponent(location)}&count=1',
+        'https://geocoding-api.open-meteo.com/v1/search?name=${Uri.encodeComponent(location)}&count=5&language=en&format=json',
       );
 
       final geocodeResponse = await http.get(geocodeUrl);
@@ -148,7 +158,7 @@ class _ToolsViewState extends State<ToolsView> {
       final results = geocodeData['results'] as List?;
       if (results == null || results.isEmpty) {
         return {
-          'error': const StringToolValue('Location not found'),
+          'error': StringToolValue('Could not find location: $location'),
           'location': StringToolValue(location),
         };
       }
@@ -156,11 +166,11 @@ class _ToolsViewState extends State<ToolsView> {
       final firstResult = results[0] as Map<String, dynamic>;
       final lat = firstResult['latitude'] as num;
       final lon = firstResult['longitude'] as num;
-      final cityName = firstResult['name'] as String;
+      final cityName = firstResult['name'] as String? ?? location;
 
       // Fetch weather
       final weatherUrl = Uri.parse(
-        'https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,weathercode&temperature_unit=fahrenheit',
+        'https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph',
       );
 
       final weatherResponse = await http.get(weatherUrl);
@@ -170,16 +180,18 @@ class _ToolsViewState extends State<ToolsView> {
 
       final weatherData = jsonDecode(weatherResponse.body) as Map<String, dynamic>;
       final current = weatherData['current'] as Map<String, dynamic>;
-      final temp = current['temperature_2m'] as num;
-      final code = current['weathercode'] as int;
-
-      final condition = _weatherCodeToCondition(code);
+      final temp = current['temperature_2m'] as num? ?? 0;
+      final humidity = current['relative_humidity_2m'] as num? ?? 0;
+      final windSpeed = current['wind_speed_10m'] as num? ?? 0;
+      final weatherCode = current['weather_code'] as int? ?? 0;
 
       return {
         'location': StringToolValue(cityName),
         'temperature': NumberToolValue(temp.toDouble()),
         'unit': const StringToolValue('fahrenheit'),
-        'condition': StringToolValue(condition),
+        'humidity': NumberToolValue(humidity.toDouble()),
+        'wind_speed_mph': NumberToolValue(windSpeed.toDouble()),
+        'condition': StringToolValue(_weatherCodeToCondition(weatherCode)),
       };
     } catch (e) {
       return {
@@ -189,22 +201,99 @@ class _ToolsViewState extends State<ToolsView> {
     }
   }
 
+  /// Clean location string for better geocoding results
+  String _cleanLocationString(String location) {
+    var cleaned = location.trim();
+
+    // Common patterns to remove: ", CA", ", NY", ", US", ", USA"
+    final patterns = [
+      RegExp(r',\s*(US|USA|United States)$', caseSensitive: false),
+      RegExp(r',\s*[A-Z]{2}$'), // State abbreviations like ", CA", ", NY"
+      RegExp(r',\s*[A-Z]{2},\s*(US|USA)$', caseSensitive: false),
+    ];
+
+    for (final pattern in patterns) {
+      cleaned = cleaned.replaceAll(pattern, '');
+    }
+
+    // Handle common abbreviations
+    final abbreviations = {
+      'SF': 'San Francisco',
+      'NYC': 'New York City',
+      'LA': 'Los Angeles',
+      'DC': 'Washington DC',
+    };
+
+    final upperCleaned = cleaned.toUpperCase();
+    if (abbreviations.containsKey(upperCleaned)) {
+      return abbreviations[upperCleaned]!;
+    }
+
+    return cleaned;
+  }
+
   String _weatherCodeToCondition(int code) {
-    if (code == 0) return 'Clear sky';
-    if (code <= 3) return 'Partly cloudy';
-    if (code <= 49) return 'Foggy';
-    if (code <= 59) return 'Drizzle';
-    if (code <= 69) return 'Rain';
-    if (code <= 79) return 'Snow';
-    if (code <= 99) return 'Thunderstorm';
-    return 'Unknown';
+    switch (code) {
+      case 0:
+        return 'Clear sky';
+      case 1:
+        return 'Mainly clear';
+      case 2:
+        return 'Partly cloudy';
+      case 3:
+        return 'Overcast';
+      case 45:
+      case 48:
+        return 'Foggy';
+      case 51:
+      case 53:
+      case 55:
+        return 'Drizzle';
+      case 56:
+      case 57:
+        return 'Freezing drizzle';
+      case 61:
+      case 63:
+      case 65:
+        return 'Rain';
+      case 66:
+      case 67:
+        return 'Freezing rain';
+      case 71:
+      case 73:
+      case 75:
+        return 'Snow';
+      case 77:
+        return 'Snow grains';
+      case 80:
+      case 81:
+      case 82:
+        return 'Rain showers';
+      case 85:
+      case 86:
+        return 'Snow showers';
+      case 95:
+        return 'Thunderstorm';
+      case 96:
+      case 99:
+        return 'Thunderstorm with hail';
+      default:
+        return 'Unknown';
+    }
   }
 
   /// Calculator tool executor
   Future<Map<String, ToolValue>> _calculate(
     Map<String, ToolValue> args,
   ) async {
-    final expression = args['expression']?.stringValue ?? '';
+    final expression = args['expression']?.stringValue;
+    
+    // Require expression argument - no hardcoded defaults
+    if (expression == null || expression.isEmpty) {
+      return {
+        'error': const StringToolValue('Missing required argument: expression'),
+      };
+    }
 
     try {
       // Simple expression parser for basic arithmetic

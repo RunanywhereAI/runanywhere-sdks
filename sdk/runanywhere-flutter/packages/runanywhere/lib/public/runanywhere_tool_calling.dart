@@ -12,6 +12,7 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_tool_calling.dart';
 import 'package:runanywhere/public/runanywhere.dart';
+import 'package:runanywhere/public/types/generation_types.dart';
 import 'package:runanywhere/public/types/tool_calling_types.dart';
 
 /// Tool calling extension for RunAnywhere
@@ -155,6 +156,7 @@ extension RunAnywhereToolCalling on RunAnywhere {
   }) async {
     final opts = options ?? const ToolCallingOptions();
     final tools = opts.tools ?? getRegisteredTools();
+    final formatName = opts.formatName;
 
     if (tools.isEmpty) {
       // No tools - just do regular generation
@@ -170,12 +172,16 @@ extension RunAnywhereToolCalling on RunAnywhere {
     // Build tools JSON
     final toolsJson = toolsToJson(tools);
     _logger.debug('Tools JSON: $toolsJson');
+    _logger.debug('Using tool call format: $formatName');
 
-    // Build initial prompt with tools
-    final formattedPrompt = DartBridgeToolCalling.shared.buildInitialPrompt(
-      prompt,
+    // Build initial prompt with tools using the specified format
+    final toolsPrompt = DartBridgeToolCalling.shared.formatToolsPromptWithFormat(
       toolsJson,
+      formatName,
     );
+    
+    // Build the full prompt with system instructions and user query
+    final formattedPrompt = '$toolsPrompt\n\nUser: $prompt';
     _logger.debug('Formatted prompt: ${formattedPrompt.substring(0, formattedPrompt.length.clamp(0, 200))}...');
 
     // Track all tool calls and results
@@ -189,12 +195,24 @@ extension RunAnywhereToolCalling on RunAnywhere {
     while (iterations < maxIterations) {
       iterations++;
 
-      // Generate response
-      final result = await RunAnywhere.generate(currentPrompt);
-      _logger.debug('LLM output (iter $iterations): ${result.text.substring(0, result.text.length.clamp(0, 200))}...');
+      // Match Swift SDK defaults: temperature 0.7, maxTokens 1024
+      final genOptions = LLMGenerationOptions(
+        maxTokens: opts.maxTokens ?? 1024,
+        temperature: opts.temperature ?? 0.7,
+      );
+      
+      // Use streaming like Swift does, then collect all tokens
+      final streamResult = await RunAnywhere.generateStream(currentPrompt, options: genOptions);
+      final buffer = StringBuffer();
+      await for (final token in streamResult.stream) {
+        buffer.write(token);
+      }
+      final responseText = buffer.toString();
+      
+      _logger.debug('LLM output (iter $iterations): ${responseText.substring(0, responseText.length.clamp(0, 200))}...');
 
       // Parse for tool calls using C++ bridge
-      final parseResult = DartBridgeToolCalling.shared.parseToolCall(result.text);
+      final parseResult = DartBridgeToolCalling.shared.parseToolCall(responseText);
 
       if (!parseResult.hasToolCall || parseResult.toolName == null) {
         // No tool call - return final result
