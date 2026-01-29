@@ -20,6 +20,7 @@ import { Typography } from '../../theme/typography';
 import { Spacing, BorderRadius, Padding, Layout } from '../../theme/spacing';
 import type { Message } from '../../types/chat';
 import { MessageRole } from '../../types/chat';
+import { ToolCallIndicator } from './ToolCallIndicator';
 
 interface MessageBubbleProps {
   message: Message;
@@ -89,6 +90,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               </Text>
             </View>
           )}
+
+        {/* Tool Call Indicator (for messages that used tools) */}
+        {isAssistant && message.toolCallInfo && (
+          <ToolCallIndicator toolCallInfo={message.toolCallInfo} />
+        )}
 
         {/* Thinking Section (expandable) */}
         {hasThinking && (
