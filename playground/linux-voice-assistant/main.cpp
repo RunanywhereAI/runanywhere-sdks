@@ -10,6 +10,8 @@
 //   --input <device>  Audio input device (default: "default")
 //   --output <device> Audio output device (default: "default")
 //   --wakeword        Enable wake word detection ("Hey Jarvis")
+//   --moltbot         Enable Moltbot integration (sends transcriptions to Moltbot)
+//   --moltbot-url     Moltbot voice bridge URL (default: "http://localhost:8081")
 //   --help            Show this help message
 //
 // Controls:
@@ -56,6 +58,8 @@ struct AppConfig {
     bool list_devices = false;
     bool show_help = false;
     bool enable_wakeword = false;
+    bool enable_moltbot = false;
+    std::string moltbot_url = "http://localhost:8081";
 };
 
 void print_usage(const char* prog_name) {
@@ -65,6 +69,8 @@ void print_usage(const char* prog_name) {
               << "  --input <device>  Audio input device (default: \"default\")\n"
               << "  --output <device> Audio output device (default: \"default\")\n"
               << "  --wakeword        Enable wake word detection (\"Hey Jarvis\")\n"
+              << "  --moltbot         Enable Moltbot integration (sends transcriptions to Moltbot)\n"
+              << "  --moltbot-url     Moltbot voice bridge URL (default: \"http://localhost:8081\")\n"
               << "  --help            Show this help message\n\n"
               << "Controls:\n"
               << "  Ctrl+C            Exit the application\n"
@@ -83,6 +89,10 @@ AppConfig parse_args(int argc, char* argv[]) {
             config.output_device = argv[++i];
         } else if (strcmp(argv[i], "--wakeword") == 0) {
             config.enable_wakeword = true;
+        } else if (strcmp(argv[i], "--moltbot") == 0) {
+            config.enable_moltbot = true;
+        } else if (strcmp(argv[i], "--moltbot-url") == 0 && i + 1 < argc) {
+            config.moltbot_url = argv[++i];
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             config.show_help = true;
         }
@@ -225,6 +235,14 @@ int main(int argc, char* argv[]) {
 
     runanywhere::VoicePipelineConfig pipeline_config;
 
+    // Configure Moltbot integration (optional)
+    if (app_config.enable_moltbot) {
+        pipeline_config.enable_moltbot = true;
+        pipeline_config.moltbot_voice_bridge_url = app_config.moltbot_url;
+        std::cout << "  Moltbot integration enabled\n";
+        std::cout << "  Voice bridge URL: " << app_config.moltbot_url << "\n";
+    }
+
     // Configure wake word (optional)
     pipeline_config.enable_wake_word = app_config.enable_wakeword;
     if (app_config.enable_wakeword) {
@@ -307,6 +325,11 @@ int main(int argc, char* argv[]) {
 
     std::cout << "========================================\n"
               << "Voice Assistant is ready!\n";
+    if (app_config.enable_moltbot) {
+        std::cout << "Mode: Moltbot Agent (local STT + Moltbot + local TTS)\n";
+    } else {
+        std::cout << "Mode: Local LLM (full on-device pipeline)\n";
+    }
     if (app_config.enable_wakeword) {
         std::cout << "Say \"Hey Jarvis\" to activate.\n";
     } else {
@@ -326,9 +349,23 @@ int main(int argc, char* argv[]) {
     // Start voice pipeline
     pipeline.start();
 
+    // Polling interval for speak queue (when Moltbot enabled)
+    auto last_poll_time = std::chrono::steady_clock::now();
+    const auto poll_interval = std::chrono::milliseconds(500);  // Poll every 500ms
+
     // Main loop
     while (g_running) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+        // Poll Moltbot speak queue for messages from other channels
+        if (app_config.enable_moltbot) {
+            auto now = std::chrono::steady_clock::now();
+            if (now - last_poll_time >= poll_interval) {
+                last_poll_time = now;
+                // Poll and speak any pending messages (from WhatsApp, Telegram, etc.)
+                pipeline.poll_speak_queue();
+            }
+        }
     }
 
     // =============================================================================

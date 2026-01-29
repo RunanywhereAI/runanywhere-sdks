@@ -17,8 +17,233 @@
 #include <mutex>
 #include <iostream>
 #include <chrono>
+#include <sstream>
+#include <regex>
+
+// For HTTP client (Moltbot integration)
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <unistd.h>
 
 namespace runanywhere {
+
+// =============================================================================
+// HTTP Client for Moltbot Voice Bridge
+// =============================================================================
+
+struct HttpResponse {
+    int status_code = 0;
+    std::string body;
+    bool success = false;
+};
+
+// Parse URL into host, port, path
+static bool parse_url(const std::string& url, std::string& host, int& port, std::string& path) {
+    // Simple URL parser for http://host:port/path format
+    std::regex url_regex(R"(http://([^:/]+)(?::(\d+))?(/.*)?)", std::regex::icase);
+    std::smatch match;
+
+    if (!std::regex_match(url, match, url_regex)) {
+        return false;
+    }
+
+    host = match[1].str();
+    port = match[2].matched ? std::stoi(match[2].str()) : 80;
+    path = match[3].matched ? match[3].str() : "/";
+
+    return true;
+}
+
+// Simple HTTP POST request
+static HttpResponse http_post(const std::string& url, const std::string& json_body, int timeout_ms = 30000) {
+    HttpResponse response;
+
+    std::string host, path;
+    int port;
+    if (!parse_url(url, host, port, path)) {
+        std::cerr << "[HTTP] Failed to parse URL: " << url << std::endl;
+        return response;
+    }
+
+    // Create socket
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) {
+        std::cerr << "[HTTP] Failed to create socket" << std::endl;
+        return response;
+    }
+
+    // Set timeout
+    struct timeval tv;
+    tv.tv_sec = timeout_ms / 1000;
+    tv.tv_usec = (timeout_ms % 1000) * 1000;
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+
+    // Resolve hostname
+    struct hostent* server = gethostbyname(host.c_str());
+    if (!server) {
+        std::cerr << "[HTTP] Failed to resolve host: " << host << std::endl;
+        close(sock);
+        return response;
+    }
+
+    // Connect
+    struct sockaddr_in server_addr = {};
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(port);
+    memcpy(&server_addr.sin_addr.s_addr, server->h_addr, server->h_length);
+
+    if (connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+        std::cerr << "[HTTP] Failed to connect to " << host << ":" << port << std::endl;
+        close(sock);
+        return response;
+    }
+
+    // Build HTTP request
+    std::ostringstream request;
+    request << "POST " << path << " HTTP/1.1\r\n";
+    request << "Host: " << host << ":" << port << "\r\n";
+    request << "Content-Type: application/json\r\n";
+    request << "Content-Length: " << json_body.size() << "\r\n";
+    request << "Connection: close\r\n";
+    request << "\r\n";
+    request << json_body;
+
+    std::string request_str = request.str();
+
+    // Send request
+    if (send(sock, request_str.c_str(), request_str.size(), 0) < 0) {
+        std::cerr << "[HTTP] Failed to send request" << std::endl;
+        close(sock);
+        return response;
+    }
+
+    // Read response
+    std::string response_data;
+    char buffer[4096];
+    ssize_t bytes_read;
+
+    while ((bytes_read = recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
+        buffer[bytes_read] = '\0';
+        response_data += buffer;
+    }
+
+    close(sock);
+
+    // Parse response
+    size_t header_end = response_data.find("\r\n\r\n");
+    if (header_end == std::string::npos) {
+        std::cerr << "[HTTP] Invalid response (no header end)" << std::endl;
+        return response;
+    }
+
+    std::string headers = response_data.substr(0, header_end);
+    response.body = response_data.substr(header_end + 4);
+
+    // Extract status code
+    std::regex status_regex(R"(HTTP/\d\.\d\s+(\d+))");
+    std::smatch status_match;
+    if (std::regex_search(headers, status_match, status_regex)) {
+        response.status_code = std::stoi(status_match[1].str());
+        response.success = (response.status_code >= 200 && response.status_code < 300);
+    }
+
+    return response;
+}
+
+// Simple HTTP GET request
+static HttpResponse http_get(const std::string& url, int timeout_ms = 5000) {
+    HttpResponse response;
+
+    std::string host, path;
+    int port;
+    if (!parse_url(url, host, port, path)) {
+        return response;
+    }
+
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) {
+        return response;
+    }
+
+    struct timeval tv;
+    tv.tv_sec = timeout_ms / 1000;
+    tv.tv_usec = (timeout_ms % 1000) * 1000;
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+
+    struct hostent* server = gethostbyname(host.c_str());
+    if (!server) {
+        close(sock);
+        return response;
+    }
+
+    struct sockaddr_in server_addr = {};
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(port);
+    memcpy(&server_addr.sin_addr.s_addr, server->h_addr, server->h_length);
+
+    if (connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+        close(sock);
+        return response;
+    }
+
+    // Build HTTP GET request
+    std::ostringstream request;
+    request << "GET " << path << " HTTP/1.1\r\n";
+    request << "Host: " << host << ":" << port << "\r\n";
+    request << "Connection: close\r\n";
+    request << "\r\n";
+
+    std::string request_str = request.str();
+
+    if (send(sock, request_str.c_str(), request_str.size(), 0) < 0) {
+        close(sock);
+        return response;
+    }
+
+    std::string response_data;
+    char buffer[4096];
+    ssize_t bytes_read;
+
+    while ((bytes_read = recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
+        buffer[bytes_read] = '\0';
+        response_data += buffer;
+    }
+
+    close(sock);
+
+    size_t header_end = response_data.find("\r\n\r\n");
+    if (header_end == std::string::npos) {
+        return response;
+    }
+
+    std::string headers = response_data.substr(0, header_end);
+    response.body = response_data.substr(header_end + 4);
+
+    std::regex status_regex("HTTP/\\d\\.\\d\\s+(\\d+)");
+    std::smatch status_match;
+    if (std::regex_search(headers, status_match, status_regex)) {
+        response.status_code = std::stoi(status_match[1].str());
+        response.success = (response.status_code >= 200 && response.status_code < 300);
+    }
+
+    return response;
+}
+
+// Extract "text" field from JSON response (simple parser)
+static std::string extract_json_text(const std::string& json) {
+    // Look for "text": "..." pattern
+    // Using escaped regex instead of raw string literal
+    std::regex text_regex("\"text\"\\s*:\\s*\"([^\"]*)\"");
+    std::smatch match;
+    if (std::regex_search(json, match, text_regex)) {
+        return match[1].str();
+    }
+    return "";
+}
 
 // =============================================================================
 // Constants (matching iOS VoiceSession behavior)
@@ -378,7 +603,12 @@ bool VoicePipeline::process_voice_turn(const int16_t* samples, size_t num_sample
         return false;
     }
 
-    // Use voice agent to process complete turn
+    // If Moltbot integration is enabled, use STT-only then send to Moltbot
+    if (config_.enable_moltbot) {
+        return process_voice_turn_moltbot(samples, num_samples);
+    }
+
+    // Use voice agent to process complete turn (local STT -> LLM -> TTS)
     rac_voice_agent_result_t result = {};
 
     rac_result_t status = rac_voice_agent_process_voice_turn(
@@ -419,6 +649,178 @@ bool VoicePipeline::process_voice_turn(const int16_t* samples, size_t num_sample
     rac_voice_agent_result_free(&result);
 
     return result.speech_detected == RAC_TRUE;
+}
+
+bool VoicePipeline::process_voice_turn_moltbot(const int16_t* samples, size_t num_samples) {
+    // Step 1: Transcribe using local STT
+    // Note: voice_agent_transcribe expects raw audio bytes (int16), not float
+    char* transcription_ptr = nullptr;
+    rac_result_t status = rac_voice_agent_transcribe(
+        impl_->voice_agent,
+        samples,
+        num_samples * sizeof(int16_t),
+        &transcription_ptr
+    );
+
+    if (status != RAC_SUCCESS || !transcription_ptr || strlen(transcription_ptr) == 0) {
+        if (config_.on_error) {
+            config_.on_error("STT transcription failed");
+        }
+        if (transcription_ptr) {
+            free(transcription_ptr);
+        }
+        return false;
+    }
+
+    std::string transcription = transcription_ptr;
+    free(transcription_ptr);
+
+    // Report transcription
+    if (config_.on_transcription) {
+        config_.on_transcription(transcription, true);
+    }
+
+    // Step 2: Send transcription to Moltbot voice bridge
+    std::string voice_bridge_url = config_.moltbot_voice_bridge_url + "/transcription";
+
+    // Build JSON request
+    std::ostringstream json;
+    json << "{\"text\":\"";
+    // Escape special characters in transcription
+    for (char c : transcription) {
+        if (c == '"') json << "\\\"";
+        else if (c == '\\') json << "\\\\";
+        else if (c == '\n') json << "\\n";
+        else if (c == '\r') json << "\\r";
+        else if (c == '\t') json << "\\t";
+        else json << c;
+    }
+    json << "\",\"sessionId\":\"" << config_.moltbot_session_id << "\"}";
+
+    std::cout << "[Moltbot] Sending to voice bridge: " << transcription << std::endl;
+
+    HttpResponse http_response = http_post(voice_bridge_url, json.str(), 30000);
+
+    if (!http_response.success) {
+        std::cerr << "[Moltbot] Voice bridge request failed (status=" << http_response.status_code << ")" << std::endl;
+        if (config_.on_error) {
+            config_.on_error("Moltbot voice bridge request failed");
+        }
+        return false;
+    }
+
+    // Extract response text from JSON
+    std::string response_text = extract_json_text(http_response.body);
+
+    if (response_text.empty()) {
+        std::cerr << "[Moltbot] Empty response from voice bridge" << std::endl;
+        response_text = "I received your message but couldn't generate a response.";
+    }
+
+    std::cout << "[Moltbot] Response: " << response_text << std::endl;
+
+    // Report LLM response
+    if (config_.on_response) {
+        config_.on_response(response_text, true);
+    }
+
+    // Step 3: Synthesize response using local TTS
+    void* audio_data = nullptr;
+    size_t audio_size = 0;
+    status = rac_voice_agent_synthesize_speech(
+        impl_->voice_agent,
+        response_text.c_str(),
+        &audio_data,
+        &audio_size
+    );
+
+    if (status == RAC_SUCCESS && audio_data && audio_size > 0) {
+        if (config_.on_audio_output) {
+            config_.on_audio_output(
+                static_cast<const int16_t*>(audio_data),
+                audio_size / sizeof(int16_t),
+                22050  // Default TTS sample rate
+            );
+        }
+        free(audio_data);
+    }
+
+    return true;
+}
+
+bool VoicePipeline::speak_text(const std::string& text) {
+    if (!initialized_ || !impl_->voice_agent) {
+        return false;
+    }
+
+    // Synthesize speech using local TTS
+    void* audio_data = nullptr;
+    size_t audio_size = 0;
+    rac_result_t status = rac_voice_agent_synthesize_speech(
+        impl_->voice_agent,
+        text.c_str(),
+        &audio_data,
+        &audio_size
+    );
+
+    if (status == RAC_SUCCESS && audio_data && audio_size > 0) {
+        if (config_.on_audio_output) {
+            config_.on_audio_output(
+                static_cast<const int16_t*>(audio_data),
+                audio_size / sizeof(int16_t),
+                22050  // Default TTS sample rate
+            );
+        }
+        free(audio_data);
+        return true;
+    }
+
+    return false;
+}
+
+bool VoicePipeline::poll_speak_queue() {
+    if (!config_.enable_moltbot || config_.moltbot_voice_bridge_url.empty()) {
+        return false;
+    }
+
+    // Poll the /speak endpoint
+    std::string speak_url = config_.moltbot_voice_bridge_url + "/speak";
+
+    HttpResponse response = http_get(speak_url, 2000);  // 2 second timeout
+
+    if (!response.success || response.body.empty()) {
+        return false;
+    }
+
+    // Parse JSON response: {"text": "...", "sourceChannel": "..."}
+    // or {"text": null} if no message
+    std::string text = extract_json_text(response.body);
+
+    if (text.empty()) {
+        return false;
+    }
+
+    // Extract source channel for logging
+    std::string source = "unknown";
+    size_t source_pos = response.body.find("\"sourceChannel\"");
+    if (source_pos != std::string::npos) {
+        size_t colon = response.body.find(':', source_pos);
+        size_t quote1 = response.body.find('"', colon);
+        size_t quote2 = response.body.find('"', quote1 + 1);
+        if (quote1 != std::string::npos && quote2 != std::string::npos) {
+            source = response.body.substr(quote1 + 1, quote2 - quote1 - 1);
+        }
+    }
+
+    std::cout << "[Moltbot] Speaking message from " << source << ": " << text << std::endl;
+
+    // Report as response
+    if (config_.on_response) {
+        config_.on_response(text, true);
+    }
+
+    // Speak the text
+    return speak_text(text);
 }
 
 void VoicePipeline::start() {
