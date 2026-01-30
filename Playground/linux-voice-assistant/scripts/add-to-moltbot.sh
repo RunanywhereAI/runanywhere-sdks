@@ -6,7 +6,7 @@
 # 1. RunAnywhere extension (local LLM provider)
 # 2. Voice Assistant channel extension
 #
-# Usage: curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/playground/linux-voice-assistant/scripts/add-to-moltbot.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/Playground/linux-voice-assistant/scripts/add-to-moltbot.sh | bash
 # =============================================================================
 
 set -e
@@ -52,7 +52,7 @@ else
     echo "  npm install -g moltbot@latest"
     echo ""
     log_info "Or use the full installation script instead:"
-    echo "  curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/playground/linux-voice-assistant/scripts/install.sh | bash"
+    echo "  curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/Playground/linux-voice-assistant/scripts/install.sh | bash"
     exit 1
 fi
 
@@ -191,12 +191,12 @@ echo ""
 # Build Voice Assistant (if SDK was cloned)
 # =============================================================================
 
-if [ -d "$SDK_DIR/playground/linux-voice-assistant" ]; then
+if [ -d "$SDK_DIR/Playground/linux-voice-assistant" ]; then
     read -p "Do you want to build the voice assistant? [y/N] " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         log_info "Building voice assistant..."
-        cd "$SDK_DIR/playground/linux-voice-assistant"
+        cd "$SDK_DIR/Playground/linux-voice-assistant"
 
         # Download models
         if [ ! -d "models" ] || [ -z "$(ls -A models 2>/dev/null)" ]; then
@@ -246,9 +246,9 @@ echo "  2. Verify plugins are loaded:"
 echo "     $MOLTBOT_CMD plugins list"
 echo ""
 
-if [ -d "$SDK_DIR/playground/linux-voice-assistant/build" ]; then
+if [ -d "$SDK_DIR/Playground/linux-voice-assistant/build" ]; then
     echo "  3. Start the voice assistant:"
-    echo "     cd $SDK_DIR/playground/linux-voice-assistant"
+    echo "     cd $SDK_DIR/Playground/linux-voice-assistant"
     echo "     npx tsx scripts/start-voice-bridge.ts --websocket &"
     echo "     ./build/voice-assistant --moltbot --wakeword"
     echo ""

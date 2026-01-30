@@ -13,7 +13,7 @@
 #      ./scripts/build-linux.sh --shared
 #
 #   2. Build this application:
-#      cd playground/linux-voice-assistant
+#      cd Playground/linux-voice-assistant
 #      cmake -B build
 #      cmake --build build
 #

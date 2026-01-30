@@ -67,7 +67,7 @@ After Moltbot is running, set up the voice assistant:
 # Clone the voice assistant SDK
 git clone https://github.com/RunanywhereAI/runanywhere-sdks.git ~/runanywhere-sdks
 # Voice assistant is on main branch
-cd ~/runanywhere-sdks/playground/linux-voice-assistant
+cd ~/runanywhere-sdks/Playground/linux-voice-assistant
 
 # Download models
 ./scripts/download-models.sh
@@ -166,7 +166,7 @@ Best for users who want the quickest path to a working setup.
 ### Full Installation (Fresh System)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/playground/linux-voice-assistant/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/Playground/linux-voice-assistant/scripts/install.sh | bash
 ```
 
 This script will:
@@ -181,7 +181,7 @@ This script will:
 ### Add to Existing Moltbot
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/playground/linux-voice-assistant/scripts/add-to-moltbot.sh | bash
+curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/Playground/linux-voice-assistant/scripts/add-to-moltbot.sh | bash
 ```
 
 This script will:
