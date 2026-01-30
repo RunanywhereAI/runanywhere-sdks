@@ -1,0 +1,160 @@
+# Moltbot Configuration for Raspberry Pi with Local LLM
+# Optimized for resource-constrained devices using LFM 1.2B model
+#
+# Copy to ~/.clawdbot/config.yaml
+#
+# Key optimization: promptMode: "local" reduces system prompt from ~30KB to ~8KB
+
+# =============================================================================
+# MODEL PROVIDERS
+# =============================================================================
+models:
+  providers:
+    runanywhere:
+      baseUrl: "http://localhost:8080/v1"
+      apiKey: "local"  # Must be non-empty for provider recognition
+      api: openai-completions
+      models:
+        # LFM 1.2B - Recommended for Raspberry Pi 5
+        - id: "LFM2.5-1.2B-Instruct-Q8_0"
+          name: "Lobster Brain (LFM 1.2B)"
+          reasoning: false
+          input: ["text"]
+          cost:
+            input: 0
+            output: 0
+            cacheRead: 0
+            cacheWrite: 0
+          contextWindow: 16384  # CRITICAL: Must be at least 16000
+          maxTokens: 4096
+
+        # Qwen3 1.7B - Alternative with slightly better quality
+        - id: "Qwen3-1.7B-Q8_0"
+          name: "Qwen3 1.7B (Local)"
+          reasoning: false
+          input: ["text"]
+          cost:
+            input: 0
+            output: 0
+            cacheRead: 0
+            cacheWrite: 0
+          contextWindow: 16384
+          maxTokens: 4096
+
+# =============================================================================
+# AGENT DEFAULTS
+# =============================================================================
+agents:
+  defaults:
+    # CRITICAL: Use "local" prompt mode for 72% prompt size reduction
+    # This drops prompt from ~30KB (~7800 tokens) to ~8KB (~2500 tokens)
+    promptMode: "local"
+    model:
+      primary: "runanywhere/LFM2.5-1.2B-Instruct-Q8_0"
+      fallbacks:
+        - "runanywhere/Qwen3-1.7B-Q8_0"
+    compaction:
+      mode: safeguard
+    maxConcurrent: 4
+    subagents:
+      maxConcurrent: 8
+
+# =============================================================================
+# MESSAGES & COMMANDS
+# =============================================================================
+messages:
+  ackReactionScope: group-mentions
+
+commands:
+  native: auto
+  nativeSkills: auto
+
+# =============================================================================
+# GATEWAY SETTINGS
+# =============================================================================
+gateway:
+  mode: local           # Required for gateway to start
+  bind: loopback
+  port: 18789
+  auth:
+    mode: token
+    token: "REPLACE_WITH_SECURE_TOKEN"  # IMPORTANT: Change this!
+
+# =============================================================================
+# PLUGINS
+# =============================================================================
+plugins:
+  entries:
+    runanywhere:
+      enabled: true
+    voice-assistant:
+      enabled: true
+    whatsapp:
+      enabled: true
+
+# =============================================================================
+# VOICE ASSISTANT CHANNEL
+# =============================================================================
+channels:
+  voice-assistant:
+    wsPort: 8082
+    broadcastAllChannels: true
+    accounts:
+      default:
+        name: "Pi Voice"
+        enabled: true
+
+# =============================================================================
+# PERFORMANCE OPTIMIZATIONS
+# =============================================================================
+# Disable heartbeat for local LLMs (saves resources)
+heartbeat:
+  enabled: false
+
+# Disable web features for local-only deployment
+tools:
+  shell:
+    enabled: true
+  fs:
+    enabled: true
+  web:
+    search:
+      enabled: false
+    fetch:
+      enabled: false
+
+# =============================================================================
+# ARCHITECTURE OVERVIEW
+# =============================================================================
+#
+# ┌─────────────────────────────────────────────────────────────┐
+# │                     User Interfaces                          │
+# ├────────────────┬─────────────────┬──────────────────────────┤
+# │  Voice (8082)  │  WhatsApp       │  Web UI (18789)          │
+# └───────┬────────┴────────┬────────┴─────────────┬────────────┘
+#         │                 │                      │
+#         └─────────────────┼──────────────────────┘
+#                           │
+#               ┌───────────▼───────────┐
+#               │   Moltbot Gateway     │
+#               │   (Port 18789)        │
+#               │                       │
+#               │  - Agent orchestration│
+#               │  - Tool execution     │
+#               │  - Prompt management  │
+#               │  - Session handling   │
+#               └───────────┬───────────┘
+#                           │
+#               ┌───────────▼───────────┐
+#               │  RunAnywhere Server   │
+#               │  (Port 8080)          │
+#               │                       │
+#               │  - LLM inference      │
+#               │  - OpenAI-compatible  │
+#               │  - llama.cpp backend  │
+#               └───────────────────────┘
+#
+# Critical Settings for Raspberry Pi:
+# - promptMode: "local" - 72% prompt size reduction
+# - contextWindow: 16384 - Moltbot minimum requirement
+# - heartbeat.enabled: false - Save CPU cycles
