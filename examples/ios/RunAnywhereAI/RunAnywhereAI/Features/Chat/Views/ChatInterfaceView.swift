@@ -22,7 +22,6 @@ struct ChatInterfaceView: View {
     @State private var showingConversationList = false
     @State private var showingModelSelection = false
     @State private var showingChatDetails = false
-    @State private var showingVLMCamera = false
     @State private var showDebugAlert = false
     @State private var debugMessage = ""
     @FocusState private var isTextFieldFocused: Bool
@@ -103,27 +102,6 @@ extension ChatInterfaceView {
                     contentArea
                 }
                 modelRequiredOverlayIfNeeded
-
-                // Floating VLM camera button
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Button {
-                            showingVLMCamera = true
-                        } label: {
-                            Image(systemName: "camera.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(.white)
-                                .frame(width: 56, height: 56)
-                                .background(AppColors.primaryAccent)
-                                .clipShape(Circle())
-                                .shadow(radius: 4)
-                        }
-                        .padding(.trailing, 20)
-                        .padding(.bottom, 100)
-                    }
-                }
             }
             .navigationTitle("Chat")
             .navigationBarTitleDisplayMode(.inline)
@@ -138,9 +116,6 @@ extension ChatInterfaceView {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     toolbarButtons
                 }
-            }
-            .fullScreenCover(isPresented: $showingVLMCamera) {
-                VLMCameraView()
             }
         }
     }

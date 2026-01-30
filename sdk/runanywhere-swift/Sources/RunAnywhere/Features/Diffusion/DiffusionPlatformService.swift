@@ -202,11 +202,13 @@ public actor DiffusionPlatformService {
                 }
 
                 // Create progress info
+                // Flatten double optional: currentImages is [CGImage?], .first returns CGImage??
+                let currentImage = progress.currentImages.first.flatMap { $0 }
                 let progressInfo = DiffusionProgressInfo(
                     step: progress.step,
                     totalSteps: progress.stepCount,
                     progress: Float(progress.step) / Float(progress.stepCount),
-                    currentImage: progress.currentImages.first
+                    currentImage: currentImage
                 )
                 lastProgress = progressInfo
 

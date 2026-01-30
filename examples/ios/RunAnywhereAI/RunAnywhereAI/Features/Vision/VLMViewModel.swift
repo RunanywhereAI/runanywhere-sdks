@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 import RunAnywhere
-import AVFoundation
+@preconcurrency import AVFoundation
 import os.log
 
 #if canImport(UIKit)
@@ -139,7 +139,7 @@ final class VLMViewModel: NSObject {
             let result = try await RunAnywhere.processImageStream(
                 image,
                 prompt: "Describe what you see briefly.",
-                options: VLMGenerationOptions(maxTokens: 200)
+                maxTokens: 200
             )
 
             for try await token in result.stream {
@@ -164,7 +164,7 @@ final class VLMViewModel: NSObject {
             let result = try await RunAnywhere.processImageStream(
                 image,
                 prompt: "Describe this image in detail.",
-                options: VLMGenerationOptions(maxTokens: 300)
+                maxTokens: 300
             )
 
             for try await token in result.stream {
@@ -234,7 +234,7 @@ final class VLMViewModel: NSObject {
             let result = try await RunAnywhere.processImageStream(
                 image,
                 prompt: "Describe what you see in one sentence.",
-                options: VLMGenerationOptions(maxTokens: 100)
+                maxTokens: 100
             )
 
             for try await token in result.stream {

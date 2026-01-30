@@ -3,7 +3,7 @@
 //  RunAnywhere SDK
 //
 //  Public API for Vision Language Model (VLM) operations.
-//  Calls C++ directly via CppBridge.VLM for all operations.
+//  Uses C++ directly via CppBridge.VLM.
 //
 
 import CRACommons
@@ -15,434 +15,226 @@ public extension RunAnywhere {
 
     // MARK: - Simple API
 
-    /// Describe an image with a simple text prompt
-    /// - Parameters:
-    ///   - image: The image to analyze
-    ///   - prompt: Text prompt describing what to analyze (e.g., "What's in this image?")
-    /// - Returns: Generated text description
+    /// Describe an image with a text prompt
     static func describeImage(_ image: VLMImage, prompt: String = "What's in this image?") async throws -> String {
-        let result = try await processImage(image, prompt: prompt, options: nil)
-        return result.text
+        try await processImage(image, prompt: prompt).text
     }
 
     /// Ask a question about an image
-    /// - Parameters:
-    ///   - question: The question to ask about the image
-    ///   - image: The image to analyze
-    /// - Returns: Generated answer
     static func askAboutImage(_ question: String, image: VLMImage) async throws -> String {
-        let result = try await processImage(image, prompt: question, options: nil)
-        return result.text
+        try await processImage(image, prompt: question).text
     }
 
     // MARK: - Full API
 
-    /// Process an image with full metrics and options
-    /// - Parameters:
-    ///   - image: The image to process
-    ///   - prompt: Text prompt
-    ///   - options: Generation options (optional)
-    /// - Returns: VLMGenerationResult with full metrics
+    /// Process an image with VLM
     static func processImage(
         _ image: VLMImage,
         prompt: String,
-        options: VLMGenerationOptions? = nil
-    ) async throws -> VLMGenerationResult {
+        maxTokens: Int32 = 2048,
+        temperature: Float = 0.7
+    ) async throws -> VLMResult {
         guard isInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
-
         try await ensureServicesReady()
 
-        // Get handle from CppBridge.VLM
         let handle = try await CppBridge.VLM.shared.getHandle()
-
-        // Verify model is loaded
         guard await CppBridge.VLM.shared.isLoaded else {
             throw SDKError.vlm(.notInitialized, "VLM model not loaded")
         }
 
-        let modelId = await CppBridge.VLM.shared.currentModelId ?? "unknown"
-        let opts = options ?? VLMGenerationOptions()
-
-        // Convert Swift image to C struct
-        guard let (cImage, retainedData) = image.toCImage() else {
-            throw SDKError.vlm(.invalidImage, "Failed to convert image to C format")
+        guard let imageData = image.toCImage() else {
+            throw SDKError.vlm(.invalidImage, "Failed to convert image")
         }
+        var cImage = imageData.0
+        let rgbData = imageData.1
 
-        // Generate (non-streaming)
+        // Setup options using C struct directly
+        var opts = rac_vlm_options_t()
+        opts.max_tokens = maxTokens
+        opts.temperature = temperature
+        opts.top_p = 0.9
+        opts.streaming_enabled = RAC_FALSE
+        opts.use_gpu = RAC_TRUE
+
         var vlmResult = rac_vlm_result_t()
-        let generateResult: rac_result_t = try opts.withCOptions { cOptionsPtr in
-            return withImagePointers(cImage: cImage, format: image.format, retainedData: retainedData) { cImagePtr in
-                return prompt.withCString { promptPtr in
-                    return rac_vlm_component_process(handle, cImagePtr, promptPtr, cOptionsPtr, &vlmResult)
-                }
+        let result: rac_result_t = image.withCPointers(cImage: &cImage, rgbData: rgbData) { cImagePtr in
+            prompt.withCString { promptPtr in
+                rac_vlm_component_process(handle, cImagePtr, promptPtr, &opts, &vlmResult)
             }
         }
 
-        guard generateResult == RAC_SUCCESS else {
-            throw SDKError.vlm(.processingFailed, "VLM processing failed: \(generateResult)")
+        guard result == RAC_SUCCESS else {
+            throw SDKError.vlm(.processingFailed, "VLM processing failed: \(result)")
         }
+        defer { rac_vlm_result_free(&vlmResult) }
 
-        defer {
-            // Free the result text if allocated
-            rac_vlm_result_free(&vlmResult)
-        }
-
-        return VLMGenerationResult(from: vlmResult, modelId: modelId)
+        return VLMResult(from: vlmResult)
     }
 
-    /// Stream image processing with real-time token output
-    ///
-    /// Example usage:
-    /// ```swift
-    /// let result = try await RunAnywhere.processImageStream(image, prompt: "Describe this")
-    ///
-    /// // Display tokens in real-time
-    /// for try await token in result.stream {
-    ///     print(token, terminator: "")
-    /// }
-    ///
-    /// // Get complete analytics after streaming finishes
-    /// let metrics = try await result.result.value
-    /// print("Speed: \(metrics.tokensPerSecond) tok/s")
-    /// ```
-    ///
-    /// - Parameters:
-    ///   - image: The image to process
-    ///   - prompt: Text prompt
-    ///   - options: Generation options (optional)
-    /// - Returns: VLMStreamingResult containing both the token stream and final metrics task
+    /// Stream image processing with real-time tokens
     static func processImageStream(
         _ image: VLMImage,
         prompt: String,
-        options: VLMGenerationOptions? = nil
+        maxTokens: Int32 = 2048,
+        temperature: Float = 0.7
     ) async throws -> VLMStreamingResult {
         guard isInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
-
         try await ensureServicesReady()
 
         let handle = try await CppBridge.VLM.shared.getHandle()
-
         guard await CppBridge.VLM.shared.isLoaded else {
             throw SDKError.vlm(.notInitialized, "VLM model not loaded")
         }
 
-        let modelId = await CppBridge.VLM.shared.currentModelId ?? "unknown"
-        let opts = options ?? VLMGenerationOptions()
+        guard let imageData = image.toCImage() else {
+            throw SDKError.vlm(.invalidImage, "Failed to convert image")
+        }
+        var cImage = imageData.0
+        let rgbData = imageData.1
 
-        // Convert Swift image to C struct
-        guard let (cImage, retainedData) = image.toCImage() else {
-            throw SDKError.vlm(.invalidImage, "Failed to convert image to C format")
+        let collector = StreamingCollector()
+
+        let stream = AsyncThrowingStream<String, Error> { continuation in
+            Task {
+                await collector.start()
+
+                let context = StreamContext(continuation: continuation, collector: collector)
+                let contextPtr = Unmanaged.passRetained(context).toOpaque()
+
+                var opts = rac_vlm_options_t()
+                opts.max_tokens = maxTokens
+                opts.temperature = temperature
+                opts.top_p = 0.9
+                opts.streaming_enabled = RAC_TRUE
+                opts.use_gpu = RAC_TRUE
+
+                let tokenCb: rac_vlm_component_token_callback_fn = { tokenPtr, userData -> rac_bool_t in
+                    guard let tokenPtr = tokenPtr, let userData = userData else { return RAC_TRUE }
+                    let ctx = Unmanaged<StreamContext>.fromOpaque(userData).takeUnretainedValue()
+                    let token = String(cString: tokenPtr)
+                    Task {
+                        await ctx.collector.addToken(token)
+                        ctx.continuation.yield(token)
+                    }
+                    return RAC_TRUE
+                }
+
+                let completeCb: rac_vlm_component_complete_callback_fn = { _, userData in
+                    guard let userData = userData else { return }
+                    let ctx = Unmanaged<StreamContext>.fromOpaque(userData).takeRetainedValue()
+                    ctx.continuation.finish()
+                    Task { await ctx.collector.complete() }
+                }
+
+                let errorCb: rac_vlm_component_error_callback_fn = { _, msg, userData in
+                    guard let userData = userData else { return }
+                    let ctx = Unmanaged<StreamContext>.fromOpaque(userData).takeRetainedValue()
+                    let error = SDKError.vlm(.processingFailed, msg.map { String(cString: $0) } ?? "Unknown")
+                    ctx.continuation.finish(throwing: error)
+                    Task { await ctx.collector.fail(error) }
+                }
+
+                let result: rac_result_t = image.withCPointers(cImage: &cImage, rgbData: rgbData) { cImagePtr in
+                    prompt.withCString { promptPtr in
+                        rac_vlm_component_process_stream(handle, cImagePtr, promptPtr, &opts, tokenCb, completeCb, errorCb, contextPtr)
+                    }
+                }
+
+                if result != RAC_SUCCESS {
+                    Unmanaged<StreamContext>.fromOpaque(contextPtr).release()
+                    let error = SDKError.vlm(.processingFailed, "Stream failed: \(result)")
+                    continuation.finish(throwing: error)
+                    await collector.fail(error)
+                }
+            }
         }
 
-        let collector = VLMStreamingMetricsCollector(modelId: modelId, promptLength: prompt.count)
-
-        let stream = createVLMTokenStream(
-            image: image,
-            cImage: cImage,
-            retainedData: retainedData,
-            prompt: prompt,
-            handle: handle,
-            options: opts,
-            collector: collector
-        )
-
-        let resultTask = Task<VLMGenerationResult, Error> {
-            try await collector.waitForResult()
-        }
-
-        return VLMStreamingResult(stream: stream, result: resultTask)
+        let metricsTask = Task<VLMResult, Error> { try await collector.waitForResult() }
+        return VLMStreamingResult(stream: stream, metrics: metricsTask)
     }
 
     // MARK: - Model Management
 
-    /// Load a VLM model
-    /// - Parameters:
-    ///   - modelPath: Path to the main model file (GGUF)
-    ///   - mmprojPath: Path to the vision projector file (required for llama.cpp)
-    ///   - modelId: Model identifier
-    ///   - modelName: Human-readable name
-    static func loadVLMModel(
-        _ modelPath: String,
-        mmprojPath: String?,
-        modelId: String,
-        modelName: String
-    ) async throws {
+    static func loadVLMModel(_ modelPath: String, mmprojPath: String?, modelId: String, modelName: String) async throws {
         try await CppBridge.VLM.shared.loadModel(modelPath, mmprojPath: mmprojPath, modelId: modelId, modelName: modelName)
     }
 
-    /// Unload the current VLM model
     static func unloadVLMModel() async {
         await CppBridge.VLM.shared.unload()
     }
 
-    /// Check if a VLM model is loaded
     static var isVLMModelLoaded: Bool {
-        get async {
-            await CppBridge.VLM.shared.isLoaded
-        }
+        get async { await CppBridge.VLM.shared.isLoaded }
     }
 
-    /// Cancel ongoing VLM generation
     static func cancelVLMGeneration() async {
         await CppBridge.VLM.shared.cancel()
     }
-
-    // MARK: - Private Streaming Helpers
-
-    private static func createVLMTokenStream(
-        image: VLMImage,
-        cImage: rac_vlm_image_t,
-        retainedData: (any Sendable)?,
-        prompt: String,
-        handle: UnsafeMutableRawPointer,
-        options: VLMGenerationOptions,
-        collector: VLMStreamingMetricsCollector
-    ) -> AsyncThrowingStream<String, Error> {
-        AsyncThrowingStream<String, Error> { continuation in
-            Task {
-                do {
-                    await collector.markStart()
-
-                    let context = VLMStreamCallbackContext(continuation: continuation, collector: collector)
-                    let contextPtr = Unmanaged.passRetained(context).toOpaque()
-
-                    let callbacks = VLMStreamCallbacks.create()
-
-                    let streamResult: rac_result_t = try options.withCOptions { cOptionsPtr in
-                        return withImagePointers(cImage: cImage, format: image.format, retainedData: retainedData) { cImagePtr in
-                            return prompt.withCString { promptPtr in
-                                return rac_vlm_component_process_stream(
-                                    handle,
-                                    cImagePtr,
-                                    promptPtr,
-                                    cOptionsPtr,
-                                    callbacks.token,
-                                    callbacks.complete,
-                                    callbacks.error,
-                                    contextPtr
-                                )
-                            }
-                        }
-                    }
-
-                    if streamResult != RAC_SUCCESS {
-                        Unmanaged<VLMStreamCallbackContext>.fromOpaque(contextPtr).release()
-                        let error = SDKError.vlm(.processingFailed, "VLM stream processing failed: \(streamResult)")
-                        continuation.finish(throwing: error)
-                        await collector.markFailed(error)
-                    }
-                } catch {
-                    continuation.finish(throwing: error)
-                    await collector.markFailed(error)
-                }
-            }
-        }
-    }
-
-    /// Helper to set up image pointers for C API
-    private static func withImagePointers<T>(
-        cImage: rac_vlm_image_t,
-        format: VLMImage.Format,
-        retainedData: (any Sendable)?,
-        body: (UnsafePointer<rac_vlm_image_t>) -> T
-    ) -> T {
-        var mutableImage = cImage
-
-        switch format {
-        case .filePath(let path):
-            return path.withCString { pathPtr in
-                mutableImage.file_path = pathPtr
-                return body(&mutableImage)
-            }
-
-        case .rgbPixels(let data, _, _):
-            return data.withUnsafeBytes { buffer in
-                mutableImage.pixel_data = buffer.baseAddress?.assumingMemoryBound(to: UInt8.self)
-                return body(&mutableImage)
-            }
-
-        case .base64(let encoded):
-            return encoded.withCString { base64Ptr in
-                mutableImage.base64_data = base64Ptr
-                return body(&mutableImage)
-            }
-
-        #if canImport(UIKit)
-        case .uiImage:
-            // retainedData contains the converted RGB data
-            if let rgbData = retainedData as? Data {
-                return rgbData.withUnsafeBytes { buffer in
-                    mutableImage.pixel_data = buffer.baseAddress?.assumingMemoryBound(to: UInt8.self)
-                    return body(&mutableImage)
-                }
-            }
-            return body(&mutableImage)
-        #endif
-
-        #if canImport(CoreVideo)
-        case .pixelBuffer:
-            // retainedData contains the converted RGB data
-            if let rgbData = retainedData as? Data {
-                return rgbData.withUnsafeBytes { buffer in
-                    mutableImage.pixel_data = buffer.baseAddress?.assumingMemoryBound(to: UInt8.self)
-                    return body(&mutableImage)
-                }
-            }
-            return body(&mutableImage)
-        #endif
-        }
-    }
 }
 
-// MARK: - Streaming Callbacks
+// MARK: - Internal Streaming Helpers
 
-private enum VLMStreamCallbacks {
-    typealias TokenFn = rac_vlm_component_token_callback_fn
-    typealias CompleteFn = rac_vlm_component_complete_callback_fn
-    typealias ErrorFn = rac_vlm_component_error_callback_fn
-
-    struct Callbacks {
-        let token: TokenFn
-        let complete: CompleteFn
-        let error: ErrorFn
-    }
-
-    static func create() -> Callbacks {
-        let tokenCallback: TokenFn = { tokenPtr, userData -> rac_bool_t in
-            guard let tokenPtr = tokenPtr, let userData = userData else { return RAC_TRUE }
-            let ctx = Unmanaged<VLMStreamCallbackContext>.fromOpaque(userData).takeUnretainedValue()
-            let token = String(cString: tokenPtr)
-            Task {
-                await ctx.collector.recordToken(token)
-                ctx.continuation.yield(token)
-            }
-            return RAC_TRUE
-        }
-
-        let completeCallback: CompleteFn = { _, userData in
-            guard let userData = userData else { return }
-            let ctx = Unmanaged<VLMStreamCallbackContext>.fromOpaque(userData).takeRetainedValue()
-            ctx.continuation.finish()
-            Task { await ctx.collector.markComplete() }
-        }
-
-        let errorCallback: ErrorFn = { _, errorMsg, userData in
-            guard let userData = userData else { return }
-            let ctx = Unmanaged<VLMStreamCallbackContext>.fromOpaque(userData).takeRetainedValue()
-            let message = errorMsg.map { String(cString: $0) } ?? "Unknown error"
-            let error = SDKError.vlm(.processingFailed, message)
-            ctx.continuation.finish(throwing: error)
-            Task { await ctx.collector.markFailed(error) }
-        }
-
-        return Callbacks(token: tokenCallback, complete: completeCallback, error: errorCallback)
-    }
-}
-
-// MARK: - Streaming Callback Context
-
-private final class VLMStreamCallbackContext: @unchecked Sendable {
+private final class StreamContext: @unchecked Sendable {
     let continuation: AsyncThrowingStream<String, Error>.Continuation
-    let collector: VLMStreamingMetricsCollector
-
-    init(continuation: AsyncThrowingStream<String, Error>.Continuation, collector: VLMStreamingMetricsCollector) {
+    let collector: StreamingCollector
+    init(continuation: AsyncThrowingStream<String, Error>.Continuation, collector: StreamingCollector) {
         self.continuation = continuation
         self.collector = collector
     }
 }
 
-// MARK: - Streaming Metrics Collector
-
-/// Internal actor for collecting VLM streaming metrics
-private actor VLMStreamingMetricsCollector {
-    private let modelId: String
-    private let promptLength: Int
-
+private actor StreamingCollector {
     private var startTime: Date?
-    private var firstTokenTime: Date?
-    private var fullText = ""
-    private var tokenCount = 0
-    private var firstTokenRecorded = false
-    private var isComplete = false
+    private var text = ""
+    private var tokens = 0
+    private var isDone = false
     private var error: Error?
-    private var resultContinuation: CheckedContinuation<VLMGenerationResult, Error>?
+    private var waiting: CheckedContinuation<VLMResult, Error>?
 
-    init(modelId: String, promptLength: Int) {
-        self.modelId = modelId
-        self.promptLength = promptLength
+    func start() { startTime = Date() }
+
+    func addToken(_ token: String) {
+        text += token
+        tokens += 1
     }
 
-    func markStart() {
-        startTime = Date()
+    func complete() {
+        isDone = true
+        waiting?.resume(returning: buildResult())
+        waiting = nil
     }
 
-    func recordToken(_ token: String) {
-        fullText += token
-        tokenCount += 1
-
-        if !firstTokenRecorded {
-            firstTokenRecorded = true
-            firstTokenTime = Date()
-        }
-    }
-
-    func markComplete() {
-        isComplete = true
-        if let continuation = resultContinuation {
-            continuation.resume(returning: buildResult())
-            resultContinuation = nil
-        }
-    }
-
-    func markFailed(_ error: Error) {
+    func fail(_ error: Error) {
         self.error = error
-        if let continuation = resultContinuation {
-            continuation.resume(throwing: error)
-            resultContinuation = nil
-        }
+        waiting?.resume(throwing: error)
+        waiting = nil
     }
 
-    func waitForResult() async throws -> VLMGenerationResult {
-        if isComplete {
-            return buildResult()
-        }
-        if let error = error {
-            throw error
-        }
-        return try await withCheckedThrowingContinuation { continuation in
-            resultContinuation = continuation
-        }
+    func waitForResult() async throws -> VLMResult {
+        if isDone { return buildResult() }
+        if let error = error { throw error }
+        return try await withCheckedThrowingContinuation { waiting = $0 }
     }
 
-    private func buildResult() -> VLMGenerationResult {
-        let endTime = Date()
-        let totalTimeMs = (startTime.map { endTime.timeIntervalSince($0) } ?? 0) * 1000
+    private func buildResult() -> VLMResult {
+        let elapsed = startTime.map { Date().timeIntervalSince($0) * 1000 } ?? 0
+        let tps = elapsed > 0 ? Double(tokens) / (elapsed / 1000) : 0
+        return VLMResult(text: text, promptTokens: 0, completionTokens: tokens, totalTimeMs: elapsed, tokensPerSecond: tps)
+    }
+}
 
-        var timeToFirstTokenMs: Double?
-        if let start = startTime, let firstToken = firstTokenTime {
-            timeToFirstTokenMs = firstToken.timeIntervalSince(start) * 1000
-        }
+// MARK: - VLMResult initializer extension
 
-        // Estimate tokens (rough approximation)
-        let promptTokens = max(1, promptLength / 4)
-        let completionTokens = tokenCount
-        let tokensPerSecond = totalTimeMs > 0 ? Double(completionTokens) / (totalTimeMs / 1000.0) : 0
-
-        return VLMGenerationResult(
-            text: fullText,
-            promptTokens: promptTokens,
-            imageTokens: 0, // We don't have this from streaming
-            completionTokens: completionTokens,
-            totalTokens: promptTokens + completionTokens,
-            timeToFirstTokenMs: timeToFirstTokenMs,
-            imageEncodeTimeMs: nil,
-            totalTimeMs: totalTimeMs,
-            tokensPerSecond: tokensPerSecond,
-            modelUsed: modelId
-        )
+extension VLMResult {
+    init(text: String, promptTokens: Int, completionTokens: Int, totalTimeMs: Double, tokensPerSecond: Double) {
+        self.text = text
+        self.promptTokens = promptTokens
+        self.completionTokens = completionTokens
+        self.totalTimeMs = totalTimeMs
+        self.tokensPerSecond = tokensPerSecond
     }
 }
