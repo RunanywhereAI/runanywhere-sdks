@@ -32,7 +32,7 @@ option(RAC_BUILD_PLATFORM "Build platform backend (Apple Foundation Models, Syst
 option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, WhisperCPP)" OFF)
 option(RAC_BACKEND_LLAMACPP "Build LlamaCPP backend" ON)
 option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
-option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" ON)
+option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" OFF)
 option(RAC_BUILD_SERVER "Build OpenAI-compatible HTTP server (runanywhere-server)" OFF)
 
 # =============================================================================
