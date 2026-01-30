@@ -223,30 +223,34 @@ journalctl --user -u moltbot-gateway | grep "agent model"
 
 ## Key Optimizations for Raspberry Pi
 
-### 1. `promptMode: "local"` (Critical)
+### 1. `promptMode` Options (Critical)
 
-This setting reduces the system prompt size dramatically:
+This setting controls system prompt size - essential for small models on Pi:
 
-| Mode | Prompt Size | Tokens | Inference Time |
-|------|-------------|--------|----------------|
-| `"full"` | ~30KB | ~7,800 | 5-10+ minutes |
-| `"local"` | ~8KB | ~2,500 | 1-2 minutes |
+| Mode | Prompt Size | Tokens | Description | Recommended For |
+|------|-------------|--------|-------------|-----------------|
+| `"full"` | ~30KB | ~7,800 | Complete prompt | Cloud models only |
+| `"local"` | ~4.2KB | ~1,200 | Tool names only, compact | LFM 1.2B, Qwen 1.7B |
+| `"none"` | ~50 bytes | ~12 | Minimal identity | Ultra-fast responses |
+
+**`"local"` mode (recommended for most Pi use):**
+- Tool names only (no descriptions)
+- Compact user/timezone info
+- SOUL.md personality files
+- Silent reply token
+- Heartbeat support
 
 **What `"local"` mode removes:**
+- Full tool descriptions
 - CLI command reference
-- Skills listing (loaded on-demand)
-- Memory recall instructions
-- Self-update instructions
+- Skills listing
+- Memory/recall instructions
 - Model alias documentation
-- Sandbox details
+- Sandbox/runtime details
 
-**What `"local"` mode keeps:**
-- Tool list with descriptions
-- Workspace context
-- User identity
-- Project context files
-- Silent reply handling
-- Runtime info
+**`"none"` mode (for absolute speed):**
+- Just: "You are a personal assistant running inside Moltbot."
+- Use when response time is critical and tool use isn't needed
 
 ### 2. Context Window Configuration
 
@@ -397,6 +401,65 @@ systemctl --user restart moltbot-gateway
 ```bash
 cd ~/.local/runanywhere/lib
 for lib in *.so; do ln -sf "$lib" "${lib}.1"; done
+```
+
+---
+
+## Debugging
+
+### Enable Prompt Size Debugging
+
+The moltbot fork includes debug logging to monitor prompt size. Check logs for:
+
+```bash
+# Look for PROMPT-DEBUG lines
+journalctl --user -u moltbot-gateway | grep PROMPT-DEBUG
+# Output: [PROMPT-DEBUG] promptMode=local prompt_chars=4248 tools=18
+```
+
+### Config File Precedence
+
+Moltbot uses two config files - **moltbot.json takes precedence over config.yaml**:
+
+| File | Location | Purpose |
+|------|----------|---------|
+| `moltbot.json` | `~/.clawdbot/moltbot.json` | Primary config (via CLI `moltbot config set`) |
+| `config.yaml` | `~/.clawdbot/config.yaml` | Secondary config (manual edits) |
+
+⚠️ **Important:** If you edit `config.yaml` but changes don't take effect, check if the same setting exists in `moltbot.json`. Use the CLI to ensure consistent config:
+
+```bash
+# Set config via CLI (updates moltbot.json)
+cd ~/moltbot && pnpm moltbot config set agents.defaults.promptMode none
+
+# Verify config
+pnpm moltbot config get agents.defaults.promptMode
+```
+
+### Check Running Servers
+
+```bash
+# Should show exactly one of each:
+ps aux | grep -E "(moltbot|runanywhere-server)" | grep -v grep
+
+# Kill all and restart cleanly:
+pkill -f moltbot-gateway
+pkill -f runanywhere-server
+systemctl --user restart moltbot-gateway
+# Then restart runanywhere-server manually
+```
+
+### View Real-time Logs
+
+```bash
+# Gateway logs
+journalctl --user -u moltbot-gateway -f
+
+# Check prompt mode and model on startup
+journalctl --user -u moltbot-gateway | grep -E "agent model|PROMPT"
+
+# LLM server (if running via systemd)
+journalctl --user -u runanywhere-server -f
 ```
 
 ---

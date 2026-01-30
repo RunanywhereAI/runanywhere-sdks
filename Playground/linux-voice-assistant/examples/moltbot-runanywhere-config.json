@@ -1,6 +1,11 @@
 {
   "$schema": "https://docs.molt.bot/schema/config.json",
   "_comment": "Moltbot configuration optimized for Raspberry Pi with local LLM (LFM 1.2B)",
+  "_promptModeOptions": {
+    "full": "~30KB prompt - Cloud models only",
+    "local": "~4.2KB prompt - Recommended for Pi (tool names only, compact format)",
+    "none": "~50 bytes - Ultra-fast (just identity line, no tools)"
+  },
 
   "models": {
     "providers": {
