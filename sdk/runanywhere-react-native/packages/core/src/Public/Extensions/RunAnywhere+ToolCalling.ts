@@ -196,6 +196,12 @@ A: <tool_call>{"tool": "calculate", "arguments": {"expression": "2+2"}}</tool_ca
 
   // Build prompt EXACTLY like C++ rac_tool_call_format_prompt_json_with_format()
   // See: sdk/runanywhere-commons/src/features/llm/tool_calling.cpp lines 1343-1358
+
+  // Format-specific tag instructions
+  const tagInstruction = toolFormat === 'lfm2'
+    ? '- ALWAYS include <|tool_call_start|> and <|tool_call_end|> tags.'
+    : '- ALWAYS include <tool_call> and </tool_call> tags.';
+
   return `# TOOLS
 ${toolsJson}
 
@@ -206,7 +212,7 @@ ${formatExample}
 - Math/calculation question (add, subtract, multiply, divide, "what's X*Y", etc.) = call calculate with the EXPRESSION as a string
 - Time question = call get_current_time
 - DO NOT compute answers yourself. ALWAYS use the tool with the original expression.
-- ALWAYS include <|tool_call_start|> and <|tool_call_end|> tags.`;
+${tagInstruction}`;
 }
 
 // =============================================================================

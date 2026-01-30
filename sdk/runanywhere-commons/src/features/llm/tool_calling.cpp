@@ -1360,7 +1360,13 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format(const char*
     prompt += "- Math/calculation question (add, subtract, multiply, divide, \"what's X*Y\", etc.) = call calculate with the EXPRESSION as a string\n";
     prompt += "- Time question = call get_current_time\n";
     prompt += "- DO NOT compute answers yourself. ALWAYS use the tool with the original expression.\n";
-    prompt += "- ALWAYS include <|tool_call_start|> and <|tool_call_end|> tags.\n";
+
+    // Format-specific tag instructions
+    if (actual_format == RAC_TOOL_FORMAT_LFM2) {
+        prompt += "- ALWAYS include <|tool_call_start|> and <|tool_call_end|> tags.\n";
+    } else {
+        prompt += "- ALWAYS include <tool_call> and </tool_call> tags.\n";
+    }
     
     RAC_LOG_INFO("ToolCalling", "Generated tool prompt (format=%d): %.500s...", 
                  (int)actual_format, prompt.c_str());
