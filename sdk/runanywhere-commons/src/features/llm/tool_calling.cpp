@@ -494,6 +494,47 @@ static bool is_standard_key(const char* key) {
     return false;
 }
 
+/**
+ * @brief Escape a string for JSON output (manual implementation)
+ *
+ * Escapes special characters (quotes, backslashes, control characters)
+ * to produce valid JSON string content.
+ */
+static std::string escape_json_string(const char* str) {
+    if (!str) {
+        return "";
+    }
+
+    std::string result;
+    result.reserve(strlen(str) + 16);
+
+    for (size_t i = 0; str[i]; i++) {
+        char c = str[i];
+        switch (c) {
+        case '"':
+            result += "\\\"";
+            break;
+        case '\\':
+            result += "\\\\";
+            break;
+        case '\n':
+            result += "\\n";
+            break;
+        case '\r':
+            result += "\\r";
+            break;
+        case '\t':
+            result += "\\t";
+            break;
+        default:
+            result += c;
+            break;
+        }
+    }
+
+    return result;
+}
+
 // =============================================================================
 // JSON NORMALIZATION
 // =============================================================================
@@ -609,11 +650,12 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
                         if (args_is_obj) {
                             *out_args_json = args_value;
                         } else {
-                            // Wrap scalar in {"input": value}
-                            size_t wrap_len = strlen(args_value) + 20;
+                            // Wrap scalar in {"input": value} - escape the value for valid JSON
+                            std::string escaped_args = escape_json_string(args_value);
+                            size_t wrap_len = escaped_args.size() + 14; // {"input":"" } + null
                             *out_args_json = static_cast<char*>(malloc(wrap_len));
                             if (*out_args_json) {
-                                snprintf(*out_args_json, wrap_len, "{\"input\":\"%s\"}", args_value);
+                                snprintf(*out_args_json, wrap_len, "{\"input\":\"%s\"}", escaped_args.c_str());
                             }
                             free(args_value);
                         }
@@ -649,11 +691,12 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
                     // Value is object - use as arguments
                     *out_args_json = value;
                 } else if (value) {
-                    // Value is scalar - wrap in {"input": value}
-                    size_t wrap_len = strlen(value) + 20;
+                    // Value is scalar - wrap in {"input": value} - escape for valid JSON
+                    std::string escaped_value = escape_json_string(value);
+                    size_t wrap_len = escaped_value.size() + 14; // {"input":"" } + null
                     *out_args_json = static_cast<char*>(malloc(wrap_len));
                     if (*out_args_json) {
-                        snprintf(*out_args_json, wrap_len, "{\"input\":\"%s\"}", value);
+                        snprintf(*out_args_json, wrap_len, "{\"input\":\"%s\"}", escaped_value.c_str());
                     }
                     free(value);
                 } else {
@@ -790,12 +833,14 @@ static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char
             if (in_string) {
                 if (c == string_char && (i == 0 || args_str[i - 1] != '\\')) {
                     in_string = false;
-                    // End of value
+                    // End of value - escape key and value for valid JSON
                     if (!current_key.empty()) {
                         if (!first_arg) {
                             json_args += ",";
                         }
-                        json_args += "\"" + current_key + "\":\"" + current_value + "\"";
+                        std::string escaped_key = escape_json_string(current_key.c_str());
+                        std::string escaped_val = escape_json_string(current_value.c_str());
+                        json_args += "\"" + escaped_key + "\":\"" + escaped_val + "\"";
                         first_arg = false;
                         current_key.clear();
                         current_value.clear();
@@ -817,18 +862,30 @@ static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char
                         if (!first_arg) {
                             json_args += ",";
                         }
-                        // Check if value is numeric
-                        bool is_numeric = true;
-                        for (char vc : current_value) {
-                            if (!isdigit(vc) && vc != '.' && vc != '-') {
+                        // Check if value is numeric (handles edge cases)
+                        bool is_numeric = !current_value.empty();
+                        bool has_dot = false;
+                        bool has_minus = false;
+                        for (size_t i = 0; i < current_value.size() && is_numeric; i++) {
+                            char vc = current_value[i];
+                            if (vc == '-') {
+                                if (i != 0 || has_minus) is_numeric = false;
+                                has_minus = true;
+                            } else if (vc == '.') {
+                                if (has_dot) is_numeric = false;
+                                has_dot = true;
+                            } else if (!isdigit(vc)) {
                                 is_numeric = false;
-                                break;
                             }
                         }
+                        if (current_value == "-" || current_value == ".") is_numeric = false;
+                        // Escape key always; escape value only for non-numeric strings
+                        std::string escaped_key = escape_json_string(current_key.c_str());
                         if (is_numeric) {
-                            json_args += "\"" + current_key + "\":" + current_value;
+                            json_args += "\"" + escaped_key + "\":" + current_value;
                         } else {
-                            json_args += "\"" + current_key + "\":\"" + current_value + "\"";
+                            std::string escaped_val = escape_json_string(current_value.c_str());
+                            json_args += "\"" + escaped_key + "\":\"" + escaped_val + "\"";
                         }
                         first_arg = false;
                     }
@@ -850,17 +907,30 @@ static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char
             if (!first_arg) {
                 json_args += ",";
             }
-            bool is_numeric = true;
-            for (char vc : current_value) {
-                if (!isdigit(vc) && vc != '.' && vc != '-') {
+            // Check if value is numeric (handles edge cases)
+            bool is_numeric = !current_value.empty();
+            bool has_dot = false;
+            bool has_minus = false;
+            for (size_t i = 0; i < current_value.size() && is_numeric; i++) {
+                char vc = current_value[i];
+                if (vc == '-') {
+                    if (i != 0 || has_minus) is_numeric = false;
+                    has_minus = true;
+                } else if (vc == '.') {
+                    if (has_dot) is_numeric = false;
+                    has_dot = true;
+                } else if (!isdigit(vc)) {
                     is_numeric = false;
-                    break;
                 }
             }
+            if (current_value == "-" || current_value == ".") is_numeric = false;
+            // Escape key always; escape value only for non-numeric strings
+            std::string escaped_key = escape_json_string(current_key.c_str());
             if (is_numeric) {
-                json_args += "\"" + current_key + "\":" + current_value;
+                json_args += "\"" + escaped_key + "\":" + current_value;
             } else {
-                json_args += "\"" + current_key + "\":\"" + current_value + "\"";
+                std::string escaped_val = escape_json_string(current_value.c_str());
+                json_args += "\"" + escaped_key + "\":\"" + escaped_val + "\"";
             }
         }
 
@@ -1111,44 +1181,6 @@ extern "C" void rac_tool_call_free(rac_tool_call_t* result) {
 // =============================================================================
 // PROMPT FORMATTING
 // =============================================================================
-
-/**
- * @brief Escape a string for JSON output (manual implementation)
- */
-static std::string escape_json_string(const char* str) {
-    if (!str) {
-        return "";
-    }
-
-    std::string result;
-    result.reserve(strlen(str) + 16);
-
-    for (size_t i = 0; str[i]; i++) {
-        char c = str[i];
-        switch (c) {
-        case '"':
-            result += "\\\"";
-            break;
-        case '\\':
-            result += "\\\\";
-            break;
-        case '\n':
-            result += "\\n";
-            break;
-        case '\r':
-            result += "\\r";
-            break;
-        case '\t':
-            result += "\\t";
-            break;
-        default:
-            result += c;
-            break;
-        }
-    }
-
-    return result;
-}
 
 /**
  * @brief Get parameter type name

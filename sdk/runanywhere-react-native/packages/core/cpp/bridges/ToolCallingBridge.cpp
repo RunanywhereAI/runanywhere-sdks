@@ -81,8 +81,48 @@ std::string ToolCallingBridge::buildInitialPrompt(
     const std::string& toolsJson,
     const std::string& optionsJson
 ) {
-    // Use default options for now
-    rac_tool_calling_options_t options = {5, RAC_TRUE, 0.7f, 1024, nullptr, RAC_FALSE, RAC_FALSE};
+    // Start with default options
+    rac_tool_calling_options_t options = {
+        5,                          // max_tool_calls
+        RAC_TRUE,                   // auto_execute
+        0.7f,                       // temperature
+        1024,                       // max_tokens
+        nullptr,                    // system_prompt
+        RAC_FALSE,                  // replace_system_prompt
+        RAC_FALSE,                  // keep_tools_available
+        RAC_TOOL_FORMAT_DEFAULT     // format
+    };
+
+    // Parse optionsJson if provided
+    if (!optionsJson.empty()) {
+        try {
+            json opts = json::parse(optionsJson);
+
+            if (opts.contains("maxToolCalls") && opts["maxToolCalls"].is_number_integer()) {
+                options.max_tool_calls = opts["maxToolCalls"].get<int32_t>();
+            }
+            if (opts.contains("autoExecute") && opts["autoExecute"].is_boolean()) {
+                options.auto_execute = opts["autoExecute"].get<bool>() ? RAC_TRUE : RAC_FALSE;
+            }
+            if (opts.contains("temperature") && opts["temperature"].is_number()) {
+                options.temperature = opts["temperature"].get<float>();
+            }
+            if (opts.contains("maxTokens") && opts["maxTokens"].is_number_integer()) {
+                options.max_tokens = opts["maxTokens"].get<int32_t>();
+            }
+            if (opts.contains("format") && opts["format"].is_string()) {
+                options.format = rac_tool_call_format_from_name(opts["format"].get<std::string>().c_str());
+            }
+            if (opts.contains("replaceSystemPrompt") && opts["replaceSystemPrompt"].is_boolean()) {
+                options.replace_system_prompt = opts["replaceSystemPrompt"].get<bool>() ? RAC_TRUE : RAC_FALSE;
+            }
+            if (opts.contains("keepToolsAvailable") && opts["keepToolsAvailable"].is_boolean()) {
+                options.keep_tools_available = opts["keepToolsAvailable"].get<bool>() ? RAC_TRUE : RAC_FALSE;
+            }
+        } catch (...) {
+            // JSON parse failed, keep defaults
+        }
+    }
 
     char* prompt = nullptr;
     rac_result_t rc = rac_tool_call_build_initial_prompt(
