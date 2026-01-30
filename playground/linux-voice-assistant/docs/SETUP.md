@@ -130,12 +130,20 @@ voice-assistant [options]
 
 ## Troubleshooting
 
-### Library not found errors
+### Library not found errors (e.g., libonnxruntime.so.1)
 
-Set LD_LIBRARY_PATH:
-```bash
-export LD_LIBRARY_PATH=~/.local/runanywhere/lib:$LD_LIBRARY_PATH
-```
+If you see errors like `libonnxruntime.so.1: cannot open shared object file`:
+
+1. **Create versioned symlinks** (if install.sh didn't create them):
+   ```bash
+   cd ~/.local/runanywhere/lib
+   for lib in *.so; do ln -sf "$lib" "${lib}.1" 2>/dev/null; done
+   ```
+
+2. **Ensure LD_LIBRARY_PATH is set** (run.sh does this automatically):
+   ```bash
+   export LD_LIBRARY_PATH=~/.local/runanywhere/lib:$LD_LIBRARY_PATH
+   ```
 
 ### No audio input
 
