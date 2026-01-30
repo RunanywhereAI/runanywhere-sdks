@@ -451,6 +451,7 @@ fun ModelInfoBar(
 // MESSAGE BUBBLE
 // ====================
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MessageBubbleView(
     message: ChatMessage,
