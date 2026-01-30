@@ -1,131 +1,96 @@
-# Linux Voice Assistant
+# RunAnywhere Voice Assistant
 
-A complete voice AI pipeline for Raspberry Pi 5 (and other Linux devices) using `runanywhere-commons` as the ML backend.
+On-device voice AI for Raspberry Pi 5. Say **"Hey Jarvis"** to activate.
 
-## Features
+**Stack:** Wake Word + VAD + STT (Whisper) + LLM (Qwen3) + TTS (Piper) — all local, no cloud.
 
-- **Wake Word Detection** - Say "Hey Jarvis" to activate
-- **Voice Activity Detection (VAD)** - Silero VAD via Sherpa-ONNX
-- **Speech-to-Text (STT)** - Whisper via Sherpa-ONNX
-- **Large Language Model (LLM)** - llama.cpp with GGUF models
-- **Text-to-Speech (TTS)** - Sherpa-ONNX VITS/Piper
-- **Moltbot Integration** - Optional AI assistant framework with tool execution
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│              Linux Voice Assistant (This App)               │
-│  • Audio capture/playback via ALSA                          │
-│  • Voice pipeline orchestration                             │
-│  • Wake word → VAD → STT → LLM → TTS                        │
-├─────────────────────────────────────────────────────────────┤
-│              runanywhere-commons                             │
-│  ┌─────────────────────────────────────────────────────────┐│
-│  │ Wake Word (CPU) - openWakeWord "Hey Jarvis"             ││
-│  │ VAD (CPU) - Silero via Sherpa-ONNX                      ││
-│  │ STT (CPU) - Whisper via Sherpa-ONNX                     ││
-│  │ LLM (CPU) - llama.cpp with GGUF models                  ││
-│  │ TTS (CPU) - Sherpa-ONNX VITS/Piper                      ││
-│  └─────────────────────────────────────────────────────────┘│
-├─────────────────────────────────────────────────────────────┤
-│              External Audio Hardware                         │
-│  • USB Microphone (input)                                    │
-│  • USB Speaker / DAC (output)                                │
-└─────────────────────────────────────────────────────────────┘
-```
+---
 
 ## Quick Start
 
-### One-Line Install (Fresh Setup)
+### Step 1: Install RunAnywhere (Pre-built Binaries)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/Playground/linux-voice-assistant/scripts/install.sh | bash
+# Download and install
+curl -fsSL https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/voice-assistant-v0.1.0/runanywhere-voice-assistant-linux-aarch64.tar.gz | tar -xzf - -C /tmp
+cd /tmp/runanywhere-release && ./install.sh
+
+# Fix library symlinks (if needed)
+cd ~/.local/runanywhere/lib && for lib in *.so; do ln -sf "$lib" "${lib}.1"; done
 ```
 
-### Add to Existing Moltbot
+### Step 2: Download AI Models (~2.5GB)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/Playground/linux-voice-assistant/scripts/add-to-moltbot.sh | bash
+curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/smonga/rasp/Playground/linux-voice-assistant/scripts/download-models.sh | bash
 ```
 
-### Run
+### Step 3: Install Moltbot
 
 ```bash
-# Without wake word (always listening)
-./build/voice-assistant
+# Clone
+git clone https://github.com/RunanywhereAI/clawdbot.git ~/moltbot
 
-# With wake word (say "Hey Jarvis" to activate)
-./build/voice-assistant --wakeword
+# Install and build
+cd ~/moltbot
+npm install -g pnpm
+pnpm install
+pnpm build
 
-# With Moltbot integration
-./build/voice-assistant --wakeword --moltbot
+# Configure (creates ~/.clawdbot/config.yaml)
+pnpm moltbot onboard
 ```
 
-## Documentation
+### Step 4: Run
 
-| Document | Description |
-|----------|-------------|
-| [SETUP.md](SETUP.md) | Complete setup guide (build, models, configuration) |
-| [docs/MOLTBOT_INTEGRATION.md](docs/MOLTBOT_INTEGRATION.md) | Detailed Moltbot integration guide |
-| [docs/RELEASE.md](docs/RELEASE.md) | Release process documentation |
+```bash
+# Start everything (LLM server + Moltbot + Voice Assistant)
+~/moltbot/scripts/run-with-voice.sh
 
-## Usage
+# Or start components separately:
+# Terminal 1: LLM Server
+~/.local/runanywhere/bin/runanywhere-server --model ~/.local/share/runanywhere/Models/LlamaCpp/qwen3-1.7b/*.gguf --port 8080
 
-```
-Usage: ./voice-assistant [options]
+# Terminal 2: Moltbot
+cd ~/moltbot && pnpm moltbot gateway --port 18789
 
-Options:
-  --list-devices    List available audio devices
-  --input <device>  Audio input device (default: "default")
-  --output <device> Audio output device (default: "default")
-  --wakeword        Enable wake word detection ("Hey Jarvis")
-  --moltbot         Enable Moltbot integration
-  --moltbot-url     Moltbot voice bridge URL (default: "http://localhost:8081")
-  --help            Show this help message
-
-Controls:
-  Ctrl+C            Exit the application
+# Terminal 3: Voice Assistant
+export LD_LIBRARY_PATH=~/.local/runanywhere/lib:$LD_LIBRARY_PATH
+~/.local/runanywhere/bin/voice-assistant --wakeword --moltbot
 ```
 
-## Project Structure
+---
 
-```
-Playground/linux-voice-assistant/
-├── CMakeLists.txt          # Build configuration
-├── README.md               # This file
-├── SETUP.md                # Complete setup guide
-├── main.cpp                # Entry point
-├── model_config.h          # Pre-configured model IDs and paths
-├── voice_pipeline.h        # Pipeline orchestration interface
-├── voice_pipeline.cpp      # Pipeline implementation
-├── audio_capture.h/cpp     # ALSA audio input
-├── audio_playback.h/cpp    # ALSA audio output
-├── docs/
-│   ├── MOLTBOT_INTEGRATION.md
-│   └── RELEASE.md
-├── examples/
-│   ├── moltbot-runanywhere-config.json
-│   └── moltbot-runanywhere-config.yaml
-└── scripts/
-    ├── download-models.sh  # Model download script
-    ├── install.sh          # One-line installer
-    ├── add-to-moltbot.sh   # Add to existing Moltbot
-    └── start-voice-bridge.ts
+## What's Running
+
+| Component | Port | Purpose |
+|-----------|------|---------|
+| runanywhere-server | 8080 | Local LLM inference |
+| Moltbot gateway | 18789 | AI orchestration, tools |
+| Voice assistant | — | Wake word, STT, TTS |
+
+---
+
+## Standalone Mode (No Moltbot)
+
+For simple voice chat without Moltbot:
+
+```bash
+~/.local/runanywhere/run.sh
 ```
 
-## Expected Performance (Raspberry Pi 5)
+---
 
-| Metric | Expected Value |
-|--------|----------------|
-| **Wake Word** | ~50-100ms detection |
-| **VAD** | ~10-20ms detection |
-| **STT Latency** | ~300-500ms per utterance |
-| **LLM Tokens/sec** | ~5-10 tok/s |
-| **TTS Latency** | ~100-200ms |
-| **Total Pipeline** | ~2-3s per conversational turn |
-| **Power** | ~5-8W |
+## Troubleshooting
+
+**Library not found:** `cd ~/.local/runanywhere/lib && for lib in *.so; do ln -sf "$lib" "${lib}.1"; done`
+
+**No audio:** `arecord -l` to list devices, then use `--input plughw:X,0`
+
+**Model not found:** Re-run the download script from Step 2
+
+---
 
 ## License
 
-MIT License - See LICENSE file for details.
+MIT
