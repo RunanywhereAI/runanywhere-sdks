@@ -155,10 +155,12 @@ export function formatToolsForPrompt(tools?: ToolDefinition[], format?: string):
   let formatExample: string;
 
   if (toolFormat === 'lfm2') {
-    // LFM2 format - EXACTLY matches C++ RAC_TOOL_FORMAT_LFM2
+    // LFM2 format - Enhanced with more math examples for better reliability
     formatExample = `## OUTPUT FORMAT
 You MUST respond with ONLY a tool call in this exact format:
 <|tool_call_start|>[function_name(param="value")]<|tool_call_end|>
+
+CRITICAL: Always include the FULL format with <|tool_call_start|> and <|tool_call_end|> tags.
 
 ## EXAMPLES
 Q: What's the weather in NYC?
@@ -168,7 +170,13 @@ Q: weather in sf
 A: <|tool_call_start|>[get_weather(location="San Francisco")]<|tool_call_end|>
 
 Q: calculate 2+2
-A: <|tool_call_start|>[calculate(expression="2+2")]<|tool_call_end|>`;
+A: <|tool_call_start|>[calculate(expression="2+2")]<|tool_call_end|>
+
+Q: What's 5*10?
+A: <|tool_call_start|>[calculate(expression="5*10")]<|tool_call_end|>
+
+Q: What is 100/4?
+A: <|tool_call_start|>[calculate(expression="100/4")]<|tool_call_end|>`;
   } else {
     // Default JSON format - EXACTLY matches C++ RAC_TOOL_FORMAT_DEFAULT
     formatExample = `## OUTPUT FORMAT
@@ -195,9 +203,10 @@ ${formatExample}
 
 ## RULES
 - Weather question = call get_weather
-- Math question = call calculate
+- Math/calculation question (add, subtract, multiply, divide, "what's X*Y", etc.) = call calculate with the EXPRESSION as a string
 - Time question = call get_current_time
-- DO NOT make up data. ALWAYS use the tool.`;
+- DO NOT compute answers yourself. ALWAYS use the tool with the original expression.
+- ALWAYS include <|tool_call_start|> and <|tool_call_end|> tags.`;
 }
 
 // =============================================================================
