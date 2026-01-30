@@ -132,6 +132,13 @@ void OpenAIHandler::processNonStreaming(const httplib::Request& /*req*/,
     std::string prompt = translation::buildPromptFromOpenAI(messages, tools, nullptr);
     RAC_LOG_INFO("Server", "processNonStreaming: prompt built, length=%zu", prompt.length());
 
+    // DEBUG: Log the messages JSON and built prompt
+    RAC_LOG_INFO("Server", "=== REQUEST MESSAGES JSON ===");
+    RAC_LOG_INFO("Server", "%s", messages.dump(2).c_str());
+    RAC_LOG_INFO("Server", "=== BUILT PROMPT (first 2000 chars) ===");
+    RAC_LOG_INFO("Server", "%s", prompt.substr(0, 2000).c_str());
+    RAC_LOG_INFO("Server", "=== END PROMPT ===");
+
     // Parse LLM options
     rac_llm_options_t options = parseOptions(requestJson);
     RAC_LOG_INFO("Server", "processNonStreaming: options parsed, max_tokens=%d, temp=%.2f",
