@@ -37,7 +37,7 @@ cmake .. -DCMAKE_BUILD_TYPE=Release \
 make -j$(nproc)
 
 # Build voice assistant
-cd ~/runanywhere-sdks/playground/linux-voice-assistant
+cd ~/runanywhere-sdks/Playground/linux-voice-assistant
 rm -rf build && mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
@@ -56,7 +56,7 @@ mkdir -p bin lib
 
 # Copy binaries
 cp ~/runanywhere-sdks/sdk/runanywhere-commons/build-server/tools/runanywhere-server bin/
-cp ~/runanywhere-sdks/playground/linux-voice-assistant/build/voice-assistant bin/
+cp ~/runanywhere-sdks/Playground/linux-voice-assistant/build/voice-assistant bin/
 
 # Copy shared libraries
 ARCH=$(uname -m)
@@ -92,7 +92,7 @@ for lib in "$INSTALL_DIR/lib/"*.so; do
 done
 
 echo "Installation complete!"
-echo "Download models: curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/smonga/rasp/playground/linux-voice-assistant/scripts/download-models.sh | bash"
+echo "Download models: curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/smonga/rasp/Playground/linux-voice-assistant/scripts/download-models.sh | bash"
 echo "Run: ~/.local/runanywhere/run.sh"
 INSTALL_EOF
 chmod +x /tmp/runanywhere-release/install.sh
@@ -164,7 +164,7 @@ cd /tmp/runanywhere-release && ./install.sh
 
 ### Download Models
 \`\`\`bash
-curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/smonga/rasp/playground/linux-voice-assistant/scripts/download-models.sh | bash
+curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/smonga/rasp/Playground/linux-voice-assistant/scripts/download-models.sh | bash
 \`\`\`
 
 ### Run

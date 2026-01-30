@@ -15,8 +15,8 @@ Choose the installation method that fits your situation:
 
 | Method | Best For | Command |
 |--------|----------|---------|
-| **One-liner (Fresh)** | New users | `curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/playground/linux-voice-assistant/scripts/install.sh \| bash` |
-| **Add to Moltbot** | Existing Moltbot users | `curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/playground/linux-voice-assistant/scripts/add-to-moltbot.sh \| bash` |
+| **One-liner (Fresh)** | New users | `curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/Playground/linux-voice-assistant/scripts/install.sh \| bash` |
+| **Add to Moltbot** | Existing Moltbot users | `curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/Playground/linux-voice-assistant/scripts/add-to-moltbot.sh \| bash` |
 | **Manual Setup** | Developers, custom configs | Follow this guide |
 
 For detailed Moltbot integration options, see [docs/MOLTBOT_INTEGRATION.md](docs/MOLTBOT_INTEGRATION.md).
@@ -113,7 +113,7 @@ After setup, you'll have:
 │   │   ├── build-server/                # Server build output
 │   │   │   └── tools/runanywhere-server # OpenAI-compatible server
 │   │   └── dist/linux/aarch64/          # Built libraries
-│   └── playground/linux-voice-assistant/
+│   └── Playground/linux-voice-assistant/
 │       └── build/
 │           └── voice-assistant          # Voice assistant binary
 ├── moltbot/                             # Moltbot fork (optional)
@@ -208,7 +208,7 @@ export LD_LIBRARY_PATH=$PWD/dist/linux/aarch64:$LD_LIBRARY_PATH
 ### 2.1 Build the Voice Assistant
 
 ```bash
-cd ~/runanywhere-sdks/playground/linux-voice-assistant
+cd ~/runanywhere-sdks/Playground/linux-voice-assistant
 
 # Configure
 cmake -B build
@@ -224,7 +224,7 @@ ls -la build/voice-assistant
 ### 2.2 Test Voice Assistant Build
 
 ```bash
-cd ~/runanywhere-sdks/playground/linux-voice-assistant
+cd ~/runanywhere-sdks/Playground/linux-voice-assistant
 
 # Show help
 ./build/voice-assistant --help
@@ -240,7 +240,7 @@ cd ~/runanywhere-sdks/playground/linux-voice-assistant
 ### 3.1 Required Models (~600MB total)
 
 ```bash
-cd ~/runanywhere-sdks/playground/linux-voice-assistant
+cd ~/runanywhere-sdks/Playground/linux-voice-assistant
 
 # Download all required models
 ./scripts/download-models.sh
@@ -259,7 +259,7 @@ cd ~/runanywhere-sdks/playground/linux-voice-assistant
 For "Hey Jarvis" wake word activation:
 
 ```bash
-cd ~/runanywhere-sdks/playground/linux-voice-assistant
+cd ~/runanywhere-sdks/Playground/linux-voice-assistant
 
 # Download wake word models
 ./scripts/download-models.sh --wakeword
@@ -348,7 +348,7 @@ alsamixer
 ### 4.2 Run Voice Assistant (Always Listening Mode)
 
 ```bash
-cd ~/runanywhere-sdks/playground/linux-voice-assistant
+cd ~/runanywhere-sdks/Playground/linux-voice-assistant
 
 # Run with default audio devices
 ./build/voice-assistant
@@ -360,7 +360,7 @@ cd ~/runanywhere-sdks/playground/linux-voice-assistant
 ### 4.3 Run with Wake Word (Say "Hey Jarvis" to Activate)
 
 ```bash
-cd ~/runanywhere-sdks/playground/linux-voice-assistant
+cd ~/runanywhere-sdks/Playground/linux-voice-assistant
 
 # Enable wake word detection
 ./build/voice-assistant --wakeword
@@ -535,11 +535,11 @@ Copy the sample config or merge with your existing config:
 
 ```bash
 # Option 1: Copy sample config (review and merge manually)
-cp ~/runanywhere-sdks/playground/linux-voice-assistant/examples/moltbot-runanywhere-config.yaml \
+cp ~/runanywhere-sdks/Playground/linux-voice-assistant/examples/moltbot-runanywhere-config.yaml \
    ~/.clawdbot/runanywhere-provider.yaml
 
 # Option 2: Or use JSON format
-cp ~/runanywhere-sdks/playground/linux-voice-assistant/examples/moltbot-runanywhere-config.json \
+cp ~/runanywhere-sdks/Playground/linux-voice-assistant/examples/moltbot-runanywhere-config.json \
    ~/.clawdbot/runanywhere-provider.json
 ```
 
@@ -609,7 +609,7 @@ curl -s http://localhost:3000/hooks/agent
 The voice bridge receives transcriptions from the voice assistant and forwards them to Moltbot.
 
 ```bash
-cd ~/runanywhere-sdks/playground/linux-voice-assistant
+cd ~/runanywhere-sdks/Playground/linux-voice-assistant
 
 # Start voice bridge (requires npx/tsx)
 npx tsx scripts/start-voice-bridge.ts \
@@ -636,7 +636,7 @@ The voice bridge automatically detects which Moltbot API to use:
 ### 5.2 Run Voice Assistant with Moltbot
 
 ```bash
-cd ~/runanywhere-sdks/playground/linux-voice-assistant
+cd ~/runanywhere-sdks/Playground/linux-voice-assistant
 
 # With Moltbot integration (no wake word)
 ./build/voice-assistant --moltbot
@@ -829,7 +829,7 @@ Simple standalone mode - voice assistant with local LLM, no external services.
 **Single Terminal:**
 
 ```bash
-cd ~/runanywhere-sdks/playground/linux-voice-assistant
+cd ~/runanywhere-sdks/Playground/linux-voice-assistant
 
 # Without wake word (always listening)
 ./build/voice-assistant
@@ -875,7 +875,7 @@ npm run start
 **Terminal 3: Voice Bridge (Channel Bridge)**
 
 ```bash
-cd ~/runanywhere-sdks/playground/linux-voice-assistant
+cd ~/runanywhere-sdks/Playground/linux-voice-assistant
 
 # WebSocket mode (recommended) - connects to Moltbot voice channel
 npx tsx scripts/start-voice-bridge.ts \
@@ -893,7 +893,7 @@ npx tsx scripts/start-voice-bridge.ts \
 **Terminal 4: Voice Assistant (Voice Channel)**
 
 ```bash
-cd ~/runanywhere-sdks/playground/linux-voice-assistant
+cd ~/runanywhere-sdks/Playground/linux-voice-assistant
 
 # With Moltbot + Wake Word (recommended)
 ./build/voice-assistant --wakeword --moltbot
@@ -922,7 +922,7 @@ moltbot models list | grep runanywhere
 
 **Terminal 3: Add Voice Bridge**
 ```bash
-cd ~/runanywhere-sdks/playground/linux-voice-assistant
+cd ~/runanywhere-sdks/Playground/linux-voice-assistant
 npx tsx scripts/start-voice-bridge.ts \
     --moltbot-url http://localhost:3000 \
     --moltbot-token your-existing-token
@@ -991,8 +991,8 @@ After=network.target runanywhere-server.service
 [Service]
 Type=simple
 User=runanywhere
-WorkingDirectory=/home/runanywhere/runanywhere-sdks/playground/linux-voice-assistant
-ExecStart=/home/runanywhere/runanywhere-sdks/playground/linux-voice-assistant/build/voice-assistant --wakeword
+WorkingDirectory=/home/runanywhere/runanywhere-sdks/Playground/linux-voice-assistant
+ExecStart=/home/runanywhere/runanywhere-sdks/Playground/linux-voice-assistant/build/voice-assistant --wakeword
 Restart=on-failure
 RestartSec=5
 
@@ -1124,7 +1124,7 @@ ls -la ~/.local/share/runanywhere/Models/ONNX/hey-jarvis/
 # Should contain: hey_jarvis_v0.1.onnx
 
 # If missing, download them
-cd ~/runanywhere-sdks/playground/linux-voice-assistant
+cd ~/runanywhere-sdks/Playground/linux-voice-assistant
 ./scripts/download-models.sh --wakeword
 
 # Check detection threshold (default 0.5)

@@ -7,7 +7,7 @@
 # 2. Voice Assistant SDK and models
 # 3. Voice Bridge for Moltbot integration
 #
-# Usage: curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/playground/linux-voice-assistant/scripts/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/Playground/linux-voice-assistant/scripts/install.sh | bash
 # =============================================================================
 
 set -e
@@ -153,7 +153,7 @@ else
     # Voice assistant is on main branch
 fi
 
-cd "$SDK_DIR/playground/linux-voice-assistant"
+cd "$SDK_DIR/Playground/linux-voice-assistant"
 
 # =============================================================================
 # Download Models
@@ -189,7 +189,7 @@ log_success "Voice assistant built successfully"
 log_info "Creating convenience scripts..."
 
 # Start script
-cat > "$SDK_DIR/playground/linux-voice-assistant/start.sh" << 'SCRIPT'
+cat > "$SDK_DIR/Playground/linux-voice-assistant/start.sh" << 'SCRIPT'
 #!/bin/bash
 # Start the complete voice assistant stack
 
@@ -222,10 +222,10 @@ echo "Starting voice assistant..."
 # Cleanup on exit
 trap "kill $MOLTBOT_PID $BRIDGE_PID 2>/dev/null" EXIT
 SCRIPT
-chmod +x "$SDK_DIR/playground/linux-voice-assistant/start.sh"
+chmod +x "$SDK_DIR/Playground/linux-voice-assistant/start.sh"
 
 # Stop script
-cat > "$SDK_DIR/playground/linux-voice-assistant/stop.sh" << 'SCRIPT'
+cat > "$SDK_DIR/Playground/linux-voice-assistant/stop.sh" << 'SCRIPT'
 #!/bin/bash
 # Stop all voice assistant processes
 
@@ -235,7 +235,7 @@ pkill -f "start-voice-bridge" 2>/dev/null
 pkill -f "moltbot.*gateway" 2>/dev/null
 echo "Done"
 SCRIPT
-chmod +x "$SDK_DIR/playground/linux-voice-assistant/stop.sh"
+chmod +x "$SDK_DIR/Playground/linux-voice-assistant/stop.sh"
 
 log_success "Convenience scripts created"
 
@@ -274,7 +274,7 @@ Requires=moltbot.service
 [Service]
 Type=simple
 User=$USER
-WorkingDirectory=$SDK_DIR/playground/linux-voice-assistant
+WorkingDirectory=$SDK_DIR/Playground/linux-voice-assistant
 ExecStart=$(which npx) tsx scripts/start-voice-bridge.ts --websocket
 Restart=always
 RestartSec=10
@@ -293,8 +293,8 @@ Requires=voice-bridge.service
 [Service]
 Type=simple
 User=$USER
-WorkingDirectory=$SDK_DIR/playground/linux-voice-assistant
-ExecStart=$SDK_DIR/playground/linux-voice-assistant/build/voice-assistant --moltbot --wakeword
+WorkingDirectory=$SDK_DIR/Playground/linux-voice-assistant
+ExecStart=$SDK_DIR/Playground/linux-voice-assistant/build/voice-assistant --moltbot --wakeword
 Restart=always
 RestartSec=10
 
@@ -325,7 +325,7 @@ echo "  Installation Complete!"
 echo "=========================================="
 echo ""
 log_success "Moltbot installed at: $MOLTBOT_DIR"
-log_success "Voice Assistant installed at: $SDK_DIR/playground/linux-voice-assistant"
+log_success "Voice Assistant installed at: $SDK_DIR/Playground/linux-voice-assistant"
 echo ""
 log_info "Next steps:"
 echo ""
@@ -333,7 +333,7 @@ echo "  1. Run Moltbot onboarding (first time only):"
 echo "     cd $MOLTBOT_DIR && pnpm moltbot onboard"
 echo ""
 echo "  2. Start the voice assistant stack:"
-echo "     cd $SDK_DIR/playground/linux-voice-assistant"
+echo "     cd $SDK_DIR/Playground/linux-voice-assistant"
 echo "     ./start.sh"
 echo ""
 echo "  Or start components individually:"
@@ -341,7 +341,7 @@ echo "     # Terminal 1: Moltbot gateway"
 echo "     cd $MOLTBOT_DIR && pnpm moltbot gateway --port 18789"
 echo ""
 echo "     # Terminal 2: Voice bridge"
-echo "     cd $SDK_DIR/playground/linux-voice-assistant"
+echo "     cd $SDK_DIR/Playground/linux-voice-assistant"
 echo "     npx tsx scripts/start-voice-bridge.ts --websocket"
 echo ""
 echo "     # Terminal 3: Voice assistant"
