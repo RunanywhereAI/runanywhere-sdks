@@ -41,20 +41,23 @@ pnpm build
 pnpm moltbot onboard
 ```
 
-### Step 4: Run
+### Step 4: Run (3 terminals)
 
+**Terminal 1 - LLM Server:**
 ```bash
-# Start everything (LLM server + Moltbot + Voice Assistant)
-~/moltbot/scripts/run-with-voice.sh
+export LD_LIBRARY_PATH=~/.local/runanywhere/lib:$LD_LIBRARY_PATH
+~/.local/runanywhere/bin/runanywhere-server \
+  --model ~/.local/share/runanywhere/Models/LlamaCpp/qwen3-1.7b/Qwen3-1.7B-Q8_0.gguf \
+  --port 8080 --threads 4
+```
 
-# Or start components separately:
-# Terminal 1: LLM Server
-~/.local/runanywhere/bin/runanywhere-server --model ~/.local/share/runanywhere/Models/LlamaCpp/qwen3-1.7b/*.gguf --port 8080
-
-# Terminal 2: Moltbot
+**Terminal 2 - Moltbot:**
+```bash
 cd ~/moltbot && pnpm moltbot gateway --port 18789
+```
 
-# Terminal 3: Voice Assistant
+**Terminal 3 - Voice Assistant:**
+```bash
 export LD_LIBRARY_PATH=~/.local/runanywhere/lib:$LD_LIBRARY_PATH
 ~/.local/runanywhere/bin/voice-assistant --wakeword --moltbot
 ```
