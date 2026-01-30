@@ -19,6 +19,74 @@ extern "C" {
 #endif
 
 // =============================================================================
+// CHAT TEMPLATE - Abstraction for VLM prompt formatting
+// =============================================================================
+
+/**
+ * @brief Known VLM model families for chat template selection
+ *
+ * Use RAC_VLM_MODEL_FAMILY_AUTO (default) to auto-detect from model metadata.
+ * Use RAC_VLM_MODEL_FAMILY_CUSTOM with a custom template string for new models.
+ *
+ * Verified templates (from official HuggingFace repos):
+ * - QWEN2_VL: <|im_start|>system\nYou are a helpful assistant.<|im_end|>\n
+ *             <|im_start|>user\n<|vision_start|><|image_pad|><|vision_end|>{prompt}<|im_end|>\n
+ *             <|im_start|>assistant\n
+ * - SMOLVLM:  <|im_start|>User: {image}{prompt} \nAssistant:
+ * - LLAVA:    USER: <image>\n{prompt}\nASSISTANT:
+ */
+typedef enum rac_vlm_model_family {
+    RAC_VLM_MODEL_FAMILY_AUTO = 0,     /**< Auto-detect from model metadata (default) */
+    RAC_VLM_MODEL_FAMILY_QWEN2_VL = 1, /**< Qwen2-VL: chatml with <|vision_start|> markers */
+    RAC_VLM_MODEL_FAMILY_SMOLVLM = 2,  /**< SmolVLM: <|im_start|>User: format */
+    RAC_VLM_MODEL_FAMILY_LLAVA = 3,    /**< LLaVA/Vicuna: USER:/ASSISTANT: format */
+    RAC_VLM_MODEL_FAMILY_CUSTOM = 99,  /**< Use custom_chat_template string */
+} rac_vlm_model_family_t;
+
+/**
+ * @brief Custom chat template for VLM prompt formatting
+ *
+ * A simple template string with placeholders:
+ *   {system}  - System prompt (optional, can be empty)
+ *   {image}   - Image marker/placeholder
+ *   {prompt}  - User's text prompt
+ *
+ * Example template string:
+ *   "<|im_start|>user\n{image}{prompt}<|im_end|>\n<|im_start|>assistant\n"
+ *
+ * The SDK will replace placeholders at runtime. If {system} is in the template
+ * but no system prompt is provided, it uses a default or leaves empty.
+ */
+typedef struct rac_vlm_chat_template {
+    /**
+     * Full template string with {system}, {image}, {prompt} placeholders.
+     * Example: "<|im_start|>user\n{image}{prompt}<|im_end|>\n<|im_start|>assistant\n"
+     */
+    const char* template_str;
+
+    /**
+     * Image marker to insert at {image} placeholder.
+     * Examples: "<image>", "<|vision_start|><|image_pad|><|vision_end|>"
+     * If NULL, uses the backend's default marker.
+     */
+    const char* image_marker;
+
+    /**
+     * Default system prompt if {system} is in template but none provided.
+     * Can be NULL for no default.
+     */
+    const char* default_system_prompt;
+} rac_vlm_chat_template_t;
+
+/**
+ * @brief Get built-in chat template for a model family
+ *
+ * @param family Model family enum value
+ * @return Pointer to static template, or NULL if family not supported
+ */
+RAC_API const rac_vlm_chat_template_t* rac_vlm_get_builtin_template(rac_vlm_model_family_t family);
+
+// =============================================================================
 // IMAGE INPUT - Supports multiple input formats
 // =============================================================================
 
@@ -92,7 +160,7 @@ typedef struct rac_vlm_options {
     /** Enable streaming mode (default: true) */
     rac_bool_t streaming_enabled;
 
-    /** System prompt (can be NULL) */
+    /** System prompt (can be NULL, uses template default if available) */
     const char* system_prompt;
 
     // ── VLM-Specific Parameters ──
@@ -104,6 +172,26 @@ typedef struct rac_vlm_options {
 
     /** Use GPU for vision encoding */
     rac_bool_t use_gpu;
+
+    // ── Chat Template Configuration ──
+    /**
+     * Model family for automatic chat template selection.
+     * Set to RAC_VLM_MODEL_FAMILY_AUTO (default) to auto-detect from model metadata.
+     * Set to RAC_VLM_MODEL_FAMILY_CUSTOM and provide custom_chat_template for custom templates.
+     */
+    rac_vlm_model_family_t model_family;
+
+    /**
+     * Custom chat template (only used when model_family == RAC_VLM_MODEL_FAMILY_CUSTOM).
+     * If NULL and model_family is CUSTOM, falls back to GENERIC template.
+     */
+    const rac_vlm_chat_template_t* custom_chat_template;
+
+    /**
+     * Override image marker (can be NULL to use template default).
+     * Useful when the default marker doesn't match your model's expectations.
+     */
+    const char* image_marker_override;
 } rac_vlm_options_t;
 
 /**
@@ -113,7 +201,9 @@ typedef struct rac_vlm_options {
     {                                                                                              \
         .max_tokens = 2048, .temperature = 0.7f, .top_p = 0.9f, .stop_sequences = RAC_NULL,        \
         .num_stop_sequences = 0, .streaming_enabled = RAC_TRUE, .system_prompt = RAC_NULL,         \
-        .max_image_size = 0, .n_threads = 0, .use_gpu = RAC_TRUE                                   \
+        .max_image_size = 0, .n_threads = 0, .use_gpu = RAC_TRUE,                                  \
+        .model_family = RAC_VLM_MODEL_FAMILY_AUTO, .custom_chat_template = RAC_NULL,               \
+        .image_marker_override = RAC_NULL                                                          \
     }
 
 // =============================================================================

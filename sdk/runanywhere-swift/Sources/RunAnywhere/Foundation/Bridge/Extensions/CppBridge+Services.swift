@@ -278,6 +278,8 @@ extension SDKComponent {
         switch self {
         case .llm:
             return RAC_CAPABILITY_TEXT_GENERATION
+        case .vlm:
+            return RAC_CAPABILITY_VISION_LANGUAGE
         case .stt:
             return RAC_CAPABILITY_STT
         case .tts:
@@ -300,12 +302,16 @@ extension SDKComponent {
         switch capability {
         case RAC_CAPABILITY_TEXT_GENERATION:
             return .llm
+        case RAC_CAPABILITY_VISION_LANGUAGE:
+            return .vlm
         case RAC_CAPABILITY_STT:
             return .stt
         case RAC_CAPABILITY_TTS:
             return .tts
         case RAC_CAPABILITY_VAD:
             return .vad
+        case RAC_CAPABILITY_DIFFUSION:
+            return .diffusion
         default:
             return nil
         }

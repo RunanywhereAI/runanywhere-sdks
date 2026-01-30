@@ -38,6 +38,8 @@ public extension RunAnywhere {
         switch capability {
         case .llm:
             relevantCategories = [.language, .multimodal]
+        case .vlm:
+            relevantCategories = [.multimodal, .vision]
         case .stt:
             relevantCategories = [.speechRecognition]
         case .tts:
