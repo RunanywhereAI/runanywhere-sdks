@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -314,6 +315,23 @@ class _ToolsViewState extends State<ToolsView> {
     // Remove spaces
     expr = expr.replaceAll(' ', '');
 
+    // Handle power operator first (** or ^)
+    if (expr.contains('**')) {
+      final parts = expr.split('**');
+      var result = double.parse(parts[0]);
+      for (var i = 1; i < parts.length; i++) {
+        result = _pow(result, double.parse(parts[i]));
+      }
+      return result;
+    } else if (expr.contains('^')) {
+      final parts = expr.split('^');
+      var result = double.parse(parts[0]);
+      for (var i = 1; i < parts.length; i++) {
+        result = _pow(result, double.parse(parts[i]));
+      }
+      return result;
+    }
+
     // Handle simple operations
     if (expr.contains('+')) {
       final parts = expr.split('+');
@@ -338,6 +356,10 @@ class _ToolsViewState extends State<ToolsView> {
     }
 
     return double.parse(expr);
+  }
+  
+  double _pow(double base, double exponent) {
+    return math.pow(base, exponent).toDouble();
   }
 
   /// Time tool executor

@@ -195,10 +195,10 @@ extension RunAnywhereToolCalling on RunAnywhere {
     while (iterations < maxIterations) {
       iterations++;
 
-      // Match Swift SDK defaults: temperature 0.7, maxTokens 1024
+      // Lower temperature for more consistent tool calling behavior
       final genOptions = LLMGenerationOptions(
         maxTokens: opts.maxTokens ?? 1024,
-        temperature: opts.temperature ?? 0.7,
+        temperature: opts.temperature ?? 0.3,
       );
       
       // Use streaming like Swift does, then collect all tokens

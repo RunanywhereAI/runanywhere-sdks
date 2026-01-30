@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:runanywhere/public/runanywhere_tool_calling.dart';
@@ -326,6 +327,23 @@ class ToolSettingsViewModel extends ChangeNotifier {
     // Remove spaces
     expr = expr.replaceAll(' ', '');
 
+    // Handle power operator first (** or ^)
+    if (expr.contains('**')) {
+      final parts = expr.split('**');
+      var result = double.parse(parts[0]);
+      for (var i = 1; i < parts.length; i++) {
+        result = _pow(result, double.parse(parts[i]));
+      }
+      return result;
+    } else if (expr.contains('^')) {
+      final parts = expr.split('^');
+      var result = double.parse(parts[0]);
+      for (var i = 1; i < parts.length; i++) {
+        result = _pow(result, double.parse(parts[i]));
+      }
+      return result;
+    }
+
     // Handle simple operations
     if (expr.contains('+')) {
       final parts = expr.split('+');
@@ -350,5 +368,9 @@ class ToolSettingsViewModel extends ChangeNotifier {
     }
 
     return double.parse(expr);
+  }
+  
+  double _pow(double base, double exponent) {
+    return math.pow(base, exponent).toDouble();
   }
 }
