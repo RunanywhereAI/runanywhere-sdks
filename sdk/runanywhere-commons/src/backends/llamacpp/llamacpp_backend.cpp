@@ -282,7 +282,7 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
 
     llama_context_params ctx_params = llama_context_default_params();
     ctx_params.n_ctx = context_size_;
-    ctx_params.n_batch = std::min(context_size_, 512);
+    ctx_params.n_batch = context_size_;  // Allow processing full prompt at once
     ctx_params.n_threads = backend_->get_num_threads();
     ctx_params.n_threads_batch = backend_->get_num_threads();
     ctx_params.no_perf = true;
