@@ -154,16 +154,16 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   /// Different models are trained on different tool calling formats.
   /// Returns format name string (C++ is single source of truth for valid formats).
   String _detectToolCallFormat(String? modelName) {
-    if (modelName == null) return 'default';
+    if (modelName == null) return ToolCallFormatName.defaultFormat;
     final name = modelName.toLowerCase();
 
     // LFM2-Tool models use Pythonic format: <|tool_call_start|>[func(args)]<|tool_call_end|>
     if (name.contains('lfm2') && name.contains('tool')) {
-      return 'lfm2';
+      return ToolCallFormatName.lfm2;
     }
 
     // Default JSON format for general-purpose models
-    return 'default';
+    return ToolCallFormatName.defaultFormat;
   }
 
   Future<void> _generateWithToolCalling(
@@ -209,11 +209,13 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
       // Create ToolCallInfo from the result if tools were called
       ToolCallInfo? toolCallInfo;
+      debugPrint('📊 Tool calling result: toolCalls=${result.toolCalls.length}, toolResults=${result.toolResults.length}');
       if (result.toolCalls.isNotEmpty) {
         final lastCall = result.toolCalls.last;
         final lastResult = result.toolResults.isNotEmpty
             ? result.toolResults.last
             : null;
+        debugPrint('📊 Creating ToolCallInfo for: ${lastCall.toolName}');
 
         toolCallInfo = ToolCallInfo(
           toolName: lastCall.toolName,
@@ -224,6 +226,9 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           success: lastResult?.success ?? false,
           error: lastResult?.error,
         );
+        debugPrint('📊 ToolCallInfo created: ${toolCallInfo.toolName}, success=${toolCallInfo.success}');
+      } else {
+        debugPrint('📊 No tool calls in result - badge will NOT show');
       }
 
       final analytics = MessageAnalytics(

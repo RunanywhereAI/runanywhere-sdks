@@ -1225,22 +1225,31 @@ static std::string get_format_example_json(rac_tool_call_format_t format) {
 
     switch (format) {
     case RAC_TOOL_FORMAT_LFM2:
-        example += "Tool call format:\n";
-        example += "<|tool_call_start|>[tool_name(param=\"VALUE_FROM_USER_QUERY\")]<|tool_call_end|>\n\n";
-        example += "CRITICAL: Extract the EXACT value from the user's question. Examples:\n";
-        example += "- User asks 'weather in Tokyo' -> <|tool_call_start|>[get_weather(location=\"Tokyo\")]<|tool_call_end|>\n";
-        example += "- User asks 'weather in sf' -> <|tool_call_start|>[get_weather(location=\"San Francisco\")]<|tool_call_end|>\n";
-        example += "- User asks 'calculate 5+3' -> <|tool_call_start|>[calculate(expression=\"5+3\")]<|tool_call_end|>\n";
+        // LFM2 format - very direct instructions
+        example += "## OUTPUT FORMAT\n";
+        example += "You MUST respond with ONLY a tool call in this exact format:\n";
+        example += "<|tool_call_start|>[function_name(param=\"value\")]<|tool_call_end|>\n\n";
+        example += "## EXAMPLES\n";
+        example += "Q: What's the weather in NYC?\n";
+        example += "A: <|tool_call_start|>[get_weather(location=\"New York\")]<|tool_call_end|>\n\n";
+        example += "Q: weather in sf\n";
+        example += "A: <|tool_call_start|>[get_weather(location=\"San Francisco\")]<|tool_call_end|>\n\n";
+        example += "Q: calculate 2+2\n";
+        example += "A: <|tool_call_start|>[calculate(expression=\"2+2\")]<|tool_call_end|>\n";
         break;
 
     case RAC_TOOL_FORMAT_DEFAULT:
     default:
-        example += "Tool call format:\n";
-        example += "<tool_call>{\"tool\": \"tool_name\", \"arguments\": {\"param\": \"VALUE_FROM_USER_QUERY\"}}</tool_call>\n\n";
-        example += "CRITICAL: Extract the EXACT value from the user's question. Examples:\n";
-        example += "- User asks 'weather in Tokyo' -> <tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"Tokyo\"}}</tool_call>\n";
-        example += "- User asks 'weather in sf' -> <tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"San Francisco\"}}</tool_call>\n";
-        example += "- User asks 'calculate 5+3' -> <tool_call>{\"tool\": \"calculate\", \"arguments\": {\"expression\": \"5+3\"}}</tool_call>\n";
+        example += "## OUTPUT FORMAT\n";
+        example += "You MUST respond with ONLY a tool call in this exact format:\n";
+        example += "<tool_call>{\"tool\": \"function_name\", \"arguments\": {\"param\": \"value\"}}</tool_call>\n\n";
+        example += "## EXAMPLES\n";
+        example += "Q: What's the weather in NYC?\n";
+        example += "A: <tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"New York\"}}</tool_call>\n\n";
+        example += "Q: weather in sf\n";
+        example += "A: <tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"San Francisco\"}}</tool_call>\n\n";
+        example += "Q: calculate 2+2\n";
+        example += "A: <tool_call>{\"tool\": \"calculate\", \"arguments\": {\"expression\": \"2+2\"}}</tool_call>\n";
         break;
     }
 
@@ -1334,22 +1343,21 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format(const char*
     std::string prompt;
     prompt.reserve(1024 + strlen(tools_json));
 
-    prompt += "# Available Tools\n\n";
-    prompt += "You have access to the following tools. ONLY use them when the user specifically asks for information that requires them:\n\n";
+    prompt += "# TOOLS\n";
     prompt += tools_json;
     prompt += "\n\n";
 
-    prompt += "# Tool Usage Instructions\n\n";
-    prompt += "When using a tool, you MUST include ALL required arguments extracted from the user's message.\n\n";
-    prompt += "RULES:\n";
-    prompt += "- Use tools for: weather queries, calculations, time queries\n";
-    prompt += "- For normal conversation, respond naturally without tools\n";
-    prompt += "- ALWAYS extract parameter values from the user's question\n\n";
-
-    // Add format-specific example
+    // Add format-specific example with direct instructions
     prompt += get_format_example_json(actual_format);
 
-    prompt += "\n\nNEVER use empty arguments. Always extract the value from the user's question.";
+    prompt += "\n\n## RULES\n";
+    prompt += "- Weather question = call get_weather\n";
+    prompt += "- Math question = call calculate\n";
+    prompt += "- Time question = call get_current_time\n";
+    prompt += "- DO NOT make up data. ALWAYS use the tool.\n";
+    
+    RAC_LOG_INFO("ToolCalling", "Generated tool prompt (format=%d): %.500s...", 
+                 (int)actual_format, prompt.c_str());
 
     *out_prompt = static_cast<char*>(malloc(prompt.size() + 1));
     if (!*out_prompt) {
@@ -1381,6 +1389,8 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format_name(const 
                                                                           char** out_prompt) {
     // Convert format name to enum and delegate
     rac_tool_call_format_t format = rac_tool_call_format_from_name(format_name);
+    RAC_LOG_INFO("ToolCalling", "Formatting prompt with format_name='%s' -> enum=%d", 
+                 format_name ? format_name : "null", (int)format);
     return rac_tool_call_format_prompt_json_with_format(tools_json, format, out_prompt);
 }
 
