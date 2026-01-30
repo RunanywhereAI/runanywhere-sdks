@@ -6,37 +6,153 @@ On-device voice AI for Raspberry Pi 5 (Linux aarch64). Say **"Hey Jarvis"** to a
 
 ## Option 1: Full Moltbot Integration (Easiest & Recommended)
 
-One command to set up Moltbot + Voice Assistant + RunAnywhere:
+Complete AI assistant with WhatsApp, Voice, and local LLM.
+
+### Step 1: Install Pre-built Binaries
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/clawdbot/main/scripts/quickstart.sh | bash
+# Download and install RunAnywhere
+curl -fsSL https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/voice-assistant-v0.1.0/runanywhere-voice-assistant-linux-aarch64.tar.gz | tar -xzf - -C /tmp
+cd /tmp/runanywhere-release && ./install.sh
+
+# Fix library symlinks
+cd ~/.local/runanywhere/lib && for lib in *.so; do ln -sf "$lib" "${lib}.1"; done
 ```
 
-This installs:
-- Moltbot (AI assistant gateway)
-- RunAnywhere Server (local LLM inference)
-- Voice Assistant (wake word + STT + TTS)
-- AI Models (Whisper, Piper, Qwen3-1.7B)
+### Step 2: Download AI Models (~2.5GB)
 
-After installation:
 ```bash
-# First time only - configure Moltbot
+curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/smonga/rasp/Playground/linux-voice-assistant/scripts/download-models.sh | bash
+```
+
+### Step 3: Install Moltbot
+
+```bash
+# Clone
+git clone https://github.com/RunanywhereAI/clawdbot.git ~/moltbot
+cd ~/moltbot
+
+# Install pnpm and dependencies
+npm install -g pnpm
+pnpm install
+pnpm build
+```
+
+### Step 4: Run Moltbot Onboarding
+
+```bash
 cd ~/moltbot && pnpm moltbot onboard
-
-# Start everything
-~/runanywhere-sdks/Playground/linux-voice-assistant/run.sh
 ```
+
+**Answer the prompts as follows:**
+
+| Prompt | Answer |
+|--------|--------|
+| Security warning - Continue? | **Yes** |
+| Onboarding mode | **QuickStart** |
+| Config handling | **Use existing values** |
+| Model/auth provider | **Skip for now** |
+| Filter models by provider | **All providers** |
+| Default model | **Keep current** |
+| Select channel | **WhatsApp (QR link)** or skip |
+| Link WhatsApp now? | **Yes** (scan QR with your phone) |
+| WhatsApp phone setup | **This is my personal phone number** |
+| Your WhatsApp number | Enter your number (e.g., +15551234567) |
+| Configure skills now? | **Yes** |
+| Show Homebrew install? | **Yes** (or No) |
+| Preferred node manager | **npm** |
+| Install missing skill dependencies | **Skip for now** |
+| API keys (GOOGLE_PLACES, etc.) | **No** for all (or add if you have them) |
+| Enable hooks? | **Skip for now** |
+| How to hatch your bot? | **Do this later** |
+
+### Step 5: Configure RunAnywhere as Model Provider
+
+Add RunAnywhere to `~/.moltbot/moltbot.json`:
+
+```bash
+# Open the config
+nano ~/.moltbot/moltbot.json
+```
+
+Add this `"models"` section right after `"meta"`:
+
+```json
+{
+  "meta": { ... },
+  "models": {
+    "providers": {
+      "runanywhere": {
+        "baseUrl": "http://localhost:8080/v1",
+        "apiKey": "",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "qwen3-1.7b",
+            "name": "Qwen3 1.7B (Local)",
+            "contextWindow": 8192,
+            "maxTokens": 4096
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      ...existing config...,
+      "models": {
+        "default": {
+          "provider": "runanywhere",
+          "model": "qwen3-1.7b"
+        }
+      }
+    }
+  },
+  ...rest of config...
+}
+```
+
+### Step 6: Start Everything
+
+**Terminal 1 - RunAnywhere Server:**
+```bash
+export LD_LIBRARY_PATH=~/.local/runanywhere/lib:$LD_LIBRARY_PATH
+~/.local/runanywhere/bin/runanywhere-server \
+  --model ~/.local/share/runanywhere/Models/LlamaCpp/qwen3-1.7b/Qwen3-1.7B-Q8_0.gguf \
+  --port 8080 --threads 4
+```
+
+**Terminal 2 - Restart Moltbot Gateway:**
+```bash
+systemctl --user restart moltbot-gateway
+systemctl --user status moltbot-gateway
+```
+
+**Terminal 3 - Voice Assistant (optional):**
+```bash
+export LD_LIBRARY_PATH=~/.local/runanywhere/lib:$LD_LIBRARY_PATH
+~/.local/runanywhere/bin/voice-assistant --wakeword --moltbot
+```
+
+### Step 7: Test
+
+- **Web UI:** http://127.0.0.1:18789 (use token from onboarding)
+- **WhatsApp:** Send yourself a message
+- **Voice:** Say "Hey Jarvis"
 
 ---
 
 ## Option 2: Pre-built Binaries (Standalone)
 
-Download pre-built binaries - no Moltbot, no compilation needed.
+Simple voice assistant without Moltbot. No WhatsApp, no tools.
 
 ```bash
 # Download and install
 curl -fsSL https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/voice-assistant-v0.1.0/runanywhere-voice-assistant-linux-aarch64.tar.gz | tar -xzf - -C /tmp
 cd /tmp/runanywhere-release && ./install.sh
+
+# Fix library symlinks
+cd ~/.local/runanywhere/lib && for lib in *.so; do ln -sf "$lib" "${lib}.1"; done
 
 # Download AI models (~2.5GB)
 curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/smonga/rasp/Playground/linux-voice-assistant/scripts/download-models.sh | bash
@@ -95,25 +211,13 @@ cd ~/runanywhere-sdks/Playground/linux-voice-assistant
 
 ---
 
-## Running
+## What's Running
 
-### Standalone (no Moltbot)
-
-```bash
-~/.local/runanywhere/run.sh
-```
-
-### With Moltbot
-
-```bash
-~/runanywhere-sdks/Playground/linux-voice-assistant/run.sh
-```
-
-This starts:
-1. **runanywhere-server** on port 8080 (LLM inference)
-2. **Moltbot gateway** on port 18789
-3. **Voice bridge** (WebSocket)
-4. **Voice assistant** (wake word + STT + TTS)
+| Component | Port | Purpose |
+|-----------|------|---------|
+| runanywhere-server | 8080 | Local LLM inference |
+| Moltbot gateway | 18789 | AI orchestration, WhatsApp, tools |
+| Voice assistant | — | Wake word, STT, TTS |
 
 ---
 
@@ -141,7 +245,7 @@ voice-assistant [options]
 
 ```bash
 cd ~/.local/runanywhere/lib
-for lib in *.so; do ln -sf "$lib" "${lib}.1" 2>/dev/null; done
+for lib in *.so; do ln -sf "$lib" "${lib}.1"; done
 ```
 
 ### No audio input
@@ -155,6 +259,12 @@ arecord -l  # List devices
 ```bash
 curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/smonga/rasp/Playground/linux-voice-assistant/scripts/download-models.sh | bash
 ```
+
+### Moltbot can't connect to RunAnywhere
+
+1. Check RunAnywhere server is running: `curl http://localhost:8080/health`
+2. Check config has RunAnywhere provider in `~/.moltbot/moltbot.json`
+3. Restart gateway: `systemctl --user restart moltbot-gateway`
 
 ---
 
