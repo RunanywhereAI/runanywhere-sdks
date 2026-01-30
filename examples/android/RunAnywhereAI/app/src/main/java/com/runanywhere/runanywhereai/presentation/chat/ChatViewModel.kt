@@ -212,7 +212,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     val toolViewModel = ToolSettingsViewModel.getInstance(app)
                     val useToolCalling = toolViewModel.toolCallingEnabled
                     val registeredTools = RunAnywhereToolCalling.getRegisteredTools()
-                    
+
                     if (useToolCalling && registeredTools.isNotEmpty()) {
                         Log.i(TAG, "🔧 Using tool calling with ${registeredTools.size} tools")
                         generateWithToolCalling(prompt, assistantMessage.id)
@@ -226,7 +226,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
     }
-    
+
     /**
      * Generate with tool calling support
      * Matches iOS generateWithToolCalling pattern
@@ -236,15 +236,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         messageId: String,
     ) {
         val startTime = System.currentTimeMillis()
-        
+
         try {
             // Detect the appropriate tool call format based on loaded model
+            // Note: loadedModelName can be null if model state changes during generation
             val modelName = _uiState.value.loadedModelName
+            if (modelName == null) {
+                Log.w(TAG, "⚠️ Tool calling initiated but model name is null, using default format")
+            }
             val toolViewModel = ToolSettingsViewModel.getInstance(app)
             val format = toolViewModel.detectToolCallFormat(modelName)
-            
-            Log.i(TAG, "🔧 Tool calling with format: $format for model: $modelName")
-            
+
+            Log.i(TAG, "🔧 Tool calling with format: $format for model: ${modelName ?: "unknown"}")
+
             // Create tool calling options
             val toolOptions = ToolCallingOptions(
                 maxToolCalls = 3,
@@ -253,26 +257,26 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 maxTokens = 1024,
                 format = format
             )
-            
+
             // Generate with tools
             val result = RunAnywhereToolCalling.generateWithTools(prompt, toolOptions)
             val endTime = System.currentTimeMillis()
-            
+
             // Update the assistant message with the result
             val response = result.text
             updateAssistantMessage(messageId, response, null)
-            
+
             // Log tool calls and create tool call info
             if (result.toolCalls.isNotEmpty()) {
                 Log.i(TAG, "🔧 Tool calls made: ${result.toolCalls.map { it.toolName }}")
                 result.toolResults.forEach { toolResult ->
                     Log.i(TAG, "📋 Tool result: ${toolResult.toolName} - success: ${toolResult.success}")
                 }
-                
+
                 // Create ToolCallInfo from the first tool call and result
                 val firstToolCall = result.toolCalls.first()
                 val firstToolResult = result.toolResults.firstOrNull { it.toolName == firstToolCall.toolName }
-                
+
                 val toolCallInfo = ToolCallInfo(
                     toolName = firstToolCall.toolName,
                     arguments = formatToolValueMapToJson(firstToolCall.arguments),
@@ -280,10 +284,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     success = firstToolResult?.success ?: false,
                     error = firstToolResult?.error,
                 )
-                
+
                 updateAssistantMessageWithToolCallInfo(messageId, toolCallInfo)
             }
-            
+
             // Create analytics
             val analytics = createMessageAnalytics(
                 startTime = startTime,
@@ -296,9 +300,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 thinkingText = null,
                 wasInterrupted = false,
             )
-            
+
             updateAssistantMessageWithAnalytics(messageId, analytics)
-            
+
         } catch (e: Exception) {
             Log.e(TAG, "Tool calling failed", e)
             throw e

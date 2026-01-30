@@ -1052,6 +1052,9 @@ base class RacToolCallingOptionsStruct extends Struct {
 
   @Int32()
   external int keepToolsAvailable;
+
+  @Int32()
+  external int format;
 }
 
 /// Tool parameter type enum values - matches rac_tool_param_type_t

@@ -30,23 +30,23 @@ import kotlinx.coroutines.sync.withLock
 private object ToolRegistry {
     private val mutex = Mutex()
     private val tools = mutableMapOf<String, RegisteredTool>()
-    
+
     suspend fun register(definition: ToolDefinition, executor: ToolExecutor) = mutex.withLock {
         tools[definition.name] = RegisteredTool(definition, executor)
     }
-    
+
     suspend fun unregister(toolName: String) = mutex.withLock {
         tools.remove(toolName)
     }
-    
+
     suspend fun getAll(): List<ToolDefinition> = mutex.withLock {
         tools.values.map { it.definition }
     }
-    
+
     suspend fun get(toolName: String): RegisteredTool? = mutex.withLock {
         tools[toolName]
     }
-    
+
     suspend fun clear() = mutex.withLock {
         tools.clear()
     }
@@ -58,11 +58,11 @@ private object ToolRegistry {
 object RunAnywhereToolCalling {
     private const val TAG = "ToolCalling"
     private val logger = SDKLogger(TAG)
-    
+
     // ========================================================================
     // TOOL REGISTRATION
     // ========================================================================
-    
+
     /**
      * Register a tool that the LLM can use.
      *
@@ -79,7 +79,7 @@ object RunAnywhereToolCalling {
         ToolRegistry.register(definition, executor)
         logger.info("Registered tool: ${definition.name}")
     }
-    
+
     /**
      * Unregister a tool by name.
      *
@@ -89,7 +89,7 @@ object RunAnywhereToolCalling {
         ToolRegistry.unregister(toolName)
         logger.info("Unregistered tool: $toolName")
     }
-    
+
     /**
      * Get all registered tool definitions.
      *
@@ -98,7 +98,7 @@ object RunAnywhereToolCalling {
     suspend fun getRegisteredTools(): List<ToolDefinition> {
         return ToolRegistry.getAll()
     }
-    
+
     /**
      * Clear all registered tools.
      */
@@ -106,11 +106,11 @@ object RunAnywhereToolCalling {
         ToolRegistry.clear()
         logger.info("Cleared all registered tools")
     }
-    
+
     // ========================================================================
     // TOOL EXECUTION
     // ========================================================================
-    
+
     /**
      * Execute a tool call.
      *
@@ -122,7 +122,7 @@ object RunAnywhereToolCalling {
      */
     suspend fun executeTool(toolCall: ToolCall): ToolResult {
         val tool = ToolRegistry.get(toolCall.toolName)
-        
+
         if (tool == null) {
             return ToolResult(
                 toolName = toolCall.toolName,
@@ -131,7 +131,7 @@ object RunAnywhereToolCalling {
                 callId = toolCall.callId
             )
         }
-        
+
         return try {
             val result = tool.executor(toolCall.arguments)
             ToolResult(
@@ -150,11 +150,11 @@ object RunAnywhereToolCalling {
             )
         }
     }
-    
+
     // ========================================================================
     // GENERATE WITH TOOLS
     // ========================================================================
-    
+
     /**
      * Generates a response with tool calling support.
      *
@@ -175,37 +175,42 @@ object RunAnywhereToolCalling {
     ): ToolCallingResult {
         // Ensure SDK is initialized
         require(RunAnywhere.isInitialized) { "SDK not initialized" }
-        
+
         val opts = options ?: ToolCallingOptions()
         val registeredTools = ToolRegistry.getAll()
         val tools = opts.tools ?: registeredTools
-        
+
         // Build system prompt using C++ (SINGLE SOURCE OF TRUTH)
         val systemPrompt = buildToolSystemPrompt(tools, opts)
         var fullPrompt = if (systemPrompt.isEmpty()) prompt else "$systemPrompt\n\nUser: $prompt"
-        
+
         val allToolCalls = mutableListOf<ToolCall>()
         val allToolResults = mutableListOf<ToolResult>()
         var finalText = ""
-        
+
         repeat(opts.maxToolCalls) { iteration ->
             logger.debug("Tool calling iteration $iteration")
-            
+
             // Generate response
             val responseText = generateAndCollect(fullPrompt, opts.temperature, opts.maxTokens)
-            
+
             // Parse for tool calls using C++ (SINGLE SOURCE OF TRUTH - NO FALLBACK)
             val (cleanText, toolCall) = CppBridgeToolCalling.parseToolCallToObject(responseText)
             finalText = cleanText
-            
+
             if (toolCall == null) {
                 logger.debug("No tool call found, generation complete")
-                return@repeat
+                return ToolCallingResult(
+                    text = finalText,
+                    toolCalls = allToolCalls,
+                    toolResults = allToolResults,
+                    isComplete = true
+                )
             }
-            
+
             allToolCalls.add(toolCall)
             logger.info("Found tool call: ${toolCall.toolName}")
-            
+
             if (!opts.autoExecute) {
                 return ToolCallingResult(
                     text = finalText,
@@ -214,17 +219,17 @@ object RunAnywhereToolCalling {
                     isComplete = false
                 )
             }
-            
+
             // Execute tool
             val result = executeTool(toolCall)
             allToolResults.add(result)
             logger.info("Tool ${toolCall.toolName} executed: ${if (result.success) "success" else "failed"}")
-            
+
             // Build follow-up prompt using C++ (SINGLE SOURCE OF TRUTH)
             val toolResultJson = CppBridgeToolCalling.toolValueToJsonString(
                 result.result ?: mapOf("error" to ToolValue.string(result.error ?: "Unknown error"))
             )
-            
+
             fullPrompt = CppBridgeToolCalling.buildFollowupPrompt(
                 originalPrompt = prompt,
                 toolsPrompt = if (opts.keepToolsAvailable) CppBridgeToolCalling.formatToolsForPrompt(tools, opts.format) else null,
@@ -233,7 +238,7 @@ object RunAnywhereToolCalling {
                 keepToolsAvailable = opts.keepToolsAvailable
             )
         }
-        
+
         return ToolCallingResult(
             text = finalText,
             toolCalls = allToolCalls,
@@ -241,7 +246,7 @@ object RunAnywhereToolCalling {
             isComplete = true
         )
     }
-    
+
     /**
      * Continue generation after manual tool execution.
      *
@@ -263,15 +268,15 @@ object RunAnywhereToolCalling {
         val resultJson = CppBridgeToolCalling.toolValueToJsonString(
             toolResult.result ?: mapOf("error" to ToolValue.string(toolResult.error ?: "Unknown error"))
         )
-        
+
         val continuedPrompt = """
             $previousPrompt
-            
+
             Tool Result for ${toolCall.toolName}: $resultJson
-            
+
             Based on the tool result, please provide your response:
         """.trimIndent()
-        
+
         val continuationOptions = ToolCallingOptions(
             tools = options?.tools,
             maxToolCalls = (options?.maxToolCalls ?: 5) - 1,
@@ -283,14 +288,14 @@ object RunAnywhereToolCalling {
             keepToolsAvailable = options?.keepToolsAvailable ?: false,
             format = options?.format ?: ToolCallFormatName.DEFAULT
         )
-        
+
         return generateWithTools(continuedPrompt, continuationOptions)
     }
-    
+
     // ========================================================================
     // PRIVATE HELPERS
     // ========================================================================
-    
+
     /**
      * Builds the system prompt with tool definitions using C++ implementation.
      */
@@ -301,7 +306,7 @@ object RunAnywhereToolCalling {
         // Use C++ implementation for prompt formatting (SINGLE SOURCE OF TRUTH)
         // Pass the format from options to generate model-specific instructions
         val toolsPrompt = CppBridgeToolCalling.formatToolsForPrompt(tools, options.format)
-        
+
         return when {
             options.replaceSystemPrompt && options.systemPrompt != null -> {
                 options.systemPrompt
@@ -314,7 +319,7 @@ object RunAnywhereToolCalling {
             }
         }
     }
-    
+
     /**
      * Generate text using streaming and collect all tokens into a single string.
      */
@@ -327,14 +332,14 @@ object RunAnywhereToolCalling {
             maxTokens = maxTokens ?: 1024,
             temperature = temperature ?: 0.7f
         )
-        
+
         val tokenFlow = RunAnywhere.generateStream(prompt, genOptions)
-        
+
         val responseText = StringBuilder()
         tokenFlow.collect { token ->
             responseText.append(token)
         }
-        
+
         return responseText.toString()
     }
 }

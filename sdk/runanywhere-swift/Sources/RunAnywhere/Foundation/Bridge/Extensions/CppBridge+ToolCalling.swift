@@ -13,8 +13,8 @@
 //  - Tool execution (Swift async calls)
 //
 
-import Foundation
 import CRACommons
+import Foundation
 
 // MARK: - Tool Calling Bridge
 
@@ -192,16 +192,32 @@ extension CppBridge {
             var promptPtr: UnsafeMutablePointer<CChar>?
             defer { if let p = promptPtr { rac_free(p) } }
 
-            let toolsPromptPtr = toolsPrompt?.withCString { UnsafePointer($0) }
+            // IMPORTANT: The C function call MUST be inside withCString closure(s)
+            // to ensure pointers remain valid. Swift's automatic String-to-C bridging
+            // handles non-optional strings, but optional strings need explicit handling.
+            let rc: Int32
+            if let toolsPrompt = toolsPrompt {
+                rc = toolsPrompt.withCString { toolsPromptPtr in
+                    rac_tool_call_build_followup_prompt(
+                        originalPrompt,
+                        toolsPromptPtr,
+                        toolName,
+                        toolResultJson,
+                        keepToolsAvailable ? RAC_TRUE : RAC_FALSE,
+                        &promptPtr
+                    )
+                }
+            } else {
+                rc = rac_tool_call_build_followup_prompt(
+                    originalPrompt,
+                    nil,
+                    toolName,
+                    toolResultJson,
+                    keepToolsAvailable ? RAC_TRUE : RAC_FALSE,
+                    &promptPtr
+                )
+            }
 
-            let rc = rac_tool_call_build_followup_prompt(
-                originalPrompt,
-                toolsPromptPtr,
-                toolName,
-                toolResultJson,
-                keepToolsAvailable ? RAC_TRUE : RAC_FALSE,
-                &promptPtr
-            )
             guard rc == RAC_SUCCESS, let ptr = promptPtr else {
                 return ""
             }
