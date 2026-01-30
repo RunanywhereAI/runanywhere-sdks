@@ -666,7 +666,7 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
                 // No arguments found - use empty object
                 *out_args_json = static_cast<char*>(malloc(3));
                 if (*out_args_json) {
-                    strcpy(*out_args_json, "{}");
+                    std::memcpy(*out_args_json, "{}", 3);
                 }
                 return true;
             }
@@ -684,7 +684,7 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
             if (extract_json_value(json_obj, key.c_str(), &value, &is_obj)) {
                 *out_tool_name = static_cast<char*>(malloc(key.size() + 1));
                 if (*out_tool_name) {
-                    strcpy(*out_tool_name, key.c_str());
+                    std::memcpy(*out_tool_name, key.c_str(), key.size() + 1);
                 }
 
                 if (is_obj) {
@@ -702,7 +702,7 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
                 } else {
                     *out_args_json = static_cast<char*>(malloc(3));
                     if (*out_args_json) {
-                        strcpy(*out_args_json, "{}");
+                        std::memcpy(*out_args_json, "{}", 3);
                     }
                 }
                 return true;
@@ -786,11 +786,11 @@ static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char
         // No arguments - whole thing is function name
         *out_tool_name = static_cast<char*>(malloc(call_str.size() + 1));
         if (*out_tool_name) {
-            strcpy(*out_tool_name, call_str.c_str());
+            std::memcpy(*out_tool_name, call_str.c_str(), call_str.size() + 1);
         }
         *out_args_json = static_cast<char*>(malloc(3));
         if (*out_args_json) {
-            strcpy(*out_args_json, "{}");
+            std::memcpy(*out_args_json, "{}", 3);
         }
     } else {
         std::string func_name = call_str.substr(0, paren_pos);
@@ -802,7 +802,7 @@ static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char
 
         *out_tool_name = static_cast<char*>(malloc(func_name.size() + 1));
         if (*out_tool_name) {
-            strcpy(*out_tool_name, func_name.c_str());
+            std::memcpy(*out_tool_name, func_name.c_str(), func_name.size() + 1);
         }
 
         // Parse arguments: arg1="val1", arg2="val2", ...
@@ -940,7 +940,7 @@ static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char
 
         *out_args_json = static_cast<char*>(malloc(json_args.size() + 1));
         if (*out_args_json) {
-            strcpy(*out_args_json, json_args.c_str());
+            std::memcpy(*out_args_json, json_args.c_str(), json_args.size() + 1);
         }
     }
 
@@ -1147,7 +1147,7 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
         // Return original text as clean_text
         out_result->clean_text = static_cast<char*>(malloc(output_len + 1));
         if (out_result->clean_text) {
-            strcpy(out_result->clean_text, llm_output);
+            std::memcpy(out_result->clean_text, llm_output, output_len + 1);
         }
     }
 
@@ -1555,7 +1555,7 @@ extern "C" rac_result_t rac_tool_call_definitions_to_json(const rac_tool_definit
     if (!definitions || num_definitions == 0) {
         *out_json = static_cast<char*>(malloc(3));
         if (*out_json) {
-            strcpy(*out_json, "[]");
+            std::memcpy(*out_json, "[]", 3);
         }
         return RAC_SUCCESS;
     }
