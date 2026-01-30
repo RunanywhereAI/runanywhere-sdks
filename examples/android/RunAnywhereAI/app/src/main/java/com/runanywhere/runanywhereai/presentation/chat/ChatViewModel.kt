@@ -26,11 +26,18 @@ import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.public.extensions.isLLMModelLoaded
 import com.runanywhere.sdk.public.extensions.loadLLMModel
 import com.runanywhere.sdk.public.extensions.LLM.ToolCallingOptions
-import com.runanywhere.sdk.public.extensions.LLM.ToolCallFormatName
+import com.runanywhere.sdk.public.extensions.LLM.ToolCallFormat
 import com.runanywhere.sdk.public.extensions.LLM.RunAnywhereToolCalling
 import com.runanywhere.runanywhereai.presentation.settings.ToolSettingsViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterIsInstance
@@ -840,23 +847,34 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Format a ToolValue map to JSON string for display
+     * Format a ToolValue map to JSON string for display.
+     * Uses kotlinx.serialization for proper JSON escaping of special characters.
      */
     private fun formatToolValueMapToJson(map: Map<String, ToolValue>): String {
-        val entries = map.entries.map { (key, value) ->
-            "  \"$key\": ${formatToolValue(value)}"
+        val jsonObject = buildJsonObject {
+            map.forEach { (key, value) ->
+                put(key, formatToolValueToJsonElement(value))
+            }
         }
-        return "{\n${entries.joinToString(",\n")}\n}"
+        return Json.encodeToString(JsonObject.serializer(), jsonObject)
     }
 
-    private fun formatToolValue(value: ToolValue): String {
+    /**
+     * Convert a ToolValue to the appropriate JsonElement type.
+     * Handles all ToolValue variants with proper JSON escaping.
+     */
+    private fun formatToolValueToJsonElement(value: ToolValue): JsonElement {
         return when (value) {
-            is ToolValue.StringValue -> "\"${value.value}\""
-            is ToolValue.NumberValue -> value.value.toString()
-            is ToolValue.BoolValue -> value.value.toString()
-            is ToolValue.NullValue -> "null"
-            is ToolValue.ArrayValue -> "[${value.value.joinToString(", ") { formatToolValue(it) }}]"
-            is ToolValue.ObjectValue -> formatToolValueMapToJson(value.value)
+            is ToolValue.StringValue -> JsonPrimitive(value.value)
+            is ToolValue.NumberValue -> JsonPrimitive(value.value)
+            is ToolValue.BoolValue -> JsonPrimitive(value.value)
+            is ToolValue.NullValue -> JsonNull
+            is ToolValue.ArrayValue -> buildJsonArray {
+                value.value.forEach { add(formatToolValueToJsonElement(it)) }
+            }
+            is ToolValue.ObjectValue -> buildJsonObject {
+                value.value.forEach { (k, v) -> put(k, formatToolValueToJsonElement(v)) }
+            }
         }
     }
 

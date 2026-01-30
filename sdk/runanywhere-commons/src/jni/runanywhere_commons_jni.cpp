@@ -2323,6 +2323,37 @@ static bool extract_json_bool(const char* json, const char* key) {
     return strncmp(pos, "true", 4) == 0;
 }
 
+// Helper to extract a float value from JSON
+static float extract_json_float(const char* json, const char* key, float default_value) {
+    if (!json || !key)
+        return default_value;
+
+    std::string search_key = "\"" + std::string(key) + "\":";
+    const char* pos = strstr(json, search_key.c_str());
+    if (!pos)
+        return default_value;
+
+    pos += search_key.length();
+    while (*pos == ' ')
+        pos++;
+
+    char* end = nullptr;
+    float value = strtof(pos, &end);
+    if (end == pos)
+        return default_value;
+
+    return value;
+}
+
+// Helper to check if a JSON key exists
+static bool json_has_key(const char* json, const char* key) {
+    if (!json || !key)
+        return false;
+
+    std::string search_key = "\"" + std::string(key) + "\":";
+    return strstr(json, search_key.c_str()) != nullptr;
+}
+
 // Static storage for device info strings (need to persist for C callbacks)
 static struct {
     std::string device_id;
@@ -3274,36 +3305,45 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallParse(JNIEnv
     
     rac_result_t rc = rac_tool_call_parse(outputStr.c_str(), &result);
     
+    // Helper lambda to escape JSON string values
+    auto escape_json_string = [](const char* s) -> std::string {
+        std::string out;
+        if (!s) return out;
+        for (const char* p = s; *p; ++p) {
+            switch (*p) {
+                case '"': out += "\\\""; break;
+                case '\\': out += "\\\\"; break;
+                case '\n': out += "\\n"; break;
+                case '\r': out += "\\r"; break;
+                case '\t': out += "\\t"; break;
+                default: out += *p; break;
+            }
+        }
+        return out;
+    };
+    
     // Build JSON response
     std::string json = "{";
     json += "\"hasToolCall\":";
     json += (result.has_tool_call == RAC_TRUE) ? "true" : "false";
     json += ",\"cleanText\":\"";
-    
-    // Escape clean text
-    if (result.clean_text) {
-        for (const char* p = result.clean_text; *p; p++) {
-            switch (*p) {
-                case '"': json += "\\\""; break;
-                case '\\': json += "\\\\"; break;
-                case '\n': json += "\\n"; break;
-                case '\r': json += "\\r"; break;
-                case '\t': json += "\\t"; break;
-                default: json += *p; break;
-            }
-        }
-    }
+    json += escape_json_string(result.clean_text);
     json += "\"";
     
     if (result.has_tool_call == RAC_TRUE) {
+        // Escape tool_name to prevent JSON injection
         json += ",\"toolName\":\"";
-        if (result.tool_name) json += result.tool_name;
+        json += escape_json_string(result.tool_name);
         json += "\",\"argumentsJson\":";
-        if (result.arguments_json) {
+        
+        // Validate arguments_json: only embed if it looks like valid JSON object/array
+        if (result.arguments_json && 
+            (result.arguments_json[0] == '{' || result.arguments_json[0] == '[')) {
             json += result.arguments_json;
         } else {
             json += "{}";
         }
+        
         json += ",\"callId\":";
         json += std::to_string(result.call_id);
     }
@@ -3380,9 +3420,71 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallBuildInitial
     JNIEnv* env, jclass clazz, jstring userPrompt, jstring toolsJson, jstring optionsJson) {
     std::string userStr = getCString(env, userPrompt);
     std::string toolsStr = getCString(env, toolsJson);
+    std::string optionsStr = getCString(env, optionsJson);
     
-    // Parse options if provided (simplified - use defaults for now)
-    rac_tool_calling_options_t options = {5, RAC_TRUE, 0.7f, 1024, nullptr, RAC_FALSE, RAC_FALSE};
+    // Initialize with defaults (matching RAC_TOOL_CALLING_OPTIONS_DEFAULT)
+    rac_tool_calling_options_t options = {};
+    options.max_tool_calls = 5;
+    options.auto_execute = RAC_TRUE;
+    options.temperature = 0.7f;
+    options.max_tokens = 1024;
+    options.system_prompt = nullptr;
+    options.replace_system_prompt = RAC_FALSE;
+    options.keep_tools_available = RAC_FALSE;
+    options.format = RAC_TOOL_FORMAT_DEFAULT;
+    
+    // Storage for system prompt string (needs to outlive options struct)
+    std::string systemPromptStorage;
+    
+    // Parse options JSON if provided
+    const char* optionsJsonStr = optionsStr.c_str();
+    if (optionsJsonStr && strlen(optionsJsonStr) > 2) {
+        // Parse maxToolCalls
+        if (json_has_key(optionsJsonStr, "maxToolCalls")) {
+            options.max_tool_calls = static_cast<int32_t>(extract_json_int(optionsJsonStr, "maxToolCalls"));
+        }
+        
+        // Parse autoExecute
+        if (json_has_key(optionsJsonStr, "autoExecute")) {
+            options.auto_execute = extract_json_bool(optionsJsonStr, "autoExecute") ? RAC_TRUE : RAC_FALSE;
+        }
+        
+        // Parse temperature (optional field)
+        if (json_has_key(optionsJsonStr, "temperature")) {
+            options.temperature = extract_json_float(optionsJsonStr, "temperature", 0.7f);
+        }
+        
+        // Parse maxTokens (optional field)
+        if (json_has_key(optionsJsonStr, "maxTokens")) {
+            options.max_tokens = static_cast<int32_t>(extract_json_int(optionsJsonStr, "maxTokens"));
+        }
+        
+        // Parse systemPrompt (optional field)
+        if (json_has_key(optionsJsonStr, "systemPrompt")) {
+            systemPromptStorage = extract_json_string(optionsJsonStr, "systemPrompt");
+            if (!systemPromptStorage.empty()) {
+                options.system_prompt = systemPromptStorage.c_str();
+            }
+        }
+        
+        // Parse replaceSystemPrompt
+        if (json_has_key(optionsJsonStr, "replaceSystemPrompt")) {
+            options.replace_system_prompt = extract_json_bool(optionsJsonStr, "replaceSystemPrompt") ? RAC_TRUE : RAC_FALSE;
+        }
+        
+        // Parse keepToolsAvailable
+        if (json_has_key(optionsJsonStr, "keepToolsAvailable")) {
+            options.keep_tools_available = extract_json_bool(optionsJsonStr, "keepToolsAvailable") ? RAC_TRUE : RAC_FALSE;
+        }
+        
+        // Parse format (string to enum conversion)
+        if (json_has_key(optionsJsonStr, "format")) {
+            std::string formatStr = extract_json_string(optionsJsonStr, "format");
+            if (!formatStr.empty()) {
+                options.format = rac_tool_call_format_from_name(formatStr.c_str());
+            }
+        }
+    }
     
     char* prompt = nullptr;
     rac_result_t rc = rac_tool_call_build_initial_prompt(userStr.c_str(), toolsStr.c_str(), &options, &prompt);

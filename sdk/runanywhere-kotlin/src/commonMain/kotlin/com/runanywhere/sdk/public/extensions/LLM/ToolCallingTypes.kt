@@ -204,19 +204,48 @@ internal data class RegisteredTool(
 // =============================================================================
 
 /**
- * Format names for tool calling output.
- * Different LLM models expect different formats for tool calls.
+ * Format names for tool calling output (internal string constants).
+ * Used for C++ bridge communication.
+ */
+internal object ToolCallFormatName {
+    const val DEFAULT = "default"
+    const val LFM2 = "lfm2"
+}
+
+/**
+ * Tool calling format types.
+ * Each format specifies how tool calls are formatted in the LLM prompt.
  *
  * The format logic is handled in C++ commons (single source of truth).
  */
-object ToolCallFormatName {
-    /** JSON format: `<tool_call>{"tool":"name","arguments":{...}}</tool_call>`
-     * Use for most general-purpose models (Llama, Qwen, Mistral, etc.) */
-    const val DEFAULT = "default"
+sealed class ToolCallFormat {
+    /** 
+     * Default format using XML-style tags.
+     * JSON format: `<tool_call>{"tool":"name","arguments":{...}}</tool_call>`
+     * Use for most general-purpose models (Llama, Qwen, Mistral, etc.)
+     */
+    data object Default : ToolCallFormat()
     
-    /** Liquid AI format: `<|tool_call_start|>[func(args)]<|tool_call_end|>`
-     * Use for LFM2-Tool models */
-    const val LFM2 = "lfm2"
+    /** 
+     * LFM2 format for Liquid AI models.
+     * Liquid AI format: `<|tool_call_start|>[func(args)]<|tool_call_end|>`
+     * Use for LFM2-Tool models.
+     */
+    data object LFM2 : ToolCallFormat()
+    
+    /** Get the string representation for C++ bridge */
+    fun toFormatName(): String = when (this) {
+        is Default -> ToolCallFormatName.DEFAULT
+        is LFM2 -> ToolCallFormatName.LFM2
+    }
+    
+    companion object {
+        /** Convert from format name string (for deserialization) */
+        fun fromFormatName(name: String?): ToolCallFormat = when (name) {
+            ToolCallFormatName.LFM2 -> LFM2
+            else -> Default
+        }
+    }
 }
 
 // =============================================================================
@@ -244,12 +273,11 @@ data class ToolCallingOptions(
     /** If true, keeps tool definitions available after the first tool call */
     val keepToolsAvailable: Boolean = false,
     /**
-     * Format for tool calls. Use "lfm2" for LFM2-Tool models (Liquid AI).
-     * Default: "default" which uses JSON-based format suitable for most models.
-     * Valid values: "default", "lfm2"
-     * See [ToolCallFormatName] for constants.
+     * Format for tool calls.
+     * Use [ToolCallFormat.LFM2] for LFM2-Tool models (Liquid AI).
+     * Default: [ToolCallFormat.Default] which uses JSON-based format suitable for most models.
      */
-    val format: String = ToolCallFormatName.DEFAULT
+    val format: ToolCallFormat = ToolCallFormat.Default
 )
 
 // =============================================================================

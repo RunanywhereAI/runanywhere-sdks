@@ -116,18 +116,19 @@ object CppBridgeToolCalling {
      * Format tool definitions into a system prompt using C++ implementation.
      *
      * @param tools List of tool definitions
-     * @param format Tool calling format name (e.g., "default", "lfm2"). See [ToolCallFormatName].
+     * @param format Tool calling format type. See [ToolCallFormat].
      * @return Formatted system prompt string
      */
     fun formatToolsForPrompt(
         tools: List<ToolDefinition>,
-        format: String = ToolCallFormatName.DEFAULT
+        format: ToolCallFormat = ToolCallFormat.Default
     ): String {
         if (tools.isEmpty()) return ""
         
         val toolsJson = serializeToolsToJson(tools)
-        // Use string-based C++ API (single source of truth for format names)
-        return RunAnywhereBridge.racToolCallFormatPromptJsonWithFormatName(toolsJson, format) ?: ""
+        // Convert to string at JNI boundary - C++ handles the format logic
+        val formatString = format.toFormatName()
+        return RunAnywhereBridge.racToolCallFormatPromptJsonWithFormatName(toolsJson, formatString) ?: ""
     }
     
     // ========================================================================
@@ -280,7 +281,7 @@ object CppBridgeToolCalling {
             options.systemPrompt?.let { put("systemPrompt", it) }
             put("replaceSystemPrompt", options.replaceSystemPrompt)
             put("keepToolsAvailable", options.keepToolsAvailable)
-            put("format", options.format)  // Pass format as string
+            put("format", options.format.toFormatName())  // Convert to string at serialization boundary
         }
         return jsonObj.toString()
     }

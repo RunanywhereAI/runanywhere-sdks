@@ -46,6 +46,7 @@ import {
 } from '../types/settings';
 import type { StoredModel } from '../types/model';
 import { LLMFramework, FrameworkDisplayNames } from '../types/model';
+import { safeEvaluateExpression } from '../utils/mathParser';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
 import { RunAnywhere, type ModelInfo } from '@runanywhere/core';
@@ -310,12 +311,10 @@ export const SettingsScreen: React.FC = () => {
       async (args: Record<string, unknown>) => {
         const expression = (args.expression as string) || '0';
         try {
-          // Simple and safe math evaluation
-          const sanitized = expression.replace(/[^0-9+\-*/().% ]/g, '');
-          // eslint-disable-next-line no-eval
-          const result = eval(sanitized);
+          // Safe math evaluation using recursive descent parser
+          const result = safeEvaluateExpression(expression);
           return {
-            expression: sanitized,
+            expression: expression,
             result: result,
           };
         } catch (error) {

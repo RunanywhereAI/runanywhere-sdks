@@ -269,24 +269,30 @@ object RunAnywhereToolCalling {
             toolResult.result ?: mapOf("error" to ToolValue.string(toolResult.error ?: "Unknown error"))
         )
 
-        val continuedPrompt = """
-            $previousPrompt
+        // Build follow-up prompt using C++ (SINGLE SOURCE OF TRUTH)
+        val tools = options?.tools ?: ToolRegistry.getAll()
+        val toolsPrompt = if (options?.keepToolsAvailable == true) {
+            CppBridgeToolCalling.formatToolsForPrompt(tools, options.format)
+        } else null
 
-            Tool Result for ${toolCall.toolName}: $resultJson
-
-            Based on the tool result, please provide your response:
-        """.trimIndent()
+        val continuedPrompt = CppBridgeToolCalling.buildFollowupPrompt(
+            originalPrompt = previousPrompt,
+            toolsPrompt = toolsPrompt,
+            toolName = toolCall.toolName,
+            toolResultJson = resultJson,
+            keepToolsAvailable = options?.keepToolsAvailable ?: false
+        )
 
         val continuationOptions = ToolCallingOptions(
             tools = options?.tools,
-            maxToolCalls = (options?.maxToolCalls ?: 5) - 1,
+            maxToolCalls = maxOf(0, (options?.maxToolCalls ?: 5) - 1),
             autoExecute = options?.autoExecute ?: true,
             temperature = options?.temperature,
             maxTokens = options?.maxTokens,
             systemPrompt = options?.systemPrompt,
             replaceSystemPrompt = options?.replaceSystemPrompt ?: false,
             keepToolsAvailable = options?.keepToolsAvailable ?: false,
-            format = options?.format ?: ToolCallFormatName.DEFAULT
+            format = options?.format ?: ToolCallFormat.Default
         )
 
         return generateWithTools(continuedPrompt, continuationOptions)

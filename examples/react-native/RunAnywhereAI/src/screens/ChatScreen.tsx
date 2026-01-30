@@ -51,6 +51,7 @@ import {
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
 import { RunAnywhere, type ModelInfo as SDKModelInfo } from '@runanywhere/core';
+import { safeEvaluateExpression } from '../utils/mathParser';
 
 // Generate unique ID
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -152,12 +153,10 @@ const registerChatTools = () => {
       const expression = (args.expression || args.input) as string;
       console.log('[Tool] calculate called for:', expression);
       try {
-        // Simple and safe math evaluation
-        const sanitized = expression.replace(/[^0-9+\-*/().% ]/g, '');
-        // eslint-disable-next-line no-eval
-        const result = eval(sanitized);
+        // Safe math evaluation using recursive descent parser
+        const result = safeEvaluateExpression(expression);
         return {
-          expression: sanitized,
+          expression: expression,
           result: result,
         };
       } catch (error) {
