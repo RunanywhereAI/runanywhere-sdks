@@ -83,6 +83,14 @@ cp -r "$SCRIPT_DIR/lib/"* "$INSTALL_DIR/lib/"
 cp "$SCRIPT_DIR/run.sh" "$INSTALL_DIR/"
 chmod +x "$INSTALL_DIR/run.sh" "$INSTALL_DIR/bin/"*
 
+# Create versioned symlinks for shared libraries
+# (binaries may link against libonnxruntime.so.1 instead of libonnxruntime.so)
+for lib in "$INSTALL_DIR/lib/"*.so; do
+    [ -f "$lib" ] || continue
+    base=$(basename "$lib")
+    ln -sf "$base" "${lib}.1" 2>/dev/null || true
+done
+
 echo "Installation complete!"
 echo "Download models: curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/smonga/rasp/playground/linux-voice-assistant/scripts/download-models.sh | bash"
 echo "Run: ~/.local/runanywhere/run.sh"
@@ -173,6 +181,7 @@ Say **Hey Jarvis** to activate!
 - [ ] All components build successfully
 - [ ] Binaries are stripped (optional: `strip bin/*`)
 - [ ] Libraries are included
+- [ ] Library versioned symlinks created (libonnxruntime.so.1, etc.)
 - [ ] install.sh works on clean system
 - [ ] run.sh works after install
 - [ ] Models download script works
