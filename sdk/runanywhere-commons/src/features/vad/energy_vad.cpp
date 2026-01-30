@@ -27,7 +27,7 @@
 
 struct rac_energy_vad {
     
-    // Hot data -> accesed frequently 
+    // Hot data -> accessed frequently 
 
     bool is_active;
     bool is_currently_speaking;
