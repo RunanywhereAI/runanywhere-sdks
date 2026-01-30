@@ -4,7 +4,7 @@ On-device voice AI for Raspberry Pi 5 (Linux aarch64). Say **"Hey Jarvis"** to a
 
 ---
 
-## Option 1: Full Moltbot Integration (Recommended)
+## Option 1: Full Moltbot Integration (Easiest & Recommended)
 
 One command to set up Moltbot + Voice Assistant + RunAnywhere:
 
