@@ -1771,7 +1771,7 @@ private fun MessageAnalyticsCard(
 // ====================
 
 @Composable
-fun SelectableTextDialog(
+private fun SelectableTextDialog(
     text: String,
     onDismiss: () -> Unit,
 ) {
