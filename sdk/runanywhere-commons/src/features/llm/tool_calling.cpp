@@ -1225,17 +1225,22 @@ static std::string get_format_example_json(rac_tool_call_format_t format) {
 
     switch (format) {
     case RAC_TOOL_FORMAT_LFM2:
-        // LFM2 format - very direct instructions
+        // LFM2 format - enhanced with more math examples for better reliability
         example += "## OUTPUT FORMAT\n";
         example += "You MUST respond with ONLY a tool call in this exact format:\n";
         example += "<|tool_call_start|>[function_name(param=\"value\")]<|tool_call_end|>\n\n";
+        example += "CRITICAL: Always include the FULL format with <|tool_call_start|> and <|tool_call_end|> tags.\n\n";
         example += "## EXAMPLES\n";
         example += "Q: What's the weather in NYC?\n";
         example += "A: <|tool_call_start|>[get_weather(location=\"New York\")]<|tool_call_end|>\n\n";
         example += "Q: weather in sf\n";
         example += "A: <|tool_call_start|>[get_weather(location=\"San Francisco\")]<|tool_call_end|>\n\n";
         example += "Q: calculate 2+2\n";
-        example += "A: <|tool_call_start|>[calculate(expression=\"2+2\")]<|tool_call_end|>\n";
+        example += "A: <|tool_call_start|>[calculate(expression=\"2+2\")]<|tool_call_end|>\n\n";
+        example += "Q: What's 5*10?\n";
+        example += "A: <|tool_call_start|>[calculate(expression=\"5*10\")]<|tool_call_end|>\n\n";
+        example += "Q: What is 100/4?\n";
+        example += "A: <|tool_call_start|>[calculate(expression=\"100/4\")]<|tool_call_end|>\n";
         break;
 
     case RAC_TOOL_FORMAT_DEFAULT:
@@ -1352,9 +1357,10 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format(const char*
 
     prompt += "\n\n## RULES\n";
     prompt += "- Weather question = call get_weather\n";
-    prompt += "- Math question = call calculate\n";
+    prompt += "- Math/calculation question (add, subtract, multiply, divide, \"what's X*Y\", etc.) = call calculate with the EXPRESSION as a string\n";
     prompt += "- Time question = call get_current_time\n";
-    prompt += "- DO NOT make up data. ALWAYS use the tool.\n";
+    prompt += "- DO NOT compute answers yourself. ALWAYS use the tool with the original expression.\n";
+    prompt += "- ALWAYS include <|tool_call_start|> and <|tool_call_end|> tags.\n";
     
     RAC_LOG_INFO("ToolCalling", "Generated tool prompt (format=%d): %.500s...", 
                  (int)actual_format, prompt.c_str());

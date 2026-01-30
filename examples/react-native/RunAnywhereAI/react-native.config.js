@@ -23,6 +23,7 @@ module.exports = {
     'react-native-sound': {
       platforms: {
         ios: null,
+        android: null,
       },
     },
     'react-native-tts': {
