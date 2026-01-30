@@ -8,7 +8,7 @@ How to create releases for the RunAnywhere Voice Assistant.
    ```bash
    # Install
    sudo apt install gh
-   
+
    # Authenticate
    gh auth login
    ```
