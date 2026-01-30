@@ -26,47 +26,50 @@
 // =============================================================================
 
 struct rac_energy_vad {
-    // Configuration
-    int32_t sample_rate;
-    int32_t frame_length_samples;
-    float energy_threshold;
-    float base_energy_threshold;
-    float tts_threshold_multiplier;
-    float calibration_multiplier;
+    
+    // Hot data -> accesed frequently 
 
-    // State tracking (mirrors Swift's state properties)
     bool is_active;
     bool is_currently_speaking;
-    int32_t consecutive_silent_frames;
-    int32_t consecutive_voice_frames;
     bool is_paused;
     bool is_tts_active;
 
-    // Hysteresis parameters (mirrors Swift constants)
-    int32_t voice_start_threshold;      // frames of voice to start
-    int32_t voice_end_threshold;        // frames of silence to end
-    int32_t tts_voice_start_threshold;  // more frames needed during TTS
-    int32_t tts_voice_end_threshold;    // quicker end during TTS
+    int32_t consecutive_silent_frames;
+    int32_t consecutive_voice_frames;
 
-    // Calibration (mirrors Swift calibration properties)
+    float energy_threshold;
+    float base_energy_threshold;
+
+    int32_t voice_start_threshold;
+    int32_t voice_end_threshold;
+    int32_t tts_voice_start_threshold;
+    int32_t tts_voice_end_threshold;
+
+    size_t ring_buffer_write_index;
+    size_t ring_buffer_count;
+
+    // Cold data -> accessed less frequently
+
+    int32_t sample_rate;
+    int32_t frame_length_samples;
+    float tts_threshold_multiplier;
+    float calibration_multiplier;
+
     bool is_calibrating;
-    std::vector<float> calibration_samples;
+    float ambient_noise_level;
     int32_t calibration_frame_count;
     int32_t calibration_frames_needed;
-    float ambient_noise_level;
+    std::vector<float> calibration_samples;
 
-    // Debug statistics (mirrors Swift debug properties)
     std::vector<float> recent_energy_values;
     int32_t max_recent_values;
     int32_t debug_frame_count;
 
-    // Callbacks
     rac_speech_activity_callback_fn speech_callback;
     void* speech_user_data;
     rac_audio_buffer_callback_fn audio_callback;
     void* audio_user_data;
 
-    // Thread safety
     std::mutex mutex;
 };
 
@@ -176,12 +179,23 @@ static void handle_calibration_frame(rac_energy_vad* vad, float energy) {
 
 /**
  * Update debug statistics
- * Mirrors Swift's updateDebugStatistics(energy:)
+ * Mirrors Swift's updateDebugStatistics(energy:) 
+ * Optimised to use ring buffer 
  */
 static void update_debug_statistics(rac_energy_vad* vad, float energy) {
-    vad->recent_energy_values.push_back(energy);
-    if (static_cast<int32_t>(vad->recent_energy_values.size()) > vad->max_recent_values) {
-        vad->recent_energy_values.erase(vad->recent_energy_values.begin());
+    if (vad->recent_energy_values.empty()) {
+        return;
+    }
+    
+    vad->recent_energy_values[vad->ring_buffer_write_index] = energy;
+
+    vad->ring_buffer_write_index++;
+    if (vad->ring_buffer_write_index >= vad->recent_energy_values.size()) {
+        vad->ring_buffer_write_index = 0;
+    }
+
+    if (vad->ring_buffer_count < vad->recent_energy_values.size()) {
+        vad->ring_buffer_count++;
     }
 }
 
@@ -228,9 +242,13 @@ rac_result_t rac_energy_vad_create(const rac_energy_vad_config_t* config,
     vad->calibration_frames_needed = RAC_VAD_CALIBRATION_FRAMES_NEEDED;
     vad->ambient_noise_level = 0.0f;
 
-    // Debug (mirrors Swift defaults)
+    // Debug Ring Buffer Init
     vad->max_recent_values = RAC_VAD_MAX_RECENT_VALUES;
     vad->debug_frame_count = 0;
+    vad->ring_buffer_write_index = 0;
+    vad->ring_buffer_count = 0;
+
+    vad->recent_energy_values.resize(vad->max_recent_values, 0.0f);
 
     // Callbacks
     vad->speech_callback = nullptr;
@@ -402,16 +420,31 @@ rac_result_t rac_energy_vad_process_audio(rac_energy_vad_handle_t handle, const 
     return RAC_SUCCESS;
 }
 
-float rac_energy_vad_calculate_rms(const float* audio_data, size_t sample_count) {
+float rac_energy_vad_calculate_rms(const float* __restrict audio_data,
+                                  size_t sample_count) {
     if (sample_count == 0 || audio_data == nullptr) {
         return 0.0f;
     }
 
-    // RMS calculation: sqrt(sum(x^2) / N)
-    // Mirrors Swift's calculateAverageEnergy using vDSP_rmsqv
-    float sum_squares = 0.0f;
-    for (size_t i = 0; i < sample_count; ++i) {
-        sum_squares += audio_data[i] * audio_data[i];
+    float s0 = 0.0f, s1 = 0.0f, s2 = 0.0f, s3 = 0.0f;
+    size_t i = 0;
+
+    for (; i + 3 < sample_count; i += 4) {
+        float a = audio_data[i];
+        float b = audio_data[i + 1];
+        float c = audio_data[i + 2];
+        float d = audio_data[i + 3];
+        s0 += a * a;
+        s1 += b * b;
+        s2 += c * c;
+        s3 += d * d;
+    }
+
+    float sum_squares = (s0 + s1) + (s2 + s3);
+
+    for (; i < sample_count; ++i) {
+        float x = audio_data[i];
+        sum_squares += x * x;
     }
     return std::sqrt(sum_squares / static_cast<float>(sample_count));
 }
@@ -439,8 +472,10 @@ rac_result_t rac_energy_vad_pause(rac_energy_vad_handle_t handle) {
         }
     }
 
-    // Clear recent energy values
-    handle->recent_energy_values.clear();
+    // Clear recent energy values (Reset Ring Buffer)
+    handle->ring_buffer_count = 0;
+    handle->ring_buffer_write_index = 0;
+    // No need to zero out vector, just reset indices
     handle->consecutive_silent_frames = 0;
     handle->consecutive_voice_frames = 0;
 
@@ -461,11 +496,13 @@ rac_result_t rac_energy_vad_resume(rac_energy_vad_handle_t handle) {
 
     handle->is_paused = false;
 
-    // Reset state for clean resumption
     handle->is_currently_speaking = false;
     handle->consecutive_silent_frames = 0;
     handle->consecutive_voice_frames = 0;
-    handle->recent_energy_values.clear();
+
+    handle->ring_buffer_count = 0;
+    handle->ring_buffer_write_index = 0;
+
     handle->debug_frame_count = 0;
 
     RAC_LOG_INFO("EnergyVAD", "VAD resumed");
@@ -564,7 +601,8 @@ rac_result_t rac_energy_vad_notify_tts_finish(rac_energy_vad_handle_t handle) {
     RAC_LOG_INFO("EnergyVAD", "TTS finished - VAD threshold restored");
 
     // Reset state for immediate readiness
-    handle->recent_energy_values.clear();
+    handle->ring_buffer_count = 0;
+    handle->ring_buffer_write_index = 0;
     handle->consecutive_silent_frames = 0;
     handle->consecutive_voice_frames = 0;
     handle->is_currently_speaking = false;
@@ -636,13 +674,20 @@ rac_result_t rac_energy_vad_get_statistics(rac_energy_vad_handle_t handle,
     float recent_max = 0.0f;
     float current = 0.0f;
 
-    if (!handle->recent_energy_values.empty()) {
-        for (float val : handle->recent_energy_values) {
+    size_t count = handle->ring_buffer_count;
+    if (count > 0) {
+        
+        size_t last_idx = (handle->ring_buffer_write_index == 0)
+                              ? (handle->recent_energy_values.size() - 1)
+                              : (handle->ring_buffer_write_index - 1);
+        current = handle->recent_energy_values[last_idx];
+
+        for (size_t i = 0; i < count; ++i) {
+            float val = handle->recent_energy_values[i];
             recent_avg += val;
             recent_max = std::max(recent_max, val);
         }
-        recent_avg /= static_cast<float>(handle->recent_energy_values.size());
-        current = handle->recent_energy_values.back();
+        recent_avg /= static_cast<float>(count);
     }
 
     out_stats->current = current;
