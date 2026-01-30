@@ -288,19 +288,18 @@ rac_result_t HttpServer::loadModel(const std::string& modelPath) {
     // Register LlamaCPP backend if not already registered
     rac_backend_llamacpp_register();
 
-    // Create LLM handle using model path as ID
-    rac_result_t rc = rac_llm_create(modelPath.c_str(), &llmHandle_);
-    if (RAC_FAILED(rc)) {
-        RAC_LOG_ERROR("Server", "Failed to create LLM handle: %d", rc);
-        return RAC_ERROR_SERVER_MODEL_LOAD_FAILED;
-    }
+    // Configure LlamaCPP with server settings
+    rac_llm_llamacpp_config_t llamacpp_config = RAC_LLM_LLAMACPP_CONFIG_DEFAULT;
+    llamacpp_config.context_size = config_.context_size;
+    llamacpp_config.num_threads = config_.threads;
 
-    // Initialize with the model path
-    rc = rac_llm_initialize(llmHandle_, modelPath.c_str());
+    RAC_LOG_INFO("Server", "LlamaCPP config: context_size=%d, num_threads=%d",
+                 llamacpp_config.context_size, llamacpp_config.num_threads);
+
+    // Create LLM handle using LlamaCPP-specific API with config
+    rac_result_t rc = rac_llm_llamacpp_create(modelPath.c_str(), &llamacpp_config, &llmHandle_);
     if (RAC_FAILED(rc)) {
-        RAC_LOG_ERROR("Server", "Failed to initialize LLM: %d", rc);
-        rac_llm_destroy(llmHandle_);
-        llmHandle_ = nullptr;
+        RAC_LOG_ERROR("Server", "Failed to create LlamaCPP LLM handle: %d", rc);
         return RAC_ERROR_SERVER_MODEL_LOAD_FAILED;
     }
 
