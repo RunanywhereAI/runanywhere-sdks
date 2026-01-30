@@ -132,74 +132,6 @@ private struct IOSSettingsContent: View {
                     .font(AppTypography.caption)
             }
 
-            // Storage Overview Section
-            Section {
-                StorageOverviewRows(viewModel: viewModel)
-            } header: {
-                HStack {
-                    Text("Storage Overview")
-                    Spacer()
-                    Button("Refresh") {
-                        Task {
-                            await viewModel.refreshStorageData()
-                        }
-                    }
-                    .font(AppTypography.caption)
-                }
-            }
-
-            // Downloaded Models Section
-            Section("Downloaded Models") {
-                if viewModel.storedModels.isEmpty {
-                    Text("No models downloaded yet")
-                        .foregroundColor(AppColors.textSecondary)
-                        .font(AppTypography.caption)
-                } else {
-                    ForEach(viewModel.storedModels, id: \.id) { model in
-                        StoredModelRow(model: model) {
-                            await viewModel.deleteModel(model)
-                        }
-                    }
-                }
-            }
-
-            // Storage Management
-            Section("Storage Management") {
-                Button(
-                    action: {
-                        Task {
-                            await viewModel.clearCache()
-                        }
-                    },
-                    label: {
-                        HStack {
-                            Image(systemName: "trash")
-                                .foregroundColor(AppColors.primaryRed)
-                            Text("Clear Cache")
-                                .foregroundColor(AppColors.primaryRed)
-                            Spacer()
-                        }
-                    }
-                )
-
-                Button(
-                    action: {
-                        Task {
-                            await viewModel.cleanTempFiles()
-                        }
-                    },
-                    label: {
-                        HStack {
-                            Image(systemName: "trash")
-                                .foregroundColor(AppColors.primaryOrange)
-                            Text("Clean Temporary Files")
-                                .foregroundColor(AppColors.primaryOrange)
-                            Spacer()
-                        }
-                    }
-                )
-            }
-
             // Logging Configuration
             Section("Logging Configuration") {
                 Toggle("Log Analytics Locally", isOn: $viewModel.analyticsLogToLocal)
@@ -248,9 +180,6 @@ private struct MacOSSettingsContent: View {
                 GenerationSettingsCard(viewModel: viewModel)
                 ToolSettingsCard(viewModel: toolViewModel)
                 APIConfigurationCard(viewModel: viewModel)
-                StorageCard(viewModel: viewModel)
-                DownloadedModelsCard(viewModel: viewModel)
-                StorageManagementCard(viewModel: viewModel)
                 LoggingConfigurationCard(viewModel: viewModel)
                 AboutCard()
 

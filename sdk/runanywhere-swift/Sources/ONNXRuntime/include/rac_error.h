@@ -64,6 +64,8 @@ extern "C" {
 #define RAC_ERROR_INVALID_API_KEY ((rac_result_t) - 104)
 /** Environment mismatch (e.g., dev vs prod) */
 #define RAC_ERROR_ENVIRONMENT_MISMATCH ((rac_result_t) - 105)
+/** Invalid parameter value passed to a function */
+#define RAC_ERROR_INVALID_PARAMETER ((rac_result_t) - 106)
 
 // =============================================================================
 // MODEL ERRORS (-110 to -129)

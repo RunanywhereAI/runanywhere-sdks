@@ -52,21 +52,25 @@ public protocol ComponentOutput: Sendable {
 /// ```
 public enum SDKComponent: String, CaseIterable, Codable, Sendable, Hashable {
     case llm = "LLM"
+    case vlm = "VLM"
     case stt = "STT"
     case tts = "TTS"
     case vad = "VAD"
     case voice = "VOICE"
     case embedding = "EMBEDDING"
+    case diffusion = "DIFFUSION"
 
     /// Human-readable display name
     public var displayName: String {
         switch self {
         case .llm: return "Language Model"
+        case .vlm: return "Vision Language Model"
         case .stt: return "Speech to Text"
         case .tts: return "Text to Speech"
         case .vad: return "Voice Activity Detection"
         case .voice: return "Voice Agent"
         case .embedding: return "Embedding"
+        case .diffusion: return "Image Generation"
         }
     }
 

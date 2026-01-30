@@ -38,6 +38,8 @@ public extension RunAnywhere {
         switch capability {
         case .llm:
             relevantCategories = [.language, .multimodal]
+        case .vlm:
+            relevantCategories = [.multimodal, .vision]
         case .stt:
             relevantCategories = [.speechRecognition]
         case .tts:
@@ -49,6 +51,8 @@ public extension RunAnywhere {
         case .embedding:
             // Embedding models could be language or multimodal
             relevantCategories = [.language, .multimodal]
+        case .diffusion:
+            relevantCategories = [.imageGeneration]
         }
 
         for model in allModels where relevantCategories.contains(model.category) {

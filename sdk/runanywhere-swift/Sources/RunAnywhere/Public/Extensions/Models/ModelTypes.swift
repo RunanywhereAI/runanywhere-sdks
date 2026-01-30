@@ -77,6 +77,7 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
     case foundationModels = "FoundationModels"
     case systemTTS = "SystemTTS"
     case fluidAudio = "FluidAudio"
+    case coreml = "CoreML"        // Core ML (Apple Neural Engine) for diffusion models
 
     // Special cases
     case builtIn = "BuiltIn"      // For simple services (e.g., energy-based VAD)
@@ -91,6 +92,7 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
         case .foundationModels: return "Foundation Models"
         case .systemTTS: return "System TTS"
         case .fluidAudio: return "FluidAudio"
+        case .coreml: return "Core ML"
         case .builtIn: return "Built-in"
         case .none: return "None"
         case .unknown: return "Unknown"
@@ -105,6 +107,7 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
         case .foundationModels: return "foundation_models"
         case .systemTTS: return "system_tts"
         case .fluidAudio: return "fluid_audio"
+        case .coreml: return "coreml"
         case .builtIn: return "built_in"
         case .none: return "none"
         case .unknown: return "unknown"
@@ -123,6 +126,7 @@ public extension InferenceFramework {
         case .foundationModels: return RAC_FRAMEWORK_FOUNDATION_MODELS
         case .systemTTS: return RAC_FRAMEWORK_SYSTEM_TTS
         case .fluidAudio: return RAC_FRAMEWORK_FLUID_AUDIO
+        case .coreml: return RAC_FRAMEWORK_COREML
         case .builtIn: return RAC_FRAMEWORK_BUILTIN
         case .none: return RAC_FRAMEWORK_NONE
         case .unknown: return RAC_FRAMEWORK_UNKNOWN
@@ -137,6 +141,7 @@ public extension InferenceFramework {
         case RAC_FRAMEWORK_FOUNDATION_MODELS: return .foundationModels
         case RAC_FRAMEWORK_SYSTEM_TTS: return .systemTTS
         case RAC_FRAMEWORK_FLUID_AUDIO: return .fluidAudio
+        case RAC_FRAMEWORK_COREML: return .coreml
         case RAC_FRAMEWORK_BUILTIN: return .builtIn
         case RAC_FRAMEWORK_NONE: return .none
         default: return .unknown
@@ -228,15 +233,22 @@ public struct ExpectedModelFiles: Codable, Sendable, Equatable {
 
 /// Describes a file that needs to be downloaded as part of a multi-file model
 public struct ModelFileDescriptor: Codable, Sendable, Equatable {
-    public let relativePath: String
-    public let destinationPath: String
+    /// Full URL to download this file from
+    public let url: URL
+    /// Filename to save as (e.g., "model.gguf" or "mmproj.gguf")
+    public let filename: String
+    /// Whether this file is required for the model to work
     public let isRequired: Bool
 
-    public init(relativePath: String, destinationPath: String, isRequired: Bool = true) {
-        self.relativePath = relativePath
-        self.destinationPath = destinationPath
+    public init(url: URL, filename: String, isRequired: Bool = true) {
+        self.url = url
+        self.filename = filename
         self.isRequired = isRequired
     }
+
+    // Legacy compatibility
+    public var relativePath: String { url.lastPathComponent }
+    public var destinationPath: String { filename }
 }
 
 // MARK: - Model Artifact Type
