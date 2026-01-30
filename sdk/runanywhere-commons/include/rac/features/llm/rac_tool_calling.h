@@ -194,10 +194,10 @@ RAC_API const char* rac_tool_call_format_name(rac_tool_call_format_t format);
  * @brief Detect which format is present in LLM output
  *
  * Checks for format-specific markers without fully parsing.
- * Returns RAC_TOOL_FORMAT_AUTO if no recognizable format is found.
+ * Returns RAC_TOOL_FORMAT_DEFAULT if no recognizable format is found.
  *
  * @param llm_output Raw LLM output text
- * @return Detected format, or RAC_TOOL_FORMAT_AUTO if none detected
+ * @return Detected format, or RAC_TOOL_FORMAT_DEFAULT if none detected
  */
 RAC_API rac_tool_call_format_t rac_tool_call_detect_format(const char* llm_output);
 

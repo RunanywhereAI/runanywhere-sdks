@@ -199,6 +199,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           maxToolCalls: 3,
           autoExecute: true,
           formatName: format,
+          maxTokens: maxTokens,
+          temperature: temperature,
         ),
       );
 

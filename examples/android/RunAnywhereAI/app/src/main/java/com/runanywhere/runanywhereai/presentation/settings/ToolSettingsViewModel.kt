@@ -42,51 +42,51 @@ data class ToolSettingsUiState(
  * Mirrors iOS ToolSettingsViewModel.swift functionality.
  */
 class ToolSettingsViewModel private constructor(application: Application) : AndroidViewModel(application) {
-    
+
     private val _uiState = MutableStateFlow(ToolSettingsUiState())
     val uiState: StateFlow<ToolSettingsUiState> = _uiState.asStateFlow()
-    
+
     private val prefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    
+
     val toolCallingEnabled: Boolean
         get() = _uiState.value.toolCallingEnabled
-    
+
     companion object {
         private const val TAG = "ToolSettingsVM"
         private const val PREFS_NAME = "tool_settings"
         private const val KEY_TOOL_CALLING_ENABLED = "tool_calling_enabled"
-        
+
         @Volatile
         private var instance: ToolSettingsViewModel? = null
-        
+
         fun getInstance(application: Application): ToolSettingsViewModel {
             return instance ?: synchronized(this) {
                 instance ?: ToolSettingsViewModel(application).also { instance = it }
             }
         }
     }
-    
+
     init {
         // Load saved preference
         val enabled = prefs.getBoolean(KEY_TOOL_CALLING_ENABLED, false)
         _uiState.update { it.copy(toolCallingEnabled = enabled) }
-        
+
         // Refresh registered tools
         viewModelScope.launch {
             refreshRegisteredTools()
         }
     }
-    
+
     fun setToolCallingEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_TOOL_CALLING_ENABLED, enabled).apply()
         _uiState.update { it.copy(toolCallingEnabled = enabled) }
     }
-    
+
     suspend fun refreshRegisteredTools() {
         val tools = RunAnywhereToolCalling.getRegisteredTools()
         _uiState.update { it.copy(registeredTools = tools) }
     }
-    
+
     /**
      * Register demo tools matching iOS implementation:
      * - get_weather: Uses Open-Meteo API (free, no API key)
@@ -96,7 +96,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
     fun registerDemoTools() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            
+
             try {
                 // Weather Tool - Uses Open-Meteo API (free, no API key required)
                 RunAnywhereToolCalling.registerTool(
@@ -117,7 +117,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                         fetchWeather((args["location"] as? ToolValue.StringValue)?.value ?: "San Francisco")
                     }
                 )
-                
+
                 // Time Tool - Real system time with timezone
                 RunAnywhereToolCalling.registerTool(
                     definition = ToolDefinition(
@@ -134,7 +134,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                             timeZone = TimeZone.getTimeZone("UTC")
                         }
                         val tz = TimeZone.getDefault()
-                        
+
                         mapOf(
                             "datetime" to ToolValue.StringValue(dateFormatter.format(now)),
                             "time" to ToolValue.StringValue(timeFormatter.format(now)),
@@ -144,7 +144,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                         )
                     }
                 )
-                
+
                 // Calculator Tool - Math evaluation
                 RunAnywhereToolCalling.registerTool(
                     definition = ToolDefinition(
@@ -167,10 +167,10 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                         evaluateMathExpression(expression)
                     }
                 )
-                
+
                 Log.i(TAG, "✅ Demo tools registered")
                 refreshRegisteredTools()
-                
+
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to register demo tools", e)
             } finally {
@@ -178,7 +178,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
             }
         }
     }
-    
+
     fun clearAllTools() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
@@ -193,7 +193,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
             }
         }
     }
-    
+
     /**
      * Detect the appropriate tool call format based on model name.
      * LFM2-Tool models use the lfm2 format, others use default JSON format.
@@ -206,11 +206,11 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
             ToolCallFormatName.DEFAULT
         }
     }
-    
+
     // ========================================================================
     // Tool Executor Implementations
     // ========================================================================
-    
+
     /**
      * Fetch weather using Open-Meteo API (free, no API key required)
      */
@@ -220,38 +220,38 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                 // First, geocode the location
                 val geocodeUrl = "https://geocoding-api.open-meteo.com/v1/search?name=${URLEncoder.encode(location, "UTF-8")}&count=1"
                 val geocodeResponse = fetchUrl(geocodeUrl)
-            
+
             // Parse geocode response (simple JSON parsing)
             val latMatch = Regex("\"latitude\":\\s*(-?\\d+\\.?\\d*)").find(geocodeResponse)
             val lonMatch = Regex("\"longitude\":\\s*(-?\\d+\\.?\\d*)").find(geocodeResponse)
             val nameMatch = Regex("\"name\":\\s*\"([^\"]+)\"").find(geocodeResponse)
-            
+
             if (latMatch == null || lonMatch == null) {
                 return@withContext mapOf(
                     "error" to ToolValue.StringValue("Location not found: $location"),
                     "location" to ToolValue.StringValue(location)
                 )
             }
-            
+
             val lat = latMatch.groupValues[1]
             val lon = lonMatch.groupValues[1]
             val resolvedName = nameMatch?.groupValues?.get(1) ?: location
-            
+
             // Fetch weather
             val weatherUrl = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m"
             val weatherResponse = fetchUrl(weatherUrl)
-            
+
             // Parse weather response
             val tempMatch = Regex("\"temperature_2m\":\\s*(-?\\d+\\.?\\d*)").find(weatherResponse)
             val humidityMatch = Regex("\"relative_humidity_2m\":\\s*(\\d+)").find(weatherResponse)
             val windMatch = Regex("\"wind_speed_10m\":\\s*(-?\\d+\\.?\\d*)").find(weatherResponse)
             val codeMatch = Regex("\"weather_code\":\\s*(\\d+)").find(weatherResponse)
-            
+
             val temperature = tempMatch?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
             val humidity = humidityMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
             val windSpeed = windMatch?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
             val weatherCode = codeMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
-            
+
             val condition = when (weatherCode) {
                 0 -> "Clear sky"
                 1, 2, 3 -> "Partly cloudy"
@@ -263,7 +263,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                 95, 96, 99 -> "Thunderstorm"
                 else -> "Unknown"
             }
-            
+
             mapOf(
                 "location" to ToolValue.StringValue(resolvedName),
                 "temperature_celsius" to ToolValue.NumberValue(temperature),
@@ -281,21 +281,21 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
             }
         }
     }
-    
+
     private fun fetchUrl(urlString: String): String {
         val url = URL(urlString)
         val connection = url.openConnection() as HttpURLConnection
         connection.requestMethod = "GET"
         connection.connectTimeout = 10000
         connection.readTimeout = 10000
-        
+
         return try {
             connection.inputStream.bufferedReader().use { it.readText() }
         } finally {
             connection.disconnect()
         }
     }
-    
+
     /**
      * Evaluate a math expression
      */
@@ -308,10 +308,10 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                 .replace("×", "*")
                 .replace("÷", "/")
                 .trim()
-            
+
             // Simple expression evaluator (handles basic math)
             val result = evaluateSimpleExpression(cleaned)
-            
+
             mapOf(
                 "result" to ToolValue.NumberValue(result),
                 "expression" to ToolValue.StringValue(expression)
@@ -323,20 +323,40 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
             )
         }
     }
-    
+
+    /**
+     * Token parser with index-based iteration supporting peek operations.
+     * Enables lookahead for recursive descent parsing without consuming tokens.
+     */
+    private class TokenParser(private val tokens: List<String>) {
+        private var index = 0
+
+        /** Returns true if there are more tokens to consume */
+        fun hasNext(): Boolean = index < tokens.size
+
+        /** Returns and consumes the next token */
+        fun next(): String {
+            if (!hasNext()) throw NoSuchElementException("No more tokens")
+            return tokens[index++]
+        }
+
+        /** Returns the next token without consuming it, or null if no more tokens */
+        fun peek(): String? = if (hasNext()) tokens[index] else null
+    }
+
     /**
      * Simple recursive descent parser for math expressions
      */
     private fun evaluateSimpleExpression(expr: String): Double {
         val tokens = tokenize(expr)
-        val iterator = tokens.iterator()
-        return parseExpression(iterator)
+        val parser = TokenParser(tokens)
+        return parseExpression(parser)
     }
-    
+
     private fun tokenize(expr: String): List<String> {
         val tokens = mutableListOf<String>()
         var current = StringBuilder()
-        
+
         for (char in expr) {
             when {
                 char.isDigit() || char == '.' -> current.append(char)
@@ -360,47 +380,42 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
         }
         return tokens
     }
-    
-    private fun parseExpression(tokens: Iterator<String>): Double {
-        var left = parseTerm(tokens)
-        while (tokens.hasNext()) {
-            val op = peekNext(tokens) ?: break
+
+    private fun parseExpression(parser: TokenParser): Double {
+        var left = parseTerm(parser)
+        while (parser.hasNext()) {
+            val op = parser.peek() ?: break
             if (op != "+" && op != "-") break
-            tokens.next()
-            val right = parseTerm(tokens)
+            parser.next() // consume the operator
+            val right = parseTerm(parser)
             left = if (op == "+") left + right else left - right
         }
         return left
     }
-    
-    private fun parseTerm(tokens: Iterator<String>): Double {
-        var left = parseFactor(tokens)
-        while (tokens.hasNext()) {
-            val op = peekNext(tokens) ?: break
+
+    private fun parseTerm(parser: TokenParser): Double {
+        var left = parseFactor(parser)
+        while (parser.hasNext()) {
+            val op = parser.peek() ?: break
             if (op != "*" && op != "/") break
-            tokens.next()
-            val right = parseFactor(tokens)
+            parser.next() // consume the operator
+            val right = parseFactor(parser)
             left = if (op == "*") left * right else left / right
         }
         return left
     }
-    
-    private fun parseFactor(tokens: Iterator<String>): Double {
-        if (!tokens.hasNext()) return 0.0
-        val token = tokens.next()
+
+    private fun parseFactor(parser: TokenParser): Double {
+        if (!parser.hasNext()) return 0.0
+        val token = parser.next()
         return when {
             token == "(" -> {
-                val result = parseExpression(tokens)
-                if (tokens.hasNext()) tokens.next() // consume ')'
+                val result = parseExpression(parser)
+                if (parser.hasNext()) parser.next() // consume ')'
                 result
             }
-            token == "-" -> -parseFactor(tokens)
+            token == "-" -> -parseFactor(parser)
             else -> token.toDoubleOrNull() ?: 0.0
         }
-    }
-    
-    private fun peekNext(iterator: Iterator<String>): String? {
-        // This is a simplified peek - for real implementation use a PeekingIterator
-        return null // Simplified - just parse sequentially
     }
 }
