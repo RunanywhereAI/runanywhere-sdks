@@ -6,11 +6,17 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SDK_DIR="$HOME/runanywhere-sdks"
 MOLTBOT_DIR="$HOME/moltbot"
 MODEL_DIR="$HOME/.local/share/runanywhere/Models"
+ARCH=$(uname -m)
+SDK_LIBS="$SDK_DIR/sdk/runanywhere-commons/dist/linux/$ARCH"
+SHERPA_LIBS="$SDK_DIR/sdk/runanywhere-commons/third_party/sherpa-onnx-linux/lib"
+
+# Set library path for voice assistant
+export LD_LIBRARY_PATH="$SDK_LIBS:$SHERPA_LIBS:$LD_LIBRARY_PATH"
 
 # Find the default LLM model
 find_default_model() {
     # Preference order: qwen3-1.7b > qwen3-0.6b > lfm-1.2b > llama-3.2-3b > qwen3-4b
-    for model in qwen3-1.7b qwen3-0.6b lfm-1.2b llama-3.2-3b qwen3-4b qwen2.5-0.5b-instruct-q4; do
+    for model in qwen3-1.7b qwen3-0.6b lfm-1.2b llama-3.2-3b qwen3-4b; do
         local model_path="$MODEL_DIR/LlamaCpp/$model"
         if [ -d "$model_path" ]; then
             local gguf=$(ls "$model_path"/*.gguf 2>/dev/null | head -1)
@@ -35,7 +41,7 @@ trap cleanup INT TERM
 SERVER_BIN="$SDK_DIR/sdk/runanywhere-commons/build-server/tools/runanywhere-server"
 if [ ! -x "$SERVER_BIN" ]; then
     echo "Error: runanywhere-server not found at $SERVER_BIN"
-    echo "Please build it first: cd $SDK_DIR/sdk/runanywhere-commons && mkdir build-server && cd build-server && cmake .. -DBUILD_SERVER=ON && make -j\$(nproc)"
+    echo "Please build it first"
     exit 1
 fi
 
