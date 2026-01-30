@@ -546,7 +546,9 @@ fun MessageBubbleView(
                                         }
                                     }
                                 },
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimensions.padding16)
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = Dimensions.padding16)
                             ) {
                                 Text("Copy", style = MaterialTheme.typography.bodyLarge)
                             }
@@ -555,7 +557,9 @@ fun MessageBubbleView(
                                     showDialog = false
                                     showTextSelectionDialog = true
                                 },
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = Dimensions.padding16)
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = Dimensions.padding16)
                             ) {
                                 Text("Select Text", style = MaterialTheme.typography.bodyLarge)
                             }
