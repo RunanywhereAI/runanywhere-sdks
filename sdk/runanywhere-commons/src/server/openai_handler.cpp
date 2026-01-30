@@ -119,19 +119,29 @@ void OpenAIHandler::handleHealth(const httplib::Request& /*req*/, httplib::Respo
 void OpenAIHandler::processNonStreaming(const httplib::Request& /*req*/,
                                          httplib::Response& res,
                                          const nlohmann::json& requestJson) {
+    RAC_LOG_INFO("Server", "processNonStreaming: START");
+
     // Get messages and tools from request
     const auto& messages = requestJson["messages"];
     nlohmann::json tools = requestJson.value("tools", nlohmann::json::array());
+    RAC_LOG_INFO("Server", "processNonStreaming: messages count=%zu, tools count=%zu",
+                 messages.size(), tools.size());
 
     // Build prompt using translation layer (which uses Commons APIs)
+    RAC_LOG_INFO("Server", "processNonStreaming: building prompt...");
     std::string prompt = translation::buildPromptFromOpenAI(messages, tools, nullptr);
+    RAC_LOG_INFO("Server", "processNonStreaming: prompt built, length=%zu", prompt.length());
 
     // Parse LLM options
     rac_llm_options_t options = parseOptions(requestJson);
+    RAC_LOG_INFO("Server", "processNonStreaming: options parsed, max_tokens=%d, temp=%.2f",
+                 options.max_tokens, options.temperature);
 
     // Generate response
+    RAC_LOG_INFO("Server", "processNonStreaming: calling rac_llm_generate with handle=%p", (void*)llmHandle_);
     rac_llm_result_t result = {};
     rac_result_t rc = rac_llm_generate(llmHandle_, prompt.c_str(), &options, &result);
+    RAC_LOG_INFO("Server", "processNonStreaming: rac_llm_generate returned rc=%d", rc)
 
     if (RAC_FAILED(rc)) {
         sendError(res, 500, "Generation failed", "server_error");
