@@ -97,15 +97,31 @@ rac_result_t rac_llm_initialize(rac_handle_t handle, const char* model_path) {
 
 rac_result_t rac_llm_generate(rac_handle_t handle, const char* prompt,
                               const rac_llm_options_t* options, rac_llm_result_t* out_result) {
-    if (!handle || !prompt || !out_result)
-        return RAC_ERROR_NULL_POINTER;
+    RAC_LOG_INFO(LOG_CAT, "rac_llm_generate: START handle=%p, prompt=%p, out_result=%p",
+                 handle, (void*)prompt, (void*)out_result);
 
+    if (!handle || !prompt || !out_result) {
+        RAC_LOG_ERROR(LOG_CAT, "rac_llm_generate: NULL pointer!");
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    RAC_LOG_INFO(LOG_CAT, "rac_llm_generate: casting to service...");
     auto* service = static_cast<rac_llm_service_t*>(handle);
+    RAC_LOG_INFO(LOG_CAT, "rac_llm_generate: service=%p, ops=%p", (void*)service, (void*)service->ops);
+
     if (!service->ops || !service->ops->generate) {
+        RAC_LOG_ERROR(LOG_CAT, "rac_llm_generate: ops or generate is NULL!");
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
-    return service->ops->generate(service->impl, prompt, options, out_result);
+    RAC_LOG_INFO(LOG_CAT, "rac_llm_generate: ops->generate=%p, impl=%p",
+                 (void*)service->ops->generate, service->impl);
+    RAC_LOG_INFO(LOG_CAT, "rac_llm_generate: calling backend generate...");
+
+    rac_result_t result = service->ops->generate(service->impl, prompt, options, out_result);
+
+    RAC_LOG_INFO(LOG_CAT, "rac_llm_generate: backend returned result=%d", result);
+    return result;
 }
 
 rac_result_t rac_llm_generate_stream(rac_handle_t handle, const char* prompt,
