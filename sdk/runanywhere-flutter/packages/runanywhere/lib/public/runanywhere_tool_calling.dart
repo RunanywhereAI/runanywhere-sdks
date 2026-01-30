@@ -211,7 +211,7 @@ extension RunAnywhereToolCalling on RunAnywhere {
       
       _logger.debug('LLM output (iter $iterations): ${responseText.substring(0, responseText.length.clamp(0, 200))}...');
 
-      // Parse for tool calls using C++ bridge
+      // Parse for tool calls using C++ bridge (auto-detection like Swift)
       final parseResult = DartBridgeToolCalling.shared.parseToolCall(responseText);
 
       if (!parseResult.hasToolCall || parseResult.toolName == null) {

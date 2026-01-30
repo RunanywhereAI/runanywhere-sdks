@@ -159,6 +159,7 @@ class DartBridgeToolCalling {
     }
   }
 
+  // =============================================================================
   // MARK: - Format Tools for Prompt (NO FALLBACK)
 
   /// Format tool definitions into a system prompt using C++ implementation

@@ -9,6 +9,24 @@ library tool_calling_types;
 import 'dart:convert';
 
 // =============================================================================
+// TOOL CALL FORMAT NAMES
+// =============================================================================
+
+/// Constants for tool call format names.
+///
+/// The format logic is handled in C++ commons (single source of truth).
+/// Mirrors Swift SDK's ToolCallFormatName enum.
+abstract class ToolCallFormatName {
+  /// JSON format: `<tool_call>{"tool":"name","arguments":{...}}</tool_call>`
+  /// Use for most general-purpose models (Llama, Qwen, Mistral, etc.)
+  static const String defaultFormat = 'default';
+
+  /// Liquid AI format: `<|tool_call_start|>[func(args)]<|tool_call_end|>`
+  /// Use for LFM2-Tool models
+  static const String lfm2 = 'lfm2';
+}
+
+// =============================================================================
 // TOOL VALUE - Type-safe JSON representation
 // =============================================================================
 
@@ -293,7 +311,7 @@ class ToolCallingOptions {
     this.systemPrompt,
     this.replaceSystemPrompt = false,
     this.keepToolsAvailable = false,
-    this.formatName = 'default',
+    this.formatName = ToolCallFormatName.defaultFormat,
   });
 }
 
