@@ -8,6 +8,7 @@
 #include "openai_handler.h"
 #include "json_utils.h"
 #include "openai_translation.h"
+#include "rac/backends/rac_llm_llamacpp.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_tool_calling.h"
 
@@ -105,9 +106,8 @@ void OpenAIHandler::handleHealth(const httplib::Request& /*req*/, httplib::Respo
     response["model"] = modelId_;
 
     // Check if LLM is ready
-    rac_llm_info_t info = {};
-    if (llmHandle_ && rac_llm_get_info(llmHandle_, &info) == RAC_SUCCESS) {
-        response["model_loaded"] = info.is_ready == RAC_TRUE;
+    if (llmHandle_) {
+        response["model_loaded"] = rac_llm_llamacpp_is_model_loaded(llmHandle_) != 0;
     } else {
         response["model_loaded"] = false;
     }
@@ -137,11 +137,11 @@ void OpenAIHandler::processNonStreaming(const httplib::Request& /*req*/,
     RAC_LOG_INFO("Server", "processNonStreaming: options parsed, max_tokens=%d, temp=%.2f",
                  options.max_tokens, options.temperature);
 
-    // Generate response
-    RAC_LOG_INFO("Server", "processNonStreaming: calling rac_llm_generate with handle=%p", (void*)llmHandle_);
+    // Generate response using LlamaCPP backend directly
+    RAC_LOG_INFO("Server", "processNonStreaming: calling rac_llm_llamacpp_generate with handle=%p", (void*)llmHandle_);
     rac_llm_result_t result = {};
-    rac_result_t rc = rac_llm_generate(llmHandle_, prompt.c_str(), &options, &result);
-    RAC_LOG_INFO("Server", "processNonStreaming: rac_llm_generate returned rc=%d", rc);
+    rac_result_t rc = rac_llm_llamacpp_generate(llmHandle_, prompt.c_str(), &options, &result);
+    RAC_LOG_INFO("Server", "processNonStreaming: rac_llm_llamacpp_generate returned rc=%d", rc);
 
     if (RAC_FAILED(rc)) {
         sendError(res, 500, "Generation failed", "server_error");
@@ -298,10 +298,10 @@ void OpenAIHandler::processStreaming(const httplib::Request& /*req*/,
                 cbData.firstToken = false;
             }
 
-            // Note: For a full implementation, we'd use rac_llm_generate_stream
+            // Note: For a full implementation, we'd use rac_llm_llamacpp_generate_stream
             // For now, use non-streaming and send all at once
             rac_llm_result_t result = {};
-            rac_result_t rc = rac_llm_generate(llmHandle_, prompt.c_str(), &options, &result);
+            rac_result_t rc = rac_llm_llamacpp_generate(llmHandle_, prompt.c_str(), &options, &result);
 
             if (RAC_SUCCEEDED(rc) && result.text) {
                 // Send the content
