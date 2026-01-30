@@ -4,11 +4,18 @@ On-device voice AI for Raspberry Pi 5 (Linux aarch64). Say **"Hey Jarvis"** to a
 
 ---
 
-## Option 1: Full Moltbot Integration (Easiest & Recommended)
+## Quick Start (Recommended)
 
-Complete AI assistant with WhatsApp, Voice, and local LLM.
+Complete AI assistant with WhatsApp, Voice, and local LLM using **LFM 1.2B** model.
 
-### Step 1: Install Pre-built Binaries
+### Prerequisites
+
+- Raspberry Pi 5 with 8GB RAM (4GB works with smaller models)
+- Raspberry Pi OS Lite (64-bit) or Ubuntu 22.04+ ARM64
+- Node.js 22+
+- ~3GB disk space for models
+
+### Step 1: Install RunAnywhere Binaries
 
 ```bash
 # Download and install RunAnywhere
@@ -19,28 +26,32 @@ cd /tmp/runanywhere-release && ./install.sh
 cd ~/.local/runanywhere/lib && for lib in *.so; do ln -sf "$lib" "${lib}.1"; done
 ```
 
-### Step 2: Download AI Models (~2.5GB)
+### Step 2: Download AI Models
 
 ```bash
-# Download default model (qwen3-1.7b)
-curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/smonga/rasp/Playground/linux-voice-assistant/scripts/download-models.sh | bash
+# Download LFM 1.2B (recommended - fast and efficient)
+mkdir -p ~/.local/share/runanywhere/Models/LlamaCpp/lfm2.5-1.2b
+curl -L -o ~/.local/share/runanywhere/Models/LlamaCpp/lfm2.5-1.2b/LFM2.5-1.2B-Instruct-Q8_0.gguf \
+  "https://huggingface.co/lmstudio-community/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q8_0.gguf"
 
-# For better quality (recommended for 8GB Pi), download qwen3-4b:
-curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/smonga/rasp/Playground/linux-voice-assistant/scripts/download-models.sh | bash -s -- --llm qwen3-4b
+# Or download Qwen3 1.7B (alternative - slightly better quality)
+mkdir -p ~/.local/share/runanywhere/Models/LlamaCpp/qwen3-1.7b
+curl -L -o ~/.local/share/runanywhere/Models/LlamaCpp/qwen3-1.7b/Qwen3-1.7B-Q8_0.gguf \
+  "https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q8_0.gguf"
 ```
 
-**Available LLM Models:**
+**Available Models:**
 
-| Model | Size | Context | Description |
-|-------|------|---------|-------------|
-| qwen3-0.6b | ~639MB | 32K | Smallest, fastest |
-| qwen3-1.7b | ~1.8GB | 32K | Good balance |
-| qwen3-4b | ~2.5GB | 32K | Best quality (recommended for 8GB Pi) |
+| Model | Size | Speed | Quality | Recommended For |
+|-------|------|-------|---------|-----------------|
+| **LFM 1.2B (Q8)** | ~1.3GB | Fast | Good | Pi 5 8GB (recommended) |
+| Qwen3 1.7B (Q8) | ~1.8GB | Medium | Better | Pi 5 8GB |
+| Qwen3 4B (Q4) | ~2.5GB | Slow | Best | Pi 5 8GB (patient users) |
 
-### Step 3: Install Moltbot
+### Step 3: Install Moltbot (RunAnywhere Fork)
 
 ```bash
-# Clone
+# Clone the RunAnywhere fork
 git clone https://github.com/RunanywhereAI/clawdbot.git ~/moltbot
 cd ~/moltbot
 
@@ -50,49 +61,16 @@ pnpm install
 pnpm build
 ```
 
-### Step 4: Run Moltbot Onboarding
+### Step 4: Configure Moltbot for Local LLM
+
+The configuration file is `~/.clawdbot/moltbot.json`. Create it with these optimized settings:
 
 ```bash
-cd ~/moltbot && pnpm moltbot onboard
-```
-
-**Answer the prompts as follows:**
-
-| Prompt | Answer |
-|--------|--------|
-| Security warning - Continue? | **Yes** |
-| Onboarding mode | **QuickStart** |
-| Config handling | **Use existing values** |
-| Model/auth provider | **Skip for now** |
-| Filter models by provider | **All providers** |
-| Default model | **Keep current** |
-| Select channel | **WhatsApp (QR link)** or skip |
-| Link WhatsApp now? | **Yes** (scan QR with your phone) |
-| WhatsApp phone setup | **This is my personal phone number** |
-| Your WhatsApp number | Enter your number (e.g., +15551234567) |
-| Configure skills now? | **Yes** |
-| Show Homebrew install? | **Yes** (or No) |
-| Preferred node manager | **npm** |
-| Install missing skill dependencies | **Skip for now** |
-| API keys (GOOGLE_PLACES, etc.) | **No** for all (or add if you have them) |
-| Enable hooks? | **Skip for now** |
-| How to hatch your bot? | **Do this later** |
-
-### Step 5: Configure RunAnywhere as Model Provider
-
-Edit `~/.moltbot/moltbot.json` to add RunAnywhere as the model provider:
-
-```bash
-nano ~/.moltbot/moltbot.json
-```
-
-**Complete moltbot.json configuration:**
-
-```json
+mkdir -p ~/.clawdbot/agents/main/agent
+cat > ~/.clawdbot/moltbot.json << 'EOF'
 {
   "meta": {
-    "lastTouchedVersion": "2026.1.29",
-    "lastTouchedAt": "2026-01-30T01:39:23.045Z"
+    "lastTouchedVersion": "2026.1.29"
   },
   "models": {
     "providers": {
@@ -102,10 +80,18 @@ nano ~/.moltbot/moltbot.json
         "api": "openai-completions",
         "models": [
           {
-            "id": "qwen3-4b",
-            "name": "Qwen3 4B (Local)",
+            "id": "LFM2.5-1.2B-Instruct-Q8_0",
+            "name": "Lobster Brain (LFM 1.2B)",
             "contextWindow": 16384,
-            "maxTokens": 4096
+            "maxTokens": 4096,
+            "reasoning": false,
+            "input": ["text"],
+            "cost": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0
+            }
           }
         ]
       }
@@ -114,16 +100,16 @@ nano ~/.moltbot/moltbot.json
   "agents": {
     "defaults": {
       "model": {
-        "primary": "runanywhere/qwen3-4b"
+        "primary": "runanywhere/LFM2.5-1.2B-Instruct-Q8_0"
       },
+      "promptMode": "local",
       "compaction": {
         "mode": "safeguard"
       },
       "maxConcurrent": 4,
       "subagents": {
         "maxConcurrent": 8
-      },
-      "workspace": "/home/runanywhere/clawd"
+      }
     }
   },
   "messages": {
@@ -132,6 +118,13 @@ nano ~/.moltbot/moltbot.json
   "commands": {
     "native": "auto",
     "nativeSkills": "auto"
+  },
+  "gateway": {
+    "mode": "local",
+    "auth": {
+      "mode": "token",
+      "token": "YOUR_SECURE_TOKEN_HERE"
+    }
   },
   "plugins": {
     "entries": {
@@ -146,65 +139,25 @@ nano ~/.moltbot/moltbot.json
       }
     }
   },
-  "gateway": {
-    "mode": "local",
-    "auth": {
-      "mode": "token",
-      "token": "YOUR_TOKEN_HERE"
-    },
-    "port": 18789,
-    "bind": "loopback",
-    "tailscale": {
-      "mode": "off",
-      "resetOnExit": false
-    }
-  },
-  "channels": {
-    "whatsapp": {
-      "selfChatMode": true,
-      "dmPolicy": "allowlist",
-      "allowFrom": [
-        "+YOUR_PHONE_NUMBER"
-      ]
-    }
-  },
-  "skills": {
-    "install": {
-      "nodeManager": "npm"
-    },
-    "entries": {}
-  },
-  "wizard": {
-    "lastRunAt": "2026-01-30T01:39:23.032Z",
-    "lastRunVersion": "2026.1.29",
-    "lastRunCommand": "onboard",
-    "lastRunMode": "local"
+  "heartbeat": {
+    "enabled": false
   }
 }
+EOF
 ```
 
-**Key configuration sections explained:**
+**Critical Configuration Settings:**
 
-1. **models.providers.runanywhere**: Defines the local LLM server connection
-   - `baseUrl`: RunAnywhere server endpoint (default: `http://localhost:8080/v1`)
-   - `apiKey`: Set to `"local"` (must be non-empty for Moltbot to recognize the provider)
-   - `api`: Must be `"openai-completions"` for compatibility
-   - `models`: Array of available models with their capabilities
+| Setting | Value | Purpose |
+|---------|-------|---------|
+| `promptMode` | `"local"` | **Reduces system prompt from ~30KB to ~8KB** (72% reduction) |
+| `contextWindow` | `16384` | Minimum required by Moltbot (must match server `--context`) |
+| `apiKey` | `"local"` | Must be non-empty for provider recognition |
+| `gateway.mode` | `"local"` | Required for gateway to start |
 
-2. **models[].contextWindow**: **CRITICAL** - Must be at least 16384 (16K) for Moltbot
-   - Moltbot requires minimum 16000 tokens context window
-   - This must match the `--context` flag when starting RunAnywhere server
-
-3. **agents.defaults.model.primary**: Sets the default model
-   - Format: `"provider/model-id"` (e.g., `"runanywhere/qwen3-4b"`)
-   - This tells Moltbot which model to use for AI responses
-
-### Step 5b: Create Auth Profile (Required)
-
-Create the auth profile file so Moltbot recognizes the RunAnywhere provider:
+### Step 5: Create Auth Profile
 
 ```bash
-mkdir -p ~/.clawdbot/agents/main/agent
 cat > ~/.clawdbot/agents/main/agent/auth-profiles.json << 'EOF'
 {
   "version": 2,
@@ -220,44 +173,28 @@ EOF
 chmod 600 ~/.clawdbot/agents/main/agent/auth-profiles.json
 ```
 
-### Step 6: Start Everything
+### Step 6: Start Services
 
-**Terminal 1 - RunAnywhere Server:**
+**Terminal 1 - RunAnywhere LLM Server:**
 
 ```bash
 export LD_LIBRARY_PATH=~/.local/runanywhere/lib:$LD_LIBRARY_PATH
 
-# For qwen3-4b (recommended for 8GB Pi):
+# For LFM 1.2B (recommended):
 ~/.local/runanywhere/bin/runanywhere-server \
-  --model ~/.local/share/runanywhere/Models/LlamaCpp/qwen3-4b/Qwen3-4B-Q4_K_M.gguf \
-  --port 8080 \
-  --threads 4 \
-  --context 16384
-
-# For qwen3-1.7b (if you have less RAM):
-~/.local/runanywhere/bin/runanywhere-server \
-  --model ~/.local/share/runanywhere/Models/LlamaCpp/qwen3-1.7b/Qwen3-1.7B-Q8_0.gguf \
+  --model ~/.local/share/runanywhere/Models/LlamaCpp/lfm2.5-1.2b/LFM2.5-1.2B-Instruct-Q8_0.gguf \
+  --host 0.0.0.0 \
   --port 8080 \
   --threads 4 \
   --context 16384
 ```
 
-**RunAnywhere Server Options:**
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--model, -m` | Path to GGUF model file | Required |
-| `--port, -p` | Server port | 8080 |
-| `--threads, -t` | CPU threads for inference | 4 |
-| `--context, -c` | Context window size | 8192 |
-| `--host, -H` | Host to bind to | 127.0.0.1 |
-| `--verbose, -v` | Enable verbose logging | Off |
-
-**Terminal 2 - Restart Moltbot Gateway:**
+**Terminal 2 - Moltbot Gateway:**
 
 ```bash
-systemctl --user restart moltbot-gateway
-systemctl --user status moltbot-gateway
+cd ~/moltbot
+pnpm moltbot gateway run
+# Or use systemd: systemctl --user start moltbot-gateway
 ```
 
 **Terminal 3 - Voice Assistant (optional):**
@@ -267,11 +204,126 @@ export LD_LIBRARY_PATH=~/.local/runanywhere/lib:$LD_LIBRARY_PATH
 ~/.local/runanywhere/bin/voice-assistant --wakeword --moltbot
 ```
 
-### Step 7: Test
+### Step 7: Verify Setup
 
-- **Web UI:** http://127.0.0.1:18789 (use token from onboarding)
-- **WhatsApp:** Send yourself a message
-- **Voice:** Say "Hey Jarvis"
+```bash
+# Check LLM server
+curl http://localhost:8080/v1/models
+# Should show: {"data":[{"id":"LFM2.5-1.2B-Instruct-Q8_0",...}]}
+
+# Check Moltbot gateway logs
+journalctl --user -u moltbot-gateway | grep "agent model"
+# Should show: agent model: runanywhere/LFM2.5-1.2B-Instruct-Q8_0
+
+# Check prompt mode is applied
+# First message should show reduced token count (~2500 vs ~7800)
+```
+
+---
+
+## Key Optimizations for Raspberry Pi
+
+### 1. `promptMode: "local"` (Critical)
+
+This setting reduces the system prompt size dramatically:
+
+| Mode | Prompt Size | Tokens | Inference Time |
+|------|-------------|--------|----------------|
+| `"full"` | ~30KB | ~7,800 | 5-10+ minutes |
+| `"local"` | ~8KB | ~2,500 | 1-2 minutes |
+
+**What `"local"` mode removes:**
+- CLI command reference
+- Skills listing (loaded on-demand)
+- Memory recall instructions
+- Self-update instructions
+- Model alias documentation
+- Sandbox details
+
+**What `"local"` mode keeps:**
+- Tool list with descriptions
+- Workspace context
+- User identity
+- Project context files
+- Silent reply handling
+- Runtime info
+
+### 2. Context Window Configuration
+
+Both the server and config must use matching context sizes:
+
+```bash
+# Server must use --context 16384
+runanywhere-server --context 16384 ...
+
+# Config must have contextWindow: 16384
+"contextWindow": 16384
+```
+
+### 3. n_batch Optimization
+
+The SDK includes a fix that sets `n_batch = context_size` instead of the default 512 limit. This allows the full prompt to be processed in a single batch.
+
+---
+
+## Configuration Reference
+
+### Config File Location
+
+Moltbot uses `~/.clawdbot/moltbot.json` as the primary config file.
+
+⚠️ **Note:** There may be a legacy `~/.moltbot/` directory from older versions. If you see unexpected behavior, check that directory doesn't contain conflicting settings.
+
+### Model Provider Configuration
+
+```json
+"models": {
+  "providers": {
+    "runanywhere": {
+      "baseUrl": "http://localhost:8080/v1",
+      "apiKey": "local",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "LFM2.5-1.2B-Instruct-Q8_0",
+          "name": "Lobster Brain (LFM 1.2B)",
+          "contextWindow": 16384,
+          "maxTokens": 4096,
+          "reasoning": false,
+          "input": ["text"],
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        }
+      ]
+    }
+  }
+}
+```
+
+### Agent Defaults
+
+```json
+"agents": {
+  "defaults": {
+    "model": {
+      "primary": "runanywhere/LFM2.5-1.2B-Instruct-Q8_0"
+    },
+    "promptMode": "local",
+    "compaction": { "mode": "safeguard" },
+    "maxConcurrent": 4,
+    "subagents": { "maxConcurrent": 8 }
+  }
+}
+```
+
+### RunAnywhere Server Options
+
+| Option | Description | Default | Recommended |
+|--------|-------------|---------|-------------|
+| `--model, -m` | Path to GGUF model file | Required | — |
+| `--port, -p` | Server port | 8080 | 8080 |
+| `--threads, -t` | CPU threads | 4 | 4 |
+| `--context, -c` | Context window | 8192 | **16384** |
+| `--host, -H` | Host to bind | 127.0.0.1 | 0.0.0.0 |
 
 ---
 
@@ -279,33 +331,67 @@ export LD_LIBRARY_PATH=~/.local/runanywhere/lib:$LD_LIBRARY_PATH
 
 ### Error: "Model context window too small (8192 tokens). Minimum is 16000"
 
-**Cause:** Moltbot requires at least 16K context window. The RunAnywhere server or moltbot.json config has a smaller context window.
+**Cause:** Moltbot requires 16K+ context window.
 
 **Fix:**
-1. Start RunAnywhere server with `--context 16384`:
-   ```bash
-   ~/.local/runanywhere/bin/runanywhere-server \
-     --model ~/.local/share/runanywhere/Models/LlamaCpp/qwen3-4b/Qwen3-4B-Q4_K_M.gguf \
-     --context 16384 \
-     --port 8080 --threads 4
-   ```
+1. Start server with `--context 16384`
+2. Set `contextWindow: 16384` in moltbot.json
+3. Restart gateway
 
-2. Update `~/.moltbot/moltbot.json` to have `contextWindow: 16384`:
-   ```json
-   "models": [
-     {
-       "id": "qwen3-4b",
-       "contextWindow": 16384,
-       "maxTokens": 4096
-     }
-   ]
-   ```
+### Error: "agent model: anthropic/claude-opus-4-5" (wrong model)
 
+**Cause:** Missing or incorrect `agents.defaults.model.primary` or provider config.
+
+**Fix:**
+1. Ensure `models.providers.runanywhere` is defined in moltbot.json
+2. Ensure `agents.defaults.model.primary` is set to `"runanywhere/MODEL_ID"`
 3. Restart gateway: `systemctl --user restart moltbot-gateway`
 
-### Error: "libonnxruntime.so.1 not found"
+### Error: "No API key found for provider runanywhere"
 
-**Cause:** Missing versioned library symlinks.
+**Cause:** Missing auth profile or empty apiKey.
+
+**Fix:**
+1. Set `"apiKey": "local"` in provider config (not empty string)
+2. Create `~/.clawdbot/agents/main/agent/auth-profiles.json` with the runanywhere profile
+
+### Session caching wrong model
+
+**Symptom:** Changed config but still using old model.
+
+**Cause:** Sessions cache model and provider settings.
+
+**Fix:**
+```bash
+# Clear session cache
+mv ~/.clawdbot/agents/main/sessions/*.json ~/.clawdbot/agents/main/sessions/backup/
+mv ~/.clawdbot/agents/main/sessions/*.jsonl ~/.clawdbot/agents/main/sessions/backup/
+systemctl --user restart moltbot-gateway
+```
+
+### Legacy config directory conflict
+
+**Symptom:** Config changes not being applied.
+
+**Cause:** Both `~/.moltbot/` and `~/.clawdbot/` exist with different settings.
+
+**Fix:**
+```bash
+# Backup and remove legacy directory
+mv ~/.moltbot ~/.moltbot.backup
+systemctl --user restart moltbot-gateway
+```
+
+### Slow inference (5-10+ minutes)
+
+**Cause:** Large system prompt (~30KB).
+
+**Fix:**
+1. Set `"promptMode": "local"` in agents.defaults
+2. Restart gateway
+3. First message should now be much faster
+
+### libonnxruntime.so.1 not found
 
 **Fix:**
 ```bash
@@ -313,233 +399,71 @@ cd ~/.local/runanywhere/lib
 for lib in *.so; do ln -sf "$lib" "${lib}.1"; done
 ```
 
-### Error: "Unrecognized keys" or "Invalid input" in moltbot.json
-
-**Cause:** Incorrect config format.
-
-**Common mistakes:**
-```json
-// WRONG - agents.defaults.models.default doesn't exist
-"agents": {
-  "defaults": {
-    "models": {
-      "default": { "provider": "runanywhere", "model": "qwen3-4b" }
-    }
-  }
-}
-
-// CORRECT - use model.primary as a string
-"agents": {
-  "defaults": {
-    "model": {
-      "primary": "runanywhere/qwen3-4b"
-    }
-  }
-}
-```
-
-### Error: "Gateway not using local model"
-
-**Symptom:** Logs show `agent model: anthropic/claude-opus-4-5` instead of `runanywhere/qwen3-4b`
-
-**Fix:**
-1. Ensure `agents.defaults.model.primary` is set correctly in moltbot.json
-2. Restart gateway: `systemctl --user restart moltbot-gateway`
-3. Check logs: `journalctl --user -u moltbot-gateway -n 20`
-
-### Error: "No API key found for provider runanywhere"
-
-**Cause:** Moltbot requires an auth profile for custom providers.
-
-**Fix:**
-1. Ensure `apiKey` in moltbot.json is set to `"local"` (not empty string `""`):
-   ```json
-   "runanywhere": {
-     "baseUrl": "http://localhost:8080/v1",
-     "apiKey": "local",
-     ...
-   }
-   ```
-
-2. Create the auth-profiles.json file:
-   ```bash
-   mkdir -p ~/.clawdbot/agents/main/agent
-   cat > ~/.clawdbot/agents/main/agent/auth-profiles.json << 'EOF'
-   {
-     "version": 2,
-     "profiles": {
-       "runanywhere:default": {
-         "type": "api_key",
-         "provider": "runanywhere",
-         "key": "local"
-       }
-     }
-   }
-   EOF
-   chmod 600 ~/.clawdbot/agents/main/agent/auth-profiles.json
-   ```
-
-3. Restart gateway: `systemctl --user restart moltbot-gateway`
-
-### No audio input
-
-```bash
-arecord -l  # List devices
-~/.local/runanywhere/bin/voice-assistant --list-devices
-```
-
-### Model not found
-
-```bash
-# List downloaded models
-ls -la ~/.local/share/runanywhere/Models/LlamaCpp/
-
-# Download a specific model
-cd ~/runanywhere-sdks/Playground/linux-voice-assistant
-./scripts/download-models.sh --llm qwen3-4b
-```
-
-### Moltbot can't connect to RunAnywhere
-
-1. Check RunAnywhere server is running:
-   ```bash
-   curl http://localhost:8080/health
-   # Should return: {"model":"...","model_loaded":true,"status":"ok"}
-   ```
-
-2. Check config has correct baseUrl in `~/.moltbot/moltbot.json`:
-   ```json
-   "runanywhere": {
-     "baseUrl": "http://localhost:8080/v1",
-     ...
-   }
-   ```
-
-3. Restart gateway: `systemctl --user restart moltbot-gateway`
-
-### Check service logs
-
-```bash
-# Moltbot gateway logs
-journalctl --user -u moltbot-gateway --no-pager -n 50
-moltbot logs --follow
-
-# RunAnywhere server logs (if running in background)
-tail -f /tmp/runanywhere-server.log
-```
-
-### Memory issues on Raspberry Pi
-
-Check available memory:
-```bash
-free -h
-```
-
-**Recommended configurations by RAM:**
-
-| Pi RAM | Model | Context | Notes |
-|--------|-------|---------|-------|
-| 4GB | qwen3-0.6b | 8192 | Minimum viable |
-| 8GB | qwen3-4b | 16384 | Recommended |
-| 8GB | qwen3-1.7b | 32768 | Alternative with more context |
-
 ---
 
-## Option 2: Pre-built Binaries (Standalone)
+## Templates
 
-Simple voice assistant without Moltbot. No WhatsApp, no tools.
+Pre-configured templates are available in the [moltbot repo](https://github.com/RunanywhereAI/clawdbot/tree/main/templates/local-llm):
 
 ```bash
-# Download and install
-curl -fsSL https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/voice-assistant-v0.1.0/runanywhere-voice-assistant-linux-aarch64.tar.gz | tar -xzf - -C /tmp
-cd /tmp/runanywhere-release && ./install.sh
-
-# Fix library symlinks
-cd ~/.local/runanywhere/lib && for lib in *.so; do ln -sf "$lib" "${lib}.1"; done
-
-# Download AI models (~2.5GB)
-curl -fsSL https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/smonga/rasp/Playground/linux-voice-assistant/scripts/download-models.sh | bash
-
-# Run
-~/.local/runanywhere/run.sh
+# Copy templates to your config
+cp ~/moltbot/templates/local-llm/moltbot.json ~/.clawdbot/moltbot.json
+cp ~/moltbot/templates/local-llm/workspace/*.md ~/clawd/
 ```
 
 ---
 
-## Option 3: Build from Source
+## Architecture
 
-For development or custom configurations.
-
-### Prerequisites
-
-```bash
-sudo apt-get update
-sudo apt-get install -y cmake build-essential libasound2-dev libpulse-dev git
-
-# Node.js 22+ (for Moltbot)
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt-get install -y nodejs
 ```
-
-### Build Steps
-
-```bash
-# Clone the SDK
-git clone -b smonga/rasp https://github.com/RunanywhereAI/runanywhere-sdks.git ~/runanywhere-sdks
-cd ~/runanywhere-sdks/sdk/runanywhere-commons
-
-# Build SDK with shared libraries
-./scripts/build-linux.sh --shared
-
-# Build the server
-mkdir -p build-server && cd build-server
-cmake .. -DCMAKE_BUILD_TYPE=Release \
-    -DRAC_BUILD_BACKENDS=ON \
-    -DRAC_BUILD_SERVER=ON \
-    -DRAC_BACKEND_LLAMACPP=ON \
-    -DRAC_BACKEND_ONNX=ON \
-    -DRAC_BACKEND_WHISPERCPP=OFF
-make -j$(nproc)
-
-# Build voice assistant
-cd ~/runanywhere-sdks/Playground/linux-voice-assistant
-mkdir -p build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j$(nproc)
-
-# Download models
-cd ~/runanywhere-sdks/Playground/linux-voice-assistant
-./scripts/download-models.sh
+┌─────────────────────────────────────────────────────────────┐
+│                     User Interfaces                          │
+├────────────────┬─────────────────┬──────────────────────────┤
+│  Voice (8082)  │  WhatsApp       │  Web UI (18789)          │
+└───────┬────────┴────────┬────────┴─────────────┬────────────┘
+        │                 │                      │
+        └─────────────────┼──────────────────────┘
+                          │
+              ┌───────────▼───────────┐
+              │   Moltbot Gateway     │
+              │   (Port 18789)        │
+              │                       │
+              │  - Agent orchestration│
+              │  - Tool execution     │
+              │  - Prompt management  │
+              │  - Session handling   │
+              └───────────┬───────────┘
+                          │
+              ┌───────────▼───────────┐
+              │  RunAnywhere Server   │
+              │  (Port 8080)          │
+              │                       │
+              │  - LLM inference      │
+              │  - OpenAI-compatible  │
+              │  - llama.cpp backend  │
+              └───────────────────────┘
 ```
 
 ---
 
-## What's Running
+## Memory Requirements
 
-| Component | Port | Purpose |
-|-----------|------|---------|
-| runanywhere-server | 8080 | Local LLM inference |
-| Moltbot gateway | 18789 | AI orchestration, WhatsApp, tools |
-| Voice assistant | — | Wake word, STT, TTS |
-| Voice gateway | 8082 | Voice assistant WebSocket bridge |
+| Pi RAM | Model | Context | Expected Performance |
+|--------|-------|---------|---------------------|
+| 4GB | LFM 1.2B | 8192 | Marginal |
+| 8GB | LFM 1.2B | 16384 | **Good** (recommended) |
+| 8GB | Qwen3 1.7B | 16384 | Good |
+| 8GB | Qwen3 4B | 16384 | Slow but best quality |
 
 ---
 
-## Usage
+## SDK Changes for Local LLM Support
 
-Say **"Hey Jarvis"** to activate, then speak your question.
+The following changes were made to the RunAnywhere SDK to support local LLM inference:
 
-### Command Line Options
-
-```
-voice-assistant [options]
-  --list-devices    List available audio devices
-  --input <device>  Audio input device (default: "default")
-  --output <device> Audio output device (default: "default")
-  --wakeword        Enable wake word detection
-  --moltbot         Enable Moltbot integration
-  --moltbot-url     Moltbot voice bridge URL (default: "http://localhost:8082")
-```
+1. **n_batch fix** (`llamacpp_backend.cpp`): Changed `n_batch` from capped at 512 to use full context size
+2. **Context flag fix** (`http_server.cpp`): Server now properly passes `--context` flag to LlamaCPP backend
+3. **Debug logging** (`openai_handler.cpp`): Added prompt analysis logging for debugging
 
 ---
 
@@ -548,39 +472,32 @@ voice-assistant [options]
 ### Start/Stop Services
 
 ```bash
-# Start RunAnywhere server (foreground)
+# LLM Server (foreground)
 export LD_LIBRARY_PATH=~/.local/runanywhere/lib:$LD_LIBRARY_PATH
 ~/.local/runanywhere/bin/runanywhere-server \
-  --model ~/.local/share/runanywhere/Models/LlamaCpp/qwen3-4b/Qwen3-4B-Q4_K_M.gguf \
+  --model ~/.local/share/runanywhere/Models/LlamaCpp/lfm2.5-1.2b/LFM2.5-1.2B-Instruct-Q8_0.gguf \
   --port 8080 --threads 4 --context 16384
 
-# Start RunAnywhere server (background)
-nohup ~/.local/runanywhere/bin/runanywhere-server \
-  --model ~/.local/share/runanywhere/Models/LlamaCpp/qwen3-4b/Qwen3-4B-Q4_K_M.gguf \
-  --port 8080 --threads 4 --context 16384 \
-  > /tmp/runanywhere-server.log 2>&1 &
-
-# Moltbot gateway
+# Moltbot Gateway
 systemctl --user start moltbot-gateway
 systemctl --user stop moltbot-gateway
 systemctl --user restart moltbot-gateway
-systemctl --user status moltbot-gateway
 
 # View logs
 journalctl --user -u moltbot-gateway -f
 ```
 
-### Verify Setup
+### Verify Configuration
 
 ```bash
-# Check RunAnywhere server
-curl http://localhost:8080/health
+# Check model
+curl -s http://localhost:8080/v1/models | grep id
 
-# Check Moltbot gateway
-curl http://localhost:18789/health
-
-# Check which model is active
+# Check gateway model
 journalctl --user -u moltbot-gateway | grep "agent model"
+
+# Check config
+cat ~/.clawdbot/moltbot.json | grep -E '"primary"|"promptMode"|"contextWindow"'
 ```
 
 ---
