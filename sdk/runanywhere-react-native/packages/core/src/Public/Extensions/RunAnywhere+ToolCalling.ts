@@ -123,37 +123,81 @@ async function parseToolCallViaCpp(llmOutput: string): Promise<{
 /**
  * Format tool definitions for LLM prompt
  * Creates a system prompt describing available tools
+ * 
+ * IMPORTANT: This MUST match the C++ implementation in rac_tool_calling.cpp
+ * The C++ function is: rac_tool_call_format_prompt_json_with_format()
+ * 
+ * @param tools - Tool definitions (defaults to registered tools)
+ * @param format - Tool calling format: 'default' (JSON) or 'lfm2' (Pythonic)
  */
-export function formatToolsForPrompt(tools?: ToolDefinition[]): string {
+export function formatToolsForPrompt(tools?: ToolDefinition[], format?: string): string {
   const toolsToFormat = tools || getRegisteredTools();
+  const toolFormat = format?.toLowerCase() || 'default';
 
   if (toolsToFormat.length === 0) {
     return '';
   }
 
-  const toolDescriptions = toolsToFormat.map((tool) => {
-    const params = tool.parameters
-      .map((p) => `    - ${p.name} (${p.type}${p.required ? ', required' : ''}): ${p.description}`)
-      .join('\n');
+  // Serialize tools to JSON array - EXACTLY like C++ does
+  const toolsJson = JSON.stringify(toolsToFormat.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.parameters.map((p) => ({
+      name: p.name,
+      type: p.type,
+      description: p.description,
+      required: p.required,
+      ...(p.enumValues ? { enumValues: p.enumValues } : {}),
+    })),
+  })));
 
-    return `- ${tool.name}: ${tool.description}\n  Parameters:\n${params}`;
-  });
+  // Format-specific instructions - MUST match C++ get_format_example_json()
+  let formatExample: string;
 
-  return `You have access to these tools:
+  if (toolFormat === 'lfm2') {
+    // LFM2 format - EXACTLY matches C++ RAC_TOOL_FORMAT_LFM2
+    formatExample = `## OUTPUT FORMAT
+You MUST respond with ONLY a tool call in this exact format:
+<|tool_call_start|>[function_name(param="value")]<|tool_call_end|>
 
-${toolDescriptions.join('\n\n')}
+## EXAMPLES
+Q: What's the weather in NYC?
+A: <|tool_call_start|>[get_weather(location="New York")]<|tool_call_end|>
 
-TOOL CALLING FORMAT - YOU MUST USE THIS EXACT FORMAT:
-When you need to use a tool, output ONLY this (no other text before or after):
-<tool_call>{"tool": "TOOL_NAME", "arguments": {"PARAM_NAME": "VALUE"}}</tool_call>
+Q: weather in sf
+A: <|tool_call_start|>[get_weather(location="San Francisco")]<|tool_call_end|>
 
-EXAMPLE - If user asks "what's the weather in Paris":
-<tool_call>{"tool": "get_weather", "arguments": {"location": "Paris"}}</tool_call>
+Q: calculate 2+2
+A: <|tool_call_start|>[calculate(expression="2+2")]<|tool_call_end|>`;
+  } else {
+    // Default JSON format - EXACTLY matches C++ RAC_TOOL_FORMAT_DEFAULT
+    formatExample = `## OUTPUT FORMAT
+You MUST respond with ONLY a tool call in this exact format:
+<tool_call>{"tool": "function_name", "arguments": {"param": "value"}}</tool_call>
 
-RULES:
-1. For greetings or general chat, respond normally without tools
-2. When using a tool, output ONLY the <tool_call> tag, nothing else
-3. Use the exact parameter names shown in the tool definitions above`;
+## EXAMPLES
+Q: What's the weather in NYC?
+A: <tool_call>{"tool": "get_weather", "arguments": {"location": "New York"}}</tool_call>
+
+Q: weather in sf
+A: <tool_call>{"tool": "get_weather", "arguments": {"location": "San Francisco"}}</tool_call>
+
+Q: calculate 2+2
+A: <tool_call>{"tool": "calculate", "arguments": {"expression": "2+2"}}</tool_call>`;
+  }
+
+  // Build prompt EXACTLY like C++ rac_tool_call_format_prompt_json_with_format()
+  // See: sdk/runanywhere-commons/src/features/llm/tool_calling.cpp lines 1343-1358
+  return `# TOOLS
+${toolsJson}
+
+${formatExample}
+
+## RULES
+- Weather question = call get_weather
+- Math question = call calculate
+- Time question = call get_current_time
+- DO NOT make up data. ALWAYS use the tool.`;
 }
 
 // =============================================================================
@@ -221,9 +265,12 @@ export async function generateWithTools(
   const autoExecute = options?.autoExecute ?? true;
   const replaceSystemPrompt = options?.replaceSystemPrompt ?? false;
   const keepToolsAvailable = options?.keepToolsAvailable ?? false;
+  const format = options?.format || 'default';
 
-  // Build system prompt with tools
-  const toolsPrompt = formatToolsForPrompt(tools);
+  logger.debug(`[ToolCalling] Starting with format: ${format}, tools: ${tools.length}`);
+
+  // Build system prompt with tools (pass format for correct instructions)
+  const toolsPrompt = formatToolsForPrompt(tools, format);
 
   // Handle system prompt based on replaceSystemPrompt option
   let systemPrompt: string;

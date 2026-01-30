@@ -9,7 +9,7 @@
  */
 
 #include "ToolCallingBridge.hpp"
-#include <rac/features/llm/rac_tool_calling.h>
+#include <rac_tool_calling.h>
 #include <nlohmann/json.hpp>
 #include <cstring>
 
