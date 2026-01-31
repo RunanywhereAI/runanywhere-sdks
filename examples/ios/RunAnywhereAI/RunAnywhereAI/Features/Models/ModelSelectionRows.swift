@@ -200,12 +200,24 @@ struct FlatModelRow: View {
         } else if model.localPath != nil {
             return "Ready"
         } else {
-            return "Download"
+            return ""  // Removed "Download" text
         }
+    }
+
+    /// Get logo asset name for model - uses centralized extension
+    private var modelLogoName: String {
+        model.logoAssetName
     }
 
     var body: some View {
         HStack(spacing: AppSpacing.mediumLarge) {
+            // Model logo
+            Image(modelLogoName)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 40, height: 40)
+                .cornerRadius(8)
+
             modelInfoView
 
             Spacer()
@@ -242,17 +254,7 @@ struct FlatModelRow: View {
 
     private var statusRowView: some View {
         HStack(spacing: AppSpacing.smallMedium) {
-            // Size badge
-            if let size = model.downloadSize, size > 0 {
-                Label(
-                    ByteCountFormatter.string(fromByteCount: size, countStyle: .memory),
-                    systemImage: "memorychip"
-                )
-                .font(AppTypography.caption2)
-                .foregroundColor(AppColors.textSecondary)
-            }
-
-            // Status indicator
+            // Status indicator (no size badge here anymore)
             if isDownloading {
                 HStack(spacing: AppSpacing.xSmall) {
                     ProgressView()
@@ -261,7 +263,7 @@ struct FlatModelRow: View {
                         .font(AppTypography.caption2)
                         .foregroundColor(AppColors.textSecondary)
                 }
-            } else {
+            } else if !statusText.isEmpty {
                 HStack(spacing: AppSpacing.xxSmall) {
                     Image(systemName: statusIcon)
                         .foregroundColor(statusColor)
@@ -313,7 +315,12 @@ struct FlatModelRow: View {
                 } label: {
                     HStack(spacing: AppSpacing.xxSmall) {
                         Image(systemName: "arrow.down.circle.fill")
-                        Text("Get")
+                        // Show file size instead of "Get"
+                        if let size = model.downloadSize, size > 0 {
+                            Text(ByteCountFormatter.string(fromByteCount: size, countStyle: .memory))
+                        } else {
+                            Text("Get")
+                        }
                     }
                 }
                 .font(AppTypography.caption)
