@@ -53,6 +53,7 @@ struct ContentView: View {
                 NavigationView {
                     CombinedSettingsView()
                 }
+                .navigationViewStyle(.stack)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 #endif
             }

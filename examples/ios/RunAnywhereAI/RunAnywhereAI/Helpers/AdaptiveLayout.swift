@@ -469,39 +469,82 @@ struct AdaptiveMicButton: View {
     }
 
     var body: some View {
-        Button(action: action) {
-            ZStack {
-                // Background circle
-                Circle()
-                    .fill(isActive ? activeColor : inactiveColor)
-                    .frame(width: AdaptiveSizing.micButtonSize, height: AdaptiveSizing.micButtonSize)
+        Group {
+            if #available(iOS 26.0, *) {
+                Button(action: action) {
+                    ZStack {
+                        // Background circle
+                        Circle()
+                            .fill(isActive ? activeColor : inactiveColor)
+                            .frame(width: AdaptiveSizing.micButtonSize, height: AdaptiveSizing.micButtonSize)
 
-                // Pulsing effect when active
-                if isPulsing {
-                    Circle()
-                        .stroke(Color.white.opacity(0.4), lineWidth: 2)
-                        .frame(width: AdaptiveSizing.micButtonSize, height: AdaptiveSizing.micButtonSize)
-                        .scaleEffect(1.3)
-                        .opacity(0)
-                        .animation(
-                            .easeOut(duration: 1.0).repeatForever(autoreverses: false),
-                            value: isPulsing
-                        )
-                }
+                        // Pulsing effect when active
+                        if isPulsing {
+                            Circle()
+                                .stroke(Color.white.opacity(0.4), lineWidth: 2)
+                                .frame(width: AdaptiveSizing.micButtonSize, height: AdaptiveSizing.micButtonSize)
+                                .scaleEffect(1.3)
+                                .opacity(0)
+                                .animation(
+                                    .easeOut(duration: 1.0).repeatForever(autoreverses: false),
+                                    value: isPulsing
+                                )
+                        }
 
-                // Icon or loading indicator
-                if isLoading {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(1.2)
-                } else {
-                    Image(systemName: icon)
-                        .font(.system(size: AdaptiveSizing.micIconSize))
-                        .foregroundColor(.white)
+                        // Icon or loading indicator
+                        if isLoading {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(1.2)
+                        } else {
+                            Image(systemName: icon)
+                                .font(.system(size: AdaptiveSizing.micIconSize))
+                                .foregroundColor(.white)
+                                .contentTransition(.symbolEffect(.replace))
+                                .animation(.smooth(duration: 0.3), value: icon)
+                        }
+                    }
                 }
+                .buttonStyle(.plain)
+                .glassEffect(.regular.interactive())
+            } else {
+                Button(action: action) {
+                    ZStack {
+                        // Background circle
+                        Circle()
+                            .fill(isActive ? activeColor : inactiveColor)
+                            .frame(width: AdaptiveSizing.micButtonSize, height: AdaptiveSizing.micButtonSize)
+
+                        // Pulsing effect when active
+                        if isPulsing {
+                            Circle()
+                                .stroke(Color.white.opacity(0.4), lineWidth: 2)
+                                .frame(width: AdaptiveSizing.micButtonSize, height: AdaptiveSizing.micButtonSize)
+                                .scaleEffect(1.3)
+                                .opacity(0)
+                                .animation(
+                                    .easeOut(duration: 1.0).repeatForever(autoreverses: false),
+                                    value: isPulsing
+                                )
+                        }
+
+                        // Icon or loading indicator
+                        if isLoading {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(1.2)
+                        } else {
+                            Image(systemName: icon)
+                                .font(.system(size: AdaptiveSizing.micIconSize))
+                                .foregroundColor(.white)
+                                .contentTransition(.symbolEffect(.replace))
+                                .animation(.smooth(duration: 0.3), value: icon)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
             }
         }
-        .buttonStyle(.plain)
     }
 }
 
