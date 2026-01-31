@@ -22,14 +22,12 @@ export * from './settings';
 // Tab 1: Speech-to-Text
 // Tab 2: Text-to-Speech
 // Tab 3: Voice Assistant (STT + LLM + TTS)
-// Tab 4: Tools (Tool Calling Demo)
-// Tab 5: Settings
+// Tab 4: Settings (includes Tool Settings)
 export type RootTabParamList = {
   Chat: undefined;
   STT: undefined;
   TTS: undefined;
   Voice: undefined;
-  Tools: undefined;
   Settings: undefined;
 };
 

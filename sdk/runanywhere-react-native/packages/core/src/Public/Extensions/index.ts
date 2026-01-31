@@ -159,6 +159,7 @@ export {
   parseToolCall,
   executeTool,
   formatToolsForPrompt,
+  formatToolsForPromptAsync,
   generateWithTools,
   continueWithToolResult,
 } from './RunAnywhere+ToolCalling';

@@ -610,6 +610,7 @@ export const RunAnywhere = {
   parseToolCall: ToolCalling.parseToolCall,
   executeTool: ToolCalling.executeTool,
   formatToolsForPrompt: ToolCalling.formatToolsForPrompt,
+  formatToolsForPromptAsync: ToolCalling.formatToolsForPromptAsync,
   generateWithTools: ToolCalling.generateWithTools,
   continueWithToolResult: ToolCalling.continueWithToolResult,
 

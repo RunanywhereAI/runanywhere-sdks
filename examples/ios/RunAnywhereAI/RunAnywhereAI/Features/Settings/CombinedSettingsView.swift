@@ -13,13 +13,14 @@ import Combine
 struct CombinedSettingsView: View {
     // ViewModel - all business logic is here
     @StateObject private var viewModel = SettingsViewModel()
+    @StateObject private var toolViewModel = ToolSettingsViewModel.shared
 
     var body: some View {
         Group {
             #if os(macOS)
-            MacOSSettingsContent(viewModel: viewModel)
+            MacOSSettingsContent(viewModel: viewModel, toolViewModel: toolViewModel)
             #else
-            IOSSettingsContent(viewModel: viewModel)
+            IOSSettingsContent(viewModel: viewModel, toolViewModel: toolViewModel)
             #endif
         }
         .sheet(isPresented: $viewModel.showApiKeyEntry) {
@@ -27,6 +28,7 @@ struct CombinedSettingsView: View {
         }
         .task {
             await viewModel.loadStorageData()
+            await toolViewModel.refreshRegisteredTools()
         }
         .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
             Button("OK") {
@@ -51,6 +53,7 @@ struct CombinedSettingsView: View {
 
 private struct IOSSettingsContent: View {
     @ObservedObject var viewModel: SettingsViewModel
+    @ObservedObject var toolViewModel: ToolSettingsViewModel
 
     var body: some View {
         Form {
@@ -70,6 +73,9 @@ private struct IOSSettingsContent: View {
                     step: 500
                 )
             }
+
+            // Tool Calling Settings
+            ToolSettingsSection(viewModel: toolViewModel)
 
             // API Configuration (for testing custom backend)
             Section {
@@ -230,6 +236,7 @@ private struct IOSSettingsContent: View {
 
 private struct MacOSSettingsContent: View {
     @ObservedObject var viewModel: SettingsViewModel
+    @ObservedObject var toolViewModel: ToolSettingsViewModel
 
     var body: some View {
         ScrollView {
@@ -239,6 +246,7 @@ private struct MacOSSettingsContent: View {
                     .padding(.bottom, AppSpacing.medium)
 
                 GenerationSettingsCard(viewModel: viewModel)
+                ToolSettingsCard(viewModel: toolViewModel)
                 APIConfigurationCard(viewModel: viewModel)
                 StorageCard(viewModel: viewModel)
                 DownloadedModelsCard(viewModel: viewModel)

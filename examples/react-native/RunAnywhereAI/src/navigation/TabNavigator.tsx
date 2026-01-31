@@ -1,13 +1,12 @@
 /**
  * TabNavigator - Bottom Tab Navigation
  *
- * Reference: iOS ContentView.swift with 6 tabs:
+ * Reference: iOS ContentView.swift with 5 tabs:
  * - Chat (LLM)
  * - STT (Speech-to-Text)
  * - TTS (Text-to-Speech)
  * - Voice (Voice Assistant - STT + LLM + TTS)
- * - Tools (Tool Calling Demo)
- * - Settings
+ * - Settings (includes Tool Settings)
  */
 
 import React from 'react';
@@ -22,7 +21,6 @@ import ChatScreen from '../screens/ChatScreen';
 import STTScreen from '../screens/STTScreen';
 import TTSScreen from '../screens/TTSScreen';
 import VoiceAssistantScreen from '../screens/VoiceAssistantScreen';
-import ToolsScreen from '../screens/ToolsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -38,20 +36,18 @@ const tabIcons: Record<
   STT: { focused: 'pulse', unfocused: 'pulse-outline' }, // waveform equivalent
   TTS: { focused: 'volume-high', unfocused: 'volume-high-outline' }, // speaker.wave.2
   Voice: { focused: 'mic', unfocused: 'mic-outline' }, // mic for voice assistant
-  Tools: { focused: 'construct', unfocused: 'construct-outline' }, // tool calling demo
   Settings: { focused: 'settings', unfocused: 'settings-outline' },
 };
 
 /**
  * Tab display names - matching iOS Swift sample app (ContentView.swift)
- * iOS uses: Chat, Transcribe, Speak, Voice, Tools, Settings
+ * iOS uses: Chat, Transcribe, Speak, Voice, Settings
  */
 const tabLabels: Record<keyof RootTabParamList, string> = {
   Chat: 'Chat',
   STT: 'Transcribe',
   TTS: 'Speak',
   Voice: 'Voice',
-  Tools: 'Tools',
   Settings: 'Settings',
 };
 
@@ -112,13 +108,7 @@ export const TabNavigator: React.FC = () => {
         component={VoiceAssistantScreen}
         options={{ tabBarLabel: tabLabels.Voice }}
       />
-      {/* Tab 4: Tools (Tool Calling Demo) */}
-      <Tab.Screen
-        name="Tools"
-        component={ToolsScreen}
-        options={{ tabBarLabel: tabLabels.Tools }}
-      />
-      {/* Tab 5: Settings */}
+      {/* Tab 4: Settings (includes Tool Settings) */}
       <Tab.Screen
         name="Settings"
         component={SettingsScreen}

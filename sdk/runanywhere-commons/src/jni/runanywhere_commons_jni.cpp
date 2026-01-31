@@ -40,6 +40,7 @@
 #include "rac/infrastructure/network/rac_environment.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_types.h"
+#include "rac/features/llm/rac_tool_calling.h"
 
 // NOTE: Backend headers are NOT included here.
 // Backend registration is handled by their respective JNI libraries:
@@ -2322,6 +2323,37 @@ static bool extract_json_bool(const char* json, const char* key) {
     return strncmp(pos, "true", 4) == 0;
 }
 
+// Helper to extract a float value from JSON
+static float extract_json_float(const char* json, const char* key, float default_value) {
+    if (!json || !key)
+        return default_value;
+
+    std::string search_key = "\"" + std::string(key) + "\":";
+    const char* pos = strstr(json, search_key.c_str());
+    if (!pos)
+        return default_value;
+
+    pos += search_key.length();
+    while (*pos == ' ')
+        pos++;
+
+    char* end = nullptr;
+    float value = strtof(pos, &end);
+    if (end == pos)
+        return default_value;
+
+    return value;
+}
+
+// Helper to check if a JSON key exists
+static bool json_has_key(const char* json, const char* key) {
+    if (!json || !key)
+        return false;
+
+    std::string search_key = "\"" + std::string(key) + "\":";
+    return strstr(json, search_key.c_str()) != nullptr;
+}
+
 // Static storage for device info strings (need to persist for C callbacks)
 static struct {
     std::string device_id;
@@ -3258,6 +3290,257 @@ JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
     }
 
     return static_cast<jint>(result);
+}
+
+// =============================================================================
+// TOOL CALLING API (rac_tool_calling.h)
+// Mirrors Swift SDK's CppBridge+ToolCalling.swift
+// =============================================================================
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallParse(JNIEnv* env, jclass clazz,
+                                                                          jstring llmOutput) {
+    std::string outputStr = getCString(env, llmOutput);
+    rac_tool_call_t result;
+    
+    rac_result_t rc = rac_tool_call_parse(outputStr.c_str(), &result);
+    
+    // Helper lambda to escape JSON string values
+    auto escape_json_string = [](const char* s) -> std::string {
+        std::string out;
+        if (!s) return out;
+        for (const char* p = s; *p; ++p) {
+            switch (*p) {
+                case '"': out += "\\\""; break;
+                case '\\': out += "\\\\"; break;
+                case '\n': out += "\\n"; break;
+                case '\r': out += "\\r"; break;
+                case '\t': out += "\\t"; break;
+                default: out += *p; break;
+            }
+        }
+        return out;
+    };
+    
+    // Build JSON response
+    std::string json = "{";
+    json += "\"hasToolCall\":";
+    json += (result.has_tool_call == RAC_TRUE) ? "true" : "false";
+    json += ",\"cleanText\":\"";
+    json += escape_json_string(result.clean_text);
+    json += "\"";
+    
+    if (result.has_tool_call == RAC_TRUE) {
+        // Escape tool_name to prevent JSON injection
+        json += ",\"toolName\":\"";
+        json += escape_json_string(result.tool_name);
+        json += "\",\"argumentsJson\":";
+        
+        // Validate arguments_json: only embed if it looks like valid JSON object/array
+        if (result.arguments_json && 
+            (result.arguments_json[0] == '{' || result.arguments_json[0] == '[')) {
+            json += result.arguments_json;
+        } else {
+            json += "{}";
+        }
+        
+        json += ",\"callId\":";
+        json += std::to_string(result.call_id);
+    }
+    
+    json += "}";
+    
+    rac_tool_call_free(&result);
+    return env->NewStringUTF(json.c_str());
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallFormatPromptJson(
+    JNIEnv* env, jclass clazz, jstring toolsJson) {
+    std::string toolsStr = getCString(env, toolsJson);
+    char* prompt = nullptr;
+    
+    rac_result_t rc = rac_tool_call_format_prompt_json(toolsStr.c_str(), &prompt);
+    
+    if (rc != RAC_SUCCESS || prompt == nullptr) {
+        return nullptr;
+    }
+    
+    jstring result = env->NewStringUTF(prompt);
+    rac_free(prompt);
+    return result;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallFormatPromptJsonWithFormat(
+    JNIEnv* env, jclass clazz, jstring toolsJson, jint format) {
+    std::string toolsStr = getCString(env, toolsJson);
+    char* prompt = nullptr;
+    
+    rac_result_t rc = rac_tool_call_format_prompt_json_with_format(
+        toolsStr.c_str(),
+        static_cast<rac_tool_call_format_t>(format),
+        &prompt
+    );
+    
+    if (rc != RAC_SUCCESS || prompt == nullptr) {
+        return nullptr;
+    }
+    
+    jstring result = env->NewStringUTF(prompt);
+    rac_free(prompt);
+    return result;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallFormatPromptJsonWithFormatName(
+    JNIEnv* env, jclass clazz, jstring toolsJson, jstring formatName) {
+    std::string toolsStr = getCString(env, toolsJson);
+    std::string formatStr = getCString(env, formatName);
+    char* prompt = nullptr;
+    
+    // Use string-based API (C++ is single source of truth for format names)
+    rac_result_t rc = rac_tool_call_format_prompt_json_with_format_name(
+        toolsStr.c_str(),
+        formatStr.c_str(),
+        &prompt
+    );
+    
+    if (rc != RAC_SUCCESS || prompt == nullptr) {
+        return nullptr;
+    }
+    
+    jstring result = env->NewStringUTF(prompt);
+    rac_free(prompt);
+    return result;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallBuildInitialPrompt(
+    JNIEnv* env, jclass clazz, jstring userPrompt, jstring toolsJson, jstring optionsJson) {
+    std::string userStr = getCString(env, userPrompt);
+    std::string toolsStr = getCString(env, toolsJson);
+    std::string optionsStr = getCString(env, optionsJson);
+    
+    // Initialize with defaults (matching RAC_TOOL_CALLING_OPTIONS_DEFAULT)
+    rac_tool_calling_options_t options = {};
+    options.max_tool_calls = 5;
+    options.auto_execute = RAC_TRUE;
+    options.temperature = 0.7f;
+    options.max_tokens = 1024;
+    options.system_prompt = nullptr;
+    options.replace_system_prompt = RAC_FALSE;
+    options.keep_tools_available = RAC_FALSE;
+    options.format = RAC_TOOL_FORMAT_DEFAULT;
+    
+    // Storage for system prompt string (needs to outlive options struct)
+    std::string systemPromptStorage;
+    
+    // Parse options JSON if provided
+    const char* optionsJsonStr = optionsStr.c_str();
+    if (optionsJsonStr && strlen(optionsJsonStr) > 2) {
+        // Parse maxToolCalls
+        if (json_has_key(optionsJsonStr, "maxToolCalls")) {
+            options.max_tool_calls = static_cast<int32_t>(extract_json_int(optionsJsonStr, "maxToolCalls"));
+        }
+        
+        // Parse autoExecute
+        if (json_has_key(optionsJsonStr, "autoExecute")) {
+            options.auto_execute = extract_json_bool(optionsJsonStr, "autoExecute") ? RAC_TRUE : RAC_FALSE;
+        }
+        
+        // Parse temperature (optional field)
+        if (json_has_key(optionsJsonStr, "temperature")) {
+            options.temperature = extract_json_float(optionsJsonStr, "temperature", 0.7f);
+        }
+        
+        // Parse maxTokens (optional field)
+        if (json_has_key(optionsJsonStr, "maxTokens")) {
+            options.max_tokens = static_cast<int32_t>(extract_json_int(optionsJsonStr, "maxTokens"));
+        }
+        
+        // Parse systemPrompt (optional field)
+        if (json_has_key(optionsJsonStr, "systemPrompt")) {
+            systemPromptStorage = extract_json_string(optionsJsonStr, "systemPrompt");
+            if (!systemPromptStorage.empty()) {
+                options.system_prompt = systemPromptStorage.c_str();
+            }
+        }
+        
+        // Parse replaceSystemPrompt
+        if (json_has_key(optionsJsonStr, "replaceSystemPrompt")) {
+            options.replace_system_prompt = extract_json_bool(optionsJsonStr, "replaceSystemPrompt") ? RAC_TRUE : RAC_FALSE;
+        }
+        
+        // Parse keepToolsAvailable
+        if (json_has_key(optionsJsonStr, "keepToolsAvailable")) {
+            options.keep_tools_available = extract_json_bool(optionsJsonStr, "keepToolsAvailable") ? RAC_TRUE : RAC_FALSE;
+        }
+        
+        // Parse format (string to enum conversion)
+        if (json_has_key(optionsJsonStr, "format")) {
+            std::string formatStr = extract_json_string(optionsJsonStr, "format");
+            if (!formatStr.empty()) {
+                options.format = rac_tool_call_format_from_name(formatStr.c_str());
+            }
+        }
+    }
+    
+    char* prompt = nullptr;
+    rac_result_t rc = rac_tool_call_build_initial_prompt(userStr.c_str(), toolsStr.c_str(), &options, &prompt);
+    
+    if (rc != RAC_SUCCESS || prompt == nullptr) {
+        return nullptr;
+    }
+    
+    jstring result = env->NewStringUTF(prompt);
+    rac_free(prompt);
+    return result;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallBuildFollowupPrompt(
+    JNIEnv* env, jclass clazz, jstring originalPrompt, jstring toolsPrompt, jstring toolName,
+    jstring toolResultJson, jboolean keepToolsAvailable) {
+    std::string originalStr = getCString(env, originalPrompt);
+    std::string toolsPromptStr = getCString(env, toolsPrompt);
+    std::string toolNameStr = getCString(env, toolName);
+    std::string resultJsonStr = getCString(env, toolResultJson);
+    
+    char* prompt = nullptr;
+    rac_result_t rc = rac_tool_call_build_followup_prompt(
+        originalStr.c_str(),
+        toolsPromptStr.empty() ? nullptr : toolsPromptStr.c_str(),
+        toolNameStr.c_str(),
+        resultJsonStr.c_str(),
+        keepToolsAvailable ? RAC_TRUE : RAC_FALSE,
+        &prompt);
+    
+    if (rc != RAC_SUCCESS || prompt == nullptr) {
+        return nullptr;
+    }
+    
+    jstring result = env->NewStringUTF(prompt);
+    rac_free(prompt);
+    return result;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallNormalizeJson(JNIEnv* env,
+                                                                                   jclass clazz,
+                                                                                   jstring jsonStr) {
+    std::string inputStr = getCString(env, jsonStr);
+    char* normalized = nullptr;
+    
+    rac_result_t rc = rac_tool_call_normalize_json(inputStr.c_str(), &normalized);
+    
+    if (rc != RAC_SUCCESS || normalized == nullptr) {
+        return nullptr;
+    }
+    
+    jstring result = env->NewStringUTF(normalized);
+    rac_free(normalized);
+    return result;
 }
 
 }  // extern "C"

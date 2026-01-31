@@ -5,8 +5,9 @@
  *
  * Architecture Pattern:
  * - Two-phase SDK initialization (matching iOS pattern)
- * - Module registration with models (LlamaCPP, ONNX, FluidAudio)
- * - Tab-based navigation with 5 tabs (Chat, STT, TTS, Voice, Settings)
+ * - Module registration with models (LlamaCPP, ONNX)
+ * - Tab-based navigation with 5 tabs (Chat, Transcribe, Speak, Voice, Settings)
+ * - Tool calling settings are in Settings tab (matching iOS)
  *
  * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/App/RunAnywhereAIApp.swift
  */
@@ -158,6 +159,20 @@ const App: React.FC = () => {
       name: 'LiquidAI LFM2.5 1.2B Instruct Q4_K_M',
       url: 'https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf',
       memoryRequirement: 900_000_000,
+    });
+    // Tool Calling Optimized Models
+    // LFM2-1.2B-Tool - Designed for concise and precise tool calling (Liquid AI)
+    await LlamaCPP.addModel({
+      id: 'lfm2-1.2b-tool-q4_k_m',
+      name: 'LiquidAI LFM2 1.2B Tool Q4_K_M',
+      url: 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf',
+      memoryRequirement: 800_000_000,
+    });
+    await LlamaCPP.addModel({
+      id: 'lfm2-1.2b-tool-q8_0',
+      name: 'LiquidAI LFM2 1.2B Tool Q8_0',
+      url: 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf',
+      memoryRequirement: 1_400_000_000,
     });
 
     // ONNX module with STT and TTS models

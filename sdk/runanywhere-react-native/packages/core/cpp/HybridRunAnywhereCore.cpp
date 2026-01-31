@@ -2595,4 +2595,46 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::parseToolCallFromOu
     });
 }
 
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::formatToolsForPrompt(
+    const std::string& toolsJson,
+    const std::string& format
+) {
+    return Promise<std::string>::async([toolsJson, format]() -> std::string {
+        LOGD("formatToolsForPrompt: tools length=%zu, format=%s", toolsJson.length(), format.c_str());
+
+        // Use C++ single source of truth for prompt formatting
+        // This eliminates duplicate TypeScript implementation
+        return ::runanywhere::bridges::ToolCallingBridge::shared().formatToolsPrompt(toolsJson, format);
+    });
+}
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::buildInitialPrompt(
+    const std::string& userPrompt,
+    const std::string& toolsJson,
+    const std::string& optionsJson
+) {
+    return Promise<std::string>::async([userPrompt, toolsJson, optionsJson]() -> std::string {
+        LOGD("buildInitialPrompt: prompt length=%zu, tools length=%zu", userPrompt.length(), toolsJson.length());
+
+        // Use C++ single source of truth for initial prompt building
+        return ::runanywhere::bridges::ToolCallingBridge::shared().buildInitialPrompt(userPrompt, toolsJson, optionsJson);
+    });
+}
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::buildFollowupPrompt(
+    const std::string& originalPrompt,
+    const std::string& toolsPrompt,
+    const std::string& toolName,
+    const std::string& resultJson,
+    bool keepToolsAvailable
+) {
+    return Promise<std::string>::async([originalPrompt, toolsPrompt, toolName, resultJson, keepToolsAvailable]() -> std::string {
+        LOGD("buildFollowupPrompt: tool=%s, keepTools=%d", toolName.c_str(), keepToolsAvailable);
+
+        // Use C++ single source of truth for follow-up prompt building
+        return ::runanywhere::bridges::ToolCallingBridge::shared().buildFollowupPrompt(
+            originalPrompt, toolsPrompt, toolName, resultJson, keepToolsAvailable);
+    });
+}
+
 } // namespace margelo::nitro::runanywhere
