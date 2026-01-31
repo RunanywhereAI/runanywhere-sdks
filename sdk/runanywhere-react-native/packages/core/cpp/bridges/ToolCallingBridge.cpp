@@ -59,13 +59,17 @@ std::string ToolCallingBridge::parseToolCall(const std::string& llmOutput) {
     return response.dump();
 }
 
-std::string ToolCallingBridge::formatToolsPrompt(const std::string& toolsJson) {
+std::string ToolCallingBridge::formatToolsPrompt(const std::string& toolsJson, const std::string& format) {
     if (toolsJson.empty() || toolsJson == "[]") {
         return "";
     }
 
     char* prompt = nullptr;
-    rac_result_t rc = rac_tool_call_format_prompt_json(toolsJson.c_str(), &prompt);
+    rac_result_t rc = rac_tool_call_format_prompt_json_with_format_name(
+        toolsJson.c_str(),
+        format.c_str(),
+        &prompt
+    );
 
     if (rc != RAC_SUCCESS || !prompt) {
         return "";

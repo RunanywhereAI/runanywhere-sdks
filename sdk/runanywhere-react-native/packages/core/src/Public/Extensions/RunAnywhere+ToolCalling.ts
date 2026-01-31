@@ -123,10 +123,10 @@ async function parseToolCallViaCpp(llmOutput: string): Promise<{
 /**
  * Format tool definitions for LLM prompt
  * Creates a system prompt describing available tools
- * 
- * IMPORTANT: This MUST match the C++ implementation in rac_tool_calling.cpp
- * The C++ function is: rac_tool_call_format_prompt_json_with_format()
- * 
+ *
+ * Uses C++ single source of truth via native module.
+ * Falls back to synchronous TypeScript implementation if native unavailable.
+ *
  * @param tools - Tool definitions (defaults to registered tools)
  * @param format - Tool calling format: 'default' (JSON) or 'lfm2' (Pythonic)
  */
@@ -138,7 +138,7 @@ export function formatToolsForPrompt(tools?: ToolDefinition[], format?: string):
     return '';
   }
 
-  // Serialize tools to JSON array - EXACTLY like C++ does
+  // Serialize tools to JSON for C++ consumption
   const toolsJson = JSON.stringify(toolsToFormat.map((tool) => ({
     name: tool.name,
     description: tool.description,
@@ -147,72 +147,58 @@ export function formatToolsForPrompt(tools?: ToolDefinition[], format?: string):
       type: p.type,
       description: p.description,
       required: p.required,
-      ...(p.enumValues ? { enumValues: p.enumValues } : {}),
+      ...(p.enum ? { enumValues: p.enum } : {}),
     })),
   })));
 
-  // Format-specific instructions - MUST match C++ get_format_example_json()
-  let formatExample: string;
+  // Use async C++ bridge version internally
+  // For sync callers, we return a placeholder and log a warning
+  // Prefer using formatToolsForPromptAsync for new code
+  logger.warning('formatToolsForPrompt is sync but C++ bridge is async. Use formatToolsForPromptAsync() for full C++ integration.');
 
-  if (toolFormat === 'lfm2') {
-    // LFM2 format - Enhanced with more math examples for better reliability
-    formatExample = `## OUTPUT FORMAT
-You MUST respond with ONLY a tool call in this exact format:
-<|tool_call_start|>[function_name(param="value")]<|tool_call_end|>
+  return toolsJson; // Return raw JSON - actual formatting done by buildInitialPrompt
+}
 
-CRITICAL: Always include the FULL format with <|tool_call_start|> and <|tool_call_end|> tags.
+/**
+ * Format tool definitions for LLM prompt (async version)
+ * Uses C++ single source of truth for consistent formatting across all platforms.
+ *
+ * @param tools - Tool definitions (defaults to registered tools)
+ * @param format - Tool calling format: 'default' (JSON) or 'lfm2' (Pythonic)
+ */
+export async function formatToolsForPromptAsync(tools?: ToolDefinition[], format?: string): Promise<string> {
+  const toolsToFormat = tools || getRegisteredTools();
+  const toolFormat = format?.toLowerCase() || 'default';
 
-## EXAMPLES
-Q: What's the weather in NYC?
-A: <|tool_call_start|>[get_weather(location="New York")]<|tool_call_end|>
-
-Q: weather in sf
-A: <|tool_call_start|>[get_weather(location="San Francisco")]<|tool_call_end|>
-
-Q: calculate 2+2
-A: <|tool_call_start|>[calculate(expression="2+2")]<|tool_call_end|>
-
-Q: What's 5*10?
-A: <|tool_call_start|>[calculate(expression="5*10")]<|tool_call_end|>
-
-Q: What is 100/4?
-A: <|tool_call_start|>[calculate(expression="100/4")]<|tool_call_end|>`;
-  } else {
-    // Default JSON format - EXACTLY matches C++ RAC_TOOL_FORMAT_DEFAULT
-    formatExample = `## OUTPUT FORMAT
-You MUST respond with ONLY a tool call in this exact format:
-<tool_call>{"tool": "function_name", "arguments": {"param": "value"}}</tool_call>
-
-## EXAMPLES
-Q: What's the weather in NYC?
-A: <tool_call>{"tool": "get_weather", "arguments": {"location": "New York"}}</tool_call>
-
-Q: weather in sf
-A: <tool_call>{"tool": "get_weather", "arguments": {"location": "San Francisco"}}</tool_call>
-
-Q: calculate 2+2
-A: <tool_call>{"tool": "calculate", "arguments": {"expression": "2+2"}}</tool_call>`;
+  if (toolsToFormat.length === 0) {
+    return '';
   }
 
-  // Build prompt EXACTLY like C++ rac_tool_call_format_prompt_json_with_format()
-  // See: sdk/runanywhere-commons/src/features/llm/tool_calling.cpp lines 1343-1358
+  // Serialize tools to JSON for C++ consumption
+  const toolsJson = JSON.stringify(toolsToFormat.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.parameters.map((p) => ({
+      name: p.name,
+      type: p.type,
+      description: p.description,
+      required: p.required,
+      ...(p.enum ? { enumValues: p.enum } : {}),
+    })),
+  })));
 
-  // Format-specific tag instructions
-  const tagInstruction = toolFormat === 'lfm2'
-    ? '- ALWAYS include <|tool_call_start|> and <|tool_call_end|> tags.'
-    : '- ALWAYS include <tool_call> and </tool_call> tags.';
+  if (!isNativeModuleAvailable()) {
+    logger.warning('Native module not available, returning raw tools JSON');
+    return toolsJson;
+  }
 
-  return `# TOOLS
-${toolsJson}
-
-${formatExample}
-
-## RULES
-- Weather question = call get_weather
-- Math/calculation question (add, subtract, multiply, divide, "what's X*Y", etc.) = call calculate with the EXPRESSION as a string
-- Time question = call get_current_time
-- DO NOT compute answers yourself. ALWAYS use the tool with the original expression.
-${tagInstruction}`;
+  try {
+    const native = requireNativeModule();
+    return await native.formatToolsForPrompt(toolsJson, toolFormat);
+  } catch (error) {
+    logger.error(`C++ formatToolsForPrompt failed: ${error}`);
+    return toolsJson;
+  }
 }
 
 // =============================================================================
@@ -262,12 +248,87 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
 // MAIN API: GENERATE WITH TOOLS
 // =============================================================================
 
+// =============================================================================
+// C++ BRIDGE HELPERS - Use C++ single source of truth for prompt building
+// =============================================================================
+
+/**
+ * Build initial prompt using C++ bridge
+ * Falls back to simple concatenation if native unavailable
+ */
+async function buildInitialPromptViaCpp(
+  userPrompt: string,
+  toolsJson: string,
+  options?: ToolCallingOptions
+): Promise<string> {
+  if (!isNativeModuleAvailable()) {
+    // Fallback: simple concatenation
+    return `${toolsJson}\n\nUser: ${userPrompt}`;
+  }
+
+  try {
+    const native = requireNativeModule();
+    const optionsJson = JSON.stringify({
+      maxToolCalls: options?.maxToolCalls ?? 5,
+      autoExecute: options?.autoExecute ?? true,
+      temperature: options?.temperature ?? 0.7,
+      maxTokens: options?.maxTokens ?? 1024,
+      format: options?.format ?? 'default',
+      replaceSystemPrompt: options?.replaceSystemPrompt ?? false,
+      keepToolsAvailable: options?.keepToolsAvailable ?? false,
+      systemPrompt: options?.systemPrompt,
+    });
+    return await native.buildInitialPrompt(userPrompt, toolsJson, optionsJson);
+  } catch (error) {
+    logger.error(`C++ buildInitialPrompt failed: ${error}`);
+    return `${toolsJson}\n\nUser: ${userPrompt}`;
+  }
+}
+
+/**
+ * Build follow-up prompt using C++ bridge
+ * Falls back to template string if native unavailable
+ */
+async function buildFollowupPromptViaCpp(
+  originalPrompt: string,
+  toolsPrompt: string,
+  toolName: string,
+  resultJson: string,
+  keepToolsAvailable: boolean
+): Promise<string> {
+  if (!isNativeModuleAvailable()) {
+    // Fallback: simple template
+    if (keepToolsAvailable) {
+      return `${toolsPrompt}\n\nUser: ${originalPrompt}\n\nTool ${toolName} returned: ${resultJson}`;
+    }
+    return `The user asked: "${originalPrompt}"\n\nYou used ${toolName} and got: ${resultJson}\n\nRespond naturally.`;
+  }
+
+  try {
+    const native = requireNativeModule();
+    return await native.buildFollowupPrompt(
+      originalPrompt,
+      toolsPrompt,
+      toolName,
+      resultJson,
+      keepToolsAvailable
+    );
+  } catch (error) {
+    logger.error(`C++ buildFollowupPrompt failed: ${error}`);
+    return `The user asked: "${originalPrompt}"\n\nYou used ${toolName} and got: ${resultJson}`;
+  }
+}
+
+// =============================================================================
+// MAIN API: GENERATE WITH TOOLS
+// =============================================================================
+
 /**
  * Generate a response with tool calling support
- * Uses C++ for parsing, TypeScript for execution
+ * Uses C++ for parsing AND prompt building (single source of truth)
  *
  * ARCHITECTURE:
- * - Parsing: C++ ToolCallingBridge (single source of truth)
+ * - Parsing & Prompts: C++ ToolCallingBridge (single source of truth)
  * - Registry & Execution: TypeScript (needs JS APIs like fetch)
  * - Orchestration: This function manages the generate-parse-execute loop
  */
@@ -278,34 +339,32 @@ export async function generateWithTools(
   const tools = options?.tools ?? getRegisteredTools();
   const maxToolCalls = options?.maxToolCalls ?? 5;
   const autoExecute = options?.autoExecute ?? true;
-  const replaceSystemPrompt = options?.replaceSystemPrompt ?? false;
   const keepToolsAvailable = options?.keepToolsAvailable ?? false;
   const format = options?.format || 'default';
 
   logger.debug(`[ToolCalling] Starting with format: ${format}, tools: ${tools.length}`);
 
-  // Build system prompt with tools (pass format for correct instructions)
-  const toolsPrompt = formatToolsForPrompt(tools, format);
+  // Serialize tools to JSON for C++ consumption
+  const toolsJson = JSON.stringify(tools.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.parameters.map((p) => ({
+      name: p.name,
+      type: p.type,
+      description: p.description,
+      required: p.required,
+      ...(p.enum ? { enumValues: p.enum } : {}),
+    })),
+  })));
 
-  // Handle system prompt based on replaceSystemPrompt option
-  let systemPrompt: string;
-  if (replaceSystemPrompt && options?.systemPrompt) {
-    // Use user's system prompt as-is (they handle tool instructions themselves)
-    systemPrompt = options.systemPrompt;
-  } else if (options?.systemPrompt) {
-    // Merge user's system prompt with tool instructions (default behavior)
-    systemPrompt = `${options.systemPrompt}\n\n${toolsPrompt}`;
-  } else {
-    // Use only tool instructions
-    systemPrompt = toolsPrompt;
-  }
+  // Build initial prompt using C++ single source of truth
+  let fullPrompt = await buildInitialPromptViaCpp(prompt, toolsJson, options);
+  logger.debug(`[ToolCalling] Initial prompt built (${fullPrompt.length} chars)`);
 
-  // Build conversation history for context preservation
-  const conversationHistory: Array<{ role: string; content: string }> = [];
-
-  // Initial prompt with system context
-  let fullPrompt = systemPrompt ? `${systemPrompt}\n\nUser: ${prompt}` : prompt;
-  conversationHistory.push({ role: 'user', content: prompt });
+  // Get formatted tools prompt for follow-up (if keepToolsAvailable)
+  const toolsPrompt = keepToolsAvailable
+    ? await formatToolsForPromptAsync(tools, format)
+    : '';
 
   const allToolCalls: ToolCall[] = [];
   const allToolResults: ToolResult[] = [];
@@ -337,7 +396,6 @@ export async function generateWithTools(
     if (!toolCall) {
       // No tool call, we're done - LLM provided a natural response
       logger.debug('[ToolCalling] No tool call found, breaking loop with finalText');
-      conversationHistory.push({ role: 'assistant', content: finalText });
       break;
     }
 
@@ -365,32 +423,15 @@ export async function generateWithTools(
       logger.debug(`[ToolCalling] Tool error: ${result.error}`);
     }
 
-    // Add tool interaction to conversation history
-    conversationHistory.push({ role: 'assistant', content: `[Tool: ${toolCall.toolName}]` });
-    conversationHistory.push({ role: 'tool', content: JSON.stringify(result.success ? result.result : { error: result.error }) });
-
-    // Build follow-up prompt based on keepToolsAvailable option
+    // Build follow-up prompt using C++ single source of truth
     const resultData = result.success ? result.result : { error: result.error };
-
-    if (keepToolsAvailable) {
-      // Keep tool definitions available for potential additional tool calls
-      fullPrompt = `${systemPrompt}
-
-User: ${prompt}
-
-You previously used the ${toolCall.toolName} tool and received:
-${JSON.stringify(resultData, null, 2)}
-
-Based on this tool result, either use another tool if needed, or provide a helpful response to the user.`;
-    } else {
-      // Default: Remove tool definitions to encourage natural response
-      fullPrompt = `The user asked: "${prompt}"
-
-You used the ${toolCall.toolName} tool and received this data:
-${JSON.stringify(resultData, null, 2)}
-
-Now provide a helpful, natural response to the user based on this information. Do NOT use any tools - just respond conversationally.`;
-    }
+    fullPrompt = await buildFollowupPromptViaCpp(
+      prompt,
+      toolsPrompt,
+      toolCall.toolName,
+      JSON.stringify(resultData),
+      keepToolsAvailable
+    );
 
     logger.debug(`[ToolCalling] Continuing to iteration ${iterations + 1} with tool result...`);
   }
