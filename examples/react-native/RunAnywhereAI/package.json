@@ -17,6 +17,7 @@
     "clean": "watchman watch-del-all && rm -rf node_modules && rm -rf ios/Pods && npm install && cd ios && pod install"
   },
   "dependencies": {
+    "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-navigation/bottom-tabs": "^7.8.11",
     "@react-navigation/native": "^7.1.24",
     "@react-navigation/native-stack": "^7.8.5",
@@ -32,12 +33,12 @@
     "react-native-nitro-modules": "^0.31.10",
     "react-native-permissions": "^5.4.4",
     "react-native-reanimated": "~4.2.1",
-    "react-native-worklets": "0.7.1",
     "react-native-safe-area-context": "~5.6.2",
     "react-native-screens": "~4.19.0",
     "react-native-sound": "^0.13.0",
     "react-native-tts": "^4.1.1",
     "react-native-vector-icons": "^10.1.0",
+    "react-native-worklets": "0.7.1",
     "react-native-zip-archive": "^6.1.2",
     "rn-fetch-blob": "^0.12.0",
     "zustand": "^5.0.0"
