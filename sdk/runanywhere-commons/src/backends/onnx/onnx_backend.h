@@ -36,6 +36,7 @@ enum class DeviceType {
     CPU = 0,
     GPU = 1,
     NEURAL_ENGINE = 2,
+    NPU = 5,      // Qualcomm Hexagon / Android NNAPI
     COREML = 6,
 };
 
@@ -90,11 +91,16 @@ struct STTResult {
 // =============================================================================
 
 enum class TTSModelType {
-    PIPER,
-    COQUI,
-    BARK,
-    ESPEAK,
-    CUSTOM
+    UNKNOWN = 0,
+    VITS = 1,      // Piper TTS (VITS-based) - also covers PIPER
+    KOKORO = 2,    // Kokoro TTS (StyleTTS2-based)
+    MATCHA = 3,    // Matcha TTS
+    KITTEN = 4,    // Kitten TTS (lightweight)
+    PIPER = VITS,  // Alias for backwards compatibility
+    COQUI = 5,
+    BARK = 6,
+    ESPEAK = 7,
+    CUSTOM = 8
 };
 
 struct VoiceInfo {

@@ -3,6 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * JVM/Android actual implementations for Text-to-Speech operations.
+ * 
+ * Uses TTSRouter to route between backends:
+ * - KokoroTTSProvider: For Kokoro models (NPU-accelerated via QNN on Qualcomm devices)
+ * - CppBridgeTTS: For other models (Sherpa-ONNX on CPU)
  */
 
 package com.runanywhere.sdk.public.extensions
@@ -11,6 +15,7 @@ import com.runanywhere.sdk.features.tts.TtsAudioPlayback
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
+import com.runanywhere.sdk.foundation.bridge.extensions.TTSRouter
 import com.runanywhere.sdk.foundation.errors.SDKError
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.TTS.TTSOptions
@@ -36,35 +41,35 @@ actual suspend fun RunAnywhere.loadTTSVoice(voiceId: String) {
         modelInfo.localPath
             ?: throw SDKError.tts("Voice '$voiceId' is not downloaded")
 
-    // Pass modelPath, modelId, and modelName separately for correct telemetry
-    val result = CppBridgeTTS.loadModel(localPath, voiceId, modelInfo.name)
-    if (result != 0) {
-        ttsLogger.error("Failed to load TTS voice '$voiceId' (error code: $result)")
-        throw SDKError.tts("Failed to load TTS voice '$voiceId' (error code: $result)")
+    // Use TTSRouter to route to appropriate backend (Kokoro or SherpaOnnx)
+    TTSRouter.loadModel(localPath, voiceId, modelInfo.name).getOrElse { error ->
+        ttsLogger.error("Failed to load TTS voice: ${error.message}")
+        throw if (error is SDKError) error else SDKError.tts("Failed to load TTS voice: ${error.message}")
     }
-    ttsLogger.info("TTS voice loaded: $voiceId")
+    
+    ttsLogger.info("TTS voice loaded: $voiceId (backend: ${TTSRouter.backendName})")
 }
 
 actual suspend fun RunAnywhere.unloadTTSVoice() {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
-    CppBridgeTTS.unload()
+    TTSRouter.unload()
 }
 
 actual suspend fun RunAnywhere.isTTSVoiceLoaded(): Boolean {
-    return CppBridgeTTS.isLoaded
+    return TTSRouter.isLoaded
 }
 
 actual val RunAnywhere.currentTTSVoiceId: String?
-    get() = CppBridgeTTS.getLoadedModelId()
+    get() = TTSRouter.getLoadedModelId()
 
 actual val RunAnywhere.isTTSVoiceLoadedSync: Boolean
-    get() = CppBridgeTTS.isLoaded
+    get() = TTSRouter.isLoaded
 
 actual suspend fun RunAnywhere.availableTTSVoices(): List<String> {
-    // Get available voices from TTS component
-    return CppBridgeTTS.getAvailableVoices().map { it.voiceId }
+    // Get available voices from TTS router (routes to appropriate backend)
+    return TTSRouter.getAvailableVoices().map { it.voiceId }
 }
 
 actual suspend fun RunAnywhere.synthesize(
@@ -75,8 +80,8 @@ actual suspend fun RunAnywhere.synthesize(
         throw SDKError.notInitialized("SDK not initialized")
     }
 
-    val voiceId = CppBridgeTTS.getLoadedModelId() ?: "unknown"
-    ttsLogger.debug("Synthesizing text: ${text.take(50)}${if (text.length > 50) "..." else ""} (voice: $voiceId)")
+    val voiceId = TTSRouter.getLoadedModelId() ?: "unknown"
+    ttsLogger.debug("Synthesizing text: ${text.take(50)}${if (text.length > 50) "..." else ""} (voice: $voiceId, backend: ${TTSRouter.backendName})")
 
     val config =
         CppBridgeTTS.SynthesisConfig(
@@ -85,10 +90,16 @@ actual suspend fun RunAnywhere.synthesize(
             volume = options.volume,
             sampleRate = options.sampleRate,
             language = options.language ?: CppBridgeTTS.Language.ENGLISH,
+            voiceId = options.voice ?: "", // Pass voice for Kokoro
         )
 
-    val result = CppBridgeTTS.synthesize(text, config)
-    ttsLogger.info("Synthesis complete: ${result.durationMs}ms audio")
+    // Use TTSRouter which routes to appropriate backend
+    val result = TTSRouter.synthesize(text, config).getOrElse { error ->
+        ttsLogger.error("Synthesis failed: ${error.message}")
+        throw if (error is SDKError) error else SDKError.tts("Synthesis failed: ${error.message}")
+    }
+    
+    ttsLogger.info("Synthesis complete: ${result.durationMs}ms audio (backend: ${TTSRouter.backendName})")
 
     val metadata =
         TTSSynthesisMetadata(
@@ -116,7 +127,7 @@ actual suspend fun RunAnywhere.synthesizeStream(
         throw SDKError.notInitialized("SDK not initialized")
     }
 
-    val voiceId = CppBridgeTTS.getLoadedModelId() ?: "unknown"
+    val voiceId = TTSRouter.getLoadedModelId() ?: "unknown"
 
     val config =
         CppBridgeTTS.SynthesisConfig(
@@ -125,13 +136,17 @@ actual suspend fun RunAnywhere.synthesizeStream(
             volume = options.volume,
             sampleRate = options.sampleRate,
             language = options.language ?: CppBridgeTTS.Language.ENGLISH,
+            voiceId = options.voice ?: "", // Pass voice for Kokoro
         )
 
-    val result =
-        CppBridgeTTS.synthesizeStream(text, config) { audioData, isFinal ->
-            onAudioChunk(audioData)
-            true // Continue processing
-        }
+    // Use TTSRouter which routes to appropriate backend
+    val result = TTSRouter.synthesizeStream(text, config) { audioData, isFinal ->
+        onAudioChunk(audioData)
+        true // Continue processing
+    }.getOrElse { error ->
+        ttsLogger.error("Streaming synthesis failed: ${error.message}")
+        throw if (error is SDKError) error else SDKError.tts("Streaming synthesis failed: ${error.message}")
+    }
 
     val metadata =
         TTSSynthesisMetadata(
@@ -151,7 +166,7 @@ actual suspend fun RunAnywhere.synthesizeStream(
 }
 
 actual suspend fun RunAnywhere.stopSynthesis() {
-    CppBridgeTTS.cancel()
+    TTSRouter.cancel()
 }
 
 actual suspend fun RunAnywhere.speak(

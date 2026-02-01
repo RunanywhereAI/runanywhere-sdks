@@ -1,0 +1,140 @@
+/**
+ * android_qnn_setup.gradle
+ * 
+ * Gradle configuration for integrating QNN (Qualcomm NPU) support in Android apps.
+ * Include this in your app's build.gradle or copy the relevant sections.
+ *
+ * Usage:
+ *   In your app's build.gradle:
+ *   apply from: '/path/to/android_qnn_setup.gradle'
+ */
+
+// =============================================================================
+// QNN Library Configuration
+// =============================================================================
+
+ext {
+    // QNN library directory (adjust path as needed)
+    qnnLibsDir = file("${project.rootDir}/../sdk/runanywhere-commons/third_party/qnn-libs")
+    
+    // Enable/disable QNN support
+    enableQnnSupport = true
+}
+
+android {
+    
+    // =============================================================================
+    // JNI Libraries Configuration
+    // =============================================================================
+    
+    sourceSets {
+        main {
+            // Include QNN native libraries
+            if (ext.enableQnnSupport && ext.qnnLibsDir.exists()) {
+                jniLibs.srcDirs += ext.qnnLibsDir
+            }
+        }
+    }
+    
+    // =============================================================================
+    // ABI Filters (Qualcomm NPU only supports ARM64)
+    // =============================================================================
+    
+    defaultConfig {
+        ndk {
+            // QNN only supports arm64-v8a (64-bit ARM)
+            // Remove x86/x86_64 filters if you want emulator support (falls back to CPU)
+            if (ext.enableQnnSupport) {
+                abiFilters 'arm64-v8a'
+            } else {
+                abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64', 'x86'
+            }
+        }
+    }
+    
+    // =============================================================================
+    // Build Types Configuration
+    // =============================================================================
+    
+    buildTypes {
+        debug {
+            // Enable verbose logging for QNN debugging
+            buildConfigField "boolean", "QNN_DEBUG", "true"
+        }
+        
+        release {
+            buildConfigField "boolean", "QNN_DEBUG", "false"
+            
+            // Recommended: Strip debug symbols for smaller APK
+            // QNN libraries can be large (~50MB)
+            ndk {
+                debugSymbolLevel 'NONE'
+            }
+        }
+    }
+    
+    // =============================================================================
+    // Packaging Options
+    // =============================================================================
+    
+    packagingOptions {
+        // Exclude duplicate files
+        pickFirst 'lib/arm64-v8a/libc++_shared.so'
+        
+        // Keep QNN libraries uncompressed for faster loading
+        doNotStrip '*/arm64-v8a/libQnn*.so'
+        doNotStrip '*/arm64-v8a/libsherpa-onnx*.so'
+        
+        // Exclude unnecessary files to reduce APK size
+        exclude 'META-INF/DEPENDENCIES'
+        exclude 'META-INF/LICENSE'
+        exclude 'META-INF/LICENSE.txt'
+        exclude 'META-INF/NOTICE'
+    }
+}
+
+// =============================================================================
+// ProGuard/R8 Rules for QNN
+// =============================================================================
+
+// If using ProGuard/R8, add these rules to your proguard-rules.pro:
+/*
+-keep class com.qualcomm.qnn.** { *; }
+-keep class ai.onnxruntime.** { *; }
+-keepclassmembers class * {
+    native <methods>;
+}
+*/
+
+// =============================================================================
+// Verification Task
+// =============================================================================
+
+task verifyQnnLibs {
+    doLast {
+        def qnnDir = ext.qnnLibsDir
+        def requiredLibs = [
+            'arm64-v8a/libQnnHtp.so',
+            'arm64-v8a/libQnnSystem.so'
+        ]
+        
+        def missing = []
+        requiredLibs.each { lib ->
+            if (!file("${qnnDir}/${lib}").exists()) {
+                missing << lib
+            }
+        }
+        
+        if (missing.isEmpty()) {
+            println "✅ All required QNN libraries found"
+        } else {
+            println "❌ Missing QNN libraries:"
+            missing.each { println "   - ${it}" }
+            println ""
+            println "Run: ./scripts/android/download-qnn-sdk.sh"
+        }
+    }
+}
+
+// Run verification before build
+preBuild.dependsOn verifyQnnLibs

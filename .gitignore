@@ -357,3 +357,16 @@ sdk/runanywhere-flutter/android/*.aar
 
 # React Native - Pre-built xcframeworks (build artifacts)
 sdk/runanywhere-react-native/packages/*/ios/xcframeworks/
+
+# Python virtual environments
+venv/
+venv*/
+.venv/
+.venv*/
+**/venv/
+**/venv*/
+**/.venv/
+**/.venv*/
+__pycache__/
+**/__pycache__/
+*.pyc

@@ -317,11 +317,18 @@ android {
     // This is automatically included by the KMP Android plugin
     // ==========================================================================
 
-    // Prevent packaging duplicates
+    // Prevent packaging duplicates and symbol stripping issues
     packaging {
         jniLibs {
             // Pick first if duplicates somehow still occur
             pickFirsts.add("**/*.so")
+            
+            // CRITICAL: Do NOT strip JNI libraries - stripping removes required JNI symbols
+            // The Android NDK's llvm-strip --strip-unneeded removes JNI function exports
+            // which causes UnsatisfiedLinkError at runtime
+            keepDebugSymbols.add("**/librunanywhere_jni.so")
+            keepDebugSymbols.add("**/librac_*.so")
+            keepDebugSymbols.add("**/libsherpa-onnx*.so")
         }
     }
 }

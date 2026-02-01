@@ -5,7 +5,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -14,13 +16,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.platform.LocalContext
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppTypography
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
+import com.runanywhere.sdk.core.onnx.ONNX
 import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.models.DeviceInfo
 import com.runanywhere.sdk.public.RunAnywhere
@@ -66,10 +76,94 @@ fun ModelSelectionBottomSheet(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    val appContext = LocalContext.current
     val sheetState =
         rememberModalBottomSheetState(
             skipPartiallyExpanded = true,
         )
+
+    // State for showing error dialog
+    var showErrorDialog by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
+
+    // NOTE: Error dialog is triggered directly in onSelectModel with detailed ONNX backend info
+    // Do NOT use LaunchedEffect on uiState.error as it would overwrite our detailed message
+
+    // BIG ERROR DIALOG with COPY button
+    if (showErrorDialog) {
+        AlertDialog(
+            onDismissRequest = { showErrorDialog = false },
+            title = {
+                Text(
+                    text = "MODEL LOAD FAILED",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Red,
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 400.dp)
+                ) {
+                    // Scrollable error content with dark background
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp))
+                            .padding(12.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            text = errorMessage,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            color = Color(0xFFE0E0E0),
+                            lineHeight = 16.sp,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // COPY button
+                    Button(
+                        onClick = {
+                            val clipboard = appContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val clip = ClipData.newPlainText("Error Log", errorMessage)
+                            clipboard.setPrimaryClip(clip)
+                            Toast.makeText(appContext, "Copied to clipboard!", Toast.LENGTH_SHORT).show()
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF2196F3),
+                        ),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = "Copy",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("COPY", color = Color.White)
+                    }
+                    // OK button
+                    Button(
+                        onClick = { showErrorDialog = false },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Red,
+                        ),
+                    ) {
+                        Text("OK", color = Color.White)
+                    }
+                }
+            },
+        )
+    }
 
     ModalBottomSheet(
         onDismissRequest = { if (!uiState.isLoadingModel) onDismiss() },
@@ -192,19 +286,84 @@ fun ModelSelectionBottomSheet(
                         } else {
                             // Model rows
                             items(filteredModels, key = { it.id }) { model ->
+                                val rowContext = LocalContext.current
                                 SelectableModelRow(
                                     model = model,
                                     isSelected = uiState.currentModel?.id == model.id,
                                     isLoading = uiState.isLoadingModel && uiState.selectedModelId == model.id,
                                     onDownloadModel = {
+                                        Toast.makeText(rowContext, "Starting download: ${model.id}", Toast.LENGTH_SHORT).show()
                                         viewModel.startDownload(model.id)
                                     },
                                     onSelectModel = {
                                         scope.launch {
-                                            viewModel.selectModel(model.id)
-                                            kotlinx.coroutines.delay(500)
-                                            onModelSelected(model)
-                                            onDismiss()
+                                            try {
+                                                viewModel.selectModel(model.id)
+                                                // Only call onModelSelected if loading succeeded (no error)
+                                                val currentError = viewModel.uiState.value.error
+                                                if (currentError == null) {
+                                                    kotlinx.coroutines.delay(500)
+                                                    onModelSelected(model)
+                                                    onDismiss()
+                                                } else {
+                                                    // Get detailed info from ONNX backend
+                                                    val ttsProviderCount = try { ONNX.getTTSProviderCount() } catch (e: Exception) { -1 }
+                                                    val (ttsErrorCode, ttsErrorDetails) = try {
+                                                        ONNX.getLastTTSError()
+                                                    } catch (e: Exception) {
+                                                        Pair(-1, "Could not get TTS error: ${e.message}")
+                                                    }
+                                                    // Show BIG error dialog with all details
+                                                    errorMessage = """
+=== MODEL LOAD ERROR ===
+MODEL ID: ${model.id}
+MODEL PATH: ${model.localPath ?: "(unknown)"}
+FRAMEWORK: ${model.framework}
+
+=== SDK ERROR ===
+$currentError
+
+=== ONNX BACKEND STATUS ===
+TTS Providers Registered: $ttsProviderCount
+Last TTS Error Code: $ttsErrorCode
+Last TTS Error Details:
+$ttsErrorDetails
+
+=== MODEL INFO ===
+URL: ${model.downloadURL ?: "(none)"}
+Downloaded: ${model.isDownloaded}
+Download Size: ${model.downloadSize ?: "(unknown)"}
+""".trimIndent()
+                                                    showErrorDialog = true
+                                                }
+                                            } catch (e: Exception) {
+                                                // Get detailed info from ONNX backend
+                                                val ttsProviderCount = try { ONNX.getTTSProviderCount() } catch (ex: Exception) { -1 }
+                                                val (ttsErrorCode, ttsErrorDetails) = try {
+                                                    ONNX.getLastTTSError()
+                                                } catch (ex: Exception) {
+                                                    Pair(-1, "Could not get TTS error: ${ex.message}")
+                                                }
+                                                // Show BIG error dialog for exceptions
+                                                errorMessage = """
+=== MODEL LOAD EXCEPTION ===
+MODEL ID: ${model.id}
+MODEL PATH: ${model.localPath ?: "(unknown)"}
+
+=== EXCEPTION ===
+${e.javaClass.simpleName}: ${e.message}
+
+=== ONNX BACKEND STATUS ===
+TTS Providers Registered: $ttsProviderCount
+Last TTS Error Code: $ttsErrorCode
+Last TTS Error Details:
+$ttsErrorDetails
+
+=== STACK TRACE ===
+${e.stackTraceToString().take(500)}
+""".trimIndent()
+                                                showErrorDialog = true
+                                            }
                                         }
                                     },
                                 )

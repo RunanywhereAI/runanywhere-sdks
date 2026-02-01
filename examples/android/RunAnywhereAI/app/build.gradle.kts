@@ -154,13 +154,26 @@ android {
 
             // Handle duplicate native libraries from multiple backend modules
             // (ONNX and LlamaCPP both include some common libraries)
+            // IMPORTANT: libonnxruntime.so comes from both sherpa-onnx and QNN AAR
+            // We pick the QNN AAR version to ensure Java API with QNN EP works
             pickFirsts += listOf(
                 "lib/arm64-v8a/libomp.so",
                 "lib/arm64-v8a/libc++_shared.so",
                 "lib/arm64-v8a/librac_commons.so",
+                "lib/arm64-v8a/libonnxruntime.so",
+                "lib/arm64-v8a/libonnxruntime4j_jni.so",
                 "lib/armeabi-v7a/libomp.so",
                 "lib/armeabi-v7a/libc++_shared.so",
                 "lib/armeabi-v7a/librac_commons.so",
+            )
+            
+            // CRITICAL: Do NOT strip JNI libraries - stripping removes required JNI symbols
+            // The Android NDK's llvm-strip --strip-unneeded removes JNI function exports
+            // which causes UnsatisfiedLinkError at runtime
+            keepDebugSymbols += listOf(
+                "**/librunanywhere_jni.so",
+                "**/librac_*.so",
+                "**/libsherpa-onnx*.so",
             )
         }
     }

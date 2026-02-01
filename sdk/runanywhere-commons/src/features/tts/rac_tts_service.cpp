@@ -30,11 +30,13 @@ rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle) {
 
     *out_handle = nullptr;
 
-    RAC_LOG_INFO(LOG_CAT, "Creating TTS service for: %s", voice_id);
+    RAC_LOG_INFO(LOG_CAT, "=== rac_tts_create START ===");
+    RAC_LOG_INFO(LOG_CAT, "voice_id: %s", voice_id);
 
     // Query model registry to get framework
     rac_model_info_t* model_info = nullptr;
     rac_result_t result = rac_get_model(voice_id, &model_info);
+    RAC_LOG_INFO(LOG_CAT, "rac_get_model result: %d", result);
 
     rac_inference_framework_t framework = RAC_FRAMEWORK_ONNX;
     const char* model_path = voice_id;
@@ -42,7 +44,10 @@ rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle) {
     if (result == RAC_SUCCESS && model_info) {
         framework = model_info->framework;
         model_path = model_info->local_path ? model_info->local_path : voice_id;
-        RAC_LOG_DEBUG(LOG_CAT, "Found model in registry, framework=%d", framework);
+        RAC_LOG_INFO(LOG_CAT, "Found in registry: framework=%d, local_path=%s", framework, 
+                     model_info->local_path ? model_info->local_path : "(null)");
+    } else {
+        RAC_LOG_INFO(LOG_CAT, "Not in registry, using default framework=ONNX");
     }
 
     // Build service request
@@ -52,6 +57,9 @@ rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle) {
     request.framework = framework;
     request.model_path = model_path;
 
+    RAC_LOG_INFO(LOG_CAT, "Service request: identifier=%s, model_path=%s, framework=%d",
+                 request.identifier, request.model_path, framework);
+
     // Service registry returns a rac_tts_service_t* with vtable already set
     result = rac_service_create(RAC_CAPABILITY_TTS, &request, out_handle);
 
@@ -60,11 +68,11 @@ rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle) {
     }
 
     if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to create service via registry");
+        RAC_LOG_ERROR(LOG_CAT, "Failed to create service via registry: error=%d", result);
         return result;
     }
 
-    RAC_LOG_INFO(LOG_CAT, "TTS service created");
+    RAC_LOG_INFO(LOG_CAT, "=== rac_tts_create SUCCESS ===");
     return RAC_SUCCESS;
 }
 

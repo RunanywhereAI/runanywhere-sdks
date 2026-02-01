@@ -96,16 +96,21 @@ object ONNX : RunAnywhereModule {
         logger.info("Registering ONNX backend with C++ registry...")
 
         val result = registerNative()
+        logger.info("ONNX registerNative() returned: $result")
 
         // Success or already registered is OK
         if (result != 0 && result != -4) { // RAC_ERROR_MODULE_ALREADY_REGISTERED = -4
-            logger.error("ONNX registration failed with code: $result")
-            // Don't throw - registration failure shouldn't crash the app
-            return
+            val errorMsg = "ONNX registration FAILED with code: $result"
+            logger.error(errorMsg)
+            // Throw so the app knows registration failed
+            throw RuntimeException(errorMsg)
         }
 
         isRegistered = true
         logger.info("ONNX backend registered successfully (STT + TTS + VAD)")
+        
+        // Register platform-specific extensions (e.g., Kokoro TTS provider on Android)
+        registerPlatformExtensions()
     }
 
     /**
@@ -140,7 +145,9 @@ object ONNX : RunAnywhereModule {
     fun canHandleTTS(modelId: String?): Boolean {
         if (modelId == null) return false
         val lowercased = modelId.lowercase()
-        return lowercased.contains("piper") || lowercased.contains("vits")
+        return lowercased.contains("piper") || 
+               lowercased.contains("vits") ||
+               lowercased.contains("kokoro")  // Kokoro uses ONNX Runtime directly
     }
 
     /**
@@ -161,6 +168,20 @@ object ONNX : RunAnywhereModule {
     val autoRegister: Unit by lazy {
         register()
     }
+
+    /**
+     * Get the number of TTS providers registered in the service registry.
+     * For debugging purposes.
+     */
+    @JvmStatic
+    fun getTTSProviderCount(): Int = getTTSProviderCountNative()
+
+    /**
+     * Get the last TTS creation error for debugging.
+     * Returns a Pair of (errorCode, errorDetails).
+     */
+    @JvmStatic
+    fun getLastTTSError(): Pair<Int, String> = getLastTTSErrorNative()
 }
 
 /**
@@ -174,3 +195,22 @@ internal expect fun ONNX.registerNative(): Int
  * Calls rac_backend_onnx_unregister() via JNI.
  */
 internal expect fun ONNX.unregisterNative(): Int
+
+/**
+ * Get TTS provider count from native service registry.
+ * For debugging purposes.
+ */
+internal expect fun ONNX.getTTSProviderCountNative(): Int
+
+/**
+ * Get last TTS error from native backend.
+ * For debugging purposes.
+ */
+internal expect fun ONNX.getLastTTSErrorNative(): Pair<Int, String>
+
+/**
+ * Register platform-specific extensions.
+ * On Android: Registers KokoroTTSProvider for NPU-accelerated TTS.
+ * On JVM: No-op.
+ */
+internal expect fun ONNX.registerPlatformExtensions()

@@ -645,14 +645,32 @@ object CppBridgeTTS {
             val result = RunAnywhereBridge.racTtsComponentLoadModel(handle, modelPath, modelId, modelName)
             if (result != 0) {
                 setState(TTSState.ERROR)
+                
+                // Get error code meaning
+                val errorMeaning = when (result) {
+                    -400 -> "NULL_POINTER"
+                    -401 -> "INVALID_ARGUMENT"
+                    -402 -> "INVALID_HANDLE"
+                    -410 -> "MODEL_NOT_FOUND"
+                    -411 -> "MODEL_LOAD_FAILED"
+                    -412 -> "MODEL_INVALID"
+                    -420 -> "BACKEND_NOT_AVAILABLE"
+                    -421 -> "BACKEND_INIT_FAILED"
+                    -422 -> "NO_CAPABLE_PROVIDER"
+                    -430 -> "INFERENCE_FAILED"
+                    else -> "UNKNOWN"
+                }
+                
+                val errorMsg = "Failed to load TTS model '$modelId' (error: $result = $errorMeaning). Path: $modelPath"
+                
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Failed to load model: $modelId (error: $result)",
+                    errorMsg,
                 )
 
                 try {
-                    ttsListener?.onError(result, "Failed to load model: $modelId")
+                    ttsListener?.onError(result, errorMsg)
                 } catch (e: Exception) {
                     // Ignore listener errors
                 }

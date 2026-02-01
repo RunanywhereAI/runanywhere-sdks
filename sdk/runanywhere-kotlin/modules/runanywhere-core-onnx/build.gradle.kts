@@ -127,6 +127,16 @@ kotlin {
 
         val androidMain by getting {
             dependsOn(jvmAndroidMain)
+            dependencies {
+                // ONNX Runtime with QNN Execution Provider for Qualcomm NPU acceleration
+                // This is used by KokoroQnnTTS for NPU-accelerated TTS inference
+                // The QNN variant includes Qualcomm Hexagon HTP backend support
+                // Note: This replaces the standard onnxruntime-android for NPU acceleration
+                // ONNX Runtime 1.23.2 with QNN EP (supports QNN SDK 2.37)
+                implementation("com.microsoft.onnxruntime:onnxruntime-android-qnn:1.23.2")
+                // QNN Runtime 2.37 - matches ONNX Runtime 1.23 requirements
+                implementation("com.qualcomm.qti:qnn-runtime:2.37.0")
+            }
         }
 
         val jvmTest by getting

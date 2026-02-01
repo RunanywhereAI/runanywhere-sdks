@@ -64,6 +64,27 @@ RAC_ONNX_API void rac_tts_onnx_stop(rac_handle_t handle);
 
 RAC_ONNX_API void rac_tts_onnx_destroy(rac_handle_t handle);
 
+// =============================================================================
+// DEBUG/ERROR TRACKING
+// =============================================================================
+
+/**
+ * Get the last TTS creation error code.
+ * For debugging failed TTS loads.
+ */
+RAC_ONNX_API rac_result_t rac_backend_onnx_get_last_tts_error(void);
+
+/**
+ * Get the last TTS creation error details.
+ * For debugging failed TTS loads.
+ */
+RAC_ONNX_API const char* rac_backend_onnx_get_last_tts_error_details(void);
+
+/**
+ * Set the last TTS error (called internally).
+ */
+RAC_ONNX_API void rac_backend_onnx_set_last_tts_error(rac_result_t error, const char* details);
+
 #ifdef __cplusplus
 }
 #endif

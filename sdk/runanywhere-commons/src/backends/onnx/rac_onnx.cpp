@@ -14,11 +14,39 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <sys/stat.h>
+#include <dirent.h>
 
 #include "onnx_backend.h"
 
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
 #include "rac/infrastructure/events/rac_events.h"
+
+// =============================================================================
+// TTS ERROR TRACKING (for debugging)
+// =============================================================================
+
+static rac_result_t g_last_tts_error = RAC_SUCCESS;
+static char g_last_tts_error_details[512] = {0};
+
+extern "C" rac_result_t rac_backend_onnx_get_last_tts_error(void) {
+    return g_last_tts_error;
+}
+
+extern "C" const char* rac_backend_onnx_get_last_tts_error_details(void) {
+    return g_last_tts_error_details;
+}
+
+extern "C" void rac_backend_onnx_set_last_tts_error(rac_result_t error, const char* details) {
+    g_last_tts_error = error;
+    if (details) {
+        strncpy(g_last_tts_error_details, details, sizeof(g_last_tts_error_details) - 1);
+        g_last_tts_error_details[sizeof(g_last_tts_error_details) - 1] = '\0';
+    } else {
+        g_last_tts_error_details[0] = '\0';
+    }
+}
 
 // =============================================================================
 // INTERNAL HANDLE STRUCTURES
@@ -298,9 +326,68 @@ rac_result_t rac_tts_onnx_create(const char* model_path, const rac_tts_onnx_conf
     }
 
     if (model_path != nullptr) {
-        if (!handle->tts->load_model(model_path, runanywhere::TTSModelType::PIPER)) {
+        // Auto-detect model type based on path
+        runanywhere::TTSModelType model_type = runanywhere::TTSModelType::PIPER;  // Default
+        if (strstr(model_path, "kokoro") != nullptr) {
+            model_type = runanywhere::TTSModelType::KOKORO;
+            RAC_LOG_INFO("TTS.ONNX", "Detected Kokoro model type for path: %s", model_path);
+        } else if (strstr(model_path, "vits") != nullptr || strstr(model_path, "piper") != nullptr) {
+            model_type = runanywhere::TTSModelType::PIPER;
+            RAC_LOG_INFO("TTS.ONNX", "Detected VITS/Piper model type for path: %s", model_path);
+        }
+        
+        if (!handle->tts->load_model(model_path, model_type)) {
+            // Gather detailed file existence info for debugging
+            char detail_msg[1024];
+            struct stat st;
+            
+            std::string model_onnx = std::string(model_path) + "/model.onnx";
+            std::string tokens = std::string(model_path) + "/tokens.txt";
+            std::string voices = std::string(model_path) + "/voices.bin";
+            std::string dict = std::string(model_path) + "/dict";
+            std::string espeak = std::string(model_path) + "/espeak-ng-data";
+            std::string lexicon = std::string(model_path) + "/lexicon-us-en.txt";
+            
+            bool has_model = (stat(model_onnx.c_str(), &st) == 0);
+            bool has_tokens = (stat(tokens.c_str(), &st) == 0);
+            bool has_voices = (stat(voices.c_str(), &st) == 0);
+            bool has_dict = (stat(dict.c_str(), &st) == 0);
+            bool has_espeak = (stat(espeak.c_str(), &st) == 0);
+            bool has_lexicon = (stat(lexicon.c_str(), &st) == 0);
+            
+            // Also scan for any .onnx file
+            std::string found_onnx = "(none)";
+            DIR* dir = opendir(model_path);
+            if (dir) {
+                struct dirent* entry;
+                while ((entry = readdir(dir)) != nullptr) {
+                    std::string fname = entry->d_name;
+                    if (fname.size() > 5 && fname.substr(fname.size() - 5) == ".onnx") {
+                        found_onnx = fname;
+                        break;
+                    }
+                }
+                closedir(dir);
+            }
+            
+            snprintf(detail_msg, sizeof(detail_msg),
+                "Failed to load TTS model\n"
+                "Path: %s\n"
+                "Type: %s\n"
+                "Files: model.onnx=%s, tokens.txt=%s, voices.bin=%s, dict/=%s, espeak-ng-data/=%s, lexicon=%s\n"
+                "Found .onnx: %s",
+                model_path,
+                model_type == runanywhere::TTSModelType::KOKORO ? "KOKORO" : "PIPER",
+                has_model ? "YES" : "NO",
+                has_tokens ? "YES" : "NO",
+                has_voices ? "YES" : "NO",
+                has_dict ? "YES" : "NO",
+                has_espeak ? "YES" : "NO",
+                has_lexicon ? "YES" : "NO",
+                found_onnx.c_str());
+            
             delete handle;
-            rac_error_set_details("Failed to load TTS model");
+            rac_error_set_details(detail_msg);
             return RAC_ERROR_MODEL_LOAD_FAILED;
         }
     }

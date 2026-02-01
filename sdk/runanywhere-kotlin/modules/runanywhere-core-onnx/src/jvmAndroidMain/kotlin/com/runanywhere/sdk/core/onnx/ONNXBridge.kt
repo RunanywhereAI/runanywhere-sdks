@@ -114,4 +114,28 @@ internal object ONNXBridge {
      */
     @JvmStatic
     external fun nativeGetVersion(): String
+
+    /**
+     * Get the number of registered TTS providers (for debugging).
+     *
+     * @return Number of TTS providers in the registry
+     */
+    @JvmStatic
+    external fun nativeGetTTSProviderCount(): Int
+
+    /**
+     * Get the last TTS creation error code (for debugging).
+     *
+     * @return Error code from the last failed TTS creation
+     */
+    @JvmStatic
+    external fun nativeGetLastTTSError(): Int
+
+    /**
+     * Get the last TTS creation error details (for debugging).
+     *
+     * @return Error details string
+     */
+    @JvmStatic
+    external fun nativeGetLastTTSErrorDetails(): String
 }

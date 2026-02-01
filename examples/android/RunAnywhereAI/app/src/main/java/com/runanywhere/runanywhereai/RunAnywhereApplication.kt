@@ -4,8 +4,10 @@ import android.app.Application
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.widget.Toast
 import com.runanywhere.runanywhereai.presentation.settings.SettingsViewModel
 import com.runanywhere.sdk.core.onnx.ONNX
+import com.runanywhere.sdk.core.onnx.ONNXAndroid
 import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.public.RunAnywhere
@@ -265,7 +267,22 @@ class RunAnywhereApplication : Application() {
         LlamaCPP.register(priority = 100)
 
         Log.i("RunAnywhereApp", "🔧 Registering ONNX backend...")
-        ONNX.register(priority = 100)
+        try {
+            // Initialize ONNX Android module first (enables Kokoro TTS with NPU acceleration)
+            ONNXAndroid.initialize(this@RunAnywhereApplication)
+            Log.i("RunAnywhereApp", "✅ ONNXAndroid initialized (Kokoro TTS provider ready)")
+            
+            ONNX.register(priority = 100)
+            Log.i("RunAnywhereApp", "✅ ONNX.register() completed successfully")
+            // Get TTS provider count to verify registration worked
+            val ttsProviderCount = ONNX.getTTSProviderCount()
+            Log.i("RunAnywhereApp", "🔍 TTS provider count after ONNX.register: $ttsProviderCount")
+            // No toast - just log it
+        } catch (e: UnsatisfiedLinkError) {
+            Log.e("RunAnywhereApp", "❌ ONNX native library load failed: ${e.message}", e)
+        } catch (e: Exception) {
+            Log.e("RunAnywhereApp", "❌ ONNX.register() failed: ${e.message}", e)
+        }
 
         Log.i("RunAnywhereApp", "✅ Backends registered, now registering models...")
 
@@ -341,6 +358,22 @@ class RunAnywhereApplication : Application() {
             modality = ModelCategory.SPEECH_SYNTHESIS,
             memoryRequirement = 65_000_000,
         )
+        
+        // =================================================================
+        // Kokoro TTS - Static Shapes for QNN HTP (NPU)
+        // Fully static shapes for optimal Qualcomm Hexagon NPU performance
+        // Input: [1, 50] tokens, Output: [192000] samples (8s max)
+        // =================================================================
+        RunAnywhere.registerModel(
+            id = "kokoro-static-npu-v1",
+            name = "Kokoro TTS v1.0 (Static NPU)",
+            url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/kokoro-static-npu-v1.0/kokoro-static-npu-v1.0.tar.gz",
+            framework = InferenceFramework.ONNX,
+            modality = ModelCategory.SPEECH_SYNTHESIS,
+            memoryRequirement = 350_000_000,  // ~350MB for FP32 static model
+        )
+        Log.i("RunAnywhereApp", "✅ Kokoro Static NPU TTS model registered (fully static shapes for HTP)")
+        
         Log.i("RunAnywhereApp", "✅ ONNX STT/TTS models registered")
 
         Log.i("RunAnywhereApp", "🎉 All modules and models registered")
