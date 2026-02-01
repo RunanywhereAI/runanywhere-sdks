@@ -144,3 +144,9 @@ export type {
   LLMStreamCompleteCallback,
   LLMStreamErrorCallback,
 } from './LLMTypes';
+
+// Compatibility Types
+export type {
+  ModelCompatibilityResult,
+  DeviceCapabilities,
+} from './CompatibilityTypes'
