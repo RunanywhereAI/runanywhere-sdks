@@ -44,7 +44,6 @@ import {
   RoutingPolicyDisplayNames,
   SETTINGS_CONSTRAINTS,
 } from '../types/settings';
-import type { StoredModel } from '../types/model';
 import { LLMFramework, FrameworkDisplayNames } from '../types/model';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
@@ -134,7 +133,6 @@ export const SettingsScreen: React.FC = () => {
   // Storage state
   const [storageInfo, setStorageInfo] =
     useState<StorageInfo>(DEFAULT_STORAGE_INFO);
-  const [storedModels, setStoredModels] = useState<StoredModel[]>([]);
   const [_isRefreshing, setIsRefreshing] = useState(false);
   const [sdkVersion, setSdkVersion] = useState('0.1.0');
 
@@ -327,26 +325,12 @@ export const SettingsScreen: React.FC = () => {
         const storage = await RunAnywhere.getStorageInfo();
         console.warn('[Settings] Storage info:', storage);
         setStorageInfo({
-          totalStorage: storage.totalSpace,
-          appStorage: storage.usedSpace,
-          modelsStorage: storage.modelsSize,
-          cacheSize: 0, // SDK doesn't provide cache size separately
-          freeSpace: storage.freeSpace,
+          totalStorage: storage.deviceStorage.totalSpace,
+          appStorage: storage.appStorage.totalSize,
+          modelsStorage: storage.modelStorage.totalSize,
+          cacheSize: storage.cacheSize,
+          freeSpace: storage.deviceStorage.freeSpace,
         });
-        // Update storedModels from downloaded models
-        const models = await RunAnywhere.getAvailableModels();
-        const downloaded = models.filter((m) => m.isDownloaded);
-        setStoredModels(
-          downloaded.map((m) => ({
-            id: m.id,
-            name: m.name,
-            framework:
-              (m.compatibleFrameworks?.[0] as unknown as LLMFramework) ||
-              LLMFramework.LlamaCpp,
-            sizeOnDisk: m.downloadSize || 0,
-            downloadedAt: new Date(),
-          }))
-        );
       } catch (err) {
         console.warn('[Settings] Failed to get storage info:', err);
       }
@@ -389,33 +373,7 @@ export const SettingsScreen: React.FC = () => {
     setShowApiConfigModal(false);
   }, []);
 
-  /**
-   * Handle model deletion
-   */
-  const handleDeleteModel = useCallback((model: StoredModel) => {
-    Alert.alert(
-      'Delete Model',
-      `Are you sure you want to delete ${model.name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Unload models if they're loaded
-              await RunAnywhere.unloadModel();
-              await RunAnywhere.unloadSTTModel();
-              await RunAnywhere.unloadTTSModel();
-              setStoredModels((prev) => prev.filter((m) => m.id !== model.id));
-            } catch (error) {
-              Alert.alert('Error', `Failed to delete model: ${error}`);
-            }
-          },
-        },
-      ]
-    );
-  }, []);
+
 
   /**
    * Handle clear cache
@@ -508,9 +466,17 @@ export const SettingsScreen: React.FC = () => {
    * Handle delete downloaded model
    */
   const handleDeleteDownloadedModel = useCallback(async (model: ModelInfo) => {
+    const downloadedModel = downloadedModels.find((m) => m.id === model.id);
+    // Prefer downloaded model's size (actual disk usage) over catalog downloadSize (expected size)
+    // TODO: Replace with actual disk size once SDK exposes it (e.g., sizeOnDisk or actualSize)
+    const freedSize =
+      downloadedModel?.downloadSize ?? // Use downloaded model's size when available
+      model.downloadSize ??
+      0;
+
     Alert.alert(
       'Delete Model',
-      `Are you sure you want to delete ${model.name}? This will free up ${formatBytes(model.downloadSize || 0)}.`,
+      `Are you sure you want to delete ${model.name}? This will free up ${formatBytes(freedSize)}.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -528,7 +494,7 @@ export const SettingsScreen: React.FC = () => {
         },
       ]
     );
-  }, []);
+  }, [downloadedModels]);
 
   /**
    * Handle clear all data
@@ -550,7 +516,6 @@ export const SettingsScreen: React.FC = () => {
               await RunAnywhere.unloadTTSModel();
               // Destroy SDK
               await RunAnywhere.destroy();
-              setStoredModels([]);
               Alert.alert('Success', 'All data cleared');
             } catch (error) {
               Alert.alert('Error', `Failed to clear data: ${error}`);
@@ -668,30 +633,7 @@ export const SettingsScreen: React.FC = () => {
     );
   };
 
-  /**
-   * Render stored model row
-   */
-  const renderStoredModelRow = (model: StoredModel) => (
-    <View key={model.id} style={styles.modelRow}>
-      <View style={styles.modelInfo}>
-        <Text style={styles.modelName}>{model.name}</Text>
-        <View style={styles.modelMeta}>
-          <View style={styles.frameworkBadge}>
-            <Text style={styles.frameworkBadgeText}>
-              {FrameworkDisplayNames[model.framework] || model.framework}
-            </Text>
-          </View>
-          <Text style={styles.modelSize}>{formatBytes(model.sizeOnDisk)}</Text>
-        </View>
-      </View>
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={() => handleDeleteModel(model)}
-      >
-        <Icon name="trash-outline" size={20} color={Colors.primaryRed} />
-      </TouchableOpacity>
-    </View>
-  );
+
 
   /**
    * Render catalog model row
@@ -701,6 +643,16 @@ export const SettingsScreen: React.FC = () => {
     const downloadProgress = downloadingModels[model.id] || 0;
     const isDownloaded = downloadedModels.some((m) => m.id === model.id);
 
+    // Determine framework based on format
+    const framework = model.format === 'onnx' ? LLMFramework.ONNX : LLMFramework.LlamaCpp;
+    const frameworkName = FrameworkDisplayNames[framework] || framework;
+
+    // Get model size estimate based on download size (may differ from actual on-disk size)
+    const downloadedModel = downloadedModels.find((m) => m.id === model.id);
+    const modelSize =
+      downloadedModel?.downloadSize ?? // Prefer size from downloaded model when available
+      model.downloadSize ?? // Fall back to catalog's expected download size
+      0;
     return (
       <View key={model.id} style={styles.catalogModelRow}>
         <View style={styles.catalogModelInfo}>
@@ -717,9 +669,9 @@ export const SettingsScreen: React.FC = () => {
           )}
           <View style={styles.catalogModelMeta}>
             <Text style={styles.catalogModelSize}>
-              {formatBytes(model.downloadSize || 0)}
+              {formatBytes(modelSize)}
             </Text>
-            <Text style={styles.catalogModelFormat}>{model.format}</Text>
+            <Text style={styles.catalogModelFormat}>{frameworkName}</Text>
           </View>
           {isDownloading && (
             <View style={styles.downloadProgressContainer}>
@@ -894,16 +846,6 @@ export const SettingsScreen: React.FC = () => {
             availableModels.map(renderCatalogModelRow)
           )}
         </View>
-
-        {/* Downloaded Models (legacy) */}
-        {storedModels.length > 0 && (
-          <>
-            {renderSectionHeader('Downloaded Models')}
-            <View style={styles.section}>
-              {storedModels.map(renderStoredModelRow)}
-            </View>
-          </>
-        )}
 
         {/* Storage Management */}
         {renderSectionHeader('Storage Management')}
