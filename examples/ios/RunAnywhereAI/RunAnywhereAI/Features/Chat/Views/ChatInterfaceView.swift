@@ -110,7 +110,7 @@ extension ChatInterfaceView {
                 }
                 modelRequiredOverlayIfNeeded
             }
-            .navigationTitle("")
+            .navigationTitle(hasModelSelected ? "Chat" : "")
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarHidden(!hasModelSelected)
             .toolbar {
@@ -195,6 +195,8 @@ extension ChatInterfaceView {
         }
     }
 
+<<<<<<< HEAD
+=======
     private var modelButton: some View {
         Button {
             showingModelSelection = true

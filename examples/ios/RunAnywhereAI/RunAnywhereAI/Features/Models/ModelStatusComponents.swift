@@ -171,262 +171,141 @@ struct ModelStatusBanner: View {
 struct ModelRequiredOverlay: View {
     let modality: ModelSelectionContext
     let onSelectModel: () -> Void
-    
-    @Environment(\.colorScheme) private var colorScheme
-    
-    // Animated circle positions - at bottom like NotebookLM style
-    @State private var circle1Position: CGPoint = CGPoint(x: 0.0, y: 1.05)
-    @State private var circle2Position: CGPoint = CGPoint(x: 1.0, y: 1.0)
-    @State private var circle3Position: CGPoint = CGPoint(x: 0.5, y: 1.1)
+
+    @State private var circle1Offset: CGFloat = -100
+    @State private var circle2Offset: CGFloat = 100
+    @State private var circle3Offset: CGFloat = 0
 
     var body: some View {
-        GeometryReader { geometry in
+        ZStack {
+            // Animated floating circles background
             ZStack {
-                // Background base color
-                backgroundColor
-                    .ignoresSafeArea()
-                
-                // Animated floating gradient circles
-                floatingCirclesBackground(in: geometry.size)
-                    .ignoresSafeArea()
+                // Circle 1 - Top left
+                Circle()
+                    .fill(modalityColor.opacity(0.15))
+                    .blur(radius: 80)
+                    .frame(width: 300, height: 300)
+                    .offset(x: circle1Offset, y: -200)
 
-                VStack(spacing: AppSpacing.xLarge) {
-                    Spacer()
+                // Circle 2 - Bottom right
+                Circle()
+                    .fill(modalityColor.opacity(0.12))
+                    .blur(radius: 100)
+                    .frame(width: 250, height: 250)
+                    .offset(x: circle2Offset, y: 300)
 
-                    // Friendly icon with gradient background
-                    ZStack {
-                        Circle()
-                            .fill(LinearGradient(
-                                colors: [modalityColor.opacity(0.3), modalityColor.opacity(0.15)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ))
-                            .frame(width: 120, height: 120)
-
-                        Image(systemName: modalityIcon)
-                            .font(.system(size: 48))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [modalityColor, modalityColor.opacity(0.7)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                    }
-
-                    // Title
-                    Text(modalityTitle)
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(textPrimaryColor)
-
-                    // Description
-                    Text(modalityDescription)
-                        .font(.body)
-                        .foregroundColor(textSecondaryColor)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
-
-                    Spacer()
-
-                    // Bottom section - button and privacy note together
-                    VStack(spacing: AppSpacing.medium) {
-                        // Primary CTA button with glass effect
-                        if #available(iOS 26.0, *) {
-                            Button(action: onSelectModel) {
-                                Text("Get Started")
-                                    .font(.headline)
-                                    .foregroundColor(modalityColor)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 16)
-                                    .background {
-                                        RoundedRectangle(cornerRadius: 28)
-                                            .fill(.ultraThinMaterial)
-                                            .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 28))
-                                    }
-                            }
-                            .buttonStyle(.plain)
-                            .padding(.horizontal, AppSpacing.xLarge)
-                        } else {
-                            Button(action: onSelectModel) {
-                                Text("Get Started")
-                                    .font(.headline)
-                                    .foregroundColor(modalityColor)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 16)
-                                    .background(buttonBackgroundColor)
-                                    .cornerRadius(28)
-                            }
-                            .buttonStyle(.plain)
-                            .padding(.horizontal, AppSpacing.xLarge)
-                        }
-
-                        // Privacy note
-                        HStack(spacing: 6) {
-                            Image(systemName: "lock.shield.fill")
-                                .font(.caption2)
-                            Text("100% Private • Runs on your device")
-                                .font(.caption)
-                        }
-                        .foregroundColor(textSecondaryColor)
-                    }
-                    .padding(.bottom, AppSpacing.xLarge)
+                // Circle 3 - Center
+                Circle()
+                    .fill(modalityColor.opacity(0.08))
+                    .blur(radius: 90)
+                    .frame(width: 280, height: 280)
+                    .offset(x: -circle3Offset, y: circle3Offset)
+            }
+            .ignoresSafeArea()
+            .onAppear {
+                withAnimation(
+                    .easeInOut(duration: 8)
+                    .repeatForever(autoreverses: true)
+                ) {
+                    circle1Offset = 100
+                    circle2Offset = -100
+                    circle3Offset = 80
                 }
             }
+
+            VStack(spacing: AppSpacing.xLarge) {
+                Spacer()
+
+                // Friendly icon with gradient background
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(
+                            colors: [modalityColor.opacity(0.2), modalityColor.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                        .frame(width: 120, height: 120)
+
+                    Image(systemName: modalityIcon)
+                        .font(.system(size: 48))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [modalityColor, modalityColor.opacity(0.7)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+
+                // Title
+                Text(modalityTitle)
+                    .font(.title2)
+                    .fontWeight(.bold)
+
+                // Description
+                Text(modalityDescription)
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+
+                Spacer()
+
+                // Bottom section with glass effect button
+                VStack(spacing: AppSpacing.medium) {
+                    // Primary CTA with glass effect
+                    if #available(iOS 26.0, *) {
+                        Button(action: onSelectModel) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "sparkles")
+                                Text("Get Started")
+                            }
+                            .font(.headline)
+                            .foregroundColor(modalityColor)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(.thinMaterial)
+                                    .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 16))
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, AppSpacing.xLarge)
+                    } else {
+                        Button(action: onSelectModel) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "sparkles")
+                                Text("Get Started")
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(modalityColor)
+                        .padding(.horizontal, AppSpacing.xLarge)
+                    }
+
+                    // Privacy note
+                    HStack(spacing: 6) {
+                        Image(systemName: "lock.shield.fill")
+                            .font(.caption2)
+                        Text("100% Private • Runs on your device")
+                            .font(.caption)
+                    }
+                    .foregroundColor(.secondary)
+                }
+                .padding(.bottom, AppSpacing.large)
+            }
         }
-        .onAppear {
-            startFloatingAnimation()
-        }
-    }
-    
-    // MARK: - Floating Circles Background
-    
-    private func floatingCirclesBackground(in size: CGSize) -> some View {
-        // Adaptive sizing - larger on iPad
-        let isLargeScreen = size.width > 500
-        let circleSize: CGFloat = isLargeScreen ? size.width * 0.55 : size.width * 0.9
-        let blurAmount: CGFloat = isLargeScreen ? 50 : 30
-        
-        return ZStack {
-            // Circle 1 - Left side, primary tone
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [
-                            circleColor1.opacity(isDarkMode ? 0.6 : 0.8),
-                            circleColor1.opacity(isDarkMode ? 0.3 : 0.4),
-                            circleColor1.opacity(0)
-                        ],
-                        center: .center,
-                        startRadius: 0,
-                        endRadius: circleSize * 0.5
-                    )
-                )
-                .frame(width: circleSize, height: circleSize)
-                .blur(radius: blurAmount)
-                .position(
-                    x: size.width * circle1Position.x,
-                    y: size.height * circle1Position.y
-                )
-            
-            // Circle 2 - Right side, lighter complementary tone
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [
-                            circleColor2.opacity(isDarkMode ? 0.55 : 0.75),
-                            circleColor2.opacity(isDarkMode ? 0.25 : 0.35),
-                            circleColor2.opacity(0)
-                        ],
-                        center: .center,
-                        startRadius: 0,
-                        endRadius: circleSize * 0.45
-                    )
-                )
-                .frame(width: circleSize * 0.9, height: circleSize * 0.9)
-                .blur(radius: blurAmount)
-                .position(
-                    x: size.width * circle2Position.x,
-                    y: size.height * circle2Position.y
-                )
-            
-            // Circle 3 - Center, accent tone
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [
-                            circleColor3.opacity(isDarkMode ? 0.5 : 0.7),
-                            circleColor3.opacity(isDarkMode ? 0.2 : 0.3),
-                            circleColor3.opacity(0)
-                        ],
-                        center: .center,
-                        startRadius: 0,
-                        endRadius: circleSize * 0.48
-                    )
-                )
-                .frame(width: circleSize * 0.95, height: circleSize * 0.95)
-                .blur(radius: blurAmount)
-                .position(
-                    x: size.width * circle3Position.x,
-                    y: size.height * circle3Position.y
-                )
-        }
-    }
-    
-    private func startFloatingAnimation() {
-        // Circle 1 - left side, gentle horizontal sway
-        withAnimation(
-            .easeInOut(duration: 10)
-            .repeatForever(autoreverses: true)
-        ) {
-            circle1Position = CGPoint(x: 0.25, y: 1.0)
-        }
-        
-        // Circle 2 - right side, opposite sway
-        withAnimation(
-            .easeInOut(duration: 9)
-            .repeatForever(autoreverses: true)
-        ) {
-            circle2Position = CGPoint(x: 0.75, y: 1.05)
-        }
-        
-        // Circle 3 - center, subtle vertical movement
-        withAnimation(
-            .easeInOut(duration: 11)
-            .repeatForever(autoreverses: true)
-        ) {
-            circle3Position = CGPoint(x: 0.5, y: 0.95)
-        }
-    }
-    
-    // MARK: - Color Properties
-    
-    private var isDarkMode: Bool {
-        colorScheme == .dark
-    }
-    
-    private var backgroundColor: Color {
-        isDarkMode ? Color(red: 0.08, green: 0.08, blue: 0.10) : Color(red: 0.98, green: 0.98, blue: 0.99)
-    }
-    
-    private var textPrimaryColor: Color {
-        isDarkMode ? .white : .primary
-    }
-    
-    private var textSecondaryColor: Color {
-        isDarkMode ? Color.white.opacity(0.7) : .secondary
-    }
-    
-    private var buttonBackgroundColor: Color {
-        isDarkMode ? Color.white.opacity(0.12) : Color.white.opacity(0.8)
-    }
-    
-    // Circle colors based on modality - harmonious tones like NotebookLM
-    private var circleColor1: Color {
-        switch modality {
-        case .llm: return Color(red: 1.0, green: 0.7, blue: 0.6)   // Soft peach
-        case .stt: return Color(red: 0.5, green: 0.9, blue: 0.75)  // Mint
-        case .tts: return Color(red: 0.75, green: 0.65, blue: 0.95) // Soft lavender
-        case .voice: return Color(red: 1.0, green: 0.65, blue: 0.55) // Warm coral
-        }
-    }
-    
-    private var circleColor2: Color {
-        switch modality {
-        case .llm: return Color(red: 1.0, green: 0.85, blue: 0.7)  // Light peach/cream
-        case .stt: return Color(red: 0.65, green: 0.95, blue: 0.85) // Light mint
-        case .tts: return Color(red: 0.85, green: 0.8, blue: 1.0)   // Light lavender
-        case .voice: return Color(red: 1.0, green: 0.8, blue: 0.7)  // Light coral
-        }
-    }
-    
-    private var circleColor3: Color {
-        switch modality {
-        case .llm: return Color(red: 0.95, green: 0.6, blue: 0.55)  // Salmon
-        case .stt: return Color(red: 0.4, green: 0.85, blue: 0.7)   // Teal
-        case .tts: return Color(red: 0.6, green: 0.55, blue: 0.9)   // Periwinkle
-        case .voice: return Color(red: 0.95, green: 0.55, blue: 0.5) // Rose
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        #if os(iOS)
+        .background(Color(.systemBackground))
+        #else
+        .background(Color(NSColor.windowBackgroundColor))
+        #endif
     }
 
     private var modalityIcon: String {
