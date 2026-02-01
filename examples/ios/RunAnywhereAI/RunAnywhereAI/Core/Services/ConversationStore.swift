@@ -57,25 +57,30 @@ class ConversationStore: ObservableObject {
             frameworkName: nil
         )
 
-        conversations.insert(conversation, at: 0)
+        // Don't add to conversations list yet - wait until first message is added
         currentConversation = conversation
-        saveConversation(conversation)
+        // Don't save empty conversation - wait until first message is added
 
         return conversation
     }
 
     func updateConversation(_ conversation: Conversation) {
+        var updated = conversation
+        updated.updatedAt = Date()
+
         if let index = conversations.firstIndex(where: { $0.id == conversation.id }) {
-            var updated = conversation
-            updated.updatedAt = Date()
+            // Update existing conversation
             conversations[index] = updated
-
-            if currentConversation?.id == conversation.id {
-                currentConversation = updated
-            }
-
-            saveConversation(updated)
+        } else {
+            // First time adding this conversation (when first message is sent)
+            conversations.insert(updated, at: 0)
         }
+
+        if currentConversation?.id == conversation.id {
+            currentConversation = updated
+        }
+
+        saveConversation(updated)
     }
 
     func deleteConversation(_ conversation: Conversation) {

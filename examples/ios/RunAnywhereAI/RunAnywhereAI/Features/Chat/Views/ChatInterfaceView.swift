@@ -110,7 +110,7 @@ extension ChatInterfaceView {
                 }
                 modelRequiredOverlayIfNeeded
             }
-            .navigationTitle(hasModelSelected ? "Chat" : "")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarHidden(!hasModelSelected)
             .toolbar {
@@ -119,11 +119,22 @@ extension ChatInterfaceView {
                         Button {
                             showingConversationList = true
                         } label: {
-                            Image(systemName: "list.bullet")
+                            Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
                         }
                     }
+
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button {
+                            showingChatDetails = true
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .foregroundColor(viewModel.messages.isEmpty ? .gray : AppColors.primaryAccent)
+                        }
+                        .disabled(viewModel.messages.isEmpty)
+                    }
+
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        toolbarButtons
+                        modelButton
                     }
                 }
             }
@@ -145,6 +156,15 @@ extension ChatInterfaceView {
             .buttonStyle(.bordered)
             .tint(AppColors.primaryAccent)
 
+            Button {
+                showingChatDetails = true
+            } label: {
+                Image(systemName: "info.circle")
+            }
+            .buttonStyle(.bordered)
+            .tint(AppColors.primaryAccent)
+            .disabled(viewModel.messages.isEmpty)
+
             Spacer()
 
             Text("Chat")
@@ -152,7 +172,7 @@ extension ChatInterfaceView {
 
             Spacer()
 
-            toolbarButtons
+            modelButton
         }
         .padding(.horizontal, AppSpacing.large)
         .padding(.vertical, AppSpacing.smallMedium)
@@ -175,27 +195,6 @@ extension ChatInterfaceView {
         }
     }
 
-    var toolbarButtons: some View {
-        HStack(spacing: 8) {
-            detailsButton
-            modelButton
-        }
-    }
-
-    private var detailsButton: some View {
-        Button {
-            showingChatDetails = true
-        } label: {
-            Image(systemName: "info.circle")
-                .foregroundColor(viewModel.messages.isEmpty ? .gray : AppColors.primaryAccent)
-        }
-        .disabled(viewModel.messages.isEmpty)
-        #if os(macOS)
-        .buttonStyle(.bordered)
-        .tint(AppColors.primaryAccent)
-        #endif
-    }
-
     private var modelButton: some View {
         Button {
             showingModelSelection = true
@@ -215,7 +214,7 @@ extension ChatInterfaceView {
 
                 if let modelName = viewModel.loadedModelName {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(modelName)
+                        Text(modelName.shortModelName(maxLength: 13))
                             .font(.caption)
                             .fontWeight(.medium)
                             .lineLimit(1)
@@ -332,6 +331,7 @@ extension ChatInterfaceView {
                 MessageBubbleView(message: message, isGenerating: viewModel.isGenerating)
                     .id(message.id)
                     .transition(messageTransition)
+                    .animation(nil, value: message.content)
             }
 
             if viewModel.isGenerating {
@@ -344,6 +344,7 @@ extension ChatInterfaceView {
                 .id("bottom-spacer")
         }
         .padding(AppSpacing.large)
+        .animation(.default, value: viewModel.messages.count)
     }
 
     private var messageTransition: AnyTransition {
