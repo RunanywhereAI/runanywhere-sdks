@@ -252,6 +252,16 @@ final class LLMViewModel {
 
     func clearChat() {
         generationTask?.cancel()
+        
+        // Generate smart title for the old conversation before creating new one
+        if let oldConversation = currentConversation,
+           oldConversation.messages.count >= 2 {
+            let conversationId = oldConversation.id
+            Task { @MainActor in
+                await self.conversationStore.generateSmartTitleForConversation(conversationId)
+            }
+        }
+        
         messages.removeAll()
         currentInput = ""
         isGenerating = false
@@ -310,16 +320,8 @@ final class LLMViewModel {
     // MARK: - Internal Methods - Helpers
 
     func addSystemMessage() {
-        guard isModelLoaded, let modelName = loadedModelName else { return }
-
-        let content = "Model '\(modelName)' is loaded and ready to chat!"
-        let systemMessage = Message(role: .system, content: content)
-        messages.insert(systemMessage, at: 0)
-
-        if var conversation = currentConversation {
-            conversation.messages = messages
-            conversationStore.updateConversation(conversation)
-        }
+        // Model loaded notification is now shown as a toast instead
+        // No need to add a system message to the chat
     }
 
     private func ensureSettingsAreApplied() async {

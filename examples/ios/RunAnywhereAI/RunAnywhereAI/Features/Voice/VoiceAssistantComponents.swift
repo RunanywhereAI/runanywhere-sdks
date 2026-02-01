@@ -27,22 +27,15 @@ struct ConversationBubble: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(speaker)
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(.secondary)
-
-            Text(message)
-                .font(.body)
-                .foregroundColor(.primary)
-                .padding(12)
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(fillColor(isUser: isUser))
-                )
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
+        Text(message)
+            .font(.body)
+            .foregroundColor(.primary)
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(fillColor(isUser: isUser))
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

@@ -147,14 +147,37 @@ extension LLMViewModel {
     func finalizeGeneration(at index: Int) async {
         await MainActor.run {
             self.setIsGenerating(false)
-
-            if index < self.messagesValue.count,
-               let conversation = self.currentConversation {
-                var updatedConversation = conversation
+        }
+        
+        guard index < self.messagesValue.count else { return }
+        
+        // Get the assistant message that was just generated
+        let assistantMessage = self.messagesValue[index]
+        
+        // Get the CURRENT conversation from store (not the stale local copy)
+        guard let conversationId = self.currentConversation?.id,
+              let conversation = self.conversationStore.conversations.first(where: { $0.id == conversationId }) else {
+            return
+        }
+        
+        // Add assistant message to conversation store
+        await MainActor.run {
+            self.conversationStore.addMessage(assistantMessage, to: conversation)
+        }
+        
+        // Update conversation with all messages and model info
+        await MainActor.run {
+            if var updatedConversation = self.conversationStore.currentConversation {
                 updatedConversation.messages = self.messagesValue
                 updatedConversation.modelName = self.loadedModelName
                 self.conversationStore.updateConversation(updatedConversation)
+                self.setCurrentConversation(updatedConversation)
             }
+        }
+        
+        // Generate smart title immediately after first AI response
+        if self.messagesValue.count >= 2 {
+            await self.conversationStore.generateSmartTitleForConversation(conversationId)
         }
     }
 }
