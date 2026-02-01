@@ -149,4 +149,4 @@ export type {
 export type {
   ModelCompatibilityResult,
   DeviceCapabilities,
-} from './CompatibilityTypes'
+} from './CompatibilityTypes';

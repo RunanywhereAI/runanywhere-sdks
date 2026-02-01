@@ -30,7 +30,7 @@ const MIN_RAM_OVERHEAD_BYTES = 500 * 1024 * 1024;
 /** Minimum storage overhead for temp files (100 MB) */
 const MIN_STORAGE_OVERHEAD_BYTES = 100 * 1024 * 1024;
 
-/** Memory multiplier for model loading (typically 1.5x model size) */
+/** Memory multiplier for model loading (1.5x model size) */
 const MEMORY_MULTIPLIER = 1.5;
 
 /** Storage multiplier for extraction/temp files (1.2x download size) */

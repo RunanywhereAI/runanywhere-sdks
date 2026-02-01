@@ -705,9 +705,9 @@ export const RunAnywhere = {
   // Model Compatibility (Delegated to Extension)
   // ============================================================================
 
-    checkModelCompatibility: Compatibility.checkModelCompatibility,
-    checkModelsCompatibility: Compatibility.checkModelsCompatibility,
-    getDeviceCapabilities: Compatibility.getDeviceCapabilities,
+  checkModelCompatibility: Compatibility.checkModelCompatibility,
+  checkModelsCompatibility: Compatibility.checkModelsCompatibility,
+  getDeviceCapabilities: Compatibility.getDeviceCapabilities,
 
   // ============================================================================
   // Factory Methods

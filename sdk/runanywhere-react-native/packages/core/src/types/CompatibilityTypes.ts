@@ -1,5 +1,3 @@
-
-
 /**
  * Model compatibility check result
  * Simplified - just performs essential checks
@@ -59,5 +57,5 @@ export interface DeviceCapabilities {
     deviceModel: string;
 
     /** Device Platform */
-    platform: 'ios' | 'android' | 'windows' | 'macos' | 'web';
+    platform: 'ios' | 'android';
 }

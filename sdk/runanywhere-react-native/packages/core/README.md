@@ -170,7 +170,7 @@ console.log(`Device: ${caps.deviceModel} (${caps.chipName})`);
 console.log(`RAM: ${(caps.availableMemory / 1e9).toFixed(1)} / ${(caps.totalMemory / 1e9).toFixed(1)} GB`);
 console.log(`Storage: ${(caps.availableStorage / 1e9).toFixed(1)} / ${(caps.totalStorage / 1e9).toFixed(1)} GB`);
 console.log(`CPU: ${caps.cpuCores} cores, GPU: ${caps.hasGPU}, NPU: ${caps.hasNPU}`);
-
+```
 ---
 
 ### EventBus
