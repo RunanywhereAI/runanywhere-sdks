@@ -1,11 +1,18 @@
 package com.runanywhere.runanywhereai.presentation.chat
 
+import android.content.ClipData
+import android.os.Build
+import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -22,10 +29,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.data.ConversationStore
@@ -455,6 +467,7 @@ fun ModelInfoBar(
 // MESSAGE BUBBLE
 // ====================
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MessageBubbleView(
     message: ChatMessage,
@@ -468,6 +481,13 @@ fun MessageBubbleView(
         } else {
             Arrangement.Start
         }
+
+    // context menu state
+    var showDialog by remember { mutableStateOf(false) }
+    var showTextSelectionDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -530,6 +550,58 @@ fun MessageBubbleView(
                 val bubbleShape = RoundedCornerShape(Dimensions.messageBubbleCornerRadius)
                 val isUserMessage = message.role == MessageRole.USER
 
+                if (showDialog) {
+                    BasicAlertDialog(
+                        onDismissRequest = { showDialog = false },
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(Dimensions.cornerRadiusModal))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .widthIn(max = Dimensions.contextMenuMaxWidth)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(vertical = Dimensions.padding8)
+                        ) {
+                            TextButton(
+                                onClick = {
+                                    scope.launch {
+                                        val clipEntry = ClipEntry(ClipData.newPlainText("chat_msg", message.content))
+                                        clipboard.setClipEntry(clipEntry)
+                                        showDialog = false
+                                        // Only show a toast for Android 12 and lower.
+                                        // note: https://developer.android.com/develop/ui/views/touch-and-input/copy-paste#duplicate-notifications
+                                        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2) {
+                                            Toast.makeText(context, "Message copied to clipboard", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = Dimensions.padding16)
+                            ) {
+                                Text("Copy", style = MaterialTheme.typography.bodyLarge)
+                            }
+                            TextButton(
+                                onClick = {
+                                    showDialog = false
+                                    showTextSelectionDialog = true
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = Dimensions.padding16)
+                            ) {
+                                Text("Select Text", style = MaterialTheme.typography.bodyLarge)
+                            }
+                        }
+                    }
+                }
+
+                if (showTextSelectionDialog) {
+                    SelectableTextDialog(
+                        text = message.content,
+                        onDismiss = { showTextSelectionDialog = false }
+                    )
+                }
+
                 Box(
                     modifier =
                         Modifier
@@ -555,6 +627,10 @@ fun MessageBubbleView(
                                         AppColors.borderMedium
                                     },
                                 shape = bubbleShape,
+                            )
+                            .combinedClickable(
+                                onClick = { /* No-op */ },
+                                onLongClick = { showDialog = true },
                             ),
                 ) {
                     Text(
@@ -1756,6 +1832,78 @@ private fun MessageAnalyticsCard(
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.secondary,
                     )
+                }
+            }
+        }
+    }
+}
+
+// ====================
+// SELECTABLE TEXT DIALOG
+// ====================
+
+@Composable
+private fun SelectableTextDialog(
+    text: String,
+    onDismiss: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surface),
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    tonalElevation = Dimensions.padding4,
+                ) {
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Dimensions.padding16, vertical = Dimensions.padding12),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Select Text",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close",
+                            )
+                        }
+                    }
+                }
+
+                // Selectable text content
+                SelectionContainer {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                                .padding(Dimensions.padding16),
+                    ) {
+                        Text(
+                            text = text,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 }
             }
         }
