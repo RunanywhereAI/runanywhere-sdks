@@ -365,7 +365,24 @@ class RunAnywhereApplication : Application() {
             modality = ModelCategory.SPEECH_SYNTHESIS,
             memoryRequirement = 350_000_000, // ~310MB FP32 model with static shapes
         )
-        Log.i("RunAnywhereApp", "✅ ONNX STT/TTS models registered (including Kokoro Unified + NNAPI)")
+
+        // Kokoro TTS INT8 - INT8 quantized model for true NPU acceleration via NNAPI
+        // This model uses INT8 quantization which enables full NPU execution on:
+        // - Qualcomm Hexagon DSP/HTP (4x+ speedup vs CPU)
+        // - Samsung Exynos NPU
+        // - MediaTek APU
+        // - Google Tensor TPU (Pixel devices)
+        // INT8 provides: smaller model (88MB vs 310MB), faster inference, lower memory usage
+        // v1.1.0: Fixed ai.onnx.ml opset 5->4 for ONNX Runtime 1.17.1 compatibility
+        RunAnywhere.registerModel(
+            id = "kokoro-tts-int8",
+            name = "Kokoro TTS 82M (INT8 NPU)",
+            url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/kokoro-int8-opset4-v1.0/kokoro-tts-int8-nnapi-v1.0.tar.gz",
+            framework = InferenceFramework.ONNX,
+            modality = ModelCategory.SPEECH_SYNTHESIS,
+            memoryRequirement = 120_000_000, // ~88MB INT8 model + voices
+        )
+        Log.i("RunAnywhereApp", "✅ ONNX STT/TTS models registered (including Kokoro Unified + NNAPI + INT8)")
 
         Log.i("RunAnywhereApp", "🎉 All modules and models registered")
     }

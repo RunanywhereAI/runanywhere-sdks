@@ -81,10 +81,24 @@ enum class KokoroModelType {
 };
 
 /**
+ * @brief Model quantization type for NPU routing
+ *
+ * INT8 quantized models get the best NPU acceleration via NNAPI.
+ * FP32 models may fall back to CPU for unsupported ops.
+ */
+enum class KokoroQuantizationType {
+    UNKNOWN = 0,
+    FP32 = 1,      // Float32 precision (larger, may fall back to CPU)
+    FP16 = 2,      // Float16 precision (QNN HTP compatible)
+    INT8 = 3,      // INT8 quantized (best NNAPI NPU acceleration)
+};
+
+/**
  * @brief Kokoro model information (internal)
  */
 struct KokoroModelInfo {
     KokoroModelType type = KokoroModelType::UNKNOWN;
+    KokoroQuantizationType quantization = KokoroQuantizationType::UNKNOWN;
     std::string unified_path;
     std::string encoder_path;
     std::string vocoder_path;
@@ -92,6 +106,7 @@ struct KokoroModelInfo {
     std::string voices_path;
     bool has_tokenizer = false;
     bool has_voices = false;
+    bool is_int8 = false;  // True if model is INT8 quantized (for easy checking)
 };
 
 /**
