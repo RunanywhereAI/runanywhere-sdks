@@ -363,6 +363,7 @@ extension MessageBubbleView {
                                 color: AppColors.textPrimary
                             )
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
 
                             // Extra spacing at bottom for model badge
                             if message.modelInfo != nil {
@@ -373,6 +374,7 @@ extension MessageBubbleView {
                     } else {
                         Text(message.content)
                             .foregroundColor(AppColors.textWhite)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .padding(.horizontal, AppSpacing.large)
@@ -392,12 +394,7 @@ extension MessageBubbleView {
                 }
             }
             .background(messageBubbleBackground)
-            .scaleEffect(shouldPulse ? 1.02 : 1.0)
-            .animation(
-                .easeInOut(duration: AppLayout.animationLoopSlow)
-                    .repeatForever(autoreverses: true),
-                value: isGenerating
-            )
+            .animation(nil, value: message.content)
         }
     }
 }

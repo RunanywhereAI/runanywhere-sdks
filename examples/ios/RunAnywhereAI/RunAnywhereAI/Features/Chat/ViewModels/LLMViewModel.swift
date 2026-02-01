@@ -139,9 +139,8 @@ final class LLMViewModel {
     // MARK: - Initialization
 
     init() {
-        // Create new conversation
-        let conversation = conversationStore.createConversation()
-        currentConversation = conversation
+        // Don't create conversation yet - wait until first message is sent
+        currentConversation = nil
 
         // Listen for model loaded notifications
         NotificationCenter.default.addObserver(
@@ -203,6 +202,12 @@ final class LLMViewModel {
         currentInput = ""
         isGenerating = true
         error = nil
+
+        // Create conversation on first message
+        if currentConversation == nil {
+            let conversation = conversationStore.createConversation()
+            currentConversation = conversation
+        }
 
         // Add user message
         let userMessage = Message(role: .user, content: prompt)

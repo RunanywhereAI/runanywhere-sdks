@@ -351,7 +351,7 @@ struct SpeechToTextView: View {
 
                 if let modelName = viewModel.selectedModelName {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(modelName)
+                        Text(modelName.shortModelName())
                             .font(.caption)
                             .fontWeight(.medium)
                             .lineLimit(1)

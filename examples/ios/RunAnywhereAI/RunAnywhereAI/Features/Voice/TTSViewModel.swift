@@ -69,7 +69,7 @@ class TTSViewModel: ObservableObject {
         do {
             try await RunAnywhere.loadTTSModel(model.id)
             selectedFramework = model.framework
-            selectedModelName = model.name
+            selectedModelName = model.name.modelNameFromID()
             selectedModelId = model.id
             logger.info("TTS model loaded successfully: \(model.name)")
         } catch {
