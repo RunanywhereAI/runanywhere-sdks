@@ -165,9 +165,9 @@ rac_result_t rac_service_create(rac_capability_t capability, const rac_service_r
 
     auto it = state.providers.find(capability);
     if (it == state.providers.end() || it->second.empty()) {
-        RAC_LOG_ERROR(LOG_CAT, "rac_service_create: No providers registered for capability %d",
-                      static_cast<int>(capability));
-        rac_error_set_details("No providers registered for capability");
+        RAC_LOG_ERROR(LOG_CAT, "rac_service_create: NO PROVIDERS REGISTERED for capability %d! "
+                      "Make sure ONNX.register() was called.", static_cast<int>(capability));
+        rac_error_set_details("NO_PROVIDERS_REGISTERED - call ONNX.register() first");
         return RAC_ERROR_NO_CAPABLE_PROVIDER;
     }
 

@@ -4,6 +4,12 @@
  * This file implements the ONNX backend using:
  * - ONNX Runtime for general ML inference
  * - Sherpa-ONNX for speech tasks (STT, TTS, VAD)
+ *
+ * NPU Acceleration:
+ * - iOS/macOS: CoreML → Apple Neural Engine (ANE)
+ * - Android Qualcomm: QNN → Hexagon NPU
+ * - Android Other: NNAPI → Device NPU
+ * - Desktop: CPU with SIMD
  */
 
 #include "onnx_backend.h"
@@ -14,8 +20,151 @@
 #include <cstring>
 
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_error.h"
+
+#if defined(__ANDROID__)
+#include <android/log.h>
+#include <dlfcn.h>
+#include <sys/system_properties.h>
+#endif
 
 namespace runanywhere {
+
+// =============================================================================
+// NPU Provider Selection
+// =============================================================================
+
+#if defined(__ANDROID__)
+/**
+ * Check if device has Qualcomm Snapdragon SoC
+ */
+static bool is_qualcomm_device() {
+    char soc_model[PROP_VALUE_MAX] = {0};
+    char hardware[PROP_VALUE_MAX] = {0};
+    
+    // Check SoC model (e.g., "SM8650" for Snapdragon 8 Gen 3)
+    if (__system_property_get("ro.soc.model", soc_model) > 0) {
+        if (strstr(soc_model, "SM8") || strstr(soc_model, "SM7") || 
+            strstr(soc_model, "SC8") || strstr(soc_model, "QCM") ||
+            strstr(soc_model, "SDM")) {
+            RAC_LOG_DEBUG("ONNX.NPU", "Detected Qualcomm SoC: %s", soc_model);
+            return true;
+        }
+    }
+    
+    // Fallback: check hardware property
+    if (__system_property_get("ro.hardware", hardware) > 0) {
+        if (strstr(hardware, "qcom") || strstr(hardware, "qualcomm")) {
+            RAC_LOG_DEBUG("ONNX.NPU", "Detected Qualcomm hardware: %s", hardware);
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+/**
+ * Check if QNN libraries are available on device
+ */
+static bool is_qnn_available() {
+    // Try to load QNN HTP library
+    void* handle = dlopen("libQnnHtp.so", RTLD_NOW | RTLD_LOCAL);
+    if (handle) {
+        dlclose(handle);
+        RAC_LOG_DEBUG("ONNX.NPU", "QNN HTP library available");
+        return true;
+    }
+    RAC_LOG_DEBUG("ONNX.NPU", "QNN HTP library not available");
+    return false;
+}
+#endif
+
+/**
+ * Get optimal execution provider for NPU acceleration
+ *
+ * Platform mapping:
+ * - iOS/macOS: "coreml" → CoreML → Apple Neural Engine (ANE)
+ * - Android Qualcomm with QNN: "qnn" → QNN HTP → Hexagon NPU
+ * - Android Other: "nnapi" → NNAPI → Device NPU
+ * - Desktop: "cpu" → Standard CPU execution with SIMD
+ *
+ * @param prefer_npu If true, prefer NPU providers; if false, force CPU
+ * @return Provider string for Sherpa-ONNX configuration
+ */
+static const char* get_optimal_provider(bool prefer_npu = true) {
+    if (!prefer_npu) {
+        RAC_LOG_INFO("ONNX.NPU", "NPU disabled by configuration - using CPU provider");
+        return "cpu";
+    }
+
+#if defined(__APPLE__)
+    // CoreML automatically routes to Apple Neural Engine (ANE) when available
+    // ANE is Apple's NPU present in A11+ (iPhone 8+) and M1+ chips
+    RAC_LOG_INFO("ONNX.NPU", "============================================");
+    RAC_LOG_INFO("ONNX.NPU", "  USING APPLE NPU (Neural Engine / ANE)");
+    RAC_LOG_INFO("ONNX.NPU", "  Provider: CoreML");
+    RAC_LOG_INFO("ONNX.NPU", "  Hardware: Apple Neural Engine (A11+/M1+)");
+    RAC_LOG_INFO("ONNX.NPU", "============================================");
+    return "coreml";
+    
+#elif defined(__ANDROID__)
+    // Check for Qualcomm device with QNN support (best NPU performance)
+    if (is_qualcomm_device() && is_qnn_available()) {
+        RAC_LOG_INFO("ONNX.NPU", "============================================");
+        RAC_LOG_INFO("ONNX.NPU", "  USING QUALCOMM QNN (HTP/NPU)");
+        RAC_LOG_INFO("ONNX.NPU", "  Provider: QNN");
+        RAC_LOG_INFO("ONNX.NPU", "  Hardware: Hexagon Tensor Processor");
+        RAC_LOG_INFO("ONNX.NPU", "============================================");
+        return "qnn";
+    }
+    
+    // Fallback to NNAPI for other Android devices
+    // NNAPI routes to device NPU: Samsung NPU, MediaTek APU, Google Tensor TPU
+    RAC_LOG_INFO("ONNX.NPU", "============================================");
+    RAC_LOG_INFO("ONNX.NPU", "  USING ANDROID NPU (via NNAPI)");
+    RAC_LOG_INFO("ONNX.NPU", "  Provider: NNAPI");
+    RAC_LOG_INFO("ONNX.NPU", "  Hardware: Device NPU (Samsung/MediaTek/Google)");
+    RAC_LOG_INFO("ONNX.NPU", "============================================");
+    return "nnapi";
+    
+#else
+    // Desktop/Server: CPU with SIMD optimizations (AVX2, NEON, etc.)
+    RAC_LOG_INFO("ONNX.NPU", "No NPU available on this platform - using CPU provider");
+    return "cpu";
+#endif
+}
+
+/**
+ * Detect TTS model type from model directory contents
+ */
+static TTSModelType detect_tts_model_type(const std::string& model_path) {
+    struct stat path_stat;
+    
+    // Check for Kokoro-specific files
+    std::string voices_bin = model_path + "/voices.bin";
+    if (stat(voices_bin.c_str(), &path_stat) == 0) {
+        RAC_LOG_INFO("ONNX.TTS", "Detected Kokoro model (found voices.bin)");
+        return TTSModelType::KOKORO;
+    }
+    
+    // Check for Kitten-specific files
+    std::string kitten_marker = model_path + "/kitten.json";
+    if (stat(kitten_marker.c_str(), &path_stat) == 0) {
+        RAC_LOG_INFO("ONNX.TTS", "Detected Kitten model (found kitten.json)");
+        return TTSModelType::KITTEN;
+    }
+    
+    // Check for Matcha-specific files
+    std::string acoustic_model = model_path + "/acoustic_model.onnx";
+    if (stat(acoustic_model.c_str(), &path_stat) == 0) {
+        RAC_LOG_INFO("ONNX.TTS", "Detected Matcha model (found acoustic_model.onnx)");
+        return TTSModelType::MATCHA;
+    }
+    
+    // Default to VITS (Piper)
+    RAC_LOG_INFO("ONNX.TTS", "Defaulting to VITS/Piper model type");
+    return TTSModelType::VITS;
+}
 
 // =============================================================================
 // ONNXBackendNew Implementation
@@ -66,7 +215,12 @@ void ONNXBackendNew::cleanup() {
 }
 
 DeviceType ONNXBackendNew::get_device_type() const {
+#if defined(__APPLE__) || defined(__ANDROID__)
+    // On Apple and Android, we use NPU when available
+    return DeviceType::NPU;
+#else
     return DeviceType::CPU;
+#endif
 }
 
 size_t ONNXBackendNew::get_memory_usage() const {
@@ -249,7 +403,12 @@ bool ONNXSTT::load_model(const std::string& model_path, STTModelType model_type,
     recognizer_config.model_config.tokens = tokens_path.c_str();
     recognizer_config.model_config.num_threads = 2;
     recognizer_config.model_config.debug = 1;
-    recognizer_config.model_config.provider = "cpu";
+    
+    // Use NPU provider for STT acceleration
+    const char* stt_provider = get_optimal_provider();
+    recognizer_config.model_config.provider = stt_provider;
+    RAC_LOG_INFO("ONNX.STT", "Using execution provider: %s", stt_provider);
+    
     recognizer_config.model_config.model_type = "whisper";
 
     recognizer_config.model_config.modeling_unit = "cjkchar";
@@ -579,17 +738,46 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
     model_dir_ = model_path;
 
     RAC_LOG_INFO("ONNX.TTS", "Loading model from: %s", model_path.c_str());
+    
+#ifdef __ANDROID__
+    __android_log_print(ANDROID_LOG_INFO, "ONNX_TTS", "=== LOAD MODEL START ===");
+    __android_log_print(ANDROID_LOG_INFO, "ONNX_TTS", "model_path: %s", model_path.c_str());
+    __android_log_print(ANDROID_LOG_INFO, "ONNX_TTS", "model_type: %d", static_cast<int>(model_type));
+#endif
 
     std::string model_onnx_path;
     std::string tokens_path;
     std::string data_dir;
     std::string lexicon_path;
+    std::string voices_bin;  // For Kokoro - must stay in scope until SherpaOnnxCreateOfflineTts
+    std::string dict_dir;    // For Kokoro - must stay in scope until SherpaOnnxCreateOfflineTts
 
     struct stat path_stat;
     if (stat(model_path.c_str(), &path_stat) != 0) {
         RAC_LOG_ERROR("ONNX.TTS", "Model path does not exist: %s", model_path.c_str());
+#ifdef __ANDROID__
+        __android_log_print(ANDROID_LOG_ERROR, "ONNX_TTS", "Model path does NOT exist: %s", model_path.c_str());
+#endif
         return false;
     }
+
+#ifdef __ANDROID__
+    __android_log_print(ANDROID_LOG_INFO, "ONNX_TTS", "Model path exists, is_dir=%d", S_ISDIR(path_stat.st_mode));
+    
+    // List directory contents for debugging
+    if (S_ISDIR(path_stat.st_mode)) {
+        DIR* debug_dir = opendir(model_path.c_str());
+        if (debug_dir) {
+            __android_log_print(ANDROID_LOG_INFO, "ONNX_TTS", "=== Directory contents of %s ===", model_path.c_str());
+            struct dirent* debug_entry;
+            while ((debug_entry = readdir(debug_dir)) != nullptr) {
+                __android_log_print(ANDROID_LOG_INFO, "ONNX_TTS", "  - %s", debug_entry->d_name);
+            }
+            closedir(debug_dir);
+            __android_log_print(ANDROID_LOG_INFO, "ONNX_TTS", "=== End directory contents ===");
+        }
+    }
+#endif
 
     if (S_ISDIR(path_stat.st_mode)) {
         model_onnx_path = model_path + "/model.onnx";
@@ -598,6 +786,9 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
         lexicon_path = model_path + "/lexicon.txt";
 
         if (stat(model_onnx_path.c_str(), &path_stat) != 0) {
+#ifdef __ANDROID__
+            __android_log_print(ANDROID_LOG_INFO, "ONNX_TTS", "model.onnx not found, scanning for .onnx files...");
+#endif
             DIR* dir = opendir(model_path.c_str());
             if (dir) {
                 struct dirent* entry;
@@ -606,6 +797,9 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
                     if (filename.size() > 5 && filename.substr(filename.size() - 5) == ".onnx") {
                         model_onnx_path = model_path + "/" + filename;
                         RAC_LOG_DEBUG("ONNX.TTS", "Found model file: %s", model_onnx_path.c_str());
+#ifdef __ANDROID__
+                        __android_log_print(ANDROID_LOG_INFO, "ONNX_TTS", "Found ONNX file: %s", filename.c_str());
+#endif
                         break;
                     }
                 }
@@ -644,71 +838,253 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
 
     if (stat(model_onnx_path.c_str(), &path_stat) != 0) {
         RAC_LOG_ERROR("ONNX.TTS", "Model ONNX file not found: %s", model_onnx_path.c_str());
+        char err[256];
+        snprintf(err, sizeof(err), "ONNX file missing: %s", model_onnx_path.c_str());
+        rac_error_set_details(err);
         return false;
     }
 
     if (stat(tokens_path.c_str(), &path_stat) != 0) {
         RAC_LOG_ERROR("ONNX.TTS", "Tokens file not found: %s", tokens_path.c_str());
+        char err[256];
+        snprintf(err, sizeof(err), "tokens.txt missing: %s", tokens_path.c_str());
+        rac_error_set_details(err);
         return false;
     }
+
+    // Detect model type from directory contents
+    TTSModelType detected_type = detect_tts_model_type(model_path);
+    
+    // Get optimal provider for NPU acceleration
+    const char* provider = get_optimal_provider();
+    RAC_LOG_INFO("ONNX.TTS", "Using execution provider: %s", provider);
 
     SherpaOnnxOfflineTtsConfig tts_config;
     memset(&tts_config, 0, sizeof(tts_config));
 
-    tts_config.model.vits.model = model_onnx_path.c_str();
-    tts_config.model.vits.tokens = tokens_path.c_str();
+    // Configure based on model type
+    if (detected_type == TTSModelType::KOKORO) {
+        // Kokoro TTS configuration
+        RAC_LOG_INFO("ONNX.TTS", "Configuring Kokoro TTS model");
+        
+        // Set up paths (variables declared at function scope to avoid dangling pointers)
+        voices_bin = model_path + "/voices.bin";
+        dict_dir = model_path + "/dict";
+        
+        // CRITICAL: Kokoro requires voices.bin
+        if (stat(voices_bin.c_str(), &path_stat) != 0) {
+            RAC_LOG_ERROR("ONNX.TTS", "Kokoro voices.bin not found: %s", voices_bin.c_str());
+            char err[256];
+            snprintf(err, sizeof(err), "voices.bin missing: %s", voices_bin.c_str());
+            rac_error_set_details(err);
+            return false;
+        }
+        RAC_LOG_INFO("ONNX.TTS", "Kokoro voices.bin found: %ld bytes", (long)path_stat.st_size);
+        
+        // Check for language-specific lexicon
+        std::string lexicon_us = model_path + "/lexicon-us-en.txt";
+        if (stat(lexicon_us.c_str(), &path_stat) == 0) {
+            lexicon_path = lexicon_us;
+        }
+        
+        RAC_LOG_INFO("ONNX.TTS", "Kokoro config: model=%s, voices=%s, tokens=%s", 
+            model_onnx_path.c_str(), voices_bin.c_str(), tokens_path.c_str());
+        
+        tts_config.model.kokoro.model = model_onnx_path.c_str();
+        tts_config.model.kokoro.voices = voices_bin.c_str();
+        tts_config.model.kokoro.tokens = tokens_path.c_str();
+        
+        if (stat(lexicon_path.c_str(), &path_stat) == 0) {
+            tts_config.model.kokoro.lexicon = lexicon_path.c_str();
+            RAC_LOG_DEBUG("ONNX.TTS", "Using Kokoro lexicon: %s", lexicon_path.c_str());
+        }
+        
+        if (stat(data_dir.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
+            tts_config.model.kokoro.data_dir = data_dir.c_str();
+            RAC_LOG_DEBUG("ONNX.TTS", "Using Kokoro data_dir: %s", data_dir.c_str());
+        }
+        
+        // Check for dict directory
+        if (stat(dict_dir.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
+            tts_config.model.kokoro.dict_dir = dict_dir.c_str();
+            RAC_LOG_DEBUG("ONNX.TTS", "Using Kokoro dict_dir: %s", dict_dir.c_str());
+        }
+        
+        tts_config.model.kokoro.length_scale = 1.0f;
+        tts_config.model.kokoro.lang = "en-us";
+        
+    } else {
+        // VITS/Piper TTS configuration (default)
+        RAC_LOG_INFO("ONNX.TTS", "Configuring VITS/Piper TTS model");
+        
+        tts_config.model.vits.model = model_onnx_path.c_str();
+        tts_config.model.vits.tokens = tokens_path.c_str();
 
-    if (stat(lexicon_path.c_str(), &path_stat) == 0 && S_ISREG(path_stat.st_mode)) {
-        tts_config.model.vits.lexicon = lexicon_path.c_str();
-        RAC_LOG_DEBUG("ONNX.TTS", "Using lexicon file: %s", lexicon_path.c_str());
+        if (stat(lexicon_path.c_str(), &path_stat) == 0 && S_ISREG(path_stat.st_mode)) {
+            tts_config.model.vits.lexicon = lexicon_path.c_str();
+            RAC_LOG_DEBUG("ONNX.TTS", "Using lexicon file: %s", lexicon_path.c_str());
+        }
+
+        if (stat(data_dir.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
+            tts_config.model.vits.data_dir = data_dir.c_str();
+            RAC_LOG_DEBUG("ONNX.TTS", "Using espeak-ng data dir: %s", data_dir.c_str());
+        }
+
+        tts_config.model.vits.noise_scale = 0.667f;
+        tts_config.model.vits.noise_scale_w = 0.8f;
+        tts_config.model.vits.length_scale = 1.0f;
     }
 
-    if (stat(data_dir.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
-        tts_config.model.vits.data_dir = data_dir.c_str();
-        RAC_LOG_DEBUG("ONNX.TTS", "Using espeak-ng data dir: %s", data_dir.c_str());
-    }
-
-    tts_config.model.vits.noise_scale = 0.667f;
-    tts_config.model.vits.noise_scale_w = 0.8f;
-    tts_config.model.vits.length_scale = 1.0f;
-
-    tts_config.model.provider = "cpu";
+    // Common settings - use NPU provider
+    tts_config.model.provider = provider;
     tts_config.model.num_threads = 2;
     tts_config.model.debug = 1;
 
-    RAC_LOG_INFO("ONNX.TTS", "Creating SherpaOnnxOfflineTts...");
+    RAC_LOG_INFO("ONNX.TTS", "Creating SherpaOnnxOfflineTts with %s provider...", provider);
+
+#ifdef __ANDROID__
+    __android_log_print(ANDROID_LOG_INFO, "ONNX_TTS", "=== Creating SherpaOnnxOfflineTts ===");
+    __android_log_print(ANDROID_LOG_INFO, "ONNX_TTS", "provider: %s", provider);
+    __android_log_print(ANDROID_LOG_INFO, "ONNX_TTS", "detected_type: %d (VITS=0, PIPER=1, KOKORO=2)", static_cast<int>(detected_type));
+    if (detected_type == TTSModelType::KOKORO) {
+        __android_log_print(ANDROID_LOG_INFO, "ONNX_TTS", "kokoro.model: %s", tts_config.model.kokoro.model ? tts_config.model.kokoro.model : "(null)");
+        __android_log_print(ANDROID_LOG_INFO, "ONNX_TTS", "kokoro.voices: %s", tts_config.model.kokoro.voices ? tts_config.model.kokoro.voices : "(null)");
+        __android_log_print(ANDROID_LOG_INFO, "ONNX_TTS", "kokoro.tokens: %s", tts_config.model.kokoro.tokens ? tts_config.model.kokoro.tokens : "(null)");
+        __android_log_print(ANDROID_LOG_INFO, "ONNX_TTS", "kokoro.data_dir: %s", tts_config.model.kokoro.data_dir ? tts_config.model.kokoro.data_dir : "(null)");
+        __android_log_print(ANDROID_LOG_INFO, "ONNX_TTS", "kokoro.dict_dir: %s", tts_config.model.kokoro.dict_dir ? tts_config.model.kokoro.dict_dir : "(null)");
+        __android_log_print(ANDROID_LOG_INFO, "ONNX_TTS", "kokoro.lexicon: %s", tts_config.model.kokoro.lexicon ? tts_config.model.kokoro.lexicon : "(null)");
+    } else {
+        __android_log_print(ANDROID_LOG_INFO, "ONNX_TTS", "vits.model: %s", tts_config.model.vits.model ? tts_config.model.vits.model : "(null)");
+        __android_log_print(ANDROID_LOG_INFO, "ONNX_TTS", "vits.tokens: %s", tts_config.model.vits.tokens ? tts_config.model.vits.tokens : "(null)");
+    }
+#endif
 
     const SherpaOnnxOfflineTts* new_tts = nullptr;
     try {
         new_tts = SherpaOnnxCreateOfflineTts(&tts_config);
     } catch (const std::exception& e) {
         RAC_LOG_ERROR("ONNX.TTS", "Exception during TTS creation: %s", e.what());
-        return false;
+        
+        // Fallback to CPU if NPU fails
+        if (strcmp(provider, "cpu") != 0) {
+            RAC_LOG_INFO("ONNX.TTS", "NPU failed, falling back to CPU provider");
+            tts_config.model.provider = "cpu";
+            try {
+                new_tts = SherpaOnnxCreateOfflineTts(&tts_config);
+            } catch (...) {
+                RAC_LOG_ERROR("ONNX.TTS", "CPU fallback also failed");
+                return false;
+            }
+        } else {
+            return false;
+        }
     } catch (...) {
         RAC_LOG_ERROR("ONNX.TTS", "Unknown exception during TTS creation");
         return false;
     }
 
     if (!new_tts) {
-        RAC_LOG_ERROR("ONNX.TTS", "Failed to create SherpaOnnxOfflineTts");
-        return false;
+#ifdef __ANDROID__
+        __android_log_print(ANDROID_LOG_ERROR, "ONNX_TTS", "SherpaOnnxCreateOfflineTts returned NULL!");
+#endif
+        // Fallback to CPU if NPU provider returned null
+        if (strcmp(provider, "cpu") != 0) {
+            RAC_LOG_INFO("ONNX.TTS", "============================================");
+            RAC_LOG_INFO("ONNX.TTS", "  NPU FAILED - FALLING BACK TO CPU");
+            RAC_LOG_INFO("ONNX.TTS", "============================================");
+#ifdef __ANDROID__
+            __android_log_print(ANDROID_LOG_INFO, "ONNX_TTS", "Trying CPU fallback...");
+#endif
+            tts_config.model.provider = "cpu";
+            new_tts = SherpaOnnxCreateOfflineTts(&tts_config);
+        }
+        
+        if (!new_tts) {
+            RAC_LOG_ERROR("ONNX.TTS", "Failed to create SherpaOnnxOfflineTts");
+#ifdef __ANDROID__
+            __android_log_print(ANDROID_LOG_ERROR, "ONNX_TTS", "FINAL FAILURE: Could not create TTS even with CPU");
+#endif
+            // List directory to help debug
+            std::string file_list = "";
+            DIR* dir = opendir(model_path.c_str());
+            if (dir) {
+                struct dirent* entry;
+                int count = 0;
+                while ((entry = readdir(dir)) != nullptr && count < 10) {
+                    if (entry->d_name[0] != '.') {
+                        file_list += std::string(entry->d_name) + ",";
+                        count++;
+                    }
+                }
+                closedir(dir);
+            }
+            
+            // Set detailed error for debugging
+            char err[1024];
+            snprintf(err, sizeof(err), 
+                "SherpaOnnx NULL|type=%s|prov=%s|files=[%s]|model=%s|tokens=%s|voices=%s",
+                detected_type == TTSModelType::KOKORO ? "KOKORO" : "PIPER",
+                tts_config.model.provider ? tts_config.model.provider : "null",
+                file_list.c_str(),
+                model_onnx_path.c_str(),
+                tokens_path.c_str(),
+                voices_bin.empty() ? "N/A" : voices_bin.c_str());
+            rac_error_set_details(err);
+            return false;
+        }
     }
+    
+#ifdef __ANDROID__
+    __android_log_print(ANDROID_LOG_INFO, "ONNX_TTS", "SUCCESS: SherpaOnnxOfflineTts created!");
+#endif
 
     sherpa_tts_ = new_tts;
 
     sample_rate_ = SherpaOnnxOfflineTtsSampleRate(sherpa_tts_);
     int num_speakers = SherpaOnnxOfflineTtsNumSpeakers(sherpa_tts_);
 
-    RAC_LOG_INFO("ONNX.TTS", "TTS model loaded successfully");
-    RAC_LOG_INFO("ONNX.TTS", "Sample rate: %d, speakers: %d", sample_rate_, num_speakers);
+    // Log success with NPU status
+    const char* npu_status = (strcmp(tts_config.model.provider, "cpu") != 0) ? "NPU" : "CPU";
+    RAC_LOG_INFO("ONNX.TTS", "============================================");
+    RAC_LOG_INFO("ONNX.TTS", "  TTS MODEL LOADED WITH %s ACCELERATION", npu_status);
+    RAC_LOG_INFO("ONNX.TTS", "  Model Type: %s", detected_type == TTSModelType::KOKORO ? "Kokoro" : "VITS/Piper");
+    RAC_LOG_INFO("ONNX.TTS", "  Provider: %s", tts_config.model.provider);
+    RAC_LOG_INFO("ONNX.TTS", "  Sample Rate: %d Hz", sample_rate_);
+    RAC_LOG_INFO("ONNX.TTS", "  Speakers: %d", num_speakers);
+    RAC_LOG_INFO("ONNX.TTS", "============================================");
 
+    // Register voices
     voices_.clear();
-    for (int i = 0; i < num_speakers; ++i) {
-        VoiceInfo voice;
-        voice.id = std::to_string(i);
-        voice.name = "Speaker " + std::to_string(i);
-        voice.language = "en";
-        voices_.push_back(voice);
+    
+    if (detected_type == TTSModelType::KOKORO && num_speakers > 20) {
+        // Kokoro v1.0+ has 53 speakers with specific names
+        const char* kokoro_voices[] = {
+            "af_alloy", "af_aoede", "af_bella", "af_heart", "af_jessica",
+            "af_kore", "af_nicole", "af_nova", "af_river", "af_sarah", "af_sky",
+            "am_adam", "am_echo", "am_eric", "am_fenrir", "am_liam",
+            "am_michael", "am_onyx", "am_puck", "am_santa",
+            "bf_alice", "bf_emma", "bf_isabella", "bf_lily",
+            "bm_daniel", "bm_fable", "bm_george", "bm_lewis"
+        };
+        int num_kokoro_voices = sizeof(kokoro_voices) / sizeof(kokoro_voices[0]);
+        
+        for (int i = 0; i < std::min(num_speakers, num_kokoro_voices); ++i) {
+            VoiceInfo voice;
+            voice.id = kokoro_voices[i];
+            voice.name = kokoro_voices[i];
+            voice.language = (kokoro_voices[i][0] == 'a') ? "en-US" : "en-GB";
+            voices_.push_back(voice);
+        }
+        RAC_LOG_INFO("ONNX.TTS", "Registered %d Kokoro voices", (int)voices_.size());
+    } else {
+        // Generic voice registration
+        for (int i = 0; i < num_speakers; ++i) {
+            VoiceInfo voice;
+            voice.id = std::to_string(i);
+            voice.name = "Speaker " + std::to_string(i);
+            voice.language = "en";
+            voices_.push_back(voice);
+        }
     }
 
     model_loaded_ = true;

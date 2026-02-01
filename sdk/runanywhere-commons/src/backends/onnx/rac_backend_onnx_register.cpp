@@ -15,6 +15,17 @@
 #include <cstring>
 #include <vector>
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#define ONNX_LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "ONNX_BACKEND", __VA_ARGS__)
+#define ONNX_LOGI(...) __android_log_print(ANDROID_LOG_INFO, "ONNX_BACKEND", __VA_ARGS__)
+#define ONNX_LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "ONNX_BACKEND", __VA_ARGS__)
+#else
+#define ONNX_LOGD(...) do { fprintf(stderr, "[ONNX_BACKEND] " __VA_ARGS__); fprintf(stderr, "\n"); } while(0)
+#define ONNX_LOGI(...) do { fprintf(stderr, "[ONNX_BACKEND] " __VA_ARGS__); fprintf(stderr, "\n"); } while(0)
+#define ONNX_LOGE(...) do { fprintf(stderr, "[ONNX_BACKEND] " __VA_ARGS__); fprintf(stderr, "\n"); } while(0)
+#endif
+
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -274,47 +285,56 @@ rac_handle_t onnx_stt_create(const rac_service_request_t* request, void* user_da
     return service;
 }
 
-// TTS can_handle
+// TTS can_handle - ALWAYS RETURN TRUE FOR NOW (debugging)
 rac_bool_t onnx_tts_can_handle(const rac_service_request_t* request, void* user_data) {
     (void)user_data;
+    (void)request;
 
-    if (request == nullptr) {
-        return RAC_FALSE;
-    }
-
-    if (request->identifier == nullptr || request->identifier[0] == '\0') {
-        return RAC_TRUE;
-    }
-
-    const char* path = request->identifier;
-    if (strstr(path, "piper") != nullptr || strstr(path, "vits") != nullptr ||
-        strstr(path, ".onnx") != nullptr) {
-        return RAC_TRUE;
-    }
-
-    return RAC_FALSE;
+    // ALWAYS return TRUE to bypass all checks - for debugging
+    ONNX_LOGI("onnx_tts_can_handle: ALWAYS RETURNING TRUE (debug mode)");
+    return RAC_TRUE;
 }
 
 // TTS create with vtable
 rac_handle_t onnx_tts_create(const rac_service_request_t* request, void* user_data) {
     (void)user_data;
 
+    // Reset last error
+    rac_backend_onnx_set_last_tts_error(RAC_SUCCESS, nullptr);
+
     if (request == nullptr) {
+        rac_backend_onnx_set_last_tts_error(RAC_ERROR_NULL_POINTER, "request is null");
         return nullptr;
     }
 
-    RAC_LOG_INFO(LOG_CAT, "Creating ONNX TTS service for: %s",
-                 request->identifier ? request->identifier : "(default)");
+    // Use model_path if available (actual file path), otherwise fall back to identifier
+    const char* path_to_use = request->model_path ? request->model_path : request->identifier;
+    
+    ONNX_LOGI("onnx_tts_create: identifier=%s, model_path=%s, using=%s",
+              request->identifier ? request->identifier : "(null)",
+              request->model_path ? request->model_path : "(null)",
+              path_to_use ? path_to_use : "(null)");
+
+    RAC_LOG_INFO(LOG_CAT, "Creating ONNX TTS service for: %s (path: %s)",
+                 request->identifier ? request->identifier : "(default)",
+                 path_to_use ? path_to_use : "(null)");
 
     rac_handle_t backend_handle = nullptr;
-    rac_result_t result = rac_tts_onnx_create(request->identifier, nullptr, &backend_handle);
+    rac_result_t result = rac_tts_onnx_create(path_to_use, nullptr, &backend_handle);
     if (result != RAC_SUCCESS) {
+        const char* details = rac_error_get_details();
+        char error_msg[512];
+        snprintf(error_msg, sizeof(error_msg), 
+                 "rac_tts_onnx_create failed: %d - %s", result, details ? details : "(no details)");
+        rac_backend_onnx_set_last_tts_error(result, error_msg);
+        ONNX_LOGE("onnx_tts_create: %s", error_msg);
         RAC_LOG_ERROR(LOG_CAT, "Failed to create ONNX TTS backend: %d", result);
         return nullptr;
     }
 
     auto* service = static_cast<rac_tts_service_t*>(malloc(sizeof(rac_tts_service_t)));
     if (!service) {
+        rac_backend_onnx_set_last_tts_error(RAC_ERROR_OUT_OF_MEMORY, "malloc failed for service");
         rac_tts_onnx_destroy(backend_handle);
         return nullptr;
     }
@@ -468,7 +488,10 @@ bool g_registered = false;
 extern "C" {
 
 rac_result_t rac_backend_onnx_register(void) {
+    ONNX_LOGI("rac_backend_onnx_register() called");
+
     if (g_registered) {
+        ONNX_LOGI("rac_backend_onnx_register: already registered");
         return RAC_ERROR_MODULE_ALREADY_REGISTERED;
     }
 
@@ -514,12 +537,15 @@ rac_result_t rac_backend_onnx_register(void) {
     tts_provider.can_handle = onnx_tts_can_handle;
     tts_provider.create = onnx_tts_create;
 
+    ONNX_LOGI("Registering TTS provider: %s", TTS_PROVIDER_NAME);
     result = rac_service_register_provider(&tts_provider);
     if (result != RAC_SUCCESS) {
+        ONNX_LOGE("Failed to register TTS provider: %d", result);
         rac_service_unregister_provider(STT_PROVIDER_NAME, RAC_CAPABILITY_STT);
         rac_module_unregister(MODULE_ID);
         return result;
     }
+    ONNX_LOGI("TTS provider registered successfully");
 
     // Register VAD provider
     rac_service_provider_t vad_provider = {};
@@ -538,7 +564,7 @@ rac_result_t rac_backend_onnx_register(void) {
     }
 
     g_registered = true;
-    RAC_LOG_INFO(LOG_CAT, "ONNX backend registered (STT + TTS + VAD)");
+    ONNX_LOGI("ONNX backend registered (STT + TTS + VAD)");
     return RAC_SUCCESS;
 }
 

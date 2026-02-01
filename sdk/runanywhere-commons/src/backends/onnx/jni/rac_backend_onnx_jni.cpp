@@ -45,7 +45,18 @@ extern "C" {
 JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
     (void)vm;
     (void)reserved;
-    LOGi("JNI_OnLoad: rac_backend_onnx_jni loaded");
+    LOGi("JNI_OnLoad: rac_backend_onnx_jni loaded - AUTO-REGISTERING NOW!");
+    
+    // Auto-register the ONNX backend immediately when library is loaded
+    rac_result_t result = rac_backend_onnx_register();
+    LOGi("JNI_OnLoad: rac_backend_onnx_register() returned: %d", result);
+    
+    if (result == RAC_SUCCESS || result == RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+        LOGi("JNI_OnLoad: ONNX backend auto-registered successfully!");
+    } else {
+        LOGe("JNI_OnLoad: ONNX backend auto-registration FAILED: %d", result);
+    }
+    
     return JNI_VERSION_1_6;
 }
 
@@ -57,22 +68,64 @@ JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_core_onnx_ONNXBridge_nativeRegister(JNIEnv* env, jclass clazz) {
     (void)env;
     (void)clazz;
-    LOGi("ONNX nativeRegister called");
+    LOGi("=== ONNX nativeRegister START ===");
 
     rac_result_t result = rac_backend_onnx_register();
+    LOGi("rac_backend_onnx_register() returned: %d", result);
 
     if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
         LOGe("Failed to register ONNX backend: %d", result);
         return static_cast<jint>(result);
     }
 
-    const char** provider_names = nullptr;
-    size_t provider_count = 0;
-    rac_result_t list_result = rac_service_list_providers(RAC_CAPABILITY_STT, &provider_names, &provider_count);
-    LOGi("After ONNX registration - STT providers: count=%zu, result=%d", provider_count, list_result);
+    // List STT providers
+    const char** stt_provider_names = nullptr;
+    size_t stt_provider_count = 0;
+    rac_result_t stt_list_result = rac_service_list_providers(RAC_CAPABILITY_STT, &stt_provider_names, &stt_provider_count);
+    LOGi("STT providers after registration: count=%zu, result=%d", stt_provider_count, stt_list_result);
+    for (size_t i = 0; i < stt_provider_count; i++) {
+        LOGi("  STT provider[%zu]: %s", i, stt_provider_names[i]);
+    }
 
-    LOGi("ONNX backend registered successfully (STT + TTS + VAD)");
+    // List TTS providers
+    const char** tts_provider_names = nullptr;
+    size_t tts_provider_count = 0;
+    rac_result_t tts_list_result = rac_service_list_providers(RAC_CAPABILITY_TTS, &tts_provider_names, &tts_provider_count);
+    LOGi("TTS providers after registration: count=%zu, result=%d", tts_provider_count, tts_list_result);
+    for (size_t i = 0; i < tts_provider_count; i++) {
+        LOGi("  TTS provider[%zu]: %s", i, tts_provider_names[i]);
+    }
+
+    LOGi("=== ONNX nativeRegister END (success) ===");
     return RAC_SUCCESS;
+}
+
+// Get TTS provider count - for debugging
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_core_onnx_ONNXBridge_nativeGetTTSProviderCount(JNIEnv* env, jclass clazz) {
+    (void)env;
+    (void)clazz;
+    const char** tts_provider_names = nullptr;
+    size_t tts_provider_count = 0;
+    rac_service_list_providers(RAC_CAPABILITY_TTS, &tts_provider_names, &tts_provider_count);
+    LOGi("nativeGetTTSProviderCount: %zu", tts_provider_count);
+    return static_cast<jint>(tts_provider_count);
+}
+
+// Get the last TTS creation error code
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_core_onnx_ONNXBridge_nativeGetLastTTSError(JNIEnv* env, jclass clazz) {
+    (void)env;
+    (void)clazz;
+    return static_cast<jint>(rac_backend_onnx_get_last_tts_error());
+}
+
+// Get the last TTS creation error details
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_core_onnx_ONNXBridge_nativeGetLastTTSErrorDetails(JNIEnv* env, jclass clazz) {
+    (void)clazz;
+    const char* details = rac_backend_onnx_get_last_tts_error_details();
+    return env->NewStringUTF(details ? details : "");
 }
 
 JNIEXPORT jint JNICALL
