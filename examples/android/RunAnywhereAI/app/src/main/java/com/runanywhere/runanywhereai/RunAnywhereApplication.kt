@@ -382,7 +382,41 @@ class RunAnywhereApplication : Application() {
             modality = ModelCategory.SPEECH_SYNTHESIS,
             memoryRequirement = 120_000_000, // ~88MB INT8 model + voices
         )
-        Log.i("RunAnywhereApp", "✅ ONNX STT/TTS models registered (including Kokoro Unified + NNAPI + INT8)")
+
+        // ============================================================
+        // NNAPI NPU Optimized Model Variants (for benchmarking)
+        // Release: kokoro-nnapi-optimized-v2.0
+        // ============================================================
+
+        // Variant 1: FP32 with NNAPI-compatible ops decomposed
+        // - LayerNormalization decomposed to ReduceMean+Sub+Sqrt+Div+Mul+Add
+        // - Sin/Cos operations kept (many NNAPI devices support these)
+        // - 98.6% NNAPI compatibility, best audio quality
+        // - Larger model size (291 MB)
+        RunAnywhere.registerModel(
+            id = "kokoro-tts-fp32-nnapi",
+            name = "Kokoro TTS 82M (FP32 NNAPI)",
+            url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/kokoro-nnapi-optimized-v2.0/kokoro-tts-fp32-nnapi-v1.1.tar.gz",
+            framework = InferenceFramework.ONNX,
+            modality = ModelCategory.SPEECH_SYNTHESIS,
+            memoryRequirement = 350_000_000, // ~291MB FP32 model with decomposed ops
+        )
+
+        // Variant 2: INT8 OPTIMIZED - Maximum NNAPI NPU Coverage
+        // - 139 DynamicQuantizeLinear replaced with static QuantizeLinear (NNAPI supported)
+        // - 31 LayerNormalization decomposed to supported ops
+        // - Based on working baseline model
+        // - Should have HIGHEST NNAPI NPU utilization
+        RunAnywhere.registerModel(
+            id = "kokoro-tts-int8-optimized",
+            name = "Kokoro TTS 82M (INT8 Optimized)",
+            url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/kokoro-nnapi-optimized-v2.0/kokoro-tts-int8-optimized-v1.0.tar.gz",
+            framework = InferenceFramework.ONNX,
+            modality = ModelCategory.SPEECH_SYNTHESIS,
+            memoryRequirement = 150_000_000, // ~115MB INT8 model with optimizations
+        )
+
+        Log.i("RunAnywhereApp", "✅ ONNX STT/TTS models registered (including 6 Kokoro variants for NPU benchmarking)")
 
         Log.i("RunAnywhereApp", "🎉 All modules and models registered")
     }
