@@ -232,7 +232,7 @@ RAC_API rac_result_t rac_energy_vad_process_audio(rac_energy_vad_handle_t handle
  * @param sample_count Number of samples
  * @return RMS energy value, or 0.0 if empty
  */
-RAC_API float rac_energy_vad_calculate_rms(const float* audio_data, size_t sample_count);
+RAC_API float rac_energy_vad_calculate_rms(const float* __restrict audio_data,size_t sample_count);
 
 // =============================================================================
 // PAUSE/RESUME API
