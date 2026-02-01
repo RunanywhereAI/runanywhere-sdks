@@ -7,8 +7,10 @@ import android.media.AudioTrack
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.runanywhere.runanywhereai.npu.KokoroTFLiteNPU
 import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
@@ -622,6 +624,361 @@ class TextToSpeechViewModel(
         }
         systemTts?.stop()
         _uiState.update { it.copy(isGenerating = false, isSpeaking = false) }
+    }
+
+    /**
+     * Quick test for QNN/NPU availability
+     * Call this to verify if the LiteRT + QNN delegate can initialize on this device
+     */
+    fun testNPUAvailability() {
+        viewModelScope.launch {
+            Log.i(TAG, "Testing NPU/QNN availability...")
+
+            val result = withContext(Dispatchers.IO) {
+                KokoroTFLiteNPU.testQNNAvailability(getApplication())
+            }
+
+            withContext(Dispatchers.Main) {
+                val message = if (result.success) {
+                    "✅ NPU Available!\n${result.message}"
+                } else {
+                    "❌ NPU Not Available\n${result.message}\nError: ${result.error}"
+                }
+
+                Log.i(TAG, "NPU Test Result: $message")
+
+                // Show toast with result
+                Toast.makeText(getApplication(), message, Toast.LENGTH_LONG).show()
+
+                // Also update UI state with error message for visibility
+                if (!result.success) {
+                    _uiState.update {
+                        it.copy(errorMessage = "NPU Test: ${result.message}")
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Full NPU inference test - loads model and runs inference
+     */
+    fun runNPUInferenceTest() {
+        viewModelScope.launch {
+            Log.i(TAG, "Running full NPU inference test...")
+
+            // Update UI to show loading
+            _uiState.update { it.copy(isGenerating = true, errorMessage = null) }
+
+            val result = withContext(Dispatchers.IO) {
+                KokoroTFLiteNPU.runNPUInferenceTest(getApplication())
+            }
+
+            withContext(Dispatchers.Main) {
+                _uiState.update { it.copy(isGenerating = false) }
+
+                val message = if (result.success) {
+                    "✅ QNN Test PASSED!\n" +
+                    "Backend: ${result.backend}\n" +
+                    "Load time: ${result.loadTimeMs}ms\n" +
+                    "Inference time: ${result.inferenceTimeMs}ms"
+                } else {
+                    "❌ QNN Test FAILED\n${result.message}\n${result.error?.take(200) ?: ""}"
+                }
+
+                Log.i(TAG, "NPU Inference Test Result: $message")
+
+                // Show toast with result
+                Toast.makeText(getApplication(), message, Toast.LENGTH_LONG).show()
+
+                // Update error message if failed
+                if (!result.success) {
+                    _uiState.update {
+                        it.copy(errorMessage = "QNN Test: ${result.message}")
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Test NNAPI delegate (uses Android HAL, no sandbox issues)
+     * Note: For true NPU acceleration, model must be int8 quantized
+     * Float models will use GPU or CPU via NNAPI
+     */
+    fun runNNAPIInferenceTest() {
+        viewModelScope.launch {
+            Log.i(TAG, "Running NNAPI inference test...")
+
+            _uiState.update { it.copy(isGenerating = true, errorMessage = null) }
+
+            val result = withContext(Dispatchers.IO) {
+                KokoroTFLiteNPU.runNNAPIInferenceTest(getApplication())
+            }
+
+            withContext(Dispatchers.Main) {
+                _uiState.update { it.copy(isGenerating = false) }
+
+                val message = if (result.success) {
+                    "✅ NNAPI Test PASSED!\n" +
+                    "Backend: ${result.backend}\n" +
+                    "Load time: ${result.loadTimeMs}ms\n" +
+                    "Inference time: ${result.inferenceTimeMs}ms\n" +
+                    "(Float model = GPU/CPU, int8 = NPU)"
+                } else {
+                    "❌ NNAPI Test FAILED\n${result.message}\n${result.error?.take(200) ?: ""}"
+                }
+
+                Log.i(TAG, "NNAPI Inference Test Result: $message")
+                Toast.makeText(getApplication(), message, Toast.LENGTH_LONG).show()
+
+                if (!result.success) {
+                    _uiState.update {
+                        it.copy(errorMessage = "NNAPI Test: ${result.message}")
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Run comprehensive benchmark: CPU vs GPU vs NNAPI (float32 and int8)
+     * This will test all backends and compare performance
+     */
+    fun runComprehensiveBenchmark() {
+        viewModelScope.launch {
+            Log.i(TAG, "Running comprehensive NPU benchmark...")
+
+            _uiState.update { it.copy(isGenerating = true, errorMessage = null) }
+
+            val result = withContext(Dispatchers.IO) {
+                KokoroTFLiteNPU.runComprehensiveBenchmark(getApplication())
+            }
+
+            withContext(Dispatchers.Main) {
+                _uiState.update { it.copy(isGenerating = false) }
+
+                Log.i(TAG, "Benchmark Complete:\n${result.summary}")
+                Toast.makeText(getApplication(), "Benchmark complete! Check logs.", Toast.LENGTH_LONG).show()
+
+                // Show detailed results in error message area (for now)
+                _uiState.update {
+                    it.copy(errorMessage = result.summary)
+                }
+            }
+        }
+    }
+
+    /**
+     * Run Kokoro ONNX NPU vs CPU benchmark
+     *
+     * This uses the ONNX Runtime-based Kokoro TTS loader to compare
+     * NPU (NNAPI) vs CPU inference performance.
+     *
+     * Requires a Kokoro model to be available in the models directory.
+     */
+    fun runKokoroONNXBenchmark() {
+        viewModelScope.launch {
+            Log.i(TAG, "")
+            Log.i(TAG, "╔═══════════════════════════════════════════════════════════════╗")
+            Log.i(TAG, "║  KOKORO ONNX NPU vs CPU BENCHMARK                             ║")
+            Log.i(TAG, "╚═══════════════════════════════════════════════════════════════╝")
+
+            _uiState.update { it.copy(isGenerating = true, errorMessage = null) }
+
+            try {
+                // Import ONNXBridge
+                val onnxBridgeClass = Class.forName("com.runanywhere.sdk.core.onnx.ONNXBridge")
+
+                // Get the model path - try to find the Kokoro model
+                // First check if a model is currently loaded
+                val modelPath = findKokoroModelPath()
+
+                if (modelPath == null) {
+                    Log.e(TAG, "No Kokoro model found for benchmark")
+                    withContext(Dispatchers.Main) {
+                        _uiState.update { it.copy(isGenerating = false) }
+                        Toast.makeText(
+                            getApplication(),
+                            "No Kokoro model found. Please download a Kokoro TTS model first.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        _uiState.update {
+                            it.copy(errorMessage = "No Kokoro model found. Download a Kokoro model first.")
+                        }
+                    }
+                    return@launch
+                }
+
+                Log.i(TAG, "Using Kokoro model at: $modelPath")
+
+                val result = withContext(Dispatchers.IO) {
+                    // Call the native benchmark via reflection
+                    val method = onnxBridgeClass.getMethod(
+                        "nativeRunStandaloneKokoroBenchmark",
+                        String::class.java,
+                        String::class.java
+                    )
+
+                    // Use default test text
+                    method.invoke(null, modelPath, null) as String
+                }
+
+                Log.i(TAG, "Benchmark result JSON: $result")
+
+                // Parse JSON result
+                val jsonResult = org.json.JSONObject(result)
+                val success = jsonResult.optBoolean("success", false)
+                val npuAvailable = jsonResult.optBoolean("npu_available", false)
+                val npuIsFaster = jsonResult.optBoolean("npu_is_faster", false)
+                val npuInferenceMs = jsonResult.optDouble("npu_inference_ms", 0.0)
+                val cpuInferenceMs = jsonResult.optDouble("cpu_inference_ms", 0.0)
+                val speedup = jsonResult.optDouble("speedup", 0.0)
+                val audioDurationMs = jsonResult.optDouble("audio_duration_ms", 0.0)
+                val npuRtf = jsonResult.optDouble("npu_rtf", 0.0)
+                val cpuRtf = jsonResult.optDouble("cpu_rtf", 0.0)
+                val errorMsg = jsonResult.optString("error", "")
+
+                // Build summary message
+                val summary = StringBuilder()
+                summary.appendLine("═══ KOKORO ONNX NPU vs CPU BENCHMARK ═══")
+                summary.appendLine("")
+
+                if (success) {
+                    summary.appendLine("✅ Benchmark completed successfully!")
+                    summary.appendLine("")
+                    summary.appendLine("📊 NPU (NNAPI):")
+                    summary.appendLine("   Inference: ${String.format("%.2f", npuInferenceMs)} ms")
+                    summary.appendLine("   Real-time factor: ${String.format("%.2f", npuRtf)}x")
+                    summary.appendLine("   NNAPI Active: ${if (npuAvailable) "YES ✓" else "NO ✗"}")
+                    summary.appendLine("")
+                    summary.appendLine("⚙️ CPU Only:")
+                    summary.appendLine("   Inference: ${String.format("%.2f", cpuInferenceMs)} ms")
+                    summary.appendLine("   Real-time factor: ${String.format("%.2f", cpuRtf)}x")
+                    summary.appendLine("")
+                    summary.appendLine("🎵 Audio: ${String.format("%.2f", audioDurationMs)} ms")
+                    summary.appendLine("")
+
+                    if (npuIsFaster) {
+                        summary.appendLine("🚀 NPU is ${String.format("%.2f", speedup)}x FASTER!")
+                        summary.appendLine("   Saved ${String.format("%.2f", cpuInferenceMs - npuInferenceMs)} ms")
+                    } else if (speedup > 0.9 && speedup < 1.1) {
+                        summary.appendLine("⚠️ NPU and CPU similar (${String.format("%.2f", speedup)}x)")
+                    } else {
+                        summary.appendLine("❌ CPU is ${String.format("%.2f", 1.0 / speedup)}x faster")
+                        summary.appendLine("   (NPU may not be optimal for this model)")
+                    }
+                } else {
+                    summary.appendLine("❌ Benchmark failed!")
+                    summary.appendLine("Error: $errorMsg")
+                }
+
+                withContext(Dispatchers.Main) {
+                    _uiState.update { it.copy(isGenerating = false) }
+
+                    Log.i(TAG, summary.toString())
+
+                    val toastMsg = if (success) {
+                        "NPU: ${String.format("%.1f", npuInferenceMs)}ms, CPU: ${String.format("%.1f", cpuInferenceMs)}ms, Speedup: ${String.format("%.1f", speedup)}x"
+                    } else {
+                        "Benchmark failed: $errorMsg"
+                    }
+                    Toast.makeText(getApplication(), toastMsg, Toast.LENGTH_LONG).show()
+
+                    _uiState.update {
+                        it.copy(errorMessage = summary.toString())
+                    }
+                }
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Kokoro ONNX benchmark failed: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    _uiState.update { it.copy(isGenerating = false) }
+                    Toast.makeText(
+                        getApplication(),
+                        "Benchmark failed: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    _uiState.update {
+                        it.copy(errorMessage = "Benchmark failed: ${e.message}")
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Find the path to a Kokoro model for benchmarking
+     */
+    private fun findKokoroModelPath(): String? {
+        // Try common locations for Kokoro models
+        val possiblePaths = listOf(
+            // Primary location - runanywhere models directory (where models are downloaded)
+            "${getApplication<Application>().filesDir}/runanywhere/models/tts/kokoro-tts-nnapi",
+            "${getApplication<Application>().filesDir}/runanywhere/models/tts/kokoro-tts",
+            "${getApplication<Application>().filesDir}/runanywhere/models/tts/kokoro",
+            // Legacy paths
+            "${getApplication<Application>().filesDir}/models/kokoro",
+            "${getApplication<Application>().filesDir}/models/kokoro-tts",
+            "${getApplication<Application>().filesDir}/models/kokoro_tts",
+            // External storage
+            "${getApplication<Application>().getExternalFilesDir(null)}/models/kokoro",
+            // Check if there's a currently selected model
+            _uiState.value.selectedModelId?.let { modelId ->
+                if (modelId.contains("kokoro", ignoreCase = true)) {
+                    "${getApplication<Application>().filesDir}/runanywhere/models/tts/$modelId"
+                } else null
+            }
+        ).filterNotNull()
+
+        for (path in possiblePaths) {
+            val dir = java.io.File(path)
+            if (dir.exists() && dir.isDirectory) {
+                // Check if it has a Kokoro model file
+                val modelFile = dir.listFiles()?.find {
+                    it.name.endsWith(".onnx") && it.name.contains("kokoro", ignoreCase = true)
+                }
+                if (modelFile != null) {
+                    Log.i(TAG, "Found Kokoro model at: $path")
+                    return path
+                }
+                // Check for package subdirectory
+                val packageDir = java.io.File(dir, "package")
+                if (packageDir.exists()) {
+                    val packageModel = packageDir.listFiles()?.find { it.name.endsWith(".onnx") }
+                    if (packageModel != null) {
+                        Log.i(TAG, "Found Kokoro model in package at: $path")
+                        return path
+                    }
+                }
+            }
+        }
+
+        // Also check if there's any model directory with kokoro in the name
+        val modelsDir = java.io.File("${getApplication<Application>().filesDir}/models")
+        if (modelsDir.exists()) {
+            modelsDir.listFiles()?.forEach { dir ->
+                if (dir.isDirectory && dir.name.contains("kokoro", ignoreCase = true)) {
+                    Log.i(TAG, "Found Kokoro model directory: ${dir.absolutePath}")
+                    return dir.absolutePath
+                }
+            }
+        }
+
+        // Check runanywhere TTS models directory (primary location)
+        val runAnywhereTtsDir = java.io.File("${getApplication<Application>().filesDir}/runanywhere/models/tts")
+        if (runAnywhereTtsDir.exists()) {
+            runAnywhereTtsDir.listFiles()?.forEach { dir ->
+                if (dir.isDirectory && dir.name.contains("kokoro", ignoreCase = true)) {
+                    Log.i(TAG, "Found Kokoro model in runanywhere directory: ${dir.absolutePath}")
+                    return dir.absolutePath
+                }
+            }
+        }
+
+        Log.w(TAG, "No Kokoro model found in any of the expected locations")
+        Log.w(TAG, "Searched: ${getApplication<Application>().filesDir}/runanywhere/models/tts/")
+        return null
     }
 
     override fun onCleared() {

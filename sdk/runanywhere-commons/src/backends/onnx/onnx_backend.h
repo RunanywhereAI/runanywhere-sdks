@@ -21,6 +21,10 @@
 
 #include <nlohmann/json.hpp>
 
+// QNN Configuration for NPU support - COMPLETELY DISABLED FOR NNAPI TESTING
+// #include "rac/backends/rac_qnn_config.h"  // QNN DISABLED
+// All QNN types and functions are disabled. Use NNAPI for NPU acceleration.
+
 // Sherpa-ONNX C API for TTS/STT
 #if SHERPA_ONNX_AVAILABLE
 #include <sherpa-onnx/c-api/c-api.h>
@@ -36,7 +40,25 @@ enum class DeviceType {
     CPU = 0,
     GPU = 1,
     NEURAL_ENGINE = 2,
+    NPU = 3,           // Qualcomm HTP (QNN)
     COREML = 6,
+};
+
+// =============================================================================
+// NPU STRATEGY (for hybrid execution)
+// =============================================================================
+
+/**
+ * @brief NPU execution strategy for models with partial NPU support
+ *
+ * IMPORTANT: For models with ISTFT (e.g., Kokoro TTS), HYBRID is required
+ * because ISTFT is NOT supported on QNN HTP.
+ */
+enum class NPUStrategy {
+    CPU_ONLY = 0,       // No NPU, use CPU only
+    NPU_PREFERRED = 1,  // Try NPU, fallback to CPU for unsupported ops
+    NPU_REQUIRED = 2,   // NPU only, fail if any op can't run on NPU
+    HYBRID = 3,         // NPU for encoder, CPU for vocoder (DEFAULT for Kokoro)
 };
 
 struct DeviceInfo {
@@ -307,6 +329,31 @@ class ONNXTTS {
     std::vector<VoiceInfo> get_voices() const;
     std::string get_default_voice(const std::string& language) const;
 
+    // ==========================================================================
+    // NPU Support - QNN DISABLED FOR NNAPI TESTING
+    // ==========================================================================
+    // NOTE: All QNN-related methods are disabled. Use NNAPI for NPU acceleration.
+    // These methods are kept for API compatibility but always return false/empty.
+
+    /**
+     * @brief Check if NPU is being used
+     * NOTE: QNN DISABLED - always returns false
+     */
+    bool is_npu_active() const { return npu_active_; }
+
+    /**
+     * @brief Get current NPU strategy
+     * NOTE: QNN DISABLED - always returns CPU_ONLY
+     */
+    NPUStrategy get_npu_strategy() const { return npu_strategy_; }
+
+    // QNN DISABLED - These methods are commented out
+    // bool load_split_models(const std::string& encoder_path, const std::string& vocoder_path,
+    //                       const rac_qnn_config_t& qnn_config);
+    // bool load_model_npu(const std::string& model_path, const rac_qnn_config_t& qnn_config,
+    //                     NPUStrategy strategy = NPUStrategy::HYBRID);
+    // rac_npu_stats_t get_npu_stats() const;
+
    private:
     ONNXBackendNew* backend_;
 #if SHERPA_ONNX_AVAILABLE
@@ -322,6 +369,12 @@ class ONNXTTS {
     std::string model_dir_;
     int sample_rate_ = 22050;
     mutable std::mutex mutex_;
+
+    // NPU support members - QNN DISABLED
+    bool npu_active_ = false;
+    NPUStrategy npu_strategy_ = NPUStrategy::CPU_ONLY;
+    void* split_executor_ = nullptr;  // rac_split_executor_t for hybrid mode
+    // rac_qnn_config_t qnn_config_ = {};  // QNN DISABLED
 };
 
 // =============================================================================

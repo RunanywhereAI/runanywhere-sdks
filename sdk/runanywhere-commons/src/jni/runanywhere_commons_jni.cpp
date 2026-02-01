@@ -1308,12 +1308,19 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentLoadMode
 
     // TTS component uses load_voice instead of load_model
     // Pass voice_path, voice_id, and voice_name separately to C++ lifecycle
-    return static_cast<jint>(rac_tts_component_load_voice(
+    LOGi("racTtsComponentLoadModel: calling rac_tts_component_load_voice...");
+    rac_result_t result = rac_tts_component_load_voice(
         reinterpret_cast<rac_handle_t>(handle),
         voicePath.c_str(),                               // voice_path
         voiceId.c_str(),                                 // voice_id (for telemetry)
         voiceName.empty() ? nullptr : voiceName.c_str()  // voice_name (optional, for telemetry)
-        ));
+    );
+    LOGi("racTtsComponentLoadModel: rac_tts_component_load_voice returned %d", result);
+    if (result != RAC_SUCCESS) {
+        const char* error_details = rac_error_get_details();
+        LOGe("racTtsComponentLoadModel: error details: %s", error_details ? error_details : "(null)");
+    }
+    return static_cast<jint>(result);
 }
 
 JNIEXPORT void JNICALL

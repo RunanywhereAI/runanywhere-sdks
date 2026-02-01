@@ -24,6 +24,15 @@
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#define SR_LOGI(...) __android_log_print(ANDROID_LOG_INFO, "ServiceRegistry", __VA_ARGS__)
+#define SR_LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "ServiceRegistry", __VA_ARGS__)
+#else
+#define SR_LOGI(...) printf("[ServiceRegistry] " __VA_ARGS__); printf("\n")
+#define SR_LOGE(...) fprintf(stderr, "[ServiceRegistry ERROR] " __VA_ARGS__); fprintf(stderr, "\n")
+#endif
+
 // Category for logging
 static const char* LOG_CAT = "ServiceRegistry";
 
@@ -165,22 +174,26 @@ rac_result_t rac_service_create(rac_capability_t capability, const rac_service_r
 
     auto it = state.providers.find(capability);
     if (it == state.providers.end() || it->second.empty()) {
+        SR_LOGE("No providers registered for capability %d", static_cast<int>(capability));
         RAC_LOG_ERROR(LOG_CAT, "rac_service_create: No providers registered for capability %d",
                       static_cast<int>(capability));
         rac_error_set_details("No providers registered for capability");
         return RAC_ERROR_NO_CAPABLE_PROVIDER;
     }
 
+    SR_LOGI("Found %zu providers for capability %d", it->second.size(), static_cast<int>(capability));
     RAC_LOG_INFO(LOG_CAT, "rac_service_create: Found %zu providers for capability %d",
                  it->second.size(), static_cast<int>(capability));
 
     // Find first provider that can handle the request (already sorted by priority)
     // This matches Swift's pattern: registrations.sorted(by:).first(where: canHandle)
     for (const auto& provider : it->second) {
+        SR_LOGI("Checking provider '%s' (priority=%d)", provider.name.c_str(), provider.priority);
         RAC_LOG_INFO(LOG_CAT, "rac_service_create: Checking provider '%s' (priority=%d)",
                      provider.name.c_str(), provider.priority);
 
         bool can_handle = provider.can_handle(request, provider.user_data);
+        SR_LOGI("Provider '%s' can_handle=%s", provider.name.c_str(), can_handle ? "TRUE" : "FALSE");
         RAC_LOG_INFO(LOG_CAT, "rac_service_create: Provider '%s' can_handle=%s",
                      provider.name.c_str(), can_handle ? "TRUE" : "FALSE");
 
