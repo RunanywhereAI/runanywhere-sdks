@@ -74,6 +74,98 @@ fun TextToSpeechScreen(viewModel: TextToSpeechViewModel = viewModel()) {
                 onSelectModel = { showModelPicker = true },
             )
 
+            // NPU Test Buttons (for quick verification)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // Quick availability check
+                TextButton(
+                    onClick = { viewModel.testNPUAvailability() },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Memory,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text("NPU?", style = MaterialTheme.typography.labelSmall)
+                }
+
+                // QNN test (direct NPU - may hit sandbox issue)
+                Button(
+                    onClick = { viewModel.runNPUInferenceTest() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    ),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+                ) {
+                    Text("QNN", style = MaterialTheme.typography.labelSmall)
+                }
+
+                Spacer(modifier = Modifier.width(2.dp))
+
+                // NNAPI test (uses Android HAL - should work!)
+                Button(
+                    onClick = { viewModel.runNNAPIInferenceTest() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.tertiary
+                    ),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+                ) {
+                    Text("NNAPI", style = MaterialTheme.typography.labelSmall)
+                }
+
+                Spacer(modifier = Modifier.width(2.dp))
+
+                // Full TFLite benchmark (CPU vs GPU vs NNAPI int8)
+                Button(
+                    onClick = { viewModel.runComprehensiveBenchmark() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    ),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+                ) {
+                    Text("TFLite", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+
+            // Second row - Kokoro ONNX Benchmark (the main NPU vs CPU test)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // MAIN BENCHMARK: Kokoro ONNX NPU vs CPU
+                Button(
+                    onClick = { viewModel.runKokoroONNXBenchmark() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AppColors.primaryAccent
+                    ),
+                    modifier = Modifier.fillMaxWidth(0.9f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Speed,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "🔬 Benchmark NPU vs CPU (Kokoro ONNX)",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+            }
+
             HorizontalDivider()
 
             // Main content - only enabled when model is selected

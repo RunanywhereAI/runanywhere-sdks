@@ -123,6 +123,65 @@ elseif(RAC_PLATFORM_MACOS)
 endif()
 
 # =============================================================================
+# QNN Execution Provider Support (NPU Acceleration - Qualcomm Direct)
+# =============================================================================
+# QNN IS COMPLETELY DISABLED FOR NNAPI TESTING
+# Use NNAPI instead for NPU acceleration (vendor-agnostic)
+
+set(RAC_QNN_AVAILABLE OFF)
+set(RAC_ENABLE_QNN OFF CACHE BOOL "QNN is DISABLED for NNAPI testing" FORCE)
+
+# ALWAYS use stubs - QNN is DISABLED
+# The qnn/ directory files are NOT compiled
+set(QNN_SOURCES
+    qnn_stubs.cpp
+)
+message(STATUS "  QNN EP DISABLED - using stub implementations (NNAPI testing mode)")
+message(STATUS "  NOTE: qnn/ directory sources are NOT compiled")
+
+# =============================================================================
+# NNAPI Execution Provider Support (Android Neural Networks API)
+# =============================================================================
+# NNAPI is Android's vendor-agnostic API for NPU/GPU/DSP acceleration.
+# It works on Qualcomm, Samsung Exynos, MediaTek, and other Android devices.
+# Requirements: Android 8.1+ (API 27+), optimal with API 29+ for INT8/FP16.
+
+set(RAC_NNAPI_AVAILABLE OFF)
+
+if(RAC_ENABLE_NNAPI AND RAC_PLATFORM_ANDROID)
+    message(STATUS "Configuring ONNX backend with NNAPI EP support...")
+    set(RAC_NNAPI_AVAILABLE ON)
+
+    # NNAPI source files
+    set(NNAPI_SOURCES
+        nnapi/nnapi_session_manager.cpp
+    )
+
+    message(STATUS "  NNAPI EP enabled for ONNX backend")
+    message(STATUS "  - Supports: Qualcomm (Hexagon DSP), Samsung (Exynos NPU), MediaTek (APU)")
+    message(STATUS "  - Min Android API: 27 (8.1), Recommended: 29+ (10+)")
+else()
+    set(NNAPI_SOURCES "")
+    if(RAC_ENABLE_NNAPI AND NOT RAC_PLATFORM_ANDROID)
+        message(STATUS "NNAPI EP not available on ${RAC_PLATFORM_NAME} - requires Android")
+    endif()
+endif()
+
+# =============================================================================
+# Kokoro TTS Support (Dedicated loader for Kokoro models)
+# =============================================================================
+
+message(STATUS "Configuring Kokoro TTS support...")
+
+# Kokoro TTS loader - internal only, auto-detects and loads Kokoro models
+# through the standard TTS API (rac_tts_onnx_create)
+set(KOKORO_SOURCES
+    kokoro/kokoro_tts_loader.cpp
+)
+
+message(STATUS "  Kokoro TTS loader enabled (internal, auto-detected)")
+
+# =============================================================================
 # ONNX Backend Library
 # =============================================================================
 
@@ -130,6 +189,9 @@ set(ONNX_BACKEND_SOURCES
     onnx_backend.cpp
     rac_onnx.cpp
     rac_backend_onnx_register.cpp
+    ${QNN_SOURCES}
+    ${NNAPI_SOURCES}
+    ${KOKORO_SOURCES}
 )
 
 set(ONNX_BACKEND_HEADERS
@@ -144,12 +206,24 @@ endif()
 
 target_include_directories(rac_backend_onnx PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/kokoro
+    ${CMAKE_CURRENT_SOURCE_DIR}/nnapi
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/include/rac/backends
 )
 
 # Define RAC_ONNX_BUILDING to export symbols with visibility("default")
 target_compile_definitions(rac_backend_onnx PRIVATE RAC_ONNX_BUILDING)
+
+# Ensure benchmark symbols are exported (prevent linker from stripping unreferenced symbols)
+if(RAC_PLATFORM_ANDROID)
+    target_link_options(rac_backend_onnx PRIVATE
+        -Wl,--export-dynamic-symbol=rac_tts_kokoro_run_benchmark
+        -Wl,--export-dynamic-symbol=rac_tts_is_kokoro
+        -Wl,--export-dynamic-symbol=rac_tts_kokoro_is_npu_active
+        -Wl,--export-dynamic-symbol=rac_tts_kokoro_run_standalone_benchmark
+    )
+endif()
 
 target_link_libraries(rac_backend_onnx PUBLIC
     rac_commons
@@ -163,6 +237,26 @@ if(SHERPA_ONNX_AVAILABLE)
     target_include_directories(rac_backend_onnx PUBLIC ${SHERPA_HEADER_PATH})
 else()
     target_compile_definitions(rac_backend_onnx PUBLIC SHERPA_ONNX_AVAILABLE=0)
+endif()
+
+# =============================================================================
+# QNN Configuration - ALWAYS DISABLED
+# =============================================================================
+
+# QNN is COMPLETELY DISABLED for NNAPI testing
+# Always set RAC_QNN_AVAILABLE=0
+target_compile_definitions(rac_backend_onnx PUBLIC RAC_QNN_AVAILABLE=0)
+message(STATUS "  QNN compile definition: RAC_QNN_AVAILABLE=0 (QNN DISABLED)")
+
+# =============================================================================
+# NNAPI Configuration
+# =============================================================================
+
+if(RAC_NNAPI_AVAILABLE)
+    target_compile_definitions(rac_backend_onnx PUBLIC RAC_NNAPI_AVAILABLE=1)
+    message(STATUS "  NNAPI compile definition: RAC_NNAPI_AVAILABLE=1")
+else()
+    target_compile_definitions(rac_backend_onnx PUBLIC RAC_NNAPI_AVAILABLE=0)
 endif()
 
 target_compile_features(rac_backend_onnx PUBLIC cxx_std_17)
@@ -226,4 +320,6 @@ endif()
 message(STATUS "ONNX Backend Configuration:")
 message(STATUS "  ONNX Runtime: Enabled")
 message(STATUS "  Sherpa-ONNX:  ${SHERPA_ONNX_AVAILABLE}")
-message(STATUS "  Platform: ${RAC_PLATFORM_NAME}")
+message(STATUS "  QNN NPU EP:   OFF (DISABLED for NNAPI testing)")
+message(STATUS "  NNAPI EP:     ${RAC_NNAPI_AVAILABLE}")
+message(STATUS "  Platform:     ${RAC_PLATFORM_NAME}")

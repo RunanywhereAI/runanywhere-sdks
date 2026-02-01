@@ -270,9 +270,14 @@ esac
 
 print_header "RunAnywhere Android Build (Unified)"
 echo "Backends: ONNX=$BUILD_ONNX, LlamaCPP=$BUILD_LLAMACPP, WhisperCPP=$BUILD_WHISPERCPP, TFLite=$BUILD_TFLITE"
+echo "NNAPI:    $BUILD_NNAPI (Android Neural Networks API - vendor agnostic)"
+echo "QNN NPU:  $BUILD_QNN (Qualcomm Hexagon HTP acceleration)"
 echo "ABIs: ${ABIS}"
 echo "Android API Level: ${ANDROID_API_LEVEL}"
 echo "Output: dist/android/${DIST_SUBDIR}/"
+if [ "$BUILD_QNN" = "ON" ]; then
+    echo "QNN SDK: ${QNN_SDK_PATH}"
+fi
 
 # =============================================================================
 # Prerequisites
@@ -323,6 +328,56 @@ if [ "$BUILD_ONNX" = "ON" ]; then
     print_success "Found Sherpa-ONNX (provides 16KB-aligned ONNX Runtime + STT/TTS/VAD)"
 fi
 
+# =============================================================================
+# NNAPI Support (Android Neural Networks API - Vendor Agnostic NPU)
+# =============================================================================
+
+BUILD_NNAPI=OFF
+
+# NNAPI is enabled by default on Android arm64-v8a builds
+# It provides vendor-agnostic NPU acceleration via Android's Neural Networks API
+# Works on: Qualcomm (Hexagon DSP), Samsung (Exynos NPU), MediaTek (APU), Google (TPU)
+if [ "${RAC_ENABLE_NNAPI:-ON}" = "ON" ]; then
+    BUILD_NNAPI=ON
+    print_success "NNAPI NPU acceleration ENABLED (vendor-agnostic)"
+    print_info "  Supports: Qualcomm, Samsung, MediaTek, Google Tensor devices"
+    print_info "  Best with: INT8 quantized models"
+else
+    print_info "NNAPI disabled via RAC_ENABLE_NNAPI=OFF"
+fi
+
+# =============================================================================
+# QNN NPU Support (Qualcomm Hexagon HTP - Qualcomm-specific)
+# =============================================================================
+
+BUILD_QNN=OFF
+QNN_SDK_PATH=""
+
+# Check for QNN SDK path from environment or common locations
+if [ -n "${RAC_QNN_SDK_PATH:-}" ]; then
+    QNN_SDK_PATH="${RAC_QNN_SDK_PATH}"
+elif [ -n "${QNN_SDK_ROOT:-}" ]; then
+    QNN_SDK_PATH="${QNN_SDK_ROOT}"
+elif [ -n "${QAIRT_SDK_ROOT:-}" ]; then
+    QNN_SDK_PATH="${QAIRT_SDK_ROOT}"
+fi
+
+# Verify QNN SDK has required libraries for arm64-v8a
+if [ -n "$QNN_SDK_PATH" ] && [ -d "$QNN_SDK_PATH" ]; then
+    if [ -f "$QNN_SDK_PATH/lib/aarch64-android/libQnnHtp.so" ]; then
+        BUILD_QNN=ON
+        print_success "Found QNN SDK at: $QNN_SDK_PATH"
+        print_info "  QNN HTP library: $QNN_SDK_PATH/lib/aarch64-android/libQnnHtp.so"
+    else
+        print_warning "QNN SDK found but libQnnHtp.so not found at: $QNN_SDK_PATH/lib/aarch64-android/"
+        print_info "QNN NPU acceleration will be DISABLED"
+    fi
+else
+    print_info "QNN SDK not found - Qualcomm-specific NPU disabled"
+    print_info "To enable: export RAC_QNN_SDK_PATH=/path/to/qairt/version"
+    print_info "(Note: NNAPI provides vendor-agnostic NPU acceleration)"
+fi
+
 if [ "$BUILD_LLAMACPP" = "ON" ]; then
     print_success "LlamaCPP will be fetched via CMake FetchContent"
 fi
@@ -360,6 +415,19 @@ for ABI in "${ABI_ARRAY[@]}"; do
     ABI_BUILD_DIR="${BACKEND_BUILD_DIR}/${ABI}"
     mkdir -p "${ABI_BUILD_DIR}"
 
+    # NNAPI is available on all Android ABIs
+    ENABLE_NNAPI_FOR_ABI=${BUILD_NNAPI}
+    print_info "NNAPI NPU acceleration ${ENABLE_NNAPI_FOR_ABI} for ${ABI}"
+
+    # QNN is only supported on arm64-v8a
+    ENABLE_QNN_FOR_ABI=OFF
+    QNN_CMAKE_ARGS=""
+    if [ "$BUILD_QNN" = "ON" ] && [ "$ABI" = "arm64-v8a" ]; then
+        ENABLE_QNN_FOR_ABI=ON
+        QNN_CMAKE_ARGS="-DRAC_QNN_SDK_PATH=${QNN_SDK_PATH}"
+        print_info "QNN NPU acceleration ENABLED for ${ABI}"
+    fi
+
     cmake -B "${ABI_BUILD_DIR}" \
         -DCMAKE_TOOLCHAIN_FILE="${TOOLCHAIN_FILE}" \
         -DANDROID_ABI="${ABI}" \
@@ -371,6 +439,9 @@ for ABI in "${ABI_ARRAY[@]}"; do
         -DRAC_BACKEND_ONNX=${BUILD_ONNX} \
         -DRAC_BACKEND_LLAMACPP=${BUILD_LLAMACPP} \
         -DRAC_BACKEND_WHISPERCPP=${BUILD_WHISPERCPP} \
+        -DRAC_ENABLE_NNAPI=${ENABLE_NNAPI_FOR_ABI} \
+        -DRAC_ENABLE_QNN=${ENABLE_QNN_FOR_ABI} \
+        ${QNN_CMAKE_ARGS} \
         -DRAC_BUILD_TESTS=OFF \
         -DRAC_BUILD_SHARED=ON \
         -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON \
@@ -504,6 +575,39 @@ for ABI in "${ABI_ARRAY[@]}"; do
         else
             print_warning "Sherpa-ONNX not found - libonnxruntime.so will not be copied"
             print_warning "Run: ./scripts/android/download-sherpa-onnx.sh to download"
+        fi
+
+        # Copy QNN libraries for NPU acceleration (arm64-v8a only)
+        if [ "$ENABLE_QNN_FOR_ABI" = "ON" ] && [ -n "$QNN_SDK_PATH" ]; then
+            print_step "Copying QNN NPU libraries for ${ABI}..."
+            QNN_LIB_DIR="${QNN_SDK_PATH}/lib/aarch64-android"
+
+            # Core QNN libraries required for HTP (NPU) inference
+            QNN_LIBS=(
+                "libQnnHtp.so"           # Main HTP backend
+                "libQnnHtpPrepare.so"    # Model preparation
+                "libQnnSystem.so"        # System utilities
+                "libQnnCpu.so"           # CPU fallback
+                "libQnnHtpV73Stub.so"    # Snapdragon 8 Gen 1
+                "libQnnHtpV75Stub.so"    # Snapdragon 8 Gen 2
+                "libQnnHtpV79Stub.so"    # Snapdragon 8 Gen 3
+                "libQnnHtpV81Stub.so"    # Snapdragon 8 Elite
+            )
+
+            QNN_COPIED=0
+            for lib in "${QNN_LIBS[@]}"; do
+                if [ -f "${QNN_LIB_DIR}/${lib}" ]; then
+                    cp "${QNN_LIB_DIR}/${lib}" "${DIST_DIR}/onnx/${ABI}/"
+                    echo "  Copied: ${lib} -> onnx/${ABI}/"
+                    QNN_COPIED=$((QNN_COPIED + 1))
+                fi
+            done
+
+            if [ $QNN_COPIED -gt 0 ]; then
+                print_success "Copied ${QNN_COPIED} QNN libraries for NPU acceleration"
+            else
+                print_warning "No QNN libraries found in ${QNN_LIB_DIR}"
+            fi
         fi
     fi
 

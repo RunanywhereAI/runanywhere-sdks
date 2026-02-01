@@ -41,7 +41,8 @@ extern "C" {
 //   - Extraction errors:        -350 to -369
 //   - Calibration errors:       -370 to -379
 //   - Module/Service errors:    -400 to -499
-//   - Platform adapter errors:  -500 to -599
+//   - Platform adapter errors:  -500 to -509
+//   - QNN/NPU errors:           -510 to -549
 //   - Backend errors:           -600 to -699
 //   - Event errors:             -700 to -799
 //   - Other errors:             -800 to -899
@@ -347,11 +348,45 @@ extern "C" {
 #define RAC_ERROR_NOT_FOUND ((rac_result_t) - 423)
 
 // =============================================================================
-// PLATFORM ADAPTER ERRORS (-500 to -599)
+// PLATFORM ADAPTER ERRORS (-500 to -509)
 // =============================================================================
 
 /** Adapter not set */
 #define RAC_ERROR_ADAPTER_NOT_SET ((rac_result_t) - 500)
+
+// =============================================================================
+// QNN/NPU ERRORS (-510 to -549)
+// Errors related to Qualcomm QNN Execution Provider and NPU acceleration
+// =============================================================================
+
+/** QNN runtime is not available on this device */
+#define RAC_ERROR_QNN_NOT_AVAILABLE ((rac_result_t) - 510)
+/** QNN initialization failed */
+#define RAC_ERROR_QNN_INIT_FAILED ((rac_result_t) - 511)
+/** Model has operators not supported on QNN HTP (NPU) */
+#define RAC_ERROR_QNN_UNSUPPORTED_OPS ((rac_result_t) - 512)
+/** QNN context binary generation failed */
+#define RAC_ERROR_QNN_CONTEXT_FAILED ((rac_result_t) - 513)
+/** QNN session creation failed */
+#define RAC_ERROR_QNN_SESSION_FAILED ((rac_result_t) - 514)
+/** NPU inference failed */
+#define RAC_ERROR_QNN_INFERENCE_FAILED ((rac_result_t) - 515)
+/** Model has dynamic shapes (NPU requires static shapes) */
+#define RAC_ERROR_QNN_DYNAMIC_SHAPES ((rac_result_t) - 516)
+/** Model is not QDQ quantized (NPU requires QDQ format) */
+#define RAC_ERROR_QNN_NOT_QDQ ((rac_result_t) - 517)
+/** SoC is not supported for QNN acceleration */
+#define RAC_ERROR_QNN_SOC_UNSUPPORTED ((rac_result_t) - 518)
+/** Insufficient VTCM memory for model */
+#define RAC_ERROR_QNN_VTCM_INSUFFICIENT ((rac_result_t) - 519)
+/** Split model configuration is invalid */
+#define RAC_ERROR_QNN_SPLIT_MODEL_INVALID ((rac_result_t) - 520)
+/** Encoder model failed to load on NPU */
+#define RAC_ERROR_QNN_ENCODER_LOAD_FAILED ((rac_result_t) - 521)
+/** Vocoder model failed to load on CPU */
+#define RAC_ERROR_QNN_VOCODER_LOAD_FAILED ((rac_result_t) - 522)
+/** Hybrid inference pipeline failed */
+#define RAC_ERROR_QNN_HYBRID_INFERENCE_FAILED ((rac_result_t) - 523)
 
 // =============================================================================
 // BACKEND ERRORS (-600 to -699)
@@ -365,6 +400,10 @@ extern "C" {
 #define RAC_ERROR_BACKEND_INIT_FAILED ((rac_result_t) - 602)
 /** Backend busy */
 #define RAC_ERROR_BACKEND_BUSY ((rac_result_t) - 603)
+/** NPU/QNN not available or model not compatible with NPU execution */
+#define RAC_ERROR_NPU_NOT_AVAILABLE ((rac_result_t) - 604)
+/** NPU execution required but model is not quantized (INT8) */
+#define RAC_ERROR_NPU_REQUIRES_QUANTIZED_MODEL ((rac_result_t) - 605)
 /** Invalid handle */
 #define RAC_ERROR_INVALID_HANDLE ((rac_result_t) - 610)
 

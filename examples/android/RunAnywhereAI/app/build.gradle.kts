@@ -154,6 +154,7 @@ android {
 
             // Handle duplicate native libraries from multiple backend modules
             // (ONNX and LlamaCPP both include some common libraries)
+            // Also handle duplicates between our QNN libs and qnn-runtime AAR
             pickFirsts += listOf(
                 "lib/arm64-v8a/libomp.so",
                 "lib/arm64-v8a/libc++_shared.so",
@@ -161,6 +162,26 @@ android {
                 "lib/armeabi-v7a/libomp.so",
                 "lib/armeabi-v7a/libc++_shared.so",
                 "lib/armeabi-v7a/librac_commons.so",
+                // QNN libraries - prefer qnn-runtime AAR versions over our bundled ones
+                "lib/arm64-v8a/libQnnCpu.so",
+                "lib/arm64-v8a/libQnnHtp.so",
+                "lib/arm64-v8a/libQnnHtpNetRunExtensions.so",
+                "lib/arm64-v8a/libQnnHtpPrepare.so",
+                "lib/arm64-v8a/libQnnHtpV68Stub.so",
+                "lib/arm64-v8a/libQnnHtpV68CalculatorStub.so",
+                "lib/arm64-v8a/libQnnHtpV69Stub.so",
+                "lib/arm64-v8a/libQnnHtpV69CalculatorStub.so",
+                "lib/arm64-v8a/libQnnHtpV73Stub.so",
+                "lib/arm64-v8a/libQnnHtpV73CalculatorStub.so",
+                "lib/arm64-v8a/libQnnHtpV75Stub.so",
+                "lib/arm64-v8a/libQnnHtpV75CalculatorStub.so",
+                "lib/arm64-v8a/libQnnHtpV79Stub.so",
+                "lib/arm64-v8a/libQnnHtpV79CalculatorStub.so",
+                "lib/arm64-v8a/libQnnHtpV81Stub.so",
+                "lib/arm64-v8a/libQnnHtpV81CalculatorStub.so",
+                "lib/arm64-v8a/libQnnSaver.so",
+                "lib/arm64-v8a/libQnnSystem.so",
+                "lib/arm64-v8a/libcalculator.so",
             )
         }
     }
@@ -334,6 +355,17 @@ dependencies {
     // Logging
     // ========================================
     implementation(libs.timber)
+
+    // ========================================
+    // NPU Acceleration (TFLite + QNN Delegate)
+    // For Kokoro TTS on Qualcomm Hexagon NPU
+    // ========================================
+    implementation("org.tensorflow:tensorflow-lite:2.16.1")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+    implementation("org.tensorflow:tensorflow-lite-gpu:2.16.1")  // GPU delegate
+    implementation("org.tensorflow:tensorflow-lite-gpu-api:2.16.1")  // GPU API
+    implementation("com.qualcomm.qti:qnn-runtime:2.34.0")
+    implementation("com.qualcomm.qti:qnn-litert-delegate:2.34.0")
 
     // ========================================
     // Testing

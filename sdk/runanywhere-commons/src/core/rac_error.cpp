@@ -289,10 +289,42 @@ const char* rac_error_message(rac_result_t error_code) {
             return "Not found";
 
         // =================================================================
-        // PLATFORM ADAPTER ERRORS (-500 to -599)
+        // PLATFORM ADAPTER ERRORS (-500 to -509)
         // =================================================================
         case RAC_ERROR_ADAPTER_NOT_SET:
             return "Platform adapter not set";
+
+        // =================================================================
+        // QNN/NPU ERRORS (-510 to -549)
+        // =================================================================
+        case RAC_ERROR_QNN_NOT_AVAILABLE:
+            return "QNN runtime is not available on this device";
+        case RAC_ERROR_QNN_INIT_FAILED:
+            return "QNN initialization failed";
+        case RAC_ERROR_QNN_UNSUPPORTED_OPS:
+            return "Model has operators not supported on QNN HTP (NPU)";
+        case RAC_ERROR_QNN_CONTEXT_FAILED:
+            return "QNN context binary generation failed";
+        case RAC_ERROR_QNN_SESSION_FAILED:
+            return "QNN session creation failed";
+        case RAC_ERROR_QNN_INFERENCE_FAILED:
+            return "NPU inference failed";
+        case RAC_ERROR_QNN_DYNAMIC_SHAPES:
+            return "Model has dynamic shapes (NPU requires static shapes)";
+        case RAC_ERROR_QNN_NOT_QDQ:
+            return "Model is not QDQ quantized (NPU requires QDQ format)";
+        case RAC_ERROR_QNN_SOC_UNSUPPORTED:
+            return "SoC is not supported for QNN acceleration";
+        case RAC_ERROR_QNN_VTCM_INSUFFICIENT:
+            return "Insufficient VTCM memory for model";
+        case RAC_ERROR_QNN_SPLIT_MODEL_INVALID:
+            return "Split model configuration is invalid";
+        case RAC_ERROR_QNN_ENCODER_LOAD_FAILED:
+            return "Encoder model failed to load on NPU";
+        case RAC_ERROR_QNN_VOCODER_LOAD_FAILED:
+            return "Vocoder model failed to load on CPU";
+        case RAC_ERROR_QNN_HYBRID_INFERENCE_FAILED:
+            return "Hybrid inference pipeline failed";
 
         // =================================================================
         // BACKEND ERRORS (-600 to -699)

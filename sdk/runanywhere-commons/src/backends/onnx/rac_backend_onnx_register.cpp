@@ -10,10 +10,24 @@
 #include "rac_tts_onnx.h"
 #include "rac_vad_onnx.h"
 
+// NPU/QNN support - DISABLED FOR NNAPI TESTING
+// QNN headers cause linker errors when QNN is not compiled
+// #include "rac/backends/rac_qnn_config.h"
+// #include "rac/backends/rac_onnx_npu.h"
+
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <vector>
+
+#ifdef __ANDROID__
+#include <android/log.h>
+#define ONNX_LOGI(...) __android_log_print(ANDROID_LOG_INFO, "ONNXBackend", __VA_ARGS__)
+#define ONNX_LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "ONNXBackend", __VA_ARGS__)
+#else
+#define ONNX_LOGI(...) printf("[ONNXBackend] " __VA_ARGS__); printf("\n")
+#define ONNX_LOGE(...) fprintf(stderr, "[ONNXBackend ERROR] " __VA_ARGS__); fprintf(stderr, "\n")
+#endif
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
@@ -274,12 +288,37 @@ rac_handle_t onnx_stt_create(const rac_service_request_t* request, void* user_da
     return service;
 }
 
-// TTS can_handle
+// TTS can_handle - supports Kokoro TTS with NPU acceleration
 rac_bool_t onnx_tts_can_handle(const rac_service_request_t* request, void* user_data) {
     (void)user_data;
 
+    ONNX_LOGI("onnx_tts_can_handle called");
+    RAC_LOG_INFO(LOG_CAT, "onnx_tts_can_handle called");
+
     if (request == nullptr) {
+        ONNX_LOGE("onnx_tts_can_handle: request is NULL");
+        RAC_LOG_ERROR(LOG_CAT, "onnx_tts_can_handle: request is NULL");
         return RAC_FALSE;
+    }
+
+    ONNX_LOGI("onnx_tts_can_handle: identifier='%s', model_path='%s'",
+              request->identifier ? request->identifier : "(null)",
+              request->model_path ? request->model_path : "(null)");
+    RAC_LOG_INFO(LOG_CAT, "onnx_tts_can_handle: identifier='%s', model_path='%s'",
+                 request->identifier ? request->identifier : "(null)",
+                 request->model_path ? request->model_path : "(null)");
+
+    // Check for NPU requirement in config
+    // QNN DISABLED FOR NNAPI TESTING - NPU requirement check always returns false if requested
+    if (request->config_json != nullptr) {
+        // Parse JSON config for "npu_required": true
+        // If NPU required but not available, return FALSE
+        // Note: QNN is disabled, so if NPU is explicitly required, we fail
+        if (strstr(request->config_json, "\"npu_required\":true") != nullptr ||
+            strstr(request->config_json, "\"npu_required\": true") != nullptr) {
+            RAC_LOG_INFO(LOG_CAT, "TTS: NPU required but QNN disabled for NNAPI testing");
+            return RAC_FALSE;
+        }
     }
 
     if (request->identifier == nullptr || request->identifier[0] == '\0') {
@@ -287,6 +326,14 @@ rac_bool_t onnx_tts_can_handle(const rac_service_request_t* request, void* user_
     }
 
     const char* path = request->identifier;
+
+    // Support Kokoro TTS models
+    if (strstr(path, "kokoro") != nullptr) {
+        RAC_LOG_INFO(LOG_CAT, "TTS: Kokoro TTS model detected");
+        return RAC_TRUE;
+    }
+
+    // Existing ONNX TTS models
     if (strstr(path, "piper") != nullptr || strstr(path, "vits") != nullptr ||
         strstr(path, ".onnx") != nullptr) {
         return RAC_TRUE;
@@ -299,16 +346,30 @@ rac_bool_t onnx_tts_can_handle(const rac_service_request_t* request, void* user_
 rac_handle_t onnx_tts_create(const rac_service_request_t* request, void* user_data) {
     (void)user_data;
 
+    ONNX_LOGI("onnx_tts_create called");
+
     if (request == nullptr) {
+        ONNX_LOGE("onnx_tts_create: request is NULL");
         return nullptr;
     }
 
-    RAC_LOG_INFO(LOG_CAT, "Creating ONNX TTS service for: %s",
-                 request->identifier ? request->identifier : "(default)");
+    // Use model_path if available (contains full path), otherwise fall back to identifier
+    const char* model_path = request->model_path ? request->model_path : request->identifier;
+
+    ONNX_LOGI("Creating ONNX TTS service for: identifier=%s, model_path=%s",
+              request->identifier ? request->identifier : "(null)",
+              model_path ? model_path : "(null)");
+    RAC_LOG_INFO(LOG_CAT, "Creating ONNX TTS service for: identifier=%s, model_path=%s",
+                 request->identifier ? request->identifier : "(null)",
+                 model_path ? model_path : "(null)");
 
     rac_handle_t backend_handle = nullptr;
-    rac_result_t result = rac_tts_onnx_create(request->identifier, nullptr, &backend_handle);
+    ONNX_LOGI("Calling rac_tts_onnx_create with path: %s", model_path ? model_path : "(null)");
+    rac_result_t result = rac_tts_onnx_create(model_path, nullptr, &backend_handle);
+    ONNX_LOGI("rac_tts_onnx_create returned: %d", result);
     if (result != RAC_SUCCESS) {
+        const char* details = rac_error_get_details();
+        ONNX_LOGE("Failed to create ONNX TTS backend: %d, details: %s", result, details ? details : "(null)");
         RAC_LOG_ERROR(LOG_CAT, "Failed to create ONNX TTS backend: %d", result);
         return nullptr;
     }

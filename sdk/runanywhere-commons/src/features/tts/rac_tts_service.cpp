@@ -52,8 +52,14 @@ rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle) {
     request.framework = framework;
     request.model_path = model_path;
 
+    RAC_LOG_INFO(LOG_CAT, "TTS service request: identifier='%s', model_path='%s', framework=%d",
+                 request.identifier ? request.identifier : "(null)",
+                 request.model_path ? request.model_path : "(null)",
+                 static_cast<int>(framework));
+
     // Service registry returns a rac_tts_service_t* with vtable already set
     result = rac_service_create(RAC_CAPABILITY_TTS, &request, out_handle);
+    RAC_LOG_INFO(LOG_CAT, "rac_service_create returned: %d", result);
 
     if (model_info) {
         rac_model_info_free(model_info);

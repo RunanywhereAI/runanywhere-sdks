@@ -35,6 +35,45 @@ option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
 option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" ON)
 
 # =============================================================================
+# NPU/QNN OPTIONS
+# =============================================================================
+option(RAC_ENABLE_QNN "Enable Qualcomm QNN Execution Provider for NPU acceleration" OFF)
+set(RAC_QNN_SDK_PATH "" CACHE PATH "Path to QAIRT/QNN SDK (required when RAC_ENABLE_QNN=ON)")
+
+# =============================================================================
+# NNAPI OPTIONS (Android Neural Networks API)
+# =============================================================================
+option(RAC_ENABLE_NNAPI "Enable Android NNAPI Execution Provider for NPU/GPU/DSP acceleration" OFF)
+
+# QNN is only supported on Android arm64-v8a
+if(RAC_ENABLE_QNN)
+    if(NOT ANDROID)
+        message(WARNING "QNN EP is only supported on Android, disabling RAC_ENABLE_QNN")
+        set(RAC_ENABLE_QNN OFF CACHE BOOL "" FORCE)
+    elseif(NOT ANDROID_ABI STREQUAL "arm64-v8a")
+        message(WARNING "QNN EP requires arm64-v8a ABI, current ABI is ${ANDROID_ABI}, disabling RAC_ENABLE_QNN")
+        set(RAC_ENABLE_QNN OFF CACHE BOOL "" FORCE)
+    else()
+        # Try to find QNN SDK from environment if not specified
+        if(NOT RAC_QNN_SDK_PATH)
+            if(DEFINED ENV{QNN_SDK_ROOT})
+                set(RAC_QNN_SDK_PATH $ENV{QNN_SDK_ROOT})
+                message(STATUS "Using QNN SDK from QNN_SDK_ROOT: ${RAC_QNN_SDK_PATH}")
+            elseif(DEFINED ENV{QAIRT_SDK_ROOT})
+                set(RAC_QNN_SDK_PATH $ENV{QAIRT_SDK_ROOT})
+                message(STATUS "Using QNN SDK from QAIRT_SDK_ROOT: ${RAC_QNN_SDK_PATH}")
+            endif()
+        endif()
+
+        if(RAC_QNN_SDK_PATH)
+            message(STATUS "QNN EP enabled with SDK: ${RAC_QNN_SDK_PATH}")
+        else()
+            message(STATUS "QNN EP enabled but SDK path not set - will use bundled libraries")
+        endif()
+    endif()
+endif()
+
+# =============================================================================
 # C++ CONFIGURATION
 # =============================================================================
 
@@ -341,5 +380,15 @@ if(RAC_BUILD_BACKENDS)
 endif()
 message(STATUS "")
 message(STATUS "JNI bridge:     ${RAC_BUILD_JNI}")
+if(RAC_ENABLE_QNN)
+    message(STATUS "QNN NPU:        ENABLED (SDK: ${RAC_QNN_SDK_PATH})")
+else()
+    message(STATUS "QNN NPU:        DISABLED")
+endif()
+if(RAC_ENABLE_NNAPI)
+    message(STATUS "NNAPI:          ENABLED")
+else()
+    message(STATUS "NNAPI:          DISABLED")
+endif()
 message(STATUS "====================================")
 message(STATUS "")

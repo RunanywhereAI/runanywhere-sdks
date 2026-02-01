@@ -612,8 +612,11 @@ private suspend fun extractArchive(
                     extractTarBz2(tempArchiveFile, parentDir, logger)
                 }
                 lowercaseUrl.endsWith(".zip") -> {
-                    logger.info("Extracting zip archive...")
-                    extractZip(tempArchiveFile, parentDir, logger)
+                    // ZIP files often extract flat (no nested directory), so create model subdirectory
+                    val modelDir = File(parentDir, modelId)
+                    modelDir.mkdirs()
+                    logger.info("Extracting zip archive to model directory: ${modelDir.absolutePath}")
+                    extractZip(tempArchiveFile, modelDir, logger)
                 }
                 else -> {
                     logger.warn("Unknown archive type for URL: $originalUrl")

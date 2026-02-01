@@ -341,7 +341,31 @@ class RunAnywhereApplication : Application() {
             modality = ModelCategory.SPEECH_SYNTHESIS,
             memoryRequirement = 65_000_000,
         )
-        Log.i("RunAnywhereApp", "✅ ONNX STT/TTS models registered")
+
+        // Kokoro TTS Unified - High quality TTS (ISTFT-free, CPU-compatible)
+        // This unified model has ISTFT replaced and runs directly on CPU
+        RunAnywhere.registerModel(
+            id = "kokoro-tts-unified",
+            name = "Kokoro TTS 82M (Unified)",
+            url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/kokoro-tts-unified-v1.1.0/kokoro-tts-unified-v1.1.0.zip",
+            framework = InferenceFramework.ONNX,
+            modality = ModelCategory.SPEECH_SYNTHESIS,
+            memoryRequirement = 350_000_000, // ~320MB unified model
+        )
+
+        // Kokoro TTS NNAPI - Static shapes model for NNAPI NPU acceleration
+        // This model has fixed tensor shapes required for NNAPI compatibility
+        // NNAPI routes to: Qualcomm Hexagon DSP, Samsung Exynos NPU, MediaTek APU, Google TPU
+        // Note: FP32 model - some ops may fall back to CPU. For full NPU, needs INT8 quantization.
+        RunAnywhere.registerModel(
+            id = "kokoro-tts-nnapi",
+            name = "Kokoro TTS 82M (NNAPI Static)",
+            url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/kokoro-tts-nnapi-v1.0.0/kokoro-tts-nnapi-v1.0.0.zip",
+            framework = InferenceFramework.ONNX,
+            modality = ModelCategory.SPEECH_SYNTHESIS,
+            memoryRequirement = 350_000_000, // ~310MB FP32 model with static shapes
+        )
+        Log.i("RunAnywhereApp", "✅ ONNX STT/TTS models registered (including Kokoro Unified + NNAPI)")
 
         Log.i("RunAnywhereApp", "🎉 All modules and models registered")
     }
