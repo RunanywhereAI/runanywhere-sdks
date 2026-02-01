@@ -195,8 +195,6 @@ extension ChatInterfaceView {
         }
     }
 
-<<<<<<< HEAD
-=======
     private var modelButton: some View {
         Button {
             showingModelSelection = true
