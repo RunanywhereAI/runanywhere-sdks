@@ -647,14 +647,12 @@ export const SettingsScreen: React.FC = () => {
     const framework = model.format === 'onnx' ? LLMFramework.ONNX : LLMFramework.LlamaCpp;
     const frameworkName = FrameworkDisplayNames[framework] || framework;
 
-    // Get model size - prefer actual size for downloaded models
-    // TODO: Replace with actual disk size once SDK exposes it (e.g., sizeOnDisk or actualSize)
+    // Get model size estimate based on download size (may differ from actual on-disk size)
     const downloadedModel = downloadedModels.find((m) => m.id === model.id);
     const modelSize =
-      downloadedModel?.downloadSize ?? // Use downloaded model's size (closer to actual) when available
-      model.downloadSize ?? // Fall back to catalog expected size
+      downloadedModel?.downloadSize ?? // Prefer size from downloaded model when available
+      model.downloadSize ?? // Fall back to catalog's expected download size
       0;
-
     return (
       <View key={model.id} style={styles.catalogModelRow}>
         <View style={styles.catalogModelInfo}>
