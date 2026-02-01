@@ -282,7 +282,7 @@ struct TextToSpeechView: View {
                 metadataRow(
                     icon: "person.wave.2",
                     label: "Voice",
-                    value: result.metadata.voice
+                    value: result.metadata.voice.modelNameFromID()
                 )
             }
             .font(.caption)
@@ -463,7 +463,7 @@ struct TextToSpeechView: View {
 
                 if let modelName = viewModel.selectedModelName {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(modelName)
+                        Text(modelName.shortModelName())
                             .font(.caption)
                             .fontWeight(.medium)
                             .lineLimit(1)

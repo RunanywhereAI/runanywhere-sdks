@@ -56,7 +56,7 @@ struct ModelBadge: View {
                 Text(label)
                     .font(.system(size: AdaptiveSizing.badgeFontSize - 1))
                     .foregroundColor(.secondary)
-                Text(value)
+                Text(value.shortModelName(maxLength: 15))
                     .font(.system(size: AdaptiveSizing.badgeFontSize))
                     .fontWeight(.medium)
                     .lineLimit(1)
