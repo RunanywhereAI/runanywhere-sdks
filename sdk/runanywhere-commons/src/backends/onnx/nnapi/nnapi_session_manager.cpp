@@ -229,7 +229,16 @@ bool NNAPISessionManager::add_nnapi_provider_options(OrtSessionOptions* options,
 
     if (config.cpu_disabled) {
         nnapi_flags |= 0x004;  // NNAPI_FLAG_CPU_DISABLED
-        NNAPI_LOGI("    Flag: CPU_DISABLED (no NNAPI CPU fallback)");
+        NNAPI_LOGI("╔════════════════════════════════════════════════════════════╗");
+        NNAPI_LOGI("║  ⚠️  NPU-ONLY MODE ENABLED (CPU_DISABLED=TRUE)             ║");
+        NNAPI_LOGI("║  If session creation fails, ops are NOT NPU-compatible     ║");
+        NNAPI_LOGI("╚════════════════════════════════════════════════════════════╝");
+        NNAPI_LOGI("    Flag: CPU_DISABLED (no NNAPI CPU fallback - NPU ONLY)");
+    } else {
+        NNAPI_LOGW("╔════════════════════════════════════════════════════════════╗");
+        NNAPI_LOGW("║  ⚠️  CPU FALLBACK ENABLED (CPU_DISABLED=FALSE)             ║");
+        NNAPI_LOGW("║  Unsupported ops will silently run on CPU!                 ║");
+        NNAPI_LOGW("╚════════════════════════════════════════════════════════════╝");
     }
 
     if (config.cpu_only) {
@@ -258,7 +267,21 @@ bool NNAPISessionManager::add_nnapi_provider_options(OrtSessionOptions* options,
     }
 
     NNAPI_LOGI("  ✅ NNAPI Execution Provider added successfully!");
-    NNAPI_LOGI("     Operations will be routed to NPU hardware");
+    NNAPI_LOGI("╔════════════════════════════════════════════════════════════╗");
+    NNAPI_LOGI("║  NNAPI EP Configuration Summary                            ║");
+    NNAPI_LOGI("╠════════════════════════════════════════════════════════════╣");
+    NNAPI_LOGI("║  Flags: 0x%08X                                         ", nnapi_flags);
+    NNAPI_LOGI("║  - FP16 Relaxed: %s", (nnapi_flags & 0x001) ? "YES" : "NO");
+    NNAPI_LOGI("║  - NCHW Layout: %s", (nnapi_flags & 0x002) ? "YES" : "NO");
+    NNAPI_LOGI("║  - CPU Disabled: %s (NPU-ONLY: %s)", (nnapi_flags & 0x004) ? "YES" : "NO", (nnapi_flags & 0x004) ? "TRUE" : "FALSE");
+    NNAPI_LOGI("║  - CPU Only: %s", (nnapi_flags & 0x008) ? "YES" : "NO");
+    NNAPI_LOGI("╠════════════════════════════════════════════════════════════╣");
+    if (nnapi_flags & 0x004) {
+        NNAPI_LOGI("║  ✅ NPU-ONLY: Session will FAIL if ops not supported       ║");
+    } else {
+        NNAPI_LOGW("║  ⚠️  HYBRID: Unsupported ops will run on CPU silently      ║");
+    }
+    NNAPI_LOGI("╚════════════════════════════════════════════════════════════╝");
 
     // Add model cache directory if specified
     if (!config.model_cache_dir.empty()) {

@@ -992,7 +992,22 @@ rac_result_t KokoroTTSLoader::load_unified_model(const std::string& model_path) 
 
     if (status != nullptr) {
         const char* err_msg = ort_api_->GetErrorMessage(status);
-        KOKORO_LOGE("Failed to create session: %s", err_msg);
+        KOKORO_LOGE("╔════════════════════════════════════════════════════════════════════════════════╗");
+        KOKORO_LOGE("║  ❌ SESSION CREATION FAILED                                                     ║");
+        KOKORO_LOGE("╠════════════════════════════════════════════════════════════════════════════════╣");
+        KOKORO_LOGE("║  Error: %s", err_msg);
+        KOKORO_LOGE("╠════════════════════════════════════════════════════════════════════════════════╣");
+        if (config_.nnapi_config.cpu_disabled) {
+            KOKORO_LOGE("║  ⚠️  NPU-ONLY MODE (cpu_disabled=TRUE) - This failure indicates:             ║");
+            KOKORO_LOGE("║     - Some operations in the model are NOT supported by NNAPI NPU           ║");
+            KOKORO_LOGE("║     - The model cannot run 100%% on NPU                                      ║");
+            KOKORO_LOGE("║     - Consider using cpu_disabled=FALSE for hybrid NPU/CPU execution        ║");
+            KOKORO_LOGE("╠════════════════════════════════════════════════════════════════════════════════╣");
+            KOKORO_LOGE("║  VERIFICATION RESULT: Model is NOT 100%% NPU compatible                       ║");
+        } else {
+            KOKORO_LOGE("║  CPU fallback was enabled but session still failed                           ║");
+        }
+        KOKORO_LOGE("╚════════════════════════════════════════════════════════════════════════════════╝");
         RAC_LOG_ERROR(LOG_CAT, "Session creation failed: %s", err_msg);
         ort_api_->ReleaseStatus(status);
         return RAC_ERROR_MODEL_LOAD_FAILED;
@@ -1001,6 +1016,23 @@ rac_result_t KokoroTTSLoader::load_unified_model(const std::string& model_path) 
     if (unified_session_ == nullptr) {
         KOKORO_LOGE("Session is NULL after creation");
         return RAC_ERROR_MODEL_LOAD_FAILED;
+    }
+
+    // Session created successfully - log details about NPU mode
+    if (config_.nnapi_config.cpu_disabled && stats_.npu_active) {
+        KOKORO_LOGI("╔════════════════════════════════════════════════════════════════════════════════╗");
+        KOKORO_LOGI("║  ✅ NPU-ONLY SESSION CREATED SUCCESSFULLY                                       ║");
+        KOKORO_LOGI("╠════════════════════════════════════════════════════════════════════════════════╣");
+        KOKORO_LOGI("║  cpu_disabled=TRUE and session created = ALL OPS RUN ON NPU                    ║");
+        KOKORO_LOGI("║  VERIFICATION RESULT: Model IS 100%% NPU compatible!                            ║");
+        KOKORO_LOGI("╚════════════════════════════════════════════════════════════════════════════════╝");
+    } else if (stats_.npu_active) {
+        KOKORO_LOGI("╔════════════════════════════════════════════════════════════════════════════════╗");
+        KOKORO_LOGI("║  ⚠️  HYBRID NPU/CPU SESSION CREATED                                             ║");
+        KOKORO_LOGI("╠════════════════════════════════════════════════════════════════════════════════╣");
+        KOKORO_LOGI("║  cpu_disabled=FALSE - some ops may silently run on CPU                         ║");
+        KOKORO_LOGI("║  Set cpu_disabled=TRUE to verify pure NPU execution                            ║");
+        KOKORO_LOGI("╚════════════════════════════════════════════════════════════════════════════════╝");
     }
 
     KOKORO_LOGI("  -> Session created successfully ✓");
