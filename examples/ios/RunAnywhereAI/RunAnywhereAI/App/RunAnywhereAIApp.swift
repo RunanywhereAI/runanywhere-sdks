@@ -272,26 +272,43 @@ struct RunAnywhereAIApp: App {
 
 struct InitializationLoadingView: View {
     @State private var isAnimating = false
+    @State private var progress: Double = 0.0
 
     var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "brain")
-                .font(.system(size: 60))
-                .foregroundColor(AppColors.primaryAccent)
-                .scaleEffect(isAnimating ? 1.2 : 1.0)
-                .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: isAnimating)
+        VStack(spacing: 32) {
+            Spacer()
 
-            Text("Setting Up Your AI")
-                .font(.title2)
-                .fontWeight(.semibold)
+            // RunAnywhere Logo
+            Image("runanywhere_logo")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 120, height: 120)
+                .scaleEffect(isAnimating ? 1.05 : 1.0)
+                .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: isAnimating)
 
-            Text("Preparing your private AI assistant...")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+            VStack(spacing: 12) {
+                Text("Setting Up Your AI")
+                    .font(.title2)
+                    .fontWeight(.semibold)
 
-            ProgressView()
-                .progressViewStyle(CircularProgressViewStyle())
-                .scaleEffect(1.2)
+                Text("Preparing your private AI assistant...")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+
+            // Loading Bar
+            VStack(spacing: 8) {
+                ProgressView(value: progress, total: 1.0)
+                    .progressViewStyle(.linear)
+                    .tint(AppColors.primaryAccent)
+                    .frame(width: 240)
+
+                Text("Initializing SDK...")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -302,6 +319,18 @@ struct InitializationLoadingView: View {
         #endif
         .onAppear {
             isAnimating = true
+            startProgressAnimation()
+        }
+    }
+
+    private func startProgressAnimation() {
+        Timer.scheduledTimer(withTimeInterval: 0.02, repeats: true) { timer in
+            if progress < 1.0 {
+                progress += 0.01
+            } else {
+                // Reset and start again
+                progress = 0.0
+            }
         }
     }
 }
