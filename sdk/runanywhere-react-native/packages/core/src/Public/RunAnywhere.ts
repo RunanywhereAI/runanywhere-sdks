@@ -47,6 +47,7 @@ import * as VoiceAgent from './Extensions/RunAnywhere+VoiceAgent';
 import * as VoiceSession from './Extensions/RunAnywhere+VoiceSession';
 import * as StructuredOutput from './Extensions/RunAnywhere+StructuredOutput';
 import * as Audio from './Extensions/RunAnywhere+Audio';
+import * as Compatibility from './Extensions/RunAnywhere+Compatibility'
 
 const logger = new SDKLogger('RunAnywhere');
 
@@ -166,14 +167,14 @@ export const RunAnywhere = {
       // This ensures HTTP is ready when C++ callbacks need it
       const envString = environment === SDKEnvironment.Development ? 'development'
         : environment === SDKEnvironment.Staging ? 'staging'
-        : 'production';
+          : 'production';
 
       // Map environment string to SDKEnvironment enum for HTTPService
       const networkEnv = environment === SDKEnvironment.Development
         ? NetworkSDKEnvironment.Development
         : environment === SDKEnvironment.Staging
-        ? NetworkSDKEnvironment.Staging
-        : NetworkSDKEnvironment.Production;
+          ? NetworkSDKEnvironment.Staging
+          : NetworkSDKEnvironment.Production;
 
       // Configure HTTPService with network settings
       HTTPService.shared.configure({
@@ -369,7 +370,7 @@ export const RunAnywhere = {
   ): Promise<void> {
     const envString = environment === SDKEnvironment.Development ? 'development'
       : environment === SDKEnvironment.Staging ? 'staging'
-      : 'production';
+        : 'production';
 
     try {
       const native = requireNativeModule();
@@ -699,6 +700,14 @@ export const RunAnywhere = {
     SAMPLE_RATE: Audio.AUDIO_SAMPLE_RATE,
     TTS_SAMPLE_RATE: Audio.TTS_SAMPLE_RATE,
   },
+
+  // ============================================================================
+  // Model Compatibility (Delegated to Extension)
+  // ============================================================================
+
+    checkModelCompatibility: Compatibility.checkModelCompatibility,
+    checkModelsCompatibility: Compatibility.checkModelsCompatibility,
+    getDeviceCapabilities: Compatibility.getDeviceCapabilities,
 
   // ============================================================================
   // Factory Methods

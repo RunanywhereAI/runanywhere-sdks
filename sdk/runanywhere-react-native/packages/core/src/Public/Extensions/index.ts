@@ -149,3 +149,10 @@ export type {
 
 // Re-export Audio as namespace for RunAnywhere.Audio access
 export * as Audio from './RunAnywhere+Audio';
+
+// Model Compatibility Check
+export {
+  checkModelCompatibility,
+  checkModelsCompatibility,
+  getDeviceCapabilities,
+} from './RunAnywhere+Compatibility';

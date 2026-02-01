@@ -141,6 +141,36 @@ await RunAnywhere.clearCache();
 await RunAnywhere.cleanTempFiles();
 ```
 
+#### Model Compatibility
+
+```typescript
+// Check if a model can run on device
+const result = await RunAnywhere.checkModelCompatibility('smollm2-360m-q8_0');
+
+if (result.isCompatible) {
+  console.log('✅ Model can run');
+} else {
+  if (!result.canRun) {
+    console.log(`❌ Need ${(result.requiredMemory / 1e9).toFixed(1)} GB RAM, have ${(result.availableMemory / 1e9).toFixed(1)} GB`);
+  }
+  if (!result.canFit) {
+    console.log(`❌ Need ${(result.requiredStorage / 1e9).toFixed(1)} GB storage, have ${(result.availableStorage / 1e9).toFixed(1)} GB`);
+  }
+}
+
+// Check multiple models
+const results = await RunAnywhere.checkModelsCompatibility([
+  'smollm2-360m-q8_0',
+  'llama-2-7b-chat-q4_k_m',
+]);
+
+// Get device capabilities
+const caps = await RunAnywhere.getDeviceCapabilities();
+console.log(`Device: ${caps.deviceModel} (${caps.chipName})`);
+console.log(`RAM: ${(caps.availableMemory / 1e9).toFixed(1)} / ${(caps.totalMemory / 1e9).toFixed(1)} GB`);
+console.log(`Storage: ${(caps.availableStorage / 1e9).toFixed(1)} / ${(caps.totalStorage / 1e9).toFixed(1)} GB`);
+console.log(`CPU: ${caps.cpuCores} cores, GPU: ${caps.hasGPU}, NPU: ${caps.hasNPU}`);
+
 ---
 
 ### EventBus
