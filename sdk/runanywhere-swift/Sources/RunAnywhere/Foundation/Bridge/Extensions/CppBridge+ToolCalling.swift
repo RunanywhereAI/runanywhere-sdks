@@ -278,7 +278,13 @@ extension CppBridge {
             }
         }
 
-        /// Serialize tool definitions to JSON array string
+        /// Serialize tool definitions to JSON array string.
+        ///
+        /// Note: We use Swift's native JSONSerialization here because:
+        /// 1. It's clean and simple (25 lines vs 80+ for C++ struct bridging)
+        /// 2. JSON serialization is just data formatting, not complex logic
+        /// 3. The "single source of truth" is already achieved for PARSING (in C++)
+        /// 4. The performance difference is negligible for typical tool counts
         private static func serializeToolsToJson(_ tools: [ToolDefinition]) -> String {
             let jsonArray = tools.map { tool -> [String: Any] in
                 [
