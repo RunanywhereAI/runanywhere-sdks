@@ -238,17 +238,30 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     };
     
     // Detect large models (7B+) that may need GPU layer limiting on mobile
-    bool is_large_model = is_model_size_marker("7b") ||
-                          is_model_size_marker("8b") ||
-                          is_model_size_marker("9b") ||
-                          is_model_size_marker("13b") ||
-                          is_model_size_marker("70b");
+    // First check for config-based override (for custom-named models)
+    bool is_large_model = false;
+    if (config.contains("expected_params_billions")) {
+        double expected_params = config["expected_params_billions"].get<double>();
+        is_large_model = (expected_params >= 7.0);
+        if (is_large_model) {
+            LOGI("Large model detected from config (%.1fB expected params)", expected_params);
+        }
+    }
+    
+    // Fall back to filename heuristics if no config provided
+    if (!is_large_model) {
+        is_large_model = is_model_size_marker("7b") ||
+                         is_model_size_marker("8b") ||
+                         is_model_size_marker("9b") ||
+                         is_model_size_marker("13b") ||
+                         is_model_size_marker("70b");
+    }
     
     if (is_large_model) {
         // For 7B+ models on mobile: limit GPU layers to prevent OOM
         // Most 7B models have 32 layers, offload ~24 to GPU, rest to CPU
         gpu_layers = 24;
-        LOGI("Large model detected from filename, limiting GPU layers to %d to prevent OOM", gpu_layers);
+        LOGI("Large model detected, limiting GPU layers to %d to prevent OOM", gpu_layers);
     }
     
     // Allow user override via config
