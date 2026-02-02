@@ -1,9 +1,11 @@
 # Raspberry Pi Moltbot Voice Pipeline
 
-**Target Device:** Raspberry Pi 5 (8GB)
-**Goal:** Complete on-device AI assistant with voice, Telegram, and WhatsApp channels powered by local LLM inference
+**Target Device:** Raspberry Pi 5 (8GB) + External Audio Hardware + Billy Bass Animatronic Fish
+**Goal:** Complete on-device AI assistant with voice, Telegram, and WhatsApp channels powered by local LLM inference, driving a Billy Bass fish's mouth motor via GPIO
+**Branch:** `smonga/rasp`
+**Pi Details:** IP `192.168.1.91`, username `runanywhere`, OS: Raspberry Pi OS 64-bit Bookworm (Linux 6.12 aarch64)
 **Date:** 2026-02-02
-**Status:** Telegram configured, RunAnywhere server running, troubleshooting LLM connection
+**Status:** Full pipeline verified on Pi 5. STT→LLM→TTS working end-to-end. Telegram configured. Billy Bass fish wired via L298N motor driver.
 
 ---
 
@@ -457,6 +459,153 @@ The voice assistant connects to Moltbot as a first-class channel (like Telegram 
 
 ---
 
+## Billy Bass Hardware Integration
+
+### Overview
+
+The project drives a Big Mouth Billy Bass animatronic fish using the Raspberry Pi 5. The Pi controls the fish's mouth motor through an L298N motor driver board, while the fish's original AA battery pack provides motor power. The Pi does **not** power the motor directly — it only sends GPIO control signals. The goal is to sync the fish's mouth movement with TTS audio output, making the fish "speak" the LLM's response.
+
+### Wiring Diagram
+
+```
+┌──────────────────┐         ┌──────────────────┐         ┌──────────────┐
+│  Raspberry Pi 5  │         │   L298N Motor     │         │  Billy Bass  │
+│                  │         │   Driver Board    │         │  Fish Motor  │
+│                  │         │                   │         │              │
+│  Pin 11 (GPIO17) ├────────►│ IN1              │         │              │
+│  Pin 12 (GPIO18) ├────────►│ IN2              │         │              │
+│                  │         │                   │         │              │
+│  Pin 6  (GND)   ├────────►│ GND    OUT1 ─────├────────►│ Motor Wire 1 │
+│                  │         │        OUT2 ─────├────────►│ Motor Wire 2 │
+│                  │         │                   │         │              │
+└──────────────────┘         │  12V/VIN ◄───────┤         └──────────────┘
+                             │  GND     ◄───────┤
+                             └──────────────────┘
+                                     ▲
+                             ┌───────┴───────┐
+                             │ AA Battery Pack│
+                             │  (from fish)   │
+                             │  + → 12V/VIN   │
+                             │  - → GND       │
+                             └───────────────┘
+```
+
+### Wiring Connections
+
+#### Pi → L298N (control signals + shared ground)
+
+| Pi Pin | Pi Function | L298N Pin | Purpose |
+|--------|-------------|-----------|---------|
+| **Pin 6** | GND | GND | Common ground (required for GPIO signals to work) |
+| **Pin 11** | GPIO17 | IN1 | Motor direction control line 1 |
+| **Pin 12** | GPIO18 | IN2 | Motor direction control line 2 |
+
+#### Battery → L298N (motor power)
+
+| Battery | L298N Pin | Purpose |
+|---------|-----------|---------|
+| **+ (positive)** | 12V / VIN | Motor power supply input |
+| **- (negative)** | GND | Motor power ground (shared with Pi GND) |
+
+#### L298N → Fish Motor (output)
+
+| L298N Pin | Motor | Purpose |
+|-----------|-------|---------|
+| **OUT1** | Motor wire 1 | Motor output A |
+| **OUT2** | Motor wire 2 | Motor output B |
+
+### Motor Control Logic
+
+The L298N interprets the two input lines to control the motor:
+- `IN1=HIGH, IN2=LOW` → Motor spins one direction (mouth open)
+- `IN1=LOW, IN2=HIGH` → Motor spins other direction (mouth close)
+- `IN1=LOW, IN2=LOW` → Motor stopped (coast)
+- `IN1=HIGH, IN2=HIGH` → Motor braked
+
+**Direction note:** If the mouth moves the wrong way, either swap the two motor wires on OUT1/OUT2, or swap the IN1/IN2 logic in software.
+
+### Ground Chain
+
+All three ground references must be tied together:
+```
+Battery (-) ──► L298N GND ──► Pi Pin 6 (GND)
+```
+
+---
+
+## Low-Level Voice Pipeline (C++ Core)
+
+### Voice Pipeline API
+
+The Linux voice assistant uses the `rac_voice_agent` C API which orchestrates the full pipeline:
+
+```c
+rac_voice_agent_create_standalone()    // Create pipeline instance
+rac_voice_agent_load_stt_model()       // Load Whisper model
+rac_voice_agent_load_llm_model()       // Load Qwen2.5 GGUF model
+rac_voice_agent_load_tts_voice()       // Load Piper TTS voice
+rac_voice_agent_detect_speech()        // VAD on audio chunks
+rac_voice_agent_process_voice_turn()   // Full STT → LLM → TTS turn
+```
+
+### Audio Configuration
+
+| Parameter | Capture (Mic) | Playback (Speaker) |
+|-----------|---------------|-------------------|
+| Sample Rate | 16kHz | 22050Hz (TTS output rate) |
+| Channels | Mono | Mono |
+| Format | 16-bit PCM | 16-bit PCM |
+| Buffer | 512 frames | Varies |
+
+### Voice Pipeline Files
+
+```
+Playground/linux-voice-assistant/
+├── main.cpp              # Entry point with CLI (--list-devices, --input, --output)
+├── model_config.h        # Pre-configured model IDs, paths, availability checks
+├── voice_pipeline.h/cpp  # VAD → STT → LLM → TTS orchestration
+├── audio_capture.h/cpp   # ALSA microphone input (16kHz, mono, 16-bit)
+├── audio_playback.h/cpp  # ALSA speaker output
+├── build.sh              # One-click build script
+└── scripts/
+    └── download-models.sh  # Downloads all models (~600MB)
+```
+
+### Build & Test Results
+
+**Platform:** Raspberry Pi 5 (8GB), Debian Bookworm aarch64, GCC 12.2, CMake 3.25.1
+
+**Build Output:**
+```
+dist/linux/aarch64/
+  librac_commons.so         574K
+  librac_backend_onnx.so    167K
+  librac_backend_llamacpp.so 4.1M
+  libsherpa-onnx-c-api.so   4.6M
+  libonnxruntime.so          30M
+```
+
+**End-to-End Pipeline Test:**
+```
+Input:  espeak-ng "Hello, how are you doing today?" → 16kHz mono WAV (2.0s)
+STT:    " Hello, how are you doing today?"   (Whisper Tiny, loaded in 861ms)
+LLM:    "Hello! I'm just a computer program, so I don't have feelings.
+         How can I assist you today?"          (Qwen2.5 0.5B Q4, 23 tokens)
+TTS:    106,387 samples / 4.82s at 22050Hz    (Piper Lessac, synthesis ~4.8s)
+```
+
+### Expected Performance (CPU-Only)
+
+| Metric | Expected Value |
+|--------|----------------|
+| **STT Latency** | ~300-500ms per utterance |
+| **LLM Tokens/sec** | ~5-10 tok/s |
+| **TTS Latency** | ~100-200ms |
+| **Total Pipeline** | ~2-3s per conversational turn |
+| **Power** | ~5W |
+
+---
+
 ## Troubleshooting
 
 ### Connection Error from Moltbot to RunAnywhere Server
@@ -568,14 +717,44 @@ pkill -f runanywhere-server
 
 ---
 
+## Hardware
+
+| Component | Specification |
+|-----------|---------------|
+| **Board** | Raspberry Pi 5 (8GB) |
+| **OS** | Raspberry Pi OS 64-bit Bookworm (Linux 6.12 aarch64) |
+| **Storage** | microSD (32GB+) |
+| **Audio Input** | USB Microphone |
+| **Audio Output** | USB Speaker / DAC |
+| **Animatronic** | Billy Bass fish (mouth motor) |
+| **Motor Driver** | L298N dual H-bridge module |
+| **Motor Power** | Billy Bass AA battery pack (original fish batteries) |
+
+---
+
+## Known Issues & Fixes Applied
+
+| Issue | Fix |
+|-------|-----|
+| Sherpa-ONNX v1.12.23 uses `-shared-cpu` suffix | Updated download URL in `download-sherpa-onnx.sh` |
+| Sherpa-ONNX v1.12.23 doesn't include headers | Script downloads C API header from GitHub raw |
+| Missing `#include <algorithm>` in `model_paths.cpp` | Added include for `std::find` |
+| Code used `RAC_RESULT_SUCCESS` (doesn't exist) | Changed to `RAC_SUCCESS` (defined in `rac_types.h`) |
+| Backends not registered (no providers for STT/LLM/TTS) | Added `rac_backend_onnx_register()` + `rac_backend_llamacpp_register()` in `main.cpp` |
+| TTS model URL 404 (k2-fsa Amy model removed) | Switched to Lessac model from `RunanywhereAI/sherpa-onnx` releases (tar.gz) |
+| STT fails with file path (decoder.onnx not found) | Pass directory path to STT (ONNX backend scans for encoder/decoder/tokens) |
+| VAD triggers on tiny chunks → empty transcription | Rewrote `process_audio()` with iOS-style debouncing: 1.5s silence timeout + 16,000 sample minimum buffer |
+
+---
+
 ## References
 
 - [Moltbot Documentation](https://docs.molt.bot)
 - [RunAnywhere SDKs](https://github.com/RunanywhereAI/runanywhere-sdks)
 - [Linux Voice Assistant README](/home/runanywhere/runanywhere-sdks/Playground/linux-voice-assistant/README.md)
-- [Raspberry Pi 5 Voice Pipeline Plan](/home/runanywhere/runanywhere-sdks/raspberry_pi5_hailo_voice_pipeline.md)
 
 ---
 
 **Last Updated:** 2026-02-02
+**Branch:** `smonga/rasp`
 **Author:** RunAnywhere AI Team
