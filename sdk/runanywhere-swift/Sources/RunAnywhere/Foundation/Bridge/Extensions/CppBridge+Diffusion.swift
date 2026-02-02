@@ -57,13 +57,30 @@ extension CppBridge {
             cConfig.reduce_memory = config.reduceMemory ? RAC_TRUE : RAC_FALSE
             cConfig.preferred_framework = 99 // RAC_FRAMEWORK_UNKNOWN - let system choose
 
-            let result = rac_diffusion_component_configure(handle, &cConfig)
-            guard result == RAC_SUCCESS else {
-                throw SDKError.diffusion(.configurationFailed, "Failed to configure Diffusion component: \(result)")
+            // Configure tokenizer source
+            let tokenizerSource = config.effectiveTokenizerSource
+            cConfig.tokenizer.source = tokenizerSource.cValue
+            cConfig.tokenizer.auto_download = RAC_TRUE
+
+            // Handle custom URL if provided
+            if let customURL = tokenizerSource.customURL {
+                let result = customURL.withCString { urlPtr in
+                    cConfig.tokenizer.custom_base_url = urlPtr
+                    return rac_diffusion_component_configure(handle, &cConfig)
+                }
+                guard result == RAC_SUCCESS else {
+                    throw SDKError.diffusion(.configurationFailed, "Failed to configure Diffusion component: \(result)")
+                }
+            } else {
+                cConfig.tokenizer.custom_base_url = nil
+                let result = rac_diffusion_component_configure(handle, &cConfig)
+                guard result == RAC_SUCCESS else {
+                    throw SDKError.diffusion(.configurationFailed, "Failed to configure Diffusion component: \(result)")
+                }
             }
 
             currentConfig = config
-            logger.info("Diffusion component configured with model variant: \(config.modelVariant)")
+            logger.info("Diffusion component configured with model variant: \(config.modelVariant), tokenizer: \(tokenizerSource.description)")
         }
 
         // MARK: - State

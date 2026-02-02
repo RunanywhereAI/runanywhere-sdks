@@ -9,9 +9,12 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <mutex>
 
 #include "rac/core/rac_core.h"
+
+namespace fs = std::filesystem;
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
@@ -643,13 +646,46 @@ rac_bool_t platform_diffusion_can_handle(const rac_service_request_t* request, v
         return RAC_FALSE;
     }
 
+    // Check for CoreML model files (.mlmodelc or .mlpackage directories)
+    // This allows automatic backend selection based on model format
+    if (request->identifier != nullptr) {
+        fs::path model_path(request->identifier);
+        
+        // Check if the path itself is a .mlmodelc or .mlpackage
+        std::string extension = model_path.extension().string();
+        if (extension == ".mlmodelc" || extension == ".mlpackage") {
+            if (fs::exists(model_path) && fs::is_directory(model_path)) {
+                RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: found CoreML model at path -> true");
+                return RAC_TRUE;
+            }
+        }
+        
+        // Check if directory contains .mlmodelc or .mlpackage subdirectories
+        if (fs::exists(model_path) && fs::is_directory(model_path)) {
+            try {
+                for (const auto& entry : fs::directory_iterator(model_path)) {
+                    if (entry.is_directory()) {
+                        std::string name = entry.path().filename().string();
+                        if (name.find(".mlmodelc") != std::string::npos ||
+                            name.find(".mlpackage") != std::string::npos) {
+                            RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: found CoreML model in directory -> true");
+                            return RAC_TRUE;
+                        }
+                    }
+                }
+            } catch (const fs::filesystem_error&) {
+                // Ignore filesystem errors
+            }
+        }
+    }
+
     // Check if Swift callbacks are available
     const auto* callbacks = rac_platform_diffusion_get_callbacks();
     if (callbacks == nullptr || callbacks->can_handle == nullptr) {
         return RAC_FALSE;
     }
 
-    // Delegate to Swift
+    // Delegate to Swift for additional checks
     return callbacks->can_handle(request->identifier, callbacks->user_data);
 }
 

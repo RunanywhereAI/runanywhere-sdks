@@ -55,6 +55,24 @@ public enum DiffusionTokenizerSource: Sendable, Equatable {
         case .custom(let url): return "Custom (\(url))"
         }
     }
+
+    /// C++ enum value for bridging to rac_diffusion_tokenizer_source_t
+    public var cValue: rac_diffusion_tokenizer_source_t {
+        switch self {
+        case .sd15: return RAC_DIFFUSION_TOKENIZER_SD_1_5
+        case .sd2: return RAC_DIFFUSION_TOKENIZER_SD_2_X
+        case .sdxl: return RAC_DIFFUSION_TOKENIZER_SDXL
+        case .custom: return RAC_DIFFUSION_TOKENIZER_CUSTOM
+        }
+    }
+
+    /// Custom URL (only for .custom case)
+    public var customURL: String? {
+        switch self {
+        case .custom(let url): return url
+        default: return nil
+        }
+    }
 }
 
 // MARK: - Diffusion Model Variant

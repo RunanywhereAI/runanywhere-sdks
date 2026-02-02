@@ -190,6 +190,7 @@ set(RAC_FEATURES_SOURCES
     # Diffusion (Image Generation)
     src/features/diffusion/diffusion_component.cpp
     src/features/diffusion/rac_diffusion_service.cpp
+    src/features/diffusion/rac_diffusion_tokenizer.cpp
     # Voice Agent
     src/features/voice_agent/voice_agent.cpp
     # Result memory management
