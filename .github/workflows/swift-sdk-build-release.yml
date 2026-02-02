@@ -2,11 +2,14 @@
 # Swift SDK Build & Release (Phase 2 CI/CD)
 #
 # When a swift-v* tag is pushed (from Phase 1), build native XCFrameworks via
-# build-ios.sh and the Swift SDK via build-swift.sh on macOS, then create a
-# GitHub Release and attach the built artifacts.
+# build-ios.sh and the Swift SDK via build-swift.sh on macOS, compute SHA256
+# checksums of the ZIPs, update Package.swift with those checksums and
+# sdkVersion, commit and push to main, move the tag to that commit, then
+# create a GitHub Release and attach the built artifacts. SPM consumers then
+# resolve the tag and get correct checksums for the release assets.
 #
 # Phase 1 decides when (tag on merge to main). Phase 2 performs what
-# (build + package + release assets).
+# (build + package + release assets + checksum update).
 #
 # PR description: Swift SDK builds are automated on swift-v* tag push:
 # build-ios.sh and build-swift.sh run on macOS, and the resulting XCFrameworks
@@ -72,6 +75,59 @@ jobs:
           done
           echo "assets_dir=release-assets" >> "$GITHUB_OUTPUT"
           ls -la release-assets/
+
+      - name: Compute Checksums
+        id: checksums
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          COMMONS_CHECKSUM=$(shasum -a 256 "release-assets/RACommons-ios-v${VERSION}.zip" | cut -d ' ' -f 1)
+          LLAMACPP_CHECKSUM=$(shasum -a 256 "release-assets/RABackendLLAMACPP-ios-v${VERSION}.zip" | cut -d ' ' -f 1)
+          ONNX_CHECKSUM=$(shasum -a 256 "release-assets/RABackendONNX-ios-v${VERSION}.zip" | cut -d ' ' -f 1)
+          echo "commons=$COMMONS_CHECKSUM" >> "$GITHUB_OUTPUT"
+          echo "llamacpp=$LLAMACPP_CHECKSUM" >> "$GITHUB_OUTPUT"
+          echo "onnx=$ONNX_CHECKSUM" >> "$GITHUB_OUTPUT"
+          echo "RACommons: $COMMONS_CHECKSUM"
+          echo "RABackendLLAMACPP: $LLAMACPP_CHECKSUM"
+          echo "RABackendONNX: $ONNX_CHECKSUM"
+
+      - name: Update Package.swift Checksums and Version
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          COMMONS_CHECKSUM="${{ steps.checksums.outputs.commons }}"
+          LLAMACPP_CHECKSUM="${{ steps.checksums.outputs.llamacpp }}"
+          ONNX_CHECKSUM="${{ steps.checksums.outputs.onnx }}"
+          # Ensure production mode for release (remote binaries)
+          sed -i '' 's/let useLocalBinaries = true/let useLocalBinaries = false/' Package.swift
+          # Update sdkVersion
+          sed -i '' 's/let sdkVersion = "[^"]*"/let sdkVersion = "'"$VERSION"'"/' Package.swift
+          # Update the three binary target checksums (range: url line through checksum line)
+          sed -i '' '/RACommons-ios-v.*zip/,/checksum:/ s/checksum: "[^"]*"/checksum: "'"$COMMONS_CHECKSUM"'"/' Package.swift
+          sed -i '' '/RABackendLLAMACPP-ios-v.*zip/,/checksum:/ s/checksum: "[^"]*"/checksum: "'"$LLAMACPP_CHECKSUM"'"/' Package.swift
+          sed -i '' '/RABackendONNX-ios-v.*zip/,/checksum:/ s/checksum: "[^"]*"/checksum: "'"$ONNX_CHECKSUM"'"/' Package.swift
+          echo "Updated Package.swift sdkVersion and checksums"
+          grep -A1 "RACommons-ios" Package.swift | head -4
+
+      - name: Commit and Push Package.swift Update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Package.swift
+          if git diff --staged --quiet; then
+            echo "No Package.swift changes to commit"
+          else
+            git commit -m "chore(swift): update Package.swift checksums for swift-v${{ steps.version.outputs.version }}"
+            git push origin HEAD:main
+          fi
+
+      - name: Update Tag to Commit with Checksums
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          # Delete remote tag so we can move it to the new commit
+          git push origin ":refs/tags/${TAG}" || true
+          # Tag current commit (with Package.swift update)
+          git tag -f "${TAG}" -m "Swift SDK Release ${TAG}"
+          git push origin "${TAG}"
+          echo "Tag ${TAG} updated to point to commit with correct checksums"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
