@@ -15,8 +15,9 @@
 #ifndef RAC_DIFFUSION_TOKENIZER_H
 #define RAC_DIFFUSION_TOKENIZER_H
 
-#include "rac/core/rac_types.h"
-#include "rac/features/diffusion/rac_diffusion_types.h"
+// Flattened includes for Swift SDK
+#include "rac_types.h"
+#include "rac_diffusion_types.h"
 
 #ifdef __cplusplus
 extern "C" {
