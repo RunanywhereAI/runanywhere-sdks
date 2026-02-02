@@ -219,22 +219,22 @@ func binaryTargets() -> [Target] {
     } else {
         // =====================================================================
         // PRODUCTION MODE (for external SPM consumers)
-        // Download XCFrameworks from GitHub releases
+        // Download XCFrameworks from GitHub releases (swift-v* tag from Phase 2 CI)
         // =====================================================================
         return [
             .binaryTarget(
                 name: "RACommonsBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/swift-v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
                 checksum: "ba367c89a468513b33fb167b5996574a8797bf2c00a21e01579ec59458813559"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/swift-v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
                 checksum: "9e58e33e2984f5f0498bdad69387aec306fd2d31e6690eab38b9f1d1a21fb0ca"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/swift-v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
                 checksum: "e760044abfe97d2bde9386d801b0e11421c3782980f4088edce6d6d976f48a84"
             ),
             .binaryTarget(
