@@ -149,7 +149,15 @@ class DiffusionViewModel: ObservableObject {
         generatedImage = nil
 
         do {
-            let options = DiffusionGenerationOptions(prompt: prompt)
+            // Use 256x256 for mobile devices to reduce memory usage
+            // bk-sdm-tiny was trained for 256x256 images
+            // 512x512 requires ~512MB for attention matrix which exceeds mobile memory limits
+            let options = DiffusionGenerationOptions(
+                prompt: prompt,
+                width: 256,
+                height: 256,
+                steps: 20  // Reduced steps for faster generation on mobile
+            )
             let stream = try await RunAnywhere.generateImageStream(prompt: prompt, options: options)
 
             for try await update in stream {

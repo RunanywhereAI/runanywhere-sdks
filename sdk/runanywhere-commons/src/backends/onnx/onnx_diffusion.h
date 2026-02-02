@@ -276,6 +276,9 @@ class ONNXDiffusion {
     // Utility
     void free_sessions();
     bool check_onnx_status(OrtStatus* status, const char* operation);
+    
+    // Verify external data files are accessible before generation
+    bool verify_external_data_accessible(std::string& error_message);
 };
 
 }  // namespace diffusion

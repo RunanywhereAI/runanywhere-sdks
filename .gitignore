@@ -340,6 +340,9 @@ sdk/runanywhere-swift/Sources/RunAnywhere/Data/Network/DevelopmentConfig.swift
 # Swift SDK - Local XCFrameworks
 sdk/runanywhere-swift/Binaries/*.xcframework
 
+# Swift SDK - Vendor directory (locally built xcframeworks)
+sdk/runanywhere-swift/vendor/
+
 # Kotlin SDK - Local JNI libs
 sdk/runanywhere-kotlin/src/androidMain/jniLibs/
 
