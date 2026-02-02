@@ -39,6 +39,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Determine Version
         id: version
@@ -53,7 +56,20 @@ jobs:
         run: |
           ./${COMMONS_DIR}/scripts/build-ios.sh --clean
           echo "XCFrameworks:"
-          ls -la ${COMMONS_DIR}/dist/*.xcframework 2>/dev/null || true
+          ls -la ${COMMONS_DIR}/dist/*.xcframework/ 2>/dev/null || true
+
+      - name: Verify Required XCFrameworks
+        run: |
+          set -e
+          COMMONS_DIST="${COMMONS_DIR}/dist"
+          REQUIRED="RACommons RABackendLLAMACPP RABackendONNX"
+          for name in $REQUIRED; do
+            if [ ! -d "${COMMONS_DIST}/${name}.xcframework" ]; then
+              echo "Missing required framework: ${name}.xcframework"
+              exit 1
+            fi
+          done
+          echo "All required XCFrameworks are present."
 
       - name: Build Swift SDK
         run: |
@@ -69,7 +85,7 @@ jobs:
           for name in RACommons RABackendLLAMACPP RABackendONNX; do
             if [ -d "${COMMONS_DIST}/${name}.xcframework" ]; then
               zip_name="${name}-ios-v${VERSION}.zip"
-              (cd "${COMMONS_DIST}" && zip -r "../../../../release-assets/${zip_name}" "${name}.xcframework")
+              (cd "${COMMONS_DIST}" && zip -r "${GITHUB_WORKSPACE}/release-assets/${zip_name}" "${name}.xcframework")
               echo "Created release-assets/${zip_name}"
             fi
           done
@@ -80,6 +96,12 @@ jobs:
         id: checksums
         run: |
           VERSION="${{ steps.version.outputs.version }}"
+          for name in RACommons RABackendLLAMACPP RABackendONNX; do
+            if [ ! -f "release-assets/${name}-ios-v${VERSION}.zip" ]; then
+              echo "Missing required asset: release-assets/${name}-ios-v${VERSION}.zip"
+              exit 1
+            fi
+          done
           COMMONS_CHECKSUM=$(shasum -a 256 "release-assets/RACommons-ios-v${VERSION}.zip" | cut -d ' ' -f 1)
           LLAMACPP_CHECKSUM=$(shasum -a 256 "release-assets/RABackendLLAMACPP-ios-v${VERSION}.zip" | cut -d ' ' -f 1)
           ONNX_CHECKSUM=$(shasum -a 256 "release-assets/RABackendONNX-ios-v${VERSION}.zip" | cut -d ' ' -f 1)
@@ -89,6 +111,19 @@ jobs:
           echo "RACommons: $COMMONS_CHECKSUM"
           echo "RABackendLLAMACPP: $LLAMACPP_CHECKSUM"
           echo "RABackendONNX: $ONNX_CHECKSUM"
+
+      - name: Ensure Main Matches Tag
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          git fetch origin main --prune
+          TAG_COMMIT=$(git rev-parse "${TAG}^{commit}")
+          MAIN_COMMIT=$(git rev-parse "origin/main")
+          if [ "$TAG_COMMIT" != "$MAIN_COMMIT" ]; then
+            echo "Tag ${TAG} points to ${TAG_COMMIT}, but origin/main is ${MAIN_COMMIT}"
+            echo "Refusing to update Package.swift on main to avoid mismatched assets."
+            exit 1
+          fi
+          git checkout -B main origin/main
 
       - name: Update Package.swift Checksums and Version
         run: |
@@ -119,30 +154,20 @@ jobs:
             git push origin HEAD:main
           fi
 
-      - name: Update Tag to Commit with Checksums
-        run: |
-          TAG="${{ steps.version.outputs.tag }}"
-          # Delete remote tag so we can move it to the new commit
-          git push origin ":refs/tags/${TAG}" || true
-          # Tag current commit (with Package.swift update)
-          git tag -f "${TAG}" -m "Swift SDK Release ${TAG}"
-          git push origin "${TAG}"
-          echo "Tag ${TAG} updated to point to commit with correct checksums"
-
       - name: Create Semver Tag for SPM
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           # SPM resolves versions from semver tags (e.g. 0.1.2 or v0.1.2)
-          # Create tag ${VERSION} on same commit so consumers can use from: "X.Y.Z"
-          git push origin ":refs/tags/${VERSION}" 2>/dev/null || true
-          git tag -f "${VERSION}" -m "Swift SDK v${VERSION}"
-          git push origin "${VERSION}"
-          echo "Semver tag ${VERSION} created for SPM resolution"
+          # Create v${VERSION} on the checksum-updated commit so consumers can use from: "X.Y.Z"
+          SEMVER_TAG="v${VERSION}"
+          git tag -a "${SEMVER_TAG}" -m "Swift SDK ${SEMVER_TAG}"
+          git push origin "${SEMVER_TAG}"
+          echo "Semver tag ${SEMVER_TAG} created for SPM resolution"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
+          tag_name: v${{ steps.version.outputs.version }}
           name: RunAnywhere Swift SDK v${{ steps.version.outputs.version }}
           body: |
             ## RunAnywhere Swift SDK v${{ steps.version.outputs.version }}
@@ -181,7 +206,7 @@ jobs:
             - **Privacy**: All processing happens on-device
 
             ### Requirements
-            - iOS 13.0+ / macOS 10.15+
+            - iOS 17.0+ / macOS 14.0+
             - Swift 5.9+
             - Xcode 15.0+
 
