@@ -14,6 +14,7 @@ class DiffusionViewModel: ObservableObject {
 
     @Published var isModelLoaded = false
     @Published var currentModelName: String?
+    @Published var currentBackend: String = "" // "CoreML" or "ONNX"
     @Published var availableModels: [ModelInfo] = []
     @Published var selectedModel: ModelInfo?
 
@@ -77,6 +78,10 @@ class DiffusionViewModel: ObservableObject {
             isModelLoaded = try await RunAnywhere.isDiffusionModelLoaded
             if isModelLoaded {
                 currentModelName = try await RunAnywhere.currentDiffusionModelId
+                // Determine backend from selected model
+                if let model = selectedModel {
+                    currentBackend = model.framework.displayName
+                }
             }
         } catch {
             logger.error("Failed to check model state: \(error.localizedDescription)")
@@ -121,7 +126,8 @@ class DiffusionViewModel: ObservableObject {
             try await RunAnywhere.loadDiffusionModel(modelPath: path.path, modelId: model.id, modelName: model.name, configuration: config)
             isModelLoaded = true
             currentModelName = model.name
-            statusMessage = "Model loaded"
+            currentBackend = model.framework.displayName
+            statusMessage = "Model loaded (\(currentBackend))"
         } catch {
             errorMessage = "Load failed: \(error.localizedDescription)"
             statusMessage = "Failed"
