@@ -44,8 +44,8 @@ import {
   RoutingPolicyDisplayNames,
   SETTINGS_CONSTRAINTS,
 } from '../types/settings';
-import type { StoredModel } from '../types/model';
 import { LLMFramework, FrameworkDisplayNames } from '../types/model';
+import { safeEvaluateExpression } from '../utils/mathParser';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
 import { RunAnywhere, type ModelInfo } from '@runanywhere/core';
@@ -55,6 +55,7 @@ const STORAGE_KEYS = {
   API_KEY: '@runanywhere_api_key',
   BASE_URL: '@runanywhere_base_url',
   DEVICE_REGISTERED: '@runanywhere_device_registered',
+  TOOL_CALLING_ENABLED: '@runanywhere_tool_calling_enabled',
 };
 
 /**
@@ -134,7 +135,6 @@ export const SettingsScreen: React.FC = () => {
   // Storage state
   const [storageInfo, setStorageInfo] =
     useState<StorageInfo>(DEFAULT_STORAGE_INFO);
-  const [storedModels, setStoredModels] = useState<StoredModel[]>([]);
   const [_isRefreshing, setIsRefreshing] = useState(false);
   const [sdkVersion, setSdkVersion] = useState('0.1.0');
 
@@ -156,6 +156,10 @@ export const SettingsScreen: React.FC = () => {
   >({});
   const [downloadedModels, setDownloadedModels] = useState<ModelInfo[]>([]);
 
+  // Tool calling state
+  const [toolCallingEnabled, setToolCallingEnabled] = useState(false);
+  const [registeredTools, setRegisteredTools] = useState<Array<{name: string; description: string; parameters: Array<{name: string}>}>>([]);
+
   // Capability names mapping
   const capabilityNames: Record<number, string> = {
     0: 'STT (Speech-to-Text)',
@@ -170,6 +174,7 @@ export const SettingsScreen: React.FC = () => {
   useEffect(() => {
     loadData();
     loadApiConfiguration();
+    loadToolCallingSettings();
   }, []);
 
   /**
@@ -187,6 +192,158 @@ export const SettingsScreen: React.FC = () => {
     } catch (error) {
       console.error('[Settings] Failed to load API configuration:', error);
     }
+  };
+
+  /**
+   * Load tool calling settings from AsyncStorage
+   */
+  const loadToolCallingSettings = async () => {
+    try {
+      const enabled = await AsyncStorage.getItem(STORAGE_KEYS.TOOL_CALLING_ENABLED);
+      setToolCallingEnabled(enabled === 'true');
+      refreshRegisteredTools();
+    } catch (error) {
+      console.error('[Settings] Failed to load tool calling settings:', error);
+    }
+  };
+
+  /**
+   * Refresh the list of registered tools from SDK
+   */
+  const refreshRegisteredTools = () => {
+    const tools = RunAnywhere.getRegisteredTools();
+    setRegisteredTools(tools.map(t => ({
+      name: t.name,
+      description: t.description,
+      parameters: t.parameters || [],
+    })));
+  };
+
+  /**
+   * Toggle tool calling enabled state
+   */
+  const handleToggleToolCalling = async (enabled: boolean) => {
+    setToolCallingEnabled(enabled);
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.TOOL_CALLING_ENABLED, enabled ? 'true' : 'false');
+    } catch (error) {
+      console.error('[Settings] Failed to save tool calling setting:', error);
+    }
+  };
+
+  /**
+   * Register demo tools (weather, time, calculator)
+   */
+  const registerDemoTools = () => {
+    // Clear existing tools
+    RunAnywhere.clearTools();
+
+    // Weather tool - Real API (wttr.in - no key needed)
+    RunAnywhere.registerTool(
+      {
+        name: 'get_weather',
+        description: 'Gets the current weather for a city or location',
+        parameters: [
+          {
+            name: 'location',
+            type: 'string',
+            description: 'City name or location (e.g., "Tokyo", "New York", "London")',
+            required: true,
+          },
+        ],
+      },
+      async (args: Record<string, unknown>) => {
+        const location = (args.location as string) || 'San Francisco';
+        try {
+          const response = await fetch(
+            `https://wttr.in/${encodeURIComponent(location)}?format=j1`
+          );
+          const data = await response.json();
+          const current = data.current_condition?.[0];
+          return {
+            location,
+            temperature_c: current?.temp_C || 'N/A',
+            temperature_f: current?.temp_F || 'N/A',
+            condition: current?.weatherDesc?.[0]?.value || 'Unknown',
+            humidity: current?.humidity || 'N/A',
+            wind_kph: current?.windspeedKmph || 'N/A',
+          };
+        } catch (error) {
+          return { error: `Failed to get weather: ${error}` };
+        }
+      }
+    );
+
+    // Time tool - Real system time
+    RunAnywhere.registerTool(
+      {
+        name: 'get_current_time',
+        description: 'Gets the current date, time, and timezone information',
+        parameters: [],
+      },
+      async () => {
+        const now = new Date();
+        return {
+          datetime: now.toLocaleString(),
+          time: now.toLocaleTimeString(),
+          timestamp: now.toISOString(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        };
+      }
+    );
+
+    // Calculator tool - Math evaluation
+    RunAnywhere.registerTool(
+      {
+        name: 'calculate',
+        description: 'Performs math calculations. Supports +, -, *, /, and parentheses',
+        parameters: [
+          {
+            name: 'expression',
+            type: 'string',
+            description: 'Math expression (e.g., "2 + 2 * 3", "(10 + 5) / 3")',
+            required: true,
+          },
+        ],
+      },
+      async (args: Record<string, unknown>) => {
+        const expression = (args.expression as string) || '0';
+        try {
+          // Safe math evaluation using recursive descent parser
+          const result = safeEvaluateExpression(expression);
+          return {
+            expression: expression,
+            result: result,
+          };
+        } catch (error) {
+          return { error: `Failed to calculate: ${error}` };
+        }
+      }
+    );
+
+    refreshRegisteredTools();
+    Alert.alert('Demo Tools Added', '3 demo tools have been registered: get_weather, get_current_time, calculate');
+  };
+
+  /**
+   * Clear all registered tools
+   */
+  const clearAllTools = () => {
+    Alert.alert(
+      'Clear All Tools',
+      'Are you sure you want to remove all registered tools?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: () => {
+            RunAnywhere.clearTools();
+            refreshRegisteredTools();
+          },
+        },
+      ]
+    );
   };
 
   /**
@@ -327,26 +484,12 @@ export const SettingsScreen: React.FC = () => {
         const storage = await RunAnywhere.getStorageInfo();
         console.warn('[Settings] Storage info:', storage);
         setStorageInfo({
-          totalStorage: storage.totalSpace,
-          appStorage: storage.usedSpace,
-          modelsStorage: storage.modelsSize,
-          cacheSize: 0, // SDK doesn't provide cache size separately
-          freeSpace: storage.freeSpace,
+          totalStorage: storage.deviceStorage.totalSpace,
+          appStorage: storage.appStorage.totalSize,
+          modelsStorage: storage.modelStorage.totalSize,
+          cacheSize: storage.cacheSize,
+          freeSpace: storage.deviceStorage.freeSpace,
         });
-        // Update storedModels from downloaded models
-        const models = await RunAnywhere.getAvailableModels();
-        const downloaded = models.filter((m) => m.isDownloaded);
-        setStoredModels(
-          downloaded.map((m) => ({
-            id: m.id,
-            name: m.name,
-            framework:
-              (m.compatibleFrameworks?.[0] as unknown as LLMFramework) ||
-              LLMFramework.LlamaCpp,
-            sizeOnDisk: m.downloadSize || 0,
-            downloadedAt: new Date(),
-          }))
-        );
       } catch (err) {
         console.warn('[Settings] Failed to get storage info:', err);
       }
@@ -389,33 +532,7 @@ export const SettingsScreen: React.FC = () => {
     setShowApiConfigModal(false);
   }, []);
 
-  /**
-   * Handle model deletion
-   */
-  const handleDeleteModel = useCallback((model: StoredModel) => {
-    Alert.alert(
-      'Delete Model',
-      `Are you sure you want to delete ${model.name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // Unload models if they're loaded
-              await RunAnywhere.unloadModel();
-              await RunAnywhere.unloadSTTModel();
-              await RunAnywhere.unloadTTSModel();
-              setStoredModels((prev) => prev.filter((m) => m.id !== model.id));
-            } catch (error) {
-              Alert.alert('Error', `Failed to delete model: ${error}`);
-            }
-          },
-        },
-      ]
-    );
-  }, []);
+
 
   /**
    * Handle clear cache
@@ -508,9 +625,17 @@ export const SettingsScreen: React.FC = () => {
    * Handle delete downloaded model
    */
   const handleDeleteDownloadedModel = useCallback(async (model: ModelInfo) => {
+    const downloadedModel = downloadedModels.find((m) => m.id === model.id);
+    // Prefer downloaded model's size (actual disk usage) over catalog downloadSize (expected size)
+    // TODO: Replace with actual disk size once SDK exposes it (e.g., sizeOnDisk or actualSize)
+    const freedSize =
+      downloadedModel?.downloadSize ?? // Use downloaded model's size when available
+      model.downloadSize ??
+      0;
+
     Alert.alert(
       'Delete Model',
-      `Are you sure you want to delete ${model.name}? This will free up ${formatBytes(model.downloadSize || 0)}.`,
+      `Are you sure you want to delete ${model.name}? This will free up ${formatBytes(freedSize)}.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -528,7 +653,7 @@ export const SettingsScreen: React.FC = () => {
         },
       ]
     );
-  }, []);
+  }, [downloadedModels]);
 
   /**
    * Handle clear all data
@@ -550,7 +675,6 @@ export const SettingsScreen: React.FC = () => {
               await RunAnywhere.unloadTTSModel();
               // Destroy SDK
               await RunAnywhere.destroy();
-              setStoredModels([]);
               Alert.alert('Success', 'All data cleared');
             } catch (error) {
               Alert.alert('Error', `Failed to clear data: ${error}`);
@@ -668,30 +792,7 @@ export const SettingsScreen: React.FC = () => {
     );
   };
 
-  /**
-   * Render stored model row
-   */
-  const renderStoredModelRow = (model: StoredModel) => (
-    <View key={model.id} style={styles.modelRow}>
-      <View style={styles.modelInfo}>
-        <Text style={styles.modelName}>{model.name}</Text>
-        <View style={styles.modelMeta}>
-          <View style={styles.frameworkBadge}>
-            <Text style={styles.frameworkBadgeText}>
-              {FrameworkDisplayNames[model.framework] || model.framework}
-            </Text>
-          </View>
-          <Text style={styles.modelSize}>{formatBytes(model.sizeOnDisk)}</Text>
-        </View>
-      </View>
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={() => handleDeleteModel(model)}
-      >
-        <Icon name="trash-outline" size={20} color={Colors.primaryRed} />
-      </TouchableOpacity>
-    </View>
-  );
+
 
   /**
    * Render catalog model row
@@ -701,6 +802,16 @@ export const SettingsScreen: React.FC = () => {
     const downloadProgress = downloadingModels[model.id] || 0;
     const isDownloaded = downloadedModels.some((m) => m.id === model.id);
 
+    // Determine framework based on format
+    const framework = model.format === 'onnx' ? LLMFramework.ONNX : LLMFramework.LlamaCpp;
+    const frameworkName = FrameworkDisplayNames[framework] || framework;
+
+    // Get model size estimate based on download size (may differ from actual on-disk size)
+    const downloadedModel = downloadedModels.find((m) => m.id === model.id);
+    const modelSize =
+      downloadedModel?.downloadSize ?? // Prefer size from downloaded model when available
+      model.downloadSize ?? // Fall back to catalog's expected download size
+      0;
     return (
       <View key={model.id} style={styles.catalogModelRow}>
         <View style={styles.catalogModelInfo}>
@@ -717,9 +828,9 @@ export const SettingsScreen: React.FC = () => {
           )}
           <View style={styles.catalogModelMeta}>
             <Text style={styles.catalogModelSize}>
-              {formatBytes(model.downloadSize || 0)}
+              {formatBytes(modelSize)}
             </Text>
-            <Text style={styles.catalogModelFormat}>{model.format}</Text>
+            <Text style={styles.catalogModelFormat}>{frameworkName}</Text>
           </View>
           {isDownloading && (
             <View style={styles.downloadProgressContainer}>
@@ -849,6 +960,102 @@ export const SettingsScreen: React.FC = () => {
           </Text>
         </View>
 
+        {/* Tool Settings - Matches iOS ToolSettingsView */}
+        {renderSectionHeader('Tool Settings')}
+        <View style={styles.section}>
+          {/* Enable Tool Calling Toggle */}
+          <View style={styles.toolSettingRow}>
+            <View style={styles.toolSettingInfo}>
+              <Text style={styles.toolSettingLabel}>Enable Tool Calling</Text>
+              <Text style={styles.toolSettingDescription}>
+                Allow LLMs to call tools (APIs, functions)
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.toggleButton,
+                toolCallingEnabled && styles.toggleButtonActive,
+              ]}
+              onPress={() => handleToggleToolCalling(!toolCallingEnabled)}
+            >
+              <View
+                style={[
+                  styles.toggleKnob,
+                  toolCallingEnabled && styles.toggleKnobActive,
+                ]}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {toolCallingEnabled && (
+            <>
+              <View style={styles.apiConfigDivider} />
+              
+              {/* Registered Tools Count */}
+              <View style={styles.toolSettingRow}>
+                <Text style={styles.toolSettingLabel}>Registered Tools</Text>
+                <Text style={[styles.toolSettingValue, { color: registeredTools.length > 0 ? Colors.primaryGreen : Colors.textSecondary }]}>
+                  {registeredTools.length} {registeredTools.length === 1 ? 'tool' : 'tools'}
+                </Text>
+              </View>
+
+              {/* Demo Tools Button */}
+              {registeredTools.length === 0 && (
+                <>
+                  <View style={styles.apiConfigDivider} />
+                  <TouchableOpacity
+                    style={styles.demoToolsButton}
+                    onPress={registerDemoTools}
+                  >
+                    <Icon name="add-circle-outline" size={20} color={Colors.primaryBlue} />
+                    <Text style={styles.demoToolsButtonText}>Add Demo Tools</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+
+              {/* Registered Tools List */}
+              {registeredTools.length > 0 && (
+                <>
+                  <View style={styles.apiConfigDivider} />
+                  {registeredTools.map((tool, index) => (
+                    <View key={tool.name} style={styles.toolRow}>
+                      <Icon name="construct-outline" size={18} color={Colors.primaryBlue} />
+                      <View style={styles.toolInfo}>
+                        <Text style={styles.toolName}>{tool.name}</Text>
+                        <Text style={styles.toolDescription} numberOfLines={2}>{tool.description}</Text>
+                        {tool.parameters.length > 0 && (
+                          <View style={styles.toolParams}>
+                            {tool.parameters.map((p) => (
+                              <View key={p.name} style={styles.toolParamChip}>
+                                <Text style={styles.toolParamText}>{p.name}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                      {index < registeredTools.length - 1 && <View style={styles.apiConfigDivider} />}
+                    </View>
+                  ))}
+
+                  {/* Clear All Tools Button */}
+                  <View style={styles.apiConfigDivider} />
+                  <TouchableOpacity
+                    style={styles.clearToolsButton}
+                    onPress={clearAllTools}
+                  >
+                    <Icon name="trash-outline" size={18} color={Colors.statusRed} />
+                    <Text style={styles.clearToolsButtonText}>Clear All Tools</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </>
+          )}
+
+          <Text style={styles.apiConfigHint}>
+            Tools allow the LLM to call external APIs and functions to get real-time data.
+          </Text>
+        </View>
+
         {/* Storage Overview - Matches iOS CombinedSettingsView */}
         {renderSectionHeader('Storage Overview')}
         <View style={styles.section}>
@@ -894,16 +1101,6 @@ export const SettingsScreen: React.FC = () => {
             availableModels.map(renderCatalogModelRow)
           )}
         </View>
-
-        {/* Downloaded Models (legacy) */}
-        {storedModels.length > 0 && (
-          <>
-            {renderSectionHeader('Downloaded Models')}
-            <View style={styles.section}>
-              {storedModels.map(renderStoredModelRow)}
-            </View>
-          </>
-        )}
 
         {/* Storage Management */}
         {renderSectionHeader('Storage Management')}
@@ -1577,6 +1774,116 @@ const styles = StyleSheet.create({
   },
   modalButtonTextDisabled: {
     color: Colors.textTertiary,
+  },
+  // Tool Settings styles
+  toolSettingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Padding.padding16,
+  },
+  toolSettingInfo: {
+    flex: 1,
+    marginRight: Spacing.medium,
+  },
+  toolSettingLabel: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+    fontWeight: '500',
+  },
+  toolSettingDescription: {
+    ...Typography.footnote,
+    color: Colors.textSecondary,
+    marginTop: Spacing.xxSmall,
+  },
+  toolSettingValue: {
+    ...Typography.body,
+    fontWeight: '600',
+  },
+  toggleButton: {
+    width: 51,
+    height: 31,
+    borderRadius: 15.5,
+    backgroundColor: Colors.backgroundGray5,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  toggleButtonActive: {
+    backgroundColor: Colors.primaryBlue,
+  },
+  toggleKnob: {
+    width: 27,
+    height: 27,
+    borderRadius: 13.5,
+    backgroundColor: Colors.textWhite,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  toggleKnobActive: {
+    alignSelf: 'flex-end',
+  },
+  demoToolsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.small,
+    padding: Padding.padding16,
+  },
+  demoToolsButtonText: {
+    ...Typography.body,
+    color: Colors.primaryBlue,
+    fontWeight: '600',
+  },
+  toolRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: Padding.padding16,
+    gap: Spacing.medium,
+  },
+  toolInfo: {
+    flex: 1,
+  },
+  toolName: {
+    ...Typography.subheadline,
+    color: Colors.textPrimary,
+    fontWeight: '600',
+  },
+  toolDescription: {
+    ...Typography.footnote,
+    color: Colors.textSecondary,
+    marginTop: Spacing.xxSmall,
+  },
+  toolParams: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.xSmall,
+    marginTop: Spacing.small,
+  },
+  toolParamChip: {
+    backgroundColor: Colors.badgeBlue,
+    paddingHorizontal: Spacing.small,
+    paddingVertical: Spacing.xxSmall,
+    borderRadius: BorderRadius.small,
+  },
+  toolParamText: {
+    ...Typography.caption2,
+    color: Colors.primaryBlue,
+    fontWeight: '500',
+  },
+  clearToolsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.small,
+    padding: Padding.padding16,
+  },
+  clearToolsButtonText: {
+    ...Typography.body,
+    color: Colors.statusRed,
+    fontWeight: '600',
   },
 });
 

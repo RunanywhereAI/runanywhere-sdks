@@ -162,6 +162,14 @@ export interface ToolCallingOptions {
    * Default: false (tool definitions are removed after first call to encourage natural response)
    */
   keepToolsAvailable?: boolean;
+
+  /**
+   * Tool calling format to use.
+   * - 'default': JSON format with <tool_call> tags (Llama, Qwen, Mistral, etc.)
+   * - 'lfm2': Pythonic format for Liquid AI LFM2-Tool models
+   * Default: 'default'
+   */
+  format?: string;
 }
 
 // =============================================================================

@@ -381,6 +381,10 @@ final class VoiceAgentViewModel: ObservableObject {
         sessionState = .connecting
         currentStatus = "Connecting..."
         errorMessage = nil
+        
+        // Clear previous conversation when starting a new one
+        currentTranscript = ""
+        assistantResponse = ""
 
         do {
             session = try await RunAnywhere.startVoiceSession()
@@ -453,8 +457,14 @@ final class VoiceAgentViewModel: ObservableObject {
 
     // MARK: - Helper Properties
 
-    var currentSTTModel: String { sttModel?.name ?? "Not loaded" }
-    var currentLLMModel: String { llmModel?.name ?? "Not loaded" }
-    var currentTTSModel: String { ttsModel?.name ?? "Not loaded" }
+    var currentSTTModel: String {
+        sttModel?.name.modelNameFromID() ?? "Not loaded"
+    }
+    var currentLLMModel: String {
+        llmModel?.name.modelNameFromID() ?? "Not loaded"
+    }
+    var currentTTSModel: String {
+        ttsModel?.name.modelNameFromID() ?? "Not loaded"
+    }
     var whisperModel: String { currentSTTModel }
 }
