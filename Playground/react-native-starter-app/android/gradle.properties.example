@@ -1,0 +1,32 @@
+# Gradle properties for RunAnywhere React Native Sample App
+#
+# Copy this file to gradle.properties:
+#   cp gradle.properties.example gradle.properties
+
+# AndroidX Migration
+android.useAndroidX=true
+android.enableJetifier=false
+
+# RunAnywhere SDK - Local Development
+# Set to true to use locally built native libraries
+# Set to false to download from GitHub releases
+runanywhere.testLocal=true
+
+# Gradle JVM Settings
+# Increase memory for React Native builds
+org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError
+
+# React Native
+# Enable Hermes engine
+hermesEnabled=true
+
+# Android Build Settings
+android.defaults.buildfeatures.buildconfig=true
+android.nonTransitiveRClass=false
+android.nonFinalResIds=false
+
+# =============================================================================
+# 16KB Page Alignment for Android 15+ (API 35) Compliance
+# Required for Google Play submissions starting November 2025
+# =============================================================================
+android.bundle.pageAlignSharedLibs=true

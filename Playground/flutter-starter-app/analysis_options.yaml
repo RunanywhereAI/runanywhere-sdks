@@ -1,0 +1,118 @@
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    # ==========================================================================
+    # STRONG TYPING (Matches iOS force_cast, force_unwrapping rules)
+    # ==========================================================================
+    - always_declare_return_types       # All functions must have explicit return types
+    - avoid_types_as_parameter_names    # Don't use type names as parameter names
+    - type_annotate_public_apis         # All public APIs must be typed
+    - avoid_dynamic_calls               # No calling methods on dynamic types
+    - always_use_package_imports        # Use package: imports, not relative
+    - prefer_generic_function_type_aliases  # Type safety for function types
+
+    # ==========================================================================
+    # RELIABILITY (Matches iOS unused_* and error handling rules)
+    # ==========================================================================
+    - avoid_print                       # No print statements in production
+    - cancel_subscriptions              # Always cancel stream subscriptions
+    - close_sinks                       # Always close stream sinks
+    - unawaited_futures                 # Catch unhandled futures
+    - discarded_futures                 # Don't discard futures
+    - empty_catches                     # No empty catch blocks (matches iOS philosophy)
+    # avoid_slow_async_io disabled - we use async File methods correctly
+    - throw_in_finally                  # Don't throw in finally blocks
+
+    # ==========================================================================
+    # NULL SAFETY (Matches iOS force_unwrapping rules)
+    # ==========================================================================
+    - avoid_returning_null_for_void     # Don't return null from void functions
+    # avoid_returning_null_for_future removed in Dart 3.3.0
+    - avoid_null_checks_in_equality_operators  # Use == null pattern correctly
+    - null_check_on_nullable_type_parameter    # Proper null checking
+
+    # ==========================================================================
+    # CODE ORGANIZATION (Matches iOS sorted_imports, multiline_* rules)
+    # ==========================================================================
+    - avoid_relative_lib_imports        # Use package imports
+    - directives_ordering               # Organize imports (dart, package, relative)
+    # always_put_required_named_parameters_first disabled - would require breaking API changes
+    # cascade_invocations disabled - can reduce code readability in many cases
+    - leading_newlines_in_multiline_strings      # Consistent multiline strings
+    - curly_braces_in_flow_control_structures    # Always use braces
+
+    # ==========================================================================
+    # IMMUTABILITY & PERFORMANCE (Matches iOS const usage philosophy)
+    # ==========================================================================
+    - prefer_const_constructors         # Use const where possible
+    - prefer_const_constructors_in_immutables  # Const in immutable classes
+    - prefer_const_literals_to_create_immutables
+    - prefer_const_declarations         # Const variables where possible
+    - prefer_final_fields               # Fields should be final when possible
+    - prefer_final_locals               # Local variables should be final
+    - prefer_final_in_for_each          # Final in for-each loops
+
+    # ==========================================================================
+    # STYLE & CONSISTENCY (Matches iOS style rules)
+    # ==========================================================================
+    - prefer_single_quotes              # Use single quotes for strings
+    - prefer_void_to_null               # Use void instead of Null
+    - use_key_in_widget_constructors    # Keys in widget constructors
+    - avoid_catching_errors             # Catch Exception, not Error
+    - no_duplicate_case_values          # No duplicate switch cases
+    - avoid_void_async                  # Async functions should return Future
+    - avoid_empty_else                  # No empty else blocks
+    - prefer_is_empty                   # Use isEmpty instead of length == 0
+    - prefer_is_not_empty               # Use isNotEmpty instead of !isEmpty
+    - unnecessary_await_in_return       # Don't await in return statements
+    - unnecessary_lambdas               # Don't use lambdas when not needed
+    - unnecessary_null_aware_assignments # Don't use ??= when not needed
+    - use_string_buffers                # Use StringBuffer for string concatenation
+
+    # ==========================================================================
+    # DOCUMENTATION (Matches iOS public_member_api_docs philosophy)
+    # ==========================================================================
+    # - public_member_api_docs          # Uncomment to require docs on public APIs
+
+analyzer:
+  exclude:
+    - '**/*.g.dart'
+    - '**/*.freezed.dart'
+    - 'lib/generated/**'
+  language:
+    strict-casts: true       # No implicit casts from dynamic
+    strict-inference: true   # Infer types strictly
+    strict-raw-types: true   # Require type arguments for generic types
+  errors:
+    # ==========================================================================
+    # ERROR LEVEL - Must be fixed (Matches iOS error-level rules)
+    # ==========================================================================
+    dead_code: error
+    unused_import: error
+    unused_local_variable: error
+    unused_element: error
+    unused_field: error
+
+    # ==========================================================================
+    # WARNING LEVEL - Should be fixed (Matches iOS warning-level rules)
+    # ==========================================================================
+    avoid_dynamic_calls: warning
+    avoid_print: warning
+    prefer_const_constructors: warning
+    prefer_const_declarations: warning
+    prefer_final_locals: warning
+    prefer_final_fields: warning
+    empty_catches: warning
+
+    # ==========================================================================
+    # INFO LEVEL - Nice to have
+    # ==========================================================================
+    prefer_single_quotes: info
+    unnecessary_lambdas: info
+    use_string_buffers: info
+
+    # ==========================================================================
+    # IGNORED - Generated code or special cases
+    # ==========================================================================
+    invalid_annotation_target: ignore

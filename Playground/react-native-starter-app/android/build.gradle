@@ -1,0 +1,36 @@
+buildscript {
+    ext {
+        buildToolsVersion = "36.0.0"
+        minSdkVersion = 24
+        compileSdkVersion = 36
+        targetSdkVersion = 36
+        ndkVersion = "28.0.13004108"
+        kotlinVersion = "2.1.20"
+    }
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath("com.android.tools.build:gradle")
+        classpath("com.facebook.react:react-native-gradle-plugin")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+    }
+}
+
+apply plugin: "com.facebook.react.rootproject"
+
+// =============================================================================
+// Fix: Node.js not found when running from Android Studio
+// Android Studio doesn't inherit terminal PATH
+// =============================================================================
+gradle.taskGraph.whenReady { taskGraph ->
+    taskGraph.allTasks.each { task ->
+        if (task.name.contains("generateCodegenSchemaFromJavaScript") ||
+            task.name.contains("Codegen")) {
+            if (task.hasProperty("environment")) {
+                task.environment("PATH", "/opt/homebrew/bin:/usr/local/bin:/usr/bin:" + (System.getenv("PATH") ?: ""))
+            }
+        }
+    }
+}
