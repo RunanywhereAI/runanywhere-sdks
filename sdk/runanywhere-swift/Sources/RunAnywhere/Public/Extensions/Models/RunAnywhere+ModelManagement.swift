@@ -246,6 +246,8 @@ extension RunAnywhere {
     /// - Returns: Array of available models
     public static func availableModels() async throws -> [ModelInfo] {
         guard isInitialized else { throw SDKError.general(.notInitialized, "SDK not initialized") }
+        // Ensure services are initialized (including Platform backend registration)
+        try await ensureServicesReady()
         return await CppBridge.ModelRegistry.shared.getAll()
     }
 

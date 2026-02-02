@@ -146,11 +146,15 @@ rac_result_t rac_diffusion_create(const char* model_id, rac_handle_t* out_handle
     request.framework = framework;
     request.model_path = model_path;
 
-    RAC_LOG_INFO(LOG_CAT, "Service request: framework=%d, model_path=%s",
+    RAC_LOG_INFO(LOG_CAT, "Diffusion service request: framework=%d (%s), model_path=%s",
                  static_cast<int>(request.framework),
+                 framework == RAC_FRAMEWORK_COREML ? "CoreML" :
+                 framework == RAC_FRAMEWORK_ONNX ? "ONNX" :
+                 framework == RAC_FRAMEWORK_UNKNOWN ? "Unknown" : "Other",
                  request.model_path ? request.model_path : "NULL");
 
     // Service registry returns an rac_diffusion_service_t* with vtable already set
+    RAC_LOG_INFO(LOG_CAT, "Calling rac_service_create for DIFFUSION capability...");
     result = rac_service_create(RAC_CAPABILITY_DIFFUSION, &request, out_handle);
 
     if (model_info) {

@@ -44,26 +44,30 @@ extension CppBridge {
         @MainActor
         public static func register() {
             guard !isInitialized else {
-                logger.debug("Platform backend already registered")
+                logger.info("Platform backend already registered (skipping)")
                 return
             }
 
-            logger.info("Registering platform backend...")
+            logger.info("🔧 Registering platform backend...")
 
             // Register Swift callbacks for LLM (Foundation Models)
+            logger.info("  - Registering LLM callbacks...")
             registerLLMCallbacks()
 
             // Register Swift callbacks for TTS (System TTS)
+            logger.info("  - Registering TTS callbacks...")
             registerTTSCallbacks()
 
             // Register Swift callbacks for Diffusion (CoreML)
+            logger.info("  - Registering Diffusion callbacks...")
             registerDiffusionCallbacks()
 
             // Register the backend module and service providers
+            logger.info("  - Calling rac_backend_platform_register()...")
             let result = rac_backend_platform_register()
             if result == RAC_SUCCESS || result == RAC_ERROR_MODULE_ALREADY_REGISTERED {
                 isInitialized = true
-                logger.info("✅ Platform backend registered successfully")
+                logger.info("✅ Platform backend registered successfully (result=\(result))")
             } else {
                 logger.error("❌ Failed to register platform backend: \(result)")
             }
