@@ -14,9 +14,10 @@
 #ifndef RAC_DIFFUSION_H
 #define RAC_DIFFUSION_H
 
-#include "rac/features/diffusion/rac_diffusion_component.h"
-#include "rac/features/diffusion/rac_diffusion_service.h"
-#include "rac/features/diffusion/rac_diffusion_tokenizer.h"
-#include "rac/features/diffusion/rac_diffusion_types.h"
+// Flattened includes for Swift SDK
+#include "rac_diffusion_component.h"
+#include "rac_diffusion_service.h"
+#include "rac_diffusion_tokenizer.h"
+#include "rac_diffusion_types.h"
 
 #endif /* RAC_DIFFUSION_H */
