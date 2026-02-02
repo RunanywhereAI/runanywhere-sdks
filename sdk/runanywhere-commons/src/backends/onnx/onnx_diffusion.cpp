@@ -19,6 +19,40 @@
 
 #include "rac/core/rac_logger.h"
 
+// Platform-specific Execution Provider declarations
+// These are conditionally compiled based on CMake definitions
+
+#if defined(__APPLE__) && defined(ORT_USE_COREML)
+// CoreML Execution Provider for Apple Neural Engine
+// Available in ONNX Runtime iOS/macOS packages by default
+#ifdef __cplusplus
+extern "C" {
+#endif
+OrtStatus* OrtSessionOptionsAppendExecutionProvider_CoreML(OrtSessionOptions* options, 
+                                                           uint32_t coreml_flags);
+#ifdef __cplusplus
+}
+#endif
+#define RAC_COREML_EP_AVAILABLE 1
+#else
+#define RAC_COREML_EP_AVAILABLE 0
+#endif // __APPLE__ && ORT_USE_COREML
+
+#if defined(__ANDROID__) && defined(ORT_USE_NNAPI)
+// NNAPI Execution Provider for Android NPU acceleration
+#ifdef __cplusplus
+extern "C" {
+#endif
+OrtStatus* OrtSessionOptionsAppendExecutionProvider_Nnapi(OrtSessionOptions* options,
+                                                          uint32_t nnapi_flags);
+#ifdef __cplusplus
+}
+#endif
+#define RAC_NNAPI_EP_AVAILABLE 1
+#else
+#define RAC_NNAPI_EP_AVAILABLE 0
+#endif // __ANDROID__ && ORT_USE_NNAPI
+
 namespace fs = std::filesystem;
 
 namespace runanywhere {
@@ -218,37 +252,104 @@ bool ONNXDiffusion::create_session_options() {
     check_onnx_status(status, "SetSessionGraphOptimizationLevel");
     
     // Add execution provider based on config
-    switch (config_.execution_provider) {
+    bool ep_added = false;
+    ONNXExecutionProvider effective_ep = config_.execution_provider;
+    
+    // Auto-detect best provider if AUTO is selected
+    if (effective_ep == ONNXExecutionProvider::AUTO) {
+#if RAC_COREML_EP_AVAILABLE
+        effective_ep = ONNXExecutionProvider::COREML;
+        RAC_LOG_INFO("ONNXDiffusion", "Auto-selecting CoreML EP for Apple Neural Engine");
+#elif RAC_NNAPI_EP_AVAILABLE
+        effective_ep = ONNXExecutionProvider::NNAPI;
+        RAC_LOG_INFO("ONNXDiffusion", "Auto-selecting NNAPI EP for Android NPU");
+#else
+        effective_ep = ONNXExecutionProvider::CPU;
+        RAC_LOG_INFO("ONNXDiffusion", "Auto-selecting CPU EP (no hardware acceleration available)");
+#endif
+    }
+    
+    switch (effective_ep) {
         case ONNXExecutionProvider::COREML:
-#ifdef __APPLE__
-            // CoreML execution provider would be added here
-            RAC_LOG_INFO("ONNXDiffusion", "Using CoreML execution provider");
+#if RAC_COREML_EP_AVAILABLE
+            // Add CoreML Execution Provider for Apple Neural Engine acceleration
+            {
+                // CoreML flags:
+                // COREML_FLAG_CREATE_MLPROGRAM (1) - Create ML Program format (iOS 15+, macOS 12+)
+                // COREML_FLAG_ENABLE_ON_SUBGRAPH (2) - Enable on subgraphs
+                // COREML_FLAG_ONLY_ENABLE_DEVICE_WITH_ANE (4) - Only use if ANE available
+                // COREML_FLAG_ONLY_ALLOW_STATIC_INPUT_SHAPES (8) - Static shapes only
+                // COREML_FLAG_REQUIRE_STATIC_INPUT_SHAPES (16) - Require static shapes
+                
+                uint32_t coreml_flags = 0;
+                // Enable on subgraphs for better operator coverage
+                coreml_flags |= 2;  // COREML_FLAG_ENABLE_ON_SUBGRAPH
+                
+                status = OrtSessionOptionsAppendExecutionProvider_CoreML(session_options_, coreml_flags);
+                if (status == nullptr) {
+                    RAC_LOG_INFO("ONNXDiffusion", "CoreML EP enabled for Neural Engine acceleration (flags=%u)", coreml_flags);
+                    ep_added = true;
+                } else {
+                    const char* error_msg = ort_api_->GetErrorMessage(status);
+                    RAC_LOG_WARNING("ONNXDiffusion", "CoreML EP not available: %s (falling back to CPU)", 
+                                   error_msg ? error_msg : "unknown error");
+                    ort_api_->ReleaseStatus(status);
+                }
+            }
+#else
+            RAC_LOG_WARNING("ONNXDiffusion", "CoreML EP requested but not available (ORT_USE_COREML not defined)");
 #endif
             break;
             
         case ONNXExecutionProvider::NNAPI:
-#ifdef __ANDROID__
-            // NNAPI execution provider would be added here
-            RAC_LOG_INFO("ONNXDiffusion", "Using NNAPI execution provider");
+#if RAC_NNAPI_EP_AVAILABLE
+            // Add NNAPI Execution Provider for Android NPU acceleration
+            {
+                // NNAPI flags:
+                // NNAPI_FLAG_USE_FP16 (0x001) - Use FP16 for performance
+                // NNAPI_FLAG_USE_NCHW (0x002) - Use NCHW format
+                // NNAPI_FLAG_CPU_DISABLED (0x004) - Disable CPU fallback
+                // NNAPI_FLAG_CPU_ONLY (0x008) - Use CPU only
+                
+                uint32_t nnapi_flags = 0;
+                nnapi_flags |= 0x001;  // NNAPI_FLAG_USE_FP16 for performance
+                
+                status = OrtSessionOptionsAppendExecutionProvider_Nnapi(session_options_, nnapi_flags);
+                if (status == nullptr) {
+                    RAC_LOG_INFO("ONNXDiffusion", "NNAPI EP enabled for NPU acceleration (flags=%u)", nnapi_flags);
+                    ep_added = true;
+                } else {
+                    const char* error_msg = ort_api_->GetErrorMessage(status);
+                    RAC_LOG_WARNING("ONNXDiffusion", "NNAPI EP not available: %s (falling back to CPU)", 
+                                   error_msg ? error_msg : "unknown error");
+                    ort_api_->ReleaseStatus(status);
+                }
+            }
+#else
+            RAC_LOG_WARNING("ONNXDiffusion", "NNAPI EP requested but not available (ORT_USE_NNAPI not defined)");
 #endif
             break;
             
         case ONNXExecutionProvider::CUDA:
-            // CUDA execution provider would be added here
-            RAC_LOG_INFO("ONNXDiffusion", "Using CUDA execution provider");
+            // CUDA execution provider - would require CUDA runtime
+            RAC_LOG_WARNING("ONNXDiffusion", "CUDA EP requested but not yet implemented");
             break;
             
+        case ONNXExecutionProvider::DIRECTML:
+            // DirectML execution provider - Windows only
+            RAC_LOG_WARNING("ONNXDiffusion", "DirectML EP requested but not yet implemented");
+            break;
+            
+        case ONNXExecutionProvider::CPU:
         case ONNXExecutionProvider::AUTO:
         default:
-            // Auto-detect best provider
-#ifdef __APPLE__
-            RAC_LOG_INFO("ONNXDiffusion", "Auto-selecting CoreML provider");
-#elif defined(__ANDROID__)
-            RAC_LOG_INFO("ONNXDiffusion", "Auto-selecting NNAPI provider");
-#else
-            RAC_LOG_INFO("ONNXDiffusion", "Using CPU provider");
-#endif
+            RAC_LOG_INFO("ONNXDiffusion", "Using CPU execution provider");
+            ep_added = true;  // CPU is always available
             break;
+    }
+    
+    if (!ep_added) {
+        RAC_LOG_INFO("ONNXDiffusion", "Falling back to CPU execution provider");
     }
     
     return true;
@@ -272,19 +373,212 @@ bool ONNXDiffusion::load_text_encoder(const std::string& path) {
 }
 
 bool ONNXDiffusion::load_unet(const std::string& path) {
+    RAC_LOG_INFO("ONNXDiffusion", "Loading UNet from path: %s", path.c_str());
+    
     if (!fs::exists(path)) {
         RAC_LOG_ERROR("ONNXDiffusion", "UNet not found: %s", path.c_str());
         return false;
     }
     
-    OrtStatus* status = ort_api_->CreateSession(
-        ort_env_, path.c_str(), session_options_, &unet_session_);
+    // Check for external data files in the same directory
+    // Different ONNX models use different naming conventions:
+    // - weights.pb (common in HuggingFace community models)
+    // - model.onnx_data (default ONNX export convention)
+    fs::path model_path(path);
+    fs::path model_dir = model_path.parent_path();
+    fs::path weights_pb_path = model_dir / "weights.pb";
+    fs::path onnx_data_path = model_dir / "model.onnx_data";
     
-    if (!check_onnx_status(status, "LoadUNet")) {
-        return false;
+    std::string model_dir_str = model_dir.string();
+    
+    RAC_LOG_INFO("ONNXDiffusion", "UNet model directory: %s", model_dir_str.c_str());
+    
+    // List directory contents for debugging
+    RAC_LOG_INFO("ONNXDiffusion", "Listing files in UNet directory:");
+    if (fs::exists(model_dir) && fs::is_directory(model_dir)) {
+        for (const auto& entry : fs::directory_iterator(model_dir)) {
+            std::string filename = entry.path().filename().string();
+            auto file_size = entry.is_regular_file() ? fs::file_size(entry.path()) : 0;
+            RAC_LOG_INFO("ONNXDiffusion", "  - %s (%s, %llu bytes)", 
+                filename.c_str(),
+                entry.is_regular_file() ? "file" : "dir",
+                static_cast<unsigned long long>(file_size));
+        }
+    } else {
+        RAC_LOG_ERROR("ONNXDiffusion", "UNet model directory does not exist or is not a directory!");
     }
     
-    RAC_LOG_DEBUG("ONNXDiffusion", "Loaded UNet from: %s", path.c_str());
+    // Check for external data - models may use either naming convention
+    bool has_weights_pb = fs::exists(weights_pb_path);
+    bool has_onnx_data = fs::exists(onnx_data_path);
+    bool has_external_data = has_weights_pb || has_onnx_data;
+    
+    RAC_LOG_INFO("ONNXDiffusion", "External weights files: weights.pb=%s, model.onnx_data=%s", 
+        has_weights_pb ? "YES" : "NO", 
+        has_onnx_data ? "YES" : "NO");
+    
+    // IMPORTANT: Create symlinks/copies to ensure ONNX Runtime can find the external data
+    // regardless of what filename is embedded in the ONNX model
+    // iOS sandbox may prevent symlink creation, so we try symlink first, then fall back to copy
+    if (has_weights_pb && !has_onnx_data) {
+        // Need to create model.onnx_data -> weights.pb
+        RAC_LOG_INFO("ONNXDiffusion", "Attempting to create symlink: %s -> %s",
+            onnx_data_path.string().c_str(), weights_pb_path.string().c_str());
+        
+        std::error_code ec;
+        fs::create_symlink(weights_pb_path, onnx_data_path, ec);
+        
+        if (ec) {
+            RAC_LOG_WARNING("ONNXDiffusion", "Symlink creation failed (error %d: %s), trying hard link",
+                ec.value(), ec.message().c_str());
+            
+            // Try hard link as fallback
+            ec.clear();
+            fs::create_hard_link(weights_pb_path, onnx_data_path, ec);
+            
+            if (ec) {
+                RAC_LOG_WARNING("ONNXDiffusion", "Hard link failed (error %d: %s), trying file copy",
+                    ec.value(), ec.message().c_str());
+                
+                // Last resort: copy the file (this will use ~500MB more disk space)
+                ec.clear();
+                fs::copy_file(weights_pb_path, onnx_data_path, ec);
+                
+                if (ec) {
+                    RAC_LOG_ERROR("ONNXDiffusion", "File copy also failed (error %d: %s). External data will NOT be found!",
+                        ec.value(), ec.message().c_str());
+                } else {
+                    RAC_LOG_INFO("ONNXDiffusion", "Successfully copied weights.pb to model.onnx_data");
+                }
+            } else {
+                RAC_LOG_INFO("ONNXDiffusion", "Successfully created hard link: model.onnx_data -> weights.pb");
+            }
+        } else {
+            RAC_LOG_INFO("ONNXDiffusion", "Successfully created symlink: model.onnx_data -> weights.pb");
+        }
+    } else if (has_onnx_data && !has_weights_pb) {
+        // Need to create weights.pb -> model.onnx_data
+        RAC_LOG_INFO("ONNXDiffusion", "Attempting to create symlink: %s -> %s",
+            weights_pb_path.string().c_str(), onnx_data_path.string().c_str());
+        
+        std::error_code ec;
+        fs::create_symlink(onnx_data_path, weights_pb_path, ec);
+        
+        if (ec) {
+            RAC_LOG_WARNING("ONNXDiffusion", "Symlink creation failed (error %d: %s), trying hard link",
+                ec.value(), ec.message().c_str());
+            
+            ec.clear();
+            fs::create_hard_link(onnx_data_path, weights_pb_path, ec);
+            
+            if (ec) {
+                RAC_LOG_WARNING("ONNXDiffusion", "Hard link failed (error %d: %s), trying file copy",
+                    ec.value(), ec.message().c_str());
+                
+                ec.clear();
+                fs::copy_file(onnx_data_path, weights_pb_path, ec);
+                
+                if (ec) {
+                    RAC_LOG_ERROR("ONNXDiffusion", "File copy also failed (error %d: %s). External data will NOT be found!",
+                        ec.value(), ec.message().c_str());
+                } else {
+                    RAC_LOG_INFO("ONNXDiffusion", "Successfully copied model.onnx_data to weights.pb");
+                }
+            } else {
+                RAC_LOG_INFO("ONNXDiffusion", "Successfully created hard link: weights.pb -> model.onnx_data");
+            }
+        } else {
+            RAC_LOG_INFO("ONNXDiffusion", "Successfully created symlink: weights.pb -> model.onnx_data");
+        }
+    } else if (has_weights_pb && has_onnx_data) {
+        RAC_LOG_INFO("ONNXDiffusion", "Both external data files already exist, no symlink/copy needed");
+    }
+    
+    // Verify external data files after symlink/copy creation
+    if (has_external_data) {
+        bool final_weights_pb = fs::exists(weights_pb_path);
+        bool final_onnx_data = fs::exists(onnx_data_path);
+        RAC_LOG_INFO("ONNXDiffusion", "After symlink/copy: weights.pb=%s, model.onnx_data=%s",
+            final_weights_pb ? "YES" : "NO",
+            final_onnx_data ? "YES" : "NO");
+        
+        if (final_weights_pb && final_onnx_data) {
+            // Log file sizes to verify they're correct
+            std::error_code ec;
+            auto weights_size = fs::file_size(weights_pb_path, ec);
+            auto onnx_data_size = fs::file_size(onnx_data_path, ec);
+            RAC_LOG_INFO("ONNXDiffusion", "External data sizes: weights.pb=%llu bytes, model.onnx_data=%llu bytes",
+                (unsigned long long)weights_size, (unsigned long long)onnx_data_size);
+        } else {
+            RAC_LOG_ERROR("ONNXDiffusion", "CRITICAL: External data files are missing after symlink/copy attempt!");
+        }
+    }
+    
+    if (has_external_data) {
+        RAC_LOG_INFO("ONNXDiffusion", "UNet has external data files - will use CPU EP only (CoreML EP doesn't support external data)");
+        
+        // CoreML EP doesn't support external data files properly
+        // Create a separate session options for UNet with CPU-only execution
+        OrtSessionOptions* unet_options = nullptr;
+        OrtStatus* status = ort_api_->CreateSessionOptions(&unet_options);
+        if (!check_onnx_status(status, "CreateUNetSessionOptions")) {
+            return false;
+        }
+        
+        // Copy basic settings from main session options
+        int num_threads = config_.num_threads > 0 ? config_.num_threads : 4;
+        ort_api_->SetIntraOpNumThreads(unet_options, num_threads);
+        
+        // IMPORTANT: Disable memory pattern and CPU memory arena for external data
+        // These can cause issues with external initializers on iOS
+        // Memory pattern may try to reuse memory in ways incompatible with external data
+        ort_api_->DisableMemPattern(unet_options);
+        RAC_LOG_INFO("ONNXDiffusion", "Disabled memory pattern for UNet (external data compatibility)");
+        
+        // Disable CPU memory arena to avoid memory allocation issues
+        ort_api_->DisableCpuMemArena(unet_options);
+        RAC_LOG_INFO("ONNXDiffusion", "Disabled CPU memory arena for UNet (external data compatibility)");
+        
+        // Use a more conservative optimization level for models with external data
+        ort_api_->SetSessionGraphOptimizationLevel(unet_options, ORT_ENABLE_BASIC);
+        RAC_LOG_INFO("ONNXDiffusion", "Set basic optimization level for UNet (external data compatibility)");
+        
+        // Disable environment allocators for better memory control with external data
+        status = ort_api_->AddSessionConfigEntry(unet_options, 
+            "session.use_env_allocators", "0");
+        if (status) {
+            RAC_LOG_WARNING("ONNXDiffusion", "Failed to set session.use_env_allocators: %s", 
+                ort_api_->GetErrorMessage(status));
+            ort_api_->ReleaseStatus(status);
+        }
+        
+        RAC_LOG_INFO("ONNXDiffusion", "Using CPU execution provider for UNet (external data not supported by CoreML EP)");
+        
+        // Create session with CPU-only options
+        // Note: External data paths are resolved relative to the model file location.
+        // We've created symlinks for both weights.pb and model.onnx_data above to ensure
+        // the external data is found regardless of which filename the model references internally.
+        status = ort_api_->CreateSession(
+            ort_env_, path.c_str(), unet_options, &unet_session_);
+        
+        ort_api_->ReleaseSessionOptions(unet_options);
+        
+        if (!check_onnx_status(status, "LoadUNet")) {
+            return false;
+        }
+    } else {
+        // No external data, use the main session options (may include CoreML/NNAPI EP)
+        RAC_LOG_INFO("ONNXDiffusion", "UNet has NO external data file - using main session options (may include CoreML/NNAPI EP)");
+        OrtStatus* status = ort_api_->CreateSession(
+            ort_env_, path.c_str(), session_options_, &unet_session_);
+        
+        if (!check_onnx_status(status, "LoadUNet")) {
+            return false;
+        }
+    }
+    
+    RAC_LOG_INFO("ONNXDiffusion", "Successfully loaded UNet from: %s (external_data=%s)", 
+                  path.c_str(), has_external_data ? "YES" : "NO");
     return true;
 }
 
@@ -367,6 +661,14 @@ DiffusionResult ONNXDiffusion::generate(const DiffusionOptions& options,
     
     if (!model_loaded_) {
         result.error_message = "Model not loaded";
+        return result;
+    }
+    
+    // Verify external data files are accessible before starting generation
+    // This prevents crashes during UNet inference if the weights file becomes inaccessible
+    std::string external_data_error;
+    if (!verify_external_data_accessible(external_data_error)) {
+        result.error_message = external_data_error;
         return result;
     }
     
@@ -461,9 +763,23 @@ DiffusionResult ONNXDiffusion::generate(const DiffusionOptions& options,
         std::vector<float> noise_pred_uncond = run_unet_step(
             latent_input, uncond_embeddings, t);
         
+        // Check if UNet inference failed (returns empty vector on error)
+        if (noise_pred_uncond.empty()) {
+            RAC_LOG_ERROR("ONNXDiffusion", "UNet unconditional prediction failed at step %d", i);
+            result.error_message = "UNet inference failed - external data file may be inaccessible";
+            return result;
+        }
+        
         // Run UNet for conditional prediction
         std::vector<float> noise_pred_text = run_unet_step(
             latent_input, text_embeddings, t);
+        
+        // Check if UNet inference failed
+        if (noise_pred_text.empty()) {
+            RAC_LOG_ERROR("ONNXDiffusion", "UNet conditional prediction failed at step %d", i);
+            result.error_message = "UNet inference failed - external data file may be inaccessible";
+            return result;
+        }
         
         // Apply classifier-free guidance
         std::vector<float> noise_pred = apply_guidance(
@@ -676,6 +992,9 @@ std::vector<float> ONNXDiffusion::run_unet_step(const std::vector<float>& latent
     OrtValue* input_tensors[] = {sample_tensor, timestep_tensor, encoder_tensor};
     OrtValue* output_tensor = nullptr;
     
+    // Note: External data paths are resolved by ONNX Runtime relative to the model file location.
+    // We've created symlinks for both weights.pb and model.onnx_data during model loading
+    // to ensure the external data is found regardless of which filename the model references internally.
     status = ort_api_->Run(
         unet_session_,
         nullptr,
@@ -857,6 +1176,56 @@ bool ONNXDiffusion::check_onnx_status(OrtStatus* status, const char* operation) 
         ort_api_->ReleaseStatus(status);
         return false;
     }
+    return true;
+}
+
+bool ONNXDiffusion::verify_external_data_accessible(std::string& error_message) {
+    // Check if UNet has external data files and verify they're accessible
+    fs::path unet_dir = fs::path(model_dir_) / "unet";
+    fs::path weights_pb_path = unet_dir / "weights.pb";
+    fs::path onnx_data_path = unet_dir / "model.onnx_data";
+    
+    bool has_weights_pb = fs::exists(weights_pb_path);
+    bool has_onnx_data = fs::exists(onnx_data_path);
+    
+    RAC_LOG_DEBUG("ONNXDiffusion", "Pre-generation check: model_dir=%s, weights.pb=%s, model.onnx_data=%s",
+        model_dir_.c_str(), has_weights_pb ? "YES" : "NO", has_onnx_data ? "YES" : "NO");
+    
+    // If neither external data file exists, that's fine (no external data)
+    if (!has_weights_pb && !has_onnx_data) {
+        return true;
+    }
+    
+    // Verify the external data file(s) are actually readable
+    std::vector<fs::path> files_to_check;
+    if (has_weights_pb) files_to_check.push_back(weights_pb_path);
+    if (has_onnx_data) files_to_check.push_back(onnx_data_path);
+    
+    for (const auto& file_path : files_to_check) {
+        // Try to open the file to verify it's readable
+        std::ifstream test_file(file_path, std::ios::binary);
+        if (!test_file.is_open()) {
+            error_message = "External data file exists but cannot be opened: " + file_path.string();
+            RAC_LOG_ERROR("ONNXDiffusion", "Cannot open external data file for reading: %s", file_path.c_str());
+            return false;
+        }
+        
+        // Try to read a few bytes to verify the file is actually accessible
+        char buffer[16];
+        test_file.read(buffer, sizeof(buffer));
+        if (test_file.gcount() == 0) {
+            error_message = "External data file exists but is empty or unreadable: " + file_path.string();
+            RAC_LOG_ERROR("ONNXDiffusion", "External data file is empty or unreadable: %s", file_path.c_str());
+            return false;
+        }
+        
+        // Log success and file size
+        std::error_code ec;
+        auto file_size = fs::file_size(file_path, ec);
+        RAC_LOG_INFO("ONNXDiffusion", "Verified external data file is accessible: %s (%llu bytes)", 
+            file_path.c_str(), static_cast<unsigned long long>(file_size));
+    }
+    
     return true;
 }
 

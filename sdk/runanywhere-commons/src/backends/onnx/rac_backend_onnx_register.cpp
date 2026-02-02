@@ -418,12 +418,19 @@ static const rac_diffusion_service_ops_t g_onnx_diffusion_ops = {
 rac_bool_t onnx_diffusion_can_handle(const rac_service_request_t* request, void* user_data) {
     (void)user_data;
 
-    if (request == nullptr || request->identifier == nullptr) {
+    if (request == nullptr) {
         return RAC_FALSE;
     }
 
-    const char* path = request->identifier;
-    RAC_LOG_INFO(LOG_CAT, "onnx_diffusion_can_handle: checking path=%s", path);
+    // Prefer model_path over identifier (model_path is the actual filesystem path)
+    const char* path = request->model_path ? request->model_path : request->identifier;
+    if (path == nullptr) {
+        RAC_LOG_DEBUG(LOG_CAT, "onnx_diffusion_can_handle: no path provided -> FALSE");
+        return RAC_FALSE;
+    }
+
+    RAC_LOG_INFO(LOG_CAT, "onnx_diffusion_can_handle: checking path=%s, framework=%d", 
+                 path, request->framework);
 
     // Check if this is a valid ONNX diffusion model directory
     if (rac_diffusion_onnx_is_valid_model(path) == RAC_TRUE) {
@@ -431,16 +438,38 @@ rac_bool_t onnx_diffusion_can_handle(const rac_service_request_t* request, void*
         return RAC_TRUE;
     }
 
-    // Also check if the path contains .onnx files (for backward compatibility)
+    // Check for ONNX diffusion model structure (unet/, text_encoder/, vae_decoder/)
     fs::path dir_path(path);
     if (fs::exists(dir_path) && fs::is_directory(dir_path)) {
-        for (const auto& entry : fs::directory_iterator(dir_path)) {
-            if (entry.path().extension() == ".onnx") {
-                // Found an ONNX file - could be diffusion if it has the right structure
-                RAC_LOG_INFO(LOG_CAT, "onnx_diffusion_can_handle: found .onnx file");
-                return RAC_TRUE;
-            }
+        // Look for typical Stable Diffusion ONNX structure
+        bool has_unet = fs::exists(dir_path / "unet" / "model.onnx") || 
+                        fs::exists(dir_path / "unet" / "model.onnx_data");
+        bool has_text_encoder = fs::exists(dir_path / "text_encoder" / "model.onnx");
+        bool has_vae_decoder = fs::exists(dir_path / "vae_decoder" / "model.onnx");
+        
+        if (has_unet || has_text_encoder || has_vae_decoder) {
+            RAC_LOG_INFO(LOG_CAT, "onnx_diffusion_can_handle: found SD ONNX structure (unet=%d, text_enc=%d, vae=%d) -> TRUE",
+                        has_unet, has_text_encoder, has_vae_decoder);
+            return RAC_TRUE;
         }
+
+        // Also check for .onnx files at root level (for backward compatibility)
+        try {
+            for (const auto& entry : fs::directory_iterator(dir_path)) {
+                if (entry.path().extension() == ".onnx") {
+                    RAC_LOG_INFO(LOG_CAT, "onnx_diffusion_can_handle: found .onnx file at root");
+                    return RAC_TRUE;
+                }
+            }
+        } catch (const fs::filesystem_error&) {
+            // Ignore
+        }
+    }
+
+    // Check framework hint as last resort (for cases where path doesn't exist yet)
+    if (request->framework == RAC_FRAMEWORK_ONNX) {
+        RAC_LOG_INFO(LOG_CAT, "onnx_diffusion_can_handle: framework hint ONNX -> TRUE");
+        return RAC_TRUE;
     }
 
     RAC_LOG_INFO(LOG_CAT, "onnx_diffusion_can_handle: not a diffusion model -> FALSE");
@@ -453,15 +482,25 @@ rac_handle_t onnx_diffusion_create(const rac_service_request_t* request, void* u
 
     RAC_LOG_INFO(LOG_CAT, "onnx_diffusion_create ENTRY - provider create callback invoked");
 
-    if (request == nullptr || request->identifier == nullptr) {
-        RAC_LOG_ERROR(LOG_CAT, "onnx_diffusion_create: request or identifier is null");
+    if (request == nullptr) {
+        RAC_LOG_ERROR(LOG_CAT, "onnx_diffusion_create: request is null");
         return nullptr;
     }
 
-    RAC_LOG_INFO(LOG_CAT, "Creating ONNX Diffusion service for: %s", request->identifier);
+    // Prefer model_path over identifier (model_path is the actual filesystem path)
+    const char* model_path = request->model_path ? request->model_path : request->identifier;
+    const char* model_id = request->identifier ? request->identifier : model_path;
+
+    if (model_path == nullptr) {
+        RAC_LOG_ERROR(LOG_CAT, "onnx_diffusion_create: no model path provided");
+        return nullptr;
+    }
+
+    RAC_LOG_INFO(LOG_CAT, "Creating ONNX Diffusion service for path: %s (id: %s)", 
+                 model_path, model_id ? model_id : "NULL");
 
     rac_handle_t backend_handle = nullptr;
-    rac_result_t result = rac_diffusion_onnx_create(request->identifier, nullptr, &backend_handle);
+    rac_result_t result = rac_diffusion_onnx_create(model_path, nullptr, &backend_handle);
     if (result != RAC_SUCCESS) {
         RAC_LOG_ERROR(LOG_CAT, "rac_diffusion_onnx_create failed with result: %d", result);
         return nullptr;
@@ -477,7 +516,7 @@ rac_handle_t onnx_diffusion_create(const rac_service_request_t* request, void* u
 
     service->ops = &g_onnx_diffusion_ops;
     service->impl = backend_handle;
-    service->model_id = strdup(request->identifier);
+    service->model_id = model_id ? strdup(model_id) : nullptr;
 
     RAC_LOG_INFO(LOG_CAT, "ONNX Diffusion service created successfully, service=%p", service);
     return service;

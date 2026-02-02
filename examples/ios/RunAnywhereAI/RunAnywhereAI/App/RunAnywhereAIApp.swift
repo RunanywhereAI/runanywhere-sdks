@@ -323,6 +323,7 @@ struct RunAnywhereAIApp: App {
         // BK-SDM-Tiny: Most compressed SD model (0.50B params, ~500MB) - Best for mobile!
         // Source: https://huggingface.co/nota-ai/bk-sdm-tiny
         // Requires conversion to ONNX - using pre-converted community version
+        // NOTE: UNet uses external data format - weights.pb contains the weights
         if let bksdmTinyURL = URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/unet/model.onnx") {
             RunAnywhere.registerMultiFileModel(
                 id: "bk-sdm-tiny-onnx",
@@ -337,6 +338,11 @@ struct RunAnywhereAIApp: App {
                         url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/unet/model.onnx")!,
                         filename: "unet/model.onnx"
                     ),
+                    // UNet external weights (3.2GB) - required for model to load
+                    ModelFileDescriptor(
+                        url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/unet/weights.pb")!,
+                        filename: "unet/weights.pb"
+                    ),
                     ModelFileDescriptor(
                         url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/vae_decoder/model.onnx")!,
                         filename: "vae_decoder/model.onnx"
@@ -344,16 +350,31 @@ struct RunAnywhereAIApp: App {
                     ModelFileDescriptor(
                         url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/vae_encoder/model.onnx")!,
                         filename: "vae_encoder/model.onnx"
+                    ),
+                    // Tokenizer files - required for text encoding
+                    ModelFileDescriptor(
+                        url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/tokenizer/vocab.json")!,
+                        filename: "tokenizer/vocab.json"
+                    ),
+                    ModelFileDescriptor(
+                        url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/tokenizer/merges.txt")!,
+                        filename: "tokenizer/merges.txt"
+                    ),
+                    // Scheduler config for diffusion sampling
+                    ModelFileDescriptor(
+                        url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/scheduler/scheduler_config.json")!,
+                        filename: "scheduler/scheduler_config.json"
                     )
                 ],
                 framework: .onnx,
                 modality: .imageGeneration,
-                memoryRequirement: 500_000_000  // ~500MB for tiny
+                memoryRequirement: 4_000_000_000  // ~4GB with UNet weights (3.2GB)
             )
         }
 
         // Stable Diffusion 1.5 Full ONNX (~5.5GB) - High quality but large
         // Source: https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX
+        // NOTE: UNet uses external data format - model.onnx_data contains the weights
         if let sd15ONNXURL = URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/unet/model.onnx") {
             RunAnywhere.registerMultiFileModel(
                 id: "sd15-onnx-full",
@@ -366,6 +387,11 @@ struct RunAnywhereAIApp: App {
                     ModelFileDescriptor(
                         url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/unet/model.onnx")!,
                         filename: "unet/model.onnx"
+                    ),
+                    // UNet external weights (3.2GB) - required for model to load
+                    ModelFileDescriptor(
+                        url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/unet/weights.pb")!,
+                        filename: "unet/weights.pb"
                     ),
                     ModelFileDescriptor(
                         url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/vae_decoder/model.onnx")!,
