@@ -1,0 +1,197 @@
+# =============================================================================
+# Swift SDK Build & Release (Phase 2 CI/CD)
+#
+# When a swift-v* tag is pushed (from Phase 1), build native XCFrameworks via
+# build-ios.sh and the Swift SDK via build-swift.sh on macOS, compute SHA256
+# checksums of the ZIPs, update Package.swift with those checksums and
+# sdkVersion, commit and push to main, move the tag to that commit, then
+# create a GitHub Release and attach the built artifacts. SPM consumers then
+# resolve the tag and get correct checksums for the release assets.
+#
+# Phase 1 decides when (tag on merge to main). Phase 2 performs what
+# (build + package + release assets + checksum update).
+#
+# PR description: Swift SDK builds are automated on swift-v* tag push:
+# build-ios.sh and build-swift.sh run on macOS, and the resulting XCFrameworks
+# are attached to the GitHub Release. No CocoaPods/App Store; no cross-SDK
+# orchestration.
+# =============================================================================
+
+name: Swift SDK Build & Release
+
+on:
+  push:
+    tags:
+      - 'swift-v*'
+
+permissions:
+  contents: write
+
+env:
+  COMMONS_DIR: sdk/runanywhere-commons
+  SWIFT_SDK_DIR: sdk/runanywhere-swift
+
+jobs:
+  build-and-release:
+    name: Build & Release Swift SDK
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#swift-v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Building Swift SDK $TAG (version $VERSION)"
+
+      - name: Build Native XCFrameworks
+        run: |
+          ./${COMMONS_DIR}/scripts/build-ios.sh --clean
+          echo "XCFrameworks:"
+          ls -la ${COMMONS_DIR}/dist/*.xcframework 2>/dev/null || true
+
+      - name: Build Swift SDK
+        run: |
+          ./${SWIFT_SDK_DIR}/scripts/build-swift.sh --local --build-commons --release
+          echo "Swift build complete"
+
+      - name: Prepare Release Assets
+        id: assets
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          COMMONS_DIST="${COMMONS_DIR}/dist"
+          mkdir -p release-assets
+          for name in RACommons RABackendLLAMACPP RABackendONNX; do
+            if [ -d "${COMMONS_DIST}/${name}.xcframework" ]; then
+              zip_name="${name}-ios-v${VERSION}.zip"
+              (cd "${COMMONS_DIST}" && zip -r "../../../../release-assets/${zip_name}" "${name}.xcframework")
+              echo "Created release-assets/${zip_name}"
+            fi
+          done
+          echo "assets_dir=release-assets" >> "$GITHUB_OUTPUT"
+          ls -la release-assets/
+
+      - name: Compute Checksums
+        id: checksums
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          COMMONS_CHECKSUM=$(shasum -a 256 "release-assets/RACommons-ios-v${VERSION}.zip" | cut -d ' ' -f 1)
+          LLAMACPP_CHECKSUM=$(shasum -a 256 "release-assets/RABackendLLAMACPP-ios-v${VERSION}.zip" | cut -d ' ' -f 1)
+          ONNX_CHECKSUM=$(shasum -a 256 "release-assets/RABackendONNX-ios-v${VERSION}.zip" | cut -d ' ' -f 1)
+          echo "commons=$COMMONS_CHECKSUM" >> "$GITHUB_OUTPUT"
+          echo "llamacpp=$LLAMACPP_CHECKSUM" >> "$GITHUB_OUTPUT"
+          echo "onnx=$ONNX_CHECKSUM" >> "$GITHUB_OUTPUT"
+          echo "RACommons: $COMMONS_CHECKSUM"
+          echo "RABackendLLAMACPP: $LLAMACPP_CHECKSUM"
+          echo "RABackendONNX: $ONNX_CHECKSUM"
+
+      - name: Update Package.swift Checksums and Version
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          COMMONS_CHECKSUM="${{ steps.checksums.outputs.commons }}"
+          LLAMACPP_CHECKSUM="${{ steps.checksums.outputs.llamacpp }}"
+          ONNX_CHECKSUM="${{ steps.checksums.outputs.onnx }}"
+          # Ensure production mode for release (remote binaries)
+          sed -i '' 's/let useLocalBinaries = true/let useLocalBinaries = false/' Package.swift
+          # Update sdkVersion
+          sed -i '' 's/let sdkVersion = "[^"]*"/let sdkVersion = "'"$VERSION"'"/' Package.swift
+          # Update the three binary target checksums (range: url line through checksum line)
+          sed -i '' '/RACommons-ios-v.*zip/,/checksum:/ s/checksum: "[^"]*"/checksum: "'"$COMMONS_CHECKSUM"'"/' Package.swift
+          sed -i '' '/RABackendLLAMACPP-ios-v.*zip/,/checksum:/ s/checksum: "[^"]*"/checksum: "'"$LLAMACPP_CHECKSUM"'"/' Package.swift
+          sed -i '' '/RABackendONNX-ios-v.*zip/,/checksum:/ s/checksum: "[^"]*"/checksum: "'"$ONNX_CHECKSUM"'"/' Package.swift
+          echo "Updated Package.swift sdkVersion and checksums"
+          grep -A1 "RACommons-ios" Package.swift | head -4
+
+      - name: Commit and Push Package.swift Update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Package.swift
+          if git diff --staged --quiet; then
+            echo "No Package.swift changes to commit"
+          else
+            git commit -m "chore(swift): update Package.swift checksums for swift-v${{ steps.version.outputs.version }}"
+            git push origin HEAD:main
+          fi
+
+      - name: Update Tag to Commit with Checksums
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          # Delete remote tag so we can move it to the new commit
+          git push origin ":refs/tags/${TAG}" || true
+          # Tag current commit (with Package.swift update)
+          git tag -f "${TAG}" -m "Swift SDK Release ${TAG}"
+          git push origin "${TAG}"
+          echo "Tag ${TAG} updated to point to commit with correct checksums"
+
+      - name: Create Semver Tag for SPM
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # SPM resolves versions from semver tags (e.g. 0.1.2 or v0.1.2)
+          # Create tag ${VERSION} on same commit so consumers can use from: "X.Y.Z"
+          git push origin ":refs/tags/${VERSION}" 2>/dev/null || true
+          git tag -f "${VERSION}" -m "Swift SDK v${VERSION}"
+          git push origin "${VERSION}"
+          echo "Semver tag ${VERSION} created for SPM resolution"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: RunAnywhere Swift SDK v${{ steps.version.outputs.version }}
+          body: |
+            ## RunAnywhere Swift SDK v${{ steps.version.outputs.version }}
+
+            Privacy-first, on-device AI SDK for iOS and macOS. Built automatically on swift-v* tag push (Phase 2 CI).
+
+            ### Installation
+
+            **Swift Package Manager:**
+            ```swift
+            dependencies: [
+                .package(
+                    url: "https://github.com/RunanywhereAI/runanywhere-sdks",
+                    from: "${{ steps.version.outputs.version }}"
+                )
+            ]
+            ```
+
+            Then add the products you need:
+            ```swift
+            .target(
+                name: "YourApp",
+                dependencies: [
+                    .product(name: "RunAnywhere", package: "runanywhere-sdks"),
+                    .product(name: "LlamaCPPRuntime", package: "runanywhere-sdks"),
+                    .product(name: "ONNXRuntime", package: "runanywhere-sdks"),
+                ]
+            )
+            ```
+
+            ### Features
+            - **LLM**: On-device text generation via llama.cpp
+            - **STT**: Speech-to-text via Sherpa-ONNX Whisper
+            - **TTS**: Text-to-speech via Sherpa-ONNX Piper
+            - **VAD**: Voice activity detection
+            - **Privacy**: All processing happens on-device
+
+            ### Requirements
+            - iOS 13.0+ / macOS 10.15+
+            - Swift 5.9+
+            - Xcode 15.0+
+
+            ### Documentation
+            [Swift SDK README](https://github.com/RunanywhereAI/runanywhere-sdks/tree/main/sdk/runanywhere-swift)
+
+            ---
+            Built from runanywhere-sdks @ ${{ github.sha }}
+          files: release-assets/*.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
