@@ -15,7 +15,7 @@ let package = Package(
         .iOS(.v17),
     ],
     dependencies: [
-        .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.1.0"),
+        .package(url: "https://github.com/josuediazflores/runanywhere-sdks", from: "0.1.0"),
     ],
     targets: [
         .executableTarget(
