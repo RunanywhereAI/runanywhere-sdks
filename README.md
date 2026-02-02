@@ -78,6 +78,8 @@ No cloud. No latency. No data leaves the device.
 | **React Native** | Beta | [npm](#react-native) | [docs.runanywhere.ai/react-native](https://docs.runanywhere.ai/react-native/introduction) |
 | **Flutter** | Beta | [pub.dev](#flutter) | [docs.runanywhere.ai/flutter](https://docs.runanywhere.ai/flutter/introduction) |
 
+*Merges to main automatically create Swift SDK tags `swift-vX.Y.Z`; full build and publish automation will be added later.*
+
 ---
 
 ## Quick Start
