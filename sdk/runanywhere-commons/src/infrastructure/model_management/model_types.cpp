@@ -165,6 +165,8 @@ rac_bool_t rac_framework_supports_format(rac_inference_framework_t framework,
                                                                                        : RAC_FALSE;
         case RAC_FRAMEWORK_LLAMACPP:
             return (format == RAC_MODEL_FORMAT_GGUF) ? RAC_TRUE : RAC_FALSE;
+        case RAC_FRAMEWORK_COREML:
+            return (format == RAC_MODEL_FORMAT_COREML) ? RAC_TRUE : RAC_FALSE;
         case RAC_FRAMEWORK_FLUID_AUDIO:
             return (format == RAC_MODEL_FORMAT_BIN) ? RAC_TRUE : RAC_FALSE;
         default:
@@ -176,6 +178,7 @@ rac_bool_t rac_framework_uses_directory_based_models(rac_inference_framework_t f
     // Mirrors Swift's InferenceFramework.usesDirectoryBasedModels
     switch (framework) {
         case RAC_FRAMEWORK_ONNX:
+        case RAC_FRAMEWORK_COREML:  // CoreML compiled models (.mlmodelc) are directories
             return RAC_TRUE;
         default:
             return RAC_FALSE;
@@ -222,6 +225,8 @@ const char* rac_framework_display_name(rac_inference_framework_t framework) {
             return "ONNX Runtime";
         case RAC_FRAMEWORK_LLAMACPP:
             return "llama.cpp";
+        case RAC_FRAMEWORK_COREML:
+            return "Core ML";
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
             return "Foundation Models";
         case RAC_FRAMEWORK_SYSTEM_TTS:
@@ -246,6 +251,8 @@ const char* rac_framework_analytics_key(rac_inference_framework_t framework) {
             return "onnx";
         case RAC_FRAMEWORK_LLAMACPP:
             return "llama_cpp";
+        case RAC_FRAMEWORK_COREML:
+            return "coreml";
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
             return "foundation_models";
         case RAC_FRAMEWORK_SYSTEM_TTS:

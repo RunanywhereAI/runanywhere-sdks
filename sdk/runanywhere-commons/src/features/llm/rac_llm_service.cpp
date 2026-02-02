@@ -38,13 +38,20 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
     rac_model_info_t* model_info = nullptr;
     rac_result_t result = rac_get_model(model_id, &model_info);
 
+    // If not found by model_id, try looking up by path (model_id might be a path)
+    if (result != RAC_SUCCESS) {
+        RAC_LOG_DEBUG(LOG_CAT, "Model not found by ID, trying path lookup: %s", model_id);
+        result = rac_get_model_by_path(model_id, &model_info);
+    }
+
     rac_inference_framework_t framework = RAC_FRAMEWORK_LLAMACPP;
     const char* model_path = model_id;
 
     if (result == RAC_SUCCESS && model_info) {
         framework = model_info->framework;
         model_path = model_info->local_path ? model_info->local_path : model_id;
-        RAC_LOG_INFO(LOG_CAT, "Found model in registry: framework=%d, local_path=%s",
+        RAC_LOG_INFO(LOG_CAT, "Found model in registry: id=%s, framework=%d, local_path=%s",
+                     model_info->id ? model_info->id : "NULL",
                      static_cast<int>(framework), model_path ? model_path : "NULL");
     } else {
         RAC_LOG_WARNING(LOG_CAT,
