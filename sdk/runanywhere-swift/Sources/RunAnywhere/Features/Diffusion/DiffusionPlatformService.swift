@@ -57,12 +57,14 @@ public actor DiffusionPlatformService {
         logger.info("Initializing diffusion pipeline from: \(modelPath)")
         logger.info("Tokenizer source: \(tokenizerSource.description)")
 
-        let resourceURL = URL(fileURLWithPath: modelPath)
-
         // Verify the directory exists
         guard FileManager.default.fileExists(atPath: modelPath) else {
             throw SDKError.diffusion(.modelNotFound, "Model directory not found: \(modelPath)")
         }
+
+        // Find the actual model directory (handles nested directory structure from zip extraction)
+        let resourceURL = try findModelResourceDirectory(at: URL(fileURLWithPath: modelPath))
+        logger.info("Using model resources from: \(resourceURL.path)")
 
         // Ensure tokenizer files exist (Apple's compiled models don't include them)
         try await ensureTokenizerFiles(at: resourceURL, source: tokenizerSource)
@@ -96,6 +98,45 @@ public actor DiffusionPlatformService {
             logger.error("❌ Failed to initialize pipeline: \(error)")
             throw SDKError.diffusion(.initializationFailed, "Failed to initialize: \(error.localizedDescription)")
         }
+    }
+
+    // MARK: - Model Directory Resolution
+
+    /// Find the actual model resource directory, handling nested directory structures
+    /// When a model zip is extracted with `nestedDirectory` structure, the CoreML files
+    /// may be inside a subdirectory (e.g., `coreml-stable-diffusion-v1-5-palettized_split_einsum_v2_compiled/`)
+    /// - Parameter baseURL: The base model directory URL
+    /// - Returns: URL to the directory containing CoreML model files (Unet.mlmodelc, etc.)
+    private func findModelResourceDirectory(at baseURL: URL) throws -> URL {
+        let fileManager = FileManager.default
+
+        // Check if Unet.mlmodelc exists directly in the base directory
+        let directUnet = baseURL.appendingPathComponent("Unet.mlmodelc")
+        if fileManager.fileExists(atPath: directUnet.path) {
+            logger.debug("Found Unet.mlmodelc directly in model directory")
+            return baseURL
+        }
+
+        // Look for a subdirectory containing Unet.mlmodelc (nested directory structure)
+        do {
+            let contents = try fileManager.contentsOfDirectory(at: baseURL, includingPropertiesForKeys: [.isDirectoryKey])
+            for item in contents {
+                var isDirectory: ObjCBool = false
+                if fileManager.fileExists(atPath: item.path, isDirectory: &isDirectory), isDirectory.boolValue {
+                    let nestedUnet = item.appendingPathComponent("Unet.mlmodelc")
+                    if fileManager.fileExists(atPath: nestedUnet.path) {
+                        logger.info("Found CoreML models in nested directory: \(item.lastPathComponent)")
+                        return item
+                    }
+                }
+            }
+        } catch {
+            logger.warning("Error scanning model directory: \(error.localizedDescription)")
+        }
+
+        // If we get here, we couldn't find the model files - return base URL and let the pipeline report the error
+        logger.warning("Could not find Unet.mlmodelc in \(baseURL.path) or its subdirectories")
+        return baseURL
     }
 
     // MARK: - Tokenizer Files
