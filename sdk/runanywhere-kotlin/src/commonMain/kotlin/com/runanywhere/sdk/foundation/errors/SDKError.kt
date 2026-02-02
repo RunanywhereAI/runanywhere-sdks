@@ -588,6 +588,47 @@ data class SDKError(
         }
 
         // ========================================================================
+        // DIFFUSION ERROR FACTORIES
+        // ========================================================================
+
+        /**
+         * Create a Diffusion (image generation) error.
+         *
+         * @param message The error message
+         * @param code The specific error code (defaults to DIFFUSION_GENERATION_FAILED)
+         * @param cause The underlying throwable cause
+         * @return An SDKError with DIFFUSION category
+         */
+        fun diffusion(
+            message: String,
+            code: ErrorCode = ErrorCode.DIFFUSION_GENERATION_FAILED,
+            cause: Throwable? = null,
+        ): SDKError =
+            SDKError(
+                code = code,
+                category = ErrorCategory.DIFFUSION,
+                message = message,
+                cause = cause,
+            )
+
+        /**
+         * Create a Diffusion generation failed error.
+         *
+         * @param reason The reason for the failure (optional)
+         * @param cause The underlying throwable cause
+         * @return An SDKError with DIFFUSION_GENERATION_FAILED code
+         */
+        fun diffusionGenerationFailed(reason: String? = null, cause: Throwable? = null): SDKError {
+            val message =
+                if (reason != null) {
+                    "Image generation failed: $reason"
+                } else {
+                    "Image generation failed"
+                }
+            return diffusion(message, ErrorCode.DIFFUSION_GENERATION_FAILED, cause)
+        }
+
+        // ========================================================================
         // VAD ERROR FACTORIES
         // ========================================================================
 

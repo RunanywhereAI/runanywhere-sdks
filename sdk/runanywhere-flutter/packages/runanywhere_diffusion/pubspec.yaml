@@ -1,0 +1,29 @@
+name: runanywhere_diffusion
+description: Image generation using Stable Diffusion models for the RunAnywhere Flutter SDK. Supports ONNX (cross-platform) and CoreML (iOS).
+version: 0.1.0
+homepage: https://runanywhere.ai
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.10.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  ffi: ^2.0.0
+  runanywhere:
+    path: ../runanywhere
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.runanywhere.diffusion
+        pluginClass: DiffusionPlugin
+      ios:
+        pluginClass: DiffusionPlugin

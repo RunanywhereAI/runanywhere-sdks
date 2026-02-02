@@ -156,6 +156,11 @@ enum class ErrorCode(
      */
     VOICE_AGENT_ERROR(-104),
 
+    /**
+     * Diffusion image generation failed.
+     */
+    DIFFUSION_GENERATION_FAILED(-105),
+
     // ========================================================================
     // DOWNLOAD ERRORS
     // ========================================================================
@@ -262,6 +267,7 @@ enum class ErrorCode(
                 LLM_GENERATION_FAILED -> "LLM generation failed"
                 VAD_DETECTION_FAILED -> "Voice activity detection failed"
                 VOICE_AGENT_ERROR -> "Voice agent error"
+                DIFFUSION_GENERATION_FAILED -> "Image generation failed"
                 DOWNLOAD_FAILED -> "Download failed"
                 DOWNLOAD_CANCELLED -> "Download cancelled"
                 INSUFFICIENT_STORAGE -> "Insufficient storage space"
