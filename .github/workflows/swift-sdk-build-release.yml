@@ -73,8 +73,23 @@ jobs:
 
       - name: Build Swift SDK
         run: |
-          ./${SWIFT_SDK_DIR}/scripts/build-swift.sh --local --build-commons --release
+          # Commons XCFrameworks are built first (Build Native XCFrameworks) and must be
+          # consumed by the Swift package build (via sdk/runanywhere-swift/Binaries).
+          ./${SWIFT_SDK_DIR}/scripts/build-swift.sh --local --release
           echo "Swift build complete"
+
+      - name: Verify Swift Packages Consume XCFrameworks
+        run: |
+          set -e
+          echo "Swift SDK Binaries:"
+          ls -la "${SWIFT_SDK_DIR}/Binaries/" || true
+          for name in RACommons RABackendLLAMACPP RABackendONNX; do
+            if [ ! -d "${SWIFT_SDK_DIR}/Binaries/${name}.xcframework" ]; then
+              echo "Missing expected binary in Swift SDK: ${SWIFT_SDK_DIR}/Binaries/${name}.xcframework"
+              exit 1
+            fi
+          done
+          echo "Swift SDK packages are consuming the Commons-built XCFrameworks."
 
       - name: Prepare Release Assets
         id: assets
