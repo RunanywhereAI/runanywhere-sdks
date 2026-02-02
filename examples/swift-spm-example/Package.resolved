@@ -5,8 +5,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Alamofire/Alamofire.git",
       "state" : {
-        "revision" : "7be73f6c2b5cd90e40798b06ebd5da8f9f79cf88",
-        "version" : "5.11.0"
+        "revision" : "3f99050e75bbc6fe71fc323adabb039756680016",
+        "version" : "5.11.1"
       }
     },
     {
@@ -39,9 +39,9 @@
     {
       "identity" : "runanywhere-sdks",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/josuediazflores/runanywhere-sdks.git",
+      "location" : "https://github.com/RunanywhereAI/runanywhere-sdks.git",
       "state" : {
-        "revision" : "cfe813b71836619090d74da6a584b7995d79e245",
+        "revision" : "1901c9411703bcf5864e6c1340fe68d33796ad66",
         "version" : "0.17.5"
       }
     },

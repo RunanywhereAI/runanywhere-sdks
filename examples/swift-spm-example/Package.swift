@@ -2,14 +2,24 @@
 import PackageDescription
 
 // =============================================================================
-// Minimal Swift app to validate RunAnywhere SDK consumption via SPM.
-// Separate from the main repo code — used to test Phase 2 GitHub Release.
+// Swift SPM Example App
 // =============================================================================
-// Usage: cd validation/swift-spm-consumer && swift build
+//
+// Example app that consumes the RunAnywhere SDK via Swift Package Manager
+// using **versioned** dependency (exact version). Use this to verify SDK
+// consumption from a release tag.
+//
+// Usage:
+//   cd examples/swift-spm-example
+//   swift package update
+//   swift build
+//   # Or open in Xcode and run on iOS Simulator:
+//   open Package.swift
+//
 // =============================================================================
 
 let package = Package(
-    name: "SwiftSPMConsumer",
+    name: "SwiftSPMExample",
     platforms: [
         .macOS(.v14),
         .iOS(.v17),
@@ -19,13 +29,13 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "SwiftSPMConsumer",
+            name: "SwiftSPMExample",
             dependencies: [
                 .product(name: "RunAnywhere", package: "runanywhere-sdks"),
                 .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-sdks"),
                 .product(name: "RunAnywhereONNX", package: "runanywhere-sdks"),
             ],
-            path: "Sources/SwiftSPMConsumer"
+            path: "Sources/SwiftSPMExample"
         ),
     ]
 )
