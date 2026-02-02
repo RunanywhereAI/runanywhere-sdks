@@ -3,7 +3,10 @@
 #
 # Copy to ~/.clawdbot/config.yaml
 #
-# Key optimization: promptMode: "local" reduces system prompt from ~30KB to ~8KB
+# Key optimizations:
+#   1. promptMode: "local" reduces system prompt from ~30KB to ~4KB
+#   2. tools.enabled: false removes ~14KB of tool schemas from prompt
+#   3. Combined: reduces total prompt from ~30KB (~7800 tokens) to ~4KB (~1100 tokens)
 
 # =============================================================================
 # MODEL PROVIDERS
@@ -46,8 +49,9 @@ models:
 # =============================================================================
 agents:
   defaults:
-    # CRITICAL: Use "local" prompt mode for 72% prompt size reduction
-    # This drops prompt from ~30KB (~7800 tokens) to ~8KB (~2500 tokens)
+    # CRITICAL: Use "local" prompt mode for smaller system prompts
+    # "local" mode: ~4,300 chars system prompt (vs ~10,000+ in "full" mode)
+    # Note: Tool schemas are added separately - see tools section below
     promptMode: "local"
     model:
       primary: "runanywhere/LFM2.5-1.2B-Instruct-Q8_0"
@@ -111,17 +115,39 @@ channels:
 heartbeat:
   enabled: false
 
-# Disable web features for local-only deployment
+# =============================================================================
+# TOOLS CONFIGURATION - CRITICAL FOR PROMPT SIZE
+# =============================================================================
+# WARNING: Each tool adds 500-3000 chars to the prompt via JSON schemas!
+# With 18 tools enabled, this adds ~14,000+ chars (~3500+ tokens)
+#
+# Prompt size breakdown (observed):
+#   - System prompt (local mode): ~4,300 chars (~1,100 tokens)
+#   - Tool schemas (18 tools):   ~14,000 chars (~3,500 tokens)
+#   - Context files:              ~3,600 chars (~900 tokens)
+#   - Session history:            Variable
+#   - Total with tools:          ~22,000+ chars (~5,500+ tokens)
+#
+# For fastest responses on Raspberry Pi, disable all tools:
 tools:
-  shell:
-    enabled: true
-  fs:
-    enabled: true
-  web:
-    search:
-      enabled: false
-    fetch:
-      enabled: false
+  enabled: false  # Set to true to enable tools (adds ~14KB to prompt)
+
+# If you need tools, enable only what you need:
+# tools:
+#   enabled: true
+#   shell:
+#     enabled: true   # ~1000 chars
+#   fs:
+#     enabled: true   # ~800 chars
+#   message:
+#     enabled: true   # ~3200 chars (largest tool)
+#   browser:
+#     enabled: false  # ~1800 chars
+#   web:
+#     search:
+#       enabled: false
+#     fetch:
+#       enabled: false
 
 # =============================================================================
 # ARCHITECTURE OVERVIEW
@@ -155,6 +181,9 @@ tools:
 #               └───────────────────────┘
 #
 # Critical Settings for Raspberry Pi:
-# - promptMode: "local" - 72% prompt size reduction
+# - promptMode: "local" - Smaller system prompts (~4KB vs ~10KB)
+# - tools.enabled: false - Removes ~14KB of tool schemas from prompt
 # - contextWindow: 16384 - Moltbot minimum requirement
 # - heartbeat.enabled: false - Save CPU cycles
+#
+# With both optimizations, a simple message uses ~1,100 tokens (vs ~7,800 with tools)
