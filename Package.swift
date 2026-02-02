@@ -225,17 +225,17 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/swift-v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "ba367c89a468513b33fb167b5996574a8797bf2c00a21e01579ec59458813559"
+                checksum: "38e871517017610185057e83b14ebf4ac1021d53247f7f85d12d411217ef5247"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/swift-v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
-                checksum: "9e58e33e2984f5f0498bdad69387aec306fd2d31e6690eab38b9f1d1a21fb0ca"
+                checksum: "5c8b1c68d32e72561559cb366125f4413968114cdfb1c118141d186c37f3eb4c"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/swift-v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
-                checksum: "e760044abfe97d2bde9386d801b0e11421c3782980f4088edce6d6d976f48a84"
+                checksum: "42a61542fb299f7aaf127a8590ead58d8b159db4ba5ea67fd48a835da3c6289e"
             ),
             .binaryTarget(
                 name: "ONNXRuntimeBinary",
