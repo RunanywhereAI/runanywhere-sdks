@@ -36,10 +36,10 @@ import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, IconSize } from '../theme/spacing';
 import { ModelStatusBanner, ModelRequiredOverlay } from '../components/common';
-import { MessageBubble, TypingIndicator, ChatInput } from '../components/chat';
+import { MessageBubble, TypingIndicator, ChatInput, ToolCallingBadge } from '../components/chat';
 import { ChatAnalyticsScreen } from './ChatAnalyticsScreen';
 import { ConversationListScreen } from './ConversationListScreen';
-import type { Message, Conversation } from '../types/chat';
+import type { Message, Conversation, ToolCallInfo } from '../types/chat';
 import { MessageRole } from '../types/chat';
 import type { ModelInfo } from '../types/model';
 import { ModelModality, LLMFramework, ModelCategory } from '../types/model';
@@ -51,6 +51,7 @@ import {
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
 import { RunAnywhere, type ModelInfo as SDKModelInfo } from '@runanywhere/core';
+import { safeEvaluateExpression } from '../utils/mathParser';
 
 // Generate unique ID
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -134,7 +135,66 @@ const registerChatTools = () => {
     }
   );
 
-  console.log('[ChatScreen] Tools registered: get_weather, get_current_time');
+  // Calculator tool - Math evaluation
+  RunAnywhere.registerTool(
+    {
+      name: 'calculate',
+      description: 'Performs math calculations. Supports +, -, *, /, and parentheses',
+      parameters: [
+        {
+          name: 'expression',
+          type: 'string',
+          description: 'Math expression (e.g., "2 + 2 * 3", "(10 + 5) / 3")',
+          required: true,
+        },
+      ],
+    },
+    async (args) => {
+      const expression = (args.expression || args.input) as string;
+      console.log('[Tool] calculate called for:', expression);
+      try {
+        // Safe math evaluation using recursive descent parser
+        const result = safeEvaluateExpression(expression);
+        return {
+          expression: expression,
+          result: result,
+        };
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return { error: `Failed to calculate: ${msg}` };
+      }
+    }
+  );
+
+  console.log('[ChatScreen] Tools registered: get_weather, get_current_time, calculate');
+};
+
+/**
+ * Detect tool call format based on model ID and name
+ * LFM2-Tool models use Pythonic format, others use JSON format
+ * 
+ * Matches iOS: LLMViewModel+ToolCalling.swift detectToolCallFormat()
+ * Checks both ID and name since model might be identified by either
+ */
+const detectToolCallFormat = (modelId: string | undefined, modelName: string | undefined): string => {
+  // Check model ID first (more reliable - e.g., "lfm2-1.2b-tool-q4_k_m")
+  if (modelId) {
+    const id = modelId.toLowerCase();
+    if (id.includes('lfm2') && id.includes('tool')) {
+      return 'lfm2';
+    }
+  }
+
+  // Also check model name (e.g., "LiquidAI LFM2 1.2B Tool Q4_K_M")
+  if (modelName) {
+    const name = modelName.toLowerCase();
+    if (name.includes('lfm2') && name.includes('tool')) {
+      return 'lfm2';
+    }
+  }
+
+  // Default JSON format for general-purpose models
+  return 'default';
 };
 
 export const ChatScreen: React.FC = () => {
@@ -159,6 +219,7 @@ export const ChatScreen: React.FC = () => {
   const [showConversationList, setShowConversationList] = useState(false);
   const [showModelSelection, setShowModelSelection] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [registeredToolCount, setRegisteredToolCount] = useState(0);
 
   // Refs
   const flatListRef = useRef<FlatList>(null);
@@ -225,15 +286,19 @@ export const ChatScreen: React.FC = () => {
 
   /**
    * Check if a model is loaded
+   * Note: If a model is already loaded from a previous session, we set a placeholder.
+   * For proper tool calling format detection, the user should select a model through the UI.
    */
   const checkModelStatus = async () => {
     try {
       const isLoaded = await RunAnywhere.isModelLoaded();
       console.warn('[ChatScreen] Text model loaded:', isLoaded);
       if (isLoaded) {
+        // Model is loaded but we don't know which one - set placeholder
+        // User should select a model through UI for proper format detection
         setCurrentModel({
           id: 'loaded-model',
-          name: 'Loaded Model',
+          name: 'Loaded Model (select model for tool calling)',
           category: ModelCategory.Language,
           compatibleFrameworks: [LLMFramework.LlamaCpp],
           preferredFramework: LLMFramework.LlamaCpp,
@@ -243,6 +308,9 @@ export const ChatScreen: React.FC = () => {
         });
         // Register tools if model already loaded
         registerChatTools();
+        const tools = RunAnywhere.getRegisteredTools();
+        setRegisteredToolCount(tools.length);
+        console.warn('[ChatScreen] Model loaded from previous session. For LFM2 tool calling, please select the model again.');
       }
     } catch (error) {
       console.warn('[ChatScreen] Error checking model status:', error);
@@ -287,7 +355,8 @@ export const ChatScreen: React.FC = () => {
       const success = await RunAnywhere.loadModel(model.localPath);
 
       if (success) {
-        setCurrentModel({
+        // Set the model info with actual ID and name for format detection
+        const modelInfo = {
           id: model.id,
           name: model.name,
           category: ModelCategory.Language,
@@ -296,10 +365,18 @@ export const ChatScreen: React.FC = () => {
           isDownloaded: true,
           isAvailable: true,
           supportsThinking: false,
-        });
+        };
+        setCurrentModel(modelInfo);
+        
+        // Log model info for format detection debugging
+        const format = detectToolCallFormat(model.id, model.name);
+        console.warn(`[ChatScreen] Model loaded: id="${model.id}", name="${model.name}", detected format="${format}"`);
+        
         // Register tools when model loads
         registerChatTools();
-        console.warn('[ChatScreen] Model loaded successfully with tools enabled');
+        const tools = RunAnywhere.getRegisteredTools();
+        setRegisteredToolCount(tools.length);
+        console.warn('[ChatScreen] Tools registered:', tools.length, 'tools');
       } else {
         const lastError = await RunAnywhere.getLastError();
         Alert.alert(
@@ -354,7 +431,9 @@ export const ChatScreen: React.FC = () => {
     }, 100);
 
     try {
-      console.log('[ChatScreen] Starting generation with tools for:', prompt);
+      // Detect tool call format based on loaded model (matches iOS LLMViewModel+ToolCalling.swift)
+      const format = detectToolCallFormat(currentModel?.id, currentModel?.name);
+      console.log('[ChatScreen] Starting generation with tools for:', prompt, 'model:', currentModel?.id, 'format:', format);
 
       // Use tool-enabled generation
       // If the LLM needs to call a tool (like weather API), it happens automatically
@@ -363,6 +442,7 @@ export const ChatScreen: React.FC = () => {
         maxToolCalls: 3,
         maxTokens: 1000,
         temperature: 0.7,
+        format: format,
       });
 
       // Log tool usage for debugging
@@ -374,12 +454,32 @@ export const ChatScreen: React.FC = () => {
       // Build final message content
       let finalContent = result.text || '(No response generated)';
 
+      // Extract tool call info from result (matching iOS implementation)
+      let toolCallInfo: ToolCallInfo | undefined;
+      if (result.toolCalls.length > 0) {
+        const lastToolCall = result.toolCalls[result.toolCalls.length - 1];
+        const lastToolResult = result.toolResults[result.toolResults.length - 1];
+        
+        toolCallInfo = {
+          toolName: lastToolCall.toolName,
+          arguments: JSON.stringify(lastToolCall.arguments, null, 2),
+          result: lastToolResult?.success 
+            ? JSON.stringify(lastToolResult.result, null, 2)
+            : undefined,
+          success: lastToolResult?.success ?? false,
+          error: lastToolResult?.error,
+        };
+        
+        console.log('[ChatScreen] Created toolCallInfo:', toolCallInfo.toolName, 'success:', toolCallInfo.success);
+      }
+
       // Update with final message
       const finalMessage: Message = {
         id: assistantMessageId,
         role: MessageRole.Assistant,
         content: finalContent,
         timestamp: new Date(),
+        toolCallInfo, // Attach tool call info to message
         modelInfo: {
           modelId: currentModel?.id || 'unknown',
           modelName: currentModel?.name || 'Unknown Model',
@@ -584,6 +684,11 @@ export const ChatScreen: React.FC = () => {
 
       {/* Typing Indicator */}
       {isLoading && <TypingIndicator />}
+
+      {/* Tool Calling Badge (shows when tools are enabled) */}
+      {currentModel && registeredToolCount > 0 && (
+        <ToolCallingBadge toolCount={registeredToolCount} />
+      )}
 
       {/* Input Area */}
       <ChatInput

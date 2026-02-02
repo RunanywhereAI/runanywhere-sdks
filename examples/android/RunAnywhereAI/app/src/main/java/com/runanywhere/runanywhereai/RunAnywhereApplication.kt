@@ -313,6 +313,21 @@ class RunAnywhereApplication : Application() {
             framework = InferenceFramework.LLAMA_CPP,
             memoryRequirement = 400_000_000,
         )
+        // LFM2-Tool models - For tool calling / function calling support
+        RunAnywhere.registerModel(
+            id = "lfm2-1.2b-tool-q4_k_m",
+            name = "LiquidAI LFM2 1.2B Tool Q4_K_M",
+            url = "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf",
+            framework = InferenceFramework.LLAMA_CPP,
+            memoryRequirement = 800_000_000,
+        )
+        RunAnywhere.registerModel(
+            id = "lfm2-1.2b-tool-q8_0",
+            name = "LiquidAI LFM2 1.2B Tool Q8_0",
+            url = "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf",
+            framework = InferenceFramework.LLAMA_CPP,
+            memoryRequirement = 1_400_000_000,
+        )
         Log.i("RunAnywhereApp", "✅ LLM models registered")
 
         // Register ONNX STT and TTS models

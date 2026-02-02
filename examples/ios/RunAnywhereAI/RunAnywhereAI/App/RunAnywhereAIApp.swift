@@ -204,7 +204,29 @@ struct RunAnywhereAIApp: App {
                 memoryRequirement: 400_000_000
             )
         }
-        logger.info("✅ LLM models registered")
+
+        // Tool Calling Optimized Models
+        // LFM2-1.2B-Tool - Designed for concise and precise tool calling (Liquid AI)
+        if let lfm2ToolQ4URL = URL(string: "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf") {
+            RunAnywhere.registerModel(
+                id: "lfm2-1.2b-tool-q4_k_m",
+                name: "LiquidAI LFM2 1.2B Tool Q4_K_M",
+                url: lfm2ToolQ4URL,
+                framework: .llamaCpp,
+                memoryRequirement: 800_000_000
+            )
+        }
+        if let lfm2ToolQ8URL = URL(string: "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf") {
+            RunAnywhere.registerModel(
+                id: "lfm2-1.2b-tool-q8_0",
+                name: "LiquidAI LFM2 1.2B Tool Q8_0",
+                url: lfm2ToolQ8URL,
+                framework: .llamaCpp,
+                memoryRequirement: 1_400_000_000
+            )
+        }
+
+        logger.info("✅ LLM models registered (including tool-calling optimized models)")
 
         // Register VLM (Vision Language) models
         // VLM models require 2 files: main model + mmproj (vision projector)
@@ -302,26 +324,43 @@ struct RunAnywhereAIApp: App {
 
 struct InitializationLoadingView: View {
     @State private var isAnimating = false
+    @State private var progress: Double = 0.0
 
     var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "brain")
-                .font(.system(size: 60))
-                .foregroundColor(AppColors.primaryAccent)
-                .scaleEffect(isAnimating ? 1.2 : 1.0)
-                .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: isAnimating)
+        VStack(spacing: 32) {
+            Spacer()
 
-            Text("Setting Up Your AI")
-                .font(.title2)
-                .fontWeight(.semibold)
+            // RunAnywhere Logo
+            Image("runanywhere_logo")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 120, height: 120)
+                .scaleEffect(isAnimating ? 1.05 : 1.0)
+                .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: isAnimating)
 
-            Text("Preparing your private AI assistant...")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+            VStack(spacing: 12) {
+                Text("Setting Up Your AI")
+                    .font(.title2)
+                    .fontWeight(.semibold)
 
-            ProgressView()
-                .progressViewStyle(CircularProgressViewStyle())
-                .scaleEffect(1.2)
+                Text("Preparing your private AI assistant...")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+
+            // Loading Bar
+            VStack(spacing: 8) {
+                ProgressView(value: progress, total: 1.0)
+                    .progressViewStyle(.linear)
+                    .tint(AppColors.primaryAccent)
+                    .frame(width: 240)
+
+                Text("Initializing SDK...")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -332,6 +371,18 @@ struct InitializationLoadingView: View {
         #endif
         .onAppear {
             isAnimating = true
+            startProgressAnimation()
+        }
+    }
+
+    private func startProgressAnimation() {
+        Timer.scheduledTimer(withTimeInterval: 0.02, repeats: true) { timer in
+            if progress < 1.0 {
+                progress += 0.01
+            } else {
+                // Reset and start again
+                progress = 0.0
+            }
         }
     }
 }

@@ -6,9 +6,11 @@
 //  Allows LLMs to request external actions (API calls, device functions, etc.)
 //
 //  ARCHITECTURE:
-//  - ToolCallParser (Swift): Parses <tool_call> tags from LLM output
-//  - This file: Tool registration, executor storage, prompt formatting, orchestration
-//  - Orchestration: generate → parse → execute → loop
+//  - CppBridge.ToolCalling: C++ bridge for parsing <tool_call> tags (SINGLE SOURCE OF TRUTH)
+//  - This file: Tool registration, executor storage, orchestration
+//  - Orchestration: generate → parse (C++) → execute → loop
+//
+//  *** ALL PARSING LOGIC IS IN C++ (rac_tool_calling.h) - NO SWIFT FALLBACKS ***
 //
 //  Mirrors sdk/runanywhere-react-native RunAnywhere+ToolCalling.ts
 //
@@ -178,7 +180,8 @@ public extension RunAnywhere {
                 fullPrompt, temperature: opts.temperature, maxTokens: opts.maxTokens
             )
 
-            let (text, toolCall) = ToolCallParser.parseToolCall(from: responseText)
+            // Parse using C++ implementation (SINGLE SOURCE OF TRUTH - NO FALLBACK)
+            let (text, toolCall) = CppBridge.ToolCalling.parseToolCall(from: responseText)
             finalText = text
 
             guard let toolCall = toolCall else { break }
@@ -210,12 +213,14 @@ public extension RunAnywhere {
         )
     }
 
-    /// Builds the system prompt with tool definitions.
+    /// Builds the system prompt with tool definitions using C++ implementation.
     private static func buildToolSystemPrompt(
         tools: [ToolDefinition],
         options: ToolCallingOptions
     ) -> String {
-        let toolsPrompt = ToolCallParser.formatToolsForPrompt(tools)
+        // Use C++ implementation for prompt formatting (SINGLE SOURCE OF TRUTH)
+        // Pass the format from options to generate model-specific instructions
+        let toolsPrompt = CppBridge.ToolCalling.formatToolsForPrompt(tools, format: options.format)
 
         if options.replaceSystemPrompt, let userPrompt = options.systemPrompt {
             return userPrompt
@@ -320,7 +325,7 @@ public extension RunAnywhere {
     ) async throws -> String {
         let genOptions = LLMGenerationOptions(
             maxTokens: maxTokens ?? 1024,
-            temperature: temperature ?? 0.7
+            temperature: temperature ?? 0.3  // Lower temperature for consistent tool calling
         )
 
         let streamResult = try await generateStream(prompt, options: genOptions)

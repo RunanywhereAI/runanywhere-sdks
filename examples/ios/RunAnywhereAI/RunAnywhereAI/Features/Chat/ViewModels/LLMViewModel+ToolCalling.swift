@@ -10,6 +10,25 @@ import RunAnywhere
 
 extension LLMViewModel {
 
+    // MARK: - Tool Calling Format Detection
+
+    /// Determines the optimal tool calling format based on the model name/ID.
+    /// Different models are trained on different tool calling formats.
+    /// Returns format name string (C++ is single source of truth for valid formats).
+    private func detectToolCallFormat(for modelName: String?) -> String {
+        guard let name = modelName?.lowercased() else {
+            return ToolCallFormatName.default
+        }
+
+        // LFM2-Tool models use Pythonic format: <|tool_call_start|>[func(args)]<|tool_call_end|>
+        if name.contains("lfm2") && name.contains("tool") {
+            return ToolCallFormatName.lfm2
+        }
+
+        // Default JSON format for general-purpose models
+        return ToolCallFormatName.default
+    }
+
     // MARK: - Tool Calling Generation
 
     func generateWithToolCalling(
@@ -17,13 +36,20 @@ extension LLMViewModel {
         options: LLMGenerationOptions,
         messageIndex: Int
     ) async throws {
-        // Get tool calling options
+        // Auto-detect the tool calling format based on the loaded model
+        let format = detectToolCallFormat(for: loadedModelName)
+
+        // Get tool calling options with the appropriate format
         let toolOptions = ToolCallingOptions(
             maxToolCalls: 3,
             autoExecute: true,
             temperature: options.temperature,
-            maxTokens: options.maxTokens
+            maxTokens: options.maxTokens,
+            format: format
         )
+
+        // Log the format being used for debugging
+        print("Using tool calling with format: \(format) for model: \(loadedModelName ?? "unknown")")
 
         // Generate with tools
         let result = try await RunAnywhere.generateWithTools(prompt, options: toolOptions)
