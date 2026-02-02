@@ -631,14 +631,17 @@ rac_handle_t platform_tts_create(const rac_service_request_t* request, void* use
 rac_bool_t platform_diffusion_can_handle(const rac_service_request_t* request, void* user_data) {
     (void)user_data;
 
+    RAC_LOG_INFO(LOG_CAT, "CoreMLDiffusion can_handle: ENTRY");
+    
     if (request == nullptr) {
+        RAC_LOG_INFO(LOG_CAT, "CoreMLDiffusion can_handle: null request -> FALSE");
         return RAC_FALSE;
     }
 
     // Get the model path - prefer model_path over identifier
     const char* path_str = request->model_path ? request->model_path : request->identifier;
     
-    RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: checking path=%s, framework=%d", 
+    RAC_LOG_INFO(LOG_CAT, "CoreMLDiffusion can_handle: path=%s, framework=%d", 
                   path_str ? path_str : "NULL", request->framework);
 
     // CRITICAL: Check for CoreML model files FIRST, before framework hint
@@ -963,6 +966,7 @@ rac_result_t rac_backend_platform_register(void) {
     }
 
     // Register Diffusion provider
+    RAC_LOG_INFO(LOG_CAT, "Registering CoreMLDiffusion provider with priority=100...");
     rac_service_provider_t diffusion_provider = {};
     diffusion_provider.name = state.provider_diffusion_name;
     diffusion_provider.capability = RAC_CAPABILITY_DIFFUSION;
@@ -973,11 +977,13 @@ rac_result_t rac_backend_platform_register(void) {
 
     result = rac_service_register_provider(&diffusion_provider);
     if (result != RAC_SUCCESS) {
+        RAC_LOG_ERROR(LOG_CAT, "Failed to register CoreMLDiffusion provider: %d", result);
         rac_service_unregister_provider(state.provider_tts_name, RAC_CAPABILITY_TTS);
         rac_service_unregister_provider(state.provider_llm_name, RAC_CAPABILITY_TEXT_GENERATION);
         rac_module_unregister(state.module_id);
         return result;
     }
+    RAC_LOG_INFO(LOG_CAT, "CoreMLDiffusion provider registered successfully");
 
     // Register built-in models
     register_foundation_models_entry();
