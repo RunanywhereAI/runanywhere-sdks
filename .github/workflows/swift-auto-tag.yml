@@ -1,0 +1,74 @@
+# =============================================================================
+# Swift SDK Auto-Tag (Phase 1 CI/CD)
+#
+# Merges to main automatically create a new git tag swift-vX.Y.Z to mark
+# official Swift SDK release points. Full build/publish automation will be
+# added later. No builds, no publishing, no macOS runners in this phase.
+#
+# PR description: Merges to main auto-create swift-vX.Y.Z tags to mark
+# official Swift SDK release points. Full build/publish automation will be
+# added later.
+# =============================================================================
+
+name: Swift SDK Auto-Tag
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    name: Create Swift SDK Tag
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Compute Next Tag
+        id: next_tag
+        run: |
+          set -e
+          # List swift-v* tags, strip prefix, keep only X.Y.Z (no prerelease)
+          LATEST=$(git tag -l 'swift-v*' | sed 's/^swift-v//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1 || true)
+          if [ -z "$LATEST" ]; then
+            NEXT="0.1.1"
+          else
+            MAJOR=$(echo "$LATEST" | cut -d. -f1)
+            MINOR=$(echo "$LATEST" | cut -d. -f2)
+            PATCH=$(echo "$LATEST" | cut -d. -f3)
+            PATCH=$((PATCH + 1))
+            NEXT="$MAJOR.$MINOR.$PATCH"
+          fi
+          NEW_TAG="swift-v$NEXT"
+          echo "tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+          echo "Computed next tag: $NEW_TAG"
+
+      - name: Skip If Tag Exists
+        id: skip
+        run: |
+          NEW_TAG="${{ steps.next_tag.outputs.tag }}"
+          if git rev-parse "$NEW_TAG" >/dev/null 2>&1; then
+            echo "Tag $NEW_TAG already exists, skipping (idempotent rerun)"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create and Push Tag
+        if: steps.skip.outputs.skip != 'true'
+        run: |
+          NEW_TAG="${{ steps.next_tag.outputs.tag }}"
+          git tag -a "$NEW_TAG" -m "Swift SDK Release $NEW_TAG"
+          git push origin "$NEW_TAG"
+          echo "Pushed tag: $NEW_TAG"
