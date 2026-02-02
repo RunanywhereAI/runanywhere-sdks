@@ -255,6 +255,14 @@ rac_result_t rac_get_model(const char* model_id, rac_model_info_t** out_model) {
     return rac_model_registry_get(registry, model_id, out_model);
 }
 
+rac_result_t rac_get_model_by_path(const char* local_path, rac_model_info_t** out_model) {
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    if (registry == nullptr) {
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+    return rac_model_registry_get_by_path(registry, local_path, out_model);
+}
+
 rac_bool_t rac_framework_is_platform_service(rac_inference_framework_t framework) {
     // Platform services are Swift-native implementations
     // that use service registry callbacks rather than C++ backends
