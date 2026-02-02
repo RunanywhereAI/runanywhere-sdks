@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/features/chat/chat_interface_view.dart';
 import 'package:runanywhere_ai/features/settings/combined_settings_view.dart';
+import 'package:runanywhere_ai/features/tools/tools_view.dart';
 import 'package:runanywhere_ai/features/voice/speech_to_text_view.dart';
 import 'package:runanywhere_ai/features/voice/text_to_speech_view.dart';
 import 'package:runanywhere_ai/features/voice/voice_assistant_view.dart';
@@ -26,7 +27,8 @@ class _ContentViewState extends State<ContentView> {
     SpeechToTextView(), // Tab 1: Speech-to-Text (Transcribe)
     TextToSpeechView(), // Tab 2: Text-to-Speech (Speak)
     VoiceAssistantView(), // Tab 3: Voice Assistant (STT + LLM + TTS)
-    CombinedSettingsView(), // Tab 4: Settings (includes Storage)
+    ToolsView(), // Tab 4: Tools (Tool Calling)
+    CombinedSettingsView(), // Tab 5: Settings (includes Storage)
   ];
 
   @override
@@ -65,6 +67,11 @@ class _ContentViewState extends State<ContentView> {
             icon: Icon(Icons.mic_none),
             selectedIcon: Icon(Icons.mic),
             label: 'Voice',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.build_outlined),
+            selectedIcon: Icon(Icons.build),
+            label: 'Tools',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),
