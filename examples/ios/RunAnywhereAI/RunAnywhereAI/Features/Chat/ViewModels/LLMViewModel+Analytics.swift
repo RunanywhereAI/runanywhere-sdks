@@ -46,8 +46,8 @@ extension LLMViewModel {
     ) -> MessageAnalytics {
         let completionStatus: MessageAnalytics.CompletionStatus = wasInterrupted ? .interrupted : .complete
         let generationParameters = MessageAnalytics.GenerationParameters(
-            temperature: Double(options.temperature ?? Float(LLMViewModel.defaultTemperatureValue)),
-            maxTokens: options.maxTokens ?? LLMViewModel.defaultMaxTokensValue,
+            temperature: Double(options.temperature),
+            maxTokens: options.maxTokens,
             topP: nil,
             topK: nil
         )
