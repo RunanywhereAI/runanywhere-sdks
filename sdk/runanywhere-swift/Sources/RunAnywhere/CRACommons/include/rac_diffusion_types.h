@@ -12,7 +12,8 @@
 #ifndef RAC_DIFFUSION_TYPES_H
 #define RAC_DIFFUSION_TYPES_H
 
-#include "rac/core/rac_types.h"
+// Flattened include for Swift SDK
+#include "rac_types.h"
 
 #ifdef __cplusplus
 extern "C" {
