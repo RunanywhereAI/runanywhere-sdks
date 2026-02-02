@@ -130,10 +130,19 @@ set(ONNX_BACKEND_SOURCES
     onnx_backend.cpp
     rac_onnx.cpp
     rac_backend_onnx_register.cpp
+    # Diffusion support
+    bpe_tokenizer.cpp
+    diffusion_scheduler.cpp
+    onnx_diffusion.cpp
+    rac_diffusion_onnx.cpp
 )
 
 set(ONNX_BACKEND_HEADERS
     onnx_backend.h
+    # Diffusion support
+    bpe_tokenizer.h
+    diffusion_scheduler.h
+    onnx_diffusion.h
 )
 
 if(RAC_BUILD_SHARED)
@@ -226,4 +235,5 @@ endif()
 message(STATUS "ONNX Backend Configuration:")
 message(STATUS "  ONNX Runtime: Enabled")
 message(STATUS "  Sherpa-ONNX:  ${SHERPA_ONNX_AVAILABLE}")
+message(STATUS "  Diffusion:    Enabled (BPE Tokenizer, Schedulers, ONNX Pipeline)")
 message(STATUS "  Platform: ${RAC_PLATFORM_NAME}")
