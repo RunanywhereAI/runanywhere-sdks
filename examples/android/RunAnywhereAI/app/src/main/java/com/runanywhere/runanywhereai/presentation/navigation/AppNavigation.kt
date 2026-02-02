@@ -20,6 +20,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.runanywhere.runanywhereai.presentation.chat.ChatScreen
+import com.runanywhere.runanywhereai.presentation.diffusion.DiffusionScreen
 import com.runanywhere.runanywhereai.presentation.settings.SettingsScreen
 import com.runanywhere.runanywhereai.presentation.stt.SpeechToTextScreen
 import com.runanywhere.runanywhereai.presentation.tts.TextToSpeechScreen
@@ -27,8 +28,8 @@ import com.runanywhere.runanywhereai.presentation.voice.VoiceAssistantScreen
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 
 /**
- * Main navigation component matching iOS app structure exactly
- * 5 tabs: Chat, STT, TTS, Voice, Settings
+ * Main navigation component matching iOS app structure
+ * 6 tabs: Chat, STT, TTS, Voice, Image (Diffusion), Settings
  *
  * iOS Reference: examples/ios/RunAnywhereAI/RunAnywhereAI/App/ContentView.swift
  */
@@ -61,6 +62,10 @@ fun AppNavigation() {
 
             composable(NavigationRoute.VOICE) {
                 VoiceAssistantScreen()
+            }
+
+            composable(NavigationRoute.DIFFUSION) {
+                DiffusionScreen()
             }
 
             composable(NavigationRoute.SETTINGS) {
@@ -111,6 +116,12 @@ fun RunAnywhereBottomNav(navController: NavController) {
                 label = "Voice",
                 icon = Icons.Outlined.Mic,
                 selectedIcon = Icons.Filled.Mic,
+            ),
+            BottomNavItem(
+                route = NavigationRoute.DIFFUSION,
+                label = "Image",
+                icon = Icons.Outlined.Image,
+                selectedIcon = Icons.Filled.Image,
             ),
             BottomNavItem(
                 route = NavigationRoute.SETTINGS,
@@ -174,6 +185,7 @@ object NavigationRoute {
     const val STT = "stt"
     const val TTS = "tts"
     const val VOICE = "voice"
+    const val DIFFUSION = "diffusion"
     const val SETTINGS = "settings"
 }
 
