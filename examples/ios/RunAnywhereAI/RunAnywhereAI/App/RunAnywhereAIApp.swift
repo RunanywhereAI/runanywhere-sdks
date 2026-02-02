@@ -300,21 +300,48 @@ struct RunAnywhereAIApp: App {
         }
         logger.info("✅ ONNX STT/TTS models registered")
 
-        // Register Diffusion models (Core ML Stable Diffusion)
-        // Using Apple's palettized model with split_einsum_v2 for optimized Apple Silicon performance (~1.5GB)
+        // Register Diffusion models
+        // CoreML: Apple's palettized model with split_einsum_v2 for optimized Apple Silicon performance (~1.5GB)
         // Note: Archive extracts to nested directory (e.g., coreml-stable-diffusion-v1-5-palettized_split_einsum_v2_compiled/)
-        if let sd15URL = URL(string: "https://huggingface.co/apple/coreml-stable-diffusion-v1-5-palettized/resolve/main/coreml-stable-diffusion-v1-5-palettized_split_einsum_v2_compiled.zip") {
+        if let sd15CoreMLURL = URL(string: "https://huggingface.co/apple/coreml-stable-diffusion-v1-5-palettized/resolve/main/coreml-stable-diffusion-v1-5-palettized_split_einsum_v2_compiled.zip") {
             RunAnywhere.registerModel(
                 id: "sd15-coreml-palettized",
                 name: "Stable Diffusion 1.5 (Core ML)",
-                url: sd15URL,
+                url: sd15CoreMLURL,
                 framework: .coreml,
                 modality: .imageGeneration,
                 artifactType: .archive(.zip, structure: .nestedDirectory),
                 memoryRequirement: 1_600_000_000  // ~1.6GB
             )
         }
-        logger.info("✅ Diffusion models registered")
+
+        // ONNX: Cross-platform Stable Diffusion 1.5 model (works on all platforms)
+        // Uses ONNX Runtime with optional CoreML EP acceleration on Apple devices
+        if let sd15ONNXURL = URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-diffusion-models-v1/stable-diffusion-v1-5-onnx.tar.gz") {
+            RunAnywhere.registerModel(
+                id: "sd15-onnx",
+                name: "Stable Diffusion 1.5 (ONNX)",
+                url: sd15ONNXURL,
+                framework: .onnx,
+                modality: .imageGeneration,
+                artifactType: .archive(.tarGz, structure: .nestedDirectory),
+                memoryRequirement: 2_000_000_000  // ~2GB
+            )
+        }
+
+        // SD Turbo: Fast 4-step diffusion model (ONNX)
+        if let sdTurboURL = URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-diffusion-models-v1/sd-turbo-onnx.tar.gz") {
+            RunAnywhere.registerModel(
+                id: "sd-turbo-onnx",
+                name: "SD Turbo (ONNX - Fast)",
+                url: sdTurboURL,
+                framework: .onnx,
+                modality: .imageGeneration,
+                artifactType: .archive(.tarGz, structure: .nestedDirectory),
+                memoryRequirement: 2_200_000_000  // ~2.2GB
+            )
+        }
+        logger.info("✅ Diffusion models registered (CoreML + ONNX)")
 
         logger.info("🎉 All modules and models registered")
     }

@@ -358,6 +358,27 @@ class RunAnywhereApplication : Application() {
         )
         Log.i("RunAnywhereApp", "✅ ONNX STT/TTS models registered")
 
+        // Register Diffusion models (ONNX - cross-platform)
+        // Stable Diffusion 1.5 ONNX model - works on all platforms with ONNX Runtime
+        RunAnywhere.registerModel(
+            id = "sd15-onnx",
+            name = "Stable Diffusion 1.5 (ONNX)",
+            url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-diffusion-models-v1/stable-diffusion-v1-5-onnx.tar.gz",
+            framework = InferenceFramework.ONNX,
+            modality = ModelCategory.IMAGE_GENERATION,
+            memoryRequirement = 2_000_000_000, // ~2GB
+        )
+        // SD Turbo - Fast 4-step diffusion model (ONNX)
+        RunAnywhere.registerModel(
+            id = "sd-turbo-onnx",
+            name = "SD Turbo (ONNX - Fast)",
+            url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-diffusion-models-v1/sd-turbo-onnx.tar.gz",
+            framework = InferenceFramework.ONNX,
+            modality = ModelCategory.IMAGE_GENERATION,
+            memoryRequirement = 2_200_000_000, // ~2.2GB
+        )
+        Log.i("RunAnywhereApp", "✅ Diffusion models registered (ONNX)")
+
         Log.i("RunAnywhereApp", "🎉 All modules and models registered")
     }
 }

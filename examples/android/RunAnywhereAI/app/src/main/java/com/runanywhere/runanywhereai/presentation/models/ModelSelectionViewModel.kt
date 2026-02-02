@@ -14,10 +14,12 @@ import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.Models.ModelInfo
 import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
 import com.runanywhere.sdk.public.extensions.availableModels
+import com.runanywhere.sdk.public.extensions.currentDiffusionModelId
 import com.runanywhere.sdk.public.extensions.currentLLMModelId
 import com.runanywhere.sdk.public.extensions.currentSTTModelId
 import com.runanywhere.sdk.public.extensions.currentTTSVoiceId
 import com.runanywhere.sdk.public.extensions.downloadModel
+import com.runanywhere.sdk.public.extensions.loadDiffusionModel
 import com.runanywhere.sdk.public.extensions.loadLLMModel
 import com.runanywhere.sdk.public.extensions.loadSTTModel
 import com.runanywhere.sdk.public.extensions.loadTTSVoice
@@ -181,6 +183,7 @@ class ModelSelectionViewModel(
                 // but typically the voice sheet doesn't auto-select
                 null
             }
+            ModelSelectionContext.DIFFUSION -> RunAnywhere.currentDiffusionModelId
         }
     }
 
@@ -202,6 +205,7 @@ class ModelSelectionViewModel(
                         ModelCategory.SPEECH_RECOGNITION,
                         ModelCategory.SPEECH_SYNTHESIS,
                     )
+            ModelSelectionContext.DIFFUSION -> category == ModelCategory.IMAGE_GENERATION
         }
     }
 
@@ -327,6 +331,11 @@ class ModelSelectionViewModel(
                         ModelCategory.SPEECH_SYNTHESIS -> RunAnywhere.loadTTSVoice(modelId)
                         else -> RunAnywhere.loadLLMModel(modelId)
                     }
+                }
+                ModelSelectionContext.DIFFUSION -> {
+                    val model = _uiState.value.models.find { it.id == modelId }
+                    val path = model?.localPath ?: throw IllegalStateException("Model path not found")
+                    RunAnywhere.loadDiffusionModel(path, modelId, model.name)
                 }
             }
 
