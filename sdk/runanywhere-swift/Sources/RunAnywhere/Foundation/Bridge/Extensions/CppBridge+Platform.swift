@@ -29,6 +29,19 @@ extension CppBridge {
         // swiftlint:disable:next avoid_any_type
         private static var foundationModelsService: Any?
 
+        /// Last error message from Foundation Models generate (used when C++ reports "Streaming generation failed")
+        static var lastFoundationModelsErrorMessage: String?
+
+        /// Maps generic Foundation Models error descriptions to user-friendly messages.
+        private static func friendlyFoundationModelsMessage(_ raw: String) -> String {
+            if raw.contains("FoundationModels.LanguageModelSession.GenerationError") ||
+               raw.contains("error -1") ||
+               raw.contains("The operation couldn't be completed") {
+                return "Apple Intelligence is not available on this device or simulator. Try a physical device with Apple Intelligence enabled in Settings, or use a downloaded LLM from the Models tab."
+            }
+            return raw
+        }
+
         /// Cached System TTS service instance
         private static var systemTTSService: SystemTTSService?
 
@@ -162,6 +175,8 @@ extension CppBridge {
                         result = RAC_SUCCESS
                     } catch {
                         Platform.logger.error("Foundation Models generate failed: \(error)")
+                        let raw = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+                        Platform.lastFoundationModelsErrorMessage = Platform.friendlyFoundationModelsMessage(raw)
                         result = RAC_ERROR_INTERNAL
                     }
                     group.leave()

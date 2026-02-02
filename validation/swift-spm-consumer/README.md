@@ -21,13 +21,48 @@ Until then, you can test **inside the main repo** by depending on the local path
 
 ## Run (consuming from GitHub)
 
+This consumer uses **exact: "0.17.5"** from the upstream repo (`RunanywhereAI/runanywhere-sdks`). The tag and release assets must exist with matching checksums.
+
 ```bash
 cd validation/swift-spm-consumer
+swift package update
 swift build
 ./.build/debug/SwiftSPMConsumer
 ```
 
-If you use a **fork**, change the package URL in `Package.swift` to your fork (e.g. `https://github.com/josuediazflores/runanywhere-sdks`) and use a version that exists there.
+**Note:** Release XCFrameworks (v0.17.5) are **iOS-only** (no macOS slice). On a Mac, `swift build` will resolve and compile but **fail at link** with "symbol(s) not found for architecture arm64". To get a full build, open the package in Xcode and build for an **iOS Simulator** destination (e.g. iPhone 16). Resolution and binary fetch validate correctly.
+
+### Running in Xcode
+
+- **Use iOS Simulator.** In Xcode, set the run destination to an **iOS Simulator** (e.g. "iPhone 16"). Then Run (⌘R). No code signing is required and the executable runs correctly.
+- **Do not run on a physical device.** This target is a **command-line executable**, not an app bundle (.app). Installing to a real device fails with:
+  - *"The executable is not codesigned"* — device installs require code signing.
+  - *"The provided item to be installed is not of a type that CoreDevice recognizes"* — iOS expects an .app bundle; a bare executable is not installable.
+
+To validate the SDK on device, use the full iOS example app (`examples/ios/RunAnywhereAI/`) instead, which is a proper app with signing and bundle structure.
+
+### If Xcode shows "Missing package product" (RunAnywhere, RunAnywhereLlamaCPP, RunAnywhereONNX)
+
+Xcode didn’t resolve the package graph, so it doesn’t see those products. Try in order:
+
+1. **Reset and re-resolve in Xcode:**  
+   **File → Packages → Reset Package Caches**, then **File → Packages → Resolve Package Versions**. Wait for resolution to finish, then build again.
+
+2. **Re-open the consumer package only:**  
+   Close Xcode, then open **only** the consumer:  
+   `open validation/swift-spm-consumer/Package.swift`  
+   (Don’t open the repo root if it has another `Package.swift`; that can confuse resolution.)
+
+3. **Force a clean resolve:**  
+   Close Xcode, then in Terminal from the repo root:
+   ```bash
+   cd validation/swift-spm-consumer
+   rm -rf .build Package.resolved
+   open Package.swift
+   ```
+   In Xcode, let packages resolve, then build for an **iOS Simulator** destination.
+
+If you use a **fork**, change the package URL in `Package.swift` to your fork (e.g. `https://github.com/YOUR_USERNAME/runanywhere-sdks.git`) and use a tag that exists there (e.g. `exact: "0.17.5"`).
 
 ## Run (consuming from local repo)
 

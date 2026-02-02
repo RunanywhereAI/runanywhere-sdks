@@ -153,10 +153,12 @@ public class SystemFoundationModelsService {
             return response
         } catch let error as LanguageModelSession.GenerationError {
             try handleGenerationError(error)
-            throw SDKError.llm(.generationFailed, "Generation failed", underlying: error)
+            let msg = "Generation failed: \(error.localizedDescription)"
+            throw SDKError.llm(.generationFailed, msg, underlying: error)
         } catch {
             logger.error("Generation failed: \(error)")
-            throw SDKError.llm(.generationFailed, "Generation failed", underlying: error)
+            let msg = "Generation failed: \(error.localizedDescription)"
+            throw SDKError.llm(.generationFailed, msg, underlying: error)
         }
         #else
         // Foundation Models framework not available
@@ -200,10 +202,12 @@ public class SystemFoundationModelsService {
             logger.debug("Streaming generation completed successfully")
         } catch let error as LanguageModelSession.GenerationError {
             try handleGenerationError(error)
-            throw SDKError.llm(.generationFailed, "Streaming generation failed", underlying: error)
+            let msg = "Streaming generation failed: \(error.localizedDescription)"
+            throw SDKError.llm(.generationFailed, msg, underlying: error)
         } catch {
             logger.error("Streaming generation failed: \(error)")
-            throw SDKError.llm(.generationFailed, "Streaming generation failed", underlying: error)
+            let msg = "Streaming generation failed: \(error.localizedDescription)"
+            throw SDKError.llm(.generationFailed, msg, underlying: error)
         }
         #else
         // Foundation Models framework not available

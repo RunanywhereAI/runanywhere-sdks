@@ -1,12 +1,13 @@
 {
+  "originHash" : "31e08d015de6362f94db017171511d2a9afaeb4f17dcb7d39cf919abc304ca24",
   "pins" : [
     {
       "identity" : "alamofire",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Alamofire/Alamofire.git",
       "state" : {
-        "revision" : "7be73f6c2b5cd90e40798b06ebd5da8f9f79cf88",
-        "version" : "5.11.0"
+        "revision" : "3f99050e75bbc6fe71fc323adabb039756680016",
+        "version" : "5.11.1"
       }
     },
     {
@@ -34,15 +35,6 @@
       "state" : {
         "revision" : "e85f2b4a8dfa0f242889f45236f3867d16e40480",
         "version" : "4.3.0"
-      }
-    },
-    {
-      "identity" : "runanywhere-sdks",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/josuediazflores/runanywhere-sdks.git",
-      "state" : {
-        "revision" : "cfe813b71836619090d74da6a584b7995d79e245",
-        "version" : "0.17.5"
       }
     },
     {
@@ -91,5 +83,5 @@
       }
     }
   ],
-  "version" : 2
+  "version" : 3
 }
