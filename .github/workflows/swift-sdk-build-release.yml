@@ -129,6 +129,16 @@ jobs:
           git push origin "${TAG}"
           echo "Tag ${TAG} updated to point to commit with correct checksums"
 
+      - name: Create Semver Tag for SPM
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # SPM resolves versions from semver tags (e.g. 0.1.2 or v0.1.2)
+          # Create tag ${VERSION} on same commit so consumers can use from: "X.Y.Z"
+          git push origin ":refs/tags/${VERSION}" 2>/dev/null || true
+          git tag -f "${VERSION}" -m "Swift SDK v${VERSION}"
+          git push origin "${VERSION}"
+          echo "Semver tag ${VERSION} created for SPM resolution"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
