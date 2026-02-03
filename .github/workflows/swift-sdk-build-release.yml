@@ -49,15 +49,17 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Building Swift SDK $TAG (version $VERSION)"
 
+      # 1) Build commons first → produces 3 XCFrameworks (RACommons, RABackendLLAMACPP, RABackendONNX)
       - name: Build Native XCFrameworks
         run: |
           ./${COMMONS_DIR}/scripts/build-ios.sh --clean
           echo "XCFrameworks:"
           ls -la ${COMMONS_DIR}/dist/*.xcframework 2>/dev/null || true
 
+      # 2) Swift SDK consumes the 3 XCFrameworks (install from commons/dist to Binaries/, then swift build)
       - name: Build Swift SDK
         run: |
-          ./${SWIFT_SDK_DIR}/scripts/build-swift.sh --local --build-commons --release
+          ./${SWIFT_SDK_DIR}/scripts/build-swift.sh --local --release
           echo "Swift build complete"
 
       - name: Prepare Release Assets
