@@ -22,7 +22,6 @@ permissions:
 jobs:
   tag:
     name: Create Swift SDK Tag
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
 
     steps:
@@ -40,14 +39,20 @@ jobs:
         id: next_tag
         run: |
           set -e
-          SDK_VERSION=$(grep -E 'let sdkVersion = "' Package.swift | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-          if [ -z "$SDK_VERSION" ]; then
-            echo "Unable to determine sdkVersion from Package.swift"
-            exit 1
+          # List swift-v* tags, strip prefix, keep only X.Y.Z (no prerelease)
+          LATEST=$(git tag -l 'swift-v*' | sed 's/^swift-v//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1 || true)
+          if [ -z "$LATEST" ]; then
+            NEXT="0.1.1"
+          else
+            MAJOR=$(echo "$LATEST" | cut -d. -f1)
+            MINOR=$(echo "$LATEST" | cut -d. -f2)
+            PATCH=$(echo "$LATEST" | cut -d. -f3)
+            PATCH=$((PATCH + 1))
+            NEXT="$MAJOR.$MINOR.$PATCH"
           fi
-          NEW_TAG="swift-v$SDK_VERSION"
+          NEW_TAG="swift-v$NEXT"
           echo "tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
-          echo "Computed tag from Package.swift sdkVersion: $NEW_TAG"
+          echo "Computed next tag: $NEW_TAG"
 
       - name: Skip If Tag Exists
         id: skip
