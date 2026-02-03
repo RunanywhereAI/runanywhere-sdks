@@ -106,10 +106,25 @@ jobs:
           # Discard local changes from build (useLocalBinaries was set to true)
           git checkout -- Package.swift
 
-          # Fetch and checkout main (tag checkout is detached HEAD)
+          # Save the tag build commit (git rev-parse HEAD) before switching branches
+          TAG_COMMIT=$(git rev-parse HEAD)
+          echo "Tag build commit: $TAG_COMMIT"
+
+          # Fetch origin main (git fetch)
           git fetch origin main
+
+          # Verify tag commit matches origin/main (git rev-parse origin/main)
+          # Fail fast if they differ to avoid creating divergent history
+          ORIGIN_MAIN=$(git rev-parse origin/main)
+          echo "origin/main commit: $ORIGIN_MAIN"
+          if [[ "$TAG_COMMIT" != "$ORIGIN_MAIN" ]]; then
+            echo "::error::Tag commit ($TAG_COMMIT) does not match origin/main ($ORIGIN_MAIN). Failing to avoid divergent history."
+            exit 1
+          fi
+
+          # Checkout main and pull with fast-forward only (git pull --ff-only)
           git checkout main
-          git pull origin main
+          git pull --ff-only origin main
 
           # Apply the same sed updates to Package.swift on main
           sed -i '' 's/let useLocalBinaries = true/let useLocalBinaries = false/' Package.swift
