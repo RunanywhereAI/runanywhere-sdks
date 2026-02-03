@@ -130,7 +130,19 @@ heartbeat:
 #
 # For fastest responses on Raspberry Pi, disable all tools:
 tools:
-  enabled: false  # Set to true to enable tools (adds ~14KB to prompt)
+  shell:
+    enabled: false
+  fs:
+    enabled: false
+  browser:
+    enabled: false
+  message:
+    enabled: false
+  web:
+    search:
+      enabled: false
+    fetch:
+      enabled: false
 
 # If you need tools, enable only what you need:
 # tools:
