@@ -43,6 +43,13 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          # Swift SDK currently targets Swift 5.9 (Package.swift tools-version 5.9).
+          # Pin Xcode to avoid Swift 6 strict-concurrency breaking older code paths.
+          xcode-version: '15.4'
+
       - name: Determine Version
         id: version
         run: |
