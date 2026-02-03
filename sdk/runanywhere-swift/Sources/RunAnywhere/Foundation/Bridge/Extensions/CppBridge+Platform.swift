@@ -183,7 +183,7 @@ extension CppBridge {
                         Platform.logger.error("Foundation Models generate failed: \(error)")
                         let raw = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
                         Platform.lastFoundationModelsErrorMessage = Platform.friendlyFoundationModelsMessage(raw)
-                        result = RAC_ERROR_INTERNAL
+                        resultPtr.pointee = RAC_ERROR_INTERNAL
                     }
                     group.leave()
                 }
