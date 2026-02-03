@@ -1,0 +1,335 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A1RA00012E63772A00DD7839 /* RunAnywhere in Frameworks */ = {isa = PBXBuildFile; productRef = A1RA00002E63772A00DD7839 /* RunAnywhere */; };
+		A1RA00032ED16DA40058D033 /* RunAnywhereONNX in Frameworks */ = {isa = PBXBuildFile; productRef = A1RA00022ED16DA40058D033 /* RunAnywhereONNX */; };
+		A1RA00052ED16DA40058D033 /* RunAnywhereLlamaCPP in Frameworks */ = {isa = PBXBuildFile; productRef = A1RA00042ED16DA40058D033 /* RunAnywhereLlamaCPP */; };
+		A1TA10012F000001 /* SDKTestAppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1TA10022F000001 /* SDKTestAppApp.swift */; };
+		A1TA10032F000001 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1TA10042F000001 /* ContentView.swift */; };
+		A1TA10052F000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1TA10062F000001 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0C5E8414EC72B380DADD6717 /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
+		0D23254BCD6273187BD2441C /* libbz2.tbd */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libbz2.tbd; path = usr/lib/libbz2.tbd; sourceTree = SDKROOT; };
+		502F1BAB2C2556A11E24EA6F /* libc++.tbd */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = "libc++.tbd"; path = "usr/lib/libc++.tbd"; sourceTree = SDKROOT; };
+		A1TA00002E2F250200337F2F /* SDKTestApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SDKTestApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1TA10022F000001 /* SDKTestAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SDKTestAppApp.swift; sourceTree = "<group>"; };
+		A1TA10042F000001 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A1TA10062F000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A1TA10072F000001 /* SDKTestApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SDKTestApp.entitlements; sourceTree = "<group>"; };
+		F8388285B0D64126DD4540F8 /* libarchive.tbd */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libarchive.tbd; path = usr/lib/libarchive.tbd; sourceTree = SDKROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		A1TA00022E2F250200337F2F /* SDKTestApp */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SDKTestApp;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A1TA000D2E2F250200337F2F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1RA00032ED16DA40058D033 /* RunAnywhereONNX in Frameworks */,
+				A1RA00012E63772A00DD7839 /* RunAnywhere in Frameworks */,
+				A1RA00052ED16DA40058D033 /* RunAnywhereLlamaCPP in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A1FA6C002E6374D1005EF0C7 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				F8388285B0D64126DD4540F8 /* libarchive.tbd */,
+				0D23254BCD6273187BD2441C /* libbz2.tbd */,
+				502F1BAB2C2556A11E24EA6F /* libc++.tbd */,
+				0C5E8414EC72B380DADD6717 /* Accelerate.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		A1TA00012E2F250200337F2F = {
+			isa = PBXGroup;
+			children = (
+				A1TA00022E2F250200337F2F /* SDKTestApp */,
+				A1FA6C002E6374D1005EF0C7 /* Frameworks */,
+				A1TA00032E2F250200337F2F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A1TA00032E2F250200337F2F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A1TA00002E2F250200337F2F /* SDKTestApp.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A1TA000F2E2F250200337F2F /* SDKTestApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1TA00122E2F250400337F2F /* Build configuration list for PBXNativeTarget "SDKTestApp" */;
+			buildPhases = (
+				A1TA000C2E2F250200337F2F /* Sources */,
+				A1TA000D2E2F250200337F2F /* Frameworks */,
+				A1TA000E2E2F250200337F2F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A1TA00022E2F250200337F2F /* SDKTestApp */,
+			);
+			name = SDKTestApp;
+			packageProductDependencies = (
+				A1RA00002E63772A00DD7839 /* RunAnywhere */,
+				A1RA00022ED16DA40058D033 /* RunAnywhereONNX */,
+				A1RA00042ED16DA40058D033 /* RunAnywhereLlamaCPP */,
+			);
+			productName = SDKTestApp;
+			productReference = A1TA00002E2F250200337F2F /* SDKTestApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A1TA00102E2F250200337F2F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1640;
+				LastUpgradeCheck = 1640;
+				TargetAttributes = {
+					A1TA000F2E2F250200337F2F = {
+						CreatedOnToolsVersion = 16.4;
+					};
+				};
+			};
+			buildConfigurationList = A1TA000B2E2F250200337F2F /* Build configuration list for PBXProject "SDKTestApp" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A1TA00012E2F250200337F2F;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A1E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../.." */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = A1TA00032E2F250200337F2F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A1TA000F2E2F250200337F2F /* SDKTestApp */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A1TA000E2E2F250200337F2F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1TA10052F000001 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A1TA000C2E2F250200337F2F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1TA10012F000001 /* SDKTestAppApp.swift in Sources */,
+				A1TA10032F000001 /* ContentView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A1TA00092E2F250400337F2F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		A1TA000A2E2F250400337F2F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		A1TA00132E2F250400337F2F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SDKTestApp/SDKTestApp.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9Z6RJ25W3Z;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "SDK Test";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "SDK Test uses the microphone for voice features.";
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.SDKTestApp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A1TA00142E2F250400337F2F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SDKTestApp/SDKTestApp.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 9Z6RJ25W3Z;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "SDK Test";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "SDK Test uses the microphone for voice features.";
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.SDKTestApp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A1TA000B2E2F250200337F2F /* Build configuration list for PBXProject "SDKTestApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1TA00092E2F250400337F2F /* Debug */,
+				A1TA000A2E2F250400337F2F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1TA00122E2F250400337F2F /* Build configuration list for PBXNativeTarget "SDKTestApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1TA00132E2F250400337F2F /* Debug */,
+				A1TA00142E2F250400337F2F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		A1E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../.." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../..;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A1RA00002E63772A00DD7839 /* RunAnywhere */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../.." */;
+			productName = RunAnywhere;
+		};
+		A1RA00022ED16DA40058D033 /* RunAnywhereONNX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../.." */;
+			productName = RunAnywhereONNX;
+		};
+		A1RA00042ED16DA40058D033 /* RunAnywhereLlamaCPP */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../.." */;
+			productName = RunAnywhereLlamaCPP;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = A1TA00102E2F250200337F2F /* Project object */;
+}
