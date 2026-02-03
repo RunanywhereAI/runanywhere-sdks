@@ -103,6 +103,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+          # Discard local changes from build (useLocalBinaries was set to true)
+          git checkout -- Package.swift
+
           # Fetch and checkout main (tag checkout is detached HEAD)
           git fetch origin main
           git checkout main
