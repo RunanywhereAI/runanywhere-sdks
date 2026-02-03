@@ -90,50 +90,44 @@ jobs:
           echo "RABackendLLAMACPP: $LLAMACPP_CHECKSUM"
           echo "RABackendONNX: $ONNX_CHECKSUM"
 
-      - name: Update Package.swift Checksums and Version
+      - name: Commit and Push Package.swift Update
         run: |
           VERSION="${{ steps.version.outputs.version }}"
+          TAG="${{ steps.version.outputs.tag }}"
           COMMONS_CHECKSUM="${{ steps.checksums.outputs.commons }}"
           LLAMACPP_CHECKSUM="${{ steps.checksums.outputs.llamacpp }}"
           ONNX_CHECKSUM="${{ steps.checksums.outputs.onnx }}"
-          # Ensure production mode for release (remote binaries)
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Fetch and checkout main (tag checkout is detached HEAD)
+          git fetch origin main
+          git checkout main
+          git pull origin main
+
+          # Apply the same sed updates to Package.swift on main
           sed -i '' 's/let useLocalBinaries = true/let useLocalBinaries = false/' Package.swift
-          # Update sdkVersion
           sed -i '' 's/let sdkVersion = "[^"]*"/let sdkVersion = "'"$VERSION"'"/' Package.swift
-          # Update the three binary target checksums (range: url line through checksum line)
           sed -i '' '/RACommons-ios-v.*zip/,/checksum:/ s/checksum: "[^"]*"/checksum: "'"$COMMONS_CHECKSUM"'"/' Package.swift
           sed -i '' '/RABackendLLAMACPP-ios-v.*zip/,/checksum:/ s/checksum: "[^"]*"/checksum: "'"$LLAMACPP_CHECKSUM"'"/' Package.swift
           sed -i '' '/RABackendONNX-ios-v.*zip/,/checksum:/ s/checksum: "[^"]*"/checksum: "'"$ONNX_CHECKSUM"'"/' Package.swift
-          echo "Updated Package.swift sdkVersion and checksums"
-          grep -A1 "RACommons-ios" Package.swift | head -4
 
-      - name: Commit and Push Package.swift Update
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Package.swift
           if git diff --staged --quiet; then
             echo "No Package.swift changes to commit"
           else
-            git commit -m "chore(swift): update Package.swift checksums for swift-v${{ steps.version.outputs.version }}"
-            git push origin HEAD:main
+            git commit -m "chore(swift): update Package.swift checksums for swift-v${VERSION}"
+            git push origin main
           fi
 
-      - name: Update Tag to Commit with Checksums
-        run: |
-          TAG="${{ steps.version.outputs.tag }}"
-          # Delete remote tag so we can move it to the new commit
-          git push origin ":refs/tags/${TAG}" || true
-          # Tag current commit (with Package.swift update)
+          # Create/update tags on this commit
+          git push origin ":refs/tags/${TAG}" 2>/dev/null || true
           git tag -f "${TAG}" -m "Swift SDK Release ${TAG}"
           git push origin "${TAG}"
           echo "Tag ${TAG} updated to point to commit with correct checksums"
 
-      - name: Create Semver Tag for SPM
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          # SPM resolves versions from semver tags (e.g. 0.1.2 or v0.1.2)
-          # Create tag ${VERSION} on same commit so consumers can use from: "X.Y.Z"
+          # Create semver tag for SPM resolution
           git push origin ":refs/tags/${VERSION}" 2>/dev/null || true
           git tag -f "${VERSION}" -m "Swift SDK v${VERSION}"
           git push origin "${VERSION}"
