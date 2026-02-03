@@ -69,14 +69,15 @@ public final class LiveTranscriptionSession: ObservableObject {
     /// Async stream of transcription text updates
     public var transcriptions: AsyncStream<String> {
         AsyncStream { [weak self] continuation in
+            let session = self
             Task { @MainActor in
-                self?.onPartialCallback = { text in
+                session?.onPartialCallback = { text in
                     continuation.yield(text)
                 }
             }
-            continuation.onTermination = { [weak self] _ in
+            continuation.onTermination = { _ in
                 Task { @MainActor in
-                    self?.onPartialCallback = nil
+                    session?.onPartialCallback = nil
                 }
             }
         }
