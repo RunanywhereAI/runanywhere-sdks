@@ -42,7 +42,8 @@ public extension CppBridge {
 
                 // Use semaphore to make async call synchronous for C callback
                 let semaphore = DispatchSemaphore(value: 0)
-                var result: rac_result_t = RAC_ERROR_HTTP_REQUEST_FAILED
+                let resultPtr = UnsafeMutablePointer<rac_result_t>.allocate(capacity: 1)
+                resultPtr.initialize(to: RAC_ERROR_HTTP_REQUEST_FAILED)
 
                 Task {
                     do {
@@ -60,7 +61,7 @@ public extension CppBridge {
                         outResponse.pointee.status_code = 200
                         outResponse.pointee.result = RAC_SUCCESS
                         outResponse.pointee.error_message = nil
-                        result = RAC_SUCCESS
+                        resultPtr.pointee = RAC_SUCCESS
                     } catch {
                         let errorMsg = error.localizedDescription
                         errorMsg.withCString { cStr in
@@ -70,12 +71,14 @@ public extension CppBridge {
                         outResponse.pointee.status_code = 0
                         outResponse.pointee.response_body = nil
                         outResponse.pointee.response_length = 0
-                        result = RAC_ERROR_HTTP_REQUEST_FAILED
+                        resultPtr.pointee = RAC_ERROR_HTTP_REQUEST_FAILED
                     }
                     semaphore.signal()
                 }
 
                 _ = semaphore.wait(timeout: .now() + 30)
+                let result = resultPtr.move()
+                resultPtr.deallocate()
                 return result
             }
 

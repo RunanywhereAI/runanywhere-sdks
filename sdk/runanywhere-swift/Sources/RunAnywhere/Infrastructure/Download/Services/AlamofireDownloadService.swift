@@ -124,14 +124,16 @@ public class AlamofireDownloadService: @unchecked Sendable {
 
         // Determine if we need extraction
         // First check artifact type, then infer from URL if not explicitly set
-        var requiresExtraction = model.artifactType.requiresExtraction
-
-        // If artifact type doesn't require extraction, check if URL indicates an archive
-        // This is a safeguard for models registered without explicit artifact type
-        if !requiresExtraction, let archiveType = ArchiveType.from(url: downloadURL) {
-            logger.info("URL indicates archive type (\(archiveType.rawValue)) but artifact type doesn't require extraction. Inferring extraction needed.")
-            requiresExtraction = true
-        }
+        let requiresExtraction: Bool = {
+            var extraction = model.artifactType.requiresExtraction
+            // If artifact type doesn't require extraction, check if URL indicates an archive
+            // This is a safeguard for models registered without explicit artifact type
+            if !extraction, let archiveType = ArchiveType.from(url: downloadURL) {
+                logger.info("URL indicates archive type (\(archiveType.rawValue)) but artifact type doesn't require extraction. Inferring extraction needed.")
+                extraction = true
+            }
+            return extraction
+        }()
 
         // Get destination path from C++ path utilities
         let destinationFolder = try CppBridge.ModelPaths.getModelFolder(modelId: model.id, framework: model.framework)

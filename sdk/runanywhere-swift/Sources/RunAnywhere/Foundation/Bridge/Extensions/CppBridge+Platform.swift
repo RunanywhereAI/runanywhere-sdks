@@ -108,7 +108,8 @@ extension CppBridge {
                 }
 
                 // Use a dispatch group to synchronously wait for async creation
-                var serviceHandle: rac_handle_t?
+                let handlePtr = UnsafeMutablePointer<rac_handle_t?>.allocate(capacity: 1)
+                handlePtr.initialize(to: nil)
                 let group = DispatchGroup()
                 group.enter()
 
@@ -119,17 +120,19 @@ extension CppBridge {
                         Platform.foundationModelsService = service
 
                         // Return a marker handle - actual service is managed by Swift
-                        serviceHandle = UnsafeMutableRawPointer(bitPattern: 0xF00DADE1)
+                        handlePtr.pointee = UnsafeMutableRawPointer(bitPattern: 0xF00DADE1)
                         Platform.logger.info("Foundation Models service created")
                     } catch {
                         Platform.logger.error("Failed to create Foundation Models service: \(error)")
-                        serviceHandle = nil
+                        handlePtr.pointee = nil
                     }
                     group.leave()
                 }
 
                 group.wait()
-                return serviceHandle
+                let handle = handlePtr.move()
+                handlePtr.deallocate()
+                return handle
             }
 
             callbacks.generate = { _, promptPtr, _, outResponsePtr, _ -> rac_result_t in
@@ -148,7 +151,8 @@ extension CppBridge {
 
                 let prompt = String(cString: promptPtr)
 
-                var result: rac_result_t = RAC_ERROR_INTERNAL
+                let resultPtr = UnsafeMutablePointer<rac_result_t>.allocate(capacity: 1)
+                resultPtr.initialize(to: RAC_ERROR_INTERNAL)
                 let group = DispatchGroup()
                 group.enter()
 
@@ -159,15 +163,17 @@ extension CppBridge {
                             options: LLMGenerationOptions()
                         )
                         outResponsePtr.pointee = strdup(response)
-                        result = RAC_SUCCESS
+                        resultPtr.pointee = RAC_SUCCESS
                     } catch {
                         Platform.logger.error("Foundation Models generate failed: \(error)")
-                        result = RAC_ERROR_INTERNAL
+                        resultPtr.pointee = RAC_ERROR_INTERNAL
                     }
                     group.leave()
                 }
 
                 group.wait()
+                let result = resultPtr.move()
+                resultPtr.deallocate()
                 return result
             }
 
@@ -259,22 +265,25 @@ extension CppBridge {
                     volume: volume
                 )
 
-                var result: rac_result_t = RAC_ERROR_INTERNAL
+                let resultPtr = UnsafeMutablePointer<rac_result_t>.allocate(capacity: 1)
+                resultPtr.initialize(to: RAC_ERROR_INTERNAL)
                 let group = DispatchGroup()
                 group.enter()
 
                 Task {
                     do {
                         _ = try await service.synthesize(text: text, options: options)
-                        result = RAC_SUCCESS
+                        resultPtr.pointee = RAC_SUCCESS
                     } catch {
                         Platform.logger.error("System TTS synthesize failed: \(error)")
-                        result = RAC_ERROR_INTERNAL
+                        resultPtr.pointee = RAC_ERROR_INTERNAL
                     }
                     group.leave()
                 }
 
                 group.wait()
+                let result = resultPtr.move()
+                resultPtr.deallocate()
                 return result
             }
 

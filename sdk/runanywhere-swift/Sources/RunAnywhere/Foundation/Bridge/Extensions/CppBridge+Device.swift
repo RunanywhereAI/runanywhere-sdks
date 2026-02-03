@@ -112,7 +112,8 @@ extension CppBridge {
 
                 // Make synchronous HTTP call (we're already on a background thread from C++)
                 let semaphore = DispatchSemaphore(value: 0)
-                var result: rac_result_t = RAC_SUCCESS
+                let resultPtr = UnsafeMutablePointer<rac_result_t>.allocate(capacity: 1)
+                resultPtr.initialize(to: RAC_SUCCESS)
 
                 Task {
                     do {
@@ -120,7 +121,7 @@ extension CppBridge {
                             outResponse.pointee.result = RAC_ERROR_INVALID_ARGUMENT
                             outResponse.pointee.status_code = 0
                             outResponse.pointee.error_message = ("Invalid JSON data" as NSString).utf8String
-                            result = RAC_ERROR_INVALID_ARGUMENT
+                            resultPtr.pointee = RAC_ERROR_INVALID_ARGUMENT
                             semaphore.signal()
                             return
                         }
@@ -137,17 +138,19 @@ extension CppBridge {
                         if let responseStr = String(data: responseData, encoding: .utf8) {
                             outResponse.pointee.response_body = (responseStr as NSString).utf8String
                         }
-                        result = RAC_SUCCESS
+                        resultPtr.pointee = RAC_SUCCESS
                     } catch {
                         outResponse.pointee.result = RAC_ERROR_NETWORK_ERROR
                         outResponse.pointee.status_code = 0
                         outResponse.pointee.error_message = (error.localizedDescription as NSString).utf8String
-                        result = RAC_ERROR_NETWORK_ERROR
+                        resultPtr.pointee = RAC_ERROR_NETWORK_ERROR
                     }
                     semaphore.signal()
                 }
 
                 semaphore.wait()
+                let result = resultPtr.move()
+                resultPtr.deallocate()
                 return result
             }
 
