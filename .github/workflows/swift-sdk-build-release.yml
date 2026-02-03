@@ -69,7 +69,7 @@ jobs:
           for name in RACommons RABackendLLAMACPP RABackendONNX; do
             if [ -d "${COMMONS_DIST}/${name}.xcframework" ]; then
               zip_name="${name}-ios-v${VERSION}.zip"
-              (cd "${COMMONS_DIST}" && zip -r "../../../../release-assets/${zip_name}" "${name}.xcframework")
+              (cd "${COMMONS_DIST}" && zip -r "../../../release-assets/${zip_name}" "${name}.xcframework")
               echo "Created release-assets/${zip_name}"
             fi
           done
