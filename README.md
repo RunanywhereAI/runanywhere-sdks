@@ -78,6 +78,8 @@ No cloud. No latency. No data leaves the device.
 | **React Native** | Beta | [npm](#react-native) | [docs.runanywhere.ai/react-native](https://docs.runanywhere.ai/react-native/introduction) |
 | **Flutter** | Beta | [pub.dev](#flutter) | [docs.runanywhere.ai/flutter](https://docs.runanywhere.ai/flutter/introduction) |
 
+Swift SDK CI: merges to main create `swift-vX.Y.Z` tags (Phase 1); pushing a `swift-v*` tag triggers a macOS build (build-ios.sh, build-swift.sh) and attaches XCFrameworks to the GitHub Release (Phase 2). No CocoaPods/App Store; no cross-SDK orchestration.
+
 ---
 
 ## Quick Start

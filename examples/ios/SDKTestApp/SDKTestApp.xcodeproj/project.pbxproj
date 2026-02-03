@@ -10,9 +10,6 @@
 		A1RA00012E63772A00DD7839 /* RunAnywhere in Frameworks */ = {isa = PBXBuildFile; productRef = A1RA00002E63772A00DD7839 /* RunAnywhere */; };
 		A1RA00032ED16DA40058D033 /* RunAnywhereONNX in Frameworks */ = {isa = PBXBuildFile; productRef = A1RA00022ED16DA40058D033 /* RunAnywhereONNX */; };
 		A1RA00052ED16DA40058D033 /* RunAnywhereLlamaCPP in Frameworks */ = {isa = PBXBuildFile; productRef = A1RA00042ED16DA40058D033 /* RunAnywhereLlamaCPP */; };
-		A1TA10012F000001 /* SDKTestAppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1TA10022F000001 /* SDKTestAppApp.swift */; };
-		A1TA10032F000001 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1TA10042F000001 /* ContentView.swift */; };
-		A1TA10052F000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1TA10062F000001 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -20,10 +17,6 @@
 		0D23254BCD6273187BD2441C /* libbz2.tbd */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libbz2.tbd; path = usr/lib/libbz2.tbd; sourceTree = SDKROOT; };
 		502F1BAB2C2556A11E24EA6F /* libc++.tbd */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = "libc++.tbd"; path = "usr/lib/libc++.tbd"; sourceTree = SDKROOT; };
 		A1TA00002E2F250200337F2F /* SDKTestApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SDKTestApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A1TA10022F000001 /* SDKTestAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SDKTestAppApp.swift; sourceTree = "<group>"; };
-		A1TA10042F000001 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		A1TA10062F000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		A1TA10072F000001 /* SDKTestApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SDKTestApp.entitlements; sourceTree = "<group>"; };
 		F8388285B0D64126DD4540F8 /* libarchive.tbd */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libarchive.tbd; path = usr/lib/libarchive.tbd; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -147,7 +140,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A1TA10052F000001 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -158,8 +150,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A1TA10012F000001 /* SDKTestAppApp.swift in Sources */,
-				A1TA10032F000001 /* ContentView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -244,7 +244,13 @@ private enum LLMStreamCallbacks {
         let errorCallback: ErrorFn = { _, errorMsg, userData in
             guard let userData = userData else { return }
             let ctx = Unmanaged<LLMStreamCallbackContext>.fromOpaque(userData).takeUnretainedValue()
-            let message = errorMsg.map { String(cString: $0) } ?? "Unknown error"
+            var message = errorMsg.map { String(cString: $0) } ?? "Unknown error"
+            // Use actual Foundation Models error when C++ reported generic "Streaming generation failed"
+            if message == "Streaming generation failed",
+               let platformError = CppBridge.Platform.lastFoundationModelsErrorMessage {
+                message = platformError
+                CppBridge.Platform.lastFoundationModelsErrorMessage = nil
+            }
             let error = SDKError.llm(.generationFailed, message)
             ctx.continuation.finish(throwing: error)
             Task { await ctx.collector.markFailed(error) }
