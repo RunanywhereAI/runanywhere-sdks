@@ -75,9 +75,15 @@ public final class LiveTranscriptionSession: ObservableObject {
                     continuation.yield(text)
                 }
             }
+            // Sendable box so onTermination closure doesn't capture self (Swift 6 concurrency)
+            final class Ref: @unchecked Sendable {
+                weak var session: LiveTranscriptionSession?
+            }
+            let ref = Ref()
+            ref.session = self
             continuation.onTermination = { _ in
                 Task { @MainActor in
-                    session?.onPartialCallback = nil
+                    ref.session?.onPartialCallback = nil
                 }
             }
         }
