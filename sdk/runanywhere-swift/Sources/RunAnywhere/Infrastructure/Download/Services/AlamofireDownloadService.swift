@@ -148,7 +148,8 @@ public class AlamofireDownloadService: @unchecked Sendable {
             progressContinuation.yield(progress)
         }
 
-        // Create download task
+        // Create download task (capture requiresExtraction for Swift 6 concurrency)
+        let requiresExtractionForTask = requiresExtraction
         let task = DownloadTask(
             id: taskId,
             modelId: model.id,
@@ -164,7 +165,7 @@ public class AlamofireDownloadService: @unchecked Sendable {
                         model: model,
                         downloadURL: downloadURL,
                         taskId: taskId,
-                        requiresExtraction: requiresExtraction,
+                        requiresExtraction: requiresExtractionForTask,
                         downloadStartTime: downloadStartTime,
                         destinationFolder: destinationFolder,
                         progressContinuation: progressContinuation

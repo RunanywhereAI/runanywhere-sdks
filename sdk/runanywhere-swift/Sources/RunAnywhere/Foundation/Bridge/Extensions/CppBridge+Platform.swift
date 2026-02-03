@@ -166,6 +166,8 @@ extension CppBridge {
 
                 let resultPtr = UnsafeMutablePointer<rac_result_t>.allocate(capacity: 1)
                 resultPtr.initialize(to: RAC_ERROR_INTERNAL)
+                let responsePtr = UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>.allocate(capacity: 1)
+                responsePtr.initialize(to: nil)
                 let group = DispatchGroup()
                 group.enter()
 
@@ -175,7 +177,7 @@ extension CppBridge {
                             prompt: prompt,
                             options: LLMGenerationOptions()
                         )
-                        outResponsePtr.pointee = strdup(response)
+                        responsePtr.pointee = strdup(response)
                         resultPtr.pointee = RAC_SUCCESS
                     } catch {
                         Platform.logger.error("Foundation Models generate failed: \(error)")
@@ -187,8 +189,10 @@ extension CppBridge {
                 }
 
                 group.wait()
+                outResponsePtr.pointee = responsePtr.pointee
                 let result = resultPtr.move()
                 resultPtr.deallocate()
+                responsePtr.deallocate()
                 return result
             }
 
@@ -231,7 +235,9 @@ extension CppBridge {
             }
 
             callbacks.create = { _, _ -> rac_handle_t? in
-                var serviceHandle: rac_handle_t?
+                // Use pointer to avoid mutating captured var inside sync block (Swift 6 concurrency)
+                let handlePtr = UnsafeMutablePointer<rac_handle_t?>.allocate(capacity: 1)
+                handlePtr.initialize(to: nil)
 
                 // Use DispatchQueue.main.sync to create the MainActor-isolated service
                 // This ensures proper thread safety for AVSpeechSynthesizer
@@ -240,11 +246,13 @@ extension CppBridge {
                     Platform.systemTTSService = service
 
                     // Return a marker handle
-                    serviceHandle = UnsafeMutableRawPointer(bitPattern: 0x5157E775)
+                    handlePtr.pointee = UnsafeMutableRawPointer(bitPattern: 0x5157E775)
                     Platform.logger.info("System TTS service created")
                 }
 
-                return serviceHandle
+                let handle = handlePtr.pointee
+                handlePtr.deallocate()
+                return handle
             }
 
             callbacks.synthesize = { _, textPtr, optionsPtr, _ -> rac_result_t in
