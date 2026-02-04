@@ -312,10 +312,10 @@ bool VoicePipeline::initialize() {
         return false;
     }
 
-    // Check if all models are available
-    if (!are_all_models_available()) {
+    // Check if all models are available (skip LLM in moltbot mode)
+    if (!are_all_models_available(config_.enable_moltbot)) {
         last_error_ = "One or more models are missing. Run scripts/download-models.sh";
-        print_model_status();
+        print_model_status(false, config_.enable_moltbot);
         return false;
     }
 
@@ -358,17 +358,21 @@ bool VoicePipeline::initialize() {
         return false;
     }
 
-    // Load LLM model
-    std::cout << "  Loading LLM: " << LLM_MODEL_ID << std::endl;
-    result = rac_voice_agent_load_llm_model(
-        impl_->voice_agent,
-        llm_path.c_str(),
-        LLM_MODEL_ID,
-        "Qwen2.5 0.5B"
-    );
-    if (result != RAC_SUCCESS) {
-        last_error_ = "Failed to load LLM model: " + llm_path;
-        return false;
+    // Load LLM model (skip in moltbot mode — LLM runs remotely)
+    if (!config_.enable_moltbot) {
+        std::cout << "  Loading LLM: " << LLM_MODEL_ID << std::endl;
+        result = rac_voice_agent_load_llm_model(
+            impl_->voice_agent,
+            llm_path.c_str(),
+            LLM_MODEL_ID,
+            "Qwen2.5 0.5B"
+        );
+        if (result != RAC_SUCCESS) {
+            last_error_ = "Failed to load LLM model: " + llm_path;
+            return false;
+        }
+    } else {
+        std::cout << "  LLM: skipped (moltbot mode — using remote agent)\n";
     }
 
     // Load TTS voice

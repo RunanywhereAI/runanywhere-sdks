@@ -145,10 +145,10 @@ int main(int argc, char* argv[]) {
 
     // Check model availability
     std::cout << "Checking models...\n";
-    runanywhere::print_model_status(app_config.enable_wakeword);
+    runanywhere::print_model_status(app_config.enable_wakeword, app_config.enable_moltbot);
     std::cout << std::endl;
 
-    if (!runanywhere::are_all_models_available()) {
+    if (!runanywhere::are_all_models_available(app_config.enable_moltbot)) {
         std::cerr << "ERROR: Some required models are missing!\n"
                   << "Please run: ./scripts/download-models.sh\n"
                   << std::endl;
