@@ -1,8 +1,16 @@
 package com.runanywhere.runanywhereai.presentation.tts
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -12,21 +20,28 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
 import com.runanywhere.runanywhereai.ui.theme.AppColors
+import com.runanywhere.runanywhereai.ui.theme.AppTypography
+import com.runanywhere.runanywhereai.util.getModelLogoResIdForName
 import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
 import kotlinx.coroutines.launch
 
 /**
- * Text to Speech Screen - Matching iOS TextToSpeechView.swift exactly
- *
- * iOS Reference: examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Voice/TextToSpeechView.swift
+ * Text to Speech Screen
  *
  * Features:
  * - Text input area with character count
@@ -43,118 +58,103 @@ fun TextToSpeechScreen(viewModel: TextToSpeechViewModel = viewModel()) {
     var showModelPicker by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(
+    Scaffold(
+        topBar = {
+            if (uiState.isModelLoaded) {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = "Text to Speech",
+                            style = MaterialTheme.typography.headlineMedium,
+                        )
+                    },
+                    actions = {
+                        IconButton(onClick = { showModelPicker = true }) {
+                            TTSModelButton(
+                                modelName = uiState.selectedModelName,
+                                frameworkDisplayName = uiState.selectedFramework?.displayName,
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                    ),
+                )
+            }
+        },
+    ) { paddingValues ->
+        Box(
             modifier =
                 Modifier
                     .fillMaxSize()
+                    .padding(paddingValues)
                     .background(MaterialTheme.colorScheme.background),
         ) {
-            // Header with title
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Text to Speech",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-
-            // Model Status Banner - Always visible
-            // iOS Reference: ModelStatusBanner component
-            ModelStatusBannerTTS(
-                framework = uiState.selectedFramework?.displayName,
-                modelName = uiState.selectedModelName,
-                isLoading = uiState.isGenerating && uiState.selectedModelName == null,
-                onSelectModel = { showModelPicker = true },
-            )
-
-            HorizontalDivider()
-
-            // Main content - only enabled when model is selected
-            if (uiState.isModelLoaded) {
-                // Scrollable content area
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .weight(1f)
-                            .verticalScroll(rememberScrollState())
-                            .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp),
-                ) {
-                    // Text input section
-                    // iOS Reference: TextEditor in TextToSpeechView
-                    TextInputSection(
-                        text = uiState.inputText,
-                        onTextChange = { viewModel.updateInputText(it) },
-                        characterCount = uiState.characterCount,
-                        maxCharacters = uiState.maxCharacters,
-                        onShuffle = { viewModel.shuffleSampleText() },
-                    )
-
-                    // Voice settings section
-                    // iOS Reference: Voice Settings section with sliders
-                    VoiceSettingsSection(
-                        speed = uiState.speed,
-                        pitch = uiState.pitch,
-                        onSpeedChange = { viewModel.updateSpeed(it) },
-                        onPitchChange = { viewModel.updatePitch(it) },
-                    )
-
-                    // Audio info section (shown after generation)
-                    // iOS Reference: Audio Info section with metadata
-                    if (uiState.audioDuration != null) {
-                        AudioInfoSection(
-                            duration = uiState.audioDuration!!,
-                            audioSize = uiState.audioSize,
-                            sampleRate = uiState.sampleRate,
+            Column(modifier = Modifier.fillMaxSize()) {
+                if (uiState.isModelLoaded) {
+                    Column(
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .verticalScroll(rememberScrollState())
+                                .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                    ) {
+                        TextInputSection(
+                            text = uiState.inputText,
+                            onTextChange = { viewModel.updateInputText(it) },
+                            characterCount = uiState.characterCount,
+                            maxCharacters = uiState.maxCharacters,
+                            onShuffle = { viewModel.shuffleSampleText() },
                         )
+
+                        VoiceSettingsSection(
+                            speed = uiState.speed,
+                            pitch = uiState.pitch,
+                            onSpeedChange = { viewModel.updateSpeed(it) },
+                            onPitchChange = { viewModel.updatePitch(it) },
+                        )
+
+                        if (uiState.audioDuration != null) {
+                            AudioInfoSection(
+                                duration = uiState.audioDuration!!,
+                                audioSize = uiState.audioSize,
+                                sampleRate = uiState.sampleRate,
+                            )
+                        }
                     }
+
+                    HorizontalDivider()
+
+                    ControlsSection(
+                        isGenerating = uiState.isGenerating,
+                        isPlaying = uiState.isPlaying,
+                        isSpeaking = uiState.isSpeaking,
+                        hasGeneratedAudio = uiState.hasGeneratedAudio,
+                        isSystemTTS = uiState.isSystemTTS,
+                        isTextEmpty = uiState.inputText.isEmpty(),
+                        isModelSelected = uiState.selectedModelName != null,
+                        playbackProgress = uiState.playbackProgress,
+                        currentTime = uiState.currentTime,
+                        duration = uiState.audioDuration ?: 0.0,
+                        errorMessage = uiState.errorMessage,
+                        onGenerate = { viewModel.generateSpeech() },
+                        onStopSpeaking = { viewModel.stopSynthesis() },
+                        onTogglePlayback = { viewModel.togglePlayback() },
+                    )
                 }
+            }
 
-                HorizontalDivider()
-
-                // Controls section
-                // iOS Reference: Controls VStack at bottom
-                ControlsSection(
-                    isGenerating = uiState.isGenerating,
-                    isPlaying = uiState.isPlaying,
-                    isSpeaking = uiState.isSpeaking,
-                    hasGeneratedAudio = uiState.hasGeneratedAudio,
-                    isSystemTTS = uiState.isSystemTTS,
-                    isTextEmpty = uiState.inputText.isEmpty(),
-                    isModelSelected = uiState.selectedModelName != null,
-                    playbackProgress = uiState.playbackProgress,
-                    currentTime = uiState.currentTime,
-                    duration = uiState.audioDuration ?: 0.0,
-                    errorMessage = uiState.errorMessage,
-                    onGenerate = { viewModel.generateSpeech() },
-                    onStopSpeaking = { viewModel.stopSynthesis() },
-                    onTogglePlayback = { viewModel.togglePlayback() },
+            if (!uiState.isModelLoaded && !uiState.isGenerating) {
+                ModelRequiredOverlayTTS(
+                    onSelectModel = { showModelPicker = true },
+                    modifier = Modifier.matchParentSize(),
                 )
-            } else {
-                // No model selected - show spacer
-                Spacer(modifier = Modifier.weight(1f))
             }
         }
+    }
 
-        // Overlay when no model is selected
-        // iOS Reference: ModelRequiredOverlay component
-        if (!uiState.isModelLoaded && !uiState.isGenerating) {
-            ModelRequiredOverlayTTS(
-                onSelectModel = { showModelPicker = true },
-            )
-        }
-
-        // Model picker bottom sheet - Full-screen with framework/model hierarchy
-        // iOS Reference: ModelSelectionSheet(context: .tts)
-        if (showModelPicker) {
+    if (showModelPicker) {
             ModelSelectionBottomSheet(
                 context = ModelSelectionContext.TTS,
                 onDismiss = { showModelPicker = false },
@@ -172,12 +172,83 @@ fun TextToSpeechScreen(viewModel: TextToSpeechViewModel = viewModel()) {
                 },
             )
         }
-    }
 }
 
 /**
- * Model Status Banner for TTS
- * iOS Reference: ModelStatusBanner in ModelStatusComponents.swift
+ * TTS toolbar model button - icon, model name to the right, below: electricity icon + Streaming text
+ */
+@Composable
+private fun TTSModelButton(
+    modelName: String?,
+    frameworkDisplayName: String?,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (modelName != null) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(4.dp)),
+            ) {
+                Image(
+                    painter = painterResource(id = getModelLogoResIdForName(modelName)),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                )
+            }
+            Column(
+                horizontalAlignment = Alignment.Start,
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = shortModelNameTTS(modelName),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Bolt,
+                        contentDescription = null,
+                        modifier = Modifier.size(10.dp),
+                        tint = AppColors.primaryGreen,
+                    )
+                    Text(
+                        text = "Streaming",
+                        style = AppTypography.caption2.copy(fontSize = 10.sp, fontWeight = FontWeight.Medium),
+                        color = AppColors.primaryGreen,
+                    )
+                }
+            }
+        } else {
+            Icon(
+                imageVector = Icons.Default.VolumeUp,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = AppColors.primaryPurple,
+            )
+            Text(
+                text = "Select Model",
+                style = MaterialTheme.typography.labelMedium,
+            )
+        }
+    }
+}
+
+private fun shortModelNameTTS(name: String, maxLength: Int = 15): String {
+    val cleaned = name.replace(Regex("\\s*\\([^)]*\\)"), "").trim()
+    return if (cleaned.length > maxLength) cleaned.take(maxLength - 1) + "\u2026" else cleaned
+}
+
+/**
+ * Model Status Banner for TTS (kept for reference; not used when app bar shows model)
  */
 @Composable
 private fun ModelStatusBannerTTS(
@@ -273,7 +344,6 @@ private fun ModelStatusBannerTTS(
 
 /**
  * Text Input Section
- * iOS Reference: TextEditor section in TextToSpeechView
  */
 @Composable
 private fun TextInputSection(
@@ -304,7 +374,7 @@ private fun TextInputSection(
         )
 
         // Character count and Surprise me! button row
-        // iOS Reference: HStack with character count and dice button
+        // Character count and dice button row
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -316,22 +386,29 @@ private fun TextInputSection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            TextButton(
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = AppColors.primaryPurple.copy(alpha = 0.15f),
                 onClick = onShuffle,
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Casino,
-                    contentDescription = "Shuffle",
-                    modifier = Modifier.size(16.dp),
-                    tint = AppColors.primaryAccent,
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "Surprise me!",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AppColors.primaryAccent,
-                )
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = "Surprise me",
+                        modifier = Modifier.size(11.dp),
+                        tint = AppColors.primaryPurple,
+                    )
+                    Text(
+                        text = "Surprise me",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AppColors.primaryPurple,
+                    )
+                }
             }
         }
     }
@@ -339,7 +416,6 @@ private fun TextInputSection(
 
 /**
  * Voice Settings Section with Speed and Pitch sliders
- * iOS Reference: Voice Settings section in TextToSpeechView
  */
 @Composable
 private fun VoiceSettingsSection(
@@ -415,8 +491,8 @@ private fun VoiceSettingsSection(
                     steps = 14,
                     colors =
                         SliderDefaults.colors(
-                            thumbColor = AppColors.primaryAccent,
-                            activeTrackColor = AppColors.primaryAccent,
+                            thumbColor = AppColors.primaryPurple,
+                            activeTrackColor = AppColors.primaryPurple,
                         ),
                 )
             }
@@ -426,7 +502,6 @@ private fun VoiceSettingsSection(
 
 /**
  * Audio Info Section
- * iOS Reference: Audio Info section in TextToSpeechView
  */
 @Composable
 private fun AudioInfoSection(
@@ -506,7 +581,6 @@ private fun AudioInfoRow(
 
 /**
  * Controls Section with Generate and Play buttons
- * iOS Reference: Controls VStack in TextToSpeechView
  */
 @Composable
 private fun ControlsSection(
@@ -534,12 +608,11 @@ private fun ControlsSection(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        // Error message
         errorMessage?.let { error ->
             Text(
                 text = error,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
+                color = AppColors.statusRed,
                 textAlign = TextAlign.Center,
             )
         }
@@ -676,67 +749,131 @@ private fun ControlsSection(
 }
 
 /**
- * Model Required Overlay for TTS
- * iOS Reference: ModelRequiredOverlay in ModelStatusComponents.swift
+ * Model Required Overlay for TTS - purple, "Read Aloud", same layout as Chat/STT overlay
  */
 @Composable
-private fun ModelRequiredOverlayTTS(onSelectModel: () -> Unit) {
-    Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.95f)),
-        contentAlignment = Alignment.Center,
-    ) {
+private fun ModelRequiredOverlayTTS(
+    onSelectModel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val modalityColor = AppColors.primaryPurple
+    val infiniteTransition = rememberInfiniteTransition(label = "tts_overlay_circles")
+    val circle1Offset by infiniteTransition.animateFloat(
+        initialValue = -100f,
+        targetValue = 100f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 8000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "c1",
+    )
+    val circle2Offset by infiniteTransition.animateFloat(
+        initialValue = 100f,
+        targetValue = -100f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 8000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "c2",
+    )
+    val circle3Offset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 80f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 8000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "c3",
+    )
+    val density = LocalDensity.current
+    val c1Dp = with(density) { circle1Offset.toDp() }
+    val c2Dp = with(density) { circle2Offset.toDp() }
+    val c3Dp = with(density) { circle3Offset.toDp() }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize().blur(32.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(300.dp)
+                    .offset(x = c1Dp, y = (-200).dp)
+                    .clip(CircleShape)
+                    .background(modalityColor.copy(alpha = 0.15f)),
+            )
+            Box(
+                modifier = Modifier
+                    .size(250.dp)
+                    .offset(x = c2Dp, y = 300.dp)
+                    .clip(CircleShape)
+                    .background(modalityColor.copy(alpha = 0.12f)),
+            )
+            Box(
+                modifier = Modifier
+                    .size(280.dp)
+                    .offset(x = -c3Dp, y = c3Dp)
+                    .clip(CircleShape)
+                    .background(modalityColor.copy(alpha = 0.08f)),
+            )
+        }
         Column(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-            modifier = Modifier.padding(40.dp),
         ) {
-            Icon(
-                imageVector = Icons.Outlined.VolumeUp,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-            )
-
+            Spacer(modifier = Modifier.weight(1f))
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(120.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                modalityColor.copy(alpha = 0.2f),
+                                modalityColor.copy(alpha = 0.1f),
+                            ),
+                        ),
+                    ),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.VolumeUp,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    tint = modalityColor,
+                )
+            }
+            Spacer(modifier = Modifier.height(20.dp))
             Text(
-                text = "Text to Speech",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
+                text = "Read Aloud",
+                style = MaterialTheme.typography.titleLarge,
             )
-
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "Select a text-to-speech voice to generate audio. Choose from System TTS or Piper models.",
+                text = "Have any text read aloud with natural-sounding voices.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
-
+            Spacer(modifier = Modifier.weight(1f))
             Button(
                 onClick = onSelectModel,
-                modifier =
-                    Modifier
-                        .fillMaxWidth(0.7f)
-                        .height(50.dp),
-                shape = RoundedCornerShape(25.dp),
-                colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor = AppColors.primaryAccent,
-                        contentColor = Color.White,
-                    ),
+                colors = ButtonDefaults.buttonColors(containerColor = modalityColor),
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Icon(
-                    Icons.Filled.Apps,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                    tint = Color.White,
-                )
+                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color.White)
                 Spacer(modifier = Modifier.width(8.dp))
+                Text("Get Started", style = MaterialTheme.typography.titleMedium, color = Color.White)
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.padding(bottom = 16.dp),
+            ) {
+                Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    "Select a Voice",
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
+                    text = "100% Private • Runs on your device",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

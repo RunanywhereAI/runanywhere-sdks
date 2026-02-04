@@ -5,6 +5,7 @@ import android.os.Build
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.ClipEntry
@@ -35,7 +37,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -44,6 +49,8 @@ import com.runanywhere.runanywhereai.data.ConversationStore
 import com.runanywhere.runanywhereai.domain.models.ChatMessage
 import com.runanywhere.runanywhereai.domain.models.Conversation
 import com.runanywhere.runanywhereai.domain.models.MessageRole
+import com.runanywhere.runanywhereai.presentation.chat.components.ModelRequiredOverlay
+import com.runanywhere.runanywhereai.util.getModelLogoResIdForName
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppTypography
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
@@ -53,8 +60,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * iOS-matching ChatScreen with pixel-perfect design
- * Reference: iOS ChatInterfaceView.swift
+ * ChatScreen with pixel-perfect design
  *
  * Design specifications:
  * - Message bubbles: 18dp corner radius, 16dp horizontal padding, 12dp vertical padding
@@ -63,7 +69,7 @@ import java.util.Locale
  * - Thinking section: Purple theme with collapsible content
  * - Typing indicator: Animated dots with blue color
  * - Empty state: 60sp icon with title and subtitle
- * - Matches iOS implementation exactly including:
+ * - Features:
  *   - Conversation list management
  *   - Model selection sheet
  *   - Chat details view with analytics
@@ -76,14 +82,14 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
-    // State for sheets and dialogs - matching iOS
+    // State for sheets and dialogs
     var showingConversationList by remember { mutableStateOf(false) }
     var showingModelSelection by remember { mutableStateOf(false) }
     var showingChatDetails by remember { mutableStateOf(false) }
     var showDebugAlert by remember { mutableStateOf(false) }
     var debugMessage by remember { mutableStateOf("") }
 
-    // Auto-scroll to bottom when new messages arrive - matching iOS behavior
+    // Auto-scroll to bottom when new messages arrive
     LaunchedEffect(uiState.messages.size, uiState.isGenerating) {
         if (uiState.messages.isNotEmpty()) {
             scope.launch {
@@ -92,121 +98,80 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
         }
     }
 
+    // Show app bar only when model loaded
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text =
-                            if (uiState.isModelLoaded) {
-                                uiState.loadedModelName ?: "Chat"
-                            } else {
-                                "Chat"
-                            },
-                        style = MaterialTheme.typography.headlineMedium,
-                    )
-                },
-                navigationIcon = {
-                    // Conversation list button - matching iOS
-                    IconButton(onClick = { showingConversationList = true }) {
-                        Icon(
-                            imageVector = Icons.Default.List,
-                            contentDescription = "Conversations",
-                        )
-                    }
-                },
-                actions = {
-                    // Info button for chat details - matching iOS
-                    IconButton(
-                        onClick = { showingChatDetails = true },
-                        enabled = uiState.messages.isNotEmpty(),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Info",
-                            tint =
-                                if (uiState.messages.isNotEmpty()) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                                },
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(Dimensions.toolbarButtonSpacing))
-
-                    // Model selection button - matching iOS
-                    TextButton(
-                        onClick = { showingModelSelection = true },
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ViewInAr,
-                            contentDescription = null,
-                            modifier = Modifier.size(Dimensions.iconRegular),
-                        )
-                        Spacer(modifier = Modifier.width(Dimensions.xSmall))
+            if (uiState.isModelLoaded) {
+                TopAppBar(
+                    title = {
                         Text(
-                            text = if (uiState.isModelLoaded) "Switch Model" else "Select Model",
-                            style = AppTypography.caption,
+                            text = "Chat",
+                            style = MaterialTheme.typography.headlineMedium,
                         )
-                    }
+                    },
+                    navigationIcon = {
+                        // Conversations button
+                        IconButton(onClick = { showingConversationList = true }) {
+                            Icon(
+                                imageVector = Icons.Default.History,
+                                contentDescription = "Conversations",
+                            )
+                        }
+                    },
+                    actions = {
+                        // Info button - disabled when messages.isEmpty, primaryAccent when enabled
+                        IconButton(
+                            onClick = { showingChatDetails = true },
+                            enabled = uiState.messages.isNotEmpty(),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Info",
+                                tint =
+                                    if (uiState.messages.isNotEmpty()) {
+                                        AppColors.primaryAccent
+                                    } else {
+                                        AppColors.statusGray
+                                    },
+                            )
+                        }
 
-                    Spacer(modifier = Modifier.width(Dimensions.toolbarButtonSpacing))
-
-                    // Clear chat button - matching iOS
-                    IconButton(
-                        onClick = { viewModel.clearChat() },
-                        enabled = uiState.messages.isNotEmpty(),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Clear Chat",
-                            tint =
-                                if (uiState.messages.isNotEmpty()) {
-                                    MaterialTheme.colorScheme.error
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                                },
-                        )
-                    }
-                },
-                colors =
-                    TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                    ),
-            )
+                        // Model button (logo + short name + Streaming/Batch)
+                        IconButton(onClick = { showingModelSelection = true }) {
+                            ChatModelButton(
+                                modelName = uiState.loadedModelName,
+                                supportsStreaming = uiState.useStreaming,
+                            )
+                        }
+                    },
+                    colors =
+                        TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                        ),
+                )
+            }
         },
     ) { padding ->
-        Column(
+        Box(
             modifier =
                 Modifier
                     .fillMaxSize()
                     .padding(padding)
                     .background(MaterialTheme.colorScheme.background),
         ) {
-            // Model info bar (conditional) - matching iOS
-            AnimatedVisibility(
-                visible = uiState.isModelLoaded && uiState.loadedModelName != null,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically(),
-            ) {
-                ModelInfoBar(modelName = uiState.loadedModelName ?: "", framework = "KMP")
-            }
-
-            // Messages list or empty state - matching iOS
-            if (uiState.messages.isEmpty() && !uiState.isGenerating) {
-                EmptyStateView(
-                    isModelLoaded = uiState.isModelLoaded,
-                    modelName = uiState.loadedModelName,
-                )
-            } else {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Messages list or empty state - only when model loaded
+                if (uiState.isModelLoaded) {
+                    if (uiState.messages.isEmpty() && !uiState.isGenerating) {
+                        EmptyStateView()
+                    } else {
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(Dimensions.large),
                     verticalArrangement = Arrangement.spacedBy(Dimensions.messageSpacingBetween),
                 ) {
-                    // Add spacer at top for better scrolling - matching iOS
+                    // Add spacer at top for better scrolling
                     item {
                         Spacer(modifier = Modifier.height(20.dp))
                     }
@@ -218,50 +183,49 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
                         )
                     }
 
-                    // Typing indicator - matching iOS
+                    // Typing indicator
                     if (uiState.isGenerating) {
                         item {
                             TypingIndicatorView()
                         }
                     }
 
-                    // Add spacer at bottom for better keyboard handling - matching iOS
+                    // Add spacer at bottom for better keyboard handling
                     item {
                         Spacer(modifier = Modifier.height(20.dp))
                     }
                 }
+                }
+                }
+
+                // Input area and divider only when model loaded
+                if (uiState.isModelLoaded) {
+                    HorizontalDivider(
+                        thickness = Dimensions.strokeThin,
+                        color = MaterialTheme.colorScheme.outline,
+                    )
+                    ChatInputView(
+                        value = uiState.currentInput,
+                        onValueChange = viewModel::updateInput,
+                        onSend = viewModel::sendMessage,
+                        enabled = uiState.canSend,
+                        isGenerating = uiState.isGenerating,
+                        isModelLoaded = true,
+                    )
+                }
             }
 
-            // Divider above input
-            HorizontalDivider(
-                thickness = Dimensions.strokeThin,
-                color = MaterialTheme.colorScheme.outline,
-            )
-
-            // Model selection prompt (when no model loaded) - matching iOS
-            AnimatedVisibility(
-                visible = !uiState.isModelLoaded,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically(),
-            ) {
-                ModelSelectionPrompt(
+            // ModelRequiredOverlay when no model - animated circles + Get Started
+            if (!uiState.isModelLoaded && !uiState.isGenerating) {
+                ModelRequiredOverlay(
                     onSelectModel = { showingModelSelection = true },
+                    modifier = Modifier.matchParentSize(),
                 )
             }
-
-            // Input area
-            ChatInputView(
-                value = uiState.currentInput,
-                onValueChange = viewModel::updateInput,
-                onSend = viewModel::sendMessage,
-                enabled = uiState.canSend,
-                isGenerating = uiState.isGenerating,
-                isModelLoaded = uiState.isModelLoaded,
-            )
         }
     }
 
-    // Model Selection Bottom Sheet - Matching iOS
+    // Model Selection Bottom Sheet
     if (showingModelSelection) {
         com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet(
             onDismiss = { showingModelSelection = false },
@@ -274,7 +238,7 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
         )
     }
 
-    // Conversation List Bottom Sheet - Matching iOS ConversationListView
+    // Conversation List Bottom Sheet
     if (showingConversationList) {
         val context = LocalContext.current
         val conversationStore = remember { ConversationStore.getInstance(context) }
@@ -298,7 +262,7 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
         )
     }
 
-    // Chat Details Bottom Sheet - Matching iOS ChatDetailsView
+    // Chat Details Bottom Sheet
     if (showingChatDetails) {
         ChatDetailsSheet(
             messages = uiState.messages,
@@ -336,6 +300,86 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
                 }
             },
         )
+    }
+}
+
+// ====================
+// CHAT MODEL BUTTON (toolbar trailing - model logo + short name + Streaming/Batch)
+// ====================
+
+@Composable
+private fun ChatModelButton(
+    modelName: String?,
+    supportsStreaming: Boolean,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (modelName != null) {
+            // Model logo 36x36 cornerRadius(4)
+            Box(
+                modifier =
+                    Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(4.dp)),
+            ) {
+                Image(
+                    painter = painterResource(id = getModelLogoResIdForName(modelName)),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                )
+            }
+            Column(
+                horizontalAlignment = Alignment.Start,
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = shortModelName(modelName, maxLength = 13),
+                    style = AppTypography.caption,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    Icon(
+                        imageVector = if (supportsStreaming) Icons.Default.Bolt else Icons.Default.Stop,
+                        contentDescription = null,
+                        modifier = Modifier.size(10.dp),
+                        tint = if (supportsStreaming) AppColors.primaryGreen else AppColors.primaryOrange,
+                    )
+                    Text(
+                        text = if (supportsStreaming) "Streaming" else "Batch",
+                        style = AppTypography.caption2.copy(fontSize = 10.sp, fontWeight = FontWeight.Medium),
+                        color = if (supportsStreaming) AppColors.primaryGreen else AppColors.primaryOrange,
+                    )
+                }
+            }
+        } else {
+            Icon(
+                imageVector = Icons.Default.ViewInAr,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = AppColors.primaryAccent,
+            )
+            Text(
+                text = "Select Model",
+                style = AppTypography.caption,
+            )
+        }
+    }
+}
+
+private fun shortModelName(name: String, maxLength: Int = 13): String {
+    val cleaned = name.replace(Regex("\\s*\\([^)]*\\)"), "").trim()
+    return if (cleaned.length > maxLength) {
+        cleaned.take(maxLength - 1) + "\u2026"
+    } else {
+        cleaned
     }
 }
 
@@ -386,14 +430,14 @@ fun ModelInfoBar(
                 )
             }
 
-            // Model name (first word only) - matching iOS
+            // Model name (first word only)
             Text(
                 text = modelName.split(" ").first(),
                 style = AppTypography.rounded11,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            // Stats (storage icon + size) - matching iOS
+            // Stats (storage icon + size)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(Dimensions.modelInfoStatsIconTextSpacing),
                 verticalAlignment = Alignment.CenterVertically,
@@ -412,7 +456,7 @@ fun ModelInfoBar(
                 )
             }
 
-            // Context length - matching iOS
+            // Context length
             Row(
                 horizontalArrangement = Arrangement.spacedBy(Dimensions.modelInfoStatsIconTextSpacing),
                 verticalAlignment = Alignment.CenterVertically,
@@ -433,7 +477,7 @@ fun ModelInfoBar(
         }
     }
 
-    // Bottom border with offset - matching iOS (12.dp offset)
+    // Bottom border with offset (12.dp offset)
     Box(
         modifier =
             Modifier
@@ -489,7 +533,7 @@ fun MessageBubbleView(
                     Alignment.Start
                 },
         ) {
-            // Model badge (for assistant messages) - matching iOS
+            // Model badge (for assistant messages)
             if (message.role == MessageRole.ASSISTANT && message.modelInfo != null) {
                 ModelBadge(
                     modelName = message.modelInfo.modelName,
@@ -498,7 +542,7 @@ fun MessageBubbleView(
                 Spacer(modifier = Modifier.height(Dimensions.small))
             }
 
-            // Thinking toggle (if thinking content exists) - matching iOS
+            // Thinking toggle (if thinking content exists)
             message.thinkingContent?.let { thinking ->
                 ThinkingToggle(
                     thinkingContent = thinking,
@@ -507,7 +551,7 @@ fun MessageBubbleView(
                 Spacer(modifier = Modifier.height(Dimensions.small))
             }
 
-            // Thinking progress indicator - matching iOS pattern
+            // Thinking progress indicator
             // Shows "Thinking..." when message is empty but thinking content exists during generation
             if (message.role == MessageRole.ASSISTANT &&
                 message.content.isEmpty() &&
@@ -517,9 +561,9 @@ fun MessageBubbleView(
                 ThinkingProgressIndicator()
             }
 
-            // Main message bubble - only show if there's content (matching iOS)
+            // Main message bubble - only show if there's content
             if (message.content.isNotEmpty()) {
-                // Use gradient backgrounds matching iOS exactly
+                // Use gradient backgrounds
                 val bubbleShape = RoundedCornerShape(Dimensions.messageBubbleCornerRadius)
                 val isUserMessage = message.role == MessageRole.USER
 
@@ -624,7 +668,7 @@ fun MessageBubbleView(
                 }
             }
 
-            // Analytics footer (for assistant messages) - matching iOS
+            // Analytics footer (for assistant messages)
             if (message.role == MessageRole.ASSISTANT && message.analytics != null) {
                 Spacer(modifier = Modifier.height(Dimensions.small))
                 AnalyticsFooter(
@@ -633,7 +677,7 @@ fun MessageBubbleView(
                 )
             }
 
-            // Timestamp (for user messages) - matching iOS
+            // Timestamp (for user messages)
             if (message.role == MessageRole.USER) {
                 Spacer(modifier = Modifier.height(Dimensions.small))
                 Text(
@@ -652,7 +696,7 @@ fun MessageBubbleView(
     }
 }
 
-// Helper function to format timestamp - matching iOS
+// Helper function to format timestamp
 private fun formatTimestamp(timestamp: Long): String {
     val calendar = java.util.Calendar.getInstance()
     calendar.timeInMillis = timestamp
@@ -781,7 +825,7 @@ fun ThinkingProgressIndicator() {
             horizontalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Animated dots (matching iOS)
+            // Animated dots
             repeat(3) { index ->
                 val infiniteTransition = rememberInfiniteTransition(label = "thinking_progress")
                 val scale by infiniteTransition.animateFloat(
@@ -829,14 +873,14 @@ fun ThinkingToggle(
 ) {
     var isExpanded by remember { mutableStateOf(false) }
 
-    // Extract intelligent summary like iOS
+    // Extract intelligent summary
     val thinkingSummary =
         remember(thinkingContent) {
             extractThinkingSummary(thinkingContent)
         }
 
     Column {
-        // Toggle button with gradient background matching iOS
+        // Toggle button with gradient background
         val toggleShape = RoundedCornerShape(Dimensions.thinkingSectionCornerRadius)
 
         Box(
@@ -988,6 +1032,7 @@ fun AnalyticsFooter(
 // TYPING INDICATOR
 // ====================
 
+// Typing indicator dots = primaryAccent 0.7, background = backgroundGray5, border = borderLight
 @Composable
 fun TypingIndicatorView() {
     Row(
@@ -995,17 +1040,19 @@ fun TypingIndicatorView() {
         horizontalArrangement = Arrangement.Start,
     ) {
         Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant,
+            color = AppColors.typingIndicatorBackground,
             shape = RoundedCornerShape(Dimensions.typingIndicatorCornerRadius),
             modifier =
                 Modifier
                     .shadow(
                         elevation = Dimensions.shadowMedium,
                         shape = RoundedCornerShape(Dimensions.typingIndicatorCornerRadius),
+                        ambientColor = AppColors.shadowLight,
+                        spotColor = AppColors.shadowLight,
                     )
                     .border(
                         width = Dimensions.strokeThin,
-                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f),
+                        color = AppColors.typingIndicatorBorder,
                         shape = RoundedCornerShape(Dimensions.typingIndicatorCornerRadius),
                     ),
         ) {
@@ -1018,7 +1065,6 @@ fun TypingIndicatorView() {
                 horizontalArrangement = Arrangement.spacedBy(Dimensions.typingIndicatorDotSpacing),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // Animated dots
                 repeat(3) { index ->
                     val infiniteTransition = rememberInfiniteTransition(label = "typing")
                     val scale by infiniteTransition.animateFloat(
@@ -1042,7 +1088,7 @@ fun TypingIndicatorView() {
                                     scaleY = scale
                                 }
                                 .background(
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                    color = AppColors.typingIndicatorDots,
                                     shape = CircleShape,
                                 ),
                     )
@@ -1050,11 +1096,10 @@ fun TypingIndicatorView() {
 
                 Spacer(modifier = Modifier.width(Dimensions.typingIndicatorTextSpacing))
 
-                // "AI is thinking..." text
                 Text(
                     text = "AI is thinking...",
                     style = AppTypography.caption,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    color = AppColors.typingIndicatorText,
                 )
             }
         }
@@ -1064,14 +1109,25 @@ fun TypingIndicatorView() {
 }
 
 // ====================
-// EMPTY STATE
+// EMPTY STATE with breathing waveform (matches Transcribe ready state)
+// Empty state: "Start a conversation", "Type a message below to get started"
 // ====================
 
 @Composable
-fun EmptyStateView(
-    isModelLoaded: Boolean,
-    @Suppress("UNUSED_PARAMETER") modelName: String?,
-) {
+fun EmptyStateView() {
+    val infiniteTransition = rememberInfiniteTransition(label = "chat_breathing")
+    val breathing by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "breathing",
+    )
+    val baseHeights = listOf(16, 24, 20, 28, 18)
+    val breathingHeights = listOf(24, 40, 32, 48, 28)
+
     Column(
         modifier =
             Modifier
@@ -1080,33 +1136,41 @@ fun EmptyStateView(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        // Icon
-        Icon(
-            imageVector = if (isModelLoaded) Icons.Default.Chat else Icons.Default.Download,
-            contentDescription = null,
-            modifier = Modifier.size(Dimensions.emptyStateIconSize),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            baseHeights.forEachIndexed { index, base ->
+                val h = base + (breathingHeights[index] - base) * breathing
+                Box(
+                    modifier = Modifier
+                        .width(6.dp)
+                        .height(h.toInt().dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    AppColors.primaryAccent.copy(alpha = 0.8f),
+                                    AppColors.primaryAccent.copy(alpha = 0.4f),
+                                ),
+                            ),
+                        ),
+                )
+            }
+        }
 
-        Spacer(modifier = Modifier.height(Dimensions.emptyStateIconTextSpacing))
+        Spacer(modifier = Modifier.height(48.dp))
 
-        // Title
         Text(
             text = "Start a conversation",
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
         )
 
-        Spacer(modifier = Modifier.height(Dimensions.emptyStateTitleSubtitleSpacing))
+        Spacer(modifier = Modifier.height(12.dp))
 
-        // Subtitle
         Text(
-            text =
-                if (isModelLoaded) {
-                    "Type a message below to get started"
-                } else {
-                    "Select a model first, then start chatting"
-                },
+            text = "Type a message below to get started",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -1208,29 +1272,23 @@ fun ChatInputView(
                 maxLines = 4,
             )
 
-            // Send button
+            // Send button: 28dp, primaryAccent when canSend else statusGray
             val canSendMessage = isModelLoaded && !isGenerating && value.trim().isNotBlank()
             IconButton(
                 onClick = onSend,
                 enabled = canSendMessage,
-                modifier = Modifier.size(Dimensions.sendButtonSize),
+                modifier = Modifier.size(28.dp),
             ) {
                 Icon(
-                    imageVector = Icons.Default.ArrowUpward,
+                    imageVector = Icons.Filled.ArrowCircleUp,
                     contentDescription = "Send",
-                    tint = Color.White,
-                    modifier =
-                        Modifier
-                            .size(Dimensions.sendButtonSize)
-                            .clip(CircleShape)
-                            .background(
-                                if (canSendMessage) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                                },
-                            )
-                            .padding(6.dp),
+                    tint =
+                        if (canSendMessage) {
+                            AppColors.primaryAccent
+                        } else {
+                            AppColors.statusGray
+                        },
+                    modifier = Modifier.size(28.dp),
                 )
             }
         }
@@ -1239,7 +1297,7 @@ fun ChatInputView(
 
 // ====================
 // CONVERSATION LIST SHEET
-// Matching iOS ConversationListView
+// Conversation List View
 // ====================
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1483,7 +1541,7 @@ private fun ConversationRow(
 
 // ====================
 // CHAT DETAILS SHEET
-// Matching iOS ChatDetailsView
+// Chat Details View
 // ====================
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1510,7 +1568,7 @@ fun ChatDetailsSheet(
                     .fillMaxHeight(0.75f)
                     .padding(horizontal = 16.dp),
         ) {
-            // Header
+            // Header - navigationTitle("Analytics"), toolbar Button("Done") { dismiss() }
             Row(
                 modifier =
                     Modifier
@@ -1519,19 +1577,16 @@ fun ChatDetailsSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Close",
-                    )
-                }
+                Spacer(modifier = Modifier.width(48.dp))
 
                 Text(
-                    text = "Chat Details",
+                    text = "Analytics",
                     style = MaterialTheme.typography.titleMedium,
                 )
 
-                Spacer(modifier = Modifier.width(48.dp)) // Balance the back button
+                TextButton(onClick = onDismiss) {
+                    Text("Done", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
+                }
             }
 
             HorizontalDivider()
