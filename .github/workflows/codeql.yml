@@ -1,3 +1,7 @@
+# CodeQL advanced configuration (matrix: c-cpp, javascript-typescript, ruby, swift).
+# Requires: In repo Settings > Security > Code scanning, disable "Default setup"
+# so only this workflow runs. See:
+# https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning-for-a-repository
 name: "CodeQL"
 
 on:
@@ -24,8 +28,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # C/C++: manual build (no autobuild - repo root has no top-level build system)
           - language: c-cpp
-            build-mode: autobuild
+            build-mode: manual
           - language: javascript-typescript
             build-mode: none
           - language: ruby
@@ -43,6 +48,22 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
+
+      # Manual build step for C/C++ (runanywhere-commons uses CMake; no top-level build at repo root)
+      - name: Build C/C++ (runanywhere-commons)
+        if: matrix.language == 'c-cpp' && matrix.build-mode == 'manual'
+        working-directory: sdk/runanywhere-commons
+        run: |
+          echo "=== Building runanywhere-commons for CodeQL ==="
+          mkdir -p build && cd build
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DRAC_BUILD_PLATFORM=OFF \
+            -DRAC_BUILD_BACKENDS=OFF \
+            -DRAC_BACKEND_LLAMACPP=OFF \
+            -DRAC_BACKEND_ONNX=OFF \
+            -DRAC_BACKEND_WHISPERCPP=OFF
+          cmake --build . -j$(nproc)
 
       # Manual build step for Swift
       - name: Build Swift Package
