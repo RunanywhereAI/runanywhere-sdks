@@ -34,6 +34,11 @@ data class StoredModelInfo(
  */
 @OptIn(kotlin.time.ExperimentalTime::class)
 data class SettingsUiState(
+    // Generation Settings
+    val temperature: Float = 0.7f,
+    val maxTokens: Int = 10000,
+    // Logging Configuration
+    val analyticsLogToLocal: Boolean = false,
     // Storage Overview
     val totalStorageSize: Long = 0L,
     val availableSpace: Long = 0L,
@@ -77,12 +82,20 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         )
     }
 
+    private val settingsPrefs by lazy {
+        application.getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
+    }
+
     companion object {
         private const val TAG = "SettingsViewModel"
         private const val ENCRYPTED_PREFS_FILE = "runanywhere_secure_prefs"
+        private const val SETTINGS_PREFS = "runanywhere_settings"
         private const val KEY_API_KEY = "runanywhere_api_key"
         private const val KEY_BASE_URL = "runanywhere_base_url"
         private const val KEY_DEVICE_REGISTERED = "com.runanywhere.sdk.deviceRegistered"
+        private const val KEY_TEMPERATURE = "defaultTemperature"
+        private const val KEY_MAX_TOKENS = "defaultMaxTokens"
+        private const val KEY_ANALYTICS_LOG_LOCAL = "analyticsLogToLocal"
 
         /**
          * Get stored API key (for use at app launch)
@@ -148,9 +161,37 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     init {
+        loadGenerationSettings()
+        loadAnalyticsPreference()
         loadApiConfiguration()
         loadStorageData()
         subscribeToModelEvents()
+    }
+
+    private fun loadGenerationSettings() {
+        val temp = settingsPrefs.getFloat(KEY_TEMPERATURE, 0.7f)
+        val max = settingsPrefs.getInt(KEY_MAX_TOKENS, 10000)
+        _uiState.update { it.copy(temperature = temp, maxTokens = max) }
+    }
+
+    private fun loadAnalyticsPreference() {
+        val value = settingsPrefs.getBoolean(KEY_ANALYTICS_LOG_LOCAL, false)
+        _uiState.update { it.copy(analyticsLogToLocal = value) }
+    }
+
+    fun updateTemperature(value: Float) {
+        _uiState.update { it.copy(temperature = value) }
+        settingsPrefs.edit().putFloat(KEY_TEMPERATURE, value).apply()
+    }
+
+    fun updateMaxTokens(value: Int) {
+        _uiState.update { it.copy(maxTokens = value) }
+        settingsPrefs.edit().putInt(KEY_MAX_TOKENS, value).apply()
+    }
+
+    fun updateAnalyticsLogToLocal(value: Boolean) {
+        _uiState.update { it.copy(analyticsLogToLocal = value) }
+        settingsPrefs.edit().putBoolean(KEY_ANALYTICS_LOG_LOCAL, value).apply()
     }
 
     /**
