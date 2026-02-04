@@ -584,6 +584,7 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
     std::string tokens_path;
     std::string data_dir;
     std::string lexicon_path;
+    std::string voices_path;  // For Kokoro TTS
 
     struct stat path_stat;
     if (stat(model_path.c_str(), &path_stat) != 0) {
@@ -596,20 +597,29 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
         tokens_path = model_path + "/tokens.txt";
         data_dir = model_path + "/espeak-ng-data";
         lexicon_path = model_path + "/lexicon.txt";
+        voices_path = model_path + "/voices.bin";  // Kokoro specific
 
+        // Try model.onnx first, then model.int8.onnx (for int8 quantized Kokoro)
         if (stat(model_onnx_path.c_str(), &path_stat) != 0) {
-            DIR* dir = opendir(model_path.c_str());
-            if (dir) {
-                struct dirent* entry;
-                while ((entry = readdir(dir)) != nullptr) {
-                    std::string filename = entry->d_name;
-                    if (filename.size() > 5 && filename.substr(filename.size() - 5) == ".onnx") {
-                        model_onnx_path = model_path + "/" + filename;
-                        RAC_LOG_DEBUG("ONNX.TTS", "Found model file: %s", model_onnx_path.c_str());
-                        break;
+            std::string int8_model_path = model_path + "/model.int8.onnx";
+            if (stat(int8_model_path.c_str(), &path_stat) == 0) {
+                model_onnx_path = int8_model_path;
+                RAC_LOG_DEBUG("ONNX.TTS", "Found int8 model file: %s", model_onnx_path.c_str());
+            } else {
+                // Fallback: search for any .onnx file
+                DIR* dir = opendir(model_path.c_str());
+                if (dir) {
+                    struct dirent* entry;
+                    while ((entry = readdir(dir)) != nullptr) {
+                        std::string filename = entry->d_name;
+                        if (filename.size() > 5 && filename.substr(filename.size() - 5) == ".onnx") {
+                            model_onnx_path = model_path + "/" + filename;
+                            RAC_LOG_DEBUG("ONNX.TTS", "Found model file: %s", model_onnx_path.c_str());
+                            break;
+                        }
                     }
+                    closedir(dir);
                 }
-                closedir(dir);
             }
         }
 
@@ -626,6 +636,18 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
                 lexicon_path = alt_lexicon;
             }
         }
+
+        // Try to find combined lexicon files for Kokoro
+        std::string lexicon_us_en = model_path + "/lexicon-us-en.txt";
+        std::string lexicon_zh = model_path + "/lexicon-zh.txt";
+        std::string lexicon_gb_en = model_path + "/lexicon-gb-en.txt";
+        if (stat(lexicon_us_en.c_str(), &path_stat) == 0) {
+            lexicon_path = lexicon_us_en;
+            // Check for additional lexicons and combine paths
+            if (stat(lexicon_zh.c_str(), &path_stat) == 0) {
+                lexicon_path = lexicon_us_en + "," + lexicon_zh;
+            }
+        }
     } else {
         model_onnx_path = model_path;
 
@@ -635,6 +657,7 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
             tokens_path = dir + "/tokens.txt";
             data_dir = dir + "/espeak-ng-data";
             lexicon_path = dir + "/lexicon.txt";
+            voices_path = dir + "/voices.bin";
             model_dir_ = dir;
         }
     }
@@ -652,31 +675,62 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
         return false;
     }
 
+    // Detect Kokoro model: either explicitly set as KOKORO type, or has voices.bin file
+    bool is_kokoro = (model_type == TTSModelType::KOKORO) ||
+                     (stat(voices_path.c_str(), &path_stat) == 0 && S_ISREG(path_stat.st_mode));
+
+    if (is_kokoro) {
+        model_type_ = TTSModelType::KOKORO;
+        RAC_LOG_INFO("ONNX.TTS", "Detected Kokoro TTS model");
+    }
+
     SherpaOnnxOfflineTtsConfig tts_config;
     memset(&tts_config, 0, sizeof(tts_config));
 
-    tts_config.model.vits.model = model_onnx_path.c_str();
-    tts_config.model.vits.tokens = tokens_path.c_str();
+    if (is_kokoro) {
+        // Configure for Kokoro TTS (high quality, multi-speaker, 24kHz)
+        tts_config.model.kokoro.model = model_onnx_path.c_str();
+        tts_config.model.kokoro.tokens = tokens_path.c_str();
+        tts_config.model.kokoro.voices = voices_path.c_str();
+        tts_config.model.kokoro.length_scale = 1.0f;  // Normal speed
 
-    if (stat(lexicon_path.c_str(), &path_stat) == 0 && S_ISREG(path_stat.st_mode)) {
-        tts_config.model.vits.lexicon = lexicon_path.c_str();
-        RAC_LOG_DEBUG("ONNX.TTS", "Using lexicon file: %s", lexicon_path.c_str());
+        if (stat(data_dir.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
+            tts_config.model.kokoro.data_dir = data_dir.c_str();
+            RAC_LOG_DEBUG("ONNX.TTS", "Using espeak-ng data dir: %s", data_dir.c_str());
+        }
+
+        if (!lexicon_path.empty() && stat(lexicon_path.c_str(), &path_stat) == 0) {
+            tts_config.model.kokoro.lexicon = lexicon_path.c_str();
+            RAC_LOG_DEBUG("ONNX.TTS", "Using lexicon: %s", lexicon_path.c_str());
+        }
+
+        RAC_LOG_INFO("ONNX.TTS", "Voices file: %s", voices_path.c_str());
+    } else {
+        // Configure for VITS/Piper TTS
+        tts_config.model.vits.model = model_onnx_path.c_str();
+        tts_config.model.vits.tokens = tokens_path.c_str();
+
+        if (stat(lexicon_path.c_str(), &path_stat) == 0 && S_ISREG(path_stat.st_mode)) {
+            tts_config.model.vits.lexicon = lexicon_path.c_str();
+            RAC_LOG_DEBUG("ONNX.TTS", "Using lexicon file: %s", lexicon_path.c_str());
+        }
+
+        if (stat(data_dir.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
+            tts_config.model.vits.data_dir = data_dir.c_str();
+            RAC_LOG_DEBUG("ONNX.TTS", "Using espeak-ng data dir: %s", data_dir.c_str());
+        }
+
+        tts_config.model.vits.noise_scale = 0.667f;
+        tts_config.model.vits.noise_scale_w = 0.8f;
+        tts_config.model.vits.length_scale = 1.0f;
     }
-
-    if (stat(data_dir.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
-        tts_config.model.vits.data_dir = data_dir.c_str();
-        RAC_LOG_DEBUG("ONNX.TTS", "Using espeak-ng data dir: %s", data_dir.c_str());
-    }
-
-    tts_config.model.vits.noise_scale = 0.667f;
-    tts_config.model.vits.noise_scale_w = 0.8f;
-    tts_config.model.vits.length_scale = 1.0f;
 
     tts_config.model.provider = "cpu";
     tts_config.model.num_threads = 2;
     tts_config.model.debug = 1;
 
-    RAC_LOG_INFO("ONNX.TTS", "Creating SherpaOnnxOfflineTts...");
+    RAC_LOG_INFO("ONNX.TTS", "Creating SherpaOnnxOfflineTts (%s)...",
+                 is_kokoro ? "Kokoro" : "VITS/Piper");
 
     const SherpaOnnxOfflineTts* new_tts = nullptr;
     try {
@@ -703,12 +757,60 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
     RAC_LOG_INFO("ONNX.TTS", "Sample rate: %d, speakers: %d", sample_rate_, num_speakers);
 
     voices_.clear();
-    for (int i = 0; i < num_speakers; ++i) {
-        VoiceInfo voice;
-        voice.id = std::to_string(i);
-        voice.name = "Speaker " + std::to_string(i);
-        voice.language = "en";
-        voices_.push_back(voice);
+
+    if (is_kokoro && num_speakers >= 53) {
+        // Kokoro multi-lang v1.0 speaker names
+        // Reference: https://k2-fsa.github.io/sherpa/onnx/tts/pretrained_models/kokoro.html
+        const char* kokoro_speakers[] = {
+            "af_alloy", "af_aoede", "af_bella", "af_heart", "af_jessica",
+            "af_kore", "af_nicole", "af_nova", "af_river", "af_sarah",
+            "af_sky", "am_adam", "am_echo", "am_eric", "am_fenrir",
+            "am_liam", "am_michael", "am_onyx", "am_puck", "am_santa",
+            "bf_alice", "bf_emma", "bf_isabella", "bf_lily", "bm_daniel",
+            "bm_fable", "bm_george", "bm_lewis", "ef_dora", "em_alex",
+            "ff_siwis", "hf_alpha", "hf_beta", "hm_omega", "hm_psi",
+            "if_sara", "im_nicola", "jf_alpha", "jf_gongitsune", "jf_nezumi",
+            "jf_tebukuro", "jm_kumo", "pf_dora", "pm_alex", "pm_santa",
+            "zf_xiaobei", "zf_xiaoni", "zf_xiaoxiao", "zf_xiaoyi", "zm_yunjian",
+            "zm_yunxi", "zm_yunxia", "zm_yunyang"
+        };
+
+        for (int i = 0; i < std::min(num_speakers, 53); ++i) {
+            VoiceInfo voice;
+            voice.id = std::to_string(i);
+            voice.name = kokoro_speakers[i];
+            // Determine language from speaker prefix
+            if (voice.name[0] == 'a' || voice.name[0] == 'b') {
+                voice.language = "en";
+            } else if (voice.name[0] == 'z') {
+                voice.language = "zh";
+            } else {
+                voice.language = "en";
+            }
+            // Determine gender from speaker prefix
+            voice.gender = (voice.name[1] == 'm') ? "male" : "female";
+            voice.sample_rate = 24000;  // Kokoro is 24kHz
+            voices_.push_back(voice);
+        }
+        // Add remaining speakers if any
+        for (int i = 53; i < num_speakers; ++i) {
+            VoiceInfo voice;
+            voice.id = std::to_string(i);
+            voice.name = "Speaker " + std::to_string(i);
+            voice.language = "en";
+            voice.sample_rate = 24000;
+            voices_.push_back(voice);
+        }
+    } else {
+        // Generic speaker names for VITS/Piper or other models
+        for (int i = 0; i < num_speakers; ++i) {
+            VoiceInfo voice;
+            voice.id = std::to_string(i);
+            voice.name = "Speaker " + std::to_string(i);
+            voice.language = "en";
+            voice.sample_rate = sample_rate_;
+            voices_.push_back(voice);
+        }
     }
 
     model_loaded_ = true;

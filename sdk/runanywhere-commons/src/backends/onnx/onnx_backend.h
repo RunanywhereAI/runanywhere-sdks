@@ -91,6 +91,7 @@ struct STTResult {
 
 enum class TTSModelType {
     PIPER,
+    KOKORO,  // Kokoro TTS (high quality, 24kHz, multi-speaker)
     COQUI,
     BARK,
     ESPEAK,

@@ -36,6 +36,150 @@ static constexpr size_t DEFAULT_MIN_SPEECH_SAMPLES = 16000;  // 1 second at 16kH
 static constexpr double WAKE_WORD_TIMEOUT_SEC = 10.0;
 
 // =============================================================================
+// Text Sanitization for TTS
+// =============================================================================
+// Removes special characters, emojis, markdown, etc. that shouldn't be spoken.
+// This ensures the TTS output sounds natural without saying "asterisk" or "quote".
+
+static std::string sanitize_text_for_tts(const std::string& input) {
+    if (input.empty()) return input;
+
+    std::string result;
+    result.reserve(input.size());
+
+    size_t i = 0;
+    while (i < input.size()) {
+        unsigned char c = static_cast<unsigned char>(input[i]);
+
+        // Skip emoji sequences (UTF-8 encoded, typically start with 0xF0 or certain ranges)
+        // Most emojis are in the range U+1F300 to U+1FAD6 (4-byte UTF-8 starting with 0xF0)
+        if (c == 0xF0 && i + 3 < input.size()) {
+            // Skip 4-byte emoji sequence
+            i += 4;
+            continue;
+        }
+
+        // Skip 3-byte emoji/symbol sequences (U+2000-U+2FFF, U+3000-U+3FFF range)
+        // These include arrows, symbols, etc.
+        if (c == 0xE2 || c == 0xE3) {
+            if (i + 2 < input.size()) {
+                // Skip common symbol ranges
+                unsigned char c2 = static_cast<unsigned char>(input[i + 1]);
+                if ((c == 0xE2 && c2 >= 0x80 && c2 <= 0xBF) ||  // General punctuation, symbols
+                    (c == 0xE2 && c2 >= 0x9C && c2 <= 0x9E) ||  // Dingbats, misc symbols
+                    (c == 0xE2 && c2 == 0xAD) ||                // Stars
+                    (c == 0xE3 && c2 >= 0x80)) {                // CJK symbols
+                    i += 3;
+                    continue;
+                }
+            }
+        }
+
+        // Handle ASCII special characters
+        if (c < 128) {
+            switch (c) {
+                // Remove markdown formatting characters
+                case '*':  // asterisk (bold/italic in markdown)
+                case '_':  // underscore (italic in markdown)
+                case '`':  // backtick (code in markdown)
+                case '#':  // hash (headers in markdown)
+                case '~':  // tilde (strikethrough in markdown)
+                    // Skip these characters entirely
+                    i++;
+                    continue;
+
+                // Replace quotes with natural pauses (keep single quotes for contractions)
+                case '"':
+                    // Remove double quotes but add slight pause
+                    result += ' ';
+                    i++;
+                    continue;
+
+                // Remove brackets and braces
+                case '[':
+                case ']':
+                case '{':
+                case '}':
+                case '<':
+                case '>':
+                    i++;
+                    continue;
+
+                // Remove other symbols that sound awkward
+                case '|':  // pipe
+                case '\\': // backslash
+                case '^':  // caret
+                case '@':  // at sign
+                    i++;
+                    continue;
+
+                // Keep these for natural speech
+                case '\'': // apostrophe (contractions)
+                case '.':  // period
+                case ',':  // comma
+                case '!':  // exclamation
+                case '?':  // question
+                case ':':  // colon
+                case ';':  // semicolon
+                case '-':  // hyphen (but collapse multiples)
+                case '(':  // open paren (sometimes natural)
+                case ')':  // close paren
+                    // Keep single hyphens, collapse multiple dashes
+                    if (c == '-' && !result.empty() && result.back() == '-') {
+                        i++;
+                        continue;
+                    }
+                    result += c;
+                    i++;
+                    continue;
+
+                default:
+                    // Keep letters, numbers, spaces
+                    result += c;
+                    i++;
+                    continue;
+            }
+        } else {
+            // Keep other UTF-8 characters (non-emoji international text)
+            result += c;
+            i++;
+        }
+    }
+
+    // Clean up: collapse multiple spaces
+    std::string cleaned;
+    cleaned.reserve(result.size());
+    bool last_was_space = false;
+    for (char c : result) {
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+            if (!last_was_space && !cleaned.empty()) {
+                cleaned += ' ';
+                last_was_space = true;
+            }
+        } else {
+            cleaned += c;
+            last_was_space = false;
+        }
+    }
+
+    // Trim trailing space
+    while (!cleaned.empty() && cleaned.back() == ' ') {
+        cleaned.pop_back();
+    }
+
+    // Trim leading space
+    size_t start = 0;
+    while (start < cleaned.size() && cleaned[start] == ' ') {
+        start++;
+    }
+    if (start > 0) {
+        cleaned = cleaned.substr(start);
+    }
+
+    return cleaned;
+}
+
+// =============================================================================
 // Implementation
 // =============================================================================
 
@@ -132,13 +276,13 @@ bool VoicePipeline::initialize() {
     // Skip LLM - we don't need it for OpenClaw channel
     std::cout << "  LLM: skipped (OpenClaw mode - no local LLM)\n";
 
-    // Load TTS voice
+    // Load TTS voice (Kokoro TTS English - high quality, 24kHz, 11 speakers)
     std::cout << "  Loading TTS: " << TTS_MODEL_ID << "\n";
     result = rac_voice_agent_load_tts_voice(
         impl_->voice_agent,
         tts_path.c_str(),
         TTS_MODEL_ID,
-        "Piper Lessac US"
+        "Kokoro TTS English v0.19"
     );
     if (result != RAC_SUCCESS) {
         last_error_ = "Failed to load TTS voice: " + tts_path;
@@ -501,7 +645,22 @@ bool VoicePipeline::speak_text(const std::string& text) {
         return false;
     }
 
-    std::cout << "[TTS] Synthesizing: \"" << text << "\"\n";
+    // Sanitize text: remove special characters, emojis, markdown that shouldn't be spoken
+    std::string sanitized_text = sanitize_text_for_tts(text);
+
+    if (sanitized_text.empty()) {
+        std::cout << "[TTS] Skipping empty text after sanitization\n";
+        return true;  // Not an error, just nothing to say
+    }
+
+    // Log both original and sanitized text if they differ
+    if (sanitized_text != text) {
+        std::cout << "[TTS] Original: \"" << text << "\"\n";
+        std::cout << "[TTS] Sanitized: \"" << sanitized_text << "\"\n";
+    } else {
+        std::cout << "[TTS] Synthesizing: \"" << sanitized_text << "\"\n";
+    }
+
     state_ = PipelineState::SPEAKING;
 
     // Synthesize speech using voice agent
@@ -510,7 +669,7 @@ bool VoicePipeline::speak_text(const std::string& text) {
 
     rac_result_t result = rac_voice_agent_synthesize_speech(
         impl_->voice_agent,
-        text.c_str(),
+        sanitized_text.c_str(),
         &audio_data,
         &audio_size
     );
@@ -524,11 +683,14 @@ bool VoicePipeline::speak_text(const std::string& text) {
     }
 
     // Output audio via callback
+    // Note: Kokoro TTS uses 24kHz, Piper uses 22050Hz
+    // The actual sample rate is returned by the voice agent
+    int tts_sample_rate = 24000;  // Default to Kokoro's 24kHz
     if (config_.on_audio_output) {
         config_.on_audio_output(
             static_cast<const int16_t*>(audio_data),
             audio_size / sizeof(int16_t),
-            22050  // TTS sample rate
+            tts_sample_rate
         );
     }
 

@@ -21,8 +21,8 @@ A lightweight voice assistant that acts as a **channel** for OpenClaw. No local 
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
 │  │                        OUTPUT PIPELINE                                │   │
 │  │                                                                       │   │
-│  │   OpenClaw → WebSocket → TTS/Piper → Speaker                         │   │
-│  │  (any channel)          (local)      (ALSA)                          │   │
+│  │   OpenClaw → WebSocket → TTS/Kokoro → Speaker                        │   │
+│  │  (any channel)          (24kHz)       (ALSA)                         │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -35,7 +35,7 @@ A lightweight voice assistant that acts as a **channel** for OpenClaw. No local 
 | VAD | ✅ | ✅ |
 | ASR/STT | ✅ Local Whisper | ✅ Local Whisper |
 | LLM | ✅ Local or Moltbot | ❌ None - uses OpenClaw |
-| TTS | ✅ Local Piper | ✅ Local Piper |
+| TTS | ✅ Local Piper (22kHz) | ✅ Kokoro TTS English (24kHz, 11 speakers) |
 | Integration | HTTP Voice Bridge | WebSocket to OpenClaw |
 
 ## Components
@@ -55,8 +55,13 @@ A lightweight voice assistant that acts as a **channel** for OpenClaw. No local 
 - Sample rate: 16kHz mono
 
 ### 4. Text-to-Speech (TTS)
-- Model: Piper VITS (Lessac US voice)
-- Output rate: 22050 Hz
+- Model: **Kokoro TTS English v0.19** (high quality)
+- Output rate: 24000 Hz
+- Speakers: 11 English voices (6 American, 2 British female, 3 British male)
+  - Default: `am_michael` (ID 6, American male)
+  - American: `af` (female), `af_bella`, `af_nicole`, `af_sarah`, `af_sky`, `am_adam`
+  - British: `bf_emma`, `bf_isabella`, `bm_george`, `bm_lewis`
+- Alternative: Piper VITS available with `--piper` download flag
 
 ## OpenClaw WebSocket Protocol
 
@@ -172,10 +177,13 @@ ws://openclaw-host:8082
 |-------|------|----------|
 | Silero VAD | ~2 MB | `~/.local/share/runanywhere/Models/ONNX/silero-vad/` |
 | Whisper Tiny EN | ~150 MB | `~/.local/share/runanywhere/Models/ONNX/whisper-tiny-en/` |
-| Piper Lessac | ~65 MB | `~/.local/share/runanywhere/Models/ONNX/vits-piper-en_US-lessac-medium/` |
+| **Kokoro TTS English v0.19** | ~330 MB | `~/.local/share/runanywhere/Models/ONNX/kokoro-en-v0_19/` |
 | Hey Jarvis | ~1.3 MB | `~/.local/share/runanywhere/Models/ONNX/hey-jarvis/` |
 | openWakeWord Embedding | ~1.3 MB | `~/.local/share/runanywhere/Models/ONNX/openwakeword-embedding/` |
 | openWakeWord Melspectrogram | ~1.1 MB | `~/.local/share/runanywhere/Models/ONNX/openwakeword-embedding/` |
+
+**Alternative TTS (with `--piper` flag):**
+| Piper Lessac | ~65 MB | `~/.local/share/runanywhere/Models/ONNX/vits-piper-en_US-lessac-medium/` |
 
 ### Wake Word Model Download Note
 
@@ -214,10 +222,10 @@ This builds `librac_backend_onnx.so` and other shared libraries that the hybrid 
 cd /path/to/runanywhere-sdks/Playground/openclaw-hybrid-assistant
 
 # Download all models (STT, TTS, VAD, wake word)
-./scripts/download-models.sh --all
+./scripts/download-models.sh --wakeword
 
-# Or download only wake word models
-./scripts/download-models.sh --wakeword --force
+# Or use --piper flag for Piper TTS instead of Kokoro
+./scripts/download-models.sh --wakeword --piper
 ```
 
 ### 3. Build the hybrid assistant
