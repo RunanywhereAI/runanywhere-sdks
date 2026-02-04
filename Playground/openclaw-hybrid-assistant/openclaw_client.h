@@ -18,6 +18,7 @@
 #include <mutex>
 #include <atomic>
 #include <thread>
+#include <vector>
 
 namespace openclaw {
 
@@ -54,7 +55,7 @@ struct OpenClawClientConfig {
 };
 
 // =============================================================================
-// OpenClaw Client
+// OpenClaw Client (WebSocket)
 // =============================================================================
 
 class OpenClawClient {
@@ -68,11 +69,10 @@ public:
     void disconnect();
     bool is_connected() const;
 
-    // Send transcription to OpenClaw (fire-and-forget, non-blocking)
+    // Send transcription to OpenClaw
     bool send_transcription(const std::string& text, bool is_final = true);
 
-    // Poll for speak messages (returns next message or empty if none)
-    // This is used when WebSocket is not available (HTTP fallback)
+    // Poll for speak messages from the receive queue
     bool poll_speak_queue(SpeakMessage& out_message);
 
     // Configuration
@@ -83,62 +83,33 @@ public:
     std::string last_error() const { return last_error_; }
 
 private:
-    struct Impl;
-    std::unique_ptr<Impl> impl_;
-
     OpenClawClientConfig config_;
     std::string last_error_;
     std::atomic<bool> connected_{false};
+
+    // Socket
+    int socket_fd_ = -1;
+    std::mutex write_mutex_;
 
     // Speak queue (messages received from OpenClaw)
     std::queue<SpeakMessage> speak_queue_;
     std::mutex queue_mutex_;
 
-    // Background thread for WebSocket
+    // Background thread for WebSocket receive loop
     std::thread ws_thread_;
     std::atomic<bool> running_{false};
 
-    // Internal methods
-    void run_websocket_loop();
+    // WebSocket helpers
+    bool ws_handshake(const std::string& host, int port, const std::string& path);
+    bool ws_send_text(const std::string& payload);
+    bool ws_read_frame(std::string& out_payload, uint8_t& out_opcode);
+    void ws_send_pong(const std::string& payload);
+
+    // Protocol
     bool send_connect_message();
-    bool send_ping();
+    void run_receive_loop();
     void handle_message(const std::string& message);
     std::string parse_json_string(const std::string& json, const std::string& key);
-};
-
-// =============================================================================
-// HTTP Fallback Client (for environments without WebSocket)
-// =============================================================================
-
-class OpenClawHttpClient {
-public:
-    OpenClawHttpClient();
-    explicit OpenClawHttpClient(const std::string& base_url);
-    ~OpenClawHttpClient();
-
-    // Send transcription via HTTP POST
-    bool send_transcription(const std::string& text, const std::string& session_id = "main");
-
-    // Poll for speak messages via HTTP GET
-    bool poll_speak(SpeakMessage& out_message);
-
-    // Configuration
-    void set_base_url(const std::string& url) { base_url_ = url; }
-    std::string last_error() const { return last_error_; }
-
-private:
-    std::string base_url_ = "http://localhost:8081";  // Voice bridge URL
-    std::string last_error_;
-
-    // HTTP helpers
-    struct HttpResponse {
-        int status_code = 0;
-        std::string body;
-        bool success = false;
-    };
-
-    HttpResponse http_post(const std::string& url, const std::string& body, int timeout_ms = 5000);
-    HttpResponse http_get(const std::string& url, int timeout_ms = 2000);
 };
 
 } // namespace openclaw

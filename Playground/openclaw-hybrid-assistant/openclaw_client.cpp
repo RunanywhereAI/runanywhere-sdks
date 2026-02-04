@@ -8,52 +8,165 @@
 #include <sstream>
 #include <regex>
 #include <chrono>
+#include <cstdlib>
+#include <cstring>
+#include <random>
 
-// For HTTP client
+// Socket/network
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <unistd.h>
-#include <cstring>
+#include <poll.h>
 
 namespace openclaw {
+
+// =============================================================================
+// URL parsing helper
+// =============================================================================
+
+static bool parse_ws_url(const std::string& url, std::string& host, int& port, std::string& path) {
+    // ws://host:port/path or wss://host:port/path or http://host:port/path
+    std::regex url_regex(R"((?:ws|wss|http|https)://([^:/]+)(?::(\d+))?(/.*)?)");
+    std::smatch match;
+    if (!std::regex_match(url, match, url_regex)) {
+        return false;
+    }
+    host = match[1].str();
+    port = match[2].matched ? std::stoi(match[2].str()) : 8082;
+    path = match[3].matched && !match[3].str().empty() ? match[3].str() : "/";
+    return true;
+}
+
+// =============================================================================
+// Base64 encode (for WebSocket handshake key)
+// =============================================================================
+
+static const char b64_table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+static std::string base64_encode(const uint8_t* data, size_t len) {
+    std::string result;
+    result.reserve(((len + 2) / 3) * 4);
+    for (size_t i = 0; i < len; i += 3) {
+        uint32_t n = ((uint32_t)data[i]) << 16;
+        if (i + 1 < len) n |= ((uint32_t)data[i + 1]) << 8;
+        if (i + 2 < len) n |= data[i + 2];
+        result += b64_table[(n >> 18) & 0x3F];
+        result += b64_table[(n >> 12) & 0x3F];
+        result += (i + 1 < len) ? b64_table[(n >> 6) & 0x3F] : '=';
+        result += (i + 2 < len) ? b64_table[n & 0x3F] : '=';
+    }
+    return result;
+}
+
+// =============================================================================
+// Socket helpers
+// =============================================================================
+
+static bool recv_all(int fd, void* buf, size_t len, int timeout_ms) {
+    size_t total = 0;
+    auto* p = static_cast<uint8_t*>(buf);
+    while (total < len) {
+        struct pollfd pfd = {fd, POLLIN, 0};
+        int ret = poll(&pfd, 1, timeout_ms);
+        if (ret <= 0) return false;
+        ssize_t n = recv(fd, p + total, len - total, 0);
+        if (n <= 0) return false;
+        total += n;
+    }
+    return true;
+}
+
+static bool send_all(int fd, const void* buf, size_t len) {
+    size_t total = 0;
+    auto* p = static_cast<const uint8_t*>(buf);
+    while (total < len) {
+        ssize_t n = send(fd, p + total, len - total, MSG_NOSIGNAL);
+        if (n <= 0) return false;
+        total += n;
+    }
+    return true;
+}
 
 // =============================================================================
 // OpenClawClient Implementation
 // =============================================================================
 
-struct OpenClawClient::Impl {
-    int socket_fd = -1;
-    std::string server_version;
-    std::string assigned_session_id;
-};
-
-OpenClawClient::OpenClawClient()
-    : impl_(std::make_unique<Impl>()) {
-}
+OpenClawClient::OpenClawClient() {}
 
 OpenClawClient::OpenClawClient(const OpenClawClientConfig& config)
-    : impl_(std::make_unique<Impl>())
-    , config_(config) {
-}
+    : config_(config) {}
 
 OpenClawClient::~OpenClawClient() {
     disconnect();
 }
 
 bool OpenClawClient::connect() {
-    // For now, use HTTP fallback (WebSocket implementation would require a WS library)
-    // TODO: Implement proper WebSocket using libwebsockets or similar
+    std::string host, path;
+    int port;
+    if (!parse_ws_url(config_.url, host, port, path)) {
+        last_error_ = "Invalid URL: " + config_.url;
+        std::cerr << "[OpenClaw] " << last_error_ << std::endl;
+        return false;
+    }
 
-    // Just mark as "connected" for HTTP mode
+    // TCP connect
+    struct hostent* server = gethostbyname(host.c_str());
+    if (!server) {
+        last_error_ = "Failed to resolve host: " + host;
+        std::cerr << "[OpenClaw] " << last_error_ << std::endl;
+        return false;
+    }
+
+    socket_fd_ = socket(AF_INET, SOCK_STREAM, 0);
+    if (socket_fd_ < 0) {
+        last_error_ = "Failed to create socket";
+        std::cerr << "[OpenClaw] " << last_error_ << std::endl;
+        return false;
+    }
+
+    // Disable Nagle for low latency
+    int flag = 1;
+    setsockopt(socket_fd_, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+
+    struct sockaddr_in addr = {};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    memcpy(&addr.sin_addr.s_addr, server->h_addr, server->h_length);
+
+    if (::connect(socket_fd_, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        last_error_ = "Failed to connect to " + host + ":" + std::to_string(port);
+        std::cerr << "[OpenClaw] " << last_error_ << std::endl;
+        close(socket_fd_);
+        socket_fd_ = -1;
+        return false;
+    }
+
+    // WebSocket handshake
+    if (!ws_handshake(host, port, path)) {
+        close(socket_fd_);
+        socket_fd_ = -1;
+        return false;
+    }
+
     connected_ = true;
+    std::cout << "[OpenClaw] WebSocket connected to " << config_.url << std::endl;
+
+    // Send OpenClaw connect message
+    if (!send_connect_message()) {
+        std::cerr << "[OpenClaw] WARNING: Failed to send connect message" << std::endl;
+    }
+
+    // Start background receive loop
+    running_ = true;
+    ws_thread_ = std::thread(&OpenClawClient::run_receive_loop, this);
 
     if (config_.on_connected) {
         config_.on_connected();
     }
 
-    std::cout << "[OpenClaw] Connected (HTTP mode) to " << config_.url << std::endl;
     return true;
 }
 
@@ -61,13 +174,17 @@ void OpenClawClient::disconnect() {
     running_ = false;
     connected_ = false;
 
-    if (ws_thread_.joinable()) {
-        ws_thread_.join();
+    if (socket_fd_ >= 0) {
+        // Send WebSocket close frame (opcode 0x08)
+        uint8_t close_frame[] = {0x88, 0x80, 0x00, 0x00, 0x00, 0x00};
+        send(socket_fd_, close_frame, sizeof(close_frame), MSG_NOSIGNAL);
+        shutdown(socket_fd_, SHUT_RDWR);
+        close(socket_fd_);
+        socket_fd_ = -1;
     }
 
-    if (impl_->socket_fd >= 0) {
-        close(impl_->socket_fd);
-        impl_->socket_fd = -1;
+    if (ws_thread_.joinable()) {
+        ws_thread_.join();
     }
 
     if (config_.on_disconnected) {
@@ -79,54 +196,318 @@ bool OpenClawClient::is_connected() const {
     return connected_;
 }
 
+// =============================================================================
+// WebSocket Handshake
+// =============================================================================
+
+bool OpenClawClient::ws_handshake(const std::string& host, int port, const std::string& path) {
+    // Generate random 16-byte key
+    std::random_device rd;
+    uint8_t key_bytes[16];
+    for (int i = 0; i < 16; i++) {
+        key_bytes[i] = rd() & 0xFF;
+    }
+    std::string ws_key = base64_encode(key_bytes, 16);
+
+    // Build upgrade request
+    std::ostringstream req;
+    req << "GET " << path << " HTTP/1.1\r\n"
+        << "Host: " << host << ":" << port << "\r\n"
+        << "Upgrade: websocket\r\n"
+        << "Connection: Upgrade\r\n"
+        << "Sec-WebSocket-Key: " << ws_key << "\r\n"
+        << "Sec-WebSocket-Version: 13\r\n"
+        << "\r\n";
+
+    std::string request_str = req.str();
+    if (!send_all(socket_fd_, request_str.data(), request_str.size())) {
+        last_error_ = "Failed to send WebSocket handshake";
+        std::cerr << "[OpenClaw] " << last_error_ << std::endl;
+        return false;
+    }
+
+    // Read response (look for 101 Switching Protocols)
+    std::string response;
+    char buf[1];
+    int timeout_count = 0;
+    while (timeout_count < 5000) {  // 5 second timeout
+        struct pollfd pfd = {socket_fd_, POLLIN, 0};
+        int ret = poll(&pfd, 1, 1);
+        if (ret > 0) {
+            ssize_t n = recv(socket_fd_, buf, 1, 0);
+            if (n <= 0) break;
+            response += buf[0];
+            // Check for end of HTTP headers
+            if (response.size() >= 4 &&
+                response.substr(response.size() - 4) == "\r\n\r\n") {
+                break;
+            }
+        } else {
+            timeout_count++;
+        }
+    }
+
+    if (response.find("101") == std::string::npos) {
+        last_error_ = "WebSocket handshake failed: " + response.substr(0, 80);
+        std::cerr << "[OpenClaw] " << last_error_ << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
+// =============================================================================
+// WebSocket Frame Send (client must mask)
+// =============================================================================
+
+bool OpenClawClient::ws_send_text(const std::string& payload) {
+    std::lock_guard<std::mutex> lock(write_mutex_);
+
+    if (socket_fd_ < 0 || !connected_) return false;
+
+    std::vector<uint8_t> frame;
+    // FIN + text opcode
+    frame.push_back(0x81);
+
+    // Payload length + mask bit (client frames must be masked)
+    size_t len = payload.size();
+    if (len <= 125) {
+        frame.push_back(0x80 | (uint8_t)len);
+    } else if (len <= 65535) {
+        frame.push_back(0x80 | 126);
+        frame.push_back((len >> 8) & 0xFF);
+        frame.push_back(len & 0xFF);
+    } else {
+        frame.push_back(0x80 | 127);
+        for (int i = 7; i >= 0; i--) {
+            frame.push_back((len >> (8 * i)) & 0xFF);
+        }
+    }
+
+    // Masking key (4 random bytes)
+    std::random_device rd;
+    uint8_t mask[4];
+    for (int i = 0; i < 4; i++) mask[i] = rd() & 0xFF;
+    frame.insert(frame.end(), mask, mask + 4);
+
+    // Masked payload
+    for (size_t i = 0; i < len; i++) {
+        frame.push_back(payload[i] ^ mask[i % 4]);
+    }
+
+    return send_all(socket_fd_, frame.data(), frame.size());
+}
+
+// =============================================================================
+// WebSocket Frame Receive
+// =============================================================================
+
+bool OpenClawClient::ws_read_frame(std::string& out_payload, uint8_t& out_opcode) {
+    uint8_t header[2];
+    if (!recv_all(socket_fd_, header, 2, 500)) return false;
+
+    out_opcode = header[0] & 0x0F;
+    bool masked = (header[1] & 0x80) != 0;
+    uint64_t payload_len = header[1] & 0x7F;
+
+    if (payload_len == 126) {
+        uint8_t ext[2];
+        if (!recv_all(socket_fd_, ext, 2, 500)) return false;
+        payload_len = ((uint64_t)ext[0] << 8) | ext[1];
+    } else if (payload_len == 127) {
+        uint8_t ext[8];
+        if (!recv_all(socket_fd_, ext, 8, 500)) return false;
+        payload_len = 0;
+        for (int i = 0; i < 8; i++) {
+            payload_len = (payload_len << 8) | ext[i];
+        }
+    }
+
+    // Sanity check
+    if (payload_len > 1024 * 1024) return false;  // Max 1MB
+
+    uint8_t mask_key[4] = {};
+    if (masked) {
+        if (!recv_all(socket_fd_, mask_key, 4, 500)) return false;
+    }
+
+    out_payload.resize(payload_len);
+    if (payload_len > 0) {
+        if (!recv_all(socket_fd_, &out_payload[0], payload_len, 2000)) return false;
+        if (masked) {
+            for (size_t i = 0; i < payload_len; i++) {
+                out_payload[i] ^= mask_key[i % 4];
+            }
+        }
+    }
+
+    return true;
+}
+
+void OpenClawClient::ws_send_pong(const std::string& payload) {
+    std::lock_guard<std::mutex> lock(write_mutex_);
+    if (socket_fd_ < 0) return;
+
+    std::vector<uint8_t> frame;
+    frame.push_back(0x8A);  // FIN + pong
+    size_t len = payload.size();
+    frame.push_back(0x80 | (uint8_t)(len & 0x7F));
+
+    std::random_device rd;
+    uint8_t mask[4];
+    for (int i = 0; i < 4; i++) mask[i] = rd() & 0xFF;
+    frame.insert(frame.end(), mask, mask + 4);
+
+    for (size_t i = 0; i < len; i++) {
+        frame.push_back(payload[i] ^ mask[i % 4]);
+    }
+
+    send_all(socket_fd_, frame.data(), frame.size());
+}
+
+// =============================================================================
+// OpenClaw Protocol
+// =============================================================================
+
+bool OpenClawClient::send_connect_message() {
+    std::ostringstream json;
+    json << "{"
+         << "\"type\":\"connect\","
+         << "\"deviceId\":\"" << config_.device_id << "\","
+         << "\"accountId\":\"" << config_.account_id << "\","
+         << "\"capabilities\":{"
+         <<   "\"stt\":true,"
+         <<   "\"tts\":true,"
+         <<   "\"wakeWord\":true"
+         << "}"
+         << "}";
+
+    std::cout << "[OpenClaw] Sending connect message (device: " << config_.device_id << ")" << std::endl;
+    return ws_send_text(json.str());
+}
+
 bool OpenClawClient::send_transcription(const std::string& text, bool is_final) {
     if (!connected_) {
         last_error_ = "Not connected";
         return false;
     }
 
-    // Use HTTP fallback for now
-    OpenClawHttpClient http_client(config_.url);
-    return http_client.send_transcription(text, config_.session_id);
+    // Build JSON with proper escaping
+    std::ostringstream json;
+    json << "{\"type\":\"transcription\",\"text\":\"";
+    for (char c : text) {
+        if (c == '"') json << "\\\"";
+        else if (c == '\\') json << "\\\\";
+        else if (c == '\n') json << "\\n";
+        else if (c == '\r') json << "\\r";
+        else if (c == '\t') json << "\\t";
+        else json << c;
+    }
+    json << "\",\"sessionId\":\"" << config_.session_id << "\""
+         << ",\"isFinal\":" << (is_final ? "true" : "false")
+         << "}";
+
+    std::cout << "[OpenClaw] Sending transcription: " << text << std::endl;
+
+    if (!ws_send_text(json.str())) {
+        last_error_ = "Failed to send WebSocket frame";
+        std::cerr << "[OpenClaw] " << last_error_ << std::endl;
+        return false;
+    }
+
+    std::cout << "[OpenClaw] Transcription sent successfully" << std::endl;
+    return true;
 }
 
 bool OpenClawClient::poll_speak_queue(SpeakMessage& out_message) {
-    // Check local queue first
-    {
-        std::lock_guard<std::mutex> lock(queue_mutex_);
-        if (!speak_queue_.empty()) {
-            out_message = speak_queue_.front();
-            speak_queue_.pop();
-            return true;
-        }
-    }
-
-    // Poll HTTP endpoint
-    OpenClawHttpClient http_client(config_.url);
-    return http_client.poll_speak(out_message);
+    std::lock_guard<std::mutex> lock(queue_mutex_);
+    if (speak_queue_.empty()) return false;
+    out_message = speak_queue_.front();
+    speak_queue_.pop();
+    return true;
 }
 
 void OpenClawClient::set_config(const OpenClawClientConfig& config) {
     config_ = config;
 }
 
-void OpenClawClient::run_websocket_loop() {
-    // TODO: Implement proper WebSocket loop
-    // For now, we use HTTP polling which is handled in poll_speak_queue
-}
+// =============================================================================
+// Background Receive Loop
+// =============================================================================
 
-bool OpenClawClient::send_connect_message() {
-    // TODO: Implement for WebSocket
-    return true;
-}
+void OpenClawClient::run_receive_loop() {
+    while (running_ && socket_fd_ >= 0) {
+        std::string payload;
+        uint8_t opcode;
 
-bool OpenClawClient::send_ping() {
-    // TODO: Implement for WebSocket
-    return true;
+        if (!ws_read_frame(payload, opcode)) {
+            // Timeout or error - check if we should keep running
+            if (!running_) break;
+            continue;
+        }
+
+        switch (opcode) {
+            case 0x01:  // Text frame
+                handle_message(payload);
+                break;
+            case 0x08:  // Close
+                std::cout << "[OpenClaw] Server closed connection" << std::endl;
+                connected_ = false;
+                running_ = false;
+                if (config_.on_disconnected) {
+                    config_.on_disconnected("Server closed connection");
+                }
+                return;
+            case 0x09:  // Ping
+                ws_send_pong(payload);
+                break;
+            case 0x0A:  // Pong
+                break;
+            default:
+                break;
+        }
+    }
 }
 
 void OpenClawClient::handle_message(const std::string& message) {
-    // TODO: Implement for WebSocket
+    std::string type = parse_json_string(message, "type");
+
+    if (type == "connected") {
+        std::string session_id = parse_json_string(message, "sessionId");
+        std::string version = parse_json_string(message, "serverVersion");
+        std::cout << "[OpenClaw] Handshake complete (session: " << session_id
+                  << ", server: " << version << ")" << std::endl;
+
+    } else if (type == "speak") {
+        SpeakMessage msg;
+        msg.text = parse_json_string(message, "text");
+        msg.source_channel = parse_json_string(message, "sourceChannel");
+
+        if (!msg.text.empty()) {
+            std::cout << "[OpenClaw] Received speak from " << msg.source_channel
+                      << ": " << msg.text << std::endl;
+            std::lock_guard<std::mutex> lock(queue_mutex_);
+            speak_queue_.push(msg);
+
+            if (config_.on_speak) {
+                config_.on_speak(msg);
+            }
+        }
+
+    } else if (type == "pong") {
+        // Keepalive response, ignore
+
+    } else if (type == "error") {
+        std::string code = parse_json_string(message, "code");
+        std::string err_msg = parse_json_string(message, "message");
+        std::cerr << "[OpenClaw] Error from server: " << code << " - " << err_msg << std::endl;
+        if (config_.on_error) {
+            config_.on_error(code + ": " + err_msg);
+        }
+
+    } else {
+        std::cout << "[OpenClaw] Unknown message type: " << type << std::endl;
+    }
 }
 
 std::string OpenClawClient::parse_json_string(const std::string& json, const std::string& key) {
@@ -137,299 +518,6 @@ std::string OpenClawClient::parse_json_string(const std::string& json, const std
         return match[1].str();
     }
     return "";
-}
-
-// =============================================================================
-// OpenClawHttpClient Implementation
-// =============================================================================
-
-OpenClawHttpClient::OpenClawHttpClient() {
-}
-
-OpenClawHttpClient::OpenClawHttpClient(const std::string& base_url)
-    : base_url_(base_url) {
-    // Convert ws:// to http:// if needed
-    if (base_url_.find("ws://") == 0) {
-        base_url_ = "http://" + base_url_.substr(5);
-    } else if (base_url_.find("wss://") == 0) {
-        base_url_ = "https://" + base_url_.substr(6);
-    }
-
-    // Extract host:port and default to voice bridge port
-    // ws://localhost:8082 -> http://localhost:8081
-    size_t port_pos = base_url_.rfind(':');
-    if (port_pos != std::string::npos && port_pos > 7) {
-        // Replace port with voice bridge port
-        base_url_ = base_url_.substr(0, port_pos) + ":8081";
-    }
-}
-
-OpenClawHttpClient::~OpenClawHttpClient() {
-}
-
-// Parse URL into host, port, path
-static bool parse_url(const std::string& url, std::string& host, int& port, std::string& path) {
-    std::regex url_regex(R"(https?://([^:/]+)(?::(\d+))?(/.*)?)", std::regex::icase);
-    std::smatch match;
-
-    if (!std::regex_match(url, match, url_regex)) {
-        return false;
-    }
-
-    host = match[1].str();
-    port = match[2].matched ? std::stoi(match[2].str()) : 80;
-    path = match[3].matched ? match[3].str() : "/";
-
-    return true;
-}
-
-OpenClawHttpClient::HttpResponse OpenClawHttpClient::http_post(
-    const std::string& url,
-    const std::string& body,
-    int timeout_ms
-) {
-    HttpResponse response;
-
-    std::string host, path;
-    int port;
-    if (!parse_url(url, host, port, path)) {
-        last_error_ = "Failed to parse URL: " + url;
-        return response;
-    }
-
-    // Create socket
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0) {
-        last_error_ = "Failed to create socket";
-        return response;
-    }
-
-    // Set timeout
-    struct timeval tv;
-    tv.tv_sec = timeout_ms / 1000;
-    tv.tv_usec = (timeout_ms % 1000) * 1000;
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-
-    // Resolve hostname
-    struct hostent* server = gethostbyname(host.c_str());
-    if (!server) {
-        last_error_ = "Failed to resolve host: " + host;
-        close(sock);
-        return response;
-    }
-
-    // Connect
-    struct sockaddr_in server_addr = {};
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(port);
-    memcpy(&server_addr.sin_addr.s_addr, server->h_addr, server->h_length);
-
-    if (connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        last_error_ = "Failed to connect to " + host + ":" + std::to_string(port);
-        close(sock);
-        return response;
-    }
-
-    // Build HTTP request
-    std::ostringstream request;
-    request << "POST " << path << " HTTP/1.1\r\n";
-    request << "Host: " << host << ":" << port << "\r\n";
-    request << "Content-Type: application/json\r\n";
-    request << "Content-Length: " << body.size() << "\r\n";
-    request << "Connection: close\r\n";
-    request << "\r\n";
-    request << body;
-
-    std::string request_str = request.str();
-
-    // Send request
-    if (send(sock, request_str.c_str(), request_str.size(), 0) < 0) {
-        last_error_ = "Failed to send request";
-        close(sock);
-        return response;
-    }
-
-    // Read response
-    std::string response_data;
-    char buffer[4096];
-    ssize_t bytes_read;
-
-    while ((bytes_read = recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
-        buffer[bytes_read] = '\0';
-        response_data += buffer;
-    }
-
-    close(sock);
-
-    // Parse response
-    size_t header_end = response_data.find("\r\n\r\n");
-    if (header_end == std::string::npos) {
-        last_error_ = "Invalid response (no header end)";
-        return response;
-    }
-
-    std::string headers = response_data.substr(0, header_end);
-    response.body = response_data.substr(header_end + 4);
-
-    // Extract status code
-    std::regex status_regex(R"(HTTP/\d\.\d\s+(\d+))");
-    std::smatch status_match;
-    if (std::regex_search(headers, status_match, status_regex)) {
-        response.status_code = std::stoi(status_match[1].str());
-        response.success = (response.status_code >= 200 && response.status_code < 300);
-    }
-
-    return response;
-}
-
-OpenClawHttpClient::HttpResponse OpenClawHttpClient::http_get(
-    const std::string& url,
-    int timeout_ms
-) {
-    HttpResponse response;
-
-    std::string host, path;
-    int port;
-    if (!parse_url(url, host, port, path)) {
-        return response;
-    }
-
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0) {
-        return response;
-    }
-
-    struct timeval tv;
-    tv.tv_sec = timeout_ms / 1000;
-    tv.tv_usec = (timeout_ms % 1000) * 1000;
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-
-    struct hostent* server = gethostbyname(host.c_str());
-    if (!server) {
-        close(sock);
-        return response;
-    }
-
-    struct sockaddr_in server_addr = {};
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(port);
-    memcpy(&server_addr.sin_addr.s_addr, server->h_addr, server->h_length);
-
-    if (connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        close(sock);
-        return response;
-    }
-
-    // Build HTTP GET request
-    std::ostringstream request;
-    request << "GET " << path << " HTTP/1.1\r\n";
-    request << "Host: " << host << ":" << port << "\r\n";
-    request << "Connection: close\r\n";
-    request << "\r\n";
-
-    std::string request_str = request.str();
-
-    if (send(sock, request_str.c_str(), request_str.size(), 0) < 0) {
-        close(sock);
-        return response;
-    }
-
-    std::string response_data;
-    char buffer[4096];
-    ssize_t bytes_read;
-
-    while ((bytes_read = recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
-        buffer[bytes_read] = '\0';
-        response_data += buffer;
-    }
-
-    close(sock);
-
-    size_t header_end = response_data.find("\r\n\r\n");
-    if (header_end == std::string::npos) {
-        return response;
-    }
-
-    std::string headers = response_data.substr(0, header_end);
-    response.body = response_data.substr(header_end + 4);
-
-    std::regex status_regex("HTTP/\\d\\.\\d\\s+(\\d+)");
-    std::smatch status_match;
-    if (std::regex_search(headers, status_match, status_regex)) {
-        response.status_code = std::stoi(status_match[1].str());
-        response.success = (response.status_code >= 200 && response.status_code < 300);
-    }
-
-    return response;
-}
-
-bool OpenClawHttpClient::send_transcription(const std::string& text, const std::string& session_id) {
-    std::string url = base_url_ + "/transcription";
-
-    // Build JSON body with proper escaping
-    std::ostringstream json;
-    json << "{\"text\":\"";
-    for (char c : text) {
-        if (c == '"') json << "\\\"";
-        else if (c == '\\') json << "\\\\";
-        else if (c == '\n') json << "\\n";
-        else if (c == '\r') json << "\\r";
-        else if (c == '\t') json << "\\t";
-        else json << c;
-    }
-    json << "\",\"sessionId\":\"" << session_id << "\",\"isFinal\":true}";
-
-    std::cout << "[OpenClaw] Sending transcription: " << text << std::endl;
-
-    HttpResponse response = http_post(url, json.str());
-
-    if (!response.success) {
-        last_error_ = "HTTP POST failed (status=" + std::to_string(response.status_code) + ")";
-        std::cerr << "[OpenClaw] " << last_error_ << std::endl;
-        return false;
-    }
-
-    std::cout << "[OpenClaw] Transcription sent successfully" << std::endl;
-    return true;
-}
-
-bool OpenClawHttpClient::poll_speak(SpeakMessage& out_message) {
-    std::string url = base_url_ + "/speak";
-
-    HttpResponse response = http_get(url);
-
-    if (!response.success || response.body.empty()) {
-        return false;
-    }
-
-    // Parse JSON response: {"text": "...", "sourceChannel": "..."}
-    std::regex text_regex("\"text\"\\s*:\\s*\"([^\"]*)\"");
-    std::smatch text_match;
-
-    if (!std::regex_search(response.body, text_match, text_regex)) {
-        return false;
-    }
-
-    std::string text = text_match[1].str();
-    if (text.empty() || text == "null") {
-        return false;
-    }
-
-    out_message.text = text;
-
-    // Extract source channel
-    std::regex source_regex("\"sourceChannel\"\\s*:\\s*\"([^\"]*)\"");
-    std::smatch source_match;
-    if (std::regex_search(response.body, source_match, source_regex)) {
-        out_message.source_channel = source_match[1].str();
-    }
-
-    std::cout << "[OpenClaw] Received speak from " << out_message.source_channel
-              << ": " << out_message.text << std::endl;
-
-    return true;
 }
 
 } // namespace openclaw
