@@ -113,13 +113,18 @@ jobs:
           # Fetch origin main (git fetch)
           git fetch origin main
 
-          # Verify tag commit matches origin/main (git rev-parse origin/main)
-          # Fail fast if they differ to avoid creating divergent history
           ORIGIN_MAIN=$(git rev-parse origin/main)
           echo "origin/main commit: $ORIGIN_MAIN"
-          if [[ "$TAG_COMMIT" != "$ORIGIN_MAIN" ]]; then
-            echo "::error::Tag commit ($TAG_COMMIT) does not match origin/main ($ORIGIN_MAIN). Failing to avoid divergent history."
-            exit 1
+
+          # On upstream (RunanywhereAI), require tag to match main to avoid divergent history.
+          # On forks, allow release to run so maintainers can test (tag may be moved for testing).
+          if [[ "${{ github.repository }}" == "RunanywhereAI/runanywhere-sdks" ]]; then
+            if [[ "$TAG_COMMIT" != "$ORIGIN_MAIN" ]]; then
+              echo "::error::Tag commit ($TAG_COMMIT) does not match origin/main ($ORIGIN_MAIN). Failing to avoid divergent history."
+              exit 1
+            fi
+          else
+            echo "Fork detected: skipping tag/main alignment guard (release allowed for testing)."
           fi
 
           # Checkout main and pull with fast-forward only (git pull --ff-only)
