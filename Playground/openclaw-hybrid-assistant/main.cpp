@@ -12,7 +12,7 @@
 //   --output <device>        Audio output device (default: "default")
 //   --wakeword               Enable wake word detection ("Hey Jarvis")
 //   --wakeword-threshold <f> Wake word threshold 0.0-1.0 (default: 0.5)
-//   --openclaw-url <url>     OpenClaw voice bridge URL (default: "http://localhost:8081")
+//   --openclaw-url <url>     OpenClaw WebSocket URL (default: "ws://localhost:8082")
 //   --device-id <id>         Device identifier (default: hostname)
 //   --debug-wakeword         Enable wake word debug logging
 //   --debug-vad              Enable VAD debug logging
@@ -61,7 +61,7 @@ void signal_handler(int signum) {
 struct AppConfig {
     std::string input_device = "default";
     std::string output_device = "default";
-    std::string openclaw_url = "http://localhost:8081";
+    std::string openclaw_url = "ws://localhost:8082";
     std::string device_id;
     bool list_devices = false;
     bool show_help = false;
@@ -82,7 +82,7 @@ void print_usage(const char* prog_name) {
               << "  --output <device>        Audio output device (default: \"default\")\n"
               << "  --wakeword               Enable wake word detection (\"Hey Jarvis\")\n"
               << "  --wakeword-threshold <f> Wake word threshold 0.0-1.0 (default: 0.5)\n"
-              << "  --openclaw-url <url>     OpenClaw voice bridge URL (default: \"http://localhost:8081\")\n"
+              << "  --openclaw-url <url>     OpenClaw WebSocket URL (default: \"ws://localhost:8082\")\n"
               << "  --device-id <id>         Device identifier (default: hostname)\n"
               << "  --debug-wakeword         Enable wake word debug logging\n"
               << "  --debug-vad              Enable VAD debug logging\n"
