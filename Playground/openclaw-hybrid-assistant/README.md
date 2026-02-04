@@ -173,8 +173,122 @@ ws://openclaw-host:8082
 | Silero VAD | ~2 MB | `~/.local/share/runanywhere/Models/ONNX/silero-vad/` |
 | Whisper Tiny EN | ~150 MB | `~/.local/share/runanywhere/Models/ONNX/whisper-tiny-en/` |
 | Piper Lessac | ~65 MB | `~/.local/share/runanywhere/Models/ONNX/vits-piper-en_US-lessac-medium/` |
-| Hey Jarvis | ~5 MB | `~/.local/share/runanywhere/Models/ONNX/hey-jarvis/` |
-| openWakeWord Embedding | ~15 MB | `~/.local/share/runanywhere/Models/ONNX/openwakeword-embedding/` |
+| Hey Jarvis | ~1.3 MB | `~/.local/share/runanywhere/Models/ONNX/hey-jarvis/` |
+| openWakeWord Embedding | ~1.3 MB | `~/.local/share/runanywhere/Models/ONNX/openwakeword-embedding/` |
+| openWakeWord Melspectrogram | ~1.1 MB | `~/.local/share/runanywhere/Models/ONNX/openwakeword-embedding/` |
+
+### Wake Word Model Download Note
+
+The openWakeWord `.onnx` model files are stored with Git LFS in the upstream repository.
+Downloading them via `raw.githubusercontent.com` URLs will give you an HTML page instead
+of the actual model binary, which causes ONNX runtime errors at load time.
+
+Always download wake word models from **GitHub Releases**:
+- `https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/embedding_model.onnx`
+- `https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/melspectrogram.onnx`
+- `https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/hey_jarvis_v0.1.onnx`
+
+The `scripts/download-models.sh --wakeword` script already uses the correct URLs.
+
+To verify your downloaded models are valid ONNX files (not HTML):
+```bash
+file ~/.local/share/runanywhere/Models/ONNX/openwakeword-embedding/embedding_model.onnx
+# Expected: "data" (binary ONNX file)
+# Bad:      "HTML document" (Git LFS redirect page)
+```
+
+## Raspberry Pi First-Time Setup
+
+### 1. Build runanywhere-commons (shared libraries)
+
+```bash
+cd /path/to/runanywhere-sdks/sdk/runanywhere-commons
+./scripts/build-linux.sh --shared
+```
+
+This builds `librac_backend_onnx.so` and other shared libraries that the hybrid assistant links against. You must rebuild this whenever the SDK's C++ backends change (e.g., wake word fixes).
+
+### 2. Download models
+
+```bash
+cd /path/to/runanywhere-sdks/Playground/openclaw-hybrid-assistant
+
+# Download all models (STT, TTS, VAD, wake word)
+./scripts/download-models.sh --all
+
+# Or download only wake word models
+./scripts/download-models.sh --wakeword --force
+```
+
+### 3. Build the hybrid assistant
+
+```bash
+./build.sh
+```
+
+### 4. Ensure OpenClaw is running
+
+The OpenClaw gateway must be running with the `voice-assistant` channel enabled on port 8082. Verify with:
+
+```bash
+ss -tlnp | grep 8082
+```
+
+### 5. Run the assistant
+
+```bash
+# With wake word ("Hey Jarvis")
+./build/openclaw-assistant --wakeword
+
+# Without wake word (continuous listening)
+./build/openclaw-assistant
+```
+
+### 6. Run as a systemd service (optional)
+
+To run the assistant as a background service that starts on boot, create a systemd user service and enable it. See [Viewing Logs](#viewing-logs) below for how to monitor it.
+
+## Viewing Logs
+
+### Hybrid Assistant logs
+
+If running in the foreground, logs print to stdout. If running as a background process or systemd service:
+
+```bash
+# If started via systemd
+journalctl --user -u openclaw-assistant -f
+
+# If started as a background process with output redirected
+tail -f /path/to/openclaw-assistant.log
+```
+
+### OpenClaw Gateway logs
+
+The OpenClaw gateway runs as a systemd user service:
+
+```bash
+# Follow logs in real time
+journalctl --user -u openclaw-gateway -f
+
+# View last 100 lines
+journalctl --user -u openclaw-gateway -n 100
+
+# View logs since last boot
+journalctl --user -u openclaw-gateway -b
+```
+
+### Watching both side-by-side
+
+Open two terminals (or tmux panes):
+
+```bash
+# Terminal 1: OpenClaw Gateway
+journalctl --user -u openclaw-gateway -f
+
+# Terminal 2: Hybrid Assistant
+journalctl --user -u openclaw-assistant -f
+# (or tail -f on the output file if not using systemd)
+```
 
 ## Testing on Mac
 
