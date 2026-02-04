@@ -157,17 +157,25 @@ if [ "$DOWNLOAD_WAKEWORD" = true ]; then
         echo "  Size: $(ls -lh "${JARVIS_FILE}" 2>/dev/null | awk '{print $5}' || echo 'failed')"
     fi
 
-    # Verify downloads
+    # Verify downloads (check size and that they are not HTML pages from Git LFS redirects)
     echo "  Verifying wake word model files..."
     ALL_OK=true
     for f in "${EMBED_FILE}" "${MELSPEC_FILE}" "${JARVIS_FILE}"; do
         if [ -f "$f" ]; then
             size=$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f" 2>/dev/null || echo 0)
-            if [ "$size" -lt 10000 ]; then
+            filetype=$(file -b "$f" 2>/dev/null || echo "unknown")
+            if echo "$filetype" | grep -qi "html"; then
+                echo "    ERROR: $(basename $f) is an HTML page, not an ONNX model!"
+                echo "           This usually means the file was downloaded from a raw.githubusercontent.com URL"
+                echo "           which returns an HTML Git LFS redirect instead of the actual binary."
+                echo "           Delete it and re-run this script to download from GitHub Releases."
+                rm -f "$f"
+                ALL_OK=false
+            elif [ "$size" -lt 10000 ]; then
                 echo "    WARNING: $(basename $f) seems too small ($size bytes) - may be corrupted"
                 ALL_OK=false
             else
-                echo "    OK: $(basename $f) ($size bytes)"
+                echo "    OK: $(basename $f) ($size bytes, $filetype)"
             fi
         else
             echo "    MISSING: $(basename $f)"
