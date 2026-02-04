@@ -283,8 +283,12 @@ inline bool is_model_available(const ModelConfig& model) {
 }
 
 // Check if all required models are available
-inline bool are_all_models_available() {
+// When moltbot_mode is true, LLM is not required (processed remotely)
+inline bool are_all_models_available(bool moltbot_mode = false) {
     for (size_t i = 0; i < NUM_REQUIRED_MODELS; ++i) {
+        if (moltbot_mode && REQUIRED_MODELS[i].category == RAC_MODEL_CATEGORY_LANGUAGE) {
+            continue;  // Skip LLM check in moltbot mode
+        }
         if (!is_model_available(REQUIRED_MODELS[i])) {
             return false;
         }
@@ -303,10 +307,14 @@ inline bool are_wakeword_models_available() {
 }
 
 // Print model status
-inline void print_model_status(bool include_wakeword = false) {
+inline void print_model_status(bool include_wakeword = false, bool moltbot_mode = false) {
     printf("Required Models:\n");
     for (size_t i = 0; i < NUM_REQUIRED_MODELS; ++i) {
         const ModelConfig& model = REQUIRED_MODELS[i];
+        if (moltbot_mode && model.category == RAC_MODEL_CATEGORY_LANGUAGE) {
+            printf("  [SKIP] %s (%s) — not needed in moltbot mode\n", model.name, model.id);
+            continue;
+        }
         bool available = is_model_available(model);
         printf("  [%s] %s (%s)\n",
                available ? "OK" : "MISSING",
