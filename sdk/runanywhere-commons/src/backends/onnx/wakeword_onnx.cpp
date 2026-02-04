@@ -60,6 +60,11 @@ static constexpr size_t MAX_MELSPEC_FRAMES = 970;    // ~10 seconds of audio
 static constexpr size_t MAX_EMBEDDING_HISTORY = 120; // ~10 seconds of embeddings
 static constexpr size_t DEFAULT_CLASSIFIER_EMBEDDINGS = 16;  // Typical wake word model input
 
+// Audio context overlap (CRITICAL: required for proper melspectrogram computation)
+// The openWakeWord Python implementation includes 480 extra samples (160*3 = 30ms)
+// of previous audio when computing melspectrogram for frame continuity
+static constexpr int MELSPEC_CONTEXT_SAMPLES = 160 * 3;  // 480 samples = 30ms overlap
+
 // VAD parameters
 static constexpr int VAD_FRAME_SAMPLES = 512;
 static constexpr float VAD_THRESHOLD = 0.5f;
@@ -118,9 +123,11 @@ struct WakewordOnnxBackend {
 
     // Streaming buffers
     std::vector<float> audio_buffer;                      // Accumulate to FRAME_SIZE
+    std::vector<float> audio_context_buffer;              // Keep last MELSPEC_CONTEXT_SAMPLES for overlap
     std::deque<std::vector<float>> melspec_buffer;        // Each entry is [MELSPEC_BINS]
     std::deque<std::vector<float>> embedding_buffer;      // Each entry is [EMBEDDING_DIM]
     size_t last_melspec_embedding_index = 0;              // Track which melspec frames we've embedded
+    bool buffers_initialized = false;                     // Track if buffers have been pre-filled
 
     // Thread safety
     std::mutex mutex;
@@ -153,6 +160,40 @@ static Ort::SessionOptions create_session_options(int num_threads, bool optimize
     }
 
     return options;
+}
+
+/**
+ * Initialize streaming buffers with padding data.
+ * This matches Python's openWakeWord initialization which pre-fills:
+ * - melspectrogram_buffer with np.ones((76, 32))
+ * - feature_buffer with embeddings from 4 seconds of random audio
+ *
+ * This ensures the classifier can produce valid outputs immediately
+ * rather than requiring ~1 second of warmup audio.
+ */
+static void initialize_streaming_buffers(WakewordOnnxBackend* backend) {
+    if (backend->buffers_initialized) {
+        return;
+    }
+
+    // Initialize melspec buffer with 76 frames of ones (matching Python)
+    // This provides initial context for the embedding model
+    for (int i = 0; i < MELSPEC_WINDOW_SIZE; ++i) {
+        std::vector<float> frame(MELSPEC_BINS, 1.0f);  // np.ones((76, 32))
+        backend->melspec_buffer.push_back(std::move(frame));
+    }
+
+    // Initialize audio context buffer (empty, will be filled on first process)
+    backend->audio_context_buffer.clear();
+    backend->audio_context_buffer.reserve(MELSPEC_CONTEXT_SAMPLES);
+
+    // Reset tracking index to start of initialized buffer
+    backend->last_melspec_embedding_index = 0;
+
+    backend->buffers_initialized = true;
+
+    RAC_LOG_INFO(LOG_TAG, "Initialized streaming buffers (melspec_frames=%zu)",
+                 backend->melspec_buffer.size());
 }
 
 // =============================================================================
@@ -737,6 +778,11 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_process_with_vad(
         return RAC_SUCCESS;
     }
 
+    // Initialize streaming buffers on first call (matching Python's initialization)
+    if (!backend->buffers_initialized) {
+        initialize_streaming_buffers(backend);
+    }
+
     // Optional: Run VAD pre-filtering
     bool is_speech = true;
     if (backend->vad_loaded && backend->vad_handle) {
@@ -753,17 +799,49 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_process_with_vad(
     // Step 1: Accumulate audio to FRAME_SIZE boundary
     backend->audio_buffer.insert(backend->audio_buffer.end(), samples, samples + num_samples);
 
-    // Step 2: Process complete frames
+    // Step 2: Process complete frames WITH context overlap
+    // The Python implementation includes 480 extra samples (160*3) of previous audio
+    // when computing melspectrogram for frame continuity at boundaries
     while (backend->audio_buffer.size() >= FRAME_SIZE) {
-        // Extract one frame
-        std::vector<float> frame(backend->audio_buffer.begin(),
+        // Build frame with context: [context_samples | new_frame_samples]
+        std::vector<float> frame_with_context;
+        frame_with_context.reserve(MELSPEC_CONTEXT_SAMPLES + FRAME_SIZE);
+
+        // Add context from previous frame (if available)
+        if (!backend->audio_context_buffer.empty()) {
+            frame_with_context.insert(frame_with_context.end(),
+                                     backend->audio_context_buffer.begin(),
+                                     backend->audio_context_buffer.end());
+        }
+
+        // Add current frame samples
+        frame_with_context.insert(frame_with_context.end(),
+                                 backend->audio_buffer.begin(),
                                  backend->audio_buffer.begin() + FRAME_SIZE);
+
+        // Update context buffer with last MELSPEC_CONTEXT_SAMPLES of current frame
+        // This will be used as context for the NEXT frame
+        backend->audio_context_buffer.clear();
+        if (FRAME_SIZE >= MELSPEC_CONTEXT_SAMPLES) {
+            backend->audio_context_buffer.insert(
+                backend->audio_context_buffer.end(),
+                backend->audio_buffer.begin() + (FRAME_SIZE - MELSPEC_CONTEXT_SAMPLES),
+                backend->audio_buffer.begin() + FRAME_SIZE);
+        } else {
+            // Frame is smaller than context size - use all of it
+            backend->audio_context_buffer.insert(
+                backend->audio_context_buffer.end(),
+                backend->audio_buffer.begin(),
+                backend->audio_buffer.begin() + FRAME_SIZE);
+        }
+
+        // Remove processed samples from audio buffer
         backend->audio_buffer.erase(backend->audio_buffer.begin(),
                                     backend->audio_buffer.begin() + FRAME_SIZE);
 
-        // Step 3: Compute melspectrogram for this frame
+        // Step 3: Compute melspectrogram for frame WITH context
         std::vector<std::vector<float>> melspec_frames;
-        if (!compute_melspectrogram(backend, frame, melspec_frames)) {
+        if (!compute_melspectrogram(backend, frame_with_context, melspec_frames)) {
             continue;  // Skip on error
         }
 
@@ -865,9 +943,11 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_reset(rac_handle_t handle) {
 #ifdef RAC_HAS_ONNX
     // Clear all buffers
     backend->audio_buffer.clear();
+    backend->audio_context_buffer.clear();
     backend->melspec_buffer.clear();
     backend->embedding_buffer.clear();
     backend->last_melspec_embedding_index = 0;
+    backend->buffers_initialized = false;  // Will be re-initialized on next process call
 #endif
 
     RAC_LOG_DEBUG(LOG_TAG, "Reset buffers");
