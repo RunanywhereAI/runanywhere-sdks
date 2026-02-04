@@ -28,7 +28,10 @@ namespace openclaw {
 
 constexpr const char* VAD_MODEL_ID = "silero-vad";
 constexpr const char* STT_MODEL_ID = "whisper-tiny-en";
-constexpr const char* TTS_MODEL_ID = "vits-piper-en_US-lessac-medium";
+constexpr const char* TTS_MODEL_ID = "kokoro-en-v0_19";  // Kokoro TTS English (24kHz, 11 speakers)
+
+// Piper TTS (alternative, smaller model)
+constexpr const char* TTS_MODEL_ID_PIPER = "vits-piper-en_US-lessac-medium";
 
 // Wake word models (optional)
 constexpr const char* WAKEWORD_MODEL_ID = "hey-jarvis";
@@ -40,7 +43,11 @@ constexpr const char* WAKEWORD_EMBEDDING_ID = "openwakeword-embedding";
 
 constexpr const char* VAD_MODEL_FILE = "silero_vad.onnx";
 constexpr const char* STT_MODEL_FILE = "";  // Directory-based
-constexpr const char* TTS_MODEL_FILE = "en_US-lessac-medium.onnx";
+constexpr const char* TTS_MODEL_FILE = "model.onnx";  // Kokoro uses model.onnx + voices.bin
+constexpr const char* TTS_VOICES_FILE = "voices.bin";  // Kokoro voice embeddings
+
+// Piper TTS files (alternative model)
+constexpr const char* TTS_MODEL_FILE_PIPER = "en_US-lessac-medium.onnx";
 
 // Wake word model files
 constexpr const char* WAKEWORD_MODEL_FILE = "hey_jarvis_v0.1.onnx";
@@ -83,15 +90,15 @@ inline const ModelConfig REQUIRED_MODELS[] = {
         .framework = RAC_FRAMEWORK_ONNX,
         .memory_required = 150 * 1024 * 1024
     },
-    // TTS Model
+    // TTS Model (Kokoro English - high quality, 24kHz, 11 speakers)
     {
         .id = TTS_MODEL_ID,
-        .name = "VITS Piper English US (Lessac)",
+        .name = "Kokoro TTS English v0.19",
         .filename = TTS_MODEL_FILE,
         .category = RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS,
         .format = RAC_MODEL_FORMAT_ONNX,
         .framework = RAC_FRAMEWORK_ONNX,
-        .memory_required = 50 * 1024 * 1024
+        .memory_required = 340 * 1024 * 1024  // ~330MB model + ~6MB voices
     }
 };
 
