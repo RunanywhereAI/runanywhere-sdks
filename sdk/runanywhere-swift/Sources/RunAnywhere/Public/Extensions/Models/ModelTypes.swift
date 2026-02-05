@@ -29,6 +29,7 @@ public enum ModelFormat: String, CaseIterable, Codable, Sendable {
     case ort
     case gguf
     case bin
+    case coreml
     case unknown
 }
 
