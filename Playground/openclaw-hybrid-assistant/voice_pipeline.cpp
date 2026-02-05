@@ -18,6 +18,7 @@
 #include <mutex>
 #include <iostream>
 #include <chrono>
+#include <thread>
 #include <cstring>
 
 namespace openclaw {
@@ -28,6 +29,9 @@ namespace openclaw {
 
 // Silence duration before treating speech as ended
 static constexpr double DEFAULT_SILENCE_DURATION_SEC = 1.5;
+
+// Delay after TTS finishes before re-enabling listening (prevents echo feedback)
+static constexpr int TTS_COOLDOWN_MS = 500;
 
 // Minimum speech samples before processing (avoid false triggers)
 static constexpr size_t DEFAULT_MIN_SPEECH_SAMPLES = 16000;  // 1 second at 16kHz
@@ -407,6 +411,12 @@ void VoicePipeline::process_audio(const int16_t* samples, size_t num_samples) {
         return;
     }
 
+    // Skip all audio processing while TTS is playing to prevent feedback loops
+    // (microphone picking up speaker output and triggering wake word/VAD)
+    if (state_ == PipelineState::SPEAKING) {
+        return;
+    }
+
     std::lock_guard<std::mutex> lock(impl_->mutex);
 
     // Convert to float for processing
@@ -640,6 +650,44 @@ bool VoicePipeline::process_stt(const int16_t* samples, size_t num_samples) {
     return true;
 }
 
+// Split text into sentences for streaming TTS
+static std::vector<std::string> split_into_sentences(const std::string& text) {
+    std::vector<std::string> sentences;
+    std::string current;
+
+    for (size_t i = 0; i < text.length(); ++i) {
+        char c = text[i];
+        current += c;
+
+        // Check for sentence boundaries: . ! ? followed by space or end
+        if ((c == '.' || c == '!' || c == '?') &&
+            (i + 1 >= text.length() || text[i + 1] == ' ' || text[i + 1] == '\n')) {
+            // Trim leading/trailing whitespace
+            size_t start = current.find_first_not_of(" \t\n\r");
+            size_t end = current.find_last_not_of(" \t\n\r");
+            if (start != std::string::npos && end != std::string::npos) {
+                sentences.push_back(current.substr(start, end - start + 1));
+            }
+            current.clear();
+            // Skip the space after punctuation
+            if (i + 1 < text.length() && text[i + 1] == ' ') {
+                ++i;
+            }
+        }
+    }
+
+    // Don't forget any remaining text
+    if (!current.empty()) {
+        size_t start = current.find_first_not_of(" \t\n\r");
+        size_t end = current.find_last_not_of(" \t\n\r");
+        if (start != std::string::npos && end != std::string::npos) {
+            sentences.push_back(current.substr(start, end - start + 1));
+        }
+    }
+
+    return sentences;
+}
+
 bool VoicePipeline::speak_text(const std::string& text) {
     if (!initialized_ || !impl_->voice_agent) {
         return false;
@@ -653,48 +701,71 @@ bool VoicePipeline::speak_text(const std::string& text) {
         return true;  // Not an error, just nothing to say
     }
 
-    // Log both original and sanitized text if they differ
-    if (sanitized_text != text) {
-        std::cout << "[TTS] Original: \"" << text << "\"\n";
-        std::cout << "[TTS] Sanitized: \"" << sanitized_text << "\"\n";
-    } else {
-        std::cout << "[TTS] Synthesizing: \"" << sanitized_text << "\"\n";
-    }
-
     state_ = PipelineState::SPEAKING;
 
-    // Synthesize speech using voice agent
-    void* audio_data = nullptr;
-    size_t audio_size = 0;
+    // Split into sentences for streaming playback
+    std::vector<std::string> sentences = split_into_sentences(sanitized_text);
 
-    rac_result_t result = rac_voice_agent_synthesize_speech(
-        impl_->voice_agent,
-        sanitized_text.c_str(),
-        &audio_data,
-        &audio_size
-    );
+    if (sentences.empty()) {
+        sentences.push_back(sanitized_text);  // Fallback: treat whole text as one sentence
+    }
 
-    if (result != RAC_SUCCESS || !audio_data || audio_size == 0) {
+    std::cout << "[TTS] Streaming " << sentences.size() << " sentence(s)\n";
+
+    int tts_sample_rate = 24000;  // Kokoro's 24kHz
+    bool any_success = false;
+
+    for (size_t i = 0; i < sentences.size(); ++i) {
+        const std::string& sentence = sentences[i];
+
+        if (sentence.empty()) {
+            continue;
+        }
+
+        std::cout << "[TTS] [" << (i + 1) << "/" << sentences.size() << "] \""
+                  << sentence.substr(0, 60) << (sentence.length() > 60 ? "..." : "") << "\"\n";
+
+        // Synthesize this sentence
+        void* audio_data = nullptr;
+        size_t audio_size = 0;
+
+        rac_result_t result = rac_voice_agent_synthesize_speech(
+            impl_->voice_agent,
+            sentence.c_str(),
+            &audio_data,
+            &audio_size
+        );
+
+        if (result != RAC_SUCCESS || !audio_data || audio_size == 0) {
+            std::cerr << "[TTS] Failed to synthesize sentence " << (i + 1) << "\n";
+            continue;
+        }
+
+        // Play this sentence immediately (don't wait for others)
+        if (config_.on_audio_output) {
+            config_.on_audio_output(
+                static_cast<const int16_t*>(audio_data),
+                audio_size / sizeof(int16_t),
+                tts_sample_rate
+            );
+        }
+
+        free(audio_data);
+        any_success = true;
+    }
+
+    if (!any_success) {
         if (config_.on_error) {
-            config_.on_error("TTS synthesis failed");
+            config_.on_error("TTS synthesis failed for all sentences");
         }
         state_ = impl_->wakeword_enabled ? PipelineState::WAITING_FOR_WAKE_WORD : PipelineState::LISTENING;
         return false;
     }
 
-    // Output audio via callback
-    // Note: Kokoro TTS uses 24kHz, Piper uses 22050Hz
-    // The actual sample rate is returned by the voice agent
-    int tts_sample_rate = 24000;  // Default to Kokoro's 24kHz
-    if (config_.on_audio_output) {
-        config_.on_audio_output(
-            static_cast<const int16_t*>(audio_data),
-            audio_size / sizeof(int16_t),
-            tts_sample_rate
-        );
-    }
+    // Add cooldown before re-enabling listening to prevent echo feedback
+    // (speaker audio being picked up by microphone)
+    std::this_thread::sleep_for(std::chrono::milliseconds(TTS_COOLDOWN_MS));
 
-    free(audio_data);
     state_ = impl_->wakeword_enabled ? PipelineState::WAITING_FOR_WAKE_WORD : PipelineState::LISTENING;
 
     return true;
