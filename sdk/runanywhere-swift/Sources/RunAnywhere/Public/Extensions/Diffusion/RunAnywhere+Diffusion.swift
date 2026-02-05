@@ -327,11 +327,13 @@ private extension RunAnywhere {
     ) async throws -> DiffusionResult {
 
         // Create context for callbacks
+        // Uses a flag to track whether callbacks have been invoked to prevent double-resume
         final class CallbackContext: @unchecked Sendable {
             var progressCallback: (DiffusionProgress) -> Bool
             var result: DiffusionResult?
             var error: Error?
             var completion: CheckedContinuation<DiffusionResult, Error>?
+            var callbackInvoked = false  // Track if completion/error callback was called
 
             init(progressCallback: @escaping (DiffusionProgress) -> Bool) {
                 self.progressCallback = progressCallback
@@ -358,22 +360,24 @@ private extension RunAnywhere {
                 return shouldContinue ? RAC_TRUE : RAC_FALSE
             }
 
-            // Complete callback
+            // Complete callback - called by C++ on success
             let completeCallback: rac_diffusion_complete_callback_fn = { cResultPtr, userData in
                 guard let cResultPtr = cResultPtr, let userData = userData else {
                     return
                 }
 
                 let ctx = Unmanaged<CallbackContext>.fromOpaque(userData).takeRetainedValue()
+                ctx.callbackInvoked = true
                 let result = DiffusionResult(from: cResultPtr.pointee)
                 ctx.completion?.resume(returning: result)
             }
 
-            // Error callback
+            // Error callback - called by C++ on failure (before returning error code)
             let errorCallback: rac_diffusion_error_callback_fn = { _, errorMessage, userData in
                 guard let userData = userData else { return }
 
                 let ctx = Unmanaged<CallbackContext>.fromOpaque(userData).takeRetainedValue()
+                ctx.callbackInvoked = true
                 let message = errorMessage.map { String(cString: $0) } ?? "Unknown error"
                 let error = SDKError.diffusion(SDKError.DiffusionErrorCode.generationFailed, "Generation failed: \(message)")
                 ctx.completion?.resume(throwing: error)
@@ -405,11 +409,23 @@ private extension RunAnywhere {
                         contextPtr
                     )
 
+                    // IMPORTANT: C++ code ALWAYS calls error_callback before returning failure,
+                    // so we should NOT resume the continuation here - that would cause double-resume.
+                    // The error_callback already released the context and resumed with error.
+                    // We only handle the case where C++ returned failure WITHOUT calling error_callback
+                    // (which shouldn't happen, but we check callbackInvoked for safety).
                     if result != RAC_SUCCESS {
-                        // Release context and report error
-                        let ctx = Unmanaged<CallbackContext>.fromOpaque(contextPtr).takeRetainedValue()
-                        let error = SDKError.diffusion(.generationFailed, "Failed to start generation: \(result)")
-                        ctx.completion?.resume(throwing: error)
+                        // Check if callback was already invoked (context released)
+                        // If so, do nothing - error_callback handled it
+                        // If not (shouldn't happen), we need to clean up
+                        let ctx = Unmanaged<CallbackContext>.fromOpaque(contextPtr).takeUnretainedValue()
+                        if !ctx.callbackInvoked {
+                            // Callback wasn't invoked, we need to release and resume
+                            _ = Unmanaged<CallbackContext>.fromOpaque(contextPtr).takeRetainedValue()
+                            let error = SDKError.diffusion(.generationFailed, "Failed to start generation: \(result)")
+                            ctx.completion?.resume(throwing: error)
+                        }
+                        // If callbackInvoked is true, error_callback already handled everything
                     }
                 }
             }

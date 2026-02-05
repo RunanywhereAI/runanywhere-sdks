@@ -220,3 +220,88 @@ public struct DiffusionInfo: Sendable {
         self.maxHeight = Int(cInfo.max_height)
     }
 }
+
+// MARK: - Diffusion Backend Selection
+
+/// Backend used for diffusion inference
+public enum DiffusionBackend: Int32, Sendable {
+    case onnx = 0       /// ONNX Runtime (cross-platform, uses CoreML EP on iOS or NNAPI EP on Android)
+    case coreml = 1     /// CoreML (iOS/macOS only, uses ANE → GPU → CPU automatic fallback)
+    case tflite = 2     /// TensorFlow Lite (future)
+    case auto = 99      /// Auto-select best for platform
+    
+    /// Convert from C enum
+    init(cValue: rac_diffusion_backend_t) {
+        switch cValue {
+        case RAC_DIFFUSION_BACKEND_ONNX: self = .onnx
+        case RAC_DIFFUSION_BACKEND_COREML: self = .coreml
+        case RAC_DIFFUSION_BACKEND_TFLITE: self = .tflite
+        case RAC_DIFFUSION_BACKEND_AUTO: self = .auto
+        default: self = .onnx
+        }
+    }
+    
+    /// Convert to C enum
+    var cValue: rac_diffusion_backend_t {
+        switch self {
+        case .onnx: return RAC_DIFFUSION_BACKEND_ONNX
+        case .coreml: return RAC_DIFFUSION_BACKEND_COREML
+        case .tflite: return RAC_DIFFUSION_BACKEND_TFLITE
+        case .auto: return RAC_DIFFUSION_BACKEND_AUTO
+        }
+    }
+}
+
+// MARK: - Diffusion Model Registry Bridge
+
+extension CppBridge {
+    
+    /// Diffusion Model Registry - provides access to built-in and custom model definitions
+    public enum DiffusionModelRegistry {
+        
+        private static let logger = SDKLogger(category: "CppBridge.DiffusionModelRegistry")
+        
+        /// Select the best backend for a model on the current platform
+        /// 
+        /// Backend selection follows this priority:
+        /// - iOS/macOS: CoreML (ANE → GPU → CPU automatic fallback) if model supports it
+        /// - Android: ONNX with NNAPI EP (NPU → DSP → GPU → CPU automatic fallback)
+        /// - Desktop: ONNX with CPU EP
+        ///
+        /// - Parameter modelId: The model identifier
+        /// - Returns: The best backend for this model on current platform
+        public static func selectBackend(forModel modelId: String) -> DiffusionBackend {
+            let backend = modelId.withCString { idPtr in
+                rac_diffusion_model_registry_select_backend(idPtr)
+            }
+            return DiffusionBackend(cValue: backend)
+        }
+        
+        /// Check if a model is available on the current platform
+        ///
+        /// - Parameter modelId: The model identifier
+        /// - Returns: True if the model is available
+        public static func isAvailable(modelId: String) -> Bool {
+            let available = modelId.withCString { idPtr in
+                rac_diffusion_model_registry_is_available(idPtr)
+            }
+            return available == RAC_TRUE
+        }
+        
+        /// Check if a model variant requires classifier-free guidance (CFG)
+        ///
+        /// CFG-free models (SDXS, SDXL Turbo) don't need the unconditional pass,
+        /// making them 2x faster during inference.
+        ///
+        /// - Parameter variant: The model variant
+        /// - Returns: True if CFG is required
+        public static func requiresCFG(variant: DiffusionModelVariant) -> Bool {
+            return rac_diffusion_model_requires_cfg(variant.cValue) == RAC_TRUE
+        }
+        
+        /// Get the current platform identifier
+        public static var currentPlatform: UInt32 {
+            return rac_diffusion_model_registry_get_current_platform()
+        }
+    }
+}

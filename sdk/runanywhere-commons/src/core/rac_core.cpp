@@ -17,6 +17,7 @@
 #include "rac/core/rac_structured_error.h"
 #include "rac/infrastructure/device/rac_device_manager.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "rac/features/diffusion/rac_diffusion_model_registry.h"
 
 // =============================================================================
 // STATIC STATE
@@ -104,6 +105,9 @@ rac_result_t rac_init(const rac_config_t* config) {
 
     s_initialized.store(true);
 
+    // Initialize diffusion model registry (supports extensible model definitions)
+    rac_diffusion_model_registry_init();
+
     internal_log(RAC_LOG_INFO, "RunAnywhere Commons initialized");
 
     return RAC_SUCCESS;
@@ -117,6 +121,9 @@ void rac_shutdown(void) {
     }
 
     internal_log(RAC_LOG_INFO, "RunAnywhere Commons shutting down");
+
+    // Cleanup diffusion model registry
+    rac_diffusion_model_registry_cleanup();
 
     // Clear state
     s_platform_adapter = nullptr;

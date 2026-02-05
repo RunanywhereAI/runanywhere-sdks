@@ -60,6 +60,10 @@ convert_variant(rac_diffusion_model_variant_t variant) {
             return runanywhere::diffusion::DiffusionModelVariant::SDXL;
         case RAC_DIFFUSION_MODEL_SDXL_TURBO:
             return runanywhere::diffusion::DiffusionModelVariant::SDXL_TURBO;
+        case RAC_DIFFUSION_MODEL_SDXS:
+            return runanywhere::diffusion::DiffusionModelVariant::SDXS;
+        case RAC_DIFFUSION_MODEL_LCM:
+            return runanywhere::diffusion::DiffusionModelVariant::LCM;
         default:
             return runanywhere::diffusion::DiffusionModelVariant::SD_1_5;
     }
@@ -295,6 +299,12 @@ rac_result_t rac_diffusion_onnx_get_info(
             break;
         case runanywhere::diffusion::DiffusionModelVariant::SDXL_TURBO:
             out_info->model_variant = RAC_DIFFUSION_MODEL_SDXL_TURBO;
+            break;
+        case runanywhere::diffusion::DiffusionModelVariant::SDXS:
+            out_info->model_variant = RAC_DIFFUSION_MODEL_SDXS;
+            break;
+        case runanywhere::diffusion::DiffusionModelVariant::LCM:
+            out_info->model_variant = RAC_DIFFUSION_MODEL_LCM;
             break;
         default:
             out_info->model_variant = RAC_DIFFUSION_MODEL_SD_1_5;

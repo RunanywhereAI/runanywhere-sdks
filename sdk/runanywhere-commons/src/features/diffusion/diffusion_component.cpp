@@ -175,6 +175,8 @@ extern "C" rac_result_t rac_diffusion_component_configure(rac_handle_t handle,
             component->default_options.width = 768;
             component->default_options.height = 768;
             break;
+        case RAC_DIFFUSION_MODEL_SDXS:
+        case RAC_DIFFUSION_MODEL_LCM:
         case RAC_DIFFUSION_MODEL_SD_1_5:
         default:
             component->default_options.width = 512;
@@ -182,10 +184,28 @@ extern "C" rac_result_t rac_diffusion_component_configure(rac_handle_t handle,
             break;
     }
 
-    // SDXL Turbo uses fewer steps
-    if (config->model_variant == RAC_DIFFUSION_MODEL_SDXL_TURBO) {
-        component->default_options.steps = 4;
-        component->default_options.guidance_scale = 0.0f;  // Turbo doesn't need guidance
+    // Ultra-fast models: SDXS (1 step), SDXL Turbo (4 steps), LCM (4 steps)
+    switch (config->model_variant) {
+        case RAC_DIFFUSION_MODEL_SDXS:
+            // SDXS: 1 step, no CFG
+            component->default_options.steps = 1;
+            component->default_options.guidance_scale = 0.0f;
+            component->default_options.scheduler = RAC_DIFFUSION_SCHEDULER_EULER;
+            break;
+        case RAC_DIFFUSION_MODEL_SDXL_TURBO:
+            // SDXL Turbo: 4 steps, no CFG
+            component->default_options.steps = 4;
+            component->default_options.guidance_scale = 0.0f;
+            break;
+        case RAC_DIFFUSION_MODEL_LCM:
+            // LCM: 4 steps, lower CFG
+            component->default_options.steps = 4;
+            component->default_options.guidance_scale = 1.5f;
+            component->default_options.scheduler = RAC_DIFFUSION_SCHEDULER_EULER;
+            break;
+        default:
+            // Standard models keep default values
+            break;
     }
 
     RAC_LOG_INFO("Diffusion.Component", "Diffusion component configured");
@@ -576,6 +596,9 @@ extern "C" rac_result_t rac_diffusion_component_get_info(rac_handle_t handle,
                 out_info->max_width = 768;
                 out_info->max_height = 768;
                 break;
+            case RAC_DIFFUSION_MODEL_SDXS:
+            case RAC_DIFFUSION_MODEL_LCM:
+            case RAC_DIFFUSION_MODEL_SD_1_5:
             default:
                 out_info->max_width = 512;
                 out_info->max_height = 512;
