@@ -67,9 +67,12 @@ typedef struct rac_benchmark_timing {
     int32_t output_tokens;
 
     /**
-     * Status of the request:
-     * - 0: Success
-     * - Non-zero: Error code (from rac_result_t)
+     * Status of the benchmark request.
+     * Uses RAC_BENCHMARK_STATUS_* codes:
+     * - RAC_BENCHMARK_STATUS_SUCCESS (0): Completed successfully
+     * - RAC_BENCHMARK_STATUS_ERROR (1): Failed
+     * - RAC_BENCHMARK_STATUS_TIMEOUT (2): Timed out
+     * - RAC_BENCHMARK_STATUS_CANCELLED (3): Cancelled
      */
     int32_t status;
 

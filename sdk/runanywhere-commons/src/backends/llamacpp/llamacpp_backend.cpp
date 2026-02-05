@@ -612,6 +612,11 @@ bool LlamaCppTextGeneration::generate_stream_with_timing(const TextGenerationReq
 
     if (llama_decode(context_, batch) != 0) {
         LOGE("llama_decode failed for prompt");
+        if (timing_out != nullptr) {
+            int64_t now = rac_monotonic_now_ms();
+            timing_out->t3_prefill_end_ms = now;
+            timing_out->t5_last_token_ms = now;
+        }
         llama_batch_free(batch);
         return false;
     }

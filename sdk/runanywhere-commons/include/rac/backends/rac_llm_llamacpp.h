@@ -177,7 +177,12 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_generate_stream(
  * @param options Generation options
  * @param callback Callback for each token
  * @param user_data User context passed to callback
- * @param timing_out Output: Benchmark timing (can be NULL for no timing)
+ * @param timing_out Output: Benchmark timing struct, caller-allocated.
+ *                   Must remain valid for the duration of the call.
+ *                   Caller should initialize via rac_benchmark_timing_init() before passing.
+ *                   On success, all t2/t3/t5 fields are populated.
+ *                   On failure, status is set but timing fields may be partial.
+ *                   Pass NULL to skip timing (zero overhead).
  * @return RAC_SUCCESS or error code
  */
 RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_generate_stream_with_timing(
