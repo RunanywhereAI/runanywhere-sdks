@@ -42,120 +42,261 @@ static constexpr double WAKE_WORD_TIMEOUT_SEC = 10.0;
 // =============================================================================
 // Text Sanitization for TTS
 // =============================================================================
-// Removes special characters, emojis, markdown, etc. that shouldn't be spoken.
-// This ensures the TTS output sounds natural without saying "asterisk" or "quote".
+// Prepares text for natural-sounding speech synthesis by:
+// 1. PRESERVING: Natural punctuation (. , ! ? : ; - ' ") for proper prosody
+// 2. REMOVING: Markdown formatting (* _ ` # ~ [ ] { } < >)
+// 3. REMOVING: Emojis and unicode symbols
+// 4. CONVERTING: Symbols to spoken equivalents (& → "and", % → "percent")
+// 5. NORMALIZING: Whitespace (collapse multiples, trim edges)
+// =============================================================================
 
+// Helper: Get UTF-8 sequence length from first byte
+static inline size_t get_utf8_length(unsigned char c) {
+    if ((c & 0x80) == 0) return 1;      // ASCII
+    if ((c & 0xE0) == 0xC0) return 2;   // 2-byte sequence
+    if ((c & 0xF0) == 0xE0) return 3;   // 3-byte sequence
+    if ((c & 0xF8) == 0xF0) return 4;   // 4-byte sequence
+    return 1;  // Invalid, treat as single byte
+}
+
+// Helper: Check if UTF-8 sequence is an emoji or special symbol to remove
+// Returns true if the sequence should be skipped
+static bool is_emoji_or_symbol(const std::string& input, size_t pos, size_t len) {
+    if (len < 3 || pos + len > input.size()) return false;
+
+    unsigned char c1 = static_cast<unsigned char>(input[pos]);
+    unsigned char c2 = static_cast<unsigned char>(input[pos + 1]);
+
+    // 4-byte sequences (0xF0-0xF4): Most emojis live here
+    // Range U+1F000 to U+1FFFF (emoticons, symbols, pictographs)
+    if (len == 4 && c1 == 0xF0) {
+        // U+1F300-U+1FAFF: Miscellaneous Symbols and Pictographs, Emoticons, etc.
+        // Generally skip all 4-byte sequences starting with F0 9F (emoji range)
+        if (c2 == 0x9F) return true;
+    }
+
+    // 3-byte sequences starting with E2 (U+2000-U+2FFF)
+    if (len == 3 && c1 == 0xE2) {
+        // U+2000-U+206F: General Punctuation (some are okay, but symbols aren't)
+        // U+2100-U+214F: Letterlike Symbols
+        // U+2190-U+21FF: Arrows
+        // U+2200-U+22FF: Mathematical Operators
+        // U+2300-U+23FF: Miscellaneous Technical
+        // U+2460-U+24FF: Enclosed Alphanumerics
+        // U+2500-U+257F: Box Drawing
+        // U+2580-U+259F: Block Elements
+        // U+25A0-U+25FF: Geometric Shapes
+        // U+2600-U+26FF: Miscellaneous Symbols
+        // U+2700-U+27BF: Dingbats
+        // U+2B00-U+2BFF: Miscellaneous Symbols and Arrows
+
+        // Skip arrows, symbols, dingbats, etc. but keep some punctuation
+        if (c2 >= 0x80 && c2 <= 0x8F) return false;  // Keep most general punctuation
+        if (c2 >= 0x90 && c2 <= 0xBF) return true;   // Skip symbols, arrows, math ops
+        if (c2 == 0xAD) return true;                  // Skip stars (⭐)
+        if (c2 >= 0x9C && c2 <= 0x9E) return true;   // Skip dingbats, misc symbols
+    }
+
+    // 3-byte sequences starting with E3 (U+3000-U+3FFF): CJK symbols
+    if (len == 3 && c1 == 0xE3) {
+        if (c2 >= 0x80 && c2 <= 0x8F) return true;  // CJK punctuation/symbols
+    }
+
+    // Variation selectors and zero-width characters (often paired with emoji)
+    if (len == 3 && c1 == 0xEF) {
+        // U+FE00-U+FE0F: Variation Selectors
+        // U+FEFF: BOM / Zero Width No-Break Space
+        if (c2 == 0xB8 || c2 == 0xBB) return true;
+    }
+
+    return false;
+}
+
+// Helper: Convert common symbols to spoken words
+// Returns empty string if no conversion needed (symbol should be removed)
+// Returns the symbol itself if it should be kept as-is
+static std::string convert_symbol_to_spoken(char c, char prev, char next, bool has_prev, bool has_next) {
+    switch (c) {
+        // Symbols that should be converted to words
+        case '&':
+            return " and ";
+
+        case '%':
+            // Only say "percent" if preceded by a number
+            if (has_prev && (prev >= '0' && prev <= '9')) {
+                return " percent";
+            }
+            return "";  // Remove if not after a number
+
+        case '$':
+            // Dollar sign before number: keep for context
+            // TTS engines typically handle "$100" well
+            if (has_next && (next >= '0' && next <= '9')) {
+                return "$";
+            }
+            return " dollars ";  // Standalone dollar sign
+
+        case '+':
+            // Plus sign between numbers/words: "plus" or remove
+            if (has_prev && has_next) {
+                return " plus ";
+            }
+            return "";
+
+        case '=':
+            // Equals sign: "equals"
+            if (has_prev && has_next) {
+                return " equals ";
+            }
+            return "";
+
+        case '/':
+            // Slash: "or" or "slash" depending on context
+            if (has_prev && has_next) {
+                return " or ";
+            }
+            return " ";
+
+        // Symbols to remove entirely
+        case '*':   // Markdown bold/italic
+        case '_':   // Markdown italic (but keep if between letters for compound words)
+        case '`':   // Markdown code
+        case '#':   // Markdown headers
+        case '~':   // Markdown strikethrough
+        case '[':   // Markdown links
+        case ']':
+        case '{':   // Braces
+        case '}':
+        case '<':   // Angle brackets (HTML/XML)
+        case '>':
+        case '|':   // Pipe
+        case '\\':  // Backslash
+        case '^':   // Caret
+        case '@':   // At sign (usually in mentions/emails)
+            return "";
+
+        // Symbols to convert to space (natural pause)
+        case '"':
+            // Double quotes: remove but keep sentence flow
+            return "";
+
+        default:
+            // Keep the character as-is
+            std::string s;
+            s += c;
+            return s;
+    }
+}
+
+// Main sanitization function
 static std::string sanitize_text_for_tts(const std::string& input) {
     if (input.empty()) return input;
 
     std::string result;
-    result.reserve(input.size());
+    result.reserve(input.size() * 1.2);  // May expand slightly due to word replacements
 
     size_t i = 0;
     while (i < input.size()) {
         unsigned char c = static_cast<unsigned char>(input[i]);
 
-        // Skip emoji sequences (UTF-8 encoded, typically start with 0xF0 or certain ranges)
-        // Most emojis are in the range U+1F300 to U+1FAD6 (4-byte UTF-8 starting with 0xF0)
-        if (c == 0xF0 && i + 3 < input.size()) {
-            // Skip 4-byte emoji sequence
-            i += 4;
+        // --- Handle multi-byte UTF-8 sequences ---
+        size_t utf8_len = get_utf8_length(c);
+        if (utf8_len > 1) {
+            // Check if it's an emoji or symbol to skip
+            if (is_emoji_or_symbol(input, i, utf8_len)) {
+                // Skip the entire sequence, optionally add space to maintain word boundaries
+                if (!result.empty() && result.back() != ' ') {
+                    result += ' ';
+                }
+                i += utf8_len;
+                continue;
+            }
+            // Keep valid UTF-8 text (international characters)
+            for (size_t j = 0; j < utf8_len && i + j < input.size(); ++j) {
+                result += input[i + j];
+            }
+            i += utf8_len;
             continue;
         }
 
-        // Skip 3-byte emoji/symbol sequences (U+2000-U+2FFF, U+3000-U+3FFF range)
-        // These include arrows, symbols, etc.
-        if (c == 0xE2 || c == 0xE3) {
-            if (i + 2 < input.size()) {
-                // Skip common symbol ranges
-                unsigned char c2 = static_cast<unsigned char>(input[i + 1]);
-                if ((c == 0xE2 && c2 >= 0x80 && c2 <= 0xBF) ||  // General punctuation, symbols
-                    (c == 0xE2 && c2 >= 0x9C && c2 <= 0x9E) ||  // Dingbats, misc symbols
-                    (c == 0xE2 && c2 == 0xAD) ||                // Stars
-                    (c == 0xE3 && c2 >= 0x80)) {                // CJK symbols
-                    i += 3;
-                    continue;
-                }
-            }
-        }
+        // --- Handle ASCII characters ---
 
-        // Handle ASCII special characters
-        if (c < 128) {
-            switch (c) {
-                // Remove markdown formatting characters
-                case '*':  // asterisk (bold/italic in markdown)
-                case '_':  // underscore (italic in markdown)
-                case '`':  // backtick (code in markdown)
-                case '#':  // hash (headers in markdown)
-                case '~':  // tilde (strikethrough in markdown)
-                    // Skip these characters entirely
-                    i++;
-                    continue;
-
-                // Replace quotes with natural pauses (keep single quotes for contractions)
-                case '"':
-                    // Remove double quotes but add slight pause
-                    result += ' ';
-                    i++;
-                    continue;
-
-                // Remove brackets and braces
-                case '[':
-                case ']':
-                case '{':
-                case '}':
-                case '<':
-                case '>':
-                    i++;
-                    continue;
-
-                // Remove other symbols that sound awkward
-                case '|':  // pipe
-                case '\\': // backslash
-                case '^':  // caret
-                case '@':  // at sign
-                    i++;
-                    continue;
-
-                // Keep these for natural speech
-                case '\'': // apostrophe (contractions)
-                case '.':  // period
-                case ',':  // comma
-                case '!':  // exclamation
-                case '?':  // question
-                case ':':  // colon
-                case ';':  // semicolon
-                case '-':  // hyphen (but collapse multiples)
-                case '(':  // open paren (sometimes natural)
-                case ')':  // close paren
-                    // Keep single hyphens, collapse multiple dashes
-                    if (c == '-' && !result.empty() && result.back() == '-') {
-                        i++;
-                        continue;
-                    }
-                    result += c;
-                    i++;
-                    continue;
-
-                default:
-                    // Keep letters, numbers, spaces
-                    result += c;
-                    i++;
-                    continue;
-            }
-        } else {
-            // Keep other UTF-8 characters (non-emoji international text)
+        // Characters to preserve for natural prosody (TTS uses these for pacing)
+        // Period, comma, exclamation, question mark, colon, semicolon
+        if (c == '.' || c == ',' || c == '!' || c == '?' || c == ':' || c == ';') {
             result += c;
             i++;
+            continue;
         }
+
+        // Apostrophe: Keep for contractions (don't, it's, we'll)
+        if (c == '\'') {
+            result += c;
+            i++;
+            continue;
+        }
+
+        // Hyphen/dash: Keep single hyphens, collapse multiple dashes (---, —)
+        if (c == '-') {
+            // Skip if previous char was also a dash
+            if (!result.empty() && result.back() == '-') {
+                i++;
+                continue;
+            }
+            result += c;
+            i++;
+            continue;
+        }
+
+        // Parentheses: Keep for natural grouping (TTS handles these okay)
+        if (c == '(' || c == ')') {
+            result += c;
+            i++;
+            continue;
+        }
+
+        // Letters (a-z, A-Z) and digits (0-9): Always keep
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+            result += c;
+            i++;
+            continue;
+        }
+
+        // Whitespace: Normalize to single space
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+            // Only add space if result doesn't already end with one
+            if (!result.empty() && result.back() != ' ') {
+                result += ' ';
+            }
+            i++;
+            continue;
+        }
+
+        // Special symbols: Convert or remove
+        char prev_char = (i > 0) ? input[i - 1] : '\0';
+        char next_char = (i + 1 < input.size()) ? input[i + 1] : '\0';
+
+        std::string replacement = convert_symbol_to_spoken(
+            static_cast<char>(c),
+            prev_char,
+            next_char,
+            i > 0,
+            i + 1 < input.size()
+        );
+
+        if (!replacement.empty()) {
+            result += replacement;
+        }
+        i++;
     }
 
-    // Clean up: collapse multiple spaces
+    // --- Final cleanup: Normalize whitespace ---
     std::string cleaned;
     cleaned.reserve(result.size());
     bool last_was_space = false;
+
     for (char c : result) {
-        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+        if (c == ' ') {
             if (!last_was_space && !cleaned.empty()) {
                 cleaned += ' ';
                 last_was_space = true;
@@ -166,12 +307,12 @@ static std::string sanitize_text_for_tts(const std::string& input) {
         }
     }
 
-    // Trim trailing space
+    // Trim trailing whitespace
     while (!cleaned.empty() && cleaned.back() == ' ') {
         cleaned.pop_back();
     }
 
-    // Trim leading space
+    // Trim leading whitespace
     size_t start = 0;
     while (start < cleaned.size() && cleaned[start] == ' ') {
         start++;
