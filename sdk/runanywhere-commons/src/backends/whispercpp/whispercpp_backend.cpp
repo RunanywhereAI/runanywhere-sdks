@@ -274,7 +274,7 @@ STTResult WhisperCppSTT::transcribe_internal(const std::vector<float>& audio,
 
     const int n_segments = whisper_full_n_segments(ctx_);
     std::string full_text;
-    full_text.reserve(n_segments * 64); 
+    full_text.reserve(n_segments * 64);
 
     result.segments.reserve(n_segments);
 
@@ -558,21 +558,26 @@ std::vector<float> WhisperCppSTT::resample_to_16khz(const std::vector<float>& sa
     }
 
     const double step = static_cast<double>(source_rate) / WHISPER_SAMPLE_RATE;
-    const size_t output_size = static_cast<size_t>(samples.size() / step);
+    
+    size_t output_size = static_cast<size_t>(samples.size() / step);
+    if (output_size == 0) {
+        output_size = 1;
+    }
 
     std::vector<float> output;
     
-
     if (source_rate % WHISPER_SAMPLE_RATE == 0) {
-    int stride = source_rate / WHISPER_SAMPLE_RATE;
-    output.resize(samples.size() / stride);
-    for (size_t i = 0; i < output.size(); ++i) {
-        output[i] = samples[i * stride];
-    }
-    return output;
-}
+        const int stride = source_rate / WHISPER_SAMPLE_RATE;
+        const size_t out_len = std::max<size_t>(1, samples.size() / stride);
         
-    output.reserve(output_size);
+        output.resize(out_len);
+        for (size_t i = 0; i < out_len; ++i) {
+            output[i] = samples[i * stride];
+        }
+        return output;
+    }
+        
+    output.resize(output_size);
 
     const float* __restrict src_ptr = samples.data();
     const size_t src_size = samples.size();
@@ -580,21 +585,21 @@ std::vector<float> WhisperCppSTT::resample_to_16khz(const std::vector<float>& sa
     const size_t safe_output_limit = (output_size > 0) ? output_size - 1 : 0;
 
     double pos = 0.0;
+    size_t i = 0;
 
-    for (size_t i = 0; i < safe_output_limit; ++i) {
+    for (; i < safe_output_limit; ++i) {
         size_t idx0 = static_cast<size_t>(pos);
         if (idx0 >= src_size - 1) break;
 
         double frac = pos - idx0;
-        
         float val0 = src_ptr[idx0];
         float val1 = src_ptr[idx0 + 1];
 
-        output.push_back(val0 + static_cast<float>(frac) * (val1 - val0));
+        output[i] = val0 + static_cast<float>(frac) * (val1 - val0);
         pos += step;
     }
 
-    while (output.size() < output_size) {
+    for (; i < output_size; ++i) {
         size_t idx0 = static_cast<size_t>(pos);
         if (idx0 >= src_size) idx0 = src_size - 1;
 
@@ -604,7 +609,7 @@ std::vector<float> WhisperCppSTT::resample_to_16khz(const std::vector<float>& sa
         float val0 = src_ptr[idx0];
         float val1 = src_ptr[idx1];
 
-        output.push_back(val0 + static_cast<float>(frac) * (val1 - val0));
+        output[i] = val0 + static_cast<float>(frac) * (val1 - val0);
         pos += step;
     }
 
