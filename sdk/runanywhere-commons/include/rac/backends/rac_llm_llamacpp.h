@@ -11,6 +11,7 @@
 #ifndef RAC_LLM_LLAMACPP_H
 #define RAC_LLM_LLAMACPP_H
 
+#include "rac/core/rac_benchmark.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
 #include "rac/features/llm/rac_llm.h"
@@ -162,6 +163,27 @@ typedef rac_bool_t (*rac_llm_llamacpp_stream_callback_fn)(const char* token, rac
 RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_generate_stream(
     rac_handle_t handle, const char* prompt, const rac_llm_options_t* options,
     rac_llm_llamacpp_stream_callback_fn callback, void* user_data);
+
+/**
+ * Generates text with streaming callback and benchmark timing.
+ *
+ * Same as rac_llm_llamacpp_generate_stream but captures benchmark timing:
+ * - t2: Before prefill (llama_decode for prompt batch)
+ * - t3: After prefill completes
+ * - t5: When decode loop exits (last token)
+ *
+ * @param handle Service handle
+ * @param prompt Input prompt text
+ * @param options Generation options
+ * @param callback Callback for each token
+ * @param user_data User context passed to callback
+ * @param timing_out Output: Benchmark timing (can be NULL for no timing)
+ * @return RAC_SUCCESS or error code
+ */
+RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_generate_stream_with_timing(
+    rac_handle_t handle, const char* prompt, const rac_llm_options_t* options,
+    rac_llm_llamacpp_stream_callback_fn callback, void* user_data,
+    rac_benchmark_timing_t* timing_out);
 
 /**
  * Cancels ongoing generation.
