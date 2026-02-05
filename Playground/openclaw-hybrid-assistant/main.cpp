@@ -28,7 +28,6 @@
 #include "audio_capture.h"
 #include "audio_playback.h"
 #include "openclaw_client.h"
-#include "waiting_feedback.h"
 
 // Backend registration
 #include <rac/backends/rac_vad_onnx.h>
@@ -314,20 +313,12 @@ int main(int argc, char* argv[]) {
     };
 
     // Transcription callback - SEND TO OPENCLAW
-    // Note: waiting_feedback will be captured by reference after it's created
-    openclaw::WaitingFeedback* waiting_feedback_ptr = nullptr;
-
-    pipeline_config.on_transcription = [&openclaw_client, &waiting_feedback_ptr](const std::string& text, bool is_final) {
+    pipeline_config.on_transcription = [&openclaw_client](const std::string& text, bool is_final) {
         if (is_final && !text.empty()) {
             std::cout << "[USER] " << text << std::endl;
 
             // Send to OpenClaw (fire-and-forget)
             openclaw_client.send_transcription(text, true);
-
-            // Start waiting feedback (will play acknowledgment + waiting sounds)
-            if (waiting_feedback_ptr) {
-                waiting_feedback_ptr->start(text);
-            }
         }
     };
 
@@ -357,36 +348,6 @@ int main(int argc, char* argv[]) {
               << "  STT: " << pipeline.get_stt_model_id() << "\n"
               << "  TTS: " << pipeline.get_tts_model_id() << "\n"
               << std::endl;
-
-    // =============================================================================
-    // Initialize Waiting Feedback
-    // =============================================================================
-    // Provides audio/TTS feedback while waiting for OpenClaw response
-
-    std::cout << "Initializing waiting feedback...\n";
-
-    openclaw::WaitingFeedbackConfig feedback_config;
-    feedback_config.sample_rate = 24000;  // Match Kokoro TTS
-
-    // TTS callback - use the voice pipeline's speak function
-    feedback_config.on_speak = [&pipeline](const std::string& text) {
-        pipeline.speak_text(text);
-    };
-
-    // Audio callback - play raw audio through the playback device
-    feedback_config.on_audio = [&playback](const int16_t* samples, size_t num_samples, int sample_rate) {
-        if (static_cast<uint32_t>(sample_rate) != playback.config().sample_rate) {
-            playback.reinitialize(sample_rate);
-        }
-        playback.play(samples, num_samples);
-    };
-
-    openclaw::WaitingFeedback waiting_feedback(feedback_config);
-
-    // Set the pointer so the transcription callback can use it
-    waiting_feedback_ptr = &waiting_feedback;
-
-    std::cout << "  Waiting feedback enabled\n" << std::endl;
 
     // =============================================================================
     // Connect Audio to Pipeline
@@ -424,9 +385,9 @@ int main(int argc, char* argv[]) {
     // Start voice pipeline
     pipeline.start();
 
-    // Polling interval for speak queue (poll frequently for responsive feedback)
+    // Polling interval for speak queue
     auto last_poll_time = std::chrono::steady_clock::now();
-    const auto poll_interval = std::chrono::milliseconds(100);  // Poll every 100ms for quick response detection
+    const auto poll_interval = std::chrono::milliseconds(500);  // Poll every 500ms
 
     // Main loop
     while (g_running) {
@@ -439,17 +400,10 @@ int main(int argc, char* argv[]) {
 
             openclaw::SpeakMessage message;
             if (openclaw_client.poll_speak_queue(message)) {
-                // Stop waiting feedback immediately - response has arrived!
-                waiting_feedback.stop();
-
                 std::cout << "[" << message.source_channel << "] " << message.text << std::endl;
                 pipeline.speak_text(message.text);
             }
         }
-
-        // Update waiting feedback (plays acknowledgment, periodic sounds, etc.)
-        // Only runs if we're in waiting mode
-        waiting_feedback.update();
     }
 
     // =============================================================================

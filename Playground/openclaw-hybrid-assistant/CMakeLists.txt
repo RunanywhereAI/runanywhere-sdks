@@ -70,7 +70,6 @@ add_executable(openclaw-assistant
     openclaw_client.cpp
     audio_capture.cpp
     audio_playback.cpp
-    waiting_feedback.cpp
 )
 
 target_link_libraries(openclaw-assistant PRIVATE
