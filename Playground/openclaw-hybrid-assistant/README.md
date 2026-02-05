@@ -62,6 +62,27 @@ A lightweight voice assistant that acts as a **channel** for OpenClaw. No local 
   - American: `af` (female), `af_bella`, `af_nicole`, `af_sarah`, `af_sky`, `am_adam`
   - British: `bf_emma`, `bf_isabella`, `bm_george`, `bm_lewis`
 - Alternative: Piper VITS available with `--piper` download flag
+- **Text Sanitization**: Automatically removes emojis, markdown, and special characters before synthesis
+
+### 5. Waiting Feedback (UX Enhancement)
+Provides audio feedback while waiting for OpenClaw to process the user's request:
+
+- **Immediate Acknowledgment**: Plays a gentle two-tone chime and speaks a random phrase like:
+  - "Let me think about that."
+  - "One moment, please."
+  - "Got it, one moment."
+  - "Sure, let me look into that."
+
+- **Periodic Waiting Sounds**: Every ~3 seconds, plays a subtle tone to indicate processing
+
+- **Waiting Phrases**: For longer waits (6+ seconds), speaks phrases like:
+  - "Still working on that."
+  - "Almost there."
+  - "Bear with me."
+
+- **Automatic Interruption**: Stops all waiting feedback immediately when OpenClaw responds
+
+This creates a warm, professional user experience where the user always knows the assistant is working on their request.
 
 ## OpenClaw WebSocket Protocol
 
