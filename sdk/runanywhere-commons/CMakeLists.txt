@@ -189,6 +189,7 @@ set(RAC_FEATURES_SOURCES
     src/features/vlm/rac_vlm_service.cpp
     # Diffusion (Image Generation)
     src/features/diffusion/diffusion_component.cpp
+    src/features/diffusion/diffusion_model_registry.cpp
     src/features/diffusion/rac_diffusion_service.cpp
     src/features/diffusion/rac_diffusion_tokenizer.cpp
     # Voice Agent

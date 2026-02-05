@@ -58,7 +58,9 @@ enum class DiffusionModelVariant {
     SD_1_5,      // Stable Diffusion 1.5 (512x512)
     SD_2_1,      // Stable Diffusion 2.1 (768x768)
     SDXL,        // Stable Diffusion XL (1024x1024)
-    SDXL_TURBO,  // SDXL Turbo (fewer steps)
+    SDXL_TURBO,  // SDXL Turbo (4 steps, no CFG)
+    SDXS,        // SDXS ultra-fast (1 step, no CFG)
+    LCM,         // Latent Consistency Model (4 steps)
     UNKNOWN,
 };
 
@@ -76,7 +78,10 @@ struct ONNXDiffusionConfig {
     // Default dimensions based on variant
     int default_width() const {
         switch (model_variant) {
-            case DiffusionModelVariant::SD_1_5: return 512;
+            case DiffusionModelVariant::SD_1_5:
+            case DiffusionModelVariant::SDXS:
+            case DiffusionModelVariant::LCM:
+                return 512;
             case DiffusionModelVariant::SD_2_1: return 768;
             case DiffusionModelVariant::SDXL:
             case DiffusionModelVariant::SDXL_TURBO: return 1024;
@@ -86,8 +91,28 @@ struct ONNXDiffusionConfig {
     int default_height() const { return default_width(); }
     int default_steps() const {
         switch (model_variant) {
-            case DiffusionModelVariant::SDXL_TURBO: return 4;
+            case DiffusionModelVariant::SDXS: return 1;        // Ultra-fast 1-step
+            case DiffusionModelVariant::SDXL_TURBO: return 4;  // Fast 4-step
+            case DiffusionModelVariant::LCM: return 4;         // LCM 4-step
             default: return 20;
+        }
+    }
+    float default_guidance_scale() const {
+        switch (model_variant) {
+            case DiffusionModelVariant::SDXS:
+            case DiffusionModelVariant::SDXL_TURBO:
+                return 0.0f;  // No CFG needed
+            case DiffusionModelVariant::LCM:
+                return 1.5f;  // Low CFG
+            default: return 7.5f;
+        }
+    }
+    bool requires_cfg() const {
+        switch (model_variant) {
+            case DiffusionModelVariant::SDXS:
+            case DiffusionModelVariant::SDXL_TURBO:
+                return false;  // CFG-free distilled models
+            default: return true;
         }
     }
 };

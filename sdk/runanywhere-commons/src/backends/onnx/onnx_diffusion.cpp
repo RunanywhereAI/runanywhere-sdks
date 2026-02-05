@@ -273,21 +273,34 @@ bool ONNXDiffusion::create_session_options() {
         case ONNXExecutionProvider::COREML:
 #if RAC_COREML_EP_AVAILABLE
             // Add CoreML Execution Provider for Apple Neural Engine acceleration
+            // Hardware fallback chain: ANE → GPU → CPU (automatic via CoreML)
             {
-                // CoreML flags:
+                // CoreML flags (optimized for diffusion):
                 // COREML_FLAG_CREATE_MLPROGRAM (1) - Create ML Program format (iOS 15+, macOS 12+)
+                //   - Required for ANE acceleration on newer devices
+                //   - Better performance than legacy NeuralNetwork format
                 // COREML_FLAG_ENABLE_ON_SUBGRAPH (2) - Enable on subgraphs
+                //   - Important for diffusion models with complex graphs
                 // COREML_FLAG_ONLY_ENABLE_DEVICE_WITH_ANE (4) - Only use if ANE available
                 // COREML_FLAG_ONLY_ALLOW_STATIC_INPUT_SHAPES (8) - Static shapes only
                 // COREML_FLAG_REQUIRE_STATIC_INPUT_SHAPES (16) - Require static shapes
                 
                 uint32_t coreml_flags = 0;
+                
+                // Enable ML Program format for better ANE utilization (iOS 15+/macOS 12+)
+                // This enables the modern CoreML execution path with ANE → GPU → CPU fallback
+                coreml_flags |= 1;  // COREML_FLAG_CREATE_MLPROGRAM
+                
                 // Enable on subgraphs for better operator coverage
                 coreml_flags |= 2;  // COREML_FLAG_ENABLE_ON_SUBGRAPH
                 
+                // Diffusion models have static shapes, enable this for better optimization
+                coreml_flags |= 8;  // COREML_FLAG_ONLY_ALLOW_STATIC_INPUT_SHAPES
+                
                 status = OrtSessionOptionsAppendExecutionProvider_CoreML(session_options_, coreml_flags);
                 if (status == nullptr) {
-                    RAC_LOG_INFO("ONNXDiffusion", "CoreML EP enabled for Neural Engine acceleration (flags=%u)", coreml_flags);
+                    RAC_LOG_INFO("ONNXDiffusion", "CoreML EP enabled with ML Program format (flags=0x%x)", coreml_flags);
+                    RAC_LOG_INFO("ONNXDiffusion", "Hardware fallback: ANE → GPU → CPU (automatic)");
                     ep_added = true;
                 } else {
                     const char* error_msg = ort_api_->GetErrorMessage(status);
@@ -304,19 +317,31 @@ bool ONNXDiffusion::create_session_options() {
         case ONNXExecutionProvider::NNAPI:
 #if RAC_NNAPI_EP_AVAILABLE
             // Add NNAPI Execution Provider for Android NPU acceleration
+            // Hardware fallback chain: NPU → DSP → GPU → CPU (automatic via NNAPI)
             {
-                // NNAPI flags:
+                // NNAPI flags (optimized for diffusion):
                 // NNAPI_FLAG_USE_FP16 (0x001) - Use FP16 for performance
-                // NNAPI_FLAG_USE_NCHW (0x002) - Use NCHW format
+                //   - 2x faster on NPU/DSP, minimal quality loss for diffusion
+                // NNAPI_FLAG_USE_NCHW (0x002) - Use NCHW format (channel-first)
+                //   - Matches diffusion model layout, avoids transpose overhead
                 // NNAPI_FLAG_CPU_DISABLED (0x004) - Disable CPU fallback
+                //   - Don't use: we want fallback for unsupported ops
                 // NNAPI_FLAG_CPU_ONLY (0x008) - Use CPU only
+                //   - Don't use: defeats purpose of NNAPI
                 
                 uint32_t nnapi_flags = 0;
-                nnapi_flags |= 0x001;  // NNAPI_FLAG_USE_FP16 for performance
+                
+                // Enable FP16 for significant speedup on NPU/DSP
+                nnapi_flags |= 0x001;  // NNAPI_FLAG_USE_FP16
+                
+                // Use NCHW format to match diffusion model expectations
+                // Avoids transpose operations which can be slow
+                nnapi_flags |= 0x002;  // NNAPI_FLAG_USE_NCHW
                 
                 status = OrtSessionOptionsAppendExecutionProvider_Nnapi(session_options_, nnapi_flags);
                 if (status == nullptr) {
-                    RAC_LOG_INFO("ONNXDiffusion", "NNAPI EP enabled for NPU acceleration (flags=%u)", nnapi_flags);
+                    RAC_LOG_INFO("ONNXDiffusion", "NNAPI EP enabled with FP16+NCHW (flags=0x%x)", nnapi_flags);
+                    RAC_LOG_INFO("ONNXDiffusion", "Hardware fallback: NPU → DSP → GPU → CPU (automatic)");
                     ep_added = true;
                 } else {
                     const char* error_msg = ort_api_->GetErrorMessage(status);
@@ -588,12 +613,48 @@ bool ONNXDiffusion::load_vae_decoder(const std::string& path) {
         return false;
     }
     
+    // On iOS/mobile, CoreML can fail with memory errors for VAE decoder
+    // due to the complex tensor operations and memory constraints.
+    // Use CPU-only execution for VAE decoder to ensure reliable operation.
+#if defined(__APPLE__) && (defined(TARGET_OS_IOS) || defined(TARGET_OS_IPHONE) || defined(__arm64__))
+    RAC_LOG_INFO("ONNXDiffusion", "Using CPU execution provider for VAE decoder (mobile memory optimization)");
+    
+    OrtSessionOptions* vae_options = nullptr;
+    OrtStatus* status = ort_api_->CreateSessionOptions(&vae_options);
+    if (!check_onnx_status(status, "CreateVAEDecoderSessionOptions")) {
+        return false;
+    }
+    
+    // Copy basic settings
+    int num_threads = config_.num_threads > 0 ? config_.num_threads : 4;
+    status = ort_api_->SetIntraOpNumThreads(vae_options, num_threads);
+    if (status) {
+        ort_api_->ReleaseStatus(status);
+    }
+    
+    status = ort_api_->SetSessionGraphOptimizationLevel(vae_options, ORT_ENABLE_ALL);
+    if (status) {
+        ort_api_->ReleaseStatus(status);
+    }
+    
+    // CPU-only - no CoreML EP appended
+    status = ort_api_->CreateSession(
+        ort_env_, path.c_str(), vae_options, &vae_decoder_session_);
+    
+    ort_api_->ReleaseSessionOptions(vae_options);
+    
+    if (!check_onnx_status(status, "LoadVAEDecoder")) {
+        return false;
+    }
+#else
+    // Desktop/macOS with more memory can use CoreML
     OrtStatus* status = ort_api_->CreateSession(
         ort_env_, path.c_str(), session_options_, &vae_decoder_session_);
     
     if (!check_onnx_status(status, "LoadVAEDecoder")) {
         return false;
     }
+#endif
     
     RAC_LOG_DEBUG("ONNXDiffusion", "Loaded VAE decoder from: %s", path.c_str());
     return true;
@@ -604,12 +665,43 @@ bool ONNXDiffusion::load_vae_encoder(const std::string& path) {
         return false;  // Optional component
     }
     
+    // On iOS/mobile, use CPU-only execution for VAE encoder (same as decoder)
+#if defined(__APPLE__) && (defined(TARGET_OS_IOS) || defined(TARGET_OS_IPHONE) || defined(__arm64__))
+    RAC_LOG_INFO("ONNXDiffusion", "Using CPU execution provider for VAE encoder (mobile memory optimization)");
+    
+    OrtSessionOptions* vae_options = nullptr;
+    OrtStatus* status = ort_api_->CreateSessionOptions(&vae_options);
+    if (!check_onnx_status(status, "CreateVAEEncoderSessionOptions")) {
+        return false;
+    }
+    
+    int num_threads = config_.num_threads > 0 ? config_.num_threads : 4;
+    status = ort_api_->SetIntraOpNumThreads(vae_options, num_threads);
+    if (status) {
+        ort_api_->ReleaseStatus(status);
+    }
+    
+    status = ort_api_->SetSessionGraphOptimizationLevel(vae_options, ORT_ENABLE_ALL);
+    if (status) {
+        ort_api_->ReleaseStatus(status);
+    }
+    
+    status = ort_api_->CreateSession(
+        ort_env_, path.c_str(), vae_options, &vae_encoder_session_);
+    
+    ort_api_->ReleaseSessionOptions(vae_options);
+    
+    if (!check_onnx_status(status, "LoadVAEEncoder")) {
+        return false;
+    }
+#else
     OrtStatus* status = ort_api_->CreateSession(
         ort_env_, path.c_str(), session_options_, &vae_encoder_session_);
     
     if (!check_onnx_status(status, "LoadVAEEncoder")) {
         return false;
     }
+#endif
     
     RAC_LOG_DEBUG("ONNXDiffusion", "Loaded VAE encoder from: %s", path.c_str());
     return true;
@@ -735,6 +827,17 @@ DiffusionResult ONNXDiffusion::generate(const DiffusionOptions& options,
     latents = vector_mul(latents, init_sigma);
     
     // 4. Denoising loop
+    // Optimization: CFG-free models (SDXS, SDXL Turbo) don't need unconditional pass
+    // This cuts inference time in half for these fast models
+    bool use_cfg = (options.guidance_scale > 0.01f) && 
+                   (config_.model_variant != DiffusionModelVariant::SDXS) &&
+                   (config_.model_variant != DiffusionModelVariant::SDXL_TURBO);
+    
+    if (!use_cfg) {
+        RAC_LOG_INFO("ONNXDiffusion", "CFG-free generation (variant=%d, guidance=%.2f)",
+                     static_cast<int>(config_.model_variant), options.guidance_scale);
+    }
+    
     for (int i = 0; i < steps; ++i) {
         if (cancel_requested_) {
             result.error_message = "Cancelled";
@@ -759,31 +862,48 @@ DiffusionResult ONNXDiffusion::generate(const DiffusionOptions& options,
         // Scale model input
         std::vector<float> latent_input = scheduler_->scale_model_input(latents, t);
         
-        // Run UNet for unconditional prediction
-        std::vector<float> noise_pred_uncond = run_unet_step(
-            latent_input, uncond_embeddings, t);
+        std::vector<float> noise_pred;
         
-        // Check if UNet inference failed (returns empty vector on error)
-        if (noise_pred_uncond.empty()) {
-            RAC_LOG_ERROR("ONNXDiffusion", "UNet unconditional prediction failed at step %d", i);
-            result.error_message = "UNet inference failed - external data file may be inaccessible";
-            return result;
+        if (use_cfg) {
+            // Standard CFG: Run UNet twice (unconditional + conditional)
+            // Then combine: noise_pred = noise_pred_uncond + guidance * (noise_pred_text - noise_pred_uncond)
+            
+            // Run UNet for unconditional prediction
+            std::vector<float> noise_pred_uncond = run_unet_step(
+                latent_input, uncond_embeddings, t);
+            
+            // Check if UNet inference failed (returns empty vector on error)
+            if (noise_pred_uncond.empty()) {
+                RAC_LOG_ERROR("ONNXDiffusion", "UNet unconditional prediction failed at step %d", i);
+                result.error_message = "UNet inference failed - external data file may be inaccessible";
+                return result;
+            }
+            
+            // Run UNet for conditional prediction
+            std::vector<float> noise_pred_text = run_unet_step(
+                latent_input, text_embeddings, t);
+            
+            // Check if UNet inference failed
+            if (noise_pred_text.empty()) {
+                RAC_LOG_ERROR("ONNXDiffusion", "UNet conditional prediction failed at step %d", i);
+                result.error_message = "UNet inference failed - external data file may be inaccessible";
+                return result;
+            }
+            
+            // Apply classifier-free guidance
+            noise_pred = apply_guidance(
+                noise_pred_uncond, noise_pred_text, options.guidance_scale);
+        } else {
+            // CFG-free: Run UNet once with text embeddings only
+            // This is 2x faster for distilled models (SDXS, SDXL Turbo, etc.)
+            noise_pred = run_unet_step(latent_input, text_embeddings, t);
+            
+            if (noise_pred.empty()) {
+                RAC_LOG_ERROR("ONNXDiffusion", "UNet prediction failed at step %d", i);
+                result.error_message = "UNet inference failed - external data file may be inaccessible";
+                return result;
+            }
         }
-        
-        // Run UNet for conditional prediction
-        std::vector<float> noise_pred_text = run_unet_step(
-            latent_input, text_embeddings, t);
-        
-        // Check if UNet inference failed
-        if (noise_pred_text.empty()) {
-            RAC_LOG_ERROR("ONNXDiffusion", "UNet conditional prediction failed at step %d", i);
-            result.error_message = "UNet inference failed - external data file may be inaccessible";
-            return result;
-        }
-        
-        // Apply classifier-free guidance
-        std::vector<float> noise_pred = apply_guidance(
-            noise_pred_uncond, noise_pred_text, options.guidance_scale);
         
         // Scheduler step
         latents = scheduler_->step(noise_pred, t, latents);

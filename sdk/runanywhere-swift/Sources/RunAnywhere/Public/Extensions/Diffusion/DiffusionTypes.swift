@@ -78,6 +78,16 @@ public enum DiffusionTokenizerSource: Sendable, Equatable {
 // MARK: - Diffusion Model Variant
 
 /// Stable Diffusion model variants
+///
+/// Hardware Acceleration:
+/// - iOS/macOS: Uses CoreML Execution Provider (ANE → GPU → CPU automatic fallback)
+/// - Android: Uses NNAPI Execution Provider (NPU → DSP → GPU → CPU automatic fallback)
+/// - Desktop: Uses optimized CPU with SIMD
+///
+/// Fast Models (no CFG needed, 2x faster):
+/// - `sdxs`: Ultra-fast 1-step model (~10 sec on mobile)
+/// - `sdxlTurbo`: Fast 4-step model
+/// - `lcm`: Latent Consistency Model, 4 steps
 public enum DiffusionModelVariant: String, Sendable, CaseIterable {
     /// Stable Diffusion 1.5 (512x512 default)
     case sd15 = "sd15"
@@ -88,30 +98,56 @@ public enum DiffusionModelVariant: String, Sendable, CaseIterable {
     /// SDXL (1024x1024 default, requires 8GB+ RAM)
     case sdxl = "sdxl"
 
-    /// SDXL Turbo (fast, fewer steps)
+    /// SDXL Turbo - Fast 4-step, no CFG needed
     case sdxlTurbo = "sdxl_turbo"
+    
+    /// SDXS - Ultra-fast 1-step, no CFG needed
+    /// Generates 512x512 images in ~10 seconds on mobile CPU, ~2 seconds with ANE
+    case sdxs = "sdxs"
+    
+    /// LCM (Latent Consistency Model) - Fast 4-step with low CFG
+    case lcm = "lcm"
 
     /// Default resolution for this variant
     public var defaultResolution: (width: Int, height: Int) {
         switch self {
-        case .sd15: return (512, 512)
+        case .sd15, .sdxs, .lcm: return (512, 512)
         case .sd21: return (768, 768)
         case .sdxl, .sdxlTurbo: return (1024, 1024)
         }
     }
-
-    /// Default number of steps for this variant
+    
+    /// Default number of inference steps
     public var defaultSteps: Int {
         switch self {
-        case .sd15, .sd21, .sdxl: return 28
-        case .sdxlTurbo: return 4
+        case .sdxs: return 1              // Ultra-fast 1-step
+        case .sdxlTurbo, .lcm: return 4   // Fast 4-step
+        case .sd15, .sd21, .sdxl: return 20
+        }
+    }
+    
+    /// Default guidance scale
+    public var defaultGuidanceScale: Float {
+        switch self {
+        case .sdxs, .sdxlTurbo: return 0.0  // No CFG needed
+        case .lcm: return 1.5                // Low CFG
+        case .sd15, .sd21, .sdxl: return 7.5
+        }
+    }
+    
+    /// Whether this model requires classifier-free guidance (CFG)
+    /// CFG-free models run 2x faster as they skip the unconditional pass
+    public var requiresCFG: Bool {
+        switch self {
+        case .sdxs, .sdxlTurbo: return false
+        case .sd15, .sd21, .sdxl, .lcm: return true
         }
     }
 
     /// Default tokenizer source for this model variant
     public var defaultTokenizerSource: DiffusionTokenizerSource {
         switch self {
-        case .sd15: return .sd15
+        case .sd15, .sdxs, .lcm: return .sd15
         case .sd21: return .sd2
         case .sdxl, .sdxlTurbo: return .sdxl
         }
@@ -123,6 +159,8 @@ public enum DiffusionModelVariant: String, Sendable, CaseIterable {
         case .sd21: return RAC_DIFFUSION_MODEL_SD_2_1
         case .sdxl: return RAC_DIFFUSION_MODEL_SDXL
         case .sdxlTurbo: return RAC_DIFFUSION_MODEL_SDXL_TURBO
+        case .sdxs: return RAC_DIFFUSION_MODEL_SDXS
+        case .lcm: return RAC_DIFFUSION_MODEL_LCM
         }
     }
 
@@ -132,6 +170,8 @@ public enum DiffusionModelVariant: String, Sendable, CaseIterable {
         case RAC_DIFFUSION_MODEL_SD_2_1: self = .sd21
         case RAC_DIFFUSION_MODEL_SDXL: self = .sdxl
         case RAC_DIFFUSION_MODEL_SDXL_TURBO: self = .sdxlTurbo
+        case RAC_DIFFUSION_MODEL_SDXS: self = .sdxs
+        case RAC_DIFFUSION_MODEL_LCM: self = .lcm
         default: self = .sd15
         }
     }

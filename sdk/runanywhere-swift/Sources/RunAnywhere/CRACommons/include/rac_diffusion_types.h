@@ -12,7 +12,6 @@
 #ifndef RAC_DIFFUSION_TYPES_H
 #define RAC_DIFFUSION_TYPES_H
 
-// Flattened include for Swift SDK
 #include "rac_types.h"
 
 #ifdef __cplusplus
@@ -46,10 +45,12 @@ typedef enum rac_diffusion_scheduler {
  * Different Stable Diffusion model variants with different capabilities.
  */
 typedef enum rac_diffusion_model_variant {
-    RAC_DIFFUSION_MODEL_SD_1_5 = 0,   /**< Stable Diffusion 1.5 (512x512 default) */
-    RAC_DIFFUSION_MODEL_SD_2_1 = 1,   /**< Stable Diffusion 2.1 (768x768 default) */
-    RAC_DIFFUSION_MODEL_SDXL = 2,     /**< SDXL (1024x1024 default, requires 8GB+ RAM) */
-    RAC_DIFFUSION_MODEL_SDXL_TURBO = 3, /**< SDXL Turbo (fast, fewer steps) */
+    RAC_DIFFUSION_MODEL_SD_1_5 = 0,     /**< Stable Diffusion 1.5 (512x512 default) */
+    RAC_DIFFUSION_MODEL_SD_2_1 = 1,     /**< Stable Diffusion 2.1 (768x768 default) */
+    RAC_DIFFUSION_MODEL_SDXL = 2,       /**< SDXL (1024x1024 default, requires 8GB+ RAM) */
+    RAC_DIFFUSION_MODEL_SDXL_TURBO = 3, /**< SDXL Turbo (fast, fewer steps, no CFG) */
+    RAC_DIFFUSION_MODEL_SDXS = 4,       /**< SDXS - Ultra-fast 1-step model (no CFG) */
+    RAC_DIFFUSION_MODEL_LCM = 5,        /**< LCM - Latent Consistency Model (4 steps) */
 } rac_diffusion_model_variant_t;
 
 /**
