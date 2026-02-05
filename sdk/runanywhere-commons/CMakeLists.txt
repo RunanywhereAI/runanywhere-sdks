@@ -129,6 +129,7 @@ set(RAC_CORE_SOURCES
     src/core/rac_core.cpp
     src/core/rac_error.cpp
     src/core/rac_time.cpp
+    src/core/rac_benchmark.cpp
     src/core/rac_memory.cpp
     src/core/rac_logger.cpp
     src/core/rac_audio_utils.cpp

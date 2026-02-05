@@ -122,6 +122,33 @@ rac_result_t rac_llm_generate_stream(rac_handle_t handle, const char* prompt,
     return service->ops->generate_stream(service->impl, prompt, options, callback, user_data);
 }
 
+rac_result_t rac_llm_generate_stream_with_timing(rac_handle_t handle, const char* prompt,
+                                                 const rac_llm_options_t* options,
+                                                 rac_llm_stream_callback_fn callback,
+                                                 void* user_data,
+                                                 rac_benchmark_timing_t* timing_out) {
+    if (!handle || !prompt || !callback)
+        return RAC_ERROR_NULL_POINTER;
+
+    auto* service = static_cast<rac_llm_service_t*>(handle);
+    if (!service->ops) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    // If backend implements timing-aware streaming, use it
+    if (service->ops->generate_stream_with_timing) {
+        return service->ops->generate_stream_with_timing(service->impl, prompt, options, callback,
+                                                         user_data, timing_out);
+    }
+
+    // Fallback to regular streaming (timing_out won't have t2/t3/t5)
+    if (service->ops->generate_stream) {
+        return service->ops->generate_stream(service->impl, prompt, options, callback, user_data);
+    }
+
+    return RAC_ERROR_NOT_SUPPORTED;
+}
+
 rac_result_t rac_llm_get_info(rac_handle_t handle, rac_llm_info_t* out_info) {
     if (!handle || !out_info)
         return RAC_ERROR_NULL_POINTER;

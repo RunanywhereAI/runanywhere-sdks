@@ -557,6 +557,154 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
     return !cancel_requested_.load();
 }
 
+bool LlamaCppTextGeneration::generate_stream_with_timing(const TextGenerationRequest& request,
+                                                         TextStreamCallback callback,
+                                                         int* out_prompt_tokens,
+                                                         rac_benchmark_timing_t* timing_out) {
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    if (!is_ready()) {
+        LOGE("Model not ready for generation");
+        return false;
+    }
+
+    cancel_requested_.store(false);
+
+    std::string prompt = build_prompt(request);
+    LOGI("Generating with timing, prompt length: %zu", prompt.length());
+
+    const auto tokens_list = common_tokenize(context_, prompt, true, true);
+
+    int n_ctx = llama_n_ctx(context_);
+    int prompt_tokens = static_cast<int>(tokens_list.size());
+
+    if (out_prompt_tokens) {
+        *out_prompt_tokens = prompt_tokens;
+    }
+
+    int available_tokens = n_ctx - prompt_tokens - 4;
+
+    if (available_tokens <= 0) {
+        LOGE("Prompt too long: %d tokens, context size: %d", prompt_tokens, n_ctx);
+        return false;
+    }
+
+    int effective_max_tokens = std::min(request.max_tokens, available_tokens);
+    if (effective_max_tokens < request.max_tokens) {
+        LOGI("Capping max_tokens: %d → %d (context=%d, prompt=%d tokens)", request.max_tokens,
+             effective_max_tokens, n_ctx, prompt_tokens);
+    }
+    LOGI("Generation with timing: prompt_tokens=%d, max_tokens=%d, context=%d", prompt_tokens,
+         effective_max_tokens, n_ctx);
+
+    llama_batch batch = llama_batch_init(n_ctx, 0, 1);
+
+    batch.n_tokens = 0;
+    for (size_t i = 0; i < tokens_list.size(); i++) {
+        common_batch_add(batch, tokens_list[i], i, {0}, false);
+    }
+    batch.logits[batch.n_tokens - 1] = true;
+
+    // t2: Record prefill start (before llama_decode for prompt)
+    if (timing_out != nullptr) {
+        timing_out->t2_prefill_start_ms = rac_monotonic_now_ms();
+    }
+
+    if (llama_decode(context_, batch) != 0) {
+        LOGE("llama_decode failed for prompt");
+        llama_batch_free(batch);
+        return false;
+    }
+
+    // t3: Record prefill end (after llama_decode returns)
+    if (timing_out != nullptr) {
+        timing_out->t3_prefill_end_ms = rac_monotonic_now_ms();
+    }
+
+    llama_sampler_reset(sampler_);
+
+    const auto vocab = llama_model_get_vocab(model_);
+    std::string cached_token_chars;
+    std::string accumulated_text;
+    int n_cur = batch.n_tokens;
+    int tokens_generated = 0;
+
+    while (tokens_generated < effective_max_tokens && !cancel_requested_.load()) {
+        const llama_token new_token_id = llama_sampler_sample(sampler_, context_, -1);
+
+        llama_sampler_accept(sampler_, new_token_id);
+
+        if (llama_vocab_is_eog(vocab, new_token_id)) {
+            LOGI("End of generation token received");
+            break;
+        }
+
+        auto new_token_chars = common_token_to_piece(context_, new_token_id);
+        cached_token_chars += new_token_chars;
+        accumulated_text += new_token_chars;
+
+        static const std::vector<std::string> stop_sequences = {
+            "<|im_end|>",
+            "<|eot_id|>",
+            "</s>",
+            "<|end|>",
+            "<|endoftext|>",
+            "\n\nUser:",
+            "\n\nHuman:",
+        };
+
+        bool hit_stop_sequence = false;
+        for (const auto& stop_seq : stop_sequences) {
+            size_t pos = accumulated_text.find(stop_seq);
+            if (pos != std::string::npos) {
+                LOGI("Stop sequence detected: %s", stop_seq.c_str());
+                hit_stop_sequence = true;
+                break;
+            }
+        }
+
+        if (hit_stop_sequence) {
+            break;
+        }
+
+        if (is_valid_utf8(cached_token_chars.c_str())) {
+            if (!callback(cached_token_chars)) {
+                LOGI("Generation cancelled by callback");
+                cancel_requested_.store(true);
+                break;
+            }
+            cached_token_chars.clear();
+        }
+
+        batch.n_tokens = 0;
+        common_batch_add(batch, new_token_id, n_cur, {0}, true);
+
+        n_cur++;
+        tokens_generated++;
+
+        if (llama_decode(context_, batch) != 0) {
+            LOGE("llama_decode failed during generation");
+            break;
+        }
+    }
+
+    // t5: Record last token time (decode loop exit)
+    if (timing_out != nullptr) {
+        timing_out->t5_last_token_ms = rac_monotonic_now_ms();
+    }
+
+    if (!cached_token_chars.empty() && is_valid_utf8(cached_token_chars.c_str())) {
+        callback(cached_token_chars);
+    }
+
+    llama_memory_clear(llama_get_memory(context_), true);
+
+    llama_batch_free(batch);
+
+    LOGI("Generation with timing complete: %d tokens", tokens_generated);
+    return !cancel_requested_.load();
+}
+
 void LlamaCppTextGeneration::cancel() {
     cancel_requested_.store(true);
     LOGI("Generation cancel requested");

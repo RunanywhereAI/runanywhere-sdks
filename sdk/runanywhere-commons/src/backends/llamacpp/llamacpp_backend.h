@@ -18,6 +18,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "rac/core/rac_benchmark.h"
+
 namespace runanywhere {
 
 // =============================================================================
@@ -117,6 +119,16 @@ class LlamaCppTextGeneration {
     }
     bool generate_stream(const TextGenerationRequest& request, TextStreamCallback callback,
                          int* out_prompt_tokens);
+
+    /**
+     * Generate text with streaming and benchmark timing.
+     * Captures t2 (prefill start), t3 (prefill end), t5 (last token).
+     * @param timing_out Benchmark timing struct (can be NULL for no timing)
+     */
+    bool generate_stream_with_timing(const TextGenerationRequest& request,
+                                     TextStreamCallback callback, int* out_prompt_tokens,
+                                     rac_benchmark_timing_t* timing_out);
+
     void cancel();
     nlohmann::json get_model_info() const;
 
