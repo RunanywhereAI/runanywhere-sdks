@@ -212,8 +212,19 @@ rac_result_t rac_model_paths_get_model_file_path(const char* model_id,
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
+    const char* extension = rac_model_format_extension(format);
+    if (!extension) {
+        // Unknown format - return just the model folder path
+        // The caller should search for model files in this folder
+        RAC_LOG_WARNING("ModelPaths", "Unknown model format (%d) for model '%s', returning folder path",
+                        static_cast<int>(format), model_id);
+        std::string path = g_base_dir + "/RunAnywhere/Models/" + rac_framework_raw_value(framework) +
+                           "/" + model_id;
+        return copy_string_to_buffer(path, out_path, path_size);
+    }
+
     std::string path = g_base_dir + "/RunAnywhere/Models/" + rac_framework_raw_value(framework) +
-                       "/" + model_id + "/" + model_id + "." + rac_model_format_extension(format);
+                       "/" + model_id + "/" + model_id + "." + extension;
     return copy_string_to_buffer(path, out_path, path_size);
 }
 

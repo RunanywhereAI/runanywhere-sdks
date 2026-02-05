@@ -396,6 +396,8 @@ const char* rac_model_format_extension(rac_model_format_t format) {
             return "gguf";
         case RAC_MODEL_FORMAT_BIN:
             return "bin";
+        case RAC_MODEL_FORMAT_COREML:
+            return "mlmodelc";  // CoreML compiled model directory
         default:
             return nullptr;
     }

@@ -218,6 +218,8 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
             model->format = RAC_MODEL_FORMAT_ORT;
         else if (format == "bin")
             model->format = RAC_MODEL_FORMAT_BIN;
+        else if (format == "coreml" || format == "mlmodelc" || format == "mlpackage")
+            model->format = RAC_MODEL_FORMAT_COREML;
         else
             model->format = RAC_MODEL_FORMAT_UNKNOWN;
 
@@ -428,6 +430,12 @@ rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info
                     model->framework == RAC_FRAMEWORK_UNKNOWN) {
                     model->framework = existing->framework;
                     RAC_LOG_DEBUG(LOG_CAT, "Preserved local framework for model: %s", model->id);
+                }
+                // Preserve format if existing has a known format and new doesn't
+                if (existing->format != RAC_MODEL_FORMAT_UNKNOWN &&
+                    model->format == RAC_MODEL_FORMAT_UNKNOWN) {
+                    model->format = existing->format;
+                    RAC_LOG_DEBUG(LOG_CAT, "Preserved local format for model: %s", model->id);
                 }
                 // Preserve local_path if existing has one and new doesn't
                 if (existing->local_path && !model->local_path) {

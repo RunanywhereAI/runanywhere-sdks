@@ -69,6 +69,8 @@ extension ModelFormat {
             return RAC_MODEL_FORMAT_GGUF
         case .bin:
             return RAC_MODEL_FORMAT_BIN
+        case .coreml:
+            return RAC_MODEL_FORMAT_COREML
         case .unknown:
             return RAC_MODEL_FORMAT_UNKNOWN
         }
@@ -85,6 +87,8 @@ extension ModelFormat {
             self = .gguf
         case RAC_MODEL_FORMAT_BIN:
             self = .bin
+        case RAC_MODEL_FORMAT_COREML:
+            self = .coreml
         default:
             self = .unknown
         }
