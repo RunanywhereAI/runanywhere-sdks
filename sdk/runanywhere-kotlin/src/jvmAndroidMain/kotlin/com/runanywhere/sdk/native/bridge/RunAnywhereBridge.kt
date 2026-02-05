@@ -337,6 +337,21 @@ object RunAnywhereBridge {
     )
 
     // ========================================================================
+    // VOICE AGENT CALLBACKS (rac_voice_agent.h)
+    // ========================================================================
+
+    @JvmStatic
+    external fun racVoiceAgentSetCallbacks(
+        stateCallback: Any?,
+        turnPhaseCallback: Any?,
+        partialTranscriptionCallback: Any?,
+        responseTokenCallback: Any?,
+        audioChunkCallback: Any?,
+        userInterruptCallback: Any?,
+        progressCallback: Any?,
+    )
+
+    // ========================================================================
     // BACKEND REGISTRATION
     // ========================================================================
     // NOTE: Backend registration has been MOVED to their respective module JNI bridges:

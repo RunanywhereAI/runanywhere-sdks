@@ -479,8 +479,10 @@ object CppBridgeTTS {
                 return
             }
 
-            // TODO: Call native registration
-            // nativeSetTTSCallbacks()
+            RunAnywhereBridge.racTtsSetCallbacks(
+                this,
+                this,
+            )
 
             isRegistered = true
 
@@ -1330,8 +1332,10 @@ object CppBridgeTTS {
                 destroy()
             }
 
-            // TODO: Call native unregistration
-            // nativeUnsetTTSCallbacks()
+            RunAnywhereBridge.racTtsSetCallbacks(
+                null,
+                null,
+            )
 
             ttsListener = null
             streamCallback = null
