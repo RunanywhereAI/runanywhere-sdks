@@ -1,7 +1,7 @@
 {
   "name": "@runanywhere/diffusion",
   "version": "0.1.0",
-  "description": "Diffusion backend for RunAnywhere React Native SDK - Image generation with Stable Diffusion",
+  "description": "Diffusion backend for RunAnywhere React Native SDK - iOS-only image generation with CoreML/ANE",
   "main": "src/index.ts",
   "types": "src/index.ts",
   "exports": {
@@ -18,7 +18,6 @@
     "src",
     "cpp",
     "ios",
-    "android",
     "nitrogen",
     "nitro.json",
     "react-native.config.js",
@@ -38,8 +37,8 @@
     "stable-diffusion",
     "image-generation",
     "text-to-image",
-    "onnx",
     "coreml",
+    "ios",
     "nitro",
     "expo"
   ],
@@ -56,7 +55,7 @@
     "typescript": "~5.9.2"
   },
   "create-react-native-library": {
-    "languages": "kotlin-swift",
+    "languages": "swift",
     "type": "nitro-module"
   }
 }
