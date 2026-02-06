@@ -1,18 +1,15 @@
 /**
  * @file rac_diffusion_model_registry.h
- * @brief Diffusion Model Registry - Extensible model definitions for cross-platform support
+ * @brief Diffusion Model Registry - CoreML-based model definitions for iOS/macOS
  *
- * Provides a strategy-based registry for diffusion models. Contributors can register
- * new model types without modifying core code. This is the shared C++ layer used by
- * all SDKs (Swift, Kotlin, React Native, Flutter).
+ * Provides a registry for diffusion models. Currently supports CoreML backend only
+ * (iOS/macOS with Apple Neural Engine acceleration).
  *
  * Features:
  * - Type-safe model definitions (no magic strings)
- * - Platform-aware backend selection (CoreML for iOS, NNAPI for Android)
- * - Automatic EP fallback chain: ANE → GPU → CPU (iOS), NPU → DSP → GPU → CPU (Android)
+ * - CoreML backend with ANE → GPU → CPU automatic fallback
  * - Strategy pattern for extensibility
- *
- * @see diffusion_optimization_plan.md for architectural details
+ * - Tokenizer source configuration (SD 1.5, SD 2.x, SDXL)
  */
 
 #ifndef RAC_DIFFUSION_MODEL_REGISTRY_H
@@ -32,16 +29,14 @@ extern "C" {
 /**
  * @brief Supported inference backends for diffusion models
  *
- * The AUTO backend will select the best option for the current platform:
- * - iOS/macOS: CoreML (ANE → GPU → CPU automatic fallback)
- * - Android: ONNX with NNAPI EP (NPU → DSP → GPU → CPU automatic fallback)
- * - Desktop: ONNX with CPU EP (SIMD optimized)
+ * Currently only CoreML is implemented for iOS/macOS.
+ * Other backends are reserved for future expansion.
  */
 typedef enum rac_diffusion_backend {
-    RAC_DIFFUSION_BACKEND_ONNX = 0,      /**< ONNX Runtime (cross-platform) */
-    RAC_DIFFUSION_BACKEND_COREML = 1,    /**< CoreML (iOS/macOS only, uses ANE) */
-    RAC_DIFFUSION_BACKEND_TFLITE = 2,    /**< TensorFlow Lite (future) */
-    RAC_DIFFUSION_BACKEND_AUTO = 99      /**< Auto-select best for platform */
+    RAC_DIFFUSION_BACKEND_ONNX = 0,      /**< ONNX Runtime (reserved for future) */
+    RAC_DIFFUSION_BACKEND_COREML = 1,    /**< CoreML (iOS/macOS - currently supported) */
+    RAC_DIFFUSION_BACKEND_TFLITE = 2,    /**< TensorFlow Lite (reserved for future) */
+    RAC_DIFFUSION_BACKEND_AUTO = 99      /**< Auto-select (defaults to CoreML on Apple) */
 } rac_diffusion_backend_t;
 
 /**

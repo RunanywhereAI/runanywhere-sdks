@@ -25,47 +25,14 @@ namespace {
 const char* LOG_CAT = "DiffusionModelRegistry";
 
 // =============================================================================
-// BUILT-IN MODEL DEFINITIONS
+// BUILT-IN MODEL DEFINITIONS (CoreML only for now - iOS/macOS)
 // =============================================================================
 
-// SD 1.5 (Standard ONNX - cross-platform)
-static const rac_diffusion_model_def_t MODEL_SD15_ONNX = {
-    .model_id = "stable-diffusion-v1-5-onnx",
-    .display_name = "Stable Diffusion 1.5",
-    .description = "Standard SD 1.5 model. Good quality, 20-28 steps recommended.",
-    .variant = RAC_DIFFUSION_MODEL_SD_1_5,
-    .backend = RAC_DIFFUSION_BACKEND_ONNX,
-    .platforms = RAC_DIFFUSION_PLATFORM_ALL,
-    .hardware = RAC_DIFFUSION_HW_CPU | RAC_DIFFUSION_HW_GPU | RAC_DIFFUSION_HW_ANE | RAC_DIFFUSION_HW_NPU,
-    .defaults = {
-        .width = 512,
-        .height = 512,
-        .steps = 28,
-        .guidance_scale = 7.5f,
-        .scheduler = RAC_DIFFUSION_SCHEDULER_DPM_PP_2M_KARRAS,
-        .requires_cfg = RAC_TRUE
-    },
-    .download = {
-        .base_url = "https://huggingface.co/runwayml/stable-diffusion-v1-5",
-        .onnx_path = "onnx",
-        .coreml_path = nullptr,
-        .size_bytes = 3000000000ULL,
-        .checksum = nullptr
-    },
-    .tokenizer = {
-        .source = RAC_DIFFUSION_TOKENIZER_SD_1_5,
-        .custom_url = nullptr
-    },
-    .is_recommended = RAC_FALSE,
-    .supports_img2img = RAC_TRUE,
-    .supports_inpainting = RAC_TRUE
-};
-
-// SD 1.5 CoreML (iOS/macOS optimized - uses ANE)
+// SD 1.5 CoreML (iOS/macOS - uses Apple Neural Engine)
 static const rac_diffusion_model_def_t MODEL_SD15_COREML = {
     .model_id = "stable-diffusion-v1-5-coreml",
-    .display_name = "Stable Diffusion 1.5 (CoreML)",
-    .description = "Apple-optimized SD 1.5 for iOS/macOS. Uses Neural Engine for 10x faster generation.",
+    .display_name = "Stable Diffusion 1.5",
+    .description = "Apple-optimized SD 1.5 for iOS/macOS. Uses Neural Engine for fast generation.",
     .variant = RAC_DIFFUSION_MODEL_SD_1_5,
     .backend = RAC_DIFFUSION_BACKEND_COREML,
     .platforms = RAC_DIFFUSION_PLATFORM_IOS | RAC_DIFFUSION_PLATFORM_MACOS,
@@ -89,151 +56,48 @@ static const rac_diffusion_model_def_t MODEL_SD15_COREML = {
         .source = RAC_DIFFUSION_TOKENIZER_SD_1_5,
         .custom_url = nullptr
     },
-    .is_recommended = RAC_TRUE,  // Recommended for iOS/macOS
+    .is_recommended = RAC_TRUE,
     .supports_img2img = RAC_TRUE,
     .supports_inpainting = RAC_FALSE
 };
 
-// SDXS (Ultra-fast, 1 step, no CFG)
-static const rac_diffusion_model_def_t MODEL_SDXS_ONNX = {
-    .model_id = "sdxs-512-0.9-onnx",
-    .display_name = "SDXS 512 (1-Step)",
-    .description = "Ultra-fast 1-step model. ~10 seconds on CPU, ~2 seconds on ANE. No CFG needed.",
-    .variant = RAC_DIFFUSION_MODEL_SDXS,
-    .backend = RAC_DIFFUSION_BACKEND_ONNX,
-    .platforms = RAC_DIFFUSION_PLATFORM_ALL,
-    .hardware = RAC_DIFFUSION_HW_CPU | RAC_DIFFUSION_HW_GPU | RAC_DIFFUSION_HW_ANE | RAC_DIFFUSION_HW_NPU,
+// SD 2.1 CoreML (iOS/macOS)
+static const rac_diffusion_model_def_t MODEL_SD21_COREML = {
+    .model_id = "stable-diffusion-v2-1-coreml",
+    .display_name = "Stable Diffusion 2.1",
+    .description = "Apple-optimized SD 2.1 for iOS/macOS. Higher resolution (768x768).",
+    .variant = RAC_DIFFUSION_MODEL_SD_2_1,
+    .backend = RAC_DIFFUSION_BACKEND_COREML,
+    .platforms = RAC_DIFFUSION_PLATFORM_IOS | RAC_DIFFUSION_PLATFORM_MACOS,
+    .hardware = RAC_DIFFUSION_HW_ANE | RAC_DIFFUSION_HW_GPU | RAC_DIFFUSION_HW_CPU,
     .defaults = {
-        .width = 512,
-        .height = 512,
-        .steps = 1,
-        .guidance_scale = 0.0f,  // No CFG needed
-        .scheduler = RAC_DIFFUSION_SCHEDULER_EULER,
-        .requires_cfg = RAC_FALSE
-    },
-    .download = {
-        .base_url = "https://huggingface.co/stabilityai/sdxs-512-0.9",
-        .onnx_path = "onnx",
-        .coreml_path = nullptr,
-        .size_bytes = 520000000ULL,
-        .checksum = nullptr
-    },
-    .tokenizer = {
-        .source = RAC_DIFFUSION_TOKENIZER_SD_1_5,
-        .custom_url = nullptr
-    },
-    .is_recommended = RAC_TRUE,  // Recommended for speed
-    .supports_img2img = RAC_FALSE,
-    .supports_inpainting = RAC_FALSE
-};
-
-// LCM (Fast, 4 steps, low CFG)
-static const rac_diffusion_model_def_t MODEL_LCM_ONNX = {
-    .model_id = "lcm-sdv1-5-onnx",
-    .display_name = "LCM SD 1.5 (4-Step)",
-    .description = "Latent Consistency Model. 4 steps, good balance of speed and quality.",
-    .variant = RAC_DIFFUSION_MODEL_LCM,
-    .backend = RAC_DIFFUSION_BACKEND_ONNX,
-    .platforms = RAC_DIFFUSION_PLATFORM_ALL,
-    .hardware = RAC_DIFFUSION_HW_CPU | RAC_DIFFUSION_HW_GPU | RAC_DIFFUSION_HW_ANE | RAC_DIFFUSION_HW_NPU,
-    .defaults = {
-        .width = 512,
-        .height = 512,
-        .steps = 4,
-        .guidance_scale = 1.5f,  // Low CFG
-        .scheduler = RAC_DIFFUSION_SCHEDULER_EULER,
-        .requires_cfg = RAC_TRUE
-    },
-    .download = {
-        .base_url = "https://huggingface.co/latent-consistency/lcm-sdv1-5",
-        .onnx_path = "onnx",
-        .coreml_path = nullptr,
-        .size_bytes = 2000000000ULL,
-        .checksum = nullptr
-    },
-    .tokenizer = {
-        .source = RAC_DIFFUSION_TOKENIZER_SD_1_5,
-        .custom_url = nullptr
-    },
-    .is_recommended = RAC_FALSE,
-    .supports_img2img = RAC_TRUE,
-    .supports_inpainting = RAC_FALSE
-};
-
-// SDXL Turbo (Fast SDXL, 4 steps, no CFG)
-static const rac_diffusion_model_def_t MODEL_SDXL_TURBO_ONNX = {
-    .model_id = "sdxl-turbo-onnx",
-    .display_name = "SDXL Turbo (4-Step)",
-    .description = "Fast SDXL model. 4 steps, no CFG. Requires 8GB+ RAM.",
-    .variant = RAC_DIFFUSION_MODEL_SDXL_TURBO,
-    .backend = RAC_DIFFUSION_BACKEND_ONNX,
-    .platforms = RAC_DIFFUSION_PLATFORM_MACOS | RAC_DIFFUSION_PLATFORM_WINDOWS | RAC_DIFFUSION_PLATFORM_LINUX,
-    .hardware = RAC_DIFFUSION_HW_CPU | RAC_DIFFUSION_HW_GPU,
-    .defaults = {
-        .width = 1024,
-        .height = 1024,
-        .steps = 4,
-        .guidance_scale = 0.0f,  // No CFG needed
-        .scheduler = RAC_DIFFUSION_SCHEDULER_EULER,
-        .requires_cfg = RAC_FALSE
-    },
-    .download = {
-        .base_url = "https://huggingface.co/stabilityai/sdxl-turbo",
-        .onnx_path = "onnx",
-        .coreml_path = nullptr,
-        .size_bytes = 6700000000ULL,
-        .checksum = nullptr
-    },
-    .tokenizer = {
-        .source = RAC_DIFFUSION_TOKENIZER_SDXL,
-        .custom_url = nullptr
-    },
-    .is_recommended = RAC_FALSE,
-    .supports_img2img = RAC_TRUE,
-    .supports_inpainting = RAC_FALSE
-};
-
-// BK-SDM Tiny (Current model you're using - for reference)
-static const rac_diffusion_model_def_t MODEL_BK_SDM_TINY = {
-    .model_id = "bk-sdm-tiny-onnx",
-    .display_name = "BK-SDM Tiny",
-    .description = "Compressed SD 1.5. Smaller download but slower than SDXS.",
-    .variant = RAC_DIFFUSION_MODEL_SD_1_5,
-    .backend = RAC_DIFFUSION_BACKEND_ONNX,
-    .platforms = RAC_DIFFUSION_PLATFORM_ALL,
-    .hardware = RAC_DIFFUSION_HW_CPU | RAC_DIFFUSION_HW_GPU | RAC_DIFFUSION_HW_ANE | RAC_DIFFUSION_HW_NPU,
-    .defaults = {
-        .width = 256,
-        .height = 256,
+        .width = 768,
+        .height = 768,
         .steps = 20,
         .guidance_scale = 7.5f,
-        .scheduler = RAC_DIFFUSION_SCHEDULER_DPM_PP_2M_KARRAS,
+        .scheduler = RAC_DIFFUSION_SCHEDULER_DPM_PP_2M,
         .requires_cfg = RAC_TRUE
     },
     .download = {
-        .base_url = "https://huggingface.co/segmind/bk-sdm-tiny",
-        .onnx_path = "onnx",
-        .coreml_path = nullptr,
-        .size_bytes = 3400000000ULL,
+        .base_url = "https://huggingface.co/apple/coreml-stable-diffusion-2-1-base-palettized",
+        .onnx_path = nullptr,
+        .coreml_path = "split_einsum_v2_compiled",
+        .size_bytes = 1500000000ULL,
         .checksum = nullptr
     },
     .tokenizer = {
-        .source = RAC_DIFFUSION_TOKENIZER_SD_1_5,
+        .source = RAC_DIFFUSION_TOKENIZER_SD_2_X,
         .custom_url = nullptr
     },
     .is_recommended = RAC_FALSE,
     .supports_img2img = RAC_TRUE,
-    .supports_inpainting = RAC_TRUE
+    .supports_inpainting = RAC_FALSE
 };
 
-// All built-in models
+// All built-in models (CoreML only)
 static const rac_diffusion_model_def_t* BUILTIN_MODELS[] = {
-    &MODEL_SD15_ONNX,
     &MODEL_SD15_COREML,
-    &MODEL_SDXS_ONNX,
-    &MODEL_LCM_ONNX,
-    &MODEL_SDXL_TURBO_ONNX,
-    &MODEL_BK_SDM_TINY
+    &MODEL_SD21_COREML,
 };
 
 static const size_t BUILTIN_MODEL_COUNT = sizeof(BUILTIN_MODELS) / sizeof(BUILTIN_MODELS[0]);
