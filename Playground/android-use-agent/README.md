@@ -6,7 +6,7 @@ An autonomous Android agent that navigates your phone's UI to accomplish tasks. 
 
 - **Autonomous UI Navigation** — Taps, types, swipes, and navigates apps to complete goals
 - **GPT-4o Vision (VLM)** — Screenshots sent to GPT-4o for visual understanding of the screen
-- **Unified Tool Calling** — All UI actions (tap, type, swipe, open, etc.) registered as proper OpenAI function calling tools
+- **Unified Tool Calling** — All 14 UI actions (tap, type, swipe, open, etc.) registered as proper OpenAI function calling tools
 - **On-Device Fallback** — Falls back to local LLM via RunAnywhere SDK when GPT-4o is unavailable
 - **Voice Mode** — Speak your goal via on-device Whisper STT, hear progress via TTS
 - **Built-in Tools** — Time, weather, calculator, device info, and more via function calling

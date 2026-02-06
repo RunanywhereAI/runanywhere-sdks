@@ -25,7 +25,7 @@ Available Actions:
 - {"action": "done", "reason": "Task is complete"}
 
 IMPORTANT RULES:
-- APP LAUNCHING: ALWAYS use {"action": "open", "text": "AppName"} to open apps. This directly launches the app by name. NEVER try to find an app icon on the home screen or app drawer — use "open" instead. Examples: "open" with text "YouTube", "Chrome", "WhatsApp", "Settings", "Clock", "Maps", "Spotify", "Camera", "Gmail".
+- APP LAUNCHING: ALWAYS use {"action": "open", "text": "AppName"} to open apps. This directly launches the app by name. NEVER try to find an app icon on the home screen or app drawer — use "open" instead. Use the app's CURRENT name (e.g., "X" not "Twitter"). Examples: "open" with text "YouTube", "Chrome", "WhatsApp", "X", "Instagram", "Settings", "Clock", "Maps", "Spotify", "Camera", "Gmail".
 - Use "tap" with the element "index" number to tap a UI element.
 - If an element shows [edit], use "type" action to enter text into it.
 - After tapping on a text field, your NEXT action should be "type" to enter text.
@@ -87,7 +87,7 @@ Available Actions:
 - {"action": "done", "reason": "Task is complete"}
 
 IMPORTANT RULES:
-- APP LAUNCHING: ALWAYS use {"action": "open", "text": "AppName"} to launch apps directly. NEVER search for app icons.
+- APP LAUNCHING: ALWAYS use {"action": "open", "text": "AppName"} to launch apps directly. NEVER search for app icons. Use the app's CURRENT name (e.g., "X" not "Twitter").
 - Use "tap" with the element "index" number. Match what you see in the screenshot with the element list.
 - If you see a text field in the screenshot and the element list shows [edit], use "type" to enter text.
 - After typing, use "enter" to submit or tap a search/submit button you see in the screenshot.
@@ -325,7 +325,7 @@ Utility Tools:
 - get_current_time, get_current_date, get_battery_level, get_device_info, math_calculate, get_weather, unit_convert, get_clipboard — use these for factual information instead of navigating the UI.
 
 IMPORTANT RULES:
-- APP LAUNCHING: ALWAYS use ui_open_app to open apps. NEVER try to find app icons on the home screen.
+- APP LAUNCHING: ALWAYS use ui_open_app to open apps. NEVER try to find app icons on the home screen. Use the app's CURRENT name (e.g., "X" not "Twitter", "Meta" not "Facebook"). Examples: YouTube, Chrome, WhatsApp, X, Instagram, Settings, Clock, Maps, Spotify, Camera, Gmail, Telegram, Netflix.
 - Use ui_tap with the element index number to tap a UI element.
 - If an element shows [edit], use ui_type to enter text into it.
 - After typing a search query, use ui_enter to submit it.
@@ -372,7 +372,7 @@ Utility Tools:
 - get_current_time, get_current_date, get_battery_level, get_device_info, math_calculate, get_weather, unit_convert, get_clipboard — use these for factual information.
 
 IMPORTANT RULES:
-- APP LAUNCHING: ALWAYS use ui_open_app to launch apps directly. NEVER search for app icons.
+- APP LAUNCHING: ALWAYS use ui_open_app to launch apps directly. NEVER search for app icons. Use the app's CURRENT name (e.g., "X" not "Twitter", "Meta" not "Facebook"). Examples: YouTube, Chrome, WhatsApp, X, Instagram, Settings, Clock, Maps, Spotify, Camera, Gmail, Telegram, Netflix.
 - Use ui_tap with the element index. Match what you see in the screenshot with the element list.
 - If you see a text field in the screenshot and the element list shows [edit], use ui_type.
 - After typing, use ui_enter or ui_tap on a submit button you see in the screenshot.
