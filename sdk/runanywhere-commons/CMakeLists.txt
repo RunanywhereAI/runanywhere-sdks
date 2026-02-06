@@ -30,6 +30,7 @@ option(RAC_BUILD_TESTS "Build unit tests" OFF)
 option(RAC_BUILD_SHARED "Build shared libraries" OFF)
 option(RAC_BUILD_PLATFORM "Build platform backend (Apple Foundation Models, System TTS)" ON)
 option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, WhisperCPP)" OFF)
+option(RAC_BACKEND_MEMORY "Build Memory/Vector Search backend (hnswlib)" ON)
 option(RAC_BACKEND_LLAMACPP "Build LlamaCPP backend" ON)
 option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
 option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" ON)
@@ -185,6 +186,8 @@ set(RAC_FEATURES_SOURCES
     src/features/vad/vad_analytics.cpp
     # Voice Agent
     src/features/voice_agent/voice_agent.cpp
+    # Memory / Vector Search
+    src/features/memory/rac_memory_service.cpp
     # Result memory management
     src/features/result_free.cpp
 )
@@ -273,6 +276,12 @@ endif()
 # BACKENDS (LlamaCPP, ONNX, WhisperCPP)
 # =============================================================================
 
+# Memory backend (always available, independent of RAC_BUILD_BACKENDS)
+if(RAC_BACKEND_MEMORY AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/memory/CMakeLists.txt")
+    message(STATUS "Building Memory/Vector Search backend (hnswlib)")
+    add_subdirectory(src/backends/memory)
+endif()
+
 if(RAC_BUILD_BACKENDS)
     message(STATUS "Building ML backends...")
 
@@ -332,9 +341,12 @@ message(STATUS "Components:")
 message(STATUS "  Core:         Logging, errors, events, memory")
 message(STATUS "  Registry:     Service & module registration")
 message(STATUS "  Models:       Download strategies, storage")
-message(STATUS "  Services:     LLM, STT, TTS, VAD interfaces")
+message(STATUS "  Services:     LLM, STT, TTS, VAD, Memory interfaces")
 if(APPLE AND RAC_BUILD_PLATFORM)
     message(STATUS "  Platform:     Apple Foundation Models, System TTS")
+endif()
+if(RAC_BACKEND_MEMORY)
+    message(STATUS "  Memory:       Vector search (hnswlib + flat)")
 endif()
 if(RAC_BUILD_BACKENDS)
     message(STATUS "  Backends:     LlamaCPP=${RAC_BACKEND_LLAMACPP}, ONNX=${RAC_BACKEND_ONNX}, WhisperCPP=${RAC_BACKEND_WHISPERCPP}")

@@ -120,6 +120,9 @@ class LlamaCppTextGeneration {
     void cancel();
     nlohmann::json get_model_info() const;
 
+    /// Extract embeddings from text using a temporary embedding context
+    std::vector<float> get_embeddings(const std::string& text);
+
    private:
     bool unload_model_internal();
     std::string build_prompt(const TextGenerationRequest& request);

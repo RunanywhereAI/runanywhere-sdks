@@ -35,6 +35,7 @@ typedef enum rac_sdk_component {
     RAC_COMPONENT_VAD = 3,       /**< Voice Activity Detection */
     RAC_COMPONENT_VOICE = 4,     /**< Voice Agent */
     RAC_COMPONENT_EMBEDDING = 5, /**< Embedding generation */
+    RAC_COMPONENT_MEMORY = 6,    /**< Vector memory / RAG */
 } rac_sdk_component_t;
 
 /**

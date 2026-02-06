@@ -201,6 +201,15 @@ extension SDKError {
         make(code: code, message: message, category: .llm, underlyingError: underlying)
     }
 
+    /// Creates a Memory/RAG error.
+    public static func memory(
+        _ code: ErrorCode,
+        _ message: String,
+        underlying: (any Error)? = nil
+    ) -> SDKError {
+        make(code: code, message: message, category: .memory, underlyingError: underlying)
+    }
+
     /// Creates a VAD error.
     public static func vad(
         _ code: ErrorCode,

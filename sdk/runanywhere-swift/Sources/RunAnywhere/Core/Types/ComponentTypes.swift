@@ -57,6 +57,7 @@ public enum SDKComponent: String, CaseIterable, Codable, Sendable, Hashable {
     case vad = "VAD"
     case voice = "VOICE"
     case embedding = "EMBEDDING"
+    case memory = "MEMORY"
 
     /// Human-readable display name
     public var displayName: String {
@@ -67,6 +68,7 @@ public enum SDKComponent: String, CaseIterable, Codable, Sendable, Hashable {
         case .vad: return "Voice Activity Detection"
         case .voice: return "Voice Agent"
         case .embedding: return "Embedding"
+        case .memory: return "Vector Memory"
         }
     }
 

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <string>
 
@@ -560,6 +561,97 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
 void LlamaCppTextGeneration::cancel() {
     cancel_requested_.store(true);
     LOGI("Generation cancel requested");
+}
+
+std::vector<float> LlamaCppTextGeneration::get_embeddings(const std::string& text) {
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    if (!model_loaded_ || !model_) {
+        LOGE("Model not loaded for embedding extraction");
+        return {};
+    }
+
+    // Create a temporary context with embeddings enabled
+    llama_context_params ctx_params = llama_context_default_params();
+    ctx_params.n_ctx = context_size_;
+    ctx_params.n_batch = std::min(context_size_, 512);
+    ctx_params.n_threads = backend_->get_num_threads();
+    ctx_params.n_threads_batch = backend_->get_num_threads();
+    ctx_params.embeddings = true;
+    ctx_params.no_perf = true;
+
+    llama_context* emb_ctx = llama_init_from_model(model_, ctx_params);
+    if (!emb_ctx) {
+        LOGE("Failed to create embedding context");
+        return {};
+    }
+
+    // Tokenize input
+    const auto tokens = common_tokenize(emb_ctx, text, true, true);
+    if (tokens.empty()) {
+        LOGE("Failed to tokenize text for embedding");
+        llama_free(emb_ctx);
+        return {};
+    }
+
+    int n_ctx = llama_n_ctx(emb_ctx);
+    if ((int)tokens.size() > n_ctx) {
+        LOGE("Text too long for embedding: %zu tokens, context: %d", tokens.size(), n_ctx);
+        llama_free(emb_ctx);
+        return {};
+    }
+
+    // Decode tokens
+    llama_batch batch = llama_batch_init(n_ctx, 0, 1);
+    batch.n_tokens = 0;
+    for (size_t i = 0; i < tokens.size(); i++) {
+        common_batch_add(batch, tokens[i], i, {0}, false);
+    }
+    // Enable logits on the last token to get embeddings
+    batch.logits[batch.n_tokens - 1] = true;
+
+    if (llama_decode(emb_ctx, batch) != 0) {
+        LOGE("llama_decode failed for embedding extraction");
+        llama_batch_free(batch);
+        llama_free(emb_ctx);
+        return {};
+    }
+
+    // Extract embeddings
+    int n_embd = llama_model_n_embd(model_);
+    const float* emb = llama_get_embeddings_seq(emb_ctx, 0);
+    if (!emb) {
+        // Fallback: try getting embeddings from the last token position
+        emb = llama_get_embeddings_ith(emb_ctx, batch.n_tokens - 1);
+    }
+
+    if (!emb) {
+        LOGE("Failed to get embeddings from context");
+        llama_batch_free(batch);
+        llama_free(emb_ctx);
+        return {};
+    }
+
+    // Copy and normalize embeddings
+    std::vector<float> result(emb, emb + n_embd);
+
+    // L2 normalize
+    float norm = 0.0f;
+    for (float v : result) {
+        norm += v * v;
+    }
+    if (norm > 0.0f) {
+        norm = 1.0f / std::sqrt(norm);
+        for (float& v : result) {
+            v *= norm;
+        }
+    }
+
+    llama_batch_free(batch);
+    llama_free(emb_ctx);
+
+    LOGI("Extracted %d-dim embedding from %zu tokens", n_embd, tokens.size());
+    return result;
 }
 
 nlohmann::json LlamaCppTextGeneration::get_model_info() const {

@@ -172,6 +172,7 @@ typedef enum rac_capability {
     RAC_CAPABILITY_TTS = 4,             /**< Text-to-speech */
     RAC_CAPABILITY_VAD = 5,             /**< Voice activity detection */
     RAC_CAPABILITY_DIARIZATION = 6,     /**< Speaker diarization */
+    RAC_CAPABILITY_VECTOR_SEARCH = 7,   /**< Vector similarity search (memory/RAG) */
 } rac_capability_t;
 
 /**

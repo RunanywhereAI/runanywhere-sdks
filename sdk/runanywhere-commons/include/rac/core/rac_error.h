@@ -380,7 +380,22 @@ extern "C" {
 #define RAC_ERROR_EVENT_PUBLISH_FAILED ((rac_result_t) - 702)
 
 // =============================================================================
-// OTHER ERRORS (-800 to -899)
+// MEMORY/VECTOR SEARCH ERRORS (-850 to -869)
+// =============================================================================
+
+/** Memory index is full (max_elements reached) */
+#define RAC_ERROR_MEMORY_INDEX_FULL ((rac_result_t) - 850)
+/** Vector dimension does not match index dimension */
+#define RAC_ERROR_MEMORY_DIMENSION_MISMATCH ((rac_result_t) - 851)
+/** Memory index not found at specified path */
+#define RAC_ERROR_MEMORY_INDEX_NOT_FOUND ((rac_result_t) - 852)
+/** Invalid memory index configuration */
+#define RAC_ERROR_MEMORY_INVALID_CONFIG ((rac_result_t) - 853)
+/** Memory index file is corrupt */
+#define RAC_ERROR_MEMORY_CORRUPT_INDEX ((rac_result_t) - 854)
+
+// =============================================================================
+// OTHER ERRORS (-800 to -849, -870 to -899)
 // Mirrors Swift's ErrorCode: Other Errors
 // =============================================================================
 

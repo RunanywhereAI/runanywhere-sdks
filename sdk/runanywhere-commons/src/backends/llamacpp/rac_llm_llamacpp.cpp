@@ -260,6 +260,38 @@ rac_result_t rac_llm_llamacpp_get_model_info(rac_handle_t handle, char** out_jso
     return RAC_SUCCESS;
 }
 
+rac_result_t rac_llm_llamacpp_get_embeddings(rac_handle_t handle, const char* text,
+                                              float** out_embeddings,
+                                              uint32_t* out_dimension) {
+    if (handle == nullptr || text == nullptr || out_embeddings == nullptr ||
+        out_dimension == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    auto* h = static_cast<rac_llm_llamacpp_handle_impl*>(handle);
+    if (!h->text_gen) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    auto embeddings = h->text_gen->get_embeddings(text);
+    if (embeddings.empty()) {
+        rac_error_set_details("Failed to extract embeddings");
+        return RAC_ERROR_INFERENCE_FAILED;
+    }
+
+    // Allocate output buffer (caller frees with rac_free)
+    float* result = static_cast<float*>(malloc(embeddings.size() * sizeof(float)));
+    if (!result) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    memcpy(result, embeddings.data(), embeddings.size() * sizeof(float));
+    *out_embeddings = result;
+    *out_dimension = static_cast<uint32_t>(embeddings.size());
+
+    return RAC_SUCCESS;
+}
+
 void rac_llm_llamacpp_destroy(rac_handle_t handle) {
     if (handle == nullptr) {
         return;

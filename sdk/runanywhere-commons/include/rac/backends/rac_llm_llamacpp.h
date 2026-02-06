@@ -182,6 +182,24 @@ RAC_LLAMACPP_API void rac_llm_llamacpp_cancel(rac_handle_t handle);
 RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_get_model_info(rac_handle_t handle, char** out_json);
 
 /**
+ * Extract text embeddings from a loaded model.
+ *
+ * Uses llama.cpp's embedding mode to generate a vector representation
+ * of the input text. The model must support embedding extraction
+ * (e.g., all-MiniLM, nomic-embed-text, bge-small GGUF models).
+ *
+ * @param handle Service handle with a loaded embedding model
+ * @param text Input text to embed
+ * @param out_embeddings Output: Float array (caller must free with rac_free)
+ * @param out_dimension Output: Dimension of the embedding vector
+ * @return RAC_SUCCESS or error code
+ */
+RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_get_embeddings(rac_handle_t handle,
+                                                               const char* text,
+                                                               float** out_embeddings,
+                                                               uint32_t* out_dimension);
+
+/**
  * Destroys a LlamaCPP LLM service.
  *
  * @param handle Service handle to destroy

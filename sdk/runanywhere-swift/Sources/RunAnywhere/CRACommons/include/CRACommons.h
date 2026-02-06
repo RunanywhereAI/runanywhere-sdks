@@ -73,6 +73,11 @@
 // Voice Agent
 #include "rac_voice_agent.h"
 
+// Memory / Vector Search (RAG)
+#include "rac_memory.h"
+#include "rac_memory_types.h"
+#include "rac_memory_service.h"
+
 // =============================================================================
 // INFRASTRUCTURE - Events, Download, Model Management
 // =============================================================================
@@ -100,6 +105,7 @@
 
 #include "rac_llm_platform.h"
 #include "rac_tts_platform.h"
+#include "rac_backend_memory.h"
 
 // =============================================================================
 // NETWORK - Environment, Auth, API Types, Dev Config

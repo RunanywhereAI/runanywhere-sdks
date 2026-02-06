@@ -116,6 +116,12 @@ public enum CppBridge {
         // Step 4: Device registration callbacks
         Device.register()
 
+        // Step 5: Register built-in backends (memory/vector search)
+        let memResult = rac_backend_memory_register()
+        if memResult != RAC_SUCCESS && memResult != RAC_ERROR_MODULE_ALREADY_REGISTERED {
+            SDKLogger(category: "CppBridge").warning("Memory backend registration failed: \(memResult)")
+        }
+
         lock.lock()
         _isInitialized = true
         lock.unlock()
@@ -182,6 +188,7 @@ public enum CppBridge {
         // Shutdown in reverse order
         // Note: ModelAssignment and Platform callbacks remain valid (static)
 
+        rac_backend_memory_unregister()
         Telemetry.shutdown()
         Events.unregister()
         // PlatformAdapter callbacks remain valid (static)
