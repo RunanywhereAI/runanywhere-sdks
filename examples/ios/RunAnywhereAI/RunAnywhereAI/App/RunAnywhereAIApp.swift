@@ -420,7 +420,50 @@ struct RunAnywhereAIApp: App {
             )
         }
 
-        logger.info("✅ Diffusion models registered (CoreML + ONNX from HuggingFace)")
+        // ============================================================================
+        // SD Turbo ONNX (4-step FAST model) - Works on both iOS and Android!
+        // Source: https://huggingface.co/jdp8/sd-turbo-onnx
+        // Only 4 steps, no CFG needed - much faster than SD 1.5!
+        // ============================================================================
+        RunAnywhere.registerMultiFileModel(
+            id: "sd-turbo-onnx",
+            name: "⚡ SD Turbo (4-Step FAST)",
+            files: [
+                ModelFileDescriptor(
+                    url: URL(string: "https://huggingface.co/jdp8/sd-turbo-onnx/resolve/main/text_encoder/model.onnx")!,
+                    filename: "text_encoder/model.onnx"
+                ),
+                ModelFileDescriptor(
+                    url: URL(string: "https://huggingface.co/jdp8/sd-turbo-onnx/resolve/main/unet/model.onnx")!,
+                    filename: "unet/model.onnx"
+                ),
+                ModelFileDescriptor(
+                    url: URL(string: "https://huggingface.co/jdp8/sd-turbo-onnx/resolve/main/vae_decoder/model.onnx")!,
+                    filename: "vae_decoder/model.onnx"
+                ),
+                ModelFileDescriptor(
+                    url: URL(string: "https://huggingface.co/jdp8/sd-turbo-onnx/resolve/main/vae_encoder/model.onnx")!,
+                    filename: "vae_encoder/model.onnx"
+                ),
+                ModelFileDescriptor(
+                    url: URL(string: "https://huggingface.co/jdp8/sd-turbo-onnx/resolve/main/tokenizer/vocab.json")!,
+                    filename: "tokenizer/vocab.json"
+                ),
+                ModelFileDescriptor(
+                    url: URL(string: "https://huggingface.co/jdp8/sd-turbo-onnx/resolve/main/tokenizer/merges.txt")!,
+                    filename: "tokenizer/merges.txt"
+                ),
+                ModelFileDescriptor(
+                    url: URL(string: "https://huggingface.co/jdp8/sd-turbo-onnx/resolve/main/scheduler/scheduler_config.json")!,
+                    filename: "scheduler/scheduler_config.json"
+                )
+            ],
+            framework: .onnx,
+            modality: .imageGeneration,
+            memoryRequirement: 2_500_000_000  // ~2.5GB
+        )
+
+        logger.info("✅ Diffusion models registered (CoreML + ONNX including SD Turbo 4-step)")
 
         logger.info("🎉 All modules and models registered")
     }

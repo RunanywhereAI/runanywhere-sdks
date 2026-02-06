@@ -51,6 +51,8 @@ class Diffusion {
   /// Configure the diffusion component
   Future<void> configure(DiffusionConfiguration config) async {
     final result = _bindings.configure(
+      modelId: config.modelId,
+      preferredFramework: config.preferredFramework?.rawValue,
       modelVariant: config.modelVariant.cValue,
       enableSafetyChecker: config.enableSafetyChecker,
       reduceMemory: config.reduceMemory,

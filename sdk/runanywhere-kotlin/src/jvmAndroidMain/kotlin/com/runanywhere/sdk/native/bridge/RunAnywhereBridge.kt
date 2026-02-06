@@ -337,6 +337,16 @@ object RunAnywhereBridge {
     )
 
     // ========================================================================
+    // HTTP DOWNLOAD (platform adapter callbacks)
+    // ========================================================================
+
+    @JvmStatic
+    external fun racHttpDownloadReportProgress(taskId: String, downloadedBytes: Long, totalBytes: Long): Int
+
+    @JvmStatic
+    external fun racHttpDownloadReportComplete(taskId: String, result: Int, downloadedPath: String?): Int
+
+    // ========================================================================
     // BACKEND REGISTRATION
     // ========================================================================
     // NOTE: Backend registration has been MOVED to their respective module JNI bridges:

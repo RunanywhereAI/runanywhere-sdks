@@ -10,10 +10,13 @@
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <mutex>
+#include <condition_variable>
 #include <string>
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_platform_adapter.h"
 
 // Platform-specific file existence check
 #ifdef _WIN32
@@ -114,17 +117,50 @@ rac_diffusion_tokenizer_ensure_files(const char* model_dir,
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
+    auto resolve_tokenizer_dir = [](const char* base_dir) -> std::string {
+        std::string root_dir = base_dir ? base_dir : "";
+        if (root_dir.empty()) {
+            return root_dir;
+        }
+
+        std::string root_vocab = root_dir + "/" + RAC_DIFFUSION_TOKENIZER_VOCAB_FILE;
+        std::string root_merges = root_dir + "/" + RAC_DIFFUSION_TOKENIZER_MERGES_FILE;
+        std::string tokenizer_dir = root_dir + "/tokenizer";
+        std::string tokenizer_vocab = tokenizer_dir + "/" + RAC_DIFFUSION_TOKENIZER_VOCAB_FILE;
+        std::string tokenizer_merges = tokenizer_dir + "/" + RAC_DIFFUSION_TOKENIZER_MERGES_FILE;
+
+        bool root_has_files =
+            (access(root_vocab.c_str(), F_OK) == 0) || (access(root_merges.c_str(), F_OK) == 0);
+        bool tokenizer_has_files =
+            (access(tokenizer_vocab.c_str(), F_OK) == 0) ||
+            (access(tokenizer_merges.c_str(), F_OK) == 0);
+        bool tokenizer_exists = access(tokenizer_dir.c_str(), F_OK) == 0;
+
+        if (tokenizer_has_files || (!root_has_files && tokenizer_exists)) {
+            return tokenizer_dir;
+        }
+
+        return root_dir;
+    };
+
+    std::string tokenizer_dir = resolve_tokenizer_dir(model_dir);
+    if (tokenizer_dir.empty()) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
     rac_bool_t has_vocab = RAC_FALSE;
     rac_bool_t has_merges = RAC_FALSE;
 
-    rac_result_t result = rac_diffusion_tokenizer_check_files(model_dir, &has_vocab, &has_merges);
+    rac_result_t result =
+        rac_diffusion_tokenizer_check_files(tokenizer_dir.c_str(), &has_vocab, &has_merges);
     if (result != RAC_SUCCESS) {
         return result;
     }
 
     // If both files exist, we're done
     if (has_vocab == RAC_TRUE && has_merges == RAC_TRUE) {
-        RAC_LOG_DEBUG("Diffusion.Tokenizer", "Tokenizer files already exist in %s", model_dir);
+        RAC_LOG_DEBUG("Diffusion.Tokenizer", "Tokenizer files already exist in %s",
+                      tokenizer_dir.c_str());
         return RAC_SUCCESS;
     }
 
@@ -132,11 +168,11 @@ rac_diffusion_tokenizer_ensure_files(const char* model_dir,
     if (config->auto_download != RAC_TRUE) {
         if (has_vocab != RAC_TRUE) {
             RAC_LOG_ERROR("Diffusion.Tokenizer", "Missing %s in %s (auto_download disabled)",
-                          RAC_DIFFUSION_TOKENIZER_VOCAB_FILE, model_dir);
+                          RAC_DIFFUSION_TOKENIZER_VOCAB_FILE, tokenizer_dir.c_str());
         }
         if (has_merges != RAC_TRUE) {
             RAC_LOG_ERROR("Diffusion.Tokenizer", "Missing %s in %s (auto_download disabled)",
-                          RAC_DIFFUSION_TOKENIZER_MERGES_FILE, model_dir);
+                          RAC_DIFFUSION_TOKENIZER_MERGES_FILE, tokenizer_dir.c_str());
         }
         return RAC_ERROR_FILE_NOT_FOUND;
     }
@@ -145,8 +181,7 @@ rac_diffusion_tokenizer_ensure_files(const char* model_dir,
     const char* custom_url = config->custom_base_url;
 
     if (has_vocab != RAC_TRUE) {
-        std::string vocab_path =
-            std::string(model_dir) + "/" + RAC_DIFFUSION_TOKENIZER_VOCAB_FILE;
+        std::string vocab_path = tokenizer_dir + "/" + RAC_DIFFUSION_TOKENIZER_VOCAB_FILE;
         result = rac_diffusion_tokenizer_download_file(config->source, custom_url,
                                                        RAC_DIFFUSION_TOKENIZER_VOCAB_FILE,
                                                        vocab_path.c_str());
@@ -158,8 +193,7 @@ rac_diffusion_tokenizer_ensure_files(const char* model_dir,
     }
 
     if (has_merges != RAC_TRUE) {
-        std::string merges_path =
-            std::string(model_dir) + "/" + RAC_DIFFUSION_TOKENIZER_MERGES_FILE;
+        std::string merges_path = tokenizer_dir + "/" + RAC_DIFFUSION_TOKENIZER_MERGES_FILE;
         result = rac_diffusion_tokenizer_download_file(config->source, custom_url,
                                                        RAC_DIFFUSION_TOKENIZER_MERGES_FILE,
                                                        merges_path.c_str());
@@ -170,7 +204,7 @@ rac_diffusion_tokenizer_ensure_files(const char* model_dir,
         }
     }
 
-    RAC_LOG_INFO("Diffusion.Tokenizer", "Tokenizer files ensured in %s", model_dir);
+    RAC_LOG_INFO("Diffusion.Tokenizer", "Tokenizer files ensured in %s", tokenizer_dir.c_str());
     return RAC_SUCCESS;
 }
 
@@ -192,22 +226,54 @@ extern "C" rac_result_t rac_diffusion_tokenizer_download_file(rac_diffusion_toke
 
     RAC_LOG_INFO("Diffusion.Tokenizer", "Downloading %s from %s", filename, url);
 
-    // TODO: Implement HTTP download using platform HTTP client
-    // For now, this is a placeholder that will be implemented when the ONNX backend is added.
-    // The actual download will use:
-    // - NSURLSession on iOS/macOS
-    // - OkHttp/HttpURLConnection on Android
-    // - libcurl or platform HTTP on desktop
-    //
-    // The platform SDKs can also implement this callback via the platform adapter pattern
-    // (similar to how we do platform callbacks for LLM/TTS/Diffusion).
+    struct download_context {
+        std::mutex mutex;
+        std::condition_variable cv;
+        bool completed = false;
+        rac_result_t result = RAC_ERROR_DOWNLOAD_FAILED;
+    };
 
-    RAC_LOG_WARNING("Diffusion.Tokenizer",
-                    "HTTP download not yet implemented in C++ - use platform SDK download");
+    auto progress_cb = [](int64_t /*downloaded*/, int64_t /*total*/, void* /*user_data*/) {};
 
-    // For now, return success if the file path would be valid
-    // Platform SDKs should handle the actual download
-    return RAC_ERROR_NOT_IMPLEMENTED;
+    auto complete_cb = [](rac_result_t result, const char* /*downloaded_path*/,
+                          void* user_data) {
+        auto* ctx = static_cast<download_context*>(user_data);
+        if (!ctx) {
+            return;
+        }
+        {
+            std::lock_guard<std::mutex> lock(ctx->mutex);
+            ctx->result = result;
+            ctx->completed = true;
+        }
+        ctx->cv.notify_one();
+    };
+
+    download_context ctx;
+    char* task_id = nullptr;
+
+    rac_result_t start_result = rac_http_download(url, output_path, progress_cb, complete_cb,
+                                                  &ctx, &task_id);
+    if (start_result != RAC_SUCCESS) {
+        if (task_id) {
+            rac_free(task_id);
+        }
+        RAC_LOG_ERROR("Diffusion.Tokenizer", "HTTP download start failed: %d", start_result);
+        return start_result;
+    }
+
+    std::unique_lock<std::mutex> lock(ctx.mutex);
+    ctx.cv.wait(lock, [&ctx]() { return ctx.completed; });
+
+    if (task_id) {
+        rac_free(task_id);
+    }
+
+    if (ctx.result != RAC_SUCCESS) {
+        RAC_LOG_ERROR("Diffusion.Tokenizer", "HTTP download failed: %d", ctx.result);
+    }
+
+    return ctx.result;
 }
 
 // =============================================================================

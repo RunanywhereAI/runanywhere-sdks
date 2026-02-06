@@ -14,6 +14,7 @@
 #include "onnx_backend.h"
 #include "onnx_diffusion.h"
 #include "rac/core/rac_logger.h"
+#include "rac/features/diffusion/rac_diffusion_tokenizer.h"
 
 namespace fs = std::filesystem;
 
@@ -136,6 +137,19 @@ rac_result_t rac_diffusion_onnx_create(
             diff_config.enable_cpu_mem_arena = config->enable_cpu_mem_arena == RAC_TRUE;
         }
         
+        // Ensure tokenizer files (auto-download if missing)
+        rac_diffusion_tokenizer_config_t tokenizer_config = RAC_DIFFUSION_TOKENIZER_CONFIG_DEFAULT;
+        tokenizer_config.source =
+            rac_diffusion_tokenizer_default_for_variant(
+                config ? config->model_variant : RAC_DIFFUSION_MODEL_SD_1_5);
+
+        rac_result_t tokenizer_result =
+            rac_diffusion_tokenizer_ensure_files(model_path, &tokenizer_config);
+        if (tokenizer_result != RAC_SUCCESS) {
+            RAC_LOG_ERROR("rac_diffusion_onnx", "Tokenizer ensure failed: %d", tokenizer_result);
+            return tokenizer_result;
+        }
+
         // Load model
         if (!handle->diffusion->load_model(model_path, diff_config)) {
             RAC_LOG_ERROR("rac_diffusion_onnx", "Failed to load model from: %s", model_path);

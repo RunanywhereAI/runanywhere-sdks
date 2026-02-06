@@ -96,6 +96,7 @@ export class DiffusionProvider {
 
     const configJson = JSON.stringify({
       model_id: config.modelId,
+      preferred_framework: config.preferredFramework,
       model_variant: config.modelVariant,
       enable_safety_checker: config.enableSafetyChecker ?? true,
       reduce_memory: config.reduceMemory ?? false,

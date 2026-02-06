@@ -116,11 +116,6 @@ enum class ErrorCategory {
     VAD,
 
     /**
-     * Diffusion (Image Generation) errors.
-     */
-    DIFFUSION,
-
-    /**
      * Voice Agent pipeline errors.
      */
     VOICE_AGENT,
@@ -165,7 +160,6 @@ enum class ErrorCategory {
                 STT -> "Speech-to-text error"
                 TTS -> "Text-to-speech error"
                 VAD -> "Voice activity detection error"
-                DIFFUSION -> "Image diffusion error"
                 VOICE_AGENT -> "Voice agent error"
                 DOWNLOAD -> "Download error"
                 AUTHENTICATION -> "Authentication error"
@@ -218,7 +212,6 @@ enum class ErrorCategory {
                 ErrorCode.LLM_GENERATION_FAILED -> LLM
                 ErrorCode.VAD_DETECTION_FAILED -> VAD
                 ErrorCode.VOICE_AGENT_ERROR -> VOICE_AGENT
-                ErrorCode.DIFFUSION_GENERATION_FAILED -> DIFFUSION
 
                 // Download errors
                 ErrorCode.DOWNLOAD_FAILED -> DOWNLOAD
