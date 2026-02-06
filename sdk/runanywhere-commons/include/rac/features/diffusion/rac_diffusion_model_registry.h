@@ -112,6 +112,35 @@ typedef struct rac_diffusion_model_tokenizer {
  *
  * Contains all metadata needed to download, load, and use a model.
  * This structure is shared across all SDKs via the C++ commons layer.
+ *
+ * ## Adding a New Model
+ *
+ * To add a new diffusion model:
+ * 1. Add a new `rac_diffusion_model_def_t` in `diffusion_model_registry.cpp`
+ * 2. Include it in the `BUILTIN_MODELS` array
+ * 3. Set the appropriate tokenizer source (SD15, SD2, SDXL, or CUSTOM)
+ *
+ * Example:
+ * @code
+ * static const rac_diffusion_model_def_t MY_MODEL = {
+ *     .model_id = "my-model-onnx",
+ *     .display_name = "My Custom Model",
+ *     .description = "Description here",
+ *     .variant = RAC_DIFFUSION_MODEL_SD_1_5,
+ *     .backend = RAC_DIFFUSION_BACKEND_ONNX,
+ *     .platforms = RAC_DIFFUSION_PLATFORM_ALL,
+ *     .hardware = RAC_DIFFUSION_HW_CPU | RAC_DIFFUSION_HW_GPU,
+ *     .defaults = { .width = 512, .height = 512, .steps = 20, ... },
+ *     .download = {
+ *         .base_url = "https://huggingface.co/my-org/my-model",
+ *         .onnx_path = "onnx",
+ *         .size_bytes = 2000000000ULL,
+ *     },
+ *     .tokenizer = {
+ *         .source = RAC_DIFFUSION_TOKENIZER_SD_1_5,  // Reuse existing tokenizer
+ *     },
+ * };
+ * @endcode
  */
 typedef struct rac_diffusion_model_def {
     /** Unique model identifier (e.g., "sdxs-512-0.9-onnx") */
