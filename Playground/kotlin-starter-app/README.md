@@ -6,24 +6,24 @@ A comprehensive Android starter app demonstrating the **RunAnywhere SDK** capabi
 
 This starter app showcases all major capabilities of the RunAnywhere SDK:
 
-### 🧠 Chat (LLM Text Generation)
+### Chat (LLM Text Generation)
 - On-device text generation using **SmolLM2 360M**
 - Real-time chat interface with message history
 - Powered by llama.cpp backend
 
-### 🎤 Speech to Text (STT)
+### Speech to Text (STT)
 - Real-time speech recognition using **Whisper Tiny**
 - Microphone permission handling
 - Voice activity detection
 - Powered by Sherpa-ONNX backend
 
-### 🔊 Text to Speech (TTS)
+### Text to Speech (TTS)
 - Natural voice synthesis using **Piper TTS**
 - Sample texts and custom input
 - High-quality US English voice (Lessac)
 - Powered by Sherpa-ONNX backend
 
-### 🎯 Voice Pipeline (Voice Agent)
+### Voice Pipeline (Voice Agent)
 - Complete voice conversation pipeline
 - Combines STT → LLM → TTS
 - Real-time conversation flow
@@ -43,23 +43,24 @@ This starter app showcases all major capabilities of the RunAnywhere SDK:
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
-   cd Playground/kotlin-starter-app
+   git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
+   cd runanywhere-sdks/Playground/kotlin-starter-app
    ```
 
 2. **Open in Android Studio**
    - Open Android Studio
    - Select "Open an Existing Project"
-   - Navigate to the `kotlin-starter-app` folder
+   - Navigate to the `Playground/kotlin-starter-app` folder
    - Click "OK"
 
 3. **Sync Gradle**
    - Android Studio will automatically sync Gradle
    - If not, click "Sync Now" in the notification bar
+   - Dependencies are pulled from JitPack automatically — no local Maven setup needed
 
 4. **Run the app**
    - Connect an Android device or start an emulator
-   - Click the "Run" button (▶️) in Android Studio
+   - Click the "Run" button in Android Studio
    - Select your device/emulator
    - The app will build and install
 
@@ -106,24 +107,42 @@ app/src/main/java/com/runanywhere/kotlin_starter_example/
 - **Navigation Compose**: Screen navigation
 - **Coroutines & Flow**: Asynchronous operations
 - **ViewModel**: State management
-- **RunAnywhere SDK**: On-device AI (`io.github.sanchitmonga22`)
+- **RunAnywhere SDK**: On-device AI (via [JitPack](https://jitpack.io))
 
 ## RunAnywhere SDK Integration
 
 ### Dependencies
 
-The app uses three RunAnywhere packages:
+The SDK is hosted on **JitPack**. The starter app already has everything configured — just clone and build.
 
+**Version catalog** (`gradle/libs.versions.toml`):
+```toml
+[versions]
+runanywhere = "v0.17.5"
+
+[libraries]
+runanywhere-sdk = { group = "com.github.RunanywhereAI.runanywhere-sdks", name = "runanywhere-sdk", version.ref = "runanywhere" }
+runanywhere-llamacpp = { group = "com.github.RunanywhereAI.runanywhere-sdks", name = "runanywhere-llamacpp", version.ref = "runanywhere" }
+runanywhere-onnx = { group = "com.github.RunanywhereAI.runanywhere-sdks", name = "runanywhere-onnx", version.ref = "runanywhere" }
+```
+
+**JitPack repository** (`settings.gradle.kts`):
 ```kotlin
-// build.gradle.kts (app module)
-val sdkVersion = "0.1.5-SNAPSHOT"
-dependencies {
-    // Core SDK
-    implementation("io.github.sanchitmonga22:runanywhere-sdk-android:$sdkVersion")
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url = uri("https://jitpack.io") }
+    }
+}
+```
 
-    // Backends
-    implementation("io.github.sanchitmonga22:runanywhere-llamacpp-android:$sdkVersion")  // LLM
-    implementation("io.github.sanchitmonga22:runanywhere-onnx-android:$sdkVersion")      // STT/TTS
+**App dependencies** (`app/build.gradle.kts`):
+```kotlin
+dependencies {
+    implementation(libs.runanywhere.sdk)       // Core SDK
+    implementation(libs.runanywhere.llamacpp)   // LLM backend
+    implementation(libs.runanywhere.onnx)       // STT/TTS backend
 }
 ```
 
@@ -131,7 +150,15 @@ dependencies {
 
 ```kotlin
 // MainActivity.kt
+AndroidPlatformContext.initialize(this)
 RunAnywhere.initialize(environment = SDKEnvironment.DEVELOPMENT)
+
+val runanywherePath = java.io.File(filesDir, "runanywhere").absolutePath
+CppBridgeModelPaths.setBaseDirectory(runanywherePath)
+
+LlamaCPP.register(priority = 100)  // LLM backend
+ONNX.register(priority = 100)      // STT/TTS backend
+
 ModelService.registerDefaultModels()
 ```
 
@@ -146,6 +173,7 @@ RunAnywhere.registerModel(
     name = "SmolLM2 360M Instruct Q8_0",
     url = "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q8_0.gguf",
     framework = InferenceFramework.LLAMA_CPP,
+    modality = ModelCategory.LANGUAGE,
     memoryRequirement = 400_000_000
 )
 
@@ -155,7 +183,7 @@ RunAnywhere.registerModel(
     name = "Sherpa Whisper Tiny (ONNX)",
     url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz",
     framework = InferenceFramework.ONNX,
-    category = ModelCategory.SPEECH_RECOGNITION
+    modality = ModelCategory.SPEECH_RECOGNITION
 )
 
 // TTS Model
@@ -164,7 +192,7 @@ RunAnywhere.registerModel(
     name = "Piper TTS (US English - Medium)",
     url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz",
     framework = InferenceFramework.ONNX,
-    category = ModelCategory.SPEECH_SYNTHESIS
+    modality = ModelCategory.SPEECH_SYNTHESIS
 )
 ```
 
@@ -183,21 +211,30 @@ val transcription = RunAnywhere.transcribe(audioData)
 
 #### Text to Speech (TTS)
 ```kotlin
-RunAnywhere.speak("Hello, world!")
+val output = RunAnywhere.synthesize("Hello, world!", TTSOptions())
+val audioBytes = output.audioData  // WAV format ByteArray
 ```
 
 #### Voice Pipeline
 ```kotlin
 val audioFlow: Flow<ByteArray> = captureAudio() // Your audio capture flow
-val config = VoiceSessionConfig(silenceDuration = 1.5, continuousMode = true)
+val config = VoiceSessionConfig(
+    silenceDuration = 1.5,
+    speechThreshold = 0.1f,
+    autoPlayTTS = false,
+    continuousMode = true
+)
 
 RunAnywhere.streamVoiceSession(audioFlow, config).collect { event ->
     when (event) {
         is VoiceSessionEvent.Listening -> updateUI("Listening...")
         is VoiceSessionEvent.Transcribed -> updateUI("You: ${event.text}")
-        is VoiceSessionEvent.Processing -> updateUI("Processing...")
+        is VoiceSessionEvent.Processing -> updateUI("Thinking...")
         is VoiceSessionEvent.Responded -> updateUI("AI: ${event.text}")
         is VoiceSessionEvent.Speaking -> updateUI("Speaking...")
+        is VoiceSessionEvent.TurnCompleted -> playAudio(event.audio)
+        is VoiceSessionEvent.Error -> showError(event.message)
+        else -> {}
     }
 }
 ```
@@ -231,7 +268,7 @@ companion object {
     const val LLM_MODEL_ID = "your-model-id"
     const val STT_MODEL_ID = "your-stt-model-id"
     const val TTS_MODEL_ID = "your-tts-model-id"
-    
+
     fun registerDefaultModels() {
         RunAnywhere.registerModel(
             id = LLM_MODEL_ID,
@@ -263,7 +300,7 @@ All UI colors and themes are defined in:
 - Verify all dependencies are downloaded
 
 ### Microphone Permission Denied
-- Go to Settings → Apps → RunAnywhere Kotlin → Permissions
+- Go to Settings > Apps > RunAnywhere Kotlin > Permissions
 - Enable "Microphone" permission
 
 ### Poor Performance
@@ -274,15 +311,14 @@ All UI colors and themes are defined in:
 ## Privacy & Security
 
 All AI processing happens **100% on-device**:
-- ✅ No data sent to servers
-- ✅ No internet required (after model download)
-- ✅ Complete privacy
-- ✅ Works offline
+- No data sent to servers
+- No internet required (after model download)
+- Complete privacy
+- Works offline
 
 ## Resources
 
-- [RunAnywhere SDK Documentation](https://github.com/RunanywhereAI/runanywhere-sdks)
-- [Kotlin SDK API Reference](../../sdk/runanywhere-kotlin/docs/Documentation.md)
+- [RunAnywhere SDK Repository](https://github.com/RunanywhereAI/runanywhere-sdks)
 - [Release Notes](https://github.com/RunanywhereAI/runanywhere-sdks/releases)
 
 ## License
@@ -293,8 +329,3 @@ See the [LICENSE](../../LICENSE) file for details.
 
 For issues and questions:
 - GitHub Issues: [runanywhere-sdks/issues](https://github.com/RunanywhereAI/runanywhere-sdks/issues)
-- Documentation: [RunAnywhere Docs](https://github.com/RunanywhereAI/runanywhere-sdks)
-
----
-
-**Built with RunAnywhere SDK**
