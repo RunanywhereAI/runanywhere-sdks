@@ -1,5 +1,6 @@
 package com.runanywhere.agent.actions
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -9,19 +10,45 @@ import android.util.Log
 object AppActions {
     private const val TAG = "AppActions"
 
-    // Package names for common apps
+    // Package names for common apps (Google defaults + Samsung fallbacks)
     object Packages {
         const val YOUTUBE = "com.google.android.youtube"
         const val WHATSAPP = "com.whatsapp"
         const val CHROME = "com.android.chrome"
         const val GMAIL = "com.google.android.gm"
         const val PHONE = "com.google.android.dialer"
+        const val PHONE_SAMSUNG = "com.samsung.android.dialer"
         const val MESSAGES = "com.google.android.apps.messaging"
+        const val MESSAGES_SAMSUNG = "com.samsung.android.messaging"
         const val MAPS = "com.google.android.apps.maps"
         const val SPOTIFY = "com.spotify.music"
         const val CAMERA = "com.android.camera"
+        const val CAMERA_SAMSUNG = "com.sec.android.app.camera"
         const val CLOCK = "com.google.android.deskclock"
+        const val CLOCK_SAMSUNG = "com.sec.android.app.clockpackage"
+        const val CALENDAR = "com.google.android.calendar"
+        const val CALENDAR_SAMSUNG = "com.samsung.android.calendar"
+        const val CONTACTS = "com.google.android.contacts"
+        const val CONTACTS_SAMSUNG = "com.samsung.android.contacts"
+        const val GALLERY_SAMSUNG = "com.sec.android.gallery3d"
+        const val CALCULATOR = "com.google.android.calculator"
+        const val CALCULATOR_SAMSUNG = "com.sec.android.app.popupcalculator"
+        const val FILES = "com.google.android.apps.nbu.files"
+        const val FILES_SAMSUNG = "com.sec.android.app.myfiles"
+        const val INSTAGRAM = "com.instagram.android"
+        const val TWITTER = "com.twitter.android"
+        const val TELEGRAM = "org.telegram.messenger"
+        const val NETFLIX = "com.netflix.mediaclient"
     }
+
+    /** Package names that should never be opened by the agent */
+    private val BLOCKED_PACKAGES = setOf(
+        "com.samsung.android.bixby.agent",
+        "com.samsung.android.bixby.service",
+        "com.samsung.android.visionintelligence",
+        "com.samsung.android.bixby.sidebar",
+        "com.samsung.android.app.routines",
+    )
 
     fun openYouTubeSearch(context: Context, query: String): Boolean {
         return try {
@@ -219,7 +246,29 @@ object AppActions {
         }
     }
 
+    /**
+     * Open X (formerly Twitter) using explicit component intent.
+     * getLaunchIntentForPackage fails for X because it has 20+ LAUNCHER activity-aliases
+     * (subscription icon variants) that confuse the PackageManager resolver.
+     */
+    fun openX(context: Context): Boolean {
+        return try {
+            val intent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_LAUNCHER)
+                component = ComponentName(Packages.TWITTER, "com.twitter.android.StartActivity")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to open X via StartActivity: ${e.message}")
+            // Fallback to generic package launch
+            openApp(context, Packages.TWITTER)
+        }
+    }
+
     fun openApp(context: Context, packageName: String): Boolean {
+        if (packageName in BLOCKED_PACKAGES) return false
         return try {
             val pm = context.packageManager
             val intent = pm.getLaunchIntentForPackage(packageName)
@@ -234,5 +283,49 @@ object AppActions {
             Log.e(TAG, "Failed to open app: ${e.message}")
             false
         }
+    }
+
+    /**
+     * Try to open an app by name using fuzzy package/label matching.
+     * Excludes Bixby and other Samsung system apps from results.
+     */
+    fun openAppByName(context: Context, appName: String): Boolean {
+        val pm = context.packageManager
+        val intent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_LAUNCHER)
+        }
+        val apps = pm.queryIntentActivities(intent, 0)
+        val target = appName.lowercase().replace("[^a-z0-9]".toRegex(), "")
+
+        // Filter out blocked packages and find best match
+        val candidates = apps.filter { info ->
+            info.activityInfo.packageName !in BLOCKED_PACKAGES &&
+                !info.activityInfo.packageName.contains("bixby", ignoreCase = true)
+        }
+
+        // Try exact label match first
+        val exactMatch = candidates.firstOrNull { info ->
+            val label = info.loadLabel(pm)?.toString().orEmpty()
+            label.equals(appName, ignoreCase = true)
+        }
+
+        // Then try contains match
+        val containsMatch = exactMatch ?: candidates.firstOrNull { info ->
+            val label = info.loadLabel(pm)?.toString().orEmpty()
+            val labelNorm = label.lowercase().replace("[^a-z0-9]".toRegex(), "")
+            val pkgNorm = info.activityInfo.packageName.lowercase().replace("[^a-z0-9]".toRegex(), "")
+            labelNorm.contains(target) || target.contains(labelNorm) || pkgNorm.contains(target)
+        }
+
+        val match = containsMatch ?: return false
+
+        val launch = pm.getLaunchIntentForPackage(match.activityInfo.packageName)
+        launch?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (launch != null) {
+            context.startActivity(launch)
+            Log.d(TAG, "Opened app: ${match.loadLabel(pm)} (${match.activityInfo.packageName})")
+            return true
+        }
+        return false
     }
 }

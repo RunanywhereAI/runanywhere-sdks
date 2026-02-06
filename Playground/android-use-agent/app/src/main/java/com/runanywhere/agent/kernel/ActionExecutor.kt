@@ -192,24 +192,41 @@ class ActionExecutor(
         val appName = decision.text ?: return ExecutionResult(false, "No app name provided")
         onLog("Opening app: $appName")
 
-        // Try known app shortcuts first for reliability
+        // Try known app shortcuts first, with Samsung fallbacks
         val appLower = appName.lowercase()
         val success = when {
             appLower.contains("youtube") -> AppActions.openApp(context, AppActions.Packages.YOUTUBE)
-            appLower.contains("chrome") -> AppActions.openApp(context, AppActions.Packages.CHROME)
+            appLower.contains("chrome") || appLower.contains("browser") -> AppActions.openApp(context, AppActions.Packages.CHROME)
             appLower.contains("whatsapp") -> AppActions.openApp(context, AppActions.Packages.WHATSAPP)
+            appLower.contains("instagram") -> AppActions.openApp(context, AppActions.Packages.INSTAGRAM)
+            appLower.contains("twitter") || appLower.trim() == "x" -> AppActions.openX(context)
+            appLower.contains("telegram") -> AppActions.openApp(context, AppActions.Packages.TELEGRAM)
+            appLower.contains("netflix") -> AppActions.openApp(context, AppActions.Packages.NETFLIX)
             appLower.contains("gmail") || appLower.contains("email") -> AppActions.openApp(context, AppActions.Packages.GMAIL)
             appLower.contains("maps") || appLower.contains("map") -> AppActions.openApp(context, AppActions.Packages.MAPS)
             appLower.contains("spotify") -> AppActions.openApp(context, AppActions.Packages.SPOTIFY)
             appLower.contains("clock") || appLower.contains("timer") || appLower.contains("alarm") -> AppActions.openClock(context)
-            appLower.contains("camera") -> AppActions.openCamera(context)
-            appLower.contains("phone") || appLower.contains("dialer") -> AppActions.openApp(context, AppActions.Packages.PHONE)
-            appLower.contains("messages") || appLower.contains("sms") -> AppActions.openApp(context, AppActions.Packages.MESSAGES)
+            appLower.contains("camera") ->
+                AppActions.openCamera(context) || AppActions.openApp(context, AppActions.Packages.CAMERA_SAMSUNG)
+            appLower.contains("phone") || appLower.contains("dialer") ->
+                AppActions.openApp(context, AppActions.Packages.PHONE) || AppActions.openApp(context, AppActions.Packages.PHONE_SAMSUNG)
+            appLower.contains("messages") || appLower.contains("sms") ->
+                AppActions.openApp(context, AppActions.Packages.MESSAGES) || AppActions.openApp(context, AppActions.Packages.MESSAGES_SAMSUNG)
+            appLower.contains("calendar") ->
+                AppActions.openApp(context, AppActions.Packages.CALENDAR) || AppActions.openApp(context, AppActions.Packages.CALENDAR_SAMSUNG)
+            appLower.contains("contacts") ->
+                AppActions.openApp(context, AppActions.Packages.CONTACTS) || AppActions.openApp(context, AppActions.Packages.CONTACTS_SAMSUNG)
+            appLower.contains("gallery") || appLower.contains("photos") ->
+                AppActions.openApp(context, AppActions.Packages.GALLERY_SAMSUNG)
+            appLower.contains("calculator") ->
+                AppActions.openApp(context, AppActions.Packages.CALCULATOR) || AppActions.openApp(context, AppActions.Packages.CALCULATOR_SAMSUNG)
+            appLower.contains("files") || appLower.contains("file manager") ->
+                AppActions.openApp(context, AppActions.Packages.FILES) || AppActions.openApp(context, AppActions.Packages.FILES_SAMSUNG)
             appLower.contains("setting") -> {
                 openSettings()
                 true
             }
-            else -> openApp(appName) // Generic fallback
+            else -> AppActions.openAppByName(context, appName) // Bixby-safe fuzzy search
         }
 
         return ExecutionResult(success, if (success) "Opened $appName" else "Failed to open $appName")
@@ -219,37 +236,6 @@ class ActionExecutor(
         onLog("Waiting...")
         delay(2000)
         return ExecutionResult(true, "Waited 2 seconds")
-    }
-
-    // ========== App Shortcuts ==========
-
-    fun openApp(appName: String): Boolean {
-        val pm = context.packageManager
-        val intent = Intent(Intent.ACTION_MAIN).apply {
-            addCategory(Intent.CATEGORY_LAUNCHER)
-        }
-        val apps = pm.queryIntentActivities(intent, 0)
-        val target = appName.lowercase().replace("[^a-z0-9]".toRegex(), "")
-
-        val match = apps.firstOrNull { info ->
-            val label = info.loadLabel(pm)?.toString().orEmpty()
-            val labelNorm = label.lowercase().replace("[^a-z0-9]".toRegex(), "")
-            val pkgNorm = (info.activityInfo.packageName ?: "").lowercase().replace("[^a-z0-9]".toRegex(), "")
-            labelNorm.contains(target) || pkgNorm.contains(target)
-        }
-
-        if (match != null) {
-            val launch = pm.getLaunchIntentForPackage(match.activityInfo.packageName)
-            launch?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            if (launch != null) {
-                context.startActivity(launch)
-                onLog("Opened app: ${match.loadLabel(pm)}")
-                return true
-            }
-        }
-
-        onLog("App not found: $appName")
-        return false
     }
 
     fun openSettings(settingType: String? = null): Boolean {
