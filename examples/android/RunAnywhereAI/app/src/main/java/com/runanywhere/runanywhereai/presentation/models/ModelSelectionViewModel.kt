@@ -18,9 +18,12 @@ import com.runanywhere.sdk.public.extensions.currentLLMModelId
 import com.runanywhere.sdk.public.extensions.currentSTTModelId
 import com.runanywhere.sdk.public.extensions.currentTTSVoiceId
 import com.runanywhere.sdk.public.extensions.downloadModel
+import com.runanywhere.sdk.public.extensions.isVLMModelLoaded
 import com.runanywhere.sdk.public.extensions.loadLLMModel
 import com.runanywhere.sdk.public.extensions.loadSTTModel
 import com.runanywhere.sdk.public.extensions.loadTTSVoice
+import com.runanywhere.sdk.public.extensions.loadVLMModel
+import com.runanywhere.sdk.public.extensions.unloadVLMModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -181,6 +184,11 @@ class ModelSelectionViewModel(
                 // but typically the voice sheet doesn't auto-select
                 null
             }
+            ModelSelectionContext.VLM -> {
+                // VLM doesn't expose a simple currentModelId property
+                // since it requires model path + mmproj path
+                null
+            }
         }
     }
 
@@ -202,6 +210,9 @@ class ModelSelectionViewModel(
                         ModelCategory.SPEECH_RECOGNITION,
                         ModelCategory.SPEECH_SYNTHESIS,
                     )
+            ModelSelectionContext.VLM ->
+                category == ModelCategory.MULTIMODAL ||
+                    category == ModelCategory.VISION
         }
     }
 
@@ -327,6 +338,36 @@ class ModelSelectionViewModel(
                         ModelCategory.SPEECH_SYNTHESIS -> RunAnywhere.loadTTSVoice(modelId)
                         else -> RunAnywhere.loadLLMModel(modelId)
                     }
+                }
+                ModelSelectionContext.VLM -> {
+                    // VLM requires model path + optional mmproj path
+                    val model = _uiState.value.models.find { it.id == modelId }
+                    val modelPath = model?.localPath
+                        ?: throw IllegalStateException("VLM model not downloaded: $modelId")
+
+                    // Find mmproj file in the same directory (file with "mmproj" in name)
+                    val modelDir = java.io.File(modelPath).let { file ->
+                        if (file.isDirectory) file else file.parentFile
+                    }
+                    val mmprojFile = modelDir?.listFiles()?.firstOrNull { file ->
+                        file.name.contains("mmproj", ignoreCase = true) && file.extension == "gguf"
+                    }
+
+                    // Find main model file (gguf without "mmproj" in name)
+                    val mainModelFile = if (java.io.File(modelPath).isDirectory) {
+                        modelDir?.listFiles()?.firstOrNull { file ->
+                            !file.name.contains("mmproj", ignoreCase = true) && file.extension == "gguf"
+                        }?.absolutePath ?: modelPath
+                    } else {
+                        modelPath
+                    }
+
+                    RunAnywhere.loadVLMModel(
+                        modelPath = mainModelFile,
+                        mmprojPath = mmprojFile?.absolutePath,
+                        modelId = modelId,
+                        modelName = model.name,
+                    )
                 }
             }
 

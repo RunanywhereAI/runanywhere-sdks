@@ -5,7 +5,7 @@
 #
 # The commons JNI library includes:
 # - Core commons bindings (rac_init, rac_shutdown, etc.)
-# - LLM/STT/TTS/VAD component bindings
+# - LLM/STT/TTS/VAD/VLM component bindings
 # - Model registry bindings
 # - Platform adapter callbacks
 #
@@ -23,7 +23,26 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find JNI
-find_package(JNI REQUIRED)
+# When cross-compiling for Android, we should use the NDK's JNI headers (jni.h)
+# and NOT the host JDK's JVM/AWT libraries.
+if(ANDROID)
+    # NDK sysroot contains jni.h and android/jni_md.h
+    set(_NDK_PREBUILT "${CMAKE_ANDROID_NDK}/toolchains/llvm/prebuilt/darwin-x86_64")
+    set(_NDK_SYSROOT_INCLUDE "${_NDK_PREBUILT}/sysroot/usr/include")
+
+    if(NOT EXISTS "${_NDK_SYSROOT_INCLUDE}/jni.h")
+        message(FATAL_ERROR "Could not locate NDK JNI headers at: ${_NDK_SYSROOT_INCLUDE}. Is CMAKE_ANDROID_NDK set correctly?")
+    endif()
+
+    set(JNI_INCLUDE_DIRS
+        "${_NDK_SYSROOT_INCLUDE}"
+        "${_NDK_SYSROOT_INCLUDE}/android"
+    )
+    set(JNI_LIBRARIES "")
+else()
+    find_package(JNI REQUIRED)
+endif()
+
 include_directories(${JNI_INCLUDE_DIRS})
 
 # Include runanywhere-commons headers
