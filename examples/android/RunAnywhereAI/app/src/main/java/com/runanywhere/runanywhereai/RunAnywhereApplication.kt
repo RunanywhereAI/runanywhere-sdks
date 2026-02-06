@@ -358,41 +358,6 @@ class RunAnywhereApplication : Application() {
         )
         Log.i("RunAnywhereApp", "✅ ONNX STT/TTS models registered")
 
-        // ============================================================================
-        // Register Diffusion models (ONNX - cross-platform)
-        // Using models from HuggingFace for ONNX Runtime inference
-        // ============================================================================
-
-        // Stable Diffusion 1.5 ONNX - UNet model (main inference component)
-        // Source: https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX
-        // Note: Full SD requires multiple ONNX files (text_encoder, unet, vae_decoder, vae_encoder)
-        // For now, registering the UNet as the primary model file
-        RunAnywhere.registerModel(
-            id = "sd15-onnx-unet",
-            name = "SD 1.5 UNet (ONNX)",
-            url = "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/unet/model.onnx",
-            framework = InferenceFramework.ONNX,
-            modality = ModelCategory.IMAGE_GENERATION,
-            memoryRequirement = 3_400_000_000, // ~3.4GB for UNet alone
-        )
-
-        // Recommended mobile-optimized models (architecturally compressed):
-        // These BK-SDM models are much smaller and faster for on-device inference:
-        //
-        // BK-SDM-Tiny (0.50B params, ~500MB) - Best for mobile!
-        // https://huggingface.co/nota-ai/bk-sdm-tiny
-        //
-        // BK-SDM-Small (0.66B params, ~660MB)
-        // https://huggingface.co/nota-ai/bk-sdm-small
-        //
-        // BK-SDM-Base (0.76B params, ~760MB)
-        // https://huggingface.co/nota-ai/bk-sdm-base
-        //
-        // Note: These are in Diffusers/safetensors format and need ONNX conversion.
-        // Use the Olive tool to convert: https://github.com/microsoft/Olive
-
-        Log.i("RunAnywhereApp", "✅ Diffusion models registered (ONNX from HuggingFace)")
-
         Log.i("RunAnywhereApp", "🎉 All modules and models registered")
     }
 }

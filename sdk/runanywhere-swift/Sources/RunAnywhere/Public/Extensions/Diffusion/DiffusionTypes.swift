@@ -8,6 +8,7 @@
 
 import CRACommons
 import Foundation
+import StableDiffusion
 
 // MARK: - Diffusion Tokenizer Source
 
@@ -229,6 +230,23 @@ public enum DiffusionScheduler: String, Sendable, CaseIterable {
         case RAC_DIFFUSION_SCHEDULER_PNDM: self = .pndm
         case RAC_DIFFUSION_SCHEDULER_LMS: self = .lms
         default: self = .dpmPP2MKarras
+        }
+    }
+    
+    /// Convert to Apple's StableDiffusionScheduler type
+    /// Used when routing to CoreML backend
+    public func toAppleScheduler() -> StableDiffusionScheduler {
+        switch self {
+        case .dpmPP2MKarras, .dpmPP2M, .dpmPP2MSDE:
+            return .dpmSolverMultistepScheduler
+        case .ddim:
+            return .dpmSolverMultistepScheduler  // DDIM not directly supported, use closest
+        case .euler, .eulerAncestral:
+            return .dpmSolverMultistepScheduler  // Euler not directly supported
+        case .pndm:
+            return .pndmScheduler
+        case .lms:
+            return .dpmSolverMultistepScheduler  // LMS not directly supported
         }
     }
 }
@@ -583,13 +601,16 @@ public extension SDKError {
         case notInitialized = "diffusion_not_initialized"
         case modelNotFound = "diffusion_model_not_found"
         case modelLoadFailed = "diffusion_model_load_failed"
+        case loadFailed = "diffusion_load_failed"
         case initializationFailed = "diffusion_initialization_failed"
         case generationFailed = "diffusion_generation_failed"
         case cancelled = "diffusion_cancelled"
         case invalidOptions = "diffusion_invalid_options"
         case unsupportedMode = "diffusion_unsupported_mode"
+        case unsupportedBackend = "diffusion_unsupported_backend"
         case outOfMemory = "diffusion_out_of_memory"
         case safetyCheckFailed = "diffusion_safety_check_failed"
+        case safetyCheckerTriggered = "diffusion_safety_checker_triggered"
         case configurationFailed = "diffusion_configuration_failed"
     }
 

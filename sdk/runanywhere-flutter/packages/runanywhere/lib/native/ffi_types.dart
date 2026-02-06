@@ -825,6 +825,25 @@ typedef RacHttpCompleteCallbackNative = Void Function(
   Pointer<Void> callbackUserData,
 );
 
+/// HTTP download callback: rac_result_t (*http_download)(const char* url, const char* destination_path,
+///     rac_http_progress_callback_fn progress_callback, rac_http_complete_callback_fn complete_callback,
+///     void* callback_user_data, char** out_task_id, void* user_data)
+typedef RacHttpDownloadCallbackNative = Int32 Function(
+  Pointer<Utf8> url,
+  Pointer<Utf8> destinationPath,
+  Pointer<NativeFunction<RacHttpProgressCallbackNative>> progressCallback,
+  Pointer<NativeFunction<RacHttpCompleteCallbackNative>> completeCallback,
+  Pointer<Void> callbackUserData,
+  Pointer<Pointer<Utf8>> outTaskId,
+  Pointer<Void> userData,
+);
+
+/// HTTP download cancel callback: rac_result_t (*http_download_cancel)(const char* task_id, void* user_data)
+typedef RacHttpDownloadCancelCallbackNative = Int32 Function(
+  Pointer<Utf8> taskId,
+  Pointer<Void> userData,
+);
+
 // =============================================================================
 // Structs (using FFI Struct for native memory layout)
 // =============================================================================

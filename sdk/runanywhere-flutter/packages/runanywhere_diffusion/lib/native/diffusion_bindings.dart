@@ -42,6 +42,7 @@ class DiffusionBindings {
 
   // Function pointers
   late final RacDiffusionRegisterDart _register;
+  late final RacDiffusionUnregisterDart _unregister;
   late final RacDiffusionComponentCreateDart _componentCreate;
   late final RacDiffusionComponentDestroyDart _componentDestroy;
   late final RacDiffusionComponentConfigureDart _componentConfigure;
@@ -50,14 +51,19 @@ class DiffusionBindings {
   late final RacDiffusionComponentIsLoadedDart _componentIsLoaded;
   late final RacDiffusionComponentGenerateDart _componentGenerate;
   late final RacDiffusionComponentCancelDart _componentCancel;
-  late final RacDiffusionResultFreeDart _resultFree;
+  late final RacDiffusionFreeDart _resultFree;
 
   void _bindFunctions() {
     if (!_isLoaded) return;
 
     _register = _lib
         .lookup<NativeFunction<RacDiffusionRegisterNative>>(
-            'rac_backend_diffusion_onnx_register')
+            'rac_backend_onnx_register')
+        .asFunction();
+
+    _unregister = _lib
+        .lookup<NativeFunction<RacDiffusionUnregisterNative>>(
+            'rac_backend_onnx_unregister')
         .asFunction();
 
     _componentCreate = _lib
@@ -77,7 +83,7 @@ class DiffusionBindings {
 
     _componentLoadModel = _lib
         .lookup<NativeFunction<RacDiffusionComponentLoadModelNative>>(
-            'rac_diffusion_component_load')
+            'rac_diffusion_component_load_model')
         .asFunction();
 
     _componentUnload = _lib
@@ -101,8 +107,7 @@ class DiffusionBindings {
         .asFunction();
 
     _resultFree = _lib
-        .lookup<NativeFunction<RacDiffusionResultFreeNative>>(
-            'rac_string_free')
+        .lookup<NativeFunction<RacDiffusionFreeNative>>('rac_free')
         .asFunction();
   }
 
@@ -121,6 +126,12 @@ class DiffusionBindings {
     return _register();
   }
 
+  /// Unregister the Diffusion backend
+  int unregister() {
+    if (!_isLoaded) return -1;
+    return _unregister();
+  }
+
   /// Create the component if needed
   void _ensureComponent() {
     if (_handle == nullptr) {
@@ -135,6 +146,8 @@ class DiffusionBindings {
 
   /// Configure the diffusion component
   int configure({
+    String? modelId,
+    String? preferredFramework,
     required int modelVariant,
     required bool enableSafetyChecker,
     required bool reduceMemory,
@@ -146,6 +159,8 @@ class DiffusionBindings {
     if (_handle == nullptr) return -1;
 
     final config = {
+      if (modelId != null) 'model_id': modelId,
+      if (preferredFramework != null) 'preferred_framework': preferredFramework,
       'model_variant': modelVariant,
       'enable_safety_checker': enableSafetyChecker,
       'reduce_memory': reduceMemory,
@@ -218,29 +233,61 @@ class DiffusionBindings {
       'progress_stride': options.progressStride,
     };
 
-    // Add input image if present (for img2img/inpainting)
-    if (options.inputImage != null) {
-      optionsMap['input_image_base64'] = base64Encode(options.inputImage!);
-    }
-    if (options.maskImage != null) {
-      optionsMap['mask_image_base64'] = base64Encode(options.maskImage!);
-    }
-
     final optionsJson = jsonEncode(optionsMap);
     final optionsPtr = optionsJson.toNativeUtf8();
 
+    Pointer<Uint8> inputPtr = nullptr;
+    int inputSize = 0;
+    Pointer<Uint8> maskPtr = nullptr;
+    int maskSize = 0;
+
+    if (options.inputImage != null && options.inputImage!.isNotEmpty) {
+      inputSize = options.inputImage!.length;
+      inputPtr = calloc<Uint8>(inputSize);
+      inputPtr.asTypedList(inputSize).setAll(0, options.inputImage!);
+    }
+
+    if (options.maskImage != null && options.maskImage!.isNotEmpty) {
+      maskSize = options.maskImage!.length;
+      maskPtr = calloc<Uint8>(maskSize);
+      maskPtr.asTypedList(maskSize).setAll(0, options.maskImage!);
+    }
+
+    final outJsonPtr = calloc<Pointer<Utf8>>();
+
     try {
-      final resultPtr = _componentGenerate(_handle, optionsPtr);
+      final result = _componentGenerate(
+        _handle,
+        optionsPtr,
+        inputPtr,
+        inputSize,
+        maskPtr,
+        maskSize,
+        outJsonPtr,
+      );
+
+      if (result != 0) {
+        throw Exception('Generation failed: $result');
+      }
+
+      final resultPtr = outJsonPtr.value;
       if (resultPtr == nullptr) {
         throw Exception('Generation failed: null result');
       }
 
       final resultJson = resultPtr.toDartString();
-      _resultFree(resultPtr);
+      _resultFree(resultPtr.cast<Void>());
 
       return _parseResult(resultJson);
     } finally {
       calloc.free(optionsPtr);
+      if (inputPtr != nullptr) {
+        calloc.free(inputPtr);
+      }
+      if (maskPtr != nullptr) {
+        calloc.free(maskPtr);
+      }
+      calloc.free(outJsonPtr);
     }
   }
 
@@ -251,6 +298,8 @@ class DiffusionBindings {
     Uint8List? imageData;
     if (result.containsKey('image_base64')) {
       imageData = base64Decode(result['image_base64'] as String);
+    } else if (result.containsKey('image_data')) {
+      imageData = base64Decode(result['image_data'] as String);
     }
 
     return DiffusionResult(
@@ -259,6 +308,7 @@ class DiffusionBindings {
       height: result['height'] as int? ?? 0,
       seedUsed: result['seed_used'] as int? ?? 0,
       generationTimeMs: result['generation_time_ms'] as int? ?? 0,
+      safetyFlagged: result['safety_flagged'] as bool? ?? false,
     );
   }
 
@@ -281,6 +331,9 @@ class DiffusionBindings {
 typedef RacDiffusionRegisterNative = Int32 Function();
 typedef RacDiffusionRegisterDart = int Function();
 
+typedef RacDiffusionUnregisterNative = Int32 Function();
+typedef RacDiffusionUnregisterDart = int Function();
+
 typedef RacDiffusionComponentCreateNative = Int32 Function(Pointer<Pointer<Void>>);
 typedef RacDiffusionComponentCreateDart = int Function(Pointer<Pointer<Void>>);
 
@@ -297,19 +350,31 @@ typedef RacDiffusionComponentLoadModelNative = Int32 Function(
 typedef RacDiffusionComponentLoadModelDart = int Function(
     Pointer<Void>, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>);
 
-typedef RacDiffusionComponentUnloadNative = Void Function(Pointer<Void>);
-typedef RacDiffusionComponentUnloadDart = void Function(Pointer<Void>);
+typedef RacDiffusionComponentUnloadNative = Int32 Function(Pointer<Void>);
+typedef RacDiffusionComponentUnloadDart = int Function(Pointer<Void>);
 
 typedef RacDiffusionComponentIsLoadedNative = Int32 Function(Pointer<Void>);
 typedef RacDiffusionComponentIsLoadedDart = int Function(Pointer<Void>);
 
-typedef RacDiffusionComponentGenerateNative = Pointer<Utf8> Function(
-    Pointer<Void>, Pointer<Utf8>);
-typedef RacDiffusionComponentGenerateDart = Pointer<Utf8> Function(
-    Pointer<Void>, Pointer<Utf8>);
+typedef RacDiffusionComponentGenerateNative = Int32 Function(
+    Pointer<Void>,
+    Pointer<Utf8>,
+    Pointer<Uint8>,
+    IntPtr,
+    Pointer<Uint8>,
+    IntPtr,
+    Pointer<Pointer<Utf8>>);
+typedef RacDiffusionComponentGenerateDart = int Function(
+    Pointer<Void>,
+    Pointer<Utf8>,
+    Pointer<Uint8>,
+    int,
+    Pointer<Uint8>,
+    int,
+    Pointer<Pointer<Utf8>>);
 
-typedef RacDiffusionComponentCancelNative = Void Function(Pointer<Void>);
-typedef RacDiffusionComponentCancelDart = void Function(Pointer<Void>);
+typedef RacDiffusionComponentCancelNative = Int32 Function(Pointer<Void>);
+typedef RacDiffusionComponentCancelDart = int Function(Pointer<Void>);
 
-typedef RacDiffusionResultFreeNative = Void Function(Pointer<Utf8>);
-typedef RacDiffusionResultFreeDart = void Function(Pointer<Utf8>);
+typedef RacDiffusionFreeNative = Void Function(Pointer<Void>);
+typedef RacDiffusionFreeDart = void Function(Pointer<Void>);

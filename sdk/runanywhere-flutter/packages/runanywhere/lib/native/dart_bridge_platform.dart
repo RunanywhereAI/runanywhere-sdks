@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -144,8 +145,16 @@ class DartBridgePlatform {
       );
 
       // Optional callbacks (handled by Dart directly)
-      adapter.ref.httpDownload = nullptr;
-      adapter.ref.httpDownloadCancel = nullptr;
+      adapter.ref.httpDownload =
+          Pointer.fromFunction<RacHttpDownloadCallbackNative>(
+        _platformHttpDownloadCallback,
+        _exceptionalReturnInt32,
+      ).cast<Void>();
+      adapter.ref.httpDownloadCancel =
+          Pointer.fromFunction<RacHttpDownloadCancelCallbackNative>(
+        _platformHttpDownloadCancelCallback,
+        _exceptionalReturnInt32,
+      ).cast<Void>();
       adapter.ref.extractArchive = nullptr;
       adapter.ref.userData = nullptr;
 
@@ -506,4 +515,209 @@ void _platformTrackErrorCallback(
   } catch (_) {
     // Ignore errors in error handling
   }
+}
+
+// =============================================================================
+// HTTP DOWNLOAD (Platform Adapter)
+// =============================================================================
+
+int _httpDownloadCounter = 0;
+
+int _platformHttpDownloadCallback(
+  Pointer<Utf8> url,
+  Pointer<Utf8> destinationPath,
+  Pointer<NativeFunction<RacHttpProgressCallbackNative>> progressCallback,
+  Pointer<NativeFunction<RacHttpCompleteCallbackNative>> completeCallback,
+  Pointer<Void> callbackUserData,
+  Pointer<Pointer<Utf8>> outTaskId,
+  Pointer<Void> userData,
+) {
+  try {
+    if (url == nullptr || destinationPath == nullptr || outTaskId == nullptr) {
+      return RacResultCode.errorInvalidParameter;
+    }
+
+    final urlString = url.toDartString();
+    final destinationString = destinationPath.toDartString();
+    if (urlString.isEmpty || destinationString.isEmpty) {
+      return RacResultCode.errorInvalidParameter;
+    }
+
+    final taskId = 'http_${_httpDownloadCounter++}';
+    outTaskId.value = taskId.toNativeUtf8();
+
+    final progressAddress = progressCallback == nullptr ? 0 : progressCallback.address;
+    final completeAddress = completeCallback == nullptr ? 0 : completeCallback.address;
+    final userDataAddress = callbackUserData.address;
+
+    unawaited(
+      Isolate.spawn(
+        _httpDownloadIsolateEntry,
+        <dynamic>[
+          urlString,
+          destinationString,
+          progressAddress,
+          completeAddress,
+          userDataAddress,
+        ],
+      ),
+    );
+    return RacResultCode.success;
+  } catch (_) {
+    return RacResultCode.errorDownloadFailed;
+  }
+}
+
+int _platformHttpDownloadCancelCallback(
+  Pointer<Utf8> _taskId,
+  Pointer<Void> _userData,
+) {
+  return RacResultCode.errorNotSupported;
+}
+
+Future<void> _performHttpDownloadIsolate(
+  String url,
+  String destinationPath,
+  void Function(int, int, Pointer<Void>)? progressCallback,
+  void Function(int, Pointer<Utf8>, Pointer<Void>)? completeCallback,
+  Pointer<Void> callbackUserData,
+) async {
+  var result = RacResultCode.errorDownloadFailed;
+  String? finalPath;
+  File? tempFile;
+  HttpClient? client;
+
+  try {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      result = RacResultCode.errorInvalidParameter;
+      return;
+    }
+
+    client = HttpClient();
+    final request = await client.getUrl(uri);
+    request.followRedirects = true;
+    final response = await request.close();
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      result = RacResultCode.errorDownloadFailed;
+      return;
+    }
+
+    final totalBytes = response.contentLength > 0 ? response.contentLength : 0;
+    final destFile = File(destinationPath);
+    await destFile.parent.create(recursive: true);
+    final temp = File('${destFile.path}.part');
+    tempFile = temp;
+    if (await temp.exists()) {
+      await temp.delete();
+    }
+
+    final sink = temp.openWrite();
+    var downloaded = 0;
+    var lastReported = 0;
+    const reportThreshold = 256 * 1024;
+
+    try {
+      await for (final chunk in response) {
+        sink.add(chunk);
+        downloaded += chunk.length;
+        if (progressCallback != null &&
+            downloaded - lastReported >= reportThreshold) {
+          progressCallback(
+            downloaded,
+            totalBytes,
+            callbackUserData,
+          );
+          lastReported = downloaded;
+        }
+      }
+    } finally {
+      await sink.flush();
+      await sink.close();
+    }
+
+    if (await temp.exists()) {
+      if (await destFile.exists()) {
+        await destFile.delete();
+      }
+      try {
+        await temp.rename(destFile.path);
+      } catch (_) {
+        await temp.copy(destFile.path);
+        await temp.delete();
+      }
+    }
+
+    if (progressCallback != null) {
+      progressCallback(
+        downloaded,
+        totalBytes,
+        callbackUserData,
+      );
+    }
+
+    finalPath = destFile.path;
+    result = RacResultCode.success;
+  } catch (_) {
+    result = RacResultCode.errorDownloadFailed;
+  } finally {
+    client?.close(force: true);
+
+    if (result != RacResultCode.success && tempFile != null) {
+      try {
+        if (await tempFile!.exists()) {
+          await tempFile!.delete();
+        }
+      } catch (_) {
+        // Ignore cleanup errors
+      }
+    }
+
+    if (completeCallback != null) {
+      if (finalPath != null) {
+        final pathPtr = finalPath!.toNativeUtf8();
+        completeCallback(
+          result,
+          pathPtr,
+          callbackUserData,
+        );
+        calloc.free(pathPtr);
+      } else {
+        completeCallback(
+          result,
+          nullptr,
+          callbackUserData,
+        );
+      }
+    }
+  }
+}
+
+void _httpDownloadIsolateEntry(List<dynamic> args) async {
+  final url = args[0] as String;
+  final destinationPath = args[1] as String;
+  final progressAddress = args[2] as int;
+  final completeAddress = args[3] as int;
+  final userDataAddress = args[4] as int;
+
+  final progressCallback = progressAddress == 0
+      ? null
+      : Pointer<NativeFunction<RacHttpProgressCallbackNative>>.fromAddress(
+              progressAddress)
+          .asFunction<void Function(int, int, Pointer<Void>)>();
+  final completeCallback = completeAddress == 0
+      ? null
+      : Pointer<NativeFunction<RacHttpCompleteCallbackNative>>.fromAddress(
+              completeAddress)
+          .asFunction<void Function(int, Pointer<Utf8>, Pointer<Void>)>();
+  final userDataPtr = Pointer<Void>.fromAddress(userDataAddress);
+
+  await _performHttpDownloadIsolate(
+    url,
+    destinationPath,
+    progressCallback,
+    completeCallback,
+    userDataPtr,
+  );
 }

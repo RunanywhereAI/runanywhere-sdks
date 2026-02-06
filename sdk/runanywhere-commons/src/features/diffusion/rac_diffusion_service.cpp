@@ -81,13 +81,9 @@ static rac_inference_framework_t detect_model_format_from_path(const char* path)
     return RAC_FRAMEWORK_UNKNOWN;
 }
 
-// =============================================================================
-// SERVICE CREATION - Routes through Service Registry
-// =============================================================================
-
-extern "C" {
-
-rac_result_t rac_diffusion_create(const char* model_id, rac_handle_t* out_handle) {
+static rac_result_t diffusion_create_service_internal(const char* model_id,
+                                                      const rac_diffusion_config_t* config,
+                                                      rac_handle_t* out_handle) {
     if (!model_id || !out_handle) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -120,10 +116,10 @@ rac_result_t rac_diffusion_create(const char* model_id, rac_handle_t* out_handle
         RAC_LOG_WARNING(LOG_CAT,
                         "Model NOT found in registry (result=%d), will detect from path",
                         result);
-        
+
         // Try to detect framework from the model path/id
         framework = detect_model_format_from_path(model_id);
-        
+
         if (framework == RAC_FRAMEWORK_UNKNOWN) {
             // If still unknown, use platform defaults
 #if defined(__APPLE__)
@@ -134,9 +130,17 @@ rac_result_t rac_diffusion_create(const char* model_id, rac_handle_t* out_handle
             RAC_LOG_INFO(LOG_CAT, "Could not detect format, defaulting to ONNX");
 #endif
         } else {
-            RAC_LOG_INFO(LOG_CAT, "Detected framework=%d from path inspection", 
-                        static_cast<int>(framework));
+            RAC_LOG_INFO(LOG_CAT, "Detected framework=%d from path inspection",
+                         static_cast<int>(framework));
         }
+    }
+
+    if (config &&
+        static_cast<rac_inference_framework_t>(config->preferred_framework) !=
+            RAC_FRAMEWORK_UNKNOWN) {
+        framework = static_cast<rac_inference_framework_t>(config->preferred_framework);
+        RAC_LOG_INFO(LOG_CAT, "Using preferred framework override: %d",
+                     static_cast<int>(framework));
     }
 
     // Build service request
@@ -168,6 +172,22 @@ rac_result_t rac_diffusion_create(const char* model_id, rac_handle_t* out_handle
 
     RAC_LOG_INFO(LOG_CAT, "Diffusion service created");
     return RAC_SUCCESS;
+}
+
+// =============================================================================
+// SERVICE CREATION - Routes through Service Registry
+// =============================================================================
+
+extern "C" {
+
+rac_result_t rac_diffusion_create(const char* model_id, rac_handle_t* out_handle) {
+    return diffusion_create_service_internal(model_id, nullptr, out_handle);
+}
+
+rac_result_t rac_diffusion_create_with_config(const char* model_id,
+                                              const rac_diffusion_config_t* config,
+                                              rac_handle_t* out_handle) {
+    return diffusion_create_service_internal(model_id, config, out_handle);
 }
 
 // =============================================================================

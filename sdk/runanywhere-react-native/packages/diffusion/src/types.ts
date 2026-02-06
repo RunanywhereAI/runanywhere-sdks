@@ -41,13 +41,21 @@ export function getTokenizerBaseURL(source: DiffusionTokenizerSource): string {
 // Model Variant
 // ============================================================================
 
-export type DiffusionModelVariant = 'sd15' | 'sd21' | 'sdxl' | 'sdxl_turbo';
+export type DiffusionModelVariant =
+  | 'sd15'
+  | 'sd21'
+  | 'sdxl'
+  | 'sdxl_turbo'
+  | 'sdxs'
+  | 'lcm';
 
 export const DiffusionModelVariants = {
   SD15: 'sd15' as const,
   SD21: 'sd21' as const,
   SDXL: 'sdxl' as const,
   SDXL_TURBO: 'sdxl_turbo' as const,
+  SDXS: 'sdxs' as const,
+  LCM: 'lcm' as const,
 };
 
 export function getDefaultResolution(variant: DiffusionModelVariant): {
@@ -62,6 +70,9 @@ export function getDefaultResolution(variant: DiffusionModelVariant): {
     case 'sdxl':
     case 'sdxl_turbo':
       return { width: 1024, height: 1024 };
+    case 'sdxs':
+    case 'lcm':
+      return { width: 512, height: 512 };
   }
 }
 
@@ -72,6 +83,10 @@ export function getDefaultSteps(variant: DiffusionModelVariant): number {
     case 'sdxl':
       return 28;
     case 'sdxl_turbo':
+      return 4;
+    case 'sdxs':
+      return 1;
+    case 'lcm':
       return 4;
   }
 }
@@ -119,6 +134,7 @@ export const DiffusionModes = {
 
 export interface DiffusionConfiguration {
   modelId?: string;
+  preferredFramework?: string;
   modelVariant?: DiffusionModelVariant;
   enableSafetyChecker?: boolean;
   reduceMemory?: boolean;

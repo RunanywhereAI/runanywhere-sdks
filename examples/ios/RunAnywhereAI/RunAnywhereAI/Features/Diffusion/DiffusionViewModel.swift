@@ -180,16 +180,17 @@ class DiffusionViewModel: ObservableObject {
             // - SDXS: 512x512, 1 step, no CFG (ultra-fast ~2-10 sec)
             // - LCM: 512x512, 4 steps, low CFG (fast ~15-30 sec)  
             // - SD 1.5/Turbo: defaults based on variant
-            let resolution = currentModelVariant.defaultResolution
-            let steps = currentModelVariant.defaultSteps
-            let guidanceScale = currentModelVariant.defaultGuidanceScale
+            let variant = self.currentModelVariant
+            let resolution = variant.defaultResolution
+            let steps = variant.defaultSteps
+            let guidanceScale = variant.defaultGuidanceScale
             
             // For mobile, cap resolution to avoid memory issues
             let maxMobileRes = 512
             let width = min(resolution.width, maxMobileRes)
             let height = min(resolution.height, maxMobileRes)
             
-            logger.info("Generating with \(currentModelVariant.rawValue): \(width)x\(height), \(steps) steps, CFG=\(guidanceScale)")
+            logger.info("Generating with \(variant.rawValue): \(width)x\(height), \(steps) steps, CFG=\(guidanceScale)")
             
             let options = DiffusionGenerationOptions(
                 prompt: prompt,

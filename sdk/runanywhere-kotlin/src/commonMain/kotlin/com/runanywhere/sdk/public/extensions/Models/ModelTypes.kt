@@ -69,9 +69,6 @@ enum class ModelSelectionContext(
 
     /** Select models for voice agent (all 3 types) */
     VOICE("voice"),
-
-    /** Select an image generation model (Diffusion) */
-    DIFFUSION("diffusion"),
     ;
 
     /** Human-readable title for the selection context */
@@ -82,7 +79,6 @@ enum class ModelSelectionContext(
                 STT -> "Select STT Model"
                 TTS -> "Select TTS Voice"
                 VOICE -> "Select Voice Models"
-                DIFFUSION -> "Select Diffusion Model"
             }
 
     /** Check if a category is relevant for this selection context */
@@ -95,7 +91,6 @@ enum class ModelSelectionContext(
                 category == ModelCategory.LANGUAGE ||
                     category == ModelCategory.SPEECH_RECOGNITION ||
                     category == ModelCategory.SPEECH_SYNTHESIS
-            DIFFUSION -> category == ModelCategory.IMAGE_GENERATION
         }
 
     /** Check if a framework is relevant for this selection context */
@@ -113,9 +108,6 @@ enum class ModelSelectionContext(
                 LLM.isFrameworkRelevant(framework) ||
                     STT.isFrameworkRelevant(framework) ||
                     TTS.isFrameworkRelevant(framework)
-            DIFFUSION ->
-                framework == com.runanywhere.sdk.core.types.InferenceFramework.ONNX ||
-                    framework == com.runanywhere.sdk.core.types.InferenceFramework.COREML
         }
 }
 

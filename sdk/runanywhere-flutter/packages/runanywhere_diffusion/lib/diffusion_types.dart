@@ -2,6 +2,8 @@
 ///
 /// Matches Swift DiffusionTypes.swift and Kotlin DiffusionTypes.kt
 
+import 'package:runanywhere/core/types/model_types.dart';
+
 // ============================================================================
 // Tokenizer Source
 // ============================================================================
@@ -82,7 +84,13 @@ enum DiffusionModelVariant {
   sdxl('sdxl', 1024, 1024, 28),
 
   /// SDXL Turbo (fast, fewer steps)
-  sdxlTurbo('sdxl_turbo', 1024, 1024, 4);
+  sdxlTurbo('sdxl_turbo', 1024, 1024, 4),
+
+  /// SDXS (ultra-fast 1-step model, no CFG)
+  sdxs('sdxs', 512, 512, 1),
+
+  /// LCM (Latent Consistency Model, 4 steps)
+  lcm('lcm', 512, 512, 4);
 
   const DiffusionModelVariant(
     this.rawValue,
@@ -107,6 +115,10 @@ enum DiffusionModelVariant {
         return 2;
       case DiffusionModelVariant.sdxlTurbo:
         return 3;
+      case DiffusionModelVariant.sdxs:
+        return 4;
+      case DiffusionModelVariant.lcm:
+        return 5;
     }
   }
 
@@ -120,6 +132,9 @@ enum DiffusionModelVariant {
       case DiffusionModelVariant.sdxl:
       case DiffusionModelVariant.sdxlTurbo:
         return const SDXLTokenizerSource();
+      case DiffusionModelVariant.sdxs:
+      case DiffusionModelVariant.lcm:
+        return const SD15TokenizerSource();
     }
   }
 }
@@ -191,6 +206,7 @@ class DiffusionConfiguration {
   final DiffusionModelVariant modelVariant;
   final bool enableSafetyChecker;
   final bool reduceMemory;
+  final InferenceFramework? preferredFramework;
   final DiffusionTokenizerSource? tokenizerSource;
 
   const DiffusionConfiguration({
@@ -198,6 +214,7 @@ class DiffusionConfiguration {
     this.modelVariant = DiffusionModelVariant.sd15,
     this.enableSafetyChecker = true,
     this.reduceMemory = false,
+    this.preferredFramework,
     this.tokenizerSource,
   });
 
