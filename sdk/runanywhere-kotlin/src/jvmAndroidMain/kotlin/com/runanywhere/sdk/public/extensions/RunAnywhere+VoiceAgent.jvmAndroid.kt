@@ -392,6 +392,7 @@ actual fun RunAnywhere.streamVoiceSession(
 
     // Main audio processing loop
     var lastCheckTime = System.currentTimeMillis()
+    var wasCancelled = false
 
     try {
         audioChunks.collect { chunk ->
@@ -444,13 +445,14 @@ actual fun RunAnywhere.streamVoiceSession(
         }
     } catch (e: kotlinx.coroutines.CancellationException) {
         voiceAgentLogger.debug("Voice session cancelled")
+        wasCancelled = true
     } catch (e: Exception) {
         voiceAgentLogger.error("Voice session error: ${e.message}", throwable = e)
         send(VoiceSessionEvent.Error("Session error: ${e.message}"))
     }
 
-    // Process any remaining audio when stream ends
-    if (!isProcessingTurn) {
+    // Process any remaining audio when stream ends naturally (not cancelled)
+    if (!wasCancelled && !isProcessingTurn && isActive) {
         val remainingSize = synchronized(audioBuffer) { audioBuffer.size() }
         if (remainingSize >= minAudioBytes) {
             voiceAgentLogger.info("Processing remaining audio on stream end")
@@ -458,6 +460,8 @@ actual fun RunAnywhere.streamVoiceSession(
         }
     }
 
-    send(VoiceSessionEvent.Stopped)
+    if (isActive) {
+        send(VoiceSessionEvent.Stopped)
+    }
     voiceAgentLogger.info("Voice session ended")
 }
