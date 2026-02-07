@@ -49,6 +49,8 @@ import com.runanywhere.runanywhereai.data.ConversationStore
 import com.runanywhere.runanywhereai.domain.models.ChatMessage
 import com.runanywhere.runanywhereai.domain.models.Conversation
 import com.runanywhere.runanywhereai.domain.models.MessageRole
+import com.runanywhere.runanywhereai.presentation.chat.components.MarkdownText
+import com.runanywhere.runanywhereai.presentation.chat.components.ModelLoadedToast
 import com.runanywhere.runanywhereai.presentation.chat.components.ModelRequiredOverlay
 import com.runanywhere.runanywhereai.util.getModelLogoResIdForName
 import com.runanywhere.runanywhereai.ui.theme.AppColors
@@ -88,6 +90,10 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
     var showingChatDetails by remember { mutableStateOf(false) }
     var showDebugAlert by remember { mutableStateOf(false) }
     var debugMessage by remember { mutableStateOf("") }
+
+    // Model loaded toast state
+    var showModelLoadedToast by remember { mutableStateOf(false) }
+    var loadedModelToastName by remember { mutableStateOf("") }
 
     // Auto-scroll to bottom when new messages arrive
     LaunchedEffect(uiState.messages.size, uiState.isGenerating) {
@@ -180,6 +186,7 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
                         MessageBubbleView(
                             message = message,
                             isGenerating = uiState.isGenerating,
+                            modifier = Modifier.animateItem(),
                         )
                     }
 
@@ -221,6 +228,14 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
                     modifier = Modifier.matchParentSize(),
                 )
             }
+
+            // Model loaded toast - overlaid at top
+            ModelLoadedToast(
+                modelName = loadedModelToastName,
+                isVisible = showModelLoadedToast,
+                onDismiss = { showModelLoadedToast = false },
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
         }
     }
 
@@ -234,6 +249,9 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
                     android.util.Log.i("ChatScreen", "LLM model selected: ${model.name} (${model.id})")
                     // Sync ViewModel with SDK state - model is already loaded by ModelSelectionBottomSheet
                     viewModel.checkModelStatus()
+                    // Show model loaded toast
+                    loadedModelToastName = model.name
+                    showModelLoadedToast = true
                 }
             },
         )
@@ -534,6 +552,7 @@ fun ModelInfoBar(
 fun MessageBubbleView(
     message: ChatMessage,
     isGenerating: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
     val alignment =
         if (message.role == MessageRole.USER) {
@@ -550,7 +569,7 @@ fun MessageBubbleView(
     val scope = rememberCoroutineScope()
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = alignment,
     ) {
         // Spacer for alignment
@@ -683,21 +702,29 @@ fun MessageBubbleView(
                                 onLongClick = { showDialog = true },
                             ),
                 ) {
-                    Text(
-                        text = message.content,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color =
-                            if (isUserMessage) {
-                                AppColors.textWhite
-                            } else {
-                                AppColors.assistantBubbleTextColor()
-                            },
-                        modifier =
-                            Modifier.padding(
-                                horizontal = Dimensions.messageBubblePaddingHorizontal,
-                                vertical = Dimensions.messageBubblePaddingVertical,
-                            ),
-                    )
+                    if (isUserMessage) {
+                        Text(
+                            text = message.content,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = AppColors.textWhite,
+                            modifier =
+                                Modifier.padding(
+                                    horizontal = Dimensions.messageBubblePaddingHorizontal,
+                                    vertical = Dimensions.messageBubblePaddingVertical,
+                                ),
+                        )
+                    } else {
+                        MarkdownText(
+                            markdown = message.content,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = AppColors.assistantBubbleTextColor(),
+                            modifier =
+                                Modifier.padding(
+                                    horizontal = Dimensions.messageBubblePaddingHorizontal,
+                                    vertical = Dimensions.messageBubblePaddingVertical,
+                                ),
+                        )
+                    }
                 }
             }
 
@@ -1269,46 +1296,57 @@ fun ChatInputView(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(Dimensions.inputAreaPadding),
-            horizontalArrangement = Arrangement.spacedBy(Dimensions.inputFieldButtonSpacing),
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
-            // Text field
-            TextField(
-                value = value,
-                onValueChange = onValueChange,
-                modifier = Modifier.weight(1f),
-                placeholder = {
-                    Text(
-                        text =
-                            when {
-                                !isModelLoaded -> "Load a model first..."
-                                isGenerating -> "Generating..."
-                                else -> "Type a message..."
-                            },
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                },
-                enabled = isModelLoaded && !isGenerating,
-                textStyle = MaterialTheme.typography.bodyLarge,
-                colors =
-                    TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        disabledContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        disabledIndicatorColor = Color.Transparent,
-                    ),
-                maxLines = 4,
-            )
-
-            // Send button: 28dp, primaryAccent when canSend else statusGray
+            // Text field with rounded container
             val canSendMessage = isModelLoaded && !isGenerating && value.trim().isNotBlank()
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(24.dp),
+                    ),
+            ) {
+                TextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = {
+                        Text(
+                            text =
+                                when {
+                                    !isModelLoaded -> "Load a model first..."
+                                    isGenerating -> "Generating..."
+                                    else -> "Type a message..."
+                                },
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        )
+                    },
+                    enabled = isModelLoaded && !isGenerating,
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    colors =
+                        TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            disabledContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            disabledIndicatorColor = Color.Transparent,
+                        ),
+                    maxLines = 4,
+                )
+            }
+
+            // Send button - larger, more prominent
             IconButton(
                 onClick = onSend,
                 enabled = canSendMessage,
-                modifier = Modifier.size(28.dp),
+                modifier = Modifier.size(44.dp),
             ) {
                 Icon(
                     imageVector = Icons.Filled.ArrowCircleUp,
@@ -1317,9 +1355,9 @@ fun ChatInputView(
                         if (canSendMessage) {
                             AppColors.primaryAccent
                         } else {
-                            AppColors.statusGray
+                            AppColors.statusGray.copy(alpha = 0.5f)
                         },
-                    modifier = Modifier.size(28.dp),
+                    modifier = Modifier.size(32.dp),
                 )
             }
         }

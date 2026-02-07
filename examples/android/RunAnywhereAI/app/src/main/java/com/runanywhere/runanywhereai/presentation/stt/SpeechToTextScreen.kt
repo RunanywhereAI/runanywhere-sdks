@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.presentation.chat.components.ModelLoadedToast
 import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppTypography
@@ -68,6 +69,8 @@ fun SpeechToTextScreen(viewModel: SpeechToTextViewModel = viewModel()) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showModelPicker by remember { mutableStateOf(false) }
+    var showModelLoadedToast by remember { mutableStateOf(false) }
+    var loadedModelToastName by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
     // Initialize ViewModel with context
@@ -188,6 +191,14 @@ fun SpeechToTextScreen(viewModel: SpeechToTextViewModel = viewModel()) {
                     modifier = Modifier.matchParentSize(),
                 )
             }
+
+            // Model loaded toast overlay
+            ModelLoadedToast(
+                modelName = loadedModelToastName,
+                isVisible = showModelLoadedToast,
+                onDismiss = { showModelLoadedToast = false },
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
         }
     }
 
@@ -205,6 +216,9 @@ fun SpeechToTextScreen(viewModel: SpeechToTextViewModel = viewModel()) {
                             framework = model.framework,
                         )
                         android.util.Log.d("SpeechToTextScreen", "STT model selected: ${model.name}")
+                        // Show model loaded toast
+                        loadedModelToastName = model.name
+                        showModelLoadedToast = true
                     }
                 },
             )
