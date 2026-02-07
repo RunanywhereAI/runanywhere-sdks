@@ -5,6 +5,7 @@ package com.runanywhere.runanywhereai.presentation.settings
 import android.content.Intent
 import android.net.Uri
 import android.text.format.Formatter
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -28,15 +29,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.ui.theme.AppColors
+import com.runanywhere.runanywhereai.ui.theme.AppTypography
+import com.runanywhere.runanywhereai.ui.theme.Dimensions
 
 /**
- * Settings & Storage Screen
+ * Settings screen
  *
- * Sections:
- * 1. Storage Overview
- * 2. Downloaded Models
- * 3. Storage Management
- * 4. About
+ * Section order: Generation Settings, API Configuration, Storage Overview, Downloaded Models,
+ * Storage Management, Logging Configuration, About.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,67 +59,134 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
     ) {
         // Header
         Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Dimensions.padding16, vertical = Dimensions.padding16),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = "Settings",
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
             )
         }
 
-        // API Configuration Section
-        SettingsSection(title = "API Configuration (Testing)") {
-            ApiConfigurationRow(
-                label = "API Key",
-                isConfigured = uiState.isApiKeyConfigured,
-            )
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-            ApiConfigurationRow(
-                label = "Base URL",
-                isConfigured = uiState.isBaseURLConfigured,
-            )
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OutlinedButton(
-                    onClick = { viewModel.showApiConfigSheet() },
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = AppColors.primaryAccent,
-                    ),
+        // 1. Generation Settings
+        SettingsSection(title = "Generation Settings") {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "Temperature: ${"%.2f".format(uiState.temperature)}",
+                    style = AppTypography.caption,
+                    color = AppColors.textSecondary,
+                )
+                Slider(
+                    value = uiState.temperature,
+                    onValueChange = { viewModel.updateTemperature(it) },
+                    valueRange = 0f..2f,
+                    steps = 19,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Configure")
-                }
-                if (uiState.isApiKeyConfigured && uiState.isBaseURLConfigured) {
-                    OutlinedButton(
-                        onClick = { viewModel.clearApiConfiguration() },
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = AppColors.primaryRed,
-                        ),
-                    ) {
-                        Text("Clear")
+                    Text(
+                        text = "Max Tokens: ${uiState.maxTokens}",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedButton(
+                            onClick = { viewModel.updateMaxTokens((uiState.maxTokens - 500).coerceAtLeast(500)) },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier.height(32.dp),
+                        ) { Text("-", style = AppTypography.caption) }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "${uiState.maxTokens}",
+                            style = AppTypography.caption,
+                            modifier = Modifier.widthIn(min = 48.dp),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        OutlinedButton(
+                            onClick = { viewModel.updateMaxTokens((uiState.maxTokens + 500).coerceAtMost(20000)) },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier.height(32.dp),
+                        ) { Text("+", style = AppTypography.caption) }
                     }
+                }
+            }
+        }
+
+        // 2. API Configuration (Testing)
+        SettingsSection(title = "API Configuration (Testing)") {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { viewModel.showApiConfigSheet() }
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("API Key", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = if (uiState.isApiKeyConfigured) "Configured" else "Not Set",
+                    style = AppTypography.caption,
+                    color = if (uiState.isApiKeyConfigured) AppColors.statusGreen else AppColors.statusOrange,
+                )
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Base URL", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = if (uiState.isBaseURLConfigured) "Configured" else "Using Default",
+                    style = AppTypography.caption,
+                    color = if (uiState.isBaseURLConfigured) AppColors.statusGreen else AppColors.textSecondary,
+                )
+            }
+            if (uiState.isApiKeyConfigured && uiState.isBaseURLConfigured) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { viewModel.clearApiConfiguration() }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(
+                        Icons.Outlined.Delete,
+                        contentDescription = null,
+                        tint = AppColors.primaryRed,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Text(
+                        text = "Clear Custom Configuration",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = AppColors.primaryRed,
+                    )
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Configure custom API key and base URL for testing. Requires app restart.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = "Configure custom API key and base URL for testing. Requires app restart to take effect.",
+                style = AppTypography.caption,
+                color = AppColors.textSecondary,
             )
         }
 
-        // Storage Overview Section
+        // 3. Storage Overview - iOS Label(systemImage: "externaldrive") etc.
         SettingsSection(
             title = "Storage Overview",
             trailing = {
                 TextButton(onClick = { viewModel.refreshStorage() }) {
-                    Text("Refresh", style = MaterialTheme.typography.labelMedium)
+                    Text("Refresh", style = AppTypography.caption)
                 }
             },
         ) {
@@ -127,6 +194,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 icon = Icons.Outlined.Storage,
                 label = "Total Usage",
                 value = Formatter.formatFileSize(context, uiState.totalStorageSize),
+                valueColor = AppColors.textSecondary,
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             StorageOverviewRow(
@@ -147,16 +215,17 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 icon = Icons.Outlined.Numbers,
                 label = "Downloaded Models",
                 value = uiState.downloadedModels.size.toString(),
+                valueColor = AppColors.textSecondary,
             )
         }
 
-        // Downloaded Models Section
+        // 4. Downloaded Models
         SettingsSection(title = "Downloaded Models") {
             if (uiState.downloadedModels.isEmpty()) {
                 Text(
                     text = "No models downloaded yet",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = AppTypography.caption,
+                    color = AppColors.textSecondary,
                     modifier = Modifier.padding(vertical = 8.dp),
                 )
             } else {
@@ -172,45 +241,72 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             }
         }
 
-        // Storage Management Section
+        // 5. Storage Management - iOS trash icon, red/orange
         SettingsSection(title = "Storage Management") {
             StorageManagementButton(
                 title = "Clear Cache",
-                icon = Icons.Outlined.DeleteSweep,
+                subtitle = "Free up space by clearing cached data",
+                icon = Icons.Outlined.Delete,
                 color = AppColors.primaryRed,
                 onClick = { viewModel.clearCache() },
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             StorageManagementButton(
                 title = "Clean Temporary Files",
-                icon = Icons.Outlined.CleaningServices,
+                subtitle = "Remove temporary files and logs",
+                icon = Icons.Outlined.Delete,
                 color = AppColors.primaryOrange,
                 onClick = { viewModel.cleanTempFiles() },
             )
         }
 
-        // About Section
+        // 6. Logging Configuration - iOS Toggle "Log Analytics Locally"
+        SettingsSection(title = "Logging Configuration") {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Log Analytics Locally",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Switch(
+                    checked = uiState.analyticsLogToLocal,
+                    onCheckedChange = { viewModel.updateAnalyticsLogToLocal(it) },
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "When enabled, analytics events will be saved locally on your device.",
+                style = AppTypography.caption,
+                color = AppColors.textSecondary,
+            )
+        }
+
+        // 7. About - iOS Label "RunAnywhere SDK" systemImage "cube", "Documentation" systemImage "book"
         SettingsSection(title = "About") {
             Row(
                 modifier = Modifier.padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Icon(
                     Icons.Outlined.Widgets,
                     contentDescription = null,
                     tint = AppColors.primaryAccent,
+                    modifier = Modifier.size(24.dp),
                 )
-                Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
                         text = "RunAnywhere SDK",
-                        style = MaterialTheme.typography.titleSmall,
+                        style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
                         text = "Version 0.1",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = AppTypography.caption,
+                        color = AppColors.textSecondary,
                     )
                 }
             }
@@ -218,28 +314,24 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            val intent =
-                                Intent(
-                                    Intent.ACTION_VIEW,
-                                    Uri.parse("https://github.com/RunanywhereAI/runanywhere-sdks/"),
-                                )
-                            context.startActivity(intent)
-                        }
-                        .padding(vertical = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://docs.runanywhere.ai"))
+                        context.startActivity(intent)
+                    }
+                    .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Icon(
                     Icons.Outlined.MenuBook,
                     contentDescription = null,
                     tint = AppColors.primaryAccent,
+                    modifier = Modifier.size(24.dp),
                 )
-                Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = "SDK Documentation",
+                    text = "Documentation",
                     style = MaterialTheme.typography.bodyMedium,
                     color = AppColors.primaryAccent,
                 )
@@ -298,13 +390,13 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
         )
     }
 
-    // Restart Required Dialog
+    // Restart Required Dialog - iOS exact message
     if (uiState.showRestartDialog) {
         AlertDialog(
             onDismissRequest = { viewModel.dismissRestartDialog() },
             title = { Text("Restart Required") },
             text = {
-                Text("API configuration has been updated. Please restart the app for changes to take effect.")
+                Text("Please restart the app for the new API configuration to take effect. The SDK will be reinitialized with your custom settings.")
             },
             confirmButton = {
                 TextButton(
@@ -334,10 +426,9 @@ private fun SettingsSection(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Dimensions.padding16, vertical = 8.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -346,20 +437,19 @@ private fun SettingsSection(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.headlineMedium,
+                color = AppColors.textSecondary,
             )
             trailing?.invoke()
         }
         Spacer(modifier = Modifier.height(8.dp))
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(Dimensions.cornerRadiusXLarge),
             color = MaterialTheme.colorScheme.surfaceVariant,
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(Dimensions.padding16),
                 content = content,
             )
         }
@@ -374,7 +464,7 @@ private fun StorageOverviewRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     value: String,
-    valueColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    valueColor: Color = AppColors.textSecondary,
 ) {
     Row(
         modifier =
@@ -423,7 +513,7 @@ private fun StoredModelRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Left: Model name
+        // Left: Model name - iOS AppTypography.subheadlineMedium, caption2 for size
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = model.name,
@@ -431,9 +521,9 @@ private fun StoredModelRow(
                 fontWeight = FontWeight.Medium,
             )
             Text(
-                text = "ID: ${model.id}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = Formatter.formatFileSize(context, model.size),
+                style = AppTypography.caption2,
+                color = AppColors.textSecondary,
             )
         }
 
@@ -444,23 +534,18 @@ private fun StoredModelRow(
         ) {
             Text(
                 text = Formatter.formatFileSize(context, model.size),
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Medium,
+                style = AppTypography.caption,
+                color = AppColors.textSecondary,
             )
-            // Delete button
-            OutlinedButton(
+            IconButton(
                 onClick = onDelete,
-                modifier = Modifier.size(28.dp),
-                contentPadding = PaddingValues(0.dp),
-                colors =
-                    ButtonDefaults.outlinedButtonColors(
-                        contentColor = AppColors.primaryRed,
-                    ),
+                modifier = Modifier.size(32.dp),
             ) {
                 Icon(
                     Icons.Outlined.Delete,
                     contentDescription = "Delete",
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(20.dp),
+                    tint = AppColors.primaryRed,
                 )
             }
         }
@@ -468,72 +553,57 @@ private fun StoredModelRow(
 }
 
 /**
- * Storage Management Button
+ * Storage Management Button - iOS StorageManagementButton with icon, title, subtitle
  */
 @Composable
 private fun StorageManagementButton(
     title: String,
+    subtitle: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     color: Color,
     onClick: () -> Unit,
 ) {
     Surface(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick),
-        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(Dimensions.cornerRadiusRegular),
         color = color.copy(alpha = 0.1f),
+        border = androidx.compose.foundation.BorderStroke(
+            Dimensions.strokeRegular,
+            color.copy(alpha = 0.3f),
+        ),
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = color,
-            )
-            Spacer(modifier = Modifier.width(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = color,
+                )
+            }
             Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = color,
+                text = subtitle,
+                style = AppTypography.caption,
+                color = AppColors.textSecondary,
             )
         }
     }
 }
 
 /**
- * API Configuration Row
- */
-@Composable
-private fun ApiConfigurationRow(
-    label: String,
-    isConfigured: Boolean,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Text(
-            text = if (isConfigured) "Configured" else "Not Set",
-            style = MaterialTheme.typography.bodySmall,
-            color = if (isConfigured) AppColors.primaryGreen else AppColors.primaryOrange,
-        )
-    }
-}
-
-/**
- * API Configuration Dialog
+ * API Configuration Dialog - iOS ApiConfigurationSheet
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -554,12 +624,12 @@ private fun ApiConfigurationDialog(
             Column(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                // API Key Input
+                // API Key - iOS SecureField "Enter API Key"
                 OutlinedTextField(
                     value = apiKey,
                     onValueChange = onApiKeyChange,
                     label = { Text("API Key") },
-                    placeholder = { Text("Enter your API key") },
+                    placeholder = { Text("Enter API Key") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
@@ -573,7 +643,7 @@ private fun ApiConfigurationDialog(
                         }
                     },
                     supportingText = {
-                        Text("Your API key for authenticating with the backend")
+                        Text("Your API key for authenticating with the backend", style = AppTypography.caption)
                     },
                 )
 
@@ -587,7 +657,7 @@ private fun ApiConfigurationDialog(
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                     supportingText = {
-                        Text("The backend API URL (https:// added automatically if missing)")
+                        Text("The backend API URL (e.g., https://api.runanywhere.ai)", style = AppTypography.caption)
                     },
                 )
 
@@ -609,8 +679,8 @@ private fun ApiConfigurationDialog(
                         )
                         Text(
                             text = "After saving, you must restart the app for changes to take effect. The SDK will reinitialize with your custom configuration.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = AppTypography.caption,
+                            color = AppColors.textSecondary,
                         )
                     }
                 }
