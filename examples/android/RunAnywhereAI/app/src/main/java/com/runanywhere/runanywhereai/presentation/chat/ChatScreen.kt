@@ -208,7 +208,6 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
                         value = uiState.currentInput,
                         onValueChange = viewModel::updateInput,
                         onSend = viewModel::sendMessage,
-                        enabled = uiState.canSend,
                         isGenerating = uiState.isGenerating,
                         isModelLoaded = true,
                     )
@@ -231,7 +230,9 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
             onDismiss = { showingModelSelection = false },
             onModelSelected = { model ->
                 scope.launch {
-                    // Update view model that model was selected
+                    // Log which model was selected
+                    android.util.Log.i("ChatScreen", "LLM model selected: ${model.name} (${model.id})")
+                    // Sync ViewModel with SDK state - model is already loaded by ModelSelectionBottomSheet
                     viewModel.checkModelStatus()
                 }
             },
@@ -387,10 +388,39 @@ private fun shortModelName(name: String, maxLength: Int = 13): String {
 // MODEL INFO BAR
 // ====================
 
+/**
+ * Formats a byte size into a human-readable string (e.g., "1.2G", "500M").
+ * Returns null if the size is null.
+ */
+private fun formatModelSize(sizeBytes: Long?): String? {
+    if (sizeBytes == null || sizeBytes <= 0) return null
+    return when {
+        sizeBytes >= 1_000_000_000 -> String.format("%.1fG", sizeBytes / 1_000_000_000.0)
+        sizeBytes >= 1_000_000 -> String.format("%.0fM", sizeBytes / 1_000_000.0)
+        sizeBytes >= 1_000 -> String.format("%.0fK", sizeBytes / 1_000.0)
+        else -> "${sizeBytes}B"
+    }
+}
+
+/**
+ * Formats a context length into a human-readable string (e.g., "128K", "8K").
+ * Returns null if the context length is null.
+ */
+private fun formatContextLength(contextLength: Int?): String? {
+    if (contextLength == null || contextLength <= 0) return null
+    return when {
+        contextLength >= 1_000_000 -> String.format("%.1fM", contextLength / 1_000_000.0)
+        contextLength >= 1_000 -> String.format("%.0fK", contextLength / 1_000.0)
+        else -> contextLength.toString()
+    }
+}
+
 @Composable
 fun ModelInfoBar(
     modelName: String,
     framework: String,
+    downloadSize: Long? = null,
+    contextLength: Int? = null,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -438,41 +468,45 @@ fun ModelInfoBar(
             )
 
             // Stats (storage icon + size)
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(Dimensions.modelInfoStatsIconTextSpacing),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Storage,
-                    contentDescription = null,
-                    modifier = Modifier.size(Dimensions.iconSmall),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                // TODO: Get actual size
-                Text(
-                    text = "1.2G",
-                    style = AppTypography.rounded10,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            val formattedSize = formatModelSize(downloadSize)
+            if (formattedSize != null) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(Dimensions.modelInfoStatsIconTextSpacing),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Storage,
+                        contentDescription = null,
+                        modifier = Modifier.size(Dimensions.iconSmall),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = formattedSize,
+                        style = AppTypography.rounded10,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
 
             // Context length
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(Dimensions.modelInfoStatsIconTextSpacing),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Description,
-                    contentDescription = null,
-                    modifier = Modifier.size(Dimensions.iconSmall),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                // TODO: Get actual context length
-                Text(
-                    text = "128K",
-                    style = AppTypography.rounded10,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            val formattedContextLength = formatContextLength(contextLength)
+            if (formattedContextLength != null) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(Dimensions.modelInfoStatsIconTextSpacing),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Description,
+                        contentDescription = null,
+                        modifier = Modifier.size(Dimensions.iconSmall),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = formattedContextLength,
+                        style = AppTypography.rounded10,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
@@ -546,7 +580,6 @@ fun MessageBubbleView(
             message.thinkingContent?.let { thinking ->
                 ThinkingToggle(
                     thinkingContent = thinking,
-                    isGenerating = isGenerating,
                 )
                 Spacer(modifier = Modifier.height(Dimensions.small))
             }
@@ -869,7 +902,6 @@ fun ThinkingProgressIndicator() {
 @Composable
 fun ThinkingToggle(
     thinkingContent: String,
-    @Suppress("UNUSED_PARAMETER") isGenerating: Boolean,
 ) {
     var isExpanded by remember { mutableStateOf(false) }
 
@@ -1225,7 +1257,6 @@ fun ChatInputView(
     value: String,
     onValueChange: (String) -> Unit,
     onSend: () -> Unit,
-    @Suppress("UNUSED_PARAMETER") enabled: Boolean,
     isGenerating: Boolean,
     isModelLoaded: Boolean,
 ) {

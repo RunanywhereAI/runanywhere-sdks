@@ -570,27 +570,42 @@ private fun MainVoiceAssistantUI(
     @Suppress("UNUSED_PARAMETER") onClearConversation: () -> Unit,
 ) {
     val density = LocalDensity.current
-    
+
     // Particle animation state
     var amplitude by remember { mutableStateOf(0f) }
     var morphProgress by remember { mutableStateOf(0f) }
     var scatterAmount by remember { mutableStateOf(0f) }
     var touchPoint by remember { mutableStateOf(Offset.Zero) }
     val isDarkMode = isSystemInDarkTheme()
-    
-    // Animation timer (60 FPS = ~16ms)
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(16) // ~60 FPS
-            updateAnimation(
-                uiState = uiState,
-                amplitudeState = { amplitude },
-                morphProgressState = { morphProgress },
-                scatterAmountState = { scatterAmount },
-                onAmplitudeChange = { amplitude = it },
-                onMorphProgressChange = { morphProgress = it },
-                onScatterAmountChange = { scatterAmount = it },
-            )
+
+    // Determine if animation should be active to save battery/CPU
+    // Only run when: listening, speaking, scatter recovering, or morph transitioning
+    val isListening = uiState.sessionState == SessionState.LISTENING
+    val isSpeaking = uiState.sessionState == SessionState.SPEAKING
+    val isAnimationNeeded = isListening || isSpeaking || scatterAmount > 0.001f ||
+        (morphProgress > 0.001f && morphProgress < 0.999f)
+
+    // Animation timer (60 FPS = ~16ms) - only runs when animation is needed
+    LaunchedEffect(isAnimationNeeded) {
+        if (isAnimationNeeded) {
+            while (true) {
+                delay(16) // ~60 FPS
+                updateAnimation(
+                    uiState = uiState,
+                    amplitudeState = { amplitude },
+                    morphProgressState = { morphProgress },
+                    scatterAmountState = { scatterAmount },
+                    onAmplitudeChange = { amplitude = it },
+                    onMorphProgressChange = { morphProgress = it },
+                    onScatterAmountChange = { scatterAmount = it },
+                )
+                // Re-check if animation is still needed
+                val stillNeeded = uiState.sessionState == SessionState.LISTENING ||
+                    uiState.sessionState == SessionState.SPEAKING ||
+                    scatterAmount > 0.001f ||
+                    (morphProgress > 0.001f && morphProgress < 0.999f)
+                if (!stillNeeded) break
+            }
         }
     }
 
@@ -599,9 +614,9 @@ private fun MainVoiceAssistantUI(
         // Particle animation setup
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val size = min(constraints.maxWidth, constraints.maxHeight) * 0.9f
-            val centerX = constraints.maxWidth / 2f
-            val centerY = constraints.maxHeight / 2f
-            
+            val centerX = size / 2f
+            val centerY = size / 2f
+
             VoiceAssistantParticleView(
                 amplitude = amplitude,
                 morphProgress = morphProgress,
@@ -618,7 +633,7 @@ private fun MainVoiceAssistantUI(
                             // Coordinate system
                             val normalizedX = ((offset.x - centerX) / (size / 2f)) * 0.85f
                             val normalizedY = ((offset.y - centerY) / (size / 2f)) * -0.85f // Flip Y
-                            
+
                             touchPoint = Offset(normalizedX, normalizedY)
                             scatterAmount = 1.0f
                         }
@@ -733,12 +748,12 @@ private fun updateAnimation(
     val isSpeaking = uiState.sessionState == SessionState.SPEAKING
     val isActive = isListening || isSpeaking
     val targetMorph = if (isActive) 1.0f else 0.0f
-    
+
     // Smooth morph transition
     val currentMorph = morphProgressState()
     val morphDiff = targetMorph - currentMorph
     onMorphProgressChange((currentMorph + morphDiff * 0.04f).coerceIn(0f, 1f))
-    
+
     // Scatter decay
     val currentScatter = scatterAmountState()
     if (currentScatter > 0.001f) {
@@ -746,7 +761,7 @@ private fun updateAnimation(
     } else {
         onScatterAmountChange(0f)
     }
-    
+
     // Audio amplitude - reactive to both input (listening) and output (speaking)
     val currentAmplitude = amplitudeState()
     val newAmplitude = when {
@@ -759,15 +774,15 @@ private fun updateAnimation(
         isSpeaking -> {
             // TTS output - realistic speech-like pulse simulation
             val time = System.currentTimeMillis() / 1000f
-            
+
             // Multiple frequency components for natural speech rhythm
             val basePulse = 0.35f
             val primaryWave = sin(time * 3.5f) * 0.2f // Main speech rhythm
             val secondaryWave = sin(time * 7.0f) * 0.1f // Phoneme-like variation
             val randomNoise = kotlin.random.Random.nextFloat() * 0.2f - 0.05f // Natural variation
-            
+
             val targetAmplitude = basePulse + abs(primaryWave) + abs(secondaryWave) * 0.5f + randomNoise
-            
+
             // Smooth interpolation to avoid jarring changes
             (currentAmplitude * 0.75f + targetAmplitude * 0.25f).coerceIn(0f, 1f)
         }

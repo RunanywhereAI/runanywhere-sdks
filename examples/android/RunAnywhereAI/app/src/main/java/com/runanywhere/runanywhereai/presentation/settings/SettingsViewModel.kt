@@ -420,7 +420,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     )
                 }
 
-                Log.d(TAG, "API configuration saved successfully - URL: $normalizedURL")
+                Log.d(TAG, "API configuration saved successfully")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to save API configuration", e)
                 _uiState.update {
