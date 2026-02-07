@@ -310,15 +310,21 @@ final class LLMViewModel {
     private func getGenerationOptions() -> LLMGenerationOptions {
         let savedTemperature = UserDefaults.standard.double(forKey: "defaultTemperature")
         let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
+        let savedSystemPrompt = UserDefaults.standard.string(forKey: "defaultSystemPrompt")
 
         let effectiveSettings = (
             temperature: savedTemperature != 0 ? savedTemperature : Self.defaultTemperatureValue,
             maxTokens: savedMaxTokens != 0 ? savedMaxTokens : Self.defaultMaxTokensValue
         )
 
+        let effectiveSystemPrompt = (savedSystemPrompt?.isEmpty == false) ? savedSystemPrompt : nil
+
+        logger.info("[PARAMS] App getGenerationOptions: temperature=\(effectiveSettings.temperature), maxTokens=\(effectiveSettings.maxTokens), systemPrompt=\(effectiveSystemPrompt ?? "nil")")
+
         return LLMGenerationOptions(
             maxTokens: effectiveSettings.maxTokens,
-            temperature: Float(effectiveSettings.temperature)
+            temperature: Float(effectiveSettings.temperature),
+            systemPrompt: effectiveSystemPrompt
         )
     }
 
@@ -336,10 +342,12 @@ final class LLMViewModel {
         let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
         let maxTokens = savedMaxTokens != 0 ? savedMaxTokens : Self.defaultMaxTokensValue
 
+        let savedSystemPrompt = UserDefaults.standard.string(forKey: "defaultSystemPrompt")
+
         UserDefaults.standard.set(temperature, forKey: "defaultTemperature")
         UserDefaults.standard.set(maxTokens, forKey: "defaultMaxTokens")
 
-        logger.info("Settings applied - Temperature: \(temperature), MaxTokens: \(maxTokens)")
+        logger.info("Settings applied - Temperature: \(temperature), MaxTokens: \(maxTokens), SystemPrompt: \(savedSystemPrompt ?? "nil")")
     }
 
     @objc
