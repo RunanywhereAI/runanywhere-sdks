@@ -189,8 +189,18 @@ fun ModelSelectionBottomSheet(
                             onSelectModel = {
                                 scope.launch {
                                     viewModel.selectModel(model.id)
-                                    kotlinx.coroutines.delay(500)
-                                    onModelSelected(model)
+                                    // Wait for model to actually finish loading instead of fixed delay
+                                    // Poll until loading completes (with timeout to prevent infinite wait)
+                                    var attempts = 0
+                                    val maxAttempts = 120 // 60 seconds max (500ms * 120)
+                                    while (viewModel.uiState.value.isLoadingModel && attempts < maxAttempts) {
+                                        kotlinx.coroutines.delay(500)
+                                        attempts++
+                                    }
+                                    // Only notify success if loading completed (not timed out while still loading)
+                                    if (!viewModel.uiState.value.isLoadingModel) {
+                                        onModelSelected(model)
+                                    }
                                     onDismiss()
                                 }
                             },
