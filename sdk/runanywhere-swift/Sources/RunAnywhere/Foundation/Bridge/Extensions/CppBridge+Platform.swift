@@ -29,19 +29,6 @@ extension CppBridge {
         // swiftlint:disable:next avoid_any_type
         private static var foundationModelsService: Any?
 
-        /// Last error message from Foundation Models generate (used when C++ reports "Streaming generation failed")
-        static var lastFoundationModelsErrorMessage: String?
-
-        /// Maps generic Foundation Models error descriptions to user-friendly messages.
-        private static func friendlyFoundationModelsMessage(_ raw: String) -> String {
-            if raw.contains("FoundationModels.LanguageModelSession.GenerationError") ||
-               raw.contains("error -1") ||
-               raw.contains("The operation couldn't be completed") {
-                return "Apple Intelligence is not available on this device or simulator. Try a physical device with Apple Intelligence enabled in Settings, or use a downloaded LLM from the Models tab."
-            }
-            return raw
-        }
-
         /// Cached System TTS service instance
         private static var systemTTSService: SystemTTSService?
 
@@ -121,8 +108,7 @@ extension CppBridge {
                 }
 
                 // Use a dispatch group to synchronously wait for async creation
-                let handlePtr = UnsafeMutablePointer<rac_handle_t?>.allocate(capacity: 1)
-                handlePtr.initialize(to: nil)
+                var serviceHandle: rac_handle_t?
                 let group = DispatchGroup()
                 group.enter()
 
@@ -133,19 +119,17 @@ extension CppBridge {
                         Platform.foundationModelsService = service
 
                         // Return a marker handle - actual service is managed by Swift
-                        handlePtr.pointee = UnsafeMutableRawPointer(bitPattern: 0xF00DADE1)
+                        serviceHandle = UnsafeMutableRawPointer(bitPattern: 0xF00DADE1)
                         Platform.logger.info("Foundation Models service created")
                     } catch {
                         Platform.logger.error("Failed to create Foundation Models service: \(error)")
-                        handlePtr.pointee = nil
+                        serviceHandle = nil
                     }
                     group.leave()
                 }
 
                 group.wait()
-                let handle = handlePtr.move()
-                handlePtr.deallocate()
-                return handle
+                return serviceHandle
             }
 
             callbacks.generate = { _, promptPtr, _, outResponsePtr, _ -> rac_result_t in
@@ -164,10 +148,7 @@ extension CppBridge {
 
                 let prompt = String(cString: promptPtr)
 
-                let resultPtr = UnsafeMutablePointer<rac_result_t>.allocate(capacity: 1)
-                resultPtr.initialize(to: RAC_ERROR_INTERNAL)
-                let responsePtr = UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>.allocate(capacity: 1)
-                responsePtr.initialize(to: nil)
+                var result: rac_result_t = RAC_ERROR_INTERNAL
                 let group = DispatchGroup()
                 group.enter()
 
@@ -177,22 +158,16 @@ extension CppBridge {
                             prompt: prompt,
                             options: LLMGenerationOptions()
                         )
-                        responsePtr.pointee = strdup(response)
-                        resultPtr.pointee = RAC_SUCCESS
+                        outResponsePtr.pointee = strdup(response)
+                        result = RAC_SUCCESS
                     } catch {
                         Platform.logger.error("Foundation Models generate failed: \(error)")
-                        let raw = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
-                        Platform.lastFoundationModelsErrorMessage = Platform.friendlyFoundationModelsMessage(raw)
-                        resultPtr.pointee = RAC_ERROR_INTERNAL
+                        result = RAC_ERROR_INTERNAL
                     }
                     group.leave()
                 }
 
                 group.wait()
-                outResponsePtr.pointee = responsePtr.pointee
-                let result = resultPtr.move()
-                resultPtr.deallocate()
-                responsePtr.deallocate()
                 return result
             }
 
@@ -235,9 +210,7 @@ extension CppBridge {
             }
 
             callbacks.create = { _, _ -> rac_handle_t? in
-                // Use pointer to avoid mutating captured var inside sync block (Swift 6 concurrency)
-                let handlePtr = UnsafeMutablePointer<rac_handle_t?>.allocate(capacity: 1)
-                handlePtr.initialize(to: nil)
+                var serviceHandle: rac_handle_t?
 
                 // Use DispatchQueue.main.sync to create the MainActor-isolated service
                 // This ensures proper thread safety for AVSpeechSynthesizer
@@ -246,13 +219,11 @@ extension CppBridge {
                     Platform.systemTTSService = service
 
                     // Return a marker handle
-                    handlePtr.pointee = UnsafeMutableRawPointer(bitPattern: 0x5157E775)
+                    serviceHandle = UnsafeMutableRawPointer(bitPattern: 0x5157E775)
                     Platform.logger.info("System TTS service created")
                 }
 
-                let handle = handlePtr.pointee
-                handlePtr.deallocate()
-                return handle
+                return serviceHandle
             }
 
             callbacks.synthesize = { _, textPtr, optionsPtr, _ -> rac_result_t in
@@ -288,25 +259,22 @@ extension CppBridge {
                     volume: volume
                 )
 
-                let resultPtr = UnsafeMutablePointer<rac_result_t>.allocate(capacity: 1)
-                resultPtr.initialize(to: RAC_ERROR_INTERNAL)
+                var result: rac_result_t = RAC_ERROR_INTERNAL
                 let group = DispatchGroup()
                 group.enter()
 
                 Task {
                     do {
                         _ = try await service.synthesize(text: text, options: options)
-                        resultPtr.pointee = RAC_SUCCESS
+                        result = RAC_SUCCESS
                     } catch {
                         Platform.logger.error("System TTS synthesize failed: \(error)")
-                        resultPtr.pointee = RAC_ERROR_INTERNAL
+                        result = RAC_ERROR_INTERNAL
                     }
                     group.leave()
                 }
 
                 group.wait()
-                let result = resultPtr.move()
-                resultPtr.deallocate()
                 return result
             }
 

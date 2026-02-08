@@ -123,8 +123,12 @@ extension LLMViewModel {
             self.setError(error)
 
             if index < self.messagesValue.count {
-                // Use localizedDescription so SDKError (with underlying cause in message) shows clearly
-                let errorMessage: String = error.localizedDescription
+                let errorMessage: String
+                if error is LLMError {
+                    errorMessage = error.localizedDescription
+                } else {
+                    errorMessage = "Generation failed: \(error.localizedDescription)"
+                }
 
                 let currentMessage = self.messagesValue[index]
                 let updatedMessage = Message(

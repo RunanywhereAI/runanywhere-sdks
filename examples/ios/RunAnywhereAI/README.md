@@ -98,13 +98,6 @@ Download the app from the App Store to try it out.
 
 ---
 
-## Chat & LLM Notes
-
-- **Platform LLM (Foundation Models)** — Uses Apple Intelligence (iOS 26+). On the **Simulator**, Apple Intelligence is usually not available, so generation may fail with an error like "Device not eligible" or "Apple Intelligence not enabled". Use a **physical device** with Apple Intelligence enabled, or use a downloaded LlamaCPP model for chat on the simulator.
-- **Thinking models (SmolLM2, Llama 2, Mistral, etc.)** — These must be **downloaded first**. Open the **Models** tab, select an LLM (e.g. SmolLM2 360M or Qwen 2.5 0.5B), then tap **Download** (or **Load** if already downloaded). After the model is loaded, switch to the **Chat** tab and send a message.
-
----
-
 ## Features
 
 This sample app demonstrates the full power of the RunAnywhere SDK:
