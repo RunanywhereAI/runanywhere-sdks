@@ -112,25 +112,8 @@ class DiffusionViewModel: ObservableObject {
         isDownloading = false
     }
 
-    /// Detect model variant from model ID
-    private func detectModelVariant(from modelId: String) -> DiffusionModelVariant {
-        let lowerId = modelId.lowercased()
-        if lowerId.contains("sdxs") {
-            return .sdxs  // Ultra-fast 1-step
-        } else if lowerId.contains("lcm") {
-            return .lcm   // Fast 4-step
-        } else if lowerId.contains("turbo") {
-            return .sdxlTurbo  // Fast 4-step
-        } else if lowerId.contains("sdxl") || lowerId.contains("xl") {
-            return .sdxl
-        } else if lowerId.contains("sd21") || lowerId.contains("2.1") || lowerId.contains("2-1") {
-            return .sd21
-        }
-        return .sd15  // Default
-    }
-    
     @Published var currentModelVariant: DiffusionModelVariant = .sd15
-    
+
     func loadSelectedModel() async {
         guard let model = selectedModel, model.isDownloaded, let path = model.localPath else {
             errorMessage = "Model not downloaded"
@@ -141,10 +124,10 @@ class DiffusionViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            // Detect model variant to apply correct defaults
-            let variant = detectModelVariant(from: model.id)
+            // App only supports Apple SD 1.5 (CoreML); use .sd15 for configuration
+            let variant: DiffusionModelVariant = .sd15
             currentModelVariant = variant
-            
+
             let config = DiffusionConfiguration(modelVariant: variant, enableSafetyChecker: true, reduceMemory: true)
             try await RunAnywhere.loadDiffusionModel(modelPath: path.path, modelId: model.id, modelName: model.name, configuration: config)
             isModelLoaded = true
