@@ -6,6 +6,7 @@ Interactive demo projects showcasing what you can build with RunAnywhere.
 |---------|-------------|----------|
 | [swift-starter-app](swift-starter-app/) | Privacy-first AI demo — LLM Chat, Speech-to-Text, Text-to-Speech, and Voice Pipeline with VAD | iOS (Swift/SwiftUI) |
 | [on-device-browser-agent](on-device-browser-agent/) | On-device AI browser automation using WebLLM — no cloud, no API keys, fully private | Chrome Extension (TypeScript/React) |
+| [android-use-agent](android-use-agent/) | Autonomous Android agent — navigates phone UI via accessibility + GPT-4o Vision + on-device LLM fallback | Android (Kotlin/Jetpack Compose) |
 
 ## swift-starter-app
 
@@ -28,3 +29,15 @@ A Chrome extension that automates browser tasks entirely on-device using WebLLM 
 - **Fully offline** — All AI inference runs locally on GPU after initial model download
 
 **Requirements:** Chrome 124+ (WebGPU support)
+
+## android-use-agent
+
+An autonomous Android agent that navigates your phone's UI to accomplish tasks:
+
+- **Autonomous UI Navigation** — Taps, types, swipes, and navigates apps to complete goals
+- **GPT-4o Vision** — Screenshots sent to GPT-4o for visual screen understanding
+- **Unified Tool Calling** — All UI actions registered as OpenAI function calling tools
+- **On-Device Fallback** — Falls back to local LLM via RunAnywhere SDK when offline
+- **Voice Mode** — Speak goals via on-device Whisper STT, hear progress via TTS
+
+**Requirements:** Android 8.0+ (API 26), arm64-v8a device, Accessibility service permission

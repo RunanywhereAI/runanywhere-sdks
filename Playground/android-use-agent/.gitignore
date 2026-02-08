@@ -1,0 +1,26 @@
+# Gradle
+.gradle/
+build/
+local.properties
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Android
+*.apk
+*.aab
+*.ap_
+*.dex
+/captures
+
+# Kotlin
+*.kotlin_module
+
+# Local
+*.log
+.jdk/
+.tmp-sdk/
+android/
+node_modules/
