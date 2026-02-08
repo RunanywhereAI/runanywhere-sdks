@@ -112,15 +112,22 @@ extension CppBridge {
 
                 // Make synchronous HTTP call (we're already on a background thread from C++)
                 let semaphore = DispatchSemaphore(value: 0)
-                var result: rac_result_t = RAC_SUCCESS
+                let resultPtr = UnsafeMutablePointer<rac_result_t>.allocate(capacity: 1)
+                resultPtr.initialize(to: RAC_SUCCESS)
+                // Temporary storage to avoid mutating captured outResponse inside Task (Swift 6 concurrency)
+                let statusCodePtr = UnsafeMutablePointer<Int32>.allocate(capacity: 1)
+                let responseBodyPtr = UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>.allocate(capacity: 1)
+                let errorMessagePtr = UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>.allocate(capacity: 1)
+                statusCodePtr.initialize(to: 0)
+                responseBodyPtr.initialize(to: nil)
+                errorMessagePtr.initialize(to: nil)
 
                 Task {
                     do {
                         guard let jsonData = jsonStr.data(using: .utf8) else {
-                            outResponse.pointee.result = RAC_ERROR_INVALID_ARGUMENT
-                            outResponse.pointee.status_code = 0
-                            outResponse.pointee.error_message = ("Invalid JSON data" as NSString).utf8String
-                            result = RAC_ERROR_INVALID_ARGUMENT
+                            resultPtr.pointee = RAC_ERROR_INVALID_ARGUMENT
+                            statusCodePtr.pointee = 0
+                            errorMessagePtr.pointee = "Invalid JSON data".withCString { strdup($0) }
                             semaphore.signal()
                             return
                         }
@@ -132,23 +139,29 @@ extension CppBridge {
                             requiresAuth: needsAuth
                         )
 
-                        outResponse.pointee.result = RAC_SUCCESS
-                        outResponse.pointee.status_code = 200
+                        resultPtr.pointee = RAC_SUCCESS
+                        statusCodePtr.pointee = 200
                         if let responseStr = String(data: responseData, encoding: .utf8) {
-                            outResponse.pointee.response_body = (responseStr as NSString).utf8String
+                            responseBodyPtr.pointee = responseStr.withCString { strdup($0) }
                         }
-                        result = RAC_SUCCESS
                     } catch {
-                        outResponse.pointee.result = RAC_ERROR_NETWORK_ERROR
-                        outResponse.pointee.status_code = 0
-                        outResponse.pointee.error_message = (error.localizedDescription as NSString).utf8String
-                        result = RAC_ERROR_NETWORK_ERROR
+                        resultPtr.pointee = RAC_ERROR_NETWORK_ERROR
+                        statusCodePtr.pointee = 0
+                        errorMessagePtr.pointee = error.localizedDescription.withCString { strdup($0) }
                     }
                     semaphore.signal()
                 }
 
                 semaphore.wait()
-                return result
+                outResponse.pointee.result = resultPtr.pointee
+                outResponse.pointee.status_code = statusCodePtr.pointee
+                outResponse.pointee.response_body = responseBodyPtr.pointee.map { UnsafePointer($0) }
+                outResponse.pointee.error_message = errorMessagePtr.pointee.map { UnsafePointer($0) }
+                resultPtr.deallocate()
+                statusCodePtr.deallocate()
+                responseBodyPtr.deallocate()
+                errorMessagePtr.deallocate()
+                return outResponse.pointee.result
             }
 
             callbacks.user_data = nil
