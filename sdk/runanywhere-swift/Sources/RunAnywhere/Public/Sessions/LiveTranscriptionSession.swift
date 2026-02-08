@@ -69,21 +69,14 @@ public final class LiveTranscriptionSession: ObservableObject {
     /// Async stream of transcription text updates
     public var transcriptions: AsyncStream<String> {
         AsyncStream { [weak self] continuation in
-            let session = self
             Task { @MainActor in
-                session?.onPartialCallback = { text in
+                self?.onPartialCallback = { text in
                     continuation.yield(text)
                 }
             }
-            // Sendable box so onTermination closure doesn't capture self (Swift 6 concurrency)
-            final class Ref: @unchecked Sendable {
-                weak var session: LiveTranscriptionSession?
-            }
-            let ref = Ref()
-            ref.session = self
-            continuation.onTermination = { _ in
+            continuation.onTermination = { [weak self] _ in
                 Task { @MainActor in
-                    ref.session?.onPartialCallback = nil
+                    self?.onPartialCallback = nil
                 }
             }
         }

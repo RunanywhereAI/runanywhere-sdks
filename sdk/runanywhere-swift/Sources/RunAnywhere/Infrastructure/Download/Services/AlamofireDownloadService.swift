@@ -124,16 +124,14 @@ public class AlamofireDownloadService: @unchecked Sendable {
 
         // Determine if we need extraction
         // First check artifact type, then infer from URL if not explicitly set
-        let requiresExtraction: Bool = {
-            var extraction = model.artifactType.requiresExtraction
-            // If artifact type doesn't require extraction, check if URL indicates an archive
-            // This is a safeguard for models registered without explicit artifact type
-            if !extraction, let archiveType = ArchiveType.from(url: downloadURL) {
-                logger.info("URL indicates archive type (\(archiveType.rawValue)) but artifact type doesn't require extraction. Inferring extraction needed.")
-                extraction = true
-            }
-            return extraction
-        }()
+        var requiresExtraction = model.artifactType.requiresExtraction
+
+        // If artifact type doesn't require extraction, check if URL indicates an archive
+        // This is a safeguard for models registered without explicit artifact type
+        if !requiresExtraction, let archiveType = ArchiveType.from(url: downloadURL) {
+            logger.info("URL indicates archive type (\(archiveType.rawValue)) but artifact type doesn't require extraction. Inferring extraction needed.")
+            requiresExtraction = true
+        }
 
         // Get destination path from C++ path utilities
         let destinationFolder = try CppBridge.ModelPaths.getModelFolder(modelId: model.id, framework: model.framework)
@@ -148,8 +146,7 @@ public class AlamofireDownloadService: @unchecked Sendable {
             progressContinuation.yield(progress)
         }
 
-        // Create download task (capture requiresExtraction for Swift 6 concurrency)
-        let requiresExtractionForTask = requiresExtraction
+        // Create download task
         let task = DownloadTask(
             id: taskId,
             modelId: model.id,
@@ -165,7 +162,7 @@ public class AlamofireDownloadService: @unchecked Sendable {
                         model: model,
                         downloadURL: downloadURL,
                         taskId: taskId,
-                        requiresExtraction: requiresExtractionForTask,
+                        requiresExtraction: requiresExtraction,
                         downloadStartTime: downloadStartTime,
                         destinationFolder: destinationFolder,
                         progressContinuation: progressContinuation

@@ -40,7 +40,7 @@ let onnxRuntimeMacOSPath = "\(packageDir)/sdk/runanywhere-swift/Binaries/onnxrun
 //   ./scripts/build-swift.sh --set-remote  (sets useLocalBinaries = false)
 //
 // =============================================================================
-let useLocalBinaries = false  // Toggle: true for local dev, false for release
+let useLocalBinaries = true  // Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when testLocal = false)
 // Updated automatically by CI/CD during releases
@@ -219,23 +219,23 @@ func binaryTargets() -> [Target] {
     } else {
         // =====================================================================
         // PRODUCTION MODE (for external SPM consumers)
-        // Download XCFrameworks from GitHub releases (v* or swift-v* from Phase 2 CI)
+        // Download XCFrameworks from GitHub releases
         // =====================================================================
         return [
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "38e871517017610185057e83b14ebf4ac1021d53247f7f85d12d411217ef5247"
+                checksum: "ba367c89a468513b33fb167b5996574a8797bf2c00a21e01579ec59458813559"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
-                checksum: "5c8b1c68d32e72561559cb366125f4413968114cdfb1c118141d186c37f3eb4c"
+                checksum: "9e58e33e2984f5f0498bdad69387aec306fd2d31e6690eab38b9f1d1a21fb0ca"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
-                checksum: "42a61542fb299f7aaf127a8590ead58d8b159db4ba5ea67fd48a835da3c6289e"
+                checksum: "e760044abfe97d2bde9386d801b0e11421c3782980f4088edce6d6d976f48a84"
             ),
             .binaryTarget(
                 name: "ONNXRuntimeBinary",
