@@ -59,17 +59,16 @@ struct RunAnywhereAIApp: App {
 
     private func initializeSDK() async {
         do {
+            // Register backends with C++ registry FIRST, before any await. Otherwise we can
+            // suspend at the next line and another task may run loadModel() → ensureServicesReady()
+            // → only Platform is registered → -422 "No provider could handle the request".
+            LlamaCPP.register(priority: 100)
+            ONNX.register(priority: 100)
+
             // Clear any previous error
             await MainActor.run { initializationError = nil }
 
             logger.info("🎯 Initializing SDK...")
-
-            // Register backends with C++ registry first (synchronously) so they are available
-            // before any LLM/STT/TTS API can run. Otherwise ensureServicesReady() can run
-            // (e.g. user taps Load) before registerModulesAndModels() completes, and only
-            // Platform would be registered → -422 "No provider could handle the request".
-            LlamaCPP.register(priority: 100)
-            ONNX.register(priority: 100)
 
             let startTime = Date()
 
