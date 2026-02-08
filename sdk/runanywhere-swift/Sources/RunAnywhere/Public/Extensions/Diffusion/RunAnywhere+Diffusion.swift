@@ -3,9 +3,8 @@
 //  RunAnywhere SDK
 //
 //  Public API for diffusion (image generation) operations.
-//  Routes to appropriate backend based on model framework:
-//  - CoreML models (.coreml) → DiffusionPlatformService (ANE acceleration)
-//  - ONNX models (.onnx) → CppBridge.Diffusion (C++ backend)
+//  Apple Stable Diffusion only: CoreML → DiffusionPlatformService (ANE acceleration).
+//  ONNX diffusion is not supported.
 //
 
 import CoreGraphics
@@ -33,10 +32,7 @@ private actor DiffusionBackendState {
     
     var isLoaded: Bool {
         get async {
-            if _loadedFramework == .onnx {
-                return true
-            }
-            if let service = _coreMLService {
+            if _loadedFramework == .coreml, let service = _coreMLService {
                 return await service.isReady
             }
             return false
@@ -77,9 +73,7 @@ public extension RunAnywhere {
 
     /// Generate an image from a text prompt
     ///
-    /// Automatically routes to the appropriate backend based on the loaded model's framework:
-    /// - CoreML models: Uses Apple's StableDiffusionPipeline with ANE acceleration (30-60s)
-    /// - ONNX models: Uses C++ ONNX Runtime (CPU fallback, 2-5 min)
+    /// Uses Apple Stable Diffusion (CoreML) with ANE acceleration when a model is loaded.
     ///
     /// Example usage:
     /// ```swift
@@ -108,12 +102,11 @@ public extension RunAnywhere {
 
         let opts = options ?? DiffusionGenerationOptions(prompt: prompt)
 
-        // Route to appropriate backend based on framework
         switch framework {
         case .coreml:
             return try await generateImageWithCoreML(prompt: prompt, options: opts)
         case .onnx:
-            return try await generateImageWithONNX(prompt: prompt, options: opts)
+            throw SDKError.diffusion(.unsupportedBackend, "ONNX diffusion is not supported. Use Apple Stable Diffusion (CoreML) only.")
         default:
             throw SDKError.diffusion(.unsupportedBackend, "Unsupported framework: \(framework.rawValue)")
         }
@@ -226,7 +219,7 @@ public extension RunAnywhere {
         case .coreml:
             return try await generateImageWithCoreMLProgress(prompt: prompt, options: opts, onProgress: onProgress)
         case .onnx:
-            return try await generateImageWithONNXProgress(prompt: prompt, options: opts, onProgress: onProgress)
+            throw SDKError.diffusion(.unsupportedBackend, "ONNX diffusion is not supported. Use Apple Stable Diffusion (CoreML) only.")
         default:
             throw SDKError.diffusion(.unsupportedBackend, "Unsupported framework: \(framework.rawValue)")
         }
@@ -244,7 +237,7 @@ public extension RunAnywhere {
         case .coreml:
             await DiffusionBackendState.shared.coreMLService?.cancel()
         case .onnx:
-            await CppBridge.Diffusion.shared.cancel()
+            break
         default:
             break
         }
@@ -289,14 +282,9 @@ public extension RunAnywhere {
                 configuration: configuration
             )
         case .onnx:
-            try await loadDiffusionModelWithONNX(
-                modelPath: modelPath,
-                modelId: modelId,
-                modelName: modelName,
-                configuration: configuration
-            )
+            throw SDKError.diffusion(.unsupportedBackend, "ONNX diffusion is not supported. Use Apple Stable Diffusion (CoreML) only.")
         default:
-            throw SDKError.diffusion(.unsupportedBackend, "Unsupported framework: \(framework.rawValue). Use .coreml or .onnx")
+            throw SDKError.diffusion(.unsupportedBackend, "Unsupported framework: \(framework.rawValue). Use .coreml only.")
         }
 
         // Record the loaded state
@@ -322,7 +310,6 @@ public extension RunAnywhere {
         case .coreml:
             await DiffusionBackendState.shared.unload()
         case .onnx:
-            await CppBridge.Diffusion.shared.unload()
             await DiffusionBackendState.shared.unload()
         default:
             await DiffusionBackendState.shared.unload()
@@ -366,28 +353,18 @@ public extension RunAnywhere {
 
 private extension RunAnywhere {
 
-    /// Detect the model framework from the model directory contents
-    ///
-    /// Detection rules:
-    /// - CoreML: Has .mlmodelc directories (compiled CoreML models)
-    /// - ONNX: Has .onnx files in subdirectories
-    ///
-    /// - Parameter path: Path to the model directory
-    /// - Returns: Detected InferenceFramework
+    /// Detect the model framework from the model directory contents.
+    /// Only Apple CoreML is supported; default to CoreML when unknown.
     static func detectFramework(from path: String) -> InferenceFramework {
         let fm = FileManager.default
-        
-        // Check for CoreML models (.mlmodelc directories)
-        // Common patterns for CoreML Stable Diffusion models
         let coreMLIndicators = [
             "Unet.mlmodelc",
             "TextEncoder.mlmodelc",
             "VAEDecoder.mlmodelc",
             "VAEEncoder.mlmodelc",
             "SafetyChecker.mlmodelc",
-            "TextEncoder2.mlmodelc"  // SDXL
+            "TextEncoder2.mlmodelc"
         ]
-        
         for indicator in coreMLIndicators {
             let indicatorPath = (path as NSString).appendingPathComponent(indicator)
             var isDir: ObjCBool = false
@@ -396,26 +373,8 @@ private extension RunAnywhere {
                 return .coreml
             }
         }
-        
-        // Check for ONNX models (.onnx files)
-        let onnxIndicators = [
-            "unet/model.onnx",
-            "text_encoder/model.onnx",
-            "vae_decoder/model.onnx",
-            "vae_encoder/model.onnx"
-        ]
-        
-        for indicator in onnxIndicators {
-            let indicatorPath = (path as NSString).appendingPathComponent(indicator)
-            if fm.fileExists(atPath: indicatorPath) {
-                SDKLogger.shared.debug("[Diffusion] Detected ONNX model (found \(indicator))")
-                return .onnx
-            }
-        }
-        
-        // Default to ONNX if we can't determine
-        SDKLogger.shared.warning("[Diffusion] Could not detect model framework, defaulting to ONNX")
-        return .onnx
+        SDKLogger.shared.warning("[Diffusion] Could not detect CoreML; defaulting to CoreML (Apple only)")
+        return .coreml
     }
 }
 

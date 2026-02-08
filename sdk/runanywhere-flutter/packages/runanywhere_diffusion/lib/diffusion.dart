@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io';
+
 import 'diffusion_types.dart';
 import 'native/diffusion_bindings.dart';
 
 /// Diffusion module for image generation using Stable Diffusion models.
 ///
-/// Supports both ONNX (cross-platform) and CoreML (iOS only) backends.
+/// iOS only (CoreML/ANE). On Android, methods throw [DiffusionException].
 class Diffusion {
   static final Diffusion _instance = Diffusion._internal();
 
@@ -22,13 +24,31 @@ class Diffusion {
   /// Capabilities provided by this module
   static const List<String> capabilities = ['image-generation'];
 
+  /// True only on iOS/macOS. On Android, diffusion is not supported.
+  static bool get isSupported => Platform.isIOS || Platform.isMacOS;
+
   DiffusionConfiguration? _currentConfig;
   String? _loadedModelId;
-  final DiffusionBindings _bindings = DiffusionBindings();
+  DiffusionBindings? _bindings;
+
+  /// Lazy: only created on iOS/macOS when first needed.
+  DiffusionBindings get _bindingsInstance {
+    Diffusion._throwIfUnsupported();
+    return _bindings ??= DiffusionBindings();
+  }
+
+  static void _throwIfUnsupported() {
+    if (!isSupported) {
+      throw DiffusionException(
+        'Diffusion is only supported on iOS/macOS (CoreML/ANE). It is not available on Android.',
+      );
+    }
+  }
 
   /// Register the Diffusion backend with the SDK
   static Future<void> register({int priority = 100}) async {
-    final result = _instance._bindings.register();
+    _throwIfUnsupported();
+    final result = _instance._bindingsInstance.register();
     if (result != 0) {
       throw DiffusionException('Failed to register Diffusion backend: $result');
     }
@@ -36,7 +56,8 @@ class Diffusion {
 
   /// Unregister the Diffusion backend
   static Future<void> unregister() async {
-    _instance._bindings.unregister();
+    if (!isSupported) return;
+    _instance._bindingsInstance.unregister();
   }
 
   /// Check if a model is loaded
@@ -50,7 +71,8 @@ class Diffusion {
 
   /// Configure the diffusion component
   Future<void> configure(DiffusionConfiguration config) async {
-    final result = _bindings.configure(
+    Diffusion._throwIfUnsupported();
+    final result = _bindingsInstance.configure(
       modelId: config.modelId,
       preferredFramework: config.preferredFramework?.rawValue,
       modelVariant: config.modelVariant.cValue,
@@ -73,7 +95,8 @@ class Diffusion {
     required String modelId,
     String? modelName,
   }) async {
-    final result = _bindings.loadModel(
+    Diffusion._throwIfUnsupported();
+    final result = _bindingsInstance.loadModel(
       path: path,
       modelId: modelId,
       modelName: modelName,
@@ -86,7 +109,8 @@ class Diffusion {
 
   /// Unload the current model
   Future<void> unloadModel() async {
-    _bindings.unloadModel();
+    if (!Diffusion.isSupported) return;
+    _bindingsInstance.unloadModel();
     _loadedModelId = null;
   }
 
@@ -94,11 +118,12 @@ class Diffusion {
   Future<DiffusionResult> generateImage(
     DiffusionGenerationOptions options,
   ) async {
+    Diffusion._throwIfUnsupported();
     if (!isModelLoaded) {
       throw DiffusionException('No model loaded');
     }
 
-    final result = await _bindings.generate(options);
+    final result = await _bindingsInstance.generate(options);
     return result;
   }
 
@@ -106,6 +131,7 @@ class Diffusion {
   Stream<DiffusionProgress> generateImageWithProgress(
     DiffusionGenerationOptions options,
   ) async* {
+    Diffusion._throwIfUnsupported();
     if (!isModelLoaded) {
       throw DiffusionException('No model loaded');
     }
@@ -116,7 +142,8 @@ class Diffusion {
 
   /// Cancel ongoing generation
   Future<void> cancel() async {
-    _bindings.cancel();
+    if (!Diffusion.isSupported) return;
+    _bindingsInstance.cancel();
   }
 
   /// Simple text-to-image generation

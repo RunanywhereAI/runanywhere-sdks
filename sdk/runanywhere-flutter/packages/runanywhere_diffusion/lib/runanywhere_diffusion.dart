@@ -1,6 +1,6 @@
 /// RunAnywhere Diffusion - Image generation using Stable Diffusion models
 ///
-/// Supports both ONNX (cross-platform) and CoreML (iOS only) backends.
+/// iOS only (CoreML/ANE). Not available on Android.
 library runanywhere_diffusion;
 
 export 'diffusion.dart';

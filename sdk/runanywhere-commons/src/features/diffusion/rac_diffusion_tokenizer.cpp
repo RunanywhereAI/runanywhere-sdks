@@ -28,18 +28,20 @@
 #endif
 
 // =============================================================================
-// CONSTANTS - HuggingFace tokenizer URLs
+// CONSTANTS - Tokenizer base URLs for Apple Stable Diffusion models
 // =============================================================================
+// Used when ensuring tokenizer files (vocab.json, merges.txt) for text encoding.
+// Built-in Apple models: SD 1.5 CoreML and SD 2.1 CoreML use SD_1_5 and SD_2_X.
 
-// Stable Diffusion 1.5 (runwayml/stable-diffusion-v1-5)
+// Apple SD 1.5 (same tokenizer as runwayml/stable-diffusion-v1-5)
 static const char* TOKENIZER_URL_SD_1_5 =
     "https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/tokenizer";
 
-// Stable Diffusion 2.x (stabilityai/stable-diffusion-2-1)
+// Apple SD 2.1 (same tokenizer as stabilityai/stable-diffusion-2-1)
 static const char* TOKENIZER_URL_SD_2_X =
     "https://huggingface.co/stabilityai/stable-diffusion-2-1/resolve/main/tokenizer";
 
-// Stable Diffusion XL (stabilityai/stable-diffusion-xl-base-1.0)
+// SDXL (reserved for future use; built-in app models are SD 1.5 and SD 2.1 only)
 static const char* TOKENIZER_URL_SDXL =
     "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/tokenizer";
 
