@@ -49,7 +49,14 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
 
     if (result == RAC_SUCCESS && model_info) {
         framework = model_info->framework;
-        model_path = model_info->local_path ? model_info->local_path : model_id;
+        const char* reg_path = model_info->local_path ? model_info->local_path : model_id;
+        // Registry local_path is often the model directory; LlamaCPP needs the path to the .gguf file.
+        // If model_id is already a path to a .gguf file (e.g. from path lookup), use it for loading.
+        if (strstr(model_id, ".gguf") != nullptr) {
+            model_path = model_id;
+        } else {
+            model_path = reg_path;
+        }
         RAC_LOG_INFO(LOG_CAT, "Found model in registry: id=%s, framework=%d, local_path=%s",
                      model_info->id ? model_info->id : "NULL",
                      static_cast<int>(framework), model_path ? model_path : "NULL");
