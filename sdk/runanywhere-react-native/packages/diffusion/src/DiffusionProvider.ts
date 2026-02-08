@@ -1,9 +1,10 @@
 /**
  * Diffusion Provider - Native Bridge Integration
  *
- * Provides the connection between the TypeScript API and the native C++ backend.
+ * Diffusion is iOS-only (CoreML/ANE). On Android, all methods throw or return false.
  */
 
+import { Platform } from 'react-native';
 import {
   requireNativeDiffusionModule,
   isNativeDiffusionModuleAvailable,
@@ -14,6 +15,15 @@ import type {
   DiffusionResult,
   DiffusionTokenizerSource,
 } from './types';
+
+const DIFFUSION_IOS_ONLY_MSG =
+  'Diffusion is only supported on iOS (CoreML/ANE). It is not available on Android.';
+
+function assertIOS(): void {
+  if (Platform.OS !== 'ios') {
+    throw new Error(DIFFUSION_IOS_ONLY_MSG);
+  }
+}
 
 /**
  * Convert tokenizer source to C++ enum value
@@ -41,6 +51,9 @@ export class DiffusionProvider {
    * Register the Diffusion backend
    */
   static async register(): Promise<boolean> {
+    if (Platform.OS !== 'ios') {
+      return false;
+    }
     if (this._isRegistered) return true;
     if (!isNativeDiffusionModuleAvailable()) {
       console.warn(
@@ -66,6 +79,7 @@ export class DiffusionProvider {
    * Unregister the Diffusion backend
    */
   static async unregister(): Promise<boolean> {
+    if (Platform.OS !== 'ios') return true;
     if (!this._isRegistered) return true;
 
     try {
@@ -92,6 +106,7 @@ export class DiffusionProvider {
    * Configure the diffusion component
    */
   static async configure(config: DiffusionConfiguration): Promise<void> {
+    assertIOS();
     const native = requireNativeDiffusionModule();
 
     const configJson = JSON.stringify({
@@ -123,6 +138,7 @@ export class DiffusionProvider {
     modelId: string,
     modelName?: string
   ): Promise<void> {
+    assertIOS();
     const native = requireNativeDiffusionModule();
     const success = await native.loadModel(path, modelId, modelName);
     if (!success) {
@@ -134,6 +150,7 @@ export class DiffusionProvider {
    * Unload the current model
    */
   static async unloadModel(): Promise<void> {
+    assertIOS();
     const native = requireNativeDiffusionModule();
     await native.unloadModel();
   }
@@ -142,6 +159,7 @@ export class DiffusionProvider {
    * Check if a model is loaded
    */
   static async isModelLoaded(): Promise<boolean> {
+    if (Platform.OS !== 'ios') return false;
     const native = requireNativeDiffusionModule();
     return native.isModelLoaded();
   }
@@ -153,6 +171,7 @@ export class DiffusionProvider {
     prompt: string,
     options?: Partial<DiffusionGenerationOptions>
   ): Promise<DiffusionResult> {
+    assertIOS();
     const native = requireNativeDiffusionModule();
 
     const optionsJson = JSON.stringify({
@@ -191,6 +210,7 @@ export class DiffusionProvider {
     inputImageBase64: string,
     options?: Partial<DiffusionGenerationOptions>
   ): Promise<DiffusionResult> {
+    assertIOS();
     const native = requireNativeDiffusionModule();
 
     const optionsJson = JSON.stringify({
@@ -228,6 +248,7 @@ export class DiffusionProvider {
     maskImageBase64: string,
     options?: Partial<DiffusionGenerationOptions>
   ): Promise<DiffusionResult> {
+    assertIOS();
     const native = requireNativeDiffusionModule();
 
     const optionsJson = JSON.stringify({
@@ -260,6 +281,7 @@ export class DiffusionProvider {
    * Cancel generation
    */
   static async cancel(): Promise<void> {
+    assertIOS();
     const native = requireNativeDiffusionModule();
     await native.cancelGeneration();
   }

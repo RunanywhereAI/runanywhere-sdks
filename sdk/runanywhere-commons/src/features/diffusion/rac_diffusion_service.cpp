@@ -26,43 +26,18 @@ namespace fs = std::filesystem;
 // =============================================================================
 
 /**
- * Detect model format from path by checking for actual model files.
- * Returns the detected framework, or RAC_FRAMEWORK_UNKNOWN if unsure.
+ * Detect model format from path. Only Apple CoreML diffusion is supported.
+ * ONNX diffusion is not supported; we only look for CoreML.
  */
 static rac_inference_framework_t detect_model_format_from_path(const char* path) {
     if (!path) {
         return RAC_FRAMEWORK_UNKNOWN;
     }
-    
     fs::path dir_path(path);
-    
     if (!fs::exists(dir_path) || !fs::is_directory(dir_path)) {
         return RAC_FRAMEWORK_UNKNOWN;
     }
-    
-    // Check for ONNX diffusion structure (unet/, text_encoder/, vae_decoder/)
-    bool has_onnx_unet = fs::exists(dir_path / "unet" / "model.onnx");
-    bool has_onnx_text_encoder = fs::exists(dir_path / "text_encoder" / "model.onnx");
-    bool has_onnx_vae = fs::exists(dir_path / "vae_decoder" / "model.onnx");
-    
-    if (has_onnx_unet || has_onnx_text_encoder || has_onnx_vae) {
-        RAC_LOG_DEBUG(LOG_CAT, "Detected ONNX diffusion model at path: %s", path);
-        return RAC_FRAMEWORK_ONNX;
-    }
-    
-    // Check for .onnx files at root level
-    try {
-        for (const auto& entry : fs::directory_iterator(dir_path)) {
-            if (entry.path().extension() == ".onnx") {
-                RAC_LOG_DEBUG(LOG_CAT, "Found .onnx file at root, detected ONNX model");
-                return RAC_FRAMEWORK_ONNX;
-            }
-        }
-    } catch (const fs::filesystem_error&) {
-        // Ignore
-    }
-    
-    // Check for CoreML files (.mlmodelc, .mlpackage)
+    // Only support CoreML (.mlmodelc, .mlpackage) for Apple Stable Diffusion
     try {
         for (const auto& entry : fs::directory_iterator(dir_path)) {
             std::string ext = entry.path().extension().string();
@@ -77,7 +52,6 @@ static rac_inference_framework_t detect_model_format_from_path(const char* path)
     } catch (const fs::filesystem_error&) {
         // Ignore
     }
-    
     return RAC_FRAMEWORK_UNKNOWN;
 }
 
@@ -121,14 +95,11 @@ static rac_result_t diffusion_create_service_internal(const char* model_id,
         framework = detect_model_format_from_path(model_id);
 
         if (framework == RAC_FRAMEWORK_UNKNOWN) {
-            // If still unknown, use platform defaults
-#if defined(__APPLE__)
             framework = RAC_FRAMEWORK_COREML;
-            RAC_LOG_INFO(LOG_CAT, "Could not detect format, defaulting to CoreML on Apple");
-#else
-            framework = RAC_FRAMEWORK_ONNX;
-            RAC_LOG_INFO(LOG_CAT, "Could not detect format, defaulting to ONNX");
-#endif
+            RAC_LOG_INFO(LOG_CAT, "Could not detect format, defaulting to CoreML (Apple only)");
+        } else if (framework == RAC_FRAMEWORK_ONNX) {
+            RAC_LOG_WARNING(LOG_CAT, "ONNX diffusion is not supported; only Apple CoreML. Ignoring ONNX.");
+            framework = RAC_FRAMEWORK_COREML;
         } else {
             RAC_LOG_INFO(LOG_CAT, "Detected framework=%d from path inspection",
                          static_cast<int>(framework));

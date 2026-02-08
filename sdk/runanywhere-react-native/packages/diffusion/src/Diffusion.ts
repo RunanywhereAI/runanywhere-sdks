@@ -1,8 +1,8 @@
 /**
  * Diffusion Module for React Native SDK
  *
- * Provides image generation capabilities using Stable Diffusion models.
- * Supports both ONNX (cross-platform) and CoreML (iOS only) backends.
+ * Image generation using Stable Diffusion models. iOS only (CoreML/ANE).
+ * On Android, register() returns false and other operations throw.
  */
 
 import { DiffusionProvider } from './DiffusionProvider';

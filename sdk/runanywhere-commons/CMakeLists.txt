@@ -163,7 +163,7 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/device/rac_device_manager.cpp
 )
 
-# Feature sources - LLM, STT, TTS, VAD, VLM, Diffusion service interfaces
+# Feature sources - LLM, STT, TTS, VAD, VLM, Diffusion (iOS/Apple only)
 set(RAC_FEATURES_SOURCES
     # LLM
     src/features/llm/llm_component.cpp
@@ -187,17 +187,21 @@ set(RAC_FEATURES_SOURCES
     # VLM (Vision Language Model)
     src/features/vlm/vlm_component.cpp
     src/features/vlm/rac_vlm_service.cpp
-    # Diffusion (Image Generation)
-    src/features/diffusion/diffusion_component.cpp
-    src/features/diffusion/diffusion_json.cpp
-    src/features/diffusion/diffusion_model_registry.cpp
-    src/features/diffusion/rac_diffusion_service.cpp
-    src/features/diffusion/rac_diffusion_tokenizer.cpp
     # Voice Agent
     src/features/voice_agent/voice_agent.cpp
     # Result memory management
     src/features/result_free.cpp
 )
+# Diffusion (Image Generation) - Apple only (CoreML/ANE). Not built for Android.
+if(NOT RAC_PLATFORM_ANDROID)
+    list(APPEND RAC_FEATURES_SOURCES
+        src/features/diffusion/diffusion_component.cpp
+        src/features/diffusion/diffusion_json.cpp
+        src/features/diffusion/diffusion_model_registry.cpp
+        src/features/diffusion/rac_diffusion_service.cpp
+        src/features/diffusion/rac_diffusion_tokenizer.cpp
+    )
+endif()
 
 # Image utilities (for VLM)
 set(RAC_UTILS_SOURCES
@@ -270,6 +274,7 @@ if(APPLE)
 endif()
 
 if(RAC_PLATFORM_ANDROID)
+    target_compile_definitions(rac_commons PRIVATE RAC_PLATFORM_ANDROID=1)
     target_link_libraries(rac_commons PUBLIC log)
 endif()
 

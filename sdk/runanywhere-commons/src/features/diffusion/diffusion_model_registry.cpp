@@ -205,27 +205,23 @@ static rac_result_t builtin_list_models(rac_diffusion_model_def_t** out_models,
 
 static rac_diffusion_backend_t builtin_select_backend(const rac_diffusion_model_def_t* model,
                                                        void* /*user_data*/) {
-    if (!model) return RAC_DIFFUSION_BACKEND_ONNX;
-    
-    // If model has a specific backend preference, respect it (unless AUTO)
+    // Diffusion is Apple CoreML-only; no ONNX diffusion.
+    if (!model) {
+#if defined(__APPLE__)
+        return RAC_DIFFUSION_BACKEND_COREML;
+#else
+        return RAC_DIFFUSION_BACKEND_COREML;  // Unused on non-Apple (diffusion not built)
+#endif
+    }
     if (model->backend != RAC_DIFFUSION_BACKEND_AUTO) {
         return model->backend;
     }
-    
-    // Auto-select best backend for platform
-    uint32_t current_platform = detect_current_platform();
-    
 #if defined(__APPLE__)
-    // On Apple platforms, prefer CoreML if model supports it
-    if ((current_platform == RAC_DIFFUSION_PLATFORM_IOS || 
-         current_platform == RAC_DIFFUSION_PLATFORM_MACOS) &&
-        model->download.coreml_path != nullptr) {
+    if (model->download.coreml_path != nullptr) {
         return RAC_DIFFUSION_BACKEND_COREML;
     }
 #endif
-    
-    // Default to ONNX (with platform-specific EP handling done at runtime)
-    return RAC_DIFFUSION_BACKEND_ONNX;
+    return RAC_DIFFUSION_BACKEND_COREML;
 }
 
 static rac_diffusion_model_strategy_t BUILTIN_STRATEGY = {
@@ -409,17 +405,10 @@ rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_m
 rac_diffusion_backend_t rac_diffusion_model_registry_select_backend(const char* model_id) {
     rac_diffusion_model_def_t model_def;
     
-    // Try to get model definition
     if (rac_diffusion_model_registry_get(model_id, &model_def) != RAC_SUCCESS) {
-        // Model not found, return platform default
-        RAC_LOG_DEBUG(LOG_CAT, "Model '%s' not found, using platform default backend", 
+        RAC_LOG_DEBUG(LOG_CAT, "Model '%s' not found, using CoreML (Apple only)", 
                       model_id ? model_id : "(null)");
-        
-#if defined(__APPLE__) && (TARGET_OS_IOS || TARGET_OS_OSX)
         return RAC_DIFFUSION_BACKEND_COREML;
-#else
-        return RAC_DIFFUSION_BACKEND_ONNX;
-#endif
     }
     
     auto& state = get_state();

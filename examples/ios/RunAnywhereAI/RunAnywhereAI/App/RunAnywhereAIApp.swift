@@ -64,6 +64,13 @@ struct RunAnywhereAIApp: App {
 
             logger.info("🎯 Initializing SDK...")
 
+            // Register backends with C++ registry first (synchronously) so they are available
+            // before any LLM/STT/TTS API can run. Otherwise ensureServicesReady() can run
+            // (e.g. user taps Load) before registerModulesAndModels() completes, and only
+            // Platform would be registered → -422 "No provider could handle the request".
+            LlamaCPP.register(priority: 100)
+            ONNX.register(priority: 100)
+
             let startTime = Date()
 
             // Check for custom API configuration (stored in Settings)
@@ -300,10 +307,9 @@ struct RunAnywhereAIApp: App {
         }
         logger.info("✅ ONNX STT/TTS models registered")
 
-        // Register Diffusion models
+        // Register Diffusion models (Apple Stable Diffusion / CoreML only; no ONNX)
         // ============================================================================
-        // CoreML: Apple's palettized model with split_einsum_v2 for optimized Apple Silicon performance (~1.5GB)
-        // Note: Archive extracts to nested directory (e.g., coreml-stable-diffusion-v1-5-palettized_split_einsum_v2_compiled/)
+        // Apple SD 1.5 CoreML: palettized, split_einsum_v2 for Apple Silicon / ANE (~1.5GB)
         if let sd15CoreMLURL = URL(string: "https://huggingface.co/apple/coreml-stable-diffusion-v1-5-palettized/resolve/main/coreml-stable-diffusion-v1-5-palettized_split_einsum_v2_compiled.zip") {
             RunAnywhere.registerModel(
                 id: "sd15-coreml-palettized",
@@ -316,154 +322,7 @@ struct RunAnywhereAIApp: App {
             )
         }
 
-        // ============================================================================
-        // ONNX Models from Hugging Face
-        // ============================================================================
-
-        // BK-SDM-Tiny: Most compressed SD model (0.50B params, ~500MB) - Best for mobile!
-        // Source: https://huggingface.co/nota-ai/bk-sdm-tiny
-        // Requires conversion to ONNX - using pre-converted community version
-        // NOTE: UNet uses external data format - weights.pb contains the weights
-        if let bksdmTinyURL = URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/unet/model.onnx") {
-            RunAnywhere.registerMultiFileModel(
-                id: "bk-sdm-tiny-onnx",
-                name: "BK-SDM Tiny (ONNX - Fastest)",
-                files: [
-                    // Using SD 1.5 ONNX as reference - BK-SDM would need conversion
-                    ModelFileDescriptor(
-                        url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/text_encoder/model.onnx")!,
-                        filename: "text_encoder/model.onnx"
-                    ),
-                    ModelFileDescriptor(
-                        url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/unet/model.onnx")!,
-                        filename: "unet/model.onnx"
-                    ),
-                    // UNet external weights (3.2GB) - required for model to load
-                    ModelFileDescriptor(
-                        url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/unet/weights.pb")!,
-                        filename: "unet/weights.pb"
-                    ),
-                    ModelFileDescriptor(
-                        url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/vae_decoder/model.onnx")!,
-                        filename: "vae_decoder/model.onnx"
-                    ),
-                    ModelFileDescriptor(
-                        url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/vae_encoder/model.onnx")!,
-                        filename: "vae_encoder/model.onnx"
-                    ),
-                    // Tokenizer files - required for text encoding
-                    ModelFileDescriptor(
-                        url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/tokenizer/vocab.json")!,
-                        filename: "tokenizer/vocab.json"
-                    ),
-                    ModelFileDescriptor(
-                        url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/tokenizer/merges.txt")!,
-                        filename: "tokenizer/merges.txt"
-                    ),
-                    // Scheduler config for diffusion sampling
-                    ModelFileDescriptor(
-                        url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/scheduler/scheduler_config.json")!,
-                        filename: "scheduler/scheduler_config.json"
-                    )
-                ],
-                framework: .onnx,
-                modality: .imageGeneration,
-                memoryRequirement: 4_000_000_000  // ~4GB with UNet weights (3.2GB)
-            )
-        }
-
-        // Stable Diffusion 1.5 Full ONNX (~5.5GB) - High quality but large
-        // Source: https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX
-        // NOTE: UNet uses external data format - model.onnx_data contains the weights
-        if let sd15ONNXURL = URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/unet/model.onnx") {
-            RunAnywhere.registerMultiFileModel(
-                id: "sd15-onnx-full",
-                name: "Stable Diffusion 1.5 (ONNX - Full)",
-                files: [
-                    ModelFileDescriptor(
-                        url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/text_encoder/model.onnx")!,
-                        filename: "text_encoder/model.onnx"
-                    ),
-                    ModelFileDescriptor(
-                        url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/unet/model.onnx")!,
-                        filename: "unet/model.onnx"
-                    ),
-                    // UNet external weights (3.2GB) - required for model to load
-                    ModelFileDescriptor(
-                        url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/unet/weights.pb")!,
-                        filename: "unet/weights.pb"
-                    ),
-                    ModelFileDescriptor(
-                        url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/vae_decoder/model.onnx")!,
-                        filename: "vae_decoder/model.onnx"
-                    ),
-                    ModelFileDescriptor(
-                        url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/vae_encoder/model.onnx")!,
-                        filename: "vae_encoder/model.onnx"
-                    ),
-                    ModelFileDescriptor(
-                        url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/tokenizer/vocab.json")!,
-                        filename: "tokenizer/vocab.json"
-                    ),
-                    ModelFileDescriptor(
-                        url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/tokenizer/merges.txt")!,
-                        filename: "tokenizer/merges.txt"
-                    ),
-                    ModelFileDescriptor(
-                        url: URL(string: "https://huggingface.co/onnx-community/stable-diffusion-v1-5-ONNX/resolve/main/scheduler/scheduler_config.json")!,
-                        filename: "scheduler/scheduler_config.json"
-                    )
-                ],
-                framework: .onnx,
-                modality: .imageGeneration,
-                memoryRequirement: 5_500_000_000  // ~5.5GB
-            )
-        }
-
-        // ============================================================================
-        // SD Turbo ONNX (4-step FAST model) - Works on both iOS and Android!
-        // Source: https://huggingface.co/jdp8/sd-turbo-onnx
-        // Only 4 steps, no CFG needed - much faster than SD 1.5!
-        // ============================================================================
-        RunAnywhere.registerMultiFileModel(
-            id: "sd-turbo-onnx",
-            name: "⚡ SD Turbo (4-Step FAST)",
-            files: [
-                ModelFileDescriptor(
-                    url: URL(string: "https://huggingface.co/jdp8/sd-turbo-onnx/resolve/main/text_encoder/model.onnx")!,
-                    filename: "text_encoder/model.onnx"
-                ),
-                ModelFileDescriptor(
-                    url: URL(string: "https://huggingface.co/jdp8/sd-turbo-onnx/resolve/main/unet/model.onnx")!,
-                    filename: "unet/model.onnx"
-                ),
-                ModelFileDescriptor(
-                    url: URL(string: "https://huggingface.co/jdp8/sd-turbo-onnx/resolve/main/vae_decoder/model.onnx")!,
-                    filename: "vae_decoder/model.onnx"
-                ),
-                ModelFileDescriptor(
-                    url: URL(string: "https://huggingface.co/jdp8/sd-turbo-onnx/resolve/main/vae_encoder/model.onnx")!,
-                    filename: "vae_encoder/model.onnx"
-                ),
-                ModelFileDescriptor(
-                    url: URL(string: "https://huggingface.co/jdp8/sd-turbo-onnx/resolve/main/tokenizer/vocab.json")!,
-                    filename: "tokenizer/vocab.json"
-                ),
-                ModelFileDescriptor(
-                    url: URL(string: "https://huggingface.co/jdp8/sd-turbo-onnx/resolve/main/tokenizer/merges.txt")!,
-                    filename: "tokenizer/merges.txt"
-                ),
-                ModelFileDescriptor(
-                    url: URL(string: "https://huggingface.co/jdp8/sd-turbo-onnx/resolve/main/scheduler/scheduler_config.json")!,
-                    filename: "scheduler/scheduler_config.json"
-                )
-            ],
-            framework: .onnx,
-            modality: .imageGeneration,
-            memoryRequirement: 2_500_000_000  // ~2.5GB
-        )
-
-        logger.info("✅ Diffusion models registered (CoreML + ONNX including SD Turbo 4-step)")
+        logger.info("✅ Diffusion models registered (Apple Stable Diffusion / CoreML only)")
 
         logger.info("🎉 All modules and models registered")
     }

@@ -9,7 +9,6 @@
 #include "rac_stt_onnx.h"
 #include "rac_tts_onnx.h"
 #include "rac_vad_onnx.h"
-#include "rac/backends/rac_diffusion_onnx.h"
 
 #include <cstdint>
 #include <cstdlib>
@@ -22,7 +21,6 @@
 #include "rac/core/rac_logger.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_service.h"
-#include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/infrastructure/model_management/rac_model_strategy.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 
@@ -211,7 +209,6 @@ const char* const MODULE_ID = "onnx";
 const char* const STT_PROVIDER_NAME = "ONNXSTTService";
 const char* const TTS_PROVIDER_NAME = "ONNXTTSService";
 const char* const VAD_PROVIDER_NAME = "ONNXVADService";
-const char* const DIFFUSION_PROVIDER_NAME = "ONNXDiffusionService";
 
 // STT can_handle
 rac_bool_t onnx_stt_can_handle(const rac_service_request_t* request, void* user_data) {
@@ -355,174 +352,6 @@ rac_handle_t onnx_vad_create(const rac_service_request_t* request, void* user_da
 }
 
 // =============================================================================
-// DIFFUSION VTABLE IMPLEMENTATION
-// =============================================================================
-
-static rac_result_t onnx_diffusion_vtable_initialize(void* impl, const char* model_path,
-                                                      const rac_diffusion_config_t* config) {
-    (void)impl;
-    (void)model_path;
-    (void)config;
-    // Model already loaded during create
-    return RAC_SUCCESS;
-}
-
-static rac_result_t onnx_diffusion_vtable_generate(void* impl, const rac_diffusion_options_t* options,
-                                                    rac_diffusion_result_t* out_result) {
-    return rac_diffusion_onnx_generate(impl, options, out_result);
-}
-
-static rac_result_t onnx_diffusion_vtable_generate_with_progress(
-    void* impl, const rac_diffusion_options_t* options,
-    rac_diffusion_progress_callback_fn progress_callback, void* user_data,
-    rac_diffusion_result_t* out_result) {
-    return rac_diffusion_onnx_generate_with_progress(impl, options, progress_callback, 
-                                                      user_data, out_result);
-}
-
-static rac_result_t onnx_diffusion_vtable_get_info(void* impl, rac_diffusion_info_t* out_info) {
-    return rac_diffusion_onnx_get_info(impl, out_info);
-}
-
-static uint32_t onnx_diffusion_vtable_get_capabilities(void* impl) {
-    return rac_diffusion_onnx_get_capabilities(impl);
-}
-
-static rac_result_t onnx_diffusion_vtable_cancel(void* impl) {
-    return rac_diffusion_onnx_cancel(impl);
-}
-
-static rac_result_t onnx_diffusion_vtable_cleanup(void* impl) {
-    (void)impl;
-    return RAC_SUCCESS;
-}
-
-static void onnx_diffusion_vtable_destroy(void* impl) {
-    if (impl) {
-        rac_diffusion_onnx_destroy(impl);
-    }
-}
-
-static const rac_diffusion_service_ops_t g_onnx_diffusion_ops = {
-    .initialize = onnx_diffusion_vtable_initialize,
-    .generate = onnx_diffusion_vtable_generate,
-    .generate_with_progress = onnx_diffusion_vtable_generate_with_progress,
-    .get_info = onnx_diffusion_vtable_get_info,
-    .get_capabilities = onnx_diffusion_vtable_get_capabilities,
-    .cancel = onnx_diffusion_vtable_cancel,
-    .cleanup = onnx_diffusion_vtable_cleanup,
-    .destroy = onnx_diffusion_vtable_destroy,
-};
-
-// Diffusion can_handle - checks for ONNX diffusion model structure
-rac_bool_t onnx_diffusion_can_handle(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-
-    if (request == nullptr) {
-        return RAC_FALSE;
-    }
-
-    // Prefer model_path over identifier (model_path is the actual filesystem path)
-    const char* path = request->model_path ? request->model_path : request->identifier;
-    if (path == nullptr) {
-        RAC_LOG_DEBUG(LOG_CAT, "onnx_diffusion_can_handle: no path provided -> FALSE");
-        return RAC_FALSE;
-    }
-
-    RAC_LOG_INFO(LOG_CAT, "onnx_diffusion_can_handle: checking path=%s, framework=%d", 
-                 path, request->framework);
-
-    // Check if this is a valid ONNX diffusion model directory
-    if (rac_diffusion_onnx_is_valid_model(path) == RAC_TRUE) {
-        RAC_LOG_INFO(LOG_CAT, "onnx_diffusion_can_handle: valid ONNX diffusion model -> TRUE");
-        return RAC_TRUE;
-    }
-
-    // Check for ONNX diffusion model structure (unet/, text_encoder/, vae_decoder/)
-    fs::path dir_path(path);
-    if (fs::exists(dir_path) && fs::is_directory(dir_path)) {
-        // Look for typical Stable Diffusion ONNX structure
-        bool has_unet = fs::exists(dir_path / "unet" / "model.onnx") || 
-                        fs::exists(dir_path / "unet" / "model.onnx_data");
-        bool has_text_encoder = fs::exists(dir_path / "text_encoder" / "model.onnx");
-        bool has_vae_decoder = fs::exists(dir_path / "vae_decoder" / "model.onnx");
-        
-        if (has_unet || has_text_encoder || has_vae_decoder) {
-            RAC_LOG_INFO(LOG_CAT, "onnx_diffusion_can_handle: found SD ONNX structure (unet=%d, text_enc=%d, vae=%d) -> TRUE",
-                        has_unet, has_text_encoder, has_vae_decoder);
-            return RAC_TRUE;
-        }
-
-        // Also check for .onnx files at root level (for backward compatibility)
-        try {
-            for (const auto& entry : fs::directory_iterator(dir_path)) {
-                if (entry.path().extension() == ".onnx") {
-                    RAC_LOG_INFO(LOG_CAT, "onnx_diffusion_can_handle: found .onnx file at root");
-                    return RAC_TRUE;
-                }
-            }
-        } catch (const fs::filesystem_error&) {
-            // Ignore
-        }
-    }
-
-    // Check framework hint as last resort (for cases where path doesn't exist yet)
-    if (request->framework == RAC_FRAMEWORK_ONNX) {
-        RAC_LOG_INFO(LOG_CAT, "onnx_diffusion_can_handle: framework hint ONNX -> TRUE");
-        return RAC_TRUE;
-    }
-
-    RAC_LOG_INFO(LOG_CAT, "onnx_diffusion_can_handle: not a diffusion model -> FALSE");
-    return RAC_FALSE;
-}
-
-// Diffusion create with vtable
-rac_handle_t onnx_diffusion_create(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-
-    RAC_LOG_INFO(LOG_CAT, "onnx_diffusion_create ENTRY - provider create callback invoked");
-
-    if (request == nullptr) {
-        RAC_LOG_ERROR(LOG_CAT, "onnx_diffusion_create: request is null");
-        return nullptr;
-    }
-
-    // Prefer model_path over identifier (model_path is the actual filesystem path)
-    const char* model_path = request->model_path ? request->model_path : request->identifier;
-    const char* model_id = request->identifier ? request->identifier : model_path;
-
-    if (model_path == nullptr) {
-        RAC_LOG_ERROR(LOG_CAT, "onnx_diffusion_create: no model path provided");
-        return nullptr;
-    }
-
-    RAC_LOG_INFO(LOG_CAT, "Creating ONNX Diffusion service for path: %s (id: %s)", 
-                 model_path, model_id ? model_id : "NULL");
-
-    rac_handle_t backend_handle = nullptr;
-    rac_result_t result = rac_diffusion_onnx_create(model_path, nullptr, &backend_handle);
-    if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_CAT, "rac_diffusion_onnx_create failed with result: %d", result);
-        return nullptr;
-    }
-    RAC_LOG_INFO(LOG_CAT, "rac_diffusion_onnx_create succeeded, backend_handle=%p", backend_handle);
-
-    auto* service = static_cast<rac_diffusion_service_t*>(malloc(sizeof(rac_diffusion_service_t)));
-    if (!service) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to allocate rac_diffusion_service_t");
-        rac_diffusion_onnx_destroy(backend_handle);
-        return nullptr;
-    }
-
-    service->ops = &g_onnx_diffusion_ops;
-    service->impl = backend_handle;
-    service->model_id = model_id ? strdup(model_id) : nullptr;
-
-    RAC_LOG_INFO(LOG_CAT, "ONNX Diffusion service created successfully, service=%p", service);
-    return service;
-}
-
-// =============================================================================
 // STORAGE AND DOWNLOAD STRATEGIES
 // =============================================================================
 
@@ -646,17 +475,15 @@ rac_result_t rac_backend_onnx_register(void) {
         return RAC_ERROR_MODULE_ALREADY_REGISTERED;
     }
 
-    // Register module
+    // Register module (STT, TTS, VAD only; diffusion is Apple CoreML-only)
     rac_module_info_t module_info = {};
     module_info.id = MODULE_ID;
     module_info.name = "ONNX Runtime";
     module_info.version = "1.0.0";
-    module_info.description = "STT/TTS/VAD/Diffusion backend using ONNX Runtime";
-
-    rac_capability_t capabilities[] = {RAC_CAPABILITY_STT, RAC_CAPABILITY_TTS, 
-                                       RAC_CAPABILITY_VAD, RAC_CAPABILITY_DIFFUSION};
+    module_info.description = "STT/TTS/VAD backend using ONNX Runtime";
+    rac_capability_t capabilities[] = {RAC_CAPABILITY_STT, RAC_CAPABILITY_TTS, RAC_CAPABILITY_VAD};
     module_info.capabilities = capabilities;
-    module_info.num_capabilities = 4;
+    module_info.num_capabilities = 3;
 
     rac_result_t result = rac_module_register(&module_info);
     if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
@@ -712,25 +539,8 @@ rac_result_t rac_backend_onnx_register(void) {
         return result;
     }
 
-    // Register Diffusion provider (priority 50, lower than CoreML platform backend)
-    rac_service_provider_t diffusion_provider = {};
-    diffusion_provider.name = DIFFUSION_PROVIDER_NAME;
-    diffusion_provider.capability = RAC_CAPABILITY_DIFFUSION;
-    diffusion_provider.priority = 50;  // Lower than CoreML (100) so platform backend is preferred
-    diffusion_provider.can_handle = onnx_diffusion_can_handle;
-    diffusion_provider.create = onnx_diffusion_create;
-
-    result = rac_service_register_provider(&diffusion_provider);
-    if (result != RAC_SUCCESS) {
-        rac_service_unregister_provider(VAD_PROVIDER_NAME, RAC_CAPABILITY_VAD);
-        rac_service_unregister_provider(TTS_PROVIDER_NAME, RAC_CAPABILITY_TTS);
-        rac_service_unregister_provider(STT_PROVIDER_NAME, RAC_CAPABILITY_STT);
-        rac_module_unregister(MODULE_ID);
-        return result;
-    }
-
     g_registered = true;
-    RAC_LOG_INFO(LOG_CAT, "ONNX backend registered (STT + TTS + VAD + Diffusion)");
+    RAC_LOG_INFO(LOG_CAT, "ONNX backend registered (STT + TTS + VAD)");
     return RAC_SUCCESS;
 }
 
@@ -740,7 +550,6 @@ rac_result_t rac_backend_onnx_unregister(void) {
     }
 
     rac_model_strategy_unregister(RAC_FRAMEWORK_ONNX);
-    rac_service_unregister_provider(DIFFUSION_PROVIDER_NAME, RAC_CAPABILITY_DIFFUSION);
     rac_service_unregister_provider(VAD_PROVIDER_NAME, RAC_CAPABILITY_VAD);
     rac_service_unregister_provider(TTS_PROVIDER_NAME, RAC_CAPABILITY_TTS);
     rac_service_unregister_provider(STT_PROVIDER_NAME, RAC_CAPABILITY_STT);

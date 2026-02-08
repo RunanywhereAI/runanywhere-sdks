@@ -24,20 +24,19 @@ class DiffusionBindings {
     }
   }
 
+  /// Diffusion is iOS-only (CoreML/ANE). Other platforms throw.
   static DynamicLibrary _loadLibrary() {
     if (Platform.isAndroid) {
-      return DynamicLibrary.open('librac_backend_diffusion_jni.so');
-    } else if (Platform.isIOS) {
-      // iOS uses statically linked libraries
-      return DynamicLibrary.process();
-    } else if (Platform.isMacOS) {
-      return DynamicLibrary.process();
-    } else if (Platform.isWindows) {
-      return DynamicLibrary.open('rac_backend_diffusion.dll');
-    } else if (Platform.isLinux) {
-      return DynamicLibrary.open('librac_backend_diffusion.so');
+      throw UnsupportedError(
+        'Diffusion is only supported on iOS (CoreML/ANE). It is not available on Android.',
+      );
     }
-    throw UnsupportedError('Platform not supported');
+    if (Platform.isIOS || Platform.isMacOS) {
+      return DynamicLibrary.process();
+    }
+    throw UnsupportedError(
+      'Diffusion is only supported on iOS/macOS (CoreML/ANE).',
+    );
   }
 
   // Function pointers
