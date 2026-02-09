@@ -6,12 +6,12 @@
 #include <string>
 #include <vector>
 
-// C API headers
+// C API headers (RACommons.xcframework exposes flat names under Headers/)
 extern "C" {
-#include "rac/backends/rac_vad_onnx.h"
-#include "rac/core/rac_error.h"
-#include "rac/core/rac_types.h"
-#include "rac/features/diffusion/rac_diffusion_component.h"
+#include "rac_vad_onnx.h"
+#include "rac_error.h"
+#include "rac_types.h"
+#include "rac_diffusion_component.h"
 }
 
 using json = nlohmann::json;

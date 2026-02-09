@@ -1384,7 +1384,6 @@ enum class ModelCategory {
     SPEECH_RECOGNITION,    // STT (voice-to-text)
     SPEECH_SYNTHESIS,      // TTS (text-to-voice)
     VISION,                // Image understanding
-    IMAGE_GENERATION,      // Text-to-image
     MULTIMODAL,            // Multiple modalities
     AUDIO                  // Audio processing
 }

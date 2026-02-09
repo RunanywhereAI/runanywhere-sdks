@@ -211,6 +211,9 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     // Yield between module registrations
     await Future<void>.delayed(Duration.zero);
 
+    // Diffusion (image generation) is not registered here. CoreML diffusion is supported
+    // only in the Swift SDK and Swift example app; Flutter/RN do not register diffusion.
+
     // ONNX module with STT and TTS models
     // Using tar.gz format hosted on RunanywhereAI/sherpa-onnx for fast native extraction
     // Using explicit IDs ensures models are recognized after download across app restarts
