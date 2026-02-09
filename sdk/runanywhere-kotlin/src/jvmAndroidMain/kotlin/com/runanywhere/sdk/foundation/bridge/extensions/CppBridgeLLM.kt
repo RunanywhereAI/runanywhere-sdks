@@ -736,11 +736,6 @@ object CppBridgeLLM {
                     RunAnywhereBridge.TokenCallback { tokenBytes ->
                         try {
                             val text = byteStreamDecoder.push(tokenBytes)
-                            CppBridgePlatformAdapter.logCallback(
-                                CppBridgePlatformAdapter.LogLevel.INFO,
-                                TAG,
-                                "token : ${text}",
-                            )
                             // Forward each token to the user's callback
                             if (text.isNotEmpty()) callback.onToken(text)
                             true
