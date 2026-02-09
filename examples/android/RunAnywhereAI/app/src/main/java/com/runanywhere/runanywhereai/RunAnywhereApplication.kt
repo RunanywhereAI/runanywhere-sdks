@@ -26,7 +26,6 @@ import kotlinx.coroutines.withContext
 
 /**
  * Represents the SDK initialization state.
- * Matches iOS pattern: isSDKInitialized + initializationError conditional rendering.
  */
 sealed class SDKInitializationState {
     /** SDK is currently initializing */
@@ -60,7 +59,7 @@ class RunAnywhereApplication : Application() {
     @Volatile
     private var initializationError: Throwable? = null
 
-    /** Observable SDK initialization state for Compose UI - matches iOS pattern */
+    /** Observable SDK initialization state for Compose UI */
     private val _initializationState = MutableStateFlow<SDKInitializationState>(SDKInitializationState.Loading)
     val initializationState: StateFlow<SDKInitializationState> = _initializationState.asStateFlow()
 
@@ -151,8 +150,8 @@ class RunAnywhereApplication : Application() {
             } else {
                 // PRODUCTION mode - requires API key and base URL
                 // Configure these via Settings screen or set environment variables
-                val apiKey = "YOUR_API_KEY_HERE"
-                val baseURL = "YOUR_BASE_URL_HERE"
+                val apiKey = "runa_prod_PJ8ZbRGeoGUVMsP_x1MhCvovmYyX5X36EJo-pHyWvtI"
+                val baseURL = "https://runanywhere-backend-production.up.railway.app"
 
                 // Detect placeholder credentials and abort production initialization
                 if (apiKey.startsWith("YOUR_") || baseURL.startsWith("YOUR_")) {
@@ -202,7 +201,7 @@ class RunAnywhereApplication : Application() {
             }
         }
 
-        // Register modules and models (matching iOS registerModulesAndModels pattern)
+        // Register modules and models
         registerModulesAndModels()
 
         Log.i("RunAnywhereApp", "✅ SDK initialization complete")
@@ -213,7 +212,7 @@ class RunAnywhereApplication : Application() {
 
         isSDKInitialized = RunAnywhere.isInitialized
 
-        // Update observable state for Compose UI - matches iOS conditional rendering
+        // Update observable state for Compose UI
         if (isSDKInitialized) {
             _initializationState.value = SDKInitializationState.Ready
             Log.i("RunAnywhereApp", "🎉 App is ready to use!")
@@ -237,7 +236,7 @@ class RunAnywhereApplication : Application() {
     fun getInitializationError(): Throwable? = initializationError
 
     /**
-     * Retry SDK initialization - matches iOS retryInitialization() pattern
+     * Retry SDK initialization
      */
     suspend fun retryInitialization() {
         _initializationState.value = SDKInitializationState.Loading
@@ -250,16 +249,13 @@ class RunAnywhereApplication : Application() {
      * Register modules with their associated models.
      * Each module explicitly owns its models - the framework is determined by the module.
      *
-     * Mirrors iOS RunAnywhereAIApp.registerModulesAndModels() exactly.
-     *
      * Backend registration MUST happen before model registration.
-     * This follows the same pattern as iOS where backends are registered first.
      */
     @Suppress("LongMethod")
     private fun registerModulesAndModels() {
         Log.i("RunAnywhereApp", "📦 Registering backends and models...")
 
-        // Register backends first (matching iOS pattern)
+        // Register backends first
         // These call the C++ rac_backend_xxx_register() functions via JNI
         Log.i("RunAnywhereApp", "🔧 Registering LlamaCPP backend...")
         LlamaCPP.register(priority = 100)
