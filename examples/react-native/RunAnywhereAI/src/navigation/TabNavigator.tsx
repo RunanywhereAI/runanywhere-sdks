@@ -6,7 +6,7 @@
  * - STT (Speech-to-Text)
  * - TTS (Text-to-Speech)
  * - Voice (Voice Assistant - STT + LLM + TTS)
- * - Vision (VLM + Image Generation on iOS, VLM on Android)
+ * - Vision (VLM only; image generation is Swift sample app only)
  * - Settings (includes Tool Settings)
  */
 
@@ -25,7 +25,6 @@ import TTSScreen from '../screens/TTSScreen';
 import VoiceAssistantScreen from '../screens/VoiceAssistantScreen';
 import VisionHubScreen from '../screens/VisionHubScreen';
 import VLMScreen from '../screens/VLMScreen';
-import ImageGenerationScreen from '../screens/ImageGenerationScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -116,7 +115,7 @@ export const TabNavigator: React.FC = () => {
         component={VoiceAssistantScreen}
         options={{ tabBarLabel: tabLabels.Voice }}
       />
-      {/* Tab 4: Vision (hub -> VLM / Image Generation) */}
+      {/* Tab 4: Vision (hub -> VLM) */}
       <Tab.Screen
         name="Vision"
         component={VisionStackScreen}
@@ -133,7 +132,7 @@ export const TabNavigator: React.FC = () => {
 };
 
 /**
- * Vision tab: stack with Hub -> VLM or Image Generation
+ * Vision tab: stack with Hub -> VLM
  */
 const VisionStackScreen: React.FC = () => {
   return (
@@ -150,11 +149,6 @@ const VisionStackScreen: React.FC = () => {
         name="VLM"
         component={VLMScreen}
         options={{ title: 'Vision Chat (VLM)' }}
-      />
-      <VisionStack.Screen
-        name="ImageGeneration"
-        component={ImageGenerationScreen}
-        options={{ title: 'Image Generation' }}
       />
     </VisionStack.Navigator>
   );

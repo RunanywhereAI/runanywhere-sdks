@@ -218,8 +218,8 @@ private fun convertToModelStorageMetrics(
             CppBridgeModelRegistry.ModelCategory.AUDIO -> ModelCategory.AUDIO
             CppBridgeModelRegistry.ModelCategory.VISION -> ModelCategory.VISION
             CppBridgeModelRegistry.ModelCategory.MULTIMODAL -> ModelCategory.MULTIMODAL
-            // IMAGE_GENERATION (diffusion) not supported in Kotlin SDK; map to LANGUAGE if C++ returns it
-            CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION -> ModelCategory.LANGUAGE
+            // 5 = IMAGE_GENERATION (diffusion) not supported on Kotlin/Android; treat as LANGUAGE
+            5 -> ModelCategory.LANGUAGE
             else -> ModelCategory.LANGUAGE
         }
 
