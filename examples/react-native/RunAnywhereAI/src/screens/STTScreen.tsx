@@ -380,6 +380,35 @@ export const STTScreen: React.FC = () => {
     }
   };
 
+  /** Transcribe a WAV file; on Android reads file in JS and uses transcribe(base64) to avoid native path issues. */
+  const transcribeWavFile = useCallback(
+    async (normalizedPath: string): Promise<{ text?: string; confidence?: number }> => {
+      if (Platform.OS === 'android') {
+        const base64 = await RNFS.readFile(normalizedPath, 'base64');
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        if (bytes.length < 44) throw new Error('WAV file too small');
+        const view = new DataView(bytes.buffer);
+        if (String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) !== 'RIFF')
+          throw new Error('Invalid WAV: not RIFF');
+        const sampleRate = view.getUint32(24, true) || 16000;
+        const pcmStart = 44;
+        const pcmLength = bytes.length - pcmStart;
+        if (pcmLength < 3200) throw new Error('Recording too short to transcribe');
+        let binaryPcm = '';
+        const chunk = 8192;
+        for (let off = 0; off < pcmLength; off += chunk) {
+          const end = Math.min(off + chunk, pcmLength);
+          for (let j = off; j < end; j++) binaryPcm += String.fromCharCode(bytes[pcmStart + j]!);
+        }
+        return RunAnywhere.transcribe(btoa(binaryPcm), { sampleRate, language: 'en' });
+      }
+      return RunAnywhere.transcribeFile(normalizedPath, { language: 'en' });
+    },
+    []
+  );
+
   /**
    * Stop recording and transcribe
    * Native module handles audio format conversion using iOS AudioToolbox
@@ -426,28 +455,8 @@ export const STTScreen: React.FC = () => {
         throw new Error('STT model not loaded');
       }
 
-      // Transcribe the audio file - native expects absolute path, WAV format
-      // Android: normalizedPath is already absolute (e.g. .../cache/recording_xxx.wav)
       console.warn('[STTScreen] Starting transcription...');
-      let result: { text?: string; confidence?: number };
-      try {
-        result = await RunAnywhere.transcribeFile(normalizedPath, {
-          language: 'en',
-        });
-      } catch (transcribeError: unknown) {
-        const msg =
-          transcribeError instanceof Error
-            ? transcribeError.message
-            : String(transcribeError);
-        console.error('[STTScreen] transcribeFile threw:', msg);
-        throw new Error(
-          msg +
-            (msg.includes('open') || msg.includes('WAV')
-              ? ' (ensure recording finished and file is valid WAV)'
-              : '')
-        );
-      }
-
+      const result = await transcribeWavFile(normalizedPath);
       console.warn('[STTScreen] Transcription result:', result);
 
       if (result.text) {
@@ -614,10 +623,7 @@ export const STTScreen: React.FC = () => {
         return;
       }
 
-      // Transcribe using native module (handles audio decoding)
-      const result = await RunAnywhere.transcribeFile(audioPath, {
-        language: 'en',
-      });
+      const result = await transcribeWavFile(audioPath);
       console.warn('[STTScreen] Live chunk transcription:', result.text);
 
       // Append to accumulated transcript if we got text
@@ -687,10 +693,7 @@ export const STTScreen: React.FC = () => {
           const stat = await RNFS.stat(audioPath);
           if (stat.size >= 5000) {
             console.warn('[STTScreen] Transcribing final live chunk...');
-            // Transcribe using native module (handles audio decoding)
-            const result = await RunAnywhere.transcribeFile(audioPath, {
-              language: 'en',
-            });
+            const result = await transcribeWavFile(audioPath);
             if (result.text && result.text.trim()) {
               const newText = result.text.trim();
               if (accumulatedTranscriptRef.current) {
