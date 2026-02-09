@@ -440,8 +440,12 @@ object CppBridgeVAD {
                 return
             }
 
-            // TODO: Call native registration
-            // nativeSetVADCallbacks()
+            RunAnywhereBridge.racVadSetCallbacks(
+                this,
+                this,
+                this,
+                this,
+            )
 
             isRegistered = true
 
@@ -1277,8 +1281,12 @@ object CppBridgeVAD {
                 destroy()
             }
 
-            // TODO: Call native unregistration
-            // nativeUnsetVADCallbacks()
+            RunAnywhereBridge.racVadSetCallbacks(
+                null,
+                null,
+                null,
+                null,
+            )
 
             vadListener = null
             streamCallback = null

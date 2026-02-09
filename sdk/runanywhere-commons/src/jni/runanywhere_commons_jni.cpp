@@ -17,9 +17,11 @@
 #include <jni.h>
 
 #include <condition_variable>
+#include <chrono>
 #include <cstring>
 #include <mutex>
 #include <string>
+#include <vector>
 
 // Include runanywhere-commons C API headers
 #include "rac/core/rac_analytics_events.h"
@@ -32,6 +34,7 @@
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/vad/rac_vad_component.h"
+#include "rac/features/voice_agent/rac_voice_agent.h"
 #include "rac/infrastructure/device/rac_device_manager.h"
 #include "rac/infrastructure/model_management/rac_model_assignment.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
@@ -69,6 +72,11 @@
     fprintf(stdout, "\n")
 #endif
 
+// Forward declarations for helpers used by adapters
+static JNIEnv* getJNIEnv();
+static bool clearPendingException(JNIEnv* env, const char* context);
+static int64_t nowEpochMs();
+
 // =============================================================================
 // Global State for Platform Adapter JNI Callbacks
 // =============================================================================
@@ -87,6 +95,256 @@ static jmethodID g_method_secure_get = nullptr;
 static jmethodID g_method_secure_set = nullptr;
 static jmethodID g_method_secure_delete = nullptr;
 static jmethodID g_method_now_ms = nullptr;
+
+// =============================================================================
+// Global State for Component Callback Registration
+// =============================================================================
+
+struct VadCallbackState {
+    std::mutex mutex;
+    JavaVM* jvm = nullptr;
+    jobject frame_callback = nullptr;
+    jobject speech_start_callback = nullptr;
+    jobject speech_end_callback = nullptr;
+    jobject progress_callback = nullptr;
+    jmethodID frame_method = nullptr;         // streamFrameCallback(ZFI)Z
+    jmethodID speech_start_method = nullptr;  // speechStartCallback(J)V
+    jmethodID speech_end_method = nullptr;    // speechEndCallback(JJF)V
+    jmethodID progress_method = nullptr;      // progressCallback(F)V
+    int64_t last_speech_start_ms = 0;
+};
+
+struct TtsCallbackState {
+    std::mutex mutex;
+    JavaVM* jvm = nullptr;
+    jobject audio_callback = nullptr;
+    jobject progress_callback = nullptr;
+    jmethodID audio_method = nullptr;     // streamAudioCallback([BZ)Z
+    jmethodID progress_method = nullptr;  // progressCallback(F)V
+};
+
+struct VoiceAgentCallbackState {
+    std::mutex mutex;
+    JavaVM* jvm = nullptr;
+    jobject state_callback = nullptr;
+    jobject turn_phase_callback = nullptr;
+    jobject partial_transcription_callback = nullptr;
+    jobject response_token_callback = nullptr;
+    jobject audio_chunk_callback = nullptr;
+    jobject user_interrupt_callback = nullptr;
+    jobject progress_callback = nullptr;
+    jmethodID state_method = nullptr;                 // stateChangeCallback(I)V
+    jmethodID turn_phase_method = nullptr;            // turnPhaseCallback(I)V
+    jmethodID partial_transcription_method = nullptr; // partialTranscriptionCallback(Ljava/lang/String;)V
+    jmethodID response_token_method = nullptr;        // responseTokenCallback(Ljava/lang/String;Z)Z
+    jmethodID audio_chunk_method = nullptr;           // audioChunkCallback([BZ)Z
+    jmethodID user_interrupt_method = nullptr;        // userInterruptCallback()V
+    jmethodID progress_method = nullptr;              // progressCallback(F)V
+};
+
+static VadCallbackState g_vad_callbacks;
+static TtsCallbackState g_tts_callbacks;
+static VoiceAgentCallbackState g_voice_agent_callbacks;
+
+struct TtsStreamContext {
+    std::vector<uint8_t> audio_buffer;
+};
+
+static void tts_stream_adapter(const void* audio_data, size_t audio_size, void* user_data) {
+    if (!audio_data || audio_size == 0 || !user_data) {
+        return;
+    }
+
+    auto* ctx = static_cast<TtsStreamContext*>(user_data);
+    const auto* bytes = static_cast<const uint8_t*>(audio_data);
+    ctx->audio_buffer.insert(ctx->audio_buffer.end(), bytes, bytes + audio_size);
+
+    JNIEnv* env = getJNIEnv();
+    if (!env) {
+        return;
+    }
+
+    jobject callback = nullptr;
+    jmethodID method = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_tts_callbacks.mutex);
+        if (g_tts_callbacks.audio_callback && g_tts_callbacks.audio_method) {
+            callback = env->NewLocalRef(g_tts_callbacks.audio_callback);
+            method = g_tts_callbacks.audio_method;
+        }
+    }
+
+    if (!callback || !method) {
+        return;
+    }
+
+    jbyteArray jAudio = env->NewByteArray(static_cast<jsize>(audio_size));
+    env->SetByteArrayRegion(jAudio, 0, static_cast<jsize>(audio_size),
+                            reinterpret_cast<const jbyte*>(audio_data));
+    env->CallBooleanMethod(callback, method, jAudio, JNI_FALSE);
+    env->DeleteLocalRef(jAudio);
+    env->DeleteLocalRef(callback);
+    clearPendingException(env, "tts_stream_adapter CallBooleanMethod");
+}
+
+static void vad_activity_adapter(rac_speech_activity_t activity, void* user_data) {
+    (void)user_data;
+
+    JNIEnv* env = getJNIEnv();
+    if (!env) {
+        return;
+    }
+
+    jobject frame_cb = nullptr;
+    jobject start_cb = nullptr;
+    jobject end_cb = nullptr;
+    jmethodID frame_method = nullptr;
+    jmethodID start_method = nullptr;
+    jmethodID end_method = nullptr;
+    int64_t start_ms = 0;
+
+    int64_t now_ms = nowEpochMs();
+    int event_type = 0;
+    bool is_speech = false;
+    float probability = 0.0f;
+
+    {
+        std::lock_guard<std::mutex> lock(g_vad_callbacks.mutex);
+        if (activity == RAC_SPEECH_STARTED) {
+            g_vad_callbacks.last_speech_start_ms = now_ms;
+        }
+        start_ms = g_vad_callbacks.last_speech_start_ms;
+
+        if (g_vad_callbacks.frame_callback && g_vad_callbacks.frame_method) {
+            frame_cb = env->NewLocalRef(g_vad_callbacks.frame_callback);
+            frame_method = g_vad_callbacks.frame_method;
+        }
+        if (g_vad_callbacks.speech_start_callback && g_vad_callbacks.speech_start_method) {
+            start_cb = env->NewLocalRef(g_vad_callbacks.speech_start_callback);
+            start_method = g_vad_callbacks.speech_start_method;
+        }
+        if (g_vad_callbacks.speech_end_callback && g_vad_callbacks.speech_end_method) {
+            end_cb = env->NewLocalRef(g_vad_callbacks.speech_end_callback);
+            end_method = g_vad_callbacks.speech_end_method;
+        }
+    }
+
+    if (activity == RAC_SPEECH_STARTED) {
+        event_type = 1;  // SPEECH_START
+        is_speech = true;
+        probability = 1.0f;
+        if (start_cb && start_method) {
+            env->CallVoidMethod(start_cb, start_method, static_cast<jlong>(now_ms));
+            clearPendingException(env, "vad_activity_adapter speechStartCallback");
+        }
+    } else if (activity == RAC_SPEECH_ENDED) {
+        event_type = 3;  // SPEECH_END
+        is_speech = false;
+        probability = 0.0f;
+        if (end_cb && end_method) {
+            env->CallVoidMethod(end_cb, end_method, static_cast<jlong>(start_ms),
+                                static_cast<jlong>(now_ms), static_cast<jfloat>(1.0f));
+            clearPendingException(env, "vad_activity_adapter speechEndCallback");
+        }
+    } else {
+        event_type = 2;  // SPEECH_ONGOING
+        is_speech = true;
+        probability = 1.0f;
+    }
+
+    if (frame_cb && frame_method) {
+        env->CallBooleanMethod(frame_cb, frame_method, static_cast<jboolean>(is_speech),
+                               static_cast<jfloat>(probability), static_cast<jint>(event_type));
+        clearPendingException(env, "vad_activity_adapter streamFrameCallback");
+    }
+
+    if (frame_cb)
+        env->DeleteLocalRef(frame_cb);
+    if (start_cb)
+        env->DeleteLocalRef(start_cb);
+    if (end_cb)
+        env->DeleteLocalRef(end_cb);
+}
+
+static void voice_agent_event_adapter(const rac_voice_agent_event_t* event, void* user_data) {
+    (void)user_data;
+    if (!event) {
+        return;
+    }
+
+    JNIEnv* env = getJNIEnv();
+    if (!env) {
+        return;
+    }
+
+    jobject partial_cb = nullptr;
+    jobject response_cb = nullptr;
+    jobject audio_cb = nullptr;
+    jmethodID partial_method = nullptr;
+    jmethodID response_method = nullptr;
+    jmethodID audio_method = nullptr;
+
+    {
+        std::lock_guard<std::mutex> lock(g_voice_agent_callbacks.mutex);
+        if (g_voice_agent_callbacks.partial_transcription_callback &&
+            g_voice_agent_callbacks.partial_transcription_method) {
+            partial_cb = env->NewLocalRef(g_voice_agent_callbacks.partial_transcription_callback);
+            partial_method = g_voice_agent_callbacks.partial_transcription_method;
+        }
+        if (g_voice_agent_callbacks.response_token_callback &&
+            g_voice_agent_callbacks.response_token_method) {
+            response_cb = env->NewLocalRef(g_voice_agent_callbacks.response_token_callback);
+            response_method = g_voice_agent_callbacks.response_token_method;
+        }
+        if (g_voice_agent_callbacks.audio_chunk_callback &&
+            g_voice_agent_callbacks.audio_chunk_method) {
+            audio_cb = env->NewLocalRef(g_voice_agent_callbacks.audio_chunk_callback);
+            audio_method = g_voice_agent_callbacks.audio_chunk_method;
+        }
+    }
+
+    switch (event->type) {
+        case RAC_VOICE_AGENT_EVENT_TRANSCRIPTION: {
+            if (partial_cb && partial_method && event->data.transcription) {
+                jstring jText = env->NewStringUTF(event->data.transcription);
+                env->CallVoidMethod(partial_cb, partial_method, jText);
+                env->DeleteLocalRef(jText);
+                clearPendingException(env, "voice_agent_event_adapter partialTranscriptionCallback");
+            }
+            break;
+        }
+        case RAC_VOICE_AGENT_EVENT_RESPONSE: {
+            if (response_cb && response_method && event->data.response) {
+                jstring jToken = env->NewStringUTF(event->data.response);
+                env->CallBooleanMethod(response_cb, response_method, jToken, JNI_TRUE);
+                env->DeleteLocalRef(jToken);
+                clearPendingException(env, "voice_agent_event_adapter responseTokenCallback");
+            }
+            break;
+        }
+        case RAC_VOICE_AGENT_EVENT_AUDIO_SYNTHESIZED: {
+            if (audio_cb && audio_method && event->data.audio.audio_data &&
+                event->data.audio.audio_size > 0) {
+                jbyteArray jAudio = env->NewByteArray(static_cast<jsize>(event->data.audio.audio_size));
+                env->SetByteArrayRegion(jAudio, 0, static_cast<jsize>(event->data.audio.audio_size),
+                                        reinterpret_cast<const jbyte*>(event->data.audio.audio_data));
+                env->CallBooleanMethod(audio_cb, audio_method, jAudio, JNI_TRUE);
+                env->DeleteLocalRef(jAudio);
+                clearPendingException(env, "voice_agent_event_adapter audioChunkCallback");
+            }
+            break;
+        }
+        default:
+            break;
+    }
+
+    if (partial_cb)
+        env->DeleteLocalRef(partial_cb);
+    if (response_cb)
+        env->DeleteLocalRef(response_cb);
+    if (audio_cb)
+        env->DeleteLocalRef(audio_cb);
+}
 
 // =============================================================================
 // JNI OnLoad/OnUnload
@@ -108,6 +366,71 @@ JNIEXPORT void JNI_OnUnload(JavaVM* vm, void* reserved) {
             env->DeleteGlobalRef(g_platform_adapter);
         }
         g_platform_adapter = nullptr;
+    }
+
+    JNIEnv* env = nullptr;
+    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) == JNI_OK) {
+        {
+            std::lock_guard<std::mutex> tts_lock(g_tts_callbacks.mutex);
+            if (g_tts_callbacks.audio_callback) {
+                env->DeleteGlobalRef(g_tts_callbacks.audio_callback);
+                g_tts_callbacks.audio_callback = nullptr;
+            }
+            if (g_tts_callbacks.progress_callback) {
+                env->DeleteGlobalRef(g_tts_callbacks.progress_callback);
+                g_tts_callbacks.progress_callback = nullptr;
+            }
+        }
+        {
+            std::lock_guard<std::mutex> vad_lock(g_vad_callbacks.mutex);
+            if (g_vad_callbacks.frame_callback) {
+                env->DeleteGlobalRef(g_vad_callbacks.frame_callback);
+                g_vad_callbacks.frame_callback = nullptr;
+            }
+            if (g_vad_callbacks.speech_start_callback) {
+                env->DeleteGlobalRef(g_vad_callbacks.speech_start_callback);
+                g_vad_callbacks.speech_start_callback = nullptr;
+            }
+            if (g_vad_callbacks.speech_end_callback) {
+                env->DeleteGlobalRef(g_vad_callbacks.speech_end_callback);
+                g_vad_callbacks.speech_end_callback = nullptr;
+            }
+            if (g_vad_callbacks.progress_callback) {
+                env->DeleteGlobalRef(g_vad_callbacks.progress_callback);
+                g_vad_callbacks.progress_callback = nullptr;
+            }
+        }
+        {
+            std::lock_guard<std::mutex> voice_lock(g_voice_agent_callbacks.mutex);
+            if (g_voice_agent_callbacks.state_callback) {
+                env->DeleteGlobalRef(g_voice_agent_callbacks.state_callback);
+                g_voice_agent_callbacks.state_callback = nullptr;
+            }
+            if (g_voice_agent_callbacks.turn_phase_callback) {
+                env->DeleteGlobalRef(g_voice_agent_callbacks.turn_phase_callback);
+                g_voice_agent_callbacks.turn_phase_callback = nullptr;
+            }
+            if (g_voice_agent_callbacks.partial_transcription_callback) {
+                env->DeleteGlobalRef(g_voice_agent_callbacks.partial_transcription_callback);
+                g_voice_agent_callbacks.partial_transcription_callback = nullptr;
+            }
+            if (g_voice_agent_callbacks.response_token_callback) {
+                env->DeleteGlobalRef(g_voice_agent_callbacks.response_token_callback);
+                g_voice_agent_callbacks.response_token_callback = nullptr;
+            }
+            if (g_voice_agent_callbacks.audio_chunk_callback) {
+                env->DeleteGlobalRef(g_voice_agent_callbacks.audio_chunk_callback);
+                g_voice_agent_callbacks.audio_chunk_callback = nullptr;
+            }
+            if (g_voice_agent_callbacks.user_interrupt_callback) {
+                env->DeleteGlobalRef(g_voice_agent_callbacks.user_interrupt_callback);
+                g_voice_agent_callbacks.user_interrupt_callback = nullptr;
+            }
+            if (g_voice_agent_callbacks.progress_callback) {
+                env->DeleteGlobalRef(g_voice_agent_callbacks.progress_callback);
+                g_voice_agent_callbacks.progress_callback = nullptr;
+            }
+        }
     }
     g_jvm = nullptr;
 }
@@ -145,6 +468,21 @@ static const char* getNullableCString(JNIEnv* env, jstring str, std::string& sto
         return nullptr;
     storage = getCString(env, str);
     return storage.c_str();
+}
+
+static bool clearPendingException(JNIEnv* env, const char* context) {
+    if (env != nullptr && env->ExceptionCheck()) {
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+        LOGe("%s: cleared pending JNI exception", context);
+        return true;
+    }
+    return false;
+}
+
+static int64_t nowEpochMs() {
+    auto now = std::chrono::system_clock::now();
+    return std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
 }
 
 // =============================================================================
@@ -1353,8 +1691,47 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentSynthesi
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentSynthesizeStream(
     JNIEnv* env, jclass clazz, jlong handle, jstring text, jstring configJson) {
-    return Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentSynthesize(
-        env, clazz, handle, text, configJson);
+    if (handle == 0)
+        return nullptr;
+
+    std::string textStr = getCString(env, text);
+    rac_tts_options_t options = {};
+    TtsStreamContext ctx;
+
+    rac_result_t status = rac_tts_component_synthesize_stream(
+        reinterpret_cast<rac_handle_t>(handle), textStr.c_str(), &options, tts_stream_adapter, &ctx);
+
+    if (status != RAC_SUCCESS) {
+        LOGe("TTS stream synthesize failed with status: %d", status);
+        return nullptr;
+    }
+
+    // Send final callback marker if registered
+    {
+        jobject callback = nullptr;
+        jmethodID method = nullptr;
+        std::lock_guard<std::mutex> lock(g_tts_callbacks.mutex);
+        if (g_tts_callbacks.audio_callback && g_tts_callbacks.audio_method) {
+            callback = env->NewLocalRef(g_tts_callbacks.audio_callback);
+            method = g_tts_callbacks.audio_method;
+        }
+        if (callback && method) {
+            jbyteArray empty = env->NewByteArray(0);
+            env->CallBooleanMethod(callback, method, empty, JNI_TRUE);
+            env->DeleteLocalRef(empty);
+            env->DeleteLocalRef(callback);
+            clearPendingException(env, "racTtsComponentSynthesizeStream final callback");
+        }
+    }
+
+    if (ctx.audio_buffer.empty()) {
+        return nullptr;
+    }
+
+    jbyteArray jResult = env->NewByteArray(static_cast<jsize>(ctx.audio_buffer.size()));
+    env->SetByteArrayRegion(jResult, 0, static_cast<jsize>(ctx.audio_buffer.size()),
+                            reinterpret_cast<const jbyte*>(ctx.audio_buffer.data()));
+    return jResult;
 }
 
 JNIEXPORT jlong JNICALL
@@ -1438,7 +1815,72 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentGetLangu
 
 JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsSetCallbacks(
     JNIEnv* env, jclass clazz, jobject audioCallback, jobject progressCallback) {
-    // TODO: Implement callback registration
+    LOGi("racTtsSetCallbacks called");
+
+    std::lock_guard<std::mutex> lock(g_tts_callbacks.mutex);
+
+    if (g_tts_callbacks.audio_callback != nullptr) {
+        env->DeleteGlobalRef(g_tts_callbacks.audio_callback);
+        g_tts_callbacks.audio_callback = nullptr;
+    }
+    if (g_tts_callbacks.progress_callback != nullptr) {
+        env->DeleteGlobalRef(g_tts_callbacks.progress_callback);
+        g_tts_callbacks.progress_callback = nullptr;
+    }
+
+    g_tts_callbacks.audio_method = nullptr;
+    g_tts_callbacks.progress_method = nullptr;
+
+    if (audioCallback == nullptr && progressCallback == nullptr) {
+        LOGi("racTtsSetCallbacks: callbacks cleared");
+        return;
+    }
+
+    env->GetJavaVM(&g_tts_callbacks.jvm);
+
+    if (audioCallback != nullptr) {
+        g_tts_callbacks.audio_callback = env->NewGlobalRef(audioCallback);
+        jclass callbackClass = env->GetObjectClass(audioCallback);
+        if (clearPendingException(env, "racTtsSetCallbacks GetObjectClass(audioCallback)") ||
+            callbackClass == nullptr) {
+            LOGe("racTtsSetCallbacks: failed to get audio callback class");
+            env->DeleteGlobalRef(g_tts_callbacks.audio_callback);
+            g_tts_callbacks.audio_callback = nullptr;
+        } else {
+        g_tts_callbacks.audio_method =
+            env->GetMethodID(callbackClass, "streamAudioCallback", "([BZ)Z");
+        env->DeleteLocalRef(callbackClass);
+
+        if (clearPendingException(env, "racTtsSetCallbacks GetMethodID(streamAudioCallback)") ||
+            !g_tts_callbacks.audio_method) {
+            LOGe("racTtsSetCallbacks: streamAudioCallback method not found");
+            env->DeleteGlobalRef(g_tts_callbacks.audio_callback);
+            g_tts_callbacks.audio_callback = nullptr;
+        }
+        }
+    }
+
+    if (progressCallback != nullptr) {
+        g_tts_callbacks.progress_callback = env->NewGlobalRef(progressCallback);
+        jclass callbackClass = env->GetObjectClass(progressCallback);
+        if (clearPendingException(env, "racTtsSetCallbacks GetObjectClass(progressCallback)") ||
+            callbackClass == nullptr) {
+            LOGe("racTtsSetCallbacks: failed to get progress callback class");
+            env->DeleteGlobalRef(g_tts_callbacks.progress_callback);
+            g_tts_callbacks.progress_callback = nullptr;
+        } else {
+        g_tts_callbacks.progress_method =
+            env->GetMethodID(callbackClass, "progressCallback", "(F)V");
+        env->DeleteLocalRef(callbackClass);
+
+        if (clearPendingException(env, "racTtsSetCallbacks GetMethodID(progressCallback)") ||
+            !g_tts_callbacks.progress_method) {
+            LOGe("racTtsSetCallbacks: progressCallback method not found");
+            env->DeleteGlobalRef(g_tts_callbacks.progress_callback);
+            g_tts_callbacks.progress_callback = nullptr;
+        }
+        }
+    }
 }
 
 // =============================================================================
@@ -1516,6 +1958,14 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentProcess(
 JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentProcessStream(
     JNIEnv* env, jclass clazz, jlong handle, jbyteArray audioData, jstring configJson) {
+    {
+        std::lock_guard<std::mutex> lock(g_vad_callbacks.mutex);
+        if (g_vad_callbacks.frame_callback || g_vad_callbacks.speech_start_callback ||
+            g_vad_callbacks.speech_end_callback) {
+            rac_vad_component_set_activity_callback(reinterpret_cast<rac_handle_t>(handle),
+                                                   vad_activity_adapter, nullptr);
+        }
+    }
     return Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentProcess(
         env, clazz, handle, audioData, configJson);
 }
@@ -1582,7 +2032,361 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentGetSampl
 JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadSetCallbacks(
     JNIEnv* env, jclass clazz, jobject frameCallback, jobject speechStartCallback,
     jobject speechEndCallback, jobject progressCallback) {
-    // TODO: Implement callback registration
+    LOGi("racVadSetCallbacks called");
+
+    std::lock_guard<std::mutex> lock(g_vad_callbacks.mutex);
+
+    if (g_vad_callbacks.frame_callback != nullptr) {
+        env->DeleteGlobalRef(g_vad_callbacks.frame_callback);
+        g_vad_callbacks.frame_callback = nullptr;
+    }
+    if (g_vad_callbacks.speech_start_callback != nullptr) {
+        env->DeleteGlobalRef(g_vad_callbacks.speech_start_callback);
+        g_vad_callbacks.speech_start_callback = nullptr;
+    }
+    if (g_vad_callbacks.speech_end_callback != nullptr) {
+        env->DeleteGlobalRef(g_vad_callbacks.speech_end_callback);
+        g_vad_callbacks.speech_end_callback = nullptr;
+    }
+    if (g_vad_callbacks.progress_callback != nullptr) {
+        env->DeleteGlobalRef(g_vad_callbacks.progress_callback);
+        g_vad_callbacks.progress_callback = nullptr;
+    }
+
+    g_vad_callbacks.frame_method = nullptr;
+    g_vad_callbacks.speech_start_method = nullptr;
+    g_vad_callbacks.speech_end_method = nullptr;
+    g_vad_callbacks.progress_method = nullptr;
+
+    if (frameCallback == nullptr && speechStartCallback == nullptr && speechEndCallback == nullptr &&
+        progressCallback == nullptr) {
+        LOGi("racVadSetCallbacks: callbacks cleared");
+        return;
+    }
+
+    env->GetJavaVM(&g_vad_callbacks.jvm);
+
+    if (frameCallback != nullptr) {
+        g_vad_callbacks.frame_callback = env->NewGlobalRef(frameCallback);
+        jclass callbackClass = env->GetObjectClass(frameCallback);
+        if (clearPendingException(env, "racVadSetCallbacks GetObjectClass(frameCallback)") ||
+            callbackClass == nullptr) {
+            LOGe("racVadSetCallbacks: failed to get frame callback class");
+            env->DeleteGlobalRef(g_vad_callbacks.frame_callback);
+            g_vad_callbacks.frame_callback = nullptr;
+        } else {
+        g_vad_callbacks.frame_method =
+            env->GetMethodID(callbackClass, "streamFrameCallback", "(ZFI)Z");
+        env->DeleteLocalRef(callbackClass);
+
+        if (clearPendingException(env, "racVadSetCallbacks GetMethodID(streamFrameCallback)") ||
+            !g_vad_callbacks.frame_method) {
+            LOGe("racVadSetCallbacks: streamFrameCallback method not found");
+            env->DeleteGlobalRef(g_vad_callbacks.frame_callback);
+            g_vad_callbacks.frame_callback = nullptr;
+        }
+        }
+    }
+
+    if (speechStartCallback != nullptr) {
+        g_vad_callbacks.speech_start_callback = env->NewGlobalRef(speechStartCallback);
+        jclass callbackClass = env->GetObjectClass(speechStartCallback);
+        if (clearPendingException(env, "racVadSetCallbacks GetObjectClass(speechStartCallback)") ||
+            callbackClass == nullptr) {
+            LOGe("racVadSetCallbacks: failed to get speech start callback class");
+            env->DeleteGlobalRef(g_vad_callbacks.speech_start_callback);
+            g_vad_callbacks.speech_start_callback = nullptr;
+        } else {
+        g_vad_callbacks.speech_start_method =
+            env->GetMethodID(callbackClass, "speechStartCallback", "(J)V");
+        env->DeleteLocalRef(callbackClass);
+
+        if (clearPendingException(env, "racVadSetCallbacks GetMethodID(speechStartCallback)") ||
+            !g_vad_callbacks.speech_start_method) {
+            LOGe("racVadSetCallbacks: speechStartCallback method not found");
+            env->DeleteGlobalRef(g_vad_callbacks.speech_start_callback);
+            g_vad_callbacks.speech_start_callback = nullptr;
+        }
+        }
+    }
+
+    if (speechEndCallback != nullptr) {
+        g_vad_callbacks.speech_end_callback = env->NewGlobalRef(speechEndCallback);
+        jclass callbackClass = env->GetObjectClass(speechEndCallback);
+        if (clearPendingException(env, "racVadSetCallbacks GetObjectClass(speechEndCallback)") ||
+            callbackClass == nullptr) {
+            LOGe("racVadSetCallbacks: failed to get speech end callback class");
+            env->DeleteGlobalRef(g_vad_callbacks.speech_end_callback);
+            g_vad_callbacks.speech_end_callback = nullptr;
+        } else {
+        g_vad_callbacks.speech_end_method =
+            env->GetMethodID(callbackClass, "speechEndCallback", "(JJF)V");
+        env->DeleteLocalRef(callbackClass);
+
+        if (clearPendingException(env, "racVadSetCallbacks GetMethodID(speechEndCallback)") ||
+            !g_vad_callbacks.speech_end_method) {
+            LOGe("racVadSetCallbacks: speechEndCallback method not found");
+            env->DeleteGlobalRef(g_vad_callbacks.speech_end_callback);
+            g_vad_callbacks.speech_end_callback = nullptr;
+        }
+        }
+    }
+
+    if (progressCallback != nullptr) {
+        g_vad_callbacks.progress_callback = env->NewGlobalRef(progressCallback);
+        jclass callbackClass = env->GetObjectClass(progressCallback);
+        if (clearPendingException(env, "racVadSetCallbacks GetObjectClass(progressCallback)") ||
+            callbackClass == nullptr) {
+            LOGe("racVadSetCallbacks: failed to get progress callback class");
+            env->DeleteGlobalRef(g_vad_callbacks.progress_callback);
+            g_vad_callbacks.progress_callback = nullptr;
+        } else {
+        g_vad_callbacks.progress_method =
+            env->GetMethodID(callbackClass, "progressCallback", "(F)V");
+        env->DeleteLocalRef(callbackClass);
+
+        if (clearPendingException(env, "racVadSetCallbacks GetMethodID(progressCallback)") ||
+            !g_vad_callbacks.progress_method) {
+            LOGe("racVadSetCallbacks: progressCallback method not found");
+            env->DeleteGlobalRef(g_vad_callbacks.progress_callback);
+            g_vad_callbacks.progress_callback = nullptr;
+        }
+        }
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentSetCallbacks(
+    JNIEnv* env, jclass clazz, jobject stateCallback, jobject turnPhaseCallback,
+    jobject partialTranscriptionCallback, jobject responseTokenCallback, jobject audioChunkCallback,
+    jobject userInterruptCallback, jobject progressCallback) {
+    LOGi("racVoiceAgentSetCallbacks called");
+
+    std::lock_guard<std::mutex> lock(g_voice_agent_callbacks.mutex);
+
+    if (g_voice_agent_callbacks.state_callback != nullptr) {
+        env->DeleteGlobalRef(g_voice_agent_callbacks.state_callback);
+        g_voice_agent_callbacks.state_callback = nullptr;
+    }
+    if (g_voice_agent_callbacks.turn_phase_callback != nullptr) {
+        env->DeleteGlobalRef(g_voice_agent_callbacks.turn_phase_callback);
+        g_voice_agent_callbacks.turn_phase_callback = nullptr;
+    }
+    if (g_voice_agent_callbacks.partial_transcription_callback != nullptr) {
+        env->DeleteGlobalRef(g_voice_agent_callbacks.partial_transcription_callback);
+        g_voice_agent_callbacks.partial_transcription_callback = nullptr;
+    }
+    if (g_voice_agent_callbacks.response_token_callback != nullptr) {
+        env->DeleteGlobalRef(g_voice_agent_callbacks.response_token_callback);
+        g_voice_agent_callbacks.response_token_callback = nullptr;
+    }
+    if (g_voice_agent_callbacks.audio_chunk_callback != nullptr) {
+        env->DeleteGlobalRef(g_voice_agent_callbacks.audio_chunk_callback);
+        g_voice_agent_callbacks.audio_chunk_callback = nullptr;
+    }
+    if (g_voice_agent_callbacks.user_interrupt_callback != nullptr) {
+        env->DeleteGlobalRef(g_voice_agent_callbacks.user_interrupt_callback);
+        g_voice_agent_callbacks.user_interrupt_callback = nullptr;
+    }
+    if (g_voice_agent_callbacks.progress_callback != nullptr) {
+        env->DeleteGlobalRef(g_voice_agent_callbacks.progress_callback);
+        g_voice_agent_callbacks.progress_callback = nullptr;
+    }
+
+    g_voice_agent_callbacks.state_method = nullptr;
+    g_voice_agent_callbacks.turn_phase_method = nullptr;
+    g_voice_agent_callbacks.partial_transcription_method = nullptr;
+    g_voice_agent_callbacks.response_token_method = nullptr;
+    g_voice_agent_callbacks.audio_chunk_method = nullptr;
+    g_voice_agent_callbacks.user_interrupt_method = nullptr;
+    g_voice_agent_callbacks.progress_method = nullptr;
+
+    if (stateCallback == nullptr && turnPhaseCallback == nullptr &&
+        partialTranscriptionCallback == nullptr && responseTokenCallback == nullptr &&
+        audioChunkCallback == nullptr && userInterruptCallback == nullptr &&
+        progressCallback == nullptr) {
+        LOGi("racVoiceAgentSetCallbacks: callbacks cleared");
+        return;
+    }
+
+    env->GetJavaVM(&g_voice_agent_callbacks.jvm);
+
+    if (stateCallback != nullptr) {
+        g_voice_agent_callbacks.state_callback = env->NewGlobalRef(stateCallback);
+        jclass callbackClass = env->GetObjectClass(stateCallback);
+        if (clearPendingException(env, "racVoiceAgentSetCallbacks GetObjectClass(stateCallback)") ||
+            callbackClass == nullptr) {
+            LOGe("racVoiceAgentSetCallbacks: failed to get state callback class");
+            env->DeleteGlobalRef(g_voice_agent_callbacks.state_callback);
+            g_voice_agent_callbacks.state_callback = nullptr;
+        } else {
+        g_voice_agent_callbacks.state_method =
+            env->GetMethodID(callbackClass, "stateChangeCallback", "(I)V");
+        env->DeleteLocalRef(callbackClass);
+
+        if (clearPendingException(env, "racVoiceAgentSetCallbacks GetMethodID(stateChangeCallback)") ||
+            !g_voice_agent_callbacks.state_method) {
+            LOGe("racVoiceAgentSetCallbacks: stateChangeCallback method not found");
+            env->DeleteGlobalRef(g_voice_agent_callbacks.state_callback);
+            g_voice_agent_callbacks.state_callback = nullptr;
+        }
+        }
+    }
+
+    if (turnPhaseCallback != nullptr) {
+        g_voice_agent_callbacks.turn_phase_callback = env->NewGlobalRef(turnPhaseCallback);
+        jclass callbackClass = env->GetObjectClass(turnPhaseCallback);
+        if (clearPendingException(env, "racVoiceAgentSetCallbacks GetObjectClass(turnPhaseCallback)") ||
+            callbackClass == nullptr) {
+            LOGe("racVoiceAgentSetCallbacks: failed to get turn phase callback class");
+            env->DeleteGlobalRef(g_voice_agent_callbacks.turn_phase_callback);
+            g_voice_agent_callbacks.turn_phase_callback = nullptr;
+        } else {
+        g_voice_agent_callbacks.turn_phase_method =
+            env->GetMethodID(callbackClass, "turnPhaseCallback", "(I)V");
+        env->DeleteLocalRef(callbackClass);
+
+        if (clearPendingException(env, "racVoiceAgentSetCallbacks GetMethodID(turnPhaseCallback)") ||
+            !g_voice_agent_callbacks.turn_phase_method) {
+            LOGe("racVoiceAgentSetCallbacks: turnPhaseCallback method not found");
+            env->DeleteGlobalRef(g_voice_agent_callbacks.turn_phase_callback);
+            g_voice_agent_callbacks.turn_phase_callback = nullptr;
+        }
+        }
+    }
+
+    if (partialTranscriptionCallback != nullptr) {
+        g_voice_agent_callbacks.partial_transcription_callback =
+            env->NewGlobalRef(partialTranscriptionCallback);
+        jclass callbackClass = env->GetObjectClass(partialTranscriptionCallback);
+        if (clearPendingException(env, "racVoiceAgentSetCallbacks GetObjectClass(partialTranscriptionCallback)") ||
+            callbackClass == nullptr) {
+            LOGe("racVoiceAgentSetCallbacks: failed to get partial transcription callback class");
+            env->DeleteGlobalRef(g_voice_agent_callbacks.partial_transcription_callback);
+            g_voice_agent_callbacks.partial_transcription_callback = nullptr;
+        } else {
+        g_voice_agent_callbacks.partial_transcription_method =
+            env->GetMethodID(callbackClass, "partialTranscriptionCallback",
+                             "(Ljava/lang/String;)V");
+        env->DeleteLocalRef(callbackClass);
+
+        if (clearPendingException(env, "racVoiceAgentSetCallbacks GetMethodID(partialTranscriptionCallback)") ||
+            !g_voice_agent_callbacks.partial_transcription_method) {
+            LOGe("racVoiceAgentSetCallbacks: partialTranscriptionCallback method not found");
+            env->DeleteGlobalRef(g_voice_agent_callbacks.partial_transcription_callback);
+            g_voice_agent_callbacks.partial_transcription_callback = nullptr;
+        }
+        }
+    }
+
+    if (responseTokenCallback != nullptr) {
+        g_voice_agent_callbacks.response_token_callback = env->NewGlobalRef(responseTokenCallback);
+        jclass callbackClass = env->GetObjectClass(responseTokenCallback);
+        if (clearPendingException(env, "racVoiceAgentSetCallbacks GetObjectClass(responseTokenCallback)") ||
+            callbackClass == nullptr) {
+            LOGe("racVoiceAgentSetCallbacks: failed to get response token callback class");
+            env->DeleteGlobalRef(g_voice_agent_callbacks.response_token_callback);
+            g_voice_agent_callbacks.response_token_callback = nullptr;
+        } else {
+        g_voice_agent_callbacks.response_token_method =
+            env->GetMethodID(callbackClass, "responseTokenCallback", "(Ljava/lang/String;Z)Z");
+        env->DeleteLocalRef(callbackClass);
+
+        if (clearPendingException(env, "racVoiceAgentSetCallbacks GetMethodID(responseTokenCallback)") ||
+            !g_voice_agent_callbacks.response_token_method) {
+            LOGe("racVoiceAgentSetCallbacks: responseTokenCallback method not found");
+            env->DeleteGlobalRef(g_voice_agent_callbacks.response_token_callback);
+            g_voice_agent_callbacks.response_token_callback = nullptr;
+        }
+        }
+    }
+
+    if (audioChunkCallback != nullptr) {
+        g_voice_agent_callbacks.audio_chunk_callback = env->NewGlobalRef(audioChunkCallback);
+        jclass callbackClass = env->GetObjectClass(audioChunkCallback);
+        if (clearPendingException(env, "racVoiceAgentSetCallbacks GetObjectClass(audioChunkCallback)") ||
+            callbackClass == nullptr) {
+            LOGe("racVoiceAgentSetCallbacks: failed to get audio chunk callback class");
+            env->DeleteGlobalRef(g_voice_agent_callbacks.audio_chunk_callback);
+            g_voice_agent_callbacks.audio_chunk_callback = nullptr;
+        } else {
+        g_voice_agent_callbacks.audio_chunk_method =
+            env->GetMethodID(callbackClass, "audioChunkCallback", "([BZ)Z");
+        env->DeleteLocalRef(callbackClass);
+
+        if (clearPendingException(env, "racVoiceAgentSetCallbacks GetMethodID(audioChunkCallback)") ||
+            !g_voice_agent_callbacks.audio_chunk_method) {
+            LOGe("racVoiceAgentSetCallbacks: audioChunkCallback method not found");
+            env->DeleteGlobalRef(g_voice_agent_callbacks.audio_chunk_callback);
+            g_voice_agent_callbacks.audio_chunk_callback = nullptr;
+        }
+        }
+    }
+
+    if (userInterruptCallback != nullptr) {
+        g_voice_agent_callbacks.user_interrupt_callback =
+            env->NewGlobalRef(userInterruptCallback);
+        jclass callbackClass = env->GetObjectClass(userInterruptCallback);
+        if (clearPendingException(env, "racVoiceAgentSetCallbacks GetObjectClass(userInterruptCallback)") ||
+            callbackClass == nullptr) {
+            LOGe("racVoiceAgentSetCallbacks: failed to get user interrupt callback class");
+            env->DeleteGlobalRef(g_voice_agent_callbacks.user_interrupt_callback);
+            g_voice_agent_callbacks.user_interrupt_callback = nullptr;
+        } else {
+        g_voice_agent_callbacks.user_interrupt_method =
+            env->GetMethodID(callbackClass, "userInterruptCallback", "()V");
+        env->DeleteLocalRef(callbackClass);
+
+        if (clearPendingException(env, "racVoiceAgentSetCallbacks GetMethodID(userInterruptCallback)") ||
+            !g_voice_agent_callbacks.user_interrupt_method) {
+            LOGe("racVoiceAgentSetCallbacks: userInterruptCallback method not found");
+            env->DeleteGlobalRef(g_voice_agent_callbacks.user_interrupt_callback);
+            g_voice_agent_callbacks.user_interrupt_callback = nullptr;
+        }
+        }
+    }
+
+    if (progressCallback != nullptr) {
+        g_voice_agent_callbacks.progress_callback = env->NewGlobalRef(progressCallback);
+        jclass callbackClass = env->GetObjectClass(progressCallback);
+        if (clearPendingException(env, "racVoiceAgentSetCallbacks GetObjectClass(progressCallback)") ||
+            callbackClass == nullptr) {
+            LOGe("racVoiceAgentSetCallbacks: failed to get progress callback class");
+            env->DeleteGlobalRef(g_voice_agent_callbacks.progress_callback);
+            g_voice_agent_callbacks.progress_callback = nullptr;
+        } else {
+        g_voice_agent_callbacks.progress_method =
+            env->GetMethodID(callbackClass, "progressCallback", "(F)V");
+        env->DeleteLocalRef(callbackClass);
+
+        if (clearPendingException(env, "racVoiceAgentSetCallbacks GetMethodID(progressCallback)") ||
+            !g_voice_agent_callbacks.progress_method) {
+            LOGe("racVoiceAgentSetCallbacks: progressCallback method not found");
+            env->DeleteGlobalRef(g_voice_agent_callbacks.progress_callback);
+            g_voice_agent_callbacks.progress_callback = nullptr;
+        }
+        }
+    }
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentProcessStream(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray audioData) {
+    if (handle == 0)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (audioData == nullptr)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    jsize len = env->GetArrayLength(audioData);
+    jbyte* data = env->GetByteArrayElements(audioData, nullptr);
+
+    rac_result_t status = rac_voice_agent_process_stream(
+        reinterpret_cast<rac_voice_agent_handle_t>(handle), data, static_cast<size_t>(len),
+        voice_agent_event_adapter, nullptr);
+
+    env->ReleaseByteArrayElements(audioData, data, JNI_ABORT);
+
+    return static_cast<jint>(status);
 }
 
 // =============================================================================

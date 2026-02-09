@@ -11,6 +11,7 @@
 package com.runanywhere.sdk.foundation.bridge.extensions
 
 import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
  * Voice Agent bridge that provides conversational AI pipeline management for C++ core.
@@ -659,8 +660,15 @@ object CppBridgeVoiceAgent {
                 return
             }
 
-            // TODO: Call native registration
-            // nativeSetVoiceAgentCallbacks()
+            RunAnywhereBridge.racVoiceAgentSetCallbacks(
+                this,
+                this,
+                this,
+                this,
+                this,
+                this,
+                this,
+            )
 
             isRegistered = true
 
@@ -1541,8 +1549,15 @@ object CppBridgeVoiceAgent {
                 destroy()
             }
 
-            // TODO: Call native unregistration
-            // nativeUnsetVoiceAgentCallbacks()
+            RunAnywhereBridge.racVoiceAgentSetCallbacks(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+            )
 
             voiceAgentListener = null
             audioStreamCallback = null
