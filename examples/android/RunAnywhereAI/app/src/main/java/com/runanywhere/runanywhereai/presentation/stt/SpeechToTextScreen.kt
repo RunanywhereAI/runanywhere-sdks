@@ -45,6 +45,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.presentation.chat.components.ModelLoadedToast
+import com.runanywhere.runanywhereai.presentation.chat.components.ModelRequiredOverlay
 import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppTypography
@@ -186,7 +187,8 @@ fun SpeechToTextScreen(viewModel: SpeechToTextViewModel = viewModel()) {
             }
 
             if (!uiState.isModelLoaded && uiState.recordingState != RecordingState.PROCESSING) {
-                ModelRequiredOverlaySTT(
+                ModelRequiredOverlay(
+                    modality = ModelSelectionContext.STT,
                     onSelectModel = { showModelPicker = true },
                     modifier = Modifier.matchParentSize(),
                 )
@@ -1066,134 +1068,3 @@ private fun RecordingButton(
     }
 }
 
-/**
- * Model Required Overlay for STT - green, "Voice to Text", same layout as Chat overlay
- */
-@Composable
-private fun ModelRequiredOverlaySTT(
-    onSelectModel: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val modalityColor = AppColors.primaryGreen
-    val infiniteTransition = rememberInfiniteTransition(label = "stt_overlay_circles")
-    val circle1Offset by infiniteTransition.animateFloat(
-        initialValue = -100f,
-        targetValue = 100f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 8000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "c1",
-    )
-    val circle2Offset by infiniteTransition.animateFloat(
-        initialValue = 100f,
-        targetValue = -100f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 8000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "c2",
-    )
-    val circle3Offset by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 80f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 8000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "c3",
-    )
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    val c1Dp = with(density) { circle1Offset.toDp() }
-    val c2Dp = with(density) { circle2Offset.toDp() }
-    val c3Dp = with(density) { circle3Offset.toDp() }
-
-    Box(modifier = modifier.fillMaxSize()) {
-        Box(modifier = Modifier.fillMaxSize().blur(32.dp)) {
-            Box(
-                modifier = Modifier
-                    .size(300.dp)
-                    .offset(x = c1Dp, y = (-200).dp)
-                    .clip(CircleShape)
-                    .background(modalityColor.copy(alpha = 0.15f)),
-            )
-            Box(
-                modifier = Modifier
-                    .size(250.dp)
-                    .offset(x = c2Dp, y = 300.dp)
-                    .clip(CircleShape)
-                    .background(modalityColor.copy(alpha = 0.12f)),
-            )
-            Box(
-                modifier = Modifier
-                    .size(280.dp)
-                    .offset(x = -c3Dp, y = c3Dp)
-                    .clip(CircleShape)
-                    .background(modalityColor.copy(alpha = 0.08f)),
-            )
-        }
-        Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Spacer(modifier = Modifier.weight(1f))
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(120.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(
-                            listOf(
-                                modalityColor.copy(alpha = 0.2f),
-                                modalityColor.copy(alpha = 0.1f),
-                            ),
-                        ),
-                    ),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.GraphicEq,
-                    contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = modalityColor,
-                )
-            }
-            Spacer(modifier = Modifier.height(20.dp))
-            Text(
-                text = "Voice to Text",
-                style = MaterialTheme.typography.titleLarge,
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Transcribe your speech to text with powerful on-device voice recognition.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            Button(
-                onClick = onSelectModel,
-                colors = ButtonDefaults.buttonColors(containerColor = modalityColor),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color.White)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Get Started", style = MaterialTheme.typography.titleMedium)
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.padding(bottom = 16.dp),
-            ) {
-                Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "100% Private • Runs on your device",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}

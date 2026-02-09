@@ -12,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -26,13 +27,12 @@ import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
 /**
  * ModelRequiredOverlay - Displays when a model needs to be selected
  *
- * Ported from iOS ModelStatusComponents.swift
- *
- * Features:
- * - Animated floating circles background
- * - Modality-specific icon, color, and messaging
- * - "Get Started" CTA button
- * - Privacy note footer
+ * Matches iOS ModelStatusComponents.swift ModelRequiredOverlay exactly:
+ * - Animated floating circles background (3 circles, easeInOut 8s repeatForever reverse)
+ * - Circles centered then offset: circle1 (-100→100, y -200), circle2 (100→-100, y 300), circle3 (-0→-80, 0→80)
+ * - Per-circle blur radii 80, 100, 90; opacities 0.15, 0.12, 0.08
+ * - Modality-specific icon, color, title, description
+ * - "Get Started" CTA and privacy note
  */
 @Composable
 fun ModelRequiredOverlay(
@@ -40,7 +40,7 @@ fun ModelRequiredOverlay(
     onSelectModel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Animation for floating circles
+    // Animation for floating circles - same as iOS: easeInOut duration 8, repeatForever(autoreverses: true)
     val infiniteTransition = rememberInfiniteTransition(label = "floatingCircles")
 
     val circle1Offset by infiniteTransition.animateFloat(
@@ -78,45 +78,55 @@ fun ModelRequiredOverlay(
     val modalityTitle = getModalityTitle(modality)
     val modalityDescription = getModalityDescription(modality)
 
+    val density = LocalDensity.current
+    val c1Dp = with(density) { circle1Offset.toDp() }
+    val c2Dp = with(density) { circle2Offset.toDp() }
+    val c3Dp = with(density) { circle3Offset.toDp() }
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Animated floating circles background
-        Box(modifier = Modifier.fillMaxSize()) {
-            // Circle 1 - Top left
+        // 1. Animated circles – very faint, heavy blur (iOS “behind glass”)
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
             Box(
                 modifier = Modifier
                     .size(300.dp)
-                    .offset(x = circle1Offset.dp, y = (-200).dp)
-                    .blur(80.dp)
+                    .offset(x = c1Dp, y = (-200).dp)
                     .clip(CircleShape)
-                    .background(modalityColor.copy(alpha = 0.15f))
+                    .background(modalityColor.copy(alpha = 0.10f))
+                    .blur(200.dp)
             )
-
-            // Circle 2 - Bottom right
             Box(
                 modifier = Modifier
                     .size(250.dp)
-                    .offset(x = circle2Offset.dp, y = 300.dp)
-                    .blur(100.dp)
+                    .offset(x = c2Dp, y = 300.dp)
                     .clip(CircleShape)
-                    .background(modalityColor.copy(alpha = 0.12f))
+                    .background(modalityColor.copy(alpha = 0.08f))
+                    .blur(220.dp)
             )
-
-            // Circle 3 - Center
             Box(
                 modifier = Modifier
                     .size(280.dp)
-                    .offset(x = (-circle3Offset).dp, y = circle3Offset.dp)
-                    .blur(90.dp)
+                    .offset(x = -c3Dp, y = c3Dp)
                     .clip(CircleShape)
-                    .background(modalityColor.copy(alpha = 0.08f))
+                    .background(modalityColor.copy(alpha = 0.06f))
+                    .blur(210.dp)
             )
         }
 
-        // Main content
+        // 2. Frost overlay – circles appear behind a light “glass” wash
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.25f),
+            tonalElevation = 0.dp
+        ) { }
+
+        // Layer 3: Content in front of glass (icon, text, button)
         Column(
             modifier = Modifier
                 .fillMaxSize()
