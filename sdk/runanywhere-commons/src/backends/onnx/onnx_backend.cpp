@@ -279,7 +279,9 @@ bool ONNXSTT::load_model(const std::string& model_path, STTModelType model_type,
     recognizer_config.model_config.omnilingual.model = "";
 
     recognizer_config.lm_config.model = "";
-    recognizer_config.lm_config.scale = 1.0f;
+    // Do not set lm_config.scale: on some Sherpa-ONNX ABI layouts, scale (float) can
+    // overwrite or be confused with a string pointer; strlen(0x3f800000) then crashes (SIGSEGV).
+    // Leave scale at 0 from memset; Whisper does not use LM.
 
     recognizer_config.decoding_method = "greedy_search";
     recognizer_config.max_active_paths = 4;

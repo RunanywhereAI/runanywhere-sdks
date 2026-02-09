@@ -61,6 +61,15 @@ static rac_result_t onnx_stt_vtable_initialize(void* impl, const char* model_pat
 static rac_result_t onnx_stt_vtable_transcribe(void* impl, const void* audio_data,
                                                size_t audio_size, const rac_stt_options_t* options,
                                                rac_stt_result_t* out_result) {
+    if (!audio_data || audio_size == 0 || !out_result) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    // Minimum ~0.05s at 16kHz 16-bit to avoid Sherpa crash on empty/tiny input
+    if (audio_size < 1600) {
+        out_result->text = nullptr;
+        out_result->confidence = 0.0f;
+        return RAC_SUCCESS;
+    }
     std::vector<float> float_samples = convert_int16_to_float32(audio_data, audio_size);
     return rac_stt_onnx_transcribe(impl, float_samples.data(), float_samples.size(), options,
                                    out_result);
