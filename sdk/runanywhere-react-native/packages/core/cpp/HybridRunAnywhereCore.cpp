@@ -199,6 +199,7 @@ bool extractBoolValue(const std::string& json, const std::string& key, bool defa
 rac_inference_framework_t frameworkFromString(const std::string& framework) {
     if (framework == "LlamaCpp" || framework == "llamacpp") return RAC_FRAMEWORK_LLAMACPP;
     if (framework == "ONNX" || framework == "onnx") return RAC_FRAMEWORK_ONNX;
+    if (framework == "CoreML" || framework == "coreml") return RAC_FRAMEWORK_COREML;
     if (framework == "FoundationModels") return RAC_FRAMEWORK_FOUNDATION_MODELS;
     if (framework == "SystemTTS") return RAC_FRAMEWORK_SYSTEM_TTS;
     return RAC_FRAMEWORK_UNKNOWN;
@@ -811,6 +812,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getAvailableModels(
                 case RAC_MODEL_CATEGORY_SPEECH_RECOGNITION: categoryStr = "speech-recognition"; break;
                 case RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS: categoryStr = "speech-synthesis"; break;
                 case RAC_MODEL_CATEGORY_VISION: categoryStr = "vision"; break;
+                case RAC_MODEL_CATEGORY_IMAGE_GENERATION: categoryStr = "image-generation"; break;
                 case RAC_MODEL_CATEGORY_AUDIO: categoryStr = "audio"; break;
                 case RAC_MODEL_CATEGORY_MULTIMODAL: categoryStr = "multimodal"; break;
                 default: categoryStr = "unknown"; break;
@@ -827,6 +829,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getAvailableModels(
             switch (m.framework) {
                 case RAC_FRAMEWORK_LLAMACPP: frameworkStr = "LlamaCpp"; break;
                 case RAC_FRAMEWORK_ONNX: frameworkStr = "ONNX"; break;
+                case RAC_FRAMEWORK_COREML: frameworkStr = "CoreML"; break;
                 case RAC_FRAMEWORK_FOUNDATION_MODELS: frameworkStr = "FoundationModels"; break;
                 case RAC_FRAMEWORK_SYSTEM_TTS: frameworkStr = "SystemTTS"; break;
                 default: frameworkStr = "unknown"; break;
@@ -889,6 +892,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getModelInfo(
         switch (m.framework) {
             case RAC_FRAMEWORK_LLAMACPP: frameworkStr = "LlamaCpp"; break;
             case RAC_FRAMEWORK_ONNX: frameworkStr = "ONNX"; break;
+            case RAC_FRAMEWORK_COREML: frameworkStr = "CoreML"; break;
             case RAC_FRAMEWORK_FOUNDATION_MODELS: frameworkStr = "FoundationModels"; break;
             case RAC_FRAMEWORK_SYSTEM_TTS: frameworkStr = "SystemTTS"; break;
             default: frameworkStr = "unknown"; break;

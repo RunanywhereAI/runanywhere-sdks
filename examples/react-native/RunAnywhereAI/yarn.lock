@@ -1525,6 +1525,10 @@
   version "0.17.6"
   resolved "file:../../../sdk/runanywhere-react-native/packages/core"
 
+"@runanywhere/diffusion@file:../../../sdk/runanywhere-react-native/packages/diffusion":
+  version "0.1.0"
+  resolved "file:../../../sdk/runanywhere-react-native/packages/diffusion"
+
 "@runanywhere/llamacpp@file:../../../sdk/runanywhere-react-native/packages/llamacpp":
   version "0.17.6"
   resolved "file:../../../sdk/runanywhere-react-native/packages/llamacpp"

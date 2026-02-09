@@ -22,13 +22,22 @@ export * from './settings';
 // Tab 1: Speech-to-Text
 // Tab 2: Text-to-Speech
 // Tab 3: Voice Assistant (STT + LLM + TTS)
-// Tab 4: Settings (includes Tool Settings)
+// Tab 4: Vision (hub: VLM + Image Generation on iOS, VLM only on Android)
+// Tab 5: Settings (includes Tool Settings)
 export type RootTabParamList = {
   Chat: undefined;
   STT: undefined;
   TTS: undefined;
   Voice: undefined;
+  Vision: undefined;
   Settings: undefined;
+};
+
+/** Vision tab stack: hub list -> VLM or Image Generation screen */
+export type VisionStackParamList = {
+  VisionHub: undefined;
+  VLM: undefined;
+  ImageGeneration: undefined;
 };
 
 // Common utility types

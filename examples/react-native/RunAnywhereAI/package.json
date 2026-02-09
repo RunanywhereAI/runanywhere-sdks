@@ -22,6 +22,7 @@
     "@react-navigation/native": "^7.1.24",
     "@react-navigation/native-stack": "^7.8.5",
     "@runanywhere/core": "file:../../../sdk/runanywhere-react-native/packages/core",
+    "@runanywhere/diffusion": "file:../../../sdk/runanywhere-react-native/packages/diffusion",
     "@runanywhere/llamacpp": "file:../../../sdk/runanywhere-react-native/packages/llamacpp",
     "@runanywhere/onnx": "file:../../../sdk/runanywhere-react-native/packages/onnx",
     "react": "19.2.0",

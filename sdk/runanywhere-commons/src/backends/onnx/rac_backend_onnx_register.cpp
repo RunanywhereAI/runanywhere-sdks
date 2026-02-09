@@ -475,7 +475,7 @@ rac_result_t rac_backend_onnx_register(void) {
         return RAC_ERROR_MODULE_ALREADY_REGISTERED;
     }
 
-    // Register module (STT, TTS, VAD only; diffusion is Apple CoreML-only)
+    // Register module (STT, TTS, VAD only; diffusion is CoreML-only in Swift SDK)
     rac_module_info_t module_info = {};
     module_info.id = MODULE_ID;
     module_info.name = "ONNX Runtime";
