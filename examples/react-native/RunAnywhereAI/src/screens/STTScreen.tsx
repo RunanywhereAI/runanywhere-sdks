@@ -426,30 +426,49 @@ export const STTScreen: React.FC = () => {
         throw new Error('STT model not loaded');
       }
 
-      // Transcribe the audio file - native module handles format conversion
-      // iOS AudioToolbox converts M4A/CAF/WAV to 16kHz mono float32 PCM
+      // Transcribe the audio file - native expects absolute path, WAV format
+      // Android: normalizedPath is already absolute (e.g. .../cache/recording_xxx.wav)
       console.warn('[STTScreen] Starting transcription...');
-      const result = await RunAnywhere.transcribeFile(normalizedPath, {
-        language: 'en',
-      });
+      let result: { text?: string; confidence?: number };
+      try {
+        result = await RunAnywhere.transcribeFile(normalizedPath, {
+          language: 'en',
+        });
+      } catch (transcribeError: unknown) {
+        const msg =
+          transcribeError instanceof Error
+            ? transcribeError.message
+            : String(transcribeError);
+        console.error('[STTScreen] transcribeFile threw:', msg);
+        throw new Error(
+          msg +
+            (msg.includes('open') || msg.includes('WAV')
+              ? ' (ensure recording finished and file is valid WAV)'
+              : '')
+        );
+      }
 
       console.warn('[STTScreen] Transcription result:', result);
 
       if (result.text) {
         setTranscript(result.text);
-        setConfidence(result.confidence);
+        setConfidence(result.confidence ?? null);
       } else {
         setTranscript('(No speech detected)');
       }
 
-      // Clean up temp file
+      // Clean up temp file only after successful transcription
       await RNFS.unlink(normalizedPath).catch(() => {});
       recordingPath.current = null;
     } catch (error: unknown) {
       console.error('[STTScreen] Transcription error:', error);
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      Alert.alert('Transcription Error', errorMessage);
+      Alert.alert(
+        'Transcription Error',
+        errorMessage +
+          '\n\nIf the app crashes, run: adb logcat | grep -i runanywhere'
+      );
       setTranscript('');
     } finally {
       setIsProcessing(false);
