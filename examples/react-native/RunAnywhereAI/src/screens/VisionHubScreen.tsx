@@ -1,8 +1,7 @@
 /**
  * VisionHubScreen - Vision tab hub
  *
- * Lists Vision features: Vision Chat (VLM) and Image Generation (Diffusion, iOS only).
- * Matches iOS VisionHubView with NavigationLink to VLMCameraView and ImageGenerationView.
+ * Lists Vision features: Vision Chat (VLM). Image generation is Swift sample app only.
  *
  * Reference: examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Vision/VisionHubView.swift
  */
@@ -14,7 +13,6 @@ import {
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
-  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -37,7 +35,7 @@ const VisionHubScreen: React.FC = () => {
       <View style={styles.header}>
         <Text style={styles.title}>Vision</Text>
         <Text style={styles.subtitle}>
-          Vision-language and image generation
+          Vision-language (VLM)
         </Text>
       </View>
       <View style={styles.list}>
@@ -61,29 +59,6 @@ const VisionHubScreen: React.FC = () => {
           </View>
           <Icon name="chevron-forward" size={20} color={Colors.textSecondary} />
         </TouchableOpacity>
-
-        {Platform.OS === 'ios' && (
-          <TouchableOpacity
-            style={styles.row}
-            onPress={() => navigation.navigate('ImageGeneration')}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.iconWrap, styles.iconWrapPurple]}>
-              <Icon
-                name="image-outline"
-                size={24}
-                color={Colors.primaryPurple}
-              />
-            </View>
-            <View style={styles.rowContent}>
-              <Text style={styles.rowTitle}>Image Generation</Text>
-              <Text style={styles.rowSubtitle}>
-                Generate images from text (Stable Diffusion, iOS)
-              </Text>
-            </View>
-            <Icon name="chevron-forward" size={20} color={Colors.textSecondary} />
-          </TouchableOpacity>
-        )}
       </View>
     </SafeAreaView>
   );
@@ -127,9 +102,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: Spacing.mediumLarge,
-  },
-  iconWrapPurple: {
-    backgroundColor: Colors.badgePurple,
   },
   rowContent: {
     flex: 1,
