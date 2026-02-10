@@ -14,6 +14,7 @@ class DiffusionViewModel: ObservableObject {
 
     @Published var isModelLoaded = false
     @Published var currentModelName: String?
+    @Published var currentBackend: String = "" // "CoreML" or "ONNX"
     @Published var availableModels: [ModelInfo] = []
     @Published var selectedModel: ModelInfo?
 
@@ -77,6 +78,10 @@ class DiffusionViewModel: ObservableObject {
             isModelLoaded = try await RunAnywhere.isDiffusionModelLoaded
             if isModelLoaded {
                 currentModelName = try await RunAnywhere.currentDiffusionModelId
+                // Determine backend from selected model
+                if let model = selectedModel {
+                    currentBackend = model.framework.displayName
+                }
             }
         } catch {
             logger.error("Failed to check model state: \(error.localizedDescription)")
@@ -107,6 +112,8 @@ class DiffusionViewModel: ObservableObject {
         isDownloading = false
     }
 
+    @Published var currentModelVariant: DiffusionModelVariant = .sd15
+
     func loadSelectedModel() async {
         guard let model = selectedModel, model.isDownloaded, let path = model.localPath else {
             errorMessage = "Model not downloaded"
@@ -117,11 +124,20 @@ class DiffusionViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            let config = DiffusionConfiguration(modelVariant: .sd15, enableSafetyChecker: true, reduceMemory: true)
+            // App only supports Apple SD 1.5 (CoreML); use .sd15 for configuration
+            let variant: DiffusionModelVariant = .sd15
+            currentModelVariant = variant
+
+            let config = DiffusionConfiguration(modelVariant: variant, enableSafetyChecker: true, reduceMemory: true)
             try await RunAnywhere.loadDiffusionModel(modelPath: path.path, modelId: model.id, modelName: model.name, configuration: config)
             isModelLoaded = true
             currentModelName = model.name
-            statusMessage = "Model loaded"
+            currentBackend = model.framework.displayName
+            
+            // Show helpful info about the model
+            let stepsInfo = variant.defaultSteps == 1 ? "1 step (ultra-fast)" : "\(variant.defaultSteps) steps"
+            statusMessage = "Model loaded (\(currentBackend), \(stepsInfo))"
+            logger.info("Loaded \(model.name) as \(variant.rawValue) - \(stepsInfo)")
         } catch {
             errorMessage = "Load failed: \(error.localizedDescription)"
             statusMessage = "Failed"
@@ -143,18 +159,47 @@ class DiffusionViewModel: ObservableObject {
         generatedImage = nil
 
         do {
-            let options = DiffusionGenerationOptions(prompt: prompt)
-            let stream = try await RunAnywhere.generateImageStream(prompt: prompt, options: options)
-
-            for try await update in stream {
-                progress = update.progress
-                statusMessage = "Step \(update.currentStep)/\(update.totalSteps)"
+            // Use model variant defaults for optimal performance
+            // - SDXS: 512x512, 1 step, no CFG (ultra-fast ~2-10 sec)
+            // - LCM: 512x512, 4 steps, low CFG (fast ~15-30 sec)  
+            // - SD 1.5/Turbo: defaults based on variant
+            let variant = self.currentModelVariant
+            let resolution = variant.defaultResolution
+            let steps = variant.defaultSteps
+            let guidanceScale = variant.defaultGuidanceScale
+            
+            // For mobile, cap resolution to avoid memory issues
+            let maxMobileRes = 512
+            let width = min(resolution.width, maxMobileRes)
+            let height = min(resolution.height, maxMobileRes)
+            
+            logger.info("Generating with \(variant.rawValue): \(width)x\(height), \(steps) steps, CFG=\(guidanceScale)")
+            
+            let options = DiffusionGenerationOptions(
+                prompt: prompt,
+                width: width,
+                height: height,
+                steps: steps,
+                guidanceScale: guidanceScale
+            )
+            // Use the progress-callback overload so the pipeline runs only once.
+            let result = try await RunAnywhere.generateImage(
+                prompt: prompt,
+                options: options
+            ) { [weak self] update in
+                Task { @MainActor [weak self] in
+                    self?.progress = update.progress
+                    if steps == 1 {
+                        self?.statusMessage = "Processing (1-step model)..."
+                    } else {
+                        self?.statusMessage = "Step \(update.currentStep)/\(update.totalSteps)"
+                    }
+                }
+                return true // continue generation
             }
-
-            let result = try await RunAnywhere.generateImage(prompt: prompt, options: options)
             if let uiImage = createImage(from: result.imageData, width: result.width, height: result.height) {
                 generatedImage = Image(uiImage: uiImage)
-                statusMessage = "Done"
+                statusMessage = "Done in \(result.generationTimeMs)ms"
             } else {
                 errorMessage = "Failed to create image"
             }

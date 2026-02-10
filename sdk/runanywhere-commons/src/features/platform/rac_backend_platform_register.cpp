@@ -9,9 +9,12 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <mutex>
 
 #include "rac/core/rac_core.h"
+
+namespace fs = std::filesystem;
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
@@ -628,29 +631,110 @@ rac_handle_t platform_tts_create(const rac_service_request_t* request, void* use
 rac_bool_t platform_diffusion_can_handle(const rac_service_request_t* request, void* user_data) {
     (void)user_data;
 
+    RAC_LOG_INFO(LOG_CAT, "CoreMLDiffusion can_handle: ENTRY");
+    
     if (request == nullptr) {
+        RAC_LOG_INFO(LOG_CAT, "CoreMLDiffusion can_handle: null request -> FALSE");
         return RAC_FALSE;
     }
 
-    // Check framework hint first
-    if (request->framework == RAC_FRAMEWORK_COREML) {
-        RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: framework match -> true");
+    // Get the model path - prefer model_path over identifier
+    const char* path_str = request->model_path ? request->model_path : request->identifier;
+    
+    RAC_LOG_INFO(LOG_CAT, "CoreMLDiffusion can_handle: path=%s, framework=%d", 
+                  path_str ? path_str : "NULL", request->framework);
+
+    // CRITICAL: Check for CoreML model files FIRST, before framework hint
+    // This prevents incorrectly handling ONNX models when registry lookup fails
+    if (path_str != nullptr) {
+        fs::path model_path(path_str);
+        
+        // Check if the path itself is a .mlmodelc or .mlpackage
+        std::string extension = model_path.extension().string();
+        if (extension == ".mlmodelc" || extension == ".mlpackage") {
+            if (fs::exists(model_path) && fs::is_directory(model_path)) {
+                RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: found CoreML model at path -> true");
+                return RAC_TRUE;
+            }
+        }
+        
+        // Check if directory contains CoreML model subdirectories (Unet.mlmodelc, etc.)
+        if (fs::exists(model_path) && fs::is_directory(model_path)) {
+            try {
+                bool has_coreml_files = false;
+                bool has_onnx_files = false;
+                
+                for (const auto& entry : fs::directory_iterator(model_path)) {
+                    std::string name = entry.path().filename().string();
+                    
+                    // Check for CoreML model directories
+                    if (entry.is_directory()) {
+                        if (name.find(".mlmodelc") != std::string::npos ||
+                            name.find(".mlpackage") != std::string::npos) {
+                            has_coreml_files = true;
+                        }
+                    }
+                    
+                    // Check for ONNX files - if present, this is NOT a CoreML model
+                    if (entry.path().extension() == ".onnx") {
+                        has_onnx_files = true;
+                    }
+                    
+                    // Check subdirectories for ONNX files (unet/, text_encoder/, etc.)
+                    if (entry.is_directory() && !has_onnx_files) {
+                        try {
+                            for (const auto& subentry : fs::directory_iterator(entry.path())) {
+                                if (subentry.path().extension() == ".onnx") {
+                                    has_onnx_files = true;
+                                    break;
+                                }
+                            }
+                        } catch (const fs::filesystem_error&) {
+                            // Ignore
+                        }
+                    }
+                }
+                
+                // If we found ONNX files, this is NOT a CoreML model - let ONNX backend handle it
+                if (has_onnx_files) {
+                    RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: found .onnx files, deferring to ONNX backend -> false");
+                    return RAC_FALSE;
+                }
+                
+                if (has_coreml_files) {
+                    RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: found CoreML model in directory -> true");
+                    return RAC_TRUE;
+                }
+            } catch (const fs::filesystem_error&) {
+                // Ignore filesystem errors
+            }
+        }
+    }
+
+    // Only accept framework hint if explicitly set to CoreML AND no path was provided
+    // (this handles built-in models that don't have a path)
+    if (request->framework == RAC_FRAMEWORK_COREML && path_str == nullptr) {
+        RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: framework hint COREML with no path -> true");
         return RAC_TRUE;
     }
 
-    // If framework explicitly set to something else, don't handle
-    if (request->framework != RAC_FRAMEWORK_UNKNOWN) {
+    // If framework explicitly set to something other than CoreML or Unknown, don't handle
+    if (request->framework != RAC_FRAMEWORK_UNKNOWN && request->framework != RAC_FRAMEWORK_COREML) {
+        RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: framework mismatch (%d) -> false", request->framework);
         return RAC_FALSE;
     }
 
-    // Check if Swift callbacks are available
+    // Check if Swift callbacks are available for additional checks
     const auto* callbacks = rac_platform_diffusion_get_callbacks();
     if (callbacks == nullptr || callbacks->can_handle == nullptr) {
+        RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: no Swift callbacks -> false");
         return RAC_FALSE;
     }
 
-    // Delegate to Swift
-    return callbacks->can_handle(request->identifier, callbacks->user_data);
+    // Delegate to Swift for additional checks (e.g., model ID patterns)
+    rac_bool_t swift_result = callbacks->can_handle(request->identifier, callbacks->user_data);
+    RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: Swift callback returned %d", swift_result);
+    return swift_result;
 }
 
 /**
@@ -882,6 +966,7 @@ rac_result_t rac_backend_platform_register(void) {
     }
 
     // Register Diffusion provider
+    RAC_LOG_INFO(LOG_CAT, "Registering CoreMLDiffusion provider with priority=100...");
     rac_service_provider_t diffusion_provider = {};
     diffusion_provider.name = state.provider_diffusion_name;
     diffusion_provider.capability = RAC_CAPABILITY_DIFFUSION;
@@ -892,11 +977,13 @@ rac_result_t rac_backend_platform_register(void) {
 
     result = rac_service_register_provider(&diffusion_provider);
     if (result != RAC_SUCCESS) {
+        RAC_LOG_ERROR(LOG_CAT, "Failed to register CoreMLDiffusion provider: %d", result);
         rac_service_unregister_provider(state.provider_tts_name, RAC_CAPABILITY_TTS);
         rac_service_unregister_provider(state.provider_llm_name, RAC_CAPABILITY_TEXT_GENERATION);
         rac_module_unregister(state.module_id);
         return result;
     }
+    RAC_LOG_INFO(LOG_CAT, "CoreMLDiffusion provider registered successfully");
 
     // Register built-in models
     register_foundation_models_entry();

@@ -27,7 +27,7 @@ import com.runanywhere.runanywhereai.presentation.voice.VoiceAssistantScreen
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 
 /**
- * Main navigation component matching iOS app structure exactly
+ * Main navigation component matching iOS app structure
  * 5 tabs: Chat, STT, TTS, Voice, Settings
  *
  * iOS Reference: examples/ios/RunAnywhereAI/RunAnywhereAI/App/ContentView.swift

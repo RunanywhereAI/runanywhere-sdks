@@ -3,7 +3,8 @@
 //  RunAnywhere SDK
 //
 //  Public API for diffusion (image generation) operations.
-//  Calls C++ directly via CppBridge.Diffusion for all operations.
+//  Routes through C++ component layer for architectural consistency with LLM/STT/TTS.
+//  Uses Apple Stable Diffusion (CoreML) with ANE acceleration via platform callbacks.
 //
 
 import CRACommons
@@ -14,6 +15,8 @@ import Foundation
 public extension RunAnywhere {
 
     /// Generate an image from a text prompt
+    ///
+    /// Uses Apple Stable Diffusion (CoreML) with ANE acceleration when a model is loaded.
     ///
     /// Example usage:
     /// ```swift
@@ -35,97 +38,12 @@ public extension RunAnywhere {
 
         try await ensureServicesReady()
 
-        // Get handle from CppBridge.Diffusion
-        let handle = try await CppBridge.Diffusion.shared.getHandle()
-
-        // Verify model is loaded
         guard await CppBridge.Diffusion.shared.isLoaded else {
-            throw SDKError.diffusion(.notInitialized, "Diffusion model not loaded")
+            throw SDKError.diffusion(.notInitialized, "No diffusion model loaded. Call loadDiffusionModel first.")
         }
 
         let opts = options ?? DiffusionGenerationOptions(prompt: prompt)
-
-        // Build C options
-        var cOptions = rac_diffusion_options_t()
-
-        // Set basic options
-        let result = prompt.withCString { promptPtr in
-            cOptions.prompt = promptPtr
-
-            return opts.negativePrompt.withCString { negPromptPtr -> rac_result_t in
-                cOptions.negative_prompt = negPromptPtr
-                cOptions.width = Int32(opts.width)
-                cOptions.height = Int32(opts.height)
-                cOptions.steps = Int32(opts.steps)
-                cOptions.guidance_scale = opts.guidanceScale
-                cOptions.seed = opts.seed
-                cOptions.scheduler = opts.scheduler.cValue
-                cOptions.mode = opts.mode.cValue
-                cOptions.denoise_strength = opts.denoiseStrength
-                cOptions.report_intermediate_images = opts.reportIntermediateImages ? RAC_TRUE : RAC_FALSE
-                cOptions.progress_stride = Int32(opts.progressStride)
-
-                // Handle input image for img2img/inpainting
-                if let inputImage = opts.inputImage {
-                    return inputImage.withUnsafeBytes { inputBytes -> rac_result_t in
-                        cOptions.input_image_data = inputBytes.baseAddress?.assumingMemoryBound(to: UInt8.self)
-                        cOptions.input_image_size = inputImage.count
-
-                        // Handle mask for inpainting
-                        if let maskImage = opts.maskImage {
-                            return maskImage.withUnsafeBytes { maskBytes -> rac_result_t in
-                                cOptions.mask_data = maskBytes.baseAddress?.assumingMemoryBound(to: UInt8.self)
-                                cOptions.mask_size = maskImage.count
-
-                                var diffusionResult = rac_diffusion_result_t()
-                                let genResult = rac_diffusion_component_generate(handle, &cOptions, &diffusionResult)
-                                return genResult
-                            }
-                        } else {
-                            var diffusionResult = rac_diffusion_result_t()
-                            return rac_diffusion_component_generate(handle, &cOptions, &diffusionResult)
-                        }
-                    }
-                } else {
-                    var diffusionResult = rac_diffusion_result_t()
-                    return rac_diffusion_component_generate(handle, &cOptions, &diffusionResult)
-                }
-            }
-        }
-
-        // Re-generate to get the actual result (the above was just for building options)
-        var finalResult = rac_diffusion_result_t()
-
-        let generateResult = prompt.withCString { promptPtr in
-            opts.negativePrompt.withCString { negPromptPtr -> rac_result_t in
-                var genOptions = rac_diffusion_options_t()
-                genOptions.prompt = promptPtr
-                genOptions.negative_prompt = negPromptPtr
-                genOptions.width = Int32(opts.width)
-                genOptions.height = Int32(opts.height)
-                genOptions.steps = Int32(opts.steps)
-                genOptions.guidance_scale = opts.guidanceScale
-                genOptions.seed = opts.seed
-                genOptions.scheduler = opts.scheduler.cValue
-                genOptions.mode = opts.mode.cValue
-                genOptions.denoise_strength = opts.denoiseStrength
-                genOptions.report_intermediate_images = RAC_FALSE
-                genOptions.progress_stride = 1
-
-                return rac_diffusion_component_generate(handle, &genOptions, &finalResult)
-            }
-        }
-
-        guard generateResult == RAC_SUCCESS else {
-            let errorMsg = finalResult.error_message.map { String(cString: $0) } ?? "Unknown error"
-            rac_diffusion_result_free(&finalResult)
-            throw SDKError.diffusion(.generationFailed, "Image generation failed: \(errorMsg)")
-        }
-
-        let swiftResult = DiffusionResult(from: finalResult)
-        rac_diffusion_result_free(&finalResult)
-
-        return swiftResult
+        return try await CppBridge.Diffusion.shared.generate(options: opts)
     }
 
     /// Generate an image with progress reporting
@@ -155,10 +73,8 @@ public extension RunAnywhere {
 
         try await ensureServicesReady()
 
-        let handle = try await CppBridge.Diffusion.shared.getHandle()
-
         guard await CppBridge.Diffusion.shared.isLoaded else {
-            throw SDKError.diffusion(.notInitialized, "Diffusion model not loaded")
+            throw SDKError.diffusion(.notInitialized, "No diffusion model loaded")
         }
 
         var opts = options ?? DiffusionGenerationOptions(prompt: prompt)
@@ -183,8 +99,7 @@ public extension RunAnywhere {
         return AsyncThrowingStream { continuation in
             Task {
                 do {
-                    let result = try await generateImageWithProgress(
-                        handle: handle,
+                    let result = try await generateImage(
                         prompt: prompt,
                         options: opts,
                         onProgress: { progress in
@@ -228,20 +143,12 @@ public extension RunAnywhere {
 
         try await ensureServicesReady()
 
-        let handle = try await CppBridge.Diffusion.shared.getHandle()
-
         guard await CppBridge.Diffusion.shared.isLoaded else {
-            throw SDKError.diffusion(.notInitialized, "Diffusion model not loaded")
+            throw SDKError.diffusion(.notInitialized, "No diffusion model loaded")
         }
 
         let opts = options ?? DiffusionGenerationOptions(prompt: prompt)
-
-        return try await generateImageWithProgress(
-            handle: handle,
-            prompt: prompt,
-            options: opts,
-            onProgress: onProgress
-        )
+        return try await CppBridge.Diffusion.shared.generateWithProgress(options: opts, onProgress: onProgress)
     }
 
     /// Cancel ongoing image generation
@@ -254,6 +161,11 @@ public extension RunAnywhere {
     }
 
     /// Load a diffusion model
+    ///
+    /// Expects a CoreML model directory containing .mlmodelc files
+    /// (Unet.mlmodelc, TextEncoder.mlmodelc, etc.).
+    ///
+    /// You can explicitly specify the framework via `configuration.preferredFramework`.
     ///
     /// - Parameters:
     ///   - modelPath: Path to the model directory
@@ -272,13 +184,18 @@ public extension RunAnywhere {
 
         try await ensureServicesReady()
 
-        // Configure if provided
+        SDKLogger.shared.info("[Diffusion] Loading model '\(modelId)' via C++ component layer")
+        SDKLogger.shared.info("[Diffusion] Model path: \(modelPath)")
+
+        // Configure the component if configuration is provided
         if let config = configuration {
             try await CppBridge.Diffusion.shared.configure(config)
         }
 
-        // Load model
+        // Load via C++ component -> vtable dispatch -> platform callback -> DiffusionPlatformService
         try await CppBridge.Diffusion.shared.loadModel(modelPath, modelId: modelId, modelName: modelName)
+
+        SDKLogger.shared.info("[Diffusion] Model '\(modelId)' loaded successfully via C++ component layer")
     }
 
     /// Unload the current diffusion model
@@ -288,6 +205,7 @@ public extension RunAnywhere {
         }
 
         await CppBridge.Diffusion.shared.unload()
+        SDKLogger.shared.info("[Diffusion] Model unloaded")
     }
 
     /// Check if a diffusion model is loaded
@@ -312,107 +230,13 @@ public extension RunAnywhere {
 
         return await CppBridge.Diffusion.shared.getCapabilities()
     }
-}
 
-// MARK: - Private Helpers
-
-private extension RunAnywhere {
-
-    /// Internal helper for progress-based generation
-    static func generateImageWithProgress(
-        handle: rac_handle_t,
-        prompt: String,
-        options: DiffusionGenerationOptions,
-        onProgress: @escaping (DiffusionProgress) -> Bool
-    ) async throws -> DiffusionResult {
-
-        // Create context for callbacks
-        final class CallbackContext: @unchecked Sendable {
-            var progressCallback: (DiffusionProgress) -> Bool
-            var result: DiffusionResult?
-            var error: Error?
-            var completion: CheckedContinuation<DiffusionResult, Error>?
-
-            init(progressCallback: @escaping (DiffusionProgress) -> Bool) {
-                self.progressCallback = progressCallback
-            }
-        }
-
-        let context = CallbackContext(progressCallback: onProgress)
-
-        return try await withCheckedThrowingContinuation { continuation in
-            context.completion = continuation
-
-            let contextPtr = Unmanaged.passRetained(context).toOpaque()
-
-            // Progress callback
-            let progressCallback: rac_diffusion_progress_callback_fn = { cProgressPtr, userData -> rac_bool_t in
-                guard let cProgressPtr = cProgressPtr, let userData = userData else {
-                    return RAC_TRUE
-                }
-
-                let ctx = Unmanaged<CallbackContext>.fromOpaque(userData).takeUnretainedValue()
-                let progress = DiffusionProgress(from: cProgressPtr.pointee)
-
-                let shouldContinue = ctx.progressCallback(progress)
-                return shouldContinue ? RAC_TRUE : RAC_FALSE
-            }
-
-            // Complete callback
-            let completeCallback: rac_diffusion_complete_callback_fn = { cResultPtr, userData in
-                guard let cResultPtr = cResultPtr, let userData = userData else {
-                    return
-                }
-
-                let ctx = Unmanaged<CallbackContext>.fromOpaque(userData).takeRetainedValue()
-                let result = DiffusionResult(from: cResultPtr.pointee)
-                ctx.completion?.resume(returning: result)
-            }
-
-            // Error callback
-            let errorCallback: rac_diffusion_error_callback_fn = { _, errorMessage, userData in
-                guard let userData = userData else { return }
-
-                let ctx = Unmanaged<CallbackContext>.fromOpaque(userData).takeRetainedValue()
-                let message = errorMessage.map { String(cString: $0) } ?? "Unknown error"
-                let error = SDKError.diffusion(SDKError.DiffusionErrorCode.generationFailed, "Generation failed: \(message)")
-                ctx.completion?.resume(throwing: error)
-            }
-
-            // Build C options and call
-            prompt.withCString { promptPtr in
-                options.negativePrompt.withCString { negPromptPtr in
-                    var cOptions = rac_diffusion_options_t()
-                    cOptions.prompt = promptPtr
-                    cOptions.negative_prompt = negPromptPtr
-                    cOptions.width = Int32(options.width)
-                    cOptions.height = Int32(options.height)
-                    cOptions.steps = Int32(options.steps)
-                    cOptions.guidance_scale = options.guidanceScale
-                    cOptions.seed = options.seed
-                    cOptions.scheduler = options.scheduler.cValue
-                    cOptions.mode = options.mode.cValue
-                    cOptions.denoise_strength = options.denoiseStrength
-                    cOptions.report_intermediate_images = options.reportIntermediateImages ? RAC_TRUE : RAC_FALSE
-                    cOptions.progress_stride = Int32(options.progressStride)
-
-                    let result = rac_diffusion_component_generate_with_callbacks(
-                        handle,
-                        &cOptions,
-                        progressCallback,
-                        completeCallback,
-                        errorCallback,
-                        contextPtr
-                    )
-
-                    if result != RAC_SUCCESS {
-                        // Release context and report error
-                        let ctx = Unmanaged<CallbackContext>.fromOpaque(contextPtr).takeRetainedValue()
-                        let error = SDKError.diffusion(.generationFailed, "Failed to start generation: \(result)")
-                        ctx.completion?.resume(throwing: error)
-                    }
-                }
-            }
+    /// Get the currently loaded framework
+    static var currentDiffusionFramework: InferenceFramework? {
+        get async {
+            // Always CoreML on Apple platforms
+            guard await CppBridge.Diffusion.shared.isLoaded else { return nil }
+            return .coreml
         }
     }
 }

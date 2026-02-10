@@ -19,6 +19,7 @@
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/diffusion/rac_diffusion_component.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
+#include "rac/features/diffusion/rac_diffusion_tokenizer.h"
 
 // =============================================================================
 // INTERNAL STRUCTURES
@@ -33,6 +34,10 @@ struct rac_diffusion_component {
 
     /** Current configuration */
     rac_diffusion_config_t config;
+
+    /** Storage for optional string fields in config */
+    std::string model_id_storage;
+    std::string tokenizer_custom_url_storage;
 
     /** Default generation options based on config */
     rac_diffusion_options_t default_options;
@@ -81,8 +86,21 @@ static rac_result_t diffusion_create_service(const char* model_id, void* user_da
     RAC_LOG_INFO("Diffusion.Component", "Creating diffusion service for model: %s",
                  model_id ? model_id : "");
 
+    if (component && model_id) {
+        rac_result_t ensure_result =
+            rac_diffusion_tokenizer_ensure_files(model_id, &component->config.tokenizer);
+        if (ensure_result != RAC_SUCCESS) {
+            RAC_LOG_ERROR("Diffusion.Component",
+                          "Failed to ensure tokenizer files for %s: %d",
+                          model_id, ensure_result);
+            return ensure_result;
+        }
+    }
+
     // Create diffusion service
-    rac_result_t result = rac_diffusion_create(model_id, out_service);
+    rac_result_t result =
+        rac_diffusion_create_with_config(model_id, component ? &component->config : nullptr,
+                                         out_service);
     if (result != RAC_SUCCESS) {
         RAC_LOG_ERROR("Diffusion.Component", "Failed to create diffusion service: %d", result);
         return result;
@@ -161,8 +179,25 @@ extern "C" rac_result_t rac_diffusion_component_configure(rac_handle_t handle,
     auto* component = reinterpret_cast<rac_diffusion_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
 
-    // Copy configuration
+    // Copy configuration (shallow) then normalize owned string fields
     component->config = *config;
+
+    if (config->model_id) {
+        component->model_id_storage = config->model_id;
+        component->config.model_id = component->model_id_storage.c_str();
+    } else {
+        component->model_id_storage.clear();
+        component->config.model_id = nullptr;
+    }
+
+    if (config->tokenizer.custom_base_url) {
+        component->tokenizer_custom_url_storage = config->tokenizer.custom_base_url;
+        component->config.tokenizer.custom_base_url =
+            component->tokenizer_custom_url_storage.c_str();
+    } else {
+        component->tokenizer_custom_url_storage.clear();
+        component->config.tokenizer.custom_base_url = nullptr;
+    }
 
     // Update default options based on model variant
     switch (config->model_variant) {
@@ -175,6 +210,8 @@ extern "C" rac_result_t rac_diffusion_component_configure(rac_handle_t handle,
             component->default_options.width = 768;
             component->default_options.height = 768;
             break;
+        case RAC_DIFFUSION_MODEL_SDXS:
+        case RAC_DIFFUSION_MODEL_LCM:
         case RAC_DIFFUSION_MODEL_SD_1_5:
         default:
             component->default_options.width = 512;
@@ -182,10 +219,28 @@ extern "C" rac_result_t rac_diffusion_component_configure(rac_handle_t handle,
             break;
     }
 
-    // SDXL Turbo uses fewer steps
-    if (config->model_variant == RAC_DIFFUSION_MODEL_SDXL_TURBO) {
-        component->default_options.steps = 4;
-        component->default_options.guidance_scale = 0.0f;  // Turbo doesn't need guidance
+    // Ultra-fast models: SDXS (1 step), SDXL Turbo (4 steps), LCM (4 steps)
+    switch (config->model_variant) {
+        case RAC_DIFFUSION_MODEL_SDXS:
+            // SDXS: 1 step, no CFG
+            component->default_options.steps = 1;
+            component->default_options.guidance_scale = 0.0f;
+            component->default_options.scheduler = RAC_DIFFUSION_SCHEDULER_EULER;
+            break;
+        case RAC_DIFFUSION_MODEL_SDXL_TURBO:
+            // SDXL Turbo: 4 steps, no CFG
+            component->default_options.steps = 4;
+            component->default_options.guidance_scale = 0.0f;
+            break;
+        case RAC_DIFFUSION_MODEL_LCM:
+            // LCM: 4 steps, lower CFG
+            component->default_options.steps = 4;
+            component->default_options.guidance_scale = 1.5f;
+            component->default_options.scheduler = RAC_DIFFUSION_SCHEDULER_EULER;
+            break;
+        default:
+            // Standard models keep default values
+            break;
     }
 
     RAC_LOG_INFO("Diffusion.Component", "Diffusion component configured");
@@ -576,6 +631,9 @@ extern "C" rac_result_t rac_diffusion_component_get_info(rac_handle_t handle,
                 out_info->max_width = 768;
                 out_info->max_height = 768;
                 break;
+            case RAC_DIFFUSION_MODEL_SDXS:
+            case RAC_DIFFUSION_MODEL_LCM:
+            case RAC_DIFFUSION_MODEL_SD_1_5:
             default:
                 out_info->max_width = 512;
                 out_info->max_height = 512;

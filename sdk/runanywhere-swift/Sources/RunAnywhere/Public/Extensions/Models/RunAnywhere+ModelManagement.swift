@@ -33,8 +33,13 @@ extension RunAnywhere {
             throw SDKError.llm(.modelNotFound, "Model '\(modelId)' is not downloaded")
         }
 
+        // Log model info for debugging
+        let logger = SDKLogger(category: "ModelManagement")
+        logger.info("Loading model: id=\(modelId), framework=\(modelInfo.framework), format=\(modelInfo.format), localPath=\(modelInfo.localPath?.path ?? "nil")")
+
         // Resolve actual model file path
         let modelPath = try resolveModelFilePath(for: modelInfo)
+        logger.info("Resolved model path: \(modelPath.path)")
         try await CppBridge.LLM.shared.loadModel(modelPath.path, modelId: modelId, modelName: modelInfo.name)
     }
 
@@ -121,6 +126,11 @@ extension RunAnywhere {
 
     /// Resolve single-file model path (LlamaCpp .gguf files)
     private static func resolveSingleFileModelPath(modelFolder: URL, model: ModelInfo) throws -> URL {
+        let logger = SDKLogger(category: "ModelPathResolver")
+        
+        // Log model metadata for debugging
+        logger.info("Resolving path for model: id=\(model.id), framework=\(model.framework), format=\(model.format)")
+        
         // Get the expected path from C++
         let expectedPath = try CppBridge.ModelPaths.getExpectedModelPath(
             modelId: model.id,
@@ -128,28 +138,58 @@ extension RunAnywhere {
             format: model.format
         )
 
+        logger.debug("Expected model path: \(expectedPath.path)")
+
         // If expected path exists, use it
         if FileManager.default.fileExists(atPath: expectedPath.path) {
+            logger.info("Found model at expected path: \(expectedPath.path)")
             return expectedPath
         }
 
-        // Find files with the expected extension
+        // Find files with the expected extension in model folder
         let expectedExtension = model.format.rawValue.lowercased()
-        if let contents = try? FileManager.default.contentsOfDirectory(at: modelFolder, includingPropertiesForKeys: nil) {
-            // Look for files with the model format extension
-            let modelFiles = contents.filter { url in
-                let ext = url.pathExtension.lowercased()
-                return ext == expectedExtension || ext == "gguf" || ext == "bin"
-            }
-
-            // Return the first match
-            if let modelFile = modelFiles.first {
-                return modelFile
+        if let modelFile = findModelFile(in: modelFolder, extensions: [expectedExtension, "gguf", "bin"]) {
+            logger.info("Found model file: \(modelFile.path)")
+            return modelFile
+        }
+        
+        // Search in nested subdirectories (archives often create nested folders)
+        logger.debug("Searching nested directories in: \(modelFolder.path)")
+        if let contents = try? FileManager.default.contentsOfDirectory(at: modelFolder, includingPropertiesForKeys: [.isDirectoryKey]) {
+            for item in contents {
+                var isDir: ObjCBool = false
+                if FileManager.default.fileExists(atPath: item.path, isDirectory: &isDir), isDir.boolValue {
+                    if let modelFile = findModelFile(in: item, extensions: [expectedExtension, "gguf", "bin"]) {
+                        logger.info("Found model file in nested directory: \(modelFile.path)")
+                        return modelFile
+                    }
+                }
             }
         }
 
         // Fallback to expected path
+        logger.warning("Model file not found, falling back to: \(expectedPath.path)")
         return expectedPath
+    }
+    
+    /// Find a model file with specific extensions in a directory
+    private static func findModelFile(in directory: URL, extensions: [String]) -> URL? {
+        guard let contents = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else {
+            return nil
+        }
+        
+        // Look for files with the expected extensions
+        let modelFiles = contents.filter { url in
+            let ext = url.pathExtension.lowercased()
+            return extensions.contains(ext)
+        }
+        
+        // Prefer .gguf files if multiple matches
+        if let ggufFile = modelFiles.first(where: { $0.pathExtension.lowercased() == "gguf" }) {
+            return ggufFile
+        }
+        
+        return modelFiles.first
     }
 
     /// Unload the currently loaded LLM model
@@ -246,6 +286,8 @@ extension RunAnywhere {
     /// - Returns: Array of available models
     public static func availableModels() async throws -> [ModelInfo] {
         guard isInitialized else { throw SDKError.general(.notInitialized, "SDK not initialized") }
+        // Ensure services are initialized (including Platform backend registration)
+        try await ensureServicesReady()
         return await CppBridge.ModelRegistry.shared.getAll()
     }
 

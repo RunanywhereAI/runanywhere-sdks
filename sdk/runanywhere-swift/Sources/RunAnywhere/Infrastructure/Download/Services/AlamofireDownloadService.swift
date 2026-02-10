@@ -145,7 +145,9 @@ public class AlamofireDownloadService: @unchecked Sendable {
         }
 
         // Get destination path from C++ path utilities
+        logger.info("Computing download path for model: \(model.id), framework: \(model.framework.rawValue) (\(model.framework.displayName))")
         let destinationFolder = try CppBridge.ModelPaths.getModelFolder(modelId: model.id, framework: model.framework)
+        logger.info("Destination folder: \(destinationFolder.path)")
 
         // Start tracking in C++ download manager
         let taskId = try await CppBridge.Download.shared.startDownload(
