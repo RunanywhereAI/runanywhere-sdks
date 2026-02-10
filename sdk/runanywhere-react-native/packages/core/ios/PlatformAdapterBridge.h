@@ -144,9 +144,32 @@ bool PlatformAdapter_httpPostSync(
     char** outErrorMessage
 );
 
+// ============================================================================
+// HTTP Download (Async)
+// ============================================================================
+
+/**
+ * Start an HTTP download.
+ * @param url URL to download
+ * @param destinationPath Destination file path
+ * @param taskId Task identifier (provided by C++)
+ * @return RAC_SUCCESS on success, error code otherwise
+ */
+int PlatformAdapter_httpDownload(
+    const char* url,
+    const char* destinationPath,
+    const char* taskId
+);
+
+/**
+ * Cancel an HTTP download.
+ * @param taskId Task identifier
+ * @return true if cancellation initiated
+ */
+bool PlatformAdapter_httpDownloadCancel(const char* taskId);
+
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* PlatformAdapterBridge_h */
-
