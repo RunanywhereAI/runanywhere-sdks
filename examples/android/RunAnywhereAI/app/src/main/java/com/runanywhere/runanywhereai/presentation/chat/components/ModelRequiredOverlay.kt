@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -42,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
@@ -117,8 +119,8 @@ fun ModelRequiredOverlay(
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        modalityColor.copy(alpha = 0.18f),
-                        modalityColor.copy(alpha = 0.08f),
+                        modalityColor.copy(alpha = 0.10f),
+                        modalityColor.copy(alpha = 0.04f),
                         Color.Transparent,
                     ),
                     center = c1Center,
@@ -135,8 +137,8 @@ fun ModelRequiredOverlay(
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        modalityColor.copy(alpha = 0.15f),
-                        modalityColor.copy(alpha = 0.06f),
+                        modalityColor.copy(alpha = 0.08f),
+                        modalityColor.copy(alpha = 0.03f),
                         Color.Transparent,
                     ),
                     center = c2Center,
@@ -153,8 +155,8 @@ fun ModelRequiredOverlay(
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        modalityColor.copy(alpha = 0.12f),
-                        modalityColor.copy(alpha = 0.04f),
+                        modalityColor.copy(alpha = 0.06f),
+                        modalityColor.copy(alpha = 0.02f),
                         Color.Transparent,
                     ),
                     center = c3Center,
@@ -212,10 +214,11 @@ fun ModelRequiredOverlay(
 
             Spacer(modifier = Modifier.weight(1f))
 
+            // Glass effect CTA button (matches iOS .thinMaterial + glassEffect)
             Button(
                 onClick = onSelectModel,
                 colors = ButtonDefaults.buttonColors(containerColor = modalityColor),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().heightIn(45.dp),
             ) {
                 Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color.White)
                 Spacer(modifier = Modifier.width(8.dp))
