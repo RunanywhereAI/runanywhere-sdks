@@ -124,8 +124,6 @@ enum class InferenceFramework(
     FOUNDATION_MODELS("FoundationModels"),
     SYSTEM_TTS("SystemTTS"),
     FLUID_AUDIO("FluidAudio"),
-    COREML("CoreML"),  // CoreML (Apple Neural Engine)
-    QNN("QNN"),  // Qualcomm Neural Network for Snapdragon NPU
 
     // Special cases
     BUILT_IN("BuiltIn"), // For simple services (e.g., energy-based VAD)
@@ -142,8 +140,6 @@ enum class InferenceFramework(
                 FOUNDATION_MODELS -> "Foundation Models"
                 SYSTEM_TTS -> "System TTS"
                 FLUID_AUDIO -> "FluidAudio"
-                COREML -> "Core ML"
-                QNN -> "Qualcomm QNN"
                 BUILT_IN -> "Built-in"
                 NONE -> "None"
                 UNKNOWN -> "Unknown"
@@ -158,8 +154,6 @@ enum class InferenceFramework(
                 FOUNDATION_MODELS -> "foundation_models"
                 SYSTEM_TTS -> "system_tts"
                 FLUID_AUDIO -> "fluid_audio"
-                COREML -> "coreml"
-                QNN -> "qnn"
                 BUILT_IN -> "built_in"
                 NONE -> "none"
                 UNKNOWN -> "unknown"

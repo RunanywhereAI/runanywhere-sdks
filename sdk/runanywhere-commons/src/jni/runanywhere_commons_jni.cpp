@@ -20,8 +20,6 @@
 #include <cstring>
 #include <mutex>
 #include <string>
-#include <unordered_map>
-#include <atomic>
 
 // Include runanywhere-commons C API headers
 #include "rac/core/rac_analytics_events.h"
@@ -90,19 +88,6 @@ static jmethodID g_method_secure_get = nullptr;
 static jmethodID g_method_secure_set = nullptr;
 static jmethodID g_method_secure_delete = nullptr;
 static jmethodID g_method_now_ms = nullptr;
-static jmethodID g_method_http_download = nullptr;
-static jmethodID g_method_http_download_cancel = nullptr;
-
-// HTTP download callback state
-struct http_download_context {
-    rac_http_progress_callback_fn progress_callback;
-    rac_http_complete_callback_fn complete_callback;
-    void* user_data;
-};
-
-static std::mutex g_http_download_mutex;
-static std::unordered_map<std::string, http_download_context> g_http_downloads;
-static std::atomic<uint64_t> g_http_download_counter{0};
 
 // =============================================================================
 // JNI OnLoad/OnUnload
@@ -324,122 +309,6 @@ static int64_t jni_now_ms_callback(void* user_data) {
     return env->CallLongMethod(g_platform_adapter, g_method_now_ms);
 }
 
-static rac_result_t jni_http_download_callback(const char* url, const char* destination_path,
-                                               rac_http_progress_callback_fn progress_callback,
-                                               rac_http_complete_callback_fn complete_callback,
-                                               void* callback_user_data, char** out_task_id,
-                                               void* user_data) {
-    (void)progress_callback;
-    (void)user_data;
-
-    JNIEnv* env = getJNIEnv();
-    if (env == nullptr || g_platform_adapter == nullptr || g_method_http_download == nullptr) {
-        return RAC_ERROR_NOT_SUPPORTED;
-    }
-
-    std::string task_id =
-        "http_" + std::to_string(g_http_download_counter.fetch_add(1, std::memory_order_relaxed));
-
-    if (out_task_id) {
-        *out_task_id = rac_strdup(task_id.c_str());
-    }
-
-    {
-        std::lock_guard<std::mutex> lock(g_http_download_mutex);
-        g_http_downloads[task_id] = {progress_callback, complete_callback, callback_user_data};
-    }
-
-    jstring jUrl = env->NewStringUTF(url ? url : "");
-    jstring jDestination = env->NewStringUTF(destination_path ? destination_path : "");
-    jstring jTaskId = env->NewStringUTF(task_id.c_str());
-
-    jint result = env->CallIntMethod(g_platform_adapter, g_method_http_download, jUrl,
-                                     jDestination, jTaskId);
-
-    env->DeleteLocalRef(jUrl);
-    env->DeleteLocalRef(jDestination);
-    env->DeleteLocalRef(jTaskId);
-
-    if (result != RAC_SUCCESS) {
-        http_download_context ctx{};
-        {
-            std::lock_guard<std::mutex> lock(g_http_download_mutex);
-            auto it = g_http_downloads.find(task_id);
-            if (it != g_http_downloads.end()) {
-                ctx = it->second;
-                g_http_downloads.erase(it);
-            }
-        }
-
-        if (ctx.complete_callback) {
-            ctx.complete_callback(static_cast<rac_result_t>(result), nullptr, ctx.user_data);
-        }
-    }
-
-    return static_cast<rac_result_t>(result);
-}
-
-static rac_result_t jni_http_download_cancel_callback(const char* task_id, void* user_data) {
-    (void)user_data;
-
-    JNIEnv* env = getJNIEnv();
-    if (env == nullptr || g_platform_adapter == nullptr || g_method_http_download_cancel == nullptr) {
-        return RAC_ERROR_NOT_SUPPORTED;
-    }
-
-    jstring jTaskId = env->NewStringUTF(task_id ? task_id : "");
-    jboolean cancelled =
-        env->CallBooleanMethod(g_platform_adapter, g_method_http_download_cancel, jTaskId);
-    env->DeleteLocalRef(jTaskId);
-
-    return cancelled ? RAC_SUCCESS : RAC_ERROR_CANCELLED;
-}
-
-JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpDownloadReportProgress(
-    JNIEnv* env, jclass clazz, jstring taskId, jlong downloadedBytes, jlong totalBytes) {
-    std::string task_id = getCString(env, taskId);
-    std::lock_guard<std::mutex> lock(g_http_download_mutex);
-    auto it = g_http_downloads.find(task_id);
-    if (it == g_http_downloads.end()) {
-        return RAC_ERROR_NOT_FOUND;
-    }
-    if (it->second.progress_callback) {
-        it->second.progress_callback(static_cast<int64_t>(downloadedBytes),
-                                      static_cast<int64_t>(totalBytes), it->second.user_data);
-    }
-    return RAC_SUCCESS;
-}
-
-JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpDownloadReportComplete(
-    JNIEnv* env, jclass clazz, jstring taskId, jint result, jstring downloadedPath) {
-    std::string task_id = getCString(env, taskId);
-    http_download_context ctx{};
-    {
-        std::lock_guard<std::mutex> lock(g_http_download_mutex);
-        auto it = g_http_downloads.find(task_id);
-        if (it == g_http_downloads.end()) {
-            return RAC_ERROR_NOT_FOUND;
-        }
-        ctx = it->second;
-        g_http_downloads.erase(it);
-    }
-
-    if (!ctx.complete_callback) {
-        return RAC_SUCCESS;
-    }
-
-    if (downloadedPath != nullptr) {
-        std::string path = getCString(env, downloadedPath);
-        ctx.complete_callback(static_cast<rac_result_t>(result), path.c_str(), ctx.user_data);
-    } else {
-        ctx.complete_callback(static_cast<rac_result_t>(result), nullptr, ctx.user_data);
-    }
-
-    return RAC_SUCCESS;
-}
-
 // =============================================================================
 // JNI FUNCTIONS - Core Initialization
 // =============================================================================
@@ -524,11 +393,6 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
     g_method_secure_delete =
         env->GetMethodID(adapterClass, "secureDelete", "(Ljava/lang/String;)Z");
     g_method_now_ms = env->GetMethodID(adapterClass, "nowMs", "()J");
-    g_method_http_download =
-        env->GetMethodID(adapterClass, "httpDownload",
-                         "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I");
-    g_method_http_download_cancel =
-        env->GetMethodID(adapterClass, "httpDownloadCancel", "(Ljava/lang/String;)Z");
 
     env->DeleteLocalRef(adapterClass);
 
@@ -543,11 +407,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
     g_c_adapter.secure_set = jni_secure_set_callback;
     g_c_adapter.secure_delete = jni_secure_delete_callback;
     g_c_adapter.now_ms = jni_now_ms_callback;
-    g_c_adapter.http_download = jni_http_download_callback;
-    g_c_adapter.http_download_cancel = jni_http_download_cancel_callback;
     g_c_adapter.user_data = nullptr;
-
-    rac_set_platform_adapter(&g_c_adapter);
 
     LOGi("racSetPlatformAdapter: adapter set successfully");
     return RAC_SUCCESS;
@@ -1725,7 +1585,6 @@ JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
     jobject speechEndCallback, jobject progressCallback) {
     // TODO: Implement callback registration
 }
-
 
 // =============================================================================
 // JNI FUNCTIONS - Model Registry (mirrors Swift CppBridge+ModelRegistry.swift)
