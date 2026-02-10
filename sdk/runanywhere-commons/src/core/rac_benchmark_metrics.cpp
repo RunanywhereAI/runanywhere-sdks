@@ -11,6 +11,7 @@
 
 #include <atomic>
 #include <cstring>
+#include <mutex>
 
 namespace {
 
@@ -45,12 +46,15 @@ void rac_benchmark_extended_metrics_init(rac_benchmark_extended_metrics_t* metri
 
 void rac_benchmark_set_metrics_provider(rac_benchmark_metrics_provider_fn provider,
                                          void* user_data) {
+    static std::mutex write_mutex;
+
     if (provider == nullptr) {
         g_provider.store(nullptr, std::memory_order_release);
         return;
     }
 
-    // Use double-buffering to avoid data races on the provider struct
+    // Serialize the rare registration path to prevent torn fn/user_data pairs
+    std::lock_guard<std::mutex> lock(write_mutex);
     int idx = g_provider_index.load(std::memory_order_relaxed);
     int next = 1 - idx;
     g_provider_storage[next].fn = provider;

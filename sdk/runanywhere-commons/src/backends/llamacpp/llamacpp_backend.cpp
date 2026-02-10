@@ -656,10 +656,27 @@ bool LlamaCppTextGeneration::generate_stream_with_timing(const TextGenerationReq
     llama_sampler_reset(sampler_);
 
     const auto vocab = llama_model_get_vocab(model_);
-    std::string cached_token_chars;
-    std::string accumulated_text;
+
+    static const std::vector<std::string> STOP_SEQUENCES = {
+        "<|im_end|>", "<|eot_id|>", "</s>", "<|end|>", "<|endoftext|>",
+        "\n\nUser:", "\n\nHuman:",
+    };
+
+    static const size_t MAX_STOP_LEN = []{
+        size_t m = 0;
+        for (const auto& s : STOP_SEQUENCES) m = std::max(m, s.size());
+        return m;
+    }();
+
+    std::string stop_window;
+    stop_window.reserve(MAX_STOP_LEN * 2);
+
+    std::string partial_utf8_buffer;
+    partial_utf8_buffer.reserve(8);
+
     int n_cur = batch.n_tokens;
     int tokens_generated = 0;
+    bool stop_sequence_hit = false;
 
     while (tokens_generated < effective_max_tokens && !cancel_requested_.load()) {
         const llama_token new_token_id = llama_sampler_sample(sampler_, context_, -1);
@@ -671,41 +688,55 @@ bool LlamaCppTextGeneration::generate_stream_with_timing(const TextGenerationReq
             break;
         }
 
-        auto new_token_chars = common_token_to_piece(context_, new_token_id);
-        cached_token_chars += new_token_chars;
-        accumulated_text += new_token_chars;
+        const std::string new_token_chars =
+            common_token_to_piece(context_, new_token_id);
 
-        static const std::vector<std::string> stop_sequences = {
-            "<|im_end|>",
-            "<|eot_id|>",
-            "</s>",
-            "<|end|>",
-            "<|endoftext|>",
-            "\n\nUser:",
-            "\n\nHuman:",
-        };
+        partial_utf8_buffer.append(new_token_chars);
 
-        bool hit_stop_sequence = false;
-        for (const auto& stop_seq : stop_sequences) {
-            size_t pos = accumulated_text.find(stop_seq);
-            if (pos != std::string::npos) {
-                LOGI("Stop sequence detected: %s", stop_seq.c_str());
-                hit_stop_sequence = true;
-                break;
+        Utf8State scanner_state;
+        size_t valid_upto = 0;
+        for (size_t i = 0; i < partial_utf8_buffer.size(); ++i) {
+            scanner_state.process(static_cast<uint8_t>(partial_utf8_buffer[i]));
+            if (scanner_state.state == 0) {
+                valid_upto = i + 1;
             }
         }
 
-        if (hit_stop_sequence) {
-            break;
-        }
+        if (valid_upto > 0) {
+            std::string valid_chunk = partial_utf8_buffer.substr(0, valid_upto);
+            stop_window.append(valid_chunk);
+            partial_utf8_buffer.erase(0, valid_upto);
 
-        if (is_valid_utf8(cached_token_chars.c_str())) {
-            if (!callback(cached_token_chars)) {
-                LOGI("Generation cancelled by callback");
-                cancel_requested_.store(true);
+            size_t found_stop_pos = std::string::npos;
+            for (const auto& stop_seq : STOP_SEQUENCES) {
+                size_t pos = stop_window.find(stop_seq);
+                if (pos != std::string::npos) {
+                    if (found_stop_pos == std::string::npos || pos < found_stop_pos) {
+                        found_stop_pos = pos;
+                    }
+                }
+            }
+
+            if (found_stop_pos != std::string::npos) {
+                LOGI("Stop sequence detected");
+                stop_sequence_hit = true;
+                if (found_stop_pos > 0) {
+                    if (!callback(stop_window.substr(0, found_stop_pos))) {
+                        cancel_requested_.store(true);
+                    }
+                }
                 break;
             }
-            cached_token_chars.clear();
+
+            if (stop_window.size() > MAX_STOP_LEN) {
+                size_t safe_len = stop_window.size() - MAX_STOP_LEN;
+                if (!callback(stop_window.substr(0, safe_len))) {
+                    LOGI("Generation cancelled by callback");
+                    cancel_requested_.store(true);
+                    break;
+                }
+                stop_window.erase(0, safe_len);
+            }
         }
 
         batch.n_tokens = 0;
@@ -723,10 +754,11 @@ bool LlamaCppTextGeneration::generate_stream_with_timing(const TextGenerationReq
     // t5: Record last token time (decode loop exit)
     if (timing_out != nullptr) {
         timing_out->t5_last_token_ms = rac_monotonic_now_ms();
+        timing_out->output_tokens = static_cast<int32_t>(tokens_generated);
     }
 
-    if (!cached_token_chars.empty() && is_valid_utf8(cached_token_chars.c_str())) {
-        callback(cached_token_chars);
+    if (!cancel_requested_.load() && !stop_sequence_hit && !stop_window.empty()) {
+        callback(stop_window);
     }
 
     llama_memory_clear(llama_get_memory(context_), true);

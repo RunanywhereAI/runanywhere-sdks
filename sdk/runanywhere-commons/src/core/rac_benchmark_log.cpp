@@ -117,7 +117,7 @@ char* rac_benchmark_timing_to_csv(const rac_benchmark_timing_t* timing, rac_bool
         char buf[512];
         snprintf(buf, sizeof(buf),
                  "%" PRId64 ",%" PRId64 ",%" PRId64 ",%" PRId64 ",%" PRId64 ",%" PRId64
-                 ",%d,%d,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f",
+                 ",%" PRId32 ",%" PRId32 ",%" PRId32 ",%" PRId32 ",%.2f,%.2f,%.2f,%.2f,%.2f",
                  timing->t0_request_start_ms, timing->t2_prefill_start_ms,
                  timing->t3_prefill_end_ms, timing->t4_first_token_ms, timing->t5_last_token_ms,
                  timing->t6_request_end_ms, timing->prompt_tokens, timing->output_tokens,

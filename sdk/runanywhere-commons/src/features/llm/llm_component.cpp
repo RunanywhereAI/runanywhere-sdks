@@ -885,8 +885,20 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
 
     rac_llm_result_t final_result = {};
     final_result.text = strdup(ctx.full_text.c_str());
-    final_result.prompt_tokens = ctx.prompt_tokens;
-    final_result.completion_tokens = estimate_tokens(ctx.full_text.c_str());
+
+    // Use actual backend token counts if available, fall back to estimates
+    if (timing_out != nullptr && timing_out->prompt_tokens > 0) {
+        final_result.prompt_tokens = timing_out->prompt_tokens;
+    } else {
+        final_result.prompt_tokens = ctx.prompt_tokens;
+    }
+
+    if (timing_out != nullptr && timing_out->output_tokens > 0) {
+        final_result.completion_tokens = timing_out->output_tokens;
+    } else {
+        final_result.completion_tokens = estimate_tokens(ctx.full_text.c_str());
+    }
+
     final_result.total_tokens = final_result.prompt_tokens + final_result.completion_tokens;
     final_result.total_time_ms = total_time_ms;
 
@@ -910,8 +922,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
     // Record t6 (request end) before complete callback
     if (timing_out != nullptr) {
         timing_out->t6_request_end_ms = rac_monotonic_now_ms();
-        timing_out->prompt_tokens = final_result.prompt_tokens;
-        timing_out->output_tokens = final_result.completion_tokens;
+        // prompt_tokens and output_tokens already set by backend
         timing_out->status = RAC_BENCHMARK_STATUS_SUCCESS;
         timing_out->error_code = RAC_SUCCESS;
     }
