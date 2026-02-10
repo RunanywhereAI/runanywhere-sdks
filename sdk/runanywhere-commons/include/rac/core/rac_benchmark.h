@@ -76,6 +76,13 @@ typedef struct rac_benchmark_timing {
      */
     int32_t status;
 
+    /**
+     * Specific error code when status is not RAC_BENCHMARK_STATUS_SUCCESS.
+     * Uses rac_result_t error codes (e.g., RAC_ERROR_NOT_SUPPORTED).
+     * Set to RAC_SUCCESS (0) when status is RAC_BENCHMARK_STATUS_SUCCESS.
+     */
+    rac_result_t error_code;
+
 } rac_benchmark_timing_t;
 
 // =============================================================================
