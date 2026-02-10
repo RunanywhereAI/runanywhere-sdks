@@ -151,7 +151,7 @@ object RunAnywhereBridge {
      * Token callback interface for streaming generation.
      */
     fun interface TokenCallback {
-        fun onToken(token: String): Boolean
+        fun onToken(token: ByteArray): Boolean
     }
 
     /**
