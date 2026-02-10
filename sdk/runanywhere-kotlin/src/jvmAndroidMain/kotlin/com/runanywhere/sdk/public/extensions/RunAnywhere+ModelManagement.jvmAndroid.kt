@@ -20,6 +20,7 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.DownloadProgress
 import com.runanywhere.sdk.public.extensions.Models.DownloadState
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
+import com.runanywhere.sdk.public.extensions.Models.ModelFileDescriptor
 import com.runanywhere.sdk.public.extensions.Models.ModelFormat
 import com.runanywhere.sdk.public.extensions.Models.ModelInfo
 import kotlinx.coroutines.CompletableDeferred
@@ -63,7 +64,9 @@ internal actual fun registerModelInternal(modelInfo: ModelInfo) {
                         ModelCategory.SPEECH_RECOGNITION -> CppBridgeModelRegistry.ModelCategory.SPEECH_RECOGNITION
                         ModelCategory.SPEECH_SYNTHESIS -> CppBridgeModelRegistry.ModelCategory.SPEECH_SYNTHESIS
                         ModelCategory.AUDIO -> CppBridgeModelRegistry.ModelCategory.AUDIO
-                        else -> CppBridgeModelRegistry.ModelCategory.LANGUAGE
+                        ModelCategory.VISION -> CppBridgeModelRegistry.ModelCategory.VISION
+                        ModelCategory.IMAGE_GENERATION -> CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION
+                        ModelCategory.MULTIMODAL -> CppBridgeModelRegistry.ModelCategory.MULTIMODAL
                     },
                 format =
                     when (modelInfo.format) {
@@ -120,6 +123,30 @@ private fun addToModelCache(modelInfo: ModelInfo) {
 private fun getRegisteredModels(): List<ModelInfo> {
     synchronized(modelCacheLock) {
         return registeredModels.toList()
+    }
+}
+
+// MARK: - Multi-File Model Cache
+
+/** Cache for multi-file model descriptors (C++ registry doesn't preserve file arrays) */
+private val multiFileModelCache = mutableMapOf<String, List<ModelFileDescriptor>>()
+private val multiFileCacheLock = Any()
+
+/**
+ * Cache multi-file descriptors for later retrieval during download.
+ */
+internal actual fun cacheMultiFileDescriptors(modelId: String, files: List<ModelFileDescriptor>) {
+    synchronized(multiFileCacheLock) {
+        multiFileModelCache[modelId] = files
+    }
+}
+
+/**
+ * Get cached file descriptors for a multi-file model.
+ */
+actual fun getMultiFileDescriptors(modelId: String): List<ModelFileDescriptor>? {
+    synchronized(multiFileCacheLock) {
+        return multiFileModelCache[modelId]
     }
 }
 
@@ -202,7 +229,9 @@ actual suspend fun RunAnywhere.models(category: ModelCategory): List<ModelInfo> 
             ModelCategory.SPEECH_RECOGNITION -> CppBridgeModelRegistry.ModelType.STT
             ModelCategory.SPEECH_SYNTHESIS -> CppBridgeModelRegistry.ModelType.TTS
             ModelCategory.AUDIO -> CppBridgeModelRegistry.ModelType.VAD
-            else -> return emptyList()
+            ModelCategory.VISION -> CppBridgeModelRegistry.ModelCategory.VISION
+            ModelCategory.IMAGE_GENERATION -> CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION
+            ModelCategory.MULTIMODAL -> CppBridgeModelRegistry.ModelCategory.MULTIMODAL
         }
     return CppBridgeModelRegistry.getModelsByType(type).map { bridgeModelToPublic(it) }
 }
@@ -234,6 +263,9 @@ private fun bridgeModelToPublic(bridge: CppBridgeModelRegistry.ModelInfo): Model
                 CppBridgeModelRegistry.ModelCategory.SPEECH_RECOGNITION -> ModelCategory.SPEECH_RECOGNITION
                 CppBridgeModelRegistry.ModelCategory.SPEECH_SYNTHESIS -> ModelCategory.SPEECH_SYNTHESIS
                 CppBridgeModelRegistry.ModelCategory.AUDIO -> ModelCategory.AUDIO
+                CppBridgeModelRegistry.ModelCategory.VISION -> ModelCategory.VISION
+                CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION -> ModelCategory.IMAGE_GENERATION
+                CppBridgeModelRegistry.ModelCategory.MULTIMODAL -> ModelCategory.MULTIMODAL
                 else -> ModelCategory.LANGUAGE
             },
         format =
@@ -320,7 +352,9 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
                 ModelCategory.SPEECH_RECOGNITION -> CppBridgeModelRegistry.ModelType.STT
                 ModelCategory.SPEECH_SYNTHESIS -> CppBridgeModelRegistry.ModelType.TTS
                 ModelCategory.AUDIO -> CppBridgeModelRegistry.ModelType.VAD
-                else -> CppBridgeModelRegistry.ModelType.LLM
+                ModelCategory.MULTIMODAL -> CppBridgeModelRegistry.ModelCategory.MULTIMODAL
+                ModelCategory.VISION -> CppBridgeModelRegistry.ModelCategory.VISION
+                ModelCategory.IMAGE_GENERATION -> CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION
             }
 
         // 4. Emit download started event and record start time

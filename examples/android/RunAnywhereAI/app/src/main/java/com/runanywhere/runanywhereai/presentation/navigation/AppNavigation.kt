@@ -23,12 +23,14 @@ import com.runanywhere.runanywhereai.presentation.chat.ChatScreen
 import com.runanywhere.runanywhereai.presentation.settings.SettingsScreen
 import com.runanywhere.runanywhereai.presentation.stt.SpeechToTextScreen
 import com.runanywhere.runanywhereai.presentation.tts.TextToSpeechScreen
+import com.runanywhere.runanywhereai.presentation.vision.VLMScreen
+import com.runanywhere.runanywhereai.presentation.vision.VisionHubScreen
 import com.runanywhere.runanywhereai.presentation.voice.VoiceAssistantScreen
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 
 /**
- * Main navigation component matching iOS app structure exactly
- * 5 tabs: Chat, STT, TTS, Voice, Settings
+ * Main navigation component matching iOS app structure exactly.
+ * 5 tabs: Chat, Vision, Voice, More, Settings
  *
  * iOS Reference: examples/ios/RunAnywhereAI/RunAnywhereAI/App/ContentView.swift
  */
@@ -51,16 +53,45 @@ fun AppNavigation() {
                 ChatScreen()
             }
 
+            // Vision hub — matches iOS VisionHubView
+            composable(NavigationRoute.VISION) {
+                VisionHubScreen(
+                    onNavigateToVLM = {
+                        navController.navigate(NavigationRoute.VLM)
+                    },
+                    onNavigateToImageGeneration = {
+                        // Future: navigate to image generation screen
+                    },
+                )
+            }
+
+            // VLM screen — nested route from Vision hub
+            composable(NavigationRoute.VLM) {
+                VLMScreen()
+            }
+
+            composable(NavigationRoute.VOICE) {
+                VoiceAssistantScreen()
+            }
+
+            // "More" hub routes — STT and TTS moved here to match iOS structure
+            composable(NavigationRoute.MORE) {
+                MoreHubScreen(
+                    onNavigateToSTT = {
+                        navController.navigate(NavigationRoute.STT)
+                    },
+                    onNavigateToTTS = {
+                        navController.navigate(NavigationRoute.TTS)
+                    },
+                )
+            }
+
             composable(NavigationRoute.STT) {
                 SpeechToTextScreen()
             }
 
             composable(NavigationRoute.TTS) {
                 TextToSpeechScreen()
-            }
-
-            composable(NavigationRoute.VOICE) {
-                VoiceAssistantScreen()
             }
 
             composable(NavigationRoute.SETTINGS) {
@@ -71,13 +102,13 @@ fun AppNavigation() {
 }
 
 /**
- * Bottom navigation bar matching iOS tab bar design
+ * Bottom navigation bar matching iOS tab bar design.
  *
  * iOS Reference: ContentView.swift - TabView with 5 tabs
  * - Chat (message icon)
- * - STT (waveform icon)
- * - TTS (speaker.wave.2 icon)
+ * - Vision (eye icon)
  * - Voice (mic icon)
+ * - More (ellipsis icon)
  * - Settings (gear icon)
  */
 @Composable
@@ -85,7 +116,7 @@ fun RunAnywhereBottomNav(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
-    // Match iOS tab order and icons exactly: Chat, STT, TTS, Voice, Settings
+    // Match iOS tab order exactly: Chat, Vision, Voice, More, Settings
     val items =
         listOf(
             BottomNavItem(
@@ -95,22 +126,22 @@ fun RunAnywhereBottomNav(navController: NavController) {
                 selectedIcon = Icons.Filled.Chat,
             ),
             BottomNavItem(
-                route = NavigationRoute.STT,
-                label = "STT",
-                icon = Icons.Outlined.GraphicEq,
-                selectedIcon = Icons.Filled.GraphicEq,
-            ),
-            BottomNavItem(
-                route = NavigationRoute.TTS,
-                label = "TTS",
-                icon = Icons.Outlined.VolumeUp,
-                selectedIcon = Icons.Filled.VolumeUp,
+                route = NavigationRoute.VISION,
+                label = "Vision",
+                icon = Icons.Outlined.Visibility,
+                selectedIcon = Icons.Filled.Visibility,
             ),
             BottomNavItem(
                 route = NavigationRoute.VOICE,
                 label = "Voice",
                 icon = Icons.Outlined.Mic,
                 selectedIcon = Icons.Filled.Mic,
+            ),
+            BottomNavItem(
+                route = NavigationRoute.MORE,
+                label = "More",
+                icon = Icons.Outlined.MoreHoriz,
+                selectedIcon = Icons.Filled.MoreHoriz,
             ),
             BottomNavItem(
                 route = NavigationRoute.SETTINGS,
@@ -165,15 +196,18 @@ fun RunAnywhereBottomNav(navController: NavController) {
 }
 
 /**
- * Navigation routes matching iOS tabs exactly
+ * Navigation routes matching iOS tabs exactly.
  *
  * iOS Reference: ContentView.swift TabView
  */
 object NavigationRoute {
     const val CHAT = "chat"
+    const val VISION = "vision"
+    const val VLM = "vlm"
+    const val VOICE = "voice"
+    const val MORE = "more"
     const val STT = "stt"
     const val TTS = "tts"
-    const val VOICE = "voice"
     const val SETTINGS = "settings"
 }
 

@@ -84,6 +84,7 @@ enum class SDKComponent(
     VAD("VAD"),
     VOICE("VOICE"),
     EMBEDDING("EMBEDDING"),
+    VLM("VLM"),
     ;
 
     /** Human-readable display name */
@@ -96,6 +97,7 @@ enum class SDKComponent(
                 VAD -> "Voice Activity Detection"
                 VOICE -> "Voice Agent"
                 EMBEDDING -> "Embedding"
+                VLM -> "Vision Language Model"
             }
 
     /** Analytics key for the component (lowercase) */

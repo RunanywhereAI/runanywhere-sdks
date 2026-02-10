@@ -741,6 +741,9 @@ class SDKLogger(
         /** Logger for VAD (Voice Activity Detection) operations */
         val vad = SDKLogger("VAD")
 
+        /** Logger for VLM (Vision Language Model) operations */
+        val vlm = SDKLogger("VLM")
+
         /** Logger for download operations */
         val download = SDKLogger("Download")
 

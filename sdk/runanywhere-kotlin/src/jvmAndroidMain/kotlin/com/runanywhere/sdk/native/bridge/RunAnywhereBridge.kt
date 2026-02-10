@@ -337,6 +337,103 @@ object RunAnywhereBridge {
     )
 
     // ========================================================================
+    // VLM COMPONENT (rac_vlm_component.h)
+    // ========================================================================
+
+    @JvmStatic
+    external fun racVlmComponentCreate(): Long
+
+    @JvmStatic
+    external fun racVlmComponentDestroy(handle: Long)
+
+    @JvmStatic
+    external fun racVlmComponentLoadModel(
+        handle: Long,
+        modelPath: String,
+        mmprojPath: String?,
+        modelId: String,
+        modelName: String?,
+    ): Int
+
+    @JvmStatic
+    external fun racVlmComponentUnload(handle: Long): Int
+
+    @JvmStatic
+    external fun racVlmComponentCancel(handle: Long): Int
+
+    @JvmStatic
+    external fun racVlmComponentIsLoaded(handle: Long): Boolean
+
+    @JvmStatic
+    external fun racVlmComponentGetModelId(handle: Long): String?
+
+    /**
+     * Process an image (non-streaming).
+     *
+     * @param handle VLM component handle
+     * @param imageFormat Image format (0=FILE_PATH, 1=RGB_PIXELS, 2=BASE64)
+     * @param imagePath File path (for FILE_PATH format)
+     * @param imageData RGB pixel data (for RGB_PIXELS format)
+     * @param imageBase64 Base64-encoded data (for BASE64 format)
+     * @param imageWidth Image width (for RGB_PIXELS format)
+     * @param imageHeight Image height (for RGB_PIXELS format)
+     * @param prompt Text prompt
+     * @param optionsJson Generation options as JSON string
+     * @return JSON result string or null on error
+     */
+    @JvmStatic
+    external fun racVlmComponentProcess(
+        handle: Long,
+        imageFormat: Int,
+        imagePath: String?,
+        imageData: ByteArray?,
+        imageBase64: String?,
+        imageWidth: Int,
+        imageHeight: Int,
+        prompt: String,
+        optionsJson: String?,
+    ): String?
+
+    /**
+     * Process an image with streaming output.
+     * Calls tokenCallback for each generated token.
+     *
+     * @param handle VLM component handle
+     * @param imageFormat Image format (0=FILE_PATH, 1=RGB_PIXELS, 2=BASE64)
+     * @param imagePath File path (for FILE_PATH format)
+     * @param imageData RGB pixel data (for RGB_PIXELS format)
+     * @param imageBase64 Base64-encoded data (for BASE64 format)
+     * @param imageWidth Image width (for RGB_PIXELS format)
+     * @param imageHeight Image height (for RGB_PIXELS format)
+     * @param prompt Text prompt
+     * @param optionsJson Generation options as JSON string
+     * @param tokenCallback Callback invoked for each generated token
+     * @return JSON result string with final metrics, or null on error
+     */
+    @JvmStatic
+    external fun racVlmComponentProcessStream(
+        handle: Long,
+        imageFormat: Int,
+        imagePath: String?,
+        imageData: ByteArray?,
+        imageBase64: String?,
+        imageWidth: Int,
+        imageHeight: Int,
+        prompt: String,
+        optionsJson: String?,
+        tokenCallback: TokenCallback,
+    ): String?
+
+    @JvmStatic
+    external fun racVlmComponentSupportsStreaming(handle: Long): Boolean
+
+    @JvmStatic
+    external fun racVlmComponentGetState(handle: Long): Int
+
+    @JvmStatic
+    external fun racVlmComponentGetMetrics(handle: Long): String?
+
+    // ========================================================================
     // BACKEND REGISTRATION
     // ========================================================================
     // NOTE: Backend registration has been MOVED to their respective module JNI bridges:

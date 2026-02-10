@@ -109,6 +109,8 @@ iOSInjectionProject/
 !.idea/vcs.xml
 
 # Android Studio specific
+.idea/.gitignore
+.idea/markdown.xml
 .idea/AndroidProjectSystem.xml
 .idea/appInsightsSettings.xml
 .idea/deploymentTargetSelector.xml
@@ -133,6 +135,10 @@ sdk/runanywhere-kotlin/.idea/
 
 # Claude
 .claude/
+
+# Project-specific excludes
+.no_push_backup.json
+SHARED_TASK_NOTES.md
 
 # Temporary files
 *.tmp
