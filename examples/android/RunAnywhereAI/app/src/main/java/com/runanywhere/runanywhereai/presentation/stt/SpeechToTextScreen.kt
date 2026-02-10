@@ -1067,4 +1067,3 @@ private fun RecordingButton(
         }
     }
 }
-
