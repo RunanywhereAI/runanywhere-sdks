@@ -380,35 +380,6 @@ export const STTScreen: React.FC = () => {
     }
   };
 
-  /** Transcribe a WAV file; on Android reads file in JS and uses transcribe(base64) to avoid native path issues. */
-  const transcribeWavFile = useCallback(
-    async (normalizedPath: string): Promise<{ text?: string; confidence?: number }> => {
-      if (Platform.OS === 'android') {
-        const base64 = await RNFS.readFile(normalizedPath, 'base64');
-        const binary = atob(base64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        if (bytes.length < 44) throw new Error('WAV file too small');
-        const view = new DataView(bytes.buffer);
-        if (String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) !== 'RIFF')
-          throw new Error('Invalid WAV: not RIFF');
-        const sampleRate = view.getUint32(24, true) || 16000;
-        const pcmStart = 44;
-        const pcmLength = bytes.length - pcmStart;
-        if (pcmLength < 3200) throw new Error('Recording too short to transcribe');
-        let binaryPcm = '';
-        const chunk = 8192;
-        for (let off = 0; off < pcmLength; off += chunk) {
-          const end = Math.min(off + chunk, pcmLength);
-          for (let j = off; j < end; j++) binaryPcm += String.fromCharCode(bytes[pcmStart + j]!);
-        }
-        return RunAnywhere.transcribe(btoa(binaryPcm), { sampleRate, language: 'en' });
-      }
-      return RunAnywhere.transcribeFile(normalizedPath, { language: 'en' });
-    },
-    []
-  );
-
   /**
    * Stop recording and transcribe
    * Native module handles audio format conversion using iOS AudioToolbox
@@ -455,29 +426,30 @@ export const STTScreen: React.FC = () => {
         throw new Error('STT model not loaded');
       }
 
+      // Transcribe the audio file - native module handles format conversion
+      // iOS AudioToolbox converts M4A/CAF/WAV to 16kHz mono float32 PCM
       console.warn('[STTScreen] Starting transcription...');
-      const result = await transcribeWavFile(normalizedPath);
+      const result = await RunAnywhere.transcribeFile(normalizedPath, {
+        language: 'en',
+      });
+
       console.warn('[STTScreen] Transcription result:', result);
 
       if (result.text) {
         setTranscript(result.text);
-        setConfidence(result.confidence ?? null);
+        setConfidence(result.confidence);
       } else {
         setTranscript('(No speech detected)');
       }
 
-      // Clean up temp file only after successful transcription
+      // Clean up temp file
       await RNFS.unlink(normalizedPath).catch(() => {});
       recordingPath.current = null;
     } catch (error: unknown) {
       console.error('[STTScreen] Transcription error:', error);
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      Alert.alert(
-        'Transcription Error',
-        errorMessage +
-          '\n\nIf the app crashes, run: adb logcat | grep -i runanywhere'
-      );
+      Alert.alert('Transcription Error', errorMessage);
       setTranscript('');
     } finally {
       setIsProcessing(false);
@@ -623,7 +595,10 @@ export const STTScreen: React.FC = () => {
         return;
       }
 
-      const result = await transcribeWavFile(audioPath);
+      // Transcribe using native module (handles audio decoding)
+      const result = await RunAnywhere.transcribeFile(audioPath, {
+        language: 'en',
+      });
       console.warn('[STTScreen] Live chunk transcription:', result.text);
 
       // Append to accumulated transcript if we got text
@@ -693,7 +668,10 @@ export const STTScreen: React.FC = () => {
           const stat = await RNFS.stat(audioPath);
           if (stat.size >= 5000) {
             console.warn('[STTScreen] Transcribing final live chunk...');
-            const result = await transcribeWavFile(audioPath);
+            // Transcribe using native module (handles audio decoding)
+            const result = await RunAnywhere.transcribeFile(audioPath, {
+              language: 'en',
+            });
             if (result.text && result.text.trim()) {
               const newText = result.text.trim();
               if (accumulatedTranscriptRef.current) {

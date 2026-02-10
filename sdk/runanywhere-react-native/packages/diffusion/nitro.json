@@ -1,7 +1,0 @@
-{
-  "$schema": "https://nitro.margelo.com/schema.json",
-  "cxxNamespace": ["runanywhere", "diffusion"],
-  "ios": { "iosModuleName": "RunAnywhereDiffusion" },
-  "android": { "androidNamespace": ["runanywhere", "diffusion"], "androidCxxLibName": "runanywhere_diffusion" },
-  "autolinking": { "RunAnywhereDiffusion": { "cpp": "HybridRunAnywhereDiffusion" } }
-}
