@@ -113,7 +113,12 @@ bool ONNXDiffusion::load_model(const std::string& model_dir, const ONNXDiffusion
     std::lock_guard<std::mutex> lock(mutex_);
     
     if (model_loaded_) {
-        unload_model();
+        // Call cleanup helpers directly instead of unload_model() to avoid
+        // deadlock — unload_model() also tries to acquire mutex_.
+        free_sessions();
+        tokenizer_.reset();
+        scheduler_.reset();
+        model_loaded_ = false;
     }
     
     model_dir_ = model_dir;
@@ -870,7 +875,7 @@ DiffusionResult ONNXDiffusion::generate(const DiffusionOptions& options,
             
             // Run UNet for unconditional prediction
             std::vector<float> noise_pred_uncond = run_unet_step(
-                latent_input, uncond_embeddings, t);
+                latent_input, uncond_embeddings, t, latent_height, latent_width);
             
             // Check if UNet inference failed (returns empty vector on error)
             if (noise_pred_uncond.empty()) {
@@ -881,7 +886,7 @@ DiffusionResult ONNXDiffusion::generate(const DiffusionOptions& options,
             
             // Run UNet for conditional prediction
             std::vector<float> noise_pred_text = run_unet_step(
-                latent_input, text_embeddings, t);
+                latent_input, text_embeddings, t, latent_height, latent_width);
             
             // Check if UNet inference failed
             if (noise_pred_text.empty()) {
@@ -896,7 +901,7 @@ DiffusionResult ONNXDiffusion::generate(const DiffusionOptions& options,
         } else {
             // CFG-free: Run UNet once with text embeddings only
             // This is 2x faster for distilled models (SDXS, SDXL Turbo, etc.)
-            noise_pred = run_unet_step(latent_input, text_embeddings, t);
+            noise_pred = run_unet_step(latent_input, text_embeddings, t, latent_height, latent_width);
             
             if (noise_pred.empty()) {
                 RAC_LOG_ERROR("ONNXDiffusion", "UNet prediction failed at step %d", i);
@@ -1041,18 +1046,14 @@ std::vector<float> ONNXDiffusion::encode_prompt(const std::string& prompt) {
 
 std::vector<float> ONNXDiffusion::run_unet_step(const std::vector<float>& latents,
                                                 const std::vector<float>& text_embeddings,
-                                                float timestep) {
+                                                float timestep,
+                                                int latent_h, int latent_w) {
     if (!unet_session_) {
         return {};
     }
     
-    // Determine latent dimensions from size
-    // Assuming batch=1, channels=4
-    size_t latent_size = latents.size();
-    int latent_hw = static_cast<int>(std::sqrt(latent_size / LATENT_CHANNELS));
-    
-    // Create input tensors
-    std::vector<int64_t> sample_shape = {1, LATENT_CHANNELS, latent_hw, latent_hw};
+    // Create input tensors using explicit latent dimensions (supports non-square images)
+    std::vector<int64_t> sample_shape = {1, LATENT_CHANNELS, latent_h, latent_w};
     std::vector<int64_t> timestep_shape = {1};
     std::vector<int64_t> encoder_shape = {1, BPETokenizer::MAX_SEQUENCE_LENGTH, TEXT_EMBEDDING_DIM};
     

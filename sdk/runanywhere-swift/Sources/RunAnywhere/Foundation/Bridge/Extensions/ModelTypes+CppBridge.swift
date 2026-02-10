@@ -113,6 +113,8 @@ extension InferenceFramework {
             return RAC_FRAMEWORK_FLUID_AUDIO
         case .coreml:
             return RAC_FRAMEWORK_COREML
+        case .mlx:
+            return RAC_FRAMEWORK_MLX
         case .builtIn:
             return RAC_FRAMEWORK_BUILTIN
         case .none:
@@ -137,6 +139,8 @@ extension InferenceFramework {
             self = .fluidAudio
         case RAC_FRAMEWORK_COREML:
             self = .coreml
+        case RAC_FRAMEWORK_MLX:
+            self = .mlx
         case RAC_FRAMEWORK_BUILTIN:
             self = .builtIn
         case RAC_FRAMEWORK_NONE:

@@ -445,11 +445,14 @@ rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info
                 if (existing->artifact_info.kind != RAC_ARTIFACT_KIND_SINGLE_FILE &&
                     model->artifact_info.kind == RAC_ARTIFACT_KIND_SINGLE_FILE) {
                     model->artifact_info = existing->artifact_info;
-                    // Note: This is a shallow copy which is OK since we're about to save
+                    // Note: This is a shallow copy — existing must stay alive until
+                    // after rac_model_registry_save deep-copies the data.
                 }
+                rac_model_registry_save(registry, model);
                 rac_model_info_free(existing);
+            } else {
+                rac_model_registry_save(registry, model);
             }
-            rac_model_registry_save(registry, model);
         }
         RAC_LOG_DEBUG(LOG_CAT, "Saved models to registry");
     }

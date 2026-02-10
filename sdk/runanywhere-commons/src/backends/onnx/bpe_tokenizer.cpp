@@ -151,9 +151,20 @@ void BPETokenizer::init_byte_encoder() {
     }
 
     // Create encoder/decoder maps
+    // Values in cs can be >= 128, so encode as proper UTF-8 to avoid truncation.
     for (size_t i = 0; i < bs.size(); ++i) {
-        char c = static_cast<char>(cs[i]);
-        std::string s(1, c);
+        int cp = cs[i];
+        std::string s;
+        if (cp < 0x80) {
+            s.push_back(static_cast<char>(cp));
+        } else if (cp < 0x800) {
+            s.push_back(static_cast<char>(0xC0 | (cp >> 6)));
+            s.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+        } else {
+            s.push_back(static_cast<char>(0xE0 | (cp >> 12)));
+            s.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+            s.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+        }
         byte_encoder_[static_cast<uint8_t>(bs[i])] = s;
         byte_decoder_[s] = static_cast<uint8_t>(bs[i]);
     }

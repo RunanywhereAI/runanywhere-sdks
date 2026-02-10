@@ -183,6 +183,28 @@ float Scheduler::get_sigma(float t) const {
     return sigmas_[idx] * (1.0f - frac) + sigmas_[idx + 1] * frac;
 }
 
+float Scheduler::sigma_to_t(float sigma) const {
+    // Training sigmas (from compute_alphas) are monotonically increasing.
+    // Binary search for the interval, then linearly interpolate the timestep.
+    if (sigma <= sigmas_[0]) return 0.0f;
+    int n = config_.num_train_timesteps;
+    if (sigma >= sigmas_[n - 1]) return static_cast<float>(n - 1);
+
+    // Find j such that sigmas_[j] <= sigma < sigmas_[j+1] (ascending order)
+    int lo = 0, hi = n - 2;
+    while (lo < hi) {
+        int mid = (lo + hi) / 2;
+        if (sigmas_[mid + 1] <= sigma) {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+    // lo is the largest index where sigmas_[lo] <= sigma
+    float frac = (sigma - sigmas_[lo]) / (sigmas_[lo + 1] - sigmas_[lo]);
+    return static_cast<float>(lo) + frac;
+}
+
 // =============================================================================
 // DPM++ 2M SCHEDULER
 // =============================================================================
@@ -214,6 +236,10 @@ void DPMPPScheduler::set_timesteps(int num_inference_steps) {
     num_inference_steps_ = num_inference_steps;
     model_outputs_.clear();
 
+    // Save the full training sigma schedule (ascending, num_train_timesteps elements)
+    // before overwriting sigmas_ with the inference schedule.
+    std::vector<float> train_sigmas = sigmas_;
+
     if (config_.use_karras_sigmas) {
         sigmas_ = compute_karras_sigmas(num_inference_steps);
     } else {
@@ -222,25 +248,27 @@ void DPMPPScheduler::set_timesteps(int num_inference_steps) {
         for (int i = 0; i <= num_inference_steps; ++i) {
             float t = static_cast<float>(config_.num_train_timesteps - 1) * 
                       (1.0f - static_cast<float>(i) / num_inference_steps);
-            sigmas_[i] = get_sigma(t);
+            // Use training sigmas via get_sigma (which interpolates train_sigmas)
+            int idx = static_cast<int>(t);
+            float frac = t - idx;
+            sigmas_[i] = train_sigmas[idx] * (1.0f - frac) + train_sigmas[std::min(idx + 1, static_cast<int>(train_sigmas.size()) - 1)] * frac;
         }
         sigmas_.back() = 0.0f;
     }
 
-    // Convert sigmas to timesteps
+    // Convert inference sigmas to timesteps using the training sigma schedule.
+    // sigma_to_t does a binary search through the ascending training sigmas.
+    // Temporarily restore training sigmas for the lookup, then set inference sigmas back.
+    std::vector<float> inference_sigmas = sigmas_;
+    sigmas_ = train_sigmas;
+
     timesteps_.resize(num_inference_steps);
     for (int i = 0; i < num_inference_steps; ++i) {
-        // Find timestep corresponding to sigma
-        float sigma = sigmas_[i];
-        float t = config_.num_train_timesteps - 1;
-        for (int j = 0; j < config_.num_train_timesteps - 1; ++j) {
-            if (sigmas_[j] <= sigma && sigma < sigmas_[j + 1]) {
-                t = static_cast<float>(j);
-                break;
-            }
-        }
-        timesteps_[i] = t;
+        timesteps_[i] = sigma_to_t(inference_sigmas[i]);
     }
+
+    // Restore inference sigmas for use during stepping
+    sigmas_ = inference_sigmas;
 
     step_index_ = 0;
 }
@@ -347,10 +375,15 @@ DDIMScheduler::DDIMScheduler(const SchedulerConfig& config) {
 void DDIMScheduler::set_timesteps(int num_inference_steps) {
     timesteps_.resize(num_inference_steps);
     
-    // Evenly space timesteps
-    float step = static_cast<float>(config_.num_train_timesteps - 1) / (num_inference_steps - 1);
-    for (int i = 0; i < num_inference_steps; ++i) {
-        timesteps_[i] = static_cast<float>(config_.num_train_timesteps - 1) - i * step;
+    if (num_inference_steps == 1) {
+        // Single-step models (e.g. SDXS): just use the last training timestep
+        timesteps_[0] = static_cast<float>(config_.num_train_timesteps - 1);
+    } else {
+        // Evenly space timesteps
+        float step = static_cast<float>(config_.num_train_timesteps - 1) / (num_inference_steps - 1);
+        for (int i = 0; i < num_inference_steps; ++i) {
+            timesteps_[i] = static_cast<float>(config_.num_train_timesteps - 1) - i * step;
+        }
     }
     
     step_index_ = 0;
