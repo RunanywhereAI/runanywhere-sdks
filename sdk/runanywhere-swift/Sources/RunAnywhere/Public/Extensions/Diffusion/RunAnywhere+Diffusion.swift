@@ -3,8 +3,7 @@
 //  RunAnywhere SDK
 //
 //  Public API for diffusion (image generation) operations.
-//  Apple Stable Diffusion only: CoreML → DiffusionPlatformService (ANE acceleration).
-//  ONNX diffusion is not supported.
+//  Uses Apple Stable Diffusion (CoreML) with ANE acceleration.
 //
 
 import CoreGraphics
@@ -102,14 +101,11 @@ public extension RunAnywhere {
 
         let opts = options ?? DiffusionGenerationOptions(prompt: prompt)
 
-        switch framework {
-        case .coreml:
-            return try await generateImageWithCoreML(prompt: prompt, options: opts)
-        case .onnx:
-            throw SDKError.diffusion(.unsupportedBackend, "ONNX diffusion is not supported. Use Apple Stable Diffusion (CoreML) only.")
-        default:
-            throw SDKError.diffusion(.unsupportedBackend, "Unsupported framework: \(framework.rawValue)")
+        guard framework == .coreml else {
+            throw SDKError.diffusion(.unsupportedBackend, "Unsupported framework: \(framework.rawValue). Only CoreML is supported.")
         }
+
+        return try await generateImageWithCoreML(prompt: prompt, options: opts)
     }
 
     /// Generate an image with progress reporting
@@ -215,14 +211,11 @@ public extension RunAnywhere {
 
         let opts = options ?? DiffusionGenerationOptions(prompt: prompt)
 
-        switch framework {
-        case .coreml:
-            return try await generateImageWithCoreMLProgress(prompt: prompt, options: opts, onProgress: onProgress)
-        case .onnx:
-            throw SDKError.diffusion(.unsupportedBackend, "ONNX diffusion is not supported. Use Apple Stable Diffusion (CoreML) only.")
-        default:
-            throw SDKError.diffusion(.unsupportedBackend, "Unsupported framework: \(framework.rawValue)")
+        guard framework == .coreml else {
+            throw SDKError.diffusion(.unsupportedBackend, "Unsupported framework: \(framework.rawValue). Only CoreML is supported.")
         }
+
+        return try await generateImageWithCoreMLProgress(prompt: prompt, options: opts, onProgress: onProgress)
     }
 
     /// Cancel ongoing image generation
@@ -231,25 +224,15 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        let framework = await DiffusionBackendState.shared.loadedFramework
-        
-        switch framework {
-        case .coreml:
-            await DiffusionBackendState.shared.coreMLService?.cancel()
-        case .onnx:
-            break
-        default:
-            break
-        }
+        await DiffusionBackendState.shared.coreMLService?.cancel()
     }
 
     /// Load a diffusion model
     ///
-    /// Automatically detects the model framework based on directory contents:
-    /// - CoreML: Contains .mlmodelc directories (Unet.mlmodelc, TextEncoder.mlmodelc, etc.)
-    /// - ONNX: Contains .onnx files (unet/model.onnx, text_encoder/model.onnx, etc.)
+    /// Expects a CoreML model directory containing .mlmodelc files
+    /// (Unet.mlmodelc, TextEncoder.mlmodelc, etc.).
     ///
-    /// You can also explicitly specify the framework via `configuration.preferredFramework`.
+    /// You can explicitly specify the framework via `configuration.preferredFramework`.
     ///
     /// - Parameters:
     ///   - modelPath: Path to the model directory
@@ -274,18 +257,15 @@ public extension RunAnywhere {
         SDKLogger.shared.info("[Diffusion] Loading model '\(modelId)' with framework: \(framework.rawValue)")
         SDKLogger.shared.info("[Diffusion] Model path: \(modelPath)")
 
-        switch framework {
-        case .coreml:
-            try await loadDiffusionModelWithCoreML(
-                modelPath: modelPath,
-                modelId: modelId,
-                configuration: configuration
-            )
-        case .onnx:
-            throw SDKError.diffusion(.unsupportedBackend, "ONNX diffusion is not supported. Use Apple Stable Diffusion (CoreML) only.")
-        default:
-            throw SDKError.diffusion(.unsupportedBackend, "Unsupported framework: \(framework.rawValue). Use .coreml only.")
+        guard framework == .coreml else {
+            throw SDKError.diffusion(.unsupportedBackend, "Unsupported framework: \(framework.rawValue). Only CoreML is supported.")
         }
+
+        try await loadDiffusionModelWithCoreML(
+            modelPath: modelPath,
+            modelId: modelId,
+            configuration: configuration
+        )
 
         // Record the loaded state
         await DiffusionBackendState.shared.setLoaded(
@@ -558,181 +538,3 @@ private extension RunAnywhere {
     }
 }
 
-// MARK: - ONNX Backend Implementation
-
-private extension RunAnywhere {
-
-    /// Load a diffusion model using ONNX Runtime (C++ backend)
-    static func loadDiffusionModelWithONNX(
-        modelPath: String,
-        modelId: String,
-        modelName: String,
-        configuration: DiffusionConfiguration?
-    ) async throws {
-        SDKLogger.shared.info("[Diffusion.ONNX] Loading ONNX model from: \(modelPath)")
-        
-        // Configure if provided
-        if let config = configuration {
-            try await CppBridge.Diffusion.shared.configure(config)
-        }
-
-        // Load model via C++ bridge
-        try await CppBridge.Diffusion.shared.loadModel(modelPath, modelId: modelId, modelName: modelName)
-        
-        SDKLogger.shared.info("[Diffusion.ONNX] ONNX model loaded successfully")
-    }
-
-    /// Generate an image using ONNX backend (fixed - no double generation)
-    static func generateImageWithONNX(
-        prompt: String,
-        options: DiffusionGenerationOptions
-    ) async throws -> DiffusionResult {
-        let handle = try await CppBridge.Diffusion.shared.getHandle()
-
-        guard await CppBridge.Diffusion.shared.isLoaded else {
-            throw SDKError.diffusion(.notInitialized, "ONNX model not loaded")
-        }
-
-        SDKLogger.shared.info("[Diffusion.ONNX] Generating image: \(options.width)x\(options.height), \(options.steps) steps")
-
-        var finalResult = rac_diffusion_result_t()
-
-        let generateResult = prompt.withCString { promptPtr in
-            options.negativePrompt.withCString { negPromptPtr -> rac_result_t in
-                var cOptions = rac_diffusion_options_t()
-                cOptions.prompt = promptPtr
-                cOptions.negative_prompt = negPromptPtr
-                cOptions.width = Int32(options.width)
-                cOptions.height = Int32(options.height)
-                cOptions.steps = Int32(options.steps)
-                cOptions.guidance_scale = options.guidanceScale
-                cOptions.seed = options.seed
-                cOptions.scheduler = options.scheduler.cValue
-                cOptions.mode = options.mode.cValue
-                cOptions.denoise_strength = options.denoiseStrength
-                cOptions.report_intermediate_images = RAC_FALSE
-                cOptions.progress_stride = 1
-
-                return rac_diffusion_component_generate(handle, &cOptions, &finalResult)
-            }
-        }
-
-        guard generateResult == RAC_SUCCESS else {
-            let errorMsg = finalResult.error_message.map { String(cString: $0) } ?? "Unknown error"
-            rac_diffusion_result_free(&finalResult)
-            throw SDKError.diffusion(.generationFailed, "Image generation failed: \(errorMsg)")
-        }
-
-        let swiftResult = DiffusionResult(from: finalResult)
-        rac_diffusion_result_free(&finalResult)
-
-        return swiftResult
-    }
-
-    /// Generate an image with progress using ONNX backend
-    static func generateImageWithONNXProgress(
-        prompt: String,
-        options: DiffusionGenerationOptions,
-        onProgress: @escaping (DiffusionProgress) -> Bool
-    ) async throws -> DiffusionResult {
-        let handle = try await CppBridge.Diffusion.shared.getHandle()
-
-        guard await CppBridge.Diffusion.shared.isLoaded else {
-            throw SDKError.diffusion(.notInitialized, "ONNX model not loaded")
-        }
-
-        // Create context for callbacks
-        final class CallbackContext: @unchecked Sendable {
-            var progressCallback: (DiffusionProgress) -> Bool
-            var result: DiffusionResult?
-            var error: Error?
-            var completion: CheckedContinuation<DiffusionResult, Error>?
-            var callbackInvoked = false
-
-            init(progressCallback: @escaping (DiffusionProgress) -> Bool) {
-                self.progressCallback = progressCallback
-            }
-        }
-
-        let context = CallbackContext(progressCallback: onProgress)
-
-        return try await withCheckedThrowingContinuation { continuation in
-            context.completion = continuation
-
-            let contextPtr = Unmanaged.passRetained(context).toOpaque()
-
-            // Progress callback
-            let progressCallback: rac_diffusion_progress_callback_fn = { cProgressPtr, userData -> rac_bool_t in
-                guard let cProgressPtr = cProgressPtr, let userData = userData else {
-                    return RAC_TRUE
-                }
-
-                let ctx = Unmanaged<CallbackContext>.fromOpaque(userData).takeUnretainedValue()
-                let progress = DiffusionProgress(from: cProgressPtr.pointee)
-
-                let shouldContinue = ctx.progressCallback(progress)
-                return shouldContinue ? RAC_TRUE : RAC_FALSE
-            }
-
-            // Complete callback
-            let completeCallback: rac_diffusion_complete_callback_fn = { cResultPtr, userData in
-                guard let cResultPtr = cResultPtr, let userData = userData else {
-                    return
-                }
-
-                let ctx = Unmanaged<CallbackContext>.fromOpaque(userData).takeRetainedValue()
-                ctx.callbackInvoked = true
-                let result = DiffusionResult(from: cResultPtr.pointee)
-                ctx.completion?.resume(returning: result)
-            }
-
-            // Error callback
-            let errorCallback: rac_diffusion_error_callback_fn = { _, errorMessage, userData in
-                guard let userData = userData else { return }
-
-                let ctx = Unmanaged<CallbackContext>.fromOpaque(userData).takeRetainedValue()
-                ctx.callbackInvoked = true
-                let message = errorMessage.map { String(cString: $0) } ?? "Unknown error"
-                let error = SDKError.diffusion(SDKError.DiffusionErrorCode.generationFailed, "Generation failed: \(message)")
-                ctx.completion?.resume(throwing: error)
-            }
-
-            // Build C options and call
-            prompt.withCString { promptPtr in
-                options.negativePrompt.withCString { negPromptPtr in
-                    var cOptions = rac_diffusion_options_t()
-                    cOptions.prompt = promptPtr
-                    cOptions.negative_prompt = negPromptPtr
-                    cOptions.width = Int32(options.width)
-                    cOptions.height = Int32(options.height)
-                    cOptions.steps = Int32(options.steps)
-                    cOptions.guidance_scale = options.guidanceScale
-                    cOptions.seed = options.seed
-                    cOptions.scheduler = options.scheduler.cValue
-                    cOptions.mode = options.mode.cValue
-                    cOptions.denoise_strength = options.denoiseStrength
-                    cOptions.report_intermediate_images = options.reportIntermediateImages ? RAC_TRUE : RAC_FALSE
-                    cOptions.progress_stride = Int32(options.progressStride)
-
-                    let result = rac_diffusion_component_generate_with_callbacks(
-                        handle,
-                        &cOptions,
-                        progressCallback,
-                        completeCallback,
-                        errorCallback,
-                        contextPtr
-                    )
-
-                    if result != RAC_SUCCESS {
-                        let ctx = Unmanaged<CallbackContext>.fromOpaque(contextPtr).takeUnretainedValue()
-                        if !ctx.callbackInvoked {
-                            _ = Unmanaged<CallbackContext>.fromOpaque(contextPtr).takeRetainedValue()
-                            let error = SDKError.diffusion(.generationFailed, "Failed to start generation: \(result)")
-                            ctx.completion?.resume(throwing: error)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
