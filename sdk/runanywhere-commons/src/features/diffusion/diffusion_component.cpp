@@ -8,6 +8,7 @@
  * Supports text-to-image, image-to-image, and inpainting.
  */
 
+#include <atomic>
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
@@ -45,8 +46,8 @@ struct rac_diffusion_component {
     /** Mutex for thread safety */
     std::mutex mtx;
 
-    /** Cancellation flag */
-    bool cancel_requested;
+    /** Cancellation flag (atomic for thread-safe access from cancel() while generate holds mutex) */
+    std::atomic<bool> cancel_requested;
 
     rac_diffusion_component() : lifecycle(nullptr), cancel_requested(false) {
         // Initialize with defaults
@@ -58,6 +59,57 @@ struct rac_diffusion_component {
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
+
+/**
+ * Merge user-provided options over component defaults.
+ *
+ * For numeric fields, zero/negative values mean "use default" (except guidance_scale
+ * where 0.0 is valid for CFG-free models like SDXS/SDXL Turbo - use negative to skip).
+ * Pointer fields are copied if non-null. Enums are always copied.
+ */
+static rac_diffusion_options_t merge_diffusion_options(
+    const rac_diffusion_options_t& defaults, const rac_diffusion_options_t* options) {
+    rac_diffusion_options_t effective = defaults;
+
+    effective.prompt = options->prompt;
+    if (options->negative_prompt) {
+        effective.negative_prompt = options->negative_prompt;
+    }
+    if (options->width > 0) {
+        effective.width = options->width;
+    }
+    if (options->height > 0) {
+        effective.height = options->height;
+    }
+    if (options->steps > 0) {
+        effective.steps = options->steps;
+    }
+    // guidance_scale >= 0 allows 0.0 (valid for CFG-free models like SDXS, SDXL Turbo)
+    // Only skip override if user passes a negative sentinel (which is never valid)
+    if (options->guidance_scale >= 0.0f) {
+        effective.guidance_scale = options->guidance_scale;
+    }
+    if (options->seed != 0) {
+        effective.seed = options->seed;
+    }
+    effective.scheduler = options->scheduler;
+    effective.mode = options->mode;
+
+    // Image-to-image / inpainting fields
+    effective.input_image_data = options->input_image_data;
+    effective.input_image_size = options->input_image_size;
+    effective.input_image_width = options->input_image_width;
+    effective.input_image_height = options->input_image_height;
+    effective.mask_data = options->mask_data;
+    effective.mask_size = options->mask_size;
+    effective.denoise_strength = options->denoise_strength;
+
+    // Progress reporting fields
+    effective.report_intermediate_images = options->report_intermediate_images;
+    effective.progress_stride = options->progress_stride > 0 ? options->progress_stride : 1;
+
+    return effective;
+}
 
 /**
  * Generate a unique ID for generation tracking.
@@ -354,36 +406,9 @@ extern "C" rac_result_t rac_diffusion_component_generate(rac_handle_t handle,
         return result;
     }
 
-    // Merge options with defaults
-    rac_diffusion_options_t effective_options = component->default_options;
-    effective_options.prompt = options->prompt;
-    if (options->negative_prompt) {
-        effective_options.negative_prompt = options->negative_prompt;
-    }
-    if (options->width > 0) {
-        effective_options.width = options->width;
-    }
-    if (options->height > 0) {
-        effective_options.height = options->height;
-    }
-    if (options->steps > 0) {
-        effective_options.steps = options->steps;
-    }
-    if (options->guidance_scale > 0) {
-        effective_options.guidance_scale = options->guidance_scale;
-    }
-    if (options->seed != 0) {
-        effective_options.seed = options->seed;
-    }
-    effective_options.scheduler = options->scheduler;
-    effective_options.mode = options->mode;
-    effective_options.input_image_data = options->input_image_data;
-    effective_options.input_image_size = options->input_image_size;
-    effective_options.input_image_width = options->input_image_width;
-    effective_options.input_image_height = options->input_image_height;
-    effective_options.mask_data = options->mask_data;
-    effective_options.mask_size = options->mask_size;
-    effective_options.denoise_strength = options->denoise_strength;
+    // Merge user options over component defaults
+    rac_diffusion_options_t effective_options = merge_diffusion_options(
+        component->default_options, options);
 
     RAC_LOG_INFO("Diffusion.Component",
                  "Starting generation: %dx%d, %d steps, guidance=%.1f, scheduler=%d",
@@ -474,38 +499,9 @@ extern "C" rac_result_t rac_diffusion_component_generate_with_callbacks(
         return result;
     }
 
-    // Merge options with defaults
-    rac_diffusion_options_t effective_options = component->default_options;
-    effective_options.prompt = options->prompt;
-    if (options->negative_prompt) {
-        effective_options.negative_prompt = options->negative_prompt;
-    }
-    if (options->width > 0) {
-        effective_options.width = options->width;
-    }
-    if (options->height > 0) {
-        effective_options.height = options->height;
-    }
-    if (options->steps > 0) {
-        effective_options.steps = options->steps;
-    }
-    if (options->guidance_scale > 0) {
-        effective_options.guidance_scale = options->guidance_scale;
-    }
-    if (options->seed != 0) {
-        effective_options.seed = options->seed;
-    }
-    effective_options.scheduler = options->scheduler;
-    effective_options.mode = options->mode;
-    effective_options.input_image_data = options->input_image_data;
-    effective_options.input_image_size = options->input_image_size;
-    effective_options.input_image_width = options->input_image_width;
-    effective_options.input_image_height = options->input_image_height;
-    effective_options.mask_data = options->mask_data;
-    effective_options.mask_size = options->mask_size;
-    effective_options.denoise_strength = options->denoise_strength;
-    effective_options.report_intermediate_images = options->report_intermediate_images;
-    effective_options.progress_stride = options->progress_stride > 0 ? options->progress_stride : 1;
+    // Merge user options over component defaults
+    rac_diffusion_options_t effective_options = merge_diffusion_options(
+        component->default_options, options);
 
     RAC_LOG_INFO("Diffusion.Component",
                  "Starting generation with callbacks: %dx%d, %d steps, stride=%d",

@@ -32,7 +32,8 @@ public extension RunAnywhere {
         _ image: VLMImage,
         prompt: String,
         maxTokens: Int32 = 2048,
-        temperature: Float = 0.7
+        temperature: Float = 0.7,
+        topP: Float = 0.9
     ) async throws -> VLMResult {
         guard isInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
@@ -54,7 +55,7 @@ public extension RunAnywhere {
         var opts = rac_vlm_options_t()
         opts.max_tokens = maxTokens
         opts.temperature = temperature
-        opts.top_p = 0.9
+        opts.top_p = topP
         opts.streaming_enabled = RAC_FALSE
         opts.use_gpu = RAC_TRUE
 
@@ -78,7 +79,8 @@ public extension RunAnywhere {
         _ image: VLMImage,
         prompt: String,
         maxTokens: Int32 = 2048,
-        temperature: Float = 0.7
+        temperature: Float = 0.7,
+        topP: Float = 0.9
     ) async throws -> VLMStreamingResult {
         guard isInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
@@ -108,7 +110,7 @@ public extension RunAnywhere {
                 var opts = rac_vlm_options_t()
                 opts.max_tokens = maxTokens
                 opts.temperature = temperature
-                opts.top_p = 0.9
+                opts.top_p = topP
                 opts.streaming_enabled = RAC_TRUE
                 opts.use_gpu = RAC_TRUE
 
