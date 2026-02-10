@@ -17,25 +17,22 @@ struct VLMCameraView: View {
     @State private var showingModelSelection = false
     @State private var showingPhotos = false
     @State private var selectedPhoto: PhotosPickerItem?
-    @Environment(\.dismiss) var dismiss
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.black.ignoresSafeArea()
+        ZStack {
+            Color.black.ignoresSafeArea()
 
-                if viewModel.isModelLoaded {
-                    mainContent
-                } else {
-                    modelRequiredContent
-                }
+            if viewModel.isModelLoaded {
+                mainContent
+            } else {
+                modelRequiredContent
             }
-            .navigationTitle("Vision AI")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { toolbarContent }
-            .toolbarBackground(.black, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
         }
+        .navigationTitle("Vision AI")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { toolbarContent }
+        .toolbarBackground(.black, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .sheet(isPresented: $showingModelSelection) {
             ModelSelectionSheet(context: .vlm) { _ in
                 await viewModel.checkModelStatus()
@@ -239,9 +236,6 @@ struct VLMCameraView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .navigationBarLeading) {
-            Button("Close") { dismiss() }.foregroundColor(.white)
-        }
         ToolbarItem(placement: .navigationBarTrailing) {
             if let name = viewModel.loadedModelName {
                 Text(name).font(.caption).foregroundColor(.gray)
