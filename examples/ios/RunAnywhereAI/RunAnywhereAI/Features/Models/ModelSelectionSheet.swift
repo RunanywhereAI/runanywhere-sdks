@@ -31,13 +31,13 @@ enum ModelSelectionContext {
     var relevantCategories: Set<ModelCategory> {
         switch self {
         case .llm:
-            return [.language, .multimodal]
+            return [.language]
         case .stt:
             return [.speechRecognition]
         case .tts:
             return [.speechSynthesis]
         case .voice:
-            return [.language, .multimodal, .speechRecognition, .speechSynthesis]
+            return [.language, .speechRecognition, .speechSynthesis]
         case .vlm:
             return [.multimodal, .vision]
         }
