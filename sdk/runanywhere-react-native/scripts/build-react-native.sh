@@ -27,6 +27,13 @@
 #   armeabi-v7a      32-bit ARM (older devices, ~12% coverage)
 #   x86_64           64-bit Intel (emulators on Intel Macs)
 #
+# BUILD PIPELINE (no fallbacks – single source of truth):
+#   This script reuses runanywhere-commons scripts to produce all native artifacts:
+#   • iOS:  runanywhere-commons/scripts/build-ios.sh  → .xcframework (with Headers)
+#   • Android: runanywhere-commons/scripts/build-android.sh → .so files
+#   Then copies from commons dist/ into packages/core, packages/llamacpp, packages/onnx.
+#   Run --setup to build both; use --setup --ios or --setup --android for one platform.
+#
 # WHAT GETS BUILT:
 #   iOS Output (in packages/*/ios/):
 #     • core/ios/Binaries/RACommons.xcframework
@@ -558,6 +565,9 @@ print_summary() {
     echo ""
     echo "To rebuild after C++ changes:"
     echo "  ./scripts/build-react-native.sh --local --rebuild-commons"
+    echo ""
+    echo "Note: iOS needs the xcframework from this script (build-ios.sh)."
+    echo "      After --clean, run --setup (no --android/--ios) to rebuild both."
 }
 
 # =============================================================================
