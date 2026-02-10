@@ -31,7 +31,8 @@ final class VLMViewModel: NSObject {
 
     // Auto-streaming mode
     var isAutoStreamingEnabled = false
-    private var autoStreamTask: Task<Void, Never>?
+    // nonisolated(unsafe) so deinit can cancel the task (deinit is nonisolated in Swift 6)
+    nonisolated(unsafe) private var autoStreamTask: Task<Void, Never>?
     private static let autoStreamInterval: TimeInterval = 2.5 // seconds between auto-captures
 
     // Camera
@@ -54,6 +55,7 @@ final class VLMViewModel: NSObject {
     }
 
     deinit {
+        autoStreamTask?.cancel()
         NotificationCenter.default.removeObserver(self)
         // Note: Camera cleanup is handled by onDisappear in VLMCameraView
     }
