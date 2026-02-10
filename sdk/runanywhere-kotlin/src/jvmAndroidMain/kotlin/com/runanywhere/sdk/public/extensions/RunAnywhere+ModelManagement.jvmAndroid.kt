@@ -874,10 +874,26 @@ actual suspend fun RunAnywhere.loadSTTModel(modelId: String) {
         model.localPath
             ?: throw SDKError.model("Model '$modelId' is not downloaded")
 
-    // Pass modelPath, modelId, and modelName separately for correct telemetry
-    val result = CppBridgeSTT.loadModel(localPath, modelId, model.name)
+    // Run native load on IO thread to avoid ANR and native crashes on main thread
+    val result = withContext(Dispatchers.IO) {
+        val dir = File(localPath)
+        if (!dir.exists()) {
+            return@withContext -1
+        }
+        if (!dir.isDirectory) {
+            modelsLogger.error("STT model path is not a directory (expected extracted model dir): $localPath")
+            return@withContext -1
+        }
+        // C++ backend expects directory with encoder.onnx, decoder.onnx, tokens.txt
+        val hasEncoder = dir.listFiles()?.any { it.name.contains("encoder") && it.name.endsWith(".onnx") } == true
+        if (!hasEncoder) {
+            modelsLogger.error("STT model directory missing encoder.onnx: $localPath. Re-download the model.")
+            return@withContext -1
+        }
+        CppBridgeSTT.loadModel(localPath, modelId, model.name)
+    }
     if (result != 0) {
-        throw SDKError.stt("Failed to load STT model '$modelId' (error code: $result)")
+        throw SDKError.stt("Failed to load STT model '$modelId' (error code: $result). Ensure the model is extracted and contains encoder.onnx, decoder.onnx, tokens.txt.")
     }
 }
 

@@ -47,6 +47,7 @@ import * as VoiceAgent from './Extensions/RunAnywhere+VoiceAgent';
 import * as VoiceSession from './Extensions/RunAnywhere+VoiceSession';
 import * as StructuredOutput from './Extensions/RunAnywhere+StructuredOutput';
 import * as Audio from './Extensions/RunAnywhere+Audio';
+import * as ToolCalling from './Extensions/RunAnywhere+ToolCalling';
 
 const logger = new SDKLogger('RunAnywhere');
 
@@ -599,6 +600,21 @@ export const RunAnywhere = {
   classify: StructuredOutput.classify,
 
   // ============================================================================
+  // Tool Calling (Delegated to Extension)
+  // ============================================================================
+
+  registerTool: ToolCalling.registerTool,
+  unregisterTool: ToolCalling.unregisterTool,
+  getRegisteredTools: ToolCalling.getRegisteredTools,
+  clearTools: ToolCalling.clearTools,
+  parseToolCall: ToolCalling.parseToolCall,
+  executeTool: ToolCalling.executeTool,
+  formatToolsForPrompt: ToolCalling.formatToolsForPrompt,
+  formatToolsForPromptAsync: ToolCalling.formatToolsForPromptAsync,
+  generateWithTools: ToolCalling.generateWithTools,
+  continueWithToolResult: ToolCalling.continueWithToolResult,
+
+  // ============================================================================
   // Storage Management (Delegated to Extension)
   // ============================================================================
 
@@ -611,10 +627,12 @@ export const RunAnywhere = {
 
   getAvailableModels: Models.getAvailableModels,
   getModelInfo: Models.getModelInfo,
+  getModelPath: Models.getModelPath,
   isModelDownloaded: Models.isModelDownloaded,
   downloadModel: Models.downloadModel,
   cancelDownload: Models.cancelDownload,
   deleteModel: Models.deleteModel,
+  registerModel: Models.registerModel,
 
   // ============================================================================
   // Utilities
