@@ -1,11 +1,12 @@
 package com.runanywhere.runanywhereai.presentation.chat.components
 
-import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,7 +16,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -35,8 +35,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -52,7 +52,7 @@ import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
  * Ported from iOS ModelStatusComponents.swift
  *
  * Features:
- * - Animated floating circles background
+ * - Animated floating circles background (easeInOut, 8s duration — matches iOS)
  * - Modality-specific icon, color, and messaging
  * - "Get Started" CTA button
  * - Privacy note footer
@@ -68,12 +68,14 @@ fun ModelRequiredOverlay(
     val modalityTitle = getModalityTitle(modality)
     val modalityDescription = getModalityDescription(modality)
 
+    // iOS uses .easeInOut(duration: 8).repeatForever(autoreverses: true)
     val infiniteTransition = rememberInfiniteTransition(label = "overlay_circles")
+
     val circle1Offset by infiniteTransition.animateFloat(
         initialValue = -100f,
         targetValue = 100f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 4000, easing = LinearEasing),
+            animation = tween(durationMillis = 8000, easing = EaseInOut),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "c1",
@@ -82,7 +84,7 @@ fun ModelRequiredOverlay(
         initialValue = 100f,
         targetValue = -100f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 4000, easing = LinearEasing),
+            animation = tween(durationMillis = 8000, easing = EaseInOut),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "c2",
@@ -91,45 +93,85 @@ fun ModelRequiredOverlay(
         initialValue = 0f,
         targetValue = 80f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 4000, easing = LinearEasing),
+            animation = tween(durationMillis = 8000, easing = EaseInOut),
             repeatMode = RepeatMode.Reverse,
         ),
         label = "c3",
     )
+
     val density = LocalDensity.current
-    val c1Dp = with(density) { circle1Offset.toDp() }
-    val c2Dp = with(density) { circle2Offset.toDp() }
-    val c3Dp = with(density) { circle3Offset.toDp() }
 
     Box(modifier = modifier.fillMaxSize()) {
-        Box(modifier = Modifier.fillMaxSize().blur(32.dp)) {
-            Box(
-                modifier = Modifier
-                    .size(300.dp)
-                    .offset(x = c1Dp, y = (-200).dp)
-                    .clip(CircleShape)
-                    .background(modalityColor.copy(alpha = 0.15f)),
+        // Animated floating circles background using Canvas + RadialGradient
+        // RadialGradient reliably produces soft glow on all Android devices
+        // unlike .blur() which fails on many devices
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val c1XPx = with(density) { circle1Offset.dp.toPx() }
+            val c2XPx = with(density) { circle2Offset.dp.toPx() }
+            val c3Px = with(density) { circle3Offset.dp.toPx() }
+
+            // Circle 1 - Top left, iOS: 300pt size, blur 80
+            // Total visual radius ≈ (300/2) + 80 = 230
+            val c1Center = Offset(x = size.width * 0.25f + c1XPx, y = -size.height * 0.05f)
+            val c1Radius = with(density) { 230.dp.toPx() }
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        modalityColor.copy(alpha = 0.18f),
+                        modalityColor.copy(alpha = 0.08f),
+                        Color.Transparent,
+                    ),
+                    center = c1Center,
+                    radius = c1Radius,
+                ),
+                radius = c1Radius,
+                center = c1Center,
             )
-            Box(
-                modifier = Modifier
-                    .size(250.dp)
-                    .offset(x = c2Dp, y = 300.dp)
-                    .clip(CircleShape)
-                    .background(modalityColor.copy(alpha = 0.12f)),
+
+            // Circle 2 - Bottom right, iOS: 250pt size, blur 100
+            // Total visual radius ≈ (250/2) + 100 = 225
+            val c2Center = Offset(x = size.width * 0.7f + c2XPx, y = size.height * 0.75f)
+            val c2Radius = with(density) { 225.dp.toPx() }
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        modalityColor.copy(alpha = 0.15f),
+                        modalityColor.copy(alpha = 0.06f),
+                        Color.Transparent,
+                    ),
+                    center = c2Center,
+                    radius = c2Radius,
+                ),
+                radius = c2Radius,
+                center = c2Center,
             )
-            Box(
-                modifier = Modifier
-                    .size(280.dp)
-                    .offset(x = -c3Dp, y = c3Dp)
-                    .clip(CircleShape)
-                    .background(modalityColor.copy(alpha = 0.08f)),
+
+            // Circle 3 - Center, iOS: 280pt size, blur 90
+            // Total visual radius ≈ (280/2) + 90 = 230
+            val c3Center = Offset(x = size.width * 0.4f - c3Px, y = size.height * 0.5f + c3Px)
+            val c3Radius = with(density) { 230.dp.toPx() }
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        modalityColor.copy(alpha = 0.12f),
+                        modalityColor.copy(alpha = 0.04f),
+                        Color.Transparent,
+                    ),
+                    center = c3Center,
+                    radius = c3Radius,
+                ),
+                radius = c3Radius,
+                center = c3Center,
             )
         }
+
         Column(
             modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(modifier = Modifier.weight(1f))
+
+            // Friendly icon with gradient background
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
@@ -151,19 +193,25 @@ fun ModelRequiredOverlay(
                     tint = modalityColor,
                 )
             }
+
             Spacer(modifier = Modifier.height(20.dp))
+
             Text(
                 text = modalityTitle,
                 style = MaterialTheme.typography.titleLarge,
             )
+
             Spacer(modifier = Modifier.height(12.dp))
+
             Text(
                 text = modalityDescription,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
+
             Spacer(modifier = Modifier.weight(1f))
+
             Button(
                 onClick = onSelectModel,
                 colors = ButtonDefaults.buttonColors(containerColor = modalityColor),
@@ -173,7 +221,9 @@ fun ModelRequiredOverlay(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Get Started", style = MaterialTheme.typography.titleMedium, color = Color.White)
             }
+
             Spacer(modifier = Modifier.height(16.dp))
+
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
