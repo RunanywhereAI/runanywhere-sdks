@@ -183,6 +183,13 @@ static rac_result_t builtin_list_models(rac_diffusion_model_def_t** out_models,
         }
     }
     
+    // Handle empty result (no models for this platform)
+    if (count == 0) {
+        *out_models = nullptr;
+        *out_count = 0;
+        return RAC_SUCCESS;
+    }
+
     // Allocate output array
     auto* models = static_cast<rac_diffusion_model_def_t*>(
         std::malloc(count * sizeof(rac_diffusion_model_def_t)));

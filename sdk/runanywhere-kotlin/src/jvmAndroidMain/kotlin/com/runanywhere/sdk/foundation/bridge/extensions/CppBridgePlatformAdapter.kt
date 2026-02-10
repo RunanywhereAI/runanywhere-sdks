@@ -10,7 +10,7 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
-import android.util.Base64
+import java.util.Base64
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.errors.CommonsErrorCode
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
@@ -605,12 +605,12 @@ object CppBridgePlatformAdapter {
 
     fun secureGet(key: String): String? {
         val value = secureGetCallback(key) ?: return null
-        return Base64.encodeToString(value, Base64.NO_WRAP)
+        return Base64.getEncoder().encodeToString(value)
     }
 
     fun secureSet(key: String, value: String): Boolean {
         return try {
-            val bytes = Base64.decode(value, Base64.DEFAULT)
+            val bytes = Base64.getDecoder().decode(value)
             secureSetCallback(key, bytes)
         } catch (e: Exception) {
             logCallback(LogLevel.ERROR, "SecureStorage", "secureSet decode failed: ${e.message}")

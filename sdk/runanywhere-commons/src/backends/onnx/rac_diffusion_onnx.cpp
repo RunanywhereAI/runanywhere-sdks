@@ -248,6 +248,10 @@ rac_result_t rac_diffusion_onnx_generate_with_progress(
             if (out_result->image_data) {
                 memcpy(out_result->image_data, result.image_data.data(), result.image_data.size());
                 out_result->image_size = result.image_data.size();
+            } else {
+                RAC_LOG_ERROR("rac_diffusion_onnx", "Failed to allocate %zu bytes for image data",
+                             result.image_data.size());
+                return RAC_ERROR_OUT_OF_MEMORY;
             }
             out_result->width = result.width;
             out_result->height = result.height;

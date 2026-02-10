@@ -289,7 +289,8 @@ class ONNXDiffusion {
     std::vector<float> encode_image(const std::vector<uint8_t>& image, int width, int height);
     std::vector<float> run_unet_step(const std::vector<float>& latents,
                                      const std::vector<float>& text_embeddings,
-                                     float timestep);
+                                     float timestep,
+                                     int latent_h, int latent_w);
     std::vector<uint8_t> decode_latents(const std::vector<float>& latents, 
                                         int latent_height, int latent_width);
     

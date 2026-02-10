@@ -129,6 +129,7 @@ class Scheduler {
     void compute_alphas();
     float get_alpha_prod(float t) const;
     float get_sigma(float t) const;
+    float sigma_to_t(float sigma) const;
 };
 
 // =============================================================================

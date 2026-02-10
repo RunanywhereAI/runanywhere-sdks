@@ -182,18 +182,21 @@ class DiffusionViewModel: ObservableObject {
                 steps: steps,
                 guidanceScale: guidanceScale
             )
-            let stream = try await RunAnywhere.generateImageStream(prompt: prompt, options: options)
-
-            for try await update in stream {
-                progress = update.progress
-                if steps == 1 {
-                    statusMessage = "Processing (1-step model)..."
-                } else {
-                    statusMessage = "Step \(update.currentStep)/\(update.totalSteps)"
+            // Use the progress-callback overload so the pipeline runs only once.
+            let result = try await RunAnywhere.generateImage(
+                prompt: prompt,
+                options: options
+            ) { [weak self] update in
+                Task { @MainActor [weak self] in
+                    self?.progress = update.progress
+                    if steps == 1 {
+                        self?.statusMessage = "Processing (1-step model)..."
+                    } else {
+                        self?.statusMessage = "Step \(update.currentStep)/\(update.totalSteps)"
+                    }
                 }
+                return true // continue generation
             }
-
-            let result = try await RunAnywhere.generateImage(prompt: prompt, options: options)
             if let uiImage = createImage(from: result.imageData, width: result.width, height: result.height) {
                 generatedImage = Image(uiImage: uiImage)
                 statusMessage = "Done in \(result.generationTimeMs)ms"

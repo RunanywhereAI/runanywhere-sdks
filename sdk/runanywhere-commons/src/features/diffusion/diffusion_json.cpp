@@ -230,16 +230,17 @@ static std::string base64_encode(const uint8_t* data, size_t len) {
 
     size_t i = 0;
     while (i < len) {
-        uint32_t octet_a = i < len ? data[i++] : 0;
-        uint32_t octet_b = i < len ? data[i++] : 0;
-        uint32_t octet_c = i < len ? data[i++] : 0;
+        size_t remaining = len - i;
+        uint32_t octet_a = data[i++];
+        uint32_t octet_b = remaining > 1 ? data[i++] : 0;
+        uint32_t octet_c = remaining > 2 ? data[i++] : 0;
 
         uint32_t triple = (octet_a << 16) | (octet_b << 8) | octet_c;
 
         out.push_back(table[(triple >> 18) & 0x3F]);
         out.push_back(table[(triple >> 12) & 0x3F]);
-        out.push_back(i - 2 < len ? table[(triple >> 6) & 0x3F] : '=');
-        out.push_back(i - 1 < len ? table[triple & 0x3F] : '=');
+        out.push_back(remaining > 1 ? table[(triple >> 6) & 0x3F] : '=');
+        out.push_back(remaining > 2 ? table[triple & 0x3F] : '=');
     }
 
     return out;
