@@ -255,14 +255,20 @@ rac_result_t rac_llm_llamacpp_generate_stream_with_timing(rac_handle_t handle, c
     }
 
     // Stream using C++ class with timing
+    int prompt_tokens = 0;
     bool success = h->text_gen->generate_stream_with_timing(
         request,
         [callback, user_data](const std::string& token) -> bool {
             return callback(token.c_str(), RAC_FALSE, user_data) == RAC_TRUE;
         },
-        nullptr,    // out_prompt_tokens not needed, timing is captured internally
-        timing_out  // Pass timing struct to backend
+        &prompt_tokens,
+        timing_out
     );
+
+    // Capture prompt token count in timing struct
+    if (timing_out != nullptr && prompt_tokens > 0) {
+        timing_out->prompt_tokens = static_cast<int32_t>(prompt_tokens);
+    }
 
     if (success) {
         callback("", RAC_TRUE, user_data);  // Final token

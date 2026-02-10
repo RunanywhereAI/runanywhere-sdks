@@ -1014,6 +1014,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
 
     jclass callbackClass = env->GetObjectClass(tokenCallback);
     jmethodID onTokenMethod = env->GetMethodID(callbackClass, "onToken", "(Ljava/lang/String;)Z");
+    env->DeleteLocalRef(callbackClass);
 
     if (!onTokenMethod) {
         LOGe("racLlmComponentGenerateStreamWithTiming: could not find onToken method");
@@ -1103,7 +1104,8 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
     json += "\"t6_request_end_ms\":" + std::to_string(timing.t6_request_end_ms) + ",";
     json += "\"prompt_tokens\":" + std::to_string(timing.prompt_tokens) + ",";
     json += "\"output_tokens\":" + std::to_string(timing.output_tokens) + ",";
-    json += "\"benchmark_status\":" + std::to_string(timing.status);
+    json += "\"benchmark_status\":" + std::to_string(timing.status) + ",";
+    json += "\"benchmark_error_code\":" + std::to_string(timing.error_code);
     json += "}";
 
     LOGi("racLlmComponentGenerateStreamWithTiming returning JSON: %zu bytes", json.length());

@@ -141,7 +141,10 @@ rac_result_t rac_llm_generate_stream_with_timing(rac_handle_t handle, const char
                                                          user_data, timing_out);
     }
 
-    // Fallback to regular streaming (timing_out won't have t2/t3/t5)
+    // Fallback to regular streaming for backends that don't implement timing.
+    // Backend timestamps (t2/t3/t5) will remain 0 from rac_benchmark_timing_init().
+    // The component layer (llm_component.cpp) is responsible for setting t0/t4/t6
+    // and the final status/error_code regardless of which path is taken here.
     if (service->ops->generate_stream) {
         return service->ops->generate_stream(service->impl, prompt, options, callback, user_data);
     }

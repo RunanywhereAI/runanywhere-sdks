@@ -763,6 +763,8 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
 
         if (timing_out != nullptr) {
             timing_out->status = RAC_BENCHMARK_STATUS_ERROR;
+            timing_out->error_code = result;
+            timing_out->t6_request_end_ms = rac_monotonic_now_ms();
         }
 
         if (error_callback) {
@@ -790,6 +792,8 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
 
         if (timing_out != nullptr) {
             timing_out->status = RAC_BENCHMARK_STATUS_ERROR;
+            timing_out->error_code = RAC_ERROR_NOT_SUPPORTED;
+            timing_out->t6_request_end_ms = rac_monotonic_now_ms();
         }
 
         if (error_callback) {
@@ -863,6 +867,8 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
 
         if (timing_out != nullptr) {
             timing_out->status = RAC_BENCHMARK_STATUS_ERROR;
+            timing_out->error_code = result;
+            timing_out->t6_request_end_ms = rac_monotonic_now_ms();
         }
 
         if (error_callback) {
@@ -907,6 +913,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
         timing_out->prompt_tokens = final_result.prompt_tokens;
         timing_out->output_tokens = final_result.completion_tokens;
         timing_out->status = RAC_BENCHMARK_STATUS_SUCCESS;
+        timing_out->error_code = RAC_SUCCESS;
     }
 
     if (complete_callback) {
