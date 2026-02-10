@@ -31,6 +31,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppTypography
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
+import android.app.Application
 
 /**
  * Settings screen
@@ -180,6 +181,9 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 color = AppColors.textSecondary,
             )
         }
+
+        // Tool Calling Section
+        ToolSettingsSection()
 
         // 3. Storage Overview - iOS Label(systemImage: "externaldrive") etc.
         SettingsSection(
@@ -700,4 +704,159 @@ private fun ApiConfigurationDialog(
             }
         },
     )
+}
+
+// =============================================================================
+// Tool Settings Section
+// =============================================================================
+
+/**
+ * Tool Calling Settings Section
+ * 
+ * Allows users to:
+ * - Enable/disable tool calling
+ * - Register demo tools (weather, time, calculator)
+ * - Clear all registered tools
+ * - View registered tools count
+ */
+@Composable
+fun ToolSettingsSection() {
+    val context = LocalContext.current
+    val application = context.applicationContext as Application
+    val toolViewModel = remember { ToolSettingsViewModel.getInstance(application) }
+    val toolState by toolViewModel.uiState.collectAsStateWithLifecycle()
+    
+    SettingsSection(title = "Tool Calling") {
+        // Enable/Disable Toggle
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Enable Tool Calling",
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = "Allow LLMs to use registered tools",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = toolState.toolCallingEnabled,
+                onCheckedChange = { toolViewModel.setToolCallingEnabled(it) },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = AppColors.primaryAccent,
+                    checkedTrackColor = AppColors.primaryAccent.copy(alpha = 0.5f),
+                ),
+            )
+        }
+        
+        if (toolState.toolCallingEnabled) {
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            
+            // Registered Tools Count
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Build,
+                        contentDescription = null,
+                        tint = AppColors.primaryAccent,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Text(
+                        text = "Registered Tools",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                Text(
+                    text = "${toolState.registeredTools.size}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = AppColors.primaryAccent,
+                )
+            }
+            
+            // Tool List (if any)
+            if (toolState.registeredTools.isNotEmpty()) {
+                toolState.registeredTools.forEach { tool ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 28.dp, top = 4.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "• ${tool.name}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            
+            // Action Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    onClick = { toolViewModel.registerDemoTools() },
+                    enabled = !toolState.isLoading,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = AppColors.primaryGreen,
+                    ),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(if (toolState.isLoading) "Loading..." else "Add Demo Tools")
+                }
+                
+                if (toolState.registeredTools.isNotEmpty()) {
+                    OutlinedButton(
+                        onClick = { toolViewModel.clearAllTools() },
+                        enabled = !toolState.isLoading,
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = AppColors.primaryRed,
+                        ),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Delete,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Clear")
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Demo tools: get_weather (Open-Meteo API), get_current_time, calculate",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }

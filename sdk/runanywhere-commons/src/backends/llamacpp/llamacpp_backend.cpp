@@ -207,6 +207,72 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     model_path_ = model_path;
 
     llama_model_params model_params = llama_model_default_params();
+    
+    // Detect model size from filename to set appropriate GPU layers BEFORE loading
+    // This prevents OOM crashes on mobile devices with limited GPU memory
+    // Note: We use filename heuristics here because we can't know param count until after loading
+    std::string path_lower = model_path;
+    std::transform(path_lower.begin(), path_lower.end(), path_lower.begin(), ::tolower);
+    
+    int gpu_layers = -1;  // Default: all layers to GPU
+    
+    // Check for large model indicators in filename using word boundary detection
+    // Patterns like "7b", "8b", "13b" should match at word boundaries to avoid
+    // false positives like "/backup7b/" or "/2017beta/"
+    auto is_model_size_marker = [&path_lower](const char* marker) {
+        size_t pos = path_lower.find(marker);
+        while (pos != std::string::npos) {
+            // Check for word boundary before (start of string, or non-alphanumeric)
+            bool valid_start = (pos == 0) || !std::isalnum(path_lower[pos - 1]);
+            // Check for word boundary after (end of string, or non-alphanumeric except digits for patterns like "7b-q4")
+            size_t end_pos = pos + strlen(marker);
+            bool valid_end = (end_pos >= path_lower.size()) || 
+                            (!std::isalpha(path_lower[end_pos]) || path_lower[end_pos] == '-' || path_lower[end_pos] == '_');
+            
+            if (valid_start && valid_end) {
+                return true;
+            }
+            pos = path_lower.find(marker, pos + 1);
+        }
+        return false;
+    };
+    
+    // Detect large models (7B+) that may need GPU layer limiting on mobile
+    // First check for config-based override (for custom-named models)
+    bool is_large_model = false;
+    if (config.contains("expected_params_billions")) {
+        double expected_params = config["expected_params_billions"].get<double>();
+        is_large_model = (expected_params >= 7.0);
+        if (is_large_model) {
+            LOGI("Large model detected from config (%.1fB expected params)", expected_params);
+        }
+    }
+    
+    // Fall back to filename heuristics if no config provided
+    if (!is_large_model) {
+        is_large_model = is_model_size_marker("7b") ||
+                         is_model_size_marker("8b") ||
+                         is_model_size_marker("9b") ||
+                         is_model_size_marker("13b") ||
+                         is_model_size_marker("70b");
+    }
+    
+    if (is_large_model) {
+        // For 7B+ models on mobile: limit GPU layers to prevent OOM
+        // Most 7B models have 32 layers, offload ~24 to GPU, rest to CPU
+        gpu_layers = 24;
+        LOGI("Large model detected, limiting GPU layers to %d to prevent OOM", gpu_layers);
+    }
+    
+    // Allow user override via config
+    if (config.contains("gpu_layers")) {
+        gpu_layers = config["gpu_layers"].get<int>();
+        LOGI("Using user-provided GPU layers: %d", gpu_layers);
+    }
+    
+    model_params.n_gpu_layers = gpu_layers;
+    LOGI("Loading model with n_gpu_layers=%d", gpu_layers);
+    
     model_ = llama_model_load_from_file(model_path.c_str(), model_params);
 
     if (!model_) {
@@ -217,14 +283,45 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     int model_train_ctx = llama_model_n_ctx_train(model_);
     LOGI("Model training context size: %d", model_train_ctx);
 
+    // Get model parameter count to determine appropriate context size
+    // Large models (7B+) need smaller context on mobile to fit in memory
+    uint64_t n_params = llama_model_n_params(model_);
+    double params_billions = static_cast<double>(n_params) / 1e9;
+    LOGI("Model parameters: %.2fB", params_billions);
+    
+    // Post-load verification: warn if actual param count differs from filename heuristic
+    bool actual_is_large = (params_billions >= 7.0);
+    if (actual_is_large && !is_large_model) {
+        LOGI("WARNING: Model has %.1fB params but filename didn't indicate large model. "
+             "Consider using gpu_layers config for optimal performance.", params_billions);
+    } else if (!actual_is_large && is_large_model) {
+        LOGI("NOTE: Filename suggested large model but actual params are %.1fB. "
+             "GPU layer limiting may be conservative.", params_billions);
+    }
+
+    // Adaptive context size based on model size for mobile devices
+    int adaptive_max_context;
+    if (params_billions >= 7.0) {
+        // 7B+ models: use 2048 context to fit in ~6GB GPU memory
+        adaptive_max_context = 2048;
+        LOGI("Large model detected (%.1fB params), limiting context to %d for memory", params_billions, adaptive_max_context);
+    } else if (params_billions >= 3.0) {
+        // 3-7B models: use 4096 context
+        adaptive_max_context = 4096;
+        LOGI("Medium model detected (%.1fB params), limiting context to %d", params_billions, adaptive_max_context);
+    } else {
+        // Small models (<3B): can use larger context
+        adaptive_max_context = max_default_context_;
+    }
+
     if (user_context_size > 0) {
         context_size_ = std::min(user_context_size, model_train_ctx);
         LOGI("Using user-provided context size: %d (requested: %d, model max: %d)", context_size_,
              user_context_size, model_train_ctx);
     } else {
-        context_size_ = std::min(model_train_ctx, max_default_context_);
-        LOGI("Auto-detected context size: %d (model: %d, cap: %d)", context_size_, model_train_ctx,
-             max_default_context_);
+        context_size_ = std::min({model_train_ctx, max_default_context_, adaptive_max_context});
+        LOGI("Auto-detected context size: %d (model: %d, cap: %d, adaptive: %d)", context_size_, 
+             model_train_ctx, max_default_context_, adaptive_max_context);
     }
 
     llama_context_params ctx_params = llama_context_default_params();

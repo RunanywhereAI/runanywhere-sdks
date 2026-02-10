@@ -10,6 +10,14 @@
 package com.margelo.nitro.runanywhere
 
 import android.util.Log
+import java.io.File
+import java.io.FileOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * JNI bridge that C++ code calls for platform operations.
@@ -17,6 +25,33 @@ import android.util.Log
  */
 object PlatformAdapterBridge {
     private const val TAG = "PlatformAdapterBridge"
+
+    private const val RAC_SUCCESS = 0
+    private const val RAC_ERROR_INVALID_PARAMETER = -106
+    private const val RAC_ERROR_DOWNLOAD_FAILED = -153
+    private const val RAC_ERROR_CANCELLED = -380
+
+    private data class HttpDownloadTask(
+        val taskId: String,
+        val url: String,
+        val destinationPath: String,
+        val cancelFlag: AtomicBoolean = AtomicBoolean(false),
+    ) {
+        @Volatile
+        var connection: HttpURLConnection? = null
+
+        @Volatile
+        var future: Future<*>? = null
+    }
+
+    private val httpDownloadTasks = ConcurrentHashMap<String, HttpDownloadTask>()
+
+    private val httpDownloadExecutor =
+        Executors.newCachedThreadPool { runnable ->
+            Thread(runnable, "runanywhere-http-download").apply {
+                isDaemon = true
+            }
+        }
 
     /**
      * Called from C++ to set a secure value
@@ -155,6 +190,172 @@ object PlatformAdapterBridge {
             )
         }
     }
+
+    // ========================================================================
+    // HTTP Download (Async, Platform Adapter)
+    // ========================================================================
+
+    /**
+     * Start an HTTP download (async).
+     * Called from C++ platform adapter with a provided taskId.
+     */
+    @JvmStatic
+    fun httpDownload(url: String, destinationPath: String, taskId: String): Int {
+        if (url.isBlank() || destinationPath.isBlank() || taskId.isBlank()) {
+            Log.e(TAG, "httpDownload invalid args (taskId=$taskId)")
+            return RAC_ERROR_INVALID_PARAMETER
+        }
+
+        val task = HttpDownloadTask(taskId = taskId, url = url, destinationPath = destinationPath)
+        if (httpDownloadTasks.putIfAbsent(taskId, task) != null) {
+            Log.w(TAG, "httpDownload duplicate taskId=$taskId")
+            return RAC_ERROR_INVALID_PARAMETER
+        }
+
+        return try {
+            val future = httpDownloadExecutor.submit {
+                performHttpDownload(task)
+            }
+            task.future = future
+            RAC_SUCCESS
+        } catch (e: Exception) {
+            httpDownloadTasks.remove(taskId)
+            Log.e(TAG, "httpDownload schedule failed: ${e.message}")
+            RAC_ERROR_DOWNLOAD_FAILED
+        }
+    }
+
+    /**
+     * Cancel an HTTP download.
+     */
+    @JvmStatic
+    fun httpDownloadCancel(taskId: String): Boolean {
+        val task = httpDownloadTasks[taskId] ?: return false
+        task.cancelFlag.set(true)
+        task.connection?.disconnect()
+        return true
+    }
+
+    private fun performHttpDownload(task: HttpDownloadTask) {
+        var result = RAC_ERROR_DOWNLOAD_FAILED
+        var finalPath: String? = null
+        var tempFile: File? = null
+
+        try {
+            if (task.cancelFlag.get()) {
+                result = RAC_ERROR_CANCELLED
+                return
+            }
+
+            val connection = URL(task.url).openConnection() as HttpURLConnection
+            task.connection = connection
+            connection.instanceFollowRedirects = true
+            connection.connectTimeout = 30_000
+            connection.readTimeout = 60_000
+            connection.requestMethod = "GET"
+            connection.connect()
+
+            val status = connection.responseCode
+            if (status !in 200..299) {
+                Log.e(TAG, "httpDownload failed status=$status url=${task.url}")
+                result = RAC_ERROR_DOWNLOAD_FAILED
+                return
+            }
+
+            val totalBytes = connection.contentLengthLong.let { if (it > 0) it else 0L }
+            val destFile = File(task.destinationPath)
+            val parentDir = destFile.parentFile
+            parentDir?.mkdirs()
+            val temp = if (parentDir != null) {
+                File(parentDir, destFile.name + ".part")
+            } else {
+                File(destFile.path + ".part")
+            }
+            tempFile = temp
+            if (temp.exists()) {
+                temp.delete()
+            }
+
+            var downloaded = 0L
+            var lastReported = 0L
+            val reportThreshold = 256 * 1024L
+
+            connection.inputStream.use { input ->
+                FileOutputStream(temp).use { output ->
+                    val buffer = ByteArray(8192)
+                    while (true) {
+                        if (task.cancelFlag.get()) {
+                            result = RAC_ERROR_CANCELLED
+                            return
+                        }
+                        val read = input.read(buffer)
+                        if (read <= 0) break
+                        output.write(buffer, 0, read)
+                        downloaded += read
+                        if (downloaded - lastReported >= reportThreshold) {
+                            nativeHttpDownloadReportProgress(task.taskId, downloaded, totalBytes)
+                            lastReported = downloaded
+                        }
+                    }
+                }
+            }
+
+            if (task.cancelFlag.get()) {
+                result = RAC_ERROR_CANCELLED
+                return
+            }
+
+            if (temp.exists()) {
+                if (destFile.exists()) {
+                    destFile.delete()
+                }
+                val moved = temp.renameTo(destFile)
+                if (!moved) {
+                    temp.copyTo(destFile, overwrite = true)
+                    temp.delete()
+                }
+            }
+
+            nativeHttpDownloadReportProgress(task.taskId, downloaded, totalBytes)
+            finalPath = destFile.absolutePath
+            result = RAC_SUCCESS
+        } catch (e: Exception) {
+            result = if (task.cancelFlag.get()) {
+                RAC_ERROR_CANCELLED
+            } else {
+                Log.e(TAG, "httpDownload failed for ${task.url}: ${e.message}")
+                RAC_ERROR_DOWNLOAD_FAILED
+            }
+        } finally {
+            task.connection?.disconnect()
+            task.connection = null
+            httpDownloadTasks.remove(task.taskId)
+
+            if (result != RAC_SUCCESS) {
+                tempFile?.let {
+                    if (it.exists()) {
+                        it.delete()
+                    }
+                }
+            }
+
+            nativeHttpDownloadReportComplete(task.taskId, result, finalPath)
+        }
+    }
+
+    @JvmStatic
+    private external fun nativeHttpDownloadReportProgress(
+        taskId: String,
+        downloadedBytes: Long,
+        totalBytes: Long,
+    ): Int
+
+    @JvmStatic
+    private external fun nativeHttpDownloadReportComplete(
+        taskId: String,
+        result: Int,
+        downloadedPath: String?,
+    ): Int
 
     // ========================================================================
     // Device Info (Synchronous)
@@ -389,4 +590,3 @@ object PlatformAdapterBridge {
         return false
     }
 }
-

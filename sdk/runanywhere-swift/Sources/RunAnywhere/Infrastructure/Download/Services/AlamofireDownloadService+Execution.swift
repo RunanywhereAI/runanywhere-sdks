@@ -16,7 +16,9 @@ extension AlamofireDownloadService {
         destination: URL,
         model: ModelInfo,
         taskId: String,
-        progressContinuation: AsyncStream<DownloadProgress>.Continuation
+        progressContinuation: AsyncStream<DownloadProgress>.Continuation,
+        progressOffset: Double = 0.0,
+        progressScale: Double = 1.0
     ) async throws -> URL {
         let destinationURL = destination
         let dest: DownloadRequest.Destination = { _, _ in
@@ -26,11 +28,13 @@ extension AlamofireDownloadService {
         var lastReportedProgress = -1.0
         let downloadRequest = session.download(url, to: dest)
             .downloadProgress { progress in
+                // Apply offset and scale for multi-file downloads
+                let scaledProgress = progressOffset + (progress.fractionCompleted * progressScale)
                 let downloadProgress = DownloadProgress(
                     stage: .downloading,
                     bytesDownloaded: progress.completedUnitCount,
                     totalBytes: progress.totalUnitCount,
-                    stageProgress: progress.fractionCompleted,
+                    stageProgress: scaledProgress,
                     state: .downloading
                 )
 

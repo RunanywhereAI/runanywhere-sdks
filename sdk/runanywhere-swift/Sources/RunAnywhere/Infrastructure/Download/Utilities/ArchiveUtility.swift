@@ -313,15 +313,24 @@ public final class ArchiveUtility {
         progressHandler?(0.0)
 
         do {
+            let fileManager = FileManager.default
+
+            // Clean up any existing partial extraction to avoid "file already exists" errors
+            // This handles cases where a previous extraction was interrupted
+            if fileManager.fileExists(atPath: destinationURL.path) {
+                logger.info("Removing existing destination directory for clean extraction: \(destinationURL.lastPathComponent)")
+                try fileManager.removeItem(at: destinationURL)
+            }
+
             // Ensure destination directory exists
-            try FileManager.default.createDirectory(
+            try fileManager.createDirectory(
                 at: destinationURL,
                 withIntermediateDirectories: true,
                 attributes: nil
             )
 
             // Use ZIPFoundation to extract
-            try FileManager.default.unzipItem(
+            try fileManager.unzipItem(
                 at: sourceURL,
                 to: destinationURL,
                 skipCRC32: true,
