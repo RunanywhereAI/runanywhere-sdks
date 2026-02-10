@@ -487,6 +487,22 @@ public struct DiffusionGenerationOptions: Sendable {
             maskImage: maskImage
         )
     }
+    /// Convert to C options struct (prompt/negative_prompt must be set separately via withCString)
+    func toCOptions() -> rac_diffusion_options_t {
+        var cOptions = rac_diffusion_options_t()
+        // prompt and negative_prompt are set by the caller via withCString
+        cOptions.width = Int32(width)
+        cOptions.height = Int32(height)
+        cOptions.steps = Int32(steps)
+        cOptions.guidance_scale = guidanceScale
+        cOptions.seed = seed
+        cOptions.scheduler = scheduler.cValue
+        cOptions.mode = mode.cValue
+        cOptions.denoise_strength = denoiseStrength
+        cOptions.report_intermediate_images = reportIntermediateImages ? RAC_TRUE : RAC_FALSE
+        cOptions.progress_stride = Int32(progressStride)
+        return cOptions
+    }
 }
 
 // MARK: - Diffusion Progress

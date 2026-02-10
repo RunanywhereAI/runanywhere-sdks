@@ -3,68 +3,12 @@
 //  RunAnywhere SDK
 //
 //  Public API for diffusion (image generation) operations.
-//  Uses Apple Stable Diffusion (CoreML) with ANE acceleration.
+//  Routes through C++ component layer for architectural consistency with LLM/STT/TTS.
+//  Uses Apple Stable Diffusion (CoreML) with ANE acceleration via platform callbacks.
 //
 
-import CoreGraphics
 import CRACommons
 import Foundation
-import StableDiffusion
-
-// MARK: - Backend State Management
-
-/// Tracks the currently loaded diffusion backend and framework
-private actor DiffusionBackendState {
-    static let shared = DiffusionBackendState()
-    
-    private var _loadedFramework: InferenceFramework?
-    private var _coreMLService: DiffusionPlatformService?
-    private var _currentModelPath: String?
-    private var _currentModelId: String?
-    private var _currentConfiguration: DiffusionConfiguration?
-    
-    var loadedFramework: InferenceFramework? { _loadedFramework }
-    var coreMLService: DiffusionPlatformService? { _coreMLService }
-    var currentModelPath: String? { _currentModelPath }
-    var currentModelId: String? { _currentModelId }
-    var currentConfiguration: DiffusionConfiguration? { _currentConfiguration }
-    
-    var isLoaded: Bool {
-        get async {
-            if _loadedFramework == .coreml, let service = _coreMLService {
-                return await service.isReady
-            }
-            return false
-        }
-    }
-    
-    func setLoaded(
-        framework: InferenceFramework,
-        modelPath: String,
-        modelId: String,
-        configuration: DiffusionConfiguration?
-    ) {
-        _loadedFramework = framework
-        _currentModelPath = modelPath
-        _currentModelId = modelId
-        _currentConfiguration = configuration
-    }
-    
-    func setCoreMLService(_ service: DiffusionPlatformService) {
-        _coreMLService = service
-    }
-    
-    func unload() async {
-        if let service = _coreMLService {
-            await service.unload()
-        }
-        _coreMLService = nil
-        _loadedFramework = nil
-        _currentModelPath = nil
-        _currentModelId = nil
-        _currentConfiguration = nil
-    }
-}
 
 // MARK: - Image Generation
 
@@ -94,18 +38,12 @@ public extension RunAnywhere {
 
         try await ensureServicesReady()
 
-        // Check which framework is loaded
-        guard let framework = await DiffusionBackendState.shared.loadedFramework else {
+        guard await CppBridge.Diffusion.shared.isLoaded else {
             throw SDKError.diffusion(.notInitialized, "No diffusion model loaded. Call loadDiffusionModel first.")
         }
 
         let opts = options ?? DiffusionGenerationOptions(prompt: prompt)
-
-        guard framework == .coreml else {
-            throw SDKError.diffusion(.unsupportedBackend, "Unsupported framework: \(framework.rawValue). Only CoreML is supported.")
-        }
-
-        return try await generateImageWithCoreML(prompt: prompt, options: opts)
+        return try await CppBridge.Diffusion.shared.generate(options: opts)
     }
 
     /// Generate an image with progress reporting
@@ -135,7 +73,7 @@ public extension RunAnywhere {
 
         try await ensureServicesReady()
 
-        guard let framework = await DiffusionBackendState.shared.loadedFramework else {
+        guard await CppBridge.Diffusion.shared.isLoaded else {
             throw SDKError.diffusion(.notInitialized, "No diffusion model loaded")
         }
 
@@ -205,17 +143,12 @@ public extension RunAnywhere {
 
         try await ensureServicesReady()
 
-        guard let framework = await DiffusionBackendState.shared.loadedFramework else {
+        guard await CppBridge.Diffusion.shared.isLoaded else {
             throw SDKError.diffusion(.notInitialized, "No diffusion model loaded")
         }
 
         let opts = options ?? DiffusionGenerationOptions(prompt: prompt)
-
-        guard framework == .coreml else {
-            throw SDKError.diffusion(.unsupportedBackend, "Unsupported framework: \(framework.rawValue). Only CoreML is supported.")
-        }
-
-        return try await generateImageWithCoreMLProgress(prompt: prompt, options: opts, onProgress: onProgress)
+        return try await CppBridge.Diffusion.shared.generateWithProgress(options: opts, onProgress: onProgress)
     }
 
     /// Cancel ongoing image generation
@@ -224,7 +157,7 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        await DiffusionBackendState.shared.coreMLService?.cancel()
+        await CppBridge.Diffusion.shared.cancel()
     }
 
     /// Load a diffusion model
@@ -251,31 +184,18 @@ public extension RunAnywhere {
 
         try await ensureServicesReady()
 
-        // Determine framework: explicit preference > auto-detection
-        let framework = configuration?.preferredFramework ?? detectFramework(from: modelPath)
-        
-        SDKLogger.shared.info("[Diffusion] Loading model '\(modelId)' with framework: \(framework.rawValue)")
+        SDKLogger.shared.info("[Diffusion] Loading model '\(modelId)' via C++ component layer")
         SDKLogger.shared.info("[Diffusion] Model path: \(modelPath)")
 
-        guard framework == .coreml else {
-            throw SDKError.diffusion(.unsupportedBackend, "Unsupported framework: \(framework.rawValue). Only CoreML is supported.")
+        // Configure the component if configuration is provided
+        if let config = configuration {
+            try await CppBridge.Diffusion.shared.configure(config)
         }
 
-        try await loadDiffusionModelWithCoreML(
-            modelPath: modelPath,
-            modelId: modelId,
-            configuration: configuration
-        )
+        // Load via C++ component -> vtable dispatch -> platform callback -> DiffusionPlatformService
+        try await CppBridge.Diffusion.shared.loadModel(modelPath, modelId: modelId, modelName: modelName)
 
-        // Record the loaded state
-        await DiffusionBackendState.shared.setLoaded(
-            framework: framework,
-            modelPath: modelPath,
-            modelId: modelId,
-            configuration: configuration
-        )
-        
-        SDKLogger.shared.info("[Diffusion] Model '\(modelId)' loaded successfully with \(framework.rawValue) backend")
+        SDKLogger.shared.info("[Diffusion] Model '\(modelId)' loaded successfully via C++ component layer")
     }
 
     /// Unload the current diffusion model
@@ -284,31 +204,21 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        let framework = await DiffusionBackendState.shared.loadedFramework
-        
-        switch framework {
-        case .coreml:
-            await DiffusionBackendState.shared.unload()
-        case .onnx:
-            await DiffusionBackendState.shared.unload()
-        default:
-            await DiffusionBackendState.shared.unload()
-        }
-        
+        await CppBridge.Diffusion.shared.unload()
         SDKLogger.shared.info("[Diffusion] Model unloaded")
     }
 
     /// Check if a diffusion model is loaded
     static var isDiffusionModelLoaded: Bool {
         get async {
-            return await DiffusionBackendState.shared.isLoaded
+            return await CppBridge.Diffusion.shared.isLoaded
         }
     }
 
     /// Get the currently loaded diffusion model ID
     static var currentDiffusionModelId: String? {
         get async {
-            return await DiffusionBackendState.shared.currentModelId
+            return await CppBridge.Diffusion.shared.currentModelId
         }
     }
 
@@ -320,221 +230,13 @@ public extension RunAnywhere {
 
         return await CppBridge.Diffusion.shared.getCapabilities()
     }
-    
+
     /// Get the currently loaded framework
     static var currentDiffusionFramework: InferenceFramework? {
         get async {
-            return await DiffusionBackendState.shared.loadedFramework
+            // Always CoreML on Apple platforms
+            guard await CppBridge.Diffusion.shared.isLoaded else { return nil }
+            return .coreml
         }
     }
 }
-
-// MARK: - Framework Detection
-
-private extension RunAnywhere {
-
-    /// Detect the model framework from the model directory contents.
-    /// Only Apple CoreML is supported; default to CoreML when unknown.
-    static func detectFramework(from path: String) -> InferenceFramework {
-        let fm = FileManager.default
-        let coreMLIndicators = [
-            "Unet.mlmodelc",
-            "TextEncoder.mlmodelc",
-            "VAEDecoder.mlmodelc",
-            "VAEEncoder.mlmodelc",
-            "SafetyChecker.mlmodelc",
-            "TextEncoder2.mlmodelc"
-        ]
-        for indicator in coreMLIndicators {
-            let indicatorPath = (path as NSString).appendingPathComponent(indicator)
-            var isDir: ObjCBool = false
-            if fm.fileExists(atPath: indicatorPath, isDirectory: &isDir), isDir.boolValue {
-                SDKLogger.shared.debug("[Diffusion] Detected CoreML model (found \(indicator))")
-                return .coreml
-            }
-        }
-        SDKLogger.shared.warning("[Diffusion] Could not detect CoreML; defaulting to CoreML (Apple only)")
-        return .coreml
-    }
-}
-
-// MARK: - CoreML Backend Implementation
-
-private extension RunAnywhere {
-
-    /// Load a diffusion model using CoreML (Apple Neural Engine)
-    static func loadDiffusionModelWithCoreML(
-        modelPath: String,
-        modelId: String,
-        configuration: DiffusionConfiguration?
-    ) async throws {
-        SDKLogger.shared.info("[Diffusion.CoreML] Loading CoreML model from: \(modelPath)")
-        
-        // Create or reuse the CoreML service
-        let service = DiffusionPlatformService()
-        
-        // Configure the service
-        let reduceMemory = configuration?.reduceMemory ?? true
-        let tokenizerSource = configuration?.effectiveTokenizerSource ?? .sd15
-        
-        do {
-            try await service.initialize(
-                modelPath: modelPath,
-                reduceMemory: reduceMemory,
-                disableSafetyChecker: !(configuration?.enableSafetyChecker ?? true),
-                tokenizerSource: tokenizerSource
-            )
-            
-            await DiffusionBackendState.shared.setCoreMLService(service)
-            
-            SDKLogger.shared.info("[Diffusion.CoreML] CoreML model loaded successfully with ANE acceleration")
-        } catch {
-            SDKLogger.shared.error("[Diffusion.CoreML] Failed to load CoreML model: \(error)")
-            throw SDKError.diffusion(.loadFailed, "Failed to load CoreML model: \(error.localizedDescription)")
-        }
-    }
-
-    /// Generate an image using CoreML backend
-    static func generateImageWithCoreML(
-        prompt: String,
-        options: DiffusionGenerationOptions
-    ) async throws -> DiffusionResult {
-        guard let service = await DiffusionBackendState.shared.coreMLService else {
-            throw SDKError.diffusion(.notInitialized, "CoreML service not initialized")
-        }
-        
-        let config = await DiffusionBackendState.shared.currentConfiguration
-        let variant = config?.modelVariant ?? .sd15
-        
-        // Use model-specific defaults if not specified
-        let steps = options.steps > 0 ? options.steps : variant.defaultSteps
-        let guidanceScale = options.guidanceScale > 0 ? options.guidanceScale : variant.defaultGuidanceScale
-        
-        SDKLogger.shared.info("[Diffusion.CoreML] Generating image: \(options.width)x\(options.height), \(steps) steps, CFG=\(guidanceScale)")
-        
-        let startTime = CFAbsoluteTimeGetCurrent()
-        
-        let result = try await service.generate(
-            prompt: prompt,
-            negativePrompt: options.negativePrompt,
-            width: options.width,
-            height: options.height,
-            stepCount: steps,
-            guidanceScale: guidanceScale,
-            seed: options.seed > 0 ? UInt32(options.seed) : nil,
-            scheduler: options.scheduler.toAppleScheduler()
-        )
-        
-        let elapsed = Int64((CFAbsoluteTimeGetCurrent() - startTime) * 1000)
-        SDKLogger.shared.info("[Diffusion.CoreML] Generation completed in \(elapsed)ms")
-        
-        // Convert to SDK result
-        guard let imageData = result.imageData else {
-            if result.safetyTriggered {
-                throw SDKError.diffusion(.safetyCheckerTriggered, "Image blocked by safety checker")
-            }
-            throw SDKError.diffusion(.generationFailed, "No image generated")
-        }
-        
-        return DiffusionResult(
-            imageData: imageData,
-            width: result.width,
-            height: result.height,
-            seedUsed: result.seedUsed,
-            generationTimeMs: elapsed,
-            safetyFlagged: result.safetyTriggered
-        )
-    }
-
-    /// Generate an image with progress using CoreML backend
-    static func generateImageWithCoreMLProgress(
-        prompt: String,
-        options: DiffusionGenerationOptions,
-        onProgress: @escaping (DiffusionProgress) -> Bool
-    ) async throws -> DiffusionResult {
-        guard let service = await DiffusionBackendState.shared.coreMLService else {
-            throw SDKError.diffusion(.notInitialized, "CoreML service not initialized")
-        }
-        
-        let config = await DiffusionBackendState.shared.currentConfiguration
-        let variant = config?.modelVariant ?? .sd15
-        
-        let steps = options.steps > 0 ? options.steps : variant.defaultSteps
-        let guidanceScale = options.guidanceScale > 0 ? options.guidanceScale : variant.defaultGuidanceScale
-        
-        SDKLogger.shared.info("[Diffusion.CoreML] Generating with progress: \(options.width)x\(options.height), \(steps) steps")
-        
-        let startTime = CFAbsoluteTimeGetCurrent()
-        
-        let result = try await service.generate(
-            prompt: prompt,
-            negativePrompt: options.negativePrompt,
-            width: options.width,
-            height: options.height,
-            stepCount: steps,
-            guidanceScale: guidanceScale,
-            seed: options.seed > 0 ? UInt32(options.seed) : nil,
-            scheduler: options.scheduler.toAppleScheduler(),
-            progressHandler: { progressInfo in
-                let progress = DiffusionProgress(
-                    progress: progressInfo.progress,
-                    currentStep: progressInfo.step,
-                    totalSteps: progressInfo.totalSteps,
-                    stage: "Generating",
-                    intermediateImage: progressInfo.currentImage.flatMap { convertCGImageToData($0) }
-                )
-                return onProgress(progress)
-            }
-        )
-        
-        let elapsed = Int64((CFAbsoluteTimeGetCurrent() - startTime) * 1000)
-        
-        guard let imageData = result.imageData else {
-            if result.safetyTriggered {
-                throw SDKError.diffusion(.safetyCheckerTriggered, "Image blocked by safety checker")
-            }
-            throw SDKError.diffusion(.generationFailed, "No image generated")
-        }
-        
-        return DiffusionResult(
-            imageData: imageData,
-            width: result.width,
-            height: result.height,
-            seedUsed: result.seedUsed,
-            generationTimeMs: elapsed,
-            safetyFlagged: result.safetyTriggered
-        )
-    }
-    
-    /// Convert CGImage to Data
-    static func convertCGImageToData(_ image: CGImage) -> Data? {
-        let width = image.width
-        let height = image.height
-        let bytesPerPixel = 4
-        let bytesPerRow = width * bytesPerPixel
-        let totalBytes = height * bytesPerRow
-        
-        var data = Data(count: totalBytes)
-        
-        guard data.withUnsafeMutableBytes({ ptr -> Bool in
-            guard let context = CGContext(
-                data: ptr.baseAddress,
-                width: width,
-                height: height,
-                bitsPerComponent: 8,
-                bytesPerRow: bytesPerRow,
-                space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-            ) else {
-                return false
-            }
-            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-            return true
-        }) else {
-            return nil
-        }
-        
-        return data
-    }
-}
-

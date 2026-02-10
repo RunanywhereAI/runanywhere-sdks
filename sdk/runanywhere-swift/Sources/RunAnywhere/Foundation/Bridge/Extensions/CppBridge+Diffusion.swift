@@ -140,6 +140,127 @@ extension CppBridge {
             logger.info("Diffusion model unloaded")
         }
 
+        // MARK: - Generation
+
+        /// Generate an image (blocking, no progress)
+        public func generate(options: DiffusionGenerationOptions) throws -> DiffusionResult {
+            let handle = try getHandle()
+
+            var cOptions = options.toCOptions()
+            var cResult = rac_diffusion_result_t()
+
+            let result = options.prompt.withCString { promptPtr in
+                options.negativePrompt.withCString { negPtr -> rac_result_t in
+                    cOptions.prompt = promptPtr
+                    cOptions.negative_prompt = negPtr
+                    return rac_diffusion_component_generate(handle, &cOptions, &cResult)
+                }
+            }
+
+            guard result == RAC_SUCCESS else {
+                let errorMsg = cResult.error_message.map { String(cString: $0) } ?? "Unknown error"
+                rac_diffusion_result_free(&cResult)
+                throw SDKError.diffusion(.generationFailed, "Image generation failed: \(errorMsg)")
+            }
+
+            let swiftResult = DiffusionResult(from: cResult)
+            rac_diffusion_result_free(&cResult)
+            return swiftResult
+        }
+
+        /// Generate an image with progress reporting via callback
+        public func generateWithProgress(
+            options: DiffusionGenerationOptions,
+            onProgress: @escaping (DiffusionProgress) -> Bool
+        ) throws -> DiffusionResult {
+            let handle = try getHandle()
+
+            var cOptions = options.toCOptions()
+
+            // Box the Swift closure and result storage so C callbacks can access them
+            final class CallbackContext: @unchecked Sendable {
+                let progressCallback: (DiffusionProgress) -> Bool
+                // Result captured from the complete callback (before C++ frees it)
+                var capturedImageData: Data?
+                var capturedWidth: Int32 = 0
+                var capturedHeight: Int32 = 0
+                var capturedSeedUsed: Int64 = 0
+                var capturedGenerationTimeMs: Int64 = 0
+                var capturedSafetyFlagged: Bool = false
+                var capturedErrorMessage: String?
+
+                init(_ callback: @escaping (DiffusionProgress) -> Bool) {
+                    self.progressCallback = callback
+                }
+            }
+            let context = CallbackContext(onProgress)
+            let contextPtr = Unmanaged.passRetained(context).toOpaque()
+
+            let progressCB: rac_diffusion_progress_callback_fn = { cProgressPtr, userData -> rac_bool_t in
+                guard let cProgressPtr = cProgressPtr, let userData = userData else {
+                    return RAC_TRUE
+                }
+                let ctx = Unmanaged<CallbackContext>.fromOpaque(userData).takeUnretainedValue()
+                let progress = DiffusionProgress(from: cProgressPtr.pointee)
+                return ctx.progressCallback(progress) ? RAC_TRUE : RAC_FALSE
+            }
+
+            // Capture the result in the callback — C++ frees it immediately after
+            let completeCB: rac_diffusion_complete_callback_fn = { resultPtr, userData in
+                guard let resultPtr = resultPtr, let userData = userData else { return }
+                let ctx = Unmanaged<CallbackContext>.fromOpaque(userData).takeUnretainedValue()
+                let r = resultPtr.pointee
+
+                // Copy image data before C++ frees the result
+                if let imageData = r.image_data, r.image_size > 0 {
+                    ctx.capturedImageData = Data(bytes: imageData, count: Int(r.image_size))
+                }
+                ctx.capturedWidth = r.width
+                ctx.capturedHeight = r.height
+                ctx.capturedSeedUsed = r.seed_used
+                ctx.capturedGenerationTimeMs = r.generation_time_ms
+                ctx.capturedSafetyFlagged = r.safety_flagged == RAC_TRUE
+            }
+
+            let errorCB: rac_diffusion_error_callback_fn = { errorCode, errorMsg, userData in
+                guard let userData = userData else { return }
+                let ctx = Unmanaged<CallbackContext>.fromOpaque(userData).takeUnretainedValue()
+                if let errorMsg = errorMsg {
+                    ctx.capturedErrorMessage = String(cString: errorMsg)
+                }
+            }
+
+            let result = options.prompt.withCString { promptPtr in
+                options.negativePrompt.withCString { negPtr -> rac_result_t in
+                    cOptions.prompt = promptPtr
+                    cOptions.negative_prompt = negPtr
+                    return rac_diffusion_component_generate_with_callbacks(
+                        handle, &cOptions,
+                        progressCB, completeCB, errorCB,
+                        contextPtr
+                    )
+                }
+            }
+
+            // Release the context
+            Unmanaged<CallbackContext>.fromOpaque(contextPtr).release()
+
+            guard result == RAC_SUCCESS else {
+                let errorMsg = context.capturedErrorMessage ?? "Unknown error"
+                throw SDKError.diffusion(.generationFailed, "Image generation failed: \(errorMsg)")
+            }
+
+            // Build result from captured callback data
+            return DiffusionResult(
+                imageData: context.capturedImageData ?? Data(),
+                width: Int(context.capturedWidth),
+                height: Int(context.capturedHeight),
+                seedUsed: context.capturedSeedUsed,
+                generationTimeMs: context.capturedGenerationTimeMs,
+                safetyFlagged: context.capturedSafetyFlagged
+            )
+        }
+
         /// Cancel ongoing generation
         public func cancel() {
             guard let handle = handle else { return }
