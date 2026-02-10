@@ -5,7 +5,16 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.StartOffset
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,30 +30,35 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.presentation.chat.components.ModelLoadedToast
 import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
 import com.runanywhere.runanywhereai.ui.theme.AppColors
+import com.runanywhere.runanywhereai.ui.theme.AppTypography
+import com.runanywhere.runanywhereai.util.getModelLogoResIdForName
 import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
 import kotlinx.coroutines.launch
 
 /**
- * Speech to Text Screen - Matching iOS SpeechToTextView.swift exactly
- *
- * iOS Reference: examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Voice/SpeechToTextView.swift
+ * Speech to Text Screen
  *
  * Features:
  * - Batch mode: Record full audio then transcribe
  * - Live mode: Real-time streaming transcription
- * - Recording button with RED color when recording (matching iOS exactly)
+ * - Recording button with RED color when recording
  * - Audio level visualization with GREEN bars
  * - Model status banner
  * - Transcription display
@@ -55,6 +69,8 @@ fun SpeechToTextScreen(viewModel: SpeechToTextViewModel = viewModel()) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showModelPicker by remember { mutableStateOf(false) }
+    var showModelLoadedToast by remember { mutableStateOf(false) }
+    var loadedModelToastName by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
     // Initialize ViewModel with context
@@ -73,76 +89,61 @@ fun SpeechToTextScreen(viewModel: SpeechToTextViewModel = viewModel()) {
             }
         }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(
+    Scaffold(
+        topBar = {
+            if (uiState.isModelLoaded) {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = "Speech to Text",
+                            style = MaterialTheme.typography.headlineMedium,
+                        )
+                    },
+                    actions = {
+                        IconButton(onClick = { showModelPicker = true }) {
+                            STTModelButton(
+                                modelName = uiState.selectedModelName,
+                                frameworkDisplayName = uiState.selectedFramework?.displayName,
+                                mode = uiState.mode,
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                    ),
+                )
+            }
+        },
+    ) { paddingValues ->
+        Box(
             modifier =
                 Modifier
                     .fillMaxSize()
+                    .padding(paddingValues)
                     .background(MaterialTheme.colorScheme.background),
         ) {
-            // Header with title
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Speech to Text",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-
-            // Model Status Banner - Always visible
-            // iOS Reference: ModelStatusBanner component
-            ModelStatusBannerSTT(
-                framework = uiState.selectedFramework?.displayName,
-                modelName = uiState.selectedModelName,
-                isLoading = uiState.recordingState == RecordingState.PROCESSING && !uiState.isModelLoaded,
-                onSelectModel = { showModelPicker = true },
-            )
-
-            // Main content - only enabled when model is selected
-            if (uiState.isModelLoaded) {
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .weight(1f),
-                ) {
-                    // Mode selector: Batch / Live
-                    // iOS Reference: ModeSelector in SpeechToTextView
+            Column(modifier = Modifier.fillMaxSize()) {
+                if (uiState.isModelLoaded) {
                     STTModeSelector(
                         selectedMode = uiState.mode,
                         supportsLiveMode = uiState.supportsLiveMode,
                         onModeChange = { viewModel.setMode(it) },
                     )
 
-                    // Mode description
-                    ModeDescription(
-                        mode = uiState.mode,
-                        supportsLiveMode = uiState.supportsLiveMode,
-                    )
-
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-                    // Transcription display area
                     TranscriptionArea(
                         transcription = uiState.transcription,
                         isRecording = uiState.recordingState == RecordingState.RECORDING,
                         isTranscribing = uiState.isTranscribing || uiState.recordingState == RecordingState.PROCESSING,
                         metrics = uiState.metrics,
+                        mode = uiState.mode,
                         modifier = Modifier.weight(1f),
                     )
 
-                    // Error message
                     uiState.errorMessage?.let { error ->
                         Text(
                             text = error,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
+                            color = AppColors.statusRed,
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
@@ -151,8 +152,7 @@ fun SpeechToTextScreen(viewModel: SpeechToTextViewModel = viewModel()) {
                         )
                     }
 
-                    // Audio level indicator - iOS style green bars
-                    // iOS Reference: Audio level indicator in SpeechToTextView
+                    // Audio level indicator - green bars
                     if (uiState.recordingState == RecordingState.RECORDING) {
                         AudioLevelIndicator(
                             audioLevel = uiState.audioLevel,
@@ -183,23 +183,26 @@ fun SpeechToTextScreen(viewModel: SpeechToTextViewModel = viewModel()) {
                         },
                     )
                 }
-            } else {
-                // No model selected - show spacer
-                Spacer(modifier = Modifier.weight(1f))
             }
-        }
 
-        // Overlay when no model is selected
-        // iOS Reference: ModelRequiredOverlay component
-        if (!uiState.isModelLoaded && uiState.recordingState != RecordingState.PROCESSING) {
-            ModelRequiredOverlaySTT(
-                onSelectModel = { showModelPicker = true },
+            if (!uiState.isModelLoaded && uiState.recordingState != RecordingState.PROCESSING) {
+                ModelRequiredOverlaySTT(
+                    onSelectModel = { showModelPicker = true },
+                    modifier = Modifier.matchParentSize(),
+                )
+            }
+
+            // Model loaded toast overlay
+            ModelLoadedToast(
+                modelName = loadedModelToastName,
+                isVisible = showModelLoadedToast,
+                onDismiss = { showModelLoadedToast = false },
+                modifier = Modifier.align(Alignment.TopCenter),
             )
         }
+    }
 
-        // Model picker bottom sheet - Full-screen with framework/model hierarchy
-        // iOS Reference: ModelSelectionSheet(context: .stt)
-        if (showModelPicker) {
+    if (showModelPicker) {
             ModelSelectionBottomSheet(
                 context = ModelSelectionContext.STT,
                 onDismiss = { showModelPicker = false },
@@ -213,11 +216,13 @@ fun SpeechToTextScreen(viewModel: SpeechToTextViewModel = viewModel()) {
                             framework = model.framework,
                         )
                         android.util.Log.d("SpeechToTextScreen", "STT model selected: ${model.name}")
+                        // Show model loaded toast
+                        loadedModelToastName = model.name
+                        showModelLoadedToast = true
                     }
                 },
             )
         }
-    }
 }
 
 /**
@@ -271,6 +276,67 @@ private fun ModeDescription(
 }
 
 /**
+ * Ready state - iOS: breathing waveform (5 bars gradient) + "Ready to transcribe" + subtitle by mode
+ */
+@Composable
+private fun ReadyStateSTT(mode: STTMode) {
+    val infiniteTransition = rememberInfiniteTransition(label = "stt_breathing")
+    val breathing by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "breathing",
+    )
+    val baseHeights = listOf(16, 24, 20, 28, 18)
+    val breathingHeights = listOf(24, 40, 32, 48, 28)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(48.dp),
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            baseHeights.forEachIndexed { index, base ->
+                val h = base + (breathingHeights[index] - base) * breathing
+                Box(
+                    modifier = Modifier
+                        .width(6.dp)
+                        .height(h.toInt().dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    AppColors.primaryAccent.copy(alpha = 0.8f),
+                                    AppColors.primaryAccent.copy(alpha = 0.4f),
+                                ),
+                            ),
+                        ),
+                )
+            }
+        }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = "Ready to transcribe",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = if (mode == STTMode.BATCH) "Record first, then transcribe" else "Real-time transcription",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
  * Transcription display area
  * iOS Reference: Transcription ScrollView in SpeechToTextView
  */
@@ -280,6 +346,7 @@ private fun TranscriptionArea(
     isRecording: Boolean,
     isTranscribing: Boolean,
     metrics: TranscriptionMetrics?,
+    mode: STTMode,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -291,57 +358,29 @@ private fun TranscriptionArea(
     ) {
         when {
             transcription.isEmpty() && !isRecording && !isTranscribing -> {
-                // Ready state - iOS Reference: Ready state view
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Mic,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = AppColors.primaryGreen.copy(alpha = 0.5f),
-                    )
-                    Text(
-                        text = "Ready to transcribe",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = "Tap the microphone button to start recording",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                }
+                ReadyStateSTT(mode = mode)
             }
 
             isTranscribing && transcription.isEmpty() -> {
-                // Processing state - iOS Reference: Processing state (batch mode)
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.scale(1.2f).size(48.dp),
                         strokeWidth = 4.dp,
-                        color = AppColors.primaryGreen,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                     Text(
-                        text = "Processing audio...",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = "Transcribing your recording",
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = "Transcribing...",
+                        style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
 
             else -> {
-                // Transcription display - iOS Reference: Live transcription view
+                // Transcription display
                 Column(
                     modifier = Modifier.fillMaxSize(),
                 ) {
@@ -357,7 +396,7 @@ private fun TranscriptionArea(
                             fontWeight = FontWeight.SemiBold,
                         )
 
-                        // Status badge - iOS Reference: RECORDING/TRANSCRIBING badge
+                        // Status badge: RECORDING/TRANSCRIBING
                         if (isRecording) {
                             RecordingBadge()
                         } else if (isTranscribing) {
@@ -558,7 +597,7 @@ private fun RecordingBadge() {
 
     Surface(
         shape = RoundedCornerShape(4.dp),
-        color = Color.Red.copy(alpha = 0.1f),
+        color = AppColors.statusRed.copy(alpha = 0.1f),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -570,13 +609,13 @@ private fun RecordingBadge() {
                     Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .background(Color.Red.copy(alpha = alpha)),
+                        .background(AppColors.statusRed.copy(alpha = alpha)),
             )
             Text(
                 text = "RECORDING",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
-                color = Color.Red,
+                color = AppColors.statusRed,
             )
         }
     }
@@ -668,7 +707,7 @@ private fun ControlsSection(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        // Recording button - RED when recording (matching iOS exactly)
+        // Recording button - RED when recording
         RecordingButton(
             recordingState = recordingState,
             audioLevel = audioLevel,
@@ -691,8 +730,81 @@ private fun ControlsSection(
 }
 
 /**
- * Model Status Banner for STT
- * iOS Reference: ModelStatusBanner in ModelStatusComponents.swift
+ * STT toolbar model button - icon, model name to the right, below: electricity icon + Streaming/Batch text
+ */
+@Composable
+private fun STTModelButton(
+    modelName: String?,
+    frameworkDisplayName: String?,
+    mode: STTMode,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (modelName != null) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(4.dp)),
+            ) {
+                Image(
+                    painter = painterResource(id = getModelLogoResIdForName(modelName)),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                )
+            }
+            Column(
+                horizontalAlignment = Alignment.Start,
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = shortModelNameSTT(modelName),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    Icon(
+                        imageVector = if (mode == STTMode.LIVE) Icons.Default.Bolt else Icons.Default.Stop,
+                        contentDescription = null,
+                        modifier = Modifier.size(10.dp),
+                        tint = if (mode == STTMode.LIVE) AppColors.primaryGreen else AppColors.primaryOrange,
+                    )
+                    Text(
+                        text = if (mode == STTMode.LIVE) "Streaming" else "Batch",
+                        style = AppTypography.caption2.copy(fontSize = 10.sp, fontWeight = FontWeight.Medium),
+                        color = if (mode == STTMode.LIVE) AppColors.primaryGreen else AppColors.primaryOrange,
+                    )
+                }
+            }
+        } else {
+            Icon(
+                imageVector = Icons.Default.GraphicEq,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = AppColors.primaryGreen,
+            )
+            Text(
+                text = "Select Model",
+                style = MaterialTheme.typography.labelMedium,
+            )
+        }
+    }
+}
+
+private fun shortModelNameSTT(name: String, maxLength: Int = 15): String {
+    val cleaned = name.replace(Regex("\\s*\\([^)]*\\)"), "").trim()
+    return if (cleaned.length > maxLength) cleaned.take(maxLength - 1) + "\u2026" else cleaned
+}
+
+/**
+ * Model Status Banner for STT (kept for reference; not used when app bar shows model)
  */
 @Composable
 private fun ModelStatusBannerSTT(
@@ -784,8 +896,8 @@ private fun ModelStatusBannerSTT(
 }
 
 /**
- * STT Mode Selector (Batch / Live)
- * iOS Reference: Mode selector segment control in SpeechToTextView
+ * STT Mode Selector (Batch / Live) - iOS pill style with subtitle
+ * iOS: padding horizontal 16, top 12, bottom 8; selected = primaryAccent 0.15 bg + border 0.3
  */
 @Composable
 private fun STTModeSelector(
@@ -793,37 +905,50 @@ private fun STTModeSelector(
     @Suppress("UNUSED_PARAMETER") supportsLiveMode: Boolean,
     onModeChange: (STTMode) -> Unit,
 ) {
-    Surface(
+    Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(4.dp),
-        ) {
-            STTMode.values().forEach { mode ->
-                val isSelected = mode == selectedMode
-                Surface(
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .clickable { onModeChange(mode) },
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent,
+        STTMode.values().forEach { mode ->
+            val isSelected = mode == selectedMode
+            Surface(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .clickable { onModeChange(mode) },
+                shape = RoundedCornerShape(12.dp),
+                color = if (isSelected) AppColors.primaryAccent.copy(alpha = 0.15f) else Color.Transparent,
+                border =
+                    androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (isSelected) AppColors.primaryAccent.copy(alpha = 0.3f)
+                        else Color.Gray.copy(alpha = 0.2f),
+                    ),
+            ) {
+                Column(
+                    modifier = Modifier.padding(vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(
-                        text =
-                            when (mode) {
-                                STTMode.BATCH -> "Batch"
-                                STTMode.LIVE -> "Live"
-                            },
-                        modifier = Modifier.padding(vertical = 8.dp),
-                        textAlign = TextAlign.Center,
-                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                        text = when (mode) {
+                            STTMode.BATCH -> "Batch"
+                            STTMode.LIVE -> "Live"
+                        },
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium,
                         color = if (isSelected) AppColors.primaryAccent else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = when (mode) {
+                            STTMode.BATCH -> "Record then transcribe"
+                            STTMode.LIVE -> "Real-time transcription"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     )
                 }
             }
@@ -855,13 +980,12 @@ private fun RecordingButton(
         label = "pulse_scale",
     )
 
-    // iOS Reference: Blue when idle, RED when recording, Orange when transcribing
-    // iOS code: viewModel.isRecording ? Color.red : (viewModel.isTranscribing ? Color.orange : Color.blue)
+    // Color states: Blue when idle, RED when recording, Orange when transcribing
     val buttonColor by animateColorAsState(
         targetValue =
             when (recordingState) {
                 RecordingState.IDLE -> AppColors.primaryAccent
-                RecordingState.RECORDING -> AppColors.primaryRed // RED when recording - matching iOS exactly
+                RecordingState.RECORDING -> AppColors.primaryRed // RED when recording
                 RecordingState.PROCESSING -> AppColors.primaryOrange
             },
         animationSpec = tween(300),
@@ -875,7 +999,7 @@ private fun RecordingButton(
             RecordingState.PROCESSING -> Icons.Filled.Sync
         }
 
-    // iOS button is 72pt - use 72dp to match
+    // Button size: 72dp
     Box(
         contentAlignment = Alignment.Center,
         modifier =
@@ -883,7 +1007,7 @@ private fun RecordingButton(
                 .size(88.dp) // Container for button + pulse ring
                 .scale(if (recordingState == RecordingState.RECORDING) scale else 1f),
     ) {
-        // Pulsing ring when recording - RED to match iOS
+        // Pulsing ring when recording - RED
         if (recordingState == RecordingState.RECORDING) {
             Box(
                 modifier =
@@ -892,7 +1016,7 @@ private fun RecordingButton(
                         .size(84.dp)
                         .border(
                             width = 2.dp,
-                            // RED ring - matching iOS
+                            // RED ring
                             color = AppColors.primaryRed.copy(alpha = 0.3f),
                             shape = CircleShape,
                         )
@@ -900,7 +1024,7 @@ private fun RecordingButton(
             )
         }
 
-        // Main button - 72dp to match iOS 72pt
+        // Main button - 72dp
         Surface(
             modifier =
                 Modifier
@@ -917,14 +1041,14 @@ private fun RecordingButton(
                 modifier = Modifier.fillMaxSize(),
             ) {
                 if (recordingState == RecordingState.PROCESSING) {
-                    // Match iOS icon size
+                    // Icon size
                     CircularProgressIndicator(
                         modifier = Modifier.size(32.dp),
                         color = Color.White,
                         strokeWidth = 3.dp,
                     )
                 } else {
-                    // Match iOS 32pt icon
+                    // 32dp icon
                     Icon(
                         imageVector = buttonIcon,
                         contentDescription =
@@ -943,64 +1067,131 @@ private fun RecordingButton(
 }
 
 /**
- * Model Required Overlay for STT
- * iOS Reference: ModelRequiredOverlay in ModelStatusComponents.swift
+ * Model Required Overlay for STT - green, "Voice to Text", same layout as Chat overlay
  */
 @Composable
-private fun ModelRequiredOverlaySTT(onSelectModel: () -> Unit) {
-    Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.95f)),
-        contentAlignment = Alignment.Center,
-    ) {
+private fun ModelRequiredOverlaySTT(
+    onSelectModel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val modalityColor = AppColors.primaryGreen
+    val infiniteTransition = rememberInfiniteTransition(label = "stt_overlay_circles")
+    val circle1Offset by infiniteTransition.animateFloat(
+        initialValue = -100f,
+        targetValue = 100f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 8000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "c1",
+    )
+    val circle2Offset by infiniteTransition.animateFloat(
+        initialValue = 100f,
+        targetValue = -100f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 8000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "c2",
+    )
+    val circle3Offset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 80f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 8000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "c3",
+    )
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val c1Dp = with(density) { circle1Offset.toDp() }
+    val c2Dp = with(density) { circle2Offset.toDp() }
+    val c3Dp = with(density) { circle3Offset.toDp() }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize().blur(32.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(300.dp)
+                    .offset(x = c1Dp, y = (-200).dp)
+                    .clip(CircleShape)
+                    .background(modalityColor.copy(alpha = 0.15f)),
+            )
+            Box(
+                modifier = Modifier
+                    .size(250.dp)
+                    .offset(x = c2Dp, y = 300.dp)
+                    .clip(CircleShape)
+                    .background(modalityColor.copy(alpha = 0.12f)),
+            )
+            Box(
+                modifier = Modifier
+                    .size(280.dp)
+                    .offset(x = -c3Dp, y = c3Dp)
+                    .clip(CircleShape)
+                    .background(modalityColor.copy(alpha = 0.08f)),
+            )
+        }
         Column(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-            modifier = Modifier.padding(40.dp),
         ) {
-            Icon(
-                imageVector = Icons.Outlined.GraphicEq,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-            )
-
+            Spacer(modifier = Modifier.weight(1f))
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(120.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                modalityColor.copy(alpha = 0.2f),
+                                modalityColor.copy(alpha = 0.1f),
+                            ),
+                        ),
+                    ),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.GraphicEq,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    tint = modalityColor,
+                )
+            }
+            Spacer(modifier = Modifier.height(20.dp))
             Text(
-                text = "Speech to Text",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
+                text = "Voice to Text",
+                style = MaterialTheme.typography.titleLarge,
             )
-
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "Select a speech recognition model to transcribe audio. Choose from WhisperKit or ONNX Runtime.",
+                text = "Transcribe your speech to text with powerful on-device voice recognition.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
-
+            Spacer(modifier = Modifier.weight(1f))
             Button(
                 onClick = onSelectModel,
-                modifier =
-                    Modifier
-                        .fillMaxWidth(0.7f)
-                        .height(50.dp),
-                shape = RoundedCornerShape(25.dp),
-                colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor = AppColors.primaryAccent,
-                    ),
+                colors = ButtonDefaults.buttonColors(containerColor = modalityColor),
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Icon(
-                    Icons.Filled.Apps,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                )
+                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color.White)
                 Spacer(modifier = Modifier.width(8.dp))
+                Text("Get Started", style = MaterialTheme.typography.titleMedium)
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.padding(bottom = 16.dp),
+            ) {
+                Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    "Select a Model",
-                    fontWeight = FontWeight.SemiBold,
+                    text = "100% Private • Runs on your device",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
