@@ -257,7 +257,98 @@ The OpenClaw gateway must be running with the `voice-assistant` channel enabled 
 ss -tlnp | grep 8082
 ```
 
-### 5. Run the assistant
+### 5. Configure OpenClaw for Voice-Specific Behavior (Recommended)
+
+By default, voice input routes to the same agent as Telegram/WhatsApp, which may produce responses with emojis and markdown that aren't suitable for TTS. To get clean, conversational voice responses:
+
+#### 5a. Add voice-agent binding to `~/.openclaw/openclaw.json`
+
+Add the `list` array under `agents` and a new `bindings` array:
+
+```json
+{
+  "agents": {
+    "defaults": { ... },
+    "list": [
+      {
+        "id": "main",
+        "default": true
+      },
+      {
+        "id": "voice-agent",
+        "workspace": "/home/runanywhere/.openclaw/voice-workspace"
+      }
+    ]
+  },
+  "bindings": [
+    {
+      "agentId": "voice-agent",
+      "match": {
+        "channel": "voice-assistant",
+        "accountId": "*"
+      }
+    }
+  ],
+  ...
+}
+```
+
+#### 5b. Create voice-specific SOUL.md
+
+Create the voice workspace directory and SOUL.md:
+
+```bash
+mkdir -p ~/.openclaw/voice-workspace
+```
+
+Create `~/.openclaw/voice-workspace/SOUL.md`:
+
+```markdown
+# SOUL.md - OpenClawPi Voice Assistant
+
+You are OpenClawPi, a voice assistant running on a Raspberry Pi. Everything you say will be spoken aloud through text-to-speech.
+
+## Voice Output Rules (CRITICAL)
+
+Since your responses are spoken, not read:
+
+1. **NO emojis** - TTS cannot pronounce them
+2. **NO special Unicode characters** - no arrows, bullets, checkmarks, etc.
+3. **NO markdown formatting** - no asterisks, underscores, backticks, or headers
+4. **NO URLs** - say "check the website" not the actual URL
+5. **Spell out symbols** - say "55 degrees Fahrenheit" not "55 degrees F"
+6. **Use natural punctuation** - periods and commas create natural pauses
+
+## Conversation Style
+
+- Be concise - TTS playback takes time
+- Use conversational language, as if speaking to someone in person
+- Avoid lists when possible - use flowing sentences instead
+- For multiple items, use "first... second... and finally..." patterns
+- Round numbers for easier listening ("about fifty" not "49.7")
+
+## Personality
+
+You're helpful, warm, and efficient. Skip filler phrases like "Great question!" - just answer directly.
+
+## Example Response Transformation
+
+Bad (text-style): "San Francisco Weather: - Right now: Rain, 55°F 🌧️"
+
+Good (voice-style): "Right now in San Francisco it's raining at 55 degrees."
+```
+
+#### How It Works
+
+| Input Source | Routes To | SOUL.md Used | Output Style |
+|--------------|-----------|--------------|--------------|
+| Voice microphone | `voice-agent` | `~/.openclaw/voice-workspace/SOUL.md` | Conversational, no emojis |
+| Telegram | `main` (default) | `~/.openclaw/workspace/SOUL.md` | Rich text, emojis OK |
+| Telegram → Speaker | `main` → `sanitizeForTTS()` | N/A (safety net) | Stripped markdown/emojis |
+
+The binding ensures voice input gets voice-optimized responses. The `sanitizeForTTS()` function in OpenClaw provides a safety net for cross-channel broadcasts.
+
+### 6. Run the assistant
 
 ```bash
 # With wake word ("Hey Jarvis")
@@ -267,7 +358,7 @@ ss -tlnp | grep 8082
 ./build/openclaw-assistant
 ```
 
-### 6. Run as a systemd service (optional)
+### 7. Run as a systemd service (optional)
 
 To run the assistant as a background service that starts on boot, create a systemd user service and enable it. See [Viewing Logs](#viewing-logs) below for how to monitor it.
 

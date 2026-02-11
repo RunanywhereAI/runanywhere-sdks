@@ -345,6 +345,12 @@ struct VoicePipeline::Impl {
     std::chrono::steady_clock::time_point last_speech_time;
     bool speech_callback_fired = false;
 
+    // Noise robustness state
+    int consecutive_speech_frames = 0;     // Consecutive frames with speech detected
+    int consecutive_silent_frames = 0;     // Consecutive frames with no speech
+    int current_burst_frames = 0;          // Frames in current noise burst (after silence)
+    std::chrono::steady_clock::time_point speech_start_time;  // When speech_active became true
+
     // Mutex for thread safety
     std::mutex mutex;
 };
@@ -548,6 +554,9 @@ void VoicePipeline::start() {
     impl_->speech_active = false;
     impl_->speech_buffer.clear();
     impl_->speech_callback_fired = false;
+    impl_->consecutive_speech_frames = 0;
+    impl_->consecutive_silent_frames = 0;
+    impl_->current_burst_frames = 0;
 
     if (impl_->wakeword_enabled) {
         state_ = PipelineState::WAITING_FOR_WAKE_WORD;
@@ -562,6 +571,9 @@ void VoicePipeline::stop() {
     impl_->speech_buffer.clear();
     impl_->speech_callback_fired = false;
     impl_->wakeword_activated = false;
+    impl_->consecutive_speech_frames = 0;
+    impl_->consecutive_silent_frames = 0;
+    impl_->current_burst_frames = 0;
 }
 
 bool VoicePipeline::is_running() const {
@@ -687,30 +699,59 @@ void VoicePipeline::process_vad(const float* samples, size_t num_samples, const 
 
     bool speech_detected = (is_speech == RAC_TRUE);
 
+    // --- Noise robustness: track consecutive speech/silent frames ---
+    int start_frames_needed = config_.speech_start_frames > 0 ? config_.speech_start_frames : 3;
+    int noise_burst_max = config_.noise_burst_max_frames > 0 ? config_.noise_burst_max_frames : 2;
+    double max_speech_sec = config_.max_speech_duration_sec > 0 ? config_.max_speech_duration_sec : 60.0;
+
+    if (speech_detected) {
+        impl_->consecutive_speech_frames++;
+        impl_->consecutive_silent_frames = 0;
+    } else {
+        impl_->consecutive_silent_frames++;
+        impl_->consecutive_speech_frames = 0;
+    }
+
     if (config_.debug_vad) {
         static int frame_count = 0;
         if (++frame_count % 50 == 0) {  // Log every 50 frames
             std::cout << "[VAD] Speech: " << (speech_detected ? "YES" : "no")
-                      << ", Buffer: " << impl_->speech_buffer.size() << " samples\n";
+                      << ", Buffer: " << impl_->speech_buffer.size() << " samples"
+                      << ", ConsecSpeech: " << impl_->consecutive_speech_frames
+                      << ", ConsecSilent: " << impl_->consecutive_silent_frames << "\n";
         }
     }
 
     if (speech_detected) {
-        // Update timestamps
-        impl_->last_speech_time = now;
-
         if (impl_->wakeword_enabled) {
             impl_->wakeword_activation_time = now;
         }
 
         if (!impl_->speech_active) {
-            // Speech just started
+            // --- Debounce: require multiple consecutive speech frames to start ---
+            // This prevents fan noise bursts from triggering speech detection.
+            if (impl_->consecutive_speech_frames < start_frames_needed) {
+                return;  // Not enough consecutive speech yet, wait for more
+            }
+
+            // Enough consecutive speech frames — start speech session
             impl_->speech_active = true;
             impl_->speech_buffer.clear();
             impl_->speech_callback_fired = false;
+            impl_->last_speech_time = now;
+            impl_->speech_start_time = now;
+            impl_->current_burst_frames = 0;
 
             if (config_.debug_vad) {
-                std::cout << "[VAD] Speech started\n";
+                std::cout << "[VAD] Speech started (after " << start_frames_needed << " consecutive frames)\n";
+            }
+        } else {
+            // Speech was already active — update last speech time.
+            // But only count as "real speech" if this burst is long enough.
+            impl_->current_burst_frames++;
+            if (impl_->current_burst_frames >= noise_burst_max) {
+                // This is a sustained speech burst, reset the silence timer
+                impl_->last_speech_time = now;
             }
         }
 
@@ -722,6 +763,9 @@ void VoicePipeline::process_vad(const float* samples, size_t num_samples, const 
                 config_.on_voice_activity(true);
             }
         }
+    } else if (impl_->speech_active) {
+        // Silent frame during active speech — reset burst counter
+        impl_->current_burst_frames = 0;
     }
 
     // Accumulate audio while speech session is active
@@ -732,49 +776,72 @@ void VoicePipeline::process_vad(const float* samples, size_t num_samples, const 
         );
     }
 
-    // Check for end of speech (silence timeout)
+    // --- End of speech detection ---
+    // Two conditions can end speech:
+    // 1. Silence timeout: no sustained speech for silence_duration_sec
+    // 2. Max duration: speech has been going on too long (prevents infinite buffering)
+
+    if (!impl_->speech_active) {
+        return;
+    }
+
+    bool should_end = false;
+    const char* end_reason = nullptr;
+
+    // Check silence timeout
     double silence_duration = config_.silence_duration_sec > 0 ? config_.silence_duration_sec : DEFAULT_SILENCE_DURATION_SEC;
+    double silence_elapsed = std::chrono::duration<double>(now - impl_->last_speech_time).count();
 
-    if (impl_->speech_active && !speech_detected) {
-        double silence_elapsed = std::chrono::duration<double>(
-            now - impl_->last_speech_time
-        ).count();
+    if (silence_elapsed >= silence_duration) {
+        should_end = true;
+        end_reason = "silence timeout";
+    }
 
-        if (silence_elapsed >= silence_duration) {
-            // End of speech
-            impl_->speech_active = false;
-            state_ = PipelineState::PROCESSING_STT;
+    // Check max speech duration
+    double speech_elapsed = std::chrono::duration<double>(now - impl_->speech_start_time).count();
+    if (speech_elapsed >= max_speech_sec) {
+        should_end = true;
+        end_reason = "max duration reached";
+    }
 
-            if (config_.debug_vad) {
-                std::cout << "[VAD] Speech ended, " << impl_->speech_buffer.size()
-                          << " samples buffered\n";
-            }
+    if (should_end) {
+        // End of speech
+        impl_->speech_active = false;
+        impl_->consecutive_speech_frames = 0;
+        impl_->consecutive_silent_frames = 0;
+        impl_->current_burst_frames = 0;
+        state_ = PipelineState::PROCESSING_STT;
 
-            if (config_.on_voice_activity) {
-                config_.on_voice_activity(false);
-            }
+        if (config_.debug_vad) {
+            std::cout << "[VAD] Speech ended (" << end_reason << "), "
+                      << impl_->speech_buffer.size() << " samples buffered ("
+                      << (float)impl_->speech_buffer.size() / 16000.0f << "s)\n";
+        }
 
-            // Process STT if we have enough speech
-            size_t min_samples = config_.min_speech_samples > 0 ? config_.min_speech_samples : DEFAULT_MIN_SPEECH_SAMPLES;
-            if (impl_->speech_buffer.size() >= min_samples) {
-                process_stt(impl_->speech_buffer.data(), impl_->speech_buffer.size());
-            } else if (config_.debug_stt) {
-                std::cout << "[STT] Not enough speech (" << impl_->speech_buffer.size()
-                          << " < " << min_samples << ")\n";
-            }
+        if (config_.on_voice_activity) {
+            config_.on_voice_activity(false);
+        }
 
-            // Reset state
-            impl_->speech_buffer.clear();
-            impl_->speech_callback_fired = false;
+        // Process STT if we have enough speech
+        size_t min_samples = config_.min_speech_samples > 0 ? config_.min_speech_samples : DEFAULT_MIN_SPEECH_SAMPLES;
+        if (impl_->speech_buffer.size() >= min_samples) {
+            process_stt(impl_->speech_buffer.data(), impl_->speech_buffer.size());
+        } else if (config_.debug_stt) {
+            std::cout << "[STT] Not enough speech (" << impl_->speech_buffer.size()
+                      << " < " << min_samples << ")\n";
+        }
 
-            // Return to wake word mode if enabled
-            if (impl_->wakeword_enabled) {
-                impl_->wakeword_activated = false;
-                rac_wakeword_onnx_reset(impl_->wakeword_handle);
-                state_ = PipelineState::WAITING_FOR_WAKE_WORD;
-            } else {
-                state_ = PipelineState::LISTENING;
-            }
+        // Reset state
+        impl_->speech_buffer.clear();
+        impl_->speech_callback_fired = false;
+
+        // Return to wake word mode if enabled
+        if (impl_->wakeword_enabled) {
+            impl_->wakeword_activated = false;
+            rac_wakeword_onnx_reset(impl_->wakeword_handle);
+            state_ = PipelineState::WAITING_FOR_WAKE_WORD;
+        } else {
+            state_ = PipelineState::LISTENING;
         }
     }
 }
