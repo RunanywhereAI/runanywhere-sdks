@@ -34,6 +34,8 @@
 
 #include <iostream>
 #include <sstream>
+#include <fstream>
+#include <cmath>
 #include <vector>
 #include <string>
 #include <cstring>
@@ -459,6 +461,54 @@ struct AudioCapture {
 };
 
 // =============================================================================
+// Test WAV File Generator (for earcon/chime tests)
+// =============================================================================
+// Creates a simple 16-bit PCM WAV file with a sine tone at the given path.
+
+static std::string create_test_wav(int sample_rate = 22050, int duration_ms = 500) {
+    static int counter = 0;
+    std::string path = "/tmp/test_earcon_" + std::to_string(counter++) + ".wav";
+
+    int num_samples = sample_rate * duration_ms / 1000;
+    std::vector<int16_t> samples(num_samples);
+    for (int i = 0; i < num_samples; ++i) {
+        float t = static_cast<float>(i) / sample_rate;
+        samples[i] = static_cast<int16_t>(8000.0f * std::sin(2.0f * 3.14159f * 440.0f * t));
+    }
+
+    std::ofstream file(path, std::ios::binary);
+    // RIFF header
+    uint32_t data_size = num_samples * 2;
+    uint32_t file_size = 36 + data_size;
+    file.write("RIFF", 4);
+    file.write(reinterpret_cast<char*>(&file_size), 4);
+    file.write("WAVE", 4);
+    // fmt chunk
+    file.write("fmt ", 4);
+    uint32_t fmt_size = 16;
+    file.write(reinterpret_cast<char*>(&fmt_size), 4);
+    uint16_t audio_format = 1;  // PCM
+    file.write(reinterpret_cast<char*>(&audio_format), 2);
+    uint16_t channels = 1;
+    file.write(reinterpret_cast<char*>(&channels), 2);
+    uint32_t sr = sample_rate;
+    file.write(reinterpret_cast<char*>(&sr), 4);
+    uint32_t byte_rate = sample_rate * 2;
+    file.write(reinterpret_cast<char*>(&byte_rate), 4);
+    uint16_t block_align = 2;
+    file.write(reinterpret_cast<char*>(&block_align), 2);
+    uint16_t bits = 16;
+    file.write(reinterpret_cast<char*>(&bits), 2);
+    // data chunk
+    file.write("data", 4);
+    file.write(reinterpret_cast<char*>(&data_size), 4);
+    file.write(reinterpret_cast<const char*>(samples.data()), data_size);
+    file.close();
+
+    return path;
+}
+
+// =============================================================================
 // Test: TTS Queue - Parallel Synthesis and Playback
 // =============================================================================
 // Verifies that the TTSQueue plays audio from the consumer thread while
@@ -747,13 +797,9 @@ TestResult test_waiting_chime_timing() {
     result.name = "Waiting Chime - Start/Stop Timing";
 
     AudioCapture capture;
-    openclaw::WaitingChimeConfig config;
-    config.sample_rate = 22050;
-    config.tone_duration_ms = 1500;
-    config.silence_duration_ms = 1000;
-    config.volume = 0.2f;
+    std::string wav_path = create_test_wav(22050, 500);
 
-    openclaw::WaitingChime chime(config, [&capture](const int16_t* samples, size_t n, int sr) {
+    openclaw::WaitingChime chime(wav_path, [&capture](const int16_t* samples, size_t n, int sr) {
         capture.on_audio(samples, n, sr);
     });
 
@@ -856,78 +902,49 @@ TestResult test_waiting_chime_audio_content() {
     result.name = "Waiting Chime - Audio Content Quality";
 
     AudioCapture capture;
-    openclaw::WaitingChimeConfig config;
-    config.sample_rate = 22050;
-    config.tone_duration_ms = 1000;
-    config.silence_duration_ms = 500;
-    config.volume = 0.3f;
+    std::string wav_path = create_test_wav(22050, 300);
 
-    openclaw::WaitingChime chime(config, [&capture](const int16_t* samples, size_t n, int sr) {
+    openclaw::WaitingChime chime(wav_path, [&capture](const int16_t* samples, size_t n, int sr) {
         capture.on_audio(samples, n, sr);
     });
 
-    // Play for one full loop iteration (~1.5 seconds)
+    // Play earcon - it should play the WAV once immediately
     chime.start();
-    std::this_thread::sleep_for(std::chrono::milliseconds(1800));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     chime.stop();
 
-    auto samples = capture.captured_samples;
-    if (samples.empty()) {
-        result.details = "No audio samples captured";
+    size_t total = capture.total_samples();
+    if (total == 0) {
+        result.details = "No audio samples captured from earcon playback";
         return result;
     }
 
-    // Check that the tone portion has non-zero samples
-    int tone_samples = config.sample_rate * config.tone_duration_ms / 1000;
-    int check_count = std::min(static_cast<int>(samples.size()), tone_samples);
-
-    int non_zero_count = 0;
-    int16_t max_amplitude = 0;
-    for (int i = 0; i < check_count; i++) {
-        if (samples[i] != 0) non_zero_count++;
-        int16_t abs_val = std::abs(samples[i]);
-        if (abs_val > max_amplitude) max_amplitude = abs_val;
+    // Check that audio has non-zero samples (actual sound, not silence)
+    std::lock_guard<std::mutex> lock(capture.mutex);
+    int non_zero = 0;
+    int16_t max_amp = 0;
+    for (int16_t s : capture.captured_samples) {
+        if (s != 0) non_zero++;
+        int16_t a = static_cast<int16_t>(std::abs(s));
+        if (a > max_amp) max_amp = a;
     }
 
-    float non_zero_ratio = static_cast<float>(non_zero_count) / check_count;
-
-    // The tone portion should be mostly non-zero (except at zero crossings)
-    if (non_zero_ratio < 0.8f) {
-        result.details = "Tone portion is too quiet - only " + std::to_string(non_zero_ratio * 100) + "% non-zero";
+    float non_zero_ratio = static_cast<float>(non_zero) / static_cast<float>(total);
+    if (non_zero_ratio < 0.5f) {
+        result.details = "Earcon audio is mostly silence (" + std::to_string(non_zero_ratio * 100) + "% non-zero)";
         return result;
     }
 
-    // Max amplitude should be reasonable (not clipping, not silent)
-    // At 30% volume: max should be around 0.3 * 32767 ≈ 9830
-    if (max_amplitude < 1000) {
-        result.details = "Max amplitude too low: " + std::to_string(max_amplitude);
+    if (max_amp < 500) {
+        result.details = "Earcon max amplitude too low: " + std::to_string(max_amp);
         return result;
-    }
-    if (max_amplitude > 32000) {
-        result.details = "Max amplitude near clipping: " + std::to_string(max_amplitude);
-        return result;
-    }
-
-    // Check the silence portion (if we have enough samples)
-    int silence_start = tone_samples;
-    int total_expected = tone_samples + (config.sample_rate * config.silence_duration_ms / 1000);
-    if (static_cast<int>(samples.size()) >= total_expected) {
-        int silence_non_zero = 0;
-        for (int i = silence_start; i < total_expected; i++) {
-            if (samples[i] != 0) silence_non_zero++;
-        }
-        if (silence_non_zero > 0) {
-            result.details = "Silence portion has " + std::to_string(silence_non_zero) + " non-zero samples";
-            return result;
-        }
     }
 
     result.passed = true;
     std::ostringstream details;
-    details << "Samples: " << samples.size()
-            << ", Non-zero in tone: " << (non_zero_ratio * 100) << "%"
-            << ", Max amplitude: " << max_amplitude
-            << ", Duration: " << capture.duration_seconds() << "s";
+    details << "Samples: " << total
+            << ", Non-zero: " << (non_zero_ratio * 100) << "%"
+            << ", Max amplitude: " << max_amp;
     result.details = details.str();
 
     return result;
@@ -1165,10 +1182,9 @@ TestResult test_openclaw_flow(int response_delay_ms) {
     AudioCapture tts_capture;    // Captures TTS audio
 
     // --- Step 3: Create waiting chime ---
-    openclaw::WaitingChimeConfig chime_config;
-    chime_config.sample_rate = 22050;
+    std::string earcon_path = create_test_wav(22050, 300);
 
-    openclaw::WaitingChime waiting_chime(chime_config, [&chime_capture](const int16_t* samples, size_t n, int sr) {
+    openclaw::WaitingChime waiting_chime(earcon_path, [&chime_capture](const int16_t* samples, size_t n, int sr) {
         chime_capture.on_audio(samples, n, sr);
     });
 
