@@ -510,7 +510,7 @@ private fun ModelCard(
 
             if (model.isDownloaded) {
                 Badge(
-                    text = model.size,
+                    text = "Use",
                     textColor = Color(0xFF34C759),
                     backgroundColor = Color(0xFF34C759).copy(alpha = 0.10f),
                     icon = null,
