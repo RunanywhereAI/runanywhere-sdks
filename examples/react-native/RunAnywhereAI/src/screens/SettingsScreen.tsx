@@ -43,6 +43,7 @@ import {
   RoutingPolicy,
   RoutingPolicyDisplayNames,
   SETTINGS_CONSTRAINTS,
+  GENERATION_SETTINGS_KEYS,
 } from '../types/settings';
 import { LLMFramework, FrameworkDisplayNames } from '../types/model';
 
@@ -121,6 +122,7 @@ export const SettingsScreen: React.FC = () => {
   );
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(10000);
+  const [systemPrompt, setSystemPrompt] = useState('');
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
 
   // API Configuration state
@@ -168,6 +170,7 @@ export const SettingsScreen: React.FC = () => {
   useEffect(() => {
     loadData();
     loadApiConfiguration();
+    loadGenerationSettings();
   }, []);
 
   /**
@@ -184,6 +187,52 @@ export const SettingsScreen: React.FC = () => {
       setIsBaseURLConfigured(!!storedBaseURL && storedBaseURL !== '');
     } catch (error) {
       console.error('[Settings] Failed to load API configuration:', error);
+    }
+  };
+
+  /**
+   * Load generation settings from AsyncStorage
+   */
+  const loadGenerationSettings = async () => {
+    try {
+      const tempStr = await AsyncStorage.getItem(GENERATION_SETTINGS_KEYS.TEMPERATURE);
+      const maxStr = await AsyncStorage.getItem(GENERATION_SETTINGS_KEYS.MAX_TOKENS);
+      const sysStr = await AsyncStorage.getItem(GENERATION_SETTINGS_KEYS.SYSTEM_PROMPT);
+
+      const temperature = tempStr !== null ? parseFloat(tempStr) : 0.7;
+      setTemperature(temperature);
+      if (maxStr) setMaxTokens(parseInt(maxStr, 10));
+      if (sysStr) setSystemPrompt(sysStr);
+
+      console.log('[Settings] Loaded generation settings:', {
+      temperature,
+      maxTokens,
+      systemPrompt: systemPrompt ? 'set' : 'empty',
+    });
+    } catch (error) {
+      console.error('[Settings] Failed to load generation settings:', error);
+    }
+  };
+
+  /**
+   * Save generation settings to AsyncStorage
+   */
+  const saveGenerationSettings = async () => {
+    try {
+      await AsyncStorage.setItem(GENERATION_SETTINGS_KEYS.TEMPERATURE, temperature.toString());
+      await AsyncStorage.setItem(GENERATION_SETTINGS_KEYS.MAX_TOKENS, maxTokens.toString());
+      await AsyncStorage.setItem(GENERATION_SETTINGS_KEYS.SYSTEM_PROMPT, systemPrompt);
+
+      console.log('[Settings] Saved generation settings:', {
+        temperature,
+        maxTokens,
+        systemPrompt: systemPrompt ? `set(${systemPrompt.length} chars)` : 'empty',
+      });
+
+      Alert.alert('Saved', 'Generation settings have been saved successfully.');
+    } catch (error) {
+      console.error('[Settings] Failed to save generation settings:', error);
+      Alert.alert('Error', `Failed to save settings: ${error}`);
     }
   };
 
@@ -755,6 +804,30 @@ export const SettingsScreen: React.FC = () => {
             SETTINGS_CONSTRAINTS.maxTokens.step,
             (v) => v.toLocaleString()
           )}
+
+          {/* System Prompt Input */}
+          <View style={styles.systemPromptContainer}>
+            <Text style={styles.systemPromptLabel}>System Prompt</Text>
+            <TextInput
+              style={styles.systemPromptInput}
+              value={systemPrompt}
+              onChangeText={setSystemPrompt}
+              placeholder="Enter system prompt (optional)"
+              placeholderTextColor={Colors.textTertiary}
+              multiline
+              numberOfLines={3}
+              textAlignVertical="top"
+            />
+          </View>
+
+          {/* Save Settings Button */}
+          <TouchableOpacity
+            style={styles.saveSettingsButton}
+            onPress={saveGenerationSettings}
+          >
+            <Icon name="checkmark-circle-outline" size={20} color={Colors.textWhite} />
+            <Text style={styles.saveSettingsButtonText}>Save Settings</Text>
+          </TouchableOpacity>
         </View>
 
         {/* API Configuration (Testing) */}
@@ -1519,6 +1592,42 @@ const styles = StyleSheet.create({
   },
   modalButtonTextDisabled: {
     color: Colors.textTertiary,
+  },
+  // System Prompt styles
+  systemPromptContainer: {
+    padding: Padding.padding16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+  },
+  systemPromptLabel: {
+    ...Typography.subheadline,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.small,
+  },
+  systemPromptInput: {
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: BorderRadius.small,
+    padding: Padding.padding12,
+    ...Typography.body,
+    color: Colors.textPrimary,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    minHeight: 80,
+  },
+  saveSettingsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.small,
+    backgroundColor: Colors.primaryBlue,
+    padding: Padding.padding16,
+    margin: Padding.padding16,
+    borderRadius: BorderRadius.small,
+  },
+  saveSettingsButtonText: {
+    ...Typography.body,
+    color: Colors.textWhite,
+    fontWeight: '600',
   },
 });
 

@@ -31,6 +31,7 @@ import {
   Alert,
   Modal,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
@@ -48,9 +49,10 @@ import {
   ModelSelectionSheet,
   ModelSelectionContext,
 } from '../components/model';
+import { GENERATION_SETTINGS_KEYS } from '../types/settings';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
-import { RunAnywhere, type ModelInfo as SDKModelInfo } from '@runanywhere/core';
+import { RunAnywhere, type ModelInfo as SDKModelInfo, type GenerationOptions } from '@runanywhere/core';
 
 // Generate unique ID
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -118,6 +120,24 @@ export const ChatScreen: React.FC = () => {
 
   // Messages from current conversation
   const messages = currentConversation?.messages || [];
+
+  /**
+   * Get generation options from AsyncStorage
+   * Reads user-configured temperature, maxTokens, and systemPrompt
+   */
+  const getGenerationOptions = async (): Promise<GenerationOptions> => {
+    const tempStr = await AsyncStorage.getItem(GENERATION_SETTINGS_KEYS.TEMPERATURE);
+    const maxStr = await AsyncStorage.getItem(GENERATION_SETTINGS_KEYS.MAX_TOKENS);
+    const sysStr = await AsyncStorage.getItem(GENERATION_SETTINGS_KEYS.SYSTEM_PROMPT);
+
+    const temperature =tempStr !== null && !Number.isNaN(parseFloat(tempStr))? parseFloat(tempStr): 0.7;
+    const maxTokens = maxStr ? parseInt(maxStr, 10) : 1000;
+    const systemPrompt = sysStr && sysStr.trim() !== '' ? sysStr : undefined;
+
+    console.log(`[PARAMS] App getGenerationOptions: temperature=${temperature}, maxTokens=${maxTokens}, systemPrompt=${systemPrompt ? `set(${systemPrompt.length} chars)` : 'nil'}`);
+
+    return { temperature, maxTokens, systemPrompt };
+  };
 
   /**
    * Load available LLM models from catalog
@@ -267,11 +287,11 @@ export const ChatScreen: React.FC = () => {
     try {
       console.log('[ChatScreen] Starting streaming generation for:', prompt);
 
+      // Get user-configured generation options from AsyncStorage
+      const options = await getGenerationOptions();
+
       // Use streaming generation (matches Swift SDK: RunAnywhere.generateStream)
-      const streamingResult = await RunAnywhere.generateStream(prompt, {
-        maxTokens: 1000,
-        temperature: 0.7,
-      });
+      const streamingResult = await RunAnywhere.generateStream(prompt, options);
 
       let fullResponse = '';
 
