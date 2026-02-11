@@ -235,7 +235,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       id: 'sherpa-onnx-whisper-small.en',
       name: 'Sherpa Whisper Small (ONNX)',
       url:
-          'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2',
+          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-small.en.tar.gz',
       modality: ModelCategory.speechRecognition,
       memoryRequirement: 250000000,
     );
