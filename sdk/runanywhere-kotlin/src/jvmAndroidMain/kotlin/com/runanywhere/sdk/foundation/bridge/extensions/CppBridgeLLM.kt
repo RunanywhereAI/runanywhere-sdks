@@ -219,6 +219,7 @@ object CppBridgeLLM {
      * @param repeatPenalty Penalty for repeating tokens
      * @param stopSequences List of sequences that stop generation
      * @param seed Random seed for reproducibility (-1 for random)
+     * @param systemPrompt System prompt for LLM (optional)
      */
     data class GenerationConfig(
         val maxTokens: Int = 512,
@@ -228,6 +229,7 @@ object CppBridgeLLM {
         val repeatPenalty: Float = 1.1f,
         val stopSequences: List<String> = emptyList(),
         val seed: Long = -1,
+        val systemPrompt: String? = null,
     ) {
         /**
          * Convert to JSON string for C++ interop.
@@ -246,7 +248,13 @@ object CppBridgeLLM {
                     append("\"${escapeJson(seq)}\"")
                 }
                 append("],")
-                append("\"seed\":$seed")
+                append("\"seed\":$seed,")
+                append("\"system_prompt\":")
+                if (systemPrompt != null) {
+                    append("\"${escapeJson(systemPrompt)}\"")
+                } else {
+                    append("null")
+                }
                 append("}")
             }
         }

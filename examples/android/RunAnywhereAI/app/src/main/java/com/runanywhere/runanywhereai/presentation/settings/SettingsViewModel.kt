@@ -47,6 +47,10 @@ data class SettingsUiState(
     val isBaseURLConfigured: Boolean = false,
     val showApiConfigSheet: Boolean = false,
     val showRestartDialog: Boolean = false,
+    // Generation Settings
+    val temperature: Float = 0.7f,
+    val maxTokens: Int = 1000,
+    val systemPrompt: String = "",
     // Loading states
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
@@ -77,12 +81,22 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         )
     }
 
+    private val generationPrefs by lazy {
+        application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+
     companion object {
         private const val TAG = "SettingsViewModel"
         private const val ENCRYPTED_PREFS_FILE = "runanywhere_secure_prefs"
         private const val KEY_API_KEY = "runanywhere_api_key"
         private const val KEY_BASE_URL = "runanywhere_base_url"
         private const val KEY_DEVICE_REGISTERED = "com.runanywhere.sdk.deviceRegistered"
+
+        // Generation settings constants (match iOS key names)
+        private const val PREFS_NAME = "generation_settings"
+        private const val KEY_TEMPERATURE = "defaultTemperature"
+        private const val KEY_MAX_TOKENS = "defaultMaxTokens"
+        private const val KEY_SYSTEM_PROMPT = "defaultSystemPrompt"
 
         /**
          * Get stored API key (for use at app launch)
@@ -145,10 +159,36 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         fun hasCustomConfiguration(context: Context): Boolean {
             return getStoredApiKey(context) != null && getStoredBaseURL(context) != null
         }
+
+        /**
+         * Data class for generation settings
+         */
+        data class GenerationSettings(
+            val temperature: Float,
+            val maxTokens: Int,
+            val systemPrompt: String?
+        )
+
+        /**
+         * Get generation settings (for use by ChatViewModel)
+         */
+        fun getGenerationSettings(context: Context): GenerationSettings {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val temperature = prefs.getFloat(KEY_TEMPERATURE, 0.7f)
+            val maxTokens = prefs.getInt(KEY_MAX_TOKENS, 1000)
+            val systemPrompt = prefs.getString(KEY_SYSTEM_PROMPT, "")
+
+            return GenerationSettings(
+                temperature = temperature,
+                maxTokens = maxTokens,
+                systemPrompt = if (systemPrompt.isNullOrEmpty()) null else systemPrompt
+            )
+        }
     }
 
     init {
         loadApiConfiguration()
+        loadGenerationSettings()
         loadStorageData()
         subscribeToModelEvents()
     }
@@ -297,6 +337,74 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 Log.e(TAG, "Failed to clean temp files", e)
                 _uiState.update {
                     it.copy(errorMessage = "Failed to clean temporary files: ${e.message}")
+                }
+            }
+        }
+    }
+
+    // ========== Generation Settings Management ==========
+
+    /**
+     * Load generation settings from SharedPreferences
+     */
+    private fun loadGenerationSettings() {
+        try {
+            val temperature = generationPrefs.getFloat(KEY_TEMPERATURE, 0.7f)
+            val maxTokens = generationPrefs.getInt(KEY_MAX_TOKENS, 1000)
+            val systemPrompt = generationPrefs.getString(KEY_SYSTEM_PROMPT, "") ?: ""
+
+            _uiState.update {
+                it.copy(
+                    temperature = temperature,
+                    maxTokens = maxTokens,
+                    systemPrompt = systemPrompt
+                )
+            }
+            Log.d(TAG, "Generation settings loaded - temperature: $temperature, maxTokens: $maxTokens, systemPrompt length: ${systemPrompt.length}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load generation settings", e)
+        }
+    }
+
+    /**
+     * Update temperature in UI state
+     */
+    fun updateTemperature(value: Float) {
+        _uiState.update { it.copy(temperature = value) }
+    }
+
+    /**
+     * Update max tokens in UI state
+     */
+    fun updateMaxTokens(value: Int) {
+        _uiState.update { it.copy(maxTokens = value) }
+    }
+
+    /**
+     * Update system prompt in UI state
+     */
+    fun updateSystemPrompt(value: String) {
+        _uiState.update { it.copy(systemPrompt = value) }
+    }
+
+    /**
+     * Save generation settings to SharedPreferences
+     */
+    fun saveGenerationSettings() {
+        viewModelScope.launch {
+            try {
+                val currentState = _uiState.value
+                generationPrefs.edit()
+                    .putFloat(KEY_TEMPERATURE, currentState.temperature)
+                    .putInt(KEY_MAX_TOKENS, currentState.maxTokens)
+                    .putString(KEY_SYSTEM_PROMPT, currentState.systemPrompt)
+                    .apply()
+
+                Log.d(TAG, "Generation settings saved successfully - temperature: ${currentState.temperature}, maxTokens: ${currentState.maxTokens}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to save generation settings", e)
+                _uiState.update {
+                    it.copy(errorMessage = "Failed to save generation settings: ${e.message}")
                 }
             }
         }

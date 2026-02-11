@@ -114,6 +114,95 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             )
         }
 
+        // Generation Settings Section
+        SettingsSection(title = "Generation Settings") {
+            // Temperature Slider
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Temperature",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        text = String.format("%.1f", uiState.temperature),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Slider(
+                    value = uiState.temperature,
+                    onValueChange = { viewModel.updateTemperature(it) },
+                    valueRange = 0f..2f,
+                    steps = 19, // 0.1 increments from 0.0 to 2.0
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+            // Max Tokens Slider
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Max Tokens",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        text = uiState.maxTokens.toString(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Slider(
+                    value = uiState.maxTokens.toFloat(),
+                    onValueChange = { viewModel.updateMaxTokens(it.toInt()) },
+                    valueRange = 50f..4096f,
+                    steps = 80, // 50-token increments
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+            // System Prompt TextField
+            OutlinedTextField(
+                value = uiState.systemPrompt,
+                onValueChange = { viewModel.updateSystemPrompt(it) },
+                label = { Text("System Prompt") },
+                placeholder = { Text("Enter system prompt (optional)") },
+                modifier = Modifier.fillMaxWidth(),
+                maxLines = 3,
+                textStyle = MaterialTheme.typography.bodyMedium,
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Save Button
+            OutlinedButton(
+                onClick = { viewModel.saveGenerationSettings() },
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = AppColors.primaryAccent,
+                ),
+            ) {
+                Text("Save Settings")
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "These settings affect LLM text generation.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
         // Storage Overview Section
         SettingsSection(
             title = "Storage Overview",
