@@ -34,7 +34,7 @@ A lightweight voice assistant that acts as a **channel** for OpenClaw. No local 
 | Wake Word | ✅ | ✅ |
 | VAD | ✅ | ✅ |
 | ASR/STT | ✅ Local Whisper | ✅ Parakeet TDT-CTC 110M (NeMo CTC, int8) |
-| LLM | ✅ Local or Moltbot | ❌ None - uses OpenClaw |
+| LLM | ✅ Local or Moltbot | ✅ LFM2-350M filler (optional) + OpenClaw |
 | TTS | ✅ Local Piper (22kHz) | ✅ Piper Lessac Medium (22050Hz) |
 | Integration | HTTP Voice Bridge | WebSocket to OpenClaw |
 
@@ -78,6 +78,16 @@ Plays a brief, pleasant earcon sound while waiting for OpenClaw to process the u
 - **Graceful fallback**: If the earcon WAV is missing, waiting is silent (no crash)
 
 Generated automatically by `./scripts/download-models.sh` (requires `sox`).
+
+### 6. Instant Filler LLM (Optional)
+A tiny local LLM generates contextual acknowledgment responses within ~1 second while waiting for OpenClaw:
+
+- **Model**: LiquidAI LFM2-350M (GGUF Q4_K_M, ~250MB RAM)
+- **Speed**: ~20+ tokens/sec on Pi 5 CPU (hybrid conv+attention architecture)
+- **Behavior**: After STT transcription, generates a brief filler like "Let me check the weather for you." and speaks it via TTS while OpenClaw processes the real response
+- **Interruption handling**: If the real OpenClaw response arrives while the filler is still playing, `cancel_speech()` stops the filler mid-sentence and immediately starts playing the real response
+- **Optional**: If the model is not downloaded, the pipeline falls back to earcon-only feedback
+- **Download**: `./scripts/download-models.sh --filler-llm`
 
 ## OpenClaw WebSocket Protocol
 
@@ -197,6 +207,9 @@ ws://openclaw-host:8082
 | Hey Jarvis | ~1.3 MB | `~/.local/share/runanywhere/Models/ONNX/hey-jarvis/` |
 | openWakeWord Embedding | ~1.3 MB | `~/.local/share/runanywhere/Models/ONNX/openwakeword-embedding/` |
 | openWakeWord Melspectrogram | ~1.1 MB | `~/.local/share/runanywhere/Models/ONNX/openwakeword-embedding/` |
+
+**Optional models (via download flags):**
+| LFM2-350M Filler LLM (`--filler-llm`) | ~250 MB | `~/.local/share/runanywhere/Models/GGUF/lfm2-350m/` |
 
 **Alternative models (via download flags):**
 | Whisper Tiny EN (`--whisper`) | ~150 MB | `~/.local/share/runanywhere/Models/ONNX/whisper-tiny-en/` |

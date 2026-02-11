@@ -97,11 +97,16 @@ public:
     // Sentences are pre-synthesized ahead of playback for gapless audio.
     void speak_text_async(const std::string& text);
 
-    // Cancel any in-progress async TTS playback immediately.
+    // Cancel any in-progress async TTS playback and filler LLM generation.
     void cancel_speech();
 
     // Check if async TTS is currently playing or synthesizing.
     bool is_speaking() const;
+
+    // Generate and speak an instant filler response using the local LLM.
+    // Non-blocking: runs LLM generation + TTS on a background thread.
+    // If the filler LLM is not loaded, this is a silent no-op.
+    void generate_filler_response(const std::string& transcription);
 
     // State
     PipelineState state() const { return state_; }

@@ -42,6 +42,7 @@ print_error() {
 DOWNLOAD_WAKEWORD=false
 USE_WHISPER_ASR=false
 USE_KOKORO_TTS=false
+DOWNLOAD_FILLER_LLM=false
 while [[ "$1" == --* ]]; do
     case "$1" in
         --wakeword)
@@ -56,14 +57,19 @@ while [[ "$1" == --* ]]; do
             USE_KOKORO_TTS=true
             shift
             ;;
+        --filler-llm)
+            DOWNLOAD_FILLER_LLM=true
+            shift
+            ;;
         --help|-h)
             echo "Usage: $0 [options]"
             echo ""
             echo "Options:"
-            echo "  --wakeword   Also download wake word models (Hey Jarvis)"
-            echo "  --whisper    Use Whisper Tiny EN for ASR instead of Parakeet (larger but multilingual)"
-            echo "  --kokoro     Use Kokoro TTS instead of Piper (larger but higher quality, multi-speaker)"
-            echo "  --help       Show this help"
+            echo "  --wakeword     Also download wake word models (Hey Jarvis)"
+            echo "  --whisper      Use Whisper Tiny EN for ASR instead of Parakeet"
+            echo "  --kokoro       Use Kokoro TTS instead of Piper"
+            echo "  --filler-llm   Download LFM2-350M for instant filler responses (~250MB)"
+            echo "  --help         Show this help"
             exit 0
             ;;
         *)
@@ -296,6 +302,39 @@ else
     echo ""
     echo "Skipping wake word models. To download, run:"
     echo "  $0 --wakeword"
+fi
+
+# =============================================================================
+# Filler LLM (optional - for instant acknowledgment responses)
+# =============================================================================
+
+if [ "$DOWNLOAD_FILLER_LLM" = true ]; then
+    FILLER_DIR="${MODEL_DIR}/GGUF/lfm2-350m"
+    mkdir -p "${FILLER_DIR}"
+    FILLER_FILE="${FILLER_DIR}/lfm2-350m-q4_k_m.gguf"
+
+    print_step "Downloading LFM2-350M filler LLM (~250MB)..."
+    if [ -f "${FILLER_FILE}" ]; then
+        print_success "LFM2-350M already downloaded"
+    else
+        echo "  Downloading from HuggingFace..."
+        curl -L -o "${FILLER_FILE}" \
+            "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf"
+
+        if [ -f "${FILLER_FILE}" ]; then
+            FILLER_SIZE=$(ls -lh "${FILLER_FILE}" | awk '{print $5}')
+            print_success "LFM2-350M downloaded (${FILLER_SIZE})"
+            echo "  Model: LiquidAI LFM2-350M (Q4_K_M quantized)"
+            echo "  Purpose: Instant filler responses while waiting for OpenClaw"
+        else
+            print_error "LFM2-350M download failed!"
+            echo "  Filler LLM will not be available (assistant will use earcon only)"
+        fi
+    fi
+else
+    echo ""
+    echo "Skipping filler LLM. To download, run:"
+    echo "  $0 --filler-llm"
 fi
 
 # =============================================================================

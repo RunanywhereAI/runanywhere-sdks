@@ -74,8 +74,12 @@ add_executable(openclaw-assistant
     waiting_chime.cpp
 )
 
+# Check if llamacpp backend is available (for filler LLM)
+find_library(RAC_BACKEND_LLAMACPP_LIB rac_backend_llamacpp
+    PATHS ${RAC_DIST_DIR} NO_DEFAULT_PATH)
+
 target_link_libraries(openclaw-assistant PRIVATE
-    # RunAnywhere Commons (NO LlamaCPP backend - no LLM!)
+    # RunAnywhere Commons
     rac_commons
     rac_backend_onnx
 
@@ -90,6 +94,15 @@ target_link_libraries(openclaw-assistant PRIVATE
     Threads::Threads
     dl
 )
+
+# Conditionally link llamacpp backend for filler LLM
+if(RAC_BACKEND_LLAMACPP_LIB)
+    target_link_libraries(openclaw-assistant PRIVATE rac_backend_llamacpp)
+    target_compile_definitions(openclaw-assistant PRIVATE RAC_HAS_LLAMACPP)
+    message(STATUS "  Filler LLM: enabled (llamacpp backend found)")
+else()
+    message(STATUS "  Filler LLM: disabled (llamacpp backend not built)")
+endif()
 
 # Set RPATH for finding shared libraries at runtime
 set_target_properties(openclaw-assistant PROPERTIES
