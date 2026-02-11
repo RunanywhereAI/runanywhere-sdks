@@ -314,12 +314,18 @@ int main(int argc, char* argv[]) {
     };
 
     // Transcription callback - SEND TO OPENCLAW
-    // Note: waiting_chime is captured by pointer set after construction (see below)
+    // Note: pipeline and chime are captured by pointer, set after construction (see below)
     openclaw::WaitingChime* waiting_chime_ptr = nullptr;
+    openclaw::VoicePipeline* pipeline_ptr = nullptr;
 
-    pipeline_config.on_transcription = [&openclaw_client, &waiting_chime_ptr](const std::string& text, bool is_final) {
+    pipeline_config.on_transcription = [&openclaw_client, &waiting_chime_ptr, &pipeline_ptr](const std::string& text, bool is_final) {
         if (is_final && !text.empty()) {
             std::cout << "[USER] " << text << std::endl;
+
+            // If TTS is still playing, cancel it (user is speaking again)
+            if (pipeline_ptr && pipeline_ptr->is_speaking()) {
+                pipeline_ptr->cancel_speech();
+            }
 
             // Send to OpenClaw (fire-and-forget)
             openclaw_client.send_transcription(text, true);
@@ -346,6 +352,7 @@ int main(int argc, char* argv[]) {
     };
 
     openclaw::VoicePipeline pipeline(pipeline_config);
+    pipeline_ptr = &pipeline;
 
     if (!pipeline.initialize()) {
         std::cerr << "ERROR: Failed to initialize voice pipeline: "
@@ -436,7 +443,10 @@ int main(int argc, char* argv[]) {
                 waiting_chime.stop();
 
                 std::cout << "[" << message.source_channel << "] " << message.text << std::endl;
-                pipeline.speak_text(message.text);
+
+                // Non-blocking: returns immediately, synthesis + playback runs in background.
+                // Sentences are pre-synthesized ahead of playback for gapless audio.
+                pipeline.speak_text_async(message.text);
             }
         }
     }
@@ -447,6 +457,7 @@ int main(int argc, char* argv[]) {
 
     std::cout << "\nStopping..." << std::endl;
 
+    pipeline.cancel_speech();
     waiting_chime.stop();
     pipeline.stop();
     capture.stop();
