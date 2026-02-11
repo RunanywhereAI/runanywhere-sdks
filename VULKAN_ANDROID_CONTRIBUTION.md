@@ -224,33 +224,60 @@ $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-addr2line \
 
 ---
 
+### Files Modified/Created
+
+**New Files (Added to Git):**
+```
+✅ VULKAN_ANDROID_CONTRIBUTION.md          # Complete implementation guide
+✅ VULKAN_TEST_RESULTS.md                  # Detailed test results
+✅ scripts/verify-vulkan-build.sh          # Static verification
+✅ scripts/test-vulkan-on-device.sh        # Device testing
+✅ sdk/runanywhere-commons/cmake/FetchVulkanHpp.cmake
+✅ sdk/runanywhere-commons/include/rac/infrastructure/device/vulkan_detector.h
+✅ sdk/runanywhere-commons/scripts/compile-all-vulkan-shaders.sh
+✅ sdk/runanywhere-commons/scripts/generate-shader-aggregates.py
+✅ sdk/runanywhere-commons/src/backends/llamacpp/patch_vulkan.py
+✅ sdk/runanywhere-commons/src/infrastructure/device/vulkan_detector.cpp
+✅ sdk/runanywhere-commons/src/jni/device_jni.cpp
+✅ sdk/runanywhere-kotlin/src/commonMain/kotlin/.../RunAnywhere+DeviceInfo.kt
+✅ sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/.../DeviceCapabilities.kt
+✅ sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/.../GPUInfo.kt
+```
+
+**Modified Files (Updated in Git):**
+```
+✅ sdk/runanywhere-commons/VERSIONS                    # ANDROID_MIN_SDK=26
+✅ sdk/runanywhere-commons/CMakeLists.txt              # Vulkan integration
+✅ sdk/runanywhere-commons/src/backends/llamacpp/CMakeLists.txt
+✅ sdk/runanywhere-commons/src/backends/llamacpp/llamacpp_backend.cpp
+✅ sdk/runanywhere-commons/src/backends/llamacpp/llamacpp_backend.h
+✅ sdk/runanywhere-commons/src/jni/CMakeLists.txt
+✅ sdk/runanywhere-kotlin/src/.../RunAnywhere+ModelManagement.kt
+✅ sdk/runanywhere-kotlin/src/.../CppBridgeLLM.kt
+```
+
+**Build Artifacts (NOT Pushed):**
+```
+❌ sdk/runanywhere-commons/build/                     # Build directory
+❌ sdk/runanywhere-commons/dist/                      # Distribution binaries
+❌ *.so files                                          # Compiled libraries
+❌ sdk/runanywhere-commons/ggml-vulkan-shaders.cpp    # Generated (118MB)
+❌ sdk/runanywhere-commons/ggml-vulkan-shaders.hpp    # Generated (171KB)
+❌ build/android/unified/arm64-v8a/                   # Build artifacts
+```
+
+**Why NOT Push Build Artifacts:**
+- Regenerated from source every build
+- Platform-specific (arm64-v8a, armeabi-v7a, x86, x86_64)
+- Huge file sizes (63MB+ per .so)
+- Bloats git repository
+- Should be in `.gitignore`
+
+---
+
 ## Files Modified/Created
 
-### New Files
-```
-scripts/verify-vulkan-build.sh
-scripts/test-vulkan-on-device.sh
-scripts/compile-all-vulkan-shaders.sh
-scripts/generate-shader-aggregates.py
-VULKAN_TEST_RESULTS.md
-```
 
-### Modified Files
-```
-sdk/runanywhere-commons/VERSIONS                    # ANDROID_MIN_SDK=26
-sdk/runanywhere-commons/src/backends/llamacpp/CMakeLists.txt
-sdk/runanywhere-commons/src/backends/llamacpp/patch_vulkan.py
-sdk/runanywhere-commons/cmake/FetchVulkanHpp.cmake
-```
-
-### Generated Files (in build directory)
-```
-build/android/unified/arm64-v8a/_deps/llamacpp-src/ggml/src/ggml-vulkan/
-├── *.spv (1435 files)              # Compiled SPIR-V shaders
-├── ggml-vulkan-shaders.hpp         # Shader declarations (171 KB)
-├── ggml-vulkan-shaders.cpp         # Shader data (118 MB)
-└── ggml-vulkan.cpp (modified)      # CoopMat + API 26 fixes
-```
 
 ---
 
@@ -474,6 +501,59 @@ Vulkan GPU acceleration is **COMPILED and WORKING** from a build perspective, bu
 - ❌ Cannot be disabled at runtime
 
 **Recommendation:** Use CPU-only build for Android until mobile GPU vendors fix their Vulkan drivers.
+
+---
+
+## Build Troubleshooting
+
+### Issue: Exception Handling Error
+
+If you encounter this error during build:
+```
+error: cannot use 'throw' with exceptions disabled
+```
+
+**Solutions:**
+
+**Option 1: Disable Vulkan (Recommended for Production)**
+```bash
+# In sdk/runanywhere-commons/src/backends/llamacpp/CMakeLists.txt
+set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
+```
+
+**Option 2: Enable Exceptions (For Experimental Build)**
+```cmake
+# In sdk/runanywhere-commons/src/backends/llamacpp/CMakeLists.txt
+target_compile_options(rac_backend_llamacpp PRIVATE -fexceptions)
+```
+
+### About .so Files (Build Artifacts)
+
+**DO NOT push .so files** to git because:
+- They're regenerated from source code by ninja/cmake every build
+- They're platform-specific (different for each CPU architecture)
+- They're huge (63MB each) - bloats your repository
+- `.gitignore` should exclude them
+
+**Exception:** If your project already tracks .so files in `jniLibs/` (some projects do this for prebuilt binaries):
+
+```bash
+# Check if .so files are tracked
+git ls-files | grep "\.so$"
+```
+
+If they show up, they're tracked and you should push updated ones. If empty, they're gitignored (correct).
+
+### Files to Push Checklist
+
+| File | Why | Status |
+|------|-----|--------|
+| `llamacpp_backend.cpp` | Vulkan probe + CPU fallback | ✅ Pushed |
+| `llamacpp_backend.h` | `disable_gpu()`, `is_using_gpu()` methods | ✅ Pushed |
+| `CMakeLists.txt` | Vulkan flags and configuration | ✅ Pushed |
+| `vulkan_detector.cpp/h` | GPU detection implementation | ✅ Pushed |
+| `device_jni.cpp` | JNI bridge for GPU info | ✅ Pushed |
+| `*.so files` | Build artifacts (DO NOT PUSH) | ❌ Excluded |
 
 ---
 
