@@ -366,9 +366,9 @@ object CppBridgeModelAssignment {
                         "<<< Model assignment response: status=${response.statusCode}, success=${response.success}, bodyLen=${response.body?.length ?: 0}",
                     )
 
-                    // Log full response body for debugging
+                    // Log full response body for debugging (DEBUG level to avoid leaking sensitive data)
                     CppBridgePlatformAdapter.logCallback(
-                        CppBridgePlatformAdapter.LogLevel.INFO,
+                        CppBridgePlatformAdapter.LogLevel.DEBUG,
                         TAG,
                         "<<< Full response body: ${response.body ?: "null"}",
                     )
