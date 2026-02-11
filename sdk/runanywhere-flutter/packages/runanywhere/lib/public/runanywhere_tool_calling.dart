@@ -6,10 +6,7 @@
 /// Matches Swift SDK's RunAnywhere+ToolCalling.swift
 library runanywhere_tool_calling;
 
-import 'dart:convert';
-
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_tool_calling.dart';
 import 'package:runanywhere/public/runanywhere.dart';
 import 'package:runanywhere/public/types/generation_types.dart';

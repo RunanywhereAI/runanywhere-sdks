@@ -50,19 +50,21 @@ object TTSRouter {
         get() = _currentBackend?.toString() ?: "None"
 
     val isLoaded: Boolean
-        get() = synchronized(lock) {
+        get() =
+            synchronized(lock) {
+                when (_currentBackend) {
+                    is Backend.SherpaOnnx -> CppBridgeTTS.isLoaded
+                    null -> false
+                }
+            }
+
+    fun getLoadedModelId(): String? =
+        synchronized(lock) {
             when (_currentBackend) {
-                is Backend.SherpaOnnx -> CppBridgeTTS.isLoaded
-                null -> false
+                is Backend.SherpaOnnx -> CppBridgeTTS.getLoadedModelId()
+                null -> null
             }
         }
-
-    fun getLoadedModelId(): String? = synchronized(lock) {
-        when (_currentBackend) {
-            is Backend.SherpaOnnx -> CppBridgeTTS.getLoadedModelId()
-            null -> null
-        }
-    }
 
     /**
      * Load a TTS model via CppBridgeTTS (Sherpa-ONNX).
@@ -70,31 +72,32 @@ object TTSRouter {
     suspend fun loadModel(
         modelPath: String,
         modelId: String,
-        modelName: String?
-    ): Result<Unit> = loadMutex.withLock {
-        logger.info("Loading TTS model: $modelId from $modelPath")
+        modelName: String?,
+    ): Result<Unit> =
+        loadMutex.withLock {
+            logger.info("Loading TTS model: $modelId from $modelPath")
 
-        unloadInternal()
+            unloadInternal()
 
-        logger.info("Using SherpaOnnx backend for model: $modelId")
-        val result = loadWithSherpaOnnx(modelPath, modelId, modelName)
-        if (result == 0) {
-            _currentBackend = Backend.SherpaOnnx
-            _loadedModelId = modelId
-            _loadedModelName = modelName
-            logger.info("SherpaOnnx model loaded successfully: $modelId")
-            Result.success(Unit)
-        } else {
-            val errorMsg = "Failed to load TTS model (error: $result)"
-            logger.error(errorMsg)
-            Result.failure(SDKError.tts(errorMsg))
+            logger.info("Using SherpaOnnx backend for model: $modelId")
+            val result = loadWithSherpaOnnx(modelPath, modelId, modelName)
+            if (result == 0) {
+                _currentBackend = Backend.SherpaOnnx
+                _loadedModelId = modelId
+                _loadedModelName = modelName
+                logger.info("SherpaOnnx model loaded successfully: $modelId")
+                Result.success(Unit)
+            } else {
+                val errorMsg = "Failed to load TTS model (error: $result)"
+                logger.error(errorMsg)
+                Result.failure(SDKError.tts(errorMsg))
+            }
         }
-    }
 
     private fun loadWithSherpaOnnx(
         modelPath: String,
         modelId: String,
-        modelName: String?
+        modelName: String?,
     ): Int {
         logger.info("Loading TTS model with SherpaOnnx: $modelId")
         return CppBridgeTTS.loadModel(modelPath, modelId, modelName)
@@ -102,7 +105,7 @@ object TTSRouter {
 
     suspend fun synthesize(
         text: String,
-        config: CppBridgeTTS.SynthesisConfig
+        config: CppBridgeTTS.SynthesisConfig,
     ): Result<CppBridgeTTS.SynthesisResult> {
         return when (_currentBackend) {
             is Backend.SherpaOnnx -> synthesizeWithSherpaOnnx(text, config)
@@ -112,7 +115,7 @@ object TTSRouter {
 
     private fun synthesizeWithSherpaOnnx(
         text: String,
-        config: CppBridgeTTS.SynthesisConfig
+        config: CppBridgeTTS.SynthesisConfig,
     ): Result<CppBridgeTTS.SynthesisResult> {
         logger.debug("Synthesizing with SherpaOnnx: \"${text.take(50)}...\"")
         return try {
@@ -126,7 +129,7 @@ object TTSRouter {
     suspend fun synthesizeStream(
         text: String,
         config: CppBridgeTTS.SynthesisConfig,
-        callback: CppBridgeTTS.StreamCallback
+        callback: CppBridgeTTS.StreamCallback,
     ): Result<CppBridgeTTS.SynthesisResult> {
         return when (_currentBackend) {
             is Backend.SherpaOnnx -> {
