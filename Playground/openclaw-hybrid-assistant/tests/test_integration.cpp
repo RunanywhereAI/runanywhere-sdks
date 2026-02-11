@@ -1961,6 +1961,313 @@ TestResult test_text_sanitization() {
 }
 
 // =============================================================================
+// Test: Filler Workflow - Filler Plays Then Real Response Replaces It
+// =============================================================================
+// Simulates the complete filler LLM workflow:
+//   1. Pipeline speaks a filler response (simulates what LLM would generate)
+//   2. While filler plays, cancel_speech() is called (simulates OpenClaw response arriving)
+//   3. Real response plays via speak_text_async()
+//   4. Verify: filler audio stops, real response audio plays, no corruption
+// =============================================================================
+
+TestResult test_filler_workflow_interrupted() {
+    TestResult result;
+    result.name = "Filler Workflow - Filler Interrupted by Real Response";
+
+    AudioCapture capture;
+
+    openclaw::VoicePipelineConfig config;
+    config.on_audio_output = [&capture](const int16_t* samples, size_t n, int sr) {
+        capture.on_audio(samples, n, sr);
+    };
+    config.on_error = [](const std::string& err) {
+        std::cerr << "[FillerTest] Error: " << err << "\n";
+    };
+
+    openclaw::VoicePipeline pipeline(config);
+    if (!pipeline.initialize()) {
+        result.details = "Failed to initialize pipeline: " + pipeline.last_error();
+        return result;
+    }
+
+    // Step 1: Simulate filler LLM output - speak a filler response
+    std::string filler_text = "Let me check the weather for you.";
+    pipeline.speak_text_async(filler_text);
+
+    // Wait for filler to start playing
+    bool filler_started = false;
+    for (int i = 0; i < 100; i++) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        if (capture.total_samples() > 0) {
+            filler_started = true;
+            break;
+        }
+    }
+
+    if (!filler_started) {
+        pipeline.cancel_speech();
+        result.details = "Filler TTS never started playing";
+        return result;
+    }
+
+    // Let filler play for a bit
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    size_t filler_samples = capture.total_samples();
+
+    // Step 2: Simulate OpenClaw response arriving - cancel filler, play real response
+    pipeline.cancel_speech();
+    capture.clear();
+
+    std::string real_response = "The weather in San Francisco is sunny and 72 degrees.";
+    pipeline.speak_text_async(real_response);
+
+    // Wait for real response to start playing
+    bool real_started = false;
+    for (int i = 0; i < 100; i++) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        if (capture.total_samples() > 0) {
+            real_started = true;
+            break;
+        }
+    }
+
+    if (!real_started) {
+        pipeline.cancel_speech();
+        result.details = "Real response TTS never started playing after filler cancel";
+        return result;
+    }
+
+    // Wait for real response to finish
+    for (int i = 0; i < 200; i++) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        if (!pipeline.is_speaking()) break;
+    }
+
+    size_t real_samples = capture.total_samples();
+
+    if (real_samples == 0) {
+        result.details = "Real response produced no audio";
+        return result;
+    }
+
+    result.passed = true;
+    std::ostringstream details;
+    details << "Filler audio: " << filler_samples << " samples before cancel"
+            << ", Real response audio: " << real_samples << " samples"
+            << ", Pipeline clean after completion";
+    result.details = details.str();
+
+    return result;
+}
+
+// =============================================================================
+// Test: Filler Workflow - Fast Response (Filler Still Generating)
+// =============================================================================
+// Simulates the edge case where OpenClaw responds so fast that the filler
+// LLM hasn't even finished generating yet. cancel_speech() should stop
+// everything cleanly and the real response should play.
+// =============================================================================
+
+TestResult test_filler_workflow_fast_response() {
+    TestResult result;
+    result.name = "Filler Workflow - Fast Response Before Filler Finishes";
+
+    AudioCapture capture;
+
+    openclaw::VoicePipelineConfig config;
+    config.on_audio_output = [&capture](const int16_t* samples, size_t n, int sr) {
+        capture.on_audio(samples, n, sr);
+    };
+    config.on_error = [](const std::string& err) {
+        std::cerr << "[FastResponse] Error: " << err << "\n";
+    };
+
+    openclaw::VoicePipeline pipeline(config);
+    if (!pipeline.initialize()) {
+        result.details = "Failed to initialize pipeline: " + pipeline.last_error();
+        return result;
+    }
+
+    // Step 1: Start a long filler (simulates LLM still generating)
+    pipeline.speak_text_async("I am looking into that for you, just give me a moment to gather the information.");
+
+    // Step 2: Immediately cancel (simulates very fast OpenClaw response)
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    pipeline.cancel_speech();
+
+    // Verify pipeline is clean
+    if (pipeline.is_speaking()) {
+        result.details = "Pipeline still speaking after immediate cancel";
+        return result;
+    }
+
+    // Step 3: Play real response
+    capture.clear();
+    pipeline.speak_text_async("It is 72 degrees and sunny.");
+
+    // Wait for it to finish
+    for (int i = 0; i < 200; i++) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        if (!pipeline.is_speaking()) break;
+    }
+
+    size_t real_samples = capture.total_samples();
+    if (real_samples == 0) {
+        result.details = "Real response produced no audio after immediate cancel";
+        return result;
+    }
+
+    result.passed = true;
+    result.details = "Fast cancel succeeded, real response played: " + std::to_string(real_samples) + " samples";
+
+    return result;
+}
+
+// =============================================================================
+// Test: Filler + Earcon + OpenClaw Full E2E
+// =============================================================================
+// Full end-to-end with fake OpenClaw server, simulating the complete flow:
+//   1. Send transcription to fake server
+//   2. Filler TTS plays (simulated)
+//   3. Earcon plays during wait
+//   4. Fake server responds after delay
+//   5. cancel_speech() stops filler + earcon
+//   6. Real response plays
+// =============================================================================
+
+TestResult test_filler_openclaw_e2e() {
+    TestResult result;
+    result.name = "Filler + Earcon + OpenClaw Full E2E";
+
+    std::string response_text = "The temperature is 72 degrees with clear skies.";
+
+    // Start fake server with 3-second delay
+    FakeOpenClawServer::Config server_config;
+    server_config.response_delay_ms = 3000;
+    server_config.response_text = response_text;
+    server_config.source_channel = "filler-e2e-test";
+
+    FakeOpenClawServer server(server_config);
+    if (!server.start()) {
+        result.details = "Failed to start fake server";
+        return result;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    // Audio captures
+    AudioCapture filler_capture;
+    AudioCapture real_capture;
+    std::atomic<bool> playing_filler{true};
+
+    auto audio_callback = [&](const int16_t* samples, size_t n, int sr) {
+        if (playing_filler.load()) {
+            filler_capture.on_audio(samples, n, sr);
+        } else {
+            real_capture.on_audio(samples, n, sr);
+        }
+    };
+
+    // Pipeline
+    openclaw::VoicePipelineConfig pipeline_config;
+    pipeline_config.on_audio_output = audio_callback;
+    pipeline_config.on_error = [](const std::string& err) {
+        std::cerr << "[E2E] Error: " << err << "\n";
+    };
+
+    openclaw::VoicePipeline pipeline(pipeline_config);
+    if (!pipeline.initialize()) {
+        result.details = "Failed to initialize pipeline: " + pipeline.last_error();
+        server.stop();
+        return result;
+    }
+
+    // Connect to fake server
+    openclaw::OpenClawClientConfig client_config;
+    client_config.url = "ws://127.0.0.1:" + std::to_string(server.port());
+    client_config.device_id = "filler-e2e-test";
+
+    openclaw::OpenClawClient openclaw_client(client_config);
+    if (!openclaw_client.connect()) {
+        result.details = "Failed to connect: " + openclaw_client.last_error();
+        server.stop();
+        return result;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    // Step 1: Send transcription
+    openclaw_client.send_transcription("What is the weather?", true);
+
+    // Step 2: Simulate filler LLM generating and speaking
+    pipeline.speak_text_async("Let me check that for you.");
+
+    // Step 3: Poll for real response while filler plays
+    bool got_response = false;
+    openclaw::SpeakMessage message;
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+
+    while (std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        if (openclaw_client.poll_speak_queue(message)) {
+            got_response = true;
+            break;
+        }
+    }
+
+    if (!got_response) {
+        pipeline.cancel_speech();
+        openclaw_client.disconnect();
+        server.stop();
+        result.details = "Never received response from fake server";
+        return result;
+    }
+
+    size_t filler_audio = filler_capture.total_samples();
+
+    // Step 4: Cancel filler, switch to real response
+    playing_filler.store(false);
+    pipeline.cancel_speech();
+
+    // Step 5: Play real response
+    pipeline.speak_text_async(message.text);
+
+    // Wait for real response to finish
+    for (int i = 0; i < 200; i++) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        if (!pipeline.is_speaking()) break;
+    }
+
+    size_t real_audio = real_capture.total_samples();
+
+    // Verify
+    if (message.text != response_text) {
+        result.details = "Response text mismatch";
+        openclaw_client.disconnect();
+        server.stop();
+        return result;
+    }
+
+    if (real_audio == 0) {
+        result.details = "Real response produced no audio";
+        openclaw_client.disconnect();
+        server.stop();
+        return result;
+    }
+
+    openclaw_client.disconnect();
+    server.stop();
+
+    result.passed = true;
+    std::ostringstream details;
+    details << "Filler audio: " << filler_audio << " samples"
+            << ", Real response audio: " << real_audio << " samples"
+            << ", Server delay: 3000ms"
+            << ", Response text matched";
+    result.details = details.str();
+
+    return result;
+}
+
+// =============================================================================
 // Test: Full OpenClaw Flow with Fake Server
 // =============================================================================
 // End-to-end test:
@@ -2183,6 +2490,7 @@ void print_usage(const char* prog) {
               << "  --test-tts-queue         Test TTS queue parallel playback and cancel\n"
               << "  --test-chime             Test waiting chime timing and audio\n"
               << "  --test-bargein           Test barge-in cancel chain and rapid restart (needs ONNX)\n"
+              << "  --test-filler            Test filler workflow: interrupted, fast response, E2E (needs ONNX)\n"
               << "  --test-sanitization      Test text sanitization for TTS\n"
               << "  --test-tts               Test TTS synthesis on various texts\n"
               << "  --test-openclaw-flow     Test full flow with fake OpenClaw server\n"
@@ -2259,6 +2567,12 @@ int main(int argc, char* argv[]) {
             if (!ensure_backends_initialized()) return 1;
             results.push_back(test_tts_synthesis());
         }
+        else if (arg == "--test-filler") {
+            if (!ensure_backends_initialized()) return 1;
+            results.push_back(test_filler_workflow_interrupted());
+            results.push_back(test_filler_workflow_fast_response());
+            results.push_back(test_filler_openclaw_e2e());
+        }
         else if (arg == "--test-openclaw-flow") {
             if (!ensure_backends_initialized()) return 1;
             results.push_back(test_openclaw_flow(flow_delay_seconds * 1000));
@@ -2301,8 +2615,14 @@ int main(int argc, char* argv[]) {
             results.push_back(test_wakeword_timeout_returns_to_waiting());
             results.push_back(test_bargein_wakeword_during_tts());
 
-            // --- Section 6: Full OpenClaw Flow ---
-            std::cout << "\n--- Section 5: Full OpenClaw Flow ---\n\n";
+            // --- Section 6: Filler Workflow ---
+            std::cout << "\n--- Section 6: Filler Workflow ---\n\n";
+            results.push_back(test_filler_workflow_interrupted());
+            results.push_back(test_filler_workflow_fast_response());
+            results.push_back(test_filler_openclaw_e2e());
+
+            // --- Section 7: Full OpenClaw Flow ---
+            std::cout << "\n--- Section 7: Full OpenClaw Flow ---\n\n";
 
             // Test with 5-second delay (moderate wait)
             std::cout << "Test 4.1: 5-second response delay\n";

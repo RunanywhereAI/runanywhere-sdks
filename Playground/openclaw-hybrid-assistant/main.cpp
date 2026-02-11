@@ -327,10 +327,16 @@ int main(int argc, char* argv[]) {
                 pipeline_ptr->cancel_speech();
             }
 
-            // Send to OpenClaw (fire-and-forget)
+            // 1. Send to OpenClaw (remote, slow - fire-and-forget)
             openclaw_client.send_transcription(text, true);
 
-            // Start the waiting chime loop while we wait for OpenClaw response
+            // 2. Generate instant filler response locally (fast, ~1s)
+            //    If filler LLM is not loaded, this is a silent no-op.
+            if (pipeline_ptr) {
+                pipeline_ptr->generate_filler_response(text);
+            }
+
+            // 3. Start the earcon loop for the remaining wait
             if (waiting_chime_ptr) {
                 waiting_chime_ptr->start();
             }
@@ -448,10 +454,13 @@ int main(int argc, char* argv[]) {
                 // Stop the waiting chime immediately - response has arrived
                 waiting_chime.stop();
 
+                // Cancel filler LLM + filler TTS if still playing
+                // (the real response takes priority over the filler)
+                pipeline.cancel_speech();
+
                 std::cout << "[" << message.source_channel << "] " << message.text << std::endl;
 
-                // Non-blocking: returns immediately, synthesis + playback runs in background.
-                // Sentences are pre-synthesized ahead of playback for gapless audio.
+                // Play the real response (non-blocking, gapless streaming)
                 pipeline.speak_text_async(message.text);
             }
         }

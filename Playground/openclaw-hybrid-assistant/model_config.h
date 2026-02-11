@@ -23,7 +23,7 @@
 namespace openclaw {
 
 // =============================================================================
-// Model IDs (NO LLM)
+// Model IDs
 // =============================================================================
 
 constexpr const char* VAD_MODEL_ID = "silero-vad";
@@ -33,6 +33,10 @@ constexpr const char* TTS_MODEL_ID = "vits-piper-en_US-lessac-medium";  // Piper
 // Alternative models (kept for reference / fallback)
 constexpr const char* STT_MODEL_ID_WHISPER = "whisper-tiny-en";
 constexpr const char* TTS_MODEL_ID_KOKORO = "kokoro-en-v0_19";
+
+// Filler LLM (optional - for instant acknowledgment responses)
+constexpr const char* FILLER_LLM_MODEL_ID = "lfm2-350m";
+constexpr const char* FILLER_LLM_FILE = "lfm2-350m-q4_k_m.gguf";
 
 // Wake word models (optional)
 constexpr const char* WAKEWORD_MODEL_ID = "hey-jarvis";
@@ -193,6 +197,16 @@ inline std::string get_wakeword_melspec_path() {
 
 inline std::string get_earcon_path() {
     return get_base_dir() + "/Models/ONNX/earcon/acknowledgment.wav";
+}
+
+inline std::string get_filler_llm_path() {
+    return get_base_dir() + "/Models/GGUF/" + FILLER_LLM_MODEL_ID + "/" + FILLER_LLM_FILE;
+}
+
+inline bool is_filler_llm_available() {
+    struct stat st;
+    std::string path = get_filler_llm_path();
+    return stat(path.c_str(), &st) == 0 && st.st_size > 1000000;  // Sanity check: >1MB
 }
 
 // =============================================================================

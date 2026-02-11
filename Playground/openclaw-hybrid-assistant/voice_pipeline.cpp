@@ -16,6 +16,11 @@
 #include <rac/backends/rac_vad_onnx.h>
 #include <rac/core/rac_error.h>
 
+// Filler LLM (optional - only available when llamacpp backend is built)
+#ifdef RAC_HAS_LLAMACPP
+#include <rac/backends/rac_llm_llamacpp.h>
+#endif
+
 #include <vector>
 #include <mutex>
 #include <iostream>
@@ -341,6 +346,13 @@ struct VoicePipeline::Impl {
     // Silero VAD (ONNX-based, much more accurate than energy VAD)
     rac_handle_t silero_vad = nullptr;
 
+    // Filler LLM (optional - for instant acknowledgment responses)
+#ifdef RAC_HAS_LLAMACPP
+    rac_handle_t filler_llm = nullptr;
+#endif
+    std::thread filler_thread;
+    std::atomic<bool> filler_cancelled{false};
+
     // Wake word detector (separate from voice agent)
     rac_handle_t wakeword_handle = nullptr;
     bool wakeword_enabled = false;
@@ -405,6 +417,16 @@ VoicePipeline::~VoicePipeline() {
     cancel_speech();
     stop();
 
+#ifdef RAC_HAS_LLAMACPP
+    if (impl_->filler_llm) {
+        rac_llm_llamacpp_cancel(impl_->filler_llm);
+        if (impl_->filler_thread.joinable()) {
+            impl_->filler_thread.join();
+        }
+        rac_llm_llamacpp_destroy(impl_->filler_llm);
+        impl_->filler_llm = nullptr;
+    }
+#endif
     if (impl_->silero_vad) {
         rac_vad_onnx_stop(impl_->silero_vad);
         rac_vad_onnx_destroy(impl_->silero_vad);
@@ -509,6 +531,32 @@ bool VoicePipeline::initialize() {
         rac_vad_onnx_start(impl_->silero_vad);
         std::cout << "  Silero VAD loaded (threshold: " << config_.vad_threshold << ")\n";
     }
+
+    // Initialize Filler LLM (optional - for instant acknowledgment responses)
+#ifdef RAC_HAS_LLAMACPP
+    if (is_filler_llm_available()) {
+        std::string llm_path = get_filler_llm_path();
+        std::cout << "  Loading Filler LLM: " << FILLER_LLM_MODEL_ID << "\n";
+
+        rac_llm_llamacpp_config_t llm_config = RAC_LLM_LLAMACPP_CONFIG_DEFAULT;
+        llm_config.context_size = 512;   // Small context for short filler responses
+        llm_config.num_threads = 2;      // Leave cores free for audio processing
+        llm_config.gpu_layers = 0;       // CPU only on Pi
+        llm_config.batch_size = 128;
+
+        result = rac_llm_llamacpp_create(llm_path.c_str(), &llm_config, &impl_->filler_llm);
+        if (result != RAC_SUCCESS) {
+            std::cerr << "[Pipeline] WARNING: Failed to load filler LLM (code: " << result << ")\n";
+            impl_->filler_llm = nullptr;
+        } else {
+            std::cout << "  Filler LLM loaded (instant acknowledgment responses enabled)\n";
+        }
+    } else {
+        std::cout << "  Filler LLM: not available (download with: ./scripts/download-models.sh --filler-llm)\n";
+    }
+#else
+    std::cout << "  Filler LLM: not compiled (build with llamacpp backend)\n";
+#endif
 
     // Initialize Wake Word (optional)
     if (config_.enable_wake_word) {
@@ -1276,12 +1324,95 @@ void VoicePipeline::speak_text_async(const std::string& text) {
 }
 
 void VoicePipeline::cancel_speech() {
-    if (!async_tts_) return;
-    async_tts_->cleanup();
+    // Cancel filler LLM generation if running
+    if (impl_) {
+        impl_->filler_cancelled.store(true);
+#ifdef RAC_HAS_LLAMACPP
+        if (impl_->filler_llm) {
+            rac_llm_llamacpp_cancel(impl_->filler_llm);
+        }
+#endif
+        if (impl_->filler_thread.joinable()) {
+            impl_->filler_thread.join();
+        }
+    }
+
+    // Cancel TTS queue + producer
+    if (async_tts_) {
+        async_tts_->cleanup();
+    }
 
     if (initialized_ && state_ == PipelineState::SPEAKING) {
         state_ = impl_->wakeword_enabled ? PipelineState::WAITING_FOR_WAKE_WORD : PipelineState::LISTENING;
     }
+}
+
+// =============================================================================
+// Filler LLM - Instant acknowledgment response
+// =============================================================================
+
+#ifdef RAC_HAS_LLAMACPP
+static const char* FILLER_SYSTEM_PROMPT =
+    "You are a voice assistant's acknowledgment system. Given the user's request, "
+    "generate ONE brief sentence (under 15 words) acknowledging what they asked. "
+    "Be natural and conversational. Do NOT answer the question, just acknowledge it. "
+    "Examples: 'Let me check that for you.' or 'I'm looking that up now.'";
+#endif
+
+void VoicePipeline::generate_filler_response(const std::string& transcription) {
+#ifdef RAC_HAS_LLAMACPP
+    if (!impl_->filler_llm || !initialized_) {
+        return;  // Filler LLM not loaded - silent no-op
+    }
+
+    // Cancel any previous filler generation
+    impl_->filler_cancelled.store(true);
+    if (impl_->filler_thread.joinable()) {
+        impl_->filler_thread.join();
+    }
+    impl_->filler_cancelled.store(false);
+
+    // Run generation on a background thread so we don't block the transcription callback
+    impl_->filler_thread = std::thread([this, transcription]() {
+        std::cout << "[Filler] Generating acknowledgment for: \"" << transcription.substr(0, 50) << "\"\n";
+
+        // Build prompt: system prompt + user text
+        std::string prompt = std::string("User: ") + transcription + "\nAssistant:";
+
+        rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
+        options.max_tokens = 30;         // Short response only
+        options.temperature = 0.7f;
+        options.system_prompt = FILLER_SYSTEM_PROMPT;
+
+        rac_llm_result_t result = {};
+        rac_result_t status = rac_llm_llamacpp_generate(
+            impl_->filler_llm, prompt.c_str(), &options, &result);
+
+        if (impl_->filler_cancelled.load()) {
+            rac_llm_result_free(&result);
+            return;  // Cancelled while generating
+        }
+
+        if (status != RAC_SUCCESS || !result.text || strlen(result.text) == 0) {
+            std::cerr << "[Filler] LLM generation failed (code: " << status << ")\n";
+            rac_llm_result_free(&result);
+            return;
+        }
+
+        std::string filler_text = result.text;
+        std::cout << "[Filler] Generated: \"" << filler_text << "\" ("
+                  << result.total_time_ms << "ms, " << result.tokens_per_second << " tok/s)\n";
+
+        rac_llm_result_free(&result);
+
+        // Speak the filler (if not cancelled in the meantime)
+        if (!impl_->filler_cancelled.load()) {
+            speak_text_async(filler_text);
+        }
+    });
+#else
+    (void)transcription;  // Filler LLM not compiled
+#endif
 }
 
 bool VoicePipeline::is_speaking() const {
