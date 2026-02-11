@@ -48,8 +48,8 @@ android {
         // }
 
         ndk {
-            // Only arm64-v8a for now (RunAnywhere Core ONNX is built for arm64-v8a)
-            abiFilters += listOf("arm64-v8a")
+            // arm64-v8a for physical devices, x86_64 for emulators
+            abiFilters += listOf("arm64-v8a", "x86_64")
         }
     }
 

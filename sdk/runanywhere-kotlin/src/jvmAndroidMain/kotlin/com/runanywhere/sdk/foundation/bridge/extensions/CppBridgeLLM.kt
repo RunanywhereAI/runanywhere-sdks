@@ -761,7 +761,9 @@ object CppBridgeLLM {
                     // when stream ends:
                     val tail = byteStreamDecoder.finish()
                     if (tail.isNotEmpty()) callback.onToken(tail)
-                } catch (e: Exception) {}
+                } catch (_: Exception) {
+                    // Finish may fail if stream was interrupted; safe to ignore
+                }
 
                 val result = parseGenerationResult(resultJson, System.currentTimeMillis() - startTime)
 

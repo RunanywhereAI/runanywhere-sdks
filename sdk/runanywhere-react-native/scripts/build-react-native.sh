@@ -18,8 +18,8 @@
 #   --android           Build for Android only (default: both)
 #   --clean             Clean build directories before building
 #   --skip-build        Skip native build (only setup frameworks/libs)
-#   --abis=ABIS         Android ABIs to build (default: arm64-v8a)
-#                       Multiple: Use comma-separated (e.g., arm64-v8a,armeabi-v7a)
+#   --abis=ABIS         Android ABIs to build (default: arm64-v8a,x86_64)
+#                       Multiple: Use comma-separated (e.g., arm64-v8a,x86_64)
 #   --help              Show this help message
 #
 # ANDROID ABI GUIDE:
@@ -42,8 +42,11 @@
 #
 #   Android Output (in packages/*/android/src/main/jniLibs/{ABI}/):
 #     • core: librunanywhere_jni.so, librac_commons.so, libc++_shared.so, libomp.so
-#     • llamacpp: librunanywhere_llamacpp.so, librac_backend_llamacpp_jni.so
-#     • onnx: librunanywhere_onnx.so, libonnxruntime.so, libsherpa-onnx-*.so
+#     • llamacpp: librac_backend_llamacpp.so, librac_backend_llamacpp_jni.so, libomp.so, librac_commons.so
+#     • onnx: librac_backend_onnx.so, librac_backend_onnx_jni.so, libonnxruntime.so, libsherpa-onnx-*.so, librac_commons.so
+#
+#   NOTE: librac_commons.so is synced to ALL packages (core, llamacpp, onnx) to prevent
+#   Gradle native lib merge from picking a stale version. See copy_android_jnilibs().
 #
 # FRESH CLONE TO RUNNING APP:
 #   # 1. Build SDK with native libraries (~15-20 min)
@@ -113,7 +116,7 @@ CLEAN_BUILD=false
 SKIP_BUILD=false
 BUILD_IOS=true
 BUILD_ANDROID=true
-ABIS="arm64-v8a"
+ABIS="arm64-v8a,x86_64"
 
 # =============================================================================
 # Colors & Logging
@@ -402,6 +405,12 @@ copy_android_jnilibs() {
             log_info "LlamaCPP: librac_backend_llamacpp_jni.so (from build)"
         fi
 
+        # Copy libomp.so (required by LlamaCPP backend)
+        if [[ -f "${COMMONS_DIST}/llamacpp/${ABI}/libomp.so" ]]; then
+            cp "${COMMONS_DIST}/llamacpp/${ABI}/libomp.so" "${LLAMACPP_ANDROID_JNILIBS}/${ABI}/"
+            log_info "LlamaCPP: libomp.so"
+        fi
+
         # =======================================================================
         # ONNX Package: RABackendONNX
         # Keep original library name (bridge libs depend on it)
@@ -438,6 +447,24 @@ copy_android_jnilibs() {
                 log_info "ONNX: ${lib}"
             fi
         done
+
+        # =======================================================================
+        # Sync librac_commons.so to ALL packages
+        # =======================================================================
+        # Gradle merges native libs from all modules into the final APK. If
+        # packages/onnx or packages/llamacpp ship an older librac_commons.so
+        # (from GitHub release archives or a previous build), the stale copy can
+        # win the merge and the app will crash with UnsatisfiedLinkError for
+        # symbols that only exist in the newer core build.
+        #
+        # Fix: always overwrite with the version we just built/copied into core.
+        # =======================================================================
+        local CORE_RAC="${CORE_ANDROID_JNILIBS}/${ABI}/librac_commons.so"
+        if [[ -f "$CORE_RAC" ]]; then
+            cp "$CORE_RAC" "${LLAMACPP_ANDROID_JNILIBS}/${ABI}/librac_commons.so"
+            cp "$CORE_RAC" "${ONNX_ANDROID_JNILIBS}/${ABI}/librac_commons.so"
+            log_info "Synced librac_commons.so to llamacpp + onnx packages"
+        fi
     done
 
     log_info "Android JNI libraries copied"
