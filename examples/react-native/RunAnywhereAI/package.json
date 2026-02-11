@@ -57,7 +57,6 @@
     "eslint-plugin-unused-imports": "^4.3.0",
     "knip": "^5.76.0",
     "patch-package": "^8.0.1",
-    "postinstall-postinstall": "^2.1.0",
     "prettier": "^3.3.2",
     "react-native-monorepo-config": "^0.3.0",
     "typescript": "~5.9.2"
