@@ -14,15 +14,15 @@ A lightweight voice assistant that acts as a **channel** for OpenClaw. No local 
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
 │  │                         INPUT PIPELINE                                │   │
 │  │                                                                       │   │
-│  │   Microphone → Wake Word → VAD → ASR/STT → WebSocket → OpenClaw      │   │
-│  │    (ALSA)     (openWW)  (Silero) (Whisper)            (Channel)      │   │
+│  │   Microphone → Wake Word → VAD → ASR/STT  → WebSocket → OpenClaw    │   │
+│  │    (ALSA)     (openWW)  (Silero) (Parakeet)            (Channel)    │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                                                              │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
 │  │                        OUTPUT PIPELINE                                │   │
 │  │                                                                       │   │
-│  │   OpenClaw → WebSocket → TTS/Kokoro → Speaker                        │   │
-│  │  (any channel)          (24kHz)       (ALSA)                         │   │
+│  │   OpenClaw → WebSocket → TTS/Piper → Speaker                        │   │
+│  │  (any channel)          (22050Hz)    (ALSA)                          │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -33,9 +33,9 @@ A lightweight voice assistant that acts as a **channel** for OpenClaw. No local 
 |---------|----------------------|---------------------------|
 | Wake Word | ✅ | ✅ |
 | VAD | ✅ | ✅ |
-| ASR/STT | ✅ Local Whisper | ✅ Local Whisper |
+| ASR/STT | ✅ Local Whisper | ✅ Parakeet TDT-CTC 110M (NeMo CTC, int8) |
 | LLM | ✅ Local or Moltbot | ❌ None - uses OpenClaw |
-| TTS | ✅ Local Piper (22kHz) | ✅ Kokoro TTS English (24kHz, 11 speakers) |
+| TTS | ✅ Local Piper (22kHz) | ✅ Piper Lessac Medium (22050Hz) |
 | Integration | HTTP Voice Bridge | WebSocket to OpenClaw |
 
 ## Components
@@ -51,17 +51,19 @@ A lightweight voice assistant that acts as a **channel** for OpenClaw. No local 
 - Minimum speech: 0.5 seconds
 
 ### 3. Speech-to-Text (ASR)
-- Model: Whisper Tiny English
+- Model: **Parakeet TDT-CTC 110M EN** (NeMo CTC, int8 quantized)
+- Architecture: FastConformer 110M params
+- Features: Automatic punctuation + capitalization
 - Sample rate: 16kHz mono
+- Size: ~126MB (int8 quantized)
+- Alternative: Whisper Tiny EN available with `--whisper` download flag
 
 ### 4. Text-to-Speech (TTS)
-- Model: **Kokoro TTS English v0.19** (high quality)
-- Output rate: 24000 Hz
-- Speakers: 11 English voices (6 American, 2 British female, 3 British male)
-  - Default: `am_michael` (ID 6, American male)
-  - American: `af` (female), `af_bella`, `af_nicole`, `af_sarah`, `af_sky`, `am_adam`
-  - British: `bf_emma`, `bf_isabella`, `bm_george`, `bm_lewis`
-- Alternative: Piper VITS available with `--piper` download flag
+- Model: **Piper Lessac Medium** (VITS)
+- Output rate: 22050 Hz
+- Voice: Natural American male (Lessac dataset)
+- Size: ~61MB (model + espeak-ng-data)
+- Alternative: Kokoro TTS v0.19 available with `--kokoro` download flag (11 speakers, 24kHz, ~330MB)
 
 ## OpenClaw WebSocket Protocol
 
@@ -176,14 +178,15 @@ ws://openclaw-host:8082
 | Model | Size | Location |
 |-------|------|----------|
 | Silero VAD | ~2 MB | `~/.local/share/runanywhere/Models/ONNX/silero-vad/` |
-| Whisper Tiny EN | ~150 MB | `~/.local/share/runanywhere/Models/ONNX/whisper-tiny-en/` |
-| **Kokoro TTS English v0.19** | ~330 MB | `~/.local/share/runanywhere/Models/ONNX/kokoro-en-v0_19/` |
+| **Parakeet TDT-CTC 110M EN (int8)** | ~126 MB | `~/.local/share/runanywhere/Models/ONNX/parakeet-tdt-ctc-110m-en-int8/` |
+| **Piper Lessac Medium TTS** | ~61 MB | `~/.local/share/runanywhere/Models/ONNX/vits-piper-en_US-lessac-medium/` |
 | Hey Jarvis | ~1.3 MB | `~/.local/share/runanywhere/Models/ONNX/hey-jarvis/` |
 | openWakeWord Embedding | ~1.3 MB | `~/.local/share/runanywhere/Models/ONNX/openwakeword-embedding/` |
 | openWakeWord Melspectrogram | ~1.1 MB | `~/.local/share/runanywhere/Models/ONNX/openwakeword-embedding/` |
 
-**Alternative TTS (with `--piper` flag):**
-| Piper Lessac | ~65 MB | `~/.local/share/runanywhere/Models/ONNX/vits-piper-en_US-lessac-medium/` |
+**Alternative models (via download flags):**
+| Whisper Tiny EN (`--whisper`) | ~150 MB | `~/.local/share/runanywhere/Models/ONNX/whisper-tiny-en/` |
+| Kokoro TTS v0.19 (`--kokoro`) | ~330 MB | `~/.local/share/runanywhere/Models/ONNX/kokoro-en-v0_19/` |
 
 ### Wake Word Model Download Note
 
@@ -221,11 +224,12 @@ This builds `librac_backend_onnx.so` and other shared libraries that the hybrid 
 ```bash
 cd /path/to/runanywhere-sdks/Playground/openclaw-hybrid-assistant
 
-# Download all models (STT, TTS, VAD, wake word)
+# Download all models (Parakeet ASR + Piper TTS + VAD + wake word)
 ./scripts/download-models.sh --wakeword
 
-# Or use --piper flag for Piper TTS instead of Kokoro
-./scripts/download-models.sh --wakeword --piper
+# Or use alternative models:
+./scripts/download-models.sh --wakeword --whisper   # Use Whisper for ASR instead of Parakeet
+./scripts/download-models.sh --wakeword --kokoro     # Use Kokoro TTS instead of Piper
 ```
 
 ### 3. Build the hybrid assistant
