@@ -351,6 +351,14 @@ int main(int argc, char* argv[]) {
         std::cerr << "[ERROR] " << error << std::endl;
     };
 
+    // Barge-in callback: wake word detected during TTS playback
+    pipeline_config.on_speech_interrupted = [&waiting_chime_ptr]() {
+        std::cout << "[BARGE-IN] Speech interrupted by wake word\n";
+        if (waiting_chime_ptr) {
+            waiting_chime_ptr->stop();
+        }
+    };
+
     openclaw::VoicePipeline pipeline(pipeline_config);
     pipeline_ptr = &pipeline;
 

@@ -620,13 +620,23 @@ void VoicePipeline::process_audio(const int16_t* samples, size_t num_samples) {
         return;
     }
 
-    // Skip all audio processing while TTS is playing to prevent feedback loops
-    // (microphone picking up speaker output and triggering wake word/VAD)
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+
+    // During TTS playback: ONLY run wake word detection for barge-in.
+    // Skip VAD/STT to prevent echo feedback (mic picking up speaker output).
+    // Wake word is resilient to echo because it's trained on a specific phrase,
+    // not arbitrary speech - TTS audio won't trigger "Hey Jarvis".
     if (state_ == PipelineState::SPEAKING) {
+        if (impl_->wakeword_enabled && impl_->wakeword_handle) {
+            // Convert to raw float for openWakeWord (unnormalized)
+            std::vector<float> raw(num_samples);
+            for (size_t i = 0; i < num_samples; ++i) {
+                raw[i] = static_cast<float>(samples[i]);
+            }
+            process_wakeword(raw.data(), num_samples);
+        }
         return;
     }
-
-    std::lock_guard<std::mutex> lock(impl_->mutex);
 
     // Convert to float for processing
     // NOTE: Different components need different normalization:
@@ -691,12 +701,36 @@ void VoicePipeline::process_wakeword(const float* samples, size_t num_samples) {
 
     if (result == RAC_SUCCESS && detected_index >= 0) {
         // Wake word detected!
+
+        // Barge-in: if TTS is currently playing, cancel it immediately
+        if (state_ == PipelineState::SPEAKING) {
+            std::cout << "[WakeWord] Barge-in! Cancelling TTS playback...\n";
+            // cancel_speech() stops producer thread + TTSQueue consumer + clears everything
+            // Must unlock mutex before cancel_speech (it may join threads)
+            impl_->mutex.unlock();
+            cancel_speech();
+            impl_->mutex.lock();
+
+            // Fire interrupt callback so main.cpp can stop chime/cleanup
+            if (config_.on_speech_interrupted) {
+                config_.on_speech_interrupted();
+            }
+        }
+
         impl_->wakeword_activated = true;
         impl_->wakeword_activation_time = std::chrono::steady_clock::now();
         impl_->speech_buffer.clear();
         impl_->speech_active = false;
         impl_->speech_callback_fired = false;
+        impl_->consecutive_speech_frames = 0;
+        impl_->consecutive_silent_frames = 0;
+        impl_->current_burst_frames = 0;
         state_ = PipelineState::LISTENING;
+
+        // Reset Silero VAD state (clear any residual speech detection from TTS audio)
+        if (impl_->silero_vad) {
+            rac_vad_onnx_reset(impl_->silero_vad);
+        }
 
         std::cout << "[WakeWord] Detected: \"" << config_.wake_word
                   << "\" (confidence: " << confidence << ")\n";

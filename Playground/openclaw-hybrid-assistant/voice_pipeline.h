@@ -49,6 +49,7 @@ struct VoicePipelineConfig {
     std::function<void(const std::string&, bool)> on_transcription;        // ASR result
     std::function<void(const int16_t*, size_t, int)> on_audio_output;      // TTS audio
     std::function<void(const std::string&)> on_error;                      // Error occurred
+    std::function<void()> on_speech_interrupted;                            // Wake word barge-in during TTS
 
     // Debug settings
     bool debug_wakeword = false;

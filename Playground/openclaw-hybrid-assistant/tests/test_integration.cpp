@@ -784,6 +784,177 @@ TestResult test_tts_queue_push_while_playing() {
 }
 
 // =============================================================================
+// Test: TTS Queue - Cancel During Active Playback (Barge-in Simulation)
+// =============================================================================
+// Simulates a wake word barge-in: the queue is actively playing a long response
+// (many chunks), cancel() is called mid-playback. Verifies:
+//   - Playback stops immediately (no more play() calls after cancel)
+//   - Remaining queued chunks are discarded
+//   - Queue becomes inactive
+// =============================================================================
+
+TestResult test_tts_queue_cancel_during_playback() {
+    TestResult result;
+    result.name = "TTS Queue - Cancel During Active Playback (Barge-in)";
+
+    std::atomic<size_t> play_count{0};
+    std::atomic<size_t> total_samples_played{0};
+
+    auto play_audio = [&](const int16_t*, size_t num_samples, int) {
+        play_count.fetch_add(1);
+        total_samples_played.fetch_add(num_samples);
+        // Simulate realistic ALSA playback: ~200ms per sentence chunk
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    };
+
+    openclaw::TTSQueue queue(play_audio);
+
+    // Push 20 chunks (simulating a very long response - ~4 seconds of playback)
+    const int chunks_total = 20;
+    for (int i = 0; i < chunks_total; i++) {
+        openclaw::AudioChunk chunk;
+        chunk.samples.resize(4410, static_cast<int16_t>(1000 + i * 100));  // 0.2s each
+        chunk.sample_rate = 22050;
+        queue.push(std::move(chunk));
+    }
+    queue.finish();
+
+    // Let a few chunks play (~3 chunks at 200ms each = ~600ms)
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    size_t played_before = play_count.load();
+
+    // BARGE-IN: cancel everything
+    auto cancel_start = std::chrono::steady_clock::now();
+    queue.cancel();
+    auto cancel_end = std::chrono::steady_clock::now();
+    auto cancel_ms = std::chrono::duration_cast<std::chrono::milliseconds>(cancel_end - cancel_start).count();
+
+    size_t played_at_cancel = play_count.load();
+
+    // Wait to verify nothing plays after cancel
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    size_t played_after = play_count.load();
+
+    // Verify not all chunks played (cancel worked)
+    if (played_at_cancel >= static_cast<size_t>(chunks_total)) {
+        result.details = "All " + std::to_string(chunks_total) + " chunks played - cancel was too late";
+        return result;
+    }
+
+    // Verify no audio after cancel
+    if (played_after != played_at_cancel) {
+        result.details = "Audio played after cancel: " + std::to_string(played_after - played_at_cancel) + " extra chunks";
+        return result;
+    }
+
+    // Verify queue is inactive
+    if (queue.is_active()) {
+        result.details = "Queue still active after cancel";
+        return result;
+    }
+
+    result.passed = true;
+    std::ostringstream details;
+    details << "Played " << played_before << " before cancel signal, "
+            << played_at_cancel << " total (out of " << chunks_total << " queued)"
+            << ", Cancel took " << cancel_ms << "ms"
+            << ", " << (chunks_total - played_at_cancel) << " chunks discarded";
+    result.details = details.str();
+
+    return result;
+}
+
+// =============================================================================
+// Test: TTS Queue - Cancel Kills Producer Thread Too
+// =============================================================================
+// Simulates barge-in while synthesis is still in progress: a slow producer
+// thread is pushing chunks into the queue. Cancel should stop both the
+// consumer (playback) AND make the producer exit early when it checks the
+// cancelled state. No new chunks should be synthesized after cancel.
+// =============================================================================
+
+TestResult test_tts_queue_cancel_during_synthesis() {
+    TestResult result;
+    result.name = "TTS Queue - Cancel Kills Both Producer and Consumer";
+
+    std::atomic<size_t> play_count{0};
+    std::atomic<size_t> synth_count{0};
+    std::atomic<bool> cancelled{false};
+
+    auto play_audio = [&](const int16_t*, size_t, int) {
+        play_count.fetch_add(1);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    };
+
+    openclaw::TTSQueue queue(play_audio);
+
+    // Producer thread: slowly synthesizes 10 chunks (100ms each = 1 second total)
+    std::thread producer([&]() {
+        for (int i = 0; i < 10; i++) {
+            if (cancelled.load()) break;
+
+            // Simulate synthesis time
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            synth_count.fetch_add(1);
+
+            if (cancelled.load()) break;
+
+            openclaw::AudioChunk chunk;
+            chunk.samples.resize(2205, static_cast<int16_t>(1000 + i * 100));
+            chunk.sample_rate = 22050;
+            queue.push(std::move(chunk));
+        }
+        queue.finish();
+    });
+
+    // Let producer + consumer run for a bit (~300ms = ~3 chunks synthesized)
+    std::this_thread::sleep_for(std::chrono::milliseconds(350));
+    size_t synth_before = synth_count.load();
+    size_t played_before = play_count.load();
+
+    // BARGE-IN: cancel everything
+    cancelled.store(true);
+    queue.cancel();
+
+    // Wait for producer thread to exit
+    producer.join();
+
+    size_t synth_after = synth_count.load();
+    size_t played_after = play_count.load();
+
+    // Wait to verify nothing more happens
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    size_t synth_final = synth_count.load();
+    size_t played_final = play_count.load();
+
+    // Verify not all 10 were synthesized
+    if (synth_final >= 10) {
+        result.details = "All 10 chunks synthesized despite cancel";
+        return result;
+    }
+
+    // Verify no new activity after cancel
+    if (played_final != played_after) {
+        result.details = "Audio played after cancel: " + std::to_string(played_final - played_after) + " extra";
+        return result;
+    }
+
+    if (synth_final != synth_after) {
+        result.details = "Synthesis continued after cancel: " + std::to_string(synth_final - synth_after) + " extra";
+        return result;
+    }
+
+    result.passed = true;
+    std::ostringstream details;
+    details << "Synthesized: " << synth_before << " before cancel, " << synth_final << " total (out of 10)"
+            << ", Played: " << played_before << " before cancel, " << played_final << " total"
+            << ", Producer exited cleanly";
+    result.details = details.str();
+
+    return result;
+}
+
+// =============================================================================
 // Test: Waiting Chime Timing
 // =============================================================================
 // Verifies:
@@ -1416,6 +1587,8 @@ int main(int argc, char* argv[]) {
             results.push_back(test_tts_queue_parallel_playback());
             results.push_back(test_tts_queue_cancel());
             results.push_back(test_tts_queue_push_while_playing());
+            results.push_back(test_tts_queue_cancel_during_playback());
+            results.push_back(test_tts_queue_cancel_during_synthesis());
         }
         else if (arg == "--test-chime") {
             // Chime tests need NO model/backend infrastructure
@@ -1445,6 +1618,8 @@ int main(int argc, char* argv[]) {
             results.push_back(test_tts_queue_parallel_playback());
             results.push_back(test_tts_queue_cancel());
             results.push_back(test_tts_queue_push_while_playing());
+            results.push_back(test_tts_queue_cancel_during_playback());
+            results.push_back(test_tts_queue_cancel_during_synthesis());
 
             // --- Section 2: Waiting Chime (NO backend init needed) ---
             std::cout << "\n--- Section 2: Waiting Chime ---\n\n";
