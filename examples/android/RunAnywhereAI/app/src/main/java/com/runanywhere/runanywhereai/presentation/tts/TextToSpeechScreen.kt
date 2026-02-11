@@ -238,7 +238,7 @@ private fun TTSModelButton(
                     )
                     Text(
                         text = "Streaming",
-                        style = AppTypography.caption2.copy(fontSize = 10.sp, fontWeight = FontWeight.Medium),
+                        style = AppTypography.system10.copy(fontWeight = FontWeight.Medium),
                         color = AppColors.primaryGreen,
                     )
                 }

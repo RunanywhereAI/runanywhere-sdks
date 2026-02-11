@@ -50,7 +50,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.R
@@ -181,30 +180,32 @@ fun ModelSelectionBottomSheet(
                             .thenBy { it.name },
                     )
                     sortedModels.forEachIndexed { index, model ->
+                        val isBuiltIn = model.framework == InferenceFramework.FOUNDATION_MODELS ||
+                            model.framework == InferenceFramework.SYSTEM_TTS
+                        val isReady = isBuiltIn || model.isDownloaded
                         ModelCard(
                             model = toAIModel(model),
-                            onClick = {
-                                val isBuiltIn = model.framework == InferenceFramework.FOUNDATION_MODELS ||
-                                    model.framework == InferenceFramework.SYSTEM_TTS
-                                val canDownload = model.downloadURL != null
-                                when {
-                                    isBuiltIn || model.isDownloaded -> {
-                                        scope.launch {
-                                            viewModel.selectModel(model.id)
-                                            var attempts = 0
-                                            val maxAttempts = 120
-                                            while (viewModel.uiState.value.isLoadingModel && attempts < maxAttempts) {
-                                                delay(500)
-                                                attempts++
-                                            }
-                                            if (!viewModel.uiState.value.isLoadingModel) {
-                                                onModelSelected(model)
-                                            }
-                                            onDismiss()
+                            isReady = isReady,
+                            isLoading = uiState.isLoadingModel && uiState.selectedModelId == model.id,
+                            onCardClick = {
+                                if (isReady) {
+                                    scope.launch {
+                                        viewModel.selectModel(model.id)
+                                        var attempts = 0
+                                        val maxAttempts = 120
+                                        while (viewModel.uiState.value.isLoadingModel && attempts < maxAttempts) {
+                                            delay(500)
+                                            attempts++
                                         }
+                                        if (!viewModel.uiState.value.isLoadingModel) {
+                                            onModelSelected(model)
+                                        }
+                                        onDismiss()
                                     }
-                                    canDownload -> viewModel.startDownload(model.id)
                                 }
+                            },
+                            onDownloadClick = {
+                                if (!isReady) viewModel.startDownload(model.id)
                             },
                         )
                         if (index < sortedModels.lastIndex) Spacer(modifier = Modifier.height(8.dp))
@@ -452,13 +453,18 @@ private fun RowDivider() {
 @Composable
 private fun ModelCard(
     model: AIModel,
-    onClick: () -> Unit,
+    isReady: Boolean,
+    isLoading: Boolean,
+    onCardClick: () -> Unit,
+    onDownloadClick: () -> Unit,
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
-            .clickable(onClick = onClick),
+            .then(
+                if (isReady) Modifier.clickable(onClick = onCardClick) else Modifier,
+            ),
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
@@ -510,12 +516,21 @@ private fun ModelCard(
                     icon = null,
                 )
             } else {
-                Badge(
-                    text = model.size,
-                    textColor = AppColors.primaryAccent,
-                    backgroundColor = AppColors.primaryAccent.copy(alpha = 0.10f),
-                    icon = Icons.Outlined.Download,
-                )
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = AppColors.primaryAccent,
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Badge(
+                        text = model.size,
+                        textColor = AppColors.primaryAccent,
+                        backgroundColor = AppColors.primaryAccent.copy(alpha = 0.10f),
+                        icon = Icons.Outlined.Download,
+                        onClick = onDownloadClick,
+                    )
+                }
             }
         }
     }
@@ -529,13 +544,19 @@ private fun Badge(
     textColor: Color,
     backgroundColor: Color,
     icon: ImageVector? = null,
+    onClick: (() -> Unit)? = null,
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
+    val modifier =
+        Modifier
             .clip(RoundedCornerShape(8.dp))
             .background(backgroundColor)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .then(
+                if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
+            )
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier,
     ) {
         if (icon != null) {
             Icon(
@@ -548,8 +569,7 @@ private fun Badge(
         }
         Text(
             text = text,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
             color = textColor,
         )
     }
@@ -635,7 +655,7 @@ private fun SystemTTSRow(
                     .clip(CircleShape)
                     .background(AppColors.primaryAccent.copy(alpha = 0.08f)),
             ) {
-                Text(text = "🔊", fontSize = 20.sp)
+                Text(text = "🔊", style = MaterialTheme.typography.titleSmall)
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {

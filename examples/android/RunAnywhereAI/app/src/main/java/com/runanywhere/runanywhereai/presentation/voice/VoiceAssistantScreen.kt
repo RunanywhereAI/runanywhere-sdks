@@ -460,9 +460,7 @@ private fun ModelSetupCard(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = title,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                     )
                 }
 
