@@ -13,6 +13,10 @@
 #include <memory>
 #include <string>
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
 #include "llamacpp_backend.h"
 
 #include "rac/core/rac_error.h"
@@ -58,11 +62,50 @@ rac_result_t rac_llm_llamacpp_create(const char* model_path,
         init_config["num_threads"] = config->num_threads;
     }
 
-    // Initialize backend
-    if (!handle->backend->initialize(init_config)) {
-        delete handle;
-        rac_error_set_details("Failed to initialize LlamaCPP backend");
-        return RAC_ERROR_BACKEND_INIT_FAILED;
+    // Initialize backend - wrap in try-catch for Vulkan exceptions
+    try {
+        if (!handle->backend->initialize(init_config)) {
+            delete handle;
+            rac_error_set_details("Failed to initialize LlamaCPP backend");
+            return RAC_ERROR_BACKEND_INIT_FAILED;
+        }
+    } catch (const std::exception& e) {
+        // Vulkan exception during llama_backend_init() - retry with GPU disabled
+#ifdef __ANDROID__
+        __android_log_print(ANDROID_LOG_ERROR, "RAC_GPU_STATUS",
+            "Backend init exception (Vulkan crash): %s - retrying CPU only", e.what());
+#endif
+        handle->backend = std::make_unique<runanywhere::LlamaCppBackend>();
+        handle->backend->disable_gpu();
+        try {
+            if (!handle->backend->initialize(init_config)) {
+                delete handle;
+                rac_error_set_details("Failed to initialize LlamaCPP backend (CPU fallback)");
+                return RAC_ERROR_BACKEND_INIT_FAILED;
+            }
+        } catch (...) {
+            delete handle;
+            rac_error_set_details("LlamaCPP backend init failed even in CPU mode");
+            return RAC_ERROR_BACKEND_INIT_FAILED;
+        }
+    } catch (...) {
+#ifdef __ANDROID__
+        __android_log_print(ANDROID_LOG_ERROR, "RAC_GPU_STATUS",
+            "Backend init unknown exception - retrying CPU only");
+#endif
+        handle->backend = std::make_unique<runanywhere::LlamaCppBackend>();
+        handle->backend->disable_gpu();
+        try {
+            if (!handle->backend->initialize(init_config)) {
+                delete handle;
+                rac_error_set_details("Failed to initialize LlamaCPP backend (CPU fallback)");
+                return RAC_ERROR_BACKEND_INIT_FAILED;
+            }
+        } catch (...) {
+            delete handle;
+            rac_error_set_details("LlamaCPP backend init failed even in CPU mode");
+            return RAC_ERROR_BACKEND_INIT_FAILED;
+        }
     }
 
     // Get text generation component
@@ -87,10 +130,43 @@ rac_result_t rac_llm_llamacpp_create(const char* model_path,
         }
     }
 
-    // Load model
-    if (!handle->text_gen->load_model(model_path, model_config)) {
+    // Load model with exception handling
+    try {
+        if (!handle->text_gen->load_model(model_path, model_config)) {
+            delete handle;
+            rac_error_set_details("Failed to load model");
+            return RAC_ERROR_MODEL_LOAD_FAILED;
+        }
+    } catch (const std::exception& e) {
+        // If GPU mode caused the crash, retry with CPU
+        if (handle->backend->is_using_gpu()) {
+#ifdef __ANDROID__
+            __android_log_print(ANDROID_LOG_ERROR, "RAC_GPU_STATUS",
+                "Model load Vulkan exception: %s - retrying CPU", e.what());
+#endif
+            handle->backend->disable_gpu();
+            handle->text_gen->unload_model();
+            try {
+                if (!handle->text_gen->load_model(model_path, model_config)) {
+                    delete handle;
+                    rac_error_set_details("Failed to load model (CPU fallback)");
+                    return RAC_ERROR_MODEL_LOAD_FAILED;
+                }
+            } catch (...) {
+                delete handle;
+                rac_error_set_details("Model load failed even in CPU mode");
+                return RAC_ERROR_MODEL_LOAD_FAILED;
+            }
+        } else {
+            delete handle;
+            char error_msg[512];
+            snprintf(error_msg, sizeof(error_msg), "Model load exception: %s", e.what());
+            rac_error_set_details(error_msg);
+            return RAC_ERROR_MODEL_LOAD_FAILED;
+        }
+    } catch (...) {
         delete handle;
-        rac_error_set_details("Failed to load model");
+        rac_error_set_details("Unknown exception during model load");
         return RAC_ERROR_MODEL_LOAD_FAILED;
     }
 
