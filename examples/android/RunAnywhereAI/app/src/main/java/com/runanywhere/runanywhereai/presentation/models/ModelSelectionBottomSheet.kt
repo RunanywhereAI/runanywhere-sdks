@@ -78,6 +78,7 @@ private data class AIModel(
     val name: String,
     val logoResId: Int,
     val format: String,
+    val formatColor: Color,
     val size: String,
     val isDownloaded: Boolean,
 )
@@ -248,11 +249,13 @@ private fun toAIModel(m: ModelInfo): AIModel {
         InferenceFramework.SYSTEM_TTS -> "System"
         else -> m.framework.displayName
     }
+    val formatColor = if (m.framework == InferenceFramework.ONNX) AppColors.primaryPurple else AppColors.primaryAccent
     val sizeStr = if (m.downloadSize != null && m.downloadSize!! > 0) formatBytes(m.downloadSize!!) else "—"
     return AIModel(
         name = m.name,
         logoResId = getModelLogoResId(m),
         format = formatStr,
+        formatColor = formatColor,
         size = sizeStr,
         isDownloaded = m.isDownloaded || m.framework == InferenceFramework.FOUNDATION_MODELS || m.framework == InferenceFramework.SYSTEM_TTS,
     )
@@ -493,8 +496,8 @@ private fun ModelCard(
 
             Badge(
                 text = model.format,
-                textColor = AppColors.primaryAccent,
-                backgroundColor = AppColors.primaryAccent.copy(alpha = 0.10f),
+                textColor = model.formatColor,
+                backgroundColor = model.formatColor.copy(alpha = 0.10f),
             )
 
             Spacer(modifier = Modifier.width(8.dp))
