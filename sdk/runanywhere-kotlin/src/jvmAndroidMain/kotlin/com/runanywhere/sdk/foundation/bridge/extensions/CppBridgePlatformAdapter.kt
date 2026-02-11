@@ -10,7 +10,6 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
-import java.util.Base64
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.errors.CommonsErrorCode
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
@@ -18,10 +17,11 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Base64
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Platform adapter that provides JNI callbacks for C++ core operations.
@@ -105,8 +105,11 @@ object CppBridgePlatformAdapter {
      */
     interface PlatformSecureStorage {
         fun get(key: String): ByteArray?
+
         fun set(key: String, value: ByteArray): Boolean
+
         fun delete(key: String): Boolean
+
         fun clear()
     }
 

@@ -285,118 +285,120 @@ object CppBridgeModelAssignment {
      * Callback object for C++ model assignment API.
      * Methods are called from JNI.
      */
-    private val nativeCallbackHandler = object {
-        /**
-         * HTTP GET callback for model assignments.
-         * @param endpoint API endpoint path (e.g., "/api/v1/model-assignments/for-sdk")
-         * @param requiresAuth Whether auth header is required
-         * @return JSON response or "ERROR:message" on failure
-         */
-        @Suppress("unused") // Called from JNI
-        fun httpGet(endpoint: String, requiresAuth: Boolean): String {
-            return try {
-                // Get base URL from telemetry config or use default
-                val baseUrl = CppBridgeTelemetry.getBaseUrl()
-                    ?: "https://api.runanywhere.ai"
-                val fullUrl = "$baseUrl$endpoint"
+    private val nativeCallbackHandler =
+        object {
+            /**
+             * HTTP GET callback for model assignments.
+             * @param endpoint API endpoint path (e.g., "/api/v1/model-assignments/for-sdk")
+             * @param requiresAuth Whether auth header is required
+             * @return JSON response or "ERROR:message" on failure
+             */
+            @Suppress("unused") // Called from JNI
+            fun httpGet(endpoint: String, requiresAuth: Boolean): String {
+                return try {
+                    // Get base URL from telemetry config or use default
+                    val baseUrl =
+                        CppBridgeTelemetry.getBaseUrl()
+                            ?: "https://api.runanywhere.ai"
+                    val fullUrl = "$baseUrl$endpoint"
 
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.INFO,
-                    TAG,
-                    ">>> Model assignment HTTP GET to: $fullUrl (requiresAuth: $requiresAuth)",
-                )
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.INFO,
-                    TAG,
-                    ">>> Base URL: $baseUrl, Endpoint: $endpoint",
-                )
-
-                // Build headers - matching Swift SDK's HTTPService.defaultHeaders
-                val headers = mutableMapOf<String, String>()
-                headers["Accept"] = "application/json"
-                headers["Content-Type"] = "application/json"
-                headers["X-SDK-Client"] = "RunAnywhereSDK"
-                headers["X-SDK-Version"] = com.runanywhere.sdk.utils.SDKConstants.SDK_VERSION
-                headers["X-Platform"] = "android"
-
-                if (requiresAuth) {
-                    // Get access token from auth manager
                     CppBridgePlatformAdapter.logCallback(
                         CppBridgePlatformAdapter.LogLevel.INFO,
                         TAG,
-                        "Auth state - isAuthenticated: ${CppBridgeAuth.isAuthenticated}, tokenNeedsRefresh: ${CppBridgeAuth.tokenNeedsRefresh}",
+                        ">>> Model assignment HTTP GET to: $fullUrl (requiresAuth: $requiresAuth)",
                     )
-                    val accessToken = CppBridgeAuth.getValidToken()
-                    if (!accessToken.isNullOrEmpty()) {
-                        headers["Authorization"] = "Bearer $accessToken"
+                    CppBridgePlatformAdapter.logCallback(
+                        CppBridgePlatformAdapter.LogLevel.INFO,
+                        TAG,
+                        ">>> Base URL: $baseUrl, Endpoint: $endpoint",
+                    )
+
+                    // Build headers - matching Swift SDK's HTTPService.defaultHeaders
+                    val headers = mutableMapOf<String, String>()
+                    headers["Accept"] = "application/json"
+                    headers["Content-Type"] = "application/json"
+                    headers["X-SDK-Client"] = "RunAnywhereSDK"
+                    headers["X-SDK-Version"] = com.runanywhere.sdk.utils.SDKConstants.SDK_VERSION
+                    headers["X-Platform"] = "android"
+
+                    if (requiresAuth) {
+                        // Get access token from auth manager
                         CppBridgePlatformAdapter.logCallback(
                             CppBridgePlatformAdapter.LogLevel.INFO,
                             TAG,
-                            "Added Authorization header (token length: ${accessToken.length})",
+                            "Auth state - isAuthenticated: ${CppBridgeAuth.isAuthenticated}, tokenNeedsRefresh: ${CppBridgeAuth.tokenNeedsRefresh}",
                         )
-                    } else {
-                        // Fallback to API key if no OAuth token available
-                        // This mirrors Swift SDK's HTTPService.resolveToken() behavior
-                        val apiKey = CppBridgeTelemetry.getApiKey()
-                        if (!apiKey.isNullOrEmpty()) {
-                            headers["Authorization"] = "Bearer $apiKey"
+                        val accessToken = CppBridgeAuth.getValidToken()
+                        if (!accessToken.isNullOrEmpty()) {
+                            headers["Authorization"] = "Bearer $accessToken"
                             CppBridgePlatformAdapter.logCallback(
                                 CppBridgePlatformAdapter.LogLevel.INFO,
                                 TAG,
-                                "No OAuth token available, falling back to API key authentication (key length: ${apiKey.length})",
+                                "Added Authorization header (token length: ${accessToken.length})",
                             )
                         } else {
-                            CppBridgePlatformAdapter.logCallback(
-                                CppBridgePlatformAdapter.LogLevel.ERROR,
-                                TAG,
-                                "⚠️ No access token or API key available for authenticated request! Model assignments will likely fail.",
-                            )
+                            // Fallback to API key if no OAuth token available
+                            // This mirrors Swift SDK's HTTPService.resolveToken() behavior
+                            val apiKey = CppBridgeTelemetry.getApiKey()
+                            if (!apiKey.isNullOrEmpty()) {
+                                headers["Authorization"] = "Bearer $apiKey"
+                                CppBridgePlatformAdapter.logCallback(
+                                    CppBridgePlatformAdapter.LogLevel.INFO,
+                                    TAG,
+                                    "No OAuth token available, falling back to API key authentication (key length: ${apiKey.length})",
+                                )
+                            } else {
+                                CppBridgePlatformAdapter.logCallback(
+                                    CppBridgePlatformAdapter.LogLevel.ERROR,
+                                    TAG,
+                                    "⚠️ No access token or API key available for authenticated request! Model assignments will likely fail.",
+                                )
+                            }
                         }
                     }
-                }
 
-                // Make HTTP request
-                val response = CppBridgeHTTP.get(fullUrl, headers)
+                    // Make HTTP request
+                    val response = CppBridgeHTTP.get(fullUrl, headers)
 
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.INFO,
-                    TAG,
-                    "<<< Model assignment response: status=${response.statusCode}, success=${response.success}, bodyLen=${response.body?.length ?: 0}",
-                )
-                
-                // Log full response body for debugging
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.INFO,
-                    TAG,
-                    "<<< Full response body: ${response.body ?: "null"}",
-                )
-
-                if (response.success && response.body != null) {
                     CppBridgePlatformAdapter.logCallback(
                         CppBridgePlatformAdapter.LogLevel.INFO,
                         TAG,
-                        "Model assignments fetched successfully: ${response.body.take(500)}",
+                        "<<< Model assignment response: status=${response.statusCode}, success=${response.success}, bodyLen=${response.body?.length ?: 0}",
                     )
-                    response.body
-                } else {
-                    val errorMsg = response.errorMessage ?: "HTTP ${response.statusCode}"
+
+                    // Log full response body for debugging
+                    CppBridgePlatformAdapter.logCallback(
+                        CppBridgePlatformAdapter.LogLevel.INFO,
+                        TAG,
+                        "<<< Full response body: ${response.body ?: "null"}",
+                    )
+
+                    if (response.success && response.body != null) {
+                        CppBridgePlatformAdapter.logCallback(
+                            CppBridgePlatformAdapter.LogLevel.INFO,
+                            TAG,
+                            "Model assignments fetched successfully: ${response.body.take(500)}",
+                        )
+                        response.body
+                    } else {
+                        val errorMsg = response.errorMessage ?: "HTTP ${response.statusCode}"
+                        CppBridgePlatformAdapter.logCallback(
+                            CppBridgePlatformAdapter.LogLevel.ERROR,
+                            TAG,
+                            "HTTP GET failed: $errorMsg",
+                        )
+                        "ERROR:$errorMsg"
+                    }
+                } catch (e: Exception) {
                     CppBridgePlatformAdapter.logCallback(
                         CppBridgePlatformAdapter.LogLevel.ERROR,
                         TAG,
-                        "HTTP GET failed: $errorMsg",
+                        "HTTP GET exception: ${e.message}",
                     )
-                    "ERROR:$errorMsg"
+                    "ERROR:${e.message}"
                 }
-            } catch (e: Exception) {
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.ERROR,
-                    TAG,
-                    "HTTP GET exception: ${e.message}",
-                )
-                "ERROR:${e.message}"
             }
         }
-    }
 
     /**
      * Register the model assignment callbacks with C++ core.
@@ -428,8 +430,9 @@ object CppBridgeModelAssignment {
                     "Registering model assignment callbacks with C++ (autoFetch: $autoFetch)...",
                 )
 
-                val result = com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-                    .racModelAssignmentSetCallbacks(nativeCallbackHandler, autoFetch)
+                val result =
+                    com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+                        .racModelAssignmentSetCallbacks(nativeCallbackHandler, autoFetch)
 
                 if (result == 0) { // RAC_SUCCESS
                     isRegistered = true
@@ -1001,8 +1004,9 @@ object CppBridgeModelAssignment {
                 ">>> Fetching model assignments from backend (forceRefresh: $forceRefresh)...",
             )
 
-            val result = com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-                .racModelAssignmentFetch(forceRefresh)
+            val result =
+                com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+                    .racModelAssignmentFetch(forceRefresh)
 
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
