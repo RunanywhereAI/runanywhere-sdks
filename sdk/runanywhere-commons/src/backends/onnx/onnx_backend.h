@@ -56,6 +56,7 @@ enum class STTModelType {
     ZIPFORMER,
     TRANSDUCER,
     PARAFORMER,
+    NEMO_CTC,
     CUSTOM
 };
 

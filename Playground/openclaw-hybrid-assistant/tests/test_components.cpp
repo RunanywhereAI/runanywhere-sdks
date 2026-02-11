@@ -279,7 +279,7 @@ TestResult test_vad_stt(const std::string& wav_path, bool expect_speech, const s
 
     // Load STT model
     std::string stt_path = openclaw::get_stt_model_path();
-    res = rac_voice_agent_load_stt_model(agent, stt_path.c_str(), "whisper-tiny-en", "Whisper");
+    res = rac_voice_agent_load_stt_model(agent, stt_path.c_str(), openclaw::STT_MODEL_ID, "Parakeet TDT-CTC 110M EN");
     if (res != RAC_SUCCESS) {
         result.actual = "Failed to load STT model";
         rac_voice_agent_destroy(agent);

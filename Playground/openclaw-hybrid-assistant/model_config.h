@@ -5,8 +5,8 @@
 // =============================================================================
 // Simplified configuration - NO LLM, only:
 // - VAD (Silero)
-// - STT (Whisper Tiny EN)
-// - TTS (Piper Lessac)
+// - STT (Parakeet TDT-CTC 110M - NeMo CTC, ~126MB, int8 quantized)
+// - TTS (Piper Lessac Medium - ~61MB, 22050Hz, natural male voice)
 // - Wake Word (openWakeWord - optional)
 // =============================================================================
 
@@ -27,11 +27,12 @@ namespace openclaw {
 // =============================================================================
 
 constexpr const char* VAD_MODEL_ID = "silero-vad";
-constexpr const char* STT_MODEL_ID = "whisper-tiny-en";
-constexpr const char* TTS_MODEL_ID = "kokoro-en-v0_19";  // Kokoro TTS English (24kHz, 11 speakers)
+constexpr const char* STT_MODEL_ID = "parakeet-tdt-ctc-110m-en-int8";  // Parakeet NeMo CTC (int8, ~126MB)
+constexpr const char* TTS_MODEL_ID = "vits-piper-en_US-lessac-medium";  // Piper Lessac (22050Hz, ~61MB)
 
-// Piper TTS (alternative, smaller model)
-constexpr const char* TTS_MODEL_ID_PIPER = "vits-piper-en_US-lessac-medium";
+// Alternative models (kept for reference / fallback)
+constexpr const char* STT_MODEL_ID_WHISPER = "whisper-tiny-en";
+constexpr const char* TTS_MODEL_ID_KOKORO = "kokoro-en-v0_19";
 
 // Wake word models (optional)
 constexpr const char* WAKEWORD_MODEL_ID = "hey-jarvis";
@@ -42,12 +43,8 @@ constexpr const char* WAKEWORD_EMBEDDING_ID = "openwakeword-embedding";
 // =============================================================================
 
 constexpr const char* VAD_MODEL_FILE = "silero_vad.onnx";
-constexpr const char* STT_MODEL_FILE = "";  // Directory-based
-constexpr const char* TTS_MODEL_FILE = "model.onnx";  // Kokoro uses model.onnx + voices.bin
-constexpr const char* TTS_VOICES_FILE = "voices.bin";  // Kokoro voice embeddings
-
-// Piper TTS files (alternative model)
-constexpr const char* TTS_MODEL_FILE_PIPER = "en_US-lessac-medium.onnx";
+constexpr const char* STT_MODEL_FILE = "";  // Directory-based (Parakeet has model.int8.onnx + tokens.txt)
+constexpr const char* TTS_MODEL_FILE = "en_US-lessac-medium.onnx";  // Piper model file
 
 // Wake word model files
 constexpr const char* WAKEWORD_MODEL_FILE = "hey_jarvis_v0.1.onnx";
@@ -80,25 +77,25 @@ inline const ModelConfig REQUIRED_MODELS[] = {
         .framework = RAC_FRAMEWORK_ONNX,
         .memory_required = 10 * 1024 * 1024
     },
-    // STT Model
+    // STT Model (Parakeet TDT-CTC 110M - NeMo CTC, int8 quantized)
     {
         .id = STT_MODEL_ID,
-        .name = "Whisper Tiny English",
+        .name = "Parakeet TDT-CTC 110M EN (int8)",
         .filename = STT_MODEL_FILE,
         .category = RAC_MODEL_CATEGORY_SPEECH_RECOGNITION,
         .format = RAC_MODEL_FORMAT_ONNX,
         .framework = RAC_FRAMEWORK_ONNX,
-        .memory_required = 150 * 1024 * 1024
+        .memory_required = 126 * 1024 * 1024  // ~126MB int8 quantized
     },
-    // TTS Model (Kokoro English - high quality, 24kHz, 11 speakers)
+    // TTS Model (Piper Lessac Medium - VITS, 22050Hz, natural male voice)
     {
         .id = TTS_MODEL_ID,
-        .name = "Kokoro TTS English v0.19",
+        .name = "Piper Lessac Medium TTS",
         .filename = TTS_MODEL_FILE,
         .category = RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS,
         .format = RAC_MODEL_FORMAT_ONNX,
         .framework = RAC_FRAMEWORK_ONNX,
-        .memory_required = 340 * 1024 * 1024  // ~330MB model + ~6MB voices
+        .memory_required = 65 * 1024 * 1024  // ~61MB model + espeak-ng-data
     }
 };
 

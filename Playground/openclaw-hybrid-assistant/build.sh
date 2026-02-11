@@ -204,7 +204,7 @@ MODELS_OK=true
 if [ ! -d "${MODEL_DIR}/ONNX/silero-vad" ]; then
     MODELS_OK=false
 fi
-if [ ! -d "${MODEL_DIR}/ONNX/whisper-tiny-en" ]; then
+if [ ! -d "${MODEL_DIR}/ONNX/parakeet-tdt-ctc-110m-en-int8" ]; then
     MODELS_OK=false
 fi
 if [ ! -d "${MODEL_DIR}/ONNX/vits-piper-en_US-lessac-medium" ]; then
@@ -218,7 +218,7 @@ else
 
     # Create model directories
     mkdir -p "${MODEL_DIR}/ONNX/silero-vad"
-    mkdir -p "${MODEL_DIR}/ONNX/whisper-tiny-en"
+    mkdir -p "${MODEL_DIR}/ONNX/parakeet-tdt-ctc-110m-en-int8"
     mkdir -p "${MODEL_DIR}/ONNX/vits-piper-en_US-lessac-medium"
 
     # Download Silero VAD
@@ -228,13 +228,17 @@ else
             "https://github.com/snakers4/silero-vad/raw/master/files/silero_vad.onnx"
     fi
 
-    # Download Whisper Tiny EN (Sherpa-ONNX format)
-    print_step "Downloading Whisper Tiny EN..."
-    if [ ! -f "${MODEL_DIR}/ONNX/whisper-tiny-en/tiny-encoder.int8.onnx" ]; then
-        WHISPER_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.en.tar.bz2"
-        curl -L "${WHISPER_URL}" | tar -xjf - -C "${MODEL_DIR}/ONNX/"
-        mv "${MODEL_DIR}/ONNX/sherpa-onnx-whisper-tiny.en"/* "${MODEL_DIR}/ONNX/whisper-tiny-en/" 2>/dev/null || true
-        rm -rf "${MODEL_DIR}/ONNX/sherpa-onnx-whisper-tiny.en"
+    # Download Parakeet TDT-CTC 110M EN (int8 quantized, NeMo CTC)
+    PARAKEET_DIR="${MODEL_DIR}/ONNX/parakeet-tdt-ctc-110m-en-int8"
+    print_step "Downloading Parakeet TDT-CTC 110M EN (int8)..."
+    if [ ! -f "${PARAKEET_DIR}/model.int8.onnx" ]; then
+        PARAKEET_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000-int8.tar.bz2"
+        curl -L "${PARAKEET_URL}" | tar -xjf - -C "${MODEL_DIR}/ONNX/"
+        EXTRACTED_DIR="${MODEL_DIR}/ONNX/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000-int8"
+        if [ -d "${EXTRACTED_DIR}" ]; then
+            mv "${EXTRACTED_DIR}"/* "${PARAKEET_DIR}/" 2>/dev/null || true
+            rm -rf "${EXTRACTED_DIR}"
+        fi
     fi
 
     # Download Piper TTS (Lessac medium)

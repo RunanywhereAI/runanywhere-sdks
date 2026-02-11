@@ -143,9 +143,11 @@ bool ONNXSTT::load_model(const std::string& model_path, STTModelType model_type,
         return false;
     }
 
+    // Scan the model directory for files
     std::string encoder_path;
     std::string decoder_path;
     std::string tokens_path;
+    std::string nemo_ctc_model_path;  // Single-file CTC model (model.int8.onnx or model.onnx)
 
     if (S_ISDIR(path_stat.st_mode)) {
         DIR* dir = opendir(model_path.c_str());
@@ -171,6 +173,13 @@ bool ONNXSTT::load_model(const std::string& model_path, STTModelType model_type,
                                                   filename.find(".txt") != std::string::npos)) {
                 tokens_path = full_path;
                 RAC_LOG_DEBUG("ONNX.STT", "Found tokens: %s", tokens_path.c_str());
+            } else if ((filename == "model.int8.onnx" || filename == "model.onnx") &&
+                       encoder_path.empty()) {
+                // Single-file model (NeMo CTC, etc.) - prefer int8 if both exist
+                if (filename == "model.int8.onnx" || nemo_ctc_model_path.empty()) {
+                    nemo_ctc_model_path = full_path;
+                    RAC_LOG_DEBUG("ONNX.STT", "Found single-file model: %s", nemo_ctc_model_path.c_str());
+                }
             }
         }
         closedir(dir);
@@ -209,18 +218,52 @@ bool ONNXSTT::load_model(const std::string& model_path, STTModelType model_type,
         language_ = config["language"].get<std::string>();
     }
 
-    RAC_LOG_INFO("ONNX.STT", "Encoder: %s", encoder_path.c_str());
-    RAC_LOG_INFO("ONNX.STT", "Decoder: %s", decoder_path.c_str());
-    RAC_LOG_INFO("ONNX.STT", "Tokens: %s", tokens_path.c_str());
+    // Auto-detect model type if not explicitly set:
+    // If we found a single-file model (model.int8.onnx / model.onnx) but no encoder/decoder,
+    // this is a NeMo CTC model. Also detect from path keywords.
+    if (model_type_ != STTModelType::NEMO_CTC) {
+        bool has_encoder_decoder = !encoder_path.empty() && !decoder_path.empty();
+        bool has_single_model = !nemo_ctc_model_path.empty();
+        bool path_suggests_nemo = (model_path.find("nemo") != std::string::npos ||
+                                   model_path.find("parakeet") != std::string::npos ||
+                                   model_path.find("ctc") != std::string::npos);
+
+        if ((!has_encoder_decoder && has_single_model) || path_suggests_nemo) {
+            model_type_ = STTModelType::NEMO_CTC;
+            RAC_LOG_INFO("ONNX.STT", "Auto-detected NeMo CTC model type");
+        }
+    }
+
+    // Branch based on model type
+    bool is_nemo_ctc = (model_type_ == STTModelType::NEMO_CTC);
+
+    if (is_nemo_ctc) {
+        // NeMo CTC: single model file + tokens
+        if (nemo_ctc_model_path.empty()) {
+            RAC_LOG_ERROR("ONNX.STT", "NeMo CTC model file not found (model.int8.onnx or model.onnx) in: %s",
+                          model_path.c_str());
+            return false;
+        }
+        RAC_LOG_INFO("ONNX.STT", "NeMo CTC model: %s", nemo_ctc_model_path.c_str());
+        RAC_LOG_INFO("ONNX.STT", "Tokens: %s", tokens_path.c_str());
+    } else {
+        // Whisper: encoder + decoder
+        RAC_LOG_INFO("ONNX.STT", "Encoder: %s", encoder_path.c_str());
+        RAC_LOG_INFO("ONNX.STT", "Decoder: %s", decoder_path.c_str());
+        RAC_LOG_INFO("ONNX.STT", "Tokens: %s", tokens_path.c_str());
+    }
     RAC_LOG_INFO("ONNX.STT", "Language: %s", language_.c_str());
 
-    if (stat(encoder_path.c_str(), &path_stat) != 0) {
-        RAC_LOG_ERROR("ONNX.STT", "Encoder file not found: %s", encoder_path.c_str());
-        return false;
-    }
-    if (stat(decoder_path.c_str(), &path_stat) != 0) {
-        RAC_LOG_ERROR("ONNX.STT", "Decoder file not found: %s", decoder_path.c_str());
-        return false;
+    // Validate required files
+    if (!is_nemo_ctc) {
+        if (stat(encoder_path.c_str(), &path_stat) != 0) {
+            RAC_LOG_ERROR("ONNX.STT", "Encoder file not found: %s", encoder_path.c_str());
+            return false;
+        }
+        if (stat(decoder_path.c_str(), &path_stat) != 0) {
+            RAC_LOG_ERROR("ONNX.STT", "Decoder file not found: %s", decoder_path.c_str());
+            return false;
+        }
     }
     if (stat(tokens_path.c_str(), &path_stat) != 0) {
         RAC_LOG_ERROR("ONNX.STT", "Tokens file not found: %s", tokens_path.c_str());
@@ -233,24 +276,38 @@ bool ONNXSTT::load_model(const std::string& model_path, STTModelType model_type,
     recognizer_config.feat_config.sample_rate = 16000;
     recognizer_config.feat_config.feature_dim = 80;
 
+    // Zero out all model slots
     recognizer_config.model_config.transducer.encoder = "";
     recognizer_config.model_config.transducer.decoder = "";
     recognizer_config.model_config.transducer.joiner = "";
     recognizer_config.model_config.paraformer.model = "";
     recognizer_config.model_config.nemo_ctc.model = "";
     recognizer_config.model_config.tdnn.model = "";
-
-    recognizer_config.model_config.whisper.encoder = encoder_path.c_str();
-    recognizer_config.model_config.whisper.decoder = decoder_path.c_str();
-    recognizer_config.model_config.whisper.language = language_.c_str();
-    recognizer_config.model_config.whisper.task = "transcribe";
+    recognizer_config.model_config.whisper.encoder = "";
+    recognizer_config.model_config.whisper.decoder = "";
+    recognizer_config.model_config.whisper.language = "";
+    recognizer_config.model_config.whisper.task = "";
     recognizer_config.model_config.whisper.tail_paddings = -1;
+
+    if (is_nemo_ctc) {
+        // Configure for NeMo CTC (Parakeet, etc.)
+        recognizer_config.model_config.nemo_ctc.model = nemo_ctc_model_path.c_str();
+        recognizer_config.model_config.model_type = "nemo_ctc";
+
+        RAC_LOG_INFO("ONNX.STT", "Configuring NeMo CTC recognizer");
+    } else {
+        // Configure for Whisper (encoder-decoder)
+        recognizer_config.model_config.whisper.encoder = encoder_path.c_str();
+        recognizer_config.model_config.whisper.decoder = decoder_path.c_str();
+        recognizer_config.model_config.whisper.language = language_.c_str();
+        recognizer_config.model_config.whisper.task = "transcribe";
+        recognizer_config.model_config.model_type = "whisper";
+    }
 
     recognizer_config.model_config.tokens = tokens_path.c_str();
     recognizer_config.model_config.num_threads = 2;
     recognizer_config.model_config.debug = 1;
     recognizer_config.model_config.provider = "cpu";
-    recognizer_config.model_config.model_type = "whisper";
 
     recognizer_config.model_config.modeling_unit = "cjkchar";
     recognizer_config.model_config.bpe_vocab = "";
@@ -293,7 +350,8 @@ bool ONNXSTT::load_model(const std::string& model_path, STTModelType model_type,
     recognizer_config.hr.lexicon = "";
     recognizer_config.hr.rule_fsts = "";
 
-    RAC_LOG_INFO("ONNX.STT", "Creating SherpaOnnxOfflineRecognizer...");
+    RAC_LOG_INFO("ONNX.STT", "Creating SherpaOnnxOfflineRecognizer (%s)...",
+                 is_nemo_ctc ? "NeMo CTC" : "Whisper");
 
     sherpa_recognizer_ = SherpaOnnxCreateOfflineRecognizer(&recognizer_config);
 
@@ -302,7 +360,8 @@ bool ONNXSTT::load_model(const std::string& model_path, STTModelType model_type,
         return false;
     }
 
-    RAC_LOG_INFO("ONNX.STT", "STT model loaded successfully");
+    RAC_LOG_INFO("ONNX.STT", "STT model loaded successfully (%s)",
+                 is_nemo_ctc ? "NeMo CTC" : "Whisper");
     model_loaded_ = true;
     return true;
 

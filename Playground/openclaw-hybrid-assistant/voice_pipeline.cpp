@@ -404,13 +404,13 @@ bool VoicePipeline::initialize() {
     std::string stt_path = get_stt_model_path();
     std::string tts_path = get_tts_model_path();
 
-    // Load STT model
+    // Load STT model (Parakeet TDT-CTC 110M - NeMo CTC, int8 quantized)
     std::cout << "  Loading STT: " << STT_MODEL_ID << "\n";
     result = rac_voice_agent_load_stt_model(
         impl_->voice_agent,
         stt_path.c_str(),
         STT_MODEL_ID,
-        "Whisper Tiny English"
+        "Parakeet TDT-CTC 110M EN (int8)"
     );
     if (result != RAC_SUCCESS) {
         last_error_ = "Failed to load STT model: " + stt_path;
@@ -421,13 +421,13 @@ bool VoicePipeline::initialize() {
     // Skip LLM - we don't need it for OpenClaw channel
     std::cout << "  LLM: skipped (OpenClaw mode - no local LLM)\n";
 
-    // Load TTS voice (Kokoro TTS English - high quality, 24kHz, 11 speakers)
+    // Load TTS voice (Piper Lessac Medium - VITS, 22050Hz, natural male voice)
     std::cout << "  Loading TTS: " << TTS_MODEL_ID << "\n";
     result = rac_voice_agent_load_tts_voice(
         impl_->voice_agent,
         tts_path.c_str(),
         TTS_MODEL_ID,
-        "Kokoro TTS English v0.19"
+        "Piper Lessac Medium TTS"
     );
     if (result != RAC_SUCCESS) {
         last_error_ = "Failed to load TTS voice: " + tts_path;
@@ -853,7 +853,7 @@ bool VoicePipeline::speak_text(const std::string& text) {
 
     std::cout << "[TTS] Streaming " << sentences.size() << " sentence(s)\n";
 
-    int tts_sample_rate = 24000;  // Kokoro's 24kHz
+    int tts_sample_rate = 22050;  // Piper Lessac's 22050Hz
     bool any_success = false;
 
     for (size_t i = 0; i < sentences.size(); ++i) {
