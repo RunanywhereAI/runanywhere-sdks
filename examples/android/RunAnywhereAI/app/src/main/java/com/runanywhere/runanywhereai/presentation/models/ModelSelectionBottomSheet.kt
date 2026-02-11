@@ -343,28 +343,28 @@ private fun DeviceStatusCard(status: DeviceStatus) {
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             DeviceStatusRow(
                 icon = Icons.Outlined.PhoneAndroid,
-                iconTint = AppColors.primaryAccent,
+                iconTint = AppColors.primaryBlue,
                 label = "Model",
                 value = status.model,
             )
             RowDivider()
             DeviceStatusRow(
                 icon = Icons.Outlined.Memory,
-                iconTint = AppColors.primaryAccent,
+                iconTint = AppColors.primaryBlue,
                 label = "Chip",
                 value = status.chip,
             )
             RowDivider()
             DeviceStatusRow(
                 icon = Icons.Outlined.SdStorage,
-                iconTint = AppColors.primaryAccent,
+                iconTint = AppColors.primaryBlue,
                 label = "Memory",
                 value = status.memory,
             )
             RowDivider()
             DeviceStatusRow(
                 icon = Icons.Outlined.Psychology,
-                iconTint = AppColors.primaryAccent,
+                iconTint = AppColors.primaryBlue,
                 label = "Neural Engine",
                 trailingContent = {
                     if (status.hasNeuralEngine) {
