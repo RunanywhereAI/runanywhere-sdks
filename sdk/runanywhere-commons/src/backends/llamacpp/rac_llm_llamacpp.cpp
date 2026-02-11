@@ -148,10 +148,12 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
     // Build request from RAC options
     runanywhere::TextGenerationRequest request;
     request.prompt = prompt;
+    float confidence_threshold = 0.0f;
     if (options != nullptr) {
         request.max_tokens = options->max_tokens;
         request.temperature = options->temperature;
         request.top_p = options->top_p;
+        confidence_threshold = options->confidence_threshold;
         // Handle stop sequences if available
         if (options->stop_sequences != nullptr && options->num_stop_sequences > 0) {
             for (int32_t i = 0; i < options->num_stop_sequences; i++) {
@@ -163,7 +165,7 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
     }
 
     // Generate using C++ class
-    auto result = h->text_gen->generate(request);
+    auto result = h->text_gen->generate(request, confidence_threshold);
 
     // Fill RAC result struct
     out_result->text = result.text.empty() ? nullptr : strdup(result.text.c_str());
@@ -176,6 +178,11 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
                                         ? (float)result.tokens_generated /
                                               (result.inference_time_ms / 1000.0f)
                                         : 0.0f;
+
+    // Confidence and cloud handoff fields
+    out_result->confidence = result.confidence;
+    out_result->cloud_handoff = result.cloud_handoff ? RAC_TRUE : RAC_FALSE;
+    out_result->handoff_reason = static_cast<rac_handoff_reason_t>(result.handoff_reason);
 
     // Publish event
     rac_event_track("llm.generation.completed", RAC_EVENT_CATEGORY_LLM, RAC_EVENT_DESTINATION_ALL,
@@ -199,10 +206,12 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
 
     runanywhere::TextGenerationRequest request;
     request.prompt = prompt;
+    float confidence_threshold = 0.0f;
     if (options != nullptr) {
         request.max_tokens = options->max_tokens;
         request.temperature = options->temperature;
         request.top_p = options->top_p;
+        confidence_threshold = options->confidence_threshold;
         if (options->stop_sequences != nullptr && options->num_stop_sequences > 0) {
             for (int32_t i = 0; i < options->num_stop_sequences; i++) {
                 if (options->stop_sequences[i]) {
@@ -212,13 +221,18 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
         }
     }
 
+    runanywhere::TextGenerationResult confidence_result;
+
     // Stream using C++ class
     bool success =
-        h->text_gen->generate_stream(request, [callback, user_data](const std::string& token) -> bool {
-            return callback(token.c_str(), RAC_FALSE, user_data) == RAC_TRUE;
-        });
+        h->text_gen->generate_stream(
+            request,
+            [callback, user_data](const std::string& token) -> bool {
+                return callback(token.c_str(), RAC_FALSE, user_data) == RAC_TRUE;
+            },
+            nullptr, confidence_threshold, &confidence_result);
 
-    if (success) {
+    if (success && !confidence_result.cloud_handoff) {
         callback("", RAC_TRUE, user_data);  // Final token
     }
 

@@ -112,6 +112,11 @@ data class LLMGenerationOptions(
     val preferredFramework: InferenceFramework? = null,
     val structuredOutput: StructuredOutputConfig? = null,
     val systemPrompt: String? = null,
+    /**
+     * Confidence threshold for cloud handoff (0.0 - 1.0).
+     * 0.0 = disabled. Values > 0 enable entropy-based confidence scoring.
+     */
+    val confidenceThreshold: Float = 0.0f,
 ) {
     companion object {
         val DEFAULT = LLMGenerationOptions()
@@ -150,6 +155,12 @@ data class LLMGenerationResult(
     val thinkingTokens: Int? = null,
     /** Number of tokens in the actual response content */
     val responseTokens: Int = tokensUsed,
+    /** Model confidence score (0.0 - 1.0, null if confidence scoring was disabled) */
+    val confidence: Float? = null,
+    /** Whether the engine recommends cloud fallback */
+    val cloudHandoff: Boolean? = null,
+    /** Reason for cloud handoff recommendation */
+    val handoffReason: com.runanywhere.sdk.public.extensions.Cloud.HandoffReason? = null,
 )
 
 // MARK: - LLM Streaming Result

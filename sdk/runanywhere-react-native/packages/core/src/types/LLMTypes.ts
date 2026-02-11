@@ -30,6 +30,9 @@ export interface LLMGenerationOptions {
 
   /** Enable streaming */
   streamingEnabled?: boolean;
+
+  /** Confidence threshold for cloud handoff (0.0 - 1.0). Used by routing engine. */
+  confidenceThreshold?: number;
 }
 
 /**
@@ -68,6 +71,15 @@ export interface LLMGenerationResult {
 
   /** Response tokens count */
   responseTokens: number;
+
+  /** On-device confidence score (0.0 - 1.0). Set by C++ entropy-based scoring. */
+  confidence?: number;
+
+  /** Whether cloud handoff was triggered by the on-device engine */
+  cloudHandoff?: boolean;
+
+  /** Reason for cloud handoff (maps to HandoffReason enum) */
+  handoffReason?: number;
 }
 
 /**

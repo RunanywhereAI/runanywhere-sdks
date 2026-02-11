@@ -157,3 +157,23 @@ export type {
   ToolCallingOptions,
   ToolCallingResult,
 } from './ToolCallingTypes';
+
+// Cloud Types (re-exported from cloud module for convenience)
+export {
+  RoutingMode,
+  CloudExecutionTarget,
+  HandoffReason,
+  DEFAULT_ROUTING_POLICY,
+  LOCAL_ONLY_POLICY,
+  CLOUD_ONLY_POLICY,
+  hybridAutoPolicy,
+  hybridManualPolicy,
+} from '../cloud/CloudTypes';
+export type {
+  CloudRoutingPolicy,
+  RoutingDecision,
+  CloudGenerationOptions,
+  CloudGenerationResult,
+  RoutedGenerationResult,
+  RoutedStreamingResult,
+} from '../cloud/CloudTypes';

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -153,6 +154,97 @@ size_t LlamaCppBackend::get_memory_usage() const {
 void LlamaCppBackend::create_text_generation() {
     text_gen_ = std::make_unique<LlamaCppTextGeneration>(this);
     LOGI("Created text generation component");
+}
+
+// =============================================================================
+// ENTROPY-BASED CONFIDENCE SCORING
+// =============================================================================
+
+static constexpr size_t RAC_CONFIDENCE_WINDOW_SIZE = 10;
+
+/**
+ * Rolling confidence tracker for on-device inference quality monitoring.
+ *
+ * Computes confidence as 1.0 - uncertainty, where uncertainty is the
+ * Shannon entropy of the token probability distribution normalized by
+ * the maximum possible entropy (log(vocab_size)).
+ *
+ * Used by RunAnywhere's hybrid routing to decide when on-device inference
+ * quality is insufficient and cloud fallback should be triggered.
+ */
+struct RACConfidenceTracker {
+    std::vector<float> window;
+    float window_sum = 0.0f;
+    float total_sum = 0.0f;
+    size_t total_count = 0;
+    bool degradation_detected = false;
+
+    void add(float uncertainty) {
+        window.push_back(uncertainty);
+        window_sum += uncertainty;
+        total_sum += uncertainty;
+        total_count++;
+
+        if (window.size() > RAC_CONFIDENCE_WINDOW_SIZE) {
+            window_sum -= window.front();
+            window.erase(window.begin());
+        }
+    }
+
+    float rollingScore() const {
+        if (window.empty()) return 1.0f;
+        return 1.0f - (window_sum / static_cast<float>(window.size()));
+    }
+
+    float averageScore() const {
+        if (total_count == 0) return 1.0f;
+        return 1.0f - (total_sum / static_cast<float>(total_count));
+    }
+};
+
+/**
+ * Compute token-level uncertainty from logits after a decode step.
+ *
+ * 1. Apply softmax to convert logits to probabilities.
+ * 2. Compute H = -sum(p * log(p)).
+ * 3. Normalize by max possible entropy: H_max = log(vocab_size).
+ *
+ * Returns a value in [0.0, 1.0] where:
+ * - 0.0 = model is perfectly certain (one token has all probability)
+ * - 1.0 = model is maximally uncertain (uniform distribution)
+ */
+static float rac_compute_token_uncertainty(llama_context* ctx, const llama_vocab* vocab) {
+    const int n_vocab = llama_vocab_n_tokens(vocab);
+    const float* logits = llama_get_logits_ith(ctx, -1);
+
+    if (!logits || n_vocab <= 0) return 0.0f;
+
+    // Find max logit for numerical stability (log-sum-exp trick)
+    float max_logit = logits[0];
+    for (int i = 1; i < n_vocab; i++) {
+        if (logits[i] > max_logit) max_logit = logits[i];
+    }
+
+    // Compute log(sum(exp(logit - max_logit))) + max_logit = log(sum(exp(logit)))
+    float sum_exp = 0.0f;
+    for (int i = 0; i < n_vocab; i++) {
+        sum_exp += std::exp(logits[i] - max_logit);
+    }
+    float log_sum = std::log(sum_exp) + max_logit;
+
+    // Compute entropy: H = -sum(p * log(p)) = -sum(p * (logit - log_sum))
+    float entropy = 0.0f;
+    for (int i = 0; i < n_vocab; i++) {
+        float log_p = logits[i] - log_sum;
+        float p = std::exp(log_p);
+        if (p > 1e-10f) {
+            entropy -= p * log_p;
+        }
+    }
+
+    // Normalize by max possible entropy: log(n_vocab)
+    float max_entropy = std::log(static_cast<float>(n_vocab));
+    return (max_entropy > 0.0f) ? (entropy / max_entropy) : 0.0f;
 }
 
 // =============================================================================
@@ -486,7 +578,8 @@ std::string LlamaCppTextGeneration::apply_chat_template(
     return formatted;
 }
 
-TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationRequest& request) {
+TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationRequest& request,
+                                                      float confidence_threshold) {
     TextGenerationResult result;
     result.finish_reason = "error";
 
@@ -503,7 +596,7 @@ TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationReques
             tokens_generated++;
             return !cancel_requested_.load();
         },
-        &prompt_tokens);
+        &prompt_tokens, confidence_threshold, &result);
 
     auto end_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -513,7 +606,9 @@ TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationReques
     result.prompt_tokens = prompt_tokens;
     result.inference_time_ms = duration.count();
 
-    if (cancel_requested_.load()) {
+    if (result.cloud_handoff) {
+        result.finish_reason = "cloud_handoff";
+    } else if (cancel_requested_.load()) {
         result.finish_reason = "cancelled";
     } else if (success) {
         result.finish_reason = tokens_generated >= request.max_tokens ? "length" : "stop";
@@ -524,7 +619,9 @@ TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationReques
 
 bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& request,
                                              TextStreamCallback callback,
-                                             int* out_prompt_tokens) {
+                                             int* out_prompt_tokens,
+                                             float confidence_threshold,
+                                             TextGenerationResult* out_confidence_result) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     if (!is_ready()) {
@@ -554,8 +651,15 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
     }
 
     int effective_max_tokens = std::min(request.max_tokens, available_tokens);
-    LOGI("Generation: prompt_tokens=%d, max_tokens=%d, context=%d",
-         prompt_tokens, effective_max_tokens, n_ctx);
+
+    bool confidence_enabled = (confidence_threshold > 0.0f);
+    if (confidence_enabled) {
+        LOGI("Generation: prompt_tokens=%d, max_tokens=%d, context=%d, confidence_threshold=%.2f",
+             prompt_tokens, effective_max_tokens, n_ctx, confidence_threshold);
+    } else {
+        LOGI("Generation: prompt_tokens=%d, max_tokens=%d, context=%d",
+             prompt_tokens, effective_max_tokens, n_ctx);
+    }
 
     llama_batch batch = llama_batch_init(n_ctx, 0, 1);
 
@@ -574,6 +678,9 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
     llama_sampler_reset(sampler_);
 
     const auto vocab = llama_model_get_vocab(model_);
+
+    // Confidence tracking for hybrid routing cloud handoff
+    RACConfidenceTracker confidenceTracker;
 
     static const std::vector<std::string> STOP_SEQUENCES = {
         "<|im_end|>", "<|eot_id|>", "</s>", "<|end|>", "<|endoftext|>",
@@ -595,8 +702,46 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
     int n_cur = batch.n_tokens;
     int tokens_generated = 0;
     bool stop_sequence_hit = false;
+    bool cloud_handoff_triggered = false;
 
     while (tokens_generated < effective_max_tokens && !cancel_requested_.load()) {
+        // Compute entropy BEFORE sampling (logits are ready from the previous decode)
+        if (confidence_enabled) {
+            float token_uncertainty = rac_compute_token_uncertainty(context_, vocab);
+
+            // First-token check: early bail-out if first token is low confidence
+            if (tokens_generated == 0) {
+                float initial_confidence = 1.0f - token_uncertainty;
+                if (initial_confidence < confidence_threshold) {
+                    LOGI("Cloud handoff: initial confidence %.3f < threshold %.3f",
+                         initial_confidence, confidence_threshold);
+                    cloud_handoff_triggered = true;
+                    if (out_confidence_result) {
+                        out_confidence_result->confidence = initial_confidence;
+                        out_confidence_result->cloud_handoff = true;
+                        out_confidence_result->handoff_reason = 1;  // FIRST_TOKEN_LOW_CONFIDENCE
+                    }
+                    break;
+                }
+            }
+
+            confidenceTracker.add(token_uncertainty);
+
+            // Rolling window check: bail-out if rolling confidence drops below threshold
+            if (tokens_generated > 0 && confidenceTracker.rollingScore() < confidence_threshold) {
+                LOGI("Cloud handoff: rolling confidence %.3f < threshold %.3f",
+                     confidenceTracker.rollingScore(), confidence_threshold);
+                confidenceTracker.degradation_detected = true;
+                cloud_handoff_triggered = true;
+                if (out_confidence_result) {
+                    out_confidence_result->confidence = confidenceTracker.rollingScore();
+                    out_confidence_result->cloud_handoff = true;
+                    out_confidence_result->handoff_reason = 2;  // ROLLING_WINDOW_DEGRADATION
+                }
+                break;
+            }
+        }
+
         const llama_token new_token_id = llama_sampler_sample(sampler_, context_, -1);
 
         llama_sampler_accept(sampler_, new_token_id);
@@ -669,15 +814,27 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
         }
     }
 
-    if (!cancel_requested_.load() && !stop_sequence_hit && !stop_window.empty()) {
+    if (!cancel_requested_.load() && !stop_sequence_hit && !cloud_handoff_triggered
+        && !stop_window.empty()) {
         callback(stop_window);
+    }
+
+    // Set final confidence if we completed without handoff
+    if (out_confidence_result && !cloud_handoff_triggered) {
+        out_confidence_result->confidence = confidenceTracker.averageScore();
+        out_confidence_result->cloud_handoff = false;
+        out_confidence_result->handoff_reason = 0;  // NONE
     }
 
     llama_memory_clear(llama_get_memory(context_), true);
 
     llama_batch_free(batch);
 
-    LOGI("Generation complete: %d tokens", tokens_generated);
+    if (cloud_handoff_triggered) {
+        LOGI("Generation stopped for cloud handoff after %d tokens", tokens_generated);
+    } else {
+        LOGI("Generation complete: %d tokens", tokens_generated);
+    }
     return !cancel_requested_.load();
 }
 

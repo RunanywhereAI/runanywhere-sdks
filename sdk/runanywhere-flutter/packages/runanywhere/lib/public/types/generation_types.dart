@@ -19,6 +19,11 @@ class LLMGenerationOptions {
   final InferenceFramework? preferredFramework;
   final String? systemPrompt;
 
+  /// Confidence threshold for cloud handoff (0.0 - 1.0).
+  /// 0.0 = disabled. Values > 0 enable entropy-based confidence scoring.
+  /// Matches Swift LLMGenerationOptions.confidenceThreshold.
+  final double confidenceThreshold;
+
   const LLMGenerationOptions({
     this.maxTokens = 100,
     this.temperature = 0.8,
@@ -27,6 +32,7 @@ class LLMGenerationOptions {
     this.streamingEnabled = false,
     this.preferredFramework,
     this.systemPrompt,
+    this.confidenceThreshold = 0.0,
   });
 }
 
@@ -45,6 +51,18 @@ class LLMGenerationResult {
   final int thinkingTokens;
   final int responseTokens;
 
+  /// Model confidence score (0.0 - 1.0, null if confidence scoring was disabled).
+  /// Matches Swift LLMGenerationResult.confidence.
+  final double? confidence;
+
+  /// Whether the engine recommends cloud fallback.
+  /// Matches Swift LLMGenerationResult.cloudHandoff.
+  final bool? cloudHandoff;
+
+  /// Reason code for cloud handoff recommendation.
+  /// Matches Swift LLMGenerationResult.handoffReason (HandoffReason.code).
+  final int? handoffReason;
+
   const LLMGenerationResult({
     required this.text,
     this.thinkingContent,
@@ -57,6 +75,9 @@ class LLMGenerationResult {
     this.timeToFirstTokenMs,
     this.thinkingTokens = 0,
     this.responseTokens = 0,
+    this.confidence,
+    this.cloudHandoff,
+    this.handoffReason,
   });
 }
 
