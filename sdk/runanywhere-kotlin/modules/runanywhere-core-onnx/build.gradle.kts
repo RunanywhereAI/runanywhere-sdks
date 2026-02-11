@@ -172,14 +172,9 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
-        // Prevent duplicate native library conflicts during test builds
+        // Prevent duplicate native library conflicts from KMP source set hierarchy
         jniLibs {
-            pickFirsts +=
-                setOf(
-                    "lib/arm64-v8a/libomp.so",
-                    "lib/arm64-v8a/libc++_shared.so",
-                    "lib/arm64-v8a/librac_commons.so",
-                )
+            pickFirsts += setOf("**/*.so")
         }
     }
 
