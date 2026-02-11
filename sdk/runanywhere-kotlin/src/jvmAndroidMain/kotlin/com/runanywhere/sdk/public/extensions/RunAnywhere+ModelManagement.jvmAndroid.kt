@@ -810,6 +810,10 @@ actual suspend fun RunAnywhere.refreshModelRegistry() {
 }
 
 actual suspend fun RunAnywhere.loadLLMModel(modelId: String) {
+    loadLLMModel(modelId, ModelLoadOptions())
+}
+
+actual suspend fun RunAnywhere.loadLLMModel(modelId: String, options: ModelLoadOptions) {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
@@ -822,8 +826,38 @@ actual suspend fun RunAnywhere.loadLLMModel(modelId: String) {
         model.localPath
             ?: throw SDKError.model("Model '$modelId' is not downloaded")
 
-    // Pass modelPath, modelId, and modelName separately for correct telemetry
-    val result = CppBridgeLLM.loadModel(localPath, modelId, model.name)
+    // Check GPU availability if requested
+    val useGPU = if (options.useGPU) {
+        com.runanywhere.sdk.platform.DeviceCapabilities.shouldUseGPU()
+    } else {
+        false
+    }
+    
+    if (useGPU) {
+        val gpuInfo = com.runanywhere.sdk.platform.DeviceCapabilities.detectVulkanGPU()
+        modelsLogger.info("Loading model with GPU acceleration")
+        modelsLogger.info("  GPU: ${gpuInfo.deviceName}")
+        modelsLogger.info("  Layers: ${if (options.gpuLayers == -1) "ALL" else options.gpuLayers}")
+    } else {
+        modelsLogger.info("Loading model with CPU backend")
+    }
+
+    // Pass modelPath, modelId, modelName, and GPU options via ModelConfig
+    val modelConfig = CppBridgeLLM.ModelConfig(
+        contextLength = options.contextSize ?: 4096,
+        gpuLayers = if (useGPU) options.gpuLayers else 0,
+        threads = -1,  // Auto-detect
+        batchSize = 512,
+        useMemoryMap = true,
+        useLocking = false
+    )
+    val result = CppBridgeLLM.loadModel(
+        localPath, 
+        modelId, 
+        model.name,
+        config = modelConfig
+    )
+    
     if (result != 0) {
         throw SDKError.llm("Failed to load LLM model '$modelId' (error code: $result)")
     }

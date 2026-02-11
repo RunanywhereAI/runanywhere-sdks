@@ -215,11 +215,48 @@ expect suspend fun RunAnywhere.refreshModelRegistry()
 // MARK: - Model Loading
 
 /**
- * Load an LLM model.
+ * Options for loading LLM models
+ * 
+ * @property useGPU Enable GPU acceleration if available (default: true)
+ * @property gpuLayers Number of model layers to offload to GPU (-1 = all layers)
+ * @property contextSize Context window size (null = use model default)
+ * @property temperature Sampling temperature (0.0 = deterministic, 1.0 = creative)
+ */
+data class ModelLoadOptions(
+    val useGPU: Boolean = true,
+    val gpuLayers: Int = -1,
+    val contextSize: Int? = null,
+    val temperature: Float = 0.7f
+)
+
+/**
+ * Load an LLM model with default options.
+ * 
+ * GPU acceleration is automatically enabled if available.
  *
  * @param modelId Model identifier
  */
 expect suspend fun RunAnywhere.loadLLMModel(modelId: String)
+
+/**
+ * Load an LLM model with custom options.
+ * 
+ * Example:
+ * ```kotlin
+ * // Load with GPU acceleration (default)
+ * RunAnywhere.loadLLMModel("smollm2-360m", ModelLoadOptions())
+ * 
+ * // Load with CPU only
+ * RunAnywhere.loadLLMModel("smollm2-360m", ModelLoadOptions(useGPU = false))
+ * 
+ * // Load with partial GPU offloading (32 layers)
+ * RunAnywhere.loadLLMModel("llama-3b", ModelLoadOptions(gpuLayers = 32))
+ * ```
+ * 
+ * @param modelId Model identifier
+ * @param options Loading options including GPU settings
+ */
+expect suspend fun RunAnywhere.loadLLMModel(modelId: String, options: ModelLoadOptions)
 
 /**
  * Unload the currently loaded LLM model.
