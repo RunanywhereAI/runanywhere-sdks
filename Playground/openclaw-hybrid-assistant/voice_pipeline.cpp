@@ -7,6 +7,7 @@
 // =============================================================================
 
 #include "voice_pipeline.h"
+#include "tts_queue.h"
 #include "model_config.h"
 
 // RAC headers - use voice_agent for unified API
@@ -348,16 +349,45 @@ struct VoicePipeline::Impl {
     std::mutex mutex;
 };
 
+// =============================================================================
+// Async TTS State - Manages producer thread + TTSQueue
+// =============================================================================
+
+struct VoicePipeline::AsyncTTSState {
+    std::unique_ptr<TTSQueue> queue;
+    std::thread producer_thread;
+    std::atomic<bool> cancelled{false};
+
+    void cleanup() {
+        cancelled.store(true);
+        if (queue) {
+            queue->cancel();
+        }
+        if (producer_thread.joinable()) {
+            producer_thread.join();
+        }
+        queue.reset();
+        cancelled.store(false);
+    }
+
+    ~AsyncTTSState() {
+        cleanup();
+    }
+};
+
 VoicePipeline::VoicePipeline()
-    : impl_(std::make_unique<Impl>()) {
+    : impl_(std::make_unique<Impl>())
+    , async_tts_(std::make_unique<AsyncTTSState>()) {
 }
 
 VoicePipeline::VoicePipeline(const VoicePipelineConfig& config)
     : impl_(std::make_unique<Impl>())
+    , async_tts_(std::make_unique<AsyncTTSState>())
     , config_(config) {
 }
 
 VoicePipeline::~VoicePipeline() {
+    cancel_speech();
     stop();
 
     if (impl_->wakeword_handle) {
@@ -791,6 +821,90 @@ bool VoicePipeline::process_stt(const int16_t* samples, size_t num_samples) {
     return true;
 }
 
+// =============================================================================
+// Sentence Splitting - Abbreviation-aware
+// =============================================================================
+// Splits text at sentence boundaries (. ! ?) while avoiding false splits on
+// common abbreviations like "Mr.", "Dr.", "e.g.", "U.S.", "a.m.", etc.
+
+// Check if the word before a period is a common abbreviation
+static bool is_abbreviation(const std::string& text, size_t dot_pos) {
+    // Walk backward to find the start of the word
+    if (dot_pos == 0) return false;
+
+    size_t word_end = dot_pos;
+    size_t word_start = dot_pos;
+    while (word_start > 0 && text[word_start - 1] != ' ' && text[word_start - 1] != '\n') {
+        --word_start;
+    }
+
+    // Extract the word (lowercase for comparison)
+    std::string word;
+    for (size_t i = word_start; i < word_end; ++i) {
+        word += static_cast<char>(tolower(static_cast<unsigned char>(text[i])));
+    }
+
+    if (word.empty()) return false;
+
+    // Single letter abbreviations: "A.", "B.", etc.
+    if (word.length() == 1 && isalpha(static_cast<unsigned char>(word[0]))) {
+        return true;
+    }
+
+    // Common abbreviations (without the trailing dot)
+    static const char* abbreviations[] = {
+        // Titles
+        "mr", "mrs", "ms", "dr", "prof", "sr", "jr", "rev", "hon",
+        // Addresses
+        "st", "ave", "blvd", "rd", "ln", "ct",
+        // Latin / academic
+        "vs", "etc", "approx", "dept", "est",
+        // Companies / organizations
+        "inc", "ltd", "corp", "co",
+        // Common multi-dot abbreviations (matched without dots)
+        "eg", "ie", "al",  // e.g., i.e., et al.
+        // Time
+        "am", "pm",
+        // Measurements
+        "oz", "lb", "ft", "sq",
+        nullptr
+    };
+
+    for (int i = 0; abbreviations[i] != nullptr; ++i) {
+        if (word == abbreviations[i]) {
+            return true;
+        }
+    }
+
+    // Multi-dot abbreviations: "e.g", "i.e", "u.s", "a.m", "p.m"
+    // Check if the word contains dots (like "e.g" or "u.s")
+    std::string word_with_dot;
+    for (size_t i = word_start; i <= dot_pos && i < text.size(); ++i) {
+        word_with_dot += static_cast<char>(tolower(static_cast<unsigned char>(text[i])));
+    }
+
+    static const char* dotted_abbreviations[] = {
+        "e.g.", "i.e.", "u.s.", "a.m.", "p.m.", "no.",
+        nullptr
+    };
+
+    for (int i = 0; dotted_abbreviations[i] != nullptr; ++i) {
+        if (word_with_dot == dotted_abbreviations[i]) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// Helper: trim a string of leading/trailing whitespace
+static std::string trim_string(const std::string& s) {
+    size_t start = s.find_first_not_of(" \t\n\r");
+    size_t end = s.find_last_not_of(" \t\n\r");
+    if (start == std::string::npos || end == std::string::npos) return "";
+    return s.substr(start, end - start + 1);
+}
+
 // Split text into sentences for streaming TTS
 static std::vector<std::string> split_into_sentences(const std::string& text) {
     std::vector<std::string> sentences;
@@ -800,16 +914,21 @@ static std::vector<std::string> split_into_sentences(const std::string& text) {
         char c = text[i];
         current += c;
 
-        // Check for sentence boundaries: . ! ? followed by space or end
+        // Check for sentence boundaries: . ! ? followed by space, newline, or end
         if ((c == '.' || c == '!' || c == '?') &&
             (i + 1 >= text.length() || text[i + 1] == ' ' || text[i + 1] == '\n')) {
-            // Trim leading/trailing whitespace
-            size_t start = current.find_first_not_of(" \t\n\r");
-            size_t end = current.find_last_not_of(" \t\n\r");
-            if (start != std::string::npos && end != std::string::npos) {
-                sentences.push_back(current.substr(start, end - start + 1));
+
+            // For periods, check if this is an abbreviation (not a sentence end)
+            if (c == '.' && is_abbreviation(text, i)) {
+                continue;  // Not a sentence boundary, keep accumulating
+            }
+
+            std::string trimmed = trim_string(current);
+            if (!trimmed.empty()) {
+                sentences.push_back(trimmed);
             }
             current.clear();
+
             // Skip the space after punctuation
             if (i + 1 < text.length() && text[i + 1] == ' ') {
                 ++i;
@@ -818,12 +937,9 @@ static std::vector<std::string> split_into_sentences(const std::string& text) {
     }
 
     // Don't forget any remaining text
-    if (!current.empty()) {
-        size_t start = current.find_first_not_of(" \t\n\r");
-        size_t end = current.find_last_not_of(" \t\n\r");
-        if (start != std::string::npos && end != std::string::npos) {
-            sentences.push_back(current.substr(start, end - start + 1));
-        }
+    std::string trimmed = trim_string(current);
+    if (!trimmed.empty()) {
+        sentences.push_back(trimmed);
     }
 
     return sentences;
@@ -910,6 +1026,119 @@ bool VoicePipeline::speak_text(const std::string& text) {
     state_ = impl_->wakeword_enabled ? PipelineState::WAITING_FOR_WAKE_WORD : PipelineState::LISTENING;
 
     return true;
+}
+
+// =============================================================================
+// Async TTS - Non-blocking, pre-synthesizes ahead of playback
+// =============================================================================
+// Synthesize sentence 1 → push to queue → consumer starts playing immediately
+// While sentence 1 plays, synthesize sentence 2 → push → plays right after
+// No gap between sentences.
+
+void VoicePipeline::speak_text_async(const std::string& text) {
+    if (!initialized_ || !impl_->voice_agent) {
+        return;
+    }
+
+    // Cancel any in-progress speech first
+    cancel_speech();
+
+    // Sanitize and split
+    std::string sanitized = sanitize_text_for_tts(text);
+    if (sanitized.empty()) {
+        std::cout << "[TTS] Skipping empty text after sanitization\n";
+        return;
+    }
+
+    std::vector<std::string> sentences = split_into_sentences(sanitized);
+    if (sentences.empty()) {
+        sentences.push_back(sanitized);
+    }
+
+    std::cout << "[TTS-Async] Streaming " << sentences.size() << " sentence(s)\n";
+    state_ = PipelineState::SPEAKING;
+
+    // Create queue - consumer thread starts immediately, waits for first chunk
+    async_tts_->queue = std::make_unique<TTSQueue>(config_.on_audio_output);
+    async_tts_->cancelled.store(false);
+
+    // Spawn producer: synthesize each sentence, push audio into queue
+    auto voice_agent = impl_->voice_agent;
+    bool wakeword_enabled = impl_->wakeword_enabled;
+
+    async_tts_->producer_thread = std::thread([this, voice_agent, sentences, wakeword_enabled]() {
+        int tts_sample_rate = 22050;  // Piper Lessac
+
+        for (size_t i = 0; i < sentences.size(); ++i) {
+            if (async_tts_->cancelled.load()) break;
+
+            const auto& sentence = sentences[i];
+            if (sentence.empty()) continue;
+
+            std::cout << "[TTS-Async] [" << (i + 1) << "/" << sentences.size() << "] \""
+                      << sentence.substr(0, 60) << (sentence.length() > 60 ? "..." : "") << "\"\n";
+
+            void* audio_data = nullptr;
+            size_t audio_size = 0;
+
+            rac_result_t result = rac_voice_agent_synthesize_speech(
+                voice_agent, sentence.c_str(), &audio_data, &audio_size);
+
+            if (result != RAC_SUCCESS || !audio_data || audio_size == 0) {
+                std::cerr << "[TTS-Async] Failed to synthesize sentence " << (i + 1) << "\n";
+                if (audio_data) free(audio_data);
+                continue;
+            }
+
+            // Push audio into the playback queue
+            size_t num_samples = audio_size / sizeof(int16_t);
+            AudioChunk chunk;
+            chunk.samples.assign(
+                static_cast<const int16_t*>(audio_data),
+                static_cast<const int16_t*>(audio_data) + num_samples);
+            chunk.sample_rate = tts_sample_rate;
+            free(audio_data);
+
+            if (!async_tts_->cancelled.load() && async_tts_->queue) {
+                async_tts_->queue->push(std::move(chunk));
+            }
+        }
+
+        // Tell consumer there's nothing more coming
+        if (async_tts_->queue) {
+            async_tts_->queue->finish();
+        }
+
+        // Wait for consumer to finish playing, then cooldown + state transition
+        // (This runs on the producer thread so it doesn't block main)
+        if (async_tts_->queue && !async_tts_->cancelled.load()) {
+            while (async_tts_->queue->is_active() && !async_tts_->cancelled.load()) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            }
+        }
+
+        if (!async_tts_->cancelled.load()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(TTS_COOLDOWN_MS));
+            state_ = wakeword_enabled ? PipelineState::WAITING_FOR_WAKE_WORD : PipelineState::LISTENING;
+            std::cout << "[TTS-Async] Playback complete\n";
+        }
+    });
+}
+
+void VoicePipeline::cancel_speech() {
+    if (!async_tts_) return;
+    async_tts_->cleanup();
+
+    if (initialized_ && state_ == PipelineState::SPEAKING) {
+        state_ = impl_->wakeword_enabled ? PipelineState::WAITING_FOR_WAKE_WORD : PipelineState::LISTENING;
+    }
+}
+
+bool VoicePipeline::is_speaking() const {
+    if (!async_tts_ || !async_tts_->queue) {
+        return state_ == PipelineState::SPEAKING;
+    }
+    return async_tts_->queue->is_active();
 }
 
 std::string VoicePipeline::state_string() const {

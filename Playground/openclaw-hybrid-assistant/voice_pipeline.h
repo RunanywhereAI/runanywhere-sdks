@@ -17,6 +17,9 @@
 #include <functional>
 #include <memory>
 #include <cstdint>
+#include <atomic>
+#include <thread>
+#include <mutex>
 
 namespace openclaw {
 
@@ -84,6 +87,16 @@ public:
     // TTS output (called when speak command received from OpenClaw)
     bool speak_text(const std::string& text);
 
+    // Async TTS - returns immediately, synthesis + playback runs in background.
+    // Sentences are pre-synthesized ahead of playback for gapless audio.
+    void speak_text_async(const std::string& text);
+
+    // Cancel any in-progress async TTS playback immediately.
+    void cancel_speech();
+
+    // Check if async TTS is currently playing or synthesizing.
+    bool is_speaking() const;
+
     // State
     PipelineState state() const { return state_; }
     std::string state_string() const;
@@ -108,6 +121,10 @@ private:
     std::string last_error_;
     bool initialized_ = false;
     bool running_ = false;
+
+    // Async TTS state
+    struct AsyncTTSState;
+    std::unique_ptr<AsyncTTSState> async_tts_;
 
     // Internal methods
     bool initialize_wakeword();

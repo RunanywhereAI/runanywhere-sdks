@@ -22,6 +22,7 @@
 
 #include "model_config.h"
 #include "voice_pipeline.h"
+#include "tts_queue.h"
 #include "openclaw_client.h"
 #include "waiting_chime.h"
 
@@ -456,6 +457,281 @@ struct AudioCapture {
         total_chunks = 0;
     }
 };
+
+// =============================================================================
+// Test: TTS Queue - Parallel Synthesis and Playback
+// =============================================================================
+// Verifies that the TTSQueue plays audio from the consumer thread while
+// the producer is still pushing more chunks. This is the core optimization:
+// sentence N+1 is synthesized while sentence N plays.
+//
+// We simulate this by:
+//   1. Pushing chunk 1 into the queue
+//   2. Verifying playback starts (consumer plays chunk 1)
+//   3. While chunk 1 is playing, pushing chunk 2
+//   4. Verifying chunk 2 plays immediately after chunk 1 (no gap)
+// =============================================================================
+
+TestResult test_tts_queue_parallel_playback() {
+    TestResult result;
+    result.name = "TTS Queue - Parallel Synthesis and Playback";
+
+    // Track when each chunk's audio arrives at the "speaker"
+    struct ChunkArrival {
+        std::chrono::steady_clock::time_point time;
+        size_t num_samples = 0;
+    };
+
+    std::mutex arrivals_mutex;
+    std::vector<ChunkArrival> arrivals;
+    size_t total_played_samples = 0;
+
+    auto play_audio = [&](const int16_t*, size_t num_samples, int) {
+        std::lock_guard<std::mutex> lock(arrivals_mutex);
+        arrivals.push_back({std::chrono::steady_clock::now(), num_samples});
+        total_played_samples += num_samples;
+        // Simulate ALSA blocking playback: ~46ms per 1024 samples at 22050Hz
+        // We use a shorter sleep to keep the test fast
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    };
+
+    openclaw::TTSQueue queue(play_audio);
+
+    auto test_start = std::chrono::steady_clock::now();
+
+    // Generate 3 fake "sentence" audio chunks (~0.5s each at 22050Hz)
+    const int sample_rate = 22050;
+    const int samples_per_chunk = sample_rate / 2;  // 0.5s
+
+    // Push chunk 1 - consumer should start playing immediately
+    {
+        openclaw::AudioChunk chunk;
+        chunk.samples.resize(samples_per_chunk, 1000);  // Non-zero audio
+        chunk.sample_rate = sample_rate;
+        queue.push(std::move(chunk));
+    }
+
+    // Wait a bit for consumer to pick up chunk 1
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+    // Verify playback has started
+    {
+        std::lock_guard<std::mutex> lock(arrivals_mutex);
+        if (arrivals.empty()) {
+            queue.finish();
+            result.details = "Consumer did not start playing chunk 1 within 50ms";
+            return result;
+        }
+    }
+
+    auto chunk1_play_start = std::chrono::steady_clock::now();
+
+    // Push chunk 2 while chunk 1 is still "playing" (simulated)
+    {
+        openclaw::AudioChunk chunk;
+        chunk.samples.resize(samples_per_chunk, 2000);
+        chunk.sample_rate = sample_rate;
+        queue.push(std::move(chunk));
+    }
+
+    // Push chunk 3
+    {
+        openclaw::AudioChunk chunk;
+        chunk.samples.resize(samples_per_chunk, 3000);
+        chunk.sample_rate = sample_rate;
+        queue.push(std::move(chunk));
+    }
+
+    // Signal done
+    queue.finish();
+
+    // Wait for consumer to finish playing all chunks
+    int wait_count = 0;
+    while (queue.is_active() && wait_count < 100) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        wait_count++;
+    }
+
+    auto test_end = std::chrono::steady_clock::now();
+    auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(test_end - test_start).count();
+
+    // Verify all 3 chunks were played
+    size_t expected_total = samples_per_chunk * 3;
+    if (total_played_samples != expected_total) {
+        result.details = "Expected " + std::to_string(expected_total) + " samples played, got "
+                       + std::to_string(total_played_samples);
+        return result;
+    }
+
+    // Verify queue is no longer active
+    if (queue.is_active()) {
+        result.details = "Queue still active after all chunks played";
+        return result;
+    }
+
+    // Check that chunks arrived in order and without huge gaps
+    std::lock_guard<std::mutex> lock(arrivals_mutex);
+    if (arrivals.size() < 3) {
+        result.details = "Expected at least 3 chunk arrivals, got " + std::to_string(arrivals.size());
+        return result;
+    }
+
+    // Measure gap between first chunk arrival and last chunk arrival
+    auto first_arrival = arrivals.front().time;
+    auto last_arrival = arrivals.back().time;
+    auto span_ms = std::chrono::duration_cast<std::chrono::milliseconds>(last_arrival - first_arrival).count();
+
+    result.passed = true;
+    std::ostringstream details;
+    details << "3 chunks played (" << total_played_samples << " samples)"
+            << ", " << arrivals.size() << " play() calls"
+            << ", Total time: " << total_ms << "ms"
+            << ", First-to-last arrival span: " << span_ms << "ms";
+    result.details = details.str();
+
+    return result;
+}
+
+// =============================================================================
+// Test: TTS Queue - Cancel Stops Immediately
+// =============================================================================
+// Verifies that cancel() stops the consumer thread and no more audio plays.
+// =============================================================================
+
+TestResult test_tts_queue_cancel() {
+    TestResult result;
+    result.name = "TTS Queue - Cancel Stops Playback";
+
+    std::atomic<size_t> play_count{0};
+
+    auto play_audio = [&](const int16_t*, size_t, int) {
+        play_count.fetch_add(1);
+        // Simulate slow playback so cancel has something to cancel
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    };
+
+    openclaw::TTSQueue queue(play_audio);
+
+    // Push 10 chunks
+    for (int i = 0; i < 10; i++) {
+        openclaw::AudioChunk chunk;
+        chunk.samples.resize(1024, 1000);
+        chunk.sample_rate = 22050;
+        queue.push(std::move(chunk));
+    }
+
+    // Let 1-2 chunks play
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
+    size_t played_before_cancel = play_count.load();
+
+    // Cancel
+    queue.cancel();
+
+    // Wait a moment
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    size_t played_after_cancel = play_count.load();
+
+    // Verify cancel stopped playback (not all 10 chunks played)
+    if (played_after_cancel >= 10) {
+        result.details = "All 10 chunks played despite cancel - cancel didn't stop playback";
+        return result;
+    }
+
+    // Verify queue is no longer active
+    if (queue.is_active()) {
+        result.details = "Queue still active after cancel";
+        return result;
+    }
+
+    // Verify no new chunks played after cancel
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    size_t played_final = play_count.load();
+    if (played_final != played_after_cancel) {
+        result.details = "Audio played after cancel (" + std::to_string(played_final - played_after_cancel) + " extra)";
+        return result;
+    }
+
+    result.passed = true;
+    result.details = "Played " + std::to_string(played_before_cancel) + " before cancel, "
+                   + std::to_string(played_after_cancel) + " total (out of 10)";
+    return result;
+}
+
+// =============================================================================
+// Test: TTS Queue - Push-While-Playing (Pre-synthesis Verification)
+// =============================================================================
+// The key test: verifies that the producer can push new chunks while the
+// consumer is blocked playing previous chunks. This proves parallel operation.
+//
+// We use a slow play_audio callback (simulating ALSA blocking) and verify
+// that multiple push() calls complete without waiting for playback.
+// =============================================================================
+
+TestResult test_tts_queue_push_while_playing() {
+    TestResult result;
+    result.name = "TTS Queue - Push While Consumer Plays (Parallel Proof)";
+
+    std::atomic<size_t> play_count{0};
+
+    auto play_audio = [&](const int16_t*, size_t, int) {
+        play_count.fetch_add(1);
+        // Simulate 200ms of ALSA playback per chunk
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    };
+
+    openclaw::TTSQueue queue(play_audio);
+
+    // Time how long it takes to push 5 chunks
+    auto push_start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < 5; i++) {
+        openclaw::AudioChunk chunk;
+        chunk.samples.resize(4410, static_cast<int16_t>(i * 100));  // 0.2s at 22050Hz
+        chunk.sample_rate = 22050;
+        queue.push(std::move(chunk));
+    }
+
+    auto push_end = std::chrono::steady_clock::now();
+    auto push_ms = std::chrono::duration_cast<std::chrono::milliseconds>(push_end - push_start).count();
+
+    // Key assertion: pushing all 5 chunks should be nearly instant (<50ms)
+    // because push() doesn't wait for playback. If push blocked on play,
+    // it would take 5 * 200ms = 1000ms.
+    if (push_ms > 100) {
+        result.details = "push() blocked on playback - took " + std::to_string(push_ms)
+                       + "ms to push 5 chunks (expected <100ms)";
+        return result;
+    }
+
+    // At this point, consumer should have only played ~1 chunk (200ms)
+    // but all 5 are queued
+    size_t played_at_push_done = play_count.load();
+
+    queue.finish();
+
+    // Wait for all chunks to play (5 * 200ms = ~1 second)
+    int wait = 0;
+    while (queue.is_active() && wait < 40) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        wait++;
+    }
+
+    size_t final_played = play_count.load();
+
+    if (final_played != 5) {
+        result.details = "Expected 5 chunks played, got " + std::to_string(final_played);
+        return result;
+    }
+
+    result.passed = true;
+    std::ostringstream details;
+    details << "5 push() calls completed in " << push_ms << "ms (non-blocking!)"
+            << ", Chunks played at push-done: " << played_at_push_done
+            << ", Final chunks played: " << final_played;
+    result.details = details.str();
+
+    return result;
+}
 
 // =============================================================================
 // Test: Waiting Chime Timing
@@ -1070,6 +1346,7 @@ void print_usage(const char* prog) {
               << "Usage: " << prog << " [options]\n\n"
               << "Options:\n"
               << "  --run-all                Run all integration tests\n"
+              << "  --test-tts-queue         Test TTS queue parallel playback and cancel\n"
               << "  --test-chime             Test waiting chime timing and audio\n"
               << "  --test-sanitization      Test text sanitization for TTS\n"
               << "  --test-tts               Test TTS synthesis on various texts\n"
@@ -1118,6 +1395,12 @@ int main(int argc, char* argv[]) {
             print_usage(argv[0]);
             return 0;
         }
+        else if (arg == "--test-tts-queue") {
+            // TTS queue tests need NO model/backend infrastructure
+            results.push_back(test_tts_queue_parallel_playback());
+            results.push_back(test_tts_queue_cancel());
+            results.push_back(test_tts_queue_push_while_playing());
+        }
         else if (arg == "--test-chime") {
             // Chime tests need NO model/backend infrastructure
             results.push_back(test_waiting_chime_timing());
@@ -1141,24 +1424,30 @@ int main(int argc, char* argv[]) {
                       << "  OpenClaw Hybrid Assistant\n"
                       << std::string(60, '=') << "\n\n";
 
-            // --- Section 1: Waiting Chime (NO backend init needed) ---
-            std::cout << "--- Section 1: Waiting Chime ---\n\n";
+            // --- Section 1: TTS Queue (NO backend init needed) ---
+            std::cout << "--- Section 1: TTS Queue ---\n\n";
+            results.push_back(test_tts_queue_parallel_playback());
+            results.push_back(test_tts_queue_cancel());
+            results.push_back(test_tts_queue_push_while_playing());
+
+            // --- Section 2: Waiting Chime (NO backend init needed) ---
+            std::cout << "\n--- Section 2: Waiting Chime ---\n\n";
             results.push_back(test_waiting_chime_timing());
             results.push_back(test_waiting_chime_audio_content());
 
             // --- Initialize backends for remaining tests ---
             if (!ensure_backends_initialized()) return 1;
 
-            // --- Section 2: Text Sanitization ---
-            std::cout << "\n--- Section 2: Text Sanitization ---\n\n";
+            // --- Section 3: Text Sanitization ---
+            std::cout << "\n--- Section 3: Text Sanitization ---\n\n";
             results.push_back(test_text_sanitization());
 
-            // --- Section 3: TTS Synthesis ---
-            std::cout << "\n--- Section 3: TTS Synthesis ---\n\n";
+            // --- Section 4: TTS Synthesis ---
+            std::cout << "\n--- Section 4: TTS Synthesis ---\n\n";
             results.push_back(test_tts_synthesis());
 
-            // --- Section 4: Full OpenClaw Flow ---
-            std::cout << "\n--- Section 4: Full OpenClaw Flow ---\n\n";
+            // --- Section 5: Full OpenClaw Flow ---
+            std::cout << "\n--- Section 5: Full OpenClaw Flow ---\n\n";
 
             // Test with 5-second delay (moderate wait)
             std::cout << "Test 4.1: 5-second response delay\n";

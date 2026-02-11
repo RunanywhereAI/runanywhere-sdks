@@ -67,6 +67,7 @@ link_directories(
 add_executable(openclaw-assistant
     main.cpp
     voice_pipeline.cpp
+    tts_queue.cpp
     openclaw_client.cpp
     audio_capture.cpp
     audio_playback.cpp
@@ -104,6 +105,7 @@ set_target_properties(openclaw-assistant PROPERTIES
 add_executable(test-components
     tests/test_components.cpp
     voice_pipeline.cpp
+    tts_queue.cpp
 )
 
 target_link_libraries(test-components PRIVATE
@@ -143,6 +145,7 @@ set_target_properties(test-components PROPERTIES
 add_executable(test-integration
     tests/test_integration.cpp
     voice_pipeline.cpp
+    tts_queue.cpp
     openclaw_client.cpp
     waiting_chime.cpp
 )
