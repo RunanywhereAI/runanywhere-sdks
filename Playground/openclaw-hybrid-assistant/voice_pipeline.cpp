@@ -41,6 +41,10 @@ static constexpr size_t DEFAULT_MIN_SPEECH_SAMPLES = 16000;  // 1 second at 16kH
 // Wake word timeout - return to listening after this many seconds of no speech
 static constexpr double WAKE_WORD_TIMEOUT_SEC = 10.0;
 
+// Cooldown after wake word detection - ignore detections for this long
+// to prevent the tail end of "Hey Jarvis" audio from re-triggering
+static constexpr int WAKEWORD_COOLDOWN_MS = 1000;
+
 // =============================================================================
 // Text Sanitization for TTS
 // =============================================================================
@@ -342,6 +346,7 @@ struct VoicePipeline::Impl {
     bool wakeword_enabled = false;
     bool wakeword_activated = false;
     std::chrono::steady_clock::time_point wakeword_activation_time;
+    std::chrono::steady_clock::time_point wakeword_cooldown_until;  // Ignore detections until this time
 
     // Speech state
     bool speech_active = false;
@@ -684,6 +689,19 @@ void VoicePipeline::process_wakeword(const float* samples, size_t num_samples) {
         return;
     }
 
+    // Cooldown: ignore detections for WAKEWORD_COOLDOWN_MS after the last detection
+    // to prevent the tail end of "Hey Jarvis" audio from re-triggering
+    auto now = std::chrono::steady_clock::now();
+    if (now < impl_->wakeword_cooldown_until) {
+        // Still in cooldown - feed audio to the model (to keep it in sync)
+        // but ignore the result
+        int32_t ignored_index = -1;
+        float ignored_conf = 0.0f;
+        rac_wakeword_onnx_process(impl_->wakeword_handle, samples, num_samples,
+                                   &ignored_index, &ignored_conf);
+        return;
+    }
+
     int32_t detected_index = -1;
     float confidence = 0.0f;
 
@@ -719,6 +737,8 @@ void VoicePipeline::process_wakeword(const float* samples, size_t num_samples) {
 
         impl_->wakeword_activated = true;
         impl_->wakeword_activation_time = std::chrono::steady_clock::now();
+        impl_->wakeword_cooldown_until = impl_->wakeword_activation_time
+            + std::chrono::milliseconds(WAKEWORD_COOLDOWN_MS);
         impl_->speech_buffer.clear();
         impl_->speech_active = false;
         impl_->speech_callback_fired = false;
