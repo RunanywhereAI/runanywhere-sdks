@@ -46,9 +46,11 @@ A lightweight voice assistant that acts as a **channel** for OpenClaw. No local 
 - Frame size: 80ms (1280 samples at 16kHz)
 
 ### 2. Voice Activity Detection (VAD)
-- Model: Silero VAD
+- Model: **Silero VAD** (ONNX neural network, via sherpa-onnx)
+- Much more accurate than energy-based VAD at distinguishing speech from noise
 - Silence threshold: 1.5 seconds
 - Minimum speech: 0.5 seconds
+- Fallback: energy-based VAD if Silero model fails to load
 
 ### 3. Speech-to-Text (ASR)
 - Model: **Parakeet TDT-CTC 110M EN** (NeMo CTC, int8 quantized)

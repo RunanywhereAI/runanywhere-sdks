@@ -13,6 +13,7 @@
 // RAC headers - use voice_agent for unified API
 #include <rac/features/voice_agent/rac_voice_agent.h>
 #include <rac/backends/rac_wakeword_onnx.h>
+#include <rac/backends/rac_vad_onnx.h>
 #include <rac/core/rac_error.h>
 
 #include <vector>
@@ -330,8 +331,11 @@ static std::string sanitize_text_for_tts(const std::string& input) {
 // =============================================================================
 
 struct VoicePipeline::Impl {
-    // Voice agent handle (for VAD, STT, TTS)
+    // Voice agent handle (for STT, TTS)
     rac_voice_agent_handle_t voice_agent = nullptr;
+
+    // Silero VAD (ONNX-based, much more accurate than energy VAD)
+    rac_handle_t silero_vad = nullptr;
 
     // Wake word detector (separate from voice agent)
     rac_handle_t wakeword_handle = nullptr;
@@ -396,6 +400,11 @@ VoicePipeline::~VoicePipeline() {
     cancel_speech();
     stop();
 
+    if (impl_->silero_vad) {
+        rac_vad_onnx_stop(impl_->silero_vad);
+        rac_vad_onnx_destroy(impl_->silero_vad);
+        impl_->silero_vad = nullptr;
+    }
     if (impl_->wakeword_handle) {
         rac_wakeword_onnx_destroy(impl_->wakeword_handle);
         impl_->wakeword_handle = nullptr;
@@ -477,6 +486,23 @@ bool VoicePipeline::initialize() {
         last_error_ = "Failed to initialize voice agent";
         state_ = PipelineState::ERROR;
         return false;
+    }
+
+    // Initialize Silero VAD (ONNX-based, replaces energy VAD)
+    std::string vad_path = get_vad_model_path();
+    std::cout << "  Loading VAD: Silero (ONNX)\n";
+
+    rac_vad_onnx_config_t vad_config = RAC_VAD_ONNX_CONFIG_DEFAULT;
+    vad_config.sample_rate = 16000;
+    vad_config.energy_threshold = config_.vad_threshold;  // Reuse existing threshold setting
+
+    result = rac_vad_onnx_create(vad_path.c_str(), &vad_config, &impl_->silero_vad);
+    if (result != RAC_SUCCESS) {
+        std::cerr << "[Pipeline] WARNING: Failed to load Silero VAD, falling back to energy VAD\n";
+        impl_->silero_vad = nullptr;
+    } else {
+        rac_vad_onnx_start(impl_->silero_vad);
+        std::cout << "  Silero VAD loaded (threshold: " << config_.vad_threshold << ")\n";
     }
 
     // Initialize Wake Word (optional)
@@ -688,14 +714,13 @@ void VoicePipeline::process_vad(const float* samples, size_t num_samples, const 
 
     auto now = std::chrono::steady_clock::now();
 
-    // Detect speech using voice agent's VAD
+    // Detect speech: prefer Silero VAD (ONNX) if loaded, else fall back to energy VAD
     rac_bool_t is_speech = RAC_FALSE;
-    rac_voice_agent_detect_speech(
-        impl_->voice_agent,
-        samples,
-        num_samples,
-        &is_speech
-    );
+    if (impl_->silero_vad) {
+        rac_vad_onnx_process(impl_->silero_vad, samples, num_samples, &is_speech);
+    } else {
+        rac_voice_agent_detect_speech(impl_->voice_agent, samples, num_samples, &is_speech);
+    }
 
     bool speech_detected = (is_speech == RAC_TRUE);
 
