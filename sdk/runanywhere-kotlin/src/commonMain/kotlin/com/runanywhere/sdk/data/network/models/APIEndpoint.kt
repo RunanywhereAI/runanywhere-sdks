@@ -79,9 +79,9 @@ enum class APIEndpoint(
             }
 
         /**
-         * Model assignments endpoint path
+         * Get model assignments endpoint
          * Matches iOS: APIEndpoint.modelAssignments()
          */
-        const val MODEL_ASSIGNMENTS_PATH: String = "/api/v1/model-assignments/for-sdk"
+        fun modelAssignments(): String = "/api/v1/model-assignments/for-sdk"
     }
 }
