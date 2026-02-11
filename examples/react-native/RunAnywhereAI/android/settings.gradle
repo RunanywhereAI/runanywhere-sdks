@@ -1,6 +1,27 @@
 pluginManagement { includeBuild("../node_modules/@react-native/gradle-plugin") }
 plugins { id("com.facebook.react.settings") }
-extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
+
+extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> 
+    ex.autolinkLibrariesFromCommand()
+}
+
 rootProject.name = 'RunAnywhereAI'
 include ':app'
 includeBuild('../node_modules/@react-native/gradle-plugin')
+
+// Manually include nitro-modules (excluded from autolinking to avoid Turbo codegen)
+include ':react-native-nitro-modules'
+project(':react-native-nitro-modules').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-nitro-modules/android')
+
+// Manually include @runanywhere packages (Nitro modules with custom gradle names)
+include ':runanywhere_core'
+project(':runanywhere_core').projectDir = new File(rootProject.projectDir, '../node_modules/@runanywhere/core/android')
+
+include ':runanywhere_llamacpp'
+project(':runanywhere_llamacpp').projectDir = new File(rootProject.projectDir, '../node_modules/@runanywhere/llamacpp/android')
+
+include ':runanywhere_onnx'
+project(':runanywhere_onnx').projectDir = new File(rootProject.projectDir, '../node_modules/@runanywhere/onnx/android')
+
+include ':runanywhere_rag'
+project(':runanywhere_rag').projectDir = new File(rootProject.projectDir, '../node_modules/@runanywhere/rag/android')

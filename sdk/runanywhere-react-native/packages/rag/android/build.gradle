@@ -1,0 +1,166 @@
+// =============================================================================
+// Node Binary Detection for Android Studio Compatibility
+// Android Studio doesn't inherit terminal PATH, so we need to find node explicitly
+// =============================================================================
+def findNodeBinary() {
+    // Check local.properties first (user can override)
+    def localProperties = new Properties()
+    def localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.withInputStream { localProperties.load(it) }
+        def nodePath = localProperties.getProperty("node.path")
+        if (nodePath && new File(nodePath).exists()) {
+            return nodePath
+        }
+    }
+    
+    // Check common node installation paths
+    def homeDir = System.getProperty("user.home")
+    def nodePaths = [
+        "/opt/homebrew/bin/node",                    // macOS ARM (Apple Silicon)
+        "/usr/local/bin/node",                       // macOS Intel / Linux
+        "/usr/bin/node",                             // Linux system
+        "${homeDir}/.nvm/current/bin/node",          // nvm
+        "${homeDir}/.volta/bin/node",                // volta
+        "${homeDir}/.asdf/shims/node"                // asdf
+    ]
+    for (path in nodePaths) {
+        if (new File(path).exists()) {
+            return path
+        }
+    }
+    
+    // Fallback to 'node' (works if PATH is set correctly in terminal builds)
+    return "node"
+}
+
+def getExtOrDefault(name) {
+    return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties['RunAnywhereRAG_' + name]
+}
+
+// Only arm64-v8a is supported
+def reactNativeArchitectures() {
+    return ["arm64-v8a"]
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+apply from: '../nitrogen/generated/android/runanywhererg+autolinking.gradle'
+apply plugin: 'com.facebook.react'
+
+// Configure node path for Android Studio builds
+// Set the react extension's nodeExecutableAndArgs after plugin is applied
+def nodeBinary = findNodeBinary()
+logger.lifecycle("[RunAnywhereRAG] Using node binary: ${nodeBinary}")
+
+// Configure all codegen tasks to use the detected node binary
+afterEvaluate {
+    tasks.withType(com.facebook.react.tasks.GenerateCodegenSchemaTask).configureEach {
+        nodeExecutableAndArgs.set([nodeBinary])
+    }
+    tasks.withType(com.facebook.react.tasks.GenerateCodegenArtifactsTask).configureEach {
+        nodeExecutableAndArgs.set([nodeBinary])
+    }
+}
+
+def getExtOrIntegerDefault(name) {
+    if (rootProject.ext.has(name)) {
+        return rootProject.ext.get(name)
+    } else if (project.properties.containsKey('RunAnywhereRAG_' + name)) {
+        return (project.properties['RunAnywhereRAG_' + name]).toInteger()
+    }
+    def defaults = [
+        'compileSdkVersion': 36,
+        'minSdkVersion': 24,
+        'targetSdkVersion': 36
+    ]
+    return defaults[name] ?: 36
+}
+
+// =============================================================================
+// Android Configuration
+// =============================================================================
+android {
+    compileSdk getExtOrIntegerDefault('compileSdkVersion')
+
+    namespace 'com.margelo.runanywhere.rag'
+    ndkVersion getExtOrDefault("ndkVersion")
+
+    buildFeatures {
+        prefab true
+    }
+
+    defaultConfig {
+        minSdk getExtOrIntegerDefault('minSdkVersion')
+        targetSdk getExtOrIntegerDefault('targetSdkVersion')
+        
+        externalNativeBuild {
+            cmake {
+                cppFlags "-O2 -frtti -fexceptions -Wall -Wno-unused-variable -fstack-protector-all"
+                arguments "-DANDROID_STL=c++_shared",
+                          "-DANDROID_ARM_NEON=TRUE",
+                          "-DRAC_BUILD_RAG=ON",
+                          "-DRAC_BUILD_LLAMACPP=ON",
+                          "-DRAC_BUILD_ONNX=ON"
+                abiFilters (*reactNativeArchitectures())
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "CMakeLists.txt"
+            version "3.22.1"
+        }
+    }
+
+    packagingOptions {
+        // Exclude duplicate libc++_shared.so
+        pickFirst 'lib/x86/libc++_shared.so'
+        pickFirst 'lib/x86_64/libc++_shared.so'
+        pickFirst 'lib/armeabi-v7a/libc++_shared.so'
+        pickFirst 'lib/arm64-v8a/libc++_shared.so'
+        
+        // Exclude LLVM bitcode
+        exclude 'lib/arm64-v8a/libllvmapp.a'
+        exclude 'lib/armeabi-v7a/libllvmapp.a'
+    }
+
+    lintOptions {
+        abortOnError false
+    }
+}
+
+// =============================================================================
+// Dependencies
+// =============================================================================
+repositories {
+    mavenCentral()
+    google()
+}
+
+dependencies {
+    // React Native
+    implementation 'com.facebook.react:react-android'
+    
+    // Kotlin - use rootProject's kotlinVersion
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:${rootProject.ext.kotlinVersion}"
+    
+    // Nitrogen Modules - use project dependency like core module does
+    implementation project(":react-native-nitro-modules")
+    
+    // RunAnywhere Core (includes commons library)
+    implementation project(':runanywhere_core')
+    
+    // RunAnywhere LlamaCPP (for text generation)
+    implementation project(':runanywhere_llamacpp')
+    
+    // RunAnywhere ONNX (for embeddings)
+    implementation project(':runanywhere_onnx')
+}

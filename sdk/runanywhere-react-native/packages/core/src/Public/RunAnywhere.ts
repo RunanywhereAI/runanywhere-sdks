@@ -603,6 +603,7 @@ export const RunAnywhere = {
   // ============================================================================
 
   getStorageInfo: Storage.getStorageInfo,
+  getModelsDirectory: Storage.getModelsDirectory,
   clearCache: Storage.clearCache,
 
   // ============================================================================
@@ -615,6 +616,7 @@ export const RunAnywhere = {
   downloadModel: Models.downloadModel,
   cancelDownload: Models.cancelDownload,
   deleteModel: Models.deleteModel,
+  registerModel: Models.registerModel,
 
   // ============================================================================
   // Utilities

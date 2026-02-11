@@ -21,6 +21,7 @@ import ChatScreen from '../screens/ChatScreen';
 import STTScreen from '../screens/STTScreen';
 import TTSScreen from '../screens/TTSScreen';
 import VoiceAssistantScreen from '../screens/VoiceAssistantScreen';
+import RAGScreen from '../screens/RAGScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -36,6 +37,7 @@ const tabIcons: Record<
   STT: { focused: 'pulse', unfocused: 'pulse-outline' }, // waveform equivalent
   TTS: { focused: 'volume-high', unfocused: 'volume-high-outline' }, // speaker.wave.2
   Voice: { focused: 'mic', unfocused: 'mic-outline' }, // mic for voice assistant
+  RAG: { focused: 'search', unfocused: 'search-outline' }, // search for RAG
   Settings: { focused: 'settings', unfocused: 'settings-outline' },
 };
 
@@ -48,6 +50,7 @@ const tabLabels: Record<keyof RootTabParamList, string> = {
   STT: 'Transcribe',
   TTS: 'Speak',
   Voice: 'Voice',
+  RAG: 'RAG',
   Settings: 'Settings',
 };
 
@@ -108,7 +111,13 @@ export const TabNavigator: React.FC = () => {
         component={VoiceAssistantScreen}
         options={{ tabBarLabel: tabLabels.Voice }}
       />
-      {/* Tab 4: Settings */}
+      {/* Tab 4: RAG (Retrieval-Augmented Generation) */}
+      <Tab.Screen
+        name="RAG"
+        component={RAGScreen}
+        options={{ tabBarLabel: tabLabels.RAG }}
+      />
+      {/* Tab 5: Settings */}
       <Tab.Screen
         name="Settings"
         component={SettingsScreen}

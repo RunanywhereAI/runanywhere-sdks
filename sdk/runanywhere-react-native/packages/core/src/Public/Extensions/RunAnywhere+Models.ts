@@ -287,6 +287,8 @@ export async function downloadModel(
   let extension = '';
   if (modelInfo.downloadURL.includes('.gguf')) {
     extension = '.gguf';
+  } else if (modelInfo.downloadURL.includes('.onnx')) {
+    extension = '.onnx';
   } else if (modelInfo.downloadURL.includes('.tar.bz2')) {
     extension = '.tar.bz2';
   } else if (modelInfo.downloadURL.includes('.tar.gz')) {

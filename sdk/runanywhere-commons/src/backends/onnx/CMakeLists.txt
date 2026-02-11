@@ -23,7 +23,18 @@ FetchContent_Declare(
     GIT_SHALLOW    TRUE
 )
 set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
+set(JSON_Install OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(nlohmann_json)
+
+# Workaround: nlohmann_json may use target_compile_features which fails with Xcode generator
+# Override to use set_target_properties instead
+if(TARGET nlohmann_json AND RAC_PLATFORM_IOS)
+    set_target_properties(nlohmann_json PROPERTIES
+        CXX_STANDARD 11
+        CXX_STANDARD_REQUIRED YES
+        CXX_EXTENSIONS NO
+    )
+endif()
 
 # =============================================================================
 # ONNX Runtime
@@ -165,7 +176,11 @@ else()
     target_compile_definitions(rac_backend_onnx PUBLIC SHERPA_ONNX_AVAILABLE=0)
 endif()
 
-target_compile_features(rac_backend_onnx PUBLIC cxx_std_17)
+set_target_properties(rac_backend_onnx PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+)
 
 # =============================================================================
 # Platform-specific configuration

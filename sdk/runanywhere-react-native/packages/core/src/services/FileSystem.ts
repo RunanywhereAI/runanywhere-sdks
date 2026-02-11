@@ -416,6 +416,7 @@ export const FileSystem = {
 
     // Determine destination path
     let destPath: string;
+    const archiveType = inferArchiveType(url);
     if (fw === 'LlamaCpp') {
       const ext =
         modelId.includes('.gguf') || url.includes('.gguf')
@@ -423,6 +424,10 @@ export const FileSystem = {
           : modelId.includes('.bin') || url.includes('.bin')
             ? '.bin'
             : '.gguf';
+      destPath = `${folder}/${baseId}${ext}`;
+    } else if (fw === 'ONNX' && archiveType === null) {
+      // ONNX single-file model (.onnx)
+      const ext = modelId.includes('.onnx') || url.includes('.onnx') ? '.onnx' : '';
       destPath = `${folder}/${baseId}${ext}`;
     } else {
       // For archives, download to temp first
@@ -436,7 +441,7 @@ export const FileSystem = {
 
     // Check if already exists
     const exists = await RNFS.exists(destPath);
-    if (exists && fw === 'LlamaCpp') {
+    if (exists && (fw === 'LlamaCpp' || (fw === 'ONNX' && archiveType === null))) {
       logger.info(`Model already exists: ${destPath}`);
       return destPath;
     }
@@ -476,7 +481,6 @@ export const FileSystem = {
     logger.info(`Download completed: ${result.bytesWritten} bytes`);
 
     // For ONNX archives, extract to final location
-    const archiveType = inferArchiveType(url);
     if (fw === 'ONNX' && archiveType !== null) {
       logger.info(`Extracting ${archiveType} archive...`);
 
@@ -597,15 +601,31 @@ export const FileSystem = {
     try {
       const contents = await RNFS.readDir(extractedFolder);
 
+      // Check for .onnx files in the current directory first (SingleFile models)
+      const onnxFiles = contents.filter(
+        item => item.isFile() && item.name.toLowerCase().endsWith('.onnx')
+      );
+      if (onnxFiles.length > 0) {
+        // Return the first .onnx file found (or model.onnx if it exists)
+        const modelOnnx = onnxFiles.find(f => f.name === 'model.onnx');
+        if (modelOnnx) {
+          logger.info(`Found model.onnx: ${modelOnnx.path}`);
+          return modelOnnx.path;
+        }
+        // Otherwise use the first .onnx file found
+        logger.info(`Found ONNX model: ${onnxFiles[0].path}`);
+        return onnxFiles[0].path;
+      }
+
       // If there's exactly one directory and no files, it might be a nested structure
       const directories = contents.filter(item => item.isDirectory());
       const files = contents.filter(item => item.isFile());
 
       if (directories.length === 1 && files.length === 0) {
-        // Nested directory - the actual model is inside
+        // Nested directory - recursively check inside
         const nestedDir = directories[0];
         logger.info(`Found nested directory structure: ${nestedDir.name}`);
-        return nestedDir.path;
+        return this.findModelPathAfterExtraction(nestedDir.path);
       }
 
       // Otherwise, the extracted folder contains the model directly

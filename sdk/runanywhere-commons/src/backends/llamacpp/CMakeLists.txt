@@ -79,6 +79,17 @@ set(BUILD_SHARED_LIBS OFF CACHE BOOL "Force static libraries for llama.cpp" FORC
 
 FetchContent_MakeAvailable(llamacpp)
 
+# Android: map POSIX_MADV_* to MADV_* to avoid missing constants
+if(RAC_PLATFORM_ANDROID)
+    if(TARGET llama)
+        target_compile_definitions(llama PRIVATE
+            POSIX_MADV_WILLNEED=MADV_WILLNEED
+            POSIX_MADV_RANDOM=MADV_RANDOM
+            posix_madvise=madvise
+        )
+    endif()
+endif()
+
 # =============================================================================
 # LlamaCPP Backend Library
 # =============================================================================
@@ -123,7 +134,11 @@ target_link_libraries(rac_backend_llamacpp PUBLIC
     common
 )
 
-target_compile_features(rac_backend_llamacpp PUBLIC cxx_std_17)
+set_target_properties(rac_backend_llamacpp PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+)
 
 # =============================================================================
 # Platform-specific configuration

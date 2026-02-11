@@ -214,6 +214,7 @@ rac_model_category_t categoryFromString(const std::string& category) {
     if (category == "ImageGeneration" || category == "image-generation" || category == "image_generation") return RAC_MODEL_CATEGORY_IMAGE_GENERATION;
     if (category == "Multimodal" || category == "multimodal") return RAC_MODEL_CATEGORY_MULTIMODAL;
     if (category == "Audio" || category == "audio") return RAC_MODEL_CATEGORY_AUDIO;
+    if (category == "Embedding" || category == "embedding") return RAC_MODEL_CATEGORY_EMBEDDING;
     return RAC_MODEL_CATEGORY_UNKNOWN;
 }
 
@@ -812,6 +813,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getAvailableModels(
                 case RAC_MODEL_CATEGORY_VISION: categoryStr = "vision"; break;
                 case RAC_MODEL_CATEGORY_AUDIO: categoryStr = "audio"; break;
                 case RAC_MODEL_CATEGORY_MULTIMODAL: categoryStr = "multimodal"; break;
+                case RAC_MODEL_CATEGORY_EMBEDDING: categoryStr = "embedding"; break;
                 default: categoryStr = "unknown"; break;
             }
             std::string formatStr = "unknown";
@@ -874,6 +876,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getModelInfo(
             case RAC_MODEL_CATEGORY_VISION: categoryStr = "vision"; break;
             case RAC_MODEL_CATEGORY_IMAGE_GENERATION: categoryStr = "image-generation"; break;
             case RAC_MODEL_CATEGORY_MULTIMODAL: categoryStr = "multimodal"; break;
+            case RAC_MODEL_CATEGORY_EMBEDDING: categoryStr = "embedding"; break;
             default: categoryStr = "unknown"; break;
         }
         std::string formatStr = "unknown";

@@ -15,6 +15,12 @@
  */
 
 // =============================================================================
+// Global NitroModules Initialization (MUST be first!)
+// =============================================================================
+
+export { initializeNitroModulesGlobally, getNitroModulesProxySync, isNitroModulesInitialized } from './native/NitroModulesGlobalInit';
+
+// =============================================================================
 // Main SDK
 // =============================================================================
 
@@ -183,7 +189,6 @@ export type {
   HTTPServiceConfig,
   DevModeConfig,
   NetworkConfig,
-  TelemetryEvent,
   APIEndpointKey,
   APIEndpointValue,
 } from './services';

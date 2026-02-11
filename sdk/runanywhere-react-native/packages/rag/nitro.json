@@ -1,0 +1,16 @@
+{
+  "cxxNamespace": ["runanywhere", "rag"],
+  "ios": {
+    "iosModuleName": "RunAnywhereRAG"
+  },
+  "android": {
+    "androidNamespace": ["runanywhere", "rag"],
+    "androidCxxLibName": "runanywhererg"
+  },
+  "autolinking": {
+    "RunAnywhereRAG": {
+      "cpp": "HybridRunAnywhereRAG"
+    }
+  },
+  "ignorePaths": ["node_modules", "lib", "example"]
+}

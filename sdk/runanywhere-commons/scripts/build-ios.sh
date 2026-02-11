@@ -11,10 +11,11 @@
 # OPTIONS:
 #   --skip-download     Skip downloading dependencies
 #   --skip-backends     Build RACommons only, skip backend frameworks
-#   --backend NAME      Build specific backend: llamacpp, onnx, all (default: all)
+#   --backend NAME      Build specific backend: llamacpp, onnx, rag, all (default: all)
 #                       - llamacpp: LLM text generation (GGUF models)
 #                       - onnx: STT/TTS/VAD (Sherpa-ONNX models)
-#                       - all: Both backends (default)
+#                       - rag: RAG backend with embeddings and text generation
+#                       - all: All backends (default)
 #   --clean             Clean build directories first
 #   --release           Release build (default)
 #   --debug             Debug build
@@ -25,6 +26,7 @@
 #   dist/RACommons.xcframework                 (always built)
 #   dist/RABackendLLAMACPP.xcframework         (if --backend llamacpp or all)
 #   dist/RABackendONNX.xcframework             (if --backend onnx or all)
+#   dist/RABackendRAG.xcframework              (if --backend rag or all)
 #
 # EXAMPLES:
 #   # Full build (all backends)
@@ -35,6 +37,9 @@
 #
 #   # Build only ONNX backend (speech-to-text/text-to-speech)
 #   ./scripts/build-ios.sh --backend onnx
+#
+#   # Build only RAG backend (embeddings + text generation)
+#   ./scripts/build-ios.sh --backend rag
 #
 #   # Build only RACommons (no backends)
 #   ./scripts/build-ios.sh --skip-backends
@@ -196,8 +201,19 @@ create_xcframework() {
         mkdir -p "${FRAMEWORK_DIR}/Headers"
         mkdir -p "${FRAMEWORK_DIR}/Modules"
 
-        # Find the library
+        # Find the library (try multiple locations)
         local LIB_PATH="${PLATFORM_DIR}/lib${LIB_NAME}.a"
+        
+        # Try Xcode generator output paths
+        if [[ ! -f "${LIB_PATH}" ]]; then
+            if [[ "$PLATFORM" == "OS" ]]; then
+                LIB_PATH="${PLATFORM_DIR}/Release-iphoneos/lib${LIB_NAME}.a"
+            else
+                LIB_PATH="${PLATFORM_DIR}/Release-iphonesimulator/lib${LIB_NAME}.a"
+            fi
+        fi
+        
+        # Try backend-specific paths
         [[ ! -f "${LIB_PATH}" ]] && LIB_PATH="${PLATFORM_DIR}/src/backends/${BUILD_BACKEND}/lib${LIB_NAME}.a"
 
         if [[ ! -f "${LIB_PATH}" ]]; then
@@ -256,15 +272,8 @@ EOF
 EOF
     done
 
-    # Create fat simulator
-    local SIM_FAT="${BUILD_DIR}/SIMULATOR_FAT_${FRAMEWORK_NAME}"
-    mkdir -p "${SIM_FAT}"
-    cp -R "${BUILD_DIR}/SIMULATORARM64/${FRAMEWORK_NAME}.framework" "${SIM_FAT}/"
-
-    lipo -create \
-        "${BUILD_DIR}/SIMULATORARM64/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" \
-        "${BUILD_DIR}/SIMULATOR/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" \
-        -output "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
+    # SIMULATOR already contains universal binary (arm64 + x86_64)
+    # No need to create fat binary as both SIMULATORARM64 and SIMULATOR have arm64
 
     # Create XCFramework
     local XCFW_PATH="${DIST_DIR}/${FRAMEWORK_NAME}.xcframework"
@@ -272,7 +281,7 @@ EOF
 
     xcodebuild -create-xcframework \
         -framework "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework" \
-        -framework "${SIM_FAT}/${FRAMEWORK_NAME}.framework" \
+        -framework "${BUILD_DIR}/SIMULATOR/${FRAMEWORK_NAME}.framework" \
         -output "${XCFW_PATH}"
 
     log_info "Created: ${XCFW_PATH}"
@@ -303,8 +312,16 @@ create_backend_xcframework() {
 
         # Backend library - check multiple possible locations
         local BACKEND_LIB=""
+        local XCODE_SUBDIR
+        if [[ "$PLATFORM" == "OS" ]]; then
+            XCODE_SUBDIR="Release-iphoneos"
+        else
+            XCODE_SUBDIR="Release-iphonesimulator"
+        fi
+        
         for possible_path in \
             "${PLATFORM_DIR}/src/backends/${BACKEND_NAME}/librac_backend_${BACKEND_NAME}.a" \
+            "${PLATFORM_DIR}/${XCODE_SUBDIR}/librac_backend_${BACKEND_NAME}.a" \
             "${PLATFORM_DIR}/librac_backend_${BACKEND_NAME}.a" \
             "${PLATFORM_DIR}/backends/${BACKEND_NAME}/librac_backend_${BACKEND_NAME}.a"; do
             if [[ -f "$possible_path" ]]; then
@@ -344,6 +361,25 @@ create_backend_xcframework() {
                 *) SHERPA_ARCH="ios-arm64_x86_64-simulator" ;;
             esac
             # Try both .a and framework binary
+            for possible in \
+                "${SHERPA_XCFW}/${SHERPA_ARCH}/libsherpa-onnx.a" \
+                "${SHERPA_XCFW}/${SHERPA_ARCH}/sherpa-onnx.framework/sherpa-onnx"; do
+                if [[ -f "$possible" ]]; then
+                    LIBS_TO_BUNDLE+=("$possible")
+                    break
+                fi
+            done
+        elif [[ "$BACKEND_NAME" == "rag" ]]; then
+            # RAG backend uses separation of concerns:
+            # - Has its own providers (onnx_embedding_provider.cpp, onnx_generator.cpp)
+            # - Uses ONNXBackendNew directly (not the full ONNX backend service)
+            # - Only needs to bundle Sherpa-ONNX (the underlying ONNX runtime)
+            local SHERPA_XCFW="${PROJECT_ROOT}/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework"
+            local SHERPA_ARCH
+            case $PLATFORM in
+                OS) SHERPA_ARCH="ios-arm64" ;;
+                *) SHERPA_ARCH="ios-arm64_x86_64-simulator" ;;
+            esac
             for possible in \
                 "${SHERPA_XCFW}/${SHERPA_ARCH}/libsherpa-onnx.a" \
                 "${SHERPA_XCFW}/${SHERPA_ARCH}/sherpa-onnx.framework/sherpa-onnx"; do
@@ -400,16 +436,8 @@ EOF
         return 0
     fi
 
-    # Create fat simulator
-    local SIM_FAT="${BUILD_DIR}/SIMULATOR_FAT_${FRAMEWORK_NAME}"
-    rm -rf "${SIM_FAT}"
-    mkdir -p "${SIM_FAT}"
-    cp -R "${BUILD_DIR}/SIMULATORARM64/${FRAMEWORK_NAME}.framework" "${SIM_FAT}/"
-
-    lipo -create \
-        "${BUILD_DIR}/SIMULATORARM64/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" \
-        "${BUILD_DIR}/SIMULATOR/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" \
-        -output "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" 2>/dev/null || true
+    # SIMULATOR already contains universal binary (arm64 + x86_64)
+    # No need to create fat binary as both SIMULATORARM64 and SIMULATOR have arm64
 
     # Create XCFramework
     local XCFW_PATH="${DIST_DIR}/${FRAMEWORK_NAME}.xcframework"
@@ -418,7 +446,7 @@ EOF
     if [[ -f "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" ]]; then
         xcodebuild -create-xcframework \
             -framework "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework" \
-            -framework "${SIM_FAT}/${FRAMEWORK_NAME}.framework" \
+            -framework "${BUILD_DIR}/SIMULATOR/${FRAMEWORK_NAME}.framework" \
             -output "${XCFW_PATH}"
 
         log_info "Created: ${XCFW_PATH}"
@@ -497,6 +525,9 @@ main() {
         fi
         if [[ "$BUILD_BACKEND" == "all" || "$BUILD_BACKEND" == "onnx" ]]; then
             create_backend_xcframework "onnx" "RABackendONNX"
+        fi
+        if [[ "$BUILD_BACKEND" == "all" || "$BUILD_BACKEND" == "rag" ]]; then
+            create_backend_xcframework "rag" "RABackendRAG"
         fi
     fi
 

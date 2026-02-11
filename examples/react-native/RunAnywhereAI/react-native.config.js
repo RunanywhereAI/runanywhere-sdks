@@ -8,6 +8,20 @@ module.exports = {
     },
   },
   dependencies: {
+    // Nitro modules doesn't have Turbo codegen - exclude from autolinking
+    'react-native-nitro-modules': {
+      platforms: {
+        android: null,
+        ios: null,
+      },
+    },
+    // Disable llamacpp - using ONNX only
+    '@runanywhere/llamacpp': {
+      platforms: {
+        ios: null,
+        android: null,
+      },
+    },
     // Disable audio libraries on iOS - they're incompatible with New Architecture
     'react-native-live-audio-stream': {
       platforms: {
@@ -23,6 +37,7 @@ module.exports = {
     'react-native-sound': {
       platforms: {
         ios: null,
+        android: null,
       },
     },
     'react-native-tts': {

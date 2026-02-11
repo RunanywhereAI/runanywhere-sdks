@@ -29,10 +29,11 @@ option(RAC_BUILD_JNI "Build JNI bridge for Android/JVM" OFF)
 option(RAC_BUILD_TESTS "Build unit tests" OFF)
 option(RAC_BUILD_SHARED "Build shared libraries" OFF)
 option(RAC_BUILD_PLATFORM "Build platform backend (Apple Foundation Models, System TTS)" ON)
-option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, WhisperCPP)" OFF)
+option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, WhisperCPP, RAG)" OFF)
 option(RAC_BACKEND_LLAMACPP "Build LlamaCPP backend" ON)
 option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
 option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" ON)
+option(RAC_BACKEND_RAG "Build RAG backend (USearch)" ON)
 
 # =============================================================================
 # C++ CONFIGURATION
@@ -42,6 +43,14 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# Workaround for React Native 0.83 std::format incompatibility on Android NDK 26
+# Add a define to suppress the issue in React Native's graphicsConversions.h
+if(ANDROID)
+    add_compile_definitions(YG_ENABLE_STANDARD_LIBRARY_SUPPORT=0)
+    # Suppress std::format usage by adding this flag
+    add_compile_options(-fno-strict-aliasing)
+endif()
 
 # Export compile commands for clang-tidy
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -256,7 +265,11 @@ if(RAC_PLATFORM_ANDROID)
     target_link_libraries(rac_commons PUBLIC log)
 endif()
 
-target_compile_features(rac_commons PUBLIC cxx_std_17)
+set_target_properties(rac_commons PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+)
 
 # =============================================================================
 # JNI BRIDGE (Android/JVM)
@@ -289,6 +302,11 @@ if(RAC_BUILD_BACKENDS)
     if(RAC_BACKEND_WHISPERCPP AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/whispercpp/CMakeLists.txt")
         message(STATUS "  - WhisperCPP backend")
         add_subdirectory(src/backends/whispercpp)
+    endif()
+
+    if(RAC_BACKEND_RAG AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/rag/CMakeLists.txt")
+        message(STATUS "  - RAG backend (USearch)")
+        add_subdirectory(src/backends/rag)
     endif()
 endif()
 
@@ -337,7 +355,7 @@ if(APPLE AND RAC_BUILD_PLATFORM)
     message(STATUS "  Platform:     Apple Foundation Models, System TTS")
 endif()
 if(RAC_BUILD_BACKENDS)
-    message(STATUS "  Backends:     LlamaCPP=${RAC_BACKEND_LLAMACPP}, ONNX=${RAC_BACKEND_ONNX}, WhisperCPP=${RAC_BACKEND_WHISPERCPP}")
+    message(STATUS "  Backends:     LlamaCPP=${RAC_BACKEND_LLAMACPP}, ONNX=${RAC_BACKEND_ONNX}, WhisperCPP=${RAC_BACKEND_WHISPERCPP}, RAG=${RAC_BACKEND_RAG}")
 endif()
 message(STATUS "")
 message(STATUS "JNI bridge:     ${RAC_BUILD_JNI}")

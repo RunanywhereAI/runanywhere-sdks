@@ -92,11 +92,10 @@ class SecureStorageServiceImpl {
       const native = requireNativeModule() as unknown as SecureStorageNativeModule;
 
       // Use the new native method
-      const success = await native.secureStorageSet(key, value);
-
-      if (!success) {
-        throw new Error(`Native secureStorageSet returned false for key: ${key}`);
+      if (!native.secureStorageStore) {
+        throw new Error('secureStorageStore method is not available');
       }
+      await native.secureStorageStore(key, value);
 
       // Update cache
       this.cache.set(key, value);
@@ -130,7 +129,10 @@ class SecureStorageServiceImpl {
       const native = requireNativeModule() as unknown as SecureStorageNativeModule;
 
       // Use the new native method
-      const value = await native.secureStorageGet(key);
+      if (!native.secureStorageRetrieve) {
+        return null;
+      }
+      const value = await native.secureStorageRetrieve(key);
 
       if (value !== null && value !== undefined) {
         this.cache.set(key, value);
@@ -163,7 +165,9 @@ class SecureStorageServiceImpl {
       const native = requireNativeModule() as unknown as SecureStorageNativeModule;
 
       // Use the new native method
-      await native.secureStorageDelete(key);
+      if (native.secureStorageDelete) {
+        await native.secureStorageDelete(key);
+      }
 
       // Remove from cache
       this.cache.delete(key);
@@ -199,6 +203,9 @@ class SecureStorageServiceImpl {
       const native = requireNativeModule() as unknown as SecureStorageNativeModule;
 
       // Use the new native method
+      if (!native.secureStorageExists) {
+        return false;
+      }
       return await native.secureStorageExists(key);
     } catch {
       return false;

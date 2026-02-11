@@ -2,6 +2,99 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
+// Fix for React Native 0.83 std::format incompatibility with Android NDK 26
+// C++ 17 codebase - patch graphicsConversions.h to use ostringstream instead of std::format
+def fixStdFormatIssue() {
+    def gradleHome = project.gradle.gradleUserHomeDir
+    def transformsDir = new File(gradleHome, "caches/${gradle.gradleVersion}/transforms")
+    
+    if (!transformsDir.exists()) {
+        println "ℹ️ Gradle transforms dir not found yet, will patch on next build"
+        return
+    }
+    
+    int patched = 0
+    transformsDir.eachFileRecurse { file ->
+        if ((file.name == "graphicsConversions.h" || file.name == "propsConversions.h") && file.path.contains("react-android")) {
+            def content = file.text
+            if (content.contains('std::format')) {
+                println "🔧 Patching ${file.absolutePath}"
+
+                // Replace percent formatting using std::to_string (avoids std::format)
+                content = content.replaceAll(
+                    /case\s+YGUnitPercent:\s*\n?\s*return\s+std::format\(".*?%.*?",\s*dimension\.value\);/,
+                    'case YGUnitPercent: return std::to_string(dimension.value) + "%";'
+                )
+
+                // Fallback: replace any std::format("{}%", dimension.value)
+                content = content.replaceAll(
+                    /std::format\("\{\}%",\s*dimension\.value\)/,
+                    'std::to_string(dimension.value) + "%"'
+                )
+
+                // Direct string replacement as a final safety net
+                content = content.replace(
+                    'return std::format("{}%", dimension.value);',
+                    'return std::to_string(dimension.value) + "%";'
+                )
+
+                // Add string include if not present
+                if (!content.contains('#include <string>')) {
+                    content = content.replace(
+                        '#include <array>',
+                        '#include <array>\n#include <string>'
+                    )
+                    println "✅ Added #include <string>"
+                }
+
+                file.text = content
+                patched++
+                println "✅ Successfully patched std::format usage"
+            }
+        }
+    }
+    
+    if (patched == 0) {
+        println "ℹ️ No std::format issues found to patch (may have already been patched or will be done on next build)"
+    } else {
+        println "✅ Applied ${patched} std::format patches"
+    }
+}
+
+// Patch at the earliest possible time
+gradle.projectsEvaluated {
+    fixStdFormatIssue()
+}
+
+// Also patch when CMake tasks are added (for rebuild scenarios)
+tasks.whenTaskAdded { task ->
+    if (task.name.contains('CMake') || task.name.contains('cxx')) {
+        fixStdFormatIssue()
+    }
+}
+
+// Add a more aggressive pre-build hook
+tasks.register('patchStdFormatBeforeBuild') {
+    doFirst {
+        println "🔧 Pre-build: Checking for std::format issues..."
+        fixStdFormatIssue()
+    }
+}
+
+// Run patch immediately before relevant build tasks (ensures transformed headers exist)
+tasks.matching {
+    it.name.contains('CMake') ||
+    it.name.contains('externalNativeBuild') ||
+    it.name.toLowerCase().contains('prebuild') ||
+    it.name.toLowerCase().contains('generate') ||
+    it.name.toLowerCase().contains('compile') ||
+    it.name.toLowerCase().contains('assemble')
+}.configureEach { task ->
+    task.doFirst {
+        fixStdFormatIssue()
+    }
+}
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
@@ -34,12 +127,20 @@ android {
         versionCode 1
         versionName "1.0"
 
+        // Only build for arm64-v8a (actual devices)
+        ndk {
+            abiFilters "arm64-v8a"
+        }
+
         // 16KB page size support for Android 15+ (API 35)
+        // Use patched CheckIPOSupported.cmake to skip IPO check on Android
         externalNativeBuild {
             cmake {
-                arguments "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+                arguments "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON",
+                          "-DCMAKE_MODULE_PATH=${projectDir}"
             }
         }
+        ndkVersion "26.3.11579264"
     }
     signingConfigs {
         debug {
@@ -69,7 +170,9 @@ android {
             "**/libjsi.so",
             "**/libfbjni.so",
             "**/libfolly_runtime.so",
-            "**/libreactnative.so"
+            "**/libreactnative.so",
+            "**/libNitroModules.so",  // Nitro modules shared by @runanywhere/onnx and react-native-nitro-modules
+            "**/librac_backend_onnx.so" // ONNX backend duplicated via rag + onnx modules
         ]
     }
 
@@ -87,7 +190,18 @@ dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
+    // Manually link Nitro modules (excluded from autolinking)
+    implementation project(':react-native-nitro-modules')
+    
+    // Manually link @runanywhere packages (Nitro modules)
+    implementation project(':runanywhere_core')
+    implementation project(':runanywhere_llamacpp')
+    implementation project(':runanywhere_onnx')
+    implementation project(':runanywhere_rag')
+
     def isHermesEnabled = project.hasProperty("hermesEnabled") ? project.hermesEnabled.toBoolean() : true
+    // Expose hermesEnabled for other modules (like react-native-worklets)
+    project.ext.hermesEnabled = isHermesEnabled
     if (isHermesEnabled) {
         implementation("com.facebook.react:hermes-android")
     } else {
