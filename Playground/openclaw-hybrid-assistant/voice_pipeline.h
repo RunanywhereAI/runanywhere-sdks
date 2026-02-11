@@ -38,6 +38,11 @@ struct VoicePipelineConfig {
     double silence_duration_sec = 1.5;
     size_t min_speech_samples = 16000;  // 1 second at 16kHz
 
+    // VAD noise robustness settings (for noisy environments like Pi with fan)
+    int speech_start_frames = 3;           // Consecutive speech frames needed to start (debounce)
+    int noise_burst_max_frames = 2;        // Isolated bursts shorter than this don't reset silence timer
+    double max_speech_duration_sec = 60.0; // Force-end speech after this long (prevents infinite buffering)
+
     // Callbacks
     std::function<void(const std::string&, float)> on_wake_word;           // Wake word detected
     std::function<void(bool)> on_voice_activity;                           // Speech started/stopped
