@@ -719,9 +719,10 @@ void VoicePipeline::process_wakeword(const float* samples, size_t num_samples) {
 
     if (result == RAC_SUCCESS && detected_index >= 0) {
         // Wake word detected!
+        bool was_bargein = (state_ == PipelineState::SPEAKING);
 
         // Barge-in: if TTS is currently playing, cancel it immediately
-        if (state_ == PipelineState::SPEAKING) {
+        if (was_bargein) {
             std::cout << "[WakeWord] Barge-in! Cancelling TTS playback...\n";
             // cancel_speech() stops producer thread + TTSQueue consumer + clears everything
             // Must unlock mutex before cancel_speech (it may join threads)
@@ -751,8 +752,10 @@ void VoicePipeline::process_wakeword(const float* samples, size_t num_samples) {
         // "Hey Jarvis" pattern doesn't re-trigger on subsequent frames
         rac_wakeword_onnx_reset(impl_->wakeword_handle);
 
-        // Reset Silero VAD state (clear any residual speech detection from TTS audio)
-        if (impl_->silero_vad) {
+        // Only reset Silero VAD during barge-in (TTS was playing, mic had echo).
+        // During normal wake word detection, keep VAD state intact so it can
+        // immediately detect the trailing speech ("Hey Jarvis, what's the weather?")
+        if (was_bargein && impl_->silero_vad) {
             rac_vad_onnx_reset(impl_->silero_vad);
         }
 
