@@ -16,7 +16,7 @@
 #   --rebuild-commons   Force rebuild of runanywhere-commons (even if cached)
 #   --clean             Clean build directories before building
 #   --skip-build        Skip Gradle build (only setup native libs)
-#   --abis=ABIS         ABIs to build (default: arm64-v8a)
+#   --abis=ABIS         ABIs to build (default: arm64-v8a,x86_64)
 #                       Supported: arm64-v8a, armeabi-v7a, x86_64, x86
 #                       Multiple: Use comma-separated (e.g., arm64-v8a,armeabi-v7a)
 #   --help              Show this help message
@@ -27,14 +27,14 @@
 #   x86_64           64-bit Intel (emulators on Intel Macs, ~2%)
 #
 # EXAMPLES:
-#   # First-time setup (modern devices only, ~4min build)
+#   # First-time setup (device + emulator, default)
 #   ./scripts/build-kotlin.sh --setup
 #
 #   # RECOMMENDED for production (97% device coverage, ~7min build)
 #   ./scripts/build-kotlin.sh --setup --abis=arm64-v8a,armeabi-v7a
 #
-#   # Development with emulator support (device + Intel Mac emulator)
-#   ./scripts/build-kotlin.sh --setup --abis=arm64-v8a,x86_64
+#   # Device only (faster build, no emulator support)
+#   ./scripts/build-kotlin.sh --setup --abis=arm64-v8a
 #
 #   # Rebuild only commons (after C++ code changes)
 #   ./scripts/build-kotlin.sh --local --rebuild-commons
@@ -73,7 +73,7 @@ SETUP_MODE=false
 REBUILD_COMMONS=false
 CLEAN_BUILD=false
 SKIP_BUILD=false
-ABIS="arm64-v8a"
+ABIS="arm64-v8a,x86_64"
 
 # =============================================================================
 # Colors & Logging
@@ -288,26 +288,6 @@ copy_jni_libs() {
     local COMMONS_BUILD="${COMMONS_DIR}/build/android/unified"
     local SHERPA_ONNX_LIBS="${COMMONS_DIR}/third_party/sherpa-onnx-android/jniLibs"
 
-    # =========================================================================
-    # Safety check: Remove stale .so from example apps.
-    # Example apps get native libraries transitively via SDK module dependencies.
-    # Having .so directly in app/src/main/jniLibs/ overrides the SDK module
-    # versions and can cause ABI mismatch crashes (e.g., SIGSEGV in Sherpa-ONNX).
-    # =========================================================================
-    local EXAMPLE_APPS_DIR="${SDK_ROOT}/../examples/android"
-    if [ -d "${EXAMPLE_APPS_DIR}" ]; then
-        for app_jnilibs in "${EXAMPLE_APPS_DIR}"/*/app/src/main/jniLibs; do
-            if [ -d "$app_jnilibs" ]; then
-                local stale_count=$(find "$app_jnilibs" -name "*.so" 2>/dev/null | wc -l | tr -d ' ')
-                if [ "$stale_count" -gt 0 ]; then
-                    log_warn "Found ${stale_count} stale .so in $(basename $(dirname $(dirname $(dirname $(dirname "$app_jnilibs")))))/app/src/main/jniLibs/"
-                    log_warn "Removing to prevent ABI mismatch — app gets native libs from SDK modules"
-                    rm -rf "$app_jnilibs"
-                fi
-            fi
-        done
-    fi
-
     # Clean output directories
     if [ "$CLEAN_BUILD" = true ]; then
         log_step "Cleaning JNI directories..."
@@ -372,7 +352,7 @@ copy_jni_libs() {
         fi
 
         # =======================================================================
-        # LlamaCPP Module: Backend + JNI bridge + shared dependencies
+        # LlamaCPP Module: Backend + JNI bridge
         # =======================================================================
         # Copy backend library
         if [ -f "${COMMONS_DIST}/llamacpp/${ABI}/librac_backend_llamacpp.so" ]; then
@@ -391,15 +371,6 @@ copy_jni_libs() {
             cp "${COMMONS_BUILD}/${ABI}/src/backends/llamacpp/librac_backend_llamacpp_jni.so" "${LLAMACPP_JNILIBS_DIR}/${ABI}/"
             log_info "LlamaCPP: librac_backend_llamacpp_jni.so (from build)"
         fi
-
-        # Copy shared dependencies (must stay in sync with main SDK)
-        # These are duplicated in each module so they work as standalone AARs.
-        # Gradle pickFirsts resolves duplicates at APK merge time.
-        for shared_lib in librac_commons.so libc++_shared.so libomp.so; do
-            if [ -f "${MAIN_JNILIBS_DIR}/${ABI}/${shared_lib}" ]; then
-                cp "${MAIN_JNILIBS_DIR}/${ABI}/${shared_lib}" "${LLAMACPP_JNILIBS_DIR}/${ABI}/"
-            fi
-        done
 
         # =======================================================================
         # ONNX Module: ONNX Runtime + Sherpa-ONNX + JNI bridge
@@ -438,13 +409,6 @@ copy_jni_libs() {
                 fi
             done
         fi
-
-        # Copy shared dependencies (must stay in sync with main SDK)
-        for shared_lib in librac_commons.so libc++_shared.so libomp.so; do
-            if [ -f "${MAIN_JNILIBS_DIR}/${ABI}/${shared_lib}" ]; then
-                cp "${MAIN_JNILIBS_DIR}/${ABI}/${shared_lib}" "${ONNX_JNILIBS_DIR}/${ABI}/"
-            fi
-        done
     done
 
     log_info "JNI libraries installed"
