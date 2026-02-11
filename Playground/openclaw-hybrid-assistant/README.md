@@ -64,6 +64,17 @@ A lightweight voice assistant that acts as a **channel** for OpenClaw. No local 
 - Voice: Natural American male (Lessac dataset)
 - Size: ~61MB (model + espeak-ng-data)
 - Alternative: Kokoro TTS v0.19 available with `--kokoro` download flag (11 speakers, 24kHz, ~330MB)
+- **Text Sanitization**: Automatically removes emojis, markdown, and special characters before synthesis
+
+### 5. Waiting Feedback (UX Enhancement)
+Provides a gentle audio chime loop while waiting for OpenClaw to process the user's request:
+
+- **Programmatically generated** warm chime tone (C5 / 523 Hz with harmonics) - no external audio files needed
+- **Immediate start**: Begins looping right after the transcription is sent to OpenClaw
+- **Low-latency stop**: Chime stops within ~50ms when the response arrives
+- **Unobtrusive**: Plays at 20% volume with smooth fade-in/out and 1-second silence gaps between loops
+
+This ensures the user always knows the assistant heard them and is working on their request.
 
 ## OpenClaw WebSocket Protocol
 

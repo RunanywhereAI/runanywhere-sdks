@@ -70,6 +70,7 @@ add_executable(openclaw-assistant
     openclaw_client.cpp
     audio_capture.cpp
     audio_playback.cpp
+    waiting_chime.cpp
 )
 
 target_link_libraries(openclaw-assistant PRIVATE
@@ -123,6 +124,47 @@ target_link_libraries(test-components PRIVATE
 
 # Set RPATH for test binary
 set_target_properties(test-components PROPERTIES
+    BUILD_RPATH "${RAC_DIST_DIR};${SHERPA_DIR}/lib"
+    INSTALL_RPATH "${RAC_DIST_DIR};${SHERPA_DIR}/lib"
+)
+
+# =============================================================================
+# Integration test executable: test-integration
+# =============================================================================
+# End-to-end tests with fake OpenClaw WebSocket server.
+# Run on Linux device (Pi) - ONNX runtime needs >8GB RAM.
+#
+# Tests:
+# - Waiting chime timing and audio quality
+# - Text sanitization for TTS
+# - TTS synthesis on various inputs
+# - Full flow: transcription → fake server → delayed response → TTS
+
+add_executable(test-integration
+    tests/test_integration.cpp
+    voice_pipeline.cpp
+    openclaw_client.cpp
+    waiting_chime.cpp
+)
+
+target_link_libraries(test-integration PRIVATE
+    # RunAnywhere Commons
+    rac_commons
+    rac_backend_onnx
+
+    # Sherpa-ONNX
+    sherpa-onnx-c-api
+
+    # ONNX Runtime
+    onnxruntime
+
+    # System libraries
+    Threads::Threads
+    dl
+)
+
+# Set RPATH for integration test binary
+set_target_properties(test-integration PROPERTIES
     BUILD_RPATH "${RAC_DIST_DIR};${SHERPA_DIR}/lib"
     INSTALL_RPATH "${RAC_DIST_DIR};${SHERPA_DIR}/lib"
 )

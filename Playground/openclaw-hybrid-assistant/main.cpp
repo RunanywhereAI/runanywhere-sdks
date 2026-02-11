@@ -28,6 +28,7 @@
 #include "audio_capture.h"
 #include "audio_playback.h"
 #include "openclaw_client.h"
+#include "waiting_chime.h"
 
 // Backend registration
 #include <rac/backends/rac_vad_onnx.h>
@@ -313,12 +314,20 @@ int main(int argc, char* argv[]) {
     };
 
     // Transcription callback - SEND TO OPENCLAW
-    pipeline_config.on_transcription = [&openclaw_client](const std::string& text, bool is_final) {
+    // Note: waiting_chime is captured by pointer set after construction (see below)
+    openclaw::WaitingChime* waiting_chime_ptr = nullptr;
+
+    pipeline_config.on_transcription = [&openclaw_client, &waiting_chime_ptr](const std::string& text, bool is_final) {
         if (is_final && !text.empty()) {
             std::cout << "[USER] " << text << std::endl;
 
             // Send to OpenClaw (fire-and-forget)
             openclaw_client.send_transcription(text, true);
+
+            // Start the waiting chime loop while we wait for OpenClaw response
+            if (waiting_chime_ptr) {
+                waiting_chime_ptr->start();
+            }
         }
     };
 
@@ -348,6 +357,29 @@ int main(int argc, char* argv[]) {
               << "  STT: " << pipeline.get_stt_model_id() << "\n"
               << "  TTS: " << pipeline.get_tts_model_id() << "\n"
               << std::endl;
+
+    // =============================================================================
+    // Initialize Waiting Chime
+    // =============================================================================
+    // Provides a gentle audio chime loop while waiting for OpenClaw to respond.
+    // The tone is generated programmatically at startup (no external files needed).
+
+    std::cout << "Initializing waiting chime...\n";
+
+    openclaw::WaitingChimeConfig chime_config;
+    chime_config.sample_rate = playback.config().sample_rate;
+
+    openclaw::WaitingChime waiting_chime(chime_config, [&playback](const int16_t* samples, size_t num_samples, int sample_rate) {
+        if (static_cast<uint32_t>(sample_rate) != playback.config().sample_rate) {
+            playback.reinitialize(sample_rate);
+        }
+        playback.play(samples, num_samples);
+    });
+
+    // Set the pointer so the transcription callback can start the chime
+    waiting_chime_ptr = &waiting_chime;
+
+    std::cout << "  Waiting chime ready\n" << std::endl;
 
     // =============================================================================
     // Connect Audio to Pipeline
@@ -385,9 +417,9 @@ int main(int argc, char* argv[]) {
     // Start voice pipeline
     pipeline.start();
 
-    // Polling interval for speak queue
+    // Polling interval for speak queue (200ms for responsive chime→response transition)
     auto last_poll_time = std::chrono::steady_clock::now();
-    const auto poll_interval = std::chrono::milliseconds(500);  // Poll every 500ms
+    const auto poll_interval = std::chrono::milliseconds(200);
 
     // Main loop
     while (g_running) {
@@ -400,6 +432,9 @@ int main(int argc, char* argv[]) {
 
             openclaw::SpeakMessage message;
             if (openclaw_client.poll_speak_queue(message)) {
+                // Stop the waiting chime immediately - response has arrived
+                waiting_chime.stop();
+
                 std::cout << "[" << message.source_channel << "] " << message.text << std::endl;
                 pipeline.speak_text(message.text);
             }
@@ -412,6 +447,7 @@ int main(int argc, char* argv[]) {
 
     std::cout << "\nStopping..." << std::endl;
 
+    waiting_chime.stop();
     pipeline.stop();
     capture.stop();
     playback.stop();
