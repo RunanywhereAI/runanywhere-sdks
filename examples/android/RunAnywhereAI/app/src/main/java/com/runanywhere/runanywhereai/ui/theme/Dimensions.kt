@@ -154,4 +154,5 @@ object Dimensions {
     // ====================
     val messageBubbleMaxWidth = 280.dp
     val maxContentWidth = 700.dp
+    val contextMenuMaxWidth = 280.dp
 }

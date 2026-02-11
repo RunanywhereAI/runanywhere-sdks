@@ -40,7 +40,7 @@ let onnxRuntimeMacOSPath = "\(packageDir)/sdk/runanywhere-swift/Binaries/onnxrun
 //   ./scripts/build-swift.sh --set-remote  (sets useLocalBinaries = false)
 //
 // =============================================================================
-let useLocalBinaries = false  // Toggle: true for local dev, false for release
+let useLocalBinaries = true  // Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when testLocal = false)
 // Updated automatically by CI/CD during releases
@@ -87,6 +87,8 @@ let package = Package(
         .package(url: "https://github.com/devicekit/DeviceKit.git", from: "5.6.0"),
         .package(url: "https://github.com/tsolomko/SWCompression.git", from: "4.8.0"),
         .package(url: "https://github.com/getsentry/sentry-cocoa", from: "8.40.0"),
+        // ml-stable-diffusion for CoreML-based image generation
+        .package(url: "https://github.com/apple/ml-stable-diffusion.git", from: "1.1.0"),
     ],
     targets: [
         // =================================================================
@@ -132,6 +134,7 @@ let package = Package(
                 .product(name: "DeviceKit", package: "DeviceKit"),
                 .product(name: "SWCompression", package: "SWCompression"),
                 .product(name: "Sentry", package: "sentry-cocoa"),
+                .product(name: "StableDiffusion", package: "ml-stable-diffusion"),
                 "CRACommons",
             ],
             path: "sdk/runanywhere-swift/Sources/RunAnywhere",

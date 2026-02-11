@@ -56,6 +56,11 @@ ONNX_VERSION_LINUX=1.23.2
 SHERPA_ONNX_VERSION_IOS=1.12.18
 
 # Android version (v1.12.20+ has 16KB alignment for Play Store)
+# ⚠️  IMPORTANT: When changing this version, you MUST re-download BOTH the
+# prebuilt .so files AND the C API headers to avoid ABI/struct mismatch:
+#   rm -rf third_party/sherpa-onnx-android
+#   ./scripts/android/download-sherpa-onnx.sh
+# The download script now auto-validates header vs .so version consistency.
 SHERPA_ONNX_VERSION_ANDROID=1.12.20
 
 # macOS version

@@ -24,6 +24,7 @@ struct ChatInterfaceView: View {
     @State private var showingChatDetails = false
     @State private var showDebugAlert = false
     @State private var debugMessage = ""
+    @State private var showModelLoadedToast = false
     @FocusState private var isTextFieldFocused: Bool
 
     private let logger = Logger(
@@ -65,6 +66,12 @@ struct ChatInterfaceView: View {
         ) { _ in
             Task {
                 await viewModel.checkModelStatus()
+                // Show toast when model is loaded
+                if viewModel.isModelLoaded {
+                    await MainActor.run {
+                        showModelLoadedToast = true
+                    }
+                }
             }
         }
         .alert("Debug Info", isPresented: $showDebugAlert) {
@@ -72,6 +79,10 @@ struct ChatInterfaceView: View {
         } message: {
             Text(debugMessage)
         }
+        .modelLoadedToast(
+            isShowing: $showModelLoadedToast,
+            modelName: viewModel.loadedModelName ?? "Model"
+        )
     }
 }
 
@@ -82,8 +93,6 @@ extension ChatInterfaceView {
         ZStack {
             VStack(spacing: 0) {
                 macOSToolbar
-                modelStatusSection
-                Divider()
                 contentArea
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -97,27 +106,40 @@ extension ChatInterfaceView {
         NavigationView {
             ZStack {
                 VStack(spacing: 0) {
-                    modelStatusSection
-                    Divider()
                     contentArea
                 }
                 modelRequiredOverlayIfNeeded
             }
-            .navigationTitle("Chat")
+            .navigationTitle(hasModelSelected ? "Chat" : "")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationBarHidden(!hasModelSelected)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        showingConversationList = true
-                    } label: {
-                        Image(systemName: "list.bullet")
+                if hasModelSelected {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button {
+                            showingConversationList = true
+                        } label: {
+                            Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                        }
                     }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    toolbarButtons
+
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button {
+                            showingChatDetails = true
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .foregroundColor(viewModel.messages.isEmpty ? .gray : AppColors.primaryAccent)
+                        }
+                        .disabled(viewModel.messages.isEmpty)
+                    }
+
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        modelButton
+                    }
                 }
             }
         }
+        .navigationViewStyle(.stack)
     }
 }
 
@@ -134,6 +156,15 @@ extension ChatInterfaceView {
             .buttonStyle(.bordered)
             .tint(AppColors.primaryAccent)
 
+            Button {
+                showingChatDetails = true
+            } label: {
+                Image(systemName: "info.circle")
+            }
+            .buttonStyle(.bordered)
+            .tint(AppColors.primaryAccent)
+            .disabled(viewModel.messages.isEmpty)
+
             Spacer()
 
             Text("Chat")
@@ -141,23 +172,13 @@ extension ChatInterfaceView {
 
             Spacer()
 
-            toolbarButtons
+            modelButton
         }
         .padding(.horizontal, AppSpacing.large)
         .padding(.vertical, AppSpacing.smallMedium)
         .background(AppColors.backgroundPrimary)
     }
 
-    var modelStatusSection: some View {
-        ModelStatusBanner(
-            framework: viewModel.selectedFramework,
-            modelName: viewModel.loadedModelName,
-            isLoading: viewModel.isGenerating && !hasModelSelected,
-            supportsStreaming: viewModel.modelSupportsStreaming
-        ) { showingModelSelection = true }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-    }
 
     @ViewBuilder var contentArea: some View {
         if hasModelSelected {
@@ -174,36 +195,43 @@ extension ChatInterfaceView {
         }
     }
 
-    var toolbarButtons: some View {
-        HStack(spacing: 8) {
-            detailsButton
-            modelButton
-            clearButton
-        }
-    }
-
-    private var detailsButton: some View {
-        Button {
-            showingChatDetails = true
-        } label: {
-            Image(systemName: "info.circle")
-                .foregroundColor(viewModel.messages.isEmpty ? .gray : AppColors.primaryAccent)
-        }
-        .disabled(viewModel.messages.isEmpty)
-        #if os(macOS)
-        .buttonStyle(.bordered)
-        .tint(AppColors.primaryAccent)
-        #endif
-    }
-
     private var modelButton: some View {
         Button {
             showingModelSelection = true
         } label: {
-            HStack(spacing: AppSpacing.xSmall) {
-                Image(systemName: "cube")
-                Text(viewModel.isModelLoaded ? "Switch Model" : "Select Model")
-                    .font(AppTypography.caption)
+            HStack(spacing: 6) {
+                // Model logo instead of cube icon
+                if let modelName = viewModel.loadedModelName {
+                    Image(getModelLogo(for: modelName))
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 36, height: 36)
+                        .cornerRadius(4)
+                } else {
+                    Image(systemName: "cube")
+                        .font(.system(size: 14))
+                }
+
+                if let modelName = viewModel.loadedModelName {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(modelName.shortModelName(maxLength: 13))
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .lineLimit(1)
+
+                        // Streaming indicator
+                        HStack(spacing: 3) {
+                            Image(systemName: viewModel.modelSupportsStreaming ? "bolt.fill" : "square.fill")
+                                .font(.system(size: 7))
+                            Text(viewModel.modelSupportsStreaming ? "Streaming" : "Batch")
+                                .font(.system(size: 8, weight: .medium))
+                        }
+                        .foregroundColor(viewModel.modelSupportsStreaming ? .green : .orange)
+                    }
+                } else {
+                    Text("Select Model")
+                        .font(AppTypography.caption)
+                }
             }
         }
         #if os(macOS)
@@ -212,18 +240,7 @@ extension ChatInterfaceView {
         #endif
     }
 
-    private var clearButton: some View {
-        Button {
-            viewModel.clearChat()
-        } label: {
-            Image(systemName: "trash")
-        }
-        .disabled(viewModel.messages.isEmpty)
-        #if os(macOS)
-        .buttonStyle(.bordered)
-        .tint(AppColors.primaryAccent)
-        #endif
-    }
+
 }
 
 // MARK: - Chat Content Views
@@ -239,7 +256,8 @@ extension ChatInterfaceView {
                         messageListView
                     }
                 }
-                .defaultScrollAnchor(.bottom)
+                .scrollDisabled(viewModel.messages.isEmpty && !viewModel.isGenerating)
+                .defaultScrollAnchor(viewModel.messages.isEmpty && !viewModel.isGenerating ? .center : .bottom)
             }
             .background(AppColors.backgroundGrouped)
             .contentShape(Rectangle())
@@ -284,9 +302,10 @@ extension ChatInterfaceView {
         VStack(spacing: 16) {
             Spacer()
 
-            Image(systemName: "message.circle")
-                .font(AppTypography.system60)
-                .foregroundColor(AppColors.textSecondary.opacity(0.6))
+            Image("runanywhere_logo")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 80, height: 80)
 
             VStack(spacing: 8) {
                 Text("Start a conversation")
@@ -312,6 +331,7 @@ extension ChatInterfaceView {
                 MessageBubbleView(message: message, isGenerating: viewModel.isGenerating)
                     .id(message.id)
                     .transition(messageTransition)
+                    .animation(nil, value: message.content)
             }
 
             if viewModel.isGenerating {
@@ -324,6 +344,7 @@ extension ChatInterfaceView {
                 .id("bottom-spacer")
         }
         .padding(AppSpacing.large)
+        .animation(.default, value: viewModel.messages.count)
     }
 
     private var messageTransition: AnyTransition {
@@ -346,6 +367,11 @@ extension ChatInterfaceView {
         VStack(spacing: 0) {
             Divider()
 
+            // Tool calling indicator
+            if viewModel.useToolCalling {
+                toolCallingBadge
+            }
+
             HStack(spacing: AppSpacing.mediumLarge) {
                 TextField("Type a message...", text: $viewModel.currentInput, axis: .vertical)
                     .textFieldStyle(.plain)
@@ -364,11 +390,33 @@ extension ChatInterfaceView {
                         )
                 }
                 .disabled(!viewModel.canSend)
+                .background {
+                    if #available(iOS 26.0, *) {
+                        Circle()
+                            .fill(.clear)
+                            .glassEffect(.regular.interactive())
+                    }
+                }
             }
             .padding(AppSpacing.large)
             .background(AppColors.backgroundPrimary)
             .animation(.easeInOut(duration: AppLayout.animationFast), value: isTextFieldFocused)
         }
+    }
+
+    var toolCallingBadge: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "wrench.and.screwdriver")
+                .font(.system(size: 10))
+            Text("Tools enabled")
+                .font(AppTypography.caption2)
+        }
+        .foregroundColor(AppColors.primaryAccent)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(AppColors.primaryAccent.opacity(0.1))
+        .cornerRadius(6)
+        .padding(.top, 8)
     }
 }
 

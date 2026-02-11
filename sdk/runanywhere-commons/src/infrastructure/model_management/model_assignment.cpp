@@ -218,6 +218,8 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
             model->format = RAC_MODEL_FORMAT_ORT;
         else if (format == "bin")
             model->format = RAC_MODEL_FORMAT_BIN;
+        else if (format == "coreml" || format == "mlmodelc" || format == "mlpackage")
+            model->format = RAC_MODEL_FORMAT_COREML;
         else
             model->format = RAC_MODEL_FORMAT_UNKNOWN;
 
@@ -230,6 +232,12 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
             model->framework = RAC_FRAMEWORK_FOUNDATION_MODELS;
         else if (framework == "system_tts" || framework == "platform-tts")
             model->framework = RAC_FRAMEWORK_SYSTEM_TTS;
+        else if (framework == "coreml" || framework == "core_ml" || framework == "CoreML")
+            model->framework = RAC_FRAMEWORK_COREML;
+        else if (framework == "mlx" || framework == "MLX")
+            model->framework = RAC_FRAMEWORK_MLX;
+        else if (framework == "fluid_audio" || framework == "FluidAudio")
+            model->framework = RAC_FRAMEWORK_FLUID_AUDIO;
         else
             model->framework = RAC_FRAMEWORK_UNKNOWN;
 
@@ -410,11 +418,41 @@ rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info
     snprintf(msg, sizeof(msg), "Parsed %zu model assignments", models.size());
     RAC_LOG_INFO(LOG_CAT, msg);
 
-    // Save to registry
+    // Save to registry - but preserve local metadata (like framework) if backend has less info
     rac_model_registry_handle_t registry = rac_get_model_registry();
     if (registry) {
         for (auto* model : models) {
-            rac_model_registry_save(registry, model);
+            // Check if model already exists in registry with more specific info
+            rac_model_info_t* existing = nullptr;
+            if (rac_model_registry_get(registry, model->id, &existing) == RAC_SUCCESS && existing) {
+                // Preserve framework if existing has a known framework and new doesn't
+                if (existing->framework != RAC_FRAMEWORK_UNKNOWN &&
+                    model->framework == RAC_FRAMEWORK_UNKNOWN) {
+                    model->framework = existing->framework;
+                    RAC_LOG_DEBUG(LOG_CAT, "Preserved local framework for model: %s", model->id);
+                }
+                // Preserve format if existing has a known format and new doesn't
+                if (existing->format != RAC_MODEL_FORMAT_UNKNOWN &&
+                    model->format == RAC_MODEL_FORMAT_UNKNOWN) {
+                    model->format = existing->format;
+                    RAC_LOG_DEBUG(LOG_CAT, "Preserved local format for model: %s", model->id);
+                }
+                // Preserve local_path if existing has one and new doesn't
+                if (existing->local_path && !model->local_path) {
+                    model->local_path = strdup(existing->local_path);
+                }
+                // Preserve artifact_info if existing has more specific type
+                if (existing->artifact_info.kind != RAC_ARTIFACT_KIND_SINGLE_FILE &&
+                    model->artifact_info.kind == RAC_ARTIFACT_KIND_SINGLE_FILE) {
+                    model->artifact_info = existing->artifact_info;
+                    // Note: This is a shallow copy — existing must stay alive until
+                    // after rac_model_registry_save deep-copies the data.
+                }
+                rac_model_registry_save(registry, model);
+                rac_model_info_free(existing);
+            } else {
+                rac_model_registry_save(registry, model);
+            }
         }
         RAC_LOG_DEBUG(LOG_CAT, "Saved models to registry");
     }

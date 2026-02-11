@@ -113,7 +113,7 @@ class STTViewModel: ObservableObject {
         do {
             try await RunAnywhere.loadSTTModel(model.id)
             selectedFramework = model.framework
-            selectedModelName = model.name
+            selectedModelName = model.name.modelNameFromID()
             selectedModelId = model.id
             logger.info("STT model loaded successfully: \(model.name)")
         } catch {
@@ -190,7 +190,7 @@ class STTViewModel: ObservableObject {
                 selectedModelName = matchingModel.name
                 selectedFramework = matchingModel.framework
             } else {
-                selectedModelName = modelId // Fallback to ID if model not found
+                selectedModelName = modelId.modelNameFromID() // Look up proper name
             }
             logger.info("STT model loaded: \(modelId)")
         case "stt_model_unloaded":
@@ -206,7 +206,7 @@ class STTViewModel: ObservableObject {
     private func checkInitialModelState() async {
         if let model = await RunAnywhere.currentSTTModel {
             selectedModelId = model.id
-            selectedModelName = model.name
+            selectedModelName = model.name.modelNameFromID()
             selectedFramework = model.framework
             logger.info("STT model already loaded: \(model.name)")
         }

@@ -59,6 +59,12 @@ struct RunAnywhereAIApp: App {
 
     private func initializeSDK() async {
         do {
+            // Register backends with C++ registry FIRST, before any await. Otherwise we can
+            // suspend at the next line and another task may run loadModel() → ensureServicesReady()
+            // → only Platform is registered → -422 "No provider could handle the request".
+            LlamaCPP.register(priority: 100)
+            ONNX.register(priority: 100)
+
             // Clear any previous error
             await MainActor.run { initializationError = nil }
 
@@ -204,7 +210,64 @@ struct RunAnywhereAIApp: App {
                 memoryRequirement: 400_000_000
             )
         }
-        logger.info("✅ LLM models registered")
+
+        // Tool Calling Optimized Models
+        // LFM2-1.2B-Tool - Designed for concise and precise tool calling (Liquid AI)
+        if let lfm2ToolQ4URL = URL(string: "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf") {
+            RunAnywhere.registerModel(
+                id: "lfm2-1.2b-tool-q4_k_m",
+                name: "LiquidAI LFM2 1.2B Tool Q4_K_M",
+                url: lfm2ToolQ4URL,
+                framework: .llamaCpp,
+                memoryRequirement: 800_000_000
+            )
+        }
+        if let lfm2ToolQ8URL = URL(string: "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf") {
+            RunAnywhere.registerModel(
+                id: "lfm2-1.2b-tool-q8_0",
+                name: "LiquidAI LFM2 1.2B Tool Q8_0",
+                url: lfm2ToolQ8URL,
+                framework: .llamaCpp,
+                memoryRequirement: 1_400_000_000
+            )
+        }
+
+        logger.info("✅ LLM models registered (including tool-calling optimized models)")
+
+        // Register VLM (Vision Language) models
+        // VLM models require 2 files: main model + mmproj (vision projector)
+        // Bundled as tar.gz archives for easy download/extraction
+
+        // SmolVLM 500M - Ultra-lightweight VLM for mobile (~500MB total)
+        if let smolVLMURL = URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz") {
+            RunAnywhere.registerModel(
+                id: "smolvlm-500m-instruct-q8_0",
+                name: "SmolVLM 500M Instruct",
+                url: smolVLMURL,
+                framework: .llamaCpp,
+                modality: .multimodal,
+                artifactType: .archive(.tarGz, structure: .directoryBased),
+                memoryRequirement: 600_000_000
+            )
+        }
+        // Qwen2-VL 2B - Small but capable VLM (~1.6GB total)
+        // Uses multi-file download: main model (986MB) + mmproj (710MB)
+        // Downloaded separately to avoid memory-intensive tar.gz extraction on iOS
+        if let qwenMainURL = URL(string: "https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/Qwen2-VL-2B-Instruct-Q4_K_M.gguf"),
+           let qwenMmprojURL = URL(string: "https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf") {
+            RunAnywhere.registerMultiFileModel(
+                id: "qwen2-vl-2b-instruct-q4_k_m",
+                name: "Qwen2-VL 2B Instruct",
+                files: [
+                    ModelFileDescriptor(url: qwenMainURL, filename: "Qwen2-VL-2B-Instruct-Q4_K_M.gguf"),
+                    ModelFileDescriptor(url: qwenMmprojURL, filename: "mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf")
+                ],
+                framework: .llamaCpp,
+                modality: .multimodal,
+                memoryRequirement: 1_800_000_000
+            )
+        }
+        logger.info("✅ VLM models registered")
 
         // Register ONNX STT and TTS models
         // Using tar.gz format hosted on RunanywhereAI/sherpa-onnx for fast native extraction
@@ -242,6 +305,24 @@ struct RunAnywhereAIApp: App {
             )
         }
         logger.info("✅ ONNX STT/TTS models registered")
+
+        // Register Diffusion models (Apple Stable Diffusion / CoreML only; no ONNX)
+        // ============================================================================
+        // Apple SD 1.5 CoreML: palettized, split_einsum_v2 for Apple Silicon / ANE (~1.5GB)
+        if let sd15CoreMLURL = URL(string: "https://huggingface.co/apple/coreml-stable-diffusion-v1-5-palettized/resolve/main/coreml-stable-diffusion-v1-5-palettized_split_einsum_v2_compiled.zip") {
+            RunAnywhere.registerModel(
+                id: "sd15-coreml-palettized",
+                name: "Stable Diffusion 1.5 (CoreML)",
+                url: sd15CoreMLURL,
+                framework: .coreml,
+                modality: .imageGeneration,
+                artifactType: .archive(.zip, structure: .nestedDirectory),
+                memoryRequirement: 1_600_000_000  // ~1.6GB
+            )
+        }
+
+        logger.info("✅ Diffusion models registered (Apple Stable Diffusion / CoreML only)")
+
         logger.info("🎉 All modules and models registered")
     }
 }
@@ -250,26 +331,43 @@ struct RunAnywhereAIApp: App {
 
 struct InitializationLoadingView: View {
     @State private var isAnimating = false
+    @State private var progress: Double = 0.0
 
     var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "brain")
-                .font(.system(size: 60))
-                .foregroundColor(AppColors.primaryAccent)
-                .scaleEffect(isAnimating ? 1.2 : 1.0)
-                .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: isAnimating)
+        VStack(spacing: 32) {
+            Spacer()
 
-            Text("Setting Up Your AI")
-                .font(.title2)
-                .fontWeight(.semibold)
+            // RunAnywhere Logo
+            Image("runanywhere_logo")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 120, height: 120)
+                .scaleEffect(isAnimating ? 1.05 : 1.0)
+                .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: isAnimating)
 
-            Text("Preparing your private AI assistant...")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+            VStack(spacing: 12) {
+                Text("Setting Up Your AI")
+                    .font(.title2)
+                    .fontWeight(.semibold)
 
-            ProgressView()
-                .progressViewStyle(CircularProgressViewStyle())
-                .scaleEffect(1.2)
+                Text("Preparing your private AI assistant...")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+
+            // Loading Bar
+            VStack(spacing: 8) {
+                ProgressView(value: progress, total: 1.0)
+                    .progressViewStyle(.linear)
+                    .tint(AppColors.primaryAccent)
+                    .frame(width: 240)
+
+                Text("Initializing SDK...")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -280,6 +378,18 @@ struct InitializationLoadingView: View {
         #endif
         .onAppear {
             isAnimating = true
+            startProgressAnimation()
+        }
+    }
+
+    private func startProgressAnimation() {
+        Timer.scheduledTimer(withTimeInterval: 0.02, repeats: true) { timer in
+            if progress < 1.0 {
+                progress += 0.01
+            } else {
+                // Reset and start again
+                progress = 0.0
+            }
         }
     }
 }

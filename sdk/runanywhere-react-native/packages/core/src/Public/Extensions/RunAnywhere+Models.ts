@@ -217,9 +217,11 @@ export async function registerModel(options: {
     id: options.id ?? generateModelId(options.url),
     name: options.name,
     category: options.category ?? ModelCategory.Language,
-    format: options.url.includes('.gguf')
-      ? ModelFormat.GGUF
-      : ModelFormat.GGUF,
+    format: options.url.includes('.zip')
+      ? ModelFormat.Zip
+      : options.url.includes('.gguf')
+        ? ModelFormat.GGUF
+        : ModelFormat.GGUF,
     downloadURL: options.url,
     localPath: undefined,
     downloadSize: undefined,

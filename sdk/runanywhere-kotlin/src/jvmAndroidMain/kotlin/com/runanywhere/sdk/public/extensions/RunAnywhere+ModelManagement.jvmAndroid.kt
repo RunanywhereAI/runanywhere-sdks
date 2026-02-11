@@ -810,10 +810,6 @@ actual suspend fun RunAnywhere.refreshModelRegistry() {
 }
 
 actual suspend fun RunAnywhere.loadLLMModel(modelId: String) {
-    loadLLMModel(modelId, ModelLoadOptions())
-}
-
-actual suspend fun RunAnywhere.loadLLMModel(modelId: String, options: ModelLoadOptions) {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
@@ -826,38 +822,8 @@ actual suspend fun RunAnywhere.loadLLMModel(modelId: String, options: ModelLoadO
         model.localPath
             ?: throw SDKError.model("Model '$modelId' is not downloaded")
 
-    // Check GPU availability if requested
-    val useGPU = if (options.useGPU) {
-        com.runanywhere.sdk.platform.DeviceCapabilities.shouldUseGPU()
-    } else {
-        false
-    }
-    
-    if (useGPU) {
-        val gpuInfo = com.runanywhere.sdk.platform.DeviceCapabilities.detectVulkanGPU()
-        modelsLogger.info("Loading model with GPU acceleration")
-        modelsLogger.info("  GPU: ${gpuInfo.deviceName}")
-        modelsLogger.info("  Layers: ${if (options.gpuLayers == -1) "ALL" else options.gpuLayers}")
-    } else {
-        modelsLogger.info("Loading model with CPU backend")
-    }
-
-    // Pass modelPath, modelId, modelName, and GPU options via ModelConfig
-    val modelConfig = CppBridgeLLM.ModelConfig(
-        contextLength = options.contextSize ?: 4096,
-        gpuLayers = if (useGPU) options.gpuLayers else 0,
-        threads = -1,  // Auto-detect
-        batchSize = 512,
-        useMemoryMap = true,
-        useLocking = false
-    )
-    val result = CppBridgeLLM.loadModel(
-        localPath, 
-        modelId, 
-        model.name,
-        config = modelConfig
-    )
-    
+    // Pass modelPath, modelId, and modelName separately for correct telemetry
+    val result = CppBridgeLLM.loadModel(localPath, modelId, model.name)
     if (result != 0) {
         throw SDKError.llm("Failed to load LLM model '$modelId' (error code: $result)")
     }
@@ -908,10 +874,27 @@ actual suspend fun RunAnywhere.loadSTTModel(modelId: String) {
         model.localPath
             ?: throw SDKError.model("Model '$modelId' is not downloaded")
 
-    // Pass modelPath, modelId, and modelName separately for correct telemetry
-    val result = CppBridgeSTT.loadModel(localPath, modelId, model.name)
+    // Run native load on IO thread to avoid ANR and native crashes on main thread
+    val result =
+        withContext(Dispatchers.IO) {
+            val dir = File(localPath)
+            if (!dir.exists()) {
+                return@withContext -1
+            }
+            if (!dir.isDirectory) {
+                modelsLogger.error("STT model path is not a directory (expected extracted model dir): $localPath")
+                return@withContext -1
+            }
+            // C++ backend expects directory with encoder.onnx, decoder.onnx, tokens.txt
+            val hasEncoder = dir.listFiles()?.any { it.name.contains("encoder") && it.name.endsWith(".onnx") } == true
+            if (!hasEncoder) {
+                modelsLogger.error("STT model directory missing encoder.onnx: $localPath. Re-download the model.")
+                return@withContext -1
+            }
+            CppBridgeSTT.loadModel(localPath, modelId, model.name)
+        }
     if (result != 0) {
-        throw SDKError.stt("Failed to load STT model '$modelId' (error code: $result)")
+        throw SDKError.stt("Failed to load STT model '$modelId' (error code: $result). Ensure the model is extracted and contains encoder.onnx, decoder.onnx, tokens.txt.")
     }
 }
 
@@ -942,8 +925,10 @@ actual suspend fun RunAnywhere.fetchModelAssignments(forceRefresh: Boolean): Lis
         modelsLogger.info("Fetching model assignments (forceRefresh=$forceRefresh)...")
 
         try {
-            val jsonResult = com.runanywhere.sdk.foundation.bridge.extensions
-                .CppBridgeModelAssignment.fetchModelAssignments(forceRefresh)
+            val jsonResult =
+                com.runanywhere.sdk.foundation.bridge.extensions
+                    .CppBridgeModelAssignment
+                    .fetchModelAssignments(forceRefresh)
 
             // Parse JSON result to ModelInfo list
             val models = parseModelAssignmentsJson(jsonResult)
@@ -992,36 +977,40 @@ private fun parseModelAssignmentsJson(json: String): List<ModelInfo> {
                 val contextLength = extractJsonInt(jsonObj, "contextLength") ?: 0
                 val supportsThinking = extractJsonBool(jsonObj, "supportsThinking") ?: false
 
-                val modelInfo = ModelInfo(
-                    id = id,
-                    name = name,
-                    category = when (categoryInt) {
-                        0 -> ModelCategory.LANGUAGE
-                        1 -> ModelCategory.SPEECH_RECOGNITION
-                        2 -> ModelCategory.SPEECH_SYNTHESIS
-                        3 -> ModelCategory.AUDIO
-                        else -> ModelCategory.LANGUAGE
-                    },
-                    format = when (formatInt) {
-                        1 -> ModelFormat.GGUF
-                        2 -> ModelFormat.ONNX
-                        3 -> ModelFormat.ORT
-                        else -> ModelFormat.UNKNOWN
-                    },
-                    framework = when (frameworkInt) {
-                        1 -> InferenceFramework.LLAMA_CPP
-                        2 -> InferenceFramework.ONNX
-                        3 -> InferenceFramework.FOUNDATION_MODELS
-                        4 -> InferenceFramework.SYSTEM_TTS
-                        else -> InferenceFramework.UNKNOWN
-                    },
-                    downloadURL = downloadUrl,
-                    localPath = null,
-                    downloadSize = if (downloadSize > 0) downloadSize else null,
-                    contextLength = if (contextLength > 0) contextLength else null,
-                    supportsThinking = supportsThinking,
-                    description = null,
-                )
+                val modelInfo =
+                    ModelInfo(
+                        id = id,
+                        name = name,
+                        category =
+                            when (categoryInt) {
+                                0 -> ModelCategory.LANGUAGE
+                                1 -> ModelCategory.SPEECH_RECOGNITION
+                                2 -> ModelCategory.SPEECH_SYNTHESIS
+                                3 -> ModelCategory.AUDIO
+                                else -> ModelCategory.LANGUAGE
+                            },
+                        format =
+                            when (formatInt) {
+                                1 -> ModelFormat.GGUF
+                                2 -> ModelFormat.ONNX
+                                3 -> ModelFormat.ORT
+                                else -> ModelFormat.UNKNOWN
+                            },
+                        framework =
+                            when (frameworkInt) {
+                                1 -> InferenceFramework.LLAMA_CPP
+                                2 -> InferenceFramework.ONNX
+                                3 -> InferenceFramework.FOUNDATION_MODELS
+                                4 -> InferenceFramework.SYSTEM_TTS
+                                else -> InferenceFramework.UNKNOWN
+                            },
+                        downloadURL = downloadUrl,
+                        localPath = null,
+                        downloadSize = if (downloadSize > 0) downloadSize else null,
+                        contextLength = if (contextLength > 0) contextLength else null,
+                        supportsThinking = supportsThinking,
+                        description = null,
+                    )
                 models.add(modelInfo)
             } catch (e: Exception) {
                 modelsLogger.warn("Failed to parse model at index $index: ${e.message}")
@@ -1043,17 +1032,29 @@ private fun extractJsonString(json: String, key: String): String? {
 private fun extractJsonInt(json: String, key: String): Int? {
     val pattern = "\"$key\"\\s*:\\s*(\\d+)"
     val regex = pattern.toRegex()
-    return regex.find(json)?.groupValues?.get(1)?.toIntOrNull()
+    return regex
+        .find(json)
+        ?.groupValues
+        ?.get(1)
+        ?.toIntOrNull()
 }
 
 private fun extractJsonLong(json: String, key: String): Long? {
     val pattern = "\"$key\"\\s*:\\s*(\\d+)"
     val regex = pattern.toRegex()
-    return regex.find(json)?.groupValues?.get(1)?.toLongOrNull()
+    return regex
+        .find(json)
+        ?.groupValues
+        ?.get(1)
+        ?.toLongOrNull()
 }
 
 private fun extractJsonBool(json: String, key: String): Boolean? {
     val pattern = "\"$key\"\\s*:\\s*(true|false)"
     val regex = pattern.toRegex()
-    return regex.find(json)?.groupValues?.get(1)?.let { it == "true" }
+    return regex
+        .find(json)
+        ?.groupValues
+        ?.get(1)
+        ?.let { it == "true" }
 }

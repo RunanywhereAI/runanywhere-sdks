@@ -139,8 +139,8 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
-            // Target ARM 64-bit only (modern Android devices)
-            abiFilters += listOf("arm64-v8a")
+            // Support ARM64 devices and x86_64 emulators
+            abiFilters += listOf("arm64-v8a", "x86_64")
         }
     }
 
@@ -162,6 +162,10 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+        // Prevent duplicate native library conflicts from KMP source set hierarchy
+        jniLibs {
+            pickFirsts += setOf("**/*.so")
         }
     }
 
@@ -214,11 +218,12 @@ tasks.named<Jar>("jvmJar") {
 // Maven Central group ID - using verified namespace
 val isJitPack = System.getenv("JITPACK") == "true"
 val usePendingNamespace = System.getenv("USE_RUNANYWHERE_NAMESPACE")?.toBoolean() ?: false
-group = when {
-    isJitPack -> "com.github.RunanywhereAI.runanywhere-sdks"
-    usePendingNamespace -> "com.runanywhere"
-    else -> "io.github.sanchitmonga22"  // Currently verified namespace
-}
+group =
+    when {
+        isJitPack -> "com.github.RunanywhereAI.runanywhere-sdks"
+        usePendingNamespace -> "com.runanywhere"
+        else -> "io.github.sanchitmonga22" // Currently verified namespace
+    }
 
 // Version: SDK_VERSION (our CI), VERSION (JitPack), or fallback
 version = System.getenv("SDK_VERSION")?.removePrefix("v")
@@ -226,26 +231,32 @@ version = System.getenv("SDK_VERSION")?.removePrefix("v")
     ?: "0.1.5-SNAPSHOT"
 
 // Get publishing credentials
-val mavenCentralUsername: String? = System.getenv("MAVEN_CENTRAL_USERNAME")
-    ?: project.findProperty("mavenCentral.username") as String?
-val mavenCentralPassword: String? = System.getenv("MAVEN_CENTRAL_PASSWORD")
-    ?: project.findProperty("mavenCentral.password") as String?
-val signingKeyId: String? = System.getenv("GPG_KEY_ID")
-    ?: project.findProperty("signing.keyId") as String?
-val signingPassword: String? = System.getenv("GPG_SIGNING_PASSWORD")
-    ?: project.findProperty("signing.password") as String?
-val signingKey: String? = System.getenv("GPG_SIGNING_KEY")
-    ?: project.findProperty("signing.key") as String?
+val mavenCentralUsername: String? =
+    System.getenv("MAVEN_CENTRAL_USERNAME")
+        ?: project.findProperty("mavenCentral.username") as String?
+val mavenCentralPassword: String? =
+    System.getenv("MAVEN_CENTRAL_PASSWORD")
+        ?: project.findProperty("mavenCentral.password") as String?
+val signingKeyId: String? =
+    System.getenv("GPG_KEY_ID")
+        ?: project.findProperty("signing.keyId") as String?
+val signingPassword: String? =
+    System.getenv("GPG_SIGNING_PASSWORD")
+        ?: project.findProperty("signing.password") as String?
+val signingKey: String? =
+    System.getenv("GPG_SIGNING_KEY")
+        ?: project.findProperty("signing.key") as String?
 
 publishing {
     publications.withType<MavenPublication> {
         // Maven Central artifact naming
-        artifactId = when (name) {
-            "kotlinMultiplatform" -> "runanywhere-llamacpp"
-            "androidRelease" -> "runanywhere-llamacpp-android"
-            "jvm" -> "runanywhere-llamacpp-jvm"
-            else -> "runanywhere-llamacpp-$name"
-        }
+        artifactId =
+            when (name) {
+                "kotlinMultiplatform" -> "runanywhere-llamacpp"
+                "androidRelease" -> "runanywhere-llamacpp-android"
+                "jvm" -> "runanywhere-llamacpp-jvm"
+                else -> "runanywhere-llamacpp-$name"
+            }
 
         pom {
             name.set("RunAnywhere LlamaCPP Backend")

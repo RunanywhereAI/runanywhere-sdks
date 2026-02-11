@@ -16,6 +16,7 @@ enum ModelSelectionContext {
     case stt       // Speech-to-Text - show STT frameworks (ONNX STT)
     case tts       // Text-to-Speech - show TTS frameworks (ONNX TTS/Piper, System TTS)
     case voice     // Voice Assistant - show all voice-related (LLM + STT + TTS)
+    case vlm       // Vision Language Model - show VLM frameworks
 
     var title: String {
         switch self {
@@ -23,19 +24,22 @@ enum ModelSelectionContext {
         case .stt: return "Select STT Model"
         case .tts: return "Select TTS Model"
         case .voice: return "Select Model"
+        case .vlm: return "Select Vision Model"
         }
     }
 
     var relevantCategories: Set<ModelCategory> {
         switch self {
         case .llm:
-            return [.language, .multimodal]
+            return [.language]
         case .stt:
             return [.speechRecognition]
         case .tts:
             return [.speechSynthesis]
         case .voice:
-            return [.language, .multimodal, .speechRecognition, .speechSynthesis]
+            return [.language, .speechRecognition, .speechSynthesis]
+        case .vlm:
+            return [.multimodal, .vision]
         }
     }
 }
@@ -242,6 +246,7 @@ extension ModelSelectionSheet {
         case .stt: try await RunAnywhere.loadSTTModel(model.id)
         case .tts: try await RunAnywhere.loadTTSModel(model.id)
         case .voice: try await loadModelForVoiceContext(model)
+        case .vlm: try await RunAnywhere.loadVLMModel(model)
         }
     }
 
@@ -258,14 +263,24 @@ extension ModelSelectionSheet {
             (context == .voice && [.language, .multimodal].contains(model.category))
 
         if isLLM {
-            await viewModel.setCurrentModel(model)
             await MainActor.run {
+                viewModel.setCurrentModel(model)
                 NotificationCenter.default.post(
                     name: Notification.Name("ModelLoaded"),
                     object: model
                 )
             }
         }
+
+        if context == .vlm {
+            await MainActor.run {
+                NotificationCenter.default.post(
+                    name: Notification.Name("VLMModelLoaded"),
+                    object: model
+                )
+            }
+        }
+
         await onModelSelected(model)
     }
 }

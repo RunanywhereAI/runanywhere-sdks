@@ -12,6 +12,15 @@ struct VoiceAssistantView: View {
     @State private var showLLMModelSelection = false
     @State private var showTTSModelSelection = false
 
+    // Particle animation states
+    @State private var amplitude: Float = 0.0
+    @State private var morphProgress: Float = 0.0
+    @State private var scatterAmount: Float = 0.0
+    @State private var touchPoint: SIMD2<Float> = .zero
+    @Environment(\.colorScheme) var colorScheme
+
+    private let animationTimer = Timer.publish(every: 0.016, on: .main, in: .common).autoconnect()
+
     var body: some View {
         Group {
             #if os(macOS)
@@ -192,16 +201,37 @@ extension VoiceAssistantView {
     }
 
     private var mainVoiceUI: some View {
-        VStack(spacing: 0) {
-            iOSHeader
-            if showModelInfo {
-                modelInfoSection
+        ZStack {
+            // Background particles animation - centered
+            GeometryReader { geometry in
+                VoiceAssistantParticleView(
+                    amplitude: amplitude,
+                    morphProgress: morphProgress,
+                    scatterAmount: scatterAmount,
+                    touchPoint: touchPoint,
+                    isDarkMode: colorScheme == .dark
+                )
+                .frame(width: min(geometry.size.width, geometry.size.height) * 0.9)
+                .frame(width: min(geometry.size.width, geometry.size.height) * 0.9)
+                .position(x: geometry.size.width / 2, y: geometry.size.height / 2 - 50)
+                .allowsHitTesting(false)
             }
-            iOSConversationArea
-            Spacer()
-            iOSControlArea
+
+            // Main UI overlay
+            VStack(spacing: 0) {
+                iOSHeader
+                if showModelInfo {
+                    modelInfoSection
+                }
+                iOSConversationArea
+                Spacer()
+                iOSControlArea
+            }
         }
         .background(Color(.systemBackground))
+        .onReceive(animationTimer) { _ in
+            updateAnimation()
+        }
     }
 
     private var iOSHeader: some View {
@@ -216,17 +246,6 @@ extension VoiceAssistantView {
                     .background(Color(.tertiarySystemBackground))
                     .clipShape(Circle())
             })
-
-            Spacer()
-
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(viewModel.statusColor.swiftUIColor)
-                    .frame(width: 8, height: 8)
-                Text(viewModel.sessionState.displayName)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
 
             Spacer()
 
@@ -249,40 +268,8 @@ extension VoiceAssistantView {
     }
 
     private var iOSConversationArea: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    if !viewModel.currentTranscript.isEmpty {
-                        ConversationBubble(
-                            speaker: "You",
-                            message: viewModel.currentTranscript,
-                            isUser: true
-                        )
-                        .id("user")
-                    }
-
-                    if !viewModel.assistantResponse.isEmpty {
-                        ConversationBubble(
-                            speaker: "Assistant",
-                            message: viewModel.assistantResponse,
-                            isUser: false
-                        )
-                        .id("assistant")
-                    }
-
-                    if viewModel.currentTranscript.isEmpty && viewModel.assistantResponse.isEmpty {
-                        emptyStatePlaceholder(text: "Tap the microphone to start")
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 20)
-            }
-            .onChange(of: viewModel.assistantResponse) { _ in
-                withAnimation {
-                    proxy.scrollTo("assistant", anchor: .bottom)
-                }
-            }
-        }
+        // Conversation area is now hidden - messages shown as toast at bottom
+        Spacer()
     }
 
     private var iOSControlArea: some View {
@@ -295,8 +282,29 @@ extension VoiceAssistantView {
                     .padding(.horizontal, 20)
             }
 
-            if viewModel.sessionState == .listening || viewModel.isListening {
-                audioLevelIndicator
+            // Scrollable markdown response - streaming real-time
+            if !viewModel.assistantResponse.isEmpty {
+                ScrollView {
+                    ScrollViewReader { proxy in
+                        VStack {
+                            AdaptiveMarkdownText(
+                                viewModel.assistantResponse,
+                                font: .body,
+                                color: .primary
+                            )
+                            .multilineTextAlignment(.center)
+                            .id("responseEnd")
+                        }
+                        .padding(.horizontal, 30)
+                        .onChange(of: viewModel.assistantResponse) { _ in
+                            withAnimation {
+                                proxy.scrollTo("responseEnd", anchor: .bottom)
+                            }
+                        }
+                    }
+                }
+                .frame(maxHeight: 150)
+                .animation(.none, value: viewModel.assistantResponse)
             }
 
             micButtonSection
@@ -488,6 +496,56 @@ extension VoiceAssistantView {
                 }
             }
             #endif
+        }
+        .navigationViewStyle(.stack)
+    }
+
+    // MARK: - Animation Helpers
+    private func updateAnimation() {
+        // Target morph: 0 = sphere (idle/thinking), 1 = ring (listening/speaking)
+        let isListening = viewModel.sessionState == .listening
+        let isSpeaking = viewModel.sessionState == .speaking
+        let isActive = isListening || isSpeaking
+        let targetMorph: Float = isActive ? 1.0 : 0.0
+
+        // Smooth morph transition
+        let morphDiff = targetMorph - morphProgress
+        morphProgress += morphDiff * 0.04
+        morphProgress = max(0, min(1, morphProgress))
+
+        // Scatter decay
+        if scatterAmount > 0.001 {
+            scatterAmount *= 0.92
+        } else {
+            scatterAmount = 0
+        }
+
+        // Audio amplitude - reactive to both input (listening) and output (speaking)
+        if isListening {
+            // Use real audio level from microphone
+            let realAudioLevel = viewModel.audioLevel
+            // Smooth interpolation for natural movement
+            amplitude = amplitude * 0.7 + realAudioLevel * 0.3
+            // Clamp to reasonable range
+            amplitude = max(0.0, min(1.0, amplitude))
+        } else if isSpeaking {
+            // TTS output - realistic speech-like pulse simulation
+            let time = Float(Date().timeIntervalSinceReferenceDate)
+
+            // Multiple frequency components for natural speech rhythm
+            let basePulse: Float = 0.35
+            let primaryWave = sin(time * 3.5) * 0.2         // Main speech rhythm
+            let secondaryWave = sin(time * 7.0) * 0.1       // Phoneme-like variation
+            let randomNoise = Float.random(in: -0.05...0.15) // Natural variation
+
+            let targetAmplitude = basePulse + abs(primaryWave) + abs(secondaryWave) * 0.5 + randomNoise
+
+            // Smooth interpolation to avoid jarring changes
+            amplitude = amplitude * 0.75 + targetAmplitude * 0.25
+            amplitude = max(0.0, min(1.0, amplitude))
+        } else {
+            // Gentle decay when not active
+            amplitude = amplitude * 0.95
         }
     }
 }
