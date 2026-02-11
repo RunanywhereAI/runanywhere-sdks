@@ -727,6 +727,10 @@ void VoicePipeline::process_wakeword(const float* samples, size_t num_samples) {
         impl_->current_burst_frames = 0;
         state_ = PipelineState::LISTENING;
 
+        // Reset wake word model's internal streaming buffers so the same
+        // "Hey Jarvis" pattern doesn't re-trigger on subsequent frames
+        rac_wakeword_onnx_reset(impl_->wakeword_handle);
+
         // Reset Silero VAD state (clear any residual speech detection from TTS audio)
         if (impl_->silero_vad) {
             rac_vad_onnx_reset(impl_->silero_vad);
