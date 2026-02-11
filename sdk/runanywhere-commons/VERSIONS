@@ -22,8 +22,8 @@ PROJECT_VERSION=1.0.0
 # iOS minimum deployment target
 IOS_DEPLOYMENT_TARGET=13.0
 
-# Android minimum SDK version
-ANDROID_MIN_SDK=24
+# Android minimum SDK version (API 26 = Android 8.0 for Vulkan 1.1 support)
+ANDROID_MIN_SDK=26
 
 # =============================================================================
 # Build Tools
@@ -64,9 +64,10 @@ SHERPA_ONNX_VERSION_MACOS=1.12.18
 # =============================================================================
 # llama.cpp (LLM inference)
 # =============================================================================
-# b7650 - recent stable release (8 versions before b7658)
-# NOTE: b7658 has Android cross-compilation issues, needs investigation
-LLAMACPP_VERSION=b7650
+# b7935 - LATEST release (Feb 4, 2025) with full Vulkan support
+# Includes arr_dmmv shaders and proper CoopMat handling
+# Previous: b7650 (missing modern Vulkan shaders)
+LLAMACPP_VERSION=b7935
 
 # =============================================================================
 # nlohmann/json

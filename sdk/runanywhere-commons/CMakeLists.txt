@@ -38,7 +38,8 @@ option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" ON)
 # C++ CONFIGURATION
 # =============================================================================
 
-set(CMAKE_CXX_STANDARD 17)
+# C++20 required for Vulkan-Hpp and modern llama.cpp features
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -161,6 +162,7 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/telemetry/telemetry_json.cpp
     src/infrastructure/telemetry/telemetry_manager.cpp
     src/infrastructure/device/rac_device_manager.cpp
+    src/infrastructure/device/vulkan_detector.cpp
 )
 
 # Feature sources - LLM, STT, TTS, VAD service interfaces
