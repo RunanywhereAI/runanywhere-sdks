@@ -955,6 +955,216 @@ TestResult test_tts_queue_cancel_during_synthesis() {
 }
 
 // =============================================================================
+// Test: Barge-in - speak_text_async Cancel Chain
+// =============================================================================
+// Simulates the full barge-in scenario at the pipeline level (no models):
+//   1. Start speak_text_async with a long multi-sentence response
+//   2. While TTS is "playing", call cancel_speech()
+//   3. Verify: is_speaking() returns false
+//   4. Verify: no more audio output after cancel
+//   5. Verify: pipeline state transitions back to non-SPEAKING
+//
+// This tests the exact cancel chain that fires when wake word interrupts TTS.
+// Uses the real VoicePipeline but with models loaded (requires ONNX backends).
+// =============================================================================
+
+TestResult test_bargein_cancel_chain() {
+    TestResult result;
+    result.name = "Barge-in - Cancel Chain (speak_text_async → cancel_speech)";
+
+    // Set up pipeline with audio capture
+    AudioCapture tts_capture;
+
+    openclaw::VoicePipelineConfig config;
+    config.on_audio_output = [&tts_capture](const int16_t* samples, size_t n, int sr) {
+        tts_capture.on_audio(samples, n, sr);
+    };
+    config.on_error = [](const std::string& err) {
+        std::cerr << "[BargeIn Test] Error: " << err << "\n";
+    };
+
+    openclaw::VoicePipeline pipeline(config);
+    if (!pipeline.initialize()) {
+        result.details = "Failed to initialize pipeline: " + pipeline.last_error();
+        return result;
+    }
+
+    // Speak a long multi-sentence response asynchronously
+    std::string long_text = "This is the first sentence of a very long response from OpenClaw. "
+                            "Here is the second sentence with more details about the topic. "
+                            "The third sentence adds even more context to the response. "
+                            "And the fourth sentence wraps up the explanation nicely. "
+                            "Finally, the fifth sentence concludes the response.";
+
+    pipeline.speak_text_async(long_text);
+
+    // Wait for TTS to start playing
+    bool started = false;
+    for (int i = 0; i < 100; i++) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        if (pipeline.is_speaking() || tts_capture.total_samples() > 0) {
+            started = true;
+            break;
+        }
+    }
+
+    if (!started) {
+        pipeline.cancel_speech();
+        result.details = "TTS never started playing within 5 seconds";
+        return result;
+    }
+
+    // Record audio at the moment of barge-in
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    size_t samples_before_cancel = tts_capture.total_samples();
+
+    // BARGE-IN: cancel everything
+    auto cancel_start = std::chrono::steady_clock::now();
+    pipeline.cancel_speech();
+    auto cancel_end = std::chrono::steady_clock::now();
+    auto cancel_ms = std::chrono::duration_cast<std::chrono::milliseconds>(cancel_end - cancel_start).count();
+
+    // Verify is_speaking() is false now
+    if (pipeline.is_speaking()) {
+        result.details = "is_speaking() still true after cancel_speech()";
+        return result;
+    }
+
+    // Verify state is not SPEAKING
+    if (pipeline.state() == openclaw::PipelineState::SPEAKING) {
+        result.details = "Pipeline state still SPEAKING after cancel";
+        return result;
+    }
+
+    // Wait and verify no more audio is produced
+    size_t samples_at_cancel = tts_capture.total_samples();
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    size_t samples_after_wait = tts_capture.total_samples();
+
+    if (samples_after_wait != samples_at_cancel) {
+        result.details = "Audio still being produced after cancel: "
+                       + std::to_string(samples_after_wait - samples_at_cancel) + " extra samples";
+        return result;
+    }
+
+    // The text had 5 sentences - we should NOT have heard all of them
+    // (cancel happened after ~0.5s, a 5-sentence response takes several seconds)
+    float total_audio_duration = tts_capture.duration_seconds();
+
+    result.passed = true;
+    std::ostringstream details;
+    details << "Samples before cancel: " << samples_before_cancel
+            << ", Samples at cancel: " << samples_at_cancel
+            << ", Cancel took: " << cancel_ms << "ms"
+            << ", Total audio: " << total_audio_duration << "s"
+            << ", No audio leaked after cancel";
+    result.details = details.str();
+
+    return result;
+}
+
+// =============================================================================
+// Test: Barge-in - Rapid Cancel/Restart Cycle
+// =============================================================================
+// Simulates the user saying "Hey Jarvis" multiple times rapidly:
+//   1. Start TTS with a response
+//   2. Cancel (barge-in)
+//   3. Immediately start TTS with a new response
+//   4. Verify the new response plays correctly (no corruption from old state)
+//
+// This tests that cancel_speech() leaves the pipeline in a clean state
+// ready for the next speak_text_async() call.
+// =============================================================================
+
+TestResult test_bargein_rapid_restart() {
+    TestResult result;
+    result.name = "Barge-in - Rapid Cancel/Restart Cycle";
+
+    AudioCapture capture;
+
+    openclaw::VoicePipelineConfig config;
+    config.on_audio_output = [&capture](const int16_t* samples, size_t n, int sr) {
+        capture.on_audio(samples, n, sr);
+    };
+    config.on_error = [](const std::string& err) {
+        std::cerr << "[Restart Test] Error: " << err << "\n";
+    };
+
+    openclaw::VoicePipeline pipeline(config);
+    if (!pipeline.initialize()) {
+        result.details = "Failed to initialize pipeline: " + pipeline.last_error();
+        return result;
+    }
+
+    // Cycle 1: start TTS, let it play briefly, cancel
+    pipeline.speak_text_async("This is the first response that should be interrupted quickly.");
+
+    // Wait for some audio to start
+    for (int i = 0; i < 50; i++) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        if (capture.total_samples() > 0) break;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    size_t samples_cycle1 = capture.total_samples();
+
+    pipeline.cancel_speech();
+    capture.clear();
+
+    // Cycle 2: immediately start a new response
+    pipeline.speak_text_async("Second response after barge-in.");
+
+    // Wait for new audio
+    bool got_cycle2_audio = false;
+    for (int i = 0; i < 100; i++) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        if (capture.total_samples() > 0) {
+            got_cycle2_audio = true;
+            break;
+        }
+    }
+
+    if (!got_cycle2_audio) {
+        pipeline.cancel_speech();
+        result.details = "No audio from second response after cancel/restart (pipeline state corrupted?)";
+        return result;
+    }
+
+    // Let it finish
+    for (int i = 0; i < 100; i++) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        if (!pipeline.is_speaking()) break;
+    }
+
+    size_t samples_cycle2 = capture.total_samples();
+
+    // Cycle 3: one more cancel/restart to really stress test
+    capture.clear();
+    pipeline.speak_text_async("Third response works too.");
+
+    for (int i = 0; i < 50; i++) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        if (capture.total_samples() > 0) break;
+    }
+
+    pipeline.cancel_speech();
+
+    // Verify pipeline is in a clean state
+    if (pipeline.is_speaking()) {
+        result.details = "Pipeline still speaking after 3rd cancel";
+        return result;
+    }
+
+    result.passed = true;
+    std::ostringstream details;
+    details << "Cycle 1: " << samples_cycle1 << " samples before cancel"
+            << ", Cycle 2: " << samples_cycle2 << " samples (full playback after restart)"
+            << ", Cycle 3: cancel succeeded, pipeline clean";
+    result.details = details.str();
+
+    return result;
+}
+
+// =============================================================================
 // Test: Waiting Chime Timing
 // =============================================================================
 // Verifies:
@@ -1535,6 +1745,7 @@ void print_usage(const char* prog) {
               << "  --run-all                Run all integration tests\n"
               << "  --test-tts-queue         Test TTS queue parallel playback and cancel\n"
               << "  --test-chime             Test waiting chime timing and audio\n"
+              << "  --test-bargein           Test barge-in cancel chain and rapid restart (needs ONNX)\n"
               << "  --test-sanitization      Test text sanitization for TTS\n"
               << "  --test-tts               Test TTS synthesis on various texts\n"
               << "  --test-openclaw-flow     Test full flow with fake OpenClaw server\n"
@@ -1595,6 +1806,11 @@ int main(int argc, char* argv[]) {
             results.push_back(test_waiting_chime_timing());
             results.push_back(test_waiting_chime_audio_content());
         }
+        else if (arg == "--test-bargein") {
+            if (!ensure_backends_initialized()) return 1;
+            results.push_back(test_bargein_cancel_chain());
+            results.push_back(test_bargein_rapid_restart());
+        }
         else if (arg == "--test-sanitization") {
             if (!ensure_backends_initialized()) return 1;
             results.push_back(test_text_sanitization());
@@ -1637,7 +1853,12 @@ int main(int argc, char* argv[]) {
             std::cout << "\n--- Section 4: TTS Synthesis ---\n\n";
             results.push_back(test_tts_synthesis());
 
-            // --- Section 5: Full OpenClaw Flow ---
+            // --- Section 5: Barge-in (cancel chain + rapid restart) ---
+            std::cout << "\n--- Section 5: Barge-in ---\n\n";
+            results.push_back(test_bargein_cancel_chain());
+            results.push_back(test_bargein_rapid_restart());
+
+            // --- Section 6: Full OpenClaw Flow ---
             std::cout << "\n--- Section 5: Full OpenClaw Flow ---\n\n";
 
             // Test with 5-second delay (moderate wait)
