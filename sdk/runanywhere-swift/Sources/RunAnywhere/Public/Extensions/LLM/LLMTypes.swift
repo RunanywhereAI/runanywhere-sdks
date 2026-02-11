@@ -174,6 +174,10 @@ public struct LLMGenerationOptions: Sendable {
     /// System prompt to define AI behavior and formatting rules
     public let systemPrompt: String?
 
+    /// Confidence threshold for cloud handoff (0.0 - 1.0).
+    /// 0.0 = disabled. Values > 0 enable entropy-based confidence scoring.
+    public let confidenceThreshold: Float
+
     public init(
         maxTokens: Int = 100,
         temperature: Float = 0.8,
@@ -182,7 +186,8 @@ public struct LLMGenerationOptions: Sendable {
         streamingEnabled: Bool = false,
         preferredFramework: InferenceFramework? = nil,
         structuredOutput: StructuredOutputConfig? = nil,
-        systemPrompt: String? = nil
+        systemPrompt: String? = nil,
+        confidenceThreshold: Float = 0.0
     ) {
         self.maxTokens = maxTokens
         self.temperature = temperature
@@ -192,6 +197,7 @@ public struct LLMGenerationOptions: Sendable {
         self.preferredFramework = preferredFramework
         self.structuredOutput = structuredOutput
         self.systemPrompt = systemPrompt
+        self.confidenceThreshold = confidenceThreshold
     }
 
     // MARK: - C++ Bridge (rac_llm_options_t)
@@ -205,6 +211,7 @@ public struct LLMGenerationOptions: Sendable {
         cOptions.streaming_enabled = streamingEnabled ? RAC_TRUE : RAC_FALSE
         cOptions.stop_sequences = nil
         cOptions.num_stop_sequences = 0
+        cOptions.confidence_threshold = confidenceThreshold
 
         if let prompt = systemPrompt {
             return try prompt.withCString { promptPtr in
@@ -259,6 +266,15 @@ public struct LLMGenerationResult: Sendable {
     /// Number of tokens in the actual response content
     public let responseTokens: Int
 
+    /// Model confidence score (0.0 - 1.0, nil if confidence scoring was disabled)
+    public let confidence: Float?
+
+    /// Whether the engine recommends cloud fallback
+    public let cloudHandoff: Bool?
+
+    /// Reason for cloud handoff recommendation
+    public let handoffReason: HandoffReason?
+
     public init(
         text: String,
         thinkingContent: String? = nil,
@@ -271,7 +287,10 @@ public struct LLMGenerationResult: Sendable {
         timeToFirstTokenMs: Double? = nil,
         structuredOutputValidation: StructuredOutputValidation? = nil,
         thinkingTokens: Int? = nil,
-        responseTokens: Int? = nil
+        responseTokens: Int? = nil,
+        confidence: Float? = nil,
+        cloudHandoff: Bool? = nil,
+        handoffReason: HandoffReason? = nil
     ) {
         self.text = text
         self.thinkingContent = thinkingContent
@@ -285,6 +304,9 @@ public struct LLMGenerationResult: Sendable {
         self.structuredOutputValidation = structuredOutputValidation
         self.thinkingTokens = thinkingTokens
         self.responseTokens = responseTokens ?? tokensUsed
+        self.confidence = confidence
+        self.cloudHandoff = cloudHandoff
+        self.handoffReason = handoffReason
     }
 
     // MARK: - C++ Bridge (rac_llm_result_t)
@@ -304,7 +326,10 @@ public struct LLMGenerationResult: Sendable {
                 ? Double(cResult.time_to_first_token_ms) : nil,
             structuredOutputValidation: nil,
             thinkingTokens: nil,
-            responseTokens: Int(cResult.completion_tokens)
+            responseTokens: Int(cResult.completion_tokens),
+            confidence: cResult.confidence > 0 ? cResult.confidence : nil,
+            cloudHandoff: cResult.cloud_handoff == RAC_TRUE ? true : nil,
+            handoffReason: HandoffReason(rawValue: Int(cResult.handoff_reason.rawValue))
         )
     }
 

@@ -231,6 +231,54 @@ export {
 export type { NativeRunAnywhereCoreModule, FileSystemModule } from './native/NativeRunAnywhereCore';
 
 // =============================================================================
+// Cloud Provider & Routing
+// =============================================================================
+
+export {
+  // Cloud types & enums
+  RoutingMode,
+  CloudExecutionTarget,
+  HandoffReason,
+  DEFAULT_ROUTING_POLICY,
+  LOCAL_ONLY_POLICY,
+  CLOUD_ONLY_POLICY,
+  hybridAutoPolicy,
+  hybridManualPolicy,
+  // Provider
+  OpenAICompatibleProvider,
+  CloudProviderError,
+  CloudProviderErrorType,
+  // Manager
+  CloudProviderManager,
+  // Routing engine
+  RoutingEngine,
+  // Cost tracking
+  CloudCostTracker,
+  // Failover chain
+  ProviderFailoverChain,
+} from './cloud';
+export type {
+  CloudRoutingPolicy,
+  RoutingDecision,
+  CloudGenerationOptions,
+  CloudGenerationResult,
+  RoutedGenerationResult,
+  RoutedStreamingResult,
+  CloudProvider,
+  OpenAICompatibleProviderConfig,
+  // Cost tracking
+  CloudCostSummary,
+  // Failover chain
+  ProviderHealthStatus,
+  // Telemetry events
+  RoutingEvent,
+  CloudCostEvent,
+  ProviderFailoverEvent,
+  LatencyTimeoutEvent,
+  CloudTelemetryEvent,
+} from './cloud';
+
+// =============================================================================
 // Nitrogen Spec Types
 // =============================================================================
 

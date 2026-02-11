@@ -385,6 +385,12 @@ _rac_audio_pipeline_can_play_tts
 _rac_audio_pipeline_is_valid_transition
 _rac_audio_pipeline_state_name
 
+# LLM Routing Policy
+_rac_routing_policy_create_default
+_rac_routing_policy_validate
+_rac_routing_mode_name
+_rac_execution_target_name
+
 # LLM Structured Output
 _rac_structured_output_extract_json
 _rac_structured_output_find_complete_json

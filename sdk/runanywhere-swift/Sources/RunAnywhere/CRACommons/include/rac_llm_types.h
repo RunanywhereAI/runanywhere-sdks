@@ -93,6 +93,16 @@ typedef struct rac_llm_options {
 
     /** System prompt (can be NULL) */
     const char* system_prompt;
+
+    /**
+     * Confidence threshold for cloud handoff (0.0 - 1.0).
+     * 0.0 = disabled (never recommend handoff).
+     * Values > 0 enable entropy-based confidence scoring.
+     * If on-device confidence drops below this threshold, the result
+     * will have cloud_handoff=true recommending cloud fallback.
+     * Default: 0.0 (disabled).
+     */
+    float confidence_threshold;
 } rac_llm_options_t;
 
 /**
@@ -104,7 +114,29 @@ static const rac_llm_options_t RAC_LLM_OPTIONS_DEFAULT = {.max_tokens = 100,
                                                           .stop_sequences = RAC_NULL,
                                                           .num_stop_sequences = 0,
                                                           .streaming_enabled = RAC_FALSE,
-                                                          .system_prompt = RAC_NULL};
+                                                          .system_prompt = RAC_NULL,
+                                                          .confidence_threshold = 0.0f};
+
+// =============================================================================
+// CLOUD HANDOFF TYPES - Confidence-based routing signals
+// =============================================================================
+
+/**
+ * @brief Reason for cloud handoff recommendation
+ *
+ * Indicates why the on-device engine recommended routing to cloud.
+ * Uses entropy-based confidence scoring.
+ */
+typedef enum rac_handoff_reason {
+    /** No handoff needed - on-device inference was confident */
+    RAC_HANDOFF_REASON_NONE = 0,
+
+    /** First token had low confidence (early bail-out) */
+    RAC_HANDOFF_REASON_FIRST_TOKEN_LOW_CONFIDENCE = 1,
+
+    /** Rolling window of tokens showed degrading confidence (mid-generation bail-out) */
+    RAC_HANDOFF_REASON_ROLLING_WINDOW_DEGRADATION = 2,
+} rac_handoff_reason_t;
 
 // =============================================================================
 // RESULT - Mirrors Swift's LLMGenerationResult
@@ -134,6 +166,15 @@ typedef struct rac_llm_result {
 
     /** Tokens per second */
     float tokens_per_second;
+
+    /** Model confidence score (0.0 - 1.0), based on token entropy */
+    float confidence;
+
+    /** Whether the engine recommends routing to cloud */
+    rac_bool_t cloud_handoff;
+
+    /** Reason for cloud handoff recommendation */
+    rac_handoff_reason_t handoff_reason;
 } rac_llm_result_t;
 
 // =============================================================================
@@ -281,6 +322,21 @@ typedef rac_bool_t (*rac_llm_token_event_callback_fn)(const rac_llm_token_event_
                                                       void* user_data);
 
 /**
+ * @brief Cloud handoff callback for streaming generation
+ *
+ * Called when the on-device engine detects low confidence mid-stream
+ * and recommends routing to cloud. The partial text generated so far
+ * is provided so the cloud provider can continue from where on-device stopped.
+ *
+ * @param confidence Current confidence score (0.0 - 1.0)
+ * @param reason The reason for handoff
+ * @param partial_text Text generated so far before handoff (can be NULL)
+ * @param user_data User-provided context
+ */
+typedef void (*rac_llm_handoff_callback_fn)(float confidence, rac_handoff_reason_t reason,
+                                            const char* partial_text, void* user_data);
+
+/**
  * @brief Streaming result handle
  *
  * Opaque handle for managing streaming generation.
@@ -308,6 +364,9 @@ typedef struct rac_llm_stream_params {
 
     /** Extended callback with token event details (optional, can be NULL) */
     rac_llm_token_event_callback_fn on_token_event;
+
+    /** Callback when cloud handoff is recommended mid-stream (optional, can be NULL) */
+    rac_llm_handoff_callback_fn on_handoff;
 
     /** User data passed to callbacks */
     void* user_data;
@@ -342,6 +401,15 @@ typedef struct rac_llm_stream_metrics {
 
     /** Response tokens (excluding thinking) */
     int32_t response_tokens;
+
+    /** Model confidence score (0.0 - 1.0), based on token entropy */
+    float confidence;
+
+    /** Whether the engine recommends routing to cloud */
+    rac_bool_t cloud_handoff;
+
+    /** Reason for cloud handoff recommendation */
+    rac_handoff_reason_t handoff_reason;
 } rac_llm_stream_metrics_t;
 
 /**

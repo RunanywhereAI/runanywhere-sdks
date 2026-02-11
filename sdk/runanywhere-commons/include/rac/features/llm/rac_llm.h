@@ -13,5 +13,6 @@
 
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_types.h"
+#include "rac/features/llm/rac_routing.h"
 
 #endif /* RAC_LLM_H */

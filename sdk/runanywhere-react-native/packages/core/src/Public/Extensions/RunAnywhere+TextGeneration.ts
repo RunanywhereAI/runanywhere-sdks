@@ -99,6 +99,7 @@ export async function generate(
     max_tokens: options?.maxTokens ?? 1000,
     temperature: options?.temperature ?? 0.7,
     system_prompt: options?.systemPrompt ?? null,
+    confidence_threshold: options?.confidenceThreshold ?? undefined,
   });
 
   const resultJson = await native.generate(prompt, optionsJson);
@@ -124,6 +125,9 @@ export async function generate(
       },
       thinkingTokens: result.thinkingTokens,
       responseTokens: result.responseTokens ?? result.tokensUsed ?? 0,
+      confidence: result.confidence,
+      cloudHandoff: result.cloudHandoff,
+      handoffReason: result.handoffReason,
     };
   } catch {
     if (resultJson.includes('error')) {

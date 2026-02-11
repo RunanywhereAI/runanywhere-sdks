@@ -65,12 +65,8 @@ data class PipelineResult(
     val error: String? = null,
 )
 
-@Serializable
-data class RoutingPolicy(
-    val preferOnDevice: Boolean = true,
-    val maxLatency: Int? = null,
-    val costOptimization: Boolean = true,
-)
+// Note: RoutingPolicy has been moved to public/extensions/Cloud/CloudTypes.kt
+// with full cloud routing support (RoutingMode, RoutingPolicy, RoutingDecision, etc.)
 
 // Voice-related types are defined in their respective feature packages:
 // - STTOptions, STTResult, etc. -> features/stt/STTModels.kt

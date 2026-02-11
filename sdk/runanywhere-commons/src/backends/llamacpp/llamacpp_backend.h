@@ -53,6 +53,11 @@ struct TextGenerationResult {
     int prompt_tokens = 0;
     double inference_time_ms = 0.0;
     std::string finish_reason;  // "stop", "length", "cancelled"
+
+    // Confidence scoring for cloud handoff
+    float confidence = 1.0f;       // Mean confidence (0.0 - 1.0)
+    bool cloud_handoff = false;    // Whether cloud fallback is recommended
+    int handoff_reason = 0;        // 0=none, 1=first_token, 2=rolling_window
 };
 
 // Streaming callback: receives token, returns false to cancel
@@ -111,12 +116,14 @@ class LlamaCppTextGeneration {
     bool is_model_loaded() const;
     bool unload_model();
 
-    TextGenerationResult generate(const TextGenerationRequest& request);
+    TextGenerationResult generate(const TextGenerationRequest& request,
+                                   float confidence_threshold = 0.0f);
     bool generate_stream(const TextGenerationRequest& request, TextStreamCallback callback) {
-        return generate_stream(request, callback, nullptr);
+        return generate_stream(request, callback, nullptr, 0.0f, nullptr);
     }
     bool generate_stream(const TextGenerationRequest& request, TextStreamCallback callback,
-                         int* out_prompt_tokens);
+                         int* out_prompt_tokens, float confidence_threshold = 0.0f,
+                         TextGenerationResult* out_confidence_result = nullptr);
     void cancel();
     nlohmann::json get_model_info() const;
 
