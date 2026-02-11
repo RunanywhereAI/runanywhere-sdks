@@ -38,9 +38,13 @@ def getExtOrDefault(name) {
     return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties['RunAnywhereONNX_' + name]
 }
 
-// Only arm64-v8a is supported
+// Supported ABIs - arm64-v8a for physical devices, x86_64 for emulators
+// Can be overridden via gradle.properties: reactNativeArchitectures=arm64-v8a
 def reactNativeArchitectures() {
-    return ["arm64-v8a"]
+    def value = rootProject.hasProperty("reactNativeArchitectures")
+        ? rootProject.property("reactNativeArchitectures")
+        : null
+    return value ? value.split(",").collect { it.trim() } : ["arm64-v8a", "x86_64"]
 }
 
 apply plugin: 'com.android.library'
@@ -109,7 +113,7 @@ android {
         targetSdkVersion getExtOrIntegerDefault('targetSdkVersion')
 
         ndk {
-            abiFilters 'arm64-v8a', 'x86_64'
+            abiFilters(*reactNativeArchitectures())
         }
 
         externalNativeBuild {
@@ -118,7 +122,7 @@ android {
                 arguments "-DANDROID_STL=c++_shared",
                           // Fix NitroModules prefab path - use app's build directory
                           "-DREACT_NATIVE_NITRO_BUILD_DIR=${rootProject.buildDir}"
-                abiFilters 'arm64-v8a', 'x86_64'
+                abiFilters(*reactNativeArchitectures())
             }
         }
     }
@@ -132,7 +136,12 @@ android {
     packagingOptions {
         excludes = [
             "META-INF",
-            "META-INF/**"
+            "META-INF/**",
+            // Exclude librac_commons.so from this module's packaging.
+            // The core package (@runanywhere/core) is the single authoritative source
+            // for librac_commons.so. If this module also packages it, Gradle's native
+            // lib merge may pick a stale version, causing UnsatisfiedLinkError crashes.
+            "**/librac_commons.so"
         ]
         pickFirsts = [
             "**/libc++_shared.so",
@@ -202,11 +211,64 @@ task downloadNativeLibs {
             return
         }
 
-        // Check if libs are already bundled (npm install case)
-        def bundledLibsDir = file("${jniLibsDir}/arm64-v8a")
-        def bundledLibs = bundledLibsDir.exists() ? bundledLibsDir.listFiles()?.findAll { it.name.endsWith(".so") } : []
-        if (bundledLibs?.size() > 0) {
-            logger.lifecycle("[RunAnywhereONNX] ✅ Using bundled native libraries from npm package (${bundledLibs.size()} .so files)")
+        // Check if libs are already bundled for ALL requested ABIs (npm install case)
+        def requestedAbis = reactNativeArchitectures()
+        def allAbisBundled = requestedAbis.every { abi ->
+            def abiDir = file("${jniLibsDir}/${abi}")
+            def libs = abiDir.exists() ? abiDir.listFiles()?.findAll { it.name.endsWith(".so") } : []
+            return libs?.size() > 0
+        }
+        if (allAbisBundled) {
+            logger.lifecycle("[RunAnywhereONNX] ✅ Using bundled native libraries from npm package for ABIs: ${requestedAbis.join(', ')}")
+            return
+        }
+        // Check if at least arm64-v8a is bundled (partial bundle - need to download missing ABIs)
+        def arm64Dir = file("${jniLibsDir}/arm64-v8a")
+        def arm64Bundled = arm64Dir.exists() && arm64Dir.listFiles()?.any { it.name.endsWith(".so") }
+        if (arm64Bundled) {
+            def missingAbis = requestedAbis.findAll { abi ->
+                def abiDir = file("${jniLibsDir}/${abi}")
+                def libs = abiDir.exists() ? abiDir.listFiles()?.findAll { it.name.endsWith(".so") } : []
+                return !libs || libs.size() == 0
+            }
+            if (missingAbis.size() > 0) {
+                logger.lifecycle("[RunAnywhereONNX] ⚠️ Bundled libs found for arm64-v8a but missing for: ${missingAbis.join(', ')}")
+                logger.lifecycle("[RunAnywhereONNX] Attempting to download missing ABIs from GitHub releases...")
+                try {
+                    def onnxUrl = "https://github.com/${githubOrg}/${coreRepo}/releases/download/core-v${coreVersion}/RABackendONNX-android-v${coreVersion}.zip"
+                    def tempZip = file("${downloadedLibsDir}/RABackendONNX-supplement.zip")
+                    downloadedLibsDir.mkdirs()
+                    new URL(onnxUrl).withInputStream { input ->
+                        tempZip.withOutputStream { output -> output << input }
+                    }
+                    copy {
+                        from zipTree(tempZip)
+                        into jniLibsDir
+                        exclude "**/libc++_shared.so"
+                        // Exclude librac_commons.so - the core package (@runanywhere/core) is the
+                        // authoritative source. Including it here risks a stale version winning the
+                        // Gradle native lib merge, causing UnsatisfiedLinkError crashes at runtime.
+                        exclude "**/librac_commons.so"
+                        eachFile { fileCopyDetails ->
+                            def pathString = fileCopyDetails.relativePath.pathString
+                            def match = pathString =~ /.*\/(arm64-v8a|armeabi-v7a|x86|x86_64)\/(.+\.so)$/
+                            if (match) {
+                                def abi = match[0][1]
+                                def filename = match[0][2]
+                                fileCopyDetails.relativePath = new RelativePath(true, abi, filename)
+                            } else if (!pathString.endsWith(".so")) {
+                                fileCopyDetails.exclude()
+                            }
+                        }
+                        includeEmptyDirs = false
+                    }
+                    tempZip.delete()
+                    logger.lifecycle("[RunAnywhereONNX] ✅ Downloaded missing ABIs successfully")
+                } catch (Exception e) {
+                    logger.warn("[RunAnywhereONNX] ⚠️ Could not download missing ABIs: ${e.message}")
+                    logger.warn("[RunAnywhereONNX] Building with available ABIs only (arm64-v8a)")
+                }
+            }
             return
         }
 
@@ -249,6 +311,10 @@ task downloadNativeLibs {
                 // IMPORTANT: Exclude libc++_shared.so - React Native provides its own
                 // Using a different version causes ABI compatibility issues
                 exclude "**/libc++_shared.so"
+                // Exclude librac_commons.so - the core package (@runanywhere/core) is the
+                // authoritative source. Including it here risks a stale version winning the
+                // Gradle native lib merge, causing UnsatisfiedLinkError crashes at runtime.
+                exclude "**/librac_commons.so"
                 eachFile { fileCopyDetails ->
                     def pathString = fileCopyDetails.relativePath.pathString
                     // Handle RABackendONNX-android-vX.Y.Z/onnx/ABI/*.so structure

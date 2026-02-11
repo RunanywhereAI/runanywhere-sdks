@@ -6,7 +6,7 @@ import java.nio.charset.CoderResult
 
 class IncompleteBytesToStringBuffer(
     initialByteCapacity: Int = 8 * 1024,
-    private val charCapacity: Int = 8 * 1024
+    private val charCapacity: Int = 8 * 1024,
 ) {
     private val decoder = Charsets.UTF_8.newDecoder()
     private var inBuf: ByteBuffer = ByteBuffer.allocate(initialByteCapacity)
@@ -14,8 +14,8 @@ class IncompleteBytesToStringBuffer(
 
     fun push(chunk: ByteArray): String {
         ensureCapacity(chunk.size)
-        inBuf.put(chunk)          // 1) collect
-        inBuf.flip()              // switch to read mode
+        inBuf.put(chunk) // 1) collect
+        inBuf.flip() // switch to read mode
 
         val sb = StringBuilder()
 
@@ -26,13 +26,13 @@ class IncompleteBytesToStringBuffer(
             sb.append(outBuf)
 
             when {
-                res.isOverflow -> continue          // outBuf too small, loop drains more
-                res.isUnderflow -> break            // need more bytes for next char (dangling)
+                res.isOverflow -> continue // outBuf too small, loop drains more
+                res.isUnderflow -> break // need more bytes for next char (dangling)
                 res.isError -> res.throwException() // invalid sequence
             }
         }
 
-        inBuf.compact()           // 3) drop consumed bytes, keep leftovers at start
+        inBuf.compact() // 3) drop consumed bytes, keep leftovers at start
         return sb.toString()
     }
 
