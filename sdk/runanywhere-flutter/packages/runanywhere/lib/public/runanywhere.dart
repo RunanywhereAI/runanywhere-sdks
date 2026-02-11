@@ -1192,6 +1192,7 @@ class RunAnywhere {
         prompt,
         maxTokens: opts.maxTokens,
         temperature: opts.temperature,
+        systemPrompt: opts.systemPrompt,
       );
 
       final endTime = DateTime.now();
@@ -1292,6 +1293,7 @@ class RunAnywhere {
       prompt,
       maxTokens: opts.maxTokens,
       temperature: opts.temperature,
+      systemPrompt: opts.systemPrompt,
     );
 
     // Forward tokens and collect them, track subscription in bridge for cancellation

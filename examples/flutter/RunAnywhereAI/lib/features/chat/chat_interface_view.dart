@@ -116,11 +116,17 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
       final temperature =
           prefs.getDouble(PreferenceKeys.defaultTemperature) ?? 0.7;
       final maxTokens = prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 500;
+      final systemPromptRaw =
+          prefs.getString(PreferenceKeys.defaultSystemPrompt) ?? '';
+      final systemPrompt = systemPromptRaw.isNotEmpty ? systemPromptRaw : null;
+
+      debugPrint('[PARAMS] App _sendMessage: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=${systemPrompt != null ? "set(${systemPrompt.length} chars)" : "nil"}');
 
       // Streaming now runs in a background isolate, so no ANR concerns
       final options = sdk.LLMGenerationOptions(
         maxTokens: maxTokens,
         temperature: temperature,
+        systemPrompt: systemPrompt,
       );
 
       if (_useStreaming) {

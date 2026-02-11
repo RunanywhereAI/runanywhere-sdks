@@ -8,6 +8,7 @@ import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/models/app_types.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// CombinedSettingsView (mirroring iOS CombinedSettingsView.swift)
@@ -37,6 +38,11 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
   bool _isApiKeyConfigured = false;
   bool _isBaseURLConfigured = false;
 
+  // Generation Settings
+  double _temperature = 0.7;
+  int _maxTokens = 1000;
+  String _systemPrompt = '';
+
   // Loading state
   bool _isRefreshingStorage = false;
 
@@ -44,6 +50,7 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
   void initState() {
     super.initState();
     unawaited(_loadSettings());
+    unawaited(_loadGenerationSettings());
     unawaited(_loadApiConfiguration());
     unawaited(_loadStorageData());
   }
@@ -54,6 +61,32 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
         await KeychainHelper.loadBool(KeychainKeys.analyticsLogToLocal);
     if (mounted) {
       setState(() {});
+    }
+  }
+
+  /// Load generation settings from SharedPreferences
+  Future<void> _loadGenerationSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _temperature = prefs.getDouble(PreferenceKeys.defaultTemperature) ?? 0.7;
+        _maxTokens = prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 1000;
+        _systemPrompt = prefs.getString(PreferenceKeys.defaultSystemPrompt) ?? '';
+      });
+    }
+  }
+
+  /// Save generation settings to SharedPreferences
+  Future<void> _saveGenerationSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(PreferenceKeys.defaultTemperature, _temperature);
+    await prefs.setInt(PreferenceKeys.defaultMaxTokens, _maxTokens);
+    await prefs.setString(PreferenceKeys.defaultSystemPrompt, _systemPrompt);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Generation settings saved')),
+      );
     }
   }
 
@@ -386,6 +419,11 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
           _buildApiConfigurationCard(),
           const SizedBox(height: AppSpacing.large),
 
+          // Generation Settings Section
+          _buildSectionHeader('Generation Settings'),
+          _buildGenerationSettingsCard(),
+          const SizedBox(height: AppSpacing.large),
+
           // Storage Overview Section
           _buildSectionHeader('Storage Overview',
               trailing: _buildRefreshButton()),
@@ -445,6 +483,124 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
       label: Text(
         'Refresh',
         style: AppTypography.caption(context),
+      ),
+    );
+  }
+
+  Widget _buildGenerationSettingsCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.large),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Temperature Slider
+            Text('Temperature', style: AppTypography.subheadline(context)),
+            const SizedBox(height: AppSpacing.xSmall),
+            Row(
+              children: [
+                Expanded(
+                  child: Slider(
+                    value: _temperature,
+                    min: 0.0,
+                    max: 2.0,
+                    divisions: 20,
+                    label: _temperature.toStringAsFixed(1),
+                    onChanged: (value) {
+                      setState(() {
+                        _temperature = value;
+                      });
+                    },
+                  ),
+                ),
+                SizedBox(
+                  width: 40,
+                  child: Text(
+                    _temperature.toStringAsFixed(1),
+                    style: AppTypography.subheadlineSemibold(context),
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+              ],
+            ),
+            Text(
+              'Controls randomness. Lower = more focused, higher = more creative.',
+              style: AppTypography.caption2(context).copyWith(
+                color: AppColors.textSecondary(context),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.mediumLarge),
+
+            // Max Tokens Slider
+            Text('Max Tokens', style: AppTypography.subheadline(context)),
+            const SizedBox(height: AppSpacing.xSmall),
+            Row(
+              children: [
+                Expanded(
+                  child: Slider(
+                    value: _maxTokens.toDouble(),
+                    min: 50,
+                    max: 4096,
+                    divisions: ((4096 - 50) / 50).round(),
+                    label: _maxTokens.toString(),
+                    onChanged: (value) {
+                      setState(() {
+                        _maxTokens = value.round();
+                      });
+                    },
+                  ),
+                ),
+                SizedBox(
+                  width: 60,
+                  child: Text(
+                    _maxTokens.toString(),
+                    style: AppTypography.subheadlineSemibold(context),
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+              ],
+            ),
+            Text(
+              'Maximum number of tokens to generate.',
+              style: AppTypography.caption2(context).copyWith(
+                color: AppColors.textSecondary(context),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.mediumLarge),
+
+            // System Prompt Field
+            Text('System Prompt', style: AppTypography.subheadline(context)),
+            const SizedBox(height: AppSpacing.xSmall),
+            TextField(
+              controller: TextEditingController(text: _systemPrompt)
+                ..selection = TextSelection.fromPosition(
+                  TextPosition(offset: _systemPrompt.length),
+                ),
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: 'Enter a system prompt...',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (value) {
+                _systemPrompt = value;
+              },
+            ),
+            const SizedBox(height: AppSpacing.xSmall),
+            Text(
+              'Instructions for how the model should behave.',
+              style: AppTypography.caption2(context).copyWith(
+                color: AppColors.textSecondary(context),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.mediumLarge),
+
+            // Save Settings Button
+            ElevatedButton(
+              onPressed: _saveGenerationSettings,
+              child: const Text('Save Settings'),
+            ),
+          ],
+        ),
       ),
     );
   }
