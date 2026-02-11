@@ -191,6 +191,10 @@ inline std::string get_wakeword_melspec_path() {
     return base_dir + "/Models/ONNX/" + WAKEWORD_EMBEDDING_ID + "/" + WAKEWORD_MELSPEC_FILE;
 }
 
+inline std::string get_earcon_path() {
+    return get_base_dir() + "/Models/ONNX/earcon/acknowledgment.wav";
+}
+
 // =============================================================================
 // Model Availability
 // =============================================================================

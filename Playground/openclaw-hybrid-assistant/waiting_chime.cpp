@@ -1,33 +1,32 @@
 // =============================================================================
 // Waiting Chime - Implementation
 // =============================================================================
-// Generates a warm chime tone using additive synthesis (fundamental + harmonics)
-// with a smooth ADSR-like envelope. Loops playback in small chunks so it can
-// be interrupted within ~50ms when the OpenClaw response arrives.
+// Loads a WAV earcon file and plays it once immediately, then every 5 seconds.
+// Simple WAV parser handles standard 16-bit PCM files.
 // =============================================================================
 
 #include "waiting_chime.h"
 
 #include <algorithm>
-#include <cmath>
+#include <cstring>
+#include <fstream>
 #include <iostream>
 
 namespace openclaw {
-
-// Chunk size for playback - controls interrupt latency.
-// At 22050 Hz, 1024 samples = ~46ms → response detected within one chunk.
-static constexpr size_t PLAYBACK_CHUNK_SAMPLES = 1024;
-
-static constexpr float TWO_PI = 2.0f * 3.14159265358979f;
 
 // =============================================================================
 // Constructor / Destructor
 // =============================================================================
 
-WaitingChime::WaitingChime(const WaitingChimeConfig& config, AudioOutputCallback play_audio)
-    : config_(config)
-    , play_audio_(std::move(play_audio)) {
-    generate_chime();
+WaitingChime::WaitingChime(const std::string& wav_path, AudioOutputCallback play_audio)
+    : play_audio_(std::move(play_audio)) {
+    loaded_ = load_wav(wav_path);
+    if (loaded_) {
+        std::cout << "[WaitingChime] Loaded earcon: " << earcon_buffer_.size()
+                  << " samples @ " << sample_rate_ << " Hz\n";
+    } else {
+        std::cout << "[WaitingChime] No earcon loaded (waiting feedback will be silent)\n";
+    }
 }
 
 WaitingChime::~WaitingChime() {
@@ -35,59 +34,81 @@ WaitingChime::~WaitingChime() {
 }
 
 // =============================================================================
-// Tone Generation (called once at construction)
+// WAV Loader (16-bit PCM)
 // =============================================================================
 
-void WaitingChime::generate_chime() {
-    const int tone_samples = config_.sample_rate * config_.tone_duration_ms / 1000;
-    const int silence_samples = config_.sample_rate * config_.silence_duration_ms / 1000;
-    const int total_samples = tone_samples + silence_samples;
-
-    chime_buffer_.resize(total_samples, 0);
-
-    const float volume = std::clamp(config_.volume, 0.0f, 1.0f);
-    const int fade_in_samples = std::min(
-        config_.sample_rate * config_.fade_in_ms / 1000,
-        tone_samples / 4
-    );
-    const int fade_out_samples = std::min(
-        config_.sample_rate * config_.fade_out_ms / 1000,
-        tone_samples / 2
-    );
-
-    // Normalization factor: sum of all harmonic amplitudes
-    const float norm = 1.0f / (1.0f + config_.harmonic_2nd + config_.harmonic_3rd);
-
-    for (int i = 0; i < tone_samples; ++i) {
-        const float t = static_cast<float>(i) / static_cast<float>(config_.sample_rate);
-
-        // Additive synthesis: fundamental + harmonics
-        float sample = std::sin(TWO_PI * config_.frequency_hz * t);                        // Fundamental
-        sample += config_.harmonic_2nd * std::sin(TWO_PI * config_.frequency_hz * 2.0f * t); // 2nd harmonic
-        sample += config_.harmonic_3rd * std::sin(TWO_PI * config_.frequency_hz * 3.0f * t); // 3rd harmonic
-
-        // Normalize so combined amplitude stays within [-1, 1]
-        sample *= norm;
-
-        // Envelope: smooth fade-in and fade-out using cosine curves
-        float envelope = 1.0f;
-        if (i < fade_in_samples) {
-            envelope = 0.5f * (1.0f - std::cos(3.14159f * static_cast<float>(i) / static_cast<float>(fade_in_samples)));
-        } else if (i >= tone_samples - fade_out_samples) {
-            const int fade_pos = i - (tone_samples - fade_out_samples);
-            envelope = 0.5f * (1.0f + std::cos(3.14159f * static_cast<float>(fade_pos) / static_cast<float>(fade_out_samples)));
-        }
-
-        sample *= volume * envelope;
-
-        chime_buffer_[i] = static_cast<int16_t>(std::clamp(sample * 32767.0f, -32767.0f, 32767.0f));
+bool WaitingChime::load_wav(const std::string& path) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file.is_open()) {
+        return false;
     }
 
-    // Silence portion is already zero-initialized by resize
+    // Read RIFF header
+    char riff[4];
+    file.read(riff, 4);
+    if (strncmp(riff, "RIFF", 4) != 0) return false;
 
-    std::cout << "[WaitingChime] Generated " << tone_samples << " tone + "
-              << silence_samples << " silence samples ("
-              << total_samples * 2 / 1024 << " KB)\n";
+    uint32_t file_size;
+    file.read(reinterpret_cast<char*>(&file_size), 4);
+
+    char wave[4];
+    file.read(wave, 4);
+    if (strncmp(wave, "WAVE", 4) != 0) return false;
+
+    // Find fmt and data chunks
+    uint16_t channels = 0;
+    uint16_t bits_per_sample = 0;
+
+    while (file.good()) {
+        char chunk_id[4];
+        file.read(chunk_id, 4);
+        uint32_t chunk_size;
+        file.read(reinterpret_cast<char*>(&chunk_size), 4);
+
+        if (!file.good()) break;
+
+        if (strncmp(chunk_id, "fmt ", 4) == 0) {
+            uint16_t audio_format;
+            file.read(reinterpret_cast<char*>(&audio_format), 2);
+            file.read(reinterpret_cast<char*>(&channels), 2);
+            uint32_t sr;
+            file.read(reinterpret_cast<char*>(&sr), 4);
+            sample_rate_ = static_cast<int>(sr);
+            uint32_t byte_rate;
+            file.read(reinterpret_cast<char*>(&byte_rate), 4);
+            uint16_t block_align;
+            file.read(reinterpret_cast<char*>(&block_align), 2);
+            file.read(reinterpret_cast<char*>(&bits_per_sample), 2);
+            // Skip extra fmt bytes
+            if (chunk_size > 16) {
+                file.seekg(chunk_size - 16, std::ios::cur);
+            }
+        } else if (strncmp(chunk_id, "data", 4) == 0) {
+            size_t num_samples = chunk_size / (bits_per_sample / 8) / channels;
+            earcon_buffer_.resize(num_samples);
+            if (channels == 1 && bits_per_sample == 16) {
+                // Direct read for mono 16-bit
+                file.read(reinterpret_cast<char*>(earcon_buffer_.data()), chunk_size);
+            } else if (channels == 2 && bits_per_sample == 16) {
+                // Downmix stereo to mono
+                std::vector<int16_t> stereo(num_samples * 2);
+                file.read(reinterpret_cast<char*>(stereo.data()), chunk_size);
+                for (size_t i = 0; i < num_samples; ++i) {
+                    earcon_buffer_[i] = static_cast<int16_t>(
+                        (static_cast<int32_t>(stereo[i * 2]) + stereo[i * 2 + 1]) / 2);
+                }
+            } else {
+                // Unsupported format
+                earcon_buffer_.clear();
+                return false;
+            }
+            break;
+        } else {
+            file.seekg(chunk_size, std::ios::cur);
+        }
+    }
+
+    return !earcon_buffer_.empty() && sample_rate_ > 0;
 }
 
 // =============================================================================
@@ -95,34 +116,24 @@ void WaitingChime::generate_chime() {
 // =============================================================================
 
 void WaitingChime::start() {
-    // Already playing - nothing to do
-    if (playing_.load()) {
-        return;
-    }
+    if (playing_.load() || !loaded_) return;
 
-    // If a previous thread is still joinable (shouldn't happen, but be safe)
-    if (loop_thread_.joinable()) {
-        loop_thread_.join();
+    if (repeat_thread_.joinable()) {
+        repeat_thread_.join();
     }
 
     playing_.store(true);
-    loop_thread_ = std::thread(&WaitingChime::loop_playback, this);
-
-    std::cout << "[WaitingChime] Started waiting chime loop\n";
+    repeat_thread_ = std::thread(&WaitingChime::repeat_loop, this);
 }
 
 void WaitingChime::stop() {
-    if (!playing_.load()) {
-        return;
-    }
+    if (!playing_.load()) return;
 
     playing_.store(false);
 
-    if (loop_thread_.joinable()) {
-        loop_thread_.join();
+    if (repeat_thread_.joinable()) {
+        repeat_thread_.join();
     }
-
-    std::cout << "[WaitingChime] Stopped\n";
 }
 
 bool WaitingChime::is_playing() const {
@@ -130,26 +141,41 @@ bool WaitingChime::is_playing() const {
 }
 
 // =============================================================================
-// Background Loop
+// Playback
 // =============================================================================
 
-void WaitingChime::loop_playback() {
-    if (chime_buffer_.empty() || !play_audio_) {
-        playing_.store(false);
-        return;
+void WaitingChime::play_earcon() {
+    if (!play_audio_ || earcon_buffer_.empty()) return;
+
+    // Play in small chunks so we can check the stop flag between chunks
+    size_t offset = 0;
+    while (offset < earcon_buffer_.size() && playing_.load()) {
+        size_t remaining = earcon_buffer_.size() - offset;
+        size_t chunk = std::min(remaining, PLAYBACK_CHUNK_SAMPLES);
+        play_audio_(earcon_buffer_.data() + offset, chunk, sample_rate_);
+        offset += chunk;
     }
+}
 
+void WaitingChime::repeat_loop() {
+    // Play once immediately
+    play_earcon();
+
+    // Then repeat every REPEAT_INTERVAL_MS
     while (playing_.load()) {
-        // Play the buffer in small chunks for low-latency interruption
-        size_t offset = 0;
-        while (offset < chime_buffer_.size() && playing_.load()) {
-            const size_t remaining = chime_buffer_.size() - offset;
-            const size_t chunk = std::min(remaining, PLAYBACK_CHUNK_SAMPLES);
-
-            play_audio_(chime_buffer_.data() + offset, chunk, config_.sample_rate);
-            offset += chunk;
+        // Wait in small increments so stop() is responsive
+        auto wait_start = std::chrono::steady_clock::now();
+        while (playing_.load()) {
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - wait_start
+            ).count();
+            if (elapsed >= REPEAT_INTERVAL_MS) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
-        // Loop back to start (if still playing)
+
+        if (!playing_.load()) break;
+
+        play_earcon();
     }
 }
 

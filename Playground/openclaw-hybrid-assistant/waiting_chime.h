@@ -1,38 +1,25 @@
 #pragma once
 
 // =============================================================================
-// Waiting Chime - Gentle audio feedback while waiting for OpenClaw response
+// Waiting Chime - Earcon feedback while waiting for OpenClaw response
 // =============================================================================
-// Generates a warm, soothing chime tone programmatically and loops it
-// while the user waits for OpenClaw to process their request.
+// Loads a short WAV earcon file and plays it:
+//   - Once immediately when start() is called
+//   - Then every 5 seconds as a gentle reminder the agent is still working
+//   - Stops instantly when stop() is called (response arrived)
 //
-// No external audio files needed - tone is generated at construction time.
-// Playback runs on a background thread with low-latency interruption (~50ms).
+// If the WAV file is missing, all operations are silent no-ops.
 // =============================================================================
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <functional>
+#include <string>
 #include <thread>
 #include <vector>
 
 namespace openclaw {
-
-// =============================================================================
-// Configuration
-// =============================================================================
-
-struct WaitingChimeConfig {
-    int sample_rate = 22050;          // Match TTS playback sample rate
-    float volume = 0.20f;             // Subtle (20% of max, 0.0 - 1.0)
-    float frequency_hz = 523.25f;     // C5 - warm, pleasant fundamental
-    int tone_duration_ms = 1500;      // Duration of the chime tone
-    int silence_duration_ms = 1000;   // Silence gap between loop iterations
-    int fade_in_ms = 50;              // Smooth fade-in to avoid clicks
-    int fade_out_ms = 500;            // Long fade-out for a breathing feel
-    float harmonic_2nd = 0.40f;       // 2nd harmonic amplitude (body)
-    float harmonic_3rd = 0.15f;       // 3rd harmonic amplitude (warmth)
-};
 
 // Audio output callback: (samples, num_samples, sample_rate)
 using AudioOutputCallback = std::function<void(const int16_t*, size_t, int)>;
@@ -43,40 +30,43 @@ using AudioOutputCallback = std::function<void(const int16_t*, size_t, int)>;
 
 class WaitingChime {
 public:
-    WaitingChime(const WaitingChimeConfig& config, AudioOutputCallback play_audio);
+    // Load earcon WAV from file path. Silent no-op if file doesn't exist.
+    WaitingChime(const std::string& wav_path, AudioOutputCallback play_audio);
     ~WaitingChime();
 
     // Non-copyable
     WaitingChime(const WaitingChime&) = delete;
     WaitingChime& operator=(const WaitingChime&) = delete;
 
-    // Start looping the chime (non-blocking, spawns background thread)
+    // Play earcon once immediately, then repeat every 5 seconds.
     // Safe to call if already playing (no-op).
     void start();
 
-    // Stop the chime immediately (thread-safe, blocks until thread joins)
+    // Stop immediately (thread-safe).
     // Safe to call if not playing (no-op).
     void stop();
 
-    // Check if currently playing
+    // Check if currently active
     bool is_playing() const;
 
 private:
-    WaitingChimeConfig config_;
     AudioOutputCallback play_audio_;
 
-    // Pre-generated PCM buffer (tone + trailing silence)
-    std::vector<int16_t> chime_buffer_;
+    // Loaded WAV PCM data
+    std::vector<int16_t> earcon_buffer_;
+    int sample_rate_ = 0;
+    bool loaded_ = false;
 
-    // Playback thread
-    std::thread loop_thread_;
+    // Repeat thread
+    std::thread repeat_thread_;
     std::atomic<bool> playing_{false};
 
-    // Tone generation (called once in constructor)
-    void generate_chime();
+    static constexpr int REPEAT_INTERVAL_MS = 5000;  // 5 seconds between plays
+    static constexpr size_t PLAYBACK_CHUNK_SAMPLES = 1024;  // For interruptible playback
 
-    // Background thread function
-    void loop_playback();
+    bool load_wav(const std::string& path);
+    void play_earcon();          // Play the buffer once (interruptible)
+    void repeat_loop();          // Thread: play, wait 5s, play, wait 5s, ...
 };
 
 } // namespace openclaw

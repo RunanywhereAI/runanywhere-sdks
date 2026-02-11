@@ -66,15 +66,16 @@ A lightweight voice assistant that acts as a **channel** for OpenClaw. No local 
 - Alternative: Kokoro TTS v0.19 available with `--kokoro` download flag (11 speakers, 24kHz, ~330MB)
 - **Text Sanitization**: Automatically removes emojis, markdown, and special characters before synthesis
 
-### 5. Waiting Feedback (UX Enhancement)
-Provides a gentle audio chime loop while waiting for OpenClaw to process the user's request:
+### 5. Waiting Feedback (Earcon)
+Plays a brief, pleasant earcon sound while waiting for OpenClaw to process the user's request:
 
-- **Programmatically generated** warm chime tone (C5 / 523 Hz with harmonics) - no external audio files needed
-- **Immediate start**: Begins looping right after the transcription is sent to OpenClaw
-- **Low-latency stop**: Chime stops within ~50ms when the response arrives
-- **Unobtrusive**: Plays at 20% volume with smooth fade-in/out and 1-second silence gaps between loops
+- **Professional earcon**: Generated via `sox` pluck synthesis (sounds like a real glockenspiel chime)
+- **Immediate acknowledgment**: Plays once right after the transcription is sent
+- **Periodic reminder**: Repeats every 5 seconds so the user knows the agent is still working
+- **Instant stop**: Earcon stops within ~50ms when the response arrives
+- **Graceful fallback**: If the earcon WAV is missing, waiting is silent (no crash)
 
-This ensures the user always knows the assistant heard them and is working on their request.
+Generated automatically by `./scripts/download-models.sh` (requires `sox`).
 
 ## OpenClaw WebSocket Protocol
 

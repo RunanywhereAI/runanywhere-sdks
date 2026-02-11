@@ -299,6 +299,44 @@ else
 fi
 
 # =============================================================================
+# Earcon (acknowledgment sound for waiting feedback)
+# =============================================================================
+
+EARCON_DIR="${MODEL_DIR}/ONNX/earcon"
+mkdir -p "${EARCON_DIR}"
+EARCON_FILE="${EARCON_DIR}/acknowledgment.wav"
+
+if [ -f "${EARCON_FILE}" ]; then
+    print_success "Earcon already generated"
+else
+    print_step "Generating acknowledgment earcon..."
+    if command -v sox &> /dev/null; then
+        # Two-note ascending pluck chime (C5 + E5) - sounds like a real glockenspiel
+        sox -n -r 22050 -c 1 -b 16 "${EARCON_FILE}" \
+            synth 0.4 pluck C5 fade l 0 0.4 0.3 : \
+            synth 0.4 pluck E5 fade l 0 0.4 0.3 \
+            norm -3 2>/dev/null
+        if [ -f "${EARCON_FILE}" ]; then
+            print_success "Earcon generated ($(ls -lh "${EARCON_FILE}" | awk '{print $5}'))"
+        else
+            echo -e "${YELLOW}  sox command failed, trying simpler syntax...${NC}"
+            # Fallback: single pluck note
+            sox -n -r 22050 -c 1 -b 16 "${EARCON_FILE}" \
+                synth 0.5 pluck C5 fade l 0 0.5 0.4 norm -3 2>/dev/null || true
+            if [ -f "${EARCON_FILE}" ]; then
+                print_success "Earcon generated (single note fallback)"
+            else
+                echo -e "${YELLOW}  Could not generate earcon - waiting feedback will be silent${NC}"
+            fi
+        fi
+    else
+        echo -e "${YELLOW}  sox not installed - skipping earcon generation${NC}"
+        echo "  Install with: sudo apt-get install sox"
+        echo "  Waiting feedback will be silent until earcon is generated"
+    fi
+fi
+
+# =============================================================================
 # Summary
 # =============================================================================
 
