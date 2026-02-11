@@ -780,7 +780,7 @@ private fun STTModelButton(
                     )
                     Text(
                         text = if (mode == STTMode.LIVE) "Streaming" else "Batch",
-                        style = AppTypography.caption2.copy(fontSize = 10.sp, fontWeight = FontWeight.Medium),
+                        style = AppTypography.system10.copy(fontWeight = FontWeight.Medium),
                         color = if (mode == STTMode.LIVE) AppColors.primaryGreen else AppColors.primaryOrange,
                     )
                 }
