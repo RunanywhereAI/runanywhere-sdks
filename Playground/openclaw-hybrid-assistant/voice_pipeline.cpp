@@ -45,11 +45,6 @@ static constexpr double WAKE_WORD_TIMEOUT_SEC = 10.0;
 // to prevent the tail end of "Hey Jarvis" audio from re-triggering
 static constexpr int WAKEWORD_COOLDOWN_MS = 1000;
 
-// Pre-roll ring buffer size: audio lookback preserved when wake word fires.
-// Captures the first words spoken after "Hey Jarvis" that would otherwise be
-// lost during the wake word detection → VAD activation transition.
-static constexpr size_t PREROLL_SAMPLES = 6400;  // 400ms at 16kHz
-
 // =============================================================================
 // Text Sanitization for TTS
 // =============================================================================
@@ -373,16 +368,6 @@ struct VoicePipeline::Impl {
     std::chrono::steady_clock::time_point wakeword_activation_time;
     std::chrono::steady_clock::time_point wakeword_cooldown_until;  // Ignore detections until this time
 
-    // Pre-roll ring buffer: continuously stores audio during WAITING_FOR_WAKE_WORD
-    // so the first words after "Hey Jarvis" aren't lost during detection latency
-    std::vector<int16_t> preroll_buffer;
-    size_t preroll_write_pos = 0;
-    bool preroll_full = false;
-
-    // Deferred barge-in flag: set by process_wakeword, handled by process_audio
-    // after the mutex is properly released via unique_lock
-    bool bargein_requested = false;
-
     // Speech state
     bool speech_active = false;
     std::vector<int16_t> speech_buffer;
@@ -640,10 +625,6 @@ void VoicePipeline::start() {
     impl_->consecutive_speech_frames = 0;
     impl_->consecutive_silent_frames = 0;
     impl_->current_burst_frames = 0;
-    impl_->preroll_buffer.assign(PREROLL_SAMPLES, 0);
-    impl_->preroll_write_pos = 0;
-    impl_->preroll_full = false;
-    impl_->bargein_requested = false;
 
     if (impl_->wakeword_enabled) {
         state_ = PipelineState::WAITING_FOR_WAKE_WORD;
@@ -661,9 +642,6 @@ void VoicePipeline::stop() {
     impl_->consecutive_speech_frames = 0;
     impl_->consecutive_silent_frames = 0;
     impl_->current_burst_frames = 0;
-    impl_->preroll_write_pos = 0;
-    impl_->preroll_full = false;
-    impl_->bargein_requested = false;
 }
 
 bool VoicePipeline::is_running() const {
@@ -680,11 +658,23 @@ bool VoicePipeline::is_ready() const {
 }
 
 void VoicePipeline::process_audio(const int16_t* samples, size_t num_samples) {
+    // Temporary diagnostic: log every 500th call to verify audio callback is firing
+    {
+        static int diag_frame = 0;
+        if (++diag_frame % 500 == 0) {
+            std::cout << "[DIAG] process_audio frame=" << diag_frame
+                      << " init=" << initialized_
+                      << " running=" << running_
+                      << " state=" << static_cast<int>(state_)
+                      << " samples=" << num_samples << "\n" << std::flush;
+        }
+    }
+
     if (!initialized_ || !running_) {
         return;
     }
 
-    std::unique_lock<std::mutex> lock(impl_->mutex);
+    std::lock_guard<std::mutex> lock(impl_->mutex);
 
     // During TTS playback: ONLY run wake word detection for barge-in.
     // Skip VAD/STT to prevent echo feedback (mic picking up speaker output).
@@ -698,17 +688,6 @@ void VoicePipeline::process_audio(const int16_t* samples, size_t num_samples) {
                 raw[i] = static_cast<float>(samples[i]);
             }
             process_wakeword(raw.data(), num_samples);
-
-            // Handle deferred barge-in: process_wakeword sets the flag,
-            // we handle cancellation here with proper mutex release
-            if (impl_->bargein_requested) {
-                impl_->bargein_requested = false;
-                lock.unlock();
-                cancel_speech();
-                if (config_.on_speech_interrupted) {
-                    config_.on_speech_interrupted();
-                }
-            }
         }
         return;
     }
@@ -728,14 +707,6 @@ void VoicePipeline::process_audio(const int16_t* samples, size_t num_samples) {
 
     // Stage 1: Wake Word Detection (if enabled and not activated)
     if (impl_->wakeword_enabled && !impl_->wakeword_activated) {
-        // Feed pre-roll ring buffer: continuously store raw audio so that when
-        // wake word fires, we can recover the first words of the user's command
-        for (size_t i = 0; i < num_samples; ++i) {
-            impl_->preroll_buffer[impl_->preroll_write_pos] = samples[i];
-            impl_->preroll_write_pos = (impl_->preroll_write_pos + 1) % PREROLL_SAMPLES;
-            if (impl_->preroll_write_pos == 0) impl_->preroll_full = true;
-        }
-
         process_wakeword(float_samples_raw.data(), num_samples);  // Use raw (unnormalized) for openWakeWord
         return;  // Don't process further until wake word detected
     }
@@ -791,46 +762,37 @@ void VoicePipeline::process_wakeword(const float* samples, size_t num_samples) {
         &confidence
     );
 
-    if (config_.debug_wakeword && confidence > 0.1f) {
-        std::cout << "[WakeWord] Confidence: " << confidence << "\n";
+    if (config_.debug_wakeword) {
+        static int ww_frame = 0;
+        if (++ww_frame % 100 == 0 || confidence > 0.05f) {
+            std::cout << "[WakeWord] frame=" << ww_frame << " confidence=" << confidence << "\n";
+        }
     }
 
     if (result == RAC_SUCCESS && detected_index >= 0) {
         // Wake word detected!
         bool was_bargein = (state_ == PipelineState::SPEAKING);
 
-        // Barge-in: if TTS is currently playing, defer cancellation to process_audio
-        // where the mutex can be properly released via unique_lock.
-        // Direct unlock/relock here was unsafe (double-unlock with lock_guard).
+        // Barge-in: if TTS is currently playing, cancel it immediately
         if (was_bargein) {
             std::cout << "[WakeWord] Barge-in! Cancelling TTS playback...\n";
-            impl_->bargein_requested = true;
+            // cancel_speech() stops producer thread + TTSQueue consumer + clears everything
+            // Must unlock mutex before cancel_speech (it may join threads)
+            impl_->mutex.unlock();
+            cancel_speech();
+            impl_->mutex.lock();
+
+            // Fire interrupt callback so main.cpp can stop chime/cleanup
+            if (config_.on_speech_interrupted) {
+                config_.on_speech_interrupted();
+            }
         }
 
         impl_->wakeword_activated = true;
         impl_->wakeword_activation_time = std::chrono::steady_clock::now();
         impl_->wakeword_cooldown_until = impl_->wakeword_activation_time
             + std::chrono::milliseconds(WAKEWORD_COOLDOWN_MS);
-
-        // Copy pre-roll ring buffer into speech_buffer to preserve the first
-        // words spoken after "Hey Jarvis" (before wake word detection fired)
         impl_->speech_buffer.clear();
-        if (impl_->preroll_full) {
-            // Ring buffer wrapped: copy from write_pos→end, then start→write_pos
-            impl_->speech_buffer.insert(impl_->speech_buffer.end(),
-                impl_->preroll_buffer.begin() + impl_->preroll_write_pos,
-                impl_->preroll_buffer.end());
-            impl_->speech_buffer.insert(impl_->speech_buffer.end(),
-                impl_->preroll_buffer.begin(),
-                impl_->preroll_buffer.begin() + impl_->preroll_write_pos);
-        } else if (impl_->preroll_write_pos > 0) {
-            // Ring buffer not full: copy start→write_pos
-            impl_->speech_buffer.insert(impl_->speech_buffer.end(),
-                impl_->preroll_buffer.begin(),
-                impl_->preroll_buffer.begin() + impl_->preroll_write_pos);
-        }
-        impl_->preroll_write_pos = 0;
-        impl_->preroll_full = false;
         impl_->speech_active = false;
         impl_->speech_callback_fired = false;
         impl_->consecutive_speech_frames = 0;
@@ -899,16 +861,6 @@ void VoicePipeline::process_vad(const float* samples, size_t num_samples, const 
         }
     }
 
-    // Buffer audio early: when wakeword is activated, capture ALL frames
-    // (including debounce frames that would otherwise be lost).
-    // When wake word is disabled, only buffer during active speech (same as before).
-    if (impl_->wakeword_activated || impl_->speech_active) {
-        impl_->speech_buffer.insert(
-            impl_->speech_buffer.end(),
-            raw_samples, raw_samples + num_samples
-        );
-    }
-
     if (speech_detected) {
         if (impl_->wakeword_enabled) {
             impl_->wakeword_activation_time = now;
@@ -923,8 +875,7 @@ void VoicePipeline::process_vad(const float* samples, size_t num_samples, const 
 
             // Enough consecutive speech frames — start speech session
             impl_->speech_active = true;
-            // NOTE: Don't clear speech_buffer here — it contains pre-roll audio
-            // and debounce frames that preserve the user's first words
+            impl_->speech_buffer.clear();
             impl_->speech_callback_fired = false;
             impl_->last_speech_time = now;
             impl_->speech_start_time = now;
@@ -956,8 +907,13 @@ void VoicePipeline::process_vad(const float* samples, size_t num_samples, const 
         impl_->current_burst_frames = 0;
     }
 
-    // Audio is already buffered above (early append covers both
-    // wakeword-activated and speech-active cases)
+    // Accumulate audio while speech session is active
+    if (impl_->speech_active) {
+        impl_->speech_buffer.insert(
+            impl_->speech_buffer.end(),
+            raw_samples, raw_samples + num_samples
+        );
+    }
 
     // --- End of speech detection ---
     // Two conditions can end speech:
