@@ -429,20 +429,27 @@ class ModelManagerImpl {
     this.updateModel(modelId, { status: 'loading' });
 
     try {
-      const data = await this.loadFromOPFS(modelId);
-      if (!data) {
-        throw new Error('Model not downloaded — please download the model first.');
-      }
-
-      if (model.modality === 'speechRecognition') {
-        // STT models go to the sherpa-onnx Emscripten FS (separate from RACommons)
-        await this.loadSTTModel(model, data);
-      } else if (model.modality === 'speechSynthesis') {
-        // TTS models go to the sherpa-onnx Emscripten FS
-        await this.loadTTSModel(model, data);
+      if (model.modality === 'multimodal') {
+        // VLM: Worker reads from OPFS directly — skip reading 940MB+ into main thread memory.
+        // Just verify the model file exists in OPFS.
+        const exists = await this.existsInOPFS(modelId);
+        if (!exists) {
+          throw new Error('Model not downloaded — please download the model first.');
+        }
+        await this.loadLLMModel(model, modelId, new Uint8Array(0));
       } else {
-        // LLM/VLM models go to the RACommons Emscripten FS
-        await this.loadLLMModel(model, modelId, data);
+        const data = await this.loadFromOPFS(modelId);
+        if (!data) {
+          throw new Error('Model not downloaded — please download the model first.');
+        }
+
+        if (model.modality === 'speechRecognition') {
+          await this.loadSTTModel(model, data);
+        } else if (model.modality === 'speechSynthesis') {
+          await this.loadTTSModel(model, data);
+        } else {
+          await this.loadLLMModel(model, modelId, data);
+        }
       }
 
       this.loadedByModality.set(modality, modelId);
@@ -465,76 +472,75 @@ class ModelManagerImpl {
     const fsDir = `/models`;
     const fsPath = `${fsDir}/${modelId}.gguf`;
 
-    const { WASMBridge, TextGeneration, VLM } = await import(
+    if (model.modality === 'multimodal') {
+      // VLM models are loaded in a dedicated Web Worker that reads from OPFS.
+      // No need to write model data to the main-thread Emscripten FS.
+    } else {
+      // Text-only LLM: write to main-thread Emscripten FS as before
+      const { WASMBridge } = await import(
+        '../../../../../sdk/runanywhere-web/packages/core/src/index'
+      );
+
+      const bridge = WASMBridge.shared;
+      if (!bridge.isLoaded) {
+        throw new Error('WASM module not loaded — SDK not initialized.');
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const m = bridge.module as any;
+
+      if (typeof m.FS_createPath !== 'function' || typeof m.FS_createDataFile !== 'function') {
+        throw new Error('Emscripten FS helper functions not available on WASM module.');
+      }
+
+      m.FS_createPath('/', 'models', true, true);
+      try { m.FS_unlink(fsPath); } catch { /* File doesn't exist yet */ }
+      console.log(`[ModelManager] Writing ${data.length} bytes to ${fsPath}`);
+      m.FS_createDataFile('/models', `${modelId}.gguf`, data, true, true, true);
+      console.log(`[ModelManager] Model file written to ${fsPath}`);
+    }
+
+    const { TextGeneration } = await import(
       '../../../../../sdk/runanywhere-web/packages/core/src/index'
     );
 
-    const bridge = WASMBridge.shared;
-    if (!bridge.isLoaded) {
-      throw new Error('WASM module not loaded — SDK not initialized.');
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const m = bridge.module as any;
-
-    if (typeof m.FS_createPath !== 'function' || typeof m.FS_createDataFile !== 'function') {
-      throw new Error('Emscripten FS helper functions not available on WASM module.');
-    }
-
-    // Ensure /models directory exists in Emscripten's virtual FS
-    m.FS_createPath('/', 'models', true, true);
-
-    // Remove existing file if present (FS_createDataFile throws if file exists)
-    try {
-      m.FS_unlink(fsPath);
-    } catch {
-      // File doesn't exist yet -- that's fine
-    }
-
-    // Write the model bytes into Emscripten FS
-    console.log(`[ModelManager] Writing ${data.length} bytes to ${fsPath}`);
-    m.FS_createDataFile('/models', `${modelId}.gguf`, data, true, true, true);
-    console.log(`[ModelManager] Model file written to ${fsPath}`);
-
     if (model.modality === 'multimodal') {
-      // VLM: also write the mmproj file to Emscripten FS, then load via VLM extension
-      let mmprojFsPath: string | null = null;
-
+      // VLM: load in a dedicated Web Worker so inference doesn't block the UI.
+      // The Worker reads model files directly from OPFS (zero-copy, no transfer).
       const mmprojFile = model.additionalFiles?.find((f) => f.filename.includes('mmproj'));
-      if (mmprojFile) {
+      if (!mmprojFile) {
+        console.warn(`[ModelManager] No mmproj found, loading as text-only LLM: ${modelId}`);
+        await TextGeneration.loadModel(fsPath, modelId, model.name);
+      } else {
+        // Ensure mmproj is in OPFS (fallback download if missing)
         const mmprojKey = this.additionalFileKey(modelId, mmprojFile.filename);
-        let mmprojData = await this.loadFromOPFS(mmprojKey);
-
-        // Fallback: re-download mmproj if not found in OPFS (handles migration
-        // from old nested-key format where store silently failed).
-        if (!mmprojData && mmprojFile.url) {
+        const mmprojExists = await this.existsInOPFS(mmprojKey);
+        if (!mmprojExists && mmprojFile.url) {
           console.log(`[ModelManager] mmproj not in OPFS, downloading on-demand: ${mmprojFile.filename}`);
-          mmprojData = await this.downloadFile(mmprojFile.url);
+          const mmprojData = await this.downloadFile(mmprojFile.url);
           await this.storeInOPFS(mmprojKey, mmprojData);
         }
 
-        if (mmprojData) {
-          mmprojFsPath = `${fsDir}/${mmprojFile.filename}`;
-          try {
-            m.FS_unlink(mmprojFsPath);
-          } catch {
-            // File doesn't exist yet
-          }
-          console.log(`[ModelManager] Writing mmproj ${mmprojData.length} bytes to ${mmprojFsPath}`);
-          m.FS_createDataFile('/models', mmprojFile.filename, mmprojData, true, true, true);
-          console.log(`[ModelManager] mmproj file written to ${mmprojFsPath}`);
-        } else {
-          console.warn(`[ModelManager] mmproj file not found in OPFS for ${modelId}`);
-        }
-      }
+        const { VLMWorkerBridge } = await import('./vlm-worker-bridge');
+        const workerBridge = VLMWorkerBridge.shared;
 
-      if (mmprojFsPath) {
-        await VLM.loadModel(fsPath, mmprojFsPath, modelId, model.name);
-        console.log(`[ModelManager] VLM model loaded: ${modelId}`);
-      } else {
-        // Fallback: load as text-only LLM if mmproj is missing
-        console.warn(`[ModelManager] No mmproj found, loading as text-only LLM: ${modelId}`);
-        await TextGeneration.loadModel(fsPath, modelId, model.name);
+        // Initialize the Worker (loads its own WASM instance)
+        if (!workerBridge.isInitialized) {
+          console.log('[ModelManager] Initializing VLM Worker...');
+          await workerBridge.init();
+        }
+
+        // Load model in the Worker (reads from OPFS internally)
+        console.log(`[ModelManager] Loading VLM model in Worker: ${modelId}`);
+        await workerBridge.loadModel({
+          modelOpfsKey: modelId,
+          modelFilename: `${modelId}.gguf`,
+          mmprojOpfsKey: mmprojKey,
+          mmprojFilename: mmprojFile.filename,
+          modelId,
+          modelName: model.name,
+        });
+        console.log(`[ModelManager] VLM model loaded in Worker: ${modelId}`);
       }
     } else if (model.modality === 'text') {
       await TextGeneration.loadModel(fsPath, modelId, model.name);
@@ -786,6 +792,9 @@ class ModelManagerImpl {
           '../../../../../sdk/runanywhere-web/packages/core/src/index'
         );
         await TTS.unloadVoice();
+      } else if (modality === 'multimodal') {
+        const { VLMWorkerBridge } = await import('./vlm-worker-bridge');
+        await VLMWorkerBridge.shared.unloadModel();
       } else {
         const { TextGeneration } = await import(
           '../../../../../sdk/runanywhere-web/packages/core/src/index'
@@ -871,6 +880,18 @@ class ModelManagerImpl {
 
   private async getOPFSRoot(): Promise<FileSystemDirectoryHandle> {
     return navigator.storage.getDirectory();
+  }
+
+  /** Quick existence check without reading the full file into memory. */
+  private async existsInOPFS(key: string): Promise<boolean> {
+    try {
+      const root = await this.getOPFSRoot();
+      const modelsDir = await root.getDirectoryHandle('models');
+      await modelsDir.getFileHandle(key);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private async storeInOPFS(key: string, data: Uint8Array): Promise<void> {
