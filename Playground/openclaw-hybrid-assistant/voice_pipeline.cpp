@@ -198,18 +198,38 @@ static std::string convert_symbol_to_spoken(char c, char prev, char next, bool h
 static std::string sanitize_text_for_tts(const std::string& input) {
     if (input.empty()) return input;
 
+    // Pre-process: handle literal \n sequences (backslash + n) from JSON.
+    // OpenClaw sends "\n" as a literal two-char sequence, which the character-level
+    // sanitizer below would strip the backslash and keep the 'n', producing "nn".
+    std::string preprocessed;
+    preprocessed.reserve(input.size());
+    for (size_t j = 0; j < input.size(); ++j) {
+        if (input[j] == '\\' && j + 1 < input.size()) {
+            char next = input[j + 1];
+            if (next == 'n' || next == 'r' || next == 't') {
+                // Replace \n, \r, \t with space (collapse multiple into one)
+                if (!preprocessed.empty() && preprocessed.back() != ' ') {
+                    preprocessed += ' ';
+                }
+                ++j;  // skip the escaped character
+                continue;
+            }
+        }
+        preprocessed += input[j];
+    }
+
     std::string result;
-    result.reserve(input.size() * 1.2);  // May expand slightly due to word replacements
+    result.reserve(preprocessed.size() * 1.2);  // May expand slightly due to word replacements
 
     size_t i = 0;
-    while (i < input.size()) {
-        unsigned char c = static_cast<unsigned char>(input[i]);
+    while (i < preprocessed.size()) {
+        unsigned char c = static_cast<unsigned char>(preprocessed[i]);
 
         // --- Handle multi-byte UTF-8 sequences ---
         size_t utf8_len = get_utf8_length(c);
         if (utf8_len > 1) {
             // Check if it's an emoji or symbol to skip
-            if (is_emoji_or_symbol(input, i, utf8_len)) {
+            if (is_emoji_or_symbol(preprocessed, i, utf8_len)) {
                 // Skip the entire sequence, optionally add space to maintain word boundaries
                 if (!result.empty() && result.back() != ' ') {
                     result += ' ';
@@ -218,8 +238,8 @@ static std::string sanitize_text_for_tts(const std::string& input) {
                 continue;
             }
             // Keep valid UTF-8 text (international characters)
-            for (size_t j = 0; j < utf8_len && i + j < input.size(); ++j) {
-                result += input[i + j];
+            for (size_t j = 0; j < utf8_len && i + j < preprocessed.size(); ++j) {
+                result += preprocessed[i + j];
             }
             i += utf8_len;
             continue;
@@ -279,15 +299,15 @@ static std::string sanitize_text_for_tts(const std::string& input) {
         }
 
         // Special symbols: Convert or remove
-        char prev_char = (i > 0) ? input[i - 1] : '\0';
-        char next_char = (i + 1 < input.size()) ? input[i + 1] : '\0';
+        char prev_char = (i > 0) ? preprocessed[i - 1] : '\0';
+        char next_char = (i + 1 < preprocessed.size()) ? preprocessed[i + 1] : '\0';
 
         std::string replacement = convert_symbol_to_spoken(
             static_cast<char>(c),
             prev_char,
             next_char,
             i > 0,
-            i + 1 < input.size()
+            i + 1 < preprocessed.size()
         );
 
         if (!replacement.empty()) {
@@ -369,12 +389,34 @@ struct VoicePipeline::Impl {
 // =============================================================================
 
 struct VoicePipeline::AsyncTTSState {
-    std::unique_ptr<TTSQueue> queue;
+    // shared_ptr so detached producer thread can hold a safe reference to both
+    std::shared_ptr<TTSQueue> queue;
+    std::shared_ptr<std::atomic<bool>> cancelled = std::make_shared<std::atomic<bool>>(false);
     std::thread producer_thread;
-    std::atomic<bool> cancelled{false};
 
-    void cleanup() {
-        cancelled.store(true);
+    // Fast cleanup for barge-in: detaches producer so we don't block.
+    // The producer holds shared_ptrs to queue and cancelled, keeping them alive.
+    void cleanup_fast() {
+        cancelled->store(true);
+        if (queue) {
+            queue->cancel();  // Signals consumer to stop; play_cancellable checks flag every ~46ms
+        }
+        // Detach the producer thread instead of blocking on join().
+        // The producer checks cancelled between sentences and exits on its own
+        // after the current rac_voice_agent_synthesize_speech call finishes.
+        if (producer_thread.joinable()) {
+            producer_thread.detach();
+        }
+        // Release our reference. The detached producer holds its own shared_ptrs.
+        queue.reset();
+        // Create a fresh cancelled flag for the next speak_text_async() call.
+        cancelled = std::make_shared<std::atomic<bool>>(false);
+    }
+
+    // Blocking cleanup for destruction: must join because the producer accesses
+    // voice_agent which is about to be destroyed.
+    void cleanup_blocking() {
+        cancelled->store(true);
         if (queue) {
             queue->cancel();
         }
@@ -382,11 +424,10 @@ struct VoicePipeline::AsyncTTSState {
             producer_thread.join();
         }
         queue.reset();
-        cancelled.store(false);
     }
 
     ~AsyncTTSState() {
-        cleanup();
+        cleanup_blocking();
     }
 };
 
@@ -402,7 +443,11 @@ VoicePipeline::VoicePipeline(const VoicePipelineConfig& config)
 }
 
 VoicePipeline::~VoicePipeline() {
-    cancel_speech();
+    // Use blocking cleanup (join) to ensure the producer thread exits
+    // before we destroy voice_agent and other resources it uses.
+    if (async_tts_) {
+        async_tts_->cleanup_blocking();
+    }
     stop();
 
     if (impl_->silero_vad) {
@@ -1153,11 +1198,14 @@ bool VoicePipeline::speak_text(const std::string& text) {
         }
 
         // Play this sentence immediately (don't wait for others)
+        // Synchronous speak_text has no cancellation, so pass a dummy flag
         if (config_.on_audio_output) {
+            static std::atomic<bool> no_cancel{false};
             config_.on_audio_output(
                 static_cast<const int16_t*>(audio_data),
                 audio_size / sizeof(int16_t),
-                tts_sample_rate
+                tts_sample_rate,
+                no_cancel
             );
         }
 
@@ -1213,18 +1261,22 @@ void VoicePipeline::speak_text_async(const std::string& text) {
     state_ = PipelineState::SPEAKING;
 
     // Create queue - consumer thread starts immediately, waits for first chunk
-    async_tts_->queue = std::make_unique<TTSQueue>(config_.on_audio_output);
-    async_tts_->cancelled.store(false);
+    async_tts_->queue = std::make_shared<TTSQueue>(config_.on_audio_output);
+    async_tts_->cancelled->store(false);
 
-    // Spawn producer: synthesize each sentence, push audio into queue
+    // Capture shared_ptrs to the queue and cancelled flag.
+    // Both stay alive even if cleanup() detaches this thread and resets async_tts_.
+    auto queue_ref = async_tts_->queue;
+    auto cancelled_ref = async_tts_->cancelled;
     auto voice_agent = impl_->voice_agent;
     bool wakeword_enabled = impl_->wakeword_enabled;
 
-    async_tts_->producer_thread = std::thread([this, voice_agent, sentences, wakeword_enabled]() {
+    async_tts_->producer_thread = std::thread([this, voice_agent, sentences, wakeword_enabled,
+                                                queue_ref, cancelled_ref]() {
         int tts_sample_rate = 22050;  // Piper Lessac
 
         for (size_t i = 0; i < sentences.size(); ++i) {
-            if (async_tts_->cancelled.load()) break;
+            if (cancelled_ref->load()) break;
 
             const auto& sentence = sentences[i];
             if (sentence.empty()) continue;
@@ -1253,25 +1305,23 @@ void VoicePipeline::speak_text_async(const std::string& text) {
             chunk.sample_rate = tts_sample_rate;
             free(audio_data);
 
-            if (!async_tts_->cancelled.load() && async_tts_->queue) {
-                async_tts_->queue->push(std::move(chunk));
+            if (!cancelled_ref->load()) {
+                queue_ref->push(std::move(chunk));
             }
         }
 
         // Tell consumer there's nothing more coming
-        if (async_tts_->queue) {
-            async_tts_->queue->finish();
-        }
+        queue_ref->finish();
 
         // Wait for consumer to finish playing, then cooldown + state transition
         // (This runs on the producer thread so it doesn't block main)
-        if (async_tts_->queue && !async_tts_->cancelled.load()) {
-            while (async_tts_->queue->is_active() && !async_tts_->cancelled.load()) {
+        if (!cancelled_ref->load()) {
+            while (queue_ref->is_active() && !cancelled_ref->load()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
             }
         }
 
-        if (!async_tts_->cancelled.load()) {
+        if (!cancelled_ref->load()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(TTS_COOLDOWN_MS));
             state_ = wakeword_enabled ? PipelineState::WAITING_FOR_WAKE_WORD : PipelineState::LISTENING;
             std::cout << "[TTS-Async] Playback complete\n";
@@ -1281,7 +1331,19 @@ void VoicePipeline::speak_text_async(const std::string& text) {
 
 void VoicePipeline::cancel_speech() {
     if (!async_tts_) return;
-    async_tts_->cleanup();
+
+    // Force-stop ALSA immediately (snd_pcm_drop) for instant silence
+    if (config_.on_audio_stop) {
+        config_.on_audio_stop();
+    }
+
+    // Fast cleanup: detach producer (don't block waiting for synthesis to finish)
+    async_tts_->cleanup_fast();
+
+    // Clear stale speak messages that may still be in the queue
+    if (config_.on_cancel_pending_responses) {
+        config_.on_cancel_pending_responses();
+    }
 
     if (initialized_ && state_ == PipelineState::SPEAKING) {
         state_ = impl_->wakeword_enabled ? PipelineState::WAITING_FOR_WAKE_WORD : PipelineState::LISTENING;

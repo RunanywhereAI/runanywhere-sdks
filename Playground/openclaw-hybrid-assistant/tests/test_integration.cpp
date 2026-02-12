@@ -536,7 +536,7 @@ TestResult test_tts_queue_parallel_playback() {
     std::vector<ChunkArrival> arrivals;
     size_t total_played_samples = 0;
 
-    auto play_audio = [&](const int16_t*, size_t num_samples, int) {
+    auto play_audio = [&](const int16_t*, size_t num_samples, int, const std::atomic<bool>&) {
         std::lock_guard<std::mutex> lock(arrivals_mutex);
         arrivals.push_back({std::chrono::steady_clock::now(), num_samples});
         total_played_samples += num_samples;
@@ -654,7 +654,7 @@ TestResult test_tts_queue_cancel() {
 
     std::atomic<size_t> play_count{0};
 
-    auto play_audio = [&](const int16_t*, size_t, int) {
+    auto play_audio = [&](const int16_t*, size_t, int, const std::atomic<bool>&) {
         play_count.fetch_add(1);
         // Simulate slow playback so cancel has something to cancel
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -723,7 +723,7 @@ TestResult test_tts_queue_push_while_playing() {
 
     std::atomic<size_t> play_count{0};
 
-    auto play_audio = [&](const int16_t*, size_t, int) {
+    auto play_audio = [&](const int16_t*, size_t, int, const std::atomic<bool>&) {
         play_count.fetch_add(1);
         // Simulate 200ms of ALSA playback per chunk
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
@@ -800,7 +800,7 @@ TestResult test_tts_queue_cancel_during_playback() {
     std::atomic<size_t> play_count{0};
     std::atomic<size_t> total_samples_played{0};
 
-    auto play_audio = [&](const int16_t*, size_t num_samples, int) {
+    auto play_audio = [&](const int16_t*, size_t num_samples, int, const std::atomic<bool>&) {
         play_count.fetch_add(1);
         total_samples_played.fetch_add(num_samples);
         // Simulate realistic ALSA playback: ~200ms per sentence chunk
@@ -881,7 +881,7 @@ TestResult test_tts_queue_cancel_during_synthesis() {
     std::atomic<size_t> synth_count{0};
     std::atomic<bool> cancelled{false};
 
-    auto play_audio = [&](const int16_t*, size_t, int) {
+    auto play_audio = [&](const int16_t*, size_t, int, const std::atomic<bool>&) {
         play_count.fetch_add(1);
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     };
@@ -976,7 +976,7 @@ TestResult test_bargein_cancel_chain() {
     AudioCapture tts_capture;
 
     openclaw::VoicePipelineConfig config;
-    config.on_audio_output = [&tts_capture](const int16_t* samples, size_t n, int sr) {
+    config.on_audio_output = [&tts_capture](const int16_t* samples, size_t n, int sr, const std::atomic<bool>&) {
         tts_capture.on_audio(samples, n, sr);
     };
     config.on_error = [](const std::string& err) {
@@ -1083,7 +1083,7 @@ TestResult test_bargein_rapid_restart() {
     AudioCapture capture;
 
     openclaw::VoicePipelineConfig config;
-    config.on_audio_output = [&capture](const int16_t* samples, size_t n, int sr) {
+    config.on_audio_output = [&capture](const int16_t* samples, size_t n, int sr, const std::atomic<bool>&) {
         capture.on_audio(samples, n, sr);
     };
     config.on_error = [](const std::string& err) {
@@ -1212,7 +1212,7 @@ TestResult test_wakeword_single_detection() {
         wakeword_count++;
         std::cout << "  [Test] Wake word #" << wakeword_count << " (conf=" << conf << ")\n";
     };
-    config.on_audio_output = [](const int16_t*, size_t, int) {};
+    config.on_audio_output = [](const int16_t*, size_t, int, const std::atomic<bool>&) {};
     config.on_error = [](const std::string& e) { std::cerr << "  [Test] Error: " << e << "\n"; };
 
     openclaw::VoicePipeline pipeline(config);
@@ -1334,7 +1334,7 @@ TestResult test_wakeword_timeout_returns_to_waiting() {
     config.min_speech_samples = 8000;
 
     config.on_wake_word = [&](const std::string&, float) { wakeword_detected = true; };
-    config.on_audio_output = [](const int16_t*, size_t, int) {};
+    config.on_audio_output = [](const int16_t*, size_t, int, const std::atomic<bool>&) {};
     config.on_error = [](const std::string&) {};
 
     openclaw::VoicePipeline pipeline(config);
@@ -1476,7 +1476,7 @@ TestResult test_bargein_wakeword_during_tts() {
 
     config.on_wake_word = [&](const std::string&, float) { wakeword_detected.store(true); };
     config.on_speech_interrupted = [&]() { speech_interrupted.store(true); };
-    config.on_audio_output = [&tts_capture](const int16_t* s, size_t n, int sr) {
+    config.on_audio_output = [&tts_capture](const int16_t* s, size_t n, int sr, const std::atomic<bool>&) {
         tts_capture.on_audio(s, n, sr);
     };
     config.on_error = [](const std::string&) {};
@@ -1877,7 +1877,7 @@ TestResult test_text_sanitization() {
     openclaw::VoicePipelineConfig pipeline_config;
 
     AudioCapture capture;
-    pipeline_config.on_audio_output = [&capture](const int16_t* samples, size_t n, int sr) {
+    pipeline_config.on_audio_output = [&capture](const int16_t* samples, size_t n, int sr, const std::atomic<bool>&) {
         capture.on_audio(samples, n, sr);
     };
     pipeline_config.on_error = [](const std::string& err) {
@@ -2008,7 +2008,7 @@ TestResult test_openclaw_flow(int response_delay_ms) {
 
     // --- Step 4: Create voice pipeline (for TTS) ---
     openclaw::VoicePipelineConfig pipeline_config;
-    pipeline_config.on_audio_output = [&tts_capture](const int16_t* samples, size_t n, int sr) {
+    pipeline_config.on_audio_output = [&tts_capture](const int16_t* samples, size_t n, int sr, const std::atomic<bool>&) {
         tts_capture.on_audio(samples, n, sr);
     };
     pipeline_config.on_error = [](const std::string& err) {

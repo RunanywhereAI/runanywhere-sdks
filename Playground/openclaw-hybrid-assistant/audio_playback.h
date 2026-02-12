@@ -7,6 +7,7 @@
 // Supports multiple sample rates for TTS output.
 // =============================================================================
 
+#include <atomic>
 #include <memory>
 #include <cstdint>
 #include <string>
@@ -65,6 +66,12 @@ public:
     // samples: 16-bit PCM audio data
     // num_samples: number of samples (not bytes)
     bool play(const int16_t* samples, size_t num_samples);
+
+    // Play audio samples with cancellation support (blocking until done or cancelled).
+    // Writes in period-sized chunks (~46ms at 22kHz), checking cancel_flag between each.
+    // When cancelled, calls snd_pcm_drop() to immediately silence the speaker.
+    bool play_cancellable(const int16_t* samples, size_t num_samples,
+                          const std::atomic<bool>& cancel_flag);
 
     // Play audio samples (non-blocking, queued)
     bool play_async(const int16_t* samples, size_t num_samples);

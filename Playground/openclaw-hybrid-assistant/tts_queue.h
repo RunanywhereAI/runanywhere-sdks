@@ -20,8 +20,11 @@
 
 namespace openclaw {
 
-// Audio output callback: (samples, num_samples, sample_rate)
-using AudioOutputFn = std::function<void(const int16_t*, size_t, int)>;
+// Audio output callback: (samples, num_samples, sample_rate, cancel_flag)
+// The cancel_flag allows the callback to check for cancellation during playback,
+// enabling immediate ALSA silence via snd_pcm_drop() instead of waiting for the
+// entire sentence to finish playing.
+using AudioOutputFn = std::function<void(const int16_t*, size_t, int, const std::atomic<bool>&)>;
 
 // A single sentence's synthesized audio
 struct AudioChunk {

@@ -75,6 +75,9 @@ public:
     // Poll for speak messages from the receive queue
     bool poll_speak_queue(SpeakMessage& out_message);
 
+    // Clear all pending speak messages (used during barge-in to discard stale responses)
+    void clear_speak_queue();
+
     // Configuration
     void set_config(const OpenClawClientConfig& config);
     const OpenClawClientConfig& config() const { return config_; }
