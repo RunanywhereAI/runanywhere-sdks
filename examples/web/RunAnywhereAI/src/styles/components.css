@@ -1049,3 +1049,66 @@ input[type="range"]::-webkit-slider-thumb {
   color: var(--text-tertiary);
   margin-top: 2px;
 }
+
+/* =============================================================================
+ * STT Mode Toggle (Batch / Live)
+ * ============================================================================= */
+.stt-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: var(--space-sm-md) var(--space-md-lg);
+  border-radius: var(--radius-regular);
+  border: 1.5px solid var(--border-light);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+.stt-mode-btn:hover { border-color: var(--border-strong); }
+.stt-mode-btn.active {
+  border-color: var(--color-blue);
+  background: rgba(59, 130, 246, 0.08);
+  color: var(--color-blue);
+}
+.stt-mode-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+/* =============================================================================
+ * STT Breathing Waveform Animation
+ * ============================================================================= */
+.stt-waveform-anim {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 60px;
+}
+.stt-wave-bar {
+  width: 6px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(180deg, var(--color-blue), rgba(59, 130, 246, 0.3));
+  animation: stt-breathe 2s ease-in-out infinite;
+}
+.stt-wave-bar:nth-child(1) { height: 20px; animation-delay: 0s; }
+.stt-wave-bar:nth-child(2) { height: 35px; animation-delay: 0.2s; }
+.stt-wave-bar:nth-child(3) { height: 45px; animation-delay: 0.4s; }
+.stt-wave-bar:nth-child(4) { height: 35px; animation-delay: 0.6s; }
+.stt-wave-bar:nth-child(5) { height: 20px; animation-delay: 0.8s; }
+
+@keyframes stt-breathe {
+  0%, 100% { transform: scaleY(0.5); opacity: 0.4; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+
+@keyframes stt-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

@@ -118,11 +118,17 @@ const REGISTERED_MODELS: Omit<ModelInfo, 'status'>[] = [
   {
     id: 'smolvlm-500m-instruct-q8_0',
     name: 'SmolVLM 500M Instruct Q8_0',
-    url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz',
+    url: 'https://huggingface.co/ggml-org/SmolVLM-500M-Instruct-GGUF/resolve/main/SmolVLM-500M-Instruct-Q8_0.gguf',
     framework: 'llamacpp',
     modality: 'multimodal',
     memoryRequirement: 600_000_000,
-    isArchive: true,
+    additionalFiles: [
+      {
+        url: 'https://huggingface.co/ggml-org/SmolVLM-500M-Instruct-GGUF/resolve/main/mmproj-SmolVLM-500M-Instruct-f16.gguf',
+        filename: 'mmproj-SmolVLM-500M-Instruct-f16.gguf',
+        sizeBytes: 199_000_000,
+      },
+    ],
   },
   {
     id: 'qwen2-vl-2b-instruct-q4_k_m',
@@ -140,42 +146,75 @@ const REGISTERED_MODELS: Omit<ModelInfo, 'status'>[] = [
   },
 
   // =========================================================================
-  // STT models (sherpa-onnx ONNX, tar.gz archive)
+  // STT models (sherpa-onnx Whisper, individual ONNX files)
   // =========================================================================
   {
     id: 'sherpa-onnx-whisper-tiny.en',
     name: 'Whisper Tiny English (ONNX)',
-    url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
+    url: 'https://huggingface.co/csukuangfj/sherpa-onnx-whisper-tiny.en/resolve/main/tiny.en-encoder.int8.onnx',
     framework: 'onnx',
     modality: 'speechRecognition',
-    memoryRequirement: 75_000_000,
-    isArchive: true,
+    memoryRequirement: 105_000_000,
+    additionalFiles: [
+      {
+        url: 'https://huggingface.co/csukuangfj/sherpa-onnx-whisper-tiny.en/resolve/main/tiny.en-decoder.int8.onnx',
+        filename: 'tiny.en-decoder.int8.onnx',
+        sizeBytes: 89_900_000,
+      },
+      {
+        url: 'https://huggingface.co/csukuangfj/sherpa-onnx-whisper-tiny.en/resolve/main/tiny.en-tokens.txt',
+        filename: 'tiny.en-tokens.txt',
+        sizeBytes: 836_000,
+      },
+    ],
   },
 
   // =========================================================================
-  // TTS models (sherpa-onnx ONNX, tar.gz archive)
+  // TTS models (sherpa-onnx Piper VITS, individual ONNX files)
   // =========================================================================
   {
     id: 'vits-piper-en_US-lessac-medium',
     name: 'Piper TTS US English (Lessac)',
-    url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz',
+    url: 'https://huggingface.co/csukuangfj/vits-piper-en_US-lessac-medium/resolve/main/en_US-lessac-medium.onnx',
     framework: 'onnx',
     modality: 'speechSynthesis',
     memoryRequirement: 65_000_000,
-    isArchive: true,
+    additionalFiles: [
+      {
+        url: 'https://huggingface.co/csukuangfj/vits-piper-en_US-lessac-medium/resolve/main/tokens.txt',
+        filename: 'tokens.txt',
+        sizeBytes: 921,
+      },
+      {
+        url: 'https://huggingface.co/csukuangfj/vits-piper-en_US-lessac-medium/resolve/main/en_US-lessac-medium.onnx.json',
+        filename: 'en_US-lessac-medium.onnx.json',
+        sizeBytes: 4_890,
+      },
+    ],
   },
   {
-    id: 'vits-piper-en_GB-alba-medium',
-    name: 'Piper TTS British English (Alba)',
-    url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz',
+    id: 'vits-piper-en_GB-vctk-medium',
+    name: 'Piper TTS British English (VCTK)',
+    url: 'https://huggingface.co/csukuangfj/vits-piper-en_GB-vctk-medium/resolve/main/en_GB-vctk-medium.onnx',
     framework: 'onnx',
     modality: 'speechSynthesis',
-    memoryRequirement: 65_000_000,
-    isArchive: true,
+    memoryRequirement: 77_000_000,
+    additionalFiles: [
+      {
+        url: 'https://huggingface.co/csukuangfj/vits-piper-en_GB-vctk-medium/resolve/main/tokens.txt',
+        filename: 'tokens.txt',
+        sizeBytes: 921,
+      },
+      {
+        url: 'https://huggingface.co/csukuangfj/vits-piper-en_GB-vctk-medium/resolve/main/en_GB-vctk-medium.onnx.json',
+        filename: 'en_GB-vctk-medium.onnx.json',
+        sizeBytes: 6_640,
+      },
+    ],
   },
 
   // =========================================================================
-  // VAD model (sherpa-onnx Silero VAD, single ONNX file)
+  // VAD model (Silero VAD, single ONNX file)
   // =========================================================================
   {
     id: 'silero-vad-v5',
@@ -198,6 +237,26 @@ class ModelManagerImpl {
 
   constructor() {
     this.models = REGISTERED_MODELS.map((m) => ({ ...m, status: 'registered' as ModelStatus }));
+    // Check OPFS for previously downloaded models (async, updates status when done)
+    this.refreshDownloadStatus();
+  }
+
+  /**
+   * Check OPFS for models that were downloaded in a previous session.
+   * Updates their status from 'registered' to 'downloaded'.
+   */
+  private async refreshDownloadStatus(): Promise<void> {
+    for (const model of this.models) {
+      if (model.status !== 'registered') continue;
+      try {
+        const data = await this.loadFromOPFS(model.id);
+        if (data && data.length > 0) {
+          this.updateModel(model.id, { status: 'downloaded', sizeBytes: data.length });
+        }
+      } catch {
+        // Not in OPFS, keep as registered
+      }
+    }
   }
 
   // --- Queries ---
@@ -316,52 +375,14 @@ class ModelManagerImpl {
         throw new Error('Model not downloaded — please download the model first.');
       }
 
-      // Determine the Emscripten FS path for this model
-      const fsDir = `/models`;
-      const fsPath = `${fsDir}/${modelId}.gguf`;
-
-      // Get the WASM module via the SDK
-      const { WASMBridge, TextGeneration } = await import(
-        '../../../../../sdk/runanywhere-web/packages/core/src/index'
-      );
-
-      const bridge = WASMBridge.shared;
-      if (!bridge.isLoaded) {
-        throw new Error('WASM module not loaded — SDK not initialized.');
+      if (model.modality === 'speechRecognition') {
+        // STT models go to the sherpa-onnx Emscripten FS (separate from RACommons)
+        await this.loadSTTModel(model, data);
+      } else {
+        // LLM/VLM models go to the RACommons Emscripten FS
+        await this.loadLLMModel(model, modelId, data);
       }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const m = bridge.module as any;
-
-      // Use Emscripten module-level FS helper functions which survive closure
-      // compiler minification (unlike m.FS.writeFile which gets mangled).
-      // FS_createPath(parent, path, canRead, canWrite) creates the directory tree.
-      // FS_createDataFile(parent, name, data, canRead, canWrite, canOwn) writes data.
-      if (typeof m.FS_createPath !== 'function' || typeof m.FS_createDataFile !== 'function') {
-        throw new Error('Emscripten FS helper functions not available on WASM module.');
-      }
-
-      // Ensure /models directory exists in Emscripten's virtual FS
-      m.FS_createPath('/', 'models', true, true);
-
-      // Remove existing file if present (FS_createDataFile throws if file exists)
-      try {
-        m.FS_unlink(fsPath);
-      } catch {
-        // File doesn't exist yet -- that's fine
-      }
-
-      // Write the model bytes into Emscripten FS
-      console.log(`[ModelManager] Writing ${data.length} bytes to ${fsPath}`);
-      m.FS_createDataFile('/models', `${modelId}.gguf`, data, true, true, true);
-      console.log(`[ModelManager] Model file written to ${fsPath}`);
-
-      if (model.modality === 'text' || model.modality === 'multimodal') {
-        // Load via the TextGeneration extension (calls rac_llm_component_load_model)
-        await TextGeneration.loadModel(fsPath, modelId, model.name);
-        console.log(`[ModelManager] LLM model loaded via TextGeneration: ${modelId}`);
-      }
-      // For other modalities (STT, TTS, VAD), the corresponding extension
+      // For other modalities (TTS, VAD), the corresponding extension
       // will handle loading when the user initiates those features.
 
       this.loadedModelId = modelId;
@@ -375,14 +396,171 @@ class ModelManagerImpl {
     }
   }
 
+  /**
+   * Load an LLM/VLM model into the RACommons Emscripten FS.
+   */
+  private async loadLLMModel(model: ModelInfo, modelId: string, data: Uint8Array): Promise<void> {
+    const fsDir = `/models`;
+    const fsPath = `${fsDir}/${modelId}.gguf`;
+
+    const { WASMBridge, TextGeneration } = await import(
+      '../../../../../sdk/runanywhere-web/packages/core/src/index'
+    );
+
+    const bridge = WASMBridge.shared;
+    if (!bridge.isLoaded) {
+      throw new Error('WASM module not loaded — SDK not initialized.');
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const m = bridge.module as any;
+
+    if (typeof m.FS_createPath !== 'function' || typeof m.FS_createDataFile !== 'function') {
+      throw new Error('Emscripten FS helper functions not available on WASM module.');
+    }
+
+    // Ensure /models directory exists in Emscripten's virtual FS
+    m.FS_createPath('/', 'models', true, true);
+
+    // Remove existing file if present (FS_createDataFile throws if file exists)
+    try {
+      m.FS_unlink(fsPath);
+    } catch {
+      // File doesn't exist yet -- that's fine
+    }
+
+    // Write the model bytes into Emscripten FS
+    console.log(`[ModelManager] Writing ${data.length} bytes to ${fsPath}`);
+    m.FS_createDataFile('/models', `${modelId}.gguf`, data, true, true, true);
+    console.log(`[ModelManager] Model file written to ${fsPath}`);
+
+    if (model.modality === 'text' || model.modality === 'multimodal') {
+      await TextGeneration.loadModel(fsPath, modelId, model.name);
+      console.log(`[ModelManager] LLM model loaded via TextGeneration: ${modelId}`);
+    }
+  }
+
+  /**
+   * Load an STT model into sherpa-onnx.
+   * Stages all model files into the sherpa-onnx Emscripten virtual FS,
+   * then calls STT.loadModel() with the appropriate config.
+   */
+  private async loadSTTModel(model: ModelInfo, primaryData: Uint8Array): Promise<void> {
+    const { SherpaONNXBridge, STT } = await import(
+      '../../../../../sdk/runanywhere-web/packages/core/src/index'
+    );
+
+    const sherpa = SherpaONNXBridge.shared;
+    await sherpa.ensureLoaded();
+
+    const modelDir = `/models/${model.id}`;
+
+    // Derive primary filename from the URL
+    const primaryFilename = model.url.split('/').pop()!;
+    const primaryPath = `${modelDir}/${primaryFilename}`;
+
+    // Write primary file to sherpa FS
+    console.log(`[ModelManager] Writing STT primary file to ${primaryPath} (${primaryData.length} bytes)`);
+    sherpa.writeFile(primaryPath, primaryData);
+
+    // Write additional files to sherpa FS (download on-demand if missing from OPFS)
+    const additionalPaths: Record<string, string> = {};
+    if (model.additionalFiles) {
+      for (const file of model.additionalFiles) {
+        const fileKey = `${model.id}/${file.filename}`;
+        let fileData = await this.loadFromOPFS(fileKey);
+        if (!fileData) {
+          // Download missing additional file on-demand
+          console.log(`[ModelManager] Additional file ${file.filename} not in OPFS, downloading...`);
+          fileData = await this.downloadFile(file.url);
+          await this.storeInOPFS(fileKey, fileData);
+        }
+        const filePath = `${modelDir}/${file.filename}`;
+        console.log(`[ModelManager] Writing STT file to ${filePath} (${fileData.length} bytes)`);
+        sherpa.writeFile(filePath, fileData);
+        additionalPaths[file.filename] = filePath;
+      }
+    }
+
+    // Determine model type and build config based on the model ID
+    // sherpa-onnx-whisper-* models are Whisper type
+    if (model.id.includes('whisper')) {
+      // Whisper model: needs encoder, decoder, tokens
+      const encoderPath = primaryPath; // Primary URL is the encoder
+      const decoderFilename = model.additionalFiles?.find(f => f.filename.includes('decoder'))?.filename;
+      const tokensFilename = model.additionalFiles?.find(f => f.filename.includes('tokens'))?.filename;
+
+      if (!decoderFilename || !tokensFilename) {
+        throw new Error('Whisper model requires encoder, decoder, and tokens files');
+      }
+
+      await STT.loadModel({
+        modelId: model.id,
+        type: 'whisper',
+        modelFiles: {
+          encoder: encoderPath,
+          decoder: `${modelDir}/${decoderFilename}`,
+          tokens: `${modelDir}/${tokensFilename}`,
+        },
+        sampleRate: 16000,
+        language: 'en',
+      });
+    } else if (model.id.includes('paraformer')) {
+      const tokensFilename = model.additionalFiles?.find(f => f.filename.includes('tokens'))?.filename;
+      if (!tokensFilename) {
+        throw new Error('Paraformer model requires model and tokens files');
+      }
+      await STT.loadModel({
+        modelId: model.id,
+        type: 'paraformer',
+        modelFiles: {
+          model: primaryPath,
+          tokens: `${modelDir}/${tokensFilename}`,
+        },
+        sampleRate: 16000,
+      });
+    } else if (model.id.includes('zipformer')) {
+      const decoderFilename = model.additionalFiles?.find(f => f.filename.includes('decoder'))?.filename;
+      const joinerFilename = model.additionalFiles?.find(f => f.filename.includes('joiner'))?.filename;
+      const tokensFilename = model.additionalFiles?.find(f => f.filename.includes('tokens'))?.filename;
+      if (!decoderFilename || !joinerFilename || !tokensFilename) {
+        throw new Error('Zipformer model requires encoder, decoder, joiner, and tokens files');
+      }
+      await STT.loadModel({
+        modelId: model.id,
+        type: 'zipformer',
+        modelFiles: {
+          encoder: primaryPath,
+          decoder: `${modelDir}/${decoderFilename}`,
+          joiner: `${modelDir}/${joinerFilename}`,
+          tokens: `${modelDir}/${tokensFilename}`,
+        },
+        sampleRate: 16000,
+      });
+    } else {
+      throw new Error(`Unknown STT model type for model: ${model.id}`);
+    }
+
+    console.log(`[ModelManager] STT model loaded via sherpa-onnx: ${model.id}`);
+  }
+
   private async unloadCurrentModel(): Promise<void> {
     if (!this.loadedModelId) return;
 
+    const currentModel = this.findModel(this.loadedModelId);
+
     try {
-      const { TextGeneration } = await import(
-        '../../../../../sdk/runanywhere-web/packages/core/src/index'
-      );
-      await TextGeneration.unloadModel();
+      if (currentModel?.modality === 'speechRecognition') {
+        const { STT } = await import(
+          '../../../../../sdk/runanywhere-web/packages/core/src/index'
+        );
+        await STT.unloadModel();
+      } else {
+        const { TextGeneration } = await import(
+          '../../../../../sdk/runanywhere-web/packages/core/src/index'
+        );
+        await TextGeneration.unloadModel();
+      }
     } catch {
       // Ignore unload errors
     }

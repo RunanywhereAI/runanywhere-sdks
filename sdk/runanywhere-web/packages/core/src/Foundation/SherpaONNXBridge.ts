@@ -63,7 +63,7 @@ export interface SherpaONNXModule {
   _SherpaOnnxOnlineStreamAcceptWaveform: (stream: number, sampleRate: number, samplesPtr: number, numSamples: number) => void;
   _SherpaOnnxIsOnlineStreamReady: (handle: number, stream: number) => number;
   _SherpaOnnxDecodeOnlineStream: (handle: number, stream: number) => void;
-  _SherpaOnnxGetOnlineStreamResultAsJson: (stream: number) => number;
+  _SherpaOnnxGetOnlineStreamResultAsJson: (handle: number, stream: number) => number;
   _SherpaOnnxDestroyOnlineStreamResultJson: (ptr: number) => void;
   _SherpaOnnxOnlineStreamInputFinished: (stream: number) => void;
   _SherpaOnnxOnlineStreamIsEndpoint: (handle: number, stream: number) => number;
@@ -166,10 +166,88 @@ export class SherpaONNXBridge {
       const moduleUrl = wasmUrl ?? new URL('../../wasm/sherpa/sherpa-onnx-glue.js', import.meta.url).href;
       const { default: createModule } = await import(/* @vite-ignore */ moduleUrl);
 
-      this._module = await createModule({
+      // Derive the base URL for the .wasm binary
+      const baseUrl = moduleUrl.substring(0, moduleUrl.lastIndexOf('/') + 1);
+      const wasmBinaryUrl = baseUrl + 'sherpa-onnx.wasm';
+
+      // Pre-fetch the WASM binary to avoid Emscripten's sync XHR
+      // (the Node.js-targeted build uses sync fetch which fails in browsers)
+      logger.info(`Fetching sherpa-onnx WASM binary from ${wasmBinaryUrl}`);
+      const wasmResponse = await fetch(wasmBinaryUrl);
+      if (!wasmResponse.ok) {
+        throw new Error(`Failed to fetch sherpa-onnx.wasm: ${wasmResponse.status} ${wasmResponse.statusText}`);
+      }
+      const wasmBinary = await wasmResponse.arrayBuffer();
+      logger.info(`Sherpa-ONNX WASM binary fetched: ${(wasmBinary.byteLength / 1_000_000).toFixed(1)} MB`);
+
+      // Use instantiateWasm for async compilation (Chrome blocks sync compile for >8MB).
+      //
+      // The sherpa-onnx glue JS was compiled with NODERAWFS but we patched it:
+      //   1. ENVIRONMENT_IS_NODE = false → forces browser code paths
+      //   2. NODERAWFS mounting skipped → FS uses MEMFS
+      //   3. receiveInstance patched → re-assigns Module exports after wasmExports is set
+      //
+      // We pass noFSInit: true to skip FS.init() (which creates /dev/stdin etc.).
+      // We don't need standard streams — only file operations for staging model files.
+      // This ensures initRuntime() succeeds and the ready promise resolves.
+      //
+      // We track a separate wasmReady promise so that if WebAssembly.instantiate
+      // itself fails, we get the actual error instead of a generic timeout.
+      let resolveWasm: () => void;
+      let rejectWasm: (err: Error) => void;
+      const wasmReady = new Promise<void>((resolve, reject) => {
+        resolveWasm = resolve;
+        rejectWasm = reject;
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mod = createModule({
+        noFSInit: true,
         print: (text: string) => logger.debug(text),
         printErr: (text: string) => logger.warning(text),
+        wasmBinary,
+        locateFile: (path: string) => baseUrl + path,
+        instantiateWasm: (
+          imports: WebAssembly.Imports,
+          receiveInstance: (instance: WebAssembly.Instance, module: WebAssembly.Module) => void,
+        ) => {
+          WebAssembly.instantiate(wasmBinary, imports)
+            .then((result) => {
+              try {
+                receiveInstance(result.instance, result.module);
+                resolveWasm();
+              } catch (err) {
+                // receiveInstance may throw if initRuntime fails (e.g. FS errors).
+                // The WASM exports are already set by our patch at this point.
+                logger.warning(`receiveInstance completed with error (exports should still be set): ${err}`);
+                resolveWasm(); // Still resolve — exports are set before the throw point
+              }
+            })
+            .catch((err) => {
+              const error = err instanceof Error ? err : new Error(String(err));
+              logger.error(`WASM instantiation failed: ${error.message}`);
+              rejectWasm(error);
+            });
+          return {}; // Indicates async instantiation
+        },
       }) as SherpaONNXModule;
+
+      // Wait for WASM instantiation + receiveInstance to complete.
+      // Also race with the module.ready promise (which resolves after full init).
+      const timeoutPromise = new Promise<void>((_, reject) => {
+        setTimeout(() => reject(new Error('Sherpa-ONNX WASM module timed out after 30s')), 30_000);
+      });
+      await Promise.race([wasmReady, timeoutPromise]);
+
+      this._module = mod;
+
+      // Verify critical exports are available (set by our patched receiveInstance)
+      if (typeof mod._malloc !== 'function') {
+        const available = ['_malloc', '_free', '_SherpaOnnxCreateOfflineRecognizer']
+          .map(fn => `${fn}: ${typeof (mod as Record<string, unknown>)[fn]}`)
+          .join(', ');
+        throw new Error(`WASM exports not available after initialization. Available: ${available}`);
+      }
 
       this._loaded = true;
       logger.info('Sherpa-ONNX WASM module loaded successfully');
@@ -191,16 +269,70 @@ export class SherpaONNXBridge {
   // -----------------------------------------------------------------------
 
   /**
+   * Get the Emscripten FS object from the module.
+   * Handles both direct FS property and module-level helper functions.
+   */
+  private getFS(): SherpaFS {
+    const m = this.module;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mod = m as any;
+
+    // First try direct FS property
+    if (m.FS && typeof m.FS.mkdir === 'function') {
+      return m.FS;
+    }
+
+    // Fallback: construct FS-like interface from Emscripten module-level helpers
+    if (typeof mod.FS_createPath === 'function') {
+      return {
+        mkdir: (p: string) => {
+          const parent = p.substring(0, p.lastIndexOf('/')) || '/';
+          const name = p.substring(p.lastIndexOf('/') + 1);
+          mod.FS_createPath(parent, name, true, true);
+        },
+        writeFile: (p: string, data: Uint8Array | string) => {
+          const dir = p.substring(0, p.lastIndexOf('/')) || '/';
+          const name = p.substring(p.lastIndexOf('/') + 1);
+          try { mod.FS_unlink(p); } catch { /* file may not exist */ }
+          mod.FS_createDataFile(dir, name, data, true, true, true);
+        },
+        readFile: (p: string) => mod.FS_readFile(p),
+        unlink: (p: string) => mod.FS_unlink(p),
+        analyzePath: (p: string) => {
+          try {
+            mod.FS_readFile(p);
+            return { exists: true };
+          } catch {
+            return { exists: false };
+          }
+        },
+      };
+    }
+
+    throw new SDKError(SDKErrorCode.WASMNotLoaded, 'Sherpa-ONNX FS not available');
+  }
+
+  /**
    * Ensure a directory exists in the sherpa-onnx Emscripten virtual FS.
    */
   ensureDir(path: string): void {
-    const m = this.module;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mod = this.module as any;
+
+    if (typeof mod.FS_createPath === 'function') {
+      // Use FS_createPath which creates all intermediate directories
+      mod.FS_createPath('/', path.replace(/^\//, ''), true, true);
+      return;
+    }
+
+    // Fallback to FS.mkdir
+    const fs = this.getFS();
     const parts = path.split('/').filter(Boolean);
     let current = '';
     for (const part of parts) {
       current += '/' + part;
-      if (!m.FS.analyzePath(current).exists) {
-        m.FS.mkdir(current);
+      if (!fs.analyzePath(current).exists) {
+        fs.mkdir(current);
       }
     }
   }
@@ -208,11 +340,42 @@ export class SherpaONNXBridge {
   /**
    * Write a file into the sherpa-onnx Emscripten virtual FS.
    * Used to stage model files before loading.
+   *
+   * Prefers FS_createDataFile over FS.writeFile for reliability —
+   * the module was compiled with NODERAWFS which can leave FS.writeFile
+   * in a broken state even after our browser patches.
    */
   writeFile(path: string, data: Uint8Array): void {
     const dir = path.substring(0, path.lastIndexOf('/'));
     if (dir) this.ensureDir(dir);
-    this.module.FS.writeFile(path, data);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mod = this.module as any;
+
+    // Prefer FS_createDataFile — it creates the file node and writes data
+    // in one shot, avoiding potential issues with FS.open / FS.write on
+    // NODERAWFS-patched modules.
+    if (typeof mod.FS_createDataFile === 'function') {
+      const parentDir = dir || '/';
+      const filename = path.substring(path.lastIndexOf('/') + 1);
+
+      // Remove existing file first (FS_createDataFile throws if it exists)
+      try {
+        if (typeof mod.FS_unlink === 'function') {
+          mod.FS_unlink(path);
+        }
+      } catch {
+        // File doesn't exist — that's fine
+      }
+
+      mod.FS_createDataFile(parentDir, filename, data, true, true, false);
+      logger.debug(`Wrote ${data.length} bytes to sherpa FS: ${path}`);
+      return;
+    }
+
+    // Fallback to FS.writeFile
+    const fs = this.getFS();
+    fs.writeFile(path, data);
     logger.debug(`Wrote ${data.length} bytes to sherpa FS: ${path}`);
   }
 
