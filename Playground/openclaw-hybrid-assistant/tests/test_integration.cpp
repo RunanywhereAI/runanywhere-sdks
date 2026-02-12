@@ -2096,11 +2096,23 @@ TestResult test_openclaw_flow(int response_delay_ms) {
     // --- Step 8: Verify chime played during the wait ---
     float chime_duration = chime_capture.duration_seconds();
 
-    // Chime should have played for at least some portion of the delay
-    float expected_min_chime_seconds = response_delay_ms / 1000.0f * 0.5f;  // At least 50% of delay
+    // The earcon is a short sound (~0.3s) played once immediately, then every 5 seconds.
+    // Verify based on expected number of earcon plays, not continuous audio duration.
+    // Each earcon play produces ~0.3s of audio.
+    //   5s delay  → 1-2 plays → 0.3-0.6s audio
+    //   15s delay → 3-4 plays → 0.9-1.2s audio
+    constexpr float EARCON_DURATION = 0.3f;  // Each earcon is ~0.3s
+    int expected_min_plays = 1;  // Always plays once immediately
+    if (response_delay_ms > 6000) {
+        // After the first play, one repeat fires every 5s
+        expected_min_plays += (response_delay_ms - 1000) / 5000;  // Conservative (1s margin)
+    }
+    float expected_min_chime_seconds = expected_min_plays * EARCON_DURATION * 0.5f;  // 50% tolerance
+
     if (chime_duration < expected_min_chime_seconds && response_delay_ms >= 2000) {
-        result.details = "Chime didn't play long enough: " + std::to_string(chime_duration) + "s"
-                       + " (expected at least " + std::to_string(expected_min_chime_seconds) + "s)";
+        result.details = "Chime didn't play enough earcons: " + std::to_string(chime_duration) + "s"
+                       + " (expected at least " + std::to_string(expected_min_chime_seconds) + "s"
+                       + ", " + std::to_string(expected_min_plays) + " plays)";
         openclaw_client.disconnect();
         server.stop();
         return result;
@@ -2159,9 +2171,13 @@ TestResult test_openclaw_flow(int response_delay_ms) {
     // All checks passed!
     result.passed = true;
 
+    int approx_earcon_plays = (chime_duration > 0.01f)
+        ? static_cast<int>(chime_duration / EARCON_DURATION + 0.5f) : 0;
+
     std::ostringstream details;
     details << "Server delay: " << response_delay_ms << "ms"
             << ", Chime audio: " << chime_duration << "s"
+            << " (~" << approx_earcon_plays << " earcon plays)"
             << " (" << chime_samples_at_response << " samples)"
             << ", TTS audio: " << tts_duration << "s"
             << " (" << tts_capture.total_samples() << " samples)"
