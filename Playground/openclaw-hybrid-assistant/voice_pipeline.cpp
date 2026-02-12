@@ -32,8 +32,10 @@ namespace openclaw {
 // Silence duration before treating speech as ended
 static constexpr double DEFAULT_SILENCE_DURATION_SEC = 1.5;
 
-// Delay after TTS finishes before re-enabling listening (prevents echo feedback)
-static constexpr int TTS_COOLDOWN_MS = 500;
+// Delay after TTS finishes before re-enabling listening (prevents echo feedback).
+// 200ms is enough for the last TTS samples to clear the ALSA buffer and mic echo,
+// while minimizing the perceived delay before wake word responds again.
+static constexpr int TTS_COOLDOWN_MS = 200;
 
 // Minimum speech samples before processing (avoid false triggers)
 static constexpr size_t DEFAULT_MIN_SPEECH_SAMPLES = 16000;  // 1 second at 16kHz
@@ -368,6 +370,10 @@ struct VoicePipeline::Impl {
     std::chrono::steady_clock::time_point wakeword_activation_time;
     std::chrono::steady_clock::time_point wakeword_cooldown_until;  // Ignore detections until this time
 
+    // Deferred barge-in flag: set by process_wakeword, handled by process_audio
+    // after the mutex is properly released via unique_lock
+    bool bargein_requested = false;
+
     // Speech state
     bool speech_active = false;
     std::vector<int16_t> speech_buffer;
@@ -625,11 +631,14 @@ void VoicePipeline::start() {
     impl_->consecutive_speech_frames = 0;
     impl_->consecutive_silent_frames = 0;
     impl_->current_burst_frames = 0;
+    impl_->bargein_requested = false;
 
     if (impl_->wakeword_enabled) {
         state_ = PipelineState::WAITING_FOR_WAKE_WORD;
+        std::cout << "[Pipeline] Started: WAITING_FOR_WAKE_WORD (wake word listening)\n";
     } else {
         state_ = PipelineState::LISTENING;
+        std::cout << "[Pipeline] Started: LISTENING (no wake word)\n";
     }
 }
 
@@ -642,6 +651,7 @@ void VoicePipeline::stop() {
     impl_->consecutive_speech_frames = 0;
     impl_->consecutive_silent_frames = 0;
     impl_->current_burst_frames = 0;
+    impl_->bargein_requested = false;
 }
 
 bool VoicePipeline::is_running() const {
@@ -674,7 +684,7 @@ void VoicePipeline::process_audio(const int16_t* samples, size_t num_samples) {
         return;
     }
 
-    std::lock_guard<std::mutex> lock(impl_->mutex);
+    std::unique_lock<std::mutex> lock(impl_->mutex);
 
     // During TTS playback: ONLY run wake word detection for barge-in.
     // Skip VAD/STT to prevent echo feedback (mic picking up speaker output).
@@ -688,6 +698,18 @@ void VoicePipeline::process_audio(const int16_t* samples, size_t num_samples) {
                 raw[i] = static_cast<float>(samples[i]);
             }
             process_wakeword(raw.data(), num_samples);
+
+            // Handle deferred barge-in: process_wakeword sets the flag,
+            // we handle cancellation here with proper mutex release
+            if (impl_->bargein_requested) {
+                impl_->bargein_requested = false;
+                std::cout << "[Pipeline] Barge-in: handling deferred cancel (unlock -> cancel_speech)\n";
+                lock.unlock();
+                cancel_speech();
+                if (config_.on_speech_interrupted) {
+                    config_.on_speech_interrupted();
+                }
+            }
         }
         return;
     }
@@ -718,9 +740,8 @@ void VoicePipeline::process_audio(const int16_t* samples, size_t num_samples) {
         ).count();
 
         if (elapsed >= WAKE_WORD_TIMEOUT_SEC) {
-            if (config_.debug_wakeword) {
-                std::cout << "[WakeWord] Timeout, returning to wake word mode\n";
-            }
+            std::cout << "[Pipeline] Wake word timeout (" << WAKE_WORD_TIMEOUT_SEC
+                      << "s no speech), State: LISTENING -> WAITING_FOR_WAKE_WORD\n";
             impl_->wakeword_activated = false;
             impl_->speech_buffer.clear();
             impl_->speech_callback_fired = false;
@@ -773,19 +794,13 @@ void VoicePipeline::process_wakeword(const float* samples, size_t num_samples) {
         // Wake word detected!
         bool was_bargein = (state_ == PipelineState::SPEAKING);
 
-        // Barge-in: if TTS is currently playing, cancel it immediately
+        // Barge-in: if TTS is currently playing, defer cancellation to process_audio
+        // where the mutex can be properly released via unique_lock.
+        // Direct mutex.unlock()/lock() here is unsafe (double-unlock with lock_guard,
+        // or undefined behavior on ARM with lock_guard destructor).
         if (was_bargein) {
             std::cout << "[WakeWord] Barge-in! Cancelling TTS playback...\n";
-            // cancel_speech() stops producer thread + TTSQueue consumer + clears everything
-            // Must unlock mutex before cancel_speech (it may join threads)
-            impl_->mutex.unlock();
-            cancel_speech();
-            impl_->mutex.lock();
-
-            // Fire interrupt callback so main.cpp can stop chime/cleanup
-            if (config_.on_speech_interrupted) {
-                config_.on_speech_interrupted();
-            }
+            impl_->bargein_requested = true;
         }
 
         impl_->wakeword_activated = true;
@@ -812,7 +827,10 @@ void VoicePipeline::process_wakeword(const float* samples, size_t num_samples) {
         }
 
         std::cout << "[WakeWord] Detected: \"" << config_.wake_word
-                  << "\" (confidence: " << confidence << ")\n";
+                  << "\" (confidence: " << confidence << ")"
+                  << (was_bargein ? " [BARGE-IN]" : "") << "\n";
+        std::cout << "[Pipeline] State: -> LISTENING (wake word activated, preroll="
+                  << impl_->speech_buffer.size() << " samples)\n";
 
         if (config_.on_wake_word) {
             config_.on_wake_word(config_.wake_word, confidence);
@@ -1269,6 +1287,7 @@ void VoicePipeline::speak_text_async(const std::string& text) {
 
     std::cout << "[TTS-Async] Streaming " << sentences.size() << " sentence(s)\n";
     state_ = PipelineState::SPEAKING;
+    std::cout << "[Pipeline] State: -> SPEAKING (TTS started, wake word barge-in active)\n";
 
     // Create queue - consumer thread starts immediately, waits for first chunk
     async_tts_->queue = std::make_shared<TTSQueue>(config_.on_audio_output);
@@ -1342,22 +1361,23 @@ void VoicePipeline::speak_text_async(const std::string& text) {
             {
                 std::lock_guard<std::mutex> lock(impl_->mutex);
                 state_ = wakeword_enabled ? PipelineState::WAITING_FOR_WAKE_WORD : PipelineState::LISTENING;
-
-                // Reset wake word model after TTS. During SPEAKING state, the model
-                // processed 20+ seconds of speaker audio for barge-in detection.
-                // Its streaming buffers are now polluted with TTS output, making the
-                // next "Hey Jarvis" detection unreliable. Reset to a clean state.
-                if (impl_->wakeword_handle) {
-                    rac_wakeword_onnx_reset(impl_->wakeword_handle);
-                }
+                // Do NOT reset the wake word model here. During normal TTS completion,
+                // the 200ms cooldown gap is sufficient for echo to clear. Resetting
+                // adds ~200-300ms detection latency (model needs to refill streaming
+                // buffers from scratch). The model IS reset during barge-in (line 843)
+                // where echo pollution from interrupted TTS is a real concern.
             }
-            std::cout << "[TTS-Async] Playback complete\n";
+            std::cout << "[Pipeline] State: SPEAKING -> "
+                      << (wakeword_enabled ? "WAITING_FOR_WAKE_WORD" : "LISTENING")
+                      << " (TTS playback complete)\n";
         }
     });
 }
 
 void VoicePipeline::cancel_speech() {
     if (!async_tts_) return;
+
+    std::cout << "[Pipeline] cancel_speech() called (state=" << state_string() << ")\n";
 
     // Force-stop ALSA immediately (snd_pcm_drop) for instant silence
     if (config_.on_audio_stop) {
@@ -1376,7 +1396,11 @@ void VoicePipeline::cancel_speech() {
     }
 
     if (initialized_ && state_ == PipelineState::SPEAKING) {
-        state_ = impl_->wakeword_enabled ? PipelineState::WAITING_FOR_WAKE_WORD : PipelineState::LISTENING;
+        auto new_state = impl_->wakeword_enabled ? PipelineState::WAITING_FOR_WAKE_WORD : PipelineState::LISTENING;
+        state_ = new_state;
+        std::cout << "[Pipeline] State: SPEAKING -> "
+                  << (new_state == PipelineState::WAITING_FOR_WAKE_WORD ? "WAITING_FOR_WAKE_WORD" : "LISTENING")
+                  << " (cancel_speech)\n";
     }
 }
 
