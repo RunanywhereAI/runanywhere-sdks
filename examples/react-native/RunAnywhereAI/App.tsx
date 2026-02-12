@@ -115,7 +115,6 @@ const App: React.FC = () => {
   const registerModulesAndModels = async () => {
     // LlamaCPP module with LLM models (optional - skip if not built)
     // Using explicit IDs ensures models are recognized after download across app restarts
-<<<<<<< HEAD
     const llamacppPromises = [];
     if (LlamaCPP) {
       LlamaCPP.register();
@@ -145,6 +144,13 @@ const App: React.FC = () => {
           url: 'https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf',
           memoryRequirement: 600_000_000,
         }),
+        // Llama 3.2 3B - Ideal for tool calling on mobile (3B params, ~1.8GB)
+        LlamaCPP.addModel({
+          id: 'llama-3.2-3b-instruct-q4_k_m',
+          name: 'Llama 3.2 3B Instruct Q4_K_M (Tool Calling)',
+          url: 'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
+          memoryRequirement: 2_000_000_000,
+        }),
         LlamaCPP.addModel({
           id: 'lfm2-350m-q4_k_m',
           name: 'LiquidAI LFM2 350M Q4_K_M',
@@ -156,6 +162,28 @@ const App: React.FC = () => {
           name: 'LiquidAI LFM2 350M Q8_0',
           url: 'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf',
           memoryRequirement: 400_000_000,
+        }),
+        // LFM2.5 1.2B - Best-in-class edge model from Liquid AI (1.2B params, ~700MB Q4)
+        // 239 tok/s on AMD CPU, designed for on-device deployment
+        LlamaCPP.addModel({
+          id: 'lfm2.5-1.2b-instruct-q4_k_m',
+          name: 'LiquidAI LFM2.5 1.2B Instruct Q4_K_M',
+          url: 'https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf',
+          memoryRequirement: 900_000_000,
+        }),
+        // Tool Calling Optimized Models
+        // LFM2-1.2B-Tool - Designed for concise and precise tool calling (Liquid AI)
+        LlamaCPP.addModel({
+          id: 'lfm2-1.2b-tool-q4_k_m',
+          name: 'LiquidAI LFM2 1.2B Tool Q4_K_M',
+          url: 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf',
+          memoryRequirement: 800_000_000,
+        }),
+        LlamaCPP.addModel({
+          id: 'lfm2-1.2b-tool-q8_0',
+          name: 'LiquidAI LFM2 1.2B Tool Q8_0',
+          url: 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf',
+          memoryRequirement: 1_400_000_000,
         })
       );
       // Wait for all LlamaCPP models to register
@@ -163,74 +191,6 @@ const App: React.FC = () => {
     } else {
       console.warn('[App] Skipping LlamaCPP models - backend not available');
     }
-=======
-    LlamaCPP.register();
-    await LlamaCPP.addModel({
-      id: 'smollm2-360m-q8_0',
-      name: 'SmolLM2 360M Q8_0',
-      url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
-      memoryRequirement: 500_000_000,
-    });
-    await LlamaCPP.addModel({
-      id: 'llama-2-7b-chat-q4_k_m',
-      name: 'Llama 2 7B Chat Q4_K_M',
-      url: 'https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf',
-      memoryRequirement: 4_000_000_000,
-    });
-    await LlamaCPP.addModel({
-      id: 'mistral-7b-instruct-q4_k_m',
-      name: 'Mistral 7B Instruct Q4_K_M',
-      url: 'https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf',
-      memoryRequirement: 4_000_000_000,
-    });
-    await LlamaCPP.addModel({
-      id: 'qwen2.5-0.5b-instruct-q6_k',
-      name: 'Qwen 2.5 0.5B Instruct Q6_K',
-      url: 'https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf',
-      memoryRequirement: 600_000_000,
-    });
-    // Llama 3.2 3B - Ideal for tool calling on mobile (3B params, ~1.8GB)
-    await LlamaCPP.addModel({
-      id: 'llama-3.2-3b-instruct-q4_k_m',
-      name: 'Llama 3.2 3B Instruct Q4_K_M (Tool Calling)',
-      url: 'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
-      memoryRequirement: 2_000_000_000,
-    });
-    await LlamaCPP.addModel({
-      id: 'lfm2-350m-q4_k_m',
-      name: 'LiquidAI LFM2 350M Q4_K_M',
-      url: 'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf',
-      memoryRequirement: 250_000_000,
-    });
-    await LlamaCPP.addModel({
-      id: 'lfm2-350m-q8_0',
-      name: 'LiquidAI LFM2 350M Q8_0',
-      url: 'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf',
-      memoryRequirement: 400_000_000,
-    });
-    // LFM2.5 1.2B - Best-in-class edge model from Liquid AI (1.2B params, ~700MB Q4)
-    // 239 tok/s on AMD CPU, designed for on-device deployment
-    await LlamaCPP.addModel({
-      id: 'lfm2.5-1.2b-instruct-q4_k_m',
-      name: 'LiquidAI LFM2.5 1.2B Instruct Q4_K_M',
-      url: 'https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf',
-      memoryRequirement: 900_000_000,
-    });
-    // Tool Calling Optimized Models
-    // LFM2-1.2B-Tool - Designed for concise and precise tool calling (Liquid AI)
-    await LlamaCPP.addModel({
-      id: 'lfm2-1.2b-tool-q4_k_m',
-      name: 'LiquidAI LFM2 1.2B Tool Q4_K_M',
-      url: 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf',
-      memoryRequirement: 800_000_000,
-    });
-    await LlamaCPP.addModel({
-      id: 'lfm2-1.2b-tool-q8_0',
-      name: 'LiquidAI LFM2 1.2B Tool Q8_0',
-      url: 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf',
-      memoryRequirement: 1_400_000_000,
-    });
->>>>>>> origin/main
 
     // ONNX module with STT and TTS models
     // Using tar.gz format hosted on RunanywhereAI/sherpa-onnx for fast native extraction
