@@ -32,8 +32,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
-import { Spacing, Padding, IconSize, BorderRadius } from '../theme/spacing';
-import { ModelRequiredOverlay } from '../components/common';
+import { Spacing, Padding, BorderRadius } from '../theme/spacing';
 
 // Import RunAnywhere RAG SDK
 import { createRAG, createRAGConfig, type RAGResult } from '@runanywhere/rag';

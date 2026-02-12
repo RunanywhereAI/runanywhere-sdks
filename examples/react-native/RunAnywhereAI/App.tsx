@@ -36,7 +36,7 @@ import {
 } from './src/theme/spacing';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
-import { RunAnywhere, SDKEnvironment, ModelCategory, initializeNitroModulesGlobally, LLMFramework } from '@runanywhere/core';
+import { RunAnywhere, SDKEnvironment, ModelCategory, initializeNitroModulesGlobally } from '@runanywhere/core';
 // Make LlamaCPP optional for ONNX-only builds
 let LlamaCPP: any = null;
 try {
