@@ -139,6 +139,14 @@ if(RAC_WASM_ONNX)
     set(ORT_USE_NNAPI OFF CACHE BOOL "" FORCE)
 endif()
 
+# Enable C++ exception handling at compile-time for ALL targets.
+# The linker flag -sDISABLE_EXCEPTION_CATCHING=0 enables the Emscripten
+# exception *runtime*, but without -fexceptions the Clang frontend may
+# optimize away try/catch blocks in C++ code at -O3 (assuming extern "C"
+# functions cannot throw). This global flag ensures catch blocks are
+# preserved in rac_commons, rac_backend_llamacpp, llama.cpp, etc.
+add_compile_options("-fexceptions")
+
 # Add RACommons as subdirectory (builds rac_commons static library)
 # Must come AFTER backend configuration so cache variables are set.
 add_subdirectory("${RAC_COMMONS_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/rac_commons")
@@ -633,6 +641,7 @@ target_compile_definitions(racommons PRIVATE
     RAC_PLATFORM_WASM=1
     RAC_PLATFORM_NAME="Emscripten"
 )
+
 
 if(RAC_WASM_LLAMACPP)
     target_compile_definitions(racommons PRIVATE RAC_WASM_LLAMACPP=1)

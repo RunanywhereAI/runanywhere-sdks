@@ -9,7 +9,11 @@ export default defineConfig({
     headers: {
       // Required for SharedArrayBuffer (pthreads) and WASM threads
       'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
+      // 'credentialless' allows cross-origin resource loading (e.g. model downloads
+      // from GitHub releases, HuggingFace CDN) without requiring CORS headers on every
+      // response, while still enabling SharedArrayBuffer for WASM pthreads.
+      // Supported in Chrome 96+ and Firefox 119+.
+      'Cross-Origin-Embedder-Policy': 'credentialless',
     },
     fs: {
       // Allow Vite to serve files from the entire workspace

@@ -43,6 +43,9 @@ export enum SDKErrorCode {
   FileNotFound = -182,
   FileWriteFailed = -183,
 
+  // Parameter errors (-220 to -229)
+  InvalidParameter = -220,
+
   // Component errors (-230 to -249)
   ComponentNotReady = -230,
   ComponentBusy = -231,

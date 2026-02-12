@@ -28,11 +28,14 @@ export { TextGeneration } from './Public/Extensions/RunAnywhere+TextGeneration';
 export { ModelManagement } from './Public/Extensions/RunAnywhere+ModelManagement';
 export type { DownloadProgressCallback, ModelDownloadOptions } from './Public/Extensions/RunAnywhere+ModelManagement';
 export { STT } from './Public/Extensions/RunAnywhere+STT';
-export type { STTTranscriptionResult, STTWord, STTTranscribeOptions, STTStreamCallback } from './Public/Extensions/RunAnywhere+STT';
+export type {
+  STTModelConfig, STTModelType, STTWhisperFiles, STTZipformerFiles, STTParaformerFiles,
+  STTTranscriptionResult, STTWord, STTTranscribeOptions, STTStreamCallback, STTStreamingSession,
+} from './Public/Extensions/RunAnywhere+STT';
 export { TTS } from './Public/Extensions/RunAnywhere+TTS';
-export type { TTSSynthesisResult, TTSSynthesizeOptions } from './Public/Extensions/RunAnywhere+TTS';
+export type { TTSVoiceConfig, TTSSynthesisResult, TTSSynthesizeOptions } from './Public/Extensions/RunAnywhere+TTS';
 export { VAD } from './Public/Extensions/RunAnywhere+VAD';
-export type { SpeechActivity, SpeechActivityCallback, VADConfig } from './Public/Extensions/RunAnywhere+VAD';
+export type { SpeechActivity, SpeechActivityCallback, VADModelConfig, SpeechSegment } from './Public/Extensions/RunAnywhere+VAD';
 export { VoiceAgent, VoiceAgentSession } from './Public/Extensions/RunAnywhere+VoiceAgent';
 export type { PipelineState, VoiceAgentModels, VoiceTurnResult, VoiceAgentEventData, VoiceAgentEventCallback } from './Public/Extensions/RunAnywhere+VoiceAgent';
 export { VLM } from './Public/Extensions/RunAnywhere+VLM';
@@ -56,6 +59,8 @@ export { EventBus } from './Foundation/EventBus';
 export type { EventListener, Unsubscribe, SDKEventEnvelope } from './Foundation/EventBus';
 export { WASMBridge } from './Foundation/WASMBridge';
 export type { RACommonsModule } from './Foundation/WASMBridge';
+export { SherpaONNXBridge } from './Foundation/SherpaONNXBridge';
+export type { SherpaONNXModule } from './Foundation/SherpaONNXBridge';
 
 // Infrastructure
 export { detectCapabilities, getDeviceInfo } from './Infrastructure/DeviceCapabilities';
