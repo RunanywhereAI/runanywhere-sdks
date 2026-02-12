@@ -4,6 +4,9 @@
  * Adds STT (speech recognition) capabilities via sherpa-onnx WASM.
  * Supports both offline (Whisper) and online (streaming Zipformer) models.
  *
+ * Uses the sherpa-onnx C struct packing helpers from sherpa-onnx-asr.js
+ * to properly allocate config structs in WASM memory (NOT JSON strings).
+ *
  * Mirrors: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/STT/
  *
  * Usage:
@@ -30,6 +33,13 @@ import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { EventBus } from '../../Foundation/EventBus';
 import { SDKEventType } from '../../types/enums';
+
+// Import sherpa-onnx C struct packing helpers.
+// These functions properly allocate and fill C structs in WASM memory
+// for passing to the sherpa-onnx C API.
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore — JS helper file, no .d.ts available
+import { initSherpaOnnxOfflineRecognizerConfig, initSherpaOnnxOnlineRecognizerConfig, freeConfig } from '../../../wasm/sherpa/sherpa-onnx-asr.js';
 
 const logger = new SDKLogger('STT');
 
@@ -113,72 +123,114 @@ function requireSherpa(): SherpaONNXBridge {
 }
 
 /**
- * Build the sherpa-onnx config struct in WASM memory for offline recognizer.
- * Returns a pointer that must be freed by the caller.
+ * Build a sherpa-onnx offline recognizer config object suitable for
+ * `initSherpaOnnxOfflineRecognizerConfig()` from sherpa-onnx-asr.js.
+ *
+ * This returns a plain JS config object that the helper function will
+ * pack into a C struct in WASM memory.
  */
-function buildOfflineRecognizerConfigJson(config: STTModelConfig): string {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildOfflineRecognizerConfig(config: STTModelConfig): Record<string, any> {
   const sampleRate = config.sampleRate ?? 16000;
   const files = config.modelFiles;
 
+  // Base config with all model types empty (required for struct layout)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const modelConfig: Record<string, any> = {
+    transducer: { encoder: '', decoder: '', joiner: '' },
+    paraformer: { model: '' },
+    nemoCtc: { model: '' },
+    whisper: { encoder: '', decoder: '', language: '', task: '', tailPaddings: -1 },
+    tdnn: { model: '' },
+    senseVoice: { model: '', language: '', useInverseTextNormalization: 0 },
+    moonshine: { preprocessor: '', encoder: '', uncachedDecoder: '', cachedDecoder: '' },
+    fireRedAsr: { encoder: '', decoder: '' },
+    dolphin: { model: '' },
+    zipformerCtc: { model: '' },
+    canary: { encoder: '', decoder: '', srcLang: '', tgtLang: '', usePnc: 1 },
+    wenetCtc: { model: '' },
+    omnilingual: { model: '' },
+    tokens: '',
+    numThreads: 1,
+    provider: 'cpu',
+    debug: 0,
+    modelType: '',
+    modelingUnit: '',
+    bpeVocab: '',
+    teleSpeechCtc: '',
+  };
+
   if (config.type === 'whisper') {
     const f = files as STTWhisperFiles;
-    return JSON.stringify({
-      'feat-config': { 'sample-rate': sampleRate, 'feature-dim': 80 },
-      'model-config': {
-        'whisper': {
-          'encoder': f.encoder,
-          'decoder': f.decoder,
-          'language': config.language ?? 'en',
-          'task': 'transcribe',
-        },
-        'tokens': f.tokens,
-        'num-threads': 1,
-        'provider': 'cpu',
-        'debug': 0,
-      },
-      'decoding-method': 'greedy_search',
-    });
+    modelConfig.whisper = {
+      encoder: f.encoder,
+      decoder: f.decoder,
+      language: config.language ?? 'en',
+      task: 'transcribe',
+      tailPaddings: -1,
+    };
+    modelConfig.tokens = f.tokens;
   } else if (config.type === 'paraformer') {
     const f = files as STTParaformerFiles;
-    return JSON.stringify({
-      'feat-config': { 'sample-rate': sampleRate, 'feature-dim': 80 },
-      'model-config': {
-        'paraformer': { 'model': f.model },
-        'tokens': f.tokens,
-        'num-threads': 1,
-        'provider': 'cpu',
-        'debug': 0,
-      },
-      'decoding-method': 'greedy_search',
-    });
+    modelConfig.paraformer = { model: f.model };
+    modelConfig.tokens = f.tokens;
   }
 
-  throw new SDKError(SDKErrorCode.InvalidParameter, `Unsupported STT model type: ${config.type}`);
+  return {
+    featConfig: { sampleRate, featureDim: 80 },
+    modelConfig,
+    lmConfig: { model: '', scale: 1.0 },
+    decodingMethod: 'greedy_search',
+    maxActivePaths: 4,
+    hotwordsFile: '',
+    hotwordsScore: 1.5,
+    ruleFsts: '',
+    ruleFars: '',
+    blankPenalty: 0,
+  };
 }
 
-function buildOnlineRecognizerConfigJson(config: STTModelConfig): string {
+/**
+ * Build a sherpa-onnx online recognizer config object suitable for
+ * `initSherpaOnnxOnlineRecognizerConfig()` from sherpa-onnx-asr.js.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildOnlineRecognizerConfig(config: STTModelConfig): Record<string, any> {
   const sampleRate = config.sampleRate ?? 16000;
   const files = config.modelFiles as STTZipformerFiles;
 
-  return JSON.stringify({
-    'feat-config': { 'sample-rate': sampleRate, 'feature-dim': 80 },
-    'model-config': {
-      'transducer': {
-        'encoder': files.encoder,
-        'decoder': files.decoder,
-        'joiner': files.joiner,
+  return {
+    featConfig: { sampleRate, featureDim: 80 },
+    modelConfig: {
+      transducer: {
+        encoder: files.encoder,
+        decoder: files.decoder,
+        joiner: files.joiner,
       },
-      'tokens': files.tokens,
-      'num-threads': 1,
-      'provider': 'cpu',
-      'debug': 0,
+      paraformer: { encoder: '', decoder: '' },
+      zipformer2Ctc: { model: '' },
+      nemoCtc: { model: '' },
+      toneCtc: { model: '' },
+      tokens: files.tokens,
+      numThreads: 1,
+      provider: 'cpu',
+      debug: 0,
+      modelType: '',
+      modelingUnit: '',
+      bpeVocab: '',
     },
-    'decoding-method': 'greedy_search',
-    'enable-endpoint': 1,
-    'rule1-min-trailing-silence': 2.4,
-    'rule2-min-trailing-silence': 1.2,
-    'rule3-min-utterance-length': 20,
-  });
+    decodingMethod: 'greedy_search',
+    maxActivePaths: 4,
+    enableEndpoint: 1,
+    rule1MinTrailingSilence: 2.4,
+    rule2MinTrailingSilence: 1.2,
+    rule3MinUtteranceLength: 20,
+    hotwordsFile: '',
+    hotwordsScore: 1.5,
+    ctcFstDecoderConfig: { graph: '', maxActive: 3000 },
+    ruleFsts: '',
+    ruleFars: '',
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -209,13 +261,11 @@ export const STT = {
     try {
       if (config.type === 'zipformer') {
         // Streaming model: use online recognizer
-        const configJson = buildOnlineRecognizerConfigJson(config);
-        const configPtr = sherpa.allocString(configJson);
+        const configObj = buildOnlineRecognizerConfig(config);
+        const configStruct = initSherpaOnnxOnlineRecognizerConfig(configObj, m);
 
-        _onlineRecognizerHandle = m.ccall(
-          'SherpaOnnxCreateOnlineRecognizer', 'number', ['number'], [configPtr],
-        ) as number;
-        sherpa.free(configPtr);
+        _onlineRecognizerHandle = m._SherpaOnnxCreateOnlineRecognizer(configStruct.ptr);
+        freeConfig(configStruct, m);
 
         if (_onlineRecognizerHandle === 0) {
           throw new SDKError(SDKErrorCode.ModelLoadFailed,
@@ -223,13 +273,12 @@ export const STT = {
         }
       } else {
         // Non-streaming model (Whisper, Paraformer): use offline recognizer
-        const configJson = buildOfflineRecognizerConfigJson(config);
-        const configPtr = sherpa.allocString(configJson);
+        const configObj = buildOfflineRecognizerConfig(config);
+        logger.debug(`Offline config: ${JSON.stringify(configObj.modelConfig.whisper)}`);
+        const configStruct = initSherpaOnnxOfflineRecognizerConfig(configObj, m);
 
-        _offlineRecognizerHandle = m.ccall(
-          'SherpaOnnxCreateOfflineRecognizer', 'number', ['number'], [configPtr],
-        ) as number;
-        sherpa.free(configPtr);
+        _offlineRecognizerHandle = m._SherpaOnnxCreateOfflineRecognizer(configStruct.ptr);
+        freeConfig(configStruct, m);
 
         if (_offlineRecognizerHandle === 0) {
           throw new SDKError(SDKErrorCode.ModelLoadFailed,
@@ -363,7 +412,7 @@ export const STT = {
         m._SherpaOnnxDecodeOnlineStream(_onlineRecognizerHandle, stream);
       }
 
-      const jsonPtr = m._SherpaOnnxGetOnlineStreamResultAsJson(stream);
+      const jsonPtr = m._SherpaOnnxGetOnlineStreamResultAsJson(_onlineRecognizerHandle, stream);
       const jsonStr = SherpaONNXBridge.shared.readString(jsonPtr);
       m._SherpaOnnxDestroyOnlineStreamResultJson(jsonPtr);
 
@@ -470,7 +519,7 @@ class STTStreamingSessionImpl implements STTStreamingSession {
 
   getResult(): { text: string; isEndpoint: boolean } {
     const m = SherpaONNXBridge.shared.module;
-    const jsonPtr = m._SherpaOnnxGetOnlineStreamResultAsJson(this._stream);
+    const jsonPtr = m._SherpaOnnxGetOnlineStreamResultAsJson(this._recognizer, this._stream);
     const jsonStr = SherpaONNXBridge.shared.readString(jsonPtr);
     m._SherpaOnnxDestroyOnlineStreamResultJson(jsonPtr);
 
