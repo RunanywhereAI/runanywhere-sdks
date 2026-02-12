@@ -389,34 +389,26 @@ struct VoicePipeline::Impl {
 // =============================================================================
 
 struct VoicePipeline::AsyncTTSState {
-    // shared_ptr so detached producer thread can hold a safe reference to both
     std::shared_ptr<TTSQueue> queue;
-    std::shared_ptr<std::atomic<bool>> cancelled = std::make_shared<std::atomic<bool>>(false);
+    std::atomic<bool> cancelled{false};
     std::thread producer_thread;
 
-    // Fast cleanup for barge-in: detaches producer so we don't block.
-    // The producer holds shared_ptrs to queue and cancelled, keeping them alive.
-    void cleanup_fast() {
-        cancelled->store(true);
+    // Non-blocking cancel for barge-in: signals producer to stop and silences audio.
+    // Does NOT join the producer — the thread finishes on its own after the current
+    // rac_voice_agent_synthesize_speech call returns. This avoids blocking the
+    // capture thread for 1-9s during synthesis.
+    // The next cleanup() or destructor will join the (already-finished) thread.
+    void cancel_fast() {
+        cancelled.store(true);
         if (queue) {
             queue->cancel();  // Signals consumer to stop; play_cancellable checks flag every ~46ms
         }
-        // Detach the producer thread instead of blocking on join().
-        // The producer checks cancelled between sentences and exits on its own
-        // after the current rac_voice_agent_synthesize_speech call finishes.
-        if (producer_thread.joinable()) {
-            producer_thread.detach();
-        }
-        // Release our reference. The detached producer holds its own shared_ptrs.
-        queue.reset();
-        // Create a fresh cancelled flag for the next speak_text_async() call.
-        cancelled = std::make_shared<std::atomic<bool>>(false);
     }
 
-    // Blocking cleanup for destruction: must join because the producer accesses
-    // voice_agent which is about to be destroyed.
-    void cleanup_blocking() {
-        cancelled->store(true);
+    // Full cleanup: signal cancellation, join producer (blocks until synthesis finishes),
+    // and release the queue. Called before creating a new producer or during destruction.
+    void cleanup() {
+        cancelled.store(true);
         if (queue) {
             queue->cancel();
         }
@@ -424,10 +416,11 @@ struct VoicePipeline::AsyncTTSState {
             producer_thread.join();
         }
         queue.reset();
+        cancelled.store(false);
     }
 
     ~AsyncTTSState() {
-        cleanup_blocking();
+        cleanup();
     }
 };
 
@@ -443,10 +436,9 @@ VoicePipeline::VoicePipeline(const VoicePipelineConfig& config)
 }
 
 VoicePipeline::~VoicePipeline() {
-    // Use blocking cleanup (join) to ensure the producer thread exits
-    // before we destroy voice_agent and other resources it uses.
+    // Ensure the producer thread exits before we destroy voice_agent and other resources.
     if (async_tts_) {
-        async_tts_->cleanup_blocking();
+        async_tts_->cleanup();
     }
     stop();
 
@@ -1242,8 +1234,11 @@ void VoicePipeline::speak_text_async(const std::string& text) {
         return;
     }
 
-    // Cancel any in-progress speech first
-    cancel_speech();
+    // Full cleanup: cancel + join old producer thread before starting a new one.
+    // If barge-in happened, cancel_fast() was called seconds ago (during ASR +
+    // OpenClaw processing), so the old producer has had time to finish its current
+    // synthesis call. The join here should be instant or very fast.
+    async_tts_->cleanup();
 
     // Sanitize and split
     std::string sanitized = sanitize_text_for_tts(text);
@@ -1262,21 +1257,23 @@ void VoicePipeline::speak_text_async(const std::string& text) {
 
     // Create queue - consumer thread starts immediately, waits for first chunk
     async_tts_->queue = std::make_shared<TTSQueue>(config_.on_audio_output);
-    async_tts_->cancelled->store(false);
+    async_tts_->cancelled.store(false);
 
-    // Capture shared_ptrs to the queue and cancelled flag.
-    // Both stay alive even if cleanup() detaches this thread and resets async_tts_.
+    // Capture references for the producer thread.
+    // The producer accesses async_tts_->cancelled and async_tts_->queue via these refs.
+    // This is safe because the producer is always joined before async_tts_ or the
+    // pipeline is destroyed (cleanup() or ~AsyncTTSState both join).
     auto queue_ref = async_tts_->queue;
-    auto cancelled_ref = async_tts_->cancelled;
+    auto& cancelled_ref = async_tts_->cancelled;
     auto voice_agent = impl_->voice_agent;
     bool wakeword_enabled = impl_->wakeword_enabled;
 
     async_tts_->producer_thread = std::thread([this, voice_agent, sentences, wakeword_enabled,
-                                                queue_ref, cancelled_ref]() {
+                                                queue_ref, &cancelled_ref]() {
         int tts_sample_rate = 22050;  // Piper Lessac
 
         for (size_t i = 0; i < sentences.size(); ++i) {
-            if (cancelled_ref->load()) break;
+            if (cancelled_ref.load()) break;
 
             const auto& sentence = sentences[i];
             if (sentence.empty()) continue;
@@ -1305,7 +1302,7 @@ void VoicePipeline::speak_text_async(const std::string& text) {
             chunk.sample_rate = tts_sample_rate;
             free(audio_data);
 
-            if (!cancelled_ref->load()) {
+            if (!cancelled_ref.load()) {
                 queue_ref->push(std::move(chunk));
             }
         }
@@ -1315,15 +1312,30 @@ void VoicePipeline::speak_text_async(const std::string& text) {
 
         // Wait for consumer to finish playing, then cooldown + state transition
         // (This runs on the producer thread so it doesn't block main)
-        if (!cancelled_ref->load()) {
-            while (queue_ref->is_active() && !cancelled_ref->load()) {
+        if (!cancelled_ref.load()) {
+            while (queue_ref->is_active() && !cancelled_ref.load()) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
             }
         }
 
-        if (!cancelled_ref->load()) {
+        if (!cancelled_ref.load()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(TTS_COOLDOWN_MS));
-            state_ = wakeword_enabled ? PipelineState::WAITING_FOR_WAKE_WORD : PipelineState::LISTENING;
+
+            // Lock mutex to ensure state_ write is visible on ARM (Raspberry Pi).
+            // Without this, the capture thread may never see the transition from
+            // SPEAKING back to WAITING_FOR_WAKE_WORD due to weak memory ordering.
+            {
+                std::lock_guard<std::mutex> lock(impl_->mutex);
+                state_ = wakeword_enabled ? PipelineState::WAITING_FOR_WAKE_WORD : PipelineState::LISTENING;
+
+                // Reset wake word model after TTS. During SPEAKING state, the model
+                // processed 20+ seconds of speaker audio for barge-in detection.
+                // Its streaming buffers are now polluted with TTS output, making the
+                // next "Hey Jarvis" detection unreliable. Reset to a clean state.
+                if (impl_->wakeword_handle) {
+                    rac_wakeword_onnx_reset(impl_->wakeword_handle);
+                }
+            }
             std::cout << "[TTS-Async] Playback complete\n";
         }
     });
@@ -1337,8 +1349,11 @@ void VoicePipeline::cancel_speech() {
         config_.on_audio_stop();
     }
 
-    // Fast cleanup: detach producer (don't block waiting for synthesis to finish)
-    async_tts_->cleanup_fast();
+    // Non-blocking cancel: set cancelled flag + cancel queue for instant silence.
+    // The producer thread continues running (finishes current synthesis call) but
+    // won't push any more audio. The thread stays joinable — it will be joined by
+    // the next speak_text_async() call or the destructor.
+    async_tts_->cancel_fast();
 
     // Clear stale speak messages that may still be in the queue
     if (config_.on_cancel_pending_responses) {
@@ -1353,6 +1368,11 @@ void VoicePipeline::cancel_speech() {
 bool VoicePipeline::is_speaking() const {
     if (!async_tts_ || !async_tts_->queue) {
         return state_ == PipelineState::SPEAKING;
+    }
+    // If cancelled, we're no longer "speaking" even if the consumer thread
+    // hasn't fully exited yet (cancel_fast sets cancelled without joining).
+    if (async_tts_->cancelled.load()) {
+        return false;
     }
     return async_tts_->queue->is_active();
 }
