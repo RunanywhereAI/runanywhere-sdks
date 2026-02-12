@@ -1070,6 +1070,7 @@ bool ONNXVAD::unload_model() {
     }
 #endif
 
+    pending_samples_.clear();
     model_loaded_ = false;
     return true;
 }
@@ -1089,10 +1090,16 @@ VADResult ONNXVAD::process(const std::vector<float>& audio_samples, int sample_r
 
     const int32_t window_size = 512;  // Silero native window size
 
-    // Feed audio in window_size chunks (Silero requires exactly 512 samples per call)
-    for (size_t i = 0; i + window_size <= audio_samples.size(); i += window_size) {
+    // Append incoming audio to the pending buffer.
+    // Audio capture may deliver chunks smaller than window_size (e.g. 256 samples),
+    // but Silero VAD requires exactly 512 samples per call.
+    pending_samples_.insert(pending_samples_.end(), audio_samples.begin(), audio_samples.end());
+
+    // Feed complete window_size chunks to Silero VAD
+    while (pending_samples_.size() >= static_cast<size_t>(window_size)) {
         SherpaOnnxVoiceActivityDetectorAcceptWaveform(
-            sherpa_vad_, audio_samples.data() + i, window_size);
+            sherpa_vad_, pending_samples_.data(), window_size);
+        pending_samples_.erase(pending_samples_.begin(), pending_samples_.begin() + window_size);
     }
 
     // Check if speech is currently detected in the latest frame
@@ -1134,6 +1141,7 @@ void ONNXVAD::reset() {
         SherpaOnnxVoiceActivityDetectorReset(sherpa_vad_);
     }
 #endif
+    pending_samples_.clear();
 }
 
 VADConfig ONNXVAD::get_vad_config() const {
