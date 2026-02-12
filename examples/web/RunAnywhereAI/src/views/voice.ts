@@ -1,11 +1,24 @@
 /**
  * Voice Tab - Voice Assistant with pipeline setup and particle animation
  * Matches iOS VoiceAssistantView.
+ *
+ * Pipeline flow:  Mic → STT → LLM (streaming) → TTS → Speaker
  */
 
 import { showModelSelectionSheet } from '../components/model-selection';
 import { ModelManager, type ModelModality } from '../services/model-manager';
 import { MicCapture } from '../services/audio';
+
+// Lazy-imported SDK modules (loaded only when pipeline runs)
+type SDKModules = typeof import('../../../../../sdk/runanywhere-web/packages/core/src/index');
+let sdkModules: SDKModules | null = null;
+
+async function getSDK(): Promise<SDKModules> {
+  if (!sdkModules) {
+    sdkModules = await import('../../../../../sdk/runanywhere-web/packages/core/src/index');
+  }
+  return sdkModules;
+}
 
 // ---------------------------------------------------------------------------
 // Pipeline step definitions
@@ -25,6 +38,17 @@ const PIPELINE_STEPS: PipelineStep[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// VAD Configuration (matches iOS VoiceSessionConfig defaults)
+// ---------------------------------------------------------------------------
+
+/** Audio level threshold (0–1) to detect speech */
+const SPEECH_THRESHOLD = 0.08;
+/** Seconds of silence after speech before auto-processing */
+const SILENCE_DURATION = 1.5;
+/** Minimum audio buffer (samples at 16kHz) to process — ~0.5s */
+const MIN_AUDIO_SAMPLES = 8000;
+
+// ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
 
@@ -35,6 +59,16 @@ let state: VoiceState = 'setup';
 let canvas: HTMLCanvasElement;
 let animationFrame: number | null = null;
 let particles: Particle[] = [];
+
+/** Whether the continuous conversation session is active */
+let sessionActive = false;
+/** Cancel function for in-progress LLM generation */
+let cancelGeneration: (() => void) | null = null;
+/** VAD state */
+let isSpeechActive = false;
+let lastSpeechTime: number | null = null;
+/** VAD polling interval */
+let vadInterval: ReturnType<typeof setInterval> | null = null;
 
 interface Particle {
   x: number; y: number;
@@ -215,9 +249,8 @@ function transitionToVoiceInterface(): void {
 
 /** Switch from voice interface → pipeline setup */
 function transitionToSetup(): void {
+  stopSession();
   state = 'setup';
-  stopParticles();
-  if (MicCapture.isCapturing) MicCapture.stop();
   const setup = container.querySelector('#voice-setup') as HTMLElement;
   const iface = container.querySelector('#voice-interface') as HTMLElement;
   if (setup) setup.style.display = 'flex';
@@ -225,30 +258,238 @@ function transitionToSetup(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Mic Toggle
+// UI Helpers
+// ---------------------------------------------------------------------------
+
+function setStatus(text: string): void {
+  const el = container.querySelector('#voice-status');
+  if (el) el.textContent = text;
+}
+
+function setResponse(html: string): void {
+  const el = container.querySelector('#voice-response');
+  if (el) el.innerHTML = html;
+}
+
+function setMicActive(active: boolean): void {
+  const micBtn = container.querySelector('#voice-mic-btn');
+  if (micBtn) micBtn.classList.toggle('listening', active);
+}
+
+// ---------------------------------------------------------------------------
+// Mic Toggle — starts / stops the continuous conversation session
 // ---------------------------------------------------------------------------
 
 async function toggleMic(): Promise<void> {
-  const micBtn = container.querySelector('#voice-mic-btn')!;
-  const statusEl = container.querySelector('#voice-status')!;
-
-  if (MicCapture.isCapturing) {
-    MicCapture.stop();
-    micBtn.classList.remove('listening');
-    statusEl.textContent = 'Tap to speak';
-    stopParticles();
+  if (sessionActive) {
+    stopSession();
   } else {
-    try {
-      await MicCapture.start((level) => {
-        updateParticles(level);
-      });
-      micBtn.classList.add('listening');
-      statusEl.textContent = 'Listening...';
-      startParticles();
-    } catch (err) {
-      statusEl.textContent = 'Microphone access denied';
+    await startSession();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Continuous conversation session  (matches iOS VoiceSessionHandle)
+//
+//   ┌──────────────────────────────────────────────┐
+//   │  [listening] ──(VAD silence)──► [processing]  │
+//   │       ▲                              │        │
+//   │       └──── [speaking] ◄─────────────┘        │
+//   └──────────────────────────────────────────────┘
+// ---------------------------------------------------------------------------
+
+async function startSession(): Promise<void> {
+  sessionActive = true;
+  setMicActive(true);
+  setResponse('');
+  await startListening();
+}
+
+function stopSession(): void {
+  sessionActive = false;
+  if (cancelGeneration) {
+    cancelGeneration();
+    cancelGeneration = null;
+  }
+  stopVAD();
+  if (MicCapture.isCapturing) MicCapture.stop();
+  setMicActive(false);
+  stopParticles();
+  state = 'idle';
+  setStatus('Tap to speak');
+}
+
+/** Begin capturing audio and monitoring with VAD */
+async function startListening(): Promise<void> {
+  if (!sessionActive) return;
+
+  state = 'listening';
+  isSpeechActive = false;
+  lastSpeechTime = null;
+  setStatus('Listening...');
+
+  try {
+    await MicCapture.start((level) => updateParticles(level));
+    startParticles();
+    startVAD();
+  } catch {
+    setStatus('Microphone access denied');
+    stopSession();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// VAD — energy-threshold voice activity detection (matches iOS)
+// ---------------------------------------------------------------------------
+
+function startVAD(): void {
+  stopVAD();
+  vadInterval = setInterval(() => checkSpeechState(MicCapture.currentLevel), 50);
+}
+
+function stopVAD(): void {
+  if (vadInterval) {
+    clearInterval(vadInterval);
+    vadInterval = null;
+  }
+}
+
+function checkSpeechState(level: number): void {
+  if (!sessionActive || state !== 'listening') return;
+
+  if (level > SPEECH_THRESHOLD) {
+    if (!isSpeechActive) {
+      console.log('[Voice] Speech started');
+      isSpeechActive = true;
+    }
+    lastSpeechTime = Date.now();
+  } else if (isSpeechActive && lastSpeechTime) {
+    const silenceMs = Date.now() - lastSpeechTime;
+    if (silenceMs > SILENCE_DURATION * 1000) {
+      console.log(`[Voice] Silence detected (${(silenceMs / 1000).toFixed(1)}s)`);
+      isSpeechActive = false;
+
+      // Drain audio and process if we have enough data
+      const audioData = MicCapture.drainBuffer();
+      if (audioData.length >= MIN_AUDIO_SAMPLES) {
+        // Stop mic during processing (will restart after TTS)
+        stopVAD();
+        MicCapture.stop();
+        stopParticles();
+        runPipeline(audioData);
+      }
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Voice Pipeline:  Audio → STT → LLM (streaming) → TTS → Speaker → Listen
+// ---------------------------------------------------------------------------
+
+async function runPipeline(audioData: Float32Array): Promise<void> {
+  state = 'processing';
+  const sdk = await getSDK();
+
+  try {
+    // ── Step 1: STT ──
+    setStatus('Transcribing...');
+    console.log(`[Voice] STT: ${(audioData.length / 16000).toFixed(1)}s of audio`);
+
+    const sttResult = await sdk.STT.transcribe(audioData, { sampleRate: 16000 });
+    const userText = sttResult.text.trim();
+
+    if (!userText) {
+      console.log('[Voice] No speech detected');
+      // Resume listening in continuous mode
+      if (sessionActive) {
+        await startListening();
+      } else {
+        setStatus('Tap to speak');
+        state = 'idle';
+      }
+      return;
+    }
+
+    console.log(`[Voice] STT result: "${userText}" (${sttResult.processingTimeMs}ms)`);
+    setResponse(`<div style="color:var(--text-secondary);margin-bottom:8px;"><strong>You:</strong> ${escapeHtml(userText)}</div>`);
+    setStatus('Thinking...');
+
+    // ── Step 2: LLM (streaming) ──
+    const systemPrompt =
+      'You are a helpful voice assistant. Keep responses concise — 1-3 sentences. Be conversational and friendly.';
+
+    const { stream, result, cancel } = sdk.TextGeneration.generateStream(userText, {
+      maxTokens: 150,
+      temperature: 0.7,
+      systemPrompt,
+    });
+    cancelGeneration = cancel;
+
+    // Append a response container
+    const responseEl = container.querySelector('#voice-response');
+    if (responseEl) {
+      responseEl.innerHTML += `<div><strong>Assistant:</strong> <span id="voice-llm-output"></span></div>`;
+    }
+    const outputSpan = container.querySelector('#voice-llm-output');
+
+    let fullResponse = '';
+    for await (const token of stream) {
+      if (!sessionActive) return; // session was stopped
+      fullResponse += token;
+      if (outputSpan) outputSpan.textContent = fullResponse;
+    }
+
+    cancelGeneration = null;
+
+    const llmResult = await result;
+    fullResponse = llmResult.text || fullResponse;
+    if (outputSpan) outputSpan.textContent = fullResponse;
+    console.log(`[Voice] LLM: ${llmResult.tokensUsed} tokens, ${llmResult.tokensPerSecond.toFixed(1)} tok/s`);
+
+    if (!fullResponse.trim()) {
+      if (sessionActive) {
+        await startListening();
+      } else {
+        setStatus('Tap to speak');
+        state = 'idle';
+      }
+      return;
+    }
+
+    // ── Step 3: TTS ──
+    state = 'speaking';
+    setStatus('Speaking...');
+
+    const ttsResult = await sdk.TTS.synthesize(fullResponse.trim(), { speed: 1.0 });
+    console.log(`[Voice] TTS: ${ttsResult.durationMs}ms audio in ${ttsResult.processingTimeMs}ms`);
+
+    // ── Step 4: Play audio ──
+    const player = new sdk.AudioPlayback({ sampleRate: ttsResult.sampleRate });
+    await player.play(ttsResult.audioData, ttsResult.sampleRate);
+    player.dispose();
+
+    // ── Step 5: Resume listening (continuous mode) ──
+    if (sessionActive) {
+      await startListening();
+    } else {
+      state = 'idle';
+      setStatus('Tap to speak');
+    }
+  } catch (err) {
+    console.error('[Voice] Pipeline error:', err);
+    const msg = err instanceof Error ? err.message : String(err);
+    setStatus(`Error: ${msg}`);
+    // Try to resume listening even after an error
+    if (sessionActive) {
+      await startListening();
+    } else {
+      state = 'idle';
+    }
+  }
+}
+
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 // ---------------------------------------------------------------------------

@@ -241,25 +241,65 @@ class ModelManagerImpl {
 
   constructor() {
     this.models = REGISTERED_MODELS.map((m) => ({ ...m, status: 'registered' as ModelStatus }));
+    // Request persistent storage so browser won't evict our cached models
+    this.requestPersistentStorage();
     // Check OPFS for previously downloaded models (async, updates status when done)
     this.refreshDownloadStatus();
+  }
+
+  /** Request persistent storage to prevent browser from evicting cached models */
+  private async requestPersistentStorage(): Promise<void> {
+    try {
+      if (navigator.storage?.persist) {
+        const persisted = await navigator.storage.persist();
+        console.log(`[ModelManager] Persistent storage: ${persisted ? 'granted' : 'denied'}`);
+      }
+    } catch {
+      // Not supported or denied — non-critical
+    }
   }
 
   /**
    * Check OPFS for models that were downloaded in a previous session.
    * Updates their status from 'registered' to 'downloaded'.
+   * Only checks file existence + size — does NOT read file contents into memory.
    */
   private async refreshDownloadStatus(): Promise<void> {
     for (const model of this.models) {
       if (model.status !== 'registered') continue;
       try {
-        const data = await this.loadFromOPFS(model.id);
-        if (data && data.length > 0) {
-          this.updateModel(model.id, { status: 'downloaded', sizeBytes: data.length });
+        const size = await this.getOPFSFileSize(model.id);
+        if (size !== null && size > 0) {
+          this.updateModel(model.id, { status: 'downloaded', sizeBytes: size });
         }
       } catch {
         // Not in OPFS, keep as registered
       }
+    }
+  }
+
+  /** Check if a file exists in OPFS and return its size (without reading it) */
+  private async getOPFSFileSize(key: string): Promise<number | null> {
+    try {
+      const root = await this.getOPFSRoot();
+      const modelsDir = await root.getDirectoryHandle('models');
+
+      if (key.includes('/')) {
+        const parts = key.split('/');
+        let dir = modelsDir;
+        for (let i = 0; i < parts.length - 1; i++) {
+          dir = await dir.getDirectoryHandle(parts[i]);
+        }
+        const fileHandle = await dir.getFileHandle(parts[parts.length - 1]);
+        const file = await fileHandle.getFile();
+        return file.size;
+      } else {
+        const fileHandle = await modelsDir.getFileHandle(key);
+        const file = await fileHandle.getFile();
+        return file.size;
+      }
+    } catch {
+      return null;
     }
   }
 
@@ -789,6 +829,10 @@ class ModelManagerImpl {
       const root = await this.getOPFSRoot();
       const modelsDir = await root.getDirectoryHandle('models', { create: true });
 
+      // Use the Uint8Array directly (NOT data.buffer — which could be a
+      // larger ArrayBuffer if data is a view/slice).
+      const writeData = data;
+
       // Handle nested keys (e.g., "modelId/filename.gguf")
       if (key.includes('/')) {
         const parts = key.split('/');
@@ -798,16 +842,18 @@ class ModelManagerImpl {
         }
         const fileHandle = await dir.getFileHandle(parts[parts.length - 1], { create: true });
         const writable = await fileHandle.createWritable();
-        await writable.write(data.buffer as ArrayBuffer);
+        await writable.write(writeData);
         await writable.close();
       } else {
         const fileHandle = await modelsDir.getFileHandle(key, { create: true });
         const writable = await fileHandle.createWritable();
-        await writable.write(data.buffer as ArrayBuffer);
+        await writable.write(writeData);
         await writable.close();
       }
-    } catch {
-      console.warn('OPFS not available, model stored in memory only');
+      console.log(`[ModelManager] Stored ${key} in OPFS (${(data.length / 1024 / 1024).toFixed(1)} MB)`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[ModelManager] OPFS store failed for "${key}": ${msg}`);
     }
   }
 
@@ -816,6 +862,7 @@ class ModelManagerImpl {
       const root = await this.getOPFSRoot();
       const modelsDir = await root.getDirectoryHandle('models');
 
+      let file: File;
       if (key.includes('/')) {
         const parts = key.split('/');
         let dir = modelsDir;
@@ -823,16 +870,23 @@ class ModelManagerImpl {
           dir = await dir.getDirectoryHandle(parts[i]);
         }
         const fileHandle = await dir.getFileHandle(parts[parts.length - 1]);
-        const file = await fileHandle.getFile();
-        const buffer = await file.arrayBuffer();
-        return new Uint8Array(buffer);
+        file = await fileHandle.getFile();
       } else {
         const fileHandle = await modelsDir.getFileHandle(key);
-        const file = await fileHandle.getFile();
-        const buffer = await file.arrayBuffer();
-        return new Uint8Array(buffer);
+        file = await fileHandle.getFile();
       }
-    } catch {
+
+      console.log(`[ModelManager] Loading ${key} from OPFS (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
+      const buffer = await file.arrayBuffer();
+      return new Uint8Array(buffer);
+    } catch (err) {
+      // NotFoundError is expected for files that haven't been downloaded yet
+      if (err instanceof DOMException && err.name === 'NotFoundError') {
+        return null;
+      }
+      // Log unexpected errors
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[ModelManager] OPFS load failed for "${key}": ${msg}`);
       return null;
     }
   }
