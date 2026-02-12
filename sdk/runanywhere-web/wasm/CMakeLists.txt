@@ -72,16 +72,11 @@ set(RAC_BACKEND_ONNX ${RAC_WASM_ONNX} CACHE BOOL "" FORCE)
 # Disable VLM for initial WASM (reduces build complexity)
 set(RAC_VLM_USE_MTMD OFF CACHE BOOL "" FORCE)
 
-# Add RACommons as subdirectory (builds rac_commons static library)
-add_subdirectory("${RAC_COMMONS_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/rac_commons")
-
-# =============================================================================
-# LLAMA.CPP WASM CONFIGURATION
-# =============================================================================
-
 # =============================================================================
 # BACKEND-SPECIFIC CONFIGURATION
 # =============================================================================
+# IMPORTANT: These must be set BEFORE add_subdirectory() so that llama.cpp,
+# whisper.cpp, and ONNX CMake files see the correct cache variables.
 
 if(RAC_WASM_LLAMACPP)
     message(STATUS "Building with llama.cpp LLM backend for WASM")
@@ -101,6 +96,14 @@ if(RAC_WASM_LLAMACPP)
     set(GGML_LLAMAFILE OFF CACHE BOOL "" FORCE)
     set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
     set(GGML_CPU_HBM OFF CACHE BOOL "" FORCE)
+
+    # Disable wasm64 / MEMORY64 mode -- not yet widely supported in browsers
+    # and causes wasm32/wasm64 linker mismatch with our main module
+    set(LLAMA_WASM_MEM64 OFF CACHE BOOL "" FORCE)
+
+    # Disable llama.cpp HTML output and single-file embedding
+    set(LLAMA_BUILD_HTML OFF CACHE BOOL "" FORCE)
+    set(LLAMA_WASM_SINGLE_FILE OFF CACHE BOOL "" FORCE)
 endif()
 
 if(RAC_WASM_WHISPERCPP)
@@ -126,6 +129,10 @@ if(RAC_WASM_ONNX)
     set(ORT_USE_COREML OFF CACHE BOOL "" FORCE)
     set(ORT_USE_NNAPI OFF CACHE BOOL "" FORCE)
 endif()
+
+# Add RACommons as subdirectory (builds rac_commons static library)
+# Must come AFTER backend configuration so cache variables are set.
+add_subdirectory("${RAC_COMMONS_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/rac_commons")
 
 # =============================================================================
 # WASM PLATFORM SHIMS

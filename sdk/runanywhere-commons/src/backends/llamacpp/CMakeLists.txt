@@ -141,10 +141,13 @@ else()
     )
 endif()
 
+# Resolve the runanywhere-commons root (3 levels up from src/backends/llamacpp/)
+get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
+
 target_include_directories(rac_backend_llamacpp PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/include/rac/backends
+    ${RAC_COMMONS_ROOT_DIR}/include
+    ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
     ${llamacpp_SOURCE_DIR}/include
     ${llamacpp_SOURCE_DIR}/common
     ${llamacpp_SOURCE_DIR}/ggml/include
@@ -220,7 +223,7 @@ if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED)
 
         target_include_directories(rac_backend_llamacpp_jni PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
-            ${CMAKE_SOURCE_DIR}/include
+            ${RAC_COMMONS_ROOT_DIR}/include
         )
 
         target_link_libraries(rac_backend_llamacpp_jni PRIVATE
