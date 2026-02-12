@@ -26,6 +26,7 @@ message(STATUS "Building RACommons for WebAssembly (Emscripten)")
 option(RAC_WASM_PTHREADS "Enable pthreads (requires SharedArrayBuffer)" OFF)
 option(RAC_WASM_DEBUG "Enable debug assertions and verbose logging" OFF)
 option(RAC_WASM_LLAMACPP "Build with llama.cpp LLM backend" OFF)
+option(RAC_WASM_VLM "Build with VLM (Vision Language Model) support via llama.cpp mtmd" OFF)
 option(RAC_WASM_WHISPERCPP "Build with whisper.cpp STT backend" OFF)
 option(RAC_WASM_ONNX "Build with sherpa-onnx TTS/VAD backend" OFF)
 
@@ -69,8 +70,16 @@ set(RAC_BACKEND_LLAMACPP ${RAC_WASM_LLAMACPP} CACHE BOOL "" FORCE)
 set(RAC_BACKEND_WHISPERCPP ${RAC_WASM_WHISPERCPP} CACHE BOOL "" FORCE)
 set(RAC_BACKEND_ONNX ${RAC_WASM_ONNX} CACHE BOOL "" FORCE)
 
-# Disable VLM for initial WASM (reduces build complexity)
-set(RAC_VLM_USE_MTMD OFF CACHE BOOL "" FORCE)
+# VLM support via llama.cpp mtmd (multimodal vision encoder)
+if(RAC_WASM_VLM AND RAC_WASM_LLAMACPP)
+    set(RAC_VLM_USE_MTMD ON CACHE BOOL "" FORCE)
+    message(STATUS "VLM multimodal support ENABLED via mtmd (CLIP/SigLIP)")
+else()
+    set(RAC_VLM_USE_MTMD OFF CACHE BOOL "" FORCE)
+    if(RAC_WASM_VLM AND NOT RAC_WASM_LLAMACPP)
+        message(WARNING "VLM requires llama.cpp backend (--llamacpp). Disabling VLM.")
+    endif()
+endif()
 
 # =============================================================================
 # BACKEND-SPECIFIC CONFIGURATION
@@ -535,6 +544,23 @@ if(RAC_WASM_LLAMACPP)
     )
 endif()
 
+# Add llama.cpp VLM backend exports if enabled
+if(RAC_WASM_VLM AND RAC_WASM_LLAMACPP)
+    list(APPEND RAC_EXPORTED_FUNCTIONS
+        "_rac_vlm_llamacpp_create"
+        "_rac_vlm_llamacpp_load_model"
+        "_rac_vlm_llamacpp_unload_model"
+        "_rac_vlm_llamacpp_is_model_loaded"
+        "_rac_vlm_llamacpp_process"
+        "_rac_vlm_llamacpp_process_stream"
+        "_rac_vlm_llamacpp_cancel"
+        "_rac_vlm_llamacpp_get_model_info"
+        "_rac_vlm_llamacpp_destroy"
+        "_rac_backend_llamacpp_vlm_register"
+        "_rac_backend_llamacpp_vlm_unregister"
+    )
+endif()
+
 # Add whisper.cpp backend exports if enabled
 if(RAC_WASM_WHISPERCPP)
     list(APPEND RAC_EXPORTED_FUNCTIONS
@@ -610,6 +636,10 @@ target_compile_definitions(racommons PRIVATE
 
 if(RAC_WASM_LLAMACPP)
     target_compile_definitions(racommons PRIVATE RAC_WASM_LLAMACPP=1)
+endif()
+
+if(RAC_WASM_VLM AND RAC_WASM_LLAMACPP)
+    target_compile_definitions(racommons PRIVATE RAC_WASM_VLM=1)
 endif()
 
 if(RAC_WASM_WHISPERCPP)
@@ -740,6 +770,7 @@ message(STATUS "RACommons:    ${RAC_COMMONS_DIR}")
 message(STATUS "pthreads:     ${RAC_WASM_PTHREADS}")
 message(STATUS "Debug:        ${RAC_WASM_DEBUG}")
 message(STATUS "llama.cpp:    ${RAC_WASM_LLAMACPP}")
+message(STATUS "VLM (mtmd):   ${RAC_VLM_USE_MTMD}")
 message(STATUS "whisper.cpp:  ${RAC_WASM_WHISPERCPP}")
 message(STATUS "sherpa-onnx:  ${RAC_WASM_ONNX}")
 message(STATUS "Output:       ${WASM_OUTPUT_DIR}")
