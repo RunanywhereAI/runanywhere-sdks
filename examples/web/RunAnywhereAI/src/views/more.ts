@@ -170,7 +170,11 @@ export function initMoreTab(el: HTMLElement): void {
           More
         </button>
         <div class="toolbar-title">Speak</div>
-        <div class="toolbar-actions"></div>
+        <div class="toolbar-actions">
+          <button class="btn btn-icon" id="tts-model-btn" title="Select TTS Model" style="border:none;background:none;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0 1 12 15a9.065 9.065 0 0 0-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0 1 12 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5"/></svg>
+          </button>
+        </div>
       </div>
       <div class="scroll-area" style="display:flex;flex-direction:column;align-items:center;gap:var(--space-xl);padding:var(--space-3xl);">
         <textarea class="chat-input" id="speak-text" placeholder="Enter text to speak..." rows="5" style="max-width:400px;width:100%;min-height:120px;"></textarea>
@@ -180,6 +184,8 @@ export function initMoreTab(el: HTMLElement): void {
           <input type="range" id="speak-speed" min="0.5" max="2" step="0.1" value="1" style="flex:1;">
           <span id="speak-speed-val" style="font-size:var(--font-size-sm);min-width:30px;text-align:right;">1.0x</span>
         </div>
+        <div id="tts-error" style="display:none;color:var(--color-red);font-size:var(--font-size-sm);text-align:center;width:100%;max-width:400px;"></div>
+        <div id="tts-status" style="display:none;color:var(--text-secondary);font-size:var(--font-size-sm);text-align:center;width:100%;max-width:400px;"></div>
         <button class="btn btn-primary btn-lg" id="speak-btn" style="width:100%;max-width:400px;background:var(--color-purple);border-color:var(--color-purple);">
           Speak
         </button>
@@ -221,16 +227,7 @@ export function initMoreTab(el: HTMLElement): void {
   initTranscribeView();
 
   // --- Speak (TTS) setup ---
-  const speedSlider = container.querySelector('#speak-speed') as HTMLInputElement;
-  const speedVal = container.querySelector('#speak-speed-val')!;
-  speedSlider.addEventListener('input', () => {
-    speedVal.textContent = parseFloat(speedSlider.value).toFixed(1) + 'x';
-  });
-
-  container.querySelector('#speak-surprise-btn')!.addEventListener('click', () => {
-    const textArea = container.querySelector('#speak-text') as HTMLTextAreaElement;
-    textArea.value = SURPRISE_TEXTS[Math.floor(Math.random() * SURPRISE_TEXTS.length)];
-  });
+  initSpeakView();
 
   // --- Storage setup ---
   container.querySelector('#storage-back')!.addEventListener('click', refreshStorage);
@@ -529,6 +526,138 @@ function renderSTTUI(): void {
       micIcon.innerHTML = `<circle cx="12" cy="12" r="8" stroke-dasharray="40" stroke-dashoffset="10"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/></circle>`;
       statusText.textContent = 'Transcribing...';
       break;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Speak (TTS) View Logic
+// ---------------------------------------------------------------------------
+
+let ttsIsSpeaking = false;
+let ttsPlayback: InstanceType<typeof import('../../../../../sdk/runanywhere-web/packages/core/src/Infrastructure/AudioPlayback').AudioPlayback> | null = null;
+
+function initSpeakView(): void {
+  const speedSlider = container.querySelector('#speak-speed') as HTMLInputElement;
+  const speedVal = container.querySelector('#speak-speed-val')!;
+  const modelBtn = container.querySelector('#tts-model-btn')!;
+  const speakBtn = container.querySelector('#speak-btn')!;
+
+  speedSlider.addEventListener('input', () => {
+    speedVal.textContent = parseFloat(speedSlider.value).toFixed(1) + 'x';
+  });
+
+  container.querySelector('#speak-surprise-btn')!.addEventListener('click', () => {
+    const textArea = container.querySelector('#speak-text') as HTMLTextAreaElement;
+    textArea.value = SURPRISE_TEXTS[Math.floor(Math.random() * SURPRISE_TEXTS.length)];
+  });
+
+  // Model selection
+  modelBtn.addEventListener('click', () => showModelSelectionSheet('speechSynthesis'));
+
+  // Speak button
+  speakBtn.addEventListener('click', handleSpeak);
+
+  // Stop on back
+  container.querySelector('#speak-back')!.addEventListener('click', () => {
+    if (ttsPlayback) {
+      ttsPlayback.stop();
+      ttsIsSpeaking = false;
+      renderSpeakUI();
+    }
+  });
+}
+
+async function handleSpeak(): Promise<void> {
+  const textArea = container.querySelector('#speak-text') as HTMLTextAreaElement;
+  const speedSlider = container.querySelector('#speak-speed') as HTMLInputElement;
+  const errorEl = container.querySelector('#tts-error') as HTMLElement;
+  const statusEl = container.querySelector('#tts-status') as HTMLElement;
+
+  const text = textArea.value.trim();
+  if (!text) {
+    errorEl.style.display = '';
+    errorEl.textContent = 'Please enter some text to speak.';
+    return;
+  }
+
+  // If currently speaking, stop
+  if (ttsIsSpeaking && ttsPlayback) {
+    ttsPlayback.stop();
+    ttsIsSpeaking = false;
+    renderSpeakUI();
+    return;
+  }
+
+  errorEl.style.display = 'none';
+  statusEl.style.display = '';
+  statusEl.textContent = 'Loading TTS model...';
+
+  try {
+    // Check if a TTS model is loaded; auto-load if needed
+    const ttsModels = ModelManager.getTTSModels();
+    const loaded = ttsModels.find(m => m.status === 'loaded');
+    const downloaded = ttsModels.find(m => m.status === 'downloaded');
+
+    if (!loaded && !downloaded) {
+      throw new Error(
+        'No TTS model available. Tap the model button (top right) to download a Speech Synthesis model.'
+      );
+    }
+
+    if (!loaded && downloaded) {
+      statusEl.textContent = `Loading ${downloaded.name}...`;
+      const ok = await ModelManager.loadModel(downloaded.id);
+      if (!ok) throw new Error(`Failed to load TTS model: ${downloaded.name}`);
+    }
+
+    // Synthesize
+    statusEl.textContent = 'Synthesizing speech...';
+    const speed = parseFloat(speedSlider.value);
+
+    const { TTS, AudioPlayback } = await import(
+      '../../../../../sdk/runanywhere-web/packages/core/src/index'
+    );
+
+    if (!TTS.isVoiceLoaded) {
+      throw new Error('TTS voice not loaded. Select and load a model first.');
+    }
+
+    const result = await TTS.synthesize(text, { speed });
+
+    // Play audio
+    statusEl.textContent = `Playing (${(result.durationMs / 1000).toFixed(1)}s)...`;
+    ttsIsSpeaking = true;
+    renderSpeakUI();
+
+    if (!ttsPlayback) {
+      ttsPlayback = new AudioPlayback();
+    }
+
+    await ttsPlayback.play(result.audioData, result.sampleRate);
+
+    // Done
+    ttsIsSpeaking = false;
+    statusEl.textContent = `Done — ${(result.durationMs / 1000).toFixed(1)}s audio in ${(result.processingTimeMs / 1000).toFixed(1)}s`;
+    renderSpeakUI();
+  } catch (err) {
+    ttsIsSpeaking = false;
+    errorEl.style.display = '';
+    errorEl.textContent = err instanceof Error ? err.message : String(err);
+    statusEl.style.display = 'none';
+    renderSpeakUI();
+  }
+}
+
+function renderSpeakUI(): void {
+  const speakBtn = container.querySelector('#speak-btn') as HTMLButtonElement;
+  if (ttsIsSpeaking) {
+    speakBtn.textContent = 'Stop';
+    speakBtn.style.background = 'var(--color-red)';
+    speakBtn.style.borderColor = 'var(--color-red)';
+  } else {
+    speakBtn.textContent = 'Speak';
+    speakBtn.style.background = 'var(--color-purple)';
+    speakBtn.style.borderColor = 'var(--color-purple)';
   }
 }
 

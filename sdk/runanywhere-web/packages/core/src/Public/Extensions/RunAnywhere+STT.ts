@@ -52,6 +52,11 @@ let _onlineRecognizerHandle = 0;
 let _currentModelType: STTModelType = 'whisper';
 let _currentModelId = '';
 
+/** Returns the currently loaded STT model type. */
+export function getCurrentSTTModelType(): STTModelType {
+  return _currentModelType;
+}
+
 // ---------------------------------------------------------------------------
 // STT Types
 // ---------------------------------------------------------------------------
