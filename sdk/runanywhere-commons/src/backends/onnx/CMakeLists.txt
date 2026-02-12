@@ -143,10 +143,13 @@ else()
     add_library(rac_backend_onnx STATIC ${ONNX_BACKEND_SOURCES} ${ONNX_BACKEND_HEADERS})
 endif()
 
+# Resolve the runanywhere-commons root (3 levels up from src/backends/onnx/)
+get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
+
 target_include_directories(rac_backend_onnx PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/include/rac/backends
+    ${RAC_COMMONS_ROOT_DIR}/include
+    ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
 )
 
 # Define RAC_ONNX_BUILDING to export symbols with visibility("default")
@@ -172,7 +175,12 @@ target_compile_features(rac_backend_onnx PUBLIC cxx_std_17)
 # Platform-specific configuration
 # =============================================================================
 
-if(RAC_PLATFORM_IOS)
+if(RAC_PLATFORM_WASM)
+    # WASM: CPU-only, no platform acceleration
+    target_compile_definitions(rac_backend_onnx PRIVATE RAC_PLATFORM_WASM=1)
+    message(STATUS "ONNX Backend: CPU-only EP for WASM")
+
+elseif(RAC_PLATFORM_IOS)
     target_link_libraries(rac_backend_onnx PUBLIC
         "-framework Foundation"
         "-framework CoreML"
@@ -215,7 +223,7 @@ if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED)
 
         target_include_directories(rac_backend_onnx_jni PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
-            ${CMAKE_SOURCE_DIR}/include
+            ${RAC_COMMONS_ROOT_DIR}/include
         )
 
         target_link_libraries(rac_backend_onnx_jni PRIVATE

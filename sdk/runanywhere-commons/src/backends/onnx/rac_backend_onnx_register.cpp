@@ -13,8 +13,13 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <filesystem>
 #include <vector>
+
+// std::filesystem is not available on Emscripten/WASM
+#ifndef __EMSCRIPTEN__
+#include <filesystem>
+namespace fs = std::filesystem;
+#endif
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
@@ -23,8 +28,6 @@
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/infrastructure/model_management/rac_model_strategy.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
-
-namespace fs = std::filesystem;
 
 // =============================================================================
 // STT VTABLE IMPLEMENTATION
