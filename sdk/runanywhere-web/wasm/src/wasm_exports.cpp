@@ -35,6 +35,10 @@
 #include "rac/backends/rac_llm_llamacpp.h"
 #endif
 
+#if defined(RAC_WASM_LLAMACPP) && defined(RAC_WASM_VLM)
+#include "rac/backends/rac_vlm_llamacpp.h"
+#endif
+
 #ifdef RAC_WASM_WHISPERCPP
 #include "rac/backends/rac_stt_whispercpp.h"
 #endif

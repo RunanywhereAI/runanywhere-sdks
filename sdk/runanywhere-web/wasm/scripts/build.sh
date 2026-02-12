@@ -30,6 +30,7 @@ BUILD_TYPE="Release"
 PTHREADS="OFF"
 DEBUG="OFF"
 LLAMACPP="OFF"
+VLM="OFF"
 WHISPERCPP="OFF"
 ONNX="OFF"
 CLEAN=false
@@ -50,6 +51,11 @@ while [[ $# -gt 0 ]]; do
             LLAMACPP="ON"
             shift
             ;;
+        --vlm)
+            VLM="ON"
+            LLAMACPP="ON"  # VLM requires llama.cpp
+            shift
+            ;;
         --whispercpp)
             WHISPERCPP="ON"
             shift
@@ -60,6 +66,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         --all-backends)
             LLAMACPP="ON"
+            VLM="ON"
             WHISPERCPP="ON"
             ONNX="ON"
             shift
@@ -75,9 +82,10 @@ while [[ $# -gt 0 ]]; do
             echo "  --debug          Debug build with assertions and safe heap"
             echo "  --pthreads       Enable pthreads (requires Cross-Origin Isolation)"
             echo "  --llamacpp       Include llama.cpp LLM backend"
+            echo "  --vlm            Include VLM (Vision Language Model) via llama.cpp mtmd"
             echo "  --whispercpp     Include whisper.cpp STT backend"
             echo "  --onnx           Include sherpa-onnx TTS/VAD backend"
-            echo "  --all-backends   Enable all backends (llama.cpp + whisper.cpp + onnx)"
+            echo "  --all-backends   Enable all backends (llama.cpp + VLM + whisper.cpp + onnx)"
             echo "  --clean          Clean build directory before building"
             echo "  --help           Show this help"
             exit 0
@@ -103,6 +111,7 @@ echo "======================================"
 echo " Build type:   ${BUILD_TYPE}"
 echo " pthreads:     ${PTHREADS}"
 echo " llama.cpp:    ${LLAMACPP}"
+echo " VLM (mtmd):   ${VLM}"
 echo " whisper.cpp:  ${WHISPERCPP}"
 echo " sherpa-onnx:  ${ONNX}"
 echo " Debug:        ${DEBUG}"
@@ -129,6 +138,7 @@ emcmake cmake \
     -DRAC_WASM_PTHREADS="${PTHREADS}" \
     -DRAC_WASM_DEBUG="${DEBUG}" \
     -DRAC_WASM_LLAMACPP="${LLAMACPP}" \
+    -DRAC_WASM_VLM="${VLM}" \
     -DRAC_WASM_WHISPERCPP="${WHISPERCPP}" \
     -DRAC_WASM_ONNX="${ONNX}"
 

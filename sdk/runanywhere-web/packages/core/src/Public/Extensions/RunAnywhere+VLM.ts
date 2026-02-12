@@ -24,14 +24,46 @@ import { SDKEventType } from '../../types/enums';
 const logger = new SDKLogger('VLM');
 
 let _vlmComponentHandle = 0;
+let _vlmBackendRegistered = false;
 
 function requireBridge(): WASMBridge {
   if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
   return WASMBridge.shared;
 }
 
+/**
+ * Ensure the llama.cpp VLM backend is registered with the service registry.
+ * Must be called before creating the VLM component so it can find a provider.
+ */
+function ensureVLMBackendRegistered(): void {
+  if (_vlmBackendRegistered) return;
+
+  const bridge = requireBridge();
+  const m = bridge.module;
+
+  // Check if the backend registration function exists (only when built with --vlm)
+  const fn = m['_rac_backend_llamacpp_vlm_register'];
+  if (!fn) {
+    throw new SDKError(
+      SDKErrorCode.BackendNotAvailable,
+      'VLM backend not available. Rebuild WASM with --vlm flag.',
+    );
+  }
+
+  const result = m.ccall('rac_backend_llamacpp_vlm_register', 'number', [], []) as number;
+  if (result !== 0) {
+    bridge.checkResult(result, 'rac_backend_llamacpp_vlm_register');
+  }
+
+  _vlmBackendRegistered = true;
+  logger.info('VLM backend (llama.cpp mtmd) registered');
+}
+
 function ensureVLMComponent(): number {
   if (_vlmComponentHandle !== 0) return _vlmComponentHandle;
+
+  // Register the VLM backend first
+  ensureVLMBackendRegistered();
 
   const bridge = requireBridge();
   const m = bridge.module;
@@ -298,7 +330,7 @@ export const VLM = {
     );
   },
 
-  /** Clean up the VLM component. */
+  /** Clean up the VLM component and unregister backend. */
   cleanup(): void {
     if (_vlmComponentHandle !== 0) {
       try {
@@ -307,6 +339,16 @@ export const VLM = {
         );
       } catch { /* ignore */ }
       _vlmComponentHandle = 0;
+    }
+
+    if (_vlmBackendRegistered) {
+      try {
+        const fn = WASMBridge.shared.module['_rac_backend_llamacpp_vlm_unregister'];
+        if (fn) {
+          WASMBridge.shared.module.ccall('rac_backend_llamacpp_vlm_unregister', 'number', [], []);
+        }
+      } catch { /* ignore */ }
+      _vlmBackendRegistered = false;
     }
   },
 };
