@@ -18,7 +18,6 @@
 #   --android           Build for Android only (default: both)
 #   --clean             Clean build directories before building
 #   --skip-build        Skip native build (only setup frameworks/libs)
-<<<<<<< HEAD
 #   --abis=ABIS         Android ABIs to build (default: arm64-v8a)
 #                       Multiple: Use comma-separated (e.g., arm64-v8a,armeabi-v7a)
 #   --backends=LIST     Backends to build (default: onnx)
