@@ -171,7 +171,7 @@ export class PlatformAdapter {
         const path = m.UTF8ToString(pathPtr);
         const data = m.FS.readFile(path);
         const wasmPtr = m._malloc(data.length);
-        new Uint8Array(m.HEAPU8.buffer, wasmPtr, data.length).set(data);
+        WASMBridge.shared.writeBytes(data, wasmPtr);
         m.setValue(outDataPtr, wasmPtr, '*');
         m.setValue(outSizePtr, data.length, 'i32');
         return 0; // RAC_OK
@@ -186,7 +186,7 @@ export class PlatformAdapter {
     return m.addFunction((pathPtr: number, dataPtr: number, size: number, _userData: number): number => {
       try {
         const path = m.UTF8ToString(pathPtr);
-        const data = new Uint8Array(m.HEAPU8.buffer, dataPtr, size);
+        const data = WASMBridge.shared.readBytes(dataPtr, size);
         m.FS.writeFile(path, data);
         return 0;
       } catch {

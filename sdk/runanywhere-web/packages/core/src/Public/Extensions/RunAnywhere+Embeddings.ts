@@ -285,7 +285,7 @@ export const Embeddings = {
 // ---------------------------------------------------------------------------
 
 function readEmbeddingsResult(
-  _bridge: WASMBridge,
+  bridge: WASMBridge,
   m: WASMBridge['module'],
   resPtr: number,
 ): EmbeddingsResult {
@@ -306,7 +306,7 @@ function readEmbeddingsResult(
 
     const data = new Float32Array(vecDim);
     if (dataPtr && vecDim > 0) {
-      data.set(new Float32Array(m.HEAPU8.buffer, dataPtr, vecDim));
+      data.set(bridge.readFloat32Array(dataPtr, vecDim));
     }
 
     embeddings.push({ data, dimension: vecDim });

@@ -29,6 +29,7 @@ option(RAC_WASM_LLAMACPP "Build with llama.cpp LLM backend" OFF)
 option(RAC_WASM_VLM "Build with VLM (Vision Language Model) support via llama.cpp mtmd" OFF)
 option(RAC_WASM_WHISPERCPP "Build with whisper.cpp STT backend" OFF)
 option(RAC_WASM_ONNX "Build with sherpa-onnx TTS/VAD backend" OFF)
+option(RAC_WASM_WEBGPU "Enable WebGPU acceleration for llama.cpp (requires JSPI-capable browser)" OFF)
 
 # =============================================================================
 # C++ CONFIGURATION
@@ -90,7 +91,7 @@ endif()
 if(RAC_WASM_LLAMACPP)
     message(STATUS "Building with llama.cpp LLM backend for WASM")
 
-    # Disable all GPU/accelerator backends (CPU-only for WASM)
+    # Disable all GPU/accelerator backends not applicable to WASM
     set(GGML_METAL OFF CACHE BOOL "" FORCE)
     set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
     set(GGML_CUDA OFF CACHE BOOL "" FORCE)
@@ -105,6 +106,18 @@ if(RAC_WASM_LLAMACPP)
     set(GGML_LLAMAFILE OFF CACHE BOOL "" FORCE)
     set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
     set(GGML_CPU_HBM OFF CACHE BOOL "" FORCE)
+
+    # WebGPU acceleration (optional, produces separate build variant)
+    if(RAC_WASM_WEBGPU)
+        message(STATUS "WebGPU acceleration ENABLED for llama.cpp")
+        set(GGML_WEBGPU ON CACHE BOOL "" FORCE)
+        # JSPI bridges async WebGPU calls from synchronous C code
+        set(GGML_WEBGPU_JSPI ON CACHE BOOL "" FORCE)
+        set(WASM_OUTPUT_NAME "racommons-webgpu")
+    else()
+        set(GGML_WEBGPU OFF CACHE BOOL "" FORCE)
+        set(WASM_OUTPUT_NAME "racommons")
+    endif()
 
     # Disable wasm64 / MEMORY64 mode -- not yet widely supported in browsers
     # and causes wasm32/wasm64 linker mismatch with our main module
@@ -140,12 +153,14 @@ if(RAC_WASM_ONNX)
 endif()
 
 # Enable C++ exception handling at compile-time for ALL targets.
-# The linker flag -sDISABLE_EXCEPTION_CATCHING=0 enables the Emscripten
-# exception *runtime*, but without -fexceptions the Clang frontend may
-# optimize away try/catch blocks in C++ code at -O3 (assuming extern "C"
-# functions cannot throw). This global flag ensures catch blocks are
-# preserved in rac_commons, rac_backend_llamacpp, llama.cpp, etc.
-add_compile_options("-fexceptions")
+# When WebGPU is enabled, -fwasm-exceptions is required (JSPI is
+# incompatible with the older JS-based exception mechanism).
+# Otherwise, the classic -fexceptions flag works with DISABLE_EXCEPTION_CATCHING=0.
+if(RAC_WASM_WEBGPU)
+    add_compile_options("-fwasm-exceptions")
+else()
+    add_compile_options("-fexceptions")
+endif()
 
 # Add RACommons as subdirectory (builds rac_commons static library)
 # Must come AFTER backend configuration so cache variables are set.
@@ -665,6 +680,10 @@ if(RAC_WASM_LLAMACPP)
     target_compile_definitions(racommons PRIVATE RAC_WASM_LLAMACPP=1)
 endif()
 
+if(RAC_WASM_WEBGPU AND RAC_WASM_LLAMACPP)
+    target_compile_definitions(racommons PRIVATE RAC_WASM_WEBGPU=1 GGML_USE_WEBGPU=1)
+endif()
+
 if(RAC_WASM_VLM AND RAC_WASM_LLAMACPP)
     target_compile_definitions(racommons PRIVATE RAC_WASM_VLM=1)
 endif()
@@ -697,7 +716,7 @@ set(EMSCRIPTEN_LINK_FLAGS
 
     # Function exports
     "-sEXPORTED_FUNCTIONS=[${RAC_EXPORTED_FUNCTIONS_STR}]"
-    "-sEXPORTED_RUNTIME_METHODS=[\"ccall\",\"cwrap\",\"addFunction\",\"removeFunction\",\"UTF8ToString\",\"stringToUTF8\",\"lengthBytesUTF8\",\"setValue\",\"getValue\",\"FS\"]"
+    "-sEXPORTED_RUNTIME_METHODS=[\"ccall\",\"cwrap\",\"addFunction\",\"removeFunction\",\"UTF8ToString\",\"stringToUTF8\",\"lengthBytesUTF8\",\"setValue\",\"getValue\",\"FS\",\"HEAPU8\",\"HEAPF32\",\"wasmMemory\"]"
 
     # Allow JS function pointers (needed for platform adapter callbacks)
     "-sALLOW_TABLE_GROWTH=1"
@@ -708,7 +727,7 @@ set(EMSCRIPTEN_LINK_FLAGS
     # No auto-exit
     "-sNO_EXIT_RUNTIME=1"
 
-    # Error handling
+    # Error handling (overridden below for WebGPU builds)
     "-sDISABLE_EXCEPTION_CATCHING=0"
 
     # Allow undefined symbols for core-only builds (feature stubs).
@@ -729,6 +748,19 @@ if(RAC_WASM_PTHREADS)
     message(STATUS "pthreads ENABLED (requires Cross-Origin Isolation headers)")
 else()
     message(STATUS "pthreads DISABLED (single-threaded mode)")
+endif()
+
+# WebGPU / JSPI (optional, for GPU-accelerated LLM inference)
+if(RAC_WASM_WEBGPU AND RAC_WASM_LLAMACPP)
+    # JSPI + wasm-exceptions replace the older JS-based exception mechanism.
+    # Remove the conflicting flag and replace it.
+    list(REMOVE_ITEM EMSCRIPTEN_LINK_FLAGS "-sDISABLE_EXCEPTION_CATCHING=0")
+    list(APPEND EMSCRIPTEN_LINK_FLAGS
+        "-sJSPI"                     # Enable JSPI for async WebGPU calls from sync C
+        "-sASYNCIFY=0"               # JSPI replaces Asyncify (mutually exclusive)
+        "-fwasm-exceptions"          # WASM-native exceptions (required by JSPI)
+    )
+    message(STATUS "WebGPU + JSPI ENABLED (requires Chrome 113+ / Edge 113+)")
 endif()
 
 # Debug mode
@@ -752,9 +784,14 @@ endif()
 # Join flags
 string(JOIN " " EMSCRIPTEN_LINK_FLAGS_STR ${EMSCRIPTEN_LINK_FLAGS})
 
+# Determine output file name (racommons or racommons-webgpu)
+if(NOT DEFINED WASM_OUTPUT_NAME)
+    set(WASM_OUTPUT_NAME "racommons")
+endif()
+
 set_target_properties(racommons PROPERTIES
     LINK_FLAGS "${EMSCRIPTEN_LINK_FLAGS_STR}"
-    OUTPUT_NAME "racommons"
+    OUTPUT_NAME "${WASM_OUTPUT_NAME}"
     SUFFIX ".js"
 )
 
@@ -767,12 +804,12 @@ set(WASM_OUTPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../packages/core/wasm")
 add_custom_command(TARGET racommons POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "${WASM_OUTPUT_DIR}"
     COMMAND ${CMAKE_COMMAND} -E copy
-        "${CMAKE_CURRENT_BINARY_DIR}/racommons.js"
-        "${WASM_OUTPUT_DIR}/racommons.js"
+        "${CMAKE_CURRENT_BINARY_DIR}/${WASM_OUTPUT_NAME}.js"
+        "${WASM_OUTPUT_DIR}/${WASM_OUTPUT_NAME}.js"
     COMMAND ${CMAKE_COMMAND} -E copy
-        "${CMAKE_CURRENT_BINARY_DIR}/racommons.wasm"
-        "${WASM_OUTPUT_DIR}/racommons.wasm"
-    COMMENT "Copying WASM outputs to packages/core/wasm/"
+        "${CMAKE_CURRENT_BINARY_DIR}/${WASM_OUTPUT_NAME}.wasm"
+        "${WASM_OUTPUT_DIR}/${WASM_OUTPUT_NAME}.wasm"
+    COMMENT "Copying ${WASM_OUTPUT_NAME} WASM outputs to packages/core/wasm/"
 )
 
 # Also copy worker file if pthreads enabled
@@ -797,9 +834,11 @@ message(STATUS "RACommons:    ${RAC_COMMONS_DIR}")
 message(STATUS "pthreads:     ${RAC_WASM_PTHREADS}")
 message(STATUS "Debug:        ${RAC_WASM_DEBUG}")
 message(STATUS "llama.cpp:    ${RAC_WASM_LLAMACPP}")
+message(STATUS "WebGPU:       ${RAC_WASM_WEBGPU}")
 message(STATUS "VLM (mtmd):   ${RAC_VLM_USE_MTMD}")
 message(STATUS "whisper.cpp:  ${RAC_WASM_WHISPERCPP}")
 message(STATUS "sherpa-onnx:  ${RAC_WASM_ONNX}")
-message(STATUS "Output:       ${WASM_OUTPUT_DIR}")
+message(STATUS "Output name:  ${WASM_OUTPUT_NAME}")
+message(STATUS "Output dir:   ${WASM_OUTPUT_DIR}")
 message(STATUS "====================================")
 message(STATUS "")

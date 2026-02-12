@@ -131,6 +131,8 @@ export interface VLMGenerationResult {
   imageEncodeTimeMs: number;
   totalTimeMs: number;
   tokensPerSecond: number;
+  /** Hardware acceleration used for this generation ('webgpu' | 'cpu'). */
+  hardwareUsed: string;
 }
 
 export interface VLMStreamingResult {
@@ -250,7 +252,7 @@ export const VLM = {
       m.setValue(imagePtr + 12, base64Ptr, '*'); // base64_data
     } else if (image.format === VLMImageFormat.RGBPixels && image.pixelData) {
       pixelPtr = m._malloc(image.pixelData.length);
-      new Uint8Array(m.HEAPU8.buffer, pixelPtr, image.pixelData.length).set(image.pixelData);
+      bridge.writeBytes(image.pixelData, pixelPtr);
       m.setValue(imagePtr + 8, pixelPtr, '*'); // pixel_data
     }
 
@@ -305,6 +307,7 @@ export const VLM = {
         imageEncodeTimeMs: m.getValue(resPtr + 24, 'i32'),
         totalTimeMs: m.getValue(resPtr + 28, 'i32'),
         tokensPerSecond: m.getValue(resPtr + 32, 'float'),
+        hardwareUsed: bridge.accelerationMode,
       };
 
       m.ccall('rac_vlm_result_free', null, ['number'], [resPtr]);
@@ -312,6 +315,7 @@ export const VLM = {
       EventBus.shared.emit('vlm.processed', SDKEventType.Generation, {
         tokensPerSecond: vlmResult.tokensPerSecond,
         totalTokens: vlmResult.totalTokens,
+        hardwareUsed: vlmResult.hardwareUsed,
       });
 
       return vlmResult;

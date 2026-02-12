@@ -17,13 +17,16 @@
  *   const result = await RunAnywhere.generate('Hello!', { maxTokens: 100 });
  */
 
-import { SDKEnvironment } from '../types/enums';
+import { SDKEnvironment, SDKEventType, ModelCategory } from '../types/enums';
 import type { SDKInitOptions } from '../types/models';
 import { SDKError, SDKErrorCode } from '../Foundation/ErrorTypes';
 import { EventBus } from '../Foundation/EventBus';
 import { SDKLogger, LogLevel } from '../Foundation/SDKLogger';
 import { WASMBridge } from '../Foundation/WASMBridge';
+import type { AccelerationMode } from '../Foundation/WASMBridge';
 import { PlatformAdapter } from '../Foundation/PlatformAdapter';
+import { ModelManager } from '../Infrastructure/ModelManager';
+import type { CompactModelDef, ManagedModel, VLMLoader } from '../Infrastructure/ModelManager';
 
 const logger = new SDKLogger('RunAnywhere');
 
@@ -75,6 +78,11 @@ export const RunAnywhere = {
     return WASMBridge.shared.isLoaded;
   },
 
+  /** The active hardware acceleration mode ('webgpu' or 'cpu'). */
+  get accelerationMode(): AccelerationMode {
+    return WASMBridge.shared.accelerationMode;
+  },
+
   // =========================================================================
   // Initialization
   // =========================================================================
@@ -120,9 +128,17 @@ export const RunAnywhere = {
 
     logger.info(`Initializing RunAnywhere Web SDK (${env})...`);
 
-    // Phase 1: Load WASM module
+    // Phase 1: Load WASM module (auto-detects WebGPU and loads correct variant)
     const bridge = WASMBridge.shared;
-    await bridge.load(wasmUrl);
+    const acceleration = options.acceleration ?? 'auto';
+    await bridge.load(wasmUrl, options.webgpuWasmUrl, acceleration);
+
+    logger.info(`Hardware acceleration: ${bridge.accelerationMode}`);
+
+    // Emit acceleration mode event so app UIs can show a badge
+    EventBus.shared.emit('sdk.accelerationMode', SDKEventType.Device, {
+      mode: bridge.accelerationMode,
+    });
 
     // Phase 2: Register platform adapter
     _platformAdapter = new PlatformAdapter();
@@ -171,7 +187,70 @@ export const RunAnywhere = {
     _hasCompletedServicesInit = true;
 
     logger.info('RunAnywhere Web SDK initialized successfully');
-    EventBus.shared.emit('sdk.initialized', 'initialization' as never, { environment: env });
+    EventBus.shared.emit('sdk.initialized', SDKEventType.Initialization, {
+      environment: env,
+      accelerationMode: bridge.accelerationMode,
+    });
+  },
+
+  // =========================================================================
+  // Model Management (mirrors iOS RunAnywhere.registerModel / loadModel / etc.)
+  // =========================================================================
+
+  /**
+   * Register a catalog of models for download and loading.
+   * @param models - Compact model definitions to register
+   */
+  registerModels(models: CompactModelDef[]): void {
+    ModelManager.registerModels(models);
+  },
+
+  /**
+   * Set the VLM (vision-language model) loader implementation.
+   * The app provides an implementation (typically backed by a Web Worker).
+   */
+  setVLMLoader(loader: VLMLoader): void {
+    ModelManager.setVLMLoader(loader);
+  },
+
+  /**
+   * Download a model (and any companion files) to persistent OPFS storage.
+   * @param modelId - The model ID to download
+   */
+  async downloadModel(modelId: string): Promise<void> {
+    return ModelManager.downloadModel(modelId);
+  },
+
+  /**
+   * Load a downloaded model into the inference engine.
+   * @param modelId - The model ID to load
+   * @returns true if loaded successfully
+   */
+  async loadModel(modelId: string): Promise<boolean> {
+    return ModelManager.loadModel(modelId);
+  },
+
+  /**
+   * Get all registered models with their current status.
+   */
+  availableModels(): ManagedModel[] {
+    return ModelManager.getModels();
+  },
+
+  /**
+   * Get the currently loaded model for a given category.
+   * @param category - Optional model category filter
+   */
+  getLoadedModel(category?: ModelCategory): ManagedModel | null {
+    return ModelManager.getLoadedModel(category);
+  },
+
+  /**
+   * Delete a downloaded model from OPFS storage.
+   * @param modelId - The model ID to delete
+   */
+  async deleteModel(modelId: string): Promise<void> {
+    return ModelManager.deleteModel(modelId);
   },
 
   // =========================================================================

@@ -22,7 +22,14 @@
 // ---------------------------------------------------------------------------
 
 export type VLMWorkerCommand =
-  | { type: 'init'; id: number; payload: { wasmJsUrl: string } }
+  | {
+      type: 'init'; id: number; payload: {
+        /** URL to the WASM glue JS (racommons.js or racommons-webgpu.js) */
+        wasmJsUrl: string;
+        /** Whether the loaded module is the WebGPU variant */
+        useWebGPU?: boolean;
+      };
+    }
   | {
       type: 'load-model'; id: number; payload: {
         modelOpfsKey: string; modelFilename: string;
@@ -58,6 +65,7 @@ export type VLMWorkerResponse =
 
 let wasmModule: any = null;
 let vlmHandle = 0;
+let isWebGPU = false;
 
 // ---------------------------------------------------------------------------
 // Helpers: string alloc/free on WASM heap
@@ -65,15 +73,37 @@ let vlmHandle = 0;
 
 function allocString(str: string): number {
   const m = wasmModule;
-  const encoded = new TextEncoder().encode(str + '\0');
-  const ptr = m._malloc(encoded.length);
-  new Uint8Array(m.HEAPU8.buffer, ptr, encoded.length).set(encoded);
+  const len = m.lengthBytesUTF8(str) + 1; // +1 for null terminator
+  const ptr = m._malloc(len);
+  m.stringToUTF8(str, ptr, len);
   return ptr;
 }
 
 function readString(ptr: number): string {
   if (!ptr) return '';
   return wasmModule.UTF8ToString(ptr);
+}
+
+// ---------------------------------------------------------------------------
+// Helpers: binary data ↔ WASM heap
+//
+// HEAPU8 may not be exported from the WASM module (depends on build config).
+// These helpers try HEAPU8 first for speed, then fall back to setValue/getValue.
+// ---------------------------------------------------------------------------
+
+function writeToWasmHeap(src: Uint8Array, destPtr: number): void {
+  const m = wasmModule;
+
+  // Fast path: direct HEAPU8 (available when exported via EXPORTED_RUNTIME_METHODS)
+  if (m.HEAPU8) {
+    m.HEAPU8.set(src, destPtr);
+    return;
+  }
+
+  // Slow fallback: byte-by-byte via setValue (always available)
+  for (let i = 0; i < src.length; i++) {
+    m.setValue(destPtr + i, src[i], 'i8');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -110,8 +140,9 @@ async function loadFromOPFS(key: string): Promise<Uint8Array | null> {
 // WASM initialization
 // ---------------------------------------------------------------------------
 
-async function initWASM(wasmJsUrl: string): Promise<void> {
-  console.log('[VLM Worker] Loading WASM module...');
+async function initWASM(wasmJsUrl: string, useWebGPU = false): Promise<void> {
+  isWebGPU = useWebGPU;
+  console.log(`[VLM Worker] Loading WASM module (${useWebGPU ? 'WebGPU' : 'CPU'})...`);
 
   // Dynamically import the Emscripten ES6 glue JS
   const { default: createModule } = await import(/* @vite-ignore */ wasmJsUrl);
@@ -234,7 +265,7 @@ async function initWASM(wasmJsUrl: string): Promise<void> {
   vlmHandle = m.getValue(handlePtr, 'i32');
   m._free(handlePtr);
 
-  console.log('[VLM Worker] WASM initialized, VLM component ready');
+  console.log(`[VLM Worker] WASM initialized, VLM component ready (${isWebGPU ? 'WebGPU' : 'CPU'})`);
 }
 
 // ---------------------------------------------------------------------------
@@ -319,35 +350,39 @@ function processImage(
   const m = wasmModule;
   const pixelArray = new Uint8Array(rgbPixels);
 
+  // Use C sizeof helpers for correct struct sizes (avoids 32/64-bit mismatch)
+  const imageSize: number = m.ccall('rac_wasm_sizeof_vlm_image', 'number', [], []);
+  const optSize: number = m.ccall('rac_wasm_sizeof_vlm_options', 'number', [], []);
+  const resSize: number = m.ccall('rac_wasm_sizeof_vlm_result', 'number', [], []);
+
   // Build rac_vlm_image_t struct (format=1 for RGB pixels)
-  const imageSize = 32;
   const imagePtr = m._malloc(imageSize);
   for (let i = 0; i < imageSize; i++) m.setValue(imagePtr + i, 0, 'i8');
 
   m.setValue(imagePtr, 1, 'i32'); // format = RGBPixels
 
-  // pixel_data (offset 8)
+  // pixel_data (offset 8 in WASM32: format(4) + file_path_ptr(4) = 8)
   const pixelPtr = m._malloc(pixelArray.length);
-  new Uint8Array(m.HEAPU8.buffer, pixelPtr, pixelArray.length).set(pixelArray);
+  writeToWasmHeap(pixelArray, pixelPtr);
   m.setValue(imagePtr + 8, pixelPtr, '*');
 
+  // width at offset 16: format(4) + file_path(4) + pixel_data(4) + base64_data(4) = 16
   m.setValue(imagePtr + 16, width, 'i32');
   m.setValue(imagePtr + 20, height, 'i32');
   m.setValue(imagePtr + 24, pixelArray.length, 'i32'); // data_size
 
   // Build rac_vlm_options_t
-  const optSize = 56;
   const optPtr = m._malloc(optSize);
   for (let i = 0; i < optSize; i++) m.setValue(optPtr + i, 0, 'i8');
-  m.setValue(optPtr, maxTokens, 'i32');
-  m.setValue(optPtr + 4, temperature, 'float');
-  m.setValue(optPtr + 8, 0.9, 'float'); // top_p
+  m.setValue(optPtr, maxTokens, 'i32');       // max_tokens at offset 0
+  m.setValue(optPtr + 4, temperature, 'float'); // temperature at offset 4
+  m.setValue(optPtr + 8, 0.9, 'float');         // top_p at offset 8
 
   const promptPtr = allocString(prompt);
 
   // Result struct
-  const resSize = 40;
   const resPtr = m._malloc(resSize);
+  for (let i = 0; i < resSize; i++) m.setValue(resPtr + i, 0, 'i8');
 
   try {
     const r = m.ccall(
@@ -370,6 +405,7 @@ function processImage(
       totalTokens: m.getValue(resPtr + 16, 'i32'),
     };
 
+    // Free C-allocated internal strings, then free JS-allocated struct
     m.ccall('rac_vlm_result_free', null, ['number'], [resPtr]);
     return result;
   } finally {
@@ -377,6 +413,7 @@ function processImage(
     m._free(imagePtr);
     m._free(optPtr);
     m._free(pixelPtr);
+    m._free(resPtr);
   }
 }
 
@@ -390,8 +427,8 @@ self.onmessage = async (e: MessageEvent<VLMWorkerCommand>) => {
   try {
     switch (type) {
       case 'init': {
-        await initWASM(e.data.payload.wasmJsUrl);
-        self.postMessage({ id, type: 'result', payload: { success: true } });
+        await initWASM(e.data.payload.wasmJsUrl, e.data.payload.useWebGPU ?? false);
+        self.postMessage({ id, type: 'result', payload: { success: true, useWebGPU: isWebGPU } });
         break;
       }
 

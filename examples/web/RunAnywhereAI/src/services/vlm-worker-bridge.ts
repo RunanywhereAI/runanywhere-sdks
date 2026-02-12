@@ -12,6 +12,7 @@
  */
 
 import type { VLMWorkerResult, VLMWorkerResponse } from '../workers/vlm-worker';
+import { WASMBridge } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -61,6 +62,9 @@ export class VLMWorkerBridge {
   private _isInitialized = false;
   private _isModelLoaded = false;
   private _progressListeners: ProgressListener[] = [];
+  /** Saved for auto-recovery after WASM crash */
+  private _lastModelParams: VLMLoadModelParams | null = null;
+  private _needsRecovery = false;
 
   get isInitialized(): boolean { return this._isInitialized; }
   get isModelLoaded(): boolean { return this._isModelLoaded; }
@@ -83,12 +87,24 @@ export class VLMWorkerBridge {
   /**
    * Initialize the Worker and its WASM instance.
    * Must be called once before loadModel/process.
+   *
+   * @param wasmJsUrl - Optional explicit URL for the WASM glue JS.
+   *                    When omitted, the SDK's WASMBridge.workerWasmUrl is used
+   *                    so the worker loads the exact same variant (WebGPU or CPU)
+   *                    that the main thread successfully loaded.
    */
   async init(wasmJsUrl?: string): Promise<void> {
     if (this._isInitialized) return;
 
-    // Resolve the WASM JS URL (same logic as WASMBridge)
-    const resolvedUrl = wasmJsUrl ?? this.resolveWasmUrl();
+    // All acceleration logic lives in the SDK's WASMBridge.
+    // We just read the decision it already made.
+    const bridge = WASMBridge.shared;
+    const useWebGPU = bridge.accelerationMode === 'webgpu';
+    const resolvedUrl = wasmJsUrl ?? bridge.workerWasmUrl ?? '';
+
+    if (!resolvedUrl) {
+      throw new Error('[VLMWorkerBridge] SDK not initialized — no WASM URL available');
+    }
 
     // Create the Worker (Vite handles the bundling)
     this.worker = new Worker(
@@ -101,9 +117,9 @@ export class VLMWorkerBridge {
       console.error('[VLMWorkerBridge] Worker error:', e);
     };
 
-    await this.send('init', { wasmJsUrl: resolvedUrl });
+    await this.send('init', { wasmJsUrl: resolvedUrl, useWebGPU });
     this._isInitialized = true;
-    console.log('[VLMWorkerBridge] Worker initialized');
+    console.log(`[VLMWorkerBridge] Worker initialized (${useWebGPU ? 'WebGPU' : 'CPU'})`);
   }
 
   /**
@@ -117,6 +133,8 @@ export class VLMWorkerBridge {
 
     await this.send('load-model', params);
     this._isModelLoaded = true;
+    this._lastModelParams = params;
+    this._needsRecovery = false;
     console.log(`[VLMWorkerBridge] Model loaded: ${params.modelId}`);
   }
 
@@ -132,6 +150,11 @@ export class VLMWorkerBridge {
     prompt: string,
     options: VLMProcessOptions = {},
   ): Promise<VLMWorkerResult> {
+    // Auto-recover from previous WASM crash (OOB, etc.)
+    if (this._needsRecovery) {
+      await this.recover();
+    }
+
     if (!this._isModelLoaded) {
       throw new Error('No VLM model loaded in Worker. Call loadModel() first.');
     }
@@ -142,18 +165,52 @@ export class VLMWorkerBridge {
       rgbPixels.byteOffset + rgbPixels.byteLength,
     );
 
-    return this.send(
-      'process',
-      {
-        rgbPixels: buffer,
-        width,
-        height,
-        prompt,
-        maxTokens: options.maxTokens ?? 200,
-        temperature: options.temperature ?? 0.7,
-      },
-      [buffer],
-    );
+    try {
+      return await this.send(
+        'process',
+        {
+          rgbPixels: buffer,
+          width,
+          height,
+          prompt,
+          maxTokens: options.maxTokens ?? 200,
+          temperature: options.temperature ?? 0.7,
+        },
+        [buffer],
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // WASM runtime errors (OOB, stack overflow) leave the instance corrupted.
+      // Mark for recovery so the next call creates a fresh Worker.
+      if (msg.includes('memory access out of bounds') ||
+          msg.includes('unreachable') ||
+          msg.includes('RuntimeError')) {
+        console.warn('[VLMWorkerBridge] WASM crash detected, will recover on next call');
+        this._needsRecovery = true;
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Recover from a WASM crash by terminating the old Worker,
+   * creating a fresh one, and reloading the model.
+   */
+  private async recover(): Promise<void> {
+    if (!this._lastModelParams) {
+      throw new Error('Cannot recover: no model params saved');
+    }
+
+    console.log('[VLMWorkerBridge] Recovering from WASM crash...');
+    const params = this._lastModelParams;
+
+    // Destroy old worker completely
+    this.terminate();
+
+    // Reinitialize fresh worker + reload model
+    await this.init();
+    await this.loadModel(params);
+    console.log('[VLMWorkerBridge] Recovery complete');
   }
 
   /** Cancel in-progress VLM generation. */
@@ -180,15 +237,6 @@ export class VLMWorkerBridge {
   }
 
   // ---- Internal ----
-
-  private resolveWasmUrl(): string {
-    // The WASM JS glue file location relative to the SDK source
-    // In Vite dev mode this resolves via /@fs/ prefix
-    return new URL(
-      '../../../../../sdk/runanywhere-web/packages/core/wasm/racommons.js',
-      import.meta.url,
-    ).href;
-  }
 
   private send(type: string, payload: any, transferables?: Transferable[]): Promise<any> {
     return new Promise((resolve, reject) => {

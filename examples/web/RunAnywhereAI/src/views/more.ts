@@ -6,7 +6,7 @@
  */
 
 import { MicCapture } from '../services/audio';
-import { ModelManager } from '../services/model-manager';
+import { ModelManager, ModelCategory } from '../services/model-manager';
 import { showModelSelectionSheet } from '../components/model-selection';
 
 let container: HTMLElement;
@@ -252,7 +252,7 @@ function initTranscribeView(): void {
   micBtn.addEventListener('click', handleMicToggle);
 
   // Model selection
-  modelBtn.addEventListener('click', () => showModelSelectionSheet('speechRecognition'));
+  modelBtn.addEventListener('click', () => showModelSelectionSheet(ModelCategory.SpeechRecognition));
 
   // Reset on back
   container.querySelector('#transcribe-back')!.addEventListener('click', () => {
@@ -552,7 +552,7 @@ function initSpeakView(): void {
   });
 
   // Model selection
-  modelBtn.addEventListener('click', () => showModelSelectionSheet('speechSynthesis'));
+  modelBtn.addEventListener('click', () => showModelSelectionSheet(ModelCategory.SpeechSynthesis));
 
   // Speak button
   speakBtn.addEventListener('click', handleSpeak);

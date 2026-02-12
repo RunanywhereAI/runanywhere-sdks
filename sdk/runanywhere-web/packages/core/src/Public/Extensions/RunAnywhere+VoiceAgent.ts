@@ -149,7 +149,7 @@ export class VoiceAgentSession {
     const m = bridge.module;
 
     const audioPtr = m._malloc(audioData.length);
-    new Uint8Array(m.HEAPU8.buffer, audioPtr, audioData.length).set(audioData);
+    bridge.writeBytes(audioData, audioPtr);
 
     // rac_voice_agent_result_t: { speech_detected, transcription, response, synthesized_audio, audio_size }
     const resultSize = 20;
@@ -177,8 +177,7 @@ export class VoiceAgentSession {
 
       if (audioDataPtr && audioSize > 0) {
         const numSamples = audioSize / 4;
-        result.synthesizedAudio = new Float32Array(numSamples);
-        result.synthesizedAudio.set(new Float32Array(m.HEAPU8.buffer, audioDataPtr, numSamples));
+        result.synthesizedAudio = bridge.readFloat32Array(audioDataPtr, numSamples);
       }
 
       // Free C result
@@ -214,7 +213,7 @@ export class VoiceAgentSession {
     const m = bridge.module;
 
     const audioPtr = m._malloc(audioData.length);
-    new Uint8Array(m.HEAPU8.buffer, audioPtr, audioData.length).set(audioData);
+    bridge.writeBytes(audioData, audioPtr);
     const outPtr = m._malloc(4);
 
     try {

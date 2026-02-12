@@ -46,13 +46,47 @@ async function initializeSDK(): Promise<void> {
     await RunAnywhere.initialize({
       environment: SDKEnvironment.Development,
       debug: true,
+      // acceleration: 'auto' is the default — detects WebGPU automatically
     });
 
-    console.log('[RunAnywhere] SDK initialized, version:', RunAnywhere.version);
+    console.log(
+      '[RunAnywhere] SDK initialized, version:', RunAnywhere.version,
+      '| acceleration:', RunAnywhere.accelerationMode,
+    );
+
+    // Show an acceleration badge so the user knows which backend is active
+    showAccelerationBadge(RunAnywhere.accelerationMode);
   } catch (err) {
     // SDK not built or WASM not available -- continue in demo mode
     console.warn('[RunAnywhere] SDK not available, running in demo mode:', err);
   }
+}
+
+/**
+ * Display a small floating badge indicating the active hardware acceleration.
+ */
+function showAccelerationBadge(mode: string): void {
+  const badge = document.createElement('div');
+  badge.id = 'accel-badge';
+  const isGPU = mode === 'webgpu';
+  badge.textContent = isGPU ? 'WebGPU' : 'CPU';
+  badge.style.cssText = [
+    'position:fixed',
+    'top:8px',
+    'right:8px',
+    'z-index:9999',
+    'padding:4px 10px',
+    'border-radius:12px',
+    'font-size:11px',
+    'font-weight:600',
+    'letter-spacing:0.02em',
+    `background:${isGPU ? '#22c55e' : '#64748b'}`,
+    'color:#fff',
+    'pointer-events:none',
+    'opacity:0.85',
+    'font-family:-apple-system,system-ui,sans-serif',
+  ].join(';');
+  document.body.appendChild(badge);
 }
 
 // ---------------------------------------------------------------------------

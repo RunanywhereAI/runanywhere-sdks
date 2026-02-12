@@ -13,6 +13,13 @@ import { SDKError, SDKErrorCode } from './ErrorTypes';
 import { SDKLogger } from './SDKLogger';
 
 // ---------------------------------------------------------------------------
+// Acceleration Mode
+// ---------------------------------------------------------------------------
+
+/** The hardware acceleration mode used by the loaded WASM module. */
+export type AccelerationMode = 'webgpu' | 'cpu';
+
+// ---------------------------------------------------------------------------
 // Emscripten Module Type
 // ---------------------------------------------------------------------------
 
@@ -115,6 +122,9 @@ export class WASMBridge {
   private static _instance: WASMBridge | null = null;
   private _module: RACommonsModule | null = null;
   private _loaded = false;
+  private _accelerationMode: AccelerationMode = 'cpu';
+  /** The URL that was used to load the WASM glue JS (for worker reuse). */
+  private _loadedModuleUrl: string | null = null;
 
   static get shared(): WASMBridge {
     if (!WASMBridge._instance) {
@@ -136,13 +146,38 @@ export class WASMBridge {
     return this._module;
   }
 
+  /** The hardware acceleration mode in use (webgpu or cpu). */
+  get accelerationMode(): AccelerationMode {
+    return this._accelerationMode;
+  }
+
+  /**
+   * The URL of the WASM glue JS that was successfully loaded.
+   * Web Workers should use this URL to load the same WASM variant
+   * (WebGPU or CPU) that the main thread is using.
+   *
+   * Returns `null` if `load()` has not been called yet.
+   */
+  get workerWasmUrl(): string | null {
+    return this._loadedModuleUrl;
+  }
+
   /**
    * Load the RACommons WASM module.
    *
-   * @param wasmUrl - URL or path to the racommons.js glue file.
-   *                  Defaults to looking in the same directory.
+   * Detects WebGPU at init time and loads the appropriate build variant:
+   *   - `racommons-webgpu.js` when WebGPU + JSPI are available
+   *   - `racommons.js` as the CPU-only fallback
+   *
+   * @param wasmUrl        - URL to the CPU-only racommons.js glue file.
+   * @param webgpuWasmUrl  - URL to the WebGPU racommons-webgpu.js glue file.
+   * @param acceleration   - Force a specific mode ('auto' detects, 'webgpu' forces GPU, 'cpu' forces CPU).
    */
-  async load(wasmUrl?: string): Promise<void> {
+  async load(
+    wasmUrl?: string,
+    webgpuWasmUrl?: string,
+    acceleration: 'auto' | 'webgpu' | 'cpu' = 'auto',
+  ): Promise<void> {
     if (this._loaded) {
       logger.debug('WASM module already loaded');
       return;
@@ -151,11 +186,20 @@ export class WASMBridge {
     logger.info('Loading RACommons WASM module...');
 
     try {
+      // Determine whether to use the WebGPU variant
+      const useWebGPU = await this.resolveAcceleration(acceleration);
+      this._accelerationMode = useWebGPU ? 'webgpu' : 'cpu';
+
+      // Select the correct module URL
+      const moduleUrl = useWebGPU
+        ? (webgpuWasmUrl ?? new URL('../../wasm/racommons-webgpu.js', import.meta.url).href)
+        : (wasmUrl ?? new URL('../../wasm/racommons.js', import.meta.url).href);
+
+      this._loadedModuleUrl = moduleUrl;
+      logger.info(`Acceleration mode: ${this._accelerationMode} (loading ${useWebGPU ? 'racommons-webgpu' : 'racommons'})`);
+
       // Dynamic import of the Emscripten glue JS
       // The glue file exports a factory function: createRACommonsModule()
-      const moduleUrl = wasmUrl ?? new URL('../../wasm/racommons.js', import.meta.url).href;
-
-      // Import the ES module
       const { default: createModule } = await import(/* @vite-ignore */ moduleUrl);
 
       // Instantiate the WASM module
@@ -172,13 +216,58 @@ export class WASMBridge {
       }
 
       this._loaded = true;
-      logger.info('RACommons WASM module loaded successfully');
+      logger.info(`RACommons WASM module loaded successfully (${this._accelerationMode})`);
     } catch (error) {
+      // If WebGPU load failed, fall back to CPU automatically
+      if (this._accelerationMode === 'webgpu' && acceleration === 'auto') {
+        logger.warning('WebGPU WASM module failed to load, falling back to CPU');
+        this._accelerationMode = 'cpu';
+        this._module = null;
+        this._loaded = false;
+        return this.load(wasmUrl, undefined, 'cpu');
+      }
+
       this._module = null;
       this._loaded = false;
       const message = error instanceof Error ? error.message : String(error);
       logger.error(`Failed to load WASM module: ${message}`);
       throw new SDKError(SDKErrorCode.WASMLoadFailed, `Failed to load WASM module: ${message}`);
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // WebGPU Detection
+  // -----------------------------------------------------------------------
+
+  /**
+   * Determine whether to use WebGPU based on the acceleration preference
+   * and actual browser capability.
+   */
+  private async resolveAcceleration(preference: 'auto' | 'webgpu' | 'cpu'): Promise<boolean> {
+    if (preference === 'cpu') return false;
+
+    const hasWebGPU = await WASMBridge.detectWebGPU();
+    if (preference === 'webgpu' && !hasWebGPU) {
+      logger.warning('WebGPU requested but not available; falling back to CPU');
+      return false;
+    }
+
+    return hasWebGPU;
+  }
+
+  /**
+   * Probe for a functional WebGPU adapter.
+   * Returns true only when the browser exposes navigator.gpu AND
+   * a valid adapter can be obtained.
+   */
+  static async detectWebGPU(): Promise<boolean> {
+    if (typeof navigator === 'undefined' || !('gpu' in navigator)) return false;
+    try {
+      const gpu = (navigator as NavigatorWithGPU).gpu;
+      const adapter = await gpu?.requestAdapter();
+      return adapter !== null;
+    } catch {
+      return false;
     }
   }
 
@@ -206,6 +295,97 @@ export class WASMBridge {
     if (ptr !== 0) {
       this.module._free(ptr);
     }
+  }
+
+  // -----------------------------------------------------------------------
+  // Binary Data Helpers
+  //
+  // HEAPU8 / HEAPF32 may not be exported by the Emscripten module.
+  // These helpers try the fast HEAPU8/HEAPF32 path first, then fall
+  // back to byte-by-byte setValue/getValue which is always available.
+  // -----------------------------------------------------------------------
+
+  /**
+   * Write a Uint8Array into WASM linear memory at `destPtr`.
+   *
+   * Fast path uses `HEAPU8.set()` when available (after WASM rebuild).
+   * Fallback uses `setValue` byte-by-byte (works with any build).
+   */
+  writeBytes(src: Uint8Array, destPtr: number): void {
+    const m = this.module;
+    if ((m as any).HEAPU8) {
+      (m as any).HEAPU8.set(src, destPtr);
+      return;
+    }
+    for (let i = 0; i < src.length; i++) {
+      m.setValue(destPtr + i, src[i], 'i8');
+    }
+  }
+
+  /**
+   * Read `length` bytes from WASM linear memory starting at `srcPtr`.
+   *
+   * Fast path uses `HEAPU8.slice()` when available.
+   * Fallback uses `getValue` byte-by-byte.
+   */
+  readBytes(srcPtr: number, length: number): Uint8Array {
+    const m = this.module;
+    if ((m as any).HEAPU8) {
+      return (m as any).HEAPU8.slice(srcPtr, srcPtr + length);
+    }
+    const result = new Uint8Array(length);
+    for (let i = 0; i < length; i++) {
+      result[i] = m.getValue(srcPtr + i, 'i8') & 0xFF;
+    }
+    return result;
+  }
+
+  /**
+   * Read `count` float32 values from WASM linear memory starting at `srcPtr`.
+   *
+   * Fast path uses `HEAPF32` when available.
+   * Fallback reads 4 bytes at a time via getValue('float').
+   */
+  readFloat32Array(srcPtr: number, count: number): Float32Array {
+    const m = this.module;
+    if ((m as any).HEAPF32) {
+      const startIndex = srcPtr >> 2; // byte offset → float32 index
+      return (m as any).HEAPF32.slice(startIndex, startIndex + count);
+    }
+    const result = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+      result[i] = m.getValue(srcPtr + i * 4, 'float');
+    }
+    return result;
+  }
+
+  /**
+   * Write a Float32Array into WASM linear memory at `destPtr`.
+   * `destPtr` must be 4-byte aligned.
+   *
+   * Fast path uses `HEAPF32.set()` when available.
+   * Fallback uses `setValue` with 'float'.
+   */
+  writeFloat32Array(src: Float32Array, destPtr: number): void {
+    const m = this.module;
+    if ((m as any).HEAPF32) {
+      (m as any).HEAPF32.set(src, destPtr >> 2);
+      return;
+    }
+    for (let i = 0; i < src.length; i++) {
+      m.setValue(destPtr + i * 4, src[i], 'float');
+    }
+  }
+
+  /**
+   * Read a single float32 value from WASM linear memory.
+   */
+  readFloat32(ptr: number): number {
+    const m = this.module;
+    if ((m as any).HEAPF32) {
+      return (m as any).HEAPF32[ptr >> 2];
+    }
+    return m.getValue(ptr, 'float');
   }
 
   // -----------------------------------------------------------------------
@@ -242,6 +422,8 @@ export class WASMBridge {
     }
     this._module = null;
     this._loaded = false;
+    this._accelerationMode = 'cpu';
+    this._loadedModuleUrl = null;
     WASMBridge._instance = null;
     logger.info('WASM bridge shut down');
   }
@@ -278,4 +460,11 @@ interface EmscriptenModule {
   onRuntimeInitialized?: () => void;
   print?: (text: string) => void;
   printErr?: (text: string) => void;
+}
+
+// WebGPU navigator type stub
+interface NavigatorWithGPU extends Navigator {
+  gpu?: {
+    requestAdapter: () => Promise<unknown | null>;
+  };
 }

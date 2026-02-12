@@ -3,7 +3,7 @@
  * Matches iOS ModelSelectionSheet.
  */
 
-import { ModelManager, type ModelInfo, type ModelModality } from '../services/model-manager';
+import { ModelManager, ModelCategory, type ModelInfo } from '../services/model-manager';
 
 let modalEl: HTMLElement | null = null;
 
@@ -11,7 +11,7 @@ let modalEl: HTMLElement | null = null;
 // Show Modal
 // ---------------------------------------------------------------------------
 
-export function showModelSelectionSheet(modality?: ModelModality): void {
+export function showModelSelectionSheet(modality?: ModelCategory): void {
   if (modalEl) return; // Already open
 
   const models = modality
@@ -199,11 +199,11 @@ function showToast(message: string): void {
 
 function getModelEmoji(model: ModelInfo): string {
   switch (model.modality) {
-    case 'text': return '&#129302;';
-    case 'multimodal': return '&#128065;';
-    case 'speechRecognition': return '&#127908;';
-    case 'speechSynthesis': return '&#128266;';
-    case 'imageGeneration': return '&#127912;';
+    case ModelCategory.Language: return '&#129302;';
+    case ModelCategory.Multimodal: return '&#128065;';
+    case ModelCategory.SpeechRecognition: return '&#127908;';
+    case ModelCategory.SpeechSynthesis: return '&#128266;';
+    case ModelCategory.ImageGeneration: return '&#127912;';
     default: return '&#129302;';
   }
 }

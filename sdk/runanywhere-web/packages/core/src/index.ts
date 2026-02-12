@@ -25,8 +25,6 @@ export { RunAnywhere } from './Public/RunAnywhere';
 
 // Extensions
 export { TextGeneration } from './Public/Extensions/RunAnywhere+TextGeneration';
-export { ModelManagement } from './Public/Extensions/RunAnywhere+ModelManagement';
-export type { DownloadProgressCallback, ModelDownloadOptions } from './Public/Extensions/RunAnywhere+ModelManagement';
 export { STT } from './Public/Extensions/RunAnywhere+STT';
 export type {
   STTModelConfig, STTModelType, STTWhisperFiles, STTZipformerFiles, STTParaformerFiles,
@@ -63,7 +61,7 @@ export { SDKLogger, LogLevel } from './Foundation/SDKLogger';
 export { EventBus } from './Foundation/EventBus';
 export type { EventListener, Unsubscribe, SDKEventEnvelope } from './Foundation/EventBus';
 export { WASMBridge } from './Foundation/WASMBridge';
-export type { RACommonsModule } from './Foundation/WASMBridge';
+export type { RACommonsModule, AccelerationMode } from './Foundation/WASMBridge';
 export { SherpaONNXBridge } from './Foundation/SherpaONNXBridge';
 export type { SherpaONNXModule } from './Foundation/SherpaONNXBridge';
 
@@ -74,5 +72,8 @@ export { AudioCapture } from './Infrastructure/AudioCapture';
 export type { AudioChunkCallback, AudioCaptureConfig } from './Infrastructure/AudioCapture';
 export { AudioPlayback } from './Infrastructure/AudioPlayback';
 export type { PlaybackCompleteCallback, PlaybackConfig } from './Infrastructure/AudioPlayback';
-export { OPFSStorage } from './Infrastructure/OPFSStorage';
-export type { StoredModelInfo } from './Infrastructure/OPFSStorage';
+export { ModelManager } from './Infrastructure/ModelManager';
+export type {
+  ManagedModel, CompactModelDef, DownloadProgress,
+  ModelFileDescriptor, VLMLoader, VLMLoadParams,
+} from './Infrastructure/ModelManager';
