@@ -1,57 +1,40 @@
 /**
  * RunAnywhere Web SDK - Voice Activity Detection Extension
  *
- * Adds VAD capabilities for detecting speech in audio streams.
- * Includes both the RACommons C++ VAD (energy-based, built-in)
- * and the framework for silero VAD via sherpa-onnx WASM.
+ * Adds VAD capabilities via sherpa-onnx WASM using Silero VAD model.
+ * Detects speech segments in audio streams with high accuracy.
  *
  * Mirrors: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VAD/
  *
  * Usage:
  *   import { VAD } from '@runanywhere/web';
  *
- *   await VAD.initialize({ energyThreshold: 0.02 });
- *   VAD.onSpeechActivity((activity) => {
- *     if (activity === 'started') console.log('Speech detected!');
+ *   await VAD.loadModel({
+ *     modelPath: '/models/vad/silero_vad.onnx',
+ *     threshold: 0.5,
  *   });
- *   VAD.processSamples(audioFloat32Array);
+ *
+ *   const hasVoice = VAD.processSamples(audioFloat32Array);
+ *   if (hasVoice) console.log('Speech detected!');
  */
 
 import { RunAnywhere } from '../RunAnywhere';
-import { WASMBridge } from '../../Foundation/WASMBridge';
-import { SDKError } from '../../Foundation/ErrorTypes';
+import { SherpaONNXBridge } from '../../Foundation/SherpaONNXBridge';
+import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { EventBus } from '../../Foundation/EventBus';
 import { SDKEventType } from '../../types/enums';
 
 const logger = new SDKLogger('VAD');
 
-let _vadComponentHandle = 0;
-let _activityCallbackPtr = 0;
+// ---------------------------------------------------------------------------
+// Internal State
+// ---------------------------------------------------------------------------
 
-function requireBridge(): WASMBridge {
-  if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
-  return WASMBridge.shared;
-}
-
-function ensureVADComponent(): number {
-  if (_vadComponentHandle !== 0) return _vadComponentHandle;
-
-  const bridge = requireBridge();
-  const m = bridge.module;
-  const handlePtr = m._malloc(4);
-  const result = m.ccall('rac_vad_component_create', 'number', ['number'], [handlePtr]) as number;
-
-  if (result !== 0) {
-    m._free(handlePtr);
-    bridge.checkResult(result, 'rac_vad_component_create');
-  }
-
-  _vadComponentHandle = m.getValue(handlePtr, 'i32');
-  m._free(handlePtr);
-  logger.debug('VAD component created');
-  return _vadComponentHandle;
-}
+let _vadHandle = 0;
+let _sampleRate = 16000;
+let _jsActivityCallback: SpeechActivityCallback | null = null;
+let _lastSpeechState = false;
 
 // ---------------------------------------------------------------------------
 // VAD Types
@@ -61,201 +44,232 @@ export type SpeechActivity = 'started' | 'ended' | 'ongoing';
 
 export type SpeechActivityCallback = (activity: SpeechActivity) => void;
 
-export interface VADConfig {
-  energyThreshold?: number;
+export interface VADModelConfig {
+  /** Path to Silero VAD ONNX model in sherpa-onnx virtual FS */
+  modelPath: string;
+  /** Detection threshold (default: 0.5, range 0-1) */
+  threshold?: number;
+  /** Minimum silence duration in seconds to split segments (default: 0.5) */
+  minSilenceDuration?: number;
+  /** Minimum speech duration in seconds (default: 0.25) */
+  minSpeechDuration?: number;
+  /** Maximum speech duration in seconds (default: 5.0 for streaming) */
+  maxSpeechDuration?: number;
+  /** Sample rate (default: 16000) */
   sampleRate?: number;
-  frameLength?: number;
-  enableAutoCalibration?: boolean;
-  calibrationMultiplier?: number;
+  /** Window size in samples (default: 512 for Silero) */
+  windowSize?: number;
+}
+
+export interface SpeechSegment {
+  /** Start time in seconds */
+  startTime: number;
+  /** Audio samples of the speech segment */
+  samples: Float32Array;
 }
 
 // ---------------------------------------------------------------------------
 // VAD Extension
 // ---------------------------------------------------------------------------
 
-/** Active JS callback for speech activity */
-let _jsActivityCallback: SpeechActivityCallback | null = null;
-
 export const VAD = {
   /**
-   * Initialize the VAD component with configuration.
-   * Uses the built-in energy-based VAD (no model download needed).
+   * Load the Silero VAD model via sherpa-onnx.
+   * The model file must already be in the sherpa-onnx virtual FS.
    */
-  async initialize(config: VADConfig = {}): Promise<void> {
-    const bridge = requireBridge();
-    const m = bridge.module;
-    const handle = ensureVADComponent();
+  async loadModel(config: VADModelConfig): Promise<void> {
+    const sherpa = requireSherpa();
+    await sherpa.ensureLoaded();
+    const m = sherpa.module;
 
-    logger.info('Initializing VAD component');
+    // Clean up previous
+    VAD.cleanup();
 
-    // Build rac_vad_config_t
-    const configSize = 28; // approximate size
-    const configPtr = m._malloc(configSize);
-    for (let i = 0; i < configSize; i++) m.setValue(configPtr + i, 0, 'i8');
+    _sampleRate = config.sampleRate ?? 16000;
 
-    // model_id at offset 0 (null = use energy VAD)
-    m.setValue(configPtr, 0, '*');
-    // preferred_framework at offset 4
-    m.setValue(configPtr + 4, -1, 'i32');
-    // energy_threshold at offset 8
-    m.setValue(configPtr + 8, config.energyThreshold ?? 0.015, 'float');
-    // sample_rate at offset 12
-    m.setValue(configPtr + 12, config.sampleRate ?? 16000, 'i32');
-    // frame_length at offset 16
-    m.setValue(configPtr + 16, config.frameLength ?? 0.1, 'float');
-    // enable_auto_calibration at offset 20
-    m.setValue(configPtr + 20, config.enableAutoCalibration ? 1 : 0, 'i32');
-    // calibration_multiplier at offset 24
-    m.setValue(configPtr + 24, config.calibrationMultiplier ?? 2.0, 'float');
+    logger.info('Loading Silero VAD model');
+    EventBus.shared.emit('model.loadStarted', SDKEventType.Model, {
+      modelId: 'silero-vad', component: 'vad',
+    });
+
+    const startMs = performance.now();
+
+    // Build config JSON for sherpa-onnx VAD
+    const configJson = JSON.stringify({
+      'silero-vad': {
+        'model': config.modelPath,
+        'threshold': config.threshold ?? 0.5,
+        'min-silence-duration': config.minSilenceDuration ?? 0.5,
+        'min-speech-duration': config.minSpeechDuration ?? 0.25,
+        'max-speech-duration': config.maxSpeechDuration ?? 5.0,
+        'window-size': config.windowSize ?? 512,
+      },
+      'sample-rate': _sampleRate,
+      'num-threads': 1,
+      'provider': 'cpu',
+      'debug': 0,
+    });
+
+    const configPtr = sherpa.allocString(configJson);
+    const bufferSizeInSeconds = 30; // 30 second circular buffer
 
     try {
-      let result = m.ccall(
-        'rac_vad_component_configure', 'number',
-        ['number', 'number'], [handle, configPtr],
-      ) as number;
-      bridge.checkResult(result, 'rac_vad_component_configure');
+      _vadHandle = m._SherpaOnnxCreateVoiceActivityDetector(configPtr as unknown as number, bufferSizeInSeconds);
 
-      result = m.ccall(
-        'rac_vad_component_initialize', 'number',
-        ['number'], [handle],
-      ) as number;
-      bridge.checkResult(result, 'rac_vad_component_initialize');
+      if (_vadHandle === 0) {
+        throw new SDKError(SDKErrorCode.ModelLoadFailed, 'Failed to create VAD from Silero model');
+      }
 
-      logger.info('VAD initialized');
+      const loadTimeMs = Math.round(performance.now() - startMs);
+      logger.info(`Silero VAD loaded in ${loadTimeMs}ms`);
+      EventBus.shared.emit('model.loadCompleted', SDKEventType.Model, {
+        modelId: 'silero-vad', component: 'vad', loadTimeMs,
+      });
+    } catch (error) {
+      VAD.cleanup();
+      throw error;
     } finally {
-      m._free(configPtr);
+      sherpa.free(configPtr);
     }
   },
 
-  /** Whether VAD is initialized. */
+  /** Whether VAD model is loaded. */
   get isInitialized(): boolean {
-    if (_vadComponentHandle === 0) return false;
-    try {
-      return (WASMBridge.shared.module.ccall(
-        'rac_vad_component_is_initialized', 'number', ['number'], [_vadComponentHandle],
-      ) as number) === 1;
-    } catch { return false; }
+    return _vadHandle !== 0;
   },
 
   /**
    * Register a callback for speech activity events.
+   * Called when speech starts, ends, or is ongoing.
    */
   onSpeechActivity(callback: SpeechActivityCallback): () => void {
     _jsActivityCallback = callback;
-
-    if (_vadComponentHandle === 0) return () => { _jsActivityCallback = null; };
-
-    const m = WASMBridge.shared.module;
-
-    // Register C callback that forwards to JS
-    if (_activityCallbackPtr !== 0) {
-      m.removeFunction(_activityCallbackPtr);
-    }
-
-    _activityCallbackPtr = m.addFunction((activity: number, _userData: number): number => {
-      const activityMap: Record<number, SpeechActivity> = {
-        0: 'started',
-        1: 'ended',
-        2: 'ongoing',
-      };
-      const mapped = activityMap[activity] ?? 'ongoing';
-      _jsActivityCallback?.(mapped);
-
-      EventBus.shared.emit(`vad.speech${mapped.charAt(0).toUpperCase() + mapped.slice(1)}`, SDKEventType.Voice, {
-        activity: mapped,
-      });
-
-      return 0;
-    }, 'iii');
-
-    m.ccall(
-      'rac_vad_component_set_activity_callback', 'number',
-      ['number', 'number', 'number'],
-      [_vadComponentHandle, _activityCallbackPtr, 0],
-    );
-
-    return () => {
-      _jsActivityCallback = null;
-      if (_activityCallbackPtr !== 0) {
-        m.removeFunction(_activityCallbackPtr);
-        _activityCallbackPtr = 0;
-      }
-    };
+    return () => { _jsActivityCallback = null; };
   },
 
   /**
    * Process audio samples through VAD.
+   * Returns whether speech was detected in this frame.
    *
-   * @param samples - Float32Array of PCM audio samples
-   * @returns Whether speech was detected in this frame
+   * The Silero VAD expects 512-sample windows at 16kHz.
+   * This method handles arbitrary-length input by feeding in chunks.
+   *
+   * @param samples - Float32Array of PCM audio samples (mono, 16kHz)
+   * @returns Whether speech is currently detected
    */
   processSamples(samples: Float32Array): boolean {
-    const bridge = requireBridge();
-    const m = bridge.module;
-    const handle = ensureVADComponent();
+    if (_vadHandle === 0) {
+      logger.warning('VAD not initialized. Call loadModel() first.');
+      return false;
+    }
 
-    // Copy to WASM memory
+    const m = SherpaONNXBridge.shared.module;
+
+    // Copy samples to WASM memory
     const audioPtr = m._malloc(samples.length * 4);
-    new Float32Array(m.HEAPU8.buffer, audioPtr, samples.length).set(samples);
-
-    const outPtr = m._malloc(4);
+    m.HEAPF32.set(samples, audioPtr / 4);
 
     try {
-      const result = m.ccall(
-        'rac_vad_component_process', 'number',
-        ['number', 'number', 'number', 'number'],
-        [handle, audioPtr, samples.length, outPtr],
-      ) as number;
+      // Feed samples to VAD
+      m._SherpaOnnxVoiceActivityDetectorAcceptWaveform(_vadHandle, audioPtr, samples.length);
 
-      if (result !== 0) return false;
-      return m.getValue(outPtr, 'i32') === 1;
+      // Check detection state
+      const detected = m._SherpaOnnxVoiceActivityDetectorDetected(_vadHandle) !== 0;
+
+      // Emit speech activity callbacks
+      if (detected && !_lastSpeechState) {
+        _jsActivityCallback?.('started');
+        EventBus.shared.emit('vad.speechStarted', SDKEventType.Voice, { activity: 'started' });
+      } else if (!detected && _lastSpeechState) {
+        _jsActivityCallback?.('ended');
+        EventBus.shared.emit('vad.speechEnded', SDKEventType.Voice, { activity: 'ended' });
+      } else if (detected) {
+        _jsActivityCallback?.('ongoing');
+      }
+
+      _lastSpeechState = detected;
+      return detected;
     } finally {
       m._free(audioPtr);
-      m._free(outPtr);
     }
   },
 
-  /** Whether speech is currently active. */
-  get isSpeechActive(): boolean {
-    if (_vadComponentHandle === 0) return false;
-    try {
-      return (WASMBridge.shared.module.ccall(
-        'rac_vad_component_is_speech_active', 'number', ['number'], [_vadComponentHandle],
-      ) as number) === 1;
-    } catch { return false; }
+  /**
+   * Get the next available speech segment (if any).
+   * Returns null if no complete segments are available.
+   *
+   * After calling processSamples(), check for available segments
+   * using this method. Call repeatedly until it returns null.
+   */
+  popSpeechSegment(): SpeechSegment | null {
+    if (_vadHandle === 0) return null;
+
+    const m = SherpaONNXBridge.shared.module;
+
+    // Check if there's a segment available
+    if (m._SherpaOnnxVoiceActivityDetectorEmpty(_vadHandle) !== 0) {
+      return null;
+    }
+
+    // Get the front segment
+    const segmentPtr = m._SherpaOnnxVoiceActivityDetectorFront(_vadHandle);
+    if (segmentPtr === 0) return null;
+
+    // Read segment struct: { float start; int32_t n; const float* samples; }
+    const startTime = m.getValue(segmentPtr, 'float');
+    const numSamples = m.getValue(segmentPtr + 4, 'i32');
+    const samplesPtr = m.getValue(segmentPtr + 8, '*');
+
+    // Copy samples
+    const samples = new Float32Array(numSamples);
+    if (samplesPtr && numSamples > 0) {
+      samples.set(m.HEAPF32.subarray(samplesPtr / 4, samplesPtr / 4 + numSamples));
+    }
+
+    // Destroy the segment and pop
+    m._SherpaOnnxDestroySpeechSegment(segmentPtr);
+    m._SherpaOnnxVoiceActivityDetectorPop(_vadHandle);
+
+    return { startTime, samples };
   },
 
-  /** Set energy threshold dynamically. */
-  setEnergyThreshold(threshold: number): void {
-    if (_vadComponentHandle === 0) return;
-    WASMBridge.shared.module.ccall(
-      'rac_vad_component_set_energy_threshold', 'number',
-      ['number', 'number'], [_vadComponentHandle, threshold],
-    );
+  /** Whether speech is currently detected. */
+  get isSpeechActive(): boolean {
+    if (_vadHandle === 0) return false;
+    return SherpaONNXBridge.shared.module._SherpaOnnxVoiceActivityDetectorDetected(_vadHandle) !== 0;
   },
 
   /** Reset VAD state. */
   reset(): void {
-    if (_vadComponentHandle === 0) return;
-    WASMBridge.shared.module.ccall(
-      'rac_vad_component_reset', 'number', ['number'], [_vadComponentHandle],
-    );
+    if (_vadHandle === 0) return;
+    SherpaONNXBridge.shared.module._SherpaOnnxVoiceActivityDetectorReset(_vadHandle);
+    _lastSpeechState = false;
   },
 
-  /** Clean up the VAD component. */
+  /** Flush remaining audio through VAD. */
+  flush(): void {
+    if (_vadHandle === 0) return;
+    SherpaONNXBridge.shared.module._SherpaOnnxVoiceActivityDetectorFlush(_vadHandle);
+  },
+
+  /** Clean up the VAD resources. */
   cleanup(): void {
-    if (_activityCallbackPtr !== 0) {
-      try { WASMBridge.shared.module.removeFunction(_activityCallbackPtr); } catch { /* ignore */ }
-      _activityCallbackPtr = 0;
-    }
-    if (_vadComponentHandle !== 0) {
+    if (_vadHandle !== 0) {
       try {
-        WASMBridge.shared.module.ccall(
-          'rac_vad_component_destroy', null, ['number'], [_vadComponentHandle],
-        );
+        SherpaONNXBridge.shared.module._SherpaOnnxDestroyVoiceActivityDetector(_vadHandle);
       } catch { /* ignore */ }
-      _vadComponentHandle = 0;
+      _vadHandle = 0;
     }
     _jsActivityCallback = null;
+    _lastSpeechState = false;
   },
 };
+
+// ---------------------------------------------------------------------------
+// Internal Helpers
+// ---------------------------------------------------------------------------
+
+function requireSherpa(): SherpaONNXBridge {
+  if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
+  return SherpaONNXBridge.shared;
+}

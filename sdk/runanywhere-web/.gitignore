@@ -7,6 +7,8 @@ packages/core/dist/
 
 # WASM build artifacts
 wasm/build/
+wasm/build-sherpa-onnx/
+wasm/third_party/
 packages/core/wasm/
 
 # IDE

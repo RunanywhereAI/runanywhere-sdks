@@ -196,21 +196,78 @@ async function sendMessage(): Promise<void> {
   sendBtn.disabled = true;
   showTypingIndicator();
 
-  // Simulate AI response (TODO: call actual WASM inference)
-  await new Promise((resolve) => setTimeout(resolve, 1500));
+  try {
+    // Import the SDK TextGeneration extension
+    const { TextGeneration } = await import(
+      '../../../../../sdk/runanywhere-web/packages/core/src/index'
+    );
 
-  hideTypingIndicator();
+    if (!TextGeneration.isModelLoaded) {
+      throw new Error('Model not loaded in WASM backend');
+    }
 
-  const assistantMsg: ChatMessage = {
-    id: crypto.randomUUID(),
-    role: 'assistant',
-    content: `This is a simulated response. Once the WASM module is loaded with the **${loaded.name}** model, real on-device inference will happen here.\n\nYour message was: "${text}"`,
-    thinking: 'Analyzing the query and preparing a response based on the loaded model weights...',
-    timestamp: Date.now(),
-    modelId: loaded.id,
-  };
-  messages.push(assistantMsg);
-  renderMessage(assistantMsg);
+    // Use streaming generation for token-by-token display (like the iOS app).
+    // In single-threaded WASM, the ccall blocks while generating all tokens
+    // (callbacks fire synchronously). After it returns, we drain the token queue
+    // with small delays to create a streaming visual effect.
+    const { stream, result: resultPromise } = TextGeneration.generateStream(text, {
+      maxTokens: 512,
+      temperature: 0.7,
+    });
+
+    hideTypingIndicator();
+
+    // Create an empty assistant bubble to stream tokens into
+    const assistantMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+      modelId: loaded.id,
+    };
+    messages.push(assistantMsg);
+    const { bubbleEl, rowEl } = renderStreamingBubble(assistantMsg);
+
+    // Animate tokens appearing one by one
+    for await (const token of stream) {
+      assistantMsg.content += token;
+      bubbleEl.innerHTML = renderMarkdown(assistantMsg.content);
+      scrollToBottom();
+      // Yield to the browser between tokens so each one paints
+      await new Promise(r => setTimeout(r, 12));
+    }
+
+    const finalResult = await resultPromise;
+    console.log(
+      `[Chat] Generation complete: ${finalResult.tokensUsed} tokens in ` +
+      `${finalResult.latencyMs.toFixed(0)}ms (${finalResult.tokensPerSecond.toFixed(1)} tok/s)`,
+    );
+
+    // Show metrics below the message
+    appendMetrics(rowEl, {
+      tokens: finalResult.tokensUsed,
+      latencyMs: finalResult.latencyMs,
+      tokensPerSecond: finalResult.tokensPerSecond,
+    });
+    scrollToBottom();
+
+  } catch (err) {
+    hideTypingIndicator();
+
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    console.error('[Chat] Generation failed:', errorMessage);
+
+    // Show error as assistant message
+    const errorMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      content: `**Error:** ${errorMessage}\n\nPlease make sure a model is downloaded and loaded.`,
+      timestamp: Date.now(),
+      modelId: loaded.id,
+    };
+    messages.push(errorMsg);
+    renderMessage(errorMsg);
+  }
 
   isGenerating = false;
   sendBtn.disabled = inputEl.value.trim().length === 0;
@@ -238,15 +295,79 @@ function renderMessage(msg: ChatMessage): void {
     `;
   }
 
-  if (msg.role === 'assistant' && msg.modelId) {
-    html += `<div class="model-badge">${escapeHtml(msg.modelId)}</div>`;
-  }
-
   html += `<div class="message-bubble ${msg.role}">${renderMarkdown(msg.content)}</div>`;
 
   row.innerHTML = html;
   messagesEl.appendChild(row);
   scrollToBottom();
+}
+
+/**
+ * Create a streaming assistant bubble (starts empty, tokens appended later).
+ * Returns references to the bubble and the row so we can update content and
+ * append metrics after generation completes.
+ */
+function renderStreamingBubble(msg: ChatMessage): { bubbleEl: HTMLElement; rowEl: HTMLElement } {
+  const row = document.createElement('div');
+  row.className = 'message-row assistant';
+
+  let html = '';
+  if (msg.modelId) {
+    const displayName = formatModelName(msg.modelId);
+    html += `<div class="model-badge">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0 1 12 15a9.065 9.065 0 0 0-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0 1 12 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5"/></svg>
+      ${escapeHtml(displayName)}
+    </div>`;
+  }
+  html += `<div class="message-bubble assistant" id="streaming-bubble-${msg.id}"></div>`;
+
+  row.innerHTML = html;
+  messagesEl.appendChild(row);
+  scrollToBottom();
+
+  const bubbleEl = row.querySelector<HTMLElement>(`#streaming-bubble-${msg.id}`)!;
+  return { bubbleEl, rowEl: row };
+}
+
+/**
+ * Append a metrics footer below a message bubble.
+ */
+function appendMetrics(rowEl: HTMLElement, metrics: {
+  tokens: number;
+  latencyMs: number;
+  tokensPerSecond: number;
+}): void {
+  const metricsEl = document.createElement('div');
+  metricsEl.className = 'message-metrics';
+  metricsEl.innerHTML = `
+    <span class="metric">
+      <span class="metric-value">${metrics.tokensPerSecond.toFixed(1)}</span> tok/s
+    </span>
+    <span class="metric-separator">&middot;</span>
+    <span class="metric">
+      <span class="metric-value">${metrics.tokens}</span> tokens
+    </span>
+    <span class="metric-separator">&middot;</span>
+    <span class="metric">
+      <span class="metric-value">${(metrics.latencyMs / 1000).toFixed(1)}s</span>
+    </span>
+  `;
+  rowEl.appendChild(metricsEl);
+}
+
+/**
+ * Format a model ID into a shorter, display-friendly name.
+ * e.g. "lfm2-350m-q4_k_m" -> "LFM2 350M"
+ */
+function formatModelName(modelId: string): string {
+  // Try to use the loaded model's display name first
+  const loaded = ModelManager.getLoadedModel();
+  if (loaded && loaded.id === modelId) return loaded.name;
+  // Fallback: capitalize and shorten
+  return modelId
+    .replace(/-q\d.*$/i, '')  // strip quantization suffix
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
 }
 
 function showTypingIndicator(): void {

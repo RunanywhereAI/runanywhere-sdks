@@ -189,7 +189,28 @@ export const TextGeneration = {
     const resultPtr = m._malloc(resultSize);
 
     try {
-      const result = m._rac_llm_component_generate(handle, promptPtr, optionsPtr, resultPtr);
+      // Use ccall instead of direct _funcname() call so that Emscripten properly
+      // converts C++ exceptions into JavaScript throws (direct calls may return the
+      // C++ exception pointer as the "return value" instead of throwing).
+      let result: number;
+      try {
+        result = m.ccall(
+          'rac_llm_component_generate',
+          'number',
+          ['number', 'number', 'number', 'number'],
+          [handle, promptPtr, optionsPtr, resultPtr],
+        ) as number;
+      } catch (wasmErr: unknown) {
+        // Emscripten converts unhandled C++ exceptions into JS throws.
+        // The thrown value is typically the __cxa_exception pointer (a number).
+        const detail = typeof wasmErr === 'number'
+          ? `WASM C++ exception (ptr=${wasmErr}). The model's chat template may be unsupported.`
+          : String(wasmErr);
+        throw new SDKError(
+          SDKErrorCode.GenerationFailed,
+          `LLM generation crashed: ${detail}`,
+        );
+      }
       bridge.checkResult(result, 'rac_llm_component_generate');
 
       // Read result struct
@@ -352,10 +373,28 @@ export const TextGeneration = {
       m.setValue(optionsPtr + 4, options.temperature, 'float');
     }
 
-    const startResult = m._rac_llm_component_generate_stream(
-      handle, promptPtr, optionsPtr,
-      tokenCbPtr, completeCbPtr, errorCbPtr, 0,
-    );
+    let startResult: number;
+    try {
+      startResult = m.ccall(
+        'rac_llm_component_generate_stream',
+        'number',
+        ['number', 'number', 'number', 'number', 'number', 'number', 'number'],
+        [handle, promptPtr, optionsPtr, tokenCbPtr, completeCbPtr, errorCbPtr, 0],
+      ) as number;
+    } catch (wasmErr: unknown) {
+      bridge.free(promptPtr);
+      m._free(optionsPtr);
+      m.removeFunction(tokenCbPtr);
+      m.removeFunction(completeCbPtr);
+      m.removeFunction(errorCbPtr);
+      const detail = typeof wasmErr === 'number'
+        ? `WASM C++ exception (ptr=${wasmErr}). The model's chat template may be unsupported.`
+        : String(wasmErr);
+      throw new SDKError(
+        SDKErrorCode.GenerationFailed,
+        `LLM streaming generation crashed: ${detail}`,
+      );
+    }
 
     bridge.free(promptPtr);
     m._free(optionsPtr);

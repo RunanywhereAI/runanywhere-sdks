@@ -42,7 +42,8 @@ function ensureVLMBackendRegistered(): void {
   const m = bridge.module;
 
   // Check if the backend registration function exists (only when built with --vlm)
-  const fn = m['_rac_backend_llamacpp_vlm_register'];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fn = (m as any)['_rac_backend_llamacpp_vlm_register'];
   if (!fn) {
     throw new SDKError(
       SDKErrorCode.BackendNotAvailable,
@@ -343,7 +344,8 @@ export const VLM = {
 
     if (_vlmBackendRegistered) {
       try {
-        const fn = WASMBridge.shared.module['_rac_backend_llamacpp_vlm_unregister'];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const fn = (WASMBridge.shared.module as any)['_rac_backend_llamacpp_vlm_unregister'];
         if (fn) {
           WASMBridge.shared.module.ccall('rac_backend_llamacpp_vlm_unregister', 'number', [], []);
         }

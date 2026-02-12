@@ -155,6 +155,18 @@ export const RunAnywhere = {
       throw new SDKError(SDKErrorCode.InitializationFailed, `rac_init failed: ${errMsg}`);
     }
 
+    // Phase 4: Register available backends
+    // The llama.cpp LLM backend must be registered before any LLM/VLM operations.
+    // Check if the function exists (only present when built with --llamacpp).
+    if (typeof (m as any)['_rac_backend_llamacpp_register'] === 'function') {
+      const regResult = m.ccall('rac_backend_llamacpp_register', 'number', [], []) as number;
+      if (regResult === 0) {
+        logger.info('llama.cpp LLM backend registered');
+      } else {
+        logger.warning(`llama.cpp backend registration returned: ${regResult}`);
+      }
+    }
+
     _isInitialized = true;
     _hasCompletedServicesInit = true;
 

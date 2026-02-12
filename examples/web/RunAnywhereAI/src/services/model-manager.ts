@@ -3,6 +3,9 @@
  *
  * Mirrors iOS ModelManager: download from URL -> OPFS persistence ->
  * mount into Emscripten FS -> load via backend.
+ *
+ * Supports single-file models (GGUF) and multi-file models (tar.gz archives
+ * containing ONNX + tokens + data files for STT/TTS/VLM).
  */
 
 // ---------------------------------------------------------------------------
@@ -10,12 +13,32 @@
 // ---------------------------------------------------------------------------
 
 export type ModelFramework = 'llamacpp' | 'onnx' | 'coreml';
-export type ModelModality = 'text' | 'multimodal' | 'speechRecognition' | 'speechSynthesis' | 'imageGeneration';
+export type ModelModality =
+  | 'text'
+  | 'multimodal'
+  | 'speechRecognition'
+  | 'speechSynthesis'
+  | 'voiceActivity'
+  | 'imageGeneration';
 export type ModelStatus = 'registered' | 'downloading' | 'downloaded' | 'loading' | 'loaded' | 'error';
+
+/**
+ * For multi-file models (VLM, STT, TTS), describes additional files
+ * that need to be downloaded alongside the main URL.
+ */
+export interface ModelFileDescriptor {
+  /** Download URL */
+  url: string;
+  /** Filename to store as (used for OPFS key and FS path) */
+  filename: string;
+  /** Optional: size in bytes (for progress estimation) */
+  sizeBytes?: number;
+}
 
 export interface ModelInfo {
   id: string;
   name: string;
+  /** Primary download URL (single file models) or archive URL */
   url: string;
   framework: ModelFramework;
   modality?: ModelModality;
@@ -24,6 +47,26 @@ export interface ModelInfo {
   downloadProgress?: number;
   error?: string;
   sizeBytes?: number;
+
+  /**
+   * For multi-file models: additional files to download.
+   * The main 'url' is still the primary file; these are extras.
+   * For VLM: includes the mmproj file.
+   * For STT/TTS: the main URL is a tar.gz archive containing all files.
+   */
+  additionalFiles?: ModelFileDescriptor[];
+
+  /**
+   * Whether the main URL is an archive (tar.gz) that needs extraction.
+   * STT and TTS models from sherpa-onnx are typically tar.gz archives.
+   */
+  isArchive?: boolean;
+
+  /**
+   * Paths of extracted files after download (populated after extraction).
+   * Maps logical name -> filesystem path.
+   */
+  extractedPaths?: Record<string, string>;
 }
 
 type ModelChangeCallback = (models: ModelInfo[]) => void;
@@ -33,7 +76,9 @@ type ModelChangeCallback = (models: ModelInfo[]) => void;
 // ---------------------------------------------------------------------------
 
 const REGISTERED_MODELS: Omit<ModelInfo, 'status'>[] = [
-  // LLM models (llama.cpp)
+  // =========================================================================
+  // LLM models (llama.cpp GGUF)
+  // =========================================================================
   {
     id: 'smollm2-360m-q8_0',
     name: 'SmolLM2 360M Q8_0',
@@ -66,31 +111,79 @@ const REGISTERED_MODELS: Omit<ModelInfo, 'status'>[] = [
     modality: 'text',
     memoryRequirement: 400_000_000,
   },
-  // STT (ONNX)
+
+  // =========================================================================
+  // VLM models (llama.cpp + mmproj)
+  // =========================================================================
+  {
+    id: 'smolvlm-500m-instruct-q8_0',
+    name: 'SmolVLM 500M Instruct Q8_0',
+    url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz',
+    framework: 'llamacpp',
+    modality: 'multimodal',
+    memoryRequirement: 600_000_000,
+    isArchive: true,
+  },
+  {
+    id: 'qwen2-vl-2b-instruct-q4_k_m',
+    name: 'Qwen2-VL 2B Instruct Q4_K_M',
+    url: 'https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/Qwen2-VL-2B-Instruct-Q4_K_M.gguf',
+    framework: 'llamacpp',
+    modality: 'multimodal',
+    memoryRequirement: 1_800_000_000,
+    additionalFiles: [
+      {
+        url: 'https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf',
+        filename: 'mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf',
+      },
+    ],
+  },
+
+  // =========================================================================
+  // STT models (sherpa-onnx ONNX, tar.gz archive)
+  // =========================================================================
   {
     id: 'sherpa-onnx-whisper-tiny.en',
-    name: 'Whisper Tiny (ONNX)',
+    name: 'Whisper Tiny English (ONNX)',
     url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
     framework: 'onnx',
     modality: 'speechRecognition',
     memoryRequirement: 75_000_000,
+    isArchive: true,
   },
-  // TTS (ONNX)
+
+  // =========================================================================
+  // TTS models (sherpa-onnx ONNX, tar.gz archive)
+  // =========================================================================
   {
     id: 'vits-piper-en_US-lessac-medium',
-    name: 'Piper TTS (US English)',
+    name: 'Piper TTS US English (Lessac)',
     url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz',
     framework: 'onnx',
     modality: 'speechSynthesis',
     memoryRequirement: 65_000_000,
+    isArchive: true,
   },
   {
     id: 'vits-piper-en_GB-alba-medium',
-    name: 'Piper TTS (British)',
+    name: 'Piper TTS British English (Alba)',
     url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz',
     framework: 'onnx',
     modality: 'speechSynthesis',
     memoryRequirement: 65_000_000,
+    isArchive: true,
+  },
+
+  // =========================================================================
+  // VAD model (sherpa-onnx Silero VAD, single ONNX file)
+  // =========================================================================
+  {
+    id: 'silero-vad-v5',
+    name: 'Silero VAD v5',
+    url: 'https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx',
+    framework: 'onnx',
+    modality: 'voiceActivity',
+    memoryRequirement: 5_000_000,
   },
 ];
 
@@ -122,7 +215,23 @@ class ModelManagerImpl {
   }
 
   getLLMModels(): ModelInfo[] {
-    return this.models.filter((m) => m.modality === 'text' || m.modality === 'multimodal');
+    return this.models.filter((m) => m.modality === 'text');
+  }
+
+  getVLMModels(): ModelInfo[] {
+    return this.models.filter((m) => m.modality === 'multimodal');
+  }
+
+  getSTTModels(): ModelInfo[] {
+    return this.models.filter((m) => m.modality === 'speechRecognition');
+  }
+
+  getTTSModels(): ModelInfo[] {
+    return this.models.filter((m) => m.modality === 'speechSynthesis');
+  }
+
+  getVADModels(): ModelInfo[] {
+    return this.models.filter((m) => m.modality === 'voiceActivity');
   }
 
   getLoadedModel(): ModelInfo | null {
@@ -135,6 +244,10 @@ class ModelManagerImpl {
 
   // --- Model lifecycle ---
 
+  /**
+   * Download a model (and any additional files).
+   * Handles both single-file and multi-file models.
+   */
   async downloadModel(modelId: string): Promise<void> {
     const model = this.findModel(modelId);
     if (!model) return;
@@ -142,40 +255,43 @@ class ModelManagerImpl {
     this.updateModel(modelId, { status: 'downloading', downloadProgress: 0 });
 
     try {
-      const response = await fetch(model.url);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      // Download the primary file
+      const primaryData = await this.downloadFile(model.url, (progress) => {
+        // Weight primary file as main progress (adjust for additional files)
+        const totalFiles = 1 + (model.additionalFiles?.length ?? 0);
+        this.updateModel(modelId, { downloadProgress: progress / totalFiles });
+      });
 
-      const total = Number(response.headers.get('content-length') || 0);
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('No response body');
+      await this.storeInOPFS(modelId, primaryData);
 
-      const chunks: Uint8Array[] = [];
-      let received = 0;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-        received += value.length;
-        const progress = total > 0 ? received / total : 0;
-        this.updateModel(modelId, { downloadProgress: progress });
+      // Download additional files (e.g., mmproj for VLM)
+      if (model.additionalFiles && model.additionalFiles.length > 0) {
+        const totalFiles = 1 + model.additionalFiles.length;
+        for (let i = 0; i < model.additionalFiles.length; i++) {
+          const file = model.additionalFiles[i];
+          const fileKey = `${modelId}/${file.filename}`;
+          const fileData = await this.downloadFile(file.url, (progress) => {
+            const baseProgress = (1 + i) / totalFiles;
+            const fileProgress = progress / totalFiles;
+            this.updateModel(modelId, { downloadProgress: baseProgress + fileProgress });
+          });
+          await this.storeInOPFS(fileKey, fileData);
+        }
       }
 
-      // Combine chunks
-      const data = new Uint8Array(received);
-      let offset = 0;
-      for (const chunk of chunks) {
-        data.set(chunk, offset);
-        offset += chunk.length;
+      let totalSize = primaryData.length;
+      if (model.additionalFiles) {
+        for (const file of model.additionalFiles) {
+          const fileKey = `${modelId}/${file.filename}`;
+          const fileData = await this.loadFromOPFS(fileKey);
+          if (fileData) totalSize += fileData.length;
+        }
       }
-
-      // Store in OPFS
-      await this.storeInOPFS(modelId, data);
 
       this.updateModel(modelId, {
         status: 'downloaded',
         downloadProgress: 1,
-        sizeBytes: received,
+        sizeBytes: totalSize,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -187,40 +303,146 @@ class ModelManagerImpl {
     const model = this.findModel(modelId);
     if (!model || (model.status !== 'downloaded' && model.status !== 'registered')) return false;
 
-    // Unload current
+    // Unload current model of the same modality
     if (this.loadedModelId) {
-      this.updateModel(this.loadedModelId, { status: 'downloaded' });
+      await this.unloadCurrentModel();
     }
 
     this.updateModel(modelId, { status: 'loading' });
 
     try {
-      // Check if model exists in OPFS
       const data = await this.loadFromOPFS(modelId);
       if (!data) {
-        throw new Error('Model not downloaded');
+        throw new Error('Model not downloaded — please download the model first.');
       }
 
-      // TODO: Mount into Emscripten FS and call rac_lifecycle_load
-      // For now, simulate a successful load
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Determine the Emscripten FS path for this model
+      const fsDir = `/models`;
+      const fsPath = `${fsDir}/${modelId}.gguf`;
+
+      // Get the WASM module via the SDK
+      const { WASMBridge, TextGeneration } = await import(
+        '../../../../../sdk/runanywhere-web/packages/core/src/index'
+      );
+
+      const bridge = WASMBridge.shared;
+      if (!bridge.isLoaded) {
+        throw new Error('WASM module not loaded — SDK not initialized.');
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const m = bridge.module as any;
+
+      // Use Emscripten module-level FS helper functions which survive closure
+      // compiler minification (unlike m.FS.writeFile which gets mangled).
+      // FS_createPath(parent, path, canRead, canWrite) creates the directory tree.
+      // FS_createDataFile(parent, name, data, canRead, canWrite, canOwn) writes data.
+      if (typeof m.FS_createPath !== 'function' || typeof m.FS_createDataFile !== 'function') {
+        throw new Error('Emscripten FS helper functions not available on WASM module.');
+      }
+
+      // Ensure /models directory exists in Emscripten's virtual FS
+      m.FS_createPath('/', 'models', true, true);
+
+      // Remove existing file if present (FS_createDataFile throws if file exists)
+      try {
+        m.FS_unlink(fsPath);
+      } catch {
+        // File doesn't exist yet -- that's fine
+      }
+
+      // Write the model bytes into Emscripten FS
+      console.log(`[ModelManager] Writing ${data.length} bytes to ${fsPath}`);
+      m.FS_createDataFile('/models', `${modelId}.gguf`, data, true, true, true);
+      console.log(`[ModelManager] Model file written to ${fsPath}`);
+
+      if (model.modality === 'text' || model.modality === 'multimodal') {
+        // Load via the TextGeneration extension (calls rac_llm_component_load_model)
+        await TextGeneration.loadModel(fsPath, modelId, model.name);
+        console.log(`[ModelManager] LLM model loaded via TextGeneration: ${modelId}`);
+      }
+      // For other modalities (STT, TTS, VAD), the corresponding extension
+      // will handle loading when the user initiates those features.
 
       this.loadedModelId = modelId;
       this.updateModel(modelId, { status: 'loaded' });
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      console.error(`[ModelManager] Failed to load model ${modelId}:`, message);
       this.updateModel(modelId, { status: 'error', error: message });
       return false;
     }
+  }
+
+  private async unloadCurrentModel(): Promise<void> {
+    if (!this.loadedModelId) return;
+
+    try {
+      const { TextGeneration } = await import(
+        '../../../../../sdk/runanywhere-web/packages/core/src/index'
+      );
+      await TextGeneration.unloadModel();
+    } catch {
+      // Ignore unload errors
+    }
+
+    this.updateModel(this.loadedModelId, { status: 'downloaded' });
+    this.loadedModelId = null;
   }
 
   async deleteModel(modelId: string): Promise<void> {
     if (this.loadedModelId === modelId) {
       this.loadedModelId = null;
     }
+
+    // Delete primary file
     await this.deleteFromOPFS(modelId);
+
+    // Delete additional files
+    const model = this.findModel(modelId);
+    if (model?.additionalFiles) {
+      for (const file of model.additionalFiles) {
+        await this.deleteFromOPFS(`${modelId}/${file.filename}`);
+      }
+    }
+
     this.updateModel(modelId, { status: 'registered', downloadProgress: undefined, sizeBytes: undefined });
+  }
+
+  // --- Download Helper ---
+
+  private async downloadFile(
+    url: string,
+    onProgress?: (progress: number) => void,
+  ): Promise<Uint8Array> {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
+
+    const total = Number(response.headers.get('content-length') || 0);
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error('No response body');
+
+    const chunks: Uint8Array[] = [];
+    let received = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.length;
+      const progress = total > 0 ? received / total : 0;
+      onProgress?.(progress);
+    }
+
+    const data = new Uint8Array(received);
+    let offset = 0;
+    for (const chunk of chunks) {
+      data.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    return data;
   }
 
   // --- OPFS Storage ---
@@ -229,37 +451,74 @@ class ModelManagerImpl {
     return navigator.storage.getDirectory();
   }
 
-  private async storeInOPFS(modelId: string, data: Uint8Array): Promise<void> {
+  private async storeInOPFS(key: string, data: Uint8Array): Promise<void> {
     try {
       const root = await this.getOPFSRoot();
       const modelsDir = await root.getDirectoryHandle('models', { create: true });
-      const fileHandle = await modelsDir.getFileHandle(modelId, { create: true });
-      const writable = await fileHandle.createWritable();
-      await writable.write(data);
-      await writable.close();
+
+      // Handle nested keys (e.g., "modelId/filename.gguf")
+      if (key.includes('/')) {
+        const parts = key.split('/');
+        let dir = modelsDir;
+        for (let i = 0; i < parts.length - 1; i++) {
+          dir = await dir.getDirectoryHandle(parts[i], { create: true });
+        }
+        const fileHandle = await dir.getFileHandle(parts[parts.length - 1], { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(data.buffer as ArrayBuffer);
+        await writable.close();
+      } else {
+        const fileHandle = await modelsDir.getFileHandle(key, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(data.buffer as ArrayBuffer);
+        await writable.close();
+      }
     } catch {
       console.warn('OPFS not available, model stored in memory only');
     }
   }
 
-  private async loadFromOPFS(modelId: string): Promise<Uint8Array | null> {
+  private async loadFromOPFS(key: string): Promise<Uint8Array | null> {
     try {
       const root = await this.getOPFSRoot();
       const modelsDir = await root.getDirectoryHandle('models');
-      const fileHandle = await modelsDir.getFileHandle(modelId);
-      const file = await fileHandle.getFile();
-      const buffer = await file.arrayBuffer();
-      return new Uint8Array(buffer);
+
+      if (key.includes('/')) {
+        const parts = key.split('/');
+        let dir = modelsDir;
+        for (let i = 0; i < parts.length - 1; i++) {
+          dir = await dir.getDirectoryHandle(parts[i]);
+        }
+        const fileHandle = await dir.getFileHandle(parts[parts.length - 1]);
+        const file = await fileHandle.getFile();
+        const buffer = await file.arrayBuffer();
+        return new Uint8Array(buffer);
+      } else {
+        const fileHandle = await modelsDir.getFileHandle(key);
+        const file = await fileHandle.getFile();
+        const buffer = await file.arrayBuffer();
+        return new Uint8Array(buffer);
+      }
     } catch {
       return null;
     }
   }
 
-  private async deleteFromOPFS(modelId: string): Promise<void> {
+  private async deleteFromOPFS(key: string): Promise<void> {
     try {
       const root = await this.getOPFSRoot();
       const modelsDir = await root.getDirectoryHandle('models');
-      await modelsDir.removeEntry(modelId);
+
+      if (key.includes('/')) {
+        const parts = key.split('/');
+        let dir = modelsDir;
+        for (let i = 0; i < parts.length - 1; i++) {
+          dir = await dir.getDirectoryHandle(parts[i]);
+        }
+        await dir.removeEntry(parts[parts.length - 1]);
+      } else {
+        await modelsDir.removeEntry(key);
+      }
     } catch {
       // File may not exist
     }

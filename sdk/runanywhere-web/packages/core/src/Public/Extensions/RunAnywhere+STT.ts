@@ -1,19 +1,31 @@
 /**
  * RunAnywhere Web SDK - Speech-to-Text Extension
  *
- * Adds STT (speech recognition) capabilities via RACommons WASM.
+ * Adds STT (speech recognition) capabilities via sherpa-onnx WASM.
+ * Supports both offline (Whisper) and online (streaming Zipformer) models.
+ *
  * Mirrors: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/STT/
  *
  * Usage:
  *   import { STT } from '@runanywhere/web';
  *
- *   await STT.loadModel('/models/whisper-base.bin', 'whisper-base');
+ *   // Load model files (downloaded separately)
+ *   await STT.loadModel({
+ *     modelId: 'whisper-tiny-en',
+ *     type: 'whisper',
+ *     modelFiles: {
+ *       encoder: '/models/whisper-tiny-en/encoder.onnx',
+ *       decoder: '/models/whisper-tiny-en/decoder.onnx',
+ *       tokens: '/models/whisper-tiny-en/tokens.txt',
+ *     },
+ *   });
+ *
  *   const result = await STT.transcribe(audioFloat32Array);
  *   console.log(result.text);
  */
 
 import { RunAnywhere } from '../RunAnywhere';
-import { WASMBridge } from '../../Foundation/WASMBridge';
+import { SherpaONNXBridge } from '../../Foundation/SherpaONNXBridge';
 import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { EventBus } from '../../Foundation/EventBus';
@@ -21,38 +33,52 @@ import { SDKEventType } from '../../types/enums';
 
 const logger = new SDKLogger('STT');
 
-// Internal state
-let _sttComponentHandle = 0;
+// ---------------------------------------------------------------------------
+// Internal State
+// ---------------------------------------------------------------------------
 
-function requireBridge(): WASMBridge {
-  if (!RunAnywhere.isInitialized) {
-    throw SDKError.notInitialized();
-  }
-  return WASMBridge.shared;
-}
-
-function ensureSTTComponent(): number {
-  if (_sttComponentHandle !== 0) return _sttComponentHandle;
-
-  const bridge = requireBridge();
-  const m = bridge.module;
-  const handlePtr = m._malloc(4);
-  const result = m.ccall('rac_stt_component_create', 'number', ['number'], [handlePtr]) as number;
-
-  if (result !== 0) {
-    m._free(handlePtr);
-    bridge.checkResult(result, 'rac_stt_component_create');
-  }
-
-  _sttComponentHandle = m.getValue(handlePtr, 'i32');
-  m._free(handlePtr);
-  logger.debug('STT component created');
-  return _sttComponentHandle;
-}
+let _offlineRecognizerHandle = 0;
+let _onlineRecognizerHandle = 0;
+let _currentModelType: STTModelType = 'whisper';
+let _currentModelId = '';
 
 // ---------------------------------------------------------------------------
 // STT Types
 // ---------------------------------------------------------------------------
+
+export type STTModelType = 'whisper' | 'zipformer' | 'paraformer';
+
+export interface STTModelConfig {
+  modelId: string;
+  type: STTModelType;
+  /**
+   * Model files already written to sherpa-onnx virtual FS.
+   * Paths are FS paths (e.g., '/models/whisper-tiny/encoder.onnx').
+   */
+  modelFiles: STTWhisperFiles | STTZipformerFiles | STTParaformerFiles;
+  /** Sample rate (default: 16000) */
+  sampleRate?: number;
+  /** Language code (e.g., 'en', 'zh') */
+  language?: string;
+}
+
+export interface STTWhisperFiles {
+  encoder: string;
+  decoder: string;
+  tokens: string;
+}
+
+export interface STTZipformerFiles {
+  encoder: string;
+  decoder: string;
+  joiner: string;
+  tokens: string;
+}
+
+export interface STTParaformerFiles {
+  model: string;
+  tokens: string;
+}
 
 export interface STTTranscriptionResult {
   text: string;
@@ -71,9 +97,6 @@ export interface STTWord {
 
 export interface STTTranscribeOptions {
   language?: string;
-  detectLanguage?: boolean;
-  enablePunctuation?: boolean;
-  enableTimestamps?: boolean;
   sampleRate?: number;
 }
 
@@ -81,157 +104,395 @@ export interface STTTranscribeOptions {
 export type STTStreamCallback = (text: string, isFinal: boolean) => void;
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function requireSherpa(): SherpaONNXBridge {
+  if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
+  return SherpaONNXBridge.shared;
+}
+
+/**
+ * Build the sherpa-onnx config struct in WASM memory for offline recognizer.
+ * Returns a pointer that must be freed by the caller.
+ */
+function buildOfflineRecognizerConfigJson(config: STTModelConfig): string {
+  const sampleRate = config.sampleRate ?? 16000;
+  const files = config.modelFiles;
+
+  if (config.type === 'whisper') {
+    const f = files as STTWhisperFiles;
+    return JSON.stringify({
+      'feat-config': { 'sample-rate': sampleRate, 'feature-dim': 80 },
+      'model-config': {
+        'whisper': {
+          'encoder': f.encoder,
+          'decoder': f.decoder,
+          'language': config.language ?? 'en',
+          'task': 'transcribe',
+        },
+        'tokens': f.tokens,
+        'num-threads': 1,
+        'provider': 'cpu',
+        'debug': 0,
+      },
+      'decoding-method': 'greedy_search',
+    });
+  } else if (config.type === 'paraformer') {
+    const f = files as STTParaformerFiles;
+    return JSON.stringify({
+      'feat-config': { 'sample-rate': sampleRate, 'feature-dim': 80 },
+      'model-config': {
+        'paraformer': { 'model': f.model },
+        'tokens': f.tokens,
+        'num-threads': 1,
+        'provider': 'cpu',
+        'debug': 0,
+      },
+      'decoding-method': 'greedy_search',
+    });
+  }
+
+  throw new SDKError(SDKErrorCode.InvalidParameter, `Unsupported STT model type: ${config.type}`);
+}
+
+function buildOnlineRecognizerConfigJson(config: STTModelConfig): string {
+  const sampleRate = config.sampleRate ?? 16000;
+  const files = config.modelFiles as STTZipformerFiles;
+
+  return JSON.stringify({
+    'feat-config': { 'sample-rate': sampleRate, 'feature-dim': 80 },
+    'model-config': {
+      'transducer': {
+        'encoder': files.encoder,
+        'decoder': files.decoder,
+        'joiner': files.joiner,
+      },
+      'tokens': files.tokens,
+      'num-threads': 1,
+      'provider': 'cpu',
+      'debug': 0,
+    },
+    'decoding-method': 'greedy_search',
+    'enable-endpoint': 1,
+    'rule1-min-trailing-silence': 2.4,
+    'rule2-min-trailing-silence': 1.2,
+    'rule3-min-utterance-length': 20,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // STT Extension
 // ---------------------------------------------------------------------------
 
 export const STT = {
   /**
-   * Load an STT model (whisper.cpp GGML or sherpa-onnx).
+   * Load an STT model via sherpa-onnx.
+   * Model files must already be written to sherpa-onnx virtual FS
+   * (use SherpaONNXBridge.shared.downloadAndWrite() or .writeFile()).
    */
-  async loadModel(modelPath: string, modelId: string, modelName?: string): Promise<void> {
-    const bridge = requireBridge();
-    const m = bridge.module;
-    const handle = ensureSTTComponent();
+  async loadModel(config: STTModelConfig): Promise<void> {
+    const sherpa = requireSherpa();
+    await sherpa.ensureLoaded();
+    const m = sherpa.module;
 
-    logger.info(`Loading STT model: ${modelId} from ${modelPath}`);
-    EventBus.shared.emit('model.loadStarted', SDKEventType.Model, { modelId, component: 'stt' });
+    // Clean up previous model
+    STT.cleanup();
 
-    const pathPtr = bridge.allocString(modelPath);
-    const idPtr = bridge.allocString(modelId);
-    const namePtr = bridge.allocString(modelName ?? modelId);
+    logger.info(`Loading STT model: ${config.modelId} (${config.type})`);
+    EventBus.shared.emit('model.loadStarted', SDKEventType.Model, {
+      modelId: config.modelId, component: 'stt',
+    });
+
+    const startMs = performance.now();
 
     try {
-      const result = m.ccall(
-        'rac_stt_component_load_model', 'number',
-        ['number', 'number', 'number', 'number'],
-        [handle, pathPtr, idPtr, namePtr],
-      ) as number;
-      bridge.checkResult(result, 'rac_stt_component_load_model');
-      logger.info(`STT model loaded: ${modelId}`);
-      EventBus.shared.emit('model.loadCompleted', SDKEventType.Model, { modelId, component: 'stt' });
-    } finally {
-      bridge.free(pathPtr);
-      bridge.free(idPtr);
-      bridge.free(namePtr);
+      if (config.type === 'zipformer') {
+        // Streaming model: use online recognizer
+        const configJson = buildOnlineRecognizerConfigJson(config);
+        const configPtr = sherpa.allocString(configJson);
+
+        _onlineRecognizerHandle = m.ccall(
+          'SherpaOnnxCreateOnlineRecognizer', 'number', ['number'], [configPtr],
+        ) as number;
+        sherpa.free(configPtr);
+
+        if (_onlineRecognizerHandle === 0) {
+          throw new SDKError(SDKErrorCode.ModelLoadFailed,
+            `Failed to create online recognizer for ${config.modelId}`);
+        }
+      } else {
+        // Non-streaming model (Whisper, Paraformer): use offline recognizer
+        const configJson = buildOfflineRecognizerConfigJson(config);
+        const configPtr = sherpa.allocString(configJson);
+
+        _offlineRecognizerHandle = m.ccall(
+          'SherpaOnnxCreateOfflineRecognizer', 'number', ['number'], [configPtr],
+        ) as number;
+        sherpa.free(configPtr);
+
+        if (_offlineRecognizerHandle === 0) {
+          throw new SDKError(SDKErrorCode.ModelLoadFailed,
+            `Failed to create offline recognizer for ${config.modelId}`);
+        }
+      }
+
+      _currentModelType = config.type;
+      _currentModelId = config.modelId;
+
+      const loadTimeMs = Math.round(performance.now() - startMs);
+      logger.info(`STT model loaded: ${config.modelId} in ${loadTimeMs}ms`);
+      EventBus.shared.emit('model.loadCompleted', SDKEventType.Model, {
+        modelId: config.modelId, component: 'stt', loadTimeMs,
+      });
+    } catch (error) {
+      STT.cleanup();
+      throw error;
     }
   },
 
   /** Unload the STT model. */
   async unloadModel(): Promise<void> {
-    if (_sttComponentHandle === 0) return;
-    const bridge = requireBridge();
-    const result = bridge.module.ccall(
-      'rac_stt_component_unload', 'number', ['number'], [_sttComponentHandle],
-    ) as number;
-    bridge.checkResult(result, 'rac_stt_component_unload');
+    STT.cleanup();
     logger.info('STT model unloaded');
   },
 
   /** Check if an STT model is loaded. */
   get isModelLoaded(): boolean {
-    if (_sttComponentHandle === 0) return false;
-    try {
-      return (WASMBridge.shared.module.ccall(
-        'rac_stt_component_is_loaded', 'number', ['number'], [_sttComponentHandle],
-      ) as number) === 1;
-    } catch { return false; }
+    return _offlineRecognizerHandle !== 0 || _onlineRecognizerHandle !== 0;
+  },
+
+  /** Get the current model ID. */
+  get modelId(): string {
+    return _currentModelId;
   },
 
   /**
-   * Transcribe audio data (Float32Array of PCM samples at 16kHz mono).
+   * Transcribe audio data (offline / non-streaming).
    *
-   * @param audioSamples - Float32Array of PCM audio samples
+   * @param audioSamples - Float32Array of PCM audio samples (mono, 16kHz)
    * @param options - Transcription options
-   * @returns Transcription result with text, confidence, timing
+   * @returns Transcription result
    */
   async transcribe(
     audioSamples: Float32Array,
     options: STTTranscribeOptions = {},
   ): Promise<STTTranscriptionResult> {
-    const bridge = requireBridge();
-    const m = bridge.module;
-    const handle = ensureSTTComponent();
+    const sherpa = requireSherpa();
+    const m = sherpa.module;
 
-    if (!STT.isModelLoaded) {
+    if (_offlineRecognizerHandle === 0) {
+      if (_onlineRecognizerHandle !== 0) {
+        // Streaming model: process all at once via online recognizer
+        return STT._transcribeViaOnline(audioSamples, options);
+      }
       throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No STT model loaded. Call loadModel() first.');
     }
 
-    logger.debug(`Transcribing ${audioSamples.length} samples`);
+    const startMs = performance.now();
+    const sampleRate = options.sampleRate ?? 16000;
 
-    // Copy audio samples to WASM memory
-    const audioBytes = audioSamples.length * 4; // float32 = 4 bytes
-    const audioPtr = m._malloc(audioBytes);
-    new Float32Array(m.HEAPU8.buffer, audioPtr, audioSamples.length).set(audioSamples);
+    logger.debug(`Transcribing ${audioSamples.length} samples (${(audioSamples.length / sampleRate).toFixed(1)}s)`);
 
-    // Build rac_stt_options_t (simplified -- pass as raw audio data)
-    // The component will use its configured options
-    const optionsSize = 32; // approximate size of rac_stt_options_t
-    const optionsPtr = m._malloc(optionsSize);
-    for (let i = 0; i < optionsSize; i++) m.setValue(optionsPtr + i, 0, 'i8');
-
-    // Set language if provided
-    let langPtr = 0;
-    if (options.language) {
-      langPtr = bridge.allocString(options.language);
-      m.setValue(optionsPtr, langPtr, '*'); // language field at offset 0
+    // Create stream
+    const stream = m._SherpaOnnxCreateOfflineStream(_offlineRecognizerHandle);
+    if (stream === 0) {
+      throw new SDKError(SDKErrorCode.GenerationFailed, 'Failed to create offline stream');
     }
-    // detect_language at offset 4
-    m.setValue(optionsPtr + 4, options.detectLanguage ? 1 : 0, 'i32');
-    // enable_punctuation at offset 8
-    m.setValue(optionsPtr + 8, options.enablePunctuation !== false ? 1 : 0, 'i32');
-    // sample_rate at offset 28
-    m.setValue(optionsPtr + 28, options.sampleRate ?? 16000, 'i32');
 
-    // Allocate result struct
-    const resultSize = 48; // approximate size of rac_stt_result_t
-    const resultPtr = m._malloc(resultSize);
+    // Copy audio to WASM memory
+    const audioPtr = m._malloc(audioSamples.length * 4);
+    m.HEAPF32.set(audioSamples, audioPtr / 4);
 
     try {
-      const result = m.ccall(
-        'rac_stt_component_transcribe', 'number',
-        ['number', 'number', 'number', 'number', 'number'],
-        [handle, audioPtr, audioBytes, optionsPtr, resultPtr],
-      ) as number;
-      bridge.checkResult(result, 'rac_stt_component_transcribe');
+      // Feed audio
+      m._SherpaOnnxAcceptWaveformOffline(stream, sampleRate, audioPtr, audioSamples.length);
 
-      // Read result: { text (ptr), detected_language (ptr), words (ptr), num_words, confidence (float), processing_time_ms (i64) }
-      const textPtr = m.getValue(resultPtr, '*');
-      const detectedLangPtr = m.getValue(resultPtr + 4, '*');
-      const confidence = m.getValue(resultPtr + 16, 'float');
-      const processingTimeMs = m.getValue(resultPtr + 20, 'i32');
+      // Decode
+      m._SherpaOnnxDecodeOfflineStream(_offlineRecognizerHandle, stream);
 
-      const transcriptionResult: STTTranscriptionResult = {
-        text: bridge.readString(textPtr),
-        confidence,
-        detectedLanguage: detectedLangPtr ? bridge.readString(detectedLangPtr) : undefined,
+      // Get result as JSON
+      const jsonPtr = m._SherpaOnnxGetOfflineStreamResultAsJson(stream);
+      const jsonStr = sherpa.readString(jsonPtr);
+      m._SherpaOnnxDestroyOfflineStreamResultJson(jsonPtr);
+
+      const result = JSON.parse(jsonStr || '{}');
+      const processingTimeMs = Math.round(performance.now() - startMs);
+
+      const transcription: STTTranscriptionResult = {
+        text: (result.text ?? '').trim(),
+        confidence: result.confidence ?? 0,
+        detectedLanguage: result.lang,
         processingTimeMs,
       };
 
-      // Free the C result
-      m.ccall('rac_stt_result_free', null, ['number'], [resultPtr]);
-
       EventBus.shared.emit('stt.transcribed', SDKEventType.Voice, {
-        text: transcriptionResult.text,
-        confidence: transcriptionResult.confidence,
+        text: transcription.text,
+        confidence: transcription.confidence,
       });
 
-      return transcriptionResult;
+      return transcription;
     } finally {
       m._free(audioPtr);
-      m._free(optionsPtr);
-      if (langPtr) bridge.free(langPtr);
+      m._SherpaOnnxDestroyOfflineStream(stream);
     }
   },
 
-  /** Clean up the STT component. */
-  cleanup(): void {
-    if (_sttComponentHandle !== 0) {
-      try {
-        WASMBridge.shared.module.ccall(
-          'rac_stt_component_destroy', null, ['number'], [_sttComponentHandle],
-        );
-      } catch { /* ignore */ }
-      _sttComponentHandle = 0;
+  /** Internal: Transcribe via online recognizer (for streaming models used non-streaming) */
+  async _transcribeViaOnline(
+    audioSamples: Float32Array,
+    options: STTTranscribeOptions = {},
+  ): Promise<STTTranscriptionResult> {
+    const m = SherpaONNXBridge.shared.module;
+    const startMs = performance.now();
+    const sampleRate = options.sampleRate ?? 16000;
+
+    const stream = m._SherpaOnnxCreateOnlineStream(_onlineRecognizerHandle);
+    if (stream === 0) {
+      throw new SDKError(SDKErrorCode.GenerationFailed, 'Failed to create online stream');
+    }
+
+    const audioPtr = m._malloc(audioSamples.length * 4);
+    m.HEAPF32.set(audioSamples, audioPtr / 4);
+
+    try {
+      m._SherpaOnnxOnlineStreamAcceptWaveform(stream, sampleRate, audioPtr, audioSamples.length);
+      m._SherpaOnnxOnlineStreamInputFinished(stream);
+
+      while (m._SherpaOnnxIsOnlineStreamReady(_onlineRecognizerHandle, stream)) {
+        m._SherpaOnnxDecodeOnlineStream(_onlineRecognizerHandle, stream);
+      }
+
+      const jsonPtr = m._SherpaOnnxGetOnlineStreamResultAsJson(stream);
+      const jsonStr = SherpaONNXBridge.shared.readString(jsonPtr);
+      m._SherpaOnnxDestroyOnlineStreamResultJson(jsonPtr);
+
+      const result = JSON.parse(jsonStr || '{}');
+      const processingTimeMs = Math.round(performance.now() - startMs);
+
+      return {
+        text: (result.text ?? '').trim(),
+        confidence: result.confidence ?? 0,
+        processingTimeMs,
+      };
+    } finally {
+      m._free(audioPtr);
+      m._SherpaOnnxDestroyOnlineStream(stream);
     }
   },
+
+  /**
+   * Create a streaming transcription session.
+   * Returns an object to feed audio chunks and get results.
+   */
+  createStreamingSession(options: STTTranscribeOptions = {}): STTStreamingSession {
+    if (_onlineRecognizerHandle === 0) {
+      throw new SDKError(
+        SDKErrorCode.ModelNotLoaded,
+        'No streaming STT model loaded. Use a zipformer model.',
+      );
+    }
+
+    return new STTStreamingSessionImpl(_onlineRecognizerHandle, options);
+  },
+
+  /** Clean up the STT resources. */
+  cleanup(): void {
+    const sherpa = SherpaONNXBridge.shared;
+    if (!sherpa.isLoaded) return;
+
+    const m = sherpa.module;
+
+    if (_offlineRecognizerHandle !== 0) {
+      try { m._SherpaOnnxDestroyOfflineRecognizer(_offlineRecognizerHandle); } catch { /* ignore */ }
+      _offlineRecognizerHandle = 0;
+    }
+
+    if (_onlineRecognizerHandle !== 0) {
+      try { m._SherpaOnnxDestroyOnlineRecognizer(_onlineRecognizerHandle); } catch { /* ignore */ }
+      _onlineRecognizerHandle = 0;
+    }
+
+    _currentModelId = '';
+  },
 };
+
+// ---------------------------------------------------------------------------
+// Streaming Session
+// ---------------------------------------------------------------------------
+
+export interface STTStreamingSession {
+  /** Feed audio samples to the recognizer */
+  acceptWaveform(samples: Float32Array, sampleRate?: number): void;
+  /** Signal end of audio input */
+  inputFinished(): void;
+  /** Get current partial/final result */
+  getResult(): { text: string; isEndpoint: boolean };
+  /** Reset after endpoint */
+  reset(): void;
+  /** Destroy the streaming session */
+  destroy(): void;
+}
+
+class STTStreamingSessionImpl implements STTStreamingSession {
+  private _stream: number;
+  private readonly _recognizer: number;
+  private readonly _sampleRate: number;
+
+  constructor(recognizer: number, options: STTTranscribeOptions) {
+    this._recognizer = recognizer;
+    this._sampleRate = options.sampleRate ?? 16000;
+    const m = SherpaONNXBridge.shared.module;
+    this._stream = m._SherpaOnnxCreateOnlineStream(recognizer);
+    if (this._stream === 0) {
+      throw new SDKError(SDKErrorCode.GenerationFailed, 'Failed to create streaming session');
+    }
+  }
+
+  acceptWaveform(samples: Float32Array, sampleRate?: number): void {
+    const m = SherpaONNXBridge.shared.module;
+    const audioPtr = m._malloc(samples.length * 4);
+    m.HEAPF32.set(samples, audioPtr / 4);
+    m._SherpaOnnxOnlineStreamAcceptWaveform(
+      this._stream, sampleRate ?? this._sampleRate, audioPtr, samples.length,
+    );
+    m._free(audioPtr);
+
+    // Decode available frames
+    while (m._SherpaOnnxIsOnlineStreamReady(this._recognizer, this._stream)) {
+      m._SherpaOnnxDecodeOnlineStream(this._recognizer, this._stream);
+    }
+  }
+
+  inputFinished(): void {
+    SherpaONNXBridge.shared.module._SherpaOnnxOnlineStreamInputFinished(this._stream);
+  }
+
+  getResult(): { text: string; isEndpoint: boolean } {
+    const m = SherpaONNXBridge.shared.module;
+    const jsonPtr = m._SherpaOnnxGetOnlineStreamResultAsJson(this._stream);
+    const jsonStr = SherpaONNXBridge.shared.readString(jsonPtr);
+    m._SherpaOnnxDestroyOnlineStreamResultJson(jsonPtr);
+
+    const result = JSON.parse(jsonStr || '{}');
+    const isEndpoint = m._SherpaOnnxOnlineStreamIsEndpoint(this._recognizer, this._stream) !== 0;
+
+    return {
+      text: (result.text ?? '').trim(),
+      isEndpoint,
+    };
+  }
+
+  reset(): void {
+    SherpaONNXBridge.shared.module._SherpaOnnxOnlineStreamReset(this._recognizer, this._stream);
+  }
+
+  destroy(): void {
+    if (this._stream !== 0) {
+      try {
+        SherpaONNXBridge.shared.module._SherpaOnnxDestroyOnlineStream(this._stream);
+      } catch { /* ignore */ }
+      this._stream = 0;
+    }
+  }
+}
