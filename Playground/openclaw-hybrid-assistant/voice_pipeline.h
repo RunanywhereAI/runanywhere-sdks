@@ -57,6 +57,7 @@ struct VoicePipelineConfig {
     bool debug_wakeword = false;
     bool debug_vad = false;
     bool debug_stt = false;
+    bool debug_audio = false;   // Log mic input levels (RMS, peak) every ~1s
 };
 
 // =============================================================================
