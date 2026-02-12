@@ -40,7 +40,11 @@ export type { VLMImage, VLMImageFormat, VLMModelFamily, VLMGenerationOptions, VL
 export { StructuredOutput } from './Public/Extensions/RunAnywhere+StructuredOutput';
 export type { StructuredOutputConfig, StructuredOutputValidation } from './Public/Extensions/RunAnywhere+StructuredOutput';
 export { Diffusion } from './Public/Extensions/RunAnywhere+Diffusion';
+export { DiffusionScheduler, DiffusionModelVariant, DiffusionMode } from './Public/Extensions/RunAnywhere+Diffusion';
 export type { DiffusionGenerationOptions, DiffusionGenerationResult, DiffusionProgressCallback } from './Public/Extensions/RunAnywhere+Diffusion';
+export { Embeddings } from './Public/Extensions/RunAnywhere+Embeddings';
+export { EmbeddingsNormalize, EmbeddingsPooling } from './Public/Extensions/RunAnywhere+Embeddings';
+export type { EmbeddingVector, EmbeddingsResult, EmbeddingsOptions } from './Public/Extensions/RunAnywhere+Embeddings';
 
 // Types
 export * from './types';

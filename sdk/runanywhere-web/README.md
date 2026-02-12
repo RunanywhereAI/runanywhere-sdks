@@ -180,11 +180,147 @@ cd packages/core && npx tsc --noEmit
 
 ### Cross-Origin Isolation Headers
 
-For pthreads (multi-threaded WASM), your server must send:
+For pthreads (multi-threaded WASM), your server must set two HTTP headers on every response:
 
 ```
 Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
+```
+
+**Why?** These headers enable `SharedArrayBuffer`, which is required for multi-threaded WASM (pthreads). Without them, `crossOriginIsolated` will be `false` and the SDK falls back to single-threaded mode.
+
+**Important:** `require-corp` means **all** sub-resources (images, scripts, fonts, iframes) must either be same-origin or include a `Cross-Origin-Resource-Policy: cross-origin` header. Plan accordingly for CDN assets.
+
+#### Nginx
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name app.example.com;
+
+    # Cross-Origin Isolation for SharedArrayBuffer / WASM threads
+    add_header Cross-Origin-Opener-Policy "same-origin" always;
+    add_header Cross-Origin-Embedder-Policy "require-corp" always;
+
+    # Serve .wasm files with correct MIME type
+    types {
+        application/wasm wasm;
+    }
+
+    # Cache WASM/JS glue aggressively (they're versioned)
+    location ~* \.wasm$ {
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        add_header Cross-Origin-Embedder-Policy "require-corp" always;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+}
+```
+
+#### CloudFront (AWS)
+
+Add a **Response Headers Policy** to your CloudFront distribution:
+
+1. Go to **CloudFront** → **Policies** → **Response headers**
+2. Create a custom policy with:
+   - `Cross-Origin-Opener-Policy: same-origin`
+   - `Cross-Origin-Embedder-Policy: require-corp`
+3. Attach the policy to your distribution's behavior
+
+Or use CloudFront Functions:
+
+```javascript
+function handler(event) {
+  var response = event.response;
+  var headers = response.headers;
+  headers['cross-origin-opener-policy'] = { value: 'same-origin' };
+  headers['cross-origin-embedder-policy'] = { value: 'require-corp' };
+  return response;
+}
+```
+
+#### Vercel
+
+Add to `vercel.json`:
+
+```json
+{
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
+        { "key": "Cross-Origin-Embedder-Policy", "value": "require-corp" }
+      ]
+    }
+  ]
+}
+```
+
+#### Netlify
+
+Add to `netlify.toml`:
+
+```toml
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cross-Origin-Opener-Policy = "same-origin"
+    Cross-Origin-Embedder-Policy = "require-corp"
+```
+
+#### Cloudflare Pages
+
+Create `_headers` file in the project root:
+
+```
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+```
+
+#### Apache (.htaccess)
+
+```apache
+<IfModule mod_headers.c>
+    Header always set Cross-Origin-Opener-Policy "same-origin"
+    Header always set Cross-Origin-Embedder-Policy "require-corp"
+</IfModule>
+
+# Serve .wasm with correct MIME
+AddType application/wasm .wasm
+```
+
+#### Vite (development)
+
+Already configured in the demo app's `vite.config.ts`:
+
+```typescript
+export default defineConfig({
+  server: {
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
+  },
+});
+```
+
+#### Verifying Isolation
+
+Check in browser DevTools console:
+
+```javascript
+console.log('Cross-Origin Isolated:', crossOriginIsolated);
+console.log('SharedArrayBuffer:', typeof SharedArrayBuffer !== 'undefined');
+```
+
+Or use the SDK's built-in detection:
+
+```typescript
+import { detectCapabilities } from '@runanywhere/web';
+const caps = await detectCapabilities();
+console.log('COI:', caps.isCrossOriginIsolated);
+console.log('SAB:', caps.hasSharedArrayBuffer);
 ```
 
 ## Demo App

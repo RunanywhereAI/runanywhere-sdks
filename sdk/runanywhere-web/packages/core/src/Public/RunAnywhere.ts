@@ -132,6 +132,7 @@ export const RunAnywhere = {
     const m = bridge.module;
 
     // Create rac_config_t in WASM memory
+    // Layout: { rac_platform_adapter_t* platform_adapter, rac_log_level_t log_level, const char* log_tag }
     const configSize = m._rac_wasm_sizeof_config();
     const configPtr = m._malloc(configSize);
 
@@ -140,11 +141,11 @@ export const RunAnywhere = {
       m.setValue(configPtr + i, 0, 'i8');
     }
 
-    // Set log level field (first field in rac_config_t after platform_adapter pointer)
-    // rac_config_t layout: { rac_platform_adapter_t* adapter, rac_log_level_t log_level, const char* log_tag }
-    // Note: platform adapter is already set via rac_set_platform_adapter()
+    // Set platform_adapter pointer (offset 0) -- rac_init checks this field
+    m.setValue(configPtr, _platformAdapter.getAdapterPtr(), '*');
+    // Set log_level (offset 4, after the pointer)
     const logLevel = options.debug ? 1 : 2; // DEBUG=1, INFO=2
-    m.setValue(configPtr + 4, logLevel, 'i32'); // log_level (offset 4 after pointer)
+    m.setValue(configPtr + 4, logLevel, 'i32');
 
     const result = m._rac_init(configPtr);
     m._free(configPtr);

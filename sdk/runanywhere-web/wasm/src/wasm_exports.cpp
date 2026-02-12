@@ -60,6 +60,8 @@
 #include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/features/vlm/rac_vlm_types.h"
 #include "rac/features/vlm/rac_vlm_component.h"
+#include "rac/features/diffusion/rac_diffusion.h"
+#include "rac/features/embeddings/rac_embeddings.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
 #include "rac/features/llm/rac_llm_structured_output.h"
 
@@ -220,6 +222,38 @@ int rac_wasm_sizeof_vlm_image(void) {
 EMSCRIPTEN_KEEPALIVE
 int rac_wasm_sizeof_structured_output_config(void) {
     return (int)sizeof(rac_structured_output_config_t);
+}
+
+/**
+ * Helper: Get sizeof rac_diffusion_options_t for JS allocation.
+ */
+EMSCRIPTEN_KEEPALIVE
+int rac_wasm_sizeof_diffusion_options(void) {
+    return (int)sizeof(rac_diffusion_options_t);
+}
+
+/**
+ * Helper: Get sizeof rac_diffusion_result_t for JS allocation.
+ */
+EMSCRIPTEN_KEEPALIVE
+int rac_wasm_sizeof_diffusion_result(void) {
+    return (int)sizeof(rac_diffusion_result_t);
+}
+
+/**
+ * Helper: Get sizeof rac_embeddings_options_t for JS allocation.
+ */
+EMSCRIPTEN_KEEPALIVE
+int rac_wasm_sizeof_embeddings_options(void) {
+    return (int)sizeof(rac_embeddings_options_t);
+}
+
+/**
+ * Helper: Get sizeof rac_embeddings_result_t for JS allocation.
+ */
+EMSCRIPTEN_KEEPALIVE
+int rac_wasm_sizeof_embeddings_result(void) {
+    return (int)sizeof(rac_embeddings_result_t);
 }
 
 /**
