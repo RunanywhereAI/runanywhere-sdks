@@ -246,7 +246,7 @@ export const Diffusion = {
       // Copy RGBA image data
       const imageData = new Uint8ClampedArray(imageSize);
       if (imageDataPtr && imageSize > 0) {
-        imageData.set(new Uint8Array(m.HEAPU8.buffer, imageDataPtr, imageSize));
+        imageData.set(bridge.readBytes(imageDataPtr, imageSize));
       }
 
       // Free C result

@@ -6,7 +6,7 @@
  * tool calling toggle with demo tools (matching iOS ToolSettingsView).
  */
 
-import { ModelManager, type ModelInfo } from '../services/model-manager';
+import { ModelManager, ModelCategory, type ModelInfo } from '../services/model-manager';
 import { showModelSelectionSheet } from '../components/model-selection';
 import type { ToolValue } from '../../../../../sdk/runanywhere-web/packages/core/src/Public/Extensions/RunAnywhere+ToolCalling';
 
@@ -156,11 +156,11 @@ function buildFloatingCircles(): void {
 // ---------------------------------------------------------------------------
 
 function openModelSheet(): void {
-  showModelSelectionSheet('text');
+  showModelSelectionSheet(ModelCategory.Language);
 }
 
 function onModelsChanged(_models: ModelInfo[]): void {
-  const loaded = ModelManager.getLoadedModel('text');
+  const loaded = ModelManager.getLoadedModel(ModelCategory.Language);
   if (loaded) {
     overlayEl.style.display = 'none';
     toolbarModelEl.textContent = loaded.name;
@@ -334,7 +334,7 @@ async function sendMessage(): Promise<void> {
   const text = inputEl.value.trim();
   if (!text || isGenerating) return;
 
-  const loaded = ModelManager.getLoadedModel('text');
+  const loaded = ModelManager.getLoadedModel(ModelCategory.Language);
   if (!loaded) {
     openModelSheet();
     return;
@@ -642,7 +642,7 @@ function appendMetrics(rowEl: HTMLElement, metrics: {
  * Format a model ID into a shorter, display-friendly name.
  */
 function formatModelName(modelId: string): string {
-  const loaded = ModelManager.getLoadedModel('text');
+  const loaded = ModelManager.getLoadedModel(ModelCategory.Language);
   if (loaded && loaded.id === modelId) return loaded.name;
   return modelId
     .replace(/-q\d.*$/i, '')

@@ -22,7 +22,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WASM_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-BUILD_DIR="${WASM_DIR}/build"
 OUTPUT_DIR="${WASM_DIR}/../packages/core/wasm"
 
 # Defaults
@@ -33,6 +32,7 @@ LLAMACPP="OFF"
 VLM="OFF"
 WHISPERCPP="OFF"
 ONNX="OFF"
+WEBGPU="OFF"
 CLEAN=false
 
 # Parse arguments
@@ -64,6 +64,11 @@ while [[ $# -gt 0 ]]; do
             ONNX="ON"
             shift
             ;;
+        --webgpu)
+            WEBGPU="ON"
+            LLAMACPP="ON"  # WebGPU accelerates llama.cpp
+            shift
+            ;;
         --all-backends)
             LLAMACPP="ON"
             VLM="ON"
@@ -85,6 +90,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --vlm            Include VLM (Vision Language Model) via llama.cpp mtmd"
             echo "  --whispercpp     Include whisper.cpp STT backend"
             echo "  --onnx           Include sherpa-onnx TTS/VAD backend"
+            echo "  --webgpu         Enable WebGPU GPU acceleration (produces racommons-webgpu variant)"
             echo "  --all-backends   Enable all backends (llama.cpp + VLM + whisper.cpp + onnx)"
             echo "  --clean          Clean build directory before building"
             echo "  --help           Show this help"
@@ -96,6 +102,13 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Use a separate build directory for WebGPU variant to avoid cache conflicts
+if [ "$WEBGPU" = "ON" ]; then
+    BUILD_DIR="${WASM_DIR}/build-webgpu"
+else
+    BUILD_DIR="${WASM_DIR}/build"
+fi
 
 # Check Emscripten
 if ! command -v emcmake &> /dev/null; then
@@ -112,6 +125,7 @@ echo " Build type:   ${BUILD_TYPE}"
 echo " pthreads:     ${PTHREADS}"
 echo " llama.cpp:    ${LLAMACPP}"
 echo " VLM (mtmd):   ${VLM}"
+echo " WebGPU:       ${WEBGPU}"
 echo " whisper.cpp:  ${WHISPERCPP}"
 echo " sherpa-onnx:  ${ONNX}"
 echo " Debug:        ${DEBUG}"
@@ -140,7 +154,8 @@ emcmake cmake \
     -DRAC_WASM_LLAMACPP="${LLAMACPP}" \
     -DRAC_WASM_VLM="${VLM}" \
     -DRAC_WASM_WHISPERCPP="${WHISPERCPP}" \
-    -DRAC_WASM_ONNX="${ONNX}"
+    -DRAC_WASM_ONNX="${ONNX}" \
+    -DRAC_WASM_WEBGPU="${WEBGPU}"
 
 # Build
 echo ""
@@ -151,19 +166,26 @@ emmake cmake --build "${BUILD_DIR}" --parallel
 echo ""
 echo ">>> Verifying outputs..."
 
-WASM_FILE="${OUTPUT_DIR}/racommons.wasm"
-JS_FILE="${OUTPUT_DIR}/racommons.js"
+# Output file names depend on whether WebGPU variant was built
+if [ "$WEBGPU" = "ON" ]; then
+    OUTPUT_NAME="racommons-webgpu"
+else
+    OUTPUT_NAME="racommons"
+fi
+
+WASM_FILE="${OUTPUT_DIR}/${OUTPUT_NAME}.wasm"
+JS_FILE="${OUTPUT_DIR}/${OUTPUT_NAME}.js"
 
 if [ -f "${WASM_FILE}" ] && [ -f "${JS_FILE}" ]; then
     WASM_SIZE=$(du -h "${WASM_FILE}" | cut -f1)
     JS_SIZE=$(du -h "${JS_FILE}" | cut -f1)
     echo "SUCCESS: WASM build complete"
-    echo "  racommons.wasm: ${WASM_SIZE}"
-    echo "  racommons.js:   ${JS_SIZE}"
+    echo "  ${OUTPUT_NAME}.wasm: ${WASM_SIZE}"
+    echo "  ${OUTPUT_NAME}.js:   ${JS_SIZE}"
 
-    if [ "$PTHREADS" = "ON" ] && [ -f "${OUTPUT_DIR}/racommons.worker.js" ]; then
-        WORKER_SIZE=$(du -h "${OUTPUT_DIR}/racommons.worker.js" | cut -f1)
-        echo "  racommons.worker.js: ${WORKER_SIZE}"
+    if [ "$PTHREADS" = "ON" ] && [ -f "${OUTPUT_DIR}/${OUTPUT_NAME}.worker.js" ]; then
+        WORKER_SIZE=$(du -h "${OUTPUT_DIR}/${OUTPUT_NAME}.worker.js" | cut -f1)
+        echo "  ${OUTPUT_NAME}.worker.js: ${WORKER_SIZE}"
     fi
 else
     echo "ERROR: Build outputs not found!"

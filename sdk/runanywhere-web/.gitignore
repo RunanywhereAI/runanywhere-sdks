@@ -8,8 +8,10 @@ packages/core/dist/
 # WASM build artifacts
 wasm/build/
 wasm/build-sherpa-onnx/
+wasm/build-webgpu/
 wasm/third_party/
 packages/core/wasm/
+a.out.*
 
 # IDE
 .vscode/

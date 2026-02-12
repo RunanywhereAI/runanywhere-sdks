@@ -7,6 +7,7 @@
 
 import type { DeviceInfoData } from '../types/models';
 import { SDKLogger } from '../Foundation/SDKLogger';
+import type { AccelerationMode } from '../Foundation/WASMBridge';
 
 const logger = new SDKLogger('DeviceCapabilities');
 
@@ -15,6 +16,8 @@ export interface WebCapabilities {
   hasWebGPU: boolean;
   /** WebGPU adapter info (if available) */
   gpuAdapterInfo?: Record<string, string>;
+  /** The acceleration mode actually in use by the WASM module ('webgpu' | 'cpu'). */
+  activeAcceleration: AccelerationMode;
   /** SharedArrayBuffer available (needed for pthreads/multithreaded WASM) */
   hasSharedArrayBuffer: boolean;
   /** Cross-Origin Isolation enabled (required for SharedArrayBuffer) */
@@ -35,8 +38,12 @@ export interface WebCapabilities {
  * Detect all browser capabilities relevant to AI inference.
  */
 export async function detectCapabilities(): Promise<WebCapabilities> {
+  // Import WASMBridge lazily to avoid circular imports at module level
+  const { WASMBridge } = await import('../Foundation/WASMBridge');
+
   const capabilities: WebCapabilities = {
     hasWebGPU: false,
+    activeAcceleration: WASMBridge.shared.isLoaded ? WASMBridge.shared.accelerationMode : 'cpu',
     hasSharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
     isCrossOriginIsolated: typeof crossOriginIsolated !== 'undefined' ? crossOriginIsolated : false,
     hasWASMSIMD: detectWASMSIMD(),

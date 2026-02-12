@@ -118,6 +118,21 @@ export enum ConfigurationSource {
   Builtin = 'builtin',
 }
 
+export enum ModelStatus {
+  Registered = 'registered',
+  Downloading = 'downloading',
+  Downloaded = 'downloaded',
+  Loading = 'loading',
+  Loaded = 'loaded',
+  Error = 'error',
+}
+
+export enum DownloadStage {
+  Downloading = 'downloading',
+  Validating = 'validating',
+  Completed = 'completed',
+}
+
 export enum SDKEventType {
   Initialization = 'initialization',
   Configuration = 'configuration',

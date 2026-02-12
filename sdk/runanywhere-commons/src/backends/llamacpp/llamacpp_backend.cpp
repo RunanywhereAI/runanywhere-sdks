@@ -141,6 +141,8 @@ DeviceType LlamaCppBackend::get_device_type() const {
     return DeviceType::METAL;
 #elif defined(GGML_USE_CUDA)
     return DeviceType::CUDA;
+#elif defined(GGML_USE_WEBGPU)
+    return DeviceType::WEBGPU;
 #else
     return DeviceType::CPU;
 #endif

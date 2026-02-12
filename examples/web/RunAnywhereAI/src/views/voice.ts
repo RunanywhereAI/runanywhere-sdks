@@ -6,7 +6,7 @@
  */
 
 import { showModelSelectionSheet } from '../components/model-selection';
-import { ModelManager, type ModelModality } from '../services/model-manager';
+import { ModelManager, ModelCategory } from '../services/model-manager';
 import { MicCapture } from '../services/audio';
 
 // Lazy-imported SDK modules (loaded only when pipeline runs)
@@ -25,16 +25,16 @@ async function getSDK(): Promise<SDKModules> {
 // ---------------------------------------------------------------------------
 
 interface PipelineStep {
-  modality: ModelModality;
+  modality: ModelCategory;
   elementId: string;
   title: string;
   defaultStatus: string;
 }
 
 const PIPELINE_STEPS: PipelineStep[] = [
-  { modality: 'speechRecognition', elementId: 'voice-setup-stt', title: 'Speech-to-Text', defaultStatus: 'Select STT model' },
-  { modality: 'text', elementId: 'voice-setup-llm', title: 'Language Model', defaultStatus: 'Select LLM model' },
-  { modality: 'speechSynthesis', elementId: 'voice-setup-tts', title: 'Text-to-Speech', defaultStatus: 'Select TTS model' },
+  { modality: ModelCategory.SpeechRecognition, elementId: 'voice-setup-stt', title: 'Speech-to-Text', defaultStatus: 'Select STT model' },
+  { modality: ModelCategory.Language, elementId: 'voice-setup-llm', title: 'Language Model', defaultStatus: 'Select LLM model' },
+  { modality: ModelCategory.SpeechSynthesis, elementId: 'voice-setup-tts', title: 'Text-to-Speech', defaultStatus: 'Select TTS model' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -162,13 +162,13 @@ export function initVoiceTab(el: HTMLElement): void {
 
   // Setup card clicks — open model selection for each modality
   container.querySelector('#voice-setup-stt')!.addEventListener('click', () => {
-    showModelSelectionSheet('speechRecognition');
+    showModelSelectionSheet(ModelCategory.SpeechRecognition);
   });
   container.querySelector('#voice-setup-llm')!.addEventListener('click', () => {
-    showModelSelectionSheet('text');
+    showModelSelectionSheet(ModelCategory.Language);
   });
   container.querySelector('#voice-setup-tts')!.addEventListener('click', () => {
-    showModelSelectionSheet('speechSynthesis');
+    showModelSelectionSheet(ModelCategory.SpeechSynthesis);
   });
 
   // Start Voice Assistant button

@@ -23,6 +23,8 @@ export interface LLMGenerationResult {
   modelUsed: string;
   latencyMs: number;
   framework: string;
+  /** Hardware acceleration used for this generation ('webgpu' | 'cpu'). */
+  hardwareUsed: string;
   tokensPerSecond: number;
   timeToFirstTokenMs?: number;
   thinkingTokens: number;

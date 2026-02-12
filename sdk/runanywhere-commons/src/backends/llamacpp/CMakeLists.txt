@@ -12,7 +12,7 @@ include(FetchContent)
 include(LoadVersions)
 
 if(NOT DEFINED LLAMACPP_VERSION)
-    set(LLAMACPP_VERSION "b7199")
+    set(LLAMACPP_VERSION "b8011")
 endif()
 set(LLAMA_CPP_VERSION "${LLAMACPP_VERSION}")
 
@@ -126,6 +126,8 @@ if(RAC_VLM_USE_MTMD)
         ${llamacpp_SOURCE_DIR}/tools/mtmd/models/youtuvl.cpp
         ${llamacpp_SOURCE_DIR}/tools/mtmd/models/conformer.cpp
         ${llamacpp_SOURCE_DIR}/tools/mtmd/models/whisper-enc.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/kimik25.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/mobilenetv5.cpp
     )
 endif()
 
