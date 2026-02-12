@@ -64,9 +64,10 @@ void TTSQueue::consume() {
             queue_.pop();
         }
 
-        // Play it
+        // Play it — pass cancelled_ so the callback can check between ALSA writes
         if (!chunk.samples.empty() && play_audio_ && !cancelled_.load()) {
-            play_audio_(chunk.samples.data(), chunk.samples.size(), chunk.sample_rate);
+            play_audio_(chunk.samples.data(), chunk.samples.size(),
+                        chunk.sample_rate, cancelled_);
         }
     }
 

@@ -427,6 +427,11 @@ bool OpenClawClient::poll_speak_queue(SpeakMessage& out_message) {
     return true;
 }
 
+void OpenClawClient::clear_speak_queue() {
+    std::lock_guard<std::mutex> lock(queue_mutex_);
+    std::queue<SpeakMessage>().swap(speak_queue_);
+}
+
 void OpenClawClient::set_config(const OpenClawClientConfig& config) {
     config_ = config;
 }

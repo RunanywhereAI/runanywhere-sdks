@@ -337,13 +337,24 @@ int main(int argc, char* argv[]) {
         }
     };
 
-    // TTS audio callback
-    pipeline_config.on_audio_output = [&playback](const int16_t* samples, size_t num_samples, int sample_rate) {
+    // TTS audio callback — uses cancellable play for instant barge-in silence
+    pipeline_config.on_audio_output = [&playback](const int16_t* samples, size_t num_samples,
+                                                   int sample_rate, const std::atomic<bool>& cancel_flag) {
         // Reinitialize playback if sample rate changed
         if (static_cast<uint32_t>(sample_rate) != playback.config().sample_rate) {
             playback.reinitialize(sample_rate);
         }
-        playback.play(samples, num_samples);
+        playback.play_cancellable(samples, num_samples, cancel_flag);
+    };
+
+    // Force-stop ALSA playback immediately (called during cancel_speech)
+    pipeline_config.on_audio_stop = [&playback]() {
+        playback.stop();
+    };
+
+    // Clear stale speak messages on barge-in (called during cancel_speech)
+    pipeline_config.on_cancel_pending_responses = [&openclaw_client]() {
+        openclaw_client.clear_speak_queue();
     };
 
     // Error callback

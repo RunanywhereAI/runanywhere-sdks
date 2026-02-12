@@ -182,6 +182,54 @@ bool AudioPlayback::play(const int16_t* samples, size_t num_samples) {
     return true;
 }
 
+bool AudioPlayback::play_cancellable(const int16_t* samples, size_t num_samples,
+                                     const std::atomic<bool>& cancel_flag) {
+    if (!initialized_) {
+        last_error_ = "Not initialized";
+        return false;
+    }
+
+    impl_->playing = true;
+
+    // Write in period-sized chunks, checking cancel flag between each.
+    // At 22050 Hz with period_frames=1024, each chunk is ~46ms — responsive enough.
+    const size_t chunk_frames = config_.period_frames;
+    size_t frames_remaining = num_samples;
+    const int16_t* ptr = samples;
+
+    while (frames_remaining > 0 && !cancel_flag.load(std::memory_order_relaxed)) {
+        size_t to_write = std::min(frames_remaining, chunk_frames);
+        snd_pcm_sframes_t frames = snd_pcm_writei(
+            impl_->pcm_handle, ptr, to_write);
+
+        if (frames < 0) {
+            if (frames == -EPIPE) {
+                snd_pcm_prepare(impl_->pcm_handle);
+                continue;
+            } else if (frames == -EAGAIN) {
+                snd_pcm_wait(impl_->pcm_handle, 100);
+                continue;
+            } else {
+                last_error_ = std::string("Write error: ") + snd_strerror(frames);
+                impl_->playing = false;
+                return false;
+            }
+        }
+
+        frames_remaining -= frames;
+        ptr += frames * config_.channels;
+    }
+
+    // If cancelled, immediately drop buffered ALSA audio for instant silence
+    if (cancel_flag.load(std::memory_order_relaxed)) {
+        snd_pcm_drop(impl_->pcm_handle);
+        snd_pcm_prepare(impl_->pcm_handle);
+    }
+
+    impl_->playing = false;
+    return !cancel_flag.load(std::memory_order_relaxed);
+}
+
 bool AudioPlayback::play_async(const int16_t* samples, size_t num_samples) {
     // For now, just call blocking play
     // TODO: Implement proper async playback with a queue

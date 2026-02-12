@@ -47,7 +47,9 @@ struct VoicePipelineConfig {
     std::function<void(const std::string&, float)> on_wake_word;           // Wake word detected
     std::function<void(bool)> on_voice_activity;                           // Speech started/stopped
     std::function<void(const std::string&, bool)> on_transcription;        // ASR result
-    std::function<void(const int16_t*, size_t, int)> on_audio_output;      // TTS audio
+    std::function<void(const int16_t*, size_t, int, const std::atomic<bool>&)> on_audio_output;  // TTS audio (with cancel flag)
+    std::function<void()> on_audio_stop;                                   // Force-stop ALSA playback immediately
+    std::function<void()> on_cancel_pending_responses;                     // Clear stale speak messages on barge-in
     std::function<void(const std::string&)> on_error;                      // Error occurred
     std::function<void()> on_speech_interrupted;                            // Wake word barge-in during TTS
 
