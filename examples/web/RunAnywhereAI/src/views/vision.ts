@@ -12,6 +12,7 @@
 
 import { ModelManager, type ModelInfo } from '../services/model-manager';
 import { showModelSelectionSheet } from '../components/model-selection';
+import { VLMWorkerBridge } from '../services/vlm-worker-bridge';
 
 // ---------------------------------------------------------------------------
 // Constants (matching iOS VLMViewModel defaults)
@@ -19,17 +20,18 @@ import { showModelSelectionSheet } from '../components/model-selection';
 
 const AUTO_STREAM_INTERVAL_MS = 2500;
 const SINGLE_SHOT_MAX_TOKENS = 200;
-const AUTO_STREAM_MAX_TOKENS = 100;
+/** Keep tokens low for live mode — each token costs ~1-2s in WASM */
+const AUTO_STREAM_MAX_TOKENS = 30;
 const SINGLE_SHOT_PROMPT = 'Describe what you see briefly.';
-const AUTO_STREAM_PROMPT = 'Describe what you see in one sentence.';
+const AUTO_STREAM_PROMPT = 'What is in this image? Answer in one short sentence.';
 
 /**
  * Max dimension for captured frames sent to VLM.
- * The CLIP/SigLIP vision encoder resizes to ~384px internally,
- * so sending 1280x720 wastes ~6x memory & copy time.
- * 512px is a good balance between quality and speed.
+ * Single-shot: 512px for best quality.
+ * Live mode: 256px to minimize CLIP encoding time (the main bottleneck).
  */
-const MAX_CAPTURE_DIM = 512;
+const MAX_CAPTURE_DIM_SINGLE = 512;
+const MAX_CAPTURE_DIM_LIVE = 256;
 
 // ---------------------------------------------------------------------------
 // State
@@ -287,14 +289,14 @@ interface CapturedFrame {
 }
 
 /**
- * Compute a downscaled size that fits within MAX_CAPTURE_DIM while
+ * Compute a downscaled size that fits within maxDim while
  * preserving aspect ratio. Returns original size if already small enough.
  */
-function fitSize(srcW: number, srcH: number): { w: number; h: number } {
-  if (srcW <= MAX_CAPTURE_DIM && srcH <= MAX_CAPTURE_DIM) {
+function fitSize(srcW: number, srcH: number, maxDim: number): { w: number; h: number } {
+  if (srcW <= maxDim && srcH <= maxDim) {
     return { w: srcW, h: srcH };
   }
-  const scale = MAX_CAPTURE_DIM / Math.max(srcW, srcH);
+  const scale = maxDim / Math.max(srcW, srcH);
   return {
     w: Math.round(srcW * scale),
     h: Math.round(srcH * scale),
@@ -311,10 +313,10 @@ function fitSize(srcW: number, srcH: number): { w: number; h: number } {
  * Frames are downscaled to MAX_CAPTURE_DIM to reduce WASM copy time and
  * memory pressure (the vision encoder resizes to ~384px internally anyway).
  */
-function captureFrame(): CapturedFrame | null {
+function captureFrame(maxDim: number = MAX_CAPTURE_DIM_SINGLE): CapturedFrame | null {
   if (!videoEl.videoWidth || !videoEl.videoHeight) return null;
 
-  const { w, h } = fitSize(videoEl.videoWidth, videoEl.videoHeight);
+  const { w, h } = fitSize(videoEl.videoWidth, videoEl.videoHeight, maxDim);
   canvasEl.width = w;
   canvasEl.height = h;
   const ctx = canvasEl.getContext('2d');
@@ -422,19 +424,23 @@ async function describeCurrent(prompt: string, maxTokens: number): Promise<void>
     return;
   }
 
-  const frame = captureFrame();
+  // Live mode uses a smaller capture (256px) for faster CLIP encoding
+  const captureDim = isLiveMode ? MAX_CAPTURE_DIM_LIVE : MAX_CAPTURE_DIM_SINGLE;
+  const frame = captureFrame(captureDim);
   if (!frame) {
     descriptionEl.innerHTML = `<span style="color:var(--text-tertiary);">No camera frame available. Make sure the camera is active.</span>`;
     return;
   }
 
-  console.log(`[Vision] Captured frame: ${frame.width}x${frame.height} (${(frame.rgbPixels.length / 1024).toFixed(0)} KB RGB)`);
+  console.log(`[Vision] Captured frame: ${frame.width}x${frame.height} (${(frame.rgbPixels.length / 1024).toFixed(0)} KB RGB, ${isLiveMode ? 'live' : 'single'})`);
   await processFrame(frame, prompt, maxTokens);
 }
 
 /**
- * Process raw RGB pixel data with the VLM.
- * Mirrors the iOS flow: CVPixelBuffer → RGB pixels → rac_vlm_image_t
+ * Process raw RGB pixel data with the VLM via Web Worker.
+ *
+ * Runs inference OFF the main thread so the camera feed, UI animations,
+ * and event loop stay fully responsive during the 30–100s processing.
  */
 async function processFrame(frame: CapturedFrame, prompt: string, maxTokens: number): Promise<void> {
   isProcessing = true;
@@ -442,37 +448,42 @@ async function processFrame(frame: CapturedFrame, prompt: string, maxTokens: num
 
   const t0 = performance.now();
 
-  try {
-    const { VLM, VLMImageFormat } = await import(
-      '../../../../../sdk/runanywhere-web/packages/core/src/index'
-    );
+  // Live elapsed-time ticker (updates every 500ms while processing)
+  let tickerId: ReturnType<typeof setInterval> | null = null;
+  const timerSpan = processingOverlay.querySelector('span');
+  if (timerSpan) {
+    tickerId = setInterval(() => {
+      const sec = ((performance.now() - t0) / 1000).toFixed(0);
+      timerSpan.textContent = `Analyzing... ${sec}s`;
+    }, 500);
+  }
 
-    if (!VLM.isModelLoaded) {
-      throw new Error('VLM model not loaded in WASM backend');
+  try {
+    const workerBridge = VLMWorkerBridge.shared;
+
+    if (!workerBridge.isModelLoaded) {
+      throw new Error('VLM model not loaded in Worker');
     }
 
-    const result = await VLM.process(
-      {
-        format: VLMImageFormat.RGBPixels,
-        pixelData: frame.rgbPixels,
-        width: frame.width,
-        height: frame.height,
-      },
+    const result = await workerBridge.process(
+      frame.rgbPixels,
+      frame.width,
+      frame.height,
       prompt,
       { maxTokens, temperature: 0.7 },
     );
 
-    // Compute metrics from JS wall clock (C++ WASM clock is unreliable)
+    // Compute metrics from JS wall clock
     const elapsedMs = performance.now() - t0;
     const elapsedSec = elapsedMs / 1000;
     const tokPerSec = elapsedSec > 0 ? result.totalTokens / elapsedSec : 0;
 
-    // Update description (smooth replace for live mode)
+    // Update description
     currentDescription = result.text;
     descriptionEl.textContent = currentDescription;
     copyBtn.style.display = currentDescription ? '' : 'none';
 
-    // Show metrics (using JS timing, not C++ timing)
+    // Show metrics
     metricsEl.style.display = 'flex';
     metricsEl.innerHTML = `
       <span class="metric"><span class="metric-value">${tokPerSec.toFixed(1)}</span> tok/s</span>
@@ -488,14 +499,18 @@ async function processFrame(frame: CapturedFrame, prompt: string, maxTokens: num
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[Vision] VLM failed:', msg);
-    // In live mode, suppress errors to avoid disrupting the stream
     if (!isLiveMode) {
       descriptionEl.innerHTML = `<span style="color:var(--color-red);">Error: ${escapeHtml(msg)}</span>`;
     }
   }
 
+  if (tickerId) clearInterval(tickerId);
   isProcessing = false;
   processingOverlay.style.display = 'none';
+
+  // Reset overlay text for next use
+  const timerSpanReset = processingOverlay.querySelector('span');
+  if (timerSpanReset) timerSpanReset.textContent = 'Analyzing...';
 }
 
 // ---------------------------------------------------------------------------
@@ -510,7 +525,7 @@ async function handlePhotoUpload(file: File): Promise<void> {
   img.onload = () => {
     URL.revokeObjectURL(objectUrl);
 
-    const { w, h } = fitSize(img.naturalWidth, img.naturalHeight);
+    const { w, h } = fitSize(img.naturalWidth, img.naturalHeight, MAX_CAPTURE_DIM_SINGLE);
     canvasEl.width = w;
     canvasEl.height = h;
     const ctx = canvasEl.getContext('2d');
