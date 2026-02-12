@@ -23,6 +23,14 @@ const AUTO_STREAM_MAX_TOKENS = 100;
 const SINGLE_SHOT_PROMPT = 'Describe what you see briefly.';
 const AUTO_STREAM_PROMPT = 'Describe what you see in one sentence.';
 
+/**
+ * Max dimension for captured frames sent to VLM.
+ * The CLIP/SigLIP vision encoder resizes to ~384px internally,
+ * so sending 1280x720 wastes ~6x memory & copy time.
+ * 512px is a good balance between quality and speed.
+ */
+const MAX_CAPTURE_DIM = 512;
+
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
@@ -245,7 +253,7 @@ async function onGetStarted(): Promise<void> {
 async function startCamera(): Promise<void> {
   try {
     cameraStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+      video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
       audio: false,
     });
     videoEl.srcObject = cameraStream;
@@ -279,22 +287,42 @@ interface CapturedFrame {
 }
 
 /**
+ * Compute a downscaled size that fits within MAX_CAPTURE_DIM while
+ * preserving aspect ratio. Returns original size if already small enough.
+ */
+function fitSize(srcW: number, srcH: number): { w: number; h: number } {
+  if (srcW <= MAX_CAPTURE_DIM && srcH <= MAX_CAPTURE_DIM) {
+    return { w: srcW, h: srcH };
+  }
+  const scale = MAX_CAPTURE_DIM / Math.max(srcW, srcH);
+  return {
+    w: Math.round(srcW * scale),
+    h: Math.round(srcH * scale),
+  };
+}
+
+/**
  * Capture the current video frame as raw RGB pixels.
  *
  * The C++ VLM backend (llama.cpp mtmd) expects RAC_VLM_IMAGE_FORMAT_RGB_PIXELS
  * with RGBRGBRGB... byte layout — matching how iOS sends CVPixelBuffer data
  * after BGRA→RGB conversion.
+ *
+ * Frames are downscaled to MAX_CAPTURE_DIM to reduce WASM copy time and
+ * memory pressure (the vision encoder resizes to ~384px internally anyway).
  */
 function captureFrame(): CapturedFrame | null {
   if (!videoEl.videoWidth || !videoEl.videoHeight) return null;
 
-  canvasEl.width = videoEl.videoWidth;
-  canvasEl.height = videoEl.videoHeight;
+  const { w, h } = fitSize(videoEl.videoWidth, videoEl.videoHeight);
+  canvasEl.width = w;
+  canvasEl.height = h;
   const ctx = canvasEl.getContext('2d');
   if (!ctx) return null;
 
-  ctx.drawImage(videoEl, 0, 0);
-  return extractRGBFromCanvas(ctx, canvasEl.width, canvasEl.height);
+  // Draw the video frame scaled down onto the smaller canvas
+  ctx.drawImage(videoEl, 0, 0, w, h);
+  return extractRGBFromCanvas(ctx, w, h);
 }
 
 /**
@@ -308,10 +336,11 @@ function extractRGBFromCanvas(ctx: CanvasRenderingContext2D, w: number, h: numbe
   const rgb = new Uint8Array(pixelCount * 3);
 
   for (let i = 0; i < pixelCount; i++) {
-    rgb[i * 3] = rgba[i * 4];       // R
-    rgb[i * 3 + 1] = rgba[i * 4 + 1]; // G
-    rgb[i * 3 + 2] = rgba[i * 4 + 2]; // B
-    // skip rgba[i * 4 + 3] (alpha)
+    const src = i * 4;
+    const dst = i * 3;
+    rgb[dst] = rgba[src];         // R
+    rgb[dst + 1] = rgba[src + 1]; // G
+    rgb[dst + 2] = rgba[src + 2]; // B
   }
 
   return { rgbPixels: rgb, width: w, height: h };
@@ -399,6 +428,7 @@ async function describeCurrent(prompt: string, maxTokens: number): Promise<void>
     return;
   }
 
+  console.log(`[Vision] Captured frame: ${frame.width}x${frame.height} (${(frame.rgbPixels.length / 1024).toFixed(0)} KB RGB)`);
   await processFrame(frame, prompt, maxTokens);
 }
 
@@ -409,6 +439,8 @@ async function describeCurrent(prompt: string, maxTokens: number): Promise<void>
 async function processFrame(frame: CapturedFrame, prompt: string, maxTokens: number): Promise<void> {
   isProcessing = true;
   processingOverlay.style.display = 'flex';
+
+  const t0 = performance.now();
 
   try {
     const { VLM, VLMImageFormat } = await import(
@@ -430,23 +462,28 @@ async function processFrame(frame: CapturedFrame, prompt: string, maxTokens: num
       { maxTokens, temperature: 0.7 },
     );
 
+    // Compute metrics from JS wall clock (C++ WASM clock is unreliable)
+    const elapsedMs = performance.now() - t0;
+    const elapsedSec = elapsedMs / 1000;
+    const tokPerSec = elapsedSec > 0 ? result.totalTokens / elapsedSec : 0;
+
     // Update description (smooth replace for live mode)
     currentDescription = result.text;
     descriptionEl.textContent = currentDescription;
     copyBtn.style.display = currentDescription ? '' : 'none';
 
-    // Show metrics
+    // Show metrics (using JS timing, not C++ timing)
     metricsEl.style.display = 'flex';
     metricsEl.innerHTML = `
-      <span class="metric"><span class="metric-value">${result.tokensPerSecond.toFixed(1)}</span> tok/s</span>
+      <span class="metric"><span class="metric-value">${tokPerSec.toFixed(1)}</span> tok/s</span>
       <span class="metric-separator">&middot;</span>
       <span class="metric"><span class="metric-value">${result.totalTokens}</span> tokens</span>
       <span class="metric-separator">&middot;</span>
-      <span class="metric"><span class="metric-value">${(result.totalTimeMs / 1000).toFixed(1)}s</span></span>
+      <span class="metric"><span class="metric-value">${elapsedSec.toFixed(1)}s</span></span>
     `;
 
     console.log(
-      `[Vision] VLM: ${result.totalTokens} tokens, ${result.tokensPerSecond.toFixed(1)} tok/s`,
+      `[Vision] VLM: ${result.totalTokens} tokens, ${tokPerSec.toFixed(1)} tok/s, ${elapsedSec.toFixed(1)}s wall`,
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -466,20 +503,21 @@ async function processFrame(frame: CapturedFrame, prompt: string, maxTokens: num
 // ---------------------------------------------------------------------------
 
 async function handlePhotoUpload(file: File): Promise<void> {
-  // Load the image into an Image element, draw to canvas, extract RGB pixels
+  // Load the image, downscale, extract RGB pixels — same path as camera capture
   const img = new Image();
   const objectUrl = URL.createObjectURL(file);
 
   img.onload = () => {
     URL.revokeObjectURL(objectUrl);
 
-    canvasEl.width = img.naturalWidth;
-    canvasEl.height = img.naturalHeight;
+    const { w, h } = fitSize(img.naturalWidth, img.naturalHeight);
+    canvasEl.width = w;
+    canvasEl.height = h;
     const ctx = canvasEl.getContext('2d');
     if (!ctx) return;
 
-    ctx.drawImage(img, 0, 0);
-    const frame = extractRGBFromCanvas(ctx, canvasEl.width, canvasEl.height);
+    ctx.drawImage(img, 0, 0, w, h);
+    const frame = extractRGBFromCanvas(ctx, w, h);
     processFrame(frame, SINGLE_SHOT_PROMPT, SINGLE_SHOT_MAX_TOKENS);
   };
 
