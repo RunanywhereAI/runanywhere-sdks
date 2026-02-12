@@ -244,7 +244,7 @@ export class SherpaONNXBridge {
       // Verify critical exports are available (set by our patched receiveInstance)
       if (typeof mod._malloc !== 'function') {
         const available = ['_malloc', '_free', '_SherpaOnnxCreateOfflineRecognizer']
-          .map(fn => `${fn}: ${typeof (mod as Record<string, unknown>)[fn]}`)
+          .map(fn => `${fn}: ${typeof (mod as unknown as Record<string, unknown>)[fn]}`)
           .join(', ');
         throw new Error(`WASM exports not available after initialization. Available: ${available}`);
       }

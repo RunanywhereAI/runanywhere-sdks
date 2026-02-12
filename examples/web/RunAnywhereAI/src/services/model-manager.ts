@@ -378,19 +378,22 @@ class ModelManagerImpl {
       if (model.modality === 'speechRecognition') {
         // STT models go to the sherpa-onnx Emscripten FS (separate from RACommons)
         await this.loadSTTModel(model, data);
+      } else if (model.modality === 'speechSynthesis') {
+        // TTS models go to the sherpa-onnx Emscripten FS
+        await this.loadTTSModel(model, data);
       } else {
         // LLM/VLM models go to the RACommons Emscripten FS
         await this.loadLLMModel(model, modelId, data);
       }
-      // For other modalities (TTS, VAD), the corresponding extension
-      // will handle loading when the user initiates those features.
 
       this.loadedModelId = modelId;
       this.updateModel(modelId, { status: 'loaded' });
       return true;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error(`[ModelManager] Failed to load model ${modelId}:`, message);
+      const message = err instanceof Error
+        ? err.message
+        : (typeof err === 'object' ? JSON.stringify(err) : String(err));
+      console.error(`[ModelManager] Failed to load model ${modelId}:`, message, err);
       this.updateModel(modelId, { status: 'error', error: message });
       return false;
     }
@@ -544,6 +547,130 @@ class ModelManagerImpl {
     console.log(`[ModelManager] STT model loaded via sherpa-onnx: ${model.id}`);
   }
 
+  /**
+   * Load a TTS model into the sherpa-onnx Emscripten FS and initialise the TTS engine.
+   */
+  /**
+   * Core espeak-ng-data files needed for Piper VITS TTS models.
+   * These files provide phoneme data for text-to-phoneme conversion.
+   * We download them from the model's HuggingFace repo and cache in OPFS.
+   */
+  /**
+   * espeak-ng-data files needed for Piper VITS TTS.
+   * Paths are relative to the HuggingFace repo root.
+   * Includes core phoneme data AND language definition files for all
+   * English variants (US, GB, etc.) so any Piper English model works.
+   */
+  private static readonly ESPEAK_NG_DATA_FILES = [
+    // Core phoneme data
+    'espeak-ng-data/phondata',
+    'espeak-ng-data/phonindex',
+    'espeak-ng-data/phontab',
+    'espeak-ng-data/intonations',
+    'espeak-ng-data/phondata-manifest',
+    // English dictionary
+    'espeak-ng-data/en_dict',
+    // Language definition files for all English variants
+    // (required for espeak-ng voice initialization in Piper models)
+    'espeak-ng-data/lang/gmw/en',
+    'espeak-ng-data/lang/gmw/en-US',
+    'espeak-ng-data/lang/gmw/en-029',
+    'espeak-ng-data/lang/gmw/en-GB-scotland',
+    'espeak-ng-data/lang/gmw/en-GB-x-gbclan',
+    'espeak-ng-data/lang/gmw/en-GB-x-gbcwmd',
+    'espeak-ng-data/lang/gmw/en-GB-x-rp',
+    'espeak-ng-data/lang/gmw/en-US-nyc',
+  ];
+
+  private espeakNgDataLoaded = false;
+
+  /**
+   * Ensure espeak-ng-data files are available in the sherpa FS.
+   * Downloads from HuggingFace and caches in OPFS for subsequent loads.
+   */
+  private async ensureEspeakNgData(sherpa: Awaited<ReturnType<typeof import('../../../../../sdk/runanywhere-web/packages/core/src/index')>>['SherpaONNXBridge']['shared']): Promise<void> {
+    if (this.espeakNgDataLoaded) return;
+
+    const baseUrl = 'https://huggingface.co/csukuangfj/vits-piper-en_US-lessac-medium/resolve/main/';
+
+    console.log('[ModelManager] Loading espeak-ng-data files for TTS...');
+
+    for (const filePath of ModelManagerImpl.ESPEAK_NG_DATA_FILES) {
+      // Derive FS path: 'espeak-ng-data/lang/gmw/en' → '/espeak-ng-data/lang/gmw/en'
+      const fsPath = `/${filePath}`;
+      // Cache key preserves full relative path
+      const cacheKey = filePath;
+
+      let data = await this.loadFromOPFS(cacheKey);
+      if (!data) {
+        console.log(`[ModelManager] Downloading ${filePath}...`);
+        data = await this.downloadFile(`${baseUrl}${filePath}`);
+        await this.storeInOPFS(cacheKey, data);
+      }
+      console.log(`[ModelManager] Writing ${fsPath} (${data.length} bytes)`);
+      sherpa.writeFile(fsPath, data);
+    }
+
+    this.espeakNgDataLoaded = true;
+    console.log('[ModelManager] espeak-ng-data files loaded');
+  }
+
+  private async loadTTSModel(model: ModelInfo, primaryData: Uint8Array): Promise<void> {
+    const { SherpaONNXBridge, TTS } = await import(
+      '../../../../../sdk/runanywhere-web/packages/core/src/index'
+    );
+
+    const sherpa = SherpaONNXBridge.shared;
+    await sherpa.ensureLoaded();
+
+    // Ensure espeak-ng-data is available (required for Piper VITS models)
+    await this.ensureEspeakNgData(sherpa);
+
+    const modelDir = `/models/${model.id}`;
+
+    // Derive primary filename from the URL
+    const primaryFilename = model.url.split('/').pop()!;
+    const primaryPath = `${modelDir}/${primaryFilename}`;
+
+    // Write primary model file to sherpa FS
+    console.log(`[ModelManager] Writing TTS primary file to ${primaryPath} (${primaryData.length} bytes)`);
+    sherpa.writeFile(primaryPath, primaryData);
+
+    // Write additional files (tokens.txt, *.json, etc.)
+    const additionalPaths: Record<string, string> = {};
+    if (model.additionalFiles) {
+      for (const file of model.additionalFiles) {
+        const fileKey = `${model.id}/${file.filename}`;
+        let fileData = await this.loadFromOPFS(fileKey);
+        if (!fileData) {
+          console.log(`[ModelManager] Additional file ${file.filename} not in OPFS, downloading...`);
+          fileData = await this.downloadFile(file.url);
+          await this.storeInOPFS(fileKey, fileData);
+        }
+        const filePath = `${modelDir}/${file.filename}`;
+        console.log(`[ModelManager] Writing TTS file to ${filePath} (${fileData.length} bytes)`);
+        sherpa.writeFile(filePath, fileData);
+        additionalPaths[file.filename] = filePath;
+      }
+    }
+
+    // Piper VITS models: need model.onnx + tokens.txt + espeak-ng-data
+    const tokensPath = additionalPaths['tokens.txt'];
+    if (!tokensPath) {
+      throw new Error('TTS model requires tokens.txt file');
+    }
+
+    await TTS.loadVoice({
+      voiceId: model.id,
+      modelPath: primaryPath,
+      tokensPath,
+      dataDir: '/espeak-ng-data',
+      numThreads: 1,
+    });
+
+    console.log(`[ModelManager] TTS model loaded via sherpa-onnx: ${model.id}`);
+  }
+
   private async unloadCurrentModel(): Promise<void> {
     if (!this.loadedModelId) return;
 
@@ -555,6 +682,11 @@ class ModelManagerImpl {
           '../../../../../sdk/runanywhere-web/packages/core/src/index'
         );
         await STT.unloadModel();
+      } else if (currentModel?.modality === 'speechSynthesis') {
+        const { TTS } = await import(
+          '../../../../../sdk/runanywhere-web/packages/core/src/index'
+        );
+        await TTS.unloadVoice();
       } else {
         const { TextGeneration } = await import(
           '../../../../../sdk/runanywhere-web/packages/core/src/index'
