@@ -108,12 +108,40 @@ fi
 # =============================================================================
 
 print_step "Downloading Silero VAD..."
-if [ -f "${MODEL_DIR}/ONNX/silero-vad/silero_vad.onnx" ]; then
+VAD_FILE="${MODEL_DIR}/ONNX/silero-vad/silero_vad.onnx"
+
+# Check if existing file is valid (not an HTML redirect page from Git LFS)
+if [ -f "${VAD_FILE}" ]; then
+    FIRST_BYTES=$(head -c 10 "${VAD_FILE}" 2>/dev/null || true)
+    if echo "${FIRST_BYTES}" | grep -q "DOCTYPE"; then
+        echo "  Existing file is HTML (Git LFS redirect), re-downloading..."
+        rm -f "${VAD_FILE}"
+    fi
+fi
+
+if [ -f "${VAD_FILE}" ]; then
     print_success "Silero VAD already downloaded"
 else
-    curl -L -o "${MODEL_DIR}/ONNX/silero-vad/silero_vad.onnx" \
-        "https://github.com/snakers4/silero-vad/raw/master/files/silero_vad.onnx"
-    print_success "Silero VAD downloaded"
+    # NOTE: The old path (.../files/silero_vad.onnx) returns an HTML page via Git LFS.
+    # The correct path for v5+ is under src/silero_vad/data/
+    curl -L -o "${VAD_FILE}" \
+        "https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx"
+
+    # Verify download is a real ONNX file, not HTML
+    FIRST_BYTES=$(head -c 10 "${VAD_FILE}" 2>/dev/null || true)
+    if echo "${FIRST_BYTES}" | grep -q "DOCTYPE"; then
+        print_error "Downloaded file is HTML (Git LFS redirect). Trying alternative URL..."
+        rm -f "${VAD_FILE}"
+        # Fallback: try the HuggingFace mirror
+        curl -L -o "${VAD_FILE}" \
+            "https://huggingface.co/snakers4/silero-vad/resolve/main/src/silero_vad/data/silero_vad.onnx" 2>/dev/null || true
+    fi
+
+    if [ -f "${VAD_FILE}" ]; then
+        print_success "Silero VAD downloaded"
+    else
+        print_error "Failed to download Silero VAD"
+    fi
 fi
 
 # =============================================================================

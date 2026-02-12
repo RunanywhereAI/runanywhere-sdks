@@ -354,7 +354,12 @@ class ONNXVAD {
 
    private:
     ONNXBackendNew* backend_;
+#if SHERPA_ONNX_AVAILABLE
+    const SherpaOnnxVoiceActivityDetector* sherpa_vad_ = nullptr;
+#else
     void* sherpa_vad_ = nullptr;
+#endif
+    std::string model_path_;
     VADConfig config_;
     bool model_loaded_ = false;
     mutable std::mutex mutex_;

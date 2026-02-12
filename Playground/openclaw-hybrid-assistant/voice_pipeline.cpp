@@ -493,13 +493,13 @@ bool VoicePipeline::initialize() {
         return false;
     }
 
-    // Initialize Silero VAD (ONNX-based, replaces energy VAD)
+    // Initialize Silero VAD (ONNX neural network - much more accurate than energy VAD)
     std::string vad_path = get_vad_model_path();
     std::cout << "  Loading VAD: Silero (ONNX)\n";
 
     rac_vad_onnx_config_t vad_config = RAC_VAD_ONNX_CONFIG_DEFAULT;
     vad_config.sample_rate = 16000;
-    vad_config.energy_threshold = config_.vad_threshold;  // Reuse existing threshold setting
+    vad_config.energy_threshold = config_.vad_threshold;
 
     result = rac_vad_onnx_create(vad_path.c_str(), &vad_config, &impl_->silero_vad);
     if (result != RAC_SUCCESS) {
@@ -775,7 +775,8 @@ void VoicePipeline::process_vad(const float* samples, size_t num_samples, const 
 
     auto now = std::chrono::steady_clock::now();
 
-    // Detect speech: prefer Silero VAD (ONNX) if loaded, else fall back to energy VAD
+    // Detect speech: prefer Silero VAD (ONNX neural network) if loaded,
+    // fall back to energy VAD (built into voice agent) if not.
     rac_bool_t is_speech = RAC_FALSE;
     if (impl_->silero_vad) {
         rac_vad_onnx_process(impl_->silero_vad, samples, num_samples, &is_speech);

@@ -995,7 +995,7 @@ std::string ONNXTTS::get_default_voice(const std::string& language) const {
 }
 
 // =============================================================================
-// ONNXVAD Implementation
+// ONNXVAD Implementation - Silero VAD via Sherpa-ONNX
 // =============================================================================
 
 ONNXVAD::ONNXVAD(ONNXBackendNew* backend) : backend_(backend) {}
@@ -1011,8 +1011,49 @@ bool ONNXVAD::is_ready() const {
 bool ONNXVAD::load_model(const std::string& model_path, VADModelType model_type,
                          const nlohmann::json& config) {
     std::lock_guard<std::mutex> lock(mutex_);
+
+#if SHERPA_ONNX_AVAILABLE
+    // Destroy previous instance if any
+    if (sherpa_vad_) {
+        SherpaOnnxDestroyVoiceActivityDetector(sherpa_vad_);
+        sherpa_vad_ = nullptr;
+    }
+
+    model_path_ = model_path;
+
+    SherpaOnnxVadModelConfig vad_config;
+    memset(&vad_config, 0, sizeof(vad_config));
+
+    vad_config.silero_vad.model = model_path_.c_str();
+    vad_config.silero_vad.threshold = 0.5f;
+    vad_config.silero_vad.min_silence_duration = 0.5f;
+    vad_config.silero_vad.min_speech_duration = 0.25f;
+    vad_config.silero_vad.max_speech_duration = 15.0f;
+    vad_config.silero_vad.window_size = 512;
+    vad_config.sample_rate = 16000;
+    vad_config.num_threads = 1;
+    vad_config.debug = 0;
+    vad_config.provider = "cpu";
+
+    // Override threshold from config JSON if provided
+    if (config.contains("energy_threshold")) {
+        vad_config.silero_vad.threshold = config["energy_threshold"].get<float>();
+    }
+
+    sherpa_vad_ = SherpaOnnxCreateVoiceActivityDetector(&vad_config, 30.0f);
+    if (!sherpa_vad_) {
+        RAC_LOG_ERROR("ONNX.VAD", "Failed to create Silero VAD detector from: %s", model_path.c_str());
+        return false;
+    }
+
+    RAC_LOG_INFO("ONNX.VAD", "Silero VAD loaded: %s (threshold=%.2f)", model_path.c_str(),
+                 vad_config.silero_vad.threshold);
     model_loaded_ = true;
     return true;
+#else
+    model_loaded_ = true;
+    return true;
+#endif
 }
 
 bool ONNXVAD::is_model_loaded() const {
@@ -1021,6 +1062,14 @@ bool ONNXVAD::is_model_loaded() const {
 
 bool ONNXVAD::unload_model() {
     std::lock_guard<std::mutex> lock(mutex_);
+
+#if SHERPA_ONNX_AVAILABLE
+    if (sherpa_vad_) {
+        SherpaOnnxDestroyVoiceActivityDetector(sherpa_vad_);
+        sherpa_vad_ = nullptr;
+    }
+#endif
+
     model_loaded_ = false;
     return true;
 }
@@ -1032,6 +1081,34 @@ bool ONNXVAD::configure_vad(const VADConfig& config) {
 
 VADResult ONNXVAD::process(const std::vector<float>& audio_samples, int sample_rate) {
     VADResult result;
+
+#if SHERPA_ONNX_AVAILABLE
+    if (!sherpa_vad_ || audio_samples.empty()) {
+        return result;
+    }
+
+    const int32_t window_size = 512;  // Silero native window size
+
+    // Feed audio in window_size chunks (Silero requires exactly 512 samples per call)
+    for (size_t i = 0; i + window_size <= audio_samples.size(); i += window_size) {
+        SherpaOnnxVoiceActivityDetectorAcceptWaveform(
+            sherpa_vad_, audio_samples.data() + i, window_size);
+    }
+
+    // Check if speech is currently detected in the latest frame
+    result.is_speech = SherpaOnnxVoiceActivityDetectorDetected(sherpa_vad_) != 0;
+    result.probability = result.is_speech ? 1.0f : 0.0f;
+
+    // Drain any completed speech segments (keeps internal queue from growing)
+    while (SherpaOnnxVoiceActivityDetectorEmpty(sherpa_vad_) == 0) {
+        const SherpaOnnxSpeechSegment* seg = SherpaOnnxVoiceActivityDetectorFront(sherpa_vad_);
+        if (seg) {
+            SherpaOnnxDestroySpeechSegment(seg);
+        }
+        SherpaOnnxVoiceActivityDetectorPop(sherpa_vad_);
+    }
+#endif
+
     return result;
 }
 
@@ -1051,7 +1128,13 @@ VADResult ONNXVAD::feed_audio(const std::string& stream_id, const std::vector<fl
 
 void ONNXVAD::destroy_stream(const std::string& stream_id) {}
 
-void ONNXVAD::reset() {}
+void ONNXVAD::reset() {
+#if SHERPA_ONNX_AVAILABLE
+    if (sherpa_vad_) {
+        SherpaOnnxVoiceActivityDetectorReset(sherpa_vad_);
+    }
+#endif
+}
 
 VADConfig ONNXVAD::get_vad_config() const {
     return config_;
