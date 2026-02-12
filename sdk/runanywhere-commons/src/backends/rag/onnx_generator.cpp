@@ -218,7 +218,7 @@ public:
         
         // Create ORT environment (exception-safe with RAII)
         OrtStatusGuard status_guard(cached_api);
-        *status_guard.get_address() = cached_api->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "RAG_ONNX_Generator", &ort_env);
+        status_guard.reset(cached_api->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "RAG_ONNX_Generator", &ort_env));
         if (status_guard.is_error() || !ort_env) {
             LOGE("Failed to create ONNX Runtime environment: %s", status_guard.error_message());
             return false;
@@ -229,7 +229,7 @@ public:
         
         // Create session options (will auto-release on scope exit)
         OrtSessionOptions* session_options = nullptr;
-        *status_guard.get_address() = cached_api->CreateSessionOptions(&session_options);
+        status_guard.reset(cached_api->CreateSessionOptions(&session_options));
         if (status_guard.is_error()) {
             LOGE("Failed to create session options: %s", status_guard.error_message());
             return false;
@@ -249,7 +249,7 @@ public:
         cached_api->SetSessionGraphOptimizationLevel(session_options, ORT_ENABLE_ALL);
         
         // Create memory info for CPU
-        *status_guard.get_address() = cached_api->CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault, &memory_info);
+        status_guard.reset(cached_api->CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault, &memory_info));
         if (status_guard.is_error()) {
             LOGE("Failed to create memory info: %s", status_guard.error_message());
             return false;
@@ -257,7 +257,7 @@ public:
         
         // Load model and create session
         LOGI("Loading ONNX model: %s", model_path.c_str());
-        *status_guard.get_address() = cached_api->CreateSession(ort_env, model_path.c_str(), session_options, &session);
+        status_guard.reset(cached_api->CreateSession(ort_env, model_path.c_str(), session_options, &session));
         if (status_guard.is_error()) {
             LOGE("Failed to create ONNX session: %s", status_guard.error_message());
             return false;
@@ -503,6 +503,7 @@ public:
                 
                 // 4. past_key_values: [batch_size, num_heads, past_seq_len, head_dim]
                 std::vector<std::string> kv_names;
+                kv_names.reserve(num_layers * 2);  // Reserve space to prevent reallocation (2 per layer: key + value)
                 for (size_t layer = 0; layer < num_layers; ++layer) {
                     // past_key
                     std::vector<int64_t> kv_shape = {1, static_cast<int64_t>(num_heads), 
@@ -569,6 +570,7 @@ public:
                 // Prepare output names
                 std::vector<const char*> output_names = {"logits"};
                 std::vector<std::string> present_kv_names;
+                present_kv_names.reserve(num_layers * 2);  // Reserve space to prevent reallocation (2 per layer: key + value)
                 for (size_t layer = 0; layer < num_layers; ++layer) {
                     present_kv_names.push_back("present." + std::to_string(layer) + ".key");
                     output_names.push_back(present_kv_names.back().c_str());

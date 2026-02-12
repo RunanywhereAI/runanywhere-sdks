@@ -18,19 +18,26 @@ public:
     
     OrtStatusGuard(const OrtStatusGuard&) = delete;
     OrtStatusGuard& operator=(const OrtStatusGuard&) = delete;
+
+    // Get address for new status assignment
+    // IMPORTANT: Only call this once per ORT API call, or use reset() to properly clean up first
+    OrtStatus** get_address() { 
+        return &status_; 
+    }
     
-    OrtStatus** get_address() { return &status_; }
     OrtStatus* get() const { return status_; }
     bool is_error() const { return status_ != nullptr; }
-    const char* error_message() const { 
+    const char* error_message() const {
         return (status_ && api_) ? api_->GetErrorMessage(status_) : "Unknown error";
     }
     
-    void reset(OrtStatus* status = nullptr) {
+    // Reset to new status (releases old status first if present)
+    // Use this for sequential ORT calls: status_guard.reset(api->Function(...))
+    void reset(OrtStatus* new_status = nullptr) {
         if (status_ && api_) {
             api_->ReleaseStatus(status_);
         }
-        status_ = status;
+        status_ = new_status;
     }
     
 private:

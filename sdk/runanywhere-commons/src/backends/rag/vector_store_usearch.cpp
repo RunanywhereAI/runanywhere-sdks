@@ -27,6 +27,7 @@
 
 #include "vector_store_usearch.h"
 
+#include <fstream>
 #include <usearch/index_dense.hpp>
 
 #include "rac/core/rac_logger.h"
@@ -83,8 +84,14 @@ public:
             return false;
         }
 
-        // Generate unique key from ID
-        std::size_t key = std::hash<std::string>{}(chunk.id);
+        // Check for duplicate ID
+        if (id_to_key_.find(chunk.id) != id_to_key_.end()) {
+            LOGE("Duplicate chunk ID: %s", chunk.id.c_str());
+            return false;
+        }
+
+        // Generate unique key using monotonically increasing counter (no collisions)
+        std::size_t key = next_key_++;
 
         // Add to USearch index
         index_.add(key, chunk.embedding.data());
@@ -105,7 +112,14 @@ public:
                 continue;
             }
 
-            std::size_t key = std::hash<std::string>{}(chunk.id);
+            // Check for duplicate ID
+            if (id_to_key_.find(chunk.id) != id_to_key_.end()) {
+                LOGE("Duplicate chunk ID in batch: %s", chunk.id.c_str());
+                continue;
+            }
+
+            // Generate unique key using monotonically increasing counter (no collisions)
+            std::size_t key = next_key_++;
             index_.add(key, chunk.embedding.data());
             chunks_[key] = chunk;
             id_to_key_[chunk.id] = key;
@@ -195,6 +209,7 @@ public:
         index_.clear();
         chunks_.clear();
         id_to_key_.clear();
+        next_key_ = 0;  // Reset counter
         LOGI("Cleared vector store");
     }
 
@@ -223,15 +238,78 @@ public:
 
     bool save(const std::string& path) {
         std::lock_guard<std::mutex> lock(mutex_);
+        
+        // Save USearch index
         index_.save(path.c_str());
-        LOGI("Saved index to %s", path.c_str());
+        
+        // Save metadata to JSON file
+        nlohmann::json metadata;
+        metadata["next_key"] = next_key_;
+        metadata["chunks"] = nlohmann::json::array();
+        
+        for (const auto& [key, chunk] : chunks_) {
+            nlohmann::json chunk_json;
+            chunk_json["key"] = key;
+            chunk_json["id"] = chunk.id;
+            chunk_json["text"] = chunk.text;
+            chunk_json["embedding"] = chunk.embedding;
+            chunk_json["metadata"] = chunk.metadata;
+            metadata["chunks"].push_back(chunk_json);
+        }
+        
+        std::string metadata_path = path + ".metadata.json";
+        std::ofstream metadata_file(metadata_path);
+        if (!metadata_file) {
+            LOGE("Failed to open metadata file: %s", metadata_path.c_str());
+            return false;
+        }
+        metadata_file << metadata.dump();
+        metadata_file.close();
+        
+        LOGI("Saved index and metadata to %s", path.c_str());
         return true;
     }
 
     bool load(const std::string& path) {
         std::lock_guard<std::mutex> lock(mutex_);
+        
+        // Load USearch index
         index_.load(path.c_str());
-        LOGI("Loaded index from %s", path.c_str());
+        
+        // Load metadata from JSON file
+        std::string metadata_path = path + ".metadata.json";
+        std::ifstream metadata_file(metadata_path);
+        if (!metadata_file) {
+            LOGE("Failed to open metadata file: %s", metadata_path.c_str());
+            return false;
+        }
+        
+        nlohmann::json metadata;
+        metadata_file >> metadata;
+        metadata_file.close();
+        
+        // Restore next_key_
+        next_key_ = metadata["next_key"].get<std::size_t>();
+        
+        // Restore chunks and id_to_key mappings
+        chunks_.clear();
+        id_to_key_.clear();
+        
+        for (const auto& chunk_json : metadata["chunks"]) {
+            std::size_t key = chunk_json["key"].get<std::size_t>();
+            
+            DocumentChunk chunk;
+            chunk.id = chunk_json["id"].get<std::string>();
+            chunk.text = chunk_json["text"].get<std::string>();
+            chunk.embedding = chunk_json["embedding"].get<std::vector<float>>();
+            chunk.metadata = chunk_json["metadata"];
+            
+            chunks_[key] = chunk;
+            id_to_key_[chunk.id] = key;
+        }
+        
+        LOGI("Loaded index and metadata from %s (next_key=%zu, chunks=%zu)", 
+             path.c_str(), next_key_, chunks_.size());
         return true;
     }
 
@@ -240,6 +318,7 @@ private:
     index_dense_t index_;
     std::unordered_map<std::size_t, DocumentChunk> chunks_;
     std::unordered_map<std::string, std::size_t> id_to_key_;
+    std::size_t next_key_ = 0;  // Monotonically increasing counter for collision-free keys
     mutable std::mutex mutex_;
 };
 
