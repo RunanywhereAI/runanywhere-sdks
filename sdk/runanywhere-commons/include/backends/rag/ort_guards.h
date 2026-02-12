@@ -114,5 +114,51 @@ private:
     OrtMemoryInfo* memory_info_;
 };
 
+// RAII guard for OrtSessionOptions - automatically releases session options on scope exit
+class OrtSessionOptionsGuard {
+public:
+    explicit OrtSessionOptionsGuard(const OrtApi* api) : api_(api), options_(nullptr) {}
+    
+    ~OrtSessionOptionsGuard() {
+        if (options_ && api_) {
+            api_->ReleaseSessionOptions(options_);
+        }
+    }
+    
+    // Non-copyable (session options are not trivially copyable)
+    OrtSessionOptionsGuard(const OrtSessionOptionsGuard&) = delete;
+    OrtSessionOptionsGuard& operator=(const OrtSessionOptionsGuard&) = delete;
+    
+    // Movable
+    OrtSessionOptionsGuard(OrtSessionOptionsGuard&& other) noexcept 
+        : api_(other.api_), options_(other.options_) {
+        other.options_ = nullptr;
+    }
+    
+    OrtSessionOptionsGuard& operator=(OrtSessionOptionsGuard&& other) noexcept {
+        if (this != &other) {
+            if (options_ && api_) {
+                api_->ReleaseSessionOptions(options_);
+            }
+            api_ = other.api_;
+            options_ = other.options_;
+            other.options_ = nullptr;
+        }
+        return *this;
+    }
+    
+    OrtSessionOptions** ptr() { return &options_; }
+    OrtSessionOptions* get() const { return options_; }
+    OrtSessionOptions* release() {
+        OrtSessionOptions* tmp = options_;
+        options_ = nullptr;
+        return tmp;
+    }
+    
+private:
+    const OrtApi* api_;
+    OrtSessionOptions* options_;
+};
+
 } // namespace rag
 } // namespace runanywhere

@@ -285,7 +285,18 @@ public:
             
             // 4. Extract output embeddings
             float* output_data = nullptr;
-            ort_api_->GetTensorMutableData(output_guard.get(), (void**)&output_data);
+            OrtStatusGuard output_status_guard(ort_api_);
+            output_status_guard.reset(ort_api_->GetTensorMutableData(output_guard.get(), (void**)&output_data));
+            
+            if (output_status_guard.is_error()) {
+                LOGE("Failed to get output tensor data: %s", output_status_guard.error_message());
+                return std::vector<float>(embedding_dim_, 0.0f);
+            }
+            
+            if (output_data == nullptr) {
+                LOGE("Output tensor data pointer is null");
+                return std::vector<float>(embedding_dim_, 0.0f);
+            }
             
             // 5. Mean pooling
             auto pooled = mean_pooling(
@@ -337,26 +348,45 @@ private:
     }
     
     bool load_model(const std::string& model_path) {
-        // Create session options
-        OrtSessionOptions* session_options;
-        ort_api_->CreateSessionOptions(&session_options);
-        ort_api_->SetIntraOpNumThreads(session_options, 4);
-        ort_api_->SetSessionGraphOptimizationLevel(session_options, ORT_ENABLE_ALL);
+        // Create session options with RAII guard
+        OrtSessionOptionsGuard options_guard(ort_api_);
+        OrtStatusGuard status_guard(ort_api_);
         
-        // Load model
-        OrtStatus* status = ort_api_->CreateSession(
+        status_guard.reset(ort_api_->CreateSessionOptions(options_guard.ptr()));
+        if (status_guard.is_error()) {
+            LOGE("Failed to create session options: %s", status_guard.error_message());
+            return false;
+        }
+        
+        if (options_guard.get() == nullptr) {
+            LOGE("Session options is null after creation");
+            return false;
+        }
+        
+        // Configure session options with error checking
+        status_guard.reset(ort_api_->SetIntraOpNumThreads(options_guard.get(), 4));
+        if (status_guard.is_error()) {
+            LOGE("Failed to set intra-op threads: %s", status_guard.error_message());
+            return false;
+        }
+        
+        status_guard.reset(ort_api_->SetSessionGraphOptimizationLevel(options_guard.get(), ORT_ENABLE_ALL));
+        if (status_guard.is_error()) {
+            LOGE("Failed to set graph optimization level: %s", status_guard.error_message());
+            return false;
+        }
+        
+        // Load model with session options
+        status_guard.reset(ort_api_->CreateSession(
             ort_env_,
             model_path.c_str(),
-            session_options,
+            options_guard.get(),
             &session_
-        );
+        ));
+        // options_guard automatically releases session options on scope exit
         
-        ort_api_->ReleaseSessionOptions(session_options);
-        
-        if (status != nullptr) {
-            const char* error_msg = ort_api_->GetErrorMessage(status);
-            LOGE("Failed to load model: %s", error_msg);
-            ort_api_->ReleaseStatus(status);
+        if (status_guard.is_error()) {
+            LOGE("Failed to load model: %s", status_guard.error_message());
             return false;
         }
         
