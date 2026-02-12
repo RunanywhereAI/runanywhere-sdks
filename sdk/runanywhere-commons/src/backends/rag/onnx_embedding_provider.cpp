@@ -4,6 +4,7 @@
  */
 
 #include "onnx_embedding_provider.h"
+#include "backends/rag/ort_guards.h"
 #include "rac/core/rac_logger.h"
 #include "../onnx/onnx_backend.h"
 
@@ -197,50 +198,73 @@ public:
             std::vector<int64_t> input_shape = {1, static_cast<int64_t>(max_seq_length_)};
             size_t input_tensor_size = max_seq_length_;
             
-            // Create input tensors
-            OrtMemoryInfo* memory_info;
-            ort_api_->CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault, &memory_info);
+            // Create RAII guards for automatic resource management
+            OrtStatusGuard status_guard(ort_api_);
+            OrtMemoryInfoGuard memory_info_guard(ort_api_);
+            OrtValueGuard input_ids_guard(ort_api_);
+            OrtValueGuard attention_mask_guard(ort_api_);
+            OrtValueGuard token_type_ids_guard(ort_api_);
             
-            OrtValue* input_ids_tensor = nullptr;
-            ort_api_->CreateTensorWithDataAsOrtValue(
-                memory_info,
+            // Create memory info
+            status_guard.reset(ort_api_->CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault, memory_info_guard.ptr()));
+            if (status_guard.is_error()) {
+                LOGE("CreateCpuMemoryInfo failed: %s", status_guard.error_message());
+                return std::vector<float>(embedding_dim_, 0.0f);
+            }
+            
+            // Create input_ids tensor
+            status_guard.reset(ort_api_->CreateTensorWithDataAsOrtValue(
+                memory_info_guard.get(),
                 token_ids.data(),
                 input_tensor_size * sizeof(int64_t),
                 input_shape.data(),
                 input_shape.size(),
                 ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
-                &input_ids_tensor
-            );
+                input_ids_guard.ptr()
+            ));
+            if (status_guard.is_error()) {
+                LOGE("CreateTensorWithDataAsOrtValue (input_ids) failed: %s", status_guard.error_message());
+                return std::vector<float>(embedding_dim_, 0.0f);
+            }
             
-            OrtValue* attention_mask_tensor = nullptr;
-            ort_api_->CreateTensorWithDataAsOrtValue(
-                memory_info,
+            // Create attention_mask tensor
+            status_guard.reset(ort_api_->CreateTensorWithDataAsOrtValue(
+                memory_info_guard.get(),
                 attention_mask.data(),
                 input_tensor_size * sizeof(int64_t),
                 input_shape.data(),
                 input_shape.size(),
                 ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
-                &attention_mask_tensor
-            );
+                attention_mask_guard.ptr()
+            ));
+            if (status_guard.is_error()) {
+                LOGE("CreateTensorWithDataAsOrtValue (attention_mask) failed: %s", status_guard.error_message());
+                return std::vector<float>(embedding_dim_, 0.0f);
+            }
             
-            OrtValue* token_type_ids_tensor = nullptr;
-            ort_api_->CreateTensorWithDataAsOrtValue(
-                memory_info,
+            // Create token_type_ids tensor
+            status_guard.reset(ort_api_->CreateTensorWithDataAsOrtValue(
+                memory_info_guard.get(),
                 token_type_ids.data(),
                 input_tensor_size * sizeof(int64_t),
                 input_shape.data(),
                 input_shape.size(),
                 ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
-                &token_type_ids_tensor
-            );
+                token_type_ids_guard.ptr()
+            ));
+            if (status_guard.is_error()) {
+                LOGE("CreateTensorWithDataAsOrtValue (token_type_ids) failed: %s", status_guard.error_message());
+                return std::vector<float>(embedding_dim_, 0.0f);
+            }
             
             // 3. Run inference
             const char* input_names[] = {"input_ids", "attention_mask", "token_type_ids"};
-            const OrtValue* inputs[] = {input_ids_tensor, attention_mask_tensor, token_type_ids_tensor};
+            const OrtValue* inputs[] = {input_ids_guard.get(), attention_mask_guard.get(), token_type_ids_guard.get()};
             const char* output_names[] = {"last_hidden_state"};
-            OrtValue* outputs[1] = {nullptr};
+            OrtValueGuard output_guard(ort_api_);
+            OrtValue* output_ptr = nullptr;
             
-            OrtStatus* status = ort_api_->Run(
+            status_guard.reset(ort_api_->Run(
                 session_,
                 nullptr,
                 input_names,
@@ -248,26 +272,20 @@ public:
                 3,
                 output_names,
                 1,
-                outputs
-            );
+                &output_ptr
+            ));
             
-            if (status != nullptr) {
-                const char* error_msg = ort_api_->GetErrorMessage(status);
-                LOGE("ONNX inference failed: %s", error_msg);
-                ort_api_->ReleaseStatus(status);
-                
-                // Cleanup
-                ort_api_->ReleaseValue(input_ids_tensor);
-                ort_api_->ReleaseValue(attention_mask_tensor);
-                ort_api_->ReleaseValue(token_type_ids_tensor);
-                ort_api_->ReleaseMemoryInfo(memory_info);
-                
+            if (status_guard.is_error()) {
+                LOGE("ONNX inference failed: %s", status_guard.error_message());
                 return std::vector<float>(embedding_dim_, 0.0f);
             }
             
+            // Transfer ownership to guard for automatic cleanup
+            *output_guard.ptr() = output_ptr;
+            
             // 4. Extract output embeddings
             float* output_data = nullptr;
-            ort_api_->GetTensorMutableData(outputs[0], (void**)&output_data);
+            ort_api_->GetTensorMutableData(output_guard.get(), (void**)&output_data);
             
             // 5. Mean pooling
             auto pooled = mean_pooling(
@@ -280,13 +298,7 @@ public:
             // 6. Normalize to unit vector
             normalize_vector(pooled);
             
-            // Cleanup
-            ort_api_->ReleaseValue(outputs[0]);
-            ort_api_->ReleaseValue(input_ids_tensor);
-            ort_api_->ReleaseValue(attention_mask_tensor);
-            ort_api_->ReleaseValue(token_type_ids_tensor);
-            ort_api_->ReleaseMemoryInfo(memory_info);
-            
+            // All resources automatically cleaned up by RAII guards
             LOGI("Generated embedding: dim=%zu, norm=1.0", pooled.size());
             return pooled;
             

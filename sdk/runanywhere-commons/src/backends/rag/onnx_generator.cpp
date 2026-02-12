@@ -4,6 +4,7 @@
  */
 
 #include "onnx_generator.h"
+#include "backends/rag/ort_guards.h"
 
 #include "rac/core/rac_logger.h"
 #include <nlohmann/json.hpp>
@@ -25,82 +26,7 @@ namespace runanywhere {
 namespace rag {
 
 // =============================================================================
-// RAII WRAPPERS FOR ONNX RUNTIME RESOURCES
-// =============================================================================
-// Ensures proper cleanup in all code paths (exception safety)
-
-// Status guard - automatically releases OrtStatus
-class OrtStatusGuard {
-public:
-    explicit OrtStatusGuard(const OrtApi* api) : api_(api), status_(nullptr) {}
-    
-    ~OrtStatusGuard() {
-        if (status_ && api_) {
-            api_->ReleaseStatus(status_);
-        }
-    }
-    
-    OrtStatusGuard(const OrtStatusGuard&) = delete;
-    OrtStatusGuard& operator=(const OrtStatusGuard&) = delete;
-    
-    OrtStatus** get_address() { return &status_; }
-    OrtStatus* get() const { return status_; }
-    bool is_error() const { return status_ != nullptr; }
-    const char* error_message() const { 
-        return (status_ && api_) ? api_->GetErrorMessage(status_) : "Unknown error";
-    }
-    
-private:
-    const OrtApi* api_;
-    OrtStatus* status_;
-};
-
-// Tensor value guard
-class OrtValueGuard {
-public:
-    explicit OrtValueGuard(const OrtApi* api) : api_(api), value_(nullptr) {}
-    
-    ~OrtValueGuard() {
-        if (value_ && api_) {
-            api_->ReleaseValue(value_);
-        }
-    }
-    
-    // Non-copyable
-    OrtValueGuard(const OrtValueGuard&) = delete;
-    OrtValueGuard& operator=(const OrtValueGuard&) = delete;
-    
-    // Movable (for storing in containers)
-    OrtValueGuard(OrtValueGuard&& other) noexcept 
-        : api_(other.api_), value_(other.value_) {
-        other.value_ = nullptr;
-    }
-    
-    OrtValueGuard& operator=(OrtValueGuard&& other) noexcept {
-        if (this != &other) {
-            if (value_ && api_) {
-                api_->ReleaseValue(value_);
-            }
-            api_ = other.api_;
-            value_ = other.value_;
-            other.value_ = nullptr;
-        }
-        return *this;
-    }
-    
-    OrtValue** ptr() { return &value_; }
-    OrtValue* get() const { return value_; }
-    OrtValue* release() {
-        OrtValue* tmp = value_;
-        value_ = nullptr;
-        return tmp;
-    }
-    
-private:
-    const OrtApi* api_;
-    OrtValue* value_;
-};
-
+// RAII WRAPPERS - Now using shared guards from ort_guards.h
 // =============================================================================
 // SIMPLE TOKENIZER FOR LLM (MVP - Word-level with vocabulary)
 // =============================================================================
