@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -108,52 +109,13 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
     Scaffold(
         topBar = {
             if (uiState.isModelLoaded) {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = "Chat",
-                            style = MaterialTheme.typography.headlineMedium,
-                        )
-                    },
-                    navigationIcon = {
-                        // Conversations button
-                        IconButton(onClick = { showingConversationList = true }) {
-                            Icon(
-                                imageVector = Icons.Default.History,
-                                contentDescription = "Conversations",
-                            )
-                        }
-                    },
-                    actions = {
-                        // Info button - disabled when messages.isEmpty, primaryAccent when enabled
-                        IconButton(
-                            onClick = { showingChatDetails = true },
-                            enabled = uiState.messages.isNotEmpty(),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = "Info",
-                                tint =
-                                    if (uiState.messages.isNotEmpty()) {
-                                        AppColors.primaryAccent
-                                    } else {
-                                        AppColors.statusGray
-                                    },
-                            )
-                        }
-
-                        // Model button (logo + short name + Streaming/Batch)
-                        IconButton(onClick = { showingModelSelection = true }) {
-                            ChatModelButton(
-                                modelName = uiState.loadedModelName,
-                                supportsStreaming = uiState.useStreaming,
-                            )
-                        }
-                    },
-                    colors =
-                        TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                        ),
+                ChatTopBar(
+                    hasMessages = uiState.messages.isNotEmpty(),
+                    modelName = uiState.loadedModelName,
+                    supportsStreaming = uiState.useStreaming,
+                    onHistoryClick = { showingConversationList = true },
+                    onInfoClick = { showingChatDetails = true },
+                    onModelClick = { showingModelSelection = true },
                 )
             }
         },
@@ -171,38 +133,38 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
                     if (uiState.messages.isEmpty() && !uiState.isGenerating) {
                         EmptyStateView()
                     } else {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(Dimensions.large),
-                    verticalArrangement = Arrangement.spacedBy(Dimensions.messageSpacingBetween),
-                ) {
-                    // Add spacer at top for better scrolling
-                    item {
-                        Spacer(modifier = Modifier.height(20.dp))
-                    }
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(Dimensions.large),
+                            verticalArrangement = Arrangement.spacedBy(Dimensions.messageSpacingBetween),
+                        ) {
+                            // Add spacer at top for better scrolling
+                            item {
+                                Spacer(modifier = Modifier.height(20.dp))
+                            }
 
-                    items(uiState.messages, key = { it.id }) { message ->
-                        MessageBubbleView(
-                            message = message,
-                            isGenerating = uiState.isGenerating,
-                            modifier = Modifier.animateItem(),
-                        )
-                    }
+                            items(uiState.messages, key = { it.id }) { message ->
+                                MessageBubbleView(
+                                    message = message,
+                                    isGenerating = uiState.isGenerating,
+                                    modifier = Modifier.animateItem(),
+                                )
+                            }
 
-                    // Typing indicator
-                    if (uiState.isGenerating) {
-                        item {
-                            TypingIndicatorView()
+                            // Typing indicator
+                            if (uiState.isGenerating) {
+                                item {
+                                    TypingIndicatorView()
+                                }
+                            }
+
+                            // Add spacer at bottom for better keyboard handling
+                            item {
+                                Spacer(modifier = Modifier.height(20.dp))
+                            }
                         }
                     }
-
-                    // Add spacer at bottom for better keyboard handling
-                    item {
-                        Spacer(modifier = Modifier.height(20.dp))
-                    }
-                }
-                }
                 }
 
                 // Input area and divider only when model loaded
@@ -431,6 +393,174 @@ private fun formatContextLength(contextLength: Int?): String? {
         contextLength >= 1_000 -> String.format("%.0fK", contextLength / 1_000.0)
         else -> contextLength.toString()
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChatTopBar(
+    hasMessages: Boolean,
+    modelName: String?,
+    supportsStreaming: Boolean,
+    onHistoryClick: () -> Unit,
+    onInfoClick: () -> Unit,
+    onModelClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    TopAppBar(
+        modifier = modifier,
+        title = {
+            Text(
+                text = "Chat",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+            )
+        },
+        actions = {
+            // ── Grouped action icons in a pill ──
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(4.dp),
+                ) {
+                    // History icon
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = onHistoryClick,
+                            ),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.History,
+                            contentDescription = "History",
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+
+                    // Info icon — filled accent circle when messages exist
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .then(
+                                if (hasMessages) {
+                                    Modifier
+                                        .background(AppColors.primaryAccent, CircleShape)
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null,
+                                            onClick = onInfoClick,
+                                        )
+                                } else {
+                                    Modifier
+                                }
+                            ),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Info",
+                            modifier = Modifier.size(20.dp),
+                            tint = if (hasMessages) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // ── Model chip ──
+            Surface(
+                onClick = onModelClick,
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(
+                        start = 6.dp,
+                        end = 12.dp,
+                        top = 6.dp,
+                        bottom = 6.dp,
+                    ),
+                ) {
+                    if (modelName != null) {
+                        // Model logo
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(RoundedCornerShape(6.dp)),
+                        ) {
+                            Image(
+                                painter = painterResource(id = getModelLogoResIdForName(modelName)),
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Fit,
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text(
+                                text = shortModelName(modelName, maxLength = 12),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            ) {
+                                Icon(
+                                    imageVector = if (supportsStreaming) Icons.Default.Bolt else Icons.Default.Stop,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(10.dp),
+                                    tint = if (supportsStreaming) AppColors.primaryGreen else AppColors.primaryOrange,
+                                )
+                                Text(
+                                    text = if (supportsStreaming) "Streaming" else "Batch",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Medium,
+                                    ),
+                                    color = if (supportsStreaming) AppColors.primaryGreen else AppColors.primaryOrange,
+                                )
+                            }
+                        }
+                    } else {
+                        // No model selected
+                        Icon(
+                            imageVector = Icons.Default.ViewInAr,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = AppColors.primaryAccent,
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Select Model",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+        ),
+    )
 }
 
 @Composable
@@ -1389,7 +1519,7 @@ fun ConversationListSheet(
             } else {
                 conversations.filter { conversation ->
                     conversation.title?.lowercase()?.contains(searchQuery.lowercase()) == true ||
-                        conversation.messages.any { it.content.lowercase().contains(searchQuery.lowercase()) }
+                            conversation.messages.any { it.content.lowercase().contains(searchQuery.lowercase()) }
                 }
             }
         }
