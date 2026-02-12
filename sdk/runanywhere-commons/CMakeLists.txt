@@ -174,6 +174,7 @@ set(RAC_FEATURES_SOURCES
     src/features/llm/streaming_metrics.cpp
     src/features/llm/llm_analytics.cpp
     src/features/llm/structured_output.cpp
+    src/features/llm/tool_calling.cpp
     # STT
     src/features/stt/stt_component.cpp
     src/features/stt/rac_stt_service.cpp

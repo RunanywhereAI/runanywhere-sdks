@@ -385,7 +385,7 @@ class ModelManagerImpl {
         const totalFiles = 1 + model.additionalFiles.length;
         for (let i = 0; i < model.additionalFiles.length; i++) {
           const file = model.additionalFiles[i];
-          const fileKey = `${modelId}/${file.filename}`;
+          const fileKey = this.additionalFileKey(modelId, file.filename);
           const fileData = await this.downloadFile(file.url, (progress) => {
             const baseProgress = (1 + i) / totalFiles;
             const fileProgress = progress / totalFiles;
@@ -398,7 +398,7 @@ class ModelManagerImpl {
       let totalSize = primaryData.length;
       if (model.additionalFiles) {
         for (const file of model.additionalFiles) {
-          const fileKey = `${modelId}/${file.filename}`;
+          const fileKey = this.additionalFileKey(modelId, file.filename);
           const fileData = await this.loadFromOPFS(fileKey);
           if (fileData) totalSize += fileData.length;
         }
@@ -465,7 +465,7 @@ class ModelManagerImpl {
     const fsDir = `/models`;
     const fsPath = `${fsDir}/${modelId}.gguf`;
 
-    const { WASMBridge, TextGeneration } = await import(
+    const { WASMBridge, TextGeneration, VLM } = await import(
       '../../../../../sdk/runanywhere-web/packages/core/src/index'
     );
 
@@ -496,7 +496,47 @@ class ModelManagerImpl {
     m.FS_createDataFile('/models', `${modelId}.gguf`, data, true, true, true);
     console.log(`[ModelManager] Model file written to ${fsPath}`);
 
-    if (model.modality === 'text' || model.modality === 'multimodal') {
+    if (model.modality === 'multimodal') {
+      // VLM: also write the mmproj file to Emscripten FS, then load via VLM extension
+      let mmprojFsPath: string | null = null;
+
+      const mmprojFile = model.additionalFiles?.find((f) => f.filename.includes('mmproj'));
+      if (mmprojFile) {
+        const mmprojKey = this.additionalFileKey(modelId, mmprojFile.filename);
+        let mmprojData = await this.loadFromOPFS(mmprojKey);
+
+        // Fallback: re-download mmproj if not found in OPFS (handles migration
+        // from old nested-key format where store silently failed).
+        if (!mmprojData && mmprojFile.url) {
+          console.log(`[ModelManager] mmproj not in OPFS, downloading on-demand: ${mmprojFile.filename}`);
+          mmprojData = await this.downloadFile(mmprojFile.url);
+          await this.storeInOPFS(mmprojKey, mmprojData);
+        }
+
+        if (mmprojData) {
+          mmprojFsPath = `${fsDir}/${mmprojFile.filename}`;
+          try {
+            m.FS_unlink(mmprojFsPath);
+          } catch {
+            // File doesn't exist yet
+          }
+          console.log(`[ModelManager] Writing mmproj ${mmprojData.length} bytes to ${mmprojFsPath}`);
+          m.FS_createDataFile('/models', mmprojFile.filename, mmprojData, true, true, true);
+          console.log(`[ModelManager] mmproj file written to ${mmprojFsPath}`);
+        } else {
+          console.warn(`[ModelManager] mmproj file not found in OPFS for ${modelId}`);
+        }
+      }
+
+      if (mmprojFsPath) {
+        await VLM.loadModel(fsPath, mmprojFsPath, modelId, model.name);
+        console.log(`[ModelManager] VLM model loaded: ${modelId}`);
+      } else {
+        // Fallback: load as text-only LLM if mmproj is missing
+        console.warn(`[ModelManager] No mmproj found, loading as text-only LLM: ${modelId}`);
+        await TextGeneration.loadModel(fsPath, modelId, model.name);
+      }
+    } else if (model.modality === 'text') {
       await TextGeneration.loadModel(fsPath, modelId, model.name);
       console.log(`[ModelManager] LLM model loaded via TextGeneration: ${modelId}`);
     }
@@ -529,7 +569,7 @@ class ModelManagerImpl {
     const additionalPaths: Record<string, string> = {};
     if (model.additionalFiles) {
       for (const file of model.additionalFiles) {
-        const fileKey = `${model.id}/${file.filename}`;
+        const fileKey = this.additionalFileKey(model.id, file.filename);
         let fileData = await this.loadFromOPFS(fileKey);
         if (!fileData) {
           // Download missing additional file on-demand
@@ -699,7 +739,7 @@ class ModelManagerImpl {
     const additionalPaths: Record<string, string> = {};
     if (model.additionalFiles) {
       for (const file of model.additionalFiles) {
-        const fileKey = `${model.id}/${file.filename}`;
+        const fileKey = this.additionalFileKey(model.id, file.filename);
         let fileData = await this.loadFromOPFS(fileKey);
         if (!fileData) {
           console.log(`[ModelManager] Additional file ${file.filename} not in OPFS, downloading...`);
@@ -776,7 +816,7 @@ class ModelManagerImpl {
     const model = this.findModel(modelId);
     if (model?.additionalFiles) {
       for (const file of model.additionalFiles) {
-        await this.deleteFromOPFS(`${modelId}/${file.filename}`);
+        await this.deleteFromOPFS(this.additionalFileKey(modelId, file.filename));
       }
     }
 
@@ -819,6 +859,15 @@ class ModelManagerImpl {
   }
 
   // --- OPFS Storage ---
+
+  /**
+   * Build a flat OPFS key for additional files (e.g., mmproj).
+   * Uses `__` separator instead of `/` to avoid name collisions between
+   * a primary model FILE and a directory with the same name.
+   */
+  private additionalFileKey(modelId: string, filename: string): string {
+    return `${modelId}__${filename}`;
+  }
 
   private async getOPFSRoot(): Promise<FileSystemDirectoryHandle> {
     return navigator.storage.getDirectory();
