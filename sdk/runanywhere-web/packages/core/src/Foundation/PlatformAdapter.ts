@@ -119,6 +119,14 @@ export class PlatformAdapter {
   }
 
   /**
+   * Get the WASM pointer to the adapter struct.
+   * Used by RunAnywhere.initialize() to populate rac_config_t.
+   */
+  getAdapterPtr(): number {
+    return this.adapterPtr;
+  }
+
+  /**
    * Clean up allocated callbacks and memory.
    */
   cleanup(): void {
@@ -248,7 +256,7 @@ export class PlatformAdapter {
 
   /** log: void (*)(rac_log_level_t level, const char* category, const char* message, void* user_data) */
   private registerLog(m: RACommonsModule): number {
-    return m.addFunction((level: number, categoryPtr: number, messagePtr: number, _userData: number): number => {
+    return m.addFunction((level: number, categoryPtr: number, messagePtr: number, _userData: number): void => {
       const category = m.UTF8ToString(categoryPtr);
       const message = m.UTF8ToString(messagePtr);
       const prefix = `[RAC:${category}]`;
@@ -271,8 +279,7 @@ export class PlatformAdapter {
         default:
           console.log(prefix, message);
       }
-      return 0;
-    }, 'iiiii');
+    }, 'viiii');
   }
 
   /** now_ms: int64_t (*)(void* user_data) */
@@ -315,17 +322,22 @@ export class PlatformAdapter {
     }, 'iii');
   }
 
-  /** http_download: rac_result_t (*)(const char* url, const char* dest_path, progress_cb, complete_cb, void* cb_user_data, int64_t* out_task_id) */
+  /**
+   * http_download: rac_result_t (*)(const char* url, const char* dest_path,
+   *   progress_cb, complete_cb, void* cb_user_data, char** out_task_id, void* user_data)
+   * Note: 7 params in C
+   */
   private registerHttpDownload(m: RACommonsModule): number {
     return m.addFunction(
-      (urlPtr: number, destPathPtr: number, progressCbPtr: number, completeCbPtr: number, cbUserData: number, outTaskIdPtr: number): number => {
+      (urlPtr: number, destPathPtr: number, progressCbPtr: number, completeCbPtr: number, cbUserData: number, outTaskIdPtr: number, _userData: number): number => {
         const url = m.UTF8ToString(urlPtr);
         const destPath = m.UTF8ToString(destPathPtr);
 
-        // Generate task ID
-        const taskId = Date.now();
+        // Generate task ID string
+        const taskId = `dl_${Date.now()}`;
         if (outTaskIdPtr !== 0) {
-          m.setValue(outTaskIdPtr, taskId & 0xFFFFFFFF, 'i32');
+          const strPtr = WASMBridge.shared.allocString(taskId);
+          m.setValue(outTaskIdPtr, strPtr, '*');
         }
 
         // Async download via fetch
@@ -336,17 +348,21 @@ export class PlatformAdapter {
 
         return 0;
       },
-      'iiiiiii',
+      'iiiiiiii',
     );
   }
 
-  /** extract_archive: rac_result_t (*)(const char* archive_path, const char* dest_dir, progress_cb, void* cb_user_data) */
+  /**
+   * extract_archive: rac_result_t (*)(const char* archive_path, const char* dest_dir,
+   *   progress_cb, void* cb_user_data, void* user_data)
+   * Note: 5 params in C
+   */
   private registerExtractArchive(m: RACommonsModule): number {
-    return m.addFunction((_archivePtr: number, _destPtr: number, _progressCb: number, _cbUserData: number): number => {
+    return m.addFunction((_archivePtr: number, _destPtr: number, _progressCb: number, _cbUserData: number, _userData: number): number => {
       // Archive extraction not yet implemented for WASM
       logger.warning('Archive extraction not yet implemented for WASM');
       return -180;
-    }, 'iiiii');
+    }, 'iiiiii');
   }
 
   // -----------------------------------------------------------------------

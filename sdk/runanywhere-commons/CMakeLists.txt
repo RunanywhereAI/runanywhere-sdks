@@ -186,6 +186,18 @@ set(RAC_FEATURES_SOURCES
     src/features/vad/vad_component.cpp
     src/features/vad/energy_vad.cpp
     src/features/vad/vad_analytics.cpp
+    # VLM
+    src/features/vlm/vlm_component.cpp
+    src/features/vlm/rac_vlm_service.cpp
+    # Diffusion
+    src/features/diffusion/diffusion_component.cpp
+    src/features/diffusion/rac_diffusion_service.cpp
+    src/features/diffusion/diffusion_model_registry.cpp
+    src/features/diffusion/diffusion_json.cpp
+    src/features/diffusion/rac_diffusion_tokenizer.cpp
+    # Embeddings
+    src/features/embeddings/rac_embeddings_service.cpp
+    src/features/embeddings/embeddings_component.cpp
     # Voice Agent
     src/features/voice_agent/voice_agent.cpp
     # Result memory management

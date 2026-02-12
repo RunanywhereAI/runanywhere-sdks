@@ -153,7 +153,7 @@ export class WASMBridge {
     try {
       // Dynamic import of the Emscripten glue JS
       // The glue file exports a factory function: createRACommonsModule()
-      const moduleUrl = wasmUrl ?? new URL('../wasm/racommons.js', import.meta.url).href;
+      const moduleUrl = wasmUrl ?? new URL('../../wasm/racommons.js', import.meta.url).href;
 
       // Import the ES module
       const { default: createModule } = await import(/* @vite-ignore */ moduleUrl);

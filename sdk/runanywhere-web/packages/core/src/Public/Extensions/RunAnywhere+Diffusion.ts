@@ -1,214 +1,286 @@
 /**
  * RunAnywhere Web SDK - Diffusion Extension
  *
- * Adds image generation capabilities using diffusion models in the browser.
- * Uses ONNX Runtime Web (WebGPU backend) for Stable Diffusion inference.
- *
- * This extension uses onnxruntime-web directly (not RACommons C++) because
- * diffusion model inference benefits significantly from WebGPU acceleration,
- * which is not available through the WASM C++ path.
+ * Adds image generation capabilities using diffusion models.
+ * Uses the RACommons rac_diffusion_component_* C API (same as iOS/Android).
  *
  * Mirrors: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Diffusion/
  *
  * Usage:
- *   import { Diffusion } from '@runanywhere/web';
+ *   import { Diffusion, DiffusionScheduler, DiffusionMode } from '@runanywhere/web';
  *
- *   await Diffusion.loadModel('/models/sd-turbo');
- *   const result = await Diffusion.generate('A sunset over mountains', {
- *     width: 512, height: 512, steps: 4,
+ *   await Diffusion.loadModel('/models/sd-v1-5', 'sd-1.5');
+ *   const result = await Diffusion.generate({
+ *     prompt: 'A sunset over mountains',
+ *     width: 512, height: 512, steps: 28,
  *   });
- *   // result.imageData is an ImageData object
- *
- * Note: Requires WebGPU support in the browser.
- * Status: Scaffold -- ONNX Runtime Web integration is a later-stage item.
+ *   // result.imageData is Uint8ClampedArray RGBA
  */
 
+import { RunAnywhere } from '../RunAnywhere';
+import { WASMBridge } from '../../Foundation/WASMBridge';
+import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { EventBus } from '../../Foundation/EventBus';
 import { SDKEventType } from '../../types/enums';
 
 const logger = new SDKLogger('Diffusion');
 
+let _diffusionComponentHandle = 0;
+
+function requireBridge(): WASMBridge {
+  if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
+  return WASMBridge.shared;
+}
+
+function ensureDiffusionComponent(): number {
+  if (_diffusionComponentHandle !== 0) return _diffusionComponentHandle;
+
+  const bridge = requireBridge();
+  const m = bridge.module;
+  const handlePtr = m._malloc(4);
+  const result = m.ccall('rac_diffusion_component_create', 'number', ['number'], [handlePtr]) as number;
+
+  if (result !== 0) {
+    m._free(handlePtr);
+    bridge.checkResult(result, 'rac_diffusion_component_create');
+  }
+
+  _diffusionComponentHandle = m.getValue(handlePtr, 'i32');
+  m._free(handlePtr);
+  logger.debug('Diffusion component created');
+  return _diffusionComponentHandle;
+}
+
 // ---------------------------------------------------------------------------
-// Diffusion Types
+// Diffusion Types (mirrored from rac_diffusion_types.h)
 // ---------------------------------------------------------------------------
 
+export enum DiffusionScheduler {
+  DPM_PP_2M_Karras = 0,
+  DPM_PP_2M = 1,
+  DPM_PP_2M_SDE = 2,
+  DDIM = 3,
+  Euler = 4,
+  EulerAncestral = 5,
+  PNDM = 6,
+  LMS = 7,
+}
+
+export enum DiffusionModelVariant {
+  SD_1_5 = 0,
+  SD_2_1 = 1,
+  SDXL = 2,
+  SDXL_Turbo = 3,
+  SDXS = 4,
+  LCM = 5,
+}
+
+export enum DiffusionMode {
+  TextToImage = 0,
+  ImageToImage = 1,
+  Inpainting = 2,
+}
+
 export interface DiffusionGenerationOptions {
+  /** Text prompt */
+  prompt: string;
+  /** Negative prompt (optional) */
+  negativePrompt?: string;
   /** Image width (default: 512) */
   width?: number;
   /** Image height (default: 512) */
   height?: number;
-  /** Number of inference steps (default: 20) */
+  /** Number of denoising steps (default: 28) */
   steps?: number;
   /** Guidance scale (default: 7.5) */
   guidanceScale?: number;
-  /** Random seed (-1 for random) */
+  /** Seed (-1 for random) */
   seed?: number;
-  /** Negative prompt */
-  negativePrompt?: string;
-  /** Scheduler type */
-  scheduler?: 'euler' | 'euler_a' | 'ddim' | 'pndm';
+  /** Scheduler (default: DPM++ 2M Karras) */
+  scheduler?: DiffusionScheduler;
+  /** Generation mode (default: TextToImage) */
+  mode?: DiffusionMode;
+  /** Denoising strength for img2img (0-1, default: 0.75) */
+  denoiseStrength?: number;
+  /** Report intermediate images (default: false) */
+  reportIntermediateImages?: boolean;
 }
 
 export interface DiffusionGenerationResult {
-  /** Raw RGBA pixel data */
+  /** RGBA image data */
   imageData: Uint8ClampedArray;
   /** Image width */
   width: number;
   /** Image height */
   height: number;
+  /** Seed used for generation */
+  seedUsed: number;
   /** Generation time in milliseconds */
   generationTimeMs: number;
-  /** Seed used */
-  seed: number;
+  /** Whether safety checker flagged the image */
+  safetyFlagged: boolean;
 }
 
-export type DiffusionProgressCallback = (step: number, totalSteps: number) => void;
+export type DiffusionProgressCallback = (step: number, totalSteps: number, progress: number) => void;
 
 // ---------------------------------------------------------------------------
 // Diffusion Extension
 // ---------------------------------------------------------------------------
 
-let _isModelLoaded = false;
-
 export const Diffusion = {
   /**
-   * Check if WebGPU is available (required for diffusion).
+   * Load a diffusion model.
    */
-  get isWebGPUAvailable(): boolean {
-    return typeof navigator !== 'undefined' && 'gpu' in navigator;
-  },
+  async loadModel(modelPath: string, modelId: string, modelName?: string): Promise<void> {
+    const bridge = requireBridge();
+    const m = bridge.module;
+    const handle = ensureDiffusionComponent();
 
-  /** Whether a diffusion model is loaded. */
-  get isModelLoaded(): boolean {
-    return _isModelLoaded;
-  },
+    logger.info(`Loading diffusion model: ${modelId} from ${modelPath}`);
+    EventBus.shared.emit('model.loadStarted', SDKEventType.Model, { modelId, component: 'diffusion' });
 
-  /**
-   * Load a diffusion model (ONNX format).
-   *
-   * Requires WebGPU support. The model directory should contain:
-   * - text_encoder/model.onnx
-   * - unet/model.onnx
-   * - vae_decoder/model.onnx
-   * - tokenizer/ (vocab, merges)
-   * - scheduler_config.json
-   *
-   * @param modelPath - Path to the model directory
-   */
-  async loadModel(modelPath: string): Promise<void> {
-    if (!Diffusion.isWebGPUAvailable) {
-      throw new Error(
-        'WebGPU is not available in this browser. ' +
-        'Diffusion model inference requires WebGPU. ' +
-        'Try Chrome 113+ or Edge 113+.',
-      );
+    const pathPtr = bridge.allocString(modelPath);
+    const idPtr = bridge.allocString(modelId);
+    const namePtr = bridge.allocString(modelName ?? modelId);
+
+    try {
+      const result = m.ccall(
+        'rac_diffusion_component_load_model', 'number',
+        ['number', 'number', 'number', 'number'],
+        [handle, pathPtr, idPtr, namePtr],
+      ) as number;
+      bridge.checkResult(result, 'rac_diffusion_component_load_model');
+      logger.info(`Diffusion model loaded: ${modelId}`);
+      EventBus.shared.emit('model.loadCompleted', SDKEventType.Model, { modelId, component: 'diffusion' });
+    } finally {
+      bridge.free(pathPtr);
+      bridge.free(idPtr);
+      bridge.free(namePtr);
     }
+  },
 
-    logger.info(`Loading diffusion model from: ${modelPath}`);
-    EventBus.shared.emit('model.loadStarted', SDKEventType.Model, {
-      modelId: 'diffusion',
-      component: 'diffusion',
-    });
+  /** Unload the diffusion model. */
+  async unloadModel(): Promise<void> {
+    if (_diffusionComponentHandle === 0) return;
+    const bridge = requireBridge();
+    const result = bridge.module.ccall(
+      'rac_diffusion_component_unload', 'number', ['number'], [_diffusionComponentHandle],
+    ) as number;
+    bridge.checkResult(result, 'rac_diffusion_component_unload');
+    logger.info('Diffusion model unloaded');
+  },
 
-    // TODO: Initialize ONNX Runtime Web session with WebGPU backend
-    // This requires:
-    // 1. import { InferenceSession } from 'onnxruntime-web'
-    // 2. Load text_encoder, unet, vae_decoder sessions
-    // 3. Load tokenizer vocabulary
-    //
-    // Implementation will be added when onnxruntime-web is included
-    // as a dependency. For now, we set up the scaffolding.
-
-    _isModelLoaded = true;
-
-    logger.info('Diffusion model loaded (scaffold)');
-    EventBus.shared.emit('model.loadCompleted', SDKEventType.Model, {
-      modelId: 'diffusion',
-      component: 'diffusion',
-    });
+  /** Check if a diffusion model is loaded. */
+  get isModelLoaded(): boolean {
+    if (_diffusionComponentHandle === 0) return false;
+    try {
+      return (WASMBridge.shared.module.ccall(
+        'rac_diffusion_component_is_loaded', 'number', ['number'], [_diffusionComponentHandle],
+      ) as number) === 1;
+    } catch { return false; }
   },
 
   /**
    * Generate an image from a text prompt.
-   *
-   * @param prompt - Text description of the image to generate
-   * @param options - Generation options
-   * @param onProgress - Step progress callback
-   * @returns Generated image result
    */
-  async generate(
-    prompt: string,
-    options: DiffusionGenerationOptions = {},
-    onProgress?: DiffusionProgressCallback,
-  ): Promise<DiffusionGenerationResult> {
-    if (!_isModelLoaded) {
-      throw new Error('No diffusion model loaded. Call loadModel() first.');
+  async generate(options: DiffusionGenerationOptions): Promise<DiffusionGenerationResult> {
+    const bridge = requireBridge();
+    const m = bridge.module;
+    const handle = ensureDiffusionComponent();
+
+    if (!Diffusion.isModelLoaded) {
+      throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No diffusion model loaded. Call loadModel() first.');
     }
 
-    const width = options.width ?? 512;
-    const height = options.height ?? 512;
-    const steps = options.steps ?? 20;
-    const seed = options.seed ?? Math.floor(Math.random() * 2147483647);
+    logger.info(`Generating image: "${options.prompt.substring(0, 50)}..."`);
 
-    logger.info(`Generating image: "${prompt.substring(0, 50)}..." (${width}x${height}, ${steps} steps)`);
+    // Build rac_diffusion_options_t (total ~100 bytes)
+    const optSize = 104;
+    const optPtr = m._malloc(optSize);
+    for (let i = 0; i < optSize; i++) m.setValue(optPtr + i, 0, 'i8');
 
-    const startTime = performance.now();
+    const promptPtr = bridge.allocString(options.prompt);
+    let negPromptPtr = 0;
 
-    // TODO: Implement actual ONNX Runtime Web inference pipeline:
-    // 1. Tokenize prompt -> input_ids
-    // 2. Text encoder forward pass -> text embeddings
-    // 3. Initialize latent noise (from seed)
-    // 4. For each step:
-    //    a. UNet forward pass (latents + text embeddings -> noise prediction)
-    //    b. Scheduler step (denoise)
-    //    c. Report progress
-    // 5. VAE decoder forward pass (latents -> pixel space)
-    // 6. Convert to RGBA ImageData
-
-    // Placeholder: return empty image
-    for (let step = 0; step < steps; step++) {
-      onProgress?.(step + 1, steps);
-      // In real implementation, each step runs the UNet
+    m.setValue(optPtr, promptPtr, '*');        // prompt
+    if (options.negativePrompt) {
+      negPromptPtr = bridge.allocString(options.negativePrompt);
+      m.setValue(optPtr + 4, negPromptPtr, '*'); // negative_prompt
     }
+    m.setValue(optPtr + 8, options.width ?? 512, 'i32');           // width
+    m.setValue(optPtr + 12, options.height ?? 512, 'i32');          // height
+    m.setValue(optPtr + 16, options.steps ?? 28, 'i32');            // steps
+    m.setValue(optPtr + 20, options.guidanceScale ?? 7.5, 'float'); // guidance_scale
+    // seed is i64 at offset 24 -- write low 32 bits
+    const seed = options.seed ?? -1;
+    m.setValue(optPtr + 24, seed & 0xFFFFFFFF, 'i32');
+    m.setValue(optPtr + 28, seed < 0 ? -1 : 0, 'i32');
+    m.setValue(optPtr + 32, options.scheduler ?? DiffusionScheduler.DPM_PP_2M_Karras, 'i32'); // scheduler
+    m.setValue(optPtr + 36, options.mode ?? DiffusionMode.TextToImage, 'i32'); // mode
+    m.setValue(optPtr + 72, options.denoiseStrength ?? 0.75, 'float'); // denoise_strength
+    m.setValue(optPtr + 76, options.reportIntermediateImages ? 1 : 0, 'i32'); // report_intermediate_images
+    m.setValue(optPtr + 80, 1, 'i32'); // progress_stride
 
-    const generationTimeMs = performance.now() - startTime;
+    // Result struct: rac_diffusion_result_t
+    const resSize = 48;
+    const resPtr = m._malloc(resSize);
 
-    const imageData = new Uint8ClampedArray(width * height * 4);
-    // Fill with placeholder gradient
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const idx = (y * width + x) * 4;
-        imageData[idx] = Math.floor((x / width) * 255);     // R
-        imageData[idx + 1] = Math.floor((y / height) * 255); // G
-        imageData[idx + 2] = 128;                             // B
-        imageData[idx + 3] = 255;                             // A
+    try {
+      const r = m.ccall(
+        'rac_diffusion_component_generate', 'number',
+        ['number', 'number', 'number'],
+        [handle, optPtr, resPtr],
+      ) as number;
+      bridge.checkResult(r, 'rac_diffusion_component_generate');
+
+      // Read rac_diffusion_result_t
+      const imageDataPtr = m.getValue(resPtr, '*');
+      const imageSize = m.getValue(resPtr + 4, 'i32');
+      const width = m.getValue(resPtr + 8, 'i32');
+      const height = m.getValue(resPtr + 12, 'i32');
+      const seedUsed = m.getValue(resPtr + 16, 'i32'); // low 32 bits of seed
+      const generationTimeMs = m.getValue(resPtr + 24, 'i32');
+      const safetyFlagged = m.getValue(resPtr + 28, 'i32') === 1;
+
+      // Copy RGBA image data
+      const imageData = new Uint8ClampedArray(imageSize);
+      if (imageDataPtr && imageSize > 0) {
+        imageData.set(new Uint8Array(m.HEAPU8.buffer, imageDataPtr, imageSize));
       }
+
+      // Free C result
+      m.ccall('rac_diffusion_result_free', null, ['number'], [resPtr]);
+
+      EventBus.shared.emit('diffusion.generated', SDKEventType.Generation, {
+        width, height, generationTimeMs,
+      });
+
+      return { imageData, width, height, seedUsed, generationTimeMs, safetyFlagged };
+    } finally {
+      bridge.free(promptPtr);
+      if (negPromptPtr) bridge.free(negPromptPtr);
+      m._free(optPtr);
     }
-
-    const result: DiffusionGenerationResult = {
-      imageData,
-      width,
-      height,
-      generationTimeMs,
-      seed,
-    };
-
-    EventBus.shared.emit('diffusion.generated', SDKEventType.Generation, {
-      width,
-      height,
-      steps,
-      generationTimeMs,
-    });
-
-    logger.info(`Image generated in ${generationTimeMs.toFixed(0)}ms`);
-    return result;
   },
 
-  /** Unload the diffusion model. */
-  unloadModel(): void {
-    // TODO: Dispose ONNX sessions
-    _isModelLoaded = false;
-    logger.info('Diffusion model unloaded');
+  /** Cancel in-progress generation. */
+  cancel(): void {
+    if (_diffusionComponentHandle === 0) return;
+    WASMBridge.shared.module.ccall(
+      'rac_diffusion_component_cancel', 'number', ['number'], [_diffusionComponentHandle],
+    );
+  },
+
+  /** Clean up the diffusion component. */
+  cleanup(): void {
+    if (_diffusionComponentHandle !== 0) {
+      try {
+        WASMBridge.shared.module.ccall(
+          'rac_diffusion_component_destroy', null, ['number'], [_diffusionComponentHandle],
+        );
+      } catch { /* ignore */ }
+      _diffusionComponentHandle = 0;
+    }
   },
 };

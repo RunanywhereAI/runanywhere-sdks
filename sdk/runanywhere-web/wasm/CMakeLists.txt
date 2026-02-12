@@ -418,6 +418,51 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_structured_output_validate"
     "_rac_structured_output_validation_free"
 
+    # Diffusion component
+    "_rac_diffusion_component_create"
+    "_rac_diffusion_component_configure"
+    "_rac_diffusion_component_is_loaded"
+    "_rac_diffusion_component_get_model_id"
+    "_rac_diffusion_component_load_model"
+    "_rac_diffusion_component_unload"
+    "_rac_diffusion_component_cleanup"
+    "_rac_diffusion_component_cancel"
+    "_rac_diffusion_component_generate"
+    "_rac_diffusion_component_generate_with_callbacks"
+    "_rac_diffusion_component_configure_json"
+    "_rac_diffusion_component_generate_json"
+    "_rac_diffusion_component_get_info_json"
+    "_rac_diffusion_component_get_capabilities"
+    "_rac_diffusion_component_get_info"
+    "_rac_diffusion_component_get_state"
+    "_rac_diffusion_component_get_metrics"
+    "_rac_diffusion_component_destroy"
+    "_rac_diffusion_result_free"
+
+    # Embeddings service
+    "_rac_embeddings_create"
+    "_rac_embeddings_initialize"
+    "_rac_embeddings_embed"
+    "_rac_embeddings_embed_batch"
+    "_rac_embeddings_get_info"
+    "_rac_embeddings_cleanup"
+    "_rac_embeddings_destroy"
+    "_rac_embeddings_result_free"
+
+    # Embeddings component
+    "_rac_embeddings_component_create"
+    "_rac_embeddings_component_configure"
+    "_rac_embeddings_component_is_loaded"
+    "_rac_embeddings_component_get_model_id"
+    "_rac_embeddings_component_load_model"
+    "_rac_embeddings_component_unload"
+    "_rac_embeddings_component_cleanup"
+    "_rac_embeddings_component_embed"
+    "_rac_embeddings_component_embed_batch"
+    "_rac_embeddings_component_get_state"
+    "_rac_embeddings_component_get_metrics"
+    "_rac_embeddings_component_destroy"
+
     # Environment / SDK config
     "_rac_sdk_init"
     "_rac_sdk_get_config"
@@ -434,6 +479,32 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_telemetry_manager_flush"
     "_rac_telemetry_payload_default"
     "_rac_telemetry_payload_free"
+
+    # WASM helper functions (sizeof, ping, version)
+    "_rac_wasm_ping"
+    "_rac_wasm_get_version_major"
+    "_rac_wasm_get_version_minor"
+    "_rac_wasm_get_version_patch"
+    "_rac_wasm_sizeof_platform_adapter"
+    "_rac_wasm_sizeof_config"
+    "_rac_wasm_sizeof_llm_options"
+    "_rac_wasm_sizeof_llm_result"
+    "_rac_wasm_create_llm_options_default"
+    "_rac_wasm_sizeof_stt_options"
+    "_rac_wasm_sizeof_stt_result"
+    "_rac_wasm_sizeof_tts_options"
+    "_rac_wasm_sizeof_tts_result"
+    "_rac_wasm_sizeof_vad_config"
+    "_rac_wasm_sizeof_voice_agent_config"
+    "_rac_wasm_sizeof_voice_agent_result"
+    "_rac_wasm_sizeof_vlm_options"
+    "_rac_wasm_sizeof_vlm_result"
+    "_rac_wasm_sizeof_vlm_image"
+    "_rac_wasm_sizeof_structured_output_config"
+    "_rac_wasm_sizeof_diffusion_options"
+    "_rac_wasm_sizeof_diffusion_result"
+    "_rac_wasm_sizeof_embeddings_options"
+    "_rac_wasm_sizeof_embeddings_result"
 
     # Emscripten runtime helpers
     "_malloc"
@@ -575,6 +646,12 @@ set(EMSCRIPTEN_LINK_FLAGS
 
     # Error handling
     "-sDISABLE_EXCEPTION_CATCHING=0"
+
+    # Allow undefined symbols for core-only builds (feature stubs).
+    # Functions that don't exist will be null at runtime; the TypeScript
+    # wrappers already check for this and throw descriptive errors.
+    "-sERROR_ON_UNDEFINED_SYMBOLS=0"
+    "-Wno-undefined"
 )
 
 # Threading (optional)
