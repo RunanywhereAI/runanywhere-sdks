@@ -18,6 +18,7 @@
 #   --android           Build for Android only (default: both)
 #   --clean             Clean build directories before building
 #   --skip-build        Skip native build (only setup frameworks/libs)
+<<<<<<< HEAD
 #   --abis=ABIS         Android ABIs to build (default: arm64-v8a)
 #                       Multiple: Use comma-separated (e.g., arm64-v8a,armeabi-v7a)
 #   --backends=LIST     Backends to build (default: onnx)
@@ -30,6 +31,13 @@
 #   armeabi-v7a      32-bit ARM (older devices, ~12% coverage)
 #   x86_64           64-bit Intel (emulators on Intel Macs)
 #
+# BUILD PIPELINE (no fallbacks – single source of truth):
+#   This script reuses runanywhere-commons scripts to produce all native artifacts:
+#   • iOS:  runanywhere-commons/scripts/build-ios.sh  → .xcframework (with Headers)
+#   • Android: runanywhere-commons/scripts/build-android.sh → .so files
+#   Then copies from commons dist/ into packages/core, packages/llamacpp, packages/onnx.
+#   Run --setup to build both; use --setup --ios or --setup --android for one platform.
+#
 # WHAT GETS BUILT:
 #   iOS Output (in packages/*/ios/):
 #     • core/ios/Binaries/RACommons.xcframework
@@ -39,9 +47,12 @@
 #
 #   Android Output (in packages/*/android/src/main/jniLibs/{ABI}/):
 #     • core: librunanywhere_jni.so, librac_commons.so, libc++_shared.so, libomp.so
-#     • llamacpp: librunanywhere_llamacpp.so, librac_backend_llamacpp_jni.so
-#     • onnx: librunanywhere_onnx.so, libonnxruntime.so, libsherpa-onnx-*.so
+#     • llamacpp: librunanywhere_llamacpp.so, librac_backend_llamacpp_jni.so, libomp.so, librac_commons.so
+#     • onnx: librunanywhere_onnx.so, librac_backend_onnx_jni.so, libonnxruntime.so, libsherpa-onnx-*.so, librac_commons.so
 #     • rag: librac_commons.so (shared library for RAG)
+#
+#   NOTE: librac_commons.so is synced to ALL packages (core, llamacpp, onnx, rag) to prevent
+#   Gradle native lib merge from picking a stale version. See copy_android_jnilibs().
 #
 # FRESH CLONE TO RUNNING APP:
 #   # 1. Build SDK with native libraries (~15-20 min)
@@ -517,6 +528,12 @@ copy_android_jnilibs() {
             log_info "LlamaCPP: librac_backend_llamacpp_jni.so (from build)"
         fi
 
+        # Copy libomp.so (required by LlamaCPP backend)
+        if [[ -f "${COMMONS_DIST}/llamacpp/${ABI}/libomp.so" ]]; then
+            cp "${COMMONS_DIST}/llamacpp/${ABI}/libomp.so" "${LLAMACPP_ANDROID_JNILIBS}/${ABI}/"
+            log_info "LlamaCPP: libomp.so"
+        fi
+
         # =======================================================================
         # ONNX Package: RABackendONNX
         # Keep original library name (bridge libs depend on it)
@@ -553,6 +570,24 @@ copy_android_jnilibs() {
                 log_info "ONNX: ${lib}"
             fi
         done
+
+        # =======================================================================
+        # Sync librac_commons.so to ALL packages
+        # =======================================================================
+        # Gradle merges native libs from all modules into the final APK. If
+        # packages/onnx or packages/llamacpp ship an older librac_commons.so
+        # (from GitHub release archives or a previous build), the stale copy can
+        # win the merge and the app will crash with UnsatisfiedLinkError for
+        # symbols that only exist in the newer core build.
+        #
+        # Fix: always overwrite with the version we just built/copied into core.
+        # =======================================================================
+        local CORE_RAC="${CORE_ANDROID_JNILIBS}/${ABI}/librac_commons.so"
+        if [[ -f "$CORE_RAC" ]]; then
+            cp "$CORE_RAC" "${LLAMACPP_ANDROID_JNILIBS}/${ABI}/librac_commons.so"
+            cp "$CORE_RAC" "${ONNX_ANDROID_JNILIBS}/${ABI}/librac_commons.so"
+            log_info "Synced librac_commons.so to llamacpp + onnx packages"
+        fi
     done
 
     log_info "Android JNI libraries copied"
@@ -704,6 +739,9 @@ print_summary() {
     echo ""
     echo "To rebuild after C++ changes:"
     echo "  ./scripts/build-react-native.sh --local --rebuild-commons"
+    echo ""
+    echo "Note: iOS needs the xcframework from this script (build-ios.sh)."
+    echo "      After --clean, run --setup (no --android/--ios) to rebuild both."
 }
 
 # =============================================================================

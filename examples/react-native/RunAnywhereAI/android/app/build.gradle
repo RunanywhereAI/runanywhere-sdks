@@ -172,7 +172,9 @@ android {
             "**/libfolly_runtime.so",
             "**/libreactnative.so",
             "**/libNitroModules.so",  // Nitro modules shared by @runanywhere/onnx and react-native-nitro-modules
-            "**/librac_backend_onnx.so" // ONNX backend duplicated via rag + onnx modules
+            "**/librac_backend_onnx.so", // ONNX backend duplicated via rag + onnx modules
+            "**/librac_commons.so",
+            "**/libomp.so"
         ]
     }
 

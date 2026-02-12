@@ -119,10 +119,12 @@ export { getStorageInfo, clearCache } from './RunAnywhere+Storage';
 export {
   getAvailableModels,
   getModelInfo,
+  getModelPath,
   isModelDownloaded,
   downloadModel,
   cancelDownload,
   deleteModel,
+  registerModel,
 } from './RunAnywhere+Models';
 
 // Audio Utilities
@@ -149,3 +151,17 @@ export type {
 
 // Re-export Audio as namespace for RunAnywhere.Audio access
 export * as Audio from './RunAnywhere+Audio';
+
+// Tool Calling
+export {
+  registerTool,
+  unregisterTool,
+  getRegisteredTools,
+  clearTools,
+  parseToolCall,
+  executeTool,
+  formatToolsForPrompt,
+  formatToolsForPromptAsync,
+  generateWithTools,
+  continueWithToolResult,
+} from './RunAnywhere+ToolCalling';

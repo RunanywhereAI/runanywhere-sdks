@@ -33,5 +33,11 @@ export type RootTabParamList = {
   Settings: undefined;
 };
 
+/** Vision tab stack: hub list -> VLM */
+export type VisionStackParamList = {
+  VisionHub: undefined;
+  VLM: undefined;
+};
+
 // Common utility types
 export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;

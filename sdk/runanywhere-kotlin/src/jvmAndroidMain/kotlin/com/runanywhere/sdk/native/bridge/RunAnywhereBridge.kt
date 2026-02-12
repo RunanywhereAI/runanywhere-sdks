@@ -151,7 +151,7 @@ object RunAnywhereBridge {
      * Token callback interface for streaming generation.
      */
     fun interface TokenCallback {
-        fun onToken(token: String): Boolean
+        fun onToken(token: ByteArray): Boolean
     }
 
     /**
@@ -335,6 +335,16 @@ object RunAnywhereBridge {
         speechEndCallback: Any?,
         progressCallback: Any?,
     )
+
+    // ========================================================================
+    // HTTP DOWNLOAD (platform adapter callbacks)
+    // ========================================================================
+
+    @JvmStatic
+    external fun racHttpDownloadReportProgress(taskId: String, downloadedBytes: Long, totalBytes: Long): Int
+
+    @JvmStatic
+    external fun racHttpDownloadReportComplete(taskId: String, result: Int, downloadedPath: String?): Int
 
     // ========================================================================
     // BACKEND REGISTRATION
@@ -854,6 +864,97 @@ object RunAnywhereBridge {
         apiKey: String?,
         baseUrl: String?,
     ): Int
+
+    // ========================================================================
+    // TOOL CALLING API (rac_tool_calling.h)
+    // Mirrors Swift SDK's CppBridge+ToolCalling.swift
+    // ========================================================================
+
+    /**
+     * Parse LLM output for tool calls.
+     *
+     * @param llmOutput Raw LLM output text
+     * @return JSON string with parsed result, or null on error
+     */
+    @JvmStatic
+    external fun racToolCallParse(llmOutput: String): String?
+
+    /**
+     * Format tool definitions into system prompt.
+     *
+     * @param toolsJson JSON array of tool definitions
+     * @return Formatted prompt string, or null on error
+     */
+    @JvmStatic
+    external fun racToolCallFormatPromptJson(toolsJson: String): String?
+
+    /**
+     * Format tool definitions into system prompt with specified format (int).
+     *
+     * @param toolsJson JSON array of tool definitions
+     * @param format Tool calling format (0=AUTO, 1=DEFAULT, 2=LFM2, 3=OPENAI)
+     * @return Formatted prompt string, or null on error
+     */
+    @JvmStatic
+    external fun racToolCallFormatPromptJsonWithFormat(toolsJson: String, format: Int): String?
+
+    /**
+     * Format tool definitions into system prompt with format specified by name.
+     *
+     * *** PREFERRED API - Uses string format name ***
+     *
+     * Valid format names (case-insensitive): "auto", "default", "lfm2", "openai"
+     * C++ is single source of truth for format validation.
+     *
+     * @param toolsJson JSON array of tool definitions
+     * @param formatName Format name string (e.g., "lfm2", "default")
+     * @return Formatted prompt string, or null on error
+     */
+    @JvmStatic
+    external fun racToolCallFormatPromptJsonWithFormatName(toolsJson: String, formatName: String): String?
+
+    /**
+     * Build initial prompt with tools and user query.
+     *
+     * @param userPrompt The user's question/request
+     * @param toolsJson JSON array of tool definitions
+     * @param optionsJson Options as JSON (nullable)
+     * @return Complete formatted prompt, or null on error
+     */
+    @JvmStatic
+    external fun racToolCallBuildInitialPrompt(
+        userPrompt: String,
+        toolsJson: String,
+        optionsJson: String?,
+    ): String?
+
+    /**
+     * Build follow-up prompt after tool execution.
+     *
+     * @param originalPrompt The original user prompt
+     * @param toolsPrompt Formatted tools prompt (nullable)
+     * @param toolName Name of the tool that was executed
+     * @param toolResultJson JSON string of the tool result
+     * @param keepToolsAvailable Whether to include tool definitions
+     * @return Follow-up prompt, or null on error
+     */
+    @JvmStatic
+    external fun racToolCallBuildFollowupPrompt(
+        originalPrompt: String,
+        toolsPrompt: String?,
+        toolName: String,
+        toolResultJson: String,
+        keepToolsAvailable: Boolean,
+    ): String?
+
+    /**
+     * Normalize JSON by adding quotes around unquoted keys.
+     *
+     * @param jsonStr Raw JSON string possibly with unquoted keys
+     * @return Normalized JSON string, or null on error
+     */
+    @JvmStatic
+    external fun racToolCallNormalizeJson(jsonStr: String): String?
 
     // ========================================================================
     // CONSTANTS

@@ -85,6 +85,15 @@ log_error()  { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 log_step()   { echo -e "${BLUE}==>${NC} $1"; }
 log_time()   { echo -e "${CYAN}[⏱]${NC} $1"; }
 log_header() { echo -e "\n${GREEN}═══════════════════════════════════════════${NC}"; echo -e "${GREEN} $1${NC}"; echo -e "${GREEN}═══════════════════════════════════════════${NC}"; }
+require_cmd() {
+    local cmd="$1"
+    local hint="$2"
+    if ! command -v "${cmd}" >/dev/null 2>&1; then
+        log_warn "Required tool '${cmd}' is not installed or not in PATH."
+        [[ -n "${hint}" ]] && log_warn "${hint}"
+        log_error "Cannot continue without '${cmd}'."
+    fi
+}
 
 show_help() {
     head -45 "$0" | tail -40
@@ -145,6 +154,7 @@ build_platform() {
     local PLATFORM_DIR="${BUILD_DIR}/${PLATFORM}"
 
     log_step "Building for ${PLATFORM}..."
+    require_cmd "cmake" "Install it with: brew install cmake (macOS) or: sudo apt-get install cmake (Debian/Ubuntu)"
     mkdir -p "${PLATFORM_DIR}"
     cd "${PLATFORM_DIR}"
 

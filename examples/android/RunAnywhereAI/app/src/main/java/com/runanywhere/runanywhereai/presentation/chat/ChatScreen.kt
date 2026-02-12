@@ -49,11 +49,13 @@ import com.runanywhere.runanywhereai.data.ConversationStore
 import com.runanywhere.runanywhereai.domain.models.ChatMessage
 import com.runanywhere.runanywhereai.domain.models.Conversation
 import com.runanywhere.runanywhereai.domain.models.MessageRole
+import com.runanywhere.runanywhereai.presentation.settings.ToolSettingsViewModel
 import com.runanywhere.runanywhereai.presentation.chat.components.MarkdownText
 import com.runanywhere.runanywhereai.presentation.chat.components.ModelLoadedToast
 import com.runanywhere.runanywhereai.presentation.chat.components.ModelRequiredOverlay
 import com.runanywhere.runanywhereai.util.getModelLogoResIdForName
 import com.runanywhere.runanywhereai.ui.theme.AppColors
+import android.app.Application
 import com.runanywhere.runanywhereai.ui.theme.AppTypography
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
 import kotlinx.coroutines.launch
@@ -219,6 +221,20 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
                         isModelLoaded = true,
                     )
                 }
+            }
+
+            // Tool calling indicator - matching iOS
+            val toolContext = LocalContext.current
+            val application = toolContext.applicationContext as Application
+            val toolSettingsViewModel = remember { ToolSettingsViewModel.getInstance(application) }
+            val toolState by toolSettingsViewModel.uiState.collectAsStateWithLifecycle()
+            
+            AnimatedVisibility(
+                visible = toolState.toolCallingEnabled && toolState.registeredTools.isNotEmpty(),
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+            ) {
+                ToolCallingBadge(toolCount = toolState.registeredTools.size)
             }
 
             // ModelRequiredOverlay when no model - animated circles + Get Started
@@ -554,6 +570,8 @@ fun MessageBubbleView(
     isGenerating: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
+    var showToolCallSheet by remember { mutableStateOf(false) }
+    
     val alignment =
         if (message.role == MessageRole.USER) {
             Arrangement.End
@@ -591,6 +609,15 @@ fun MessageBubbleView(
                 ModelBadge(
                     modelName = message.modelInfo.modelName,
                     framework = message.modelInfo.framework,
+                )
+                Spacer(modifier = Modifier.height(Dimensions.small))
+            }
+
+            // Tool call indicator (for assistant messages with tool calls) - matching iOS
+            if (message.role == MessageRole.ASSISTANT && message.toolCallInfo != null) {
+                com.runanywhere.runanywhereai.presentation.chat.components.ToolCallIndicator(
+                    toolCallInfo = message.toolCallInfo,
+                    onTap = { showToolCallSheet = true },
                 )
                 Spacer(modifier = Modifier.height(Dimensions.small))
             }
@@ -753,6 +780,14 @@ fun MessageBubbleView(
         if (message.role == MessageRole.ASSISTANT) {
             Spacer(modifier = Modifier.width(Dimensions.messageBubbleMinSpacing))
         }
+    }
+    
+    // Tool call detail sheet - matching iOS
+    if (showToolCallSheet && message.toolCallInfo != null) {
+        com.runanywhere.runanywhereai.presentation.chat.components.ToolCallDetailSheet(
+            toolCallInfo = message.toolCallInfo,
+            onDismiss = { showToolCallSheet = false },
+        )
     }
 }
 
@@ -1240,6 +1275,42 @@ fun EmptyStateView() {
 // ====================
 // MODEL SELECTION PROMPT
 // ====================
+
+/**
+ * Tool calling indicator badge - matching iOS ChatInterfaceView toolCallingBadge
+ */
+@Composable
+fun ToolCallingBadge(toolCount: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Dimensions.mediumLarge, vertical = Dimensions.small),
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Row(
+            modifier = Modifier
+                .background(
+                    color = AppColors.primaryAccent.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(6.dp)
+                )
+                .padding(horizontal = 10.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Default.Build,
+                contentDescription = "Tools enabled",
+                modifier = Modifier.size(10.dp),
+                tint = AppColors.primaryAccent,
+            )
+            Text(
+                text = "Tools enabled ($toolCount)",
+                style = AppTypography.caption2,
+                color = AppColors.primaryAccent,
+            )
+        }
+    }
+}
 
 @Composable
 fun ModelSelectionPrompt(onSelectModel: () -> Unit) {

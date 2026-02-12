@@ -1,16 +1,21 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
+import 'package:runanywhere/public/runanywhere_tool_calling.dart';
+import 'package:runanywhere/public/types/tool_calling_types.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/services/conversation_store.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
+import 'package:runanywhere_ai/features/chat/tool_call_views.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_status_components.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
+import 'package:runanywhere_ai/features/settings/tool_settings_view_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// ChatInterfaceView (mirroring iOS ChatInterfaceView.swift)
@@ -117,16 +122,25 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           prefs.getDouble(PreferenceKeys.defaultTemperature) ?? 0.7;
       final maxTokens = prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 500;
 
-      // Streaming now runs in a background isolate, so no ANR concerns
-      final options = sdk.LLMGenerationOptions(
-        maxTokens: maxTokens,
-        temperature: temperature,
-      );
+      // Check if tool calling is enabled and has registered tools
+      final toolSettings = ToolSettingsViewModel.shared;
+      final useToolCalling = toolSettings.toolCallingEnabled &&
+          toolSettings.registeredTools.isNotEmpty;
 
-      if (_useStreaming) {
-        await _generateStreaming(userMessage, options);
+      if (useToolCalling) {
+        await _generateWithToolCalling(userMessage, maxTokens, temperature);
       } else {
-        await _generateNonStreaming(userMessage, options);
+        // Streaming now runs in a background isolate, so no ANR concerns
+        final options = sdk.LLMGenerationOptions(
+          maxTokens: maxTokens,
+          temperature: temperature,
+        );
+
+        if (_useStreaming) {
+          await _generateStreaming(userMessage, options);
+        } else {
+          await _generateNonStreaming(userMessage, options);
+        }
       }
     } catch (e) {
       setState(() {
@@ -134,6 +148,147 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
         _isGenerating = false;
       });
     }
+  }
+
+  /// Determines the optimal tool calling format based on the model name/ID.
+  /// Different models are trained on different tool calling formats.
+  /// Returns format name string (C++ is single source of truth for valid formats).
+  String _detectToolCallFormat(String? modelName) {
+    if (modelName == null) return ToolCallFormatName.defaultFormat;
+    final name = modelName.toLowerCase();
+
+    // LFM2-Tool models use Pythonic format: <|tool_call_start|>[func(args)]<|tool_call_end|>
+    if (name.contains('lfm2') && name.contains('tool')) {
+      return ToolCallFormatName.lfm2;
+    }
+
+    // Default JSON format for general-purpose models
+    return ToolCallFormatName.defaultFormat;
+  }
+
+  Future<void> _generateWithToolCalling(
+    String prompt,
+    int maxTokens,
+    double temperature,
+  ) async {
+    // Capture model name from local state (matches Swift pattern)
+    final modelName = _loadedModelName;
+
+    // Auto-detect the tool calling format based on the loaded model
+    final format = _detectToolCallFormat(modelName);
+    debugPrint('Using tool calling with format: $format for model: ${modelName ?? "unknown"}');
+
+    // Add empty assistant message
+    final assistantMessage = ChatMessage(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      role: MessageRole.assistant,
+      content: '',
+      timestamp: DateTime.now(),
+    );
+
+    setState(() {
+      _messages.add(assistantMessage);
+    });
+
+    final messageIndex = _messages.length - 1;
+
+    try {
+      final result = await RunAnywhereTools.generateWithTools(
+        prompt,
+        options: ToolCallingOptions(
+          maxToolCalls: 3,
+          autoExecute: true,
+          formatName: format,
+          maxTokens: maxTokens,
+          temperature: temperature,
+        ),
+      );
+
+      final totalTime = _generationStartTime != null
+          ? DateTime.now().difference(_generationStartTime!).inMilliseconds /
+              1000.0
+          : 0.0;
+
+      // Create ToolCallInfo from the result if tools were called
+      ToolCallInfo? toolCallInfo;
+      debugPrint('📊 Tool calling result: toolCalls=${result.toolCalls.length}, toolResults=${result.toolResults.length}');
+      if (result.toolCalls.isNotEmpty) {
+        final lastCall = result.toolCalls.last;
+        final lastResult = result.toolResults.isNotEmpty
+            ? result.toolResults.last
+            : null;
+        debugPrint('📊 Creating ToolCallInfo for: ${lastCall.toolName}');
+
+        toolCallInfo = ToolCallInfo(
+          toolName: lastCall.toolName,
+          arguments: _formatToolValueMapToJson(lastCall.arguments),
+          result: lastResult?.result != null
+              ? _formatToolValueMapToJson(lastResult!.result!)
+              : null,
+          success: lastResult?.success ?? false,
+          error: lastResult?.error,
+        );
+        debugPrint('📊 ToolCallInfo created: ${toolCallInfo.toolName}, success=${toolCallInfo.success}');
+      } else {
+        debugPrint('📊 No tool calls in result - badge will NOT show');
+      }
+
+      final analytics = MessageAnalytics(
+        messageId: assistantMessage.id,
+        modelName: modelName,
+        totalGenerationTime: totalTime,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _messages[messageIndex] = _messages[messageIndex].copyWith(
+          content: result.text,
+          analytics: analytics,
+          toolCallInfo: toolCallInfo,
+        );
+        _isGenerating = false;
+      });
+
+      _scrollToBottom();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _messages.removeLast();
+        _errorMessage = 'Tool calling failed: $e';
+        _isGenerating = false;
+      });
+    }
+  }
+
+  String _formatToolValueMapToJson(Map<String, ToolValue> map) {
+    try {
+      final jsonMap = <String, dynamic>{};
+      for (final entry in map.entries) {
+        jsonMap[entry.key] = _toolValueToJson(entry.value);
+      }
+      const encoder = JsonEncoder.withIndent('  ');
+      return encoder.convert(jsonMap);
+    } catch (e) {
+      return map.toString();
+    }
+  }
+
+  dynamic _toolValueToJson(ToolValue value) {
+    if (value is StringToolValue) return value.value;
+    if (value is NumberToolValue) return value.value;
+    if (value is BoolToolValue) return value.value;
+    if (value is NullToolValue) return null;
+    if (value is ArrayToolValue) {
+      return value.value.map((v) => _toolValueToJson(v)).toList();
+    }
+    if (value is ObjectToolValue) {
+      final result = <String, dynamic>{};
+      for (final entry in value.value.entries) {
+        result[entry.key] = _toolValueToJson(entry.value);
+      }
+      return result;
+    }
+    return value.toString();
   }
 
   Future<void> _generateStreaming(
@@ -455,6 +610,10 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   }
 
   Widget _buildInputArea() {
+    final toolSettings = ToolSettingsViewModel.shared;
+    final showToolBadge = toolSettings.toolCallingEnabled &&
+        toolSettings.registeredTools.isNotEmpty;
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.large),
       decoration: BoxDecoration(
@@ -468,43 +627,54 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
         ],
       ),
       child: SafeArea(
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: TextField(
-                controller: _controller,
-                focusNode: _focusNode,
-                maxLines: 4,
-                minLines: 1,
-                textInputAction: TextInputAction.send,
-                decoration: InputDecoration(
-                  hintText: 'Type a message...',
-                  border: OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(AppSpacing.cornerRadiusBubble),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.large,
-                    vertical: AppSpacing.mediumLarge,
+            // Tool calling badge (matches iOS)
+            if (showToolBadge) ...[
+              ToolCallingBadge(toolCount: toolSettings.registeredTools.length),
+              const SizedBox(height: AppSpacing.smallMedium),
+            ],
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    focusNode: _focusNode,
+                    maxLines: 4,
+                    minLines: 1,
+                    textInputAction: TextInputAction.send,
+                    decoration: InputDecoration(
+                      hintText: 'Type a message...',
+                      border: OutlineInputBorder(
+                        borderRadius:
+                            BorderRadius.circular(AppSpacing.cornerRadiusBubble),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.large,
+                        vertical: AppSpacing.mediumLarge,
+                      ),
+                    ),
+                    onSubmitted: (_) => _sendMessage(),
+                    onChanged: (_) => setState(() {}),
                   ),
                 ),
-                onSubmitted: (_) => _sendMessage(),
-                onChanged: (_) => setState(() {}),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.smallMedium),
-            IconButton.filled(
-              onPressed: _canSend ? _sendMessage : null,
-              icon: _isGenerating
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : const Icon(Icons.arrow_upward),
+                const SizedBox(width: AppSpacing.smallMedium),
+                IconButton.filled(
+                  onPressed: _canSend ? _sendMessage : null,
+                  icon: _isGenerating
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(Icons.arrow_upward),
+                ),
+              ],
             ),
           ],
         ),
@@ -524,6 +694,7 @@ class ChatMessage {
   final String? thinkingContent;
   final DateTime timestamp;
   final MessageAnalytics? analytics;
+  final ToolCallInfo? toolCallInfo;
 
   const ChatMessage({
     required this.id,
@@ -532,6 +703,7 @@ class ChatMessage {
     this.thinkingContent,
     required this.timestamp,
     this.analytics,
+    this.toolCallInfo,
   });
 
   ChatMessage copyWith({
@@ -541,6 +713,7 @@ class ChatMessage {
     String? thinkingContent,
     DateTime? timestamp,
     MessageAnalytics? analytics,
+    ToolCallInfo? toolCallInfo,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -549,6 +722,7 @@ class ChatMessage {
       thinkingContent: thinkingContent ?? this.thinkingContent,
       timestamp: timestamp ?? this.timestamp,
       analytics: analytics ?? this.analytics,
+      toolCallInfo: toolCallInfo ?? this.toolCallInfo,
     );
   }
 }
@@ -565,6 +739,7 @@ class _MessageBubble extends StatefulWidget {
 
 class _MessageBubbleState extends State<_MessageBubble> {
   bool _showThinking = false;
+  bool _showToolCallSheet = false;
 
   @override
   Widget build(BuildContext context) {
@@ -581,6 +756,15 @@ class _MessageBubbleState extends State<_MessageBubble> {
           crossAxisAlignment:
               isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
+            // Tool call indicator (if present, matches iOS toolCallSection)
+            if (widget.message.toolCallInfo != null && !isUser) ...[
+              ToolCallIndicator(
+                toolCallInfo: widget.message.toolCallInfo!,
+                onTap: () => _showToolCallDetails(context),
+              ),
+              const SizedBox(height: AppSpacing.smallMedium),
+            ],
+
             // Thinking section (if present)
             if (widget.message.thinkingContent != null &&
                 widget.message.thinkingContent!.isNotEmpty)
@@ -634,6 +818,21 @@ class _MessageBubbleState extends State<_MessageBubble> {
               _buildAnalyticsSummary(),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showToolCallDetails(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        builder: (context, scrollController) =>
+            ToolCallDetailSheet(toolCallInfo: widget.message.toolCallInfo!),
       ),
     );
   }

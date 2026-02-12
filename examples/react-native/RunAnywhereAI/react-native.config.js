@@ -15,13 +15,6 @@ module.exports = {
         ios: null,
       },
     },
-    // Disable llamacpp - using ONNX only
-    '@runanywhere/llamacpp': {
-      platforms: {
-        ios: null,
-        android: null,
-      },
-    },
     // Disable audio libraries on iOS - they're incompatible with New Architecture
     'react-native-live-audio-stream': {
       platforms: {

@@ -25,7 +25,7 @@ import com.runanywhere.runanywhereai.presentation.voice.VoiceAssistantScreen
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 
 /**
- * Main navigation component
+ * Main navigation component matching iOS app structure
  * 5 tabs: Chat, STT, TTS, Voice, Settings
  */
 @OptIn(ExperimentalMaterial3Api::class)

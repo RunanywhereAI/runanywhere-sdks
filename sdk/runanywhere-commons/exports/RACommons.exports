@@ -140,6 +140,7 @@ _rac_model_paths_set_base_dir
 _rac_model_registry_create
 _rac_model_registry_destroy
 _rac_model_registry_get
+_rac_model_registry_get_by_path
 _rac_model_registry_get_all
 _rac_model_registry_get_by_frameworks
 _rac_model_registry_get_downloaded
@@ -147,6 +148,12 @@ _rac_model_registry_remove
 _rac_model_registry_save
 _rac_model_registry_update_download_status
 _rac_model_registry_update_last_used
+
+# Global Model Registry Convenience Functions
+_rac_get_model_registry
+_rac_register_model
+_rac_get_model
+_rac_get_model_by_path
 
 # Model Assignment
 _rac_model_assignment_set_callbacks

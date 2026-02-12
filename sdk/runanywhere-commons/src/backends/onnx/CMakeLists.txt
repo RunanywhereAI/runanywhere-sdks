@@ -134,8 +134,9 @@ elseif(RAC_PLATFORM_MACOS)
 endif()
 
 # =============================================================================
-# ONNX Backend Library
+# ONNX Backend Library (STT, TTS, VAD only)
 # =============================================================================
+# Diffusion is Apple CoreML-only; no ONNX diffusion in this backend.
 
 set(ONNX_BACKEND_SOURCES
     onnx_backend.cpp
@@ -192,6 +193,9 @@ if(RAC_PLATFORM_IOS)
         "-framework CoreML"
         "-framework Accelerate"
     )
+    # CoreML Execution Provider is available in ONNX Runtime iOS package
+    target_compile_definitions(rac_backend_onnx PRIVATE ORT_USE_COREML=1)
+    message(STATUS "ONNX Backend: CoreML EP enabled for iOS")
 
 elseif(RAC_PLATFORM_ANDROID)
     target_link_libraries(rac_backend_onnx PRIVATE log)
@@ -199,6 +203,9 @@ elseif(RAC_PLATFORM_ANDROID)
     target_compile_options(rac_backend_onnx PRIVATE -O3 -ffunction-sections -fdata-sections)
     # 16KB page alignment for Android 15+ (API 35) compliance - required Nov 2025
     target_link_options(rac_backend_onnx PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)
+    # NNAPI Execution Provider for Android NPU acceleration
+    target_compile_definitions(rac_backend_onnx PRIVATE ORT_USE_NNAPI=1)
+    message(STATUS "ONNX Backend: NNAPI EP enabled for Android")
 
 elseif(RAC_PLATFORM_MACOS)
     target_link_libraries(rac_backend_onnx PUBLIC
@@ -206,6 +213,9 @@ elseif(RAC_PLATFORM_MACOS)
         "-framework CoreML"
         "-framework Accelerate"
     )
+    # CoreML Execution Provider is available in ONNX Runtime macOS package
+    target_compile_definitions(rac_backend_onnx PRIVATE ORT_USE_COREML=1)
+    message(STATUS "ONNX Backend: CoreML EP enabled for macOS")
 endif()
 
 # =============================================================================
@@ -241,4 +251,5 @@ endif()
 message(STATUS "ONNX Backend Configuration:")
 message(STATUS "  ONNX Runtime: Enabled")
 message(STATUS "  Sherpa-ONNX:  ${SHERPA_ONNX_AVAILABLE}")
+message(STATUS "  Diffusion:    Not in ONNX backend (Apple CoreML only)")
 message(STATUS "  Platform: ${RAC_PLATFORM_NAME}")
