@@ -3280,15 +3280,15 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallParse(JNIEnv
                                                                           jstring llmOutput) {
     std::string outputStr = getCString(env, llmOutput);
     rac_tool_call_t result;
-    
+
     rac_result_t rc = rac_tool_call_parse(outputStr.c_str(), &result);
-    
+
     // Build JSON response
     std::string json = "{";
     json += "\"hasToolCall\":";
     json += (result.has_tool_call == RAC_TRUE) ? "true" : "false";
     json += ",\"cleanText\":\"";
-    
+
     // Escape clean text
     if (result.clean_text) {
         for (const char* p = result.clean_text; *p; p++) {
@@ -3303,7 +3303,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallParse(JNIEnv
         }
     }
     json += "\"";
-    
+
     if (result.has_tool_call == RAC_TRUE) {
         json += ",\"toolName\":\"";
         if (result.tool_name) json += result.tool_name;
@@ -3328,9 +3328,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallParse(JNIEnv
         json += ",\"callId\":";
         json += std::to_string(result.call_id);
     }
-    
+
     json += "}";
-    
+
     rac_tool_call_free(&result);
     return env->NewStringUTF(json.c_str());
 }
@@ -3340,13 +3340,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallFormatPrompt
     JNIEnv* env, jclass clazz, jstring toolsJson) {
     std::string toolsStr = getCString(env, toolsJson);
     char* prompt = nullptr;
-    
+
     rac_result_t rc = rac_tool_call_format_prompt_json(toolsStr.c_str(), &prompt);
-    
+
     if (rc != RAC_SUCCESS || prompt == nullptr) {
         return nullptr;
     }
-    
+
     jstring result = env->NewStringUTF(prompt);
     rac_free(prompt);
     return result;
@@ -3357,17 +3357,17 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallFormatPrompt
     JNIEnv* env, jclass clazz, jstring toolsJson, jint format) {
     std::string toolsStr = getCString(env, toolsJson);
     char* prompt = nullptr;
-    
+
     rac_result_t rc = rac_tool_call_format_prompt_json_with_format(
         toolsStr.c_str(),
         static_cast<rac_tool_call_format_t>(format),
         &prompt
     );
-    
+
     if (rc != RAC_SUCCESS || prompt == nullptr) {
         return nullptr;
     }
-    
+
     jstring result = env->NewStringUTF(prompt);
     rac_free(prompt);
     return result;
@@ -3379,18 +3379,18 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallFormatPrompt
     std::string toolsStr = getCString(env, toolsJson);
     std::string formatStr = getCString(env, formatName);
     char* prompt = nullptr;
-    
+
     // Use string-based API (C++ is single source of truth for format names)
     rac_result_t rc = rac_tool_call_format_prompt_json_with_format_name(
         toolsStr.c_str(),
         formatStr.c_str(),
         &prompt
     );
-    
+
     if (rc != RAC_SUCCESS || prompt == nullptr) {
         return nullptr;
     }
-    
+
     jstring result = env->NewStringUTF(prompt);
     rac_free(prompt);
     return result;
@@ -3401,17 +3401,17 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallBuildInitial
     JNIEnv* env, jclass clazz, jstring userPrompt, jstring toolsJson, jstring optionsJson) {
     std::string userStr = getCString(env, userPrompt);
     std::string toolsStr = getCString(env, toolsJson);
-    
+
     // Parse options if provided (simplified - use defaults for now)
     rac_tool_calling_options_t options = {5, RAC_TRUE, 0.7f, 1024, nullptr, RAC_FALSE, RAC_FALSE};
-    
+
     char* prompt = nullptr;
     rac_result_t rc = rac_tool_call_build_initial_prompt(userStr.c_str(), toolsStr.c_str(), &options, &prompt);
-    
+
     if (rc != RAC_SUCCESS || prompt == nullptr) {
         return nullptr;
     }
-    
+
     jstring result = env->NewStringUTF(prompt);
     rac_free(prompt);
     return result;
@@ -3425,7 +3425,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallBuildFollowu
     std::string toolsPromptStr = getCString(env, toolsPrompt);
     std::string toolNameStr = getCString(env, toolName);
     std::string resultJsonStr = getCString(env, toolResultJson);
-    
+
     char* prompt = nullptr;
     rac_result_t rc = rac_tool_call_build_followup_prompt(
         originalStr.c_str(),
@@ -3434,11 +3434,11 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallBuildFollowu
         resultJsonStr.c_str(),
         keepToolsAvailable ? RAC_TRUE : RAC_FALSE,
         &prompt);
-    
+
     if (rc != RAC_SUCCESS || prompt == nullptr) {
         return nullptr;
     }
-    
+
     jstring result = env->NewStringUTF(prompt);
     rac_free(prompt);
     return result;
@@ -3450,13 +3450,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallNormalizeJso
                                                                                    jstring jsonStr) {
     std::string inputStr = getCString(env, jsonStr);
     char* normalized = nullptr;
-    
+
     rac_result_t rc = rac_tool_call_normalize_json(inputStr.c_str(), &normalized);
-    
+
     if (rc != RAC_SUCCESS || normalized == nullptr) {
         return nullptr;
     }
-    
+
     jstring result = env->NewStringUTF(normalized);
     rac_free(normalized);
     return result;

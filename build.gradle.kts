@@ -1,20 +1,29 @@
 // Root build script for RunAnywhere Android SDK
 //
-// SIMPLIFIED BUILD TASKS:
-// ----------------------
-// The SDK is now a local module that builds automatically with the apps.
-// No need to build or publish the SDK separately during development!
+// AVAILABLE TASKS (all have matching IntelliJ run configurations):
+// ---------------------------------------------------------------
 //
-// AVAILABLE TASKS:
-//   1. buildAll            - Build SDK and all example apps (creates local.properties everywhere)
-//   2. buildAndroidApp     - Build Android sample app (SDK builds automatically)
-//   3. runAndroidApp       - Build and launch Android app on connected device
-//   4. buildIntellijPlugin - Build IntelliJ plugin (publishes SDK to Maven Local first)
-//   5. runIntellijPlugin   - Build and launch IntelliJ plugin in sandbox
-//   6. cleanAll            - Clean all projects
+// SETUP:
+//   firstTimeSetup       - One-click: check env → create configs → build everything
+//   checkEnvironment     - Verify Android SDK, NDK, local.properties
+//   setupLocalProperties - Create local.properties in all project directories
 //
-// PUBLISHING (for SDK distribution only):
+// SDK:
+//   buildSdk             - Build SDK debug AAR
+//   buildSdkRelease      - Build SDK release AAR
+//   buildAll             - Build SDK + Android app + IntelliJ plugin
 //   publishSdkToMavenLocal - Publish SDK to Maven Local repository
+//
+// ANDROID:
+//   buildAndroidApp      - Build Android sample app (SDK builds automatically)
+//   runAndroidApp        - Build and launch Android app on connected device
+//
+// INTELLIJ:
+//   buildIntellijPlugin  - Build IntelliJ plugin (publishes SDK to Maven Local first)
+//   runIntellijPlugin    - Build and launch IntelliJ plugin in sandbox
+//
+// UTILITY:
+//   cleanAll             - Clean all projects
 //
 // Run these tasks from IntelliJ run configurations or via:
 //   ./gradlew <taskName>
@@ -22,6 +31,41 @@
 plugins {
     // Apply plugins to submodules only - no root plugins needed for composite builds
     id("io.gitlab.arturbosch.detekt") version "1.23.8" apply false
+}
+
+// Inject ExecOperations for Gradle 9.0 compatibility
+interface ExecOpsInjection {
+    @get:javax.inject.Inject
+    val execOps: ExecOperations
+}
+
+// ============================================================================
+// Helper: Ensure gradle wrapper jars exist in subprojects
+// ============================================================================
+// Some subprojects (e.g., IntelliJ plugin) have their own gradlew scripts but
+// the gradle-wrapper.jar may be missing from git. This copies the root wrapper
+// jar to any subproject that has a gradlew script but no wrapper jar.
+
+fun ensureSubprojectWrappers() {
+    val rootWrapperJar = file("gradle/wrapper/gradle-wrapper.jar")
+    if (!rootWrapperJar.exists()) return
+
+    val subprojectDirs = listOf(
+        file("examples/android/RunAnywhereAI"),
+        file("examples/intellij-plugin-demo/plugin"),
+    )
+
+    subprojectDirs.forEach { dir ->
+        val gradlewScript = dir.resolve("gradlew")
+        val wrapperDir = dir.resolve("gradle/wrapper")
+        val wrapperJar = wrapperDir.resolve("gradle-wrapper.jar")
+
+        if (gradlewScript.exists() && !wrapperJar.exists()) {
+            wrapperDir.mkdirs()
+            rootWrapperJar.copyTo(wrapperJar, overwrite = false)
+            println("  [FIXED] Copied gradle-wrapper.jar to ${dir.relativeTo(projectDir)}")
+        }
+    }
 }
 
 // Configure all projects
@@ -48,11 +92,16 @@ tasks.register("buildAll") {
     group = "build"
     description = "Build SDK and all example apps (ensures local.properties exists everywhere)"
 
+    val injected = project.objects.newInstance<ExecOpsInjection>()
+
     doFirst {
         println("=".repeat(70))
         println(" Building RunAnywhere SDK and Examples")
         println("=".repeat(70))
         println()
+
+        // Ensure gradle wrappers exist in all subprojects
+        ensureSubprojectWrappers()
 
         // Ensure local.properties exists in all necessary locations
         val locations = listOf(
@@ -94,7 +143,7 @@ tasks.register("buildAll") {
         // 1. Build SDK
         println("Step 2: Building SDK...")
         println("-".repeat(70))
-        exec {
+        injected.execOps.exec {
             workingDir = projectDir
             commandLine("./gradlew", ":RunAnywhereAI:sdk:runanywhere-kotlin:assembleDebug")
         }
@@ -103,7 +152,7 @@ tasks.register("buildAll") {
         // 2. Build Android app
         println("Step 3: Building Android app...")
         println("-".repeat(70))
-        exec {
+        injected.execOps.exec {
             workingDir = file("examples/android/RunAnywhereAI")
             commandLine("./gradlew", "assembleDebug")
         }
@@ -112,7 +161,7 @@ tasks.register("buildAll") {
         // 3. Publish SDK to Maven Local (for IntelliJ plugin)
         println("Step 4: Publishing SDK to Maven Local...")
         println("-".repeat(70))
-        exec {
+        injected.execOps.exec {
             workingDir = projectDir
             commandLine("./gradlew", ":RunAnywhereAI:sdk:runanywhere-kotlin:publishToMavenLocal")
         }
@@ -121,7 +170,7 @@ tasks.register("buildAll") {
         // 4. Build IntelliJ plugin
         println("Step 5: Building IntelliJ plugin...")
         println("-".repeat(70))
-        exec {
+        injected.execOps.exec {
             workingDir = file("examples/intellij-plugin-demo/plugin")
             commandLine("./gradlew", "buildPlugin")
         }
@@ -150,6 +199,8 @@ tasks.register("buildSdk") {
     group = "sdk"
     description = "Build SDK only (creates local.properties if needed)"
 
+    val injected = project.objects.newInstance<ExecOpsInjection>()
+
     doFirst {
         val sdkDir = file("sdk/runanywhere-kotlin")
         val localProps = sdkDir.resolve("local.properties")
@@ -171,7 +222,7 @@ tasks.register("buildSdk") {
     }
 
     doLast {
-        exec {
+        injected.execOps.exec {
             workingDir = projectDir
             commandLine("./gradlew", ":RunAnywhereAI:sdk:runanywhere-kotlin:assembleDebug")
         }
@@ -183,8 +234,10 @@ tasks.register("buildSdkRelease") {
     group = "sdk"
     description = "Build SDK release variant"
 
+    val injected = project.objects.newInstance<ExecOpsInjection>()
+
     doLast {
-        exec {
+        injected.execOps.exec {
             workingDir = projectDir
             commandLine("./gradlew", ":RunAnywhereAI:sdk:runanywhere-kotlin:assembleRelease")
         }
@@ -200,7 +253,10 @@ tasks.register("buildAndroidApp") {
     group = "android"
     description = "Build Android sample app (SDK builds automatically as local module)"
 
+    val injected = project.objects.newInstance<ExecOpsInjection>()
+
     doFirst {
+        ensureSubprojectWrappers()
         val appDir = file("examples/android/RunAnywhereAI")
         val localProps = appDir.resolve("local.properties")
 
@@ -215,7 +271,7 @@ tasks.register("buildAndroidApp") {
     }
 
     doLast {
-        exec {
+        injected.execOps.exec {
             workingDir = file("examples/android/RunAnywhereAI")
             commandLine("./gradlew", "assembleDebug")
         }
@@ -228,17 +284,19 @@ tasks.register("runAndroidApp") {
     description = "Build and launch Android app on connected device"
     dependsOn("buildAndroidApp")
 
+    val injected = project.objects.newInstance<ExecOpsInjection>()
+
     doLast {
         // Install on connected device
         println("Installing app...")
-        exec {
+        injected.execOps.exec {
             workingDir = file("examples/android/RunAnywhereAI")
             commandLine("./gradlew", "installDebug")
         }
 
         // Launch the app
         println("Launching app...")
-        exec {
+        injected.execOps.exec {
             commandLine(
                 "adb",
                 "shell",
@@ -260,17 +318,24 @@ tasks.register("runAndroidApp") {
 tasks.register("buildIntellijPlugin") {
     group = "intellij"
     description = "Build IntelliJ plugin (publishes SDK to Maven Local first)"
+
+    val injected = project.objects.newInstance<ExecOpsInjection>()
+
+    doFirst {
+        ensureSubprojectWrappers()
+    }
+
     doLast {
         // 1. Publish SDK to Maven Local (plugin can't use local module)
         println("Publishing SDK to Maven Local...")
-        exec {
+        injected.execOps.exec {
             workingDir = projectDir
             commandLine("./gradlew", ":RunAnywhereAI:sdk:runanywhere-kotlin:publishToMavenLocal")
         }
 
         // 2. Build plugin
         println("Building IntelliJ plugin...")
-        exec {
+        injected.execOps.exec {
             workingDir = file("examples/intellij-plugin-demo/plugin")
             commandLine("./gradlew", "buildPlugin")
         }
@@ -281,17 +346,24 @@ tasks.register("buildIntellijPlugin") {
 tasks.register("runIntellijPlugin") {
     group = "intellij"
     description = "Build and run IntelliJ plugin in sandbox (publishes SDK first)"
+
+    val injected = project.objects.newInstance<ExecOpsInjection>()
+
+    doFirst {
+        ensureSubprojectWrappers()
+    }
+
     doLast {
         // 1. Publish SDK to Maven Local (plugin can't use local module)
         println("Publishing SDK to Maven Local...")
-        exec {
+        injected.execOps.exec {
             workingDir = projectDir
             commandLine("./gradlew", ":RunAnywhereAI:sdk:runanywhere-kotlin:publishToMavenLocal")
         }
 
         // 2. Build and run plugin
         println("Building and running IntelliJ plugin...")
-        exec {
+        injected.execOps.exec {
             workingDir = file("examples/intellij-plugin-demo/plugin")
             commandLine("./gradlew", "runIde")
         }
@@ -325,6 +397,13 @@ tasks.register("publishSdkToMavenLocal") {
 tasks.register("cleanAll") {
     group = "build"
     description = "Clean SDK and all sample apps"
+
+    val injected = project.objects.newInstance<ExecOpsInjection>()
+
+    doFirst {
+        ensureSubprojectWrappers()
+    }
+
     doLast {
         // Clean SDK
         println("Cleaning SDK...")
@@ -333,19 +412,135 @@ tasks.register("cleanAll") {
 
         // Clean Android app
         println("Cleaning Android app...")
-        exec {
+        injected.execOps.exec {
             workingDir = file("examples/android/RunAnywhereAI")
             commandLine("./gradlew", "clean")
         }
 
         // Clean IntelliJ plugin
         println("Cleaning IntelliJ plugin...")
-        exec {
+        injected.execOps.exec {
             workingDir = file("examples/intellij-plugin-demo/plugin")
             commandLine("./gradlew", "clean")
         }
 
         println("All projects cleaned successfully")
+    }
+}
+
+// ============================================================================
+// FIRST-TIME SETUP - One-click from fresh clone to working build
+// ============================================================================
+
+tasks.register("firstTimeSetup") {
+    group = "setup"
+    description = "One-click first-time setup: checks environment, creates config files, and builds everything"
+
+    val injected = project.objects.newInstance<ExecOpsInjection>()
+
+    doFirst {
+        println("=".repeat(70))
+        println(" RunAnywhere - First-Time Project Setup")
+        println("=".repeat(70))
+        println()
+    }
+
+    doLast {
+        // Step 0: Ensure gradle wrappers exist in all subprojects
+        println("Ensuring gradle wrappers are present...")
+        ensureSubprojectWrappers()
+        println()
+
+        // Step 1: Check environment
+        println("Step 1/3: Checking development environment...")
+        println("-".repeat(70))
+
+        val androidHome = System.getenv("ANDROID_HOME")
+            ?: System.getenv("ANDROID_SDK_ROOT")
+            ?: "${System.getProperty("user.home")}/Android/Sdk"
+
+        val ndkHome = System.getenv("ANDROID_NDK_HOME")
+            ?: "$androidHome/ndk/27.0.12077973"
+
+        println("Android SDK: ${if (file(androidHome).exists()) "[OK] $androidHome" else "[WARN] $androidHome (not found)"}")
+        println("Android NDK: ${if (file(ndkHome).exists()) "[OK] $ndkHome" else "[WARN] $ndkHome (not found)"}")
+        println()
+
+        // Step 2: Create local.properties everywhere
+        println("Step 2/3: Creating local.properties files...")
+        println("-".repeat(70))
+
+        val locations = mapOf(
+            "Root" to projectDir,
+            "SDK" to file("sdk/runanywhere-kotlin"),
+            "Android App" to file("examples/android/RunAnywhereAI")
+        )
+
+        locations.forEach { (name, dir) ->
+            if (dir.exists()) {
+                val localProps = dir.resolve("local.properties")
+                val content = if (name == "SDK" || name == "Root") {
+                    "sdk.dir=$androidHome\nndk.dir=$ndkHome"
+                } else {
+                    "sdk.dir=$androidHome"
+                }
+                localProps.writeText(content)
+                println("  [CREATED] $name: ${localProps.relativeTo(projectDir)}")
+            }
+        }
+        println()
+
+        // Step 3: Build everything
+        println("Step 3/3: Building SDK and all example apps...")
+        println("-".repeat(70))
+
+        // Build SDK
+        println("  Building SDK...")
+        injected.execOps.exec {
+            workingDir = projectDir
+            commandLine("./gradlew", ":runanywhere-kotlin:assembleDebug")
+        }
+
+        // Build Android app
+        println("  Building Android app...")
+        injected.execOps.exec {
+            workingDir = file("examples/android/RunAnywhereAI")
+            commandLine("./gradlew", "assembleDebug")
+        }
+
+        // Publish SDK to Maven Local (for IntelliJ plugin)
+        println("  Publishing SDK to Maven Local...")
+        injected.execOps.exec {
+            workingDir = projectDir
+            commandLine("./gradlew", ":runanywhere-kotlin:publishToMavenLocal")
+        }
+
+        // Build IntelliJ plugin
+        println("  Building IntelliJ plugin...")
+        injected.execOps.exec {
+            workingDir = file("examples/intellij-plugin-demo/plugin")
+            commandLine("./gradlew", "buildPlugin")
+        }
+
+        println()
+        println("=".repeat(70))
+        println(" First-Time Setup Complete!")
+        println("=".repeat(70))
+        println()
+        println("What was done:")
+        println("  1. Environment checked")
+        println("  2. local.properties created in all project directories")
+        println("  3. SDK built (debug AAR)")
+        println("  4. Android sample app built")
+        println("  5. SDK published to Maven Local")
+        println("  6. IntelliJ plugin built")
+        println()
+        println("You can now use the individual run configurations:")
+        println("  - Android: 1 - Build App")
+        println("  - Android: 2 - Run App on Device")
+        println("  - SDK: 1 - Build")
+        println("  - SDK: 2 - Test")
+        println()
     }
 }
 
