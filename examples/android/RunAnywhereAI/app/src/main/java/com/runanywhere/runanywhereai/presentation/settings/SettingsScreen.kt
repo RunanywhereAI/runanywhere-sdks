@@ -13,8 +13,27 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.CloudQueue
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.VpnKey
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.FormatListNumbered
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Widgets
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.RestartAlt
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -61,9 +80,16 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = Dimensions.padding16, vertical = Dimensions.padding16),
+                .padding(horizontal = Dimensions.padding16, vertical = Dimensions.padding20),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Dimensions.padding16),
         ) {
+            Icon(
+                imageVector = Icons.Filled.Settings,
+                contentDescription = null,
+                tint = AppColors.primaryOrange,
+                modifier = Modifier.size(22.dp),
+            )
             Text(
                 text = "Settings",
                 style = MaterialTheme.typography.headlineMedium,
@@ -72,7 +98,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
         }
 
         // 1. Generation Settings
-        SettingsSection(title = "Generation Settings") {
+        SettingsSection(title = "Generation Settings", icon = null) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     text = "Temperature: ${"%.2f".format(uiState.temperature)}",
@@ -119,7 +145,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
         }
 
         // 2. API Configuration (Testing)
-        SettingsSection(title = "API Configuration (Testing)") {
+        SettingsSection(title = "API Configuration (Testing)", icon = null) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -158,13 +184,13 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                         .clickable { viewModel.clearApiConfiguration() }
                         .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Icon(
                         Icons.Outlined.Delete,
                         contentDescription = null,
                         tint = AppColors.primaryRed,
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(22.dp),
                     )
                     Text(
                         text = "Clear Custom Configuration",
@@ -184,6 +210,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
         // 3. Storage Overview - iOS Label(systemImage: "externaldrive") etc.
         SettingsSection(
             title = "Storage Overview",
+            icon = null,
             trailing = {
                 TextButton(onClick = { viewModel.refreshStorage() }) {
                     Text("Refresh", style = AppTypography.caption)
@@ -191,28 +218,28 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             },
         ) {
             StorageOverviewRow(
-                icon = Icons.Outlined.Storage,
+                icon = Icons.Filled.Storage,
                 label = "Total Usage",
                 value = Formatter.formatFileSize(context, uiState.totalStorageSize),
                 valueColor = AppColors.textSecondary,
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             StorageOverviewRow(
-                icon = Icons.Outlined.CloudQueue,
+                icon = Icons.Filled.CloudQueue,
                 label = "Available Space",
                 value = Formatter.formatFileSize(context, uiState.availableSpace),
                 valueColor = AppColors.primaryGreen,
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             StorageOverviewRow(
-                icon = Icons.Outlined.Memory,
+                icon = Icons.Filled.Memory,
                 label = "Models Storage",
                 value = Formatter.formatFileSize(context, uiState.modelStorageSize),
                 valueColor = AppColors.primaryAccent,
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             StorageOverviewRow(
-                icon = Icons.Outlined.Numbers,
+                icon = Icons.Filled.FormatListNumbered,
                 label = "Downloaded Models",
                 value = uiState.downloadedModels.size.toString(),
                 valueColor = AppColors.textSecondary,
@@ -220,7 +247,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
         }
 
         // 4. Downloaded Models
-        SettingsSection(title = "Downloaded Models") {
+        SettingsSection(title = "Downloaded Models", icon = null) {
             if (uiState.downloadedModels.isEmpty()) {
                 Text(
                     text = "No models downloaded yet",
@@ -242,26 +269,26 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
         }
 
         // 5. Storage Management - iOS trash icon, red/orange
-        SettingsSection(title = "Storage Management") {
+        SettingsSection(title = "Storage Management", icon = null) {
             StorageManagementButton(
                 title = "Clear Cache",
-                subtitle = "Free up space by clearing cached data",
-                icon = Icons.Outlined.Delete,
-                color = AppColors.primaryRed,
+                subtitle = "",
+                icon = Icons.Filled.Delete,
+                color = AppColors.primaryOrange,
                 onClick = { viewModel.clearCache() },
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             StorageManagementButton(
                 title = "Clean Temporary Files",
-                subtitle = "Remove temporary files and logs",
-                icon = Icons.Outlined.Delete,
+                subtitle = "",
+                icon = Icons.Filled.CleaningServices,
                 color = AppColors.primaryOrange,
                 onClick = { viewModel.cleanTempFiles() },
             )
         }
 
         // 6. Logging Configuration - iOS Toggle "Log Analytics Locally"
-        SettingsSection(title = "Logging Configuration") {
+        SettingsSection(title = "Logging Configuration", icon = null) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -285,17 +312,17 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
         }
 
         // 7. About - iOS Label "RunAnywhere SDK" systemImage "cube", "Documentation" systemImage "book"
-        SettingsSection(title = "About") {
+        SettingsSection(title = "About", icon = null) {
             Row(
                 modifier = Modifier.padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Icon(
-                    Icons.Outlined.Widgets,
+                    Icons.Filled.Widgets,
                     contentDescription = null,
-                    tint = AppColors.primaryAccent,
-                    modifier = Modifier.size(24.dp),
+                    tint = AppColors.primaryOrange,
+                    modifier = Modifier.size(22.dp),
                 )
                 Column {
                     Text(
@@ -322,13 +349,13 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                     }
                     .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Icon(
-                    Icons.Outlined.MenuBook,
+                    Icons.Filled.MenuBook,
                     contentDescription = null,
-                    tint = AppColors.primaryAccent,
-                    modifier = Modifier.size(24.dp),
+                    tint = AppColors.primaryOrange,
+                    modifier = Modifier.size(22.dp),
                 )
                 Text(
                     text = "Documentation",
@@ -337,10 +364,10 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 Icon(
-                    Icons.Default.OpenInNew,
+                    Icons.Filled.OpenInNew,
                     contentDescription = "Open link",
-                    modifier = Modifier.size(16.dp),
-                    tint = AppColors.primaryAccent,
+                    modifier = Modifier.size(22.dp),
+                    tint = AppColors.primaryOrange,
                 )
             }
         }
@@ -410,6 +437,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                     imageVector = Icons.Outlined.RestartAlt,
                     contentDescription = null,
                     tint = AppColors.primaryOrange,
+                    modifier = Modifier.size(22.dp),
                 )
             },
         )
@@ -422,6 +450,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
 @Composable
 private fun SettingsSection(
     title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     trailing: @Composable (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -435,18 +464,31 @@ private fun SettingsSection(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineMedium,
-                color = AppColors.textSecondary,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                icon?.let {
+                    Icon(
+                        imageVector = it,
+                        contentDescription = null,
+                        tint = AppColors.primaryOrange,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = AppColors.textSecondary,
+                )
+            }
             trailing?.invoke()
         }
         Spacer(modifier = Modifier.height(8.dp))
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(Dimensions.cornerRadiusXLarge),
-            color = MaterialTheme.colorScheme.surfaceVariant,
+            color = Color.White,
         ) {
             Column(
                 modifier = Modifier.padding(Dimensions.padding16),
@@ -470,7 +512,7 @@ private fun StorageOverviewRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp),
+                .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -478,10 +520,10 @@ private fun StorageOverviewRow(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
+                tint = AppColors.primaryOrange,
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyMedium,
@@ -539,13 +581,13 @@ private fun StoredModelRow(
             )
             IconButton(
                 onClick = onDelete,
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier.size(44.dp),
             ) {
                 Icon(
                     Icons.Outlined.Delete,
                     contentDescription = "Delete",
-                    modifier = Modifier.size(20.dp),
-                    tint = AppColors.primaryRed,
+                    modifier = Modifier.size(22.dp),
+                    tint = AppColors.primaryOrange,
                 )
             }
         }
@@ -567,15 +609,9 @@ private fun StorageManagementButton(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(Dimensions.cornerRadiusRegular),
-        color = color.copy(alpha = 0.1f),
-        border = androidx.compose.foundation.BorderStroke(
-            Dimensions.strokeRegular,
-            color.copy(alpha = 0.3f),
-        ),
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(Dimensions.padding16),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
@@ -584,9 +620,9 @@ private fun StorageManagementButton(
                     imageVector = icon,
                     contentDescription = null,
                     tint = color,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(22.dp),
                 )
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(16.dp))
                 Text(
                     text = title,
                     style = MaterialTheme.typography.bodyMedium,
@@ -675,7 +711,7 @@ private fun ApiConfigurationDialog(
                             imageVector = Icons.Outlined.Warning,
                             contentDescription = null,
                             tint = AppColors.primaryOrange,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(22.dp),
                         )
                         Text(
                             text = "After saving, you must restart the app for changes to take effect. The SDK will reinitialize with your custom configuration.",
