@@ -22,6 +22,8 @@
 #include <chrono>
 #include <thread>
 #include <cstring>
+#include <cmath>
+#include <algorithm>
 
 namespace openclaw {
 
@@ -668,10 +670,41 @@ bool VoicePipeline::is_ready() const {
 }
 
 void VoicePipeline::process_audio(const int16_t* samples, size_t num_samples) {
-    // Temporary diagnostic: log every 500th call to verify audio callback is firing
+    // Audio level diagnostics: compute RMS and peak of raw int16 audio
+    // Log every ~1s (62 frames @ 256 samples/frame @ 16kHz)
     {
         static int diag_frame = 0;
-        if (++diag_frame % 500 == 0) {
+        ++diag_frame;
+
+        if (config_.debug_audio && diag_frame % 62 == 0) {
+            // Compute RMS and peak of this chunk
+            double sum_sq = 0.0;
+            int16_t peak = 0;
+            int16_t min_val = 0;
+            int16_t max_val = 0;
+            for (size_t i = 0; i < num_samples; ++i) {
+                sum_sq += static_cast<double>(samples[i]) * samples[i];
+                int16_t abs_val = static_cast<int16_t>(std::abs(samples[i]));
+                if (abs_val > peak) peak = abs_val;
+                if (samples[i] < min_val) min_val = samples[i];
+                if (samples[i] > max_val) max_val = samples[i];
+            }
+            double rms = std::sqrt(sum_sq / num_samples);
+            // dBFS relative to int16 max (32768)
+            double db = (rms > 0) ? 20.0 * std::log10(rms / 32768.0) : -96.0;
+
+            std::cout << "[AUDIO] RMS=" << static_cast<int>(rms)
+                      << " (" << std::fixed;
+            std::cout.precision(1);
+            std::cout << db << "dB)"
+                      << " peak=" << peak
+                      << " range=[" << min_val << "," << max_val << "]"
+                      << " state=" << static_cast<int>(state_)
+                      << "\n" << std::flush;
+        }
+
+        // Keep the original low-frequency DIAG log (every ~8s)
+        if (diag_frame % 500 == 0) {
             std::cout << "[DIAG] process_audio frame=" << diag_frame
                       << " init=" << initialized_
                       << " running=" << running_
@@ -785,8 +818,45 @@ void VoicePipeline::process_wakeword(const float* samples, size_t num_samples) {
 
     if (config_.debug_wakeword) {
         static int ww_frame = 0;
-        if (++ww_frame % 100 == 0 || confidence > 0.05f) {
-            std::cout << "[WakeWord] frame=" << ww_frame << " confidence=" << confidence << "\n";
+        static float peak_conf = 0.0f;
+        static int peak_conf_frame = 0;
+        static int last_peak_report = 0;
+
+        ++ww_frame;
+        if (confidence > peak_conf) {
+            peak_conf = confidence;
+            peak_conf_frame = ww_frame;
+        }
+
+        // Compute RMS of this wake word audio chunk for context
+        double ww_rms = 0.0;
+        for (size_t i = 0; i < num_samples; ++i) {
+            ww_rms += static_cast<double>(samples[i]) * samples[i];
+        }
+        ww_rms = std::sqrt(ww_rms / num_samples);
+
+        // Log at multiple levels:
+        // - Every 30 frames (~0.5s) for baseline monitoring
+        // - Any time confidence > 0.01 (any hint of wake word pattern)
+        // - Confidence brackets for spotting trends
+        bool should_log = (ww_frame % 30 == 0) || (confidence > 0.01f);
+        if (should_log) {
+            std::cout << "[WakeWord] frame=" << ww_frame
+                      << " conf=" << confidence
+                      << " audioRMS=" << static_cast<int>(ww_rms)
+                      << " peak5s=" << peak_conf << "\n";
+        }
+
+        // Report and reset peak confidence every ~5 seconds (310 frames @ 16ms)
+        if (ww_frame - last_peak_report >= 310) {
+            if (peak_conf > 0.001f) {
+                std::cout << "[WakeWord] === PEAK conf=" << peak_conf
+                          << " at frame=" << peak_conf_frame
+                          << " (last 5s) ===\n" << std::flush;
+            }
+            peak_conf = 0.0f;
+            peak_conf_frame = ww_frame;
+            last_peak_report = ww_frame;
         }
     }
 

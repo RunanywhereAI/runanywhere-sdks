@@ -71,6 +71,7 @@ struct AppConfig {
     bool debug_wakeword = false;
     bool debug_vad = false;
     bool debug_stt = false;
+    bool debug_audio = false;
 };
 
 void print_usage(const char* prog_name) {
@@ -88,6 +89,7 @@ void print_usage(const char* prog_name) {
               << "  --debug-wakeword         Enable wake word debug logging\n"
               << "  --debug-vad              Enable VAD debug logging\n"
               << "  --debug-stt              Enable STT debug logging\n"
+              << "  --debug-audio            Enable mic audio level logging (RMS, peak)\n"
               << "  --help                   Show this help message\n\n"
               << "Controls:\n"
               << "  Ctrl+C                   Exit the application\n"
@@ -126,6 +128,8 @@ AppConfig parse_args(int argc, char* argv[]) {
             config.debug_vad = true;
         } else if (strcmp(argv[i], "--debug-stt") == 0) {
             config.debug_stt = true;
+        } else if (strcmp(argv[i], "--debug-audio") == 0) {
+            config.debug_audio = true;
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             config.show_help = true;
         }
@@ -294,6 +298,7 @@ int main(int argc, char* argv[]) {
     pipeline_config.debug_wakeword = app_config.debug_wakeword;
     pipeline_config.debug_vad = app_config.debug_vad;
     pipeline_config.debug_stt = app_config.debug_stt;
+    pipeline_config.debug_audio = app_config.debug_audio;
 
     // Wake word callback
     pipeline_config.on_wake_word = [](const std::string& wake_word, float confidence) {
