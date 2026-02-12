@@ -94,6 +94,8 @@
   border-bottom: 1px solid var(--border-light);
   background: var(--bg-secondary);
   flex-shrink: 0;
+  position: relative;
+  z-index: 2;
 }
 
 .toolbar-title {
@@ -1111,4 +1113,238 @@ input[type="range"]::-webkit-slider-thumb {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* =============================================================================
+ * Vision Tab - Camera + VLM
+ * ============================================================================= */
+.vision-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Camera preview container */
+.vision-camera-container {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: #000;
+  overflow: hidden;
+}
+.vision-camera-container video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Processing overlay on camera */
+.vision-processing-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.6));
+}
+
+/* Description panel */
+.vision-description-panel {
+  padding: var(--space-md) var(--space-lg);
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-light);
+  max-height: 150px;
+  overflow-y: auto;
+}
+.vision-description-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-xs);
+}
+.vision-description-text {
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+}
+.vision-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  font-size: 9px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.5px;
+  background: var(--badge-green);
+  color: var(--color-green);
+  animation: vision-live-pulse 1.5s ease-in-out infinite;
+}
+.vision-live-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-green);
+}
+@keyframes vision-live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* Metrics row */
+.vision-metrics {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  padding-top: var(--space-xs);
+}
+
+/* Control bar (bottom) */
+.vision-control-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: var(--space-md) var(--space-lg);
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-light);
+}
+.vision-control-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+  transition: color var(--duration-fast);
+}
+.vision-control-btn:hover {
+  color: var(--text-primary);
+}
+.vision-control-btn.active {
+  color: var(--color-green);
+}
+.vision-control-btn.active span {
+  color: var(--color-green);
+}
+
+/* Capture button (large center circle) */
+.vision-capture-btn {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 3px solid var(--color-orange);
+  background: rgba(255, 85, 0, 0.15);
+  color: var(--color-orange);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--duration-fast);
+  flex-shrink: 0;
+}
+.vision-capture-btn:hover {
+  background: rgba(255, 85, 0, 0.25);
+  transform: scale(1.05);
+}
+.vision-capture-btn:active {
+  transform: scale(0.95);
+}
+.vision-capture-btn.live {
+  border-color: var(--color-red);
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-red);
+}
+
+/* =============================================================================
+ * Tool Calling UI
+ * ============================================================================= */
+.tool-call-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  margin: 4px 2px;
+  cursor: pointer;
+  transition: background var(--duration-fast);
+}
+.tool-call-pill:hover {
+  background: var(--bg-secondary);
+}
+.tool-call-pill.success {
+  border-color: var(--badge-green);
+  color: var(--color-green);
+}
+.tool-call-pill.error {
+  border-color: var(--badge-red);
+  color: var(--color-red);
+}
+.tool-call-pill svg {
+  width: 12px;
+  height: 12px;
+}
+.tool-call-detail {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  margin-top: var(--space-sm);
+  font-size: var(--font-size-sm);
+}
+.tool-call-detail pre {
+  background: var(--bg-tertiary);
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  margin: var(--space-xs) 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.tool-call-detail h4 {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--space-xs);
+}
+.tools-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-light);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+.tools-toggle.active {
+  background: var(--badge-blue);
+  color: var(--color-blue);
+  border-color: var(--color-blue);
+}
+.tools-toggle svg {
+  width: 14px;
+  height: 14px;
 }

@@ -256,7 +256,10 @@ export const VLM = {
 
     m.setValue(imagePtr + 16, image.width ?? 0, 'i32');  // width
     m.setValue(imagePtr + 20, image.height ?? 0, 'i32'); // height
-    m.setValue(imagePtr + 24, image.pixelData?.length ?? 0, 'i32'); // data_size
+
+    // data_size: use pixel data length for RGB, base64 string length for base64
+    const dataSize = image.pixelData?.length ?? image.base64Data?.length ?? 0;
+    m.setValue(imagePtr + 24, dataSize, 'i32'); // data_size
 
     // Build rac_vlm_options_t
     const optSize = 56; // approximate

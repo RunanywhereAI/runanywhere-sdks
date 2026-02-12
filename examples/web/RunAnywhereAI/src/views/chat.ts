@@ -2,15 +2,25 @@
  * Chat Tab - Full chat interface matching iOS ChatInterfaceView
  *
  * Features: model overlay, model selection sheet, message bubbles,
- * streaming, thinking mode, typing indicator, input area, toolbar.
+ * streaming, thinking mode, typing indicator, input area, toolbar,
+ * tool calling toggle with demo tools (matching iOS ToolSettingsView).
  */
 
 import { ModelManager, type ModelInfo } from '../services/model-manager';
 import { showModelSelectionSheet } from '../components/model-selection';
+import type { ToolValue } from '../../../../../sdk/runanywhere-web/packages/core/src/Public/Extensions/RunAnywhere+ToolCalling';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+interface ToolCallInfo {
+  toolName: string;
+  arguments: string;  // JSON string for display
+  result?: string;    // JSON string for display
+  success: boolean;
+  error?: string;
+}
 
 interface ChatMessage {
   id: string;
@@ -19,6 +29,7 @@ interface ChatMessage {
   thinking?: string;
   timestamp: number;
   modelId?: string;
+  toolCalls?: ToolCallInfo[];
 }
 
 // ---------------------------------------------------------------------------
@@ -27,12 +38,15 @@ interface ChatMessage {
 
 let messages: ChatMessage[] = [];
 let isGenerating = false;
+let toolsEnabled = false;
+let toolsRegistered = false;
 let container: HTMLElement;
 let messagesEl: HTMLElement;
 let inputEl: HTMLTextAreaElement;
 let sendBtn: HTMLButtonElement;
 let overlayEl: HTMLElement;
 let toolbarModelEl: HTMLElement;
+let toolsToggleBtn: HTMLElement;
 
 // ---------------------------------------------------------------------------
 // Init
@@ -50,8 +64,9 @@ export function initChatTab(el: HTMLElement): void {
       </div>
       <div class="toolbar-title" id="chat-toolbar-model" style="cursor:pointer;">Select Model</div>
       <div class="toolbar-actions">
-        <button class="btn btn-icon" id="chat-info-btn" title="Info">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <button class="tools-toggle" id="chat-tools-toggle" title="Toggle Tool Calling">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          Tools
         </button>
       </div>
     </div>
@@ -92,6 +107,7 @@ export function initChatTab(el: HTMLElement): void {
   sendBtn = container.querySelector('#chat-send-btn')!;
   overlayEl = container.querySelector('#chat-model-overlay')!;
   toolbarModelEl = container.querySelector('#chat-toolbar-model')!;
+  toolsToggleBtn = container.querySelector('#chat-tools-toggle')!;
 
   // Event listeners
   sendBtn.addEventListener('click', sendMessage);
@@ -105,6 +121,7 @@ export function initChatTab(el: HTMLElement): void {
 
   container.querySelector('#chat-get-started-btn')!.addEventListener('click', openModelSheet);
   toolbarModelEl.addEventListener('click', openModelSheet);
+  toolsToggleBtn.addEventListener('click', toggleTools);
 
   // Subscribe to model changes
   ModelManager.onChange(onModelsChanged);
@@ -143,7 +160,7 @@ function openModelSheet(): void {
 }
 
 function onModelsChanged(_models: ModelInfo[]): void {
-  const loaded = ModelManager.getLoadedModel();
+  const loaded = ModelManager.getLoadedModel('text');
   if (loaded) {
     overlayEl.style.display = 'none';
     toolbarModelEl.textContent = loaded.name;
@@ -151,6 +168,150 @@ function onModelsChanged(_models: ModelInfo[]): void {
     overlayEl.style.display = '';
     toolbarModelEl.textContent = 'Select Model';
   }
+}
+
+// ---------------------------------------------------------------------------
+// Tool Calling Toggle
+// ---------------------------------------------------------------------------
+
+async function toggleTools(): Promise<void> {
+  toolsEnabled = !toolsEnabled;
+  toolsToggleBtn.classList.toggle('active', toolsEnabled);
+
+  if (toolsEnabled && !toolsRegistered) {
+    await registerDemoTools();
+    toolsRegistered = true;
+  }
+
+  console.log(`[Chat] Tools ${toolsEnabled ? 'enabled' : 'disabled'}`);
+}
+
+/**
+ * Register demo tools matching iOS ToolSettingsView:
+ * get_weather, get_current_time, calculate
+ */
+async function registerDemoTools(): Promise<void> {
+  const { ToolCalling, toToolValue } = await import(
+    '../../../../../sdk/runanywhere-web/packages/core/src/index'
+  );
+
+  // 1. get_weather - uses Open-Meteo API (free, no API key)
+  ToolCalling.registerTool(
+    {
+      name: 'get_weather',
+      description: 'Gets the current weather for a given location. Returns temperature, condition, humidity, and wind speed.',
+      parameters: [
+        { name: 'location', type: 'string', description: 'The city name to get weather for (e.g., "San Francisco")', required: true },
+      ],
+      category: 'Utility',
+    },
+    async (args): Promise<Record<string, ToolValue>> => {
+      const location = args.location?.type === 'string' ? args.location.value : 'San Francisco';
+      try {
+        // Geocode the location
+        const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1`);
+        const geoData = await geoRes.json();
+        if (!geoData.results?.length) {
+          return { error: toToolValue(`Location not found: ${location}`) };
+        }
+        const { latitude, longitude, name } = geoData.results[0];
+
+        // Get weather
+        const wxRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code`);
+        const wxData = await wxRes.json();
+        const current = wxData.current;
+
+        const conditionMap: Record<number, string> = {
+          0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
+          45: 'Foggy', 48: 'Icy fog', 51: 'Light drizzle', 53: 'Drizzle', 55: 'Heavy drizzle',
+          61: 'Light rain', 63: 'Rain', 65: 'Heavy rain', 71: 'Light snow', 73: 'Snow', 75: 'Heavy snow',
+          80: 'Rain showers', 81: 'Rain showers', 82: 'Heavy showers', 95: 'Thunderstorm',
+        };
+
+        return {
+          location: toToolValue(name),
+          temperature_celsius: toToolValue(current.temperature_2m),
+          temperature_fahrenheit: toToolValue(current.temperature_2m * 9 / 5 + 32),
+          condition: toToolValue(conditionMap[current.weather_code] ?? 'Unknown'),
+          humidity_percent: toToolValue(current.relative_humidity_2m),
+          wind_speed_kmh: toToolValue(current.wind_speed_10m),
+        };
+      } catch (err) {
+        return { error: toToolValue(err instanceof Error ? err.message : 'Failed to fetch weather') };
+      }
+    },
+  );
+
+  // 2. get_current_time - returns system time
+  ToolCalling.registerTool(
+    {
+      name: 'get_current_time',
+      description: 'Gets the current date and time with timezone information.',
+      parameters: [
+        { name: 'timezone', type: 'string', description: 'IANA timezone (e.g., "America/New_York"). Defaults to local timezone.', required: false },
+      ],
+      category: 'Utility',
+    },
+    async (args) => {
+      const tz = args.timezone?.type === 'string' ? args.timezone.value : undefined;
+      const now = new Date();
+      const options: Intl.DateTimeFormatOptions = {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        ...(tz ? { timeZone: tz } : {}),
+      };
+      return {
+        formatted: toToolValue(now.toLocaleDateString('en-US', options)),
+        iso: toToolValue(now.toISOString()),
+        timezone: toToolValue(tz ?? Intl.DateTimeFormat().resolvedOptions().timeZone),
+        unix_timestamp: toToolValue(Math.floor(now.getTime() / 1000)),
+      };
+    },
+  );
+
+  // 3. calculate - evaluate math expressions
+  ToolCalling.registerTool(
+    {
+      name: 'calculate',
+      description: 'Evaluates a mathematical expression and returns the result. Supports basic arithmetic (+, -, *, /, ^), parentheses, and common functions.',
+      parameters: [
+        { name: 'expression', type: 'string', description: 'The math expression to evaluate (e.g., "2 + 3 * 4", "sqrt(16)", "(10 + 5) / 3")', required: true },
+      ],
+      category: 'Utility',
+    },
+    async (args): Promise<Record<string, ToolValue>> => {
+      const expr = args.expression?.type === 'string' ? args.expression.value : '';
+      try {
+        // Safe evaluation using Function constructor with restricted scope
+        const sanitized = expr
+          .replace(/\^/g, '**')
+          .replace(/sqrt\(/g, 'Math.sqrt(')
+          .replace(/abs\(/g, 'Math.abs(')
+          .replace(/sin\(/g, 'Math.sin(')
+          .replace(/cos\(/g, 'Math.cos(')
+          .replace(/tan\(/g, 'Math.tan(')
+          .replace(/log\(/g, 'Math.log(')
+          .replace(/pi/gi, 'Math.PI')
+          .replace(/\be\b/g, 'Math.E');
+
+        // Only allow safe characters
+        if (!/^[0-9+\-*/().%\s,MathsqrtabsincotaglogPIE]+$/.test(sanitized)) {
+          return { error: toToolValue('Invalid expression: contains unsafe characters') };
+        }
+
+        // eslint-disable-next-line no-new-func
+        const result = new Function(`return (${sanitized})`)();
+        return {
+          expression: toToolValue(expr),
+          result: toToolValue(Number(result)),
+        };
+      } catch (err) {
+        return { error: toToolValue(err instanceof Error ? err.message : 'Evaluation failed') };
+      }
+    },
+  );
+
+  console.log('[Chat] Demo tools registered: get_weather, get_current_time, calculate');
 }
 
 // ---------------------------------------------------------------------------
@@ -173,7 +334,7 @@ async function sendMessage(): Promise<void> {
   const text = inputEl.value.trim();
   if (!text || isGenerating) return;
 
-  const loaded = ModelManager.getLoadedModel();
+  const loaded = ModelManager.getLoadedModel('text');
   if (!loaded) {
     openModelSheet();
     return;
@@ -197,67 +358,17 @@ async function sendMessage(): Promise<void> {
   showTypingIndicator();
 
   try {
-    // Import the SDK TextGeneration extension
-    const { TextGeneration } = await import(
-      '../../../../../sdk/runanywhere-web/packages/core/src/index'
-    );
-
-    if (!TextGeneration.isModelLoaded) {
-      throw new Error('Model not loaded in WASM backend');
+    if (toolsEnabled) {
+      await sendWithToolCalling(text, loaded);
+    } else {
+      await sendStreaming(text, loaded);
     }
-
-    // Use streaming generation for token-by-token display (like the iOS app).
-    // In single-threaded WASM, the ccall blocks while generating all tokens
-    // (callbacks fire synchronously). After it returns, we drain the token queue
-    // with small delays to create a streaming visual effect.
-    const { stream, result: resultPromise } = TextGeneration.generateStream(text, {
-      maxTokens: 512,
-      temperature: 0.7,
-    });
-
-    hideTypingIndicator();
-
-    // Create an empty assistant bubble to stream tokens into
-    const assistantMsg: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      content: '',
-      timestamp: Date.now(),
-      modelId: loaded.id,
-    };
-    messages.push(assistantMsg);
-    const { bubbleEl, rowEl } = renderStreamingBubble(assistantMsg);
-
-    // Animate tokens appearing one by one
-    for await (const token of stream) {
-      assistantMsg.content += token;
-      bubbleEl.innerHTML = renderMarkdown(assistantMsg.content);
-      scrollToBottom();
-      // Yield to the browser between tokens so each one paints
-      await new Promise(r => setTimeout(r, 12));
-    }
-
-    const finalResult = await resultPromise;
-    console.log(
-      `[Chat] Generation complete: ${finalResult.tokensUsed} tokens in ` +
-      `${finalResult.latencyMs.toFixed(0)}ms (${finalResult.tokensPerSecond.toFixed(1)} tok/s)`,
-    );
-
-    // Show metrics below the message
-    appendMetrics(rowEl, {
-      tokens: finalResult.tokensUsed,
-      latencyMs: finalResult.latencyMs,
-      tokensPerSecond: finalResult.tokensPerSecond,
-    });
-    scrollToBottom();
-
   } catch (err) {
     hideTypingIndicator();
 
     const errorMessage = err instanceof Error ? err.message : String(err);
     console.error('[Chat] Generation failed:', errorMessage);
 
-    // Show error as assistant message
     const errorMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'assistant',
@@ -271,6 +382,134 @@ async function sendMessage(): Promise<void> {
 
   isGenerating = false;
   sendBtn.disabled = inputEl.value.trim().length === 0;
+}
+
+/**
+ * Standard streaming generation (no tools).
+ */
+async function sendStreaming(text: string, loaded: ModelInfo): Promise<void> {
+  const { TextGeneration } = await import(
+    '../../../../../sdk/runanywhere-web/packages/core/src/index'
+  );
+
+  if (!TextGeneration.isModelLoaded) {
+    throw new Error('Model not loaded in WASM backend');
+  }
+
+  const { stream, result: resultPromise } = TextGeneration.generateStream(text, {
+    maxTokens: 512,
+    temperature: 0.7,
+  });
+
+  hideTypingIndicator();
+
+  const assistantMsg: ChatMessage = {
+    id: crypto.randomUUID(),
+    role: 'assistant',
+    content: '',
+    timestamp: Date.now(),
+    modelId: loaded.id,
+  };
+  messages.push(assistantMsg);
+  const { bubbleEl, rowEl } = renderStreamingBubble(assistantMsg);
+
+  for await (const token of stream) {
+    assistantMsg.content += token;
+    bubbleEl.innerHTML = renderMarkdown(assistantMsg.content);
+    scrollToBottom();
+    await new Promise(r => setTimeout(r, 12));
+  }
+
+  const finalResult = await resultPromise;
+  console.log(
+    `[Chat] Generation complete: ${finalResult.tokensUsed} tokens in ` +
+    `${finalResult.latencyMs.toFixed(0)}ms (${finalResult.tokensPerSecond.toFixed(1)} tok/s)`,
+  );
+
+  appendMetrics(rowEl, {
+    tokens: finalResult.tokensUsed,
+    latencyMs: finalResult.latencyMs,
+    tokensPerSecond: finalResult.tokensPerSecond,
+  });
+  scrollToBottom();
+}
+
+/**
+ * Generation with tool calling enabled.
+ */
+async function sendWithToolCalling(text: string, loaded: ModelInfo): Promise<void> {
+  const { ToolCalling } = await import(
+    '../../../../../sdk/runanywhere-web/packages/core/src/index'
+  );
+
+  // Show "calling tools" indicator
+  const typingEl = document.getElementById('typing-indicator');
+  if (typingEl) {
+    typingEl.querySelector('.typing-text')!.textContent = 'Thinking with tools...';
+  }
+
+  const result = await ToolCalling.generateWithTools(text, {
+    maxToolCalls: 3,
+    autoExecute: true,
+    temperature: 0.3,
+    maxTokens: 1024,
+  });
+
+  hideTypingIndicator();
+
+  // Build tool call info for display
+  const toolCallInfos: ToolCallInfo[] = result.toolCalls.map((tc, i) => {
+    const tr = result.toolResults[i];
+    const argsPlain: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(tc.arguments)) {
+      argsPlain[k] = toolValueToPlain(v);
+    }
+    const resultPlain: Record<string, unknown> = {};
+    if (tr?.result) {
+      for (const [k, v] of Object.entries(tr.result)) {
+        resultPlain[k] = toolValueToPlain(v);
+      }
+    }
+    return {
+      toolName: tc.toolName,
+      arguments: JSON.stringify(argsPlain, null, 2),
+      result: tr ? JSON.stringify(tr.success ? resultPlain : { error: tr.error }, null, 2) : undefined,
+      success: tr?.success ?? false,
+      error: tr?.error,
+    };
+  });
+
+  const assistantMsg: ChatMessage = {
+    id: crypto.randomUUID(),
+    role: 'assistant',
+    content: result.text,
+    timestamp: Date.now(),
+    modelId: loaded.id,
+    toolCalls: toolCallInfos.length > 0 ? toolCallInfos : undefined,
+  };
+  messages.push(assistantMsg);
+  renderMessage(assistantMsg);
+}
+
+/**
+ * Convert ToolValue to plain JS for display.
+ */
+function toolValueToPlain(tv: { type: string; value?: unknown }): unknown {
+  switch (tv.type) {
+    case 'string': return tv.value;
+    case 'number': return tv.value;
+    case 'boolean': return tv.value;
+    case 'null': return null;
+    case 'array': return (tv.value as unknown[]).map((v) => toolValueToPlain(v as { type: string; value?: unknown }));
+    case 'object': {
+      const obj: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(tv.value as Record<string, unknown>)) {
+        obj[k] = toolValueToPlain(v as { type: string; value?: unknown });
+      }
+      return obj;
+    }
+    default: return tv.value;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -295,17 +534,61 @@ function renderMessage(msg: ChatMessage): void {
     `;
   }
 
+  // Tool call pills (before the response text)
+  if (msg.toolCalls && msg.toolCalls.length > 0) {
+    html += '<div class="tool-calls-container" style="margin-bottom:var(--space-sm);">';
+    for (const tc of msg.toolCalls) {
+      const statusClass = tc.success ? 'success' : 'error';
+      const statusIcon = tc.success
+        ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>'
+        : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+      const pillId = `tool-pill-${msg.id}-${tc.toolName}`;
+      const detailId = `tool-detail-${msg.id}-${tc.toolName}`;
+      html += `
+        <span class="tool-call-pill ${statusClass}" id="${pillId}">
+          ${statusIcon}
+          ${escapeHtml(tc.toolName)}
+        </span>
+      `;
+      html += `
+        <div class="tool-call-detail" id="${detailId}" style="display:none;">
+          <h4>${escapeHtml(tc.toolName)}</h4>
+          <div style="color:var(--text-secondary);font-size:var(--font-size-xs);margin-bottom:4px;">Arguments:</div>
+          <pre>${escapeHtml(tc.arguments)}</pre>
+          ${tc.result ? `<div style="color:var(--text-secondary);font-size:var(--font-size-xs);margin-bottom:4px;">Result:</div><pre>${escapeHtml(tc.result)}</pre>` : ''}
+          ${tc.error ? `<div style="color:var(--color-red);font-size:var(--font-size-xs);">Error: ${escapeHtml(tc.error)}</div>` : ''}
+        </div>
+      `;
+    }
+    html += '</div>';
+  }
+
   html += `<div class="message-bubble ${msg.role}">${renderMarkdown(msg.content)}</div>`;
 
   row.innerHTML = html;
   messagesEl.appendChild(row);
+
+  // Attach click handlers for tool call pills to toggle detail views
+  if (msg.toolCalls) {
+    for (const tc of msg.toolCalls) {
+      const pillId = `tool-pill-${msg.id}-${tc.toolName}`;
+      const detailId = `tool-detail-${msg.id}-${tc.toolName}`;
+      const pill = row.querySelector(`#${pillId}`);
+      const detail = row.querySelector(`#${detailId}`);
+      if (pill && detail) {
+        pill.addEventListener('click', () => {
+          const isVisible = (detail as HTMLElement).style.display !== 'none';
+          (detail as HTMLElement).style.display = isVisible ? 'none' : 'block';
+        });
+      }
+    }
+  }
+
   scrollToBottom();
 }
 
 /**
  * Create a streaming assistant bubble (starts empty, tokens appended later).
- * Returns references to the bubble and the row so we can update content and
- * append metrics after generation completes.
  */
 function renderStreamingBubble(msg: ChatMessage): { bubbleEl: HTMLElement; rowEl: HTMLElement } {
   const row = document.createElement('div');
@@ -357,15 +640,12 @@ function appendMetrics(rowEl: HTMLElement, metrics: {
 
 /**
  * Format a model ID into a shorter, display-friendly name.
- * e.g. "lfm2-350m-q4_k_m" -> "LFM2 350M"
  */
 function formatModelName(modelId: string): string {
-  // Try to use the loaded model's display name first
-  const loaded = ModelManager.getLoadedModel();
+  const loaded = ModelManager.getLoadedModel('text');
   if (loaded && loaded.id === modelId) return loaded.name;
-  // Fallback: capitalize and shorten
   return modelId
-    .replace(/-q\d.*$/i, '')  // strip quantization suffix
+    .replace(/-q\d.*$/i, '')
     .replace(/-/g, ' ')
     .replace(/\b\w/g, c => c.toUpperCase());
 }
@@ -406,7 +686,6 @@ function escapeHtml(str: string): string {
 }
 
 function renderMarkdown(text: string): string {
-  // Simple markdown: bold, italic, code, newlines
   return escapeHtml(text)
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')

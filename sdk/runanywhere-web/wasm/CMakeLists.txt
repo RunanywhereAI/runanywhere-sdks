@@ -290,6 +290,24 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_llm_component_get_metrics"
     "_rac_llm_component_destroy"
 
+    # Tool Calling
+    "_rac_tool_call_parse"
+    "_rac_tool_call_parse_with_format"
+    "_rac_tool_call_free"
+    "_rac_tool_call_format_name"
+    "_rac_tool_call_detect_format"
+    "_rac_tool_call_format_from_name"
+    "_rac_tool_call_format_prompt"
+    "_rac_tool_call_format_prompt_with_format"
+    "_rac_tool_call_format_prompt_json"
+    "_rac_tool_call_format_prompt_json_with_format"
+    "_rac_tool_call_format_prompt_json_with_format_name"
+    "_rac_tool_call_build_initial_prompt"
+    "_rac_tool_call_build_followup_prompt"
+    "_rac_tool_call_normalize_json"
+    "_rac_tool_call_definitions_to_json"
+    "_rac_tool_call_result_to_json"
+
     # STT service
     "_rac_stt_create"
     "_rac_stt_initialize"
@@ -674,7 +692,7 @@ set(EMSCRIPTEN_LINK_FLAGS
     # Memory
     "-sALLOW_MEMORY_GROWTH=1"
     "-sINITIAL_MEMORY=33554432"    # 32 MB initial
-    "-sMAXIMUM_MEMORY=2147483648"  # 2 GB max
+    "-sMAXIMUM_MEMORY=4294967296"  # 4 GB max (needed for large VLM models + mmproj)
     "-sSTACK_SIZE=1048576"         # 1 MB stack
 
     # Function exports

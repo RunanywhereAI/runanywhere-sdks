@@ -38,8 +38,13 @@ export { VAD } from './Public/Extensions/RunAnywhere+VAD';
 export type { SpeechActivity, SpeechActivityCallback, VADModelConfig, SpeechSegment } from './Public/Extensions/RunAnywhere+VAD';
 export { VoiceAgent, VoiceAgentSession } from './Public/Extensions/RunAnywhere+VoiceAgent';
 export type { PipelineState, VoiceAgentModels, VoiceTurnResult, VoiceAgentEventData, VoiceAgentEventCallback } from './Public/Extensions/RunAnywhere+VoiceAgent';
-export { VLM } from './Public/Extensions/RunAnywhere+VLM';
-export type { VLMImage, VLMImageFormat, VLMModelFamily, VLMGenerationOptions, VLMGenerationResult, VLMStreamingResult } from './Public/Extensions/RunAnywhere+VLM';
+export { VLM, VLMImageFormat, VLMModelFamily } from './Public/Extensions/RunAnywhere+VLM';
+export type { VLMImage, VLMGenerationOptions, VLMGenerationResult, VLMStreamingResult } from './Public/Extensions/RunAnywhere+VLM';
+export { ToolCalling, toToolValue, fromToolValue, getStringArg, getNumberArg } from './Public/Extensions/RunAnywhere+ToolCalling';
+export type {
+  ToolValue, ToolParameterType, ToolParameter, ToolDefinition,
+  ToolCall, ToolResult, ToolCallFormat, ToolCallingOptions, ToolCallingResult, ToolExecutor,
+} from './Public/Extensions/RunAnywhere+ToolCalling';
 export { StructuredOutput } from './Public/Extensions/RunAnywhere+StructuredOutput';
 export type { StructuredOutputConfig, StructuredOutputValidation } from './Public/Extensions/RunAnywhere+StructuredOutput';
 export { Diffusion } from './Public/Extensions/RunAnywhere+Diffusion';
