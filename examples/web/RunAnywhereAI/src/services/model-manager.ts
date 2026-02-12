@@ -233,7 +233,11 @@ const REGISTERED_MODELS: Omit<ModelInfo, 'status'>[] = [
 class ModelManagerImpl {
   private models: ModelInfo[] = [];
   private listeners: ModelChangeCallback[] = [];
-  private loadedModelId: string | null = null;
+  /**
+   * Tracks loaded models per modality — allows STT + LLM + TTS simultaneously
+   * for the voice pipeline. Key = ModelModality, Value = model id.
+   */
+  private loadedByModality: Map<ModelModality, string> = new Map();
 
   constructor() {
     this.models = REGISTERED_MODELS.map((m) => ({ ...m, status: 'registered' as ModelStatus }));
@@ -293,12 +297,25 @@ class ModelManagerImpl {
     return this.models.filter((m) => m.modality === 'voiceActivity');
   }
 
-  getLoadedModel(): ModelInfo | null {
+  getLoadedModel(modality?: ModelModality): ModelInfo | null {
+    if (modality) {
+      const id = this.loadedByModality.get(modality);
+      return id ? this.findModel(id) ?? null : null;
+    }
     return this.models.find((m) => m.status === 'loaded') ?? null;
   }
 
-  getLoadedModelId(): string | null {
-    return this.loadedModelId;
+  getLoadedModelId(modality?: ModelModality): string | null {
+    if (modality) {
+      return this.loadedByModality.get(modality) ?? null;
+    }
+    // Legacy: return first loaded model id
+    return this.models.find((m) => m.status === 'loaded')?.id ?? null;
+  }
+
+  /** Check if models for all given modalities are loaded */
+  areAllLoaded(modalities: ModelModality[]): boolean {
+    return modalities.every((m) => this.loadedByModality.has(m));
   }
 
   // --- Model lifecycle ---
@@ -362,9 +379,11 @@ class ModelManagerImpl {
     const model = this.findModel(modelId);
     if (!model || (model.status !== 'downloaded' && model.status !== 'registered')) return false;
 
-    // Unload current model of the same modality
-    if (this.loadedModelId) {
-      await this.unloadCurrentModel();
+    // Unload current model of the SAME modality only (allows STT + LLM + TTS simultaneously)
+    const modality = model.modality ?? 'text';
+    const currentlyLoadedId = this.loadedByModality.get(modality);
+    if (currentlyLoadedId) {
+      await this.unloadModelByModality(modality);
     }
 
     this.updateModel(modelId, { status: 'loading' });
@@ -386,7 +405,7 @@ class ModelManagerImpl {
         await this.loadLLMModel(model, modelId, data);
       }
 
-      this.loadedModelId = modelId;
+      this.loadedByModality.set(modality, modelId);
       this.updateModel(modelId, { status: 'loaded' });
       return true;
     } catch (err) {
@@ -671,18 +690,18 @@ class ModelManagerImpl {
     console.log(`[ModelManager] TTS model loaded via sherpa-onnx: ${model.id}`);
   }
 
-  private async unloadCurrentModel(): Promise<void> {
-    if (!this.loadedModelId) return;
-
-    const currentModel = this.findModel(this.loadedModelId);
+  /** Unload the currently loaded model for a specific modality */
+  private async unloadModelByModality(modality: ModelModality): Promise<void> {
+    const modelId = this.loadedByModality.get(modality);
+    if (!modelId) return;
 
     try {
-      if (currentModel?.modality === 'speechRecognition') {
+      if (modality === 'speechRecognition') {
         const { STT } = await import(
           '../../../../../sdk/runanywhere-web/packages/core/src/index'
         );
         await STT.unloadModel();
-      } else if (currentModel?.modality === 'speechSynthesis') {
+      } else if (modality === 'speechSynthesis') {
         const { TTS } = await import(
           '../../../../../sdk/runanywhere-web/packages/core/src/index'
         );
@@ -697,13 +716,17 @@ class ModelManagerImpl {
       // Ignore unload errors
     }
 
-    this.updateModel(this.loadedModelId, { status: 'downloaded' });
-    this.loadedModelId = null;
+    this.updateModel(modelId, { status: 'downloaded' });
+    this.loadedByModality.delete(modality);
   }
 
   async deleteModel(modelId: string): Promise<void> {
-    if (this.loadedModelId === modelId) {
-      this.loadedModelId = null;
+    // Remove from loaded tracking if this model is loaded
+    for (const [modality, id] of this.loadedByModality) {
+      if (id === modelId) {
+        this.loadedByModality.delete(modality);
+        break;
+      }
     }
 
     // Delete primary file

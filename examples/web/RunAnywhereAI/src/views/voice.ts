@@ -4,7 +4,25 @@
  */
 
 import { showModelSelectionSheet } from '../components/model-selection';
+import { ModelManager, type ModelModality } from '../services/model-manager';
 import { MicCapture } from '../services/audio';
+
+// ---------------------------------------------------------------------------
+// Pipeline step definitions
+// ---------------------------------------------------------------------------
+
+interface PipelineStep {
+  modality: ModelModality;
+  elementId: string;
+  title: string;
+  defaultStatus: string;
+}
+
+const PIPELINE_STEPS: PipelineStep[] = [
+  { modality: 'speechRecognition', elementId: 'voice-setup-stt', title: 'Speech-to-Text', defaultStatus: 'Select STT model' },
+  { modality: 'text', elementId: 'voice-setup-llm', title: 'Language Model', defaultStatus: 'Select LLM model' },
+  { modality: 'speechSynthesis', elementId: 'voice-setup-tts', title: 'Text-to-Speech', defaultStatus: 'Select TTS model' },
+];
 
 // ---------------------------------------------------------------------------
 // State
@@ -80,6 +98,14 @@ export function initVoiceTab(el: HTMLElement): void {
 
     <!-- Voice Interface -->
     <div id="voice-interface" style="display:none;flex:1;flex-direction:column;">
+      <div class="toolbar">
+        <div class="toolbar-title">Voice Assistant</div>
+        <div class="toolbar-actions">
+          <button class="btn btn-icon" id="voice-back-btn" style="border:none;background:none;cursor:pointer;color:var(--text-secondary);">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
       <div class="voice-canvas-container">
         <canvas class="voice-canvas" id="voice-particle-canvas"></canvas>
         <button class="mic-btn" id="voice-mic-btn">
@@ -100,7 +126,7 @@ export function initVoiceTab(el: HTMLElement): void {
 
   canvas = container.querySelector('#voice-particle-canvas')!;
 
-  // Setup card clicks
+  // Setup card clicks — open model selection for each modality
   container.querySelector('#voice-setup-stt')!.addEventListener('click', () => {
     showModelSelectionSheet('speechRecognition');
   });
@@ -111,8 +137,91 @@ export function initVoiceTab(el: HTMLElement): void {
     showModelSelectionSheet('speechSynthesis');
   });
 
+  // Start Voice Assistant button
+  container.querySelector('#voice-start-btn')!.addEventListener('click', () => {
+    transitionToVoiceInterface();
+  });
+
+  // Back button from voice interface → setup
+  container.querySelector('#voice-back-btn')!.addEventListener('click', () => {
+    transitionToSetup();
+  });
+
   // Mic button
   container.querySelector('#voice-mic-btn')!.addEventListener('click', toggleMic);
+
+  // Subscribe to model changes so we can update pipeline state
+  ModelManager.onChange(() => refreshPipelineUI());
+
+  // Initial pipeline UI check (in case models are already loaded)
+  refreshPipelineUI();
+}
+
+// ---------------------------------------------------------------------------
+// Pipeline State & UI
+// ---------------------------------------------------------------------------
+
+/** Refresh setup card states and start button based on loaded models */
+function refreshPipelineUI(): void {
+  const startBtn = container.querySelector('#voice-start-btn') as HTMLButtonElement | null;
+  if (!startBtn) return;
+
+  let allReady = true;
+
+  for (const step of PIPELINE_STEPS) {
+    const card = container.querySelector(`#${step.elementId}`);
+    if (!card) continue;
+
+    const statusEl = card.querySelector('.setup-card-status');
+    const stepNumber = card.querySelector('.setup-step-number');
+    const loadedModel = ModelManager.getLoadedModel(step.modality);
+
+    if (loadedModel) {
+      // Model is loaded — show checkmark and model name
+      if (statusEl) {
+        statusEl.textContent = loadedModel.name;
+        statusEl.style.color = 'var(--color-green)';
+      }
+      if (stepNumber) {
+        stepNumber.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>`;
+      }
+      card.classList.add('loaded');
+    } else {
+      // Not loaded — show default state
+      if (statusEl) {
+        statusEl.textContent = step.defaultStatus;
+        statusEl.style.color = '';
+      }
+      const stepIdx = PIPELINE_STEPS.indexOf(step);
+      if (stepNumber) {
+        stepNumber.textContent = String(stepIdx + 1);
+      }
+      card.classList.remove('loaded');
+      allReady = false;
+    }
+  }
+
+  startBtn.disabled = !allReady;
+}
+
+/** Switch from pipeline setup → voice interface */
+function transitionToVoiceInterface(): void {
+  state = 'idle';
+  const setup = container.querySelector('#voice-setup') as HTMLElement;
+  const iface = container.querySelector('#voice-interface') as HTMLElement;
+  if (setup) setup.style.display = 'none';
+  if (iface) iface.style.display = 'flex';
+}
+
+/** Switch from voice interface → pipeline setup */
+function transitionToSetup(): void {
+  state = 'setup';
+  stopParticles();
+  if (MicCapture.isCapturing) MicCapture.stop();
+  const setup = container.querySelector('#voice-setup') as HTMLElement;
+  const iface = container.querySelector('#voice-interface') as HTMLElement;
+  if (setup) setup.style.display = 'flex';
+  if (iface) iface.style.display = 'none';
 }
 
 // ---------------------------------------------------------------------------
