@@ -363,6 +363,10 @@ class ONNXVAD {
     VADConfig config_;
     bool model_loaded_ = false;
     mutable std::mutex mutex_;
+
+    // Internal buffer to accumulate audio until we have a full Silero window (512 samples).
+    // Audio capture may deliver chunks smaller than the required window size.
+    std::vector<float> pending_samples_;
 };
 
 }  // namespace runanywhere
