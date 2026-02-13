@@ -1,14 +1,16 @@
 /**
  * RunAnywhere AI - Web Demo App Shell
  *
- * 5-tab navigation matching iOS ContentView:
- * Tab 0: Chat, Tab 1: Vision, Tab 2: Voice, Tab 3: More, Tab 4: Settings
+ * 7-tab navigation:
+ * Chat | Vision | Voice | Transcribe | Speak | Storage | Settings
  */
 
 import { initChatTab } from './views/chat';
 import { initVisionTab } from './views/vision';
 import { initVoiceTab } from './views/voice';
-import { initMoreTab } from './views/more';
+import { initTranscribeTab } from './views/transcribe';
+import { initSpeakTab } from './views/speak';
+import { initStorageTab } from './views/storage';
 import { initSettingsTab } from './views/settings';
 
 // ---------------------------------------------------------------------------
@@ -52,9 +54,19 @@ const TABS: TabDef[] = [
     icon: '<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>',
   },
   {
-    id: 'more',
-    label: 'More',
-    icon: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+    id: 'transcribe',
+    label: 'Transcribe',
+    icon: '<path d="M2 13a2 2 0 0 0 2-2V7a2 2 0 0 1 4 0v13a2 2 0 0 0 4 0V4a2 2 0 0 1 4 0v13a2 2 0 0 0 4 0V7a2 2 0 0 1 2-2"/>',
+  },
+  {
+    id: 'speak',
+    label: 'Speak',
+    icon: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>',
+  },
+  {
+    id: 'storage',
+    label: 'Storage',
+    icon: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
   },
   {
     id: 'settings',
@@ -111,7 +123,9 @@ export function buildAppShell(): void {
   tabLifecycles[0] = initChatTab(document.getElementById('tab-chat')!);
   tabLifecycles[1] = initVisionTab(document.getElementById('tab-vision')!);
   tabLifecycles[2] = initVoiceTab(document.getElementById('tab-voice')!);
-  initMoreTab(document.getElementById('tab-more')!);
+  tabLifecycles[3] = initTranscribeTab(document.getElementById('tab-transcribe')!);
+  tabLifecycles[4] = initSpeakTab(document.getElementById('tab-speak')!);
+  tabLifecycles[5] = initStorageTab(document.getElementById('tab-storage')!);
   initSettingsTab(document.getElementById('tab-settings')!);
 
   // Activate default tab

@@ -67,7 +67,11 @@ export function initVisionTab(el: HTMLElement): TabLifecycle {
     <!-- Toolbar -->
     <div class="toolbar">
       <div class="toolbar-actions"></div>
-      <div class="toolbar-title cursor-pointer" id="vision-toolbar-model">Select Model</div>
+      <div class="toolbar-model-btn" id="vision-toolbar-model" title="Tap to change model">
+        <svg class="model-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        <span id="vision-toolbar-model-text">Select Vision Model</span>
+        <svg class="chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
       <div class="toolbar-actions"></div>
     </div>
 
@@ -218,8 +222,9 @@ function openModelSheet(): void {
 
 function onModelsChanged(_models: ModelInfo[]): void {
   const loaded = ModelManager.getLoadedModel(ModelCategory.Multimodal);
+  const textSpan = toolbarModelEl.querySelector('#vision-toolbar-model-text');
   if (loaded) {
-    toolbarModelEl.textContent = loaded.name;
+    if (textSpan) textSpan.textContent = loaded.name;
     // Model is loaded — show the main camera UI (camera may or may not be active)
     overlayEl.classList.add('hidden');
     (container.querySelector('#vision-main') as HTMLElement).classList.remove('hidden');
@@ -229,7 +234,7 @@ function onModelsChanged(_models: ModelInfo[]): void {
     }
   } else {
     overlayEl.classList.remove('hidden');
-    toolbarModelEl.textContent = 'Select Model';
+    if (textSpan) textSpan.textContent = 'Select Vision Model';
     (container.querySelector('#vision-main') as HTMLElement).classList.add('hidden');
     stopLiveMode();
     stopCamera();
