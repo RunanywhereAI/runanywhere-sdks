@@ -101,7 +101,7 @@ export const StructuredOutput = {
     const promptPtr = bridge.allocString(originalPrompt);
 
     // Build rac_structured_output_config_t: { json_schema, include_schema_in_prompt }
-    const configSize = 8;
+    const configSize = m._rac_wasm_sizeof_structured_output_config();
     const configPtr = m._malloc(configSize);
     const schemaPtr = bridge.allocString(config.jsonSchema);
     m.setValue(configPtr, schemaPtr, '*');
@@ -182,7 +182,7 @@ export const StructuredOutput = {
 
     const textPtr = bridge.allocString(text);
 
-    const configSize = 8;
+    const configSize = m._rac_wasm_sizeof_structured_output_config();
     const configPtr = m._malloc(configSize);
     const schemaPtr = bridge.allocString(config.jsonSchema);
     m.setValue(configPtr, schemaPtr, '*');

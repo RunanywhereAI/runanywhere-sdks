@@ -6,6 +6,7 @@
 
 // Enums
 export {
+  AccelerationPreference,
   ComponentState,
   ConfigurationSource,
   DownloadStage,
@@ -27,7 +28,6 @@ export type {
   DeviceInfoData,
   GenerationOptions,
   GenerationResult,
-  LLMGenerationOptions,
   ModelInfoMetadata,
   PerformanceMetrics,
   SDKInitOptions,
@@ -45,8 +45,8 @@ export type {
 
 // LLM Types
 export type {
-  LLMGenerationOptions as LLMGenOptions,
-  LLMGenerationResult as LLMGenResult,
+  LLMGenerationOptions,
+  LLMGenerationResult,
   LLMStreamCompleteCallback,
   LLMStreamErrorCallback,
   LLMStreamingMetrics,

@@ -11,7 +11,7 @@
 
 import { ModelManager, ModelCategory, type ModelInfo } from '../services/model-manager';
 import { showModelSelectionSheet } from '../components/model-selection';
-import { VLMWorkerBridge } from '../services/vlm-worker-bridge';
+import { VLMWorkerBridge } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
 
 // ---------------------------------------------------------------------------
 // Constants (matching iOS VLMViewModel defaults)

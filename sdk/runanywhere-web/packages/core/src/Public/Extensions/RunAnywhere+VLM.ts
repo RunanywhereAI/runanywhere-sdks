@@ -19,7 +19,9 @@ import { WASMBridge } from '../../Foundation/WASMBridge';
 import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { EventBus } from '../../Foundation/EventBus';
-import { SDKEventType } from '../../types/enums';
+import { SDKEventType, HardwareAcceleration } from '../../types/enums';
+import { VLMImageFormat, VLMModelFamily } from './VLMTypes';
+import type { VLMImage, VLMGenerationOptions, VLMGenerationResult, VLMStreamingResult } from './VLMTypes';
 
 const logger = new SDKLogger('VLM');
 
@@ -82,64 +84,8 @@ function ensureVLMComponent(): number {
   return _vlmComponentHandle;
 }
 
-// ---------------------------------------------------------------------------
-// VLM Types
-// ---------------------------------------------------------------------------
-
-export enum VLMImageFormat {
-  FilePath = 0,
-  RGBPixels = 1,
-  Base64 = 2,
-}
-
-export enum VLMModelFamily {
-  Auto = 0,
-  Qwen2VL = 1,
-  SmolVLM = 2,
-  LLaVA = 3,
-  Custom = 99,
-}
-
-export interface VLMImage {
-  format: VLMImageFormat;
-  /** File path in WASM virtual FS (for FilePath format) */
-  filePath?: string;
-  /** Raw RGB pixel data (for RGBPixels format) */
-  pixelData?: Uint8Array;
-  /** Base64-encoded image (for Base64 format) */
-  base64Data?: string;
-  width?: number;
-  height?: number;
-}
-
-export interface VLMGenerationOptions {
-  maxTokens?: number;
-  temperature?: number;
-  topP?: number;
-  systemPrompt?: string;
-  modelFamily?: VLMModelFamily;
-  streaming?: boolean;
-}
-
-export interface VLMGenerationResult {
-  text: string;
-  promptTokens: number;
-  imageTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-  timeToFirstTokenMs: number;
-  imageEncodeTimeMs: number;
-  totalTimeMs: number;
-  tokensPerSecond: number;
-  /** Hardware acceleration used for this generation ('webgpu' | 'cpu'). */
-  hardwareUsed: string;
-}
-
-export interface VLMStreamingResult {
-  result: Promise<VLMGenerationResult>;
-  tokens: AsyncIterable<string>;
-  cancel: () => void;
-}
+export type { VLMImage, VLMGenerationOptions, VLMGenerationResult, VLMStreamingResult } from './VLMTypes';
+export { VLMImageFormat, VLMModelFamily } from './VLMTypes';
 
 // ---------------------------------------------------------------------------
 // VLM Extension
@@ -234,7 +180,7 @@ export const VLM = {
     logger.debug(`VLM process: "${prompt.substring(0, 50)}..."`);
 
     // Build rac_vlm_image_t struct
-    const imageSize = 32; // approximate
+    const imageSize = m._rac_wasm_sizeof_vlm_image();
     const imagePtr = m._malloc(imageSize);
     for (let i = 0; i < imageSize; i++) m.setValue(imagePtr + i, 0, 'i8');
 
@@ -264,7 +210,7 @@ export const VLM = {
     m.setValue(imagePtr + 24, dataSize, 'i32'); // data_size
 
     // Build rac_vlm_options_t
-    const optSize = 56; // approximate
+    const optSize = m._rac_wasm_sizeof_vlm_options();
     const optPtr = m._malloc(optSize);
     for (let i = 0; i < optSize; i++) m.setValue(optPtr + i, 0, 'i8');
 
@@ -284,7 +230,7 @@ export const VLM = {
     const promptPtr = bridge.allocString(prompt);
 
     // Result struct
-    const resSize = 40;
+    const resSize = m._rac_wasm_sizeof_vlm_result();
     const resPtr = m._malloc(resSize);
 
     try {
@@ -307,7 +253,7 @@ export const VLM = {
         imageEncodeTimeMs: m.getValue(resPtr + 24, 'i32'),
         totalTimeMs: m.getValue(resPtr + 28, 'i32'),
         tokensPerSecond: m.getValue(resPtr + 32, 'float'),
-        hardwareUsed: bridge.accelerationMode,
+        hardwareUsed: bridge.accelerationMode as HardwareAcceleration,
       };
 
       m.ccall('rac_vlm_result_free', null, ['number'], [resPtr]);

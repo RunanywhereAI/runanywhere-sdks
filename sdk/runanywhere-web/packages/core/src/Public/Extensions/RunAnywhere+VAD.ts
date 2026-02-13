@@ -24,6 +24,11 @@ import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { EventBus } from '../../Foundation/EventBus';
 import { SDKEventType } from '../../types/enums';
+import { SpeechActivity } from './VADTypes';
+import type { SpeechActivityCallback, VADModelConfig, SpeechSegment } from './VADTypes';
+
+export { SpeechActivity } from './VADTypes';
+export type { SpeechActivityCallback, VADModelConfig, SpeechSegment } from './VADTypes';
 
 const logger = new SDKLogger('VAD');
 
@@ -35,38 +40,6 @@ let _vadHandle = 0;
 let _sampleRate = 16000;
 let _jsActivityCallback: SpeechActivityCallback | null = null;
 let _lastSpeechState = false;
-
-// ---------------------------------------------------------------------------
-// VAD Types
-// ---------------------------------------------------------------------------
-
-export type SpeechActivity = 'started' | 'ended' | 'ongoing';
-
-export type SpeechActivityCallback = (activity: SpeechActivity) => void;
-
-export interface VADModelConfig {
-  /** Path to Silero VAD ONNX model in sherpa-onnx virtual FS */
-  modelPath: string;
-  /** Detection threshold (default: 0.5, range 0-1) */
-  threshold?: number;
-  /** Minimum silence duration in seconds to split segments (default: 0.5) */
-  minSilenceDuration?: number;
-  /** Minimum speech duration in seconds (default: 0.25) */
-  minSpeechDuration?: number;
-  /** Maximum speech duration in seconds (default: 5.0 for streaming) */
-  maxSpeechDuration?: number;
-  /** Sample rate (default: 16000) */
-  sampleRate?: number;
-  /** Window size in samples (default: 512 for Silero) */
-  windowSize?: number;
-}
-
-export interface SpeechSegment {
-  /** Start time in seconds */
-  startTime: number;
-  /** Audio samples of the speech segment */
-  samples: Float32Array;
-}
 
 // ---------------------------------------------------------------------------
 // VAD Extension
@@ -178,13 +151,13 @@ export const VAD = {
 
       // Emit speech activity callbacks
       if (detected && !_lastSpeechState) {
-        _jsActivityCallback?.('started');
-        EventBus.shared.emit('vad.speechStarted', SDKEventType.Voice, { activity: 'started' });
+        _jsActivityCallback?.(SpeechActivity.Started);
+        EventBus.shared.emit('vad.speechStarted', SDKEventType.Voice, { activity: SpeechActivity.Started });
       } else if (!detected && _lastSpeechState) {
-        _jsActivityCallback?.('ended');
-        EventBus.shared.emit('vad.speechEnded', SDKEventType.Voice, { activity: 'ended' });
+        _jsActivityCallback?.(SpeechActivity.Ended);
+        EventBus.shared.emit('vad.speechEnded', SDKEventType.Voice, { activity: SpeechActivity.Ended });
       } else if (detected) {
-        _jsActivityCallback?.('ongoing');
+        _jsActivityCallback?.(SpeechActivity.Ongoing);
       }
 
       _lastSpeechState = detected;

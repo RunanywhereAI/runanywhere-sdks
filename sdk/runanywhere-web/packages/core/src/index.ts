@@ -25,17 +25,17 @@ export { RunAnywhere } from './Public/RunAnywhere';
 
 // Extensions
 export { TextGeneration } from './Public/Extensions/RunAnywhere+TextGeneration';
-export { STT } from './Public/Extensions/RunAnywhere+STT';
+export { STT, STTModelType } from './Public/Extensions/RunAnywhere+STT';
 export type {
-  STTModelConfig, STTModelType, STTWhisperFiles, STTZipformerFiles, STTParaformerFiles,
+  STTModelConfig, STTWhisperFiles, STTZipformerFiles, STTParaformerFiles,
   STTTranscriptionResult, STTWord, STTTranscribeOptions, STTStreamCallback, STTStreamingSession,
 } from './Public/Extensions/RunAnywhere+STT';
 export { TTS } from './Public/Extensions/RunAnywhere+TTS';
 export type { TTSVoiceConfig, TTSSynthesisResult, TTSSynthesizeOptions } from './Public/Extensions/RunAnywhere+TTS';
-export { VAD } from './Public/Extensions/RunAnywhere+VAD';
-export type { SpeechActivity, SpeechActivityCallback, VADModelConfig, SpeechSegment } from './Public/Extensions/RunAnywhere+VAD';
-export { VoiceAgent, VoiceAgentSession } from './Public/Extensions/RunAnywhere+VoiceAgent';
-export type { PipelineState, VoiceAgentModels, VoiceTurnResult, VoiceAgentEventData, VoiceAgentEventCallback } from './Public/Extensions/RunAnywhere+VoiceAgent';
+export { VAD, SpeechActivity } from './Public/Extensions/RunAnywhere+VAD';
+export type { SpeechActivityCallback, VADModelConfig, SpeechSegment } from './Public/Extensions/RunAnywhere+VAD';
+export { VoiceAgent, VoiceAgentSession, PipelineState } from './Public/Extensions/RunAnywhere+VoiceAgent';
+export type { VoiceAgentModels, VoiceTurnResult, VoiceAgentEventData, VoiceAgentEventCallback } from './Public/Extensions/RunAnywhere+VoiceAgent';
 export { VLM, VLMImageFormat, VLMModelFamily } from './Public/Extensions/RunAnywhere+VLM';
 export type { VLMImage, VLMGenerationOptions, VLMGenerationResult, VLMStreamingResult } from './Public/Extensions/RunAnywhere+VLM';
 export { ToolCalling, toToolValue, fromToolValue, getStringArg, getNumberArg } from './Public/Extensions/RunAnywhere+ToolCalling';
@@ -60,20 +60,24 @@ export { SDKError, SDKErrorCode } from './Foundation/ErrorTypes';
 export { SDKLogger, LogLevel } from './Foundation/SDKLogger';
 export { EventBus } from './Foundation/EventBus';
 export type { EventListener, Unsubscribe, SDKEventEnvelope } from './Foundation/EventBus';
-export { WASMBridge } from './Foundation/WASMBridge';
-export type { RACommonsModule, AccelerationMode } from './Foundation/WASMBridge';
-export { SherpaONNXBridge } from './Foundation/SherpaONNXBridge';
-export type { SherpaONNXModule } from './Foundation/SherpaONNXBridge';
 
 // Infrastructure
 export { detectCapabilities, getDeviceInfo } from './Infrastructure/DeviceCapabilities';
 export type { WebCapabilities } from './Infrastructure/DeviceCapabilities';
 export { AudioCapture } from './Infrastructure/AudioCapture';
-export type { AudioChunkCallback, AudioCaptureConfig } from './Infrastructure/AudioCapture';
+export type { AudioChunkCallback, AudioLevelCallback, AudioCaptureConfig } from './Infrastructure/AudioCapture';
 export { AudioPlayback } from './Infrastructure/AudioPlayback';
 export type { PlaybackCompleteCallback, PlaybackConfig } from './Infrastructure/AudioPlayback';
+/** @advanced — Most consumers should use `RunAnywhere.downloadModel / loadModel / registerModels` instead. */
 export { ModelManager } from './Infrastructure/ModelManager';
 export type {
   ManagedModel, CompactModelDef, DownloadProgress,
   ModelFileDescriptor, VLMLoader, VLMLoadParams,
 } from './Infrastructure/ModelManager';
+export { OPFSStorage } from './Infrastructure/OPFSStorage';
+export type { StoredModelInfo } from './Infrastructure/OPFSStorage';
+export { VLMWorkerBridge } from './Infrastructure/VLMWorkerBridge';
+export type {
+  VLMWorkerResult, VLMLoadModelParams, VLMProcessOptions,
+  VLMWorkerCommand, VLMWorkerResponse, ProgressListener,
+} from './Infrastructure/VLMWorkerBridge';

@@ -22,7 +22,7 @@ import { WASMBridge } from '../../Foundation/WASMBridge';
 import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { EventBus } from '../../Foundation/EventBus';
-import { SDKEventType } from '../../types/enums';
+import { SDKEventType, LLMFramework, HardwareAcceleration } from '../../types/enums';
 import type { LLMGenerationOptions, LLMGenerationResult, LLMStreamingResult } from '../../types/LLMTypes';
 
 const logger = new SDKLogger('TextGeneration');
@@ -229,8 +229,8 @@ export const TextGeneration = {
         tokensUsed: outputTokens,
         modelUsed: bridge.readString(m._rac_llm_component_get_model_id(handle)),
         latencyMs,
-        framework: 'LlamaCpp',
-        hardwareUsed: bridge.accelerationMode,
+        framework: LLMFramework.LlamaCpp,
+        hardwareUsed: bridge.accelerationMode as HardwareAcceleration,
         tokensPerSecond,
         thinkingTokens: 0,
         responseTokens: outputTokens,
@@ -331,8 +331,8 @@ export const TextGeneration = {
         tokensUsed: tokenCount,
         modelUsed: '',
         latencyMs,
-        framework: 'LlamaCpp',
-        hardwareUsed: bridge.accelerationMode,
+        framework: LLMFramework.LlamaCpp,
+        hardwareUsed: bridge.accelerationMode as HardwareAcceleration,
         tokensPerSecond,
         timeToFirstTokenMs: timeToFirstToken,
         thinkingTokens: 0,

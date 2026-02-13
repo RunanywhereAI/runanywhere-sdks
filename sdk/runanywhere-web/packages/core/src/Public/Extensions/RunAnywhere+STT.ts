@@ -33,6 +33,8 @@ import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { EventBus } from '../../Foundation/EventBus';
 import { SDKEventType } from '../../types/enums';
+import { STTModelType } from './STTTypes';
+import type { STTModelConfig, STTWhisperFiles, STTZipformerFiles, STTParaformerFiles, STTTranscriptionResult } from './STTTypes';
 
 // Import sherpa-onnx C struct packing helpers.
 // These functions properly allocate and fill C structs in WASM memory
@@ -49,7 +51,7 @@ const logger = new SDKLogger('STT');
 
 let _offlineRecognizerHandle = 0;
 let _onlineRecognizerHandle = 0;
-let _currentModelType: STTModelType = 'whisper';
+let _currentModelType: STTModelType = STTModelType.Whisper;
 let _currentModelId = '';
 
 /** Returns the currently loaded STT model type. */
@@ -58,57 +60,11 @@ export function getCurrentSTTModelType(): STTModelType {
 }
 
 // ---------------------------------------------------------------------------
-// STT Types
+// STT Types (re-exported from STTTypes.ts)
 // ---------------------------------------------------------------------------
 
-export type STTModelType = 'whisper' | 'zipformer' | 'paraformer';
-
-export interface STTModelConfig {
-  modelId: string;
-  type: STTModelType;
-  /**
-   * Model files already written to sherpa-onnx virtual FS.
-   * Paths are FS paths (e.g., '/models/whisper-tiny/encoder.onnx').
-   */
-  modelFiles: STTWhisperFiles | STTZipformerFiles | STTParaformerFiles;
-  /** Sample rate (default: 16000) */
-  sampleRate?: number;
-  /** Language code (e.g., 'en', 'zh') */
-  language?: string;
-}
-
-export interface STTWhisperFiles {
-  encoder: string;
-  decoder: string;
-  tokens: string;
-}
-
-export interface STTZipformerFiles {
-  encoder: string;
-  decoder: string;
-  joiner: string;
-  tokens: string;
-}
-
-export interface STTParaformerFiles {
-  model: string;
-  tokens: string;
-}
-
-export interface STTTranscriptionResult {
-  text: string;
-  confidence: number;
-  detectedLanguage?: string;
-  processingTimeMs: number;
-  words?: STTWord[];
-}
-
-export interface STTWord {
-  text: string;
-  startMs: number;
-  endMs: number;
-  confidence: number;
-}
+export { STTModelType } from './STTTypes';
+export type { STTModelConfig, STTWhisperFiles, STTZipformerFiles, STTParaformerFiles, STTTranscriptionResult, STTWord } from './STTTypes';
 
 export interface STTTranscribeOptions {
   language?: string;
@@ -165,7 +121,7 @@ function buildOfflineRecognizerConfig(config: STTModelConfig): Record<string, an
     teleSpeechCtc: '',
   };
 
-  if (config.type === 'whisper') {
+  if (config.type === STTModelType.Whisper) {
     const f = files as STTWhisperFiles;
     modelConfig.whisper = {
       encoder: f.encoder,
@@ -175,7 +131,7 @@ function buildOfflineRecognizerConfig(config: STTModelConfig): Record<string, an
       tailPaddings: -1,
     };
     modelConfig.tokens = f.tokens;
-  } else if (config.type === 'paraformer') {
+  } else if (config.type === STTModelType.Paraformer) {
     const f = files as STTParaformerFiles;
     modelConfig.paraformer = { model: f.model };
     modelConfig.tokens = f.tokens;
@@ -264,7 +220,7 @@ export const STT = {
     const startMs = performance.now();
 
     try {
-      if (config.type === 'zipformer') {
+      if (config.type === STTModelType.Zipformer) {
         // Streaming model: use online recognizer
         const configObj = buildOnlineRecognizerConfig(config);
         const configStruct = initSherpaOnnxOnlineRecognizerConfig(configObj, m);

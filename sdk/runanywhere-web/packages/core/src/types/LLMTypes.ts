@@ -5,6 +5,8 @@
  * Source of truth: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/LLMTypes.swift
  */
 
+import type { HardwareAcceleration, LLMFramework } from './enums';
+
 export interface LLMGenerationOptions {
   maxTokens?: number;
   temperature?: number;
@@ -22,9 +24,8 @@ export interface LLMGenerationResult {
   tokensUsed: number;
   modelUsed: string;
   latencyMs: number;
-  framework: string;
-  /** Hardware acceleration used for this generation ('webgpu' | 'cpu'). */
-  hardwareUsed: string;
+  framework: LLMFramework;
+  hardwareUsed: HardwareAcceleration;
   tokensPerSecond: number;
   timeToFirstTokenMs?: number;
   thinkingTokens: number;

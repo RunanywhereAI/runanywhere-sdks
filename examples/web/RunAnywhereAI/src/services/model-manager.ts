@@ -10,6 +10,7 @@ import {
   ModelManager,
   ModelCategory,
   LLMFramework,
+  VLMWorkerBridge,
   type CompactModelDef,
   type ManagedModel,
   type ModelFileDescriptor,
@@ -160,14 +161,10 @@ const REGISTERED_MODELS: CompactModelDef[] = [
 
 RunAnywhere.registerModels(REGISTERED_MODELS);
 
-// Plug in VLM worker loading (lazy import to avoid bundling the worker eagerly)
-import('./vlm-worker-bridge').then(({ VLMWorkerBridge }) => {
-  RunAnywhere.setVLMLoader({
-    get isInitialized() { return VLMWorkerBridge.shared.isInitialized; },
-    init: () => VLMWorkerBridge.shared.init(),
-    loadModel: (params) => VLMWorkerBridge.shared.loadModel(params),
-    unloadModel: () => VLMWorkerBridge.shared.unloadModel(),
-  });
-}).catch((err) => {
-  console.warn('[ModelManager] VLM worker bridge not available:', err);
+// Plug in VLM worker loading using the SDK's VLMWorkerBridge
+RunAnywhere.setVLMLoader({
+  get isInitialized() { return VLMWorkerBridge.shared.isInitialized; },
+  init: () => VLMWorkerBridge.shared.init(),
+  loadModel: (params) => VLMWorkerBridge.shared.loadModel(params),
+  unloadModel: () => VLMWorkerBridge.shared.unloadModel(),
 });

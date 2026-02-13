@@ -87,6 +87,19 @@ export interface RACommonsModule extends EmscriptenModule {
   _rac_llm_component_destroy: (handle: number) => void;
   _rac_llm_result_free: (resultPtr: number) => void;
 
+  // -- VLM Component --
+  _rac_vlm_component_create: (outHandlePtr: number) => number;
+  _rac_vlm_component_load_model: (handle: number, modelPath: number, mmprojPath: number, modelId: number, modelName: number) => number;
+  _rac_vlm_component_process: (handle: number, imagePtr: number, promptPtr: number, optionsPtr: number, resultPtr: number) => number;
+  _rac_vlm_component_is_loaded: (handle: number) => number;
+  _rac_vlm_component_destroy: (handle: number) => void;
+  _rac_vlm_component_cancel: (handle: number) => void;
+  _rac_vlm_result_free: (resultPtr: number) => void;
+
+  // -- Backend Registration --
+  _rac_backend_llamacpp_vlm_register: () => number;
+  _rac_backend_llamacpp_vlm_unregister: () => void;
+
   // -- WASM Helpers --
   _rac_wasm_ping: () => number;
   _rac_wasm_sizeof_platform_adapter: () => number;
@@ -94,6 +107,21 @@ export interface RACommonsModule extends EmscriptenModule {
   _rac_wasm_sizeof_llm_options: () => number;
   _rac_wasm_sizeof_llm_result: () => number;
   _rac_wasm_create_llm_options_default: () => number;
+  _rac_wasm_sizeof_vlm_image: () => number;
+  _rac_wasm_sizeof_vlm_options: () => number;
+  _rac_wasm_sizeof_vlm_result: () => number;
+  _rac_wasm_sizeof_diffusion_options: () => number;
+  _rac_wasm_sizeof_diffusion_result: () => number;
+  _rac_wasm_sizeof_embeddings_options: () => number;
+  _rac_wasm_sizeof_embeddings_result: () => number;
+  _rac_wasm_sizeof_structured_output_config: () => number;
+  _rac_wasm_sizeof_voice_agent_config: () => number;
+  _rac_wasm_sizeof_voice_agent_result: () => number;
+  _rac_wasm_sizeof_stt_options: () => number;
+  _rac_wasm_sizeof_stt_result: () => number;
+  _rac_wasm_sizeof_tts_options: () => number;
+  _rac_wasm_sizeof_tts_result: () => number;
+  _rac_wasm_sizeof_vad_config: () => number;
 
   // -- SDK Config --
   _rac_sdk_init: (configPtr: number) => number;
@@ -122,6 +150,7 @@ export class WASMBridge {
   private static _instance: WASMBridge | null = null;
   private _module: RACommonsModule | null = null;
   private _loaded = false;
+  private _loading: Promise<void> | null = null;
   private _accelerationMode: AccelerationMode = 'cpu';
   /** The URL that was used to load the WASM glue JS (for worker reuse). */
   private _loadedModuleUrl: string | null = null;
@@ -169,6 +198,9 @@ export class WASMBridge {
    *   - `racommons-webgpu.js` when WebGPU + JSPI are available
    *   - `racommons.js` as the CPU-only fallback
    *
+   * Safe to call concurrently -- only the first caller triggers the actual
+   * load; subsequent callers await the same in-flight promise.
+   *
    * @param wasmUrl        - URL to the CPU-only racommons.js glue file.
    * @param webgpuWasmUrl  - URL to the WebGPU racommons-webgpu.js glue file.
    * @param acceleration   - Force a specific mode ('auto' detects, 'webgpu' forces GPU, 'cpu' forces CPU).
@@ -183,6 +215,29 @@ export class WASMBridge {
       return;
     }
 
+    // Prevent duplicate loading -- return the in-flight promise
+    if (this._loading) {
+      await this._loading;
+      return;
+    }
+
+    this._loading = this._doLoad(wasmUrl, webgpuWasmUrl, acceleration);
+    try {
+      await this._loading;
+    } finally {
+      this._loading = null;
+    }
+  }
+
+  /**
+   * Internal load implementation.
+   * Separated from `load()` so the concurrent-load guard can wrap it.
+   */
+  private async _doLoad(
+    wasmUrl?: string,
+    webgpuWasmUrl?: string,
+    acceleration: 'auto' | 'webgpu' | 'cpu' = 'auto',
+  ): Promise<void> {
     logger.info('Loading RACommons WASM module...');
 
     try {
@@ -224,7 +279,7 @@ export class WASMBridge {
         this._accelerationMode = 'cpu';
         this._module = null;
         this._loaded = false;
-        return this.load(wasmUrl, undefined, 'cpu');
+        return this._doLoad(wasmUrl, undefined, 'cpu');
       }
 
       this._module = null;
@@ -422,6 +477,7 @@ export class WASMBridge {
     }
     this._module = null;
     this._loaded = false;
+    this._loading = null;
     this._accelerationMode = 'cpu';
     this._loadedModuleUrl = null;
     WASMBridge._instance = null;

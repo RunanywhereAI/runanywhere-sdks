@@ -146,3 +146,13 @@ export enum SDKEventType {
   Performance = 'performance',
   Network = 'network',
 }
+
+/** Hardware acceleration preference for SDK initialization. */
+export enum AccelerationPreference {
+  /** Detect WebGPU and use it when available, fall back to CPU. */
+  Auto = 'auto',
+  /** Force WebGPU (fails gracefully to CPU if unavailable). */
+  WebGPU = 'webgpu',
+  /** Always use CPU-only WASM (skip WebGPU detection entirely). */
+  CPU = 'cpu',
+}
