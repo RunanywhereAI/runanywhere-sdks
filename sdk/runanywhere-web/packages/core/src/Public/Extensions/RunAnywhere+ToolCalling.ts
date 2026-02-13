@@ -56,6 +56,25 @@ export {
 
 const logger = new SDKLogger('ToolCalling');
 
+/**
+ * Use streaming generation and collect all tokens into a single result.
+ * This avoids the blocking `generate()` C function which can trigger
+ * "RuntimeError: unreachable" traps in WASM on some models.
+ */
+async function collectStream(
+  prompt: string,
+  opts: { maxTokens?: number; temperature?: number },
+): Promise<{ text: string }> {
+  const { stream, result } = TextGeneration.generateStream(prompt, opts);
+  // Consume the stream so the result promise resolves
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  for await (const _token of stream) {
+    /* drain */
+  }
+  const final = await result;
+  return { text: final.text };
+}
+
 function requireBridge(): WASMBridge {
   if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
   return WASMBridge.shared;

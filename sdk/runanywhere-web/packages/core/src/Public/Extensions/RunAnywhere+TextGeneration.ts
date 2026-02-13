@@ -142,6 +142,12 @@ export const TextGeneration = {
   /**
    * Generate text from a prompt (non-streaming).
    *
+   * Uses `ccall` with `{async: true}` so that Emscripten's JSPI / Asyncify
+   * can suspend the WASM stack for async WebGPU buffer operations. Without
+   * this the blocking C function traps with `RuntimeError: unreachable` on
+   * WebGPU builds because the browser event-loop cannot pump GPU command
+   * buffers while the main thread is blocked in a synchronous ccall.
+   *
    * @param prompt - Input text prompt
    * @param options - Generation options (temperature, maxTokens, etc.)
    * @returns Generation result with text and metrics
@@ -184,21 +190,26 @@ export const TextGeneration = {
       m.setValue(optionsPtr + 8, options.topP, 'float');
     }
 
-    // Allocate result struct
+    // Allocate and zero-initialise the result struct so any C++ code that
+    // reads a field before writing (e.g. checking `text != NULL`) does not
+    // encounter garbage memory.
     const resultSize = m._rac_wasm_sizeof_llm_result();
     const resultPtr = m._malloc(resultSize);
+    for (let i = 0; i < resultSize; i++) m.setValue(resultPtr + i, 0, 'i8');
 
     try {
-      // Use ccall instead of direct _funcname() call so that Emscripten properly
-      // converts C++ exceptions into JavaScript throws (direct calls may return the
-      // C++ exception pointer as the "return value" instead of throwing).
+      // Call with {async: true} so Emscripten's JSPI / Asyncify can yield
+      // to the browser event-loop during WebGPU buffer map operations.
+      // On CPU-only builds this is harmless (the result is simply wrapped
+      // in an already-resolved Promise).
       let result: number;
       try {
-        result = m.ccall(
+        result = await m.ccall(
           'rac_llm_component_generate',
           'number',
           ['number', 'number', 'number', 'number'],
           [handle, promptPtr, optionsPtr, resultPtr],
+          { async: true },
         ) as number;
       } catch (wasmErr: unknown) {
         // Emscripten converts unhandled C++ exceptions into JS throws.
@@ -214,7 +225,14 @@ export const TextGeneration = {
       bridge.checkResult(result, 'rac_llm_component_generate');
 
       // Read result struct
-      // rac_llm_result_t layout: { const char* text, int32_t input_tokens, int32_t output_tokens, ... }
+      // rac_llm_result_t layout:
+      //   offset 0:  char*   text
+      //   offset 4:  int32   prompt_tokens
+      //   offset 8:  int32   completion_tokens
+      //   offset 12: int32   total_tokens
+      //   offset 16: int64   time_to_first_token_ms
+      //   offset 24: int64   total_time_ms
+      //   offset 32: float   tokens_per_second
       const textPtr = m.getValue(resultPtr, '*');
       const text = bridge.readString(textPtr);
       const inputTokens = m.getValue(resultPtr + 4, 'i32');
@@ -241,7 +259,7 @@ export const TextGeneration = {
         latencyMs,
       });
 
-      // Free the result
+      // Free the text string allocated inside the result by the C++ side
       m._rac_llm_result_free(resultPtr);
 
       return genResult;
@@ -253,6 +271,9 @@ export const TextGeneration = {
     } finally {
       bridge.free(promptPtr);
       m._free(optionsPtr);
+      // Free the result struct itself (separate from _rac_llm_result_free
+      // which only frees the inner `text` string).
+      m._free(resultPtr);
     }
   },
 

@@ -65,16 +65,13 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
         </button>
       </div>
-      <div class="toolbar-model-btn" id="chat-toolbar-model" title="Change Model">
+      <div class="toolbar-model-btn" id="chat-toolbar-model" title="Tap to change model">
         <svg class="model-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
         <span id="chat-toolbar-model-text">Select Model</span>
         <svg class="chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
       <div class="toolbar-actions">
-        <button class="tools-toggle" id="chat-tools-toggle" title="Toggle Tool Calling">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-          Tools
-        </button>
+        <!-- intentionally empty to keep model btn centered -->
       </div>
     </div>
 
@@ -91,8 +88,19 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
       </div>
     </div>
 
-    <!-- Tools badge (shown when tools are enabled) -->
-    <div id="chat-tools-badge" style="display:none;padding:var(--space-sm) var(--space-lg) 0;"></div>
+    <!-- Tools toggle + badge (above input) -->
+    <div id="chat-tools-row" class="chat-tools-row">
+      <button class="tools-toggle-pill" id="chat-tools-toggle" title="Toggle Tool Calling">
+        <span class="tools-toggle-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        </span>
+        <span class="tools-toggle-label">Tools</span>
+        <span class="tools-toggle-switch" id="chat-tools-switch">
+          <span class="tools-toggle-knob"></span>
+        </span>
+      </button>
+      <div class="tools-badge-text" id="chat-tools-badge" style="display:none;"></div>
+    </div>
 
     <!-- Input -->
     <div class="chat-input-area">
@@ -221,20 +229,15 @@ async function toggleTools(): Promise<void> {
     toolsRegistered = true;
   }
 
-  // Show/hide tools badge above input
+  // Show/hide tools badge text below the toggle
   const badgeEl = container.querySelector('#chat-tools-badge') as HTMLElement;
   if (badgeEl) {
     if (toolsEnabled) {
       badgeEl.style.display = '';
-      badgeEl.innerHTML = `
-        <span class="tools-badge">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-          Tools enabled &mdash; weather, time, calculator
-        </span>
-      `;
+      badgeEl.textContent = 'weather \u00b7 time \u00b7 calculator';
     } else {
       badgeEl.style.display = 'none';
-      badgeEl.innerHTML = '';
+      badgeEl.textContent = '';
     }
   }
 
