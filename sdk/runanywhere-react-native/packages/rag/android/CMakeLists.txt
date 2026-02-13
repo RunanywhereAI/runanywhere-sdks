@@ -1,7 +1,7 @@
-project(runanywhererg)
+project(runanywhererag)
 cmake_minimum_required(VERSION 3.9.0)
 
-set(PACKAGE_NAME runanywhererg)
+set(PACKAGE_NAME runanywhererag)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 20)
 
@@ -107,7 +107,7 @@ if(DEFINED REACT_NATIVE_NITRO_BUILD_DIR)
 endif()
 
 # Add Nitrogen specs (this handles all React Native linking)
-include(${CMAKE_SOURCE_DIR}/../nitrogen/generated/android/runanywhererg+autolinking.cmake)
+include(${CMAKE_SOURCE_DIR}/../nitrogen/generated/android/runanywhererag+autolinking.cmake)
 
 # =============================================================================
 # Include directories

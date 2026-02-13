@@ -5,7 +5,7 @@
   },
   "android": {
     "androidNamespace": ["runanywhere", "rag"],
-    "androidCxxLibName": "runanywhererg"
+    "androidCxxLibName": "runanywhererag"
   },
   "autolinking": {
     "RunAnywhereRAG": {

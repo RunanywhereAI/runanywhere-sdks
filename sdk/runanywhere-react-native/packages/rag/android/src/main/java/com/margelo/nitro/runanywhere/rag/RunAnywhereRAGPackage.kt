@@ -20,9 +20,9 @@ class RunAnywhereRAGPackage : BaseReactPackage() {
         
         init {
             try {
-                Log.i(TAG, "Loading native library: runanywhererg...")
-                runanywherergOnLoad.initializeNative()
-                Log.i(TAG, "Successfully loaded native library: runanywhererg")
+                Log.i(TAG, "Loading native library: runanywhererag...")
+                runanywhereragOnLoad.initializeNative()
+                Log.i(TAG, "Successfully loaded native library: runanywhererag")
 
                 Log.i(TAG, "Loading native library: librac_backend_rag...")
                 System.loadLibrary("rac_backend_rag")

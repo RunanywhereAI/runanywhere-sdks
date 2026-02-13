@@ -45,7 +45,7 @@ def reactNativeArchitectures() {
 
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
-apply from: '../nitrogen/generated/android/runanywhererg+autolinking.gradle'
+apply from: '../nitrogen/generated/android/runanywhererag+autolinking.gradle'
 apply plugin: 'com.facebook.react'
 
 // Configure node path for Android Studio builds
