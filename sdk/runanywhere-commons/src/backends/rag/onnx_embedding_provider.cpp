@@ -19,6 +19,10 @@
 #include <unordered_map>
 #include <list>
 
+#if defined(__aarch64__) && defined(__ARM_NEON)
+#include <arm_neon.h>
+#endif
+
 #define LOG_TAG "RAG.ONNXEmbedding"
 #define LOGI(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
 #define LOGE(...) RAC_LOG_ERROR(LOG_TAG, __VA_ARGS__)
@@ -121,20 +125,57 @@ public:
     }
 
 private:
+    static inline bool is_all_ascii(const std::string& text) {
+        for (unsigned char ch : text) {
+            if (ch & 0x80) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    static inline bool is_ascii_alnum(unsigned char ch) {
+        return (ch >= 'A' && ch <= 'Z') ||
+               (ch >= 'a' && ch <= 'z') ||
+               (ch >= '0' && ch <= '9');
+    }
+
+    static inline char to_lower_ascii(unsigned char ch) {
+        if (ch >= 'A' && ch <= 'Z') {
+            return static_cast<char>(ch + ('a' - 'A'));
+        }
+        return static_cast<char>(ch);
+    }
+
     std::vector<std::string> basic_tokenize(const std::string& text) const {
+        const bool all_ascii = is_all_ascii(text);
+#if defined(__aarch64__) && defined(__ARM_NEON)
+        if (all_ascii) {
+            return basic_tokenize_simd_ascii(text);
+        }
+        return basic_tokenize_scalar_mixed(text);
+#else
+        if (all_ascii) {
+            return basic_tokenize_scalar_ascii(text);
+        }
+        return basic_tokenize_scalar_mixed(text);
+#endif
+    }
+
+    std::vector<std::string> basic_tokenize_scalar_ascii(const std::string& text) const {
         std::vector<std::string> tokens;
         std::string current;
         current.reserve(text.size());
 
         for (unsigned char ch : text) {
-            if (std::isspace(ch) || std::ispunct(ch)) {
+            if (!is_ascii_alnum(ch)) {
                 if (!current.empty()) {
                     tokens.push_back(std::move(current));
                     current.clear();
                 }
                 continue;
             }
-            current.push_back(static_cast<char>(std::tolower(ch)));
+            current.push_back(to_lower_ascii(ch));
         }
 
         if (!current.empty()) {
@@ -143,6 +184,116 @@ private:
 
         return tokens;
     }
+
+    std::vector<std::string> basic_tokenize_scalar_mixed(const std::string& text) const {
+        std::vector<std::string> tokens;
+        std::string current;
+        current.reserve(text.size());
+
+        for (unsigned char ch : text) {
+            if (ch & 0x80) {
+                if (!current.empty()) {
+                    tokens.push_back(std::move(current));
+                    current.clear();
+                }
+                continue;
+            }
+
+            if (!is_ascii_alnum(ch)) {
+                if (!current.empty()) {
+                    tokens.push_back(std::move(current));
+                    current.clear();
+                }
+                continue;
+            }
+
+            current.push_back(to_lower_ascii(ch));
+        }
+
+        if (!current.empty()) {
+            tokens.push_back(std::move(current));
+        }
+
+        return tokens;
+    }
+
+#if defined(__aarch64__) && defined(__ARM_NEON)
+    std::vector<std::string> basic_tokenize_simd_ascii(const std::string& text) const {
+        std::vector<std::string> tokens;
+        std::string current;
+        current.reserve(text.size());
+
+        const char* data = text.data();
+        size_t length = text.size();
+        size_t i = 0;
+
+        const uint8x16_t a_upper = vdupq_n_u8('A');
+        const uint8x16_t z_upper = vdupq_n_u8('Z');
+        const uint8x16_t a_lower = vdupq_n_u8('a');
+        const uint8x16_t z_lower = vdupq_n_u8('z');
+        const uint8x16_t zero_digit = vdupq_n_u8('0');
+        const uint8x16_t nine_digit = vdupq_n_u8('9');
+        const uint8x16_t lower_mask = vdupq_n_u8(0x20);
+
+        while (i + 16 <= length) {
+            uint8x16_t v = vld1q_u8(reinterpret_cast<const uint8_t*>(data + i));
+
+            uint8x16_t geA = vcgeq_u8(v, a_upper);
+            uint8x16_t leZ = vcleq_u8(v, z_upper);
+            uint8x16_t is_upper = vandq_u8(geA, leZ);
+
+            uint8x16_t gea = vcgeq_u8(v, a_lower);
+            uint8x16_t lez = vcleq_u8(v, z_lower);
+            uint8x16_t is_lower = vandq_u8(gea, lez);
+
+            uint8x16_t ge0 = vcgeq_u8(v, zero_digit);
+            uint8x16_t le9 = vcleq_u8(v, nine_digit);
+            uint8x16_t is_digit = vandq_u8(ge0, le9);
+
+            uint8x16_t is_alnum = vorrq_u8(vorrq_u8(is_upper, is_lower), is_digit);
+            const bool all_alnum = vminvq_u8(is_alnum) == 0xFF;
+
+            if (all_alnum) {
+                uint8x16_t lower = vaddq_u8(v, vandq_u8(is_upper, lower_mask));
+                alignas(16) char buffer[16];
+                vst1q_u8(reinterpret_cast<uint8_t*>(buffer), lower);
+                current.append(buffer, 16);
+            } else {
+                for (size_t j = 0; j < 16; ++j) {
+                    unsigned char ch = static_cast<unsigned char>(data[i + j]);
+                    if (!is_ascii_alnum(ch)) {
+                        if (!current.empty()) {
+                            tokens.push_back(std::move(current));
+                            current.clear();
+                        }
+                        continue;
+                    }
+                    current.push_back(to_lower_ascii(ch));
+                }
+            }
+
+            i += 16;
+        }
+
+        for (; i < length; ++i) {
+            unsigned char ch = static_cast<unsigned char>(data[i]);
+            if (!is_ascii_alnum(ch)) {
+                if (!current.empty()) {
+                    tokens.push_back(std::move(current));
+                    current.clear();
+                }
+                continue;
+            }
+            current.push_back(to_lower_ascii(ch));
+        }
+
+        if (!current.empty()) {
+            tokens.push_back(std::move(current));
+        }
+
+        return tokens;
+    }
+#endif
 
     std::vector<std::string> wordpiece_tokenize(const std::string& word) const {
         if (!vocab_loaded_) {
