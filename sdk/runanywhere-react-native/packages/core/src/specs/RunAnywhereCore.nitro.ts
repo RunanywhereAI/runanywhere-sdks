@@ -624,4 +624,76 @@ export interface RunAnywhereCore
    * Cleanup voice agent resources
    */
   cleanupVoiceAgent(): Promise<void>;
+
+  // ============================================================================
+  // Tool Calling Capability
+  //
+  // ARCHITECTURE:
+  // - C++ (ToolCallingBridge): Parses <tool_call> tags from LLM output.
+  //   This is the SINGLE SOURCE OF TRUTH for parsing, ensuring consistency.
+  //
+  // - TypeScript (RunAnywhere+ToolCalling.ts): Handles tool registry, executor
+  //   storage, prompt formatting, and orchestration. Executors MUST stay in
+  //   TypeScript because they need JavaScript APIs (fetch, device APIs, etc.).
+  //
+  // C++ (ToolCallingBridge) implements: parseToolCallFromOutput, formatToolsPrompt,
+  // buildInitialPrompt, buildFollowupPrompt. TypeScript handles: tool registry,
+  // executor storage (needs JS APIs like fetch), orchestration.
+  // ============================================================================
+
+  /**
+   * Parse LLM output for tool call (IMPLEMENTED in C++ ToolCallingBridge)
+   *
+   * This is the single source of truth for parsing <tool_call> tags from LLM output.
+   * Ensures consistent parsing behavior across all platforms.
+   *
+   * @param llmOutput Raw LLM output text that may contain <tool_call> tags
+   * @returns JSON with {hasToolCall, cleanText, toolName, argumentsJson, callId}
+   *          TypeScript layer converts this to {text, toolCall} format
+   */
+  parseToolCallFromOutput(llmOutput: string): Promise<string>;
+
+  /**
+   * Format tool definitions for LLM prompt (IMPLEMENTED in C++ ToolCallingBridge)
+   *
+   * Creates a system prompt describing available tools with format-specific instructions.
+   * Uses C++ single source of truth for consistent formatting across all platforms.
+   *
+   * @param toolsJson JSON array of tool definitions
+   * @param format Tool calling format: 'default' or 'lfm2'
+   * @returns Formatted prompt string with tool instructions
+   */
+  formatToolsForPrompt(toolsJson: string, format: string): Promise<string>;
+
+  /**
+   * Build initial prompt with tools (IMPLEMENTED in C++ ToolCallingBridge)
+   *
+   * Combines user prompt with tool definitions and system instructions.
+   *
+   * @param userPrompt The user's question/request
+   * @param toolsJson JSON array of tool definitions
+   * @param optionsJson JSON with options (maxToolCalls, temperature, etc.)
+   * @returns Complete formatted prompt ready for LLM
+   */
+  buildInitialPrompt(userPrompt: string, toolsJson: string, optionsJson: string): Promise<string>;
+
+  /**
+   * Build follow-up prompt after tool execution (IMPLEMENTED in C++ ToolCallingBridge)
+   *
+   * Creates continuation prompt with tool result for next LLM generation.
+   *
+   * @param originalPrompt The original user prompt
+   * @param toolsPrompt Tool definitions (if keepToolsAvailable) or empty
+   * @param toolName Name of the executed tool
+   * @param resultJson JSON result from tool execution
+   * @param keepToolsAvailable Whether to include tools in follow-up
+   * @returns Follow-up prompt string
+   */
+  buildFollowupPrompt(
+    originalPrompt: string,
+    toolsPrompt: string,
+    toolName: string,
+    resultJson: string,
+    keepToolsAvailable: boolean
+  ): Promise<string>;
 }

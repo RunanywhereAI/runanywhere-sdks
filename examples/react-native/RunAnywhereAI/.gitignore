@@ -1,6 +1,11 @@
 # Dependencies
 node_modules/
 
+# Yarn
+.yarn/
+.pnp.cjs
+.pnp.loader.mjs
+
 # React Native
 .expo/
 *.jks
@@ -33,10 +38,12 @@ ios/.xcode.env.local
 # Android
 android/.gradle/
 android/app/build/
+android/app/.cxx/
 android/build/
 android/local.properties
 android/*.iml
 android/.idea/
+android/app/.idea/
 
 # Testing
 coverage/

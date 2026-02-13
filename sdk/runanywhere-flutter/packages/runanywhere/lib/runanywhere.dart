@@ -28,4 +28,6 @@ export 'public/extensions/runanywhere_frameworks.dart';
 export 'public/extensions/runanywhere_logging.dart';
 export 'public/extensions/runanywhere_storage.dart';
 export 'public/runanywhere.dart';
+export 'public/runanywhere_tool_calling.dart';
+export 'public/types/tool_calling_types.dart';
 export 'public/types/types.dart' hide SupabaseConfig;

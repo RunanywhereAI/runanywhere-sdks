@@ -366,6 +366,12 @@ extension ChatInterfaceView {
     var inputArea: some View {
         VStack(spacing: 0) {
             Divider()
+
+            // Tool calling indicator
+            if viewModel.useToolCalling {
+                toolCallingBadge
+            }
+
             HStack(spacing: AppSpacing.mediumLarge) {
                 TextField("Type a message...", text: $viewModel.currentInput, axis: .vertical)
                     .textFieldStyle(.plain)
@@ -396,6 +402,21 @@ extension ChatInterfaceView {
             .background(AppColors.backgroundPrimary)
             .animation(.easeInOut(duration: AppLayout.animationFast), value: isTextFieldFocused)
         }
+    }
+
+    var toolCallingBadge: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "wrench.and.screwdriver")
+                .font(.system(size: 10))
+            Text("Tools enabled")
+                .font(AppTypography.caption2)
+        }
+        .foregroundColor(AppColors.primaryAccent)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(AppColors.primaryAccent.opacity(0.1))
+        .cornerRadius(6)
+        .padding(.top, 8)
     }
 }
 

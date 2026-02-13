@@ -34,6 +34,8 @@ data class StoredModelInfo(
  */
 @OptIn(kotlin.time.ExperimentalTime::class)
 data class SettingsUiState(
+    // Logging Configuration
+    val analyticsLogToLocal: Boolean = false,
     // Storage Overview
     val totalStorageSize: Long = 0L,
     val availableSpace: Long = 0L,
@@ -81,6 +83,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         )
     }
 
+    // Preference file for general app settings (Analytics, etc)
+    private val settingsPrefs by lazy {
+        application.getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
+    }
+
+    // Preference file specifically for LLM generation parameters
     private val generationPrefs by lazy {
         application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
@@ -88,9 +96,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     companion object {
         private const val TAG = "SettingsViewModel"
         private const val ENCRYPTED_PREFS_FILE = "runanywhere_secure_prefs"
+        private const val SETTINGS_PREFS = "runanywhere_settings"
         private const val KEY_API_KEY = "runanywhere_api_key"
         private const val KEY_BASE_URL = "runanywhere_base_url"
         private const val KEY_DEVICE_REGISTERED = "com.runanywhere.sdk.deviceRegistered"
+        private const val KEY_ANALYTICS_LOG_LOCAL = "analyticsLogToLocal"
 
         // Generation settings constants (match iOS key names)
         private const val PREFS_NAME = "generation_settings"
@@ -187,10 +197,21 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     init {
+        loadAnalyticsPreference()
         loadApiConfiguration()
         loadGenerationSettings()
         loadStorageData()
         subscribeToModelEvents()
+    }
+
+    private fun loadAnalyticsPreference() {
+        val value = settingsPrefs.getBoolean(KEY_ANALYTICS_LOG_LOCAL, false)
+        _uiState.update { it.copy(analyticsLogToLocal = value) }
+    }
+
+    fun updateAnalyticsLogToLocal(value: Boolean) {
+        _uiState.update { it.copy(analyticsLogToLocal = value) }
+        settingsPrefs.edit().putBoolean(KEY_ANALYTICS_LOG_LOCAL, value).apply()
     }
 
     /**
@@ -487,7 +508,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     )
                 }
 
-                Log.d(TAG, "API configuration saved successfully - URL: $normalizedURL")
+                Log.d(TAG, "API configuration saved successfully")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to save API configuration", e)
                 _uiState.update {
