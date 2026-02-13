@@ -9,7 +9,6 @@ let container: HTMLElement;
 const settings = {
   temperature: 0.7,
   maxTokens: 2048,
-  toolCalling: false,
   apiKey: '',
   baseURL: '',
   analytics: true,
@@ -41,15 +40,6 @@ export function initSettingsTab(el: HTMLElement): void {
             <span class="setting-value" id="settings-tokens-val">${settings.maxTokens}</span>
             <button class="btn btn-sm" id="settings-tokens-plus">+</button>
           </div>
-        </div>
-      </div>
-
-      <!-- Tool Calling -->
-      <div class="settings-section">
-        <div class="settings-section-title">Tool Calling</div>
-        <div class="setting-row">
-          <span class="setting-label">Enable Tool Calling</span>
-          <div class="toggle ${settings.toolCalling ? 'on' : ''}" id="settings-tools-toggle"></div>
         </div>
       </div>
 
@@ -118,10 +108,6 @@ export function initSettingsTab(el: HTMLElement): void {
   });
 
   // Toggles
-  setupToggle('settings-tools-toggle', (on) => {
-    settings.toolCalling = on;
-    saveSettings();
-  });
   setupToggle('settings-analytics-toggle', (on) => {
     settings.analytics = on;
     saveSettings();
@@ -171,7 +157,6 @@ function loadSettings(): void {
       (container.querySelector('#settings-temp') as HTMLInputElement).value = String(settings.temperature);
       container.querySelector('#settings-temp-val')!.textContent = settings.temperature.toFixed(1);
       container.querySelector('#settings-tokens-val')!.textContent = String(settings.maxTokens);
-      container.querySelector('#settings-tools-toggle')!.classList.toggle('on', settings.toolCalling);
       container.querySelector('#settings-analytics-toggle')!.classList.toggle('on', settings.analytics);
       (container.querySelector('#settings-api-key') as HTMLInputElement).value = settings.apiKey;
       (container.querySelector('#settings-base-url') as HTMLInputElement).value = settings.baseURL;

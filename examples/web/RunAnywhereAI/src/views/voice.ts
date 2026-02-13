@@ -5,6 +5,7 @@
  * Pipeline flow:  Mic → STT → LLM (streaming) → TTS → Speaker
  */
 
+import type { TabLifecycle } from '../app';
 import { showModelSelectionSheet } from '../components/model-selection';
 import { ModelManager, ModelCategory } from '../services/model-manager';
 import { AudioCapture } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
@@ -86,7 +87,7 @@ interface Particle {
 // Init
 // ---------------------------------------------------------------------------
 
-export function initVoiceTab(el: HTMLElement): void {
+export function initVoiceTab(el: HTMLElement): TabLifecycle {
   container = el;
   container.innerHTML = `
     <!-- Pipeline Setup -->
@@ -192,6 +193,17 @@ export function initVoiceTab(el: HTMLElement): void {
 
   // Initial pipeline UI check (in case models are already loaded)
   refreshPipelineUI();
+
+  // Return lifecycle callbacks for tab-switching cleanup
+  return {
+    onDeactivate(): void {
+      // Stop mic, VAD, particles, and cancel any in-flight generation
+      if (sessionActive) {
+        stopSession();
+        console.log('[Voice] Tab deactivated — session stopped');
+      }
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------

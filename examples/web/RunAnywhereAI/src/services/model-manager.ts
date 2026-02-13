@@ -66,13 +66,35 @@ const REGISTERED_MODELS: CompactModelDef[] = [
     memoryRequirement: 400_000_000,
   },
 
+  // ── Tool Calling Optimized Models (Liquid AI LFM2-Tool) ──
+  // These models are designed for concise, precise tool/function calling.
+  // Auto-detected as LFM2 Pythonic format by the SDK's ToolCalling extension.
+  {
+    id: 'lfm2-1.2b-tool-q4_k_m',
+    name: 'LFM2 1.2B Tool Q4_K_M',
+    repo: 'LiquidAI/LFM2-1.2B-Tool-GGUF',
+    files: ['LFM2-1.2B-Tool-Q4_K_M.gguf'],
+    framework: LLMFramework.LlamaCpp,
+    modality: ModelCategory.Language,
+    memoryRequirement: 800_000_000,
+  },
+  {
+    id: 'lfm2-1.2b-tool-q8_0',
+    name: 'LFM2 1.2B Tool Q8_0',
+    repo: 'LiquidAI/LFM2-1.2B-Tool-GGUF',
+    files: ['LFM2-1.2B-Tool-Q8_0.gguf'],
+    framework: LLMFramework.LlamaCpp,
+    modality: ModelCategory.Language,
+    memoryRequirement: 1_400_000_000,
+  },
+
   // =========================================================================
-  // VLM models (llama.cpp + mmproj)
+  // VLM models (llama.cpp + mmproj) — hosted on runanywhere HuggingFace org
   // =========================================================================
   {
     id: 'smolvlm-500m-instruct-q8_0',
     name: 'SmolVLM 500M Instruct Q8_0',
-    repo: 'ggml-org/SmolVLM-500M-Instruct-GGUF',
+    repo: 'runanywhere/SmolVLM-500M-Instruct-GGUF',
     files: ['SmolVLM-500M-Instruct-Q8_0.gguf', 'mmproj-SmolVLM-500M-Instruct-f16.gguf'],
     framework: LLMFramework.LlamaCpp,
     modality: ModelCategory.Multimodal,
@@ -81,7 +103,7 @@ const REGISTERED_MODELS: CompactModelDef[] = [
   {
     id: 'qwen2-vl-2b-instruct-q4_k_m',
     name: 'Qwen2-VL 2B Instruct Q4_K_M',
-    repo: 'ggml-org/Qwen2-VL-2B-Instruct-GGUF',
+    repo: 'runanywhere/Qwen2-VL-2B-Instruct-GGUF',
     files: ['Qwen2-VL-2B-Instruct-Q4_K_M.gguf', 'mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf'],
     framework: LLMFramework.LlamaCpp,
     modality: ModelCategory.Multimodal,
@@ -90,7 +112,7 @@ const REGISTERED_MODELS: CompactModelDef[] = [
   {
     id: 'lfm2-vl-450m-q4_0',
     name: 'LFM2-VL 450M Q4_0',
-    repo: 'LiquidAI/LFM2-VL-450M-GGUF',
+    repo: 'runanywhere/LFM2-VL-450M-GGUF',
     files: ['LFM2-VL-450M-Q4_0.gguf', 'mmproj-LFM2-VL-450M-Q8_0.gguf'],
     framework: LLMFramework.LlamaCpp,
     modality: ModelCategory.Multimodal,
@@ -99,7 +121,7 @@ const REGISTERED_MODELS: CompactModelDef[] = [
   {
     id: 'lfm2-vl-450m-q8_0',
     name: 'LFM2-VL 450M Q8_0',
-    repo: 'LiquidAI/LFM2-VL-450M-GGUF',
+    repo: 'runanywhere/LFM2-VL-450M-GGUF',
     files: ['LFM2-VL-450M-Q8_0.gguf', 'mmproj-LFM2-VL-450M-Q8_0.gguf'],
     framework: LLMFramework.LlamaCpp,
     modality: ModelCategory.Multimodal,
@@ -107,47 +129,48 @@ const REGISTERED_MODELS: CompactModelDef[] = [
   },
 
   // =========================================================================
-  // STT models (sherpa-onnx Whisper, individual ONNX files)
+  // STT models (sherpa-onnx Whisper, tar.gz archive — matches Swift SDK)
   // =========================================================================
   {
     id: 'sherpa-onnx-whisper-tiny.en',
     name: 'Whisper Tiny English (ONNX)',
-    repo: 'csukuangfj/sherpa-onnx-whisper-tiny.en',
-    files: ['tiny.en-encoder.int8.onnx', 'tiny.en-decoder.int8.onnx', 'tiny.en-tokens.txt'],
+    url: 'https://huggingface.co/runanywhere/sherpa-onnx-whisper-tiny.en/resolve/main/sherpa-onnx-whisper-tiny.en.tar.gz',
     framework: LLMFramework.ONNX,
     modality: ModelCategory.SpeechRecognition,
     memoryRequirement: 105_000_000,
+    artifactType: 'archive',
   },
 
   // =========================================================================
-  // TTS models (sherpa-onnx Piper VITS, individual ONNX files)
+  // TTS models (sherpa-onnx Piper VITS, tar.gz archives — matches Swift SDK)
+  // Archives bundle model.onnx + tokens.txt + espeak-ng-data/ in one file.
   // =========================================================================
   {
     id: 'vits-piper-en_US-lessac-medium',
     name: 'Piper TTS US English (Lessac)',
-    repo: 'csukuangfj/vits-piper-en_US-lessac-medium',
-    files: ['en_US-lessac-medium.onnx', 'tokens.txt', 'en_US-lessac-medium.onnx.json'],
+    url: 'https://huggingface.co/runanywhere/vits-piper-en_US-lessac-medium/resolve/main/vits-piper-en_US-lessac-medium.tar.gz',
     framework: LLMFramework.ONNX,
     modality: ModelCategory.SpeechSynthesis,
     memoryRequirement: 65_000_000,
+    artifactType: 'archive',
   },
   {
-    id: 'vits-piper-en_GB-vctk-medium',
-    name: 'Piper TTS British English (VCTK)',
-    repo: 'csukuangfj/vits-piper-en_GB-vctk-medium',
-    files: ['en_GB-vctk-medium.onnx', 'tokens.txt', 'en_GB-vctk-medium.onnx.json'],
+    id: 'vits-piper-en_GB-alba-medium',
+    name: 'Piper TTS British English (Alba)',
+    url: 'https://huggingface.co/runanywhere/vits-piper-en_GB-alba-medium/resolve/main/vits-piper-en_GB-alba-medium.tar.gz',
     framework: LLMFramework.ONNX,
     modality: ModelCategory.SpeechSynthesis,
-    memoryRequirement: 77_000_000,
+    memoryRequirement: 65_000_000,
+    artifactType: 'archive',
   },
 
   // =========================================================================
-  // VAD model (Silero VAD, single ONNX file — hosted on GitHub, not HuggingFace)
+  // VAD model (Silero VAD, single ONNX file)
   // =========================================================================
   {
     id: 'silero-vad-v5',
     name: 'Silero VAD v5',
-    url: 'https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx',
+    url: 'https://huggingface.co/runanywhere/silero-vad-v5/resolve/main/silero_vad.onnx',
     files: ['silero_vad.onnx'],
     framework: LLMFramework.ONNX,
     modality: ModelCategory.Audio,

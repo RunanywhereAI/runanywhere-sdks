@@ -72,7 +72,7 @@ export type { PlaybackCompleteCallback, PlaybackConfig } from './Infrastructure/
 export { ModelManager } from './Infrastructure/ModelManager';
 export type {
   ManagedModel, CompactModelDef, DownloadProgress,
-  ModelFileDescriptor, VLMLoader, VLMLoadParams,
+  ModelFileDescriptor, ArtifactType, VLMLoader, VLMLoadParams,
 } from './Infrastructure/ModelManager';
 export { OPFSStorage } from './Infrastructure/OPFSStorage';
 export type { StoredModelInfo } from './Infrastructure/OPFSStorage';

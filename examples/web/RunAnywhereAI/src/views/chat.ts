@@ -6,6 +6,7 @@
  * tool calling toggle with demo tools (matching iOS ToolSettingsView).
  */
 
+import type { TabLifecycle } from '../app';
 import { ModelManager, ModelCategory, type ModelInfo } from '../services/model-manager';
 import { showModelSelectionSheet } from '../components/model-selection';
 import type { ToolValue } from '../../../../../sdk/runanywhere-web/packages/core/src/Public/Extensions/RunAnywhere+ToolCalling';
@@ -40,6 +41,8 @@ let messages: ChatMessage[] = [];
 let isGenerating = false;
 let toolsEnabled = false;
 let toolsRegistered = false;
+/** Cancel callback for the current streaming generation (stored so we can abort on tab switch). */
+let cancelGeneration: (() => void) | null = null;
 let container: HTMLElement;
 let messagesEl: HTMLElement;
 let inputEl: HTMLTextAreaElement;
@@ -52,17 +55,21 @@ let toolsToggleBtn: HTMLElement;
 // Init
 // ---------------------------------------------------------------------------
 
-export function initChatTab(el: HTMLElement): void {
+export function initChatTab(el: HTMLElement): TabLifecycle {
   container = el;
   container.innerHTML = `
     <!-- Toolbar -->
     <div class="toolbar">
       <div class="toolbar-actions">
-        <button class="btn btn-icon" id="chat-history-btn" title="Conversations">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/></svg>
+        <button class="btn btn-icon" id="chat-new-btn" title="New Chat">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
         </button>
       </div>
-      <div class="toolbar-title" id="chat-toolbar-model" style="cursor:pointer;">Select Model</div>
+      <div class="toolbar-model-btn" id="chat-toolbar-model" title="Change Model">
+        <svg class="model-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        <span id="chat-toolbar-model-text">Select Model</span>
+        <svg class="chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
       <div class="toolbar-actions">
         <button class="tools-toggle" id="chat-tools-toggle" title="Toggle Tool Calling">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
@@ -72,7 +79,20 @@ export function initChatTab(el: HTMLElement): void {
     </div>
 
     <!-- Messages -->
-    <div class="scroll-area" id="chat-messages" style="padding-top:var(--space-md);padding-bottom:var(--space-md);"></div>
+    <div class="scroll-area" id="chat-messages" style="padding-top:var(--space-md);padding-bottom:var(--space-md);">
+      <!-- Empty state (shown when no messages) -->
+      <div class="chat-empty-state" id="chat-empty-state">
+        <div class="empty-logo">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28" height="28"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <h3>Start a conversation</h3>
+        <p>Type a message below to get started</p>
+        <div class="suggestion-chips" id="chat-suggestions"></div>
+      </div>
+    </div>
+
+    <!-- Tools badge (shown when tools are enabled) -->
+    <div id="chat-tools-badge" style="display:none;padding:var(--space-sm) var(--space-lg) 0;"></div>
 
     <!-- Input -->
     <div class="chat-input-area">
@@ -122,10 +142,26 @@ export function initChatTab(el: HTMLElement): void {
   container.querySelector('#chat-get-started-btn')!.addEventListener('click', openModelSheet);
   toolbarModelEl.addEventListener('click', openModelSheet);
   toolsToggleBtn.addEventListener('click', toggleTools);
+  container.querySelector('#chat-new-btn')!.addEventListener('click', clearChat);
+
+  // Populate initial suggestion chips
+  renderSuggestions();
 
   // Subscribe to model changes
   ModelManager.onChange(onModelsChanged);
   onModelsChanged(ModelManager.getModels());
+
+  // Return lifecycle callbacks for tab-switching cleanup
+  return {
+    onDeactivate(): void {
+      // Cancel any in-flight LLM generation to free the WASM main thread
+      if (cancelGeneration) {
+        cancelGeneration();
+        cancelGeneration = null;
+        console.log('[Chat] Tab deactivated — cancelled in-flight generation');
+      }
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -161,13 +197,15 @@ function openModelSheet(): void {
 
 function onModelsChanged(_models: ModelInfo[]): void {
   const loaded = ModelManager.getLoadedModel(ModelCategory.Language);
+  const textSpan = toolbarModelEl.querySelector('#chat-toolbar-model-text');
   if (loaded) {
     overlayEl.style.display = 'none';
-    toolbarModelEl.textContent = loaded.name;
+    if (textSpan) textSpan.textContent = loaded.name;
   } else {
     overlayEl.style.display = '';
-    toolbarModelEl.textContent = 'Select Model';
+    if (textSpan) textSpan.textContent = 'Select Model';
   }
+  updateEmptyState();
 }
 
 // ---------------------------------------------------------------------------
@@ -182,6 +220,26 @@ async function toggleTools(): Promise<void> {
     await registerDemoTools();
     toolsRegistered = true;
   }
+
+  // Show/hide tools badge above input
+  const badgeEl = container.querySelector('#chat-tools-badge') as HTMLElement;
+  if (badgeEl) {
+    if (toolsEnabled) {
+      badgeEl.style.display = '';
+      badgeEl.innerHTML = `
+        <span class="tools-badge">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          Tools enabled &mdash; weather, time, calculator
+        </span>
+      `;
+    } else {
+      badgeEl.style.display = 'none';
+      badgeEl.innerHTML = '';
+    }
+  }
+
+  // Update suggestion chips to reflect tool-specific prompts
+  renderSuggestions();
 
   console.log(`[Chat] Tools ${toolsEnabled ? 'enabled' : 'disabled'}`);
 }
@@ -315,6 +373,76 @@ async function registerDemoTools(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Empty State & Suggestions
+// ---------------------------------------------------------------------------
+
+const GENERAL_SUGGESTIONS = [
+  'Tell me a fun fact',
+  'Explain quantum computing simply',
+  'Write a short poem about coding',
+  'What are the benefits of meditation?',
+];
+
+const TOOL_SUGGESTIONS = [
+  "What's the weather in Tokyo?",
+  'What time is it in London?',
+  'Calculate 2^10 + 15',
+  "What's the weather in San Francisco?",
+];
+
+/** Show/hide the empty state based on whether there are messages. */
+function updateEmptyState(): void {
+  const emptyState = container.querySelector('#chat-empty-state') as HTMLElement | null;
+  if (!emptyState) return;
+  emptyState.style.display = messages.length === 0 ? '' : 'none';
+}
+
+/** Populate suggestion chips (general or tool-specific depending on toggle). */
+function renderSuggestions(): void {
+  const chipsEl = container.querySelector('#chat-suggestions');
+  if (!chipsEl) return;
+
+  const suggestions = toolsEnabled ? TOOL_SUGGESTIONS : GENERAL_SUGGESTIONS;
+  chipsEl.innerHTML = suggestions.map(s =>
+    `<button class="suggestion-chip">${escapeHtml(s)}</button>`,
+  ).join('');
+
+  // Wire up click handlers: fill input and send
+  chipsEl.querySelectorAll('.suggestion-chip').forEach((chip, i) => {
+    chip.addEventListener('click', () => {
+      inputEl.value = suggestions[i];
+      onInputChange();
+      inputEl.focus();
+    });
+  });
+}
+
+/** Clear all messages and reset to empty state. */
+function clearChat(): void {
+  if (isGenerating && cancelGeneration) {
+    cancelGeneration();
+    cancelGeneration = null;
+  }
+  isGenerating = false;
+  messages = [];
+  messagesEl.innerHTML = `
+    <div class="chat-empty-state" id="chat-empty-state">
+      <div class="empty-logo">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28" height="28"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <h3>Start a conversation</h3>
+      <p>Type a message below to get started</p>
+      <div class="suggestion-chips" id="chat-suggestions"></div>
+    </div>
+  `;
+  renderSuggestions();
+  inputEl.value = '';
+  onInputChange();
+  hideTypingIndicator();
+  console.log('[Chat] Conversation cleared');
+}
+
+// ---------------------------------------------------------------------------
 // Input Handling
 // ---------------------------------------------------------------------------
 
@@ -340,6 +468,9 @@ async function sendMessage(): Promise<void> {
     return;
   }
 
+  // Hide empty state on first message
+  updateEmptyState();
+
   // Add user message
   const userMsg: ChatMessage = {
     id: crypto.randomUUID(),
@@ -348,6 +479,7 @@ async function sendMessage(): Promise<void> {
     timestamp: Date.now(),
   };
   messages.push(userMsg);
+  updateEmptyState();
   renderMessage(userMsg);
   inputEl.value = '';
   onInputChange();
@@ -396,10 +528,11 @@ async function sendStreaming(text: string, loaded: ModelInfo): Promise<void> {
     throw new Error('Model not loaded in WASM backend');
   }
 
-  const { stream, result: resultPromise } = TextGeneration.generateStream(text, {
+  const { stream, result: resultPromise, cancel } = TextGeneration.generateStream(text, {
     maxTokens: 512,
     temperature: 0.7,
   });
+  cancelGeneration = cancel;
 
   hideTypingIndicator();
 
@@ -419,6 +552,7 @@ async function sendStreaming(text: string, loaded: ModelInfo): Promise<void> {
     scrollToBottom();
     await new Promise(r => setTimeout(r, 12));
   }
+  cancelGeneration = null;
 
   const finalResult = await resultPromise;
   console.log(
