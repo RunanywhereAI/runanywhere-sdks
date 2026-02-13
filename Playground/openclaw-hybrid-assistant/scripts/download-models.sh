@@ -365,6 +365,57 @@ else
 fi
 
 # =============================================================================
+# Generate Wake Word Acknowledgment Audio ("I'm listening")
+# =============================================================================
+# Pre-synthesize a short spoken acknowledgment using espeak-ng + sox.
+# Played immediately when "Hey Jarvis" is detected so the user knows we heard them.
+# Uses espeak-ng for zero-dependency TTS, then sox to normalize and trim.
+
+ACK_FILE="${EARCON_DIR}/listening.wav"
+
+if [ -f "${ACK_FILE}" ]; then
+    print_success "Wake word acknowledgment audio already generated"
+else
+    print_step "Generating wake word acknowledgment audio..."
+    if command -v espeak-ng &> /dev/null && command -v sox &> /dev/null; then
+        # Generate with espeak-ng (English female voice, slightly faster)
+        TEMP_ACK="/tmp/ack_raw.wav"
+        espeak-ng -v en+f3 -s 170 -p 60 "I'm listening" -w "${TEMP_ACK}" 2>&1 || true
+
+        if [ -f "${TEMP_ACK}" ] && [ -s "${TEMP_ACK}" ]; then
+            # Polish: convert to 22050Hz mono 16-bit, trim silence, normalize, gentle fade
+            sox "${TEMP_ACK}" -r 22050 -c 1 -b 16 "${ACK_FILE}" \
+                silence 1 0.01 0.1% reverse silence 1 0.01 0.1% reverse \
+                norm -3 fade t 0.01 0 0.05 2>/dev/null || true
+            rm -f "${TEMP_ACK}"
+        fi
+
+        # If sox processing failed or espeak-ng failed, try simpler approach
+        if [ ! -f "${ACK_FILE}" ] || [ ! -s "${ACK_FILE}" ]; then
+            echo "  Trying simpler espeak-ng approach..."
+            espeak-ng "I'm listening" -w "${ACK_FILE}" 2>&1 || true
+            # Convert to standard format if raw espeak succeeded
+            if [ -f "${ACK_FILE}" ] && [ -s "${ACK_FILE}" ]; then
+                TEMP_CONVERT="/tmp/ack_convert.wav"
+                sox "${ACK_FILE}" -r 22050 -c 1 -b 16 "${TEMP_CONVERT}" norm -3 2>/dev/null || true
+                if [ -f "${TEMP_CONVERT}" ] && [ -s "${TEMP_CONVERT}" ]; then
+                    mv "${TEMP_CONVERT}" "${ACK_FILE}"
+                fi
+            fi
+        fi
+
+        if [ -f "${ACK_FILE}" ] && [ -s "${ACK_FILE}" ]; then
+            print_success "Acknowledgment audio generated ($(ls -lh "${ACK_FILE}" | awk '{print $5}'))"
+        else
+            echo -e "${YELLOW}  Could not generate acknowledgment audio - wake word will be silent${NC}"
+        fi
+    else
+        echo -e "${YELLOW}  espeak-ng or sox not installed - skipping acknowledgment audio${NC}"
+        echo "  Install with: sudo apt-get install espeak-ng sox"
+    fi
+fi
+
+# =============================================================================
 # Summary
 # =============================================================================
 

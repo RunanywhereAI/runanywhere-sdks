@@ -126,6 +126,11 @@ void WaitingChime::start() {
     repeat_thread_ = std::thread(&WaitingChime::repeat_loop, this);
 }
 
+void WaitingChime::play_once() {
+    if (!loaded_) return;
+    play_earcon();
+}
+
 void WaitingChime::stop() {
     if (!playing_.load()) return;
 
