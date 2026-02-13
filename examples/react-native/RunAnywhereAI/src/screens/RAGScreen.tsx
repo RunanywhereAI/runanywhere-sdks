@@ -196,8 +196,8 @@ export const RAGScreen: React.FC = () => {
 
     const baseId = stripModelExtension(model.id);
     const downloadURL = (model as any).downloadURL as string | undefined;
-    const isOnnxById = model.id.toLowerCase().includes('minilm') || model.id.toLowerCase().includes('embedding');
-    const isOnnxByName = model.name.toLowerCase().includes('minilm') || model.name.toLowerCase().includes('embedding');
+    const isOnnxById = model.id.toLowerCase().includes('minilm') || model.id.toLowerCase().includes('embedding') || model.id.toLowerCase().includes('vocab');
+    const isOnnxByName = model.name.toLowerCase().includes('minilm') || model.name.toLowerCase().includes('embedding') || model.name.toLowerCase().includes('vocab');
     const isOnnxByUrl = !!downloadURL && downloadURL.toLowerCase().includes('.onnx');
     const framework =
       model.preferredFramework ||
@@ -230,6 +230,22 @@ export const RAGScreen: React.FC = () => {
     }
 
     return `${baseDir}/model.onnx`;
+  };
+
+  const resolveVocabPath = (embeddingPath: string): string | null => {
+    if (!embeddingPath) {
+      return null;
+    }
+
+    if (embeddingPath.endsWith('.onnx')) {
+      const lastSlash = embeddingPath.lastIndexOf('/');
+      if (lastSlash === -1) {
+        return null;
+      }
+      return `${embeddingPath.substring(0, lastSlash)}/vocab.txt`;
+    }
+
+    return `${embeddingPath}/vocab.txt`;
   };
 
   const initializeRAG = async () => {
@@ -298,6 +314,10 @@ export const RAGScreen: React.FC = () => {
 
       const embeddingPath = resolveModelPath(embeddingModel, modelsDir);
       const llmPath = resolveModelPath(llmModel, modelsDir);
+      const vocabModel = availableModels.find((model) => model.id === 'all-minilm-l6-v2-vocab');
+      const vocabPath = vocabModel && vocabModel.isDownloaded
+        ? resolveModelPath(vocabModel, modelsDir)
+        : (embeddingPath ? resolveVocabPath(embeddingPath) : null);
 
       console.warn('[RAGScreen] Resolved paths:', { embeddingPath, llmPath, modelsDir });
 
@@ -320,6 +340,9 @@ export const RAGScreen: React.FC = () => {
           maxContextTokens: 2048,
           chunkSize: 512,
           chunkOverlap: 50,
+          embeddingConfigJson: vocabPath
+            ? JSON.stringify({ vocab_path: vocabPath })
+            : undefined,
         })
       );
 

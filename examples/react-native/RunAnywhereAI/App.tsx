@@ -229,7 +229,7 @@ const App: React.FC = () => {
       // Embedding model for RAG
       // NOTE: RAG has its own ONNXEmbeddingProvider (onnx_embedding_provider.cpp) that directly
       // uses ONNX Runtime C API. It's independent from the general ONNX backend used for STT/TTS.
-      // Therefore, the embedding model can be a simple model.onnx file without tar.gz packaging.
+      // The embedding model is a single ONNX file; vocab.txt is downloaded separately.
       ONNX.addModel({
         id: 'all-minilm-l6-v2',
         name: 'All MiniLM L6 v2 (Embedding)',
@@ -237,6 +237,14 @@ const App: React.FC = () => {
         modality: ModelCategory.Embedding,
         artifactType: ModelArtifactType.SingleFile,
         memoryRequirement: 25_000_000,
+      }),
+      ONNX.addModel({
+        id: 'all-minilm-l6-v2-vocab',
+        name: 'All MiniLM L6 v2 (Vocab)',
+        url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt',
+        modality: ModelCategory.Embedding,
+        artifactType: ModelArtifactType.SingleFile,
+        memoryRequirement: 500_000,
       }),
     ];
     await Promise.all(onnxPromises);

@@ -10,10 +10,13 @@
 
 #include <nlohmann/json.hpp>
 #include <onnxruntime_c_api.h>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <cmath>
 #include <algorithm>
+#include <cctype>
+#include <unordered_map>
 
 #define LOG_TAG "RAG.ONNXEmbedding"
 #define LOGI(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
@@ -30,48 +33,74 @@ namespace rag {
 class SimpleTokenizer {
 public:
     SimpleTokenizer() {
-        // Special tokens
+        // Special tokens (defaults; may be overridden by vocab load)
         token_to_id_["[CLS]"] = 101;
         token_to_id_["[SEP]"] = 102;
         token_to_id_["[PAD]"] = 0;
         token_to_id_["[UNK]"] = 100;
-        next_id_ = 1000;
+        cls_id_ = 101;
+        sep_id_ = 102;
+        pad_id_ = 0;
+        unk_id_ = 100;
+    }
+
+    bool load_vocab(const std::string& vocab_path) {
+        std::ifstream file(vocab_path);
+        if (!file) {
+            return false;
+        }
+
+        token_to_id_.clear();
+
+        std::string line;
+        int64_t id = 0;
+        while (std::getline(file, line)) {
+            if (!line.empty() && line.back() == '\r') {
+                line.pop_back();
+            }
+            token_to_id_[line] = id++;
+        }
+
+        if (token_to_id_.empty()) {
+            return false;
+        }
+
+        vocab_loaded_ = true;
+
+        // Refresh special token IDs if present in vocab
+        cls_id_ = get_token_id("[CLS]", cls_id_);
+        sep_id_ = get_token_id("[SEP]", sep_id_);
+        pad_id_ = get_token_id("[PAD]", pad_id_);
+        unk_id_ = get_token_id("[UNK]", unk_id_);
+
+        return true;
     }
     
     std::vector<int64_t> encode(const std::string& text, size_t max_length = 512) {
         std::vector<int64_t> token_ids;
-        token_ids.push_back(101); // [CLS]
-        
-        // Simple word tokenization
-        std::istringstream iss(text);
-        std::string word;
-        
-        while (iss >> word && token_ids.size() < max_length - 1) {
-            // Convert to lowercase
-            std::transform(word.begin(), word.end(), word.begin(), ::tolower);
-            
-            // Get or create token ID
-            auto it = token_to_id_.find(word);
-            if (it != token_to_id_.end()) {
-                token_ids.push_back(it->second);
-            } else {
-                // Hash-based ID for unknown words (clamped to BERT vocab range)
-                // BERT vocab size is 30522 (valid IDs: 0..30521)
-                size_t hash = std::hash<std::string>{}(word);
-                constexpr int64_t kVocabSize = 30522;
-                constexpr int64_t kMinId = 1000;
-                constexpr int64_t kMaxId = kVocabSize - 1;
-                const int64_t range = kMaxId - kMinId + 1;
-                int64_t token_id = static_cast<int64_t>(hash % static_cast<size_t>(range)) + kMinId;
-                token_ids.push_back(token_id);
+        token_ids.reserve(max_length);
+        token_ids.push_back(cls_id_); // [CLS]
+
+        const auto words = basic_tokenize(text);
+        for (const auto& word : words) {
+            if (token_ids.size() >= max_length - 1) {
+                break;
+            }
+
+            const auto ids = word_to_token_ids(word);
+            for (const auto id : ids) {
+                if (token_ids.size() >= max_length - 1) {
+                    break;
+                }
+                token_ids.push_back(id);
             }
         }
-        
-        token_ids.push_back(102); // [SEP]
+
+        token_ids.push_back(sep_id_); // [SEP]
         
         // Pad to max_length
         while (token_ids.size() < max_length) {
-            token_ids.push_back(0); // [PAD]
+            token_ids.push_back(pad_id_); // [PAD]
         }
         
         return token_ids;
@@ -91,8 +120,123 @@ public:
     }
 
 private:
+    std::vector<std::string> basic_tokenize(const std::string& text) const {
+        std::vector<std::string> tokens;
+        std::string current;
+        current.reserve(text.size());
+
+        for (unsigned char ch : text) {
+            if (std::isspace(ch) || std::ispunct(ch)) {
+                if (!current.empty()) {
+                    tokens.push_back(std::move(current));
+                    current.clear();
+                }
+                continue;
+            }
+            current.push_back(static_cast<char>(std::tolower(ch)));
+        }
+
+        if (!current.empty()) {
+            tokens.push_back(std::move(current));
+        }
+
+        return tokens;
+    }
+
+    std::vector<std::string> wordpiece_tokenize(const std::string& word) const {
+        if (!vocab_loaded_) {
+            return {word};
+        }
+
+        if (token_to_id_.find(word) != token_to_id_.end()) {
+            return {word};
+        }
+
+        std::vector<std::string> pieces;
+        size_t start = 0;
+        while (start < word.size()) {
+            size_t end = word.size();
+            std::string current_piece;
+            bool found = false;
+
+            while (start < end) {
+                std::string substr = word.substr(start, end - start);
+                if (start > 0) {
+                    substr.insert(0, "##");
+                }
+
+                if (token_to_id_.find(substr) != token_to_id_.end()) {
+                    current_piece = std::move(substr);
+                    found = true;
+                    break;
+                }
+                end--;
+            }
+
+            if (!found) {
+                return {"[UNK]"};
+            }
+
+            pieces.push_back(std::move(current_piece));
+            start = end;
+        }
+
+        return pieces;
+    }
+
+    std::vector<int64_t> word_to_token_ids(const std::string& word) {
+        auto it = token_cache_.find(word);
+        if (it != token_cache_.end()) {
+            return it->second;
+        }
+
+        const auto pieces = wordpiece_tokenize(word);
+        std::vector<int64_t> ids;
+        ids.reserve(pieces.size());
+        for (const auto& piece : pieces) {
+            ids.push_back(token_id_for(piece));
+        }
+
+        if (token_cache_.size() >= token_cache_limit_) {
+            token_cache_.clear();
+        }
+        token_cache_.emplace(word, ids);
+
+        return ids;
+    }
+
+    int64_t token_id_for(const std::string& token) const {
+        auto it = token_to_id_.find(token);
+        if (it != token_to_id_.end()) {
+            return it->second;
+        }
+
+        if (vocab_loaded_) {
+            return unk_id_;
+        }
+
+        // Hash-based fallback when vocab is unavailable
+        size_t hash = std::hash<std::string>{}(token);
+        constexpr int64_t kVocabSize = 30522;
+        constexpr int64_t kMinId = 1000;
+        constexpr int64_t kMaxId = kVocabSize - 1;
+        const int64_t range = kMaxId - kMinId + 1;
+        return static_cast<int64_t>(hash % static_cast<size_t>(range)) + kMinId;
+    }
+
+    int64_t get_token_id(const std::string& token, int64_t fallback) const {
+        auto it = token_to_id_.find(token);
+        return it != token_to_id_.end() ? it->second : fallback;
+    }
+
     std::unordered_map<std::string, int64_t> token_to_id_;
-    int64_t next_id_;
+    int64_t cls_id_ = 101;
+    int64_t sep_id_ = 102;
+    int64_t pad_id_ = 0;
+    int64_t unk_id_ = 100;
+    bool vocab_loaded_ = false;
+    std::unordered_map<std::string, std::vector<int64_t>> token_cache_;
+    std::size_t token_cache_limit_ = 4096;
 };
 
 // =============================================================================
@@ -167,6 +311,29 @@ public:
             return;
         }
         
+        // Load tokenizer vocab if provided
+        std::string vocab_path;
+        if (config_.contains("vocab_path")) {
+            vocab_path = config_.at("vocab_path").get<std::string>();
+        } else if (config_.contains("vocabPath")) {
+            vocab_path = config_.at("vocabPath").get<std::string>();
+        } else {
+            std::filesystem::path model_file(model_path_);
+            vocab_path = (model_file.parent_path() / "vocab.txt").string();
+        }
+
+        if (vocab_path.empty() || !std::filesystem::exists(vocab_path)) {
+            LOGE("Tokenizer vocab not found: %s", vocab_path.c_str());
+            return;
+        }
+
+        if (!tokenizer_.load_vocab(vocab_path)) {
+            LOGE("Failed to load tokenizer vocab: %s", vocab_path.c_str());
+            return;
+        }
+
+        LOGI("Loaded tokenizer vocab: %s", vocab_path.c_str());
+
         // Load model
         if (!load_model(model_path)) {
             LOGE("Failed to load model: %s", model_path.c_str());
