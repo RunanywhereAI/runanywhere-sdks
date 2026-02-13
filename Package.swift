@@ -40,11 +40,11 @@ let onnxRuntimeMacOSPath = "\(packageDir)/sdk/runanywhere-swift/Binaries/onnxrun
 //   ./scripts/build-swift.sh --set-remote  (sets useLocalBinaries = false)
 //
 // =============================================================================
-let useLocalBinaries = true  // Toggle: true for local dev, false for release
+let useLocalBinaries = false  // Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when testLocal = false)
 // Updated automatically by CI/CD during releases
-let sdkVersion = "0.17.5"
+let sdkVersion = "0.18.0"
 
 let package = Package(
     name: "runanywhere-sdks",
@@ -228,17 +228,17 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "ba367c89a468513b33fb167b5996574a8797bf2c00a21e01579ec59458813559"
+                checksum: "cfe8fa73fd70b344d737bdfc6f66bf13fdd1777247ac7612dc8ada6356f90631"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
-                checksum: "9e58e33e2984f5f0498bdad69387aec306fd2d31e6690eab38b9f1d1a21fb0ca"
+                checksum: "c08e6eddaf6c068f6458190b1689c32f08f153a88646591e0a0b09fdacf7f40d"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
-                checksum: "e760044abfe97d2bde9386d801b0e11421c3782980f4088edce6d6d976f48a84"
+                checksum: "2755bea9d6414a1f776a9f57da8c8de86f970cd1416fca8f44c0246428c96d5f"
             ),
             .binaryTarget(
                 name: "ONNXRuntimeBinary",
