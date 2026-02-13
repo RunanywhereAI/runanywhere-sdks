@@ -81,3 +81,6 @@ tmp/
 
 # Package artifacts
 package.tgz
+
+# Internal release guide (not for public repo)
+RELEASE_REACT_NATIVE.md
