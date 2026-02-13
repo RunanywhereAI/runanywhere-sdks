@@ -42,6 +42,10 @@ public:
     // Safe to call if already playing (no-op).
     void start();
 
+    // Play the earcon exactly once (blocking, no repeat loop).
+    // Used for wake word acknowledgment — plays the chime and returns.
+    void play_once();
+
     // Stop immediately (thread-safe).
     // Safe to call if not playing (no-op).
     void stop();

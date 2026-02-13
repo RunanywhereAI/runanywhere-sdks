@@ -195,6 +195,10 @@ inline std::string get_earcon_path() {
     return get_base_dir() + "/Models/ONNX/earcon/acknowledgment.wav";
 }
 
+inline std::string get_listening_ack_path() {
+    return get_base_dir() + "/Models/ONNX/earcon/listening.wav";
+}
+
 // =============================================================================
 // Model Availability
 // =============================================================================
