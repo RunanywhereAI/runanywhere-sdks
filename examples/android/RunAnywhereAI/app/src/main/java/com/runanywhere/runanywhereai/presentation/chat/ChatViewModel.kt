@@ -858,8 +858,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val maxTokens = generationPrefs.getInt("defaultMaxTokens", 1000)
         val systemPromptValue = generationPrefs.getString("defaultSystemPrompt", "")
         val systemPrompt = if (systemPromptValue.isNullOrEmpty()) null else systemPromptValue
+        val systemPromptInfo = systemPrompt?.let { "set(${it.length} chars)" } ?: "nil"
 
-        Log.i(TAG, "[PARAMS] App getGenerationOptions: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=${systemPrompt ?: "nil"}")
+        Log.i(TAG, "[PARAMS] App getGenerationOptions: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=$systemPromptInfo")
 
         return com.runanywhere.sdk.public.extensions.LLM.LLMGenerationOptions(
             maxTokens = maxTokens,

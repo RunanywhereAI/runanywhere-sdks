@@ -333,14 +333,21 @@ final class LLMViewModel {
 
         let effectiveSystemPrompt = (savedSystemPrompt?.isEmpty == false) ? savedSystemPrompt : nil
 
-        logger.info("[PARAMS] App getGenerationOptions: temperature=\(effectiveSettings.temperature), maxTokens=\(effectiveSettings.maxTokens), systemPrompt=\(effectiveSystemPrompt ?? "nil")")
+    let systemPromptInfo: String = {
+        guard let prompt = effectiveSystemPrompt else { return "nil" }
+        return "set(\(prompt.count) chars)"
+    }()
 
-        return LLMGenerationOptions(
-            maxTokens: effectiveSettings.maxTokens,
-            temperature: Float(effectiveSettings.temperature),
-            systemPrompt: effectiveSystemPrompt
-        )
-    }
+    logger.info(
+        "[PARAMS] App getGenerationOptions: temperature=\(effectiveSettings.temperature), maxTokens=\(effectiveSettings.maxTokens), systemPrompt=\(systemPromptInfo)"
+    )
+
+    return LLMGenerationOptions(
+        maxTokens: effectiveSettings.maxTokens,
+        temperature: Float(effectiveSettings.temperature),
+        systemPrompt: effectiveSystemPrompt
+    )
+}
 
     // MARK: - Internal Methods - Helpers
 

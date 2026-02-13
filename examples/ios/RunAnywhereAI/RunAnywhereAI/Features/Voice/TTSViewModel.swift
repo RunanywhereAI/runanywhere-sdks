@@ -26,7 +26,7 @@ class TTSViewModel: ObservableObject {
 
     // Voice Settings
     @Published var speechRate: Double = 1.0
-    @Published var pitch: Double = 1.0 // while removed from the UI, the backend still supports pitch, so maintinaining it here.
+    @Published var pitch: Double = 1.0 // while removed from the UI, the backend still supports pitch, so maintaining it here.
 
     // MARK: - Private Properties
 

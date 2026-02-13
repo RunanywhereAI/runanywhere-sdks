@@ -237,7 +237,7 @@ struct TextToSpeechView: View {
             // TODO: Find a model for TTS that supports pitch, or manually implement a good quality pitch adjustment
 
             // Pitch (not implemented in the current TTS models. Once supported, we can have this back.)
-            // VStack(alignment: .leading, spacing: 10) {claud
+            // VStack(alignment: .leading, spacing: 10) {
             //     HStack {
             //         Text("Pitch")
             //             .font(.subheadline)

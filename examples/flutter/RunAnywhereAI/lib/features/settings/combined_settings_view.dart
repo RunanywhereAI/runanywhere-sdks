@@ -44,6 +44,7 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
   double _temperature = 0.7;
   int _maxTokens = 1000;
   String _systemPrompt = '';
+  late final TextEditingController _systemPromptController;
 
   // Loading state
   bool _isRefreshingStorage = false;
@@ -51,10 +52,17 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
   @override
   void initState() {
     super.initState();
+    _systemPromptController = TextEditingController();
     unawaited(_loadSettings());
     unawaited(_loadGenerationSettings());
     unawaited(_loadApiConfiguration());
     unawaited(_loadStorageData());
+  }
+
+  @override
+  void dispose() {
+    _systemPromptController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSettings() async {
@@ -74,6 +82,7 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
         _temperature = prefs.getDouble(PreferenceKeys.defaultTemperature) ?? 0.7;
         _maxTokens = prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 1000;
         _systemPrompt = prefs.getString(PreferenceKeys.defaultSystemPrompt) ?? '';
+        _systemPromptController.text = _systemPrompt;
       });
     }
   }
@@ -579,10 +588,7 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
             Text('System Prompt', style: AppTypography.subheadline(context)),
             const SizedBox(height: AppSpacing.xSmall),
             TextField(
-              controller: TextEditingController(text: _systemPrompt)
-                ..selection = TextSelection.fromPosition(
-                  TextPosition(offset: _systemPrompt.length),
-                ),
+              controller: _systemPromptController,
               maxLines: 3,
               decoration: const InputDecoration(
                 hintText: 'Enter a system prompt...',
