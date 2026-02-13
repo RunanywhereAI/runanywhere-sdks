@@ -54,7 +54,7 @@ export function initMoreTab(el: HTMLElement): void {
     <div class="scroll-area" id="more-content">
       <div class="feature-list">
         <div class="feature-row" id="more-transcribe-btn">
-          <div class="feature-icon" style="background:var(--color-blue);">
+          <div class="feature-icon bg-blue">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><path d="M2 13a2 2 0 0 0 2-2V7a2 2 0 0 1 4 0v13a2 2 0 0 0 4 0V4a2 2 0 0 1 4 0v13a2 2 0 0 0 4 0V7a2 2 0 0 1 2-2"/></svg>
           </div>
           <div class="feature-text">
@@ -63,7 +63,7 @@ export function initMoreTab(el: HTMLElement): void {
           </div>
         </div>
         <div class="feature-row" id="more-speak-btn">
-          <div class="feature-icon" style="background:var(--color-green);">
+          <div class="feature-icon bg-green">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
           </div>
           <div class="feature-text">
@@ -72,7 +72,7 @@ export function initMoreTab(el: HTMLElement): void {
           </div>
         </div>
         <div class="feature-row" id="more-storage-btn">
-          <div class="feature-icon" style="background:var(--color-primary);">
+          <div class="feature-icon bg-orange">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
           </div>
           <div class="feature-text">
@@ -94,29 +94,29 @@ export function initMoreTab(el: HTMLElement): void {
         </button>
         <div class="toolbar-title">Speech to Text</div>
         <div class="toolbar-actions">
-          <button class="btn btn-icon" id="stt-model-btn" title="Select Model" style="border:none;background:none;">
+          <button class="btn-ghost" id="stt-model-btn" title="Select Model">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0 1 12 15a9.065 9.065 0 0 0-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0 1 12 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5"/></svg>
           </button>
         </div>
       </div>
 
       <!-- Mode Toggle (Batch / Live) -->
-      <div style="display:flex;gap:var(--space-sm);padding:var(--space-md) var(--space-lg);background:var(--bg-secondary);border-bottom:1px solid var(--border-light);">
-        <button class="stt-mode-btn active" id="stt-mode-batch" style="flex:1;">
+      <div class="stt-mode-bar">
+        <button class="stt-mode-btn active flex-1" id="stt-mode-batch">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 3h-8l-2 4h12z"/></svg>
           Batch
         </button>
-        <button class="stt-mode-btn" id="stt-mode-live" style="flex:1;">
+        <button class="stt-mode-btn flex-1" id="stt-mode-live">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><path d="M2 13a2 2 0 0 0 2-2V7a2 2 0 0 1 4 0v13a2 2 0 0 0 4 0V4a2 2 0 0 1 4 0v13a2 2 0 0 0 4 0V7a2 2 0 0 1 2-2"/></svg>
           Live
         </button>
       </div>
 
       <!-- Main content area -->
-      <div class="scroll-area" id="stt-content" style="flex:1;display:flex;flex-direction:column;">
+      <div class="scroll-area stt-content" id="stt-content">
 
         <!-- Ready state (no transcription yet) -->
-        <div id="stt-ready" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--space-lg);padding:var(--space-3xl);">
+        <div id="stt-ready" class="stt-ready-state">
           <!-- Animated waveform (breathing) -->
           <div class="stt-waveform-anim" id="stt-waveform-anim">
             <div class="stt-wave-bar"></div>
@@ -125,33 +125,33 @@ export function initMoreTab(el: HTMLElement): void {
             <div class="stt-wave-bar"></div>
             <div class="stt-wave-bar"></div>
           </div>
-          <h3 style="font-weight:var(--font-weight-semibold);">Ready to transcribe</h3>
-          <p id="stt-mode-desc" style="color:var(--text-secondary);font-size:var(--font-size-sm);text-align:center;">Record first, then transcribe</p>
+          <h3 class="font-semibold">Ready to transcribe</h3>
+          <p id="stt-mode-desc" class="helper-text text-center">Record first, then transcribe</p>
         </div>
 
         <!-- Transcription result area (hidden until there's text) -->
-        <div id="stt-result-area" style="display:none;flex:1;padding:var(--space-lg);">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-md);">
-            <span style="font-weight:var(--font-weight-semibold);font-size:var(--font-size-md);">Transcription</span>
-            <span id="stt-status-badge" style="display:none;"></span>
+        <div id="stt-result-area" class="stt-result-panel">
+          <div class="stt-result-header">
+            <span class="font-semibold text-md">Transcription</span>
+            <span id="stt-status-badge" class="hidden"></span>
           </div>
-          <div id="stt-result-text" style="padding:var(--space-lg);background:var(--bg-secondary);border-radius:var(--radius-lg);min-height:100px;line-height:var(--line-height-relaxed);color:var(--text-primary);white-space:pre-wrap;"></div>
+          <div id="stt-result-text" class="content-panel"></div>
         </div>
       </div>
 
       <!-- Bottom controls (always visible) -->
-      <div style="padding:var(--space-md) var(--space-lg) var(--space-xl);display:flex;flex-direction:column;align-items:center;gap:var(--space-md);border-top:1px solid var(--border-light);background:var(--bg-secondary);">
-        <div id="stt-error" style="display:none;color:var(--color-red);font-size:var(--font-size-sm);text-align:center;"></div>
+      <div class="stt-controls">
+        <div id="stt-error" class="error-text hidden"></div>
 
         <!-- Audio level bars -->
-        <div id="stt-level-bars" style="display:none;width:100%;max-width:300px;">
-          <div style="display:flex;align-items:center;gap:2px;height:24px;justify-content:center;">
-            ${Array.from({ length: 20 }, () => '<div class="stt-level-bar" style="width:4px;height:3px;background:var(--color-green);border-radius:1px;transition:height 0.08s ease;"></div>').join('')}
+        <div id="stt-level-bars" class="stt-level-container">
+          <div class="stt-level-row">
+            ${Array.from({ length: 20 }, () => '<div class="stt-level-bar"></div>').join('')}
           </div>
         </div>
 
         <!-- Mic button -->
-        <button class="mic-btn" id="stt-mic-btn" style="width:72px;height:72px;">
+        <button class="mic-btn mic-btn-lg" id="stt-mic-btn">
           <svg id="stt-mic-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="28" height="28">
             <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
             <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
@@ -159,7 +159,7 @@ export function initMoreTab(el: HTMLElement): void {
             <line x1="8" y1="23" x2="16" y2="23"/>
           </svg>
         </button>
-        <p id="stt-status-text" style="color:var(--text-secondary);font-size:var(--font-size-sm);">Tap to start recording</p>
+        <p id="stt-status-text" class="helper-text">Tap to start recording</p>
       </div>
     </div>
 
@@ -174,22 +174,22 @@ export function initMoreTab(el: HTMLElement): void {
         </button>
         <div class="toolbar-title">Speak</div>
         <div class="toolbar-actions">
-          <button class="btn btn-icon" id="tts-model-btn" title="Select TTS Model" style="border:none;background:none;">
+          <button class="btn-ghost" id="tts-model-btn" title="Select TTS Model">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0 1 12 15a9.065 9.065 0 0 0-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0 1 12 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5"/></svg>
           </button>
         </div>
       </div>
-      <div class="scroll-area" style="display:flex;flex-direction:column;align-items:center;gap:var(--space-xl);padding:var(--space-3xl);">
-        <textarea class="chat-input" id="speak-text" placeholder="Enter text to speak..." rows="5" style="max-width:400px;width:100%;min-height:120px;"></textarea>
-        <button class="btn btn-sm" id="speak-surprise-btn" style="color:var(--color-purple);">Surprise me</button>
-        <div style="display:flex;align-items:center;gap:var(--space-lg);width:100%;max-width:400px;">
-          <label style="font-size:var(--font-size-sm);color:var(--text-secondary);min-width:50px;">Speed</label>
-          <input type="range" id="speak-speed" min="0.5" max="2" step="0.1" value="1" style="flex:1;">
-          <span id="speak-speed-val" style="font-size:var(--font-size-sm);min-width:30px;text-align:right;">1.0x</span>
+      <div class="scroll-area tts-layout">
+        <textarea class="chat-input tts-textarea" id="speak-text" placeholder="Enter text to speak..." rows="5"></textarea>
+        <button class="btn btn-sm text-purple" id="speak-surprise-btn">Surprise me</button>
+        <div class="tts-speed-row">
+          <label class="tts-speed-label">Speed</label>
+          <input type="range" id="speak-speed" min="0.5" max="2" step="0.1" value="1" class="flex-1">
+          <span id="speak-speed-val" class="tts-speed-value">1.0x</span>
         </div>
-        <div id="tts-error" style="display:none;color:var(--color-red);font-size:var(--font-size-sm);text-align:center;width:100%;max-width:400px;"></div>
-        <div id="tts-status" style="display:none;color:var(--text-secondary);font-size:var(--font-size-sm);text-align:center;width:100%;max-width:400px;"></div>
-        <button class="btn btn-primary btn-lg" id="speak-btn" style="width:100%;max-width:400px;background:var(--color-purple);border-color:var(--color-purple);">
+        <div id="tts-error" class="tts-message error-text hidden"></div>
+        <div id="tts-status" class="tts-message helper-text hidden"></div>
+        <button class="btn btn-primary btn-lg tts-speak-btn" id="speak-btn">
           Speak
         </button>
       </div>
@@ -213,9 +213,9 @@ export function initMoreTab(el: HTMLElement): void {
           <div class="storage-stat"><div class="value" id="storage-size">0 MB</div><div class="label">Total Size</div></div>
           <div class="storage-stat"><div class="value" id="storage-available">-- GB</div><div class="label">Available</div></div>
         </div>
-        <div id="storage-models" style="padding:var(--space-lg);"></div>
-        <div style="padding:0 var(--space-lg) var(--space-lg);">
-          <button class="btn" id="storage-clear-btn" style="width:100%;color:var(--color-red);">Clear All Models</button>
+        <div id="storage-models" class="storage-models-list"></div>
+        <div class="storage-actions">
+          <button class="btn btn-danger" id="storage-clear-btn">Clear All Models</button>
         </div>
       </div>
     </div>
@@ -453,39 +453,31 @@ function renderSTTUI(): void {
   const levelBars = container.querySelector('#stt-level-bars') as HTMLElement;
 
   // Error
-  if (sttError) {
-    errorEl.style.display = '';
-    errorEl.textContent = sttError;
-  } else {
-    errorEl.style.display = 'none';
-  }
+  errorEl.classList.toggle('hidden', !sttError);
+  if (sttError) errorEl.textContent = sttError;
 
   // Show/hide result area
-  if (sttTranscription.length > 0 || sttState === 'transcribing') {
-    readyArea.style.display = 'none';
-    resultArea.style.display = '';
-    resultText.textContent = sttTranscription || 'Transcribing...';
-  } else {
-    readyArea.style.display = '';
-    resultArea.style.display = 'none';
-  }
+  const hasResult = sttTranscription.length > 0 || sttState === 'transcribing';
+  readyArea.style.display = hasResult ? 'none' : '';
+  resultArea.style.display = hasResult ? '' : 'none';
+  if (hasResult) resultText.textContent = sttTranscription || 'Transcribing...';
 
   // Level bars
   levelBars.style.display = sttState === 'recording' ? '' : 'none';
 
   // Status badge
   if (sttState === 'recording') {
-    statusBadge.style.display = '';
-    statusBadge.innerHTML = `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;background:rgba(239,68,68,0.1);color:var(--color-red);font-size:11px;font-weight:600;">
-      <span style="width:6px;height:6px;border-radius:50%;background:var(--color-red);animation:stt-pulse 1s infinite;"></span> RECORDING
+    statusBadge.classList.remove('hidden');
+    statusBadge.innerHTML = `<span class="status-badge recording">
+      <span class="status-dot red pulse"></span> RECORDING
     </span>`;
   } else if (sttState === 'transcribing') {
-    statusBadge.style.display = '';
-    statusBadge.innerHTML = `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;background:rgba(249,115,22,0.1);color:var(--color-primary);font-size:11px;font-weight:600;">
-      <span style="width:12px;height:12px;border:2px solid var(--color-primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;display:inline-block;"></span> TRANSCRIBING
+    statusBadge.classList.remove('hidden');
+    statusBadge.innerHTML = `<span class="status-badge processing">
+      <span class="spinner"></span> TRANSCRIBING
     </span>`;
   } else {
-    statusBadge.style.display = 'none';
+    statusBadge.classList.add('hidden');
   }
 
   // Mic button appearance
@@ -563,7 +555,7 @@ async function handleSpeak(): Promise<void> {
 
   const text = textArea.value.trim();
   if (!text) {
-    errorEl.style.display = '';
+    errorEl.classList.remove('hidden');
     errorEl.textContent = 'Please enter some text to speak.';
     return;
   }
@@ -576,8 +568,8 @@ async function handleSpeak(): Promise<void> {
     return;
   }
 
-  errorEl.style.display = 'none';
-  statusEl.style.display = '';
+  errorEl.classList.add('hidden');
+  statusEl.classList.remove('hidden');
   statusEl.textContent = 'Loading TTS model...';
 
   try {
@@ -620,24 +612,17 @@ async function handleSpeak(): Promise<void> {
     renderSpeakUI();
   } catch (err) {
     ttsIsSpeaking = false;
-    errorEl.style.display = '';
+    errorEl.classList.remove('hidden');
     errorEl.textContent = err instanceof Error ? err.message : String(err);
-    statusEl.style.display = 'none';
+    statusEl.classList.add('hidden');
     renderSpeakUI();
   }
 }
 
 function renderSpeakUI(): void {
   const speakBtn = container.querySelector('#speak-btn') as HTMLButtonElement;
-  if (ttsIsSpeaking) {
-    speakBtn.textContent = 'Stop';
-    speakBtn.style.background = 'var(--color-red)';
-    speakBtn.style.borderColor = 'var(--color-red)';
-  } else {
-    speakBtn.textContent = 'Speak';
-    speakBtn.style.background = 'var(--color-purple)';
-    speakBtn.style.borderColor = 'var(--color-purple)';
-  }
+  speakBtn.classList.toggle('stopping', ttsIsSpeaking);
+  speakBtn.textContent = ttsIsSpeaking ? 'Stop' : 'Speak';
 }
 
 function setupNav(triggerBtnId: string, subViewId: string, backBtnId: string): void {
@@ -663,7 +648,7 @@ async function refreshStorage(): Promise<void> {
   const modelsEl = container.querySelector('#storage-models')!;
   const downloaded = ModelManager.getModels().filter((m) => m.status === 'downloaded' || m.status === 'loaded');
   if (downloaded.length === 0) {
-    modelsEl.innerHTML = '<p style="text-align:center;color:var(--text-tertiary);padding:var(--space-xl);">No downloaded models</p>';
+    modelsEl.innerHTML = '<p class="muted-text">No downloaded models</p>';
   } else {
     modelsEl.innerHTML = downloaded
       .map(
@@ -677,7 +662,7 @@ async function refreshStorage(): Promise<void> {
               ${m.sizeBytes ? `<span class="model-size">${formatBytes(m.sizeBytes)}</span>` : ''}
             </div>
           </div>
-          <button class="btn btn-sm" style="color:var(--color-red);" data-delete="${m.id}">Delete</button>
+          <button class="btn btn-sm text-red" data-delete="${m.id}">Delete</button>
         </div>
       `
       )

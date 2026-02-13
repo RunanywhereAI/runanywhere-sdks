@@ -91,15 +91,15 @@ export function initVoiceTab(el: HTMLElement): TabLifecycle {
   container = el;
   container.innerHTML = `
     <!-- Pipeline Setup -->
-    <div id="voice-setup" class="scroll-area" style="display:flex;flex-direction:column;">
+    <div id="voice-setup" class="scroll-area flex-col">
       <div class="toolbar">
         <div class="toolbar-title">Voice Assistant</div>
         <div class="toolbar-actions"></div>
       </div>
-      <div style="flex:1;display:flex;align-items:center;justify-content:center;">
+      <div class="flex-1 flex-center">
         <div class="pipeline-setup">
-          <h3 style="text-align:center;margin-bottom:var(--space-md);">Set Up Voice Pipeline</h3>
-          <p style="text-align:center;color:var(--text-secondary);font-size:var(--font-size-sm);margin-bottom:var(--space-xl);">
+          <h3 class="text-center mb-md">Set Up Voice Pipeline</h3>
+          <p class="text-center helper-text mb-xl">
             Select models for each step of the voice AI pipeline.
           </p>
 
@@ -127,7 +127,7 @@ export function initVoiceTab(el: HTMLElement): TabLifecycle {
             </div>
           </div>
 
-          <button class="btn btn-primary btn-lg" id="voice-start-btn" disabled style="width:100%;margin-top:var(--space-xl);">
+          <button class="btn btn-primary btn-lg w-full mt-xl" id="voice-start-btn" disabled>
             Start Voice Assistant
           </button>
         </div>
@@ -135,11 +135,11 @@ export function initVoiceTab(el: HTMLElement): TabLifecycle {
     </div>
 
     <!-- Voice Interface -->
-    <div id="voice-interface" style="display:none;flex:1;flex-direction:column;">
+    <div id="voice-interface" class="voice-interface hidden">
       <div class="toolbar">
         <div class="toolbar-title">Voice Assistant</div>
         <div class="toolbar-actions">
-          <button class="btn btn-icon" id="voice-back-btn" style="border:none;background:none;cursor:pointer;color:var(--text-secondary);">
+          <button class="btn-ghost" id="voice-back-btn">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
@@ -155,9 +155,9 @@ export function initVoiceTab(el: HTMLElement): TabLifecycle {
           </svg>
         </button>
       </div>
-      <div style="padding:var(--space-lg);text-align:center;">
-        <div id="voice-status" style="color:var(--text-secondary);font-size:var(--font-size-sm);">Tap to speak</div>
-        <div id="voice-response" class="scroll-area" style="max-height:150px;margin-top:var(--space-md);text-align:left;"></div>
+      <div class="voice-status-panel">
+        <div id="voice-status" class="helper-text">Tap to speak</div>
+        <div id="voice-response" class="scroll-area voice-response-area"></div>
       </div>
     </div>
   `;
@@ -229,7 +229,7 @@ function refreshPipelineUI(): void {
       // Model is loaded — show checkmark and model name
       if (statusEl) {
         statusEl.textContent = loadedModel.name;
-        statusEl.style.color = 'var(--color-green)';
+        (statusEl as HTMLElement).classList.add('text-green');
       }
       if (stepNumber) {
         stepNumber.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>`;
@@ -239,7 +239,7 @@ function refreshPipelineUI(): void {
       // Not loaded — show default state
       if (statusEl) {
         statusEl.textContent = step.defaultStatus;
-        statusEl.style.color = '';
+        (statusEl as HTMLElement).classList.remove('text-green');
       }
       const stepIdx = PIPELINE_STEPS.indexOf(step);
       if (stepNumber) {
@@ -258,8 +258,8 @@ function transitionToVoiceInterface(): void {
   state = 'idle';
   const setup = container.querySelector('#voice-setup') as HTMLElement;
   const iface = container.querySelector('#voice-interface') as HTMLElement;
-  if (setup) setup.style.display = 'none';
-  if (iface) iface.style.display = 'flex';
+  if (setup) setup.classList.add('hidden');
+  if (iface) iface.classList.remove('hidden');
 }
 
 /** Switch from voice interface → pipeline setup */
@@ -268,8 +268,8 @@ function transitionToSetup(): void {
   state = 'setup';
   const setup = container.querySelector('#voice-setup') as HTMLElement;
   const iface = container.querySelector('#voice-interface') as HTMLElement;
-  if (setup) setup.style.display = 'flex';
-  if (iface) iface.style.display = 'none';
+  if (setup) setup.classList.remove('hidden');
+  if (iface) iface.classList.add('hidden');
 }
 
 // ---------------------------------------------------------------------------
@@ -426,7 +426,7 @@ async function runPipeline(audioData: Float32Array): Promise<void> {
     }
 
     console.log(`[Voice] STT result: "${userText}" (${sttResult.processingTimeMs}ms)`);
-    setResponse(`<div style="color:var(--text-secondary);margin-bottom:8px;"><strong>You:</strong> ${escapeHtml(userText)}</div>`);
+    setResponse(`<div class="text-secondary mb-sm"><strong>You:</strong> ${escapeHtml(userText)}</div>`);
     setStatus('Thinking...');
 
     // ── Step 2: LLM (streaming) ──

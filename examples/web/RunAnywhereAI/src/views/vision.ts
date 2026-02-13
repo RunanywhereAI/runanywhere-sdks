@@ -67,42 +67,42 @@ export function initVisionTab(el: HTMLElement): TabLifecycle {
     <!-- Toolbar -->
     <div class="toolbar">
       <div class="toolbar-actions"></div>
-      <div class="toolbar-title" id="vision-toolbar-model" style="cursor:pointer;">Select Model</div>
+      <div class="toolbar-title cursor-pointer" id="vision-toolbar-model">Select Model</div>
       <div class="toolbar-actions"></div>
     </div>
 
     <!-- Main Content -->
-    <div class="vision-main" id="vision-main" style="display:none;">
+    <div class="vision-main hidden" id="vision-main">
       <!-- Camera Preview -->
       <div class="vision-camera-container">
         <video id="vision-video" autoplay playsinline muted></video>
-        <canvas id="vision-canvas" style="display:none;"></canvas>
+        <canvas id="vision-canvas" class="hidden"></canvas>
         <!-- Processing overlay -->
-        <div class="vision-processing-overlay" id="vision-processing-overlay" style="display:none;">
-          <div class="typing-dots" style="transform:scale(0.8);">
+        <div class="vision-processing-overlay hidden" id="vision-processing-overlay">
+          <div class="typing-dots vision-typing-dots-sm">
             <div class="typing-dot"></div>
             <div class="typing-dot"></div>
             <div class="typing-dot"></div>
           </div>
-          <span style="font-size:var(--font-size-xs);color:rgba(255,255,255,0.8);">Analyzing...</span>
+          <span class="vision-analyzing-label">Analyzing...</span>
         </div>
       </div>
 
       <!-- Description Panel -->
       <div class="vision-description-panel" id="vision-description-panel">
         <div class="vision-description-header">
-          <div style="display:flex;align-items:center;gap:6px;">
-            <span style="font-size:var(--font-size-sm);font-weight:var(--font-weight-semibold);">Description</span>
-            <span class="vision-live-badge" id="vision-live-badge" style="display:none;">LIVE</span>
+          <div class="flex items-center gap-sm">
+            <span class="text-sm font-semibold">Description</span>
+            <span class="vision-live-badge hidden" id="vision-live-badge">LIVE</span>
           </div>
-          <button class="btn btn-icon" id="vision-copy-btn" title="Copy" style="display:none;width:28px;height:28px;">
+          <button class="btn-ghost hidden" id="vision-copy-btn" title="Copy">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           </button>
         </div>
         <div class="vision-description-text" id="vision-description-text">
-          <span style="color:var(--text-tertiary);">Tap the capture button to describe what the camera sees.</span>
+          <span class="text-tertiary">Tap the capture button to describe what the camera sees.</span>
         </div>
-        <div class="vision-metrics" id="vision-metrics" style="display:none;"></div>
+        <div class="vision-metrics hidden" id="vision-metrics"></div>
       </div>
 
       <!-- Control Bar -->
@@ -221,16 +221,16 @@ function onModelsChanged(_models: ModelInfo[]): void {
   if (loaded) {
     toolbarModelEl.textContent = loaded.name;
     // Model is loaded — show the main camera UI (camera may or may not be active)
-    overlayEl.style.display = 'none';
-    (container.querySelector('#vision-main') as HTMLElement).style.display = 'flex';
+    overlayEl.classList.add('hidden');
+    (container.querySelector('#vision-main') as HTMLElement).classList.remove('hidden');
     // Auto-start camera if not already running
     if (!cameraStream) {
       startCamera();
     }
   } else {
-    overlayEl.style.display = '';
+    overlayEl.classList.remove('hidden');
     toolbarModelEl.textContent = 'Select Model';
-    (container.querySelector('#vision-main') as HTMLElement).style.display = 'none';
+    (container.querySelector('#vision-main') as HTMLElement).classList.add('hidden');
     stopLiveMode();
     stopCamera();
   }
@@ -266,16 +266,16 @@ async function startCamera(): Promise<void> {
     });
     videoEl.srcObject = cameraStream;
 
-    overlayEl.style.display = 'none';
-    (container.querySelector('#vision-main') as HTMLElement).style.display = 'flex';
+    overlayEl.classList.add('hidden');
+    (container.querySelector('#vision-main') as HTMLElement).classList.remove('hidden');
 
     console.log('[Vision] Camera started');
   } catch (err) {
     console.error('[Vision] Camera access denied:', err);
-    descriptionEl.innerHTML = `<span style="color:var(--color-red);">Camera access denied. Please allow camera access in your browser settings.</span>`;
+    descriptionEl.innerHTML = `<span class="text-red">Camera access denied. Please allow camera access in your browser settings.</span>`;
     // Still show the main UI so the user can retry
-    overlayEl.style.display = 'none';
-    (container.querySelector('#vision-main') as HTMLElement).style.display = 'flex';
+    overlayEl.classList.add('hidden');
+    (container.querySelector('#vision-main') as HTMLElement).classList.remove('hidden');
   }
 }
 
@@ -382,7 +382,7 @@ function toggleLiveMode(): void {
 function startLiveMode(): void {
   isLiveMode = true;
   liveToggleBtn.classList.add('active');
-  liveBadge.style.display = 'inline-flex';
+  liveBadge.classList.remove('hidden');
   captureBtn.classList.add('live');
   captureBtn.innerHTML = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
@@ -408,7 +408,7 @@ function stopLiveMode(): void {
     liveIntervalId = null;
   }
   liveToggleBtn.classList.remove('active');
-  liveBadge.style.display = 'none';
+  liveBadge.classList.add('hidden');
   captureBtn.classList.remove('live');
   captureBtn.innerHTML = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="28" height="28"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 12 18.469V19" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -434,7 +434,7 @@ async function describeCurrent(prompt: string, maxTokens: number): Promise<void>
   const captureDim = isLiveMode ? MAX_CAPTURE_DIM_LIVE : MAX_CAPTURE_DIM_SINGLE;
   const frame = captureFrame(captureDim);
   if (!frame) {
-    descriptionEl.innerHTML = `<span style="color:var(--text-tertiary);">No camera frame available. Make sure the camera is active.</span>`;
+    descriptionEl.innerHTML = `<span class="text-tertiary">No camera frame available. Make sure the camera is active.</span>`;
     return;
   }
 
@@ -450,7 +450,7 @@ async function describeCurrent(prompt: string, maxTokens: number): Promise<void>
  */
 async function processFrame(frame: CapturedFrame, prompt: string, maxTokens: number): Promise<void> {
   isProcessing = true;
-  processingOverlay.style.display = 'flex';
+  processingOverlay.classList.remove('hidden');
 
   const t0 = performance.now();
 
@@ -487,10 +487,10 @@ async function processFrame(frame: CapturedFrame, prompt: string, maxTokens: num
     // Update description
     currentDescription = result.text;
     descriptionEl.textContent = currentDescription;
-    copyBtn.style.display = currentDescription ? '' : 'none';
+    copyBtn.classList.toggle('hidden', !currentDescription);
 
     // Show metrics
-    metricsEl.style.display = 'flex';
+    metricsEl.classList.remove('hidden');
     metricsEl.innerHTML = `
       <span class="metric"><span class="metric-value">${tokPerSec.toFixed(1)}</span> tok/s</span>
       <span class="metric-separator">&middot;</span>
@@ -513,10 +513,10 @@ async function processFrame(frame: CapturedFrame, prompt: string, maxTokens: num
                         msg.includes('RuntimeError');
 
     if (isWasmCrash) {
-      descriptionEl.innerHTML = `<span style="color:var(--text-secondary);">Recovering from memory error... Next frame will retry.</span>`;
+      descriptionEl.innerHTML = `<span class="text-secondary">Recovering from memory error... Next frame will retry.</span>`;
       // Don't stop live mode — the bridge will auto-recover on next process() call
     } else {
-      descriptionEl.innerHTML = `<span style="color:var(--color-red);">Error: ${escapeHtml(msg)}</span>`;
+      descriptionEl.innerHTML = `<span class="text-red">Error: ${escapeHtml(msg)}</span>`;
       if (isLiveMode) {
         stopLiveMode();
       }
@@ -525,7 +525,7 @@ async function processFrame(frame: CapturedFrame, prompt: string, maxTokens: num
 
   if (tickerId) clearInterval(tickerId);
   isProcessing = false;
-  processingOverlay.style.display = 'none';
+  processingOverlay.classList.add('hidden');
 
   // Reset overlay text for next use
   const timerSpanReset = processingOverlay.querySelector('span');

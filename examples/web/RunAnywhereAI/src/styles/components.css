@@ -3,6 +3,27 @@
  * ============================================================================= */
 
 /* =============================================================================
+ * Acceleration Badge
+ * ============================================================================= */
+.accel-badge {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  z-index: 9999;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #fff;
+  pointer-events: none;
+  opacity: 0.85;
+  font-family: -apple-system, system-ui, sans-serif;
+}
+.accel-badge--gpu { background: #22c55e; }
+.accel-badge--cpu { background: #64748b; }
+
+/* =============================================================================
  * App Layout
  * ============================================================================= */
 #app {
@@ -624,6 +645,7 @@
 .model-action-btn.download { background: var(--color-primary); color: white; }
 .model-action-btn.load { background: var(--badge-green); color: var(--color-green); }
 .model-action-btn.loaded { background: var(--badge-green); color: var(--color-green); opacity: 0.7; cursor: default; }
+.model-action-btn--retry { background: var(--badge-red); color: var(--color-red); }
 
 /* =============================================================================
  * Progress Bar
@@ -712,6 +734,27 @@
 }
 
 .mic-btn svg { width: 28px; height: 28px; }
+
+/* Voice Interface layout (hidden by default, shown as flex column) */
+.voice-interface {
+  flex: 1;
+  flex-direction: column;
+}
+.voice-interface:not(.hidden) {
+  display: flex;
+}
+
+/* Status panel under the particle canvas */
+.voice-status-panel {
+  padding: var(--space-lg);
+  text-align: center;
+}
+
+.voice-response-area {
+  max-height: 150px;
+  margin-top: var(--space-md);
+  text-align: left;
+}
 
 /* =============================================================================
  * Pipeline Setup Cards (Voice Tab)
@@ -845,6 +888,13 @@
 
 .setting-label { font-size: var(--font-size-base); }
 .setting-value { font-size: var(--font-size-base); color: var(--text-secondary); }
+
+/** Stacked variant for form field rows (API key, URL, etc.) */
+.setting-row--stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-sm-md);
+}
 
 /* Slider */
 input[type="range"] {
@@ -1305,6 +1355,15 @@ input[type="range"]::-webkit-slider-thumb {
   background: rgba(255, 85, 0, 0.25);
   transform: scale(1.05);
 }
+/** Scaled-down typing dots for the processing overlay */
+.vision-typing-dots-sm { transform: scale(0.8); }
+
+/** "Analyzing..." text overlay on camera */
+.vision-analyzing-label {
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.8);
+}
+
 .vision-capture-btn:active {
   transform: scale(0.95);
 }
@@ -1527,4 +1586,162 @@ input[type="range"]::-webkit-slider-thumb {
 .tools-badge svg {
   width: 11px;
   height: 11px;
+}
+
+/* =============================================================================
+ * STT (Transcribe) Sub-view Specifics
+ * ============================================================================= */
+
+/** Mode toggle bar (Batch / Live) */
+.stt-mode-bar {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-light);
+}
+
+/** Main content column with scrolling */
+.stt-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/** Ready/empty state (center graphic + heading) */
+.stt-ready-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+  padding: var(--space-3xl);
+}
+
+/** Transcription result panel */
+.stt-result-panel {
+  display: none;
+  flex: 1;
+  padding: var(--space-lg);
+}
+
+.stt-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-md);
+}
+
+/** Bottom controls strip */
+.stt-controls {
+  padding: var(--space-md) var(--space-lg) var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+  border-top: 1px solid var(--border-light);
+  background: var(--bg-secondary);
+}
+
+/** Audio level bars container */
+.stt-level-container {
+  display: none;
+  width: 100%;
+  max-width: 300px;
+}
+
+.stt-level-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+  justify-content: center;
+}
+
+.stt-level-bar {
+  width: 4px;
+  height: 3px;
+  background: var(--color-green);
+  border-radius: 1px;
+  transition: height 0.08s ease;
+}
+
+/** Mic button (large) for STT */
+.mic-btn-lg {
+  width: 72px;
+  height: 72px;
+}
+
+/* =============================================================================
+ * TTS (Speak) Sub-view Specifics
+ * ============================================================================= */
+.tts-layout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xl);
+  padding: var(--space-3xl);
+}
+
+.tts-textarea {
+  max-width: 400px;
+  width: 100%;
+  min-height: 120px;
+}
+
+.tts-speed-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  width: 100%;
+  max-width: 400px;
+}
+
+.tts-speed-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  min-width: 50px;
+}
+
+.tts-speed-value {
+  font-size: var(--font-size-sm);
+  min-width: 30px;
+  text-align: right;
+}
+
+.tts-message {
+  display: none;
+  font-size: var(--font-size-sm);
+  text-align: center;
+  width: 100%;
+  max-width: 400px;
+}
+
+.tts-speak-btn {
+  width: 100%;
+  max-width: 400px;
+  background: var(--color-purple);
+  border-color: var(--color-purple);
+}
+
+.tts-speak-btn.stopping {
+  background: var(--color-red);
+  border-color: var(--color-red);
+}
+
+/* =============================================================================
+ * Storage Sub-view Specifics
+ * ============================================================================= */
+.storage-models-list {
+  padding: var(--space-lg);
+}
+
+.storage-actions {
+  padding: 0 var(--space-lg) var(--space-lg);
+}
+
+.btn-danger {
+  width: 100%;
+  color: var(--color-red);
 }
