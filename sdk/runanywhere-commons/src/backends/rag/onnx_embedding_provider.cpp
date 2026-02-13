@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cctype>
 #include <unordered_map>
+#include <list>
 
 #define LOG_TAG "RAG.ONNXEmbedding"
 #define LOGI(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
@@ -187,7 +188,8 @@ private:
     std::vector<int64_t> word_to_token_ids(const std::string& word) {
         auto it = token_cache_.find(word);
         if (it != token_cache_.end()) {
-            return it->second;
+            touch_cache_entry(it->second.lru_it);
+            return it->second.ids;
         }
 
         const auto pieces = wordpiece_tokenize(word);
@@ -197,11 +199,7 @@ private:
             ids.push_back(token_id_for(piece));
         }
 
-        if (token_cache_.size() >= token_cache_limit_) {
-            token_cache_.clear();
-        }
-        token_cache_.emplace(word, ids);
-
+        insert_cache_entry(word, ids);
         return ids;
     }
 
@@ -229,13 +227,34 @@ private:
         return it != token_to_id_.end() ? it->second : fallback;
     }
 
+    struct CacheEntry {
+        std::vector<int64_t> ids;
+        std::list<std::string>::iterator lru_it;
+    };
+
+    void touch_cache_entry(std::list<std::string>::iterator it) {
+        lru_list_.splice(lru_list_.begin(), lru_list_, it);
+    }
+
+    void insert_cache_entry(const std::string& word, const std::vector<int64_t>& ids) {
+        if (token_cache_.size() >= token_cache_limit_ && !lru_list_.empty()) {
+            const std::string& lru_key = lru_list_.back();
+            token_cache_.erase(lru_key);
+            lru_list_.pop_back();
+        }
+
+        lru_list_.push_front(word);
+        token_cache_.emplace(word, CacheEntry{ids, lru_list_.begin()});
+    }
+
     std::unordered_map<std::string, int64_t> token_to_id_;
     int64_t cls_id_ = 101;
     int64_t sep_id_ = 102;
     int64_t pad_id_ = 0;
     int64_t unk_id_ = 100;
     bool vocab_loaded_ = false;
-    std::unordered_map<std::string, std::vector<int64_t>> token_cache_;
+    std::unordered_map<std::string, CacheEntry> token_cache_;
+    std::list<std::string> lru_list_;
     std::size_t token_cache_limit_ = 4096;
 };
 
