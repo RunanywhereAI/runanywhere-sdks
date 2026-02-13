@@ -76,7 +76,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     </div>
 
     <!-- Messages -->
-    <div class="scroll-area" id="chat-messages" style="padding-top:var(--space-md);padding-bottom:var(--space-md);">
+    <div class="scroll-area py-md" id="chat-messages">
       <!-- Empty state (shown when no messages) -->
       <div class="chat-empty-state" id="chat-empty-state">
         <div class="empty-logo">
@@ -99,7 +99,7 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
           <span class="tools-toggle-knob"></span>
         </span>
       </button>
-      <div class="tools-badge-text" id="chat-tools-badge" style="display:none;"></div>
+      <div class="tools-badge-text hidden" id="chat-tools-badge"></div>
     </div>
 
     <!-- Input -->
@@ -232,13 +232,8 @@ async function toggleTools(): Promise<void> {
   // Show/hide tools badge text below the toggle
   const badgeEl = container.querySelector('#chat-tools-badge') as HTMLElement;
   if (badgeEl) {
-    if (toolsEnabled) {
-      badgeEl.style.display = '';
-      badgeEl.textContent = 'weather \u00b7 time \u00b7 calculator';
-    } else {
-      badgeEl.style.display = 'none';
-      badgeEl.textContent = '';
-    }
+    badgeEl.classList.toggle('hidden', !toolsEnabled);
+    badgeEl.textContent = toolsEnabled ? 'weather \u00b7 time \u00b7 calculator' : '';
   }
 
   // Update suggestion chips to reflect tool-specific prompts
@@ -673,7 +668,7 @@ function renderMessage(msg: ChatMessage): void {
 
   // Tool call pills (before the response text)
   if (msg.toolCalls && msg.toolCalls.length > 0) {
-    html += '<div class="tool-calls-container" style="margin-bottom:var(--space-sm);">';
+    html += '<div class="tool-calls-container mb-sm">';
     for (const tc of msg.toolCalls) {
       const statusClass = tc.success ? 'success' : 'error';
       const statusIcon = tc.success
@@ -688,12 +683,12 @@ function renderMessage(msg: ChatMessage): void {
         </span>
       `;
       html += `
-        <div class="tool-call-detail" id="${detailId}" style="display:none;">
+        <div class="tool-call-detail hidden" id="${detailId}">
           <h4>${escapeHtml(tc.toolName)}</h4>
-          <div style="color:var(--text-secondary);font-size:var(--font-size-xs);margin-bottom:4px;">Arguments:</div>
+          <div class="text-secondary text-xs mb-xs">Arguments:</div>
           <pre>${escapeHtml(tc.arguments)}</pre>
-          ${tc.result ? `<div style="color:var(--text-secondary);font-size:var(--font-size-xs);margin-bottom:4px;">Result:</div><pre>${escapeHtml(tc.result)}</pre>` : ''}
-          ${tc.error ? `<div style="color:var(--color-red);font-size:var(--font-size-xs);">Error: ${escapeHtml(tc.error)}</div>` : ''}
+          ${tc.result ? `<div class="text-secondary text-xs mb-xs">Result:</div><pre>${escapeHtml(tc.result)}</pre>` : ''}
+          ${tc.error ? `<div class="text-red text-xs">Error: ${escapeHtml(tc.error)}</div>` : ''}
         </div>
       `;
     }
@@ -714,8 +709,7 @@ function renderMessage(msg: ChatMessage): void {
       const detail = row.querySelector(`#${detailId}`);
       if (pill && detail) {
         pill.addEventListener('click', () => {
-          const isVisible = (detail as HTMLElement).style.display !== 'none';
-          (detail as HTMLElement).style.display = isVisible ? 'none' : 'block';
+          (detail as HTMLElement).classList.toggle('hidden');
         });
       }
     }
@@ -826,6 +820,6 @@ function renderMarkdown(text: string): string {
   return escapeHtml(text)
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/`(.*?)`/g, '<code style="background:rgba(0,0,0,0.2);padding:1px 4px;border-radius:3px;font-family:var(--font-mono);font-size:0.85em;">$1</code>')
+    .replace(/`(.*?)`/g, '<code class="inline-code">$1</code>')
     .replace(/\n/g, '<br>');
 }

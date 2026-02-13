@@ -29,8 +29,8 @@ export function showModelSelectionSheet(modality?: ModelCategory): void {
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <div class="modal-header">
-        <h3 style="font-size:var(--font-size-md);font-weight:var(--font-weight-semibold);">Select Model</h3>
-        <button class="btn btn-icon" id="model-sheet-close" style="border:none;background:none;">
+        <h3 class="text-md font-semibold">Select Model</h3>
+        <button class="btn-ghost" id="model-sheet-close">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
@@ -104,7 +104,7 @@ function renderModelList(models: ModelInfo[]): void {
     .map((m) => {
       const actionBtn = getActionButton(m);
       const progressBar = m.status === 'downloading'
-        ? `<div class="progress-bar" style="margin-top:6px;"><div class="progress-fill" style="width:${(m.downloadProgress ?? 0) * 100}%;"></div></div>`
+        ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${(m.downloadProgress ?? 0) * 100}%;"></div></div>`
         : '';
 
       return `
@@ -161,7 +161,7 @@ function getActionButton(model: ModelInfo): string {
     case 'loaded':
       return `<button class="model-action-btn loaded">Loaded</button>`;
     case 'error':
-      return `<button class="model-action-btn download" data-action="download" data-model-id="${model.id}" style="background:var(--badge-red);color:var(--color-red);">Retry</button>`;
+      return `<button class="model-action-btn model-action-btn--retry" data-action="download" data-model-id="${model.id}">Retry</button>`;
     default:
       return '';
   }

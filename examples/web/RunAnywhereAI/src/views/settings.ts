@@ -28,14 +28,14 @@ export function initSettingsTab(el: HTMLElement): void {
         <div class="settings-section-title">Generation</div>
         <div class="setting-row">
           <span class="setting-label">Temperature</span>
-          <div style="display:flex;align-items:center;gap:var(--space-sm-md);">
+          <div class="flex items-center gap-sm">
             <span class="setting-value" id="settings-temp-val">${settings.temperature.toFixed(1)}</span>
             <input type="range" id="settings-temp" min="0" max="2" step="0.1" value="${settings.temperature}">
           </div>
         </div>
         <div class="setting-row">
           <span class="setting-label">Max Tokens</span>
-          <div style="display:flex;align-items:center;gap:var(--space-sm-md);">
+          <div class="flex items-center gap-sm">
             <button class="btn btn-sm" id="settings-tokens-minus">-</button>
             <span class="setting-value" id="settings-tokens-val">${settings.maxTokens}</span>
             <button class="btn btn-sm" id="settings-tokens-plus">+</button>
@@ -46,13 +46,13 @@ export function initSettingsTab(el: HTMLElement): void {
       <!-- API Configuration -->
       <div class="settings-section">
         <div class="settings-section-title">API Configuration</div>
-        <div class="setting-row" style="flex-direction:column;align-items:stretch;gap:var(--space-sm-md);">
-          <label style="font-size:var(--font-size-sm);color:var(--text-secondary);">API Key</label>
-          <input type="password" class="text-input" id="settings-api-key" placeholder="Enter API key..." value="${settings.apiKey}" style="width:100%;">
+        <div class="setting-row setting-row--stacked">
+          <label class="label">API Key</label>
+          <input type="password" class="text-input w-full" id="settings-api-key" placeholder="Enter API key..." value="${settings.apiKey}">
         </div>
-        <div class="setting-row" style="flex-direction:column;align-items:stretch;gap:var(--space-sm-md);">
-          <label style="font-size:var(--font-size-sm);color:var(--text-secondary);">Base URL</label>
-          <input type="url" class="text-input" id="settings-base-url" placeholder="https://api.runanywhere.ai" value="${settings.baseURL}" style="width:100%;">
+        <div class="setting-row setting-row--stacked">
+          <label class="label">Base URL</label>
+          <input type="url" class="text-input w-full" id="settings-base-url" placeholder="https://api.runanywhere.ai" value="${settings.baseURL}">
         </div>
       </div>
 
@@ -76,8 +76,8 @@ export function initSettingsTab(el: HTMLElement): void {
           <span class="setting-label">Platform</span>
           <span class="setting-value">Web (Emscripten WASM)</span>
         </div>
-        <div class="setting-row" style="cursor:pointer;" id="settings-docs-link">
-          <span class="setting-label" style="color:var(--color-primary);">Documentation</span>
+        <div class="setting-row cursor-pointer" id="settings-docs-link">
+          <span class="setting-label text-accent">Documentation</span>
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="1.5" width="16" height="16"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
         </div>
       </div>

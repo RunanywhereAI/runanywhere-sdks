@@ -6,6 +6,7 @@
  */
 
 import './styles/design-system.css';
+import './styles/commons.css';
 import './styles/components.css';
 import { buildAppShell } from './app';
 
@@ -70,22 +71,7 @@ function showAccelerationBadge(mode: string): void {
   badge.id = 'accel-badge';
   const isGPU = mode === 'webgpu';
   badge.textContent = isGPU ? 'WebGPU' : 'CPU';
-  badge.style.cssText = [
-    'position:fixed',
-    'top:8px',
-    'right:8px',
-    'z-index:9999',
-    'padding:4px 10px',
-    'border-radius:12px',
-    'font-size:11px',
-    'font-weight:600',
-    'letter-spacing:0.02em',
-    `background:${isGPU ? '#22c55e' : '#64748b'}`,
-    'color:#fff',
-    'pointer-events:none',
-    'opacity:0.85',
-    'font-family:-apple-system,system-ui,sans-serif',
-  ].join(';');
+  badge.className = `accel-badge ${isGPU ? 'accel-badge--gpu' : 'accel-badge--cpu'}`;
   document.body.appendChild(badge);
 }
 
@@ -118,7 +104,7 @@ function showLoadingScreen(): void {
     <div class="loading-bar">
       <div class="loading-bar-fill"></div>
     </div>
-    <p style="font-size:var(--font-size-sm);color:var(--text-tertiary);">Initializing SDK...</p>
+    <p class="text-sm text-tertiary">Initializing SDK...</p>
   `;
   document.body.appendChild(screen);
 }
@@ -143,7 +129,7 @@ function showErrorView(message: string): void {
     <div class="error-view">
       <div class="error-icon">&#9888;&#65039;</div>
       <h2>Initialization Failed</h2>
-      <p style="color:var(--text-secondary);max-width:400px;">${message}</p>
+      <p class="text-secondary max-w-md">${message}</p>
       <button class="btn btn-primary btn-lg" id="retry-btn">Retry</button>
     </div>
   `;
