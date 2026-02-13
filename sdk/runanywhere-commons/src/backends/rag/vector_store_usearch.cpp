@@ -11,7 +11,7 @@
 // USearch expects this type to be defined when FP16LIB and SIMSIMD are disabled
 #if defined(__ARM_ARCH) || defined(__aarch64__) || defined(_M_ARM64)
     // Try to use native ARM FP16 if available (device builds)
-    #if __has_include(<arm_fp16.h>) && !defined(__APPLE__) || (defined(__APPLE__) && !TARGET_OS_SIMULATOR)
+    #if __has_include(<arm_fp16.h>) && (!defined(__APPLE__) || (defined(__APPLE__) && !TARGET_OS_SIMULATOR))
         #include <arm_fp16.h>
         using f16_native_t = __fp16;
     #else
@@ -109,6 +109,7 @@ public:
 
     bool add_chunks_batch(const std::vector<DocumentChunk>& chunks) {
         std::lock_guard<std::mutex> lock(mutex_);
+        bool any_added = false;
 
         for (const auto& chunk : chunks) {
             if (chunk.embedding.size() != config_.dimension) {
@@ -131,16 +132,17 @@ public:
             }
             chunks_[key] = chunk;
             id_to_key_[chunk.id] = key;
+            any_added = true;
         }
 
-        return true;
+        return any_added;
     }
 
     std::vector<SearchResult> search(
         const std::vector<float>& query_embedding,
         size_t top_k,
         float threshold
-    ) const noexcept {
+    ) const {
         std::lock_guard<std::mutex> lock(mutex_);
 
         if (query_embedding.size() != config_.dimension) {
@@ -305,27 +307,34 @@ public:
         }
         
         nlohmann::json metadata;
-        metadata_file >> metadata;
-        metadata_file.close();
-        
-        // Restore next_key_
-        next_key_ = metadata["next_key"].get<std::size_t>();
-        
-        // Restore chunks and id_to_key mappings
-        chunks_.clear();
-        id_to_key_.clear();
-        
-        for (const auto& chunk_json : metadata["chunks"]) {
-            std::size_t key = chunk_json["key"].get<std::size_t>();
-            
-            DocumentChunk chunk;
-            chunk.id = chunk_json["id"].get<std::string>();
-            chunk.text = chunk_json["text"].get<std::string>();
-            chunk.embedding = chunk_json["embedding"].get<std::vector<float>>();
-            chunk.metadata = chunk_json["metadata"];
-            
-            chunks_[key] = chunk;
-            id_to_key_[chunk.id] = key;
+        try {
+            metadata_file >> metadata;
+
+            const auto& chunks_json = metadata.at("chunks");
+            const std::size_t parsed_next_key = metadata.at("next_key").get<std::size_t>();
+
+            decltype(chunks_) new_chunks;
+            decltype(id_to_key_) new_id_to_key;
+
+            for (const auto& chunk_json : chunks_json) {
+                const std::size_t key = chunk_json.at("key").get<std::size_t>();
+
+                DocumentChunk chunk;
+                chunk.id = chunk_json.at("id").get<std::string>();
+                chunk.text = chunk_json.at("text").get<std::string>();
+                chunk.embedding = chunk_json.at("embedding").get<std::vector<float>>();
+                chunk.metadata = chunk_json.at("metadata");
+
+                new_chunks[key] = std::move(chunk);
+                new_id_to_key[new_chunks[key].id] = key;
+            }
+
+            next_key_ = parsed_next_key;
+            chunks_ = std::move(new_chunks);
+            id_to_key_ = std::move(new_id_to_key);
+        } catch (const std::exception& e) {
+            LOGE("Failed to parse metadata JSON: %s", e.what());
+            return false;
         }
         
         LOGI("Loaded index and metadata from %s (next_key=%zu, chunks=%zu)", 
