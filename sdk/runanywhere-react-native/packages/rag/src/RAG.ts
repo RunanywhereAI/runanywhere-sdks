@@ -40,25 +40,39 @@ export class RAG {
   private _isInitialized: boolean = false;
 
   constructor() {
+    console.log('[RAG] Constructor started');
+    
     // Get the NitroModules proxy (should already be initialized by caller)
+    console.log('[RAG] Getting NitroModules proxy...');
     const NitroProxy = getNitroModulesProxy();
+    console.log('[RAG] NitroProxy result:', NitroProxy ? 'Available' : 'NULL');
     
     if (!NitroProxy) {
-      throw new Error(
+      const error = new Error(
         'NitroModules is not available. ' +
         'Make sure to call initializeNitroModulesGlobally() before creating RAG instance.\n' +
         'Example: await initializeNitroModulesGlobally(); then createRAG();'
       );
+      console.error('[RAG] Error - NitroProxy not available:', error);
+      throw error;
     }
     
+    console.log('[RAG] NitroProxy available, checking for createHybridObject method...');
+    console.log('[RAG] NitroProxy type:', typeof NitroProxy);
+    console.log('[RAG] NitroProxy.createHybridObject:', typeof NitroProxy.createHybridObject);
+    
     try {
+      console.log('[RAG] Attempting to create hybrid object "RunAnywhereRAG"...');
       this._native = NitroProxy.createHybridObject('RunAnywhereRAG') as IRunAnywhereRAG;
-      console.debug('[RAG] Successfully created RunAnywhereRAG hybrid object');
+      console.log('[RAG] Successfully created RunAnywhereRAG hybrid object:', this._native);
     } catch (err) {
       console.error('[RAG] Failed to create RunAnywhereRAG hybrid object:', err);
+      console.error('[RAG] Error message:', err instanceof Error ? err.message : String(err));
+      console.error('[RAG] Error stack:', err instanceof Error ? err.stack : 'No stack');
       throw new Error(
-        'Failed to create RunAnywhereRAG hybrid object. ' +
-        'Make sure RAG native module is properly built: npm run nitrogen'
+        'Failed to create RunAnywhereRAG hybrid object: ' + 
+        (err instanceof Error ? err.message : String(err)) + 
+        '. Make sure RAG native module is properly built: npm run nitrogen'
       );
     }
   }
@@ -206,7 +220,15 @@ export class RAG {
  * Create a new RAG instance
  */
 export function createRAG(): RAG {
-  return new RAG();
+  console.log('[RAG] createRAG() called');
+  try {
+    const instance = new RAG();
+    console.log('[RAG] createRAG() succeeded, returning instance');
+    return instance;
+  } catch (err) {
+    console.error('[RAG] createRAG() failed:', err);
+    throw err;
+  }
 }
 
 /**

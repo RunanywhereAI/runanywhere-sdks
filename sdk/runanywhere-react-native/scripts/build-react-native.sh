@@ -227,10 +227,10 @@ setup_environment() {
     # Enable corepack if available (for Yarn 3.x support)
     if command -v corepack &> /dev/null; then
         log_step "Enabling corepack for Yarn 3.x..."
-        corepack enable 2>/dev/null || {
-            log_warn "Failed to enable corepack, trying with sudo..."
-            sudo corepack enable 2>/dev/null || log_warn "Could not enable corepack"
-        }
+        if ! corepack enable 2>/dev/null; then
+            log_warn "Failed to enable corepack. You may need to run: sudo corepack enable"
+            log_warn "Continuing without corepack - yarn may not work correctly"
+        fi
         
         # Prepare the yarn version specified in package.json
         if [[ -f "package.json" ]] && grep -q '"packageManager"' package.json; then
@@ -273,11 +273,13 @@ build_commons_ios() {
     [[ "$CLEAN_BUILD" == true ]] && FLAGS="$FLAGS --clean"
     
     # Pass backends to commons build script
-    # Convert comma-separated backends to format expected by build-ios.sh
+    # Convert comma-separated backends to space-separated format for build-ios.sh
     if [[ "$BACKENDS" != "all" ]]; then
-        # Convert "onnx" or "llamacpp,onnx" to --backend flag
-        local FIRST_BACKEND=$(echo "$BACKENDS" | cut -d',' -f1)
-        FLAGS="$FLAGS --backend $FIRST_BACKEND"
+        # Convert "onnx" or "llamacpp,onnx" to multiple --backend flags
+        local BACKENDS_SPACE="${BACKENDS//,/ }"
+        for BACKEND in $BACKENDS_SPACE; do
+            FLAGS="$FLAGS --backend $BACKEND"
+        done
     fi
 
     log_step "Running: build-ios.sh $FLAGS"

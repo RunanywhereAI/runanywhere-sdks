@@ -26,6 +26,7 @@
     "@runanywhere/llamacpp": "file:../../../sdk/runanywhere-react-native/packages/llamacpp",
     "@runanywhere/onnx": "file:../../../sdk/runanywhere-react-native/packages/onnx",
     "@runanywhere/rag": "file:../../../sdk/runanywhere-react-native/packages/rag",
+    "nlohmann-json": "^0.0.1-security",
     "react": "19.2.0",
     "react-native": "0.83.1",
     "react-native-fs": "^2.20.0",
@@ -41,7 +42,7 @@
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@babel/runtime": "^7.28.6",
-    "@react-native-community/cli": "latest",
+    "@react-native-community/cli": "^20.1.1",
     "@react-native-community/cli-platform-android": "latest",
     "@react-native-community/cli-platform-ios": "latest",
     "@react-native/babel-preset": "0.83.1",

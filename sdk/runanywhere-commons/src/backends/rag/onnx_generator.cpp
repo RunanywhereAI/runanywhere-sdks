@@ -440,6 +440,7 @@ public:
                 // Prepare input tensors
                 std::vector<OrtValue*> input_tensors;
                 std::vector<const char*> input_names;
+                OrtStatus* status = nullptr;
                 
                 // 1. input_ids: [batch_size, sequence_length]
                 std::vector<int64_t> current_input_ids;
@@ -451,7 +452,7 @@ public:
                 
                 std::vector<int64_t> input_ids_shape = {1, static_cast<int64_t>(current_input_ids.size())};
                 OrtValue* input_ids_tensor = nullptr;
-                cached_api->CreateTensorWithDataAsOrtValue(
+                status = cached_api->CreateTensorWithDataAsOrtValue(
                     memory_info,
                     current_input_ids.data(),
                     current_input_ids.size() * sizeof(int64_t),
@@ -460,6 +461,19 @@ public:
                     ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
                     &input_ids_tensor
                 );
+                if (status != nullptr) {
+                    LOGE("Failed to create input_ids tensor: %s", cached_api->GetErrorMessage(status));
+                    cached_api->ReleaseStatus(status);
+                    result.success = false;
+                    result.stop_reason = "error";
+                    return result;
+                }
+                if (input_ids_tensor == nullptr) {
+                    LOGE("input_ids_tensor is null after creation");
+                    result.success = false;
+                    result.stop_reason = "error";
+                    return result;
+                }
                 input_tensors.push_back(input_ids_tensor);
                 input_names.push_back("input_ids");
                 
@@ -469,7 +483,7 @@ public:
                 std::vector<int64_t> attention_mask_shape = {1, static_cast<int64_t>(total_seq_len)};
                 
                 OrtValue* attention_mask_tensor = nullptr;
-                cached_api->CreateTensorWithDataAsOrtValue(
+                status = cached_api->CreateTensorWithDataAsOrtValue(
                     memory_info,
                     attention_mask.data(),
                     attention_mask.size() * sizeof(int64_t),
@@ -478,6 +492,19 @@ public:
                     ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
                     &attention_mask_tensor
                 );
+                if (status != nullptr) {
+                    LOGE("Failed to create attention_mask tensor: %s", cached_api->GetErrorMessage(status));
+                    cached_api->ReleaseStatus(status);
+                    result.success = false;
+                    result.stop_reason = "error";
+                    return result;
+                }
+                if (attention_mask_tensor == nullptr) {
+                    LOGE("attention_mask_tensor is null after creation");
+                    result.success = false;
+                    result.stop_reason = "error";
+                    return result;
+                }
                 input_tensors.push_back(attention_mask_tensor);
                 input_names.push_back("attention_mask");
                 
@@ -489,7 +516,7 @@ public:
                 std::vector<int64_t> position_ids_shape = {1, static_cast<int64_t>(current_seq_len)};
                 
                 OrtValue* position_ids_tensor = nullptr;
-                cached_api->CreateTensorWithDataAsOrtValue(
+                status = cached_api->CreateTensorWithDataAsOrtValue(
                     memory_info,
                     position_ids.data(),
                     position_ids.size() * sizeof(int64_t),
@@ -498,6 +525,19 @@ public:
                     ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
                     &position_ids_tensor
                 );
+                if (status != nullptr) {
+                    LOGE("Failed to create position_ids tensor: %s", cached_api->GetErrorMessage(status));
+                    cached_api->ReleaseStatus(status);
+                    result.success = false;
+                    result.stop_reason = "error";
+                    return result;
+                }
+                if (position_ids_tensor == nullptr) {
+                    LOGE("position_ids_tensor is null after creation");
+                    result.success = false;
+                    result.stop_reason = "error";
+                    return result;
+                }
                 input_tensors.push_back(position_ids_tensor);
                 input_names.push_back("position_ids");
                 
@@ -514,7 +554,7 @@ public:
                     if (past_seq_len == 0) {
                         // First step: create empty tensors
                         std::vector<float> empty;
-                        cached_api->CreateTensorWithDataAsOrtValue(
+                        status = cached_api->CreateTensorWithDataAsOrtValue(
                             memory_info,
                             empty.data(),
                             0,
@@ -523,8 +563,15 @@ public:
                             ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT,
                             &past_key_tensor
                         );
+                        if (status != nullptr) {
+                            LOGE("Failed to create empty past_key tensor: %s", cached_api->GetErrorMessage(status));
+                            cached_api->ReleaseStatus(status);
+                            result.success = false;
+                            result.stop_reason = "error";
+                            return result;
+                        }
                     } else {
-                        cached_api->CreateTensorWithDataAsOrtValue(
+                        status = cached_api->CreateTensorWithDataAsOrtValue(
                             memory_info,
                             past_keys[layer].data(),
                             past_keys[layer].size() * sizeof(float),
@@ -533,6 +580,19 @@ public:
                             ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT,
                             &past_key_tensor
                         );
+                        if (status != nullptr) {
+                            LOGE("Failed to create past_key tensor: %s", cached_api->GetErrorMessage(status));
+                            cached_api->ReleaseStatus(status);
+                            result.success = false;
+                            result.stop_reason = "error";
+                            return result;
+                        }
+                    }
+                    if (past_key_tensor == nullptr) {
+                        LOGE("past_key_tensor is null after creation");
+                        result.success = false;
+                        result.stop_reason = "error";
+                        return result;
                     }
                     input_tensors.push_back(past_key_tensor);
                     kv_names.push_back("past_key_values." + std::to_string(layer) + ".key");
@@ -542,7 +602,7 @@ public:
                     OrtValue* past_value_tensor = nullptr;
                     if (past_seq_len == 0) {
                         std::vector<float> empty;
-                        cached_api->CreateTensorWithDataAsOrtValue(
+                        status = cached_api->CreateTensorWithDataAsOrtValue(
                             memory_info,
                             empty.data(),
                             0,
@@ -551,8 +611,15 @@ public:
                             ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT,
                             &past_value_tensor
                         );
+                        if (status != nullptr) {
+                            LOGE("Failed to create empty past_value tensor: %s", cached_api->GetErrorMessage(status));
+                            cached_api->ReleaseStatus(status);
+                            result.success = false;
+                            result.stop_reason = "error";
+                            return result;
+                        }
                     } else {
-                        cached_api->CreateTensorWithDataAsOrtValue(
+                        status = cached_api->CreateTensorWithDataAsOrtValue(
                             memory_info,
                             past_values[layer].data(),
                             past_values[layer].size() * sizeof(float),
@@ -561,6 +628,19 @@ public:
                             ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT,
                             &past_value_tensor
                         );
+                        if (status != nullptr) {
+                            LOGE("Failed to create past_value tensor: %s", cached_api->GetErrorMessage(status));
+                            cached_api->ReleaseStatus(status);
+                            result.success = false;
+                            result.stop_reason = "error";
+                            return result;
+                        }
+                    }
+                    if (past_value_tensor == nullptr) {
+                        LOGE("past_value_tensor is null after creation");
+                        result.success = false;
+                        result.stop_reason = "error";
+                        return result;
                     }
                     input_tensors.push_back(past_value_tensor);
                     kv_names.push_back("past_key_values." + std::to_string(layer) + ".value");
@@ -580,7 +660,7 @@ public:
                 
                 // Run inference
                 std::vector<OrtValue*> output_tensors(output_names.size(), nullptr);
-                OrtStatus* status = cached_api->Run(
+                status = cached_api->Run(
                     session,
                     nullptr,
                     input_names.data(),
@@ -696,9 +776,14 @@ public:
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
             result.inference_time_ms = static_cast<double>(duration.count());
             
+            // Calculate tokens per second, avoiding division by zero
+            double tokens_per_sec = 0.0;
+            if (result.inference_time_ms > 0.0) {
+                tokens_per_sec = tokens_generated / (result.inference_time_ms / 1000.0);
+            }
+            
             LOGI("Generated %d tokens in %.2f ms (%.1f tokens/sec)", 
-                 tokens_generated, result.inference_time_ms,
-                 tokens_generated / (result.inference_time_ms / 1000.0));
+                 tokens_generated, result.inference_time_ms, tokens_per_sec);
             return result;
             
         } catch (const std::exception& e) {

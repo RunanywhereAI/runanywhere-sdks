@@ -6,6 +6,25 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 20)
 
 # =============================================================================
+# Fetch nlohmann/json for RAG wrapper
+# =============================================================================
+include(FetchContent)
+if(NOT TARGET nlohmann_json::nlohmann_json)
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG        v3.11.3
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(nlohmann_json)
+    # Make nlohmann_json include directory available
+    set(NLOHMANN_JSON_INCLUDE "${nlohmann_json_SOURCE_DIR}/include")
+else()
+    # If target already exists, get its include directory
+    get_target_property(NLOHMANN_JSON_INCLUDE nlohmann_json::nlohmann_json INTERFACE_INCLUDE_DIRECTORIES)
+endif()
+
+# =============================================================================
 # 16KB Page Alignment for Android 15+ (API 35) Compliance
 # Required starting November 1, 2025 for Google Play submissions
 # =============================================================================
@@ -110,6 +129,8 @@ include_directories(
     "${CORE_INCLUDE_DIR}/rac/backends/rag"
     "${CORE_INCLUDE_DIR}/rac/backends/llamacpp"
     "${CORE_INCLUDE_DIR}/rac/backends/onnx"
+    # nlohmann/json headers from FetchContent
+    "${NLOHMANN_JSON_INCLUDE}"
 )
 
 # =============================================================================

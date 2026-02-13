@@ -94,7 +94,11 @@ public:
         std::size_t key = next_key_++;
 
         // Add to USearch index
-        index_.add(key, chunk.embedding.data());
+        auto add_result = index_.add(key, chunk.embedding.data());
+        if (!add_result) {
+            LOGE("Failed to add chunk to index: %s", add_result.error.what());
+            return false;
+        }
 
         // Store metadata
         chunks_[key] = chunk;
@@ -120,7 +124,11 @@ public:
 
             // Generate unique key using monotonically increasing counter (no collisions)
             std::size_t key = next_key_++;
-            index_.add(key, chunk.embedding.data());
+            auto add_result = index_.add(key, chunk.embedding.data());
+            if (!add_result) {
+                LOGE("Failed to add chunk to batch: %s", add_result.error.what());
+                continue;
+            }
             chunks_[key] = chunk;
             id_to_key_[chunk.id] = key;
         }
@@ -197,7 +205,11 @@ public:
         }
 
         std::size_t key = it->second;
-        index_.remove(key);
+        auto remove_result = index_.remove(key);
+        if (!remove_result) {
+            LOGE("Failed to remove chunk from index: %s", remove_result.error.what());
+            return false;
+        }
         chunks_.erase(key);
         id_to_key_.erase(it);
 
@@ -240,7 +252,11 @@ public:
         std::lock_guard<std::mutex> lock(mutex_);
         
         // Save USearch index
-        index_.save(path.c_str());
+        auto save_result = index_.save(path.c_str());
+        if (!save_result) {
+            LOGE("Failed to save USearch index: %s", save_result.error.what());
+            return false;
+        }
         
         // Save metadata to JSON file
         nlohmann::json metadata;
@@ -274,7 +290,11 @@ public:
         std::lock_guard<std::mutex> lock(mutex_);
         
         // Load USearch index
-        index_.load(path.c_str());
+        auto load_result = index_.load(path.c_str());
+        if (!load_result) {
+            LOGE("Failed to load USearch index: %s", load_result.error.what());
+            return false;
+        }
         
         // Load metadata from JSON file
         std::string metadata_path = path + ".metadata.json";
