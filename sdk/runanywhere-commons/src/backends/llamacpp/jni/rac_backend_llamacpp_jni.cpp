@@ -48,6 +48,14 @@ extern "C" {
 JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
     (void)vm;
     (void)reserved;
+    
+#ifdef __ANDROID__
+    // CRITICAL: Disable Vulkan IMMEDIATELY on library load
+    // This prevents crash in llama_backend_init() before our code runs
+    __android_log_print(ANDROID_LOG_WARN, "RAC_GPU_STATUS", "JNI_OnLoad: Disabling Vulkan to prevent crash");
+    setenv("GGML_VK_DISABLE", "1", 1);
+#endif
+    
     LOGi("JNI_OnLoad: rac_backend_llamacpp_jni loaded");
     return JNI_VERSION_1_6;
 }

@@ -32,6 +32,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../include)
 # Source files
 set(JNI_SOURCES
     runanywhere_commons_jni.cpp
+    device_jni.cpp
 )
 
 # Create shared library

@@ -83,16 +83,24 @@ class LlamaCppBackend {
 
     // Get number of threads to use
     int get_num_threads() const { return num_threads_; }
+    
+    // GPU support
+    bool is_using_gpu() const { return use_gpu_; }
+    std::string get_gpu_device_name() const { return gpu_device_name_; }
+    void disable_gpu() { use_gpu_ = false; }  // Disable GPU after failure
 
     // Get text generation capability
     LlamaCppTextGeneration* get_text_generation() { return text_gen_.get(); }
 
    private:
     void create_text_generation();
+    void detect_gpu_capabilities();
 
     bool initialized_ = false;
     nlohmann::json config_;
     int num_threads_ = 0;
+    bool use_gpu_ = false;
+    std::string gpu_device_name_;
     std::unique_ptr<LlamaCppTextGeneration> text_gen_;
     mutable std::mutex mutex_;
 };
