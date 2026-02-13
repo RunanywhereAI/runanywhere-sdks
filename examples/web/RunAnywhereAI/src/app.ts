@@ -12,6 +12,20 @@ import { initMoreTab } from './views/more';
 import { initSettingsTab } from './views/settings';
 
 // ---------------------------------------------------------------------------
+// Tab Lifecycle
+// ---------------------------------------------------------------------------
+
+/**
+ * Lifecycle callbacks for tabs that hold resources (camera, mic, generation).
+ * Called by the app shell when the user switches between tabs so each view
+ * can release expensive resources and avoid background work.
+ */
+export interface TabLifecycle {
+  onActivate?: () => void;
+  onDeactivate?: () => void;
+}
+
+// ---------------------------------------------------------------------------
 // Tab Definitions
 // ---------------------------------------------------------------------------
 
@@ -55,6 +69,9 @@ const TABS: TabDef[] = [
 
 let activeTab = 0;
 
+/** Per-tab lifecycle callbacks (indexed same as TABS). */
+const tabLifecycles: (TabLifecycle | undefined)[] = new Array(TABS.length).fill(undefined);
+
 function buildSvgIcon(paths: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
 }
@@ -90,10 +107,10 @@ export function buildAppShell(): void {
   app.appendChild(tabContent);
   app.appendChild(tabBar);
 
-  // Initialize all tab views
-  initChatTab(document.getElementById('tab-chat')!);
-  initVisionTab(document.getElementById('tab-vision')!);
-  initVoiceTab(document.getElementById('tab-voice')!);
+  // Initialize all tab views, capturing lifecycle callbacks
+  tabLifecycles[0] = initChatTab(document.getElementById('tab-chat')!);
+  tabLifecycles[1] = initVisionTab(document.getElementById('tab-vision')!);
+  tabLifecycles[2] = initVoiceTab(document.getElementById('tab-voice')!);
   initMoreTab(document.getElementById('tab-more')!);
   initSettingsTab(document.getElementById('tab-settings')!);
 
@@ -102,7 +119,17 @@ export function buildAppShell(): void {
 }
 
 function switchTab(index: number): void {
+  const previousTab = activeTab;
   activeTab = index;
+
+  // Notify the outgoing tab so it can release resources (camera, mic, etc.)
+  if (previousTab !== index) {
+    try {
+      tabLifecycles[previousTab]?.onDeactivate?.();
+    } catch (err) {
+      console.warn(`[App] Tab ${TABS[previousTab].id} onDeactivate error:`, err);
+    }
+  }
 
   // Update panels
   document.querySelectorAll('.tab-panel').forEach((panel, i) => {
@@ -113,6 +140,15 @@ function switchTab(index: number): void {
   document.querySelectorAll('.tab-item').forEach((item, i) => {
     item.classList.toggle('active', i === index);
   });
+
+  // Notify the incoming tab so it can resume if needed
+  if (previousTab !== index) {
+    try {
+      tabLifecycles[index]?.onActivate?.();
+    } catch (err) {
+      console.warn(`[App] Tab ${TABS[index].id} onActivate error:`, err);
+    }
+  }
 }
 
 // Export for external use

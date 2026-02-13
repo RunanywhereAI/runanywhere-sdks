@@ -9,6 +9,7 @@
  *   - Model selection for multimodal models
  */
 
+import type { TabLifecycle } from '../app';
 import { ModelManager, ModelCategory, type ModelInfo } from '../services/model-manager';
 import { showModelSelectionSheet } from '../components/model-selection';
 import { VLMWorkerBridge } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
@@ -60,7 +61,7 @@ let currentDescription = '';
 // Init
 // ---------------------------------------------------------------------------
 
-export function initVisionTab(el: HTMLElement): void {
+export function initVisionTab(el: HTMLElement): TabLifecycle {
   container = el;
   container.innerHTML = `
     <!-- Toolbar -->
@@ -163,6 +164,25 @@ export function initVisionTab(el: HTMLElement): void {
   // Subscribe to model changes
   ModelManager.onChange(onModelsChanged);
   onModelsChanged(ModelManager.getModels());
+
+  // Return lifecycle callbacks for tab-switching cleanup
+  return {
+    onDeactivate(): void {
+      // Stop live mode interval (fires VLM inference every 2.5s)
+      stopLiveMode();
+      // Release the camera hardware to free resources
+      stopCamera();
+      console.log('[Vision] Tab deactivated — camera & live mode stopped');
+    },
+    onActivate(): void {
+      // Re-open the camera if a model is loaded (user had it running before)
+      const loaded = ModelManager.getLoadedModel(ModelCategory.Multimodal);
+      if (loaded && !cameraStream) {
+        startCamera();
+        console.log('[Vision] Tab activated — camera restarted');
+      }
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------

@@ -20,17 +20,19 @@ import { ModelCategory, LLMFramework, ModelStatus, DownloadStage, SDKEventType }
 import { OPFSStorage } from './OPFSStorage';
 import { ModelRegistry } from './ModelRegistry';
 import { ModelDownloader } from './ModelDownloader';
+import { extractTarGz } from './ArchiveUtility';
 import type {
   ManagedModel,
   CompactModelDef,
   DownloadProgress,
   ModelFileDescriptor,
   ModelChangeCallback,
+  ArtifactType,
 } from './ModelRegistry';
 
 // Re-export types so existing imports from './Infrastructure/ModelManager' still work
 export { ModelCategory, LLMFramework, ModelStatus, DownloadStage };
-export type { ManagedModel, CompactModelDef, DownloadProgress, ModelFileDescriptor };
+export type { ManagedModel, CompactModelDef, DownloadProgress, ModelFileDescriptor, ArtifactType };
 
 // ---------------------------------------------------------------------------
 // VLM Loader Interface (pluggable by the app)
@@ -422,12 +424,116 @@ class ModelManagerImpl {
 
   /**
    * Load an STT model into sherpa-onnx.
+   *
+   * Supports two modes:
+   *  1. **Archive** (isArchive=true): Download is a .tar.gz that bundles encoder,
+   *     decoder, tokens, etc. Matches the Swift SDK approach.
+   *  2. **Individual files**: Separate encoder/decoder/tokens downloads.
    */
   private async loadSTTModel(model: ManagedModel, primaryData: Uint8Array): Promise<void> {
     const sherpa = SherpaONNXBridge.shared;
     await sherpa.ensureLoaded();
 
     const modelDir = `/models/${model.id}`;
+
+    if (model.isArchive) {
+      await this.loadSTTFromArchive(model, primaryData, sherpa, modelDir);
+    } else {
+      await this.loadSTTFromIndividualFiles(model, primaryData, sherpa, modelDir);
+    }
+
+    console.log(`[ModelManager] STT model loaded via sherpa-onnx: ${model.id}`);
+  }
+
+  /**
+   * Load an STT model from a .tar.gz archive (matching Swift SDK approach).
+   * Extracts encoder, decoder, and tokens from the archive automatically.
+   */
+  private async loadSTTFromArchive(
+    model: ManagedModel,
+    archiveData: Uint8Array,
+    sherpa: SherpaONNXBridge,
+    modelDir: string,
+  ): Promise<void> {
+    console.log(`[ModelManager] Extracting STT archive for ${model.id} (${archiveData.length} bytes)...`);
+
+    const entries = await extractTarGz(archiveData);
+    console.log(`[ModelManager] Extracted ${entries.length} files from STT archive`);
+
+    const prefix = this.findArchivePrefix(entries.map(e => e.path));
+
+    // Write all files and auto-discover key paths
+    let encoderPath: string | null = null;
+    let decoderPath: string | null = null;
+    let tokensPath: string | null = null;
+    let joinerPath: string | null = null;
+    let modelPath: string | null = null;
+
+    for (const entry of entries) {
+      const relativePath = prefix ? entry.path.slice(prefix.length) : entry.path;
+      const fsPath = `${modelDir}/${relativePath}`;
+      sherpa.writeFile(fsPath, entry.data);
+
+      // Auto-discover by filename pattern
+      if (relativePath.includes('encoder') && relativePath.endsWith('.onnx')) {
+        encoderPath = fsPath;
+      } else if (relativePath.includes('decoder') && relativePath.endsWith('.onnx')) {
+        decoderPath = fsPath;
+      } else if (relativePath.includes('joiner') && relativePath.endsWith('.onnx')) {
+        joinerPath = fsPath;
+      } else if (relativePath.includes('tokens') && relativePath.endsWith('.txt')) {
+        tokensPath = fsPath;
+      } else if (relativePath.endsWith('.onnx') && !relativePath.includes('encoder') && !relativePath.includes('decoder') && !relativePath.includes('joiner')) {
+        modelPath = fsPath;
+      }
+    }
+
+    // Route to the appropriate STT model type
+    if (model.id.includes('whisper')) {
+      if (!encoderPath || !decoderPath || !tokensPath) {
+        throw new Error(`Whisper archive for '${model.id}' missing encoder/decoder/tokens`);
+      }
+      await STT.loadModel({
+        modelId: model.id,
+        type: STTModelType.Whisper,
+        modelFiles: { encoder: encoderPath, decoder: decoderPath, tokens: tokensPath },
+        sampleRate: 16000,
+        language: 'en',
+      });
+    } else if (model.id.includes('paraformer')) {
+      if (!modelPath || !tokensPath) {
+        throw new Error(`Paraformer archive for '${model.id}' missing model/tokens`);
+      }
+      await STT.loadModel({
+        modelId: model.id,
+        type: STTModelType.Paraformer,
+        modelFiles: { model: modelPath, tokens: tokensPath },
+        sampleRate: 16000,
+      });
+    } else if (model.id.includes('zipformer')) {
+      if (!encoderPath || !decoderPath || !joinerPath || !tokensPath) {
+        throw new Error(`Zipformer archive for '${model.id}' missing encoder/decoder/joiner/tokens`);
+      }
+      await STT.loadModel({
+        modelId: model.id,
+        type: STTModelType.Zipformer,
+        modelFiles: { encoder: encoderPath, decoder: decoderPath, joiner: joinerPath, tokens: tokensPath },
+        sampleRate: 16000,
+      });
+    } else {
+      throw new Error(`Unknown STT model type for model: ${model.id}`);
+    }
+  }
+
+  /**
+   * Load an STT model from individual downloaded files (legacy path).
+   */
+  private async loadSTTFromIndividualFiles(
+    model: ManagedModel,
+    primaryData: Uint8Array,
+    sherpa: SherpaONNXBridge,
+    modelDir: string,
+  ): Promise<void> {
     const primaryFilename = model.url.split('/').pop()!;
     const primaryPath = `${modelDir}/${primaryFilename}`;
 
@@ -481,10 +587,7 @@ class ModelManagerImpl {
       await STT.loadModel({
         modelId: model.id,
         type: STTModelType.Paraformer,
-        modelFiles: {
-          model: primaryPath,
-          tokens: `${modelDir}/${tokensFilename}`,
-        },
+        modelFiles: { model: primaryPath, tokens: `${modelDir}/${tokensFilename}` },
         sampleRate: 16000,
       });
     } else if (model.id.includes('zipformer')) {
@@ -508,76 +611,106 @@ class ModelManagerImpl {
     } else {
       throw new Error(`Unknown STT model type for model: ${model.id}`);
     }
-
-    console.log(`[ModelManager] STT model loaded via sherpa-onnx: ${model.id}`);
   }
 
   /**
    * Load a TTS model into the sherpa-onnx Emscripten FS and initialise the TTS engine.
+   *
+   * Supports two modes:
+   *  1. **Archive** (isArchive=true): Download is a .tar.gz that bundles model files +
+   *     espeak-ng-data. Matches the Swift SDK approach — extract and write all files.
+   *  2. **Individual files** (legacy): Separate model + companion file downloads.
    */
-
-  /**
-   * espeak-ng-data files needed for Piper VITS TTS.
-   */
-  private static readonly ESPEAK_NG_DATA_FILES = [
-    // Core phoneme data
-    'espeak-ng-data/phondata',
-    'espeak-ng-data/phonindex',
-    'espeak-ng-data/phontab',
-    'espeak-ng-data/intonations',
-    'espeak-ng-data/phondata-manifest',
-    // English dictionary
-    'espeak-ng-data/en_dict',
-    // Language definition files for all English variants
-    'espeak-ng-data/lang/gmw/en',
-    'espeak-ng-data/lang/gmw/en-US',
-    'espeak-ng-data/lang/gmw/en-029',
-    'espeak-ng-data/lang/gmw/en-GB-scotland',
-    'espeak-ng-data/lang/gmw/en-GB-x-gbclan',
-    'espeak-ng-data/lang/gmw/en-GB-x-gbcwmd',
-    'espeak-ng-data/lang/gmw/en-GB-x-rp',
-    'espeak-ng-data/lang/gmw/en-US-nyc',
-  ];
-
-  private espeakNgDataLoaded = false;
-
-  /**
-   * Ensure espeak-ng-data files are available in the sherpa FS.
-   */
-  private async ensureEspeakNgData(): Promise<void> {
-    if (this.espeakNgDataLoaded) return;
-
-    const sherpa = SherpaONNXBridge.shared;
-    const baseUrl = 'https://huggingface.co/csukuangfj/vits-piper-en_US-lessac-medium/resolve/main/';
-
-    console.log('[ModelManager] Loading espeak-ng-data files for TTS...');
-
-    for (const filePath of ModelManagerImpl.ESPEAK_NG_DATA_FILES) {
-      const fsPath = `/${filePath}`;
-      const cacheKey = filePath;
-
-      let data = await this.downloader.loadFromOPFS(cacheKey);
-      if (!data) {
-        console.log(`[ModelManager] Downloading ${filePath}...`);
-        data = await this.downloader.downloadFile(`${baseUrl}${filePath}`);
-        await this.downloader.storeInOPFS(cacheKey, data);
-      }
-      console.log(`[ModelManager] Writing ${fsPath} (${data.length} bytes)`);
-      sherpa.writeFile(fsPath, data);
-    }
-
-    this.espeakNgDataLoaded = true;
-    console.log('[ModelManager] espeak-ng-data files loaded');
-  }
-
   private async loadTTSModel(model: ManagedModel, primaryData: Uint8Array): Promise<void> {
     const sherpa = SherpaONNXBridge.shared;
     await sherpa.ensureLoaded();
 
-    // Ensure espeak-ng-data is available (required for Piper VITS models)
-    await this.ensureEspeakNgData();
-
     const modelDir = `/models/${model.id}`;
+
+    if (model.isArchive) {
+      await this.loadTTSFromArchive(model, primaryData, sherpa, modelDir);
+    } else {
+      await this.loadTTSFromIndividualFiles(model, primaryData, sherpa, modelDir);
+    }
+
+    console.log(`[ModelManager] TTS model loaded via sherpa-onnx: ${model.id}`);
+  }
+
+  /**
+   * Load a TTS model from a .tar.gz archive (matching Swift SDK approach).
+   *
+   * The archive contains all necessary files in a nested directory:
+   *   model.onnx, tokens.txt, espeak-ng-data/, etc.
+   * We extract everything and write it to the sherpa virtual FS.
+   */
+  private async loadTTSFromArchive(
+    model: ManagedModel,
+    archiveData: Uint8Array,
+    sherpa: SherpaONNXBridge,
+    modelDir: string,
+  ): Promise<void> {
+    console.log(`[ModelManager] Extracting TTS archive for ${model.id} (${archiveData.length} bytes)...`);
+
+    const entries = await extractTarGz(archiveData);
+    console.log(`[ModelManager] Extracted ${entries.length} files from archive`);
+
+    // Find the common prefix (nested directory) — archives typically contain
+    // one top-level directory with all files inside it.
+    const prefix = this.findArchivePrefix(entries.map(e => e.path));
+
+    // Write all extracted files to the sherpa virtual FS
+    let modelPath: string | null = null;
+    let tokensPath: string | null = null;
+    let dataDirPath: string | null = null;
+
+    for (const entry of entries) {
+      // Strip the nested directory prefix to get relative path
+      const relativePath = prefix ? entry.path.slice(prefix.length) : entry.path;
+      const fsPath = `${modelDir}/${relativePath}`;
+
+      sherpa.writeFile(fsPath, entry.data);
+
+      // Auto-discover key files
+      if (relativePath.endsWith('.onnx') && !relativePath.includes('/')) {
+        modelPath = fsPath;
+      }
+      if (relativePath === 'tokens.txt') {
+        tokensPath = fsPath;
+      }
+      if (relativePath.startsWith('espeak-ng-data/') && !dataDirPath) {
+        dataDirPath = `${modelDir}/espeak-ng-data`;
+      }
+    }
+
+    if (!modelPath) {
+      throw new Error(`TTS archive for '${model.id}' does not contain an .onnx model file`);
+    }
+    if (!tokensPath) {
+      throw new Error(`TTS archive for '${model.id}' does not contain tokens.txt`);
+    }
+
+    console.log(`[ModelManager] TTS archive extracted — model: ${modelPath}, tokens: ${tokensPath}, dataDir: ${dataDirPath ?? 'none'}`);
+
+    await TTS.loadVoice({
+      voiceId: model.id,
+      modelPath,
+      tokensPath,
+      dataDir: dataDirPath ?? '',
+      numThreads: 1,
+    });
+  }
+
+  /**
+   * Load a TTS model from individual downloaded files.
+   * Used when models are registered with individual file URLs (e.g. HuggingFace)
+   * rather than tar.gz archives. Downloads espeak-ng-data on-demand for Piper models.
+   */
+  private async loadTTSFromIndividualFiles(
+    model: ManagedModel,
+    primaryData: Uint8Array,
+    sherpa: SherpaONNXBridge,
+    modelDir: string,
+  ): Promise<void> {
     const primaryFilename = model.url.split('/').pop()!;
     const primaryPath = `${modelDir}/${primaryFilename}`;
 
@@ -611,11 +744,26 @@ class ModelManagerImpl {
       voiceId: model.id,
       modelPath: primaryPath,
       tokensPath,
-      dataDir: '/espeak-ng-data',
+      dataDir: '', // espeak-ng-data is bundled in archives; individual-file path doesn't include it
       numThreads: 1,
     });
+  }
 
-    console.log(`[ModelManager] TTS model loaded via sherpa-onnx: ${model.id}`);
+  /**
+   * Find the common directory prefix in archive entry paths.
+   * Archives typically contain a single top-level directory (nested structure).
+   * Returns the prefix including trailing '/', or empty string if no common prefix.
+   */
+  private findArchivePrefix(paths: string[]): string {
+    if (paths.length === 0) return '';
+
+    // Check if all paths share a common first directory component
+    const firstSlash = paths[0].indexOf('/');
+    if (firstSlash === -1) return '';
+
+    const candidate = paths[0].slice(0, firstSlash + 1);
+    const allMatch = paths.every(p => p.startsWith(candidate));
+    return allMatch ? candidate : '';
   }
 
   /** Unload the currently loaded model for a specific category */

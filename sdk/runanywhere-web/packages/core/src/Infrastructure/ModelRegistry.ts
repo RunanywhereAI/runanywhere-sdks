@@ -94,6 +94,13 @@ export type ModelChangeCallback = (models: ManagedModel[]) => void;
 
 const HF_BASE = 'https://huggingface.co';
 
+/**
+ * Artifact types for model archives.
+ * Matches Swift's `ArtifactType` — archives are downloaded as a single file
+ * and extracted, while individual files are downloaded separately.
+ */
+export type ArtifactType = 'archive';
+
 /** Compact model definition for the registry. */
 export interface CompactModelDef {
   id: string;
@@ -102,19 +109,48 @@ export interface CompactModelDef {
   repo?: string;
   /** Direct URL override for non-HuggingFace sources (e.g., GitHub). */
   url?: string;
-  /** Filenames in the repo. First = primary model file, rest = companions. */
-  files: string[];
+  /**
+   * Filenames in the repo. First = primary model file, rest = companions.
+   * Unused when `artifactType` is 'archive' (the archive contains all files).
+   */
+  files?: string[];
   framework: LLMFramework;
   modality?: ModelCategory;
   memoryRequirement?: number;
+  /**
+   * When set to 'archive', the URL points to a .tar.gz archive that
+   * bundles all model files (including espeak-ng-data for TTS).
+   * Matches Swift SDK's `.archive(.tarGz, structure: .nestedDirectory)`.
+   */
+  artifactType?: ArtifactType;
 }
 
 /** Expand a compact definition into the full ManagedModel shape (minus status). */
 function resolveModelDef(def: CompactModelDef): Omit<ManagedModel, 'status'> {
+  const files = def.files ?? [];
   const baseUrl = def.repo ? `${HF_BASE}/${def.repo}/resolve/main` : undefined;
-  const primaryUrl = def.url ?? `${baseUrl}/${def.files[0]}`;
 
-  const additionalFiles: ModelFileDescriptor[] = def.files.slice(1).map((filename) => ({
+  // Archive models: URL is the archive itself, no individual files
+  if (def.artifactType === 'archive') {
+    const archiveUrl = def.url;
+    if (!archiveUrl) {
+      throw new Error(`Archive model '${def.id}' must specify a 'url' for the archive.`);
+    }
+    return {
+      id: def.id,
+      name: def.name,
+      url: archiveUrl,
+      framework: def.framework,
+      modality: def.modality,
+      memoryRequirement: def.memoryRequirement,
+      isArchive: true,
+    };
+  }
+
+  // Individual-file models: first file = primary, rest = additional
+  const primaryUrl = def.url ?? `${baseUrl}/${files[0]}`;
+
+  const additionalFiles: ModelFileDescriptor[] = files.slice(1).map((filename) => ({
     url: baseUrl ? `${baseUrl}/${filename}` : filename,
     filename,
   }));
