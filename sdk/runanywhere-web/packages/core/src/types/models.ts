@@ -6,6 +6,7 @@
  */
 
 import type {
+  AccelerationPreference,
   ConfigurationSource,
   ExecutionTarget,
   HardwareAcceleration,
@@ -86,8 +87,6 @@ export interface GenerationOptions {
   systemPrompt?: string;
 }
 
-export type LLMGenerationOptions = GenerationOptions;
-
 export interface STTOptions {
   language?: string;
   punctuation?: boolean;
@@ -144,14 +143,8 @@ export interface SDKInitOptions {
   baseURL?: string;
   environment?: SDKEnvironment;
   debug?: boolean;
-  /**
-   * Hardware acceleration preference for LLM/VLM inference.
-   *
-   * - `'auto'` (default) — detect WebGPU and use it when available, fall back to CPU.
-   * - `'webgpu'` — force WebGPU (fails gracefully to CPU if unavailable).
-   * - `'cpu'` — always use CPU-only WASM (skip WebGPU detection entirely).
-   */
-  acceleration?: 'auto' | 'webgpu' | 'cpu';
+  /** Hardware acceleration preference for LLM/VLM inference. */
+  acceleration?: AccelerationPreference;
   /**
    * Custom URL to the WebGPU-enabled racommons-webgpu.js glue file.
    * Only used when acceleration is 'auto' or 'webgpu'.

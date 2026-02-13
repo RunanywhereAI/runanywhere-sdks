@@ -28,6 +28,31 @@ import { WASMBridge } from '../../Foundation/WASMBridge';
 import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { TextGeneration } from './RunAnywhere+TextGeneration';
+import {
+  ToolCallFormat,
+  type ToolValue,
+  type ToolParameterType,
+  type ToolParameter,
+  type ToolDefinition,
+  type ToolCall,
+  type ToolResult,
+  type ToolCallingOptions,
+  type ToolCallingResult,
+  type ToolExecutor,
+} from './ToolCallingTypes';
+
+export {
+  ToolCallFormat,
+  type ToolValue,
+  type ToolParameterType,
+  type ToolParameter,
+  type ToolDefinition,
+  type ToolCall,
+  type ToolResult,
+  type ToolCallingOptions,
+  type ToolCallingResult,
+  type ToolExecutor,
+} from './ToolCallingTypes';
 
 const logger = new SDKLogger('ToolCalling');
 
@@ -35,84 +60,6 @@ function requireBridge(): WASMBridge {
   if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
   return WASMBridge.shared;
 }
-
-// ---------------------------------------------------------------------------
-// Types (matching iOS ToolCallingTypes.swift)
-// ---------------------------------------------------------------------------
-
-/** Type-safe JSON value for tool arguments and results. */
-export type ToolValue =
-  | { type: 'string'; value: string }
-  | { type: 'number'; value: number }
-  | { type: 'boolean'; value: boolean }
-  | { type: 'array'; value: ToolValue[] }
-  | { type: 'object'; value: Record<string, ToolValue> }
-  | { type: 'null' };
-
-/** Parameter types for tool arguments. */
-export type ToolParameterType = 'string' | 'number' | 'boolean' | 'object' | 'array';
-
-/** A single parameter definition for a tool. */
-export interface ToolParameter {
-  name: string;
-  type: ToolParameterType;
-  description: string;
-  required?: boolean;
-  enumValues?: string[];
-}
-
-/** Definition of a tool that the LLM can use. */
-export interface ToolDefinition {
-  name: string;
-  description: string;
-  parameters: ToolParameter[];
-  category?: string;
-}
-
-/** A request from the LLM to execute a tool. */
-export interface ToolCall {
-  toolName: string;
-  arguments: Record<string, ToolValue>;
-  callId?: string;
-}
-
-/** Result of executing a tool. */
-export interface ToolResult {
-  toolName: string;
-  success: boolean;
-  result?: Record<string, ToolValue>;
-  error?: string;
-  callId?: string;
-}
-
-/** Tool calling format names. */
-export type ToolCallFormat = 'default' | 'lfm2';
-
-/** Options for tool-enabled generation. */
-export interface ToolCallingOptions {
-  tools?: ToolDefinition[];
-  maxToolCalls?: number;
-  autoExecute?: boolean;
-  temperature?: number;
-  maxTokens?: number;
-  systemPrompt?: string;
-  replaceSystemPrompt?: boolean;
-  keepToolsAvailable?: boolean;
-  format?: ToolCallFormat;
-}
-
-/** Result of a generation that may include tool calls. */
-export interface ToolCallingResult {
-  text: string;
-  toolCalls: ToolCall[];
-  toolResults: ToolResult[];
-  isComplete: boolean;
-}
-
-/** Executor function for a tool. Takes arguments, returns result data. */
-export type ToolExecutor = (
-  args: Record<string, ToolValue>,
-) => Promise<Record<string, ToolValue>>;
 
 // ---------------------------------------------------------------------------
 // ToolValue helpers
@@ -333,7 +280,7 @@ function parseToolCallTS(llmOutput: string): { text: string; toolCall: ToolCall 
  * Format tool definitions into system prompt.
  * Uses C++ when available, falls back to TypeScript.
  */
-function formatToolsForPrompt(tools: ToolDefinition[], format: ToolCallFormat = 'default'): string {
+function formatToolsForPrompt(tools: ToolDefinition[], format: ToolCallFormat = ToolCallFormat.Default): string {
   if (tools.length === 0) return '';
 
   const toolsJson = serializeToolDefinitions(tools);
@@ -434,7 +381,7 @@ function formatToolsForPromptTS(tools: ToolDefinition[], format: ToolCallFormat)
     return `  ${t.name}: ${t.description}\n    Parameters:\n${params}`;
   }).join('\n\n');
 
-  if (format === 'lfm2') {
+  if (format === ToolCallFormat.LFM2) {
     return `You have access to the following tools:\n\n${toolDescriptions}\n\nTo use a tool, respond with:\n<|tool_call_start|>[tool_name(arg1="value1", arg2="value2")]<|tool_call_end|>\n\nIf no tool is needed, respond normally.`;
   }
 
@@ -594,7 +541,7 @@ export const ToolCalling = {
 
     const maxToolCalls = options.maxToolCalls ?? 5;
     const autoExecute = options.autoExecute ?? true;
-    const format: ToolCallFormat = options.format ?? 'default';
+    const format: ToolCallFormat = options.format ?? ToolCallFormat.Default;
     const registeredTools = this.getRegisteredTools();
     const tools = options.tools ?? registeredTools;
 
@@ -667,6 +614,13 @@ export const ToolCalling = {
       toolResults: allToolResults,
       isComplete: true,
     };
+  },
+
+  /**
+   * Clean up the tool calling extension (clears all registered tools).
+   */
+  cleanup(): void {
+    toolRegistry.clear();
   },
 
   /**

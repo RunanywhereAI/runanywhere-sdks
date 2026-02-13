@@ -5,11 +5,14 @@
  * Transcribe sub-view mirrors iOS SpeechToTextView with Batch/Live toggle.
  */
 
-import { MicCapture } from '../services/audio';
+import { AudioCapture } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
 import { ModelManager, ModelCategory } from '../services/model-manager';
 import { showModelSelectionSheet } from '../components/model-selection';
 
 let container: HTMLElement;
+
+/** Shared AudioCapture instance for this view (replaces app-level MicCapture singleton). */
+const micCapture = new AudioCapture();
 
 // Funny texts for TTS "Surprise me" (matching iOS)
 const SURPRISE_TEXTS = [
@@ -256,8 +259,8 @@ function initTranscribeView(): void {
 
   // Reset on back
   container.querySelector('#transcribe-back')!.addEventListener('click', () => {
-    if (MicCapture.isCapturing) {
-      MicCapture.stop();
+    if (micCapture.isCapturing) {
+      micCapture.stop();
     }
     stopLiveVAD();
     sttState = 'idle';
@@ -299,14 +302,14 @@ async function handleMicToggle(): Promise<void> {
       await performBatchTranscription(); // transcribe remainder
     }
 
-    MicCapture.stop();
+    micCapture.stop();
     sttState = 'idle';
     renderSTTUI();
   } else {
     // Start recording
     sttError = '';
     try {
-      await MicCapture.start((level) => {
+      await micCapture.start(undefined, (level) => {
         updateLevelBars(level);
       });
       sttState = 'recording';
@@ -324,7 +327,7 @@ async function handleMicToggle(): Promise<void> {
 
 /** Batch transcription: send full audio buffer to STT. */
 async function performBatchTranscription(): Promise<void> {
-  const audioBuffer = MicCapture.getAudioBuffer();
+  const audioBuffer = micCapture.getAudioBuffer();
   if (audioBuffer.length < MIN_BUFFER_BYTES) {
     sttError = 'Recording too short. Please speak longer.';
     return;
@@ -351,12 +354,12 @@ function startLiveVAD(): void {
   let silenceStart = 0;
 
   liveVadTimer = setInterval(async () => {
-    if (sttState !== 'recording' || !MicCapture.isCapturing) {
+    if (sttState !== 'recording' || !micCapture.isCapturing) {
       stopLiveVAD();
       return;
     }
 
-    const level = MicCapture.currentLevel;
+    const level = micCapture.currentLevel;
 
     if (level >= SPEECH_THRESHOLD) {
       speechDetected = true;
@@ -369,7 +372,7 @@ function startLiveVAD(): void {
         speechDetected = false;
         silenceStart = 0;
 
-        const segment = MicCapture.drainBuffer();
+        const segment = micCapture.drainBuffer();
         if (segment.length >= MIN_BUFFER_BYTES) {
           try {
             const text = await transcribeAudio(segment);
@@ -404,27 +407,12 @@ function stopLiveVAD(): void {
  * The model is loaded by ModelManager.loadModel() which calls STT.loadModel().
  */
 async function transcribeAudio(pcmFloat32: Float32Array): Promise<string> {
-  // Check if an STT model is loaded
-  const sttModels = ModelManager.getSTTModels();
-  const loaded = sttModels.find(m => m.status === 'loaded');
-  const downloaded = sttModels.find(m => m.status === 'downloaded');
-
-  if (!loaded && !downloaded) {
+  // Ensure an STT model is loaded (auto-loads a downloaded one if available)
+  const model = await ModelManager.ensureLoaded(ModelCategory.SpeechRecognition);
+  if (!model) {
     throw new Error(
       'No STT model available. Tap the model button (top right) to download a Speech Recognition model.'
     );
-  }
-
-  // If we have a downloaded but not loaded model, try to load it
-  if (!loaded && downloaded) {
-    try {
-      const loadResult = await ModelManager.loadModel(downloaded.id);
-      if (!loadResult) {
-        throw new Error(`Failed to load STT model: ${downloaded.name}`);
-      }
-    } catch (err) {
-      throw new Error(`Failed to load STT model: ${err instanceof Error ? err.message : String(err)}`);
-    }
   }
 
   // Now call STT.transcribe
@@ -593,21 +581,12 @@ async function handleSpeak(): Promise<void> {
   statusEl.textContent = 'Loading TTS model...';
 
   try {
-    // Check if a TTS model is loaded; auto-load if needed
-    const ttsModels = ModelManager.getTTSModels();
-    const loaded = ttsModels.find(m => m.status === 'loaded');
-    const downloaded = ttsModels.find(m => m.status === 'downloaded');
-
-    if (!loaded && !downloaded) {
+    // Ensure a TTS model is loaded (auto-loads a downloaded one if available)
+    const ttsModel = await ModelManager.ensureLoaded(ModelCategory.SpeechSynthesis);
+    if (!ttsModel) {
       throw new Error(
         'No TTS model available. Tap the model button (top right) to download a Speech Synthesis model.'
       );
-    }
-
-    if (!loaded && downloaded) {
-      statusEl.textContent = `Loading ${downloaded.name}...`;
-      const ok = await ModelManager.loadModel(downloaded.id);
-      if (!ok) throw new Error(`Failed to load TTS model: ${downloaded.name}`);
     }
 
     // Synthesize

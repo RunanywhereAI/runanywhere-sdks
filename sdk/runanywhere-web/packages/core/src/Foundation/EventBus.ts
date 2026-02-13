@@ -6,6 +6,9 @@
  */
 
 import type { SDKEventType } from '../types/enums';
+import { SDKLogger } from './SDKLogger';
+
+const logger = new SDKLogger('EventBus');
 
 /** Generic event listener */
 export type EventListener<T = unknown> = (event: T) => void;
@@ -19,6 +22,58 @@ export interface SDKEventEnvelope {
   category: SDKEventType;
   timestamp: number;
   data: Record<string, unknown>;
+}
+
+/** Known SDK event types and their payload shapes. */
+export interface SDKEventMap {
+  // SDK lifecycle
+  'sdk.initialized': { environment: string; accelerationMode: string };
+  'sdk.accelerationMode': { mode: string };
+
+  // Model management
+  'model.registered': { count: number };
+  'model.downloadStarted': { modelId: string; url: string };
+  'model.downloadProgress': { modelId: string; progress: number; bytesDownloaded: number; totalBytes: number; stage?: string };
+  'model.downloadCompleted': { modelId: string; sizeBytes?: number; localPath?: string };
+  'model.downloadFailed': { modelId: string; error: string };
+  'model.loadStarted': { modelId: string; component?: string; category?: string };
+  'model.loadCompleted': { modelId: string; component?: string; category?: string; loadTimeMs?: number };
+  'model.loadFailed': { modelId: string; error: string };
+  'model.unloaded': { modelId: string; category: string };
+
+  // Text generation
+  'generation.started': { prompt: string };
+  'generation.completed': { tokensUsed: number; latencyMs: number };
+  'generation.failed': { error: string };
+
+  // Speech-to-text
+  'stt.transcribed': { text: string; confidence: number };
+
+  // Text-to-speech
+  'tts.synthesized': { durationMs: number; sampleRate: number; textLength: number };
+
+  // Voice activity detection
+  'vad.speechStarted': { activity: string };
+  'vad.speechEnded': { activity: string };
+
+  // Voice agent
+  'voice.turnCompleted': { speechDetected: boolean; transcription: string; response: string };
+
+  // Embeddings
+  'embeddings.generated': { numEmbeddings: number; dimension: number; processingTimeMs: number };
+
+  // Diffusion
+  'diffusion.generated': { width: number; height: number; generationTimeMs: number };
+
+  // Vision-language model
+  'vlm.processed': { tokensPerSecond: number; totalTokens: number; hardwareUsed: string };
+
+  // Audio playback
+  'playback.started': { durationMs: number; sampleRate: number };
+  'playback.completed': { durationMs: number };
+
+  // Allow custom events
+  [key: string]: Record<string, unknown>;
 }
 
 /**
@@ -45,17 +100,18 @@ export class EventBus {
    * Subscribe to events of a specific type.
    * @returns Unsubscribe function
    */
-  on<T = unknown>(eventType: string, listener: EventListener<T>): Unsubscribe {
-    if (!this.listeners.has(eventType)) {
-      this.listeners.set(eventType, new Set());
+  on<K extends keyof SDKEventMap>(eventType: K, listener: EventListener<SDKEventMap[K]>): Unsubscribe {
+    const key = eventType as string;
+    if (!this.listeners.has(key)) {
+      this.listeners.set(key, new Set());
     }
-    const set = this.listeners.get(eventType)!;
+    const set = this.listeners.get(key)!;
     set.add(listener as EventListener);
 
     return () => {
       set.delete(listener as EventListener);
       if (set.size === 0) {
-        this.listeners.delete(eventType);
+        this.listeners.delete(key);
       }
     };
   }
@@ -74,8 +130,8 @@ export class EventBus {
   /**
    * Subscribe to events once (auto-unsubscribe after first event).
    */
-  once<T = unknown>(eventType: string, listener: EventListener<T>): Unsubscribe {
-    const unsubscribe = this.on<T>(eventType, (event) => {
+  once<K extends keyof SDKEventMap>(eventType: K, listener: EventListener<SDKEventMap[K]>): Unsubscribe {
+    const unsubscribe = this.on(eventType, (event) => {
       unsubscribe();
       listener(event);
     });
@@ -85,22 +141,24 @@ export class EventBus {
   /**
    * Emit an event.
    */
-  emit(eventType: string, category: SDKEventType, data: Record<string, unknown> = {}): void {
+  emit<K extends keyof SDKEventMap>(eventType: K, category: SDKEventType, data?: SDKEventMap[K]): void {
+    const key = eventType as string;
+    const payload = (data ?? {}) as Record<string, unknown>;
     const envelope: SDKEventEnvelope = {
-      type: eventType,
+      type: key,
       category,
       timestamp: Date.now(),
-      data,
+      data: payload,
     };
 
     // Notify specific listeners
-    const specific = this.listeners.get(eventType);
+    const specific = this.listeners.get(key);
     if (specific) {
       for (const listener of specific) {
         try {
-          listener(data);
+          listener(payload);
         } catch (error) {
-          console.error(`[EventBus] Listener error for ${eventType}:`, error);
+          logger.error(`Listener error for ${key}: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
     }
@@ -110,7 +168,7 @@ export class EventBus {
       try {
         listener(envelope);
       } catch (error) {
-        console.error('[EventBus] Wildcard listener error:', error);
+        logger.error(`Wildcard listener error: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
   }

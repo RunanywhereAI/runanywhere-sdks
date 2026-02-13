@@ -22,44 +22,13 @@ import { SDKError } from '../../Foundation/ErrorTypes';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { EventBus } from '../../Foundation/EventBus';
 import { SDKEventType } from '../../types/enums';
+import { PipelineState } from './VoiceAgentTypes';
+import type { VoiceAgentModels, VoiceTurnResult, VoiceAgentEventData, VoiceAgentEventCallback } from './VoiceAgentTypes';
+
+export { PipelineState } from './VoiceAgentTypes';
+export type { VoiceAgentModels, VoiceTurnResult, VoiceAgentEventData, VoiceAgentEventCallback } from './VoiceAgentTypes';
 
 const logger = new SDKLogger('VoiceAgent');
-
-// ---------------------------------------------------------------------------
-// VoiceAgent Types
-// ---------------------------------------------------------------------------
-
-export type PipelineState =
-  | 'idle'
-  | 'listening'
-  | 'processingSTT'
-  | 'generatingResponse'
-  | 'playingTTS'
-  | 'cooldown'
-  | 'error';
-
-export interface VoiceAgentModels {
-  stt?: { path: string; id: string; name?: string };
-  llm?: { path: string; id: string; name?: string };
-  tts?: { path: string; id: string; name?: string };
-}
-
-export interface VoiceTurnResult {
-  speechDetected: boolean;
-  transcription?: string;
-  response?: string;
-  synthesizedAudio?: Float32Array;
-}
-
-export interface VoiceAgentEventData {
-  type: 'transcription' | 'response' | 'audioSynthesized' | 'vadTriggered' | 'error';
-  text?: string;
-  audioData?: Float32Array;
-  speechActive?: boolean;
-  errorCode?: number;
-}
-
-export type VoiceAgentEventCallback = (event: VoiceAgentEventData) => void;
 
 // ---------------------------------------------------------------------------
 // VoiceAgent Instance
@@ -152,7 +121,7 @@ export class VoiceAgentSession {
     bridge.writeBytes(audioData, audioPtr);
 
     // rac_voice_agent_result_t: { speech_detected, transcription, response, synthesized_audio, audio_size }
-    const resultSize = 20;
+    const resultSize = m._rac_wasm_sizeof_voice_agent_result();
     const resultPtr = m._malloc(resultSize);
 
     try {

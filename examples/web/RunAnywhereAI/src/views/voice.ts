@@ -7,7 +7,7 @@
 
 import { showModelSelectionSheet } from '../components/model-selection';
 import { ModelManager, ModelCategory } from '../services/model-manager';
-import { MicCapture } from '../services/audio';
+import { AudioCapture } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
 
 // Lazy-imported SDK modules (loaded only when pipeline runs)
 type SDKModules = typeof import('../../../../../sdk/runanywhere-web/packages/core/src/index');
@@ -19,6 +19,9 @@ async function getSDK(): Promise<SDKModules> {
   }
   return sdkModules;
 }
+
+/** Shared AudioCapture instance for this view (replaces app-level MicCapture singleton). */
+const micCapture = new AudioCapture();
 
 // ---------------------------------------------------------------------------
 // Pipeline step definitions
@@ -312,7 +315,7 @@ function stopSession(): void {
     cancelGeneration = null;
   }
   stopVAD();
-  if (MicCapture.isCapturing) MicCapture.stop();
+  if (micCapture.isCapturing) micCapture.stop();
   setMicActive(false);
   stopParticles();
   state = 'idle';
@@ -329,7 +332,7 @@ async function startListening(): Promise<void> {
   setStatus('Listening...');
 
   try {
-    await MicCapture.start((level) => updateParticles(level));
+    await micCapture.start(undefined, (level) => updateParticles(level));
     startParticles();
     startVAD();
   } catch {
@@ -344,7 +347,7 @@ async function startListening(): Promise<void> {
 
 function startVAD(): void {
   stopVAD();
-  vadInterval = setInterval(() => checkSpeechState(MicCapture.currentLevel), 50);
+  vadInterval = setInterval(() => checkSpeechState(micCapture.currentLevel), 50);
 }
 
 function stopVAD(): void {
@@ -370,11 +373,11 @@ function checkSpeechState(level: number): void {
       isSpeechActive = false;
 
       // Drain audio and process if we have enough data
-      const audioData = MicCapture.drainBuffer();
+      const audioData = micCapture.drainBuffer();
       if (audioData.length >= MIN_AUDIO_SAMPLES) {
         // Stop mic during processing (will restart after TTS)
         stopVAD();
-        MicCapture.stop();
+        micCapture.stop();
         stopParticles();
         runPipeline(audioData);
       }

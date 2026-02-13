@@ -28,6 +28,21 @@ import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { EventBus } from '../../Foundation/EventBus';
 import { SDKEventType } from '../../types/enums';
+import {
+  EmbeddingsNormalize,
+  EmbeddingsPooling,
+  type EmbeddingVector,
+  type EmbeddingsResult,
+  type EmbeddingsOptions,
+} from './EmbeddingsTypes';
+
+export {
+  EmbeddingsNormalize,
+  EmbeddingsPooling,
+  type EmbeddingVector,
+  type EmbeddingsResult,
+  type EmbeddingsOptions,
+} from './EmbeddingsTypes';
 
 const logger = new SDKLogger('Embeddings');
 
@@ -55,46 +70,6 @@ function ensureEmbeddingsComponent(): number {
   m._free(handlePtr);
   logger.debug('Embeddings component created');
   return _embeddingsComponentHandle;
-}
-
-// ---------------------------------------------------------------------------
-// Embeddings Types
-// ---------------------------------------------------------------------------
-
-export enum EmbeddingsNormalize {
-  None = 0,
-  L2 = 1,
-}
-
-export enum EmbeddingsPooling {
-  Mean = 0,
-  CLS = 1,
-  Last = 2,
-}
-
-export interface EmbeddingVector {
-  /** Dense float vector */
-  data: Float32Array;
-  /** Dimension */
-  dimension: number;
-}
-
-export interface EmbeddingsResult {
-  /** Array of embedding vectors (one per input text) */
-  embeddings: EmbeddingVector[];
-  /** Embedding dimension */
-  dimension: number;
-  /** Processing time in milliseconds */
-  processingTimeMs: number;
-  /** Total tokens processed */
-  totalTokens: number;
-}
-
-export interface EmbeddingsOptions {
-  /** Normalization mode override */
-  normalize?: EmbeddingsNormalize;
-  /** Pooling strategy override */
-  pooling?: EmbeddingsPooling;
 }
 
 // ---------------------------------------------------------------------------
@@ -171,14 +146,14 @@ export const Embeddings = {
     const textPtr = bridge.allocString(text);
 
     // Build rac_embeddings_options_t
-    const optSize = 12;
+    const optSize = m._rac_wasm_sizeof_embeddings_options();
     const optPtr = m._malloc(optSize);
     m.setValue(optPtr, options.normalize !== undefined ? options.normalize : -1, 'i32');
     m.setValue(optPtr + 4, options.pooling !== undefined ? options.pooling : -1, 'i32');
     m.setValue(optPtr + 8, 0, 'i32'); // n_threads = auto
 
     // Result struct
-    const resSize = 32;
+    const resSize = m._rac_wasm_sizeof_embeddings_result();
     const resPtr = m._malloc(resSize);
 
     try {
@@ -221,14 +196,14 @@ export const Embeddings = {
     }
 
     // Options
-    const optSize = 12;
+    const optSize = m._rac_wasm_sizeof_embeddings_options();
     const optPtr = m._malloc(optSize);
     m.setValue(optPtr, options.normalize !== undefined ? options.normalize : -1, 'i32');
     m.setValue(optPtr + 4, options.pooling !== undefined ? options.pooling : -1, 'i32');
     m.setValue(optPtr + 8, 0, 'i32');
 
     // Result
-    const resSize = 32;
+    const resSize = m._rac_wasm_sizeof_embeddings_result();
     const resPtr = m._malloc(resSize);
 
     try {

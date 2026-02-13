@@ -17,16 +17,27 @@
  *   const result = await RunAnywhere.generate('Hello!', { maxTokens: 100 });
  */
 
-import { SDKEnvironment, SDKEventType, ModelCategory } from '../types/enums';
+import { SDKEnvironment, SDKEventType, ModelCategory, AccelerationPreference } from '../types/enums';
 import type { SDKInitOptions } from '../types/models';
 import { SDKError, SDKErrorCode } from '../Foundation/ErrorTypes';
 import { EventBus } from '../Foundation/EventBus';
 import { SDKLogger, LogLevel } from '../Foundation/SDKLogger';
 import { WASMBridge } from '../Foundation/WASMBridge';
 import type { AccelerationMode } from '../Foundation/WASMBridge';
+import { SherpaONNXBridge } from '../Foundation/SherpaONNXBridge';
 import { PlatformAdapter } from '../Foundation/PlatformAdapter';
 import { ModelManager } from '../Infrastructure/ModelManager';
 import type { CompactModelDef, ManagedModel, VLMLoader } from '../Infrastructure/ModelManager';
+
+// Extension imports for shutdown cleanup
+import { TextGeneration } from './Extensions/RunAnywhere+TextGeneration';
+import { VLM } from './Extensions/RunAnywhere+VLM';
+import { STT } from './Extensions/RunAnywhere+STT';
+import { TTS } from './Extensions/RunAnywhere+TTS';
+import { VAD } from './Extensions/RunAnywhere+VAD';
+import { Embeddings } from './Extensions/RunAnywhere+Embeddings';
+import { Diffusion } from './Extensions/RunAnywhere+Diffusion';
+import { ToolCalling } from './Extensions/RunAnywhere+ToolCalling';
 
 const logger = new SDKLogger('RunAnywhere');
 
@@ -130,7 +141,7 @@ export const RunAnywhere = {
 
     // Phase 1: Load WASM module (auto-detects WebGPU and loads correct variant)
     const bridge = WASMBridge.shared;
-    const acceleration = options.acceleration ?? 'auto';
+    const acceleration = options.acceleration ?? AccelerationPreference.Auto;
     await bridge.load(wasmUrl, options.webgpuWasmUrl, acceleration);
 
     logger.info(`Hardware acceleration: ${bridge.accelerationMode}`);
@@ -259,16 +270,57 @@ export const RunAnywhere = {
 
   /**
    * Shutdown the SDK and release all resources.
+   *
+   * Cleans up extensions in reverse dependency order so that
+   * higher-level components (e.g. VoiceAgent pipeline) are torn
+   * down before the lower-level ones they depend on.
    */
   shutdown(): void {
     logger.info('Shutting down RunAnywhere Web SDK...');
 
+    // ------------------------------------------------------------------
+    // 1. Clean up extensions in reverse dependency order
+    //    (high-level orchestrations first, then individual components)
+    // ------------------------------------------------------------------
+
+    // Diffusion / Embeddings — independent components
+    try { Diffusion.cleanup(); } catch { /* ignore during shutdown */ }
+    try { Embeddings.cleanup(); } catch { /* ignore during shutdown */ }
+
+    // VLM — uses llama.cpp backend (independent of LLM component)
+    try { VLM.cleanup(); } catch { /* ignore during shutdown */ }
+
+    // ToolCalling — depends on TextGeneration, clear registry first
+    try { ToolCalling.cleanup(); } catch { /* ignore during shutdown */ }
+
+    // sherpa-onnx based components: VAD, TTS, STT
+    try { VAD.cleanup(); } catch { /* ignore during shutdown */ }
+    try { TTS.cleanup(); } catch { /* ignore during shutdown */ }
+    try { STT.cleanup(); } catch { /* ignore during shutdown */ }
+
+    // TextGeneration — base LLM component (RACommons WASM)
+    try { TextGeneration.cleanup(); } catch { /* ignore during shutdown */ }
+
+    // ------------------------------------------------------------------
+    // 2. Shut down WASM bridges
+    // ------------------------------------------------------------------
+
+    // SherpaONNXBridge (STT/TTS/VAD WASM module)
+    try { SherpaONNXBridge.shared.shutdown(); } catch { /* ignore during shutdown */ }
+
+    // Platform adapter
     if (_platformAdapter) {
       _platformAdapter.cleanup();
       _platformAdapter = null;
     }
 
+    // RACommons WASM bridge
     WASMBridge.shared.shutdown();
+
+    // ------------------------------------------------------------------
+    // 3. Reset SDK state
+    // ------------------------------------------------------------------
+
     EventBus.reset();
 
     _isInitialized = false;
