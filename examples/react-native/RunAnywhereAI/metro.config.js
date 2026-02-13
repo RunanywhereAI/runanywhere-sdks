@@ -1,7 +1,6 @@
 const path = require('path');
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
-const metroConfigPath = path.dirname(require.resolve('metro-config/package.json'));
-const exclusionList = require(path.join(metroConfigPath, 'src/defaults/exclusionList')).default;
+const { blockList } = require('metro-config');
 
 // Path to the SDK package (symlinked via node_modules)
 const sdkPath = path.resolve(__dirname, '../../../sdk/runanywhere-react-native');
@@ -16,12 +15,12 @@ const sdkPackagesPath = path.join(sdkPath, 'packages');
 const config = {
   watchFolders: [sdkPackagesPath],
   resolver: {
-        // Exclude TypeScript source files from @runanywhere/rag symlinked package
-        // Force Metro to only see the compiled lib/ directory
-        blacklistRE: exclusionList([
-          // Ignore src directory in RAG package to force Metro to use lib/
-          /.*\/node_modules\/@runanywhere\/rag\/src\/.*/,
-        ]),
+    // Exclude TypeScript source files from @runanywhere/rag symlinked package
+    // Force Metro to only see the compiled lib/ directory
+    blockList: blockList([
+      // Ignore src directory in RAG package to force Metro to use lib/
+      /.*\/node_modules\/@runanywhere\/rag\/src\/.*/,
+    ]),
     // Allow Metro to resolve modules from the SDK
     nodeModulesPaths: [
       path.resolve(__dirname, 'node_modules'),

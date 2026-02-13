@@ -28,6 +28,8 @@ interface SecureStorageNativeModule {
   secureStorageIsAvailable?: () => Promise<boolean>;
   secureStorageStore?: (key: string, value: string) => Promise<void>;
   secureStorageRetrieve?: (key: string) => Promise<string | null>;
+  secureStorageSet?: (key: string, value: string) => Promise<boolean>;
+  secureStorageGet?: (key: string) => Promise<string | null>;
   secureStorageDelete?: (key: string) => Promise<void>;
   secureStorageExists?: (key: string) => Promise<boolean>;
 }
@@ -64,8 +66,10 @@ class SecureStorageServiceImpl {
       // Verify native module is available by checking for secure storage methods
       // The methods are implemented in C++ and use platform callbacks
       this._isAvailable =
-        typeof native.secureStorageSet === 'function' &&
-        typeof native.secureStorageGet === 'function';
+        (typeof native.secureStorageStore === 'function' &&
+          typeof native.secureStorageRetrieve === 'function') ||
+        (typeof native.secureStorageSet === 'function' &&
+          typeof native.secureStorageGet === 'function');
       return this._isAvailable;
     } catch {
       this._isAvailable = false;
@@ -91,11 +95,13 @@ class SecureStorageServiceImpl {
     try {
       const native = requireNativeModule() as unknown as SecureStorageNativeModule;
 
-      // Use the new native method
-      if (!native.secureStorageStore) {
-        throw new Error('secureStorageStore method is not available');
+      if (native.secureStorageStore) {
+        await native.secureStorageStore(key, value);
+      } else if (native.secureStorageSet) {
+        await native.secureStorageSet(key, value);
+      } else {
+        throw new Error('No secure storage store method is available');
       }
-      await native.secureStorageStore(key, value);
 
       // Update cache
       this.cache.set(key, value);
@@ -128,11 +134,14 @@ class SecureStorageServiceImpl {
     try {
       const native = requireNativeModule() as unknown as SecureStorageNativeModule;
 
-      // Use the new native method
-      if (!native.secureStorageRetrieve) {
+      let value: string | null | undefined;
+      if (native.secureStorageRetrieve) {
+        value = await native.secureStorageRetrieve(key);
+      } else if (native.secureStorageGet) {
+        value = await native.secureStorageGet(key);
+      } else {
         return null;
       }
-      const value = await native.secureStorageRetrieve(key);
 
       if (value !== null && value !== undefined) {
         this.cache.set(key, value);
