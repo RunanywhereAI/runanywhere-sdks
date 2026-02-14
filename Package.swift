@@ -45,7 +45,7 @@ let useLocalBinaries = false //  Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when testLocal = false)
 // Updated automatically by CI/CD during releases
-let sdkVersion = "0.18.0"
+let sdkVersion = "0.19.0"
 
 let package = Package(
     name: "runanywhere-sdks",
@@ -243,27 +243,28 @@ func binaryTargets() -> [Target] {
         // =====================================================================
         // PRODUCTION MODE (for external SPM consumers)
         // Download XCFrameworks from GitHub releases
+        // All xcframeworks include iOS + macOS slices (v0.19.0+)
         // =====================================================================
         return [
             .binaryTarget(
                 name: "RACommonsBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "cfe8fa73fd70b344d737bdfc6f66bf13fdd1777247ac7612dc8ada6356f90631"
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-v\(sdkVersion).zip",
+                checksum: "f6bc152b1689d7549d6a7b5e692f6babb0efc44fe334c0e60acfc0c12d848c44"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
-                checksum: "c08e6eddaf6c068f6458190b1689c32f08f153a88646591e0a0b09fdacf7f40d"
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-v\(sdkVersion).zip",
+                checksum: "ba150fd924f71c2137d6cad0a294c3f9c2da5bc748b547cced87bc0910a9b327"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
-                checksum: "2755bea9d6414a1f776a9f57da8c8de86f970cd1416fca8f44c0246428c96d5f"
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-v\(sdkVersion).zip",
+                checksum: "00b28c0542ab25585c534b4e33ddacd4a1d24447aa8c2178949aad89eb56cb1f"
             ),
             .binaryTarget(
                 name: "ONNXRuntimeBinary",
-                url: "https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.17.1.zip",
-                checksum: "9a2d54d4f503fbb82d2f86361a1d22d4fe015e2b5e9fb419767209cc9ab6372c"
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/onnxruntime-v\(sdkVersion).zip",
+                checksum: "e0180262bd1b10fcda95aaf9aac595af5e6819bd454312b6fc8ffc3828db239f"
             ),
         ]
     }
