@@ -5,8 +5,9 @@
  *
  * Architecture Pattern:
  * - Two-phase SDK initialization (matching iOS pattern)
- * - Module registration with models (LlamaCPP, ONNX, FluidAudio)
- * - Tab-based navigation with 5 tabs (Chat, STT, TTS, Voice, Settings)
+ * - Module registration with models (LlamaCPP, ONNX)
+ * - Tab-based navigation with 5 tabs (Chat, Transcribe, Speak, Voice, Settings)
+ * - Tool calling settings are in Settings tab (matching iOS)
  *
  * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/App/RunAnywhereAIApp.swift
  */
@@ -18,6 +19,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -34,7 +36,7 @@ import {
 } from './src/theme/spacing';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
-import { RunAnywhere, SDKEnvironment, ModelCategory } from '@runanywhere/core';
+import { RunAnywhere, SDKEnvironment, ModelCategory, LLMFramework } from '@runanywhere/core';
 import { LlamaCPP } from '@runanywhere/llamacpp';
 import { ONNX, ModelArtifactType } from '@runanywhere/onnx';
 import { getStoredApiKey, getStoredBaseURL, hasCustomConfiguration } from './src/screens/SettingsScreen';
@@ -159,6 +161,20 @@ const App: React.FC = () => {
       url: 'https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf',
       memoryRequirement: 900_000_000,
     });
+    // Tool Calling Optimized Models
+    // LFM2-1.2B-Tool - Designed for concise and precise tool calling (Liquid AI)
+    await LlamaCPP.addModel({
+      id: 'lfm2-1.2b-tool-q4_k_m',
+      name: 'LiquidAI LFM2 1.2B Tool Q4_K_M',
+      url: 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf',
+      memoryRequirement: 800_000_000,
+    });
+    await LlamaCPP.addModel({
+      id: 'lfm2-1.2b-tool-q8_0',
+      name: 'LiquidAI LFM2 1.2B Tool Q8_0',
+      url: 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf',
+      memoryRequirement: 1_400_000_000,
+    });
 
     // ONNX module with STT and TTS models
     // Using tar.gz format hosted on RunanywhereAI/sherpa-onnx for fast native extraction
@@ -193,6 +209,10 @@ const App: React.FC = () => {
       artifactType: ModelArtifactType.TarGzArchive,
       memoryRequirement: 65_000_000,
     });
+
+    // Diffusion (CoreML) is Swift SDK + Swift example app only. React Native does not
+    // depend on the Swift SDK, so we do not register diffusion models or Diffusion.register()
+    // on iOS here. Use the Swift example app for image generation on iOS.
 
     console.warn('[App] All models registered');
   };

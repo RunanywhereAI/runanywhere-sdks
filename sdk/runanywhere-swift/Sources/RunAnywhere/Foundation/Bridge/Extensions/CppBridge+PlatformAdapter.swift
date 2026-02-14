@@ -67,8 +67,8 @@ extension CppBridge {
             adapter.track_error = platformTrackErrorCallback
 
             // MARK: Optional Callbacks (handled by Swift directly)
-            adapter.http_download = nil
-            adapter.http_download_cancel = nil
+            adapter.http_download = platformHttpDownloadCallback
+            adapter.http_download_cancel = platformHttpDownloadCancelCallback
             adapter.extract_archive = nil
             adapter.user_data = nil
 
@@ -440,4 +440,117 @@ private func createSDKErrorFromCppError(_ errorDict: [String: Any]) -> SDKError 
         stackTrace: stackTrace,
         underlyingError: nil
     )
+}
+
+// MARK: - HTTP Download Callbacks
+
+private let httpDownloadQueue = DispatchQueue(label: "com.runanywhere.sdk.httpdownload")
+private var httpDownloadTasks: [String: URLSessionDownloadTask] = [:]
+
+private func platformHttpDownloadCallback(
+    url: UnsafePointer<CChar>?,
+    destinationPath: UnsafePointer<CChar>?,
+    progressCallback: rac_http_progress_callback_fn?,
+    completeCallback: rac_http_complete_callback_fn?,
+    callbackUserData: UnsafeMutableRawPointer?,
+    outTaskId: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?,
+    userData _: UnsafeMutableRawPointer?
+) -> rac_result_t {
+    guard let url = url, let destinationPath = destinationPath, let outTaskId = outTaskId else {
+        return RAC_ERROR_INVALID_ARGUMENT
+    }
+
+    let urlString = String(cString: url)
+    let destination = String(cString: destinationPath)
+
+    guard let downloadURL = URL(string: urlString) else {
+        return RAC_ERROR_INVALID_ARGUMENT
+    }
+
+    let taskId = UUID().uuidString
+    outTaskId.pointee = rac_strdup(taskId)
+
+    let session = URLSession(configuration: .default)
+    let task = session.downloadTask(with: downloadURL) { tempURL, response, error in
+        var result: rac_result_t = RAC_SUCCESS
+        var finalPath: String? = nil
+
+        defer {
+            httpDownloadQueue.async {
+                httpDownloadTasks.removeValue(forKey: taskId)
+            }
+        }
+
+        if let _ = error {
+            result = RAC_ERROR_DOWNLOAD_FAILED
+        } else if let tempURL = tempURL {
+            do {
+                let destinationURL = URL(fileURLWithPath: destination)
+                let destinationDir = destinationURL.deletingLastPathComponent()
+                try FileManager.default.createDirectory(at: destinationDir,
+                                                        withIntermediateDirectories: true,
+                                                        attributes: nil)
+                if FileManager.default.fileExists(atPath: destinationURL.path) {
+                    try FileManager.default.removeItem(at: destinationURL)
+                }
+                try FileManager.default.moveItem(at: tempURL, to: destinationURL)
+                finalPath = destinationURL.path
+            } catch {
+                result = RAC_ERROR_DOWNLOAD_FAILED
+            }
+        } else {
+            result = RAC_ERROR_DOWNLOAD_FAILED
+        }
+
+        if let progressCallback = progressCallback {
+            if let finalPath = finalPath,
+               let attrs = try? FileManager.default.attributesOfItem(atPath: finalPath),
+               let fileSize = attrs[.size] as? NSNumber {
+                progressCallback(fileSize.int64Value, fileSize.int64Value, callbackUserData)
+            }
+        }
+
+        if let completeCallback = completeCallback {
+            if let finalPath = finalPath {
+                finalPath.withCString { cPath in
+                    completeCallback(result, cPath, callbackUserData)
+                }
+            } else {
+                completeCallback(result, nil, callbackUserData)
+            }
+        }
+    }
+
+    httpDownloadQueue.async {
+        httpDownloadTasks[taskId] = task
+    }
+
+    task.resume()
+    return RAC_SUCCESS
+}
+
+private func platformHttpDownloadCancelCallback(
+    taskId: UnsafePointer<CChar>?,
+    userData _: UnsafeMutableRawPointer?
+) -> rac_result_t {
+    guard let taskId = taskId else {
+        return RAC_ERROR_INVALID_ARGUMENT
+    }
+
+    let taskKey = String(cString: taskId)
+    var task: URLSessionDownloadTask?
+
+    httpDownloadQueue.sync {
+        task = httpDownloadTasks[taskKey]
+    }
+
+    guard let downloadTask = task else {
+        return RAC_ERROR_NOT_FOUND
+    }
+
+    downloadTask.cancel()
+    httpDownloadQueue.async {
+        httpDownloadTasks.removeValue(forKey: taskKey)
+    }
+    return RAC_SUCCESS
 }

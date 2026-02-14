@@ -26,7 +26,7 @@ class TTSViewModel: ObservableObject {
 
     // Voice Settings
     @Published var speechRate: Double = 1.0
-    @Published var pitch: Double = 1.0
+    @Published var pitch: Double = 1.0 // while removed from the UI, the backend still supports pitch, so maintaining it here.
 
     // MARK: - Private Properties
 
@@ -69,7 +69,7 @@ class TTSViewModel: ObservableObject {
         do {
             try await RunAnywhere.loadTTSModel(model.id)
             selectedFramework = model.framework
-            selectedModelName = model.name
+            selectedModelName = model.name.modelNameFromID()
             selectedModelId = model.id
             logger.info("TTS model loaded successfully: \(model.name)")
         } catch {

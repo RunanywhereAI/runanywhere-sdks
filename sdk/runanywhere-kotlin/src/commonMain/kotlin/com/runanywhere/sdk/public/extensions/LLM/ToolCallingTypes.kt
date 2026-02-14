@@ -11,7 +11,6 @@
 package com.runanywhere.sdk.public.extensions.LLM
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonElement
 
 // =============================================================================
 // TOOL VALUE - Type-safe JSON representation
@@ -24,23 +23,33 @@ import kotlinx.serialization.json.JsonElement
 @Serializable
 sealed class ToolValue {
     @Serializable
-    data class StringValue(val value: String) : ToolValue()
-    
+    data class StringValue(
+        val value: String,
+    ) : ToolValue()
+
     @Serializable
-    data class NumberValue(val value: Double) : ToolValue()
-    
+    data class NumberValue(
+        val value: Double,
+    ) : ToolValue()
+
     @Serializable
-    data class BoolValue(val value: Boolean) : ToolValue()
-    
+    data class BoolValue(
+        val value: Boolean,
+    ) : ToolValue()
+
     @Serializable
-    data class ArrayValue(val value: List<ToolValue>) : ToolValue()
-    
+    data class ArrayValue(
+        val value: List<ToolValue>,
+    ) : ToolValue()
+
     @Serializable
-    data class ObjectValue(val value: Map<String, ToolValue>) : ToolValue()
-    
+    data class ObjectValue(
+        val value: Map<String, ToolValue>,
+    ) : ToolValue()
+
     @Serializable
     object NullValue : ToolValue()
-    
+
     // Convenience value extraction
     val stringValue: String? get() = (this as? StringValue)?.value
     val numberValue: Double? get() = (this as? NumberValue)?.value
@@ -49,30 +58,40 @@ sealed class ToolValue {
     val arrayValue: List<ToolValue>? get() = (this as? ArrayValue)?.value
     val objectValue: Map<String, ToolValue>? get() = (this as? ObjectValue)?.value
     val isNull: Boolean get() = this is NullValue
-    
+
     companion object {
         fun string(value: String) = StringValue(value)
+
         fun number(value: Double) = NumberValue(value)
+
         fun number(value: Int) = NumberValue(value.toDouble())
+
         fun bool(value: Boolean) = BoolValue(value)
+
         fun array(value: List<ToolValue>) = ArrayValue(value)
+
         fun obj(value: Map<String, ToolValue>) = ObjectValue(value)
+
         fun nullValue() = NullValue
-        
+
         /**
          * Convert Any to ToolValue
          */
-        fun from(value: Any?): ToolValue = when (value) {
-            null -> NullValue
-            is String -> StringValue(value)
-            is Number -> NumberValue(value.toDouble())
-            is Boolean -> BoolValue(value)
-            is List<*> -> ArrayValue(value.map { from(it) })
-            is Map<*, *> -> ObjectValue(value.entries.associate { (k, v) -> 
-                k.toString() to from(v)
-            })
-            else -> StringValue(value.toString())
-        }
+        fun from(value: Any?): ToolValue =
+            when (value) {
+                null -> NullValue
+                is String -> StringValue(value)
+                is Number -> NumberValue(value.toDouble())
+                is Boolean -> BoolValue(value)
+                is List<*> -> ArrayValue(value.map { from(it) })
+                is Map<*, *> ->
+                    ObjectValue(
+                        value.entries.associate { (k, v) ->
+                            k.toString() to from(v)
+                        },
+                    )
+                else -> StringValue(value.toString())
+            }
     }
 }
 
@@ -83,22 +102,26 @@ sealed class ToolValue {
 /**
  * Supported parameter types for tool arguments
  */
-enum class ToolParameterType(val value: String) {
+enum class ToolParameterType(
+    val value: String,
+) {
     STRING("string"),
     NUMBER("number"),
     BOOLEAN("boolean"),
     OBJECT("object"),
-    ARRAY("array");
-    
+    ARRAY("array"),
+    ;
+
     companion object {
-        fun fromString(value: String): ToolParameterType = when (value.lowercase()) {
-            "string" -> STRING
-            "number" -> NUMBER
-            "boolean" -> BOOLEAN
-            "object" -> OBJECT
-            "array" -> ARRAY
-            else -> STRING
-        }
+        fun fromString(value: String): ToolParameterType =
+            when (value.lowercase()) {
+                "string" -> STRING
+                "number" -> NUMBER
+                "boolean" -> BOOLEAN
+                "object" -> OBJECT
+                "array" -> ARRAY
+                else -> STRING
+            }
     }
 }
 
@@ -115,7 +138,7 @@ data class ToolParameter(
     /** Whether this parameter is required */
     val required: Boolean = true,
     /** Allowed values (for enum-like parameters) */
-    val enumValues: List<String>? = null
+    val enumValues: List<String>? = null,
 )
 
 // =============================================================================
@@ -133,7 +156,7 @@ data class ToolDefinition(
     /** Parameters the tool accepts */
     val parameters: List<ToolParameter>,
     /** Category for organizing tools (optional) */
-    val category: String? = null
+    val category: String? = null,
 )
 
 // =============================================================================
@@ -149,14 +172,14 @@ data class ToolCall(
     /** Arguments to pass to the tool */
     val arguments: Map<String, ToolValue>,
     /** Unique ID for this tool call (for tracking) */
-    val callId: String? = null
+    val callId: String? = null,
 ) {
     /** Get a string argument by name */
     fun getString(key: String): String? = arguments[key]?.stringValue
-    
+
     /** Get a number argument by name */
     fun getNumber(key: String): Double? = arguments[key]?.numberValue
-    
+
     /** Get a bool argument by name */
     fun getBool(key: String): Boolean? = arguments[key]?.boolValue
 }
@@ -178,7 +201,7 @@ data class ToolResult(
     /** Error message (if failed) */
     val error: String? = null,
     /** The original call ID (for tracking) */
-    val callId: String? = null
+    val callId: String? = null,
 )
 
 // =============================================================================
@@ -196,7 +219,7 @@ typealias ToolExecutor = suspend (Map<String, ToolValue>) -> Map<String, ToolVal
  */
 internal data class RegisteredTool(
     val definition: ToolDefinition,
-    val executor: ToolExecutor
+    val executor: ToolExecutor,
 )
 
 // =============================================================================
@@ -204,19 +227,50 @@ internal data class RegisteredTool(
 // =============================================================================
 
 /**
- * Format names for tool calling output.
- * Different LLM models expect different formats for tool calls.
+ * Format names for tool calling output (internal string constants).
+ * Used for C++ bridge communication.
+ */
+internal object ToolCallFormatName {
+    const val DEFAULT = "default"
+    const val LFM2 = "lfm2"
+}
+
+/**
+ * Tool calling format types.
+ * Each format specifies how tool calls are formatted in the LLM prompt.
  *
  * The format logic is handled in C++ commons (single source of truth).
  */
-object ToolCallFormatName {
-    /** JSON format: `<tool_call>{"tool":"name","arguments":{...}}</tool_call>`
-     * Use for most general-purpose models (Llama, Qwen, Mistral, etc.) */
-    const val DEFAULT = "default"
-    
-    /** Liquid AI format: `<|tool_call_start|>[func(args)]<|tool_call_end|>`
-     * Use for LFM2-Tool models */
-    const val LFM2 = "lfm2"
+sealed class ToolCallFormat {
+    /**
+     * Default format using XML-style tags.
+     * JSON format: `<tool_call>{"tool":"name","arguments":{...}}</tool_call>`
+     * Use for most general-purpose models (Llama, Qwen, Mistral, etc.)
+     */
+    data object Default : ToolCallFormat()
+
+    /**
+     * LFM2 format for Liquid AI models.
+     * Liquid AI format: `<|tool_call_start|>[func(args)]<|tool_call_end|>`
+     * Use for LFM2-Tool models.
+     */
+    data object LFM2 : ToolCallFormat()
+
+    /** Get the string representation for C++ bridge */
+    fun toFormatName(): String =
+        when (this) {
+            is Default -> ToolCallFormatName.DEFAULT
+            is LFM2 -> ToolCallFormatName.LFM2
+        }
+
+    companion object {
+        /** Convert from format name string (for deserialization) */
+        fun fromFormatName(name: String?): ToolCallFormat =
+            when (name) {
+                ToolCallFormatName.LFM2 -> LFM2
+                else -> Default
+            }
+    }
 }
 
 // =============================================================================
@@ -244,12 +298,11 @@ data class ToolCallingOptions(
     /** If true, keeps tool definitions available after the first tool call */
     val keepToolsAvailable: Boolean = false,
     /**
-     * Format for tool calls. Use "lfm2" for LFM2-Tool models (Liquid AI).
-     * Default: "default" which uses JSON-based format suitable for most models.
-     * Valid values: "default", "lfm2"
-     * See [ToolCallFormatName] for constants.
+     * Format for tool calls.
+     * Use [ToolCallFormat.LFM2] for LFM2-Tool models (Liquid AI).
+     * Default: [ToolCallFormat.Default] which uses JSON-based format suitable for most models.
      */
-    val format: String = ToolCallFormatName.DEFAULT
+    val format: ToolCallFormat = ToolCallFormat.Default,
 )
 
 // =============================================================================
@@ -269,5 +322,5 @@ data class ToolCallingResult(
     /** Whether the response is complete or waiting for tool results */
     val isComplete: Boolean,
     /** Conversation ID for continuing with tool results */
-    val conversationId: String? = null
+    val conversationId: String? = null,
 )

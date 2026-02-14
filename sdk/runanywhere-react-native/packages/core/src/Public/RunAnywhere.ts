@@ -610,6 +610,7 @@ export const RunAnywhere = {
   parseToolCall: ToolCalling.parseToolCall,
   executeTool: ToolCalling.executeTool,
   formatToolsForPrompt: ToolCalling.formatToolsForPrompt,
+  formatToolsForPromptAsync: ToolCalling.formatToolsForPromptAsync,
   generateWithTools: ToolCalling.generateWithTools,
   continueWithToolResult: ToolCalling.continueWithToolResult,
 
@@ -626,10 +627,12 @@ export const RunAnywhere = {
 
   getAvailableModels: Models.getAvailableModels,
   getModelInfo: Models.getModelInfo,
+  getModelPath: Models.getModelPath,
   isModelDownloaded: Models.isModelDownloaded,
   downloadModel: Models.downloadModel,
   cancelDownload: Models.cancelDownload,
   deleteModel: Models.deleteModel,
+  registerModel: Models.registerModel,
 
   // ============================================================================
   // Utilities

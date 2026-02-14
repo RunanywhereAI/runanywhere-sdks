@@ -10,6 +10,7 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import com.runanywhere.sdk.data.transform.IncompleteBytesToStringBuffer
 import com.runanywhere.sdk.foundation.bridge.CppBridge
 import com.runanywhere.sdk.foundation.errors.SDKError
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
@@ -219,6 +220,7 @@ object CppBridgeLLM {
      * @param repeatPenalty Penalty for repeating tokens
      * @param stopSequences List of sequences that stop generation
      * @param seed Random seed for reproducibility (-1 for random)
+     * @param systemPrompt System prompt for LLM (optional)
      */
     data class GenerationConfig(
         val maxTokens: Int = 512,
@@ -228,6 +230,7 @@ object CppBridgeLLM {
         val repeatPenalty: Float = 1.1f,
         val stopSequences: List<String> = emptyList(),
         val seed: Long = -1,
+        val systemPrompt: String? = null,
     ) {
         /**
          * Convert to JSON string for C++ interop.
@@ -246,7 +249,13 @@ object CppBridgeLLM {
                     append("\"${escapeJson(seq)}\"")
                 }
                 append("],")
-                append("\"seed\":$seed")
+                append("\"seed\":$seed,")
+                append("\"system_prompt\":")
+                if (systemPrompt != null) {
+                    append("\"${escapeJson(systemPrompt)}\"")
+                } else {
+                    append("null")
+                }
                 append("}")
             }
         }
@@ -728,13 +737,16 @@ object CppBridgeLLM {
             val startTime = System.currentTimeMillis()
 
             try {
+                val byteStreamDecoder = IncompleteBytesToStringBuffer()
                 // Use the new callback-based streaming JNI method
                 // This calls back to Kotlin for each token in real-time
                 val jniCallback =
-                    RunAnywhereBridge.TokenCallback { token ->
+                    RunAnywhereBridge.TokenCallback { tokenBytes ->
                         try {
+                            val text = byteStreamDecoder.push(tokenBytes)
                             // Forward each token to the user's callback
-                            callback.onToken(token)
+                            if (text.isNotEmpty()) callback.onToken(text)
+                            true
                         } catch (e: Exception) {
                             CppBridgePlatformAdapter.logCallback(
                                 CppBridgePlatformAdapter.LogLevel.WARN,
@@ -752,6 +764,14 @@ object CppBridgeLLM {
                         config.toJson(),
                         jniCallback,
                     ) ?: throw SDKError.llm("Streaming generation failed: null result")
+
+                try {
+                    // when stream ends:
+                    val tail = byteStreamDecoder.finish()
+                    if (tail.isNotEmpty()) callback.onToken(tail)
+                } catch (_: Exception) {
+                    // Finish may fail if stream was interrupted; safe to ignore
+                }
 
                 val result = parseGenerationResult(resultJson, System.currentTimeMillis() - startTime)
 

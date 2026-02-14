@@ -22,6 +22,22 @@ project(runanywhere_commons_jni)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+include(FetchContent)
+
+# needed for string parsing 
+if(NOT DEFINED NLOHMANN_JSON_VERSION)
+    set(NLOHMANN_JSON_VERSION "3.11.3")
+endif()
+
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG        v${NLOHMANN_JSON_VERSION}
+    GIT_SHALLOW    TRUE
+)
+set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(nlohmann_json)
+
 # Find JNI
 find_package(JNI REQUIRED)
 include_directories(${JNI_INCLUDE_DIRS})
@@ -41,6 +57,7 @@ add_library(runanywhere_commons_jni SHARED ${JNI_SOURCES})
 # Backend libraries are NOT linked here - they have their own JNI libraries
 target_link_libraries(runanywhere_commons_jni
     rac_commons
+    nlohmann_json::nlohmann_json
     ${JNI_LIBRARIES}
 )
 

@@ -1,6 +1,9 @@
 import Foundation
 import SwiftUI
 import RunAnywhere
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
 
 // Note: Message, MessageAnalytics and ConversationAnalytics are now in separate model files
 
@@ -54,25 +57,30 @@ class ConversationStore: ObservableObject {
             frameworkName: nil
         )
 
-        conversations.insert(conversation, at: 0)
+        // Don't add to conversations list yet - wait until first message is added
         currentConversation = conversation
-        saveConversation(conversation)
+        // Don't save empty conversation - wait until first message is added
 
         return conversation
     }
 
     func updateConversation(_ conversation: Conversation) {
+        var updated = conversation
+        updated.updatedAt = Date()
+
         if let index = conversations.firstIndex(where: { $0.id == conversation.id }) {
-            var updated = conversation
-            updated.updatedAt = Date()
+            // Update existing conversation
             conversations[index] = updated
-
-            if currentConversation?.id == conversation.id {
-                currentConversation = updated
-            }
-
-            saveConversation(updated)
+        } else {
+            // First time adding this conversation (when first message is sent)
+            conversations.insert(updated, at: 0)
         }
+
+        if currentConversation?.id == conversation.id {
+            currentConversation = updated
+        }
+
+        saveConversation(updated)
     }
 
     func deleteConversation(_ conversation: Conversation) {
@@ -92,12 +100,91 @@ class ConversationStore: ObservableObject {
         updated.messages.append(message)
         updated.updatedAt = Date()
 
-        // Auto-generate title from first user message if needed
-        if updated.title == "New Chat" && message.role == .user && !message.content.isEmpty {
-            updated.title = generateTitle(from: message.content)
+        // Always try to generate a fallback title if still "New Chat"
+        if updated.title == "New Chat" {
+            if let firstUserMessage = updated.messages.first(where: { $0.role == .user }),
+               !firstUserMessage.content.isEmpty {
+                updated.title = generateTitle(from: firstUserMessage.content)
+            }
         }
 
         updateConversation(updated)
+
+        // Try to generate smart title with Foundation Models after first AI response
+        if message.role == .assistant && updated.messages.count >= 2 {
+            let conversationId = updated.id
+            Task { @MainActor in
+                await self.generateSmartTitleIfNeeded(for: conversationId)
+            }
+        }
+    }
+
+    // MARK: - Foundation Models Title Generation
+
+    /// Public method to generate smart title for a conversation
+    func generateSmartTitleForConversation(_ conversationId: String) async {
+        await generateSmartTitleIfNeeded(for: conversationId)
+    }
+
+    private func generateSmartTitleIfNeeded(for conversationId: String) async {
+        #if canImport(FoundationModels)
+        guard #available(iOS 26.0, macOS 26.0, *) else { return }
+
+        // Find the conversation
+        guard let conversation = conversations.first(where: { $0.id == conversationId }) else {
+            return
+        }
+        
+        // Get the fallback title to compare
+        let fallbackTitle = conversation.messages.first(where: { $0.role == .user })
+            .map { generateTitle(from: $0.content) } ?? "New Chat"
+        
+        // Only generate if title is still the default or fallback
+        let currentTitle = conversation.title
+        guard currentTitle == "New Chat" || currentTitle == fallbackTitle else {
+            return
+        }
+
+        // Check if Foundation Models is available
+        guard SystemLanguageModel.default.isAvailable else { return }
+
+        // Create conversation text from first few messages
+        let conversationText = conversation.messages.prefix(4).map { msg in
+            "\(msg.role == .user ? "User" : "Assistant"): \(msg.content.prefix(200))"
+        }.joined(separator: "\n")
+
+        do {
+            let titleSession = LanguageModelSession(
+                instructions: Instructions("""
+                    You are an expert at creating descriptive, readable chat titles.
+                    Generate a clear title (2-5 words) that captures the main topic.
+                    Respond in the same language as the conversation.
+                    Only output the title, nothing else.
+                    """)
+            )
+
+            let titlePrompt = """
+            Create a descriptive, readable title for this conversation:
+
+            \(conversationText)
+
+            Title:
+            """
+
+            let response = try await titleSession.respond(to: Prompt(titlePrompt))
+            let title = response.content
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "\"", with: "")
+
+            // Update the conversation with the AI-generated title
+            if !title.isEmpty, var conv = self.conversations.first(where: { $0.id == conversationId }) {
+                conv.title = String(title.prefix(50))
+                self.updateConversation(conv)
+            }
+        } catch {
+            // Keep the fallback title
+        }
+        #endif
     }
 
     func loadConversation(_ id: String) -> Conversation? {
@@ -282,7 +369,7 @@ struct ConversationListView: View {
         NavigationView {
             List {
                 ForEach(filteredConversations) { conversation in
-                    ConversationRow(conversation: conversation)
+                    ConversationRow(conversation: conversation, searchQuery: searchQuery)
                         .onTapGesture {
                             store.loadConversation(conversation.id)
                             NotificationCenter.default.post(
@@ -369,13 +456,25 @@ struct ConversationListView: View {
 
 struct ConversationRow: View {
     let conversation: Conversation
+    let searchQuery: String
+    
+    init(conversation: Conversation, searchQuery: String = "") {
+        self.conversation = conversation
+        self.searchQuery = searchQuery
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(conversation.title)
-                    .font(.headline)
-                    .lineLimit(1)
+                // Title with highlighting
+                if !searchQuery.isEmpty {
+                    highlightedText(conversation.title, searchText: searchQuery, isTitle: true)
+                        .lineLimit(1)
+                } else {
+                    Text(conversation.title)
+                        .font(.headline)
+                        .lineLimit(1)
+                }
 
                 Spacer()
 
@@ -390,10 +489,11 @@ struct ConversationRow: View {
                 }
             }
 
-            Text(conversation.lastMessagePreview)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .lineLimit(2)
+            // Show matching content preview if search is active
+            if !searchQuery.isEmpty, let preview = getMatchingPreview() {
+                highlightedText(preview, searchText: searchQuery, isTitle: false)
+                    .lineLimit(2)
+            }
 
             HStack {
                 Text(conversation.summary)
@@ -408,6 +508,77 @@ struct ConversationRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    // Get preview of matching content
+    private func getMatchingPreview() -> String? {
+        // Skip if title already matches
+        if conversation.title.localizedCaseInsensitiveContains(searchQuery) {
+            return nil
+        }
+
+        // Search in messages
+        for message in conversation.messages {
+            if message.content.localizedCaseInsensitiveContains(searchQuery) {
+                return createPreview(from: message.content, searchText: searchQuery)
+            }
+        }
+
+        return nil
+    }
+
+    // Create preview with context around search term
+    private func createPreview(from text: String, searchText: String) -> String {
+        guard let range = text.range(of: searchText, options: .caseInsensitive) else {
+            return String(text.prefix(100))
+        }
+
+        let beforeContext = 30
+        let afterContext = 30
+
+        let startIndex = text.distance(from: text.startIndex, to: range.lowerBound)
+        let previewStart = max(0, startIndex - beforeContext)
+        let previewEnd = min(text.count, startIndex + searchText.count + afterContext)
+
+        let start = text.index(text.startIndex, offsetBy: previewStart)
+        let end = text.index(text.startIndex, offsetBy: previewEnd)
+
+        var preview = String(text[start..<end])
+
+        if previewStart > 0 {
+            preview = "..." + preview
+        }
+        if previewEnd < text.count {
+            preview = preview + "..."
+        }
+
+        return preview
+    }
+
+    // Highlighted text view
+    private func highlightedText(_ text: String, searchText: String, isTitle: Bool) -> Text {
+        guard let range = text.range(of: searchText, options: .caseInsensitive) else {
+            return Text(text)
+                .font(isTitle ? .headline : .subheadline)
+                .foregroundColor(isTitle ? .primary : .secondary)
+        }
+
+        let beforeText = String(text[..<range.lowerBound])
+        let matchText = String(text[range])
+        let afterText = String(text[range.upperBound...])
+
+        return Text(beforeText)
+            .font(isTitle ? .headline : .subheadline)
+            .foregroundColor(isTitle ? .primary : .secondary)
+        +
+        Text(matchText)
+            .font(isTitle ? .headline : .subheadline)
+            .bold()
+            .foregroundColor(.orange)
+        +
+        Text(afterText)
+            .font(isTitle ? .headline : .subheadline)
+            .foregroundColor(isTitle ? .primary : .secondary)
     }
 
     private func relativeDate(_ date: Date) -> String {

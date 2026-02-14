@@ -84,6 +84,7 @@ FetchContent_MakeAvailable(llamacpp)
 # =============================================================================
 
 set(LLAMACPP_BACKEND_SOURCES
+    # LLM Backend
     llamacpp_backend.cpp
     rac_llm_llamacpp.cpp
     rac_backend_llamacpp_register.cpp
@@ -92,6 +93,41 @@ set(LLAMACPP_BACKEND_SOURCES
 set(LLAMACPP_BACKEND_HEADERS
     llamacpp_backend.h
 )
+
+# Option to enable VLM multimodal support (requires mtmd from llama.cpp)
+option(RAC_VLM_USE_MTMD "Enable VLM multimodal support via llama.cpp mtmd" ON)
+if(RAC_VLM_USE_MTMD)
+    message(STATUS "VLM multimodal support enabled")
+    # Add VLM Backend sources (Vision Language Model)
+    list(APPEND LLAMACPP_BACKEND_SOURCES
+        rac_vlm_llamacpp.cpp
+        rac_backend_llamacpp_vlm_register.cpp
+    )
+    # Add mtmd sources from llama.cpp tools directory
+    list(APPEND LLAMACPP_BACKEND_SOURCES
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd-helper.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd-audio.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/clip.cpp
+    )
+    # Add mtmd model implementations (clip_graph_* classes)
+    list(APPEND LLAMACPP_BACKEND_SOURCES
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/llava.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/qwen2vl.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/qwen3vl.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/minicpmv.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/glm4v.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/cogvlm.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/internvl.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/kimivl.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/llama4.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/siglip.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/pixtral.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/youtuvl.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/conformer.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/whisper-enc.cpp
+    )
+endif()
 
 if(RAC_BUILD_SHARED)
     add_library(rac_backend_llamacpp SHARED
@@ -115,7 +151,20 @@ target_include_directories(rac_backend_llamacpp PUBLIC
     ${llamacpp_SOURCE_DIR}/vendor               # nlohmann/json.hpp
 )
 
+# VLM multimodal includes (mtmd)
+if(RAC_VLM_USE_MTMD)
+    target_include_directories(rac_backend_llamacpp PRIVATE
+        ${llamacpp_SOURCE_DIR}/tools/mtmd
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models
+    )
+endif()
+
 target_compile_definitions(rac_backend_llamacpp PRIVATE RAC_LLAMACPP_BUILDING)
+
+# VLM multimodal compile definition
+if(RAC_VLM_USE_MTMD)
+    target_compile_definitions(rac_backend_llamacpp PRIVATE RAC_VLM_USE_MTMD=1)
+endif()
 
 target_link_libraries(rac_backend_llamacpp PUBLIC
     rac_commons

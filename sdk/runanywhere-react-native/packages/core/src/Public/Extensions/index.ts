@@ -119,10 +119,12 @@ export { getStorageInfo, clearCache } from './RunAnywhere+Storage';
 export {
   getAvailableModels,
   getModelInfo,
+  getModelPath,
   isModelDownloaded,
   downloadModel,
   cancelDownload,
   deleteModel,
+  registerModel,
 } from './RunAnywhere+Models';
 
 // Audio Utilities
@@ -159,6 +161,7 @@ export {
   parseToolCall,
   executeTool,
   formatToolsForPrompt,
+  formatToolsForPromptAsync,
   generateWithTools,
   continueWithToolResult,
 } from './RunAnywhere+ToolCalling';

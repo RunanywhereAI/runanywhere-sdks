@@ -48,8 +48,8 @@ android {
         // }
 
         ndk {
-            // Only arm64-v8a for now (RunAnywhere Core ONNX is built for arm64-v8a)
-            abiFilters += listOf("arm64-v8a")
+            // arm64-v8a for physical devices, x86_64 for emulators
+            abiFilters += listOf("arm64-v8a", "x86_64")
         }
     }
 
@@ -152,16 +152,11 @@ android {
             // and 16KB alignment during packaging.
             useLegacyPackaging = true
 
-            // Handle duplicate native libraries from multiple backend modules
-            // (ONNX and LlamaCPP both include some common libraries)
-            pickFirsts += listOf(
-                "lib/arm64-v8a/libomp.so",
-                "lib/arm64-v8a/libc++_shared.so",
-                "lib/arm64-v8a/librac_commons.so",
-                "lib/armeabi-v7a/libomp.so",
-                "lib/armeabi-v7a/libc++_shared.so",
-                "lib/armeabi-v7a/librac_commons.so",
-            )
+            // Handle duplicate native libraries from multiple SDK modules.
+            // The main SDK, ONNX module, and LlamaCPP module may share common
+            // libraries (libc++_shared, libomp, librac_commons). Use a wildcard
+            // to safely pick the first copy for any ABI.
+            pickFirsts += listOf("lib/**/*.so")
         }
     }
 
