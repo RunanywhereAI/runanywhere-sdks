@@ -37,11 +37,19 @@ struct ChatDetailsView: View {
                     PerformanceTab(messages: messages)
                         .tag(2)
                 }
+                #if os(iOS)
                 .tabViewStyle(.page(indexDisplayMode: .never))
+                #endif
             }
+            #if os(iOS)
             .background(Color(.systemGroupedBackground))
+            #else
+            .background(Color(nsColor: .controlBackgroundColor))
+            #endif
             .navigationTitle("Analytics")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }

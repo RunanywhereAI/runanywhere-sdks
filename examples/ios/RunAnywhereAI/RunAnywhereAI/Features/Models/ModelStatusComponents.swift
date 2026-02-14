@@ -254,7 +254,7 @@ struct ModelRequiredOverlay: View {
                 // Bottom section with glass effect button
                 VStack(spacing: AppSpacing.medium) {
                     // Primary CTA with glass effect
-                    if #available(iOS 26.0, *) {
+                    if #available(iOS 26.0, macOS 26.0, *) {
                         Button(action: onSelectModel) {
                             HStack(spacing: 8) {
                                 Image(systemName: "sparkles")

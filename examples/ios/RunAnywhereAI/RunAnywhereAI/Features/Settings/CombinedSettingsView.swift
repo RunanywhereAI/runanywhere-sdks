@@ -23,7 +23,7 @@ struct CombinedSettingsView: View {
             IOSSettingsContent(viewModel: viewModel, toolViewModel: toolViewModel)
             #endif
         }
-        .sheet(isPresented: $viewModel.showApiKeyEntry) {
+        .adaptiveSheet(isPresented: $viewModel.showApiKeyEntry) {
             ApiConfigurationSheet(viewModel: viewModel)
         }
         .task {
