@@ -90,9 +90,27 @@ bool read_wav(const std::string& path, WavFile& wav) {
                 file.seekg(chunk_size - 16, std::ios::cur);
             }
         } else if (strncmp(chunk_id, "data", 4) == 0) {
-            size_t num_samples = chunk_size / (wav.bits_per_sample / 8) / wav.channels;
-            wav.samples.resize(num_samples);
-            file.read(reinterpret_cast<char*>(wav.samples.data()), chunk_size);
+            if (wav.bits_per_sample != 16) {
+                std::cerr << "Only 16-bit WAV supported\n";
+                return false;
+            }
+            size_t total_samples = chunk_size / sizeof(int16_t);
+            size_t num_frames = total_samples / wav.channels;
+            if (wav.channels == 1) {
+                wav.samples.resize(num_frames);
+                file.read(reinterpret_cast<char*>(wav.samples.data()), chunk_size);
+            } else if (wav.channels == 2) {
+                std::vector<int16_t> stereo(total_samples);
+                file.read(reinterpret_cast<char*>(stereo.data()), chunk_size);
+                wav.samples.resize(num_frames);
+                for (size_t i = 0; i < num_frames; ++i) {
+                    wav.samples[i] = static_cast<int16_t>(
+                        (static_cast<int32_t>(stereo[i*2]) + stereo[i*2+1]) / 2);
+                }
+            } else {
+                std::cerr << "Unsupported channel count: " << wav.channels << "\n";
+                return false;
+            }
             break;
         } else {
             file.seekg(chunk_size, std::ios::cur);

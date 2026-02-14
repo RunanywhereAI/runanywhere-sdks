@@ -37,6 +37,7 @@
 #include <iostream>
 #include <csignal>
 #include <atomic>
+#include <mutex>
 #include <thread>
 #include <chrono>
 #include <string>
@@ -117,7 +118,11 @@ AppConfig parse_args(int argc, char* argv[]) {
         } else if (strcmp(argv[i], "--wakeword") == 0) {
             config.enable_wakeword = true;
         } else if (strcmp(argv[i], "--wakeword-threshold") == 0 && i + 1 < argc) {
-            config.wakeword_threshold = std::stof(argv[++i]);
+            try {
+                config.wakeword_threshold = std::stof(argv[++i]);
+            } catch (const std::exception&) {
+                std::cerr << "Invalid wakeword threshold, using default 0.5\n";
+            }
         } else if (strcmp(argv[i], "--openclaw-url") == 0 && i + 1 < argc) {
             config.openclaw_url = argv[++i];
         } else if (strcmp(argv[i], "--device-id") == 0 && i + 1 < argc) {
@@ -269,6 +274,7 @@ int main(int argc, char* argv[]) {
     playback_config.device = app_config.output_device;
 
     openclaw::AudioPlayback playback(playback_config);
+    std::mutex playback_mutex;
     if (!playback.initialize()) {
         std::cerr << "ERROR: Failed to initialize audio playback: "
                   << playback.last_error() << std::endl;
@@ -343,8 +349,9 @@ int main(int argc, char* argv[]) {
     };
 
     // TTS audio callback — uses cancellable play for instant barge-in silence
-    pipeline_config.on_audio_output = [&playback](const int16_t* samples, size_t num_samples,
+    pipeline_config.on_audio_output = [&playback, &playback_mutex](const int16_t* samples, size_t num_samples,
                                                    int sample_rate, const std::atomic<bool>& cancel_flag) {
+        std::lock_guard<std::mutex> lock(playback_mutex);
         // Reinitialize playback if sample rate changed
         if (static_cast<uint32_t>(sample_rate) != playback.config().sample_rate) {
             playback.reinitialize(sample_rate);
@@ -353,7 +360,8 @@ int main(int argc, char* argv[]) {
     };
 
     // Force-stop ALSA playback immediately (called during cancel_speech)
-    pipeline_config.on_audio_stop = [&playback]() {
+    pipeline_config.on_audio_stop = [&playback, &playback_mutex]() {
+        std::lock_guard<std::mutex> lock(playback_mutex);
         playback.stop();
     };
 
@@ -398,7 +406,8 @@ int main(int argc, char* argv[]) {
     std::cout << "Initializing waiting earcon...\n";
 
     std::string earcon_path = openclaw::get_earcon_path();
-    openclaw::WaitingChime waiting_chime(earcon_path, [&playback](const int16_t* samples, size_t num_samples, int sample_rate) {
+    openclaw::WaitingChime waiting_chime(earcon_path, [&playback, &playback_mutex](const int16_t* samples, size_t num_samples, int sample_rate) {
+        std::lock_guard<std::mutex> lock(playback_mutex);
         if (static_cast<uint32_t>(sample_rate) != playback.config().sample_rate) {
             playback.reinitialize(sample_rate);
         }

@@ -28,15 +28,23 @@ namespace openclaw {
 // =============================================================================
 
 static bool parse_ws_url(const std::string& url, std::string& host, int& port, std::string& path) {
-    // ws://host:port/path or wss://host:port/path or http://host:port/path
-    std::regex url_regex(R"((?:ws|wss|http|https)://([^:/]+)(?::(\d+))?(/.*)?)");
+    // ws://host:port/path or http://host:port/path (no TLS support)
+    std::regex url_regex(R"((ws|wss|http|https)://([^:/]+)(?::(\d+))?(/.*)?)");
     std::smatch match;
     if (!std::regex_match(url, match, url_regex)) {
         return false;
     }
-    host = match[1].str();
-    port = match[2].matched ? std::stoi(match[2].str()) : 8082;
-    path = match[3].matched && !match[3].str().empty() ? match[3].str() : "/";
+
+    std::string scheme = match[1].str();
+    if (scheme == "wss" || scheme == "https") {
+        std::cerr << "[OpenClaw] TLS is not supported; use ws:// or http:// instead of "
+                  << scheme << "://" << std::endl;
+        return false;
+    }
+
+    host = match[2].str();
+    port = match[3].matched ? std::stoi(match[3].str()) : 8082;
+    path = match[4].matched && !match[4].str().empty() ? match[4].str() : "/";
     return true;
 }
 
@@ -112,18 +120,24 @@ bool OpenClawClient::connect() {
         return false;
     }
 
-    // TCP connect
-    struct hostent* server = gethostbyname(host.c_str());
-    if (!server) {
-        last_error_ = "Failed to resolve host: " + host;
+    // TCP connect via getaddrinfo
+    struct addrinfo hints = {};
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+
+    struct addrinfo* result = nullptr;
+    int gai_err = getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &result);
+    if (gai_err != 0) {
+        last_error_ = "Failed to resolve host: " + host + " (" + gai_strerror(gai_err) + ")";
         std::cerr << "[OpenClaw] " << last_error_ << std::endl;
         return false;
     }
 
-    socket_fd_ = socket(AF_INET, SOCK_STREAM, 0);
+    socket_fd_ = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
     if (socket_fd_ < 0) {
         last_error_ = "Failed to create socket";
         std::cerr << "[OpenClaw] " << last_error_ << std::endl;
+        freeaddrinfo(result);
         return false;
     }
 
@@ -131,18 +145,16 @@ bool OpenClawClient::connect() {
     int flag = 1;
     setsockopt(socket_fd_, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
 
-    struct sockaddr_in addr = {};
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
-    memcpy(&addr.sin_addr.s_addr, server->h_addr, server->h_length);
-
-    if (::connect(socket_fd_, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+    if (::connect(socket_fd_, result->ai_addr, result->ai_addrlen) < 0) {
         last_error_ = "Failed to connect to " + host + ":" + std::to_string(port);
         std::cerr << "[OpenClaw] " << last_error_ << std::endl;
         close(socket_fd_);
         socket_fd_ = -1;
+        freeaddrinfo(result);
         return false;
     }
+
+    freeaddrinfo(result);
 
     // WebSocket handshake
     if (!ws_handshake(host, port, path)) {
@@ -366,6 +378,35 @@ void OpenClawClient::ws_send_pong(const std::string& payload) {
 }
 
 // =============================================================================
+// JSON helper
+// =============================================================================
+
+static std::string escape_json_string(const std::string& input) {
+    std::string result;
+    result.reserve(input.size());
+    for (char c : input) {
+        switch (c) {
+            case '"':  result += "\\\""; break;
+            case '\\': result += "\\\\"; break;
+            case '\n': result += "\\n";  break;
+            case '\r': result += "\\r";  break;
+            case '\t': result += "\\t";  break;
+            default:
+                if (static_cast<unsigned char>(c) < 0x20) {
+                    // Escape other control characters as \u00XX
+                    char buf[8];
+                    snprintf(buf, sizeof(buf), "\\u%04x", static_cast<unsigned char>(c));
+                    result += buf;
+                } else {
+                    result += c;
+                }
+                break;
+        }
+    }
+    return result;
+}
+
+// =============================================================================
 // OpenClaw Protocol
 // =============================================================================
 
@@ -373,8 +414,8 @@ bool OpenClawClient::send_connect_message() {
     std::ostringstream json;
     json << "{"
          << "\"type\":\"connect\","
-         << "\"deviceId\":\"" << config_.device_id << "\","
-         << "\"accountId\":\"" << config_.account_id << "\","
+         << "\"deviceId\":\"" << escape_json_string(config_.device_id) << "\","
+         << "\"accountId\":\"" << escape_json_string(config_.account_id) << "\","
          << "\"capabilities\":{"
          <<   "\"stt\":true,"
          <<   "\"tts\":true,"
@@ -394,16 +435,9 @@ bool OpenClawClient::send_transcription(const std::string& text, bool is_final) 
 
     // Build JSON with proper escaping
     std::ostringstream json;
-    json << "{\"type\":\"transcription\",\"text\":\"";
-    for (char c : text) {
-        if (c == '"') json << "\\\"";
-        else if (c == '\\') json << "\\\\";
-        else if (c == '\n') json << "\\n";
-        else if (c == '\r') json << "\\r";
-        else if (c == '\t') json << "\\t";
-        else json << c;
-    }
-    json << "\",\"sessionId\":\"" << config_.session_id << "\""
+    json << "{\"type\":\"transcription\",\"text\":\""
+         << escape_json_string(text)
+         << "\",\"sessionId\":\"" << escape_json_string(config_.session_id) << "\""
          << ",\"isFinal\":" << (is_final ? "true" : "false")
          << "}";
 
@@ -491,9 +525,10 @@ void OpenClawClient::handle_message(const std::string& message) {
         if (!msg.text.empty()) {
             std::cout << "[OpenClaw] Received speak from " << msg.source_channel
                       << ": " << msg.text << std::endl;
-            std::lock_guard<std::mutex> lock(queue_mutex_);
-            speak_queue_.push(msg);
-
+            {
+                std::lock_guard<std::mutex> lock(queue_mutex_);
+                speak_queue_.push(msg);
+            }
             if (config_.on_speak) {
                 config_.on_speak(msg);
             }

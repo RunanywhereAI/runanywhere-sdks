@@ -159,9 +159,9 @@ Json commonsToolCallToOpenAI(const rac_tool_call_t& toolCall) {
 }
 
 std::string generateToolCallId() {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    static std::uniform_int_distribution<uint64_t> dis;
+    thread_local std::random_device rd;
+    thread_local std::mt19937 gen(rd());
+    thread_local std::uniform_int_distribution<uint64_t> dis;
 
     std::ostringstream ss;
     ss << "call_" << std::hex << dis(gen);

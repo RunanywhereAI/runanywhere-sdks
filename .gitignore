@@ -364,4 +364,4 @@ sdk/runanywhere-react-native/packages/*/ios/xcframeworks/
 
 # Node
 node_modules/
-tools/
+/tools/

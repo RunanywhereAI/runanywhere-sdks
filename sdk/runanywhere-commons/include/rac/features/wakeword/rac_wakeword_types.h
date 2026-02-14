@@ -206,15 +206,15 @@ typedef struct rac_wakeword_frame_result {
 // ERROR CODES
 // =============================================================================
 
-/** Wake word specific error codes (extend RAC_ERROR_BASE) */
-#define RAC_ERROR_WAKEWORD_BASE               0x4000
-#define RAC_ERROR_WAKEWORD_NOT_INITIALIZED    (RAC_ERROR_WAKEWORD_BASE + 1)
-#define RAC_ERROR_WAKEWORD_MODEL_NOT_FOUND    (RAC_ERROR_WAKEWORD_BASE + 2)
-#define RAC_ERROR_WAKEWORD_MODEL_LOAD_FAILED  (RAC_ERROR_WAKEWORD_BASE + 3)
-#define RAC_ERROR_WAKEWORD_INVALID_AUDIO      (RAC_ERROR_WAKEWORD_BASE + 4)
-#define RAC_ERROR_WAKEWORD_MAX_MODELS         (RAC_ERROR_WAKEWORD_BASE + 5)
-#define RAC_ERROR_WAKEWORD_ALREADY_LISTENING  (RAC_ERROR_WAKEWORD_BASE + 6)
-#define RAC_ERROR_WAKEWORD_NOT_LISTENING      (RAC_ERROR_WAKEWORD_BASE + 7)
+/** Wake word specific error codes (range: -850 to -860, per rac_error.h convention) */
+#define RAC_ERROR_WAKEWORD_BASE               ((rac_result_t)-850)
+#define RAC_ERROR_WAKEWORD_NOT_INITIALIZED    ((rac_result_t)-851)
+#define RAC_ERROR_WAKEWORD_MODEL_NOT_FOUND    ((rac_result_t)-852)
+#define RAC_ERROR_WAKEWORD_MODEL_LOAD_FAILED  ((rac_result_t)-853)
+#define RAC_ERROR_WAKEWORD_INVALID_AUDIO      ((rac_result_t)-854)
+#define RAC_ERROR_WAKEWORD_MAX_MODELS         ((rac_result_t)-855)
+#define RAC_ERROR_WAKEWORD_ALREADY_LISTENING  ((rac_result_t)-856)
+#define RAC_ERROR_WAKEWORD_NOT_LISTENING      ((rac_result_t)-857)
 
 /** Maximum number of wake word models that can be loaded simultaneously */
 #define RAC_WAKEWORD_MAX_MODELS 8
