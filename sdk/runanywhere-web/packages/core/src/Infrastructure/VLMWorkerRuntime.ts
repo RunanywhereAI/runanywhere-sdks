@@ -25,6 +25,8 @@
 // Type-only imports are safe — they are erased at compile time and don't pull
 // SDK code into the Worker bundle.
 import type { VLMWorkerCommand, VLMWorkerResponse, VLMWorkerResult } from './VLMWorkerBridge';
+import type { AllOffsets } from '../Foundation/StructOffsets';
+import { loadOffsetsFromModule } from '../Foundation/StructOffsets';
 
 // Re-export for the bridge to import
 export type { VLMWorkerResult };
@@ -36,6 +38,7 @@ export type { VLMWorkerResult };
 let wasmModule: any = null;
 let vlmHandle = 0;
 let isWebGPU = false;
+let offsets: AllOffsets | null = null;
 
 // ---------------------------------------------------------------------------
 // Logging (lightweight — no SDKLogger dependency in Worker context)
@@ -247,6 +250,9 @@ async function initWASM(wasmJsUrl: string, useWebGPU = false): Promise<void> {
     throw new Error(`rac_init failed in Worker: ${initResult}`);
   }
 
+  // ---- Load struct field offsets ----
+  offsets = loadOffsetsFromModule(m);
+
   // ---- Register VLM backend ----
   const regFn = m['_rac_backend_llamacpp_vlm_register'];
   if (!regFn) {
@@ -358,24 +364,24 @@ function processImage(
   const imagePtr = m._malloc(imageSize);
   for (let i = 0; i < imageSize; i++) m.setValue(imagePtr + i, 0, 'i8');
 
-  m.setValue(imagePtr, 1, 'i32'); // format = RGBPixels
+  const vi = offsets!.vlmImage;
+  m.setValue(imagePtr + vi.format, 1, 'i32'); // format = RGBPixels
 
-  // pixel_data (offset 8 in WASM32: format(4) + file_path_ptr(4) = 8)
   const pixelPtr = m._malloc(pixelArray.length);
   writeToWasmHeap(pixelArray, pixelPtr);
-  m.setValue(imagePtr + 8, pixelPtr, '*');
+  m.setValue(imagePtr + vi.pixelData, pixelPtr, '*');
 
-  // width at offset 16: format(4) + file_path(4) + pixel_data(4) + base64_data(4) = 16
-  m.setValue(imagePtr + 16, width, 'i32');
-  m.setValue(imagePtr + 20, height, 'i32');
-  m.setValue(imagePtr + 24, pixelArray.length, 'i32'); // data_size
+  m.setValue(imagePtr + vi.width, width, 'i32');
+  m.setValue(imagePtr + vi.height, height, 'i32');
+  m.setValue(imagePtr + vi.dataSize, pixelArray.length, 'i32');
 
-  // Build rac_vlm_options_t
+  // Build rac_vlm_options_t (offsets from compiler)
   const optPtr = m._malloc(optSize);
   for (let i = 0; i < optSize; i++) m.setValue(optPtr + i, 0, 'i8');
-  m.setValue(optPtr, maxTokens, 'i32');        // max_tokens at offset 0
-  m.setValue(optPtr + 4, temperature, 'float'); // temperature at offset 4
-  m.setValue(optPtr + 8, 0.9, 'float');         // top_p at offset 8
+  const vo = offsets!.vlmOptions;
+  m.setValue(optPtr + vo.maxTokens, maxTokens, 'i32');
+  m.setValue(optPtr + vo.temperature, temperature, 'float');
+  m.setValue(optPtr + vo.topP, 0.9, 'float');
 
   const promptPtr = allocString(prompt);
 
@@ -394,14 +400,15 @@ function processImage(
       throw new Error(`rac_vlm_component_process failed: ${r}`);
     }
 
-    // Read rac_vlm_result_t
-    const textPtr = m.getValue(resPtr, '*');
+    // Read rac_vlm_result_t (offsets from compiler via StructOffsets)
+    const vr = offsets!.vlmResult;
+    const textPtr = m.getValue(resPtr + vr.text, '*');
     const result: VLMWorkerResult = {
       text: readString(textPtr),
-      promptTokens: m.getValue(resPtr + 4, 'i32'),
-      imageTokens: m.getValue(resPtr + 8, 'i32'),
-      completionTokens: m.getValue(resPtr + 12, 'i32'),
-      totalTokens: m.getValue(resPtr + 16, 'i32'),
+      promptTokens: m.getValue(resPtr + vr.promptTokens, 'i32'),
+      imageTokens: m.getValue(resPtr + vr.imageTokens, 'i32'),
+      completionTokens: m.getValue(resPtr + vr.completionTokens, 'i32'),
+      totalTokens: m.getValue(resPtr + vr.totalTokens, 'i32'),
     };
 
     // Free C-allocated internal strings, then free JS-allocated struct

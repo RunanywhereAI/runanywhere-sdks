@@ -16,6 +16,7 @@
 
 import { RunAnywhere } from '../RunAnywhere';
 import { WASMBridge } from '../../Foundation/WASMBridge';
+import { Offsets } from '../../Foundation/StructOffsets';
 import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { EventBus } from '../../Foundation/EventBus';
@@ -188,44 +189,46 @@ export const VLM = {
     let base64Ptr = 0;
     let pixelPtr = 0;
 
-    m.setValue(imagePtr, image.format, 'i32'); // format
+    const vi = Offsets.vlmImage;
+    m.setValue(imagePtr + vi.format, image.format, 'i32');
 
     if (image.format === VLMImageFormat.FilePath && image.filePath) {
       filePathPtr = bridge.allocString(image.filePath);
-      m.setValue(imagePtr + 4, filePathPtr, '*'); // file_path
+      m.setValue(imagePtr + vi.filePath, filePathPtr, '*');
     } else if (image.format === VLMImageFormat.Base64 && image.base64Data) {
       base64Ptr = bridge.allocString(image.base64Data);
-      m.setValue(imagePtr + 12, base64Ptr, '*'); // base64_data
+      m.setValue(imagePtr + vi.base64Data, base64Ptr, '*');
     } else if (image.format === VLMImageFormat.RGBPixels && image.pixelData) {
       pixelPtr = m._malloc(image.pixelData.length);
       bridge.writeBytes(image.pixelData, pixelPtr);
-      m.setValue(imagePtr + 8, pixelPtr, '*'); // pixel_data
+      m.setValue(imagePtr + vi.pixelData, pixelPtr, '*');
     }
 
-    m.setValue(imagePtr + 16, image.width ?? 0, 'i32');  // width
-    m.setValue(imagePtr + 20, image.height ?? 0, 'i32'); // height
+    m.setValue(imagePtr + vi.width, image.width ?? 0, 'i32');
+    m.setValue(imagePtr + vi.height, image.height ?? 0, 'i32');
 
     // data_size: use pixel data length for RGB, base64 string length for base64
     const dataSize = image.pixelData?.length ?? image.base64Data?.length ?? 0;
-    m.setValue(imagePtr + 24, dataSize, 'i32'); // data_size
+    m.setValue(imagePtr + vi.dataSize, dataSize, 'i32');
 
     // Build rac_vlm_options_t
     const optSize = m._rac_wasm_sizeof_vlm_options();
     const optPtr = m._malloc(optSize);
     for (let i = 0; i < optSize; i++) m.setValue(optPtr + i, 0, 'i8');
 
-    m.setValue(optPtr, options.maxTokens ?? 512, 'i32');       // max_tokens
-    m.setValue(optPtr + 4, options.temperature ?? 0.7, 'float'); // temperature
-    m.setValue(optPtr + 8, options.topP ?? 0.9, 'float');       // top_p
-    m.setValue(optPtr + 28, options.streaming ? 1 : 0, 'i32');  // streaming_enabled
+    const vo = Offsets.vlmOptions;
+    m.setValue(optPtr + vo.maxTokens, options.maxTokens ?? 512, 'i32');
+    m.setValue(optPtr + vo.temperature, options.temperature ?? 0.7, 'float');
+    m.setValue(optPtr + vo.topP, options.topP ?? 0.9, 'float');
+    m.setValue(optPtr + vo.streamingEnabled, options.streaming ? 1 : 0, 'i32');
 
     let sysPtr = 0;
     if (options.systemPrompt) {
       sysPtr = bridge.allocString(options.systemPrompt);
-      m.setValue(optPtr + 32, sysPtr, '*'); // system_prompt
+      m.setValue(optPtr + vo.systemPrompt, sysPtr, '*');
     }
 
-    m.setValue(optPtr + 44, options.modelFamily ?? VLMModelFamily.Auto, 'i32'); // model_family
+    m.setValue(optPtr + vo.modelFamily, options.modelFamily ?? VLMModelFamily.Auto, 'i32');
 
     const promptPtr = bridge.allocString(prompt);
 
@@ -241,18 +244,19 @@ export const VLM = {
       ) as number;
       bridge.checkResult(r, 'rac_vlm_component_process');
 
-      // Read rac_vlm_result_t
-      const textPtr = m.getValue(resPtr, '*');
+      // Read rac_vlm_result_t (offsets from compiler via StructOffsets)
+      const vr = Offsets.vlmResult;
+      const textPtr = m.getValue(resPtr + vr.text, '*');
       const vlmResult: VLMGenerationResult = {
         text: bridge.readString(textPtr),
-        promptTokens: m.getValue(resPtr + 4, 'i32'),
-        imageTokens: m.getValue(resPtr + 8, 'i32'),
-        completionTokens: m.getValue(resPtr + 12, 'i32'),
-        totalTokens: m.getValue(resPtr + 16, 'i32'),
-        timeToFirstTokenMs: m.getValue(resPtr + 20, 'i32'),
-        imageEncodeTimeMs: m.getValue(resPtr + 24, 'i32'),
-        totalTimeMs: m.getValue(resPtr + 28, 'i32'),
-        tokensPerSecond: m.getValue(resPtr + 32, 'float'),
+        promptTokens: m.getValue(resPtr + vr.promptTokens, 'i32'),
+        imageTokens: m.getValue(resPtr + vr.imageTokens, 'i32'),
+        completionTokens: m.getValue(resPtr + vr.completionTokens, 'i32'),
+        totalTokens: m.getValue(resPtr + vr.totalTokens, 'i32'),
+        timeToFirstTokenMs: m.getValue(resPtr + vr.timeToFirstTokenMs, 'i32'),
+        imageEncodeTimeMs: m.getValue(resPtr + vr.imageEncodeTimeMs, 'i32'),
+        totalTimeMs: m.getValue(resPtr + vr.totalTimeMs, 'i32'),
+        tokensPerSecond: m.getValue(resPtr + vr.tokensPerSecond, 'float'),
         hardwareUsed: bridge.accelerationMode as HardwareAcceleration,
       };
 

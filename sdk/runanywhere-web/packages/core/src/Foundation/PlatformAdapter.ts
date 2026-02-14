@@ -208,12 +208,23 @@ export class PlatformAdapter {
     }, 'iii');
   }
 
-  /** secure_get: rac_result_t (*)(const char* key, char** out_value, void* user_data) */
+  /**
+   * secure_get: rac_result_t (*)(const char* key, char** out_value, void* user_data)
+   *
+   * SECURITY NOTE: On web, "secure" storage uses localStorage which is NOT
+   * truly secure. Data is accessible to any script running on the same origin
+   * (including XSS attacks). Do NOT store sensitive secrets (API keys, tokens,
+   * PII) here. On native platforms (iOS/Android) the equivalent callback uses
+   * Keychain / KeyStore which are hardware-backed and encrypted.
+   *
+   * For the web platform this is intentionally best-effort: the RACommons C
+   * layer only uses it for non-sensitive SDK state (e.g. cached environment).
+   */
   private registerSecureGet(m: RACommonsModule): number {
     return m.addFunction((keyPtr: number, outValuePtr: number, _userData: number): number => {
       try {
         const key = m.UTF8ToString(keyPtr);
-        const value = localStorage.getItem(`rac_secure_${key}`);
+        const value = localStorage.getItem(`rac_sdk_${key}`);
         if (value === null) {
           m.setValue(outValuePtr, 0, '*');
           return -182;
@@ -227,13 +238,18 @@ export class PlatformAdapter {
     }, 'iiii');
   }
 
-  /** secure_set: rac_result_t (*)(const char* key, const char* value, void* user_data) */
+  /**
+   * secure_set: rac_result_t (*)(const char* key, const char* value, void* user_data)
+   *
+   * SECURITY NOTE: See registerSecureGet — localStorage is NOT secure on web.
+   * Do not use for sensitive data.
+   */
   private registerSecureSet(m: RACommonsModule): number {
     return m.addFunction((keyPtr: number, valuePtr: number, _userData: number): number => {
       try {
         const key = m.UTF8ToString(keyPtr);
         const value = m.UTF8ToString(valuePtr);
-        localStorage.setItem(`rac_secure_${key}`, value);
+        localStorage.setItem(`rac_sdk_${key}`, value);
         return 0;
       } catch {
         return -180;
@@ -241,12 +257,16 @@ export class PlatformAdapter {
     }, 'iiii');
   }
 
-  /** secure_delete: rac_result_t (*)(const char* key, void* user_data) */
+  /**
+   * secure_delete: rac_result_t (*)(const char* key, void* user_data)
+   *
+   * SECURITY NOTE: See registerSecureGet — localStorage is NOT secure on web.
+   */
   private registerSecureDelete(m: RACommonsModule): number {
     return m.addFunction((keyPtr: number, _userData: number): number => {
       try {
         const key = m.UTF8ToString(keyPtr);
-        localStorage.removeItem(`rac_secure_${key}`);
+        localStorage.removeItem(`rac_sdk_${key}`);
         return 0;
       } catch {
         return -180;

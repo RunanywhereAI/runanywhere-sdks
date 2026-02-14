@@ -320,13 +320,23 @@ export class VLMWorkerBridge {
     this._isModelLoaded = false;
   }
 
-  /** Terminate the Worker entirely. */
+  /**
+   * Terminate the Worker entirely.
+   *
+   * Rejects any in-flight RPC promises so callers aren't left hanging,
+   * then terminates the underlying Web Worker.
+   */
   terminate(): void {
+    // Reject all pending RPC calls so callers don't hang forever
+    for (const [, { reject }] of this.pending) {
+      reject(new Error('VLM Worker terminated'));
+    }
+    this.pending.clear();
+
     this.worker?.terminate();
     this.worker = null;
     this._isInitialized = false;
     this._isModelLoaded = false;
-    this.pending.clear();
   }
 
   // ---- Internal RPC ----

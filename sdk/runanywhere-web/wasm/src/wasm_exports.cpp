@@ -268,4 +268,236 @@ int rac_wasm_ping(void) {
     return 42;
 }
 
+// =============================================================================
+// FIELD OFFSET HELPERS
+//
+// JavaScript must not hard-code C struct field offsets — they depend on
+// alignment, padding, pointer size (wasm32 vs wasm64) and compiler flags.
+// Each helper below uses the compiler's offsetof() so JS always gets the
+// correct offset at runtime.
+//
+// Naming convention:
+//   rac_wasm_offsetof_<struct>_<field>()
+// =============================================================================
+
+#include <cstddef>  // offsetof
+
+// ---- rac_config_t ----
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_config_log_level(void) {
+    return (int)offsetof(rac_config_t, log_level);
+}
+
+// ---- rac_llm_options_t ----
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_llm_options_max_tokens(void) {
+    return (int)offsetof(rac_llm_options_t, max_tokens);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_llm_options_temperature(void) {
+    return (int)offsetof(rac_llm_options_t, temperature);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_llm_options_top_p(void) {
+    return (int)offsetof(rac_llm_options_t, top_p);
+}
+
+// ---- rac_llm_result_t ----
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_llm_result_text(void) {
+    return (int)offsetof(rac_llm_result_t, text);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_llm_result_prompt_tokens(void) {
+    return (int)offsetof(rac_llm_result_t, prompt_tokens);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_llm_result_completion_tokens(void) {
+    return (int)offsetof(rac_llm_result_t, completion_tokens);
+}
+
+// ---- rac_vlm_image_t ----
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_image_format(void) {
+    return (int)offsetof(rac_vlm_image_t, format);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_image_file_path(void) {
+    return (int)offsetof(rac_vlm_image_t, file_path);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_image_pixel_data(void) {
+    return (int)offsetof(rac_vlm_image_t, pixel_data);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_image_base64_data(void) {
+    return (int)offsetof(rac_vlm_image_t, base64_data);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_image_width(void) {
+    return (int)offsetof(rac_vlm_image_t, width);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_image_height(void) {
+    return (int)offsetof(rac_vlm_image_t, height);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_image_data_size(void) {
+    return (int)offsetof(rac_vlm_image_t, data_size);
+}
+
+// ---- rac_vlm_options_t ----
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_options_max_tokens(void) {
+    return (int)offsetof(rac_vlm_options_t, max_tokens);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_options_temperature(void) {
+    return (int)offsetof(rac_vlm_options_t, temperature);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_options_top_p(void) {
+    return (int)offsetof(rac_vlm_options_t, top_p);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_options_streaming_enabled(void) {
+    return (int)offsetof(rac_vlm_options_t, streaming_enabled);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_options_system_prompt(void) {
+    return (int)offsetof(rac_vlm_options_t, system_prompt);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_options_model_family(void) {
+    return (int)offsetof(rac_vlm_options_t, model_family);
+}
+
+// ---- rac_vlm_result_t ----
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_result_text(void) {
+    return (int)offsetof(rac_vlm_result_t, text);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_result_prompt_tokens(void) {
+    return (int)offsetof(rac_vlm_result_t, prompt_tokens);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_result_image_tokens(void) {
+    return (int)offsetof(rac_vlm_result_t, image_tokens);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_result_completion_tokens(void) {
+    return (int)offsetof(rac_vlm_result_t, completion_tokens);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_result_total_tokens(void) {
+    return (int)offsetof(rac_vlm_result_t, total_tokens);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_result_time_to_first_token_ms(void) {
+    return (int)offsetof(rac_vlm_result_t, time_to_first_token_ms);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_result_image_encode_time_ms(void) {
+    return (int)offsetof(rac_vlm_result_t, image_encode_time_ms);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_result_total_time_ms(void) {
+    return (int)offsetof(rac_vlm_result_t, total_time_ms);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_result_tokens_per_second(void) {
+    return (int)offsetof(rac_vlm_result_t, tokens_per_second);
+}
+
+// ---- rac_structured_output_config_t ----
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_structured_output_config_json_schema(void) {
+    return (int)offsetof(rac_structured_output_config_t, json_schema);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_structured_output_config_include_schema(void) {
+    return (int)offsetof(rac_structured_output_config_t, include_schema_in_prompt);
+}
+
+// ---- rac_structured_output_validation_t ----
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_structured_output_validation_is_valid(void) {
+    return (int)offsetof(rac_structured_output_validation_t, is_valid);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_structured_output_validation_error_message(void) {
+    return (int)offsetof(rac_structured_output_validation_t, error_message);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_structured_output_validation_extracted_json(void) {
+    return (int)offsetof(rac_structured_output_validation_t, extracted_json);
+}
+
+// ---- rac_embeddings_options_t ----
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_embeddings_options_normalize(void) {
+    return (int)offsetof(rac_embeddings_options_t, normalize);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_embeddings_options_pooling(void) {
+    return (int)offsetof(rac_embeddings_options_t, pooling);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_embeddings_options_n_threads(void) {
+    return (int)offsetof(rac_embeddings_options_t, n_threads);
+}
+
+// ---- rac_embeddings_result_t ----
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_embeddings_result_embeddings(void) {
+    return (int)offsetof(rac_embeddings_result_t, embeddings);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_embeddings_result_num_embeddings(void) {
+    return (int)offsetof(rac_embeddings_result_t, num_embeddings);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_embeddings_result_dimension(void) {
+    return (int)offsetof(rac_embeddings_result_t, dimension);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_embeddings_result_processing_time_ms(void) {
+    return (int)offsetof(rac_embeddings_result_t, processing_time_ms);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_embeddings_result_total_tokens(void) {
+    return (int)offsetof(rac_embeddings_result_t, total_tokens);
+}
+
+// ---- rac_embedding_vector_t ----
+EMSCRIPTEN_KEEPALIVE int rac_wasm_sizeof_embedding_vector(void) {
+    return (int)sizeof(rac_embedding_vector_t);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_embedding_vector_data(void) {
+    return (int)offsetof(rac_embedding_vector_t, data);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_embedding_vector_dimension(void) {
+    return (int)offsetof(rac_embedding_vector_t, dimension);
+}
+
+// ---- rac_diffusion_options_t ----
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_options_prompt(void) {
+    return (int)offsetof(rac_diffusion_options_t, prompt);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_options_negative_prompt(void) {
+    return (int)offsetof(rac_diffusion_options_t, negative_prompt);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_options_width(void) {
+    return (int)offsetof(rac_diffusion_options_t, width);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_options_height(void) {
+    return (int)offsetof(rac_diffusion_options_t, height);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_options_steps(void) {
+    return (int)offsetof(rac_diffusion_options_t, steps);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_options_guidance_scale(void) {
+    return (int)offsetof(rac_diffusion_options_t, guidance_scale);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_options_seed(void) {
+    return (int)offsetof(rac_diffusion_options_t, seed);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_options_scheduler(void) {
+    return (int)offsetof(rac_diffusion_options_t, scheduler);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_options_mode(void) {
+    return (int)offsetof(rac_diffusion_options_t, mode);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_options_denoise_strength(void) {
+    return (int)offsetof(rac_diffusion_options_t, denoise_strength);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_options_report_intermediate(void) {
+    return (int)offsetof(rac_diffusion_options_t, report_intermediate_images);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_options_progress_stride(void) {
+    return (int)offsetof(rac_diffusion_options_t, progress_stride);
+}
+
+// ---- rac_diffusion_result_t ----
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_result_image_data(void) {
+    return (int)offsetof(rac_diffusion_result_t, image_data);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_result_image_size(void) {
+    return (int)offsetof(rac_diffusion_result_t, image_size);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_result_width(void) {
+    return (int)offsetof(rac_diffusion_result_t, width);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_result_height(void) {
+    return (int)offsetof(rac_diffusion_result_t, height);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_result_seed_used(void) {
+    return (int)offsetof(rac_diffusion_result_t, seed_used);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_result_generation_time_ms(void) {
+    return (int)offsetof(rac_diffusion_result_t, generation_time_ms);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_result_safety_flagged(void) {
+    return (int)offsetof(rac_diffusion_result_t, safety_flagged);
+}
+
 } // extern "C"

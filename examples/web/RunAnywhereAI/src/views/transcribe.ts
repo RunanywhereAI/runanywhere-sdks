@@ -25,6 +25,7 @@ let sttState: STTState = 'idle';
 let sttTranscription = '';
 let sttError = '';
 let liveVadTimer: ReturnType<typeof setInterval> | null = null;
+let isLiveTranscribing = false;
 
 // VAD thresholds (matching iOS defaults)
 const SPEECH_THRESHOLD = 0.02;
@@ -166,15 +167,37 @@ async function handleMicToggle(): Promise<void> {
   if (sttState === 'recording') {
     stopLiveVAD();
 
-    sttState = 'transcribing';
-    renderSTTUI();
-    await performBatchTranscription();
+    if (sttMode === 'batch') {
+      // Batch mode: stop recording, then transcribe entire buffer
+      sttState = 'transcribing';
+      renderSTTUI();
+      await performBatchTranscription();
+    } else {
+      // Live mode: transcribe any remaining audio if substantial enough
+      const remaining = micCapture.drainBuffer();
+      if (remaining.length >= MIN_BUFFER_BYTES) {
+        sttState = 'transcribing';
+        renderSTTUI();
+        try {
+          const text = await transcribeAudio(remaining, micCapture.actualSampleRate);
+          if (text && text.trim().length > 0) {
+            sttTranscription += (sttTranscription.length > 0 ? '\n' : '') + text.trim();
+          }
+        } catch (err) {
+          sttError = err instanceof Error ? err.message : String(err);
+        }
+      }
+      // If remaining audio is too short, skip silently (VAD already transcribed earlier segments)
+    }
 
     micCapture.stop();
+    isLiveTranscribing = false;
     sttState = 'idle';
     renderSTTUI();
   } else {
     sttError = '';
+    sttTranscription = '';
+    isLiveTranscribing = false;
     try {
       await micCapture.start(undefined, (level) => updateLevelBars(level));
       sttState = 'recording';
@@ -193,15 +216,22 @@ async function handleMicToggle(): Promise<void> {
 
 async function performBatchTranscription(): Promise<void> {
   const audioBuffer = micCapture.getAudioBuffer();
+  const actualRate = micCapture.actualSampleRate;
+  const durationSec = audioBuffer.length / actualRate;
+
+  console.log(`[Transcribe] Buffer: ${audioBuffer.length} samples, ${actualRate}Hz, ${durationSec.toFixed(1)}s`);
+
   if (audioBuffer.length < MIN_BUFFER_BYTES) {
     sttError = 'Recording too short. Please speak longer.';
     return;
   }
 
   try {
-    const text = await transcribeAudio(audioBuffer);
+    const text = await transcribeAudio(audioBuffer, actualRate);
     if (text && text.trim().length > 0) {
       sttTranscription += (sttTranscription.length > 0 ? '\n' : '') + text.trim();
+    } else {
+      sttError = 'No speech detected. Try speaking louder or recording longer.';
     }
   } catch (err) {
     sttError = err instanceof Error ? err.message : String(err);
@@ -209,7 +239,7 @@ async function performBatchTranscription(): Promise<void> {
   renderSTTUI();
 }
 
-async function transcribeAudio(pcmFloat32: Float32Array): Promise<string> {
+async function transcribeAudio(pcmFloat32: Float32Array, sampleRate?: number): Promise<string> {
   const model = await ModelManager.ensureLoaded(ModelCategory.SpeechRecognition);
   if (!model) {
     throw new Error('No STT model available. Tap the model button (top right) to download one.');
@@ -220,7 +250,8 @@ async function transcribeAudio(pcmFloat32: Float32Array): Promise<string> {
     throw new Error('STT model not loaded. Select and load a model first.');
   }
 
-  const result = await STT.transcribe(pcmFloat32);
+  const result = await STT.transcribe(pcmFloat32, { sampleRate });
+  console.log(`[Transcribe] STT result: "${result.text}" (${result.processingTimeMs}ms)`);
   return result.text;
 }
 
@@ -232,31 +263,50 @@ function startLiveVAD(): void {
   let speechDetected = false;
   let silenceStart = 0;
 
+  console.log('[LiveVAD] Started VAD monitoring');
+
   liveVadTimer = setInterval(async () => {
     if (sttState !== 'recording' || !micCapture.isCapturing) { stopLiveVAD(); return; }
 
+    // Skip this tick if a previous transcription is still in progress
+    if (isLiveTranscribing) return;
+
     const level = micCapture.currentLevel;
     if (level >= SPEECH_THRESHOLD) {
+      if (!speechDetected) {
+        console.log('[LiveVAD] Speech started');
+      }
       speechDetected = true;
       silenceStart = 0;
     } else if (speechDetected) {
       if (silenceStart === 0) {
         silenceStart = Date.now();
       } else if (Date.now() - silenceStart >= SILENCE_DURATION_MS) {
+        console.log('[LiveVAD] Silence detected — triggering transcription');
         speechDetected = false;
         silenceStart = 0;
+
         const segment = micCapture.drainBuffer();
         if (segment.length >= MIN_BUFFER_BYTES) {
+          isLiveTranscribing = true;
           try {
-            const text = await transcribeAudio(segment);
+            const durationSec = segment.length / micCapture.actualSampleRate;
+            console.log(`[LiveVAD] Transcribing segment: ${segment.length} samples (${durationSec.toFixed(1)}s)`);
+            const text = await transcribeAudio(segment, micCapture.actualSampleRate);
             if (text && text.trim().length > 0) {
               sttTranscription += (sttTranscription.length > 0 ? '\n' : '') + text.trim();
+              console.log(`[LiveVAD] Transcription result: "${text.trim()}"`);
               renderSTTUI();
             }
           } catch (err) {
             sttError = err instanceof Error ? err.message : String(err);
+            console.error('[LiveVAD] Transcription error:', sttError);
             renderSTTUI();
+          } finally {
+            isLiveTranscribing = false;
           }
+        } else {
+          console.log(`[LiveVAD] Segment too short (${segment.length} samples), skipping`);
         }
       }
     }
@@ -296,8 +346,8 @@ function renderSTTUI(): void {
 
   // Show/hide result area
   const hasResult = sttTranscription.length > 0 || sttState === 'transcribing';
-  readyArea.style.display = hasResult ? 'none' : '';
-  resultArea.style.display = hasResult ? '' : 'none';
+  readyArea.style.display = hasResult ? 'none' : 'flex';
+  resultArea.style.display = hasResult ? 'flex' : 'none';
   if (hasResult) resultText.textContent = sttTranscription || 'Transcribing...';
 
   // Level bars

@@ -19,6 +19,7 @@
 
 import { RunAnywhere } from '../RunAnywhere';
 import { WASMBridge } from '../../Foundation/WASMBridge';
+import { Offsets } from '../../Foundation/StructOffsets';
 import { SDKError } from '../../Foundation/ErrorTypes';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 
@@ -103,9 +104,10 @@ export const StructuredOutput = {
     // Build rac_structured_output_config_t: { json_schema, include_schema_in_prompt }
     const configSize = m._rac_wasm_sizeof_structured_output_config();
     const configPtr = m._malloc(configSize);
+    const soConf = Offsets.structuredOutputConfig;
     const schemaPtr = bridge.allocString(config.jsonSchema);
-    m.setValue(configPtr, schemaPtr, '*');
-    m.setValue(configPtr + 4, (config.includeSchemaInPrompt !== false) ? 1 : 0, 'i32');
+    m.setValue(configPtr + soConf.jsonSchema, schemaPtr, '*');
+    m.setValue(configPtr + soConf.includeSchemaInPrompt, (config.includeSchemaInPrompt !== false) ? 1 : 0, 'i32');
 
     const outPromptPtr = m._malloc(4);
 
@@ -184,12 +186,13 @@ export const StructuredOutput = {
 
     const configSize = m._rac_wasm_sizeof_structured_output_config();
     const configPtr = m._malloc(configSize);
+    const soConf2 = Offsets.structuredOutputConfig;
     const schemaPtr = bridge.allocString(config.jsonSchema);
-    m.setValue(configPtr, schemaPtr, '*');
-    m.setValue(configPtr + 4, (config.includeSchemaInPrompt !== false) ? 1 : 0, 'i32');
+    m.setValue(configPtr + soConf2.jsonSchema, schemaPtr, '*');
+    m.setValue(configPtr + soConf2.includeSchemaInPrompt, (config.includeSchemaInPrompt !== false) ? 1 : 0, 'i32');
 
-    // rac_structured_output_validation_t: { is_valid, error_message, extracted_json }
-    const valSize = 12;
+    // rac_structured_output_validation_t (size from sizeof helper)
+    const valSize = 12; // 3 fields × 4 bytes on wasm32 — all i32/ptr
     const valPtr = m._malloc(valSize);
 
     try {
@@ -203,9 +206,10 @@ export const StructuredOutput = {
         return { isValid: false, errorMessage: 'Validation call failed' };
       }
 
-      const isValid = m.getValue(valPtr, 'i32') === 1;
-      const errorMsgPtr = m.getValue(valPtr + 4, '*');
-      const extractedPtr = m.getValue(valPtr + 8, '*');
+      const soVal = Offsets.structuredOutputValidation;
+      const isValid = m.getValue(valPtr + soVal.isValid, 'i32') === 1;
+      const errorMsgPtr = m.getValue(valPtr + soVal.errorMessage, '*');
+      const extractedPtr = m.getValue(valPtr + soVal.extractedJson, '*');
 
       const validation: StructuredOutputValidation = {
         isValid,
