@@ -74,6 +74,8 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("secureStorageGet", &HybridRunAnywhereCoreSpec::secureStorageGet);
       prototype.registerHybridMethod("secureStorageDelete", &HybridRunAnywhereCoreSpec::secureStorageDelete);
       prototype.registerHybridMethod("secureStorageExists", &HybridRunAnywhereCoreSpec::secureStorageExists);
+      prototype.registerHybridMethod("secureStorageStore", &HybridRunAnywhereCoreSpec::secureStorageStore);
+      prototype.registerHybridMethod("secureStorageRetrieve", &HybridRunAnywhereCoreSpec::secureStorageRetrieve);
       prototype.registerHybridMethod("getPersistentDeviceUUID", &HybridRunAnywhereCoreSpec::getPersistentDeviceUUID);
       prototype.registerHybridMethod("flushTelemetry", &HybridRunAnywhereCoreSpec::flushTelemetry);
       prototype.registerHybridMethod("isTelemetryInitialized", &HybridRunAnywhereCoreSpec::isTelemetryInitialized);

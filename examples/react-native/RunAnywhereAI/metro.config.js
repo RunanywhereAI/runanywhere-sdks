@@ -1,10 +1,13 @@
 const path = require('path');
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
-const { blockList } = require('metro-config');
 
 // Path to the SDK package (symlinked via node_modules)
 const sdkPath = path.resolve(__dirname, '../../../sdk/runanywhere-react-native');
 const sdkPackagesPath = path.join(sdkPath, 'packages');
+const sdkCorePath = path.join(sdkPackagesPath, 'core');
+const sdkRagPath = path.join(sdkPackagesPath, 'rag');
+const sdkLlamaPath = path.join(sdkPackagesPath, 'llamacpp');
+const sdkOnnxPath = path.join(sdkPackagesPath, 'onnx');
 
 /**
  * Metro configuration
@@ -15,12 +18,13 @@ const sdkPackagesPath = path.join(sdkPath, 'packages');
 const config = {
   watchFolders: [sdkPackagesPath],
   resolver: {
-    // Exclude TypeScript source files from @runanywhere/rag symlinked package
-    // Force Metro to only see the compiled lib/ directory
-    blockList: blockList([
-      // Ignore src directory in RAG package to force Metro to use lib/
-      /.*\/node_modules\/@runanywhere\/rag\/src\/.*/,
-    ]),
+    // Ensure Metro resolves SDK packages from the workspace (symlinks can be flaky)
+    extraNodeModules: {
+      '@runanywhere/core': sdkCorePath,
+      '@runanywhere/rag': sdkRagPath,
+      '@runanywhere/llamacpp': sdkLlamaPath,
+      '@runanywhere/onnx': sdkOnnxPath,
+    },
     // Allow Metro to resolve modules from the SDK
     nodeModulesPaths: [
       path.resolve(__dirname, 'node_modules'),

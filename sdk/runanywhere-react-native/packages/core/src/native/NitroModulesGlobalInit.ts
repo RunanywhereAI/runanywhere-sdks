@@ -17,6 +17,9 @@ let _nitroInstallationPromise: Promise<any> | null = null;
 /** Cached NitroModules proxy after successful installation */
 let _nitroModulesProxy: any = null;
 
+/** Track whether native install() has been invoked */
+let _nitroInstallCalled = false;
+
 /**
  * Initialize NitroModules globally, ensuring install() is called exactly once.
  * This MUST be called before any other modules try to access NitroModules.
@@ -42,21 +45,22 @@ export async function initializeNitroModulesGlobally(): Promise<any> {
       // Try to get the proxy from the named import first (most reliable in Bridgeless)
       _nitroModulesProxy = NitroModulesNamed;
 
-      if (!_nitroModulesProxy) {
-        // Fallback: Try to call install() on the native module if named import failed
-        const nativeNitro = NativeModules?.NitroModules;
-        if (nativeNitro && typeof nativeNitro.install === 'function') {
-          try {
-            console.debug('[NitroModulesGlobalInit] Calling native NitroModules.install()...');
-            nativeNitro.install();
-            console.debug('[NitroModulesGlobalInit] Native install() completed');
-            
-            // Try getting proxy again after install
-            _nitroModulesProxy = NitroModulesNamed;
-          } catch (installError) {
-            console.warn('[NitroModulesGlobalInit] Native install() failed:', installError);
-          }
+      // Always attempt native install() once to ensure JSI bindings are ready
+      const nativeNitro = NativeModules?.NitroModules;
+      if (!_nitroInstallCalled && nativeNitro && typeof nativeNitro.install === 'function') {
+        try {
+          console.debug('[NitroModulesGlobalInit] Calling native NitroModules.install()...');
+          nativeNitro.install();
+          _nitroInstallCalled = true;
+          console.debug('[NitroModulesGlobalInit] Native install() completed');
+        } catch (installError) {
+          console.warn('[NitroModulesGlobalInit] Native install() failed:', installError);
         }
+      }
+
+      // Try getting proxy again after install (if needed)
+      if (!_nitroModulesProxy) {
+        _nitroModulesProxy = NitroModulesNamed;
       }
 
       if (!_nitroModulesProxy) {

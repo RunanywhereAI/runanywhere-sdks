@@ -2,18 +2,19 @@
   "name": "@runanywhere/rag",
   "version": "0.1.0",
   "description": "RAG (Retrieval-Augmented Generation) backend for RunAnywhere React Native SDK - On-device document search with LLM",
-  "main": "lib/index.js",
-  "types": "lib/index.d.ts",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
   "exports": {
     ".": {
-      "types": "./lib/index.d.ts",
-      "default": "./lib/index.js"
+      "source": "./src/index.ts",
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
     },
     "./package.json": "./package.json"
   },
-  "react-native": "lib/index.js",
+  "source": "src/index",
   "files": [
-    "lib",
+    "src",
     "cpp",
     "ios",
     "android",
