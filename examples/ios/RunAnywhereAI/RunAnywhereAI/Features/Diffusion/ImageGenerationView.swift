@@ -36,10 +36,13 @@ struct ImageGenerationView: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
         }
+        #if os(iOS)
+        .navigationViewStyle(.stack)
+        #endif
         .task {
             await viewModel.initialize()
         }
-        .sheet(isPresented: $showModelPicker) {
+        .adaptiveSheet(isPresented: $showModelPicker) {
             DiffusionModelPickerView(viewModel: viewModel, isPresented: $showModelPicker)
         }
     }
@@ -302,6 +305,9 @@ struct DiffusionModelPickerView: View {
                 }
             }
         }
+        #if os(iOS)
+        .navigationViewStyle(.stack)
+        #endif
     }
 }
 

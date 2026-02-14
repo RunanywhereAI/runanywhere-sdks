@@ -37,7 +37,7 @@ struct ModelLoadedToast: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
                 .background {
-                    if #available(iOS 26.0, *) {
+                    if #available(iOS 26.0, macOS 26.0, *) {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .fill(.clear)
                             .glassEffect(.regular.interactive())

@@ -15,6 +15,10 @@ import os.log
 import UIKit
 #endif
 
+#if os(macOS)
+import AppKit
+#endif
+
 // MARK: - VLM View Model
 
 @MainActor
@@ -163,6 +167,51 @@ final class VLMViewModel: NSObject {
 
         do {
             let image = VLMImage(image: uiImage)
+            let result = try await RunAnywhere.processImageStream(
+                image,
+                prompt: "Describe this image in detail.",
+                maxTokens: 300
+            )
+
+            for try await token in result.stream {
+                currentDescription += token
+            }
+        } catch {
+            self.error = error
+        }
+
+        isProcessing = false
+    }
+    #endif
+
+    #if os(macOS)
+    func describeImage(_ nsImage: NSImage) async {
+        isProcessing = true
+        error = nil
+        currentDescription = ""
+
+        do {
+            guard let cgImage = nsImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                isProcessing = false
+                return
+            }
+            let width = cgImage.width
+            let height = cgImage.height
+            let bytesPerRow = 4 * width
+            var rgbData = Data(count: bytesPerRow * height)
+            rgbData.withUnsafeMutableBytes { ptr in
+                guard let context = CGContext(
+                    data: ptr.baseAddress,
+                    width: width,
+                    height: height,
+                    bitsPerComponent: 8,
+                    bytesPerRow: bytesPerRow,
+                    space: CGColorSpaceCreateDeviceRGB(),
+                    bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+                ) else { return }
+                context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+            }
+            let image = VLMImage(rgbPixels: rgbData, width: width, height: height)
             let result = try await RunAnywhere.processImageStream(
                 image,
                 prompt: "Describe this image in detail.",
