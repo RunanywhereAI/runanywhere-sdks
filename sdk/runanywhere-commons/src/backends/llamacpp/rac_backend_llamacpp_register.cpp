@@ -64,6 +64,18 @@ static rac_result_t llamacpp_vtable_generate_stream(void* impl, const char* prom
                                             &adapter);
 }
 
+// Generate stream with benchmark timing
+static rac_result_t llamacpp_vtable_generate_stream_with_timing(void* impl, const char* prompt,
+                                                                const rac_llm_options_t* options,
+                                                                rac_llm_stream_callback_fn callback,
+                                                                void* user_data,
+                                                                rac_benchmark_timing_t* timing_out) {
+    StreamAdapter adapter = {callback, user_data};
+    return rac_llm_llamacpp_generate_stream_with_timing(impl, prompt, options,
+                                                        stream_adapter_callback, &adapter,
+                                                        timing_out);
+}
+
 // Get info
 static rac_result_t llamacpp_vtable_get_info(void* impl, rac_llm_info_t* out_info) {
     if (!out_info)
@@ -114,6 +126,7 @@ static const rac_llm_service_ops_t g_llamacpp_ops = {
     .initialize = llamacpp_vtable_initialize,
     .generate = llamacpp_vtable_generate,
     .generate_stream = llamacpp_vtable_generate_stream,
+    .generate_stream_with_timing = llamacpp_vtable_generate_stream_with_timing,
     .get_info = llamacpp_vtable_get_info,
     .cancel = llamacpp_vtable_cancel,
     .cleanup = llamacpp_vtable_cleanup,

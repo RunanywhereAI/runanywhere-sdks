@@ -10,6 +10,7 @@
 #ifndef RAC_LLM_SERVICE_H
 #define RAC_LLM_SERVICE_H
 
+#include "rac/core/rac_benchmark.h"
 #include "rac/core/rac_error.h"
 #include "rac/features/llm/rac_llm_types.h"
 
@@ -37,6 +38,21 @@ typedef struct rac_llm_service_ops {
     rac_result_t (*generate_stream)(void* impl, const char* prompt,
                                     const rac_llm_options_t* options,
                                     rac_llm_stream_callback_fn callback, void* user_data);
+
+    /**
+     * Generate text with streaming callback and benchmark timing.
+     * Optional: backends that don't support timing can leave this NULL.
+     * If NULL, rac_llm_generate_stream_with_timing falls back to generate_stream.
+     *
+     * Backends that implement this should capture:
+     * - t2: Before prefill (llama_decode for prompt)
+     * - t3: After prefill completes
+     * - t5: When decode loop exits (last token)
+     */
+    rac_result_t (*generate_stream_with_timing)(void* impl, const char* prompt,
+                                                const rac_llm_options_t* options,
+                                                rac_llm_stream_callback_fn callback, void* user_data,
+                                                rac_benchmark_timing_t* timing_out);
 
     /** Get service info */
     rac_result_t (*get_info)(void* impl, rac_llm_info_t* out_info);
@@ -116,6 +132,32 @@ RAC_API rac_result_t rac_llm_generate(rac_handle_t handle, const char* prompt,
 RAC_API rac_result_t rac_llm_generate_stream(rac_handle_t handle, const char* prompt,
                                              const rac_llm_options_t* options,
                                              rac_llm_stream_callback_fn callback, void* user_data);
+
+/**
+ * @brief Stream generate text with benchmark timing
+ *
+ * Same as rac_llm_generate_stream but with optional benchmark timing.
+ * If timing_out is non-NULL and the backend supports timing, captures:
+ * - t2: Before prefill
+ * - t3: After prefill
+ * - t5: Last token generated
+ *
+ * If the backend doesn't implement generate_stream_with_timing, falls back
+ * to generate_stream (timing_out will have t2/t3/t5 as zeros).
+ *
+ * @param handle Service handle
+ * @param prompt Input prompt
+ * @param options Generation options (can be NULL for defaults)
+ * @param callback Callback for each token
+ * @param user_data User context passed to callback
+ * @param timing_out Output: Benchmark timing (can be NULL for no timing)
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_llm_generate_stream_with_timing(rac_handle_t handle, const char* prompt,
+                                                         const rac_llm_options_t* options,
+                                                         rac_llm_stream_callback_fn callback,
+                                                         void* user_data,
+                                                         rac_benchmark_timing_t* timing_out);
 
 /**
  * @brief Get service information
