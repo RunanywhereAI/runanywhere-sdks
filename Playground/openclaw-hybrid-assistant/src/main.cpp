@@ -23,12 +23,12 @@
 //   Ctrl+C                   Exit the application
 // =============================================================================
 
-#include "model_config.h"
-#include "voice_pipeline.h"
-#include "audio_capture.h"
-#include "audio_playback.h"
-#include "openclaw_client.h"
-#include "waiting_chime.h"
+#include "config/model_config.h"
+#include "pipeline/voice_pipeline.h"
+#include "audio/audio_capture.h"
+#include "audio/audio_playback.h"
+#include "network/openclaw_client.h"
+#include "audio/waiting_chime.h"
 
 // Backend registration
 #include <rac/backends/rac_vad_onnx.h>

@@ -20,11 +20,11 @@
 //   ./test-integration --test-openclaw-flow --delay <seconds>
 // =============================================================================
 
-#include "model_config.h"
-#include "voice_pipeline.h"
-#include "tts_queue.h"
-#include "openclaw_client.h"
-#include "waiting_chime.h"
+#include "config/model_config.h"
+#include "pipeline/voice_pipeline.h"
+#include "pipeline/tts_queue.h"
+#include "network/openclaw_client.h"
+#include "audio/waiting_chime.h"
 
 // RAC headers
 #include <rac/backends/rac_vad_onnx.h>

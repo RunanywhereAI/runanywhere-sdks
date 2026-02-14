@@ -13,8 +13,8 @@
 //   ./test-components --run-all
 // =============================================================================
 
-#include "model_config.h"
-#include "voice_pipeline.h"
+#include "config/model_config.h"
+#include "pipeline/voice_pipeline.h"
 
 // RAC headers for wake word testing
 #include <rac/backends/rac_vad_onnx.h>
