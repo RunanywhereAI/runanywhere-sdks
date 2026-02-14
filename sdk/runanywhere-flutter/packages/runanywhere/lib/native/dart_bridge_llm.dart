@@ -229,6 +229,7 @@ class DartBridgeLLM {
   /// [prompt] - Input prompt.
   /// [maxTokens] - Maximum tokens to generate (default: 512).
   /// [temperature] - Sampling temperature (default: 0.7).
+  /// [systemPrompt] - Optional system prompt for model behavior (default: null).
   ///
   /// Returns the generated text and metrics.
   ///
@@ -238,6 +239,7 @@ class DartBridgeLLM {
     String prompt, {
     int maxTokens = 512,
     double temperature = 0.7,
+    String? systemPrompt,
   }) async {
     final handle = getHandle();
 
@@ -251,8 +253,10 @@ class DartBridgeLLM {
     final tokens = maxTokens;
     final temp = temperature;
 
+    _logger.debug('[PARAMS] generate: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=${systemPrompt != null ? "set(${systemPrompt.length} chars)" : "nil"}');
+
     final result = await Isolate.run(() {
-      return _generateInIsolate(handleAddress, prompt, tokens, temp);
+      return _generateInIsolate(handleAddress, prompt, tokens, temp, systemPrompt);
     });
 
     if (result.error != null) {
@@ -270,7 +274,7 @@ class DartBridgeLLM {
   /// Generate text with streaming.
   ///
   /// Returns a stream of tokens as they are generated.
-  /// 
+  ///
   /// ARCHITECTURE: Runs in a background isolate to prevent ANR.
   /// The logger callback uses NativeCallable.listener which is thread-safe.
   /// Tokens are sent back to the main isolate via SendPort for UI updates.
@@ -278,6 +282,7 @@ class DartBridgeLLM {
     String prompt, {
     int maxTokens = 512, // Can use higher values now since it's non-blocking
     double temperature = 0.7,
+    String? systemPrompt,
   }) {
     final handle = getHandle();
 
@@ -288,12 +293,15 @@ class DartBridgeLLM {
     // Create stream controller for emitting tokens to the caller
     final controller = StreamController<String>();
 
+    _logger.debug('[PARAMS] generateStream: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=${systemPrompt != null ? "set(${systemPrompt.length} chars)" : "nil"}');
+
     // Start streaming generation in a background isolate
     unawaited(_startBackgroundStreaming(
       handle.address,
       prompt,
       maxTokens,
       temperature,
+      systemPrompt,
       controller,
     ));
 
@@ -301,7 +309,7 @@ class DartBridgeLLM {
   }
 
   /// Start streaming generation in a background isolate.
-  /// 
+  ///
   /// ARCHITECTURE NOTE:
   /// The logger callback now uses NativeCallable.listener which is thread-safe.
   /// This allows us to run the FFI streaming call in a background isolate
@@ -312,6 +320,7 @@ class DartBridgeLLM {
     String prompt,
     int maxTokens,
     double temperature,
+    String? systemPrompt,
     StreamController<String> controller,
   ) async {
     // Create a ReceivePort to receive tokens from the background isolate
@@ -346,6 +355,7 @@ class DartBridgeLLM {
           prompt: prompt,
           maxTokens: maxTokens,
           temperature: temperature,
+          systemPrompt: systemPrompt,
         ),
       );
     } catch (e) {
@@ -430,6 +440,7 @@ class _StreamingIsolateParams {
   final String prompt;
   final int maxTokens;
   final double temperature;
+  final String? systemPrompt;
 
   _StreamingIsolateParams({
     required this.sendPort,
@@ -437,6 +448,7 @@ class _StreamingIsolateParams {
     required this.prompt,
     required this.maxTokens,
     required this.temperature,
+    this.systemPrompt,
   });
 }
 
@@ -460,6 +472,7 @@ void _streamingIsolateEntry(_StreamingIsolateParams params) {
   final handle = Pointer<Void>.fromAddress(params.handleAddress);
   final promptPtr = params.prompt.toNativeUtf8();
   final optionsPtr = calloc<RacLlmOptionsStruct>();
+  Pointer<Utf8>? systemPromptPtr;
 
   try {
     // Set options
@@ -469,7 +482,14 @@ void _streamingIsolateEntry(_StreamingIsolateParams params) {
     optionsPtr.ref.stopSequences = nullptr;
     optionsPtr.ref.numStopSequences = 0;
     optionsPtr.ref.streamingEnabled = RAC_TRUE;
-    optionsPtr.ref.systemPrompt = nullptr;
+
+    // Set systemPrompt if provided
+    if (params.systemPrompt != null && params.systemPrompt!.isNotEmpty) {
+      systemPromptPtr = params.systemPrompt!.toNativeUtf8();
+      optionsPtr.ref.systemPrompt = systemPromptPtr!;
+    } else {
+      optionsPtr.ref.systemPrompt = nullptr;
+    }
 
     final lib = PlatformLoader.loadCommons();
 
@@ -532,6 +552,9 @@ void _streamingIsolateEntry(_StreamingIsolateParams params) {
   } finally {
     calloc.free(promptPtr);
     calloc.free(optionsPtr);
+    if (systemPromptPtr != null) {
+      calloc.free(systemPromptPtr!);
+    }
     _isolateSendPort = null;
   }
 }
@@ -579,11 +602,13 @@ _IsolateGenerationResult _generateInIsolate(
   String prompt,
   int maxTokens,
   double temperature,
+  String? systemPrompt,
 ) {
   final handle = Pointer<Void>.fromAddress(handleAddress);
   final promptPtr = prompt.toNativeUtf8();
   final optionsPtr = calloc<RacLlmOptionsStruct>();
   final resultPtr = calloc<RacLlmResultStruct>();
+  Pointer<Utf8>? systemPromptPtr;
 
   try {
     // Set options - matching C++ rac_llm_options_t
@@ -593,7 +618,14 @@ _IsolateGenerationResult _generateInIsolate(
     optionsPtr.ref.stopSequences = nullptr;
     optionsPtr.ref.numStopSequences = 0;
     optionsPtr.ref.streamingEnabled = RAC_FALSE;
-    optionsPtr.ref.systemPrompt = nullptr;
+
+    // Set systemPrompt if provided
+    if (systemPrompt != null && systemPrompt.isNotEmpty) {
+      systemPromptPtr = systemPrompt.toNativeUtf8();
+      optionsPtr.ref.systemPrompt = systemPromptPtr!;
+    } else {
+      optionsPtr.ref.systemPrompt = nullptr;
+    }
 
     final lib = PlatformLoader.loadCommons();
     final generateFn = lib.lookupFunction<
@@ -625,5 +657,8 @@ _IsolateGenerationResult _generateInIsolate(
     calloc.free(promptPtr);
     calloc.free(optionsPtr);
     calloc.free(resultPtr);
+    if (systemPromptPtr != null) {
+      calloc.free(systemPromptPtr!);
+    }
   }
 }
