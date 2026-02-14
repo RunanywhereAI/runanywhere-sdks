@@ -84,6 +84,9 @@ bool WaitingChime::load_wav(const std::string& path) {
                 file.seekg(chunk_size - 16, std::ios::cur);
             }
         } else if (strncmp(chunk_id, "data", 4) == 0) {
+            if (bits_per_sample == 0 || channels == 0) {
+                return false;  // fmt chunk not yet parsed
+            }
             size_t num_samples = chunk_size / (bits_per_sample / 8) / channels;
             earcon_buffer_.resize(num_samples);
             if (channels == 1 && bits_per_sample == 16) {

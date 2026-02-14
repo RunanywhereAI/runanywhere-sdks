@@ -390,6 +390,23 @@ struct VoicePipeline::Impl {
 
     // Mutex for thread safety
     std::mutex mutex;
+
+    // Deferred callbacks — collected under the lock, fired after unlock.
+    // This prevents deadlocks when callbacks re-enter the pipeline.
+    struct PendingCallbacks {
+        bool voice_activity_started = false;
+        bool voice_activity_ended = false;
+        std::vector<int16_t> stt_buffer;  // Non-empty if STT should be processed
+
+        void clear() {
+            voice_activity_started = false;
+            voice_activity_ended = false;
+            stt_buffer.clear();
+        }
+        bool has_any() const {
+            return voice_activity_started || voice_activity_ended || !stt_buffer.empty();
+        }
+    } pending_callbacks;
 };
 
 // =============================================================================
@@ -679,12 +696,12 @@ void VoicePipeline::process_audio(const int16_t* samples, size_t num_samples) {
         if (config_.debug_audio && diag_frame % 62 == 0) {
             // Compute RMS and peak of this chunk
             double sum_sq = 0.0;
-            int16_t peak = 0;
+            int peak = 0;
             int16_t min_val = 0;
             int16_t max_val = 0;
             for (size_t i = 0; i < num_samples; ++i) {
                 sum_sq += static_cast<double>(samples[i]) * samples[i];
-                int16_t abs_val = static_cast<int16_t>(std::abs(samples[i]));
+                int abs_val = std::abs(static_cast<int>(samples[i]));
                 if (abs_val > peak) peak = abs_val;
                 if (samples[i] < min_val) min_val = samples[i];
                 if (samples[i] > max_val) max_val = samples[i];
@@ -699,7 +716,7 @@ void VoicePipeline::process_audio(const int16_t* samples, size_t num_samples) {
             std::cout << db << "dB)"
                       << " peak=" << peak
                       << " range=[" << min_val << "," << max_val << "]"
-                      << " state=" << static_cast<int>(state_)
+                      << " state=" << static_cast<int>(state_.load())
                       << "\n" << std::flush;
         }
 
@@ -708,7 +725,7 @@ void VoicePipeline::process_audio(const int16_t* samples, size_t num_samples) {
             std::cout << "[DIAG] process_audio frame=" << diag_frame
                       << " init=" << initialized_
                       << " running=" << running_
-                      << " state=" << static_cast<int>(state_)
+                      << " state=" << static_cast<int>(state_.load())
                       << " samples=" << num_samples << "\n" << std::flush;
         }
     }
@@ -785,6 +802,24 @@ void VoicePipeline::process_audio(const int16_t* samples, size_t num_samples) {
 
     // Stage 2: VAD + Speech Buffering
     process_vad(float_samples.data(), num_samples, samples);
+
+    // Dispatch deferred callbacks outside the lock to prevent deadlocks
+    // when callbacks re-enter the pipeline (e.g., speak_text_async, cancel_speech)
+    if (impl_->pending_callbacks.has_any()) {
+        auto pending = std::move(impl_->pending_callbacks);
+        impl_->pending_callbacks.clear();
+        lock.unlock();
+
+        if (pending.voice_activity_started && config_.on_voice_activity) {
+            config_.on_voice_activity(true);
+        }
+        if (pending.voice_activity_ended && config_.on_voice_activity) {
+            config_.on_voice_activity(false);
+        }
+        if (!pending.stt_buffer.empty()) {
+            process_stt(pending.stt_buffer.data(), pending.stt_buffer.size());
+        }
+    }
 }
 
 void VoicePipeline::process_wakeword(const float* samples, size_t num_samples) {
@@ -982,13 +1017,11 @@ void VoicePipeline::process_vad(const float* samples, size_t num_samples, const 
             }
         }
 
-        // Fire "listening" callback once we have enough samples
+        // Defer "listening" callback once we have enough samples (fired after unlock)
         size_t min_samples = config_.min_speech_samples > 0 ? config_.min_speech_samples : DEFAULT_MIN_SPEECH_SAMPLES;
         if (!impl_->speech_callback_fired && impl_->speech_buffer.size() + num_samples >= min_samples / 2) {
             impl_->speech_callback_fired = true;
-            if (config_.on_voice_activity) {
-                config_.on_voice_activity(true);
-            }
+            impl_->pending_callbacks.voice_activity_started = true;
         }
     } else if (impl_->speech_active) {
         // Silent frame during active speech — reset burst counter
@@ -1045,14 +1078,13 @@ void VoicePipeline::process_vad(const float* samples, size_t num_samples, const 
                       << (float)impl_->speech_buffer.size() / 16000.0f << "s)\n";
         }
 
-        if (config_.on_voice_activity) {
-            config_.on_voice_activity(false);
-        }
+        // Defer callbacks (fired after unlock to prevent deadlock)
+        impl_->pending_callbacks.voice_activity_ended = true;
 
-        // Process STT if we have enough speech
+        // Copy speech buffer for deferred STT processing (before clearing)
         size_t min_samples = config_.min_speech_samples > 0 ? config_.min_speech_samples : DEFAULT_MIN_SPEECH_SAMPLES;
         if (impl_->speech_buffer.size() >= min_samples) {
-            process_stt(impl_->speech_buffer.data(), impl_->speech_buffer.size());
+            impl_->pending_callbacks.stt_buffer = impl_->speech_buffer;
         } else if (config_.debug_stt) {
             std::cout << "[STT] Not enough speech (" << impl_->speech_buffer.size()
                       << " < " << min_samples << ")\n";
@@ -1157,8 +1189,6 @@ static bool is_abbreviation(const std::string& text, size_t dot_pos) {
         "inc", "ltd", "corp", "co",
         // Common multi-dot abbreviations (matched without dots)
         "eg", "ie", "al",  // e.g., i.e., et al.
-        // Time
-        "am", "pm",
         // Measurements
         "oz", "lb", "ft", "sq",
         nullptr
@@ -1295,12 +1325,12 @@ bool VoicePipeline::speak_text(const std::string& text) {
         // Play this sentence immediately (don't wait for others)
         // Synchronous speak_text has no cancellation, so pass a dummy flag
         if (config_.on_audio_output) {
-            static std::atomic<bool> no_cancel{false};
+            std::atomic<bool> cancel_flag{false};
             config_.on_audio_output(
                 static_cast<const int16_t*>(audio_data),
                 audio_size / sizeof(int16_t),
                 tts_sample_rate,
-                no_cancel
+                cancel_flag
             );
         }
 
@@ -1425,11 +1455,9 @@ void VoicePipeline::speak_text_async(const std::string& text) {
         if (!cancelled_ref.load()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(TTS_COOLDOWN_MS));
 
-            // Lock mutex to ensure state_ write is visible on ARM (Raspberry Pi).
-            // Without this, the capture thread may never see the transition from
-            // SPEAKING back to WAITING_FOR_WAKE_WORD due to weak memory ordering.
+            // state_ is std::atomic so the write is inherently visible across threads
+            // (including ARM weak memory ordering on Raspberry Pi).
             {
-                std::lock_guard<std::mutex> lock(impl_->mutex);
                 state_ = wakeword_enabled ? PipelineState::WAITING_FOR_WAKE_WORD : PipelineState::LISTENING;
                 // Do NOT reset the wake word model here. During normal TTS completion,
                 // the 200ms cooldown gap is sufficient for echo to clear. Resetting

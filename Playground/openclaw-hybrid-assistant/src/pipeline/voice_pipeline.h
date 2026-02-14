@@ -6,7 +6,7 @@
 // Simplified pipeline - NO LLM:
 // - Wake Word Detection (openWakeWord)
 // - Voice Activity Detection (Silero VAD)
-// - Speech-to-Text (Whisper)
+// - Speech-to-Text (Parakeet TDT-CTC / NeMo CTC)
 // - Text-to-Speech (Piper)
 //
 // ASR results are sent to OpenClaw via callback (fire-and-forget).
@@ -107,7 +107,7 @@ public:
     bool is_speaking() const;
 
     // State
-    PipelineState state() const { return state_; }
+    PipelineState state() const { return state_.load(); }
     std::string state_string() const;
 
     // Configuration
@@ -126,10 +126,10 @@ private:
     std::unique_ptr<Impl> impl_;
 
     VoicePipelineConfig config_;
-    PipelineState state_ = PipelineState::NOT_INITIALIZED;
+    std::atomic<PipelineState> state_{PipelineState::NOT_INITIALIZED};
     std::string last_error_;
-    bool initialized_ = false;
-    bool running_ = false;
+    std::atomic<bool> initialized_{false};
+    std::atomic<bool> running_{false};
 
     // Async TTS state
     struct AsyncTTSState;

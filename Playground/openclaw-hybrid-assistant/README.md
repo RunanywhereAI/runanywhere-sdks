@@ -7,7 +7,7 @@ A lightweight voice assistant that acts as a **channel** for OpenClaw. No local 
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                        OpenClaw Hybrid Assistant                             │
 │                                                                              │
@@ -29,7 +29,7 @@ A lightweight voice assistant that acts as a **channel** for OpenClaw. No local 
 
 ## Project Structure
 
-```
+```text
 openclaw-hybrid-assistant/
 ├── src/
 │   ├── main.cpp                          # Entry point, CLI parsing, event loop
@@ -148,7 +148,7 @@ Generated automatically by `./scripts/download-models.sh` (requires `sox`).
 ## OpenClaw WebSocket Protocol
 
 ### Connection
-```
+```text
 ws://openclaw-host:8082
 ```
 

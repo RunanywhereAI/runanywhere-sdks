@@ -2,10 +2,10 @@
 Description=OpenClaw Voice Assistant (Wake Word + STT + TTS)
 After=openclaw-gateway.service
 BindsTo=openclaw-gateway.service
-# Wait for gateway WebSocket (port 8082) to be ready
-ExecStartPre=/bin/sleep 5
 
 [Service]
+# Wait for gateway WebSocket (port 8082) to be ready
+ExecStartPre=/bin/sleep 5
 ExecStart=/home/runanywhere/runanywhere-sdks/Playground/openclaw-hybrid-assistant/build/openclaw-assistant --wakeword --url ws://localhost:8082
 Restart=always
 RestartSec=3

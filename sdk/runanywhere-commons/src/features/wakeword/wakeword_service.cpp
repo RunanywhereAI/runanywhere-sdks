@@ -439,7 +439,7 @@ RAC_API rac_result_t rac_wakeword_process(rac_handle_t handle,
         return RAC_SUCCESS;
     }
 
-    std::lock_guard<std::mutex> lock(service->mutex);
+    std::unique_lock<std::mutex> lock(service->mutex);
 
     // Accumulate samples
     service->audio_buffer.insert(service->audio_buffer.end(),
@@ -482,11 +482,9 @@ RAC_API rac_result_t rac_wakeword_process(rac_handle_t handle,
             // vad_speech = rac_wakeword_onnx_vad_process(...)
         }
 
-        // Invoke VAD callback
-        if (service->vad_callback) {
-            service->vad_callback(vad_speech ? RAC_TRUE : RAC_FALSE,
-                                   vad_prob, service->vad_user_data);
-        }
+        // Copy VAD callback under lock to invoke outside lock (avoid deadlock)
+        auto vad_cb = service->vad_callback;
+        auto vad_ud = service->vad_user_data;
 
         // Only run wake word detection if VAD detects speech
         if (!service->config.use_vad_filter || vad_speech) {
@@ -500,7 +498,12 @@ RAC_API rac_result_t rac_wakeword_process(rac_handle_t handle,
             out_result->vad_is_speech = vad_speech ? RAC_TRUE : RAC_FALSE;
         }
 
-        // Check for detection with debouncing
+        // Prepare detection callback data under lock (if detection occurred)
+        rac_wakeword_callback_fn det_cb = nullptr;
+        void* det_ud = nullptr;
+        rac_wakeword_event_t event = {};
+        bool should_invoke_detection = false;
+
         if (detected && keyword_index >= 0) {
             int64_t now = get_timestamp_ms();
             int64_t elapsed = now - service->last_detection_time;
@@ -515,22 +518,39 @@ RAC_API rac_result_t rac_wakeword_process(rac_handle_t handle,
                     out_result->confidence = confidence;
                 }
 
-                // Invoke callback
                 if (service->detection_callback && keyword_index < (int32_t)service->models.size()) {
-                    rac_wakeword_event_t event = {};
+                    det_cb = service->detection_callback;
+                    det_ud = service->detection_user_data;
                     event.keyword_index = keyword_index;
                     event.keyword_name = service->models[keyword_index].wake_word.c_str();
                     event.model_id = service->models[keyword_index].model_id.c_str();
                     event.confidence = confidence;
                     event.timestamp_ms = now - service->stream_start_time;
                     event.duration_ms = service->config.frame_length_ms;
-
-                    service->detection_callback(&event, service->detection_user_data);
+                    should_invoke_detection = true;
                 }
-
-                // Only report first detection per process call
-                break;
             }
+        }
+
+        // Release lock before invoking callbacks to avoid deadlock
+        lock.unlock();
+
+        // Invoke VAD callback outside lock
+        if (vad_cb) {
+            vad_cb(vad_speech ? RAC_TRUE : RAC_FALSE, vad_prob, vad_ud);
+        }
+
+        // Invoke detection callback outside lock
+        if (should_invoke_detection && det_cb) {
+            det_cb(&event, det_ud);
+        }
+
+        // Re-acquire lock for next iteration
+        lock.lock();
+
+        // If we had a detection, only report first per process call
+        if (should_invoke_detection) {
+            break;
         }
     }
 

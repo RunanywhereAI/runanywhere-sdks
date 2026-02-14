@@ -51,6 +51,12 @@ bool AudioPlayback::initialize() {
         return false;
     }
 
+    // Close handle on failure to avoid resource leak
+    auto cleanup_handle = [this]() {
+        snd_pcm_close(impl_->pcm_handle);
+        impl_->pcm_handle = nullptr;
+    };
+
     // Set hardware parameters
     snd_pcm_hw_params_t* hw_params;
     snd_pcm_hw_params_alloca(&hw_params);
@@ -61,6 +67,7 @@ bool AudioPlayback::initialize() {
                                         SND_PCM_ACCESS_RW_INTERLEAVED);
     if (err < 0) {
         last_error_ = std::string("Cannot set access type: ") + snd_strerror(err);
+        cleanup_handle();
         return false;
     }
 
@@ -69,6 +76,7 @@ bool AudioPlayback::initialize() {
                                         SND_PCM_FORMAT_S16_LE);
     if (err < 0) {
         last_error_ = std::string("Cannot set sample format: ") + snd_strerror(err);
+        cleanup_handle();
         return false;
     }
 
@@ -78,6 +86,7 @@ bool AudioPlayback::initialize() {
                                            &rate, nullptr);
     if (err < 0) {
         last_error_ = std::string("Cannot set sample rate: ") + snd_strerror(err);
+        cleanup_handle();
         return false;
     }
     config_.sample_rate = rate;
@@ -87,6 +96,7 @@ bool AudioPlayback::initialize() {
                                           config_.channels);
     if (err < 0) {
         last_error_ = std::string("Cannot set channels: ") + snd_strerror(err);
+        cleanup_handle();
         return false;
     }
 
@@ -96,6 +106,7 @@ bool AudioPlayback::initialize() {
                                                   &buffer_size);
     if (err < 0) {
         last_error_ = std::string("Cannot set buffer size: ") + snd_strerror(err);
+        cleanup_handle();
         return false;
     }
     config_.buffer_frames = buffer_size;
@@ -106,6 +117,7 @@ bool AudioPlayback::initialize() {
                                                   &period_size, nullptr);
     if (err < 0) {
         last_error_ = std::string("Cannot set period size: ") + snd_strerror(err);
+        cleanup_handle();
         return false;
     }
     config_.period_frames = period_size;
@@ -114,6 +126,7 @@ bool AudioPlayback::initialize() {
     err = snd_pcm_hw_params(impl_->pcm_handle, hw_params);
     if (err < 0) {
         last_error_ = std::string("Cannot set hardware parameters: ") + snd_strerror(err);
+        cleanup_handle();
         return false;
     }
 
@@ -121,6 +134,7 @@ bool AudioPlayback::initialize() {
     err = snd_pcm_prepare(impl_->pcm_handle);
     if (err < 0) {
         last_error_ = std::string("Cannot prepare device: ") + snd_strerror(err);
+        cleanup_handle();
         return false;
     }
 

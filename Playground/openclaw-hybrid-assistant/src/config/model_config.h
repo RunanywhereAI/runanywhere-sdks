@@ -130,8 +130,9 @@ constexpr size_t NUM_WAKEWORD_MODELS = sizeof(WAKEWORD_MODELS) / sizeof(WAKEWORD
 
 inline std::string get_base_dir() {
     const char* home = getenv("HOME");
-    if (!home) {
-        home = "/tmp";
+    if (!home || home[0] == '\0') {
+        fprintf(stderr, "ERROR: HOME environment variable is not set\n");
+        return "";
     }
     return std::string(home) + "/.local/share/runanywhere";
 }
@@ -158,7 +159,7 @@ inline std::string get_model_path(const ModelConfig& model) {
     const char* framework_dir = get_framework_subdir(model.framework);
 
     std::string path = base_dir + "/Models/" + framework_dir + "/" + model.id;
-    if (model.filename[0] != '\0') {
+    if (model.filename && model.filename[0] != '\0') {
         path += "/";
         path += model.filename;
     }
@@ -201,8 +202,19 @@ inline std::string get_earcon_path() {
 
 inline bool is_model_available(const ModelConfig& model) {
     std::string path = get_model_path(model);
+    if (path.empty()) return false;
     struct stat st;
-    return stat(path.c_str(), &st) == 0;
+    if (stat(path.c_str(), &st) != 0) return false;
+
+    // If path is a directory (model with empty filename), verify required files exist
+    if (S_ISDIR(st.st_mode)) {
+        // Check for at least a tokens file (common to all ONNX models)
+        std::string tokens_path = path + "/tokens.txt";
+        struct stat tokens_st;
+        return stat(tokens_path.c_str(), &tokens_st) == 0;
+    }
+
+    return true;  // File exists
 }
 
 inline bool are_all_models_available() {

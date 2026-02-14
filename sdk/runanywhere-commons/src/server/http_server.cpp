@@ -321,13 +321,19 @@ void HttpServer::unloadModel() {
 void HttpServer::serverThread() {
     RAC_LOG_DEBUG("Server", "Server thread starting on %s:%d", host_.c_str(), config_.port);
 
-    // Mark as running before listen() to signal startup
+    // Bind first, then signal running, then start accepting
+    if (!server_->bind_to_port(host_, config_.port)) {
+        RAC_LOG_ERROR("Server", "Failed to bind to %s:%d", host_.c_str(), config_.port);
+        running_ = false;
+        return;
+    }
+
     running_ = true;
 
-    // Listen (blocking)
-    if (!server_->listen(host_.c_str(), config_.port)) {
+    // Listen (blocking) - port is already bound
+    if (!server_->listen_after_bind()) {
         if (!shouldStop_) {
-            RAC_LOG_ERROR("Server", "Failed to bind to %s:%d", host_.c_str(), config_.port);
+            RAC_LOG_ERROR("Server", "Listen failed on %s:%d", host_.c_str(), config_.port);
         }
     }
 

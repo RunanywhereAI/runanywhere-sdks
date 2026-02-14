@@ -23,9 +23,9 @@ namespace {
 
 // Generate a random ID for requests
 std::string generateId(const std::string& prefix) {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    static std::uniform_int_distribution<uint64_t> dis;
+    thread_local std::random_device rd;
+    thread_local std::mt19937 gen(rd());
+    thread_local std::uniform_int_distribution<uint64_t> dis;
 
     std::ostringstream ss;
     ss << prefix << std::hex << dis(gen);
@@ -133,11 +133,11 @@ void OpenAIHandler::processNonStreaming(const httplib::Request& /*req*/,
     RAC_LOG_INFO("Server", "processNonStreaming: prompt built, length=%zu", prompt.length());
 
     // DEBUG: Log the messages JSON and built prompt
-    RAC_LOG_INFO("Server", "=== REQUEST MESSAGES JSON ===");
-    RAC_LOG_INFO("Server", "%s", messages.dump(2).c_str());
-    RAC_LOG_INFO("Server", "=== BUILT PROMPT (first 2000 chars) ===");
-    RAC_LOG_INFO("Server", "%s", prompt.substr(0, 2000).c_str());
-    RAC_LOG_INFO("Server", "=== END PROMPT ===");
+    RAC_LOG_DEBUG("Server", "=== REQUEST MESSAGES JSON ===");
+    RAC_LOG_DEBUG("Server", "%s", messages.dump(2).c_str());
+    RAC_LOG_DEBUG("Server", "=== BUILT PROMPT (first 2000 chars) ===");
+    RAC_LOG_DEBUG("Server", "%s", prompt.substr(0, 2000).c_str());
+    RAC_LOG_DEBUG("Server", "=== END PROMPT ===");
 
     // Parse LLM options
     rac_llm_options_t options = parseOptions(requestJson);
@@ -253,39 +253,17 @@ void OpenAIHandler::processStreaming(const httplib::Request& /*req*/,
     res.set_header("Cache-Control", "no-cache");
     res.set_header("Connection", "keep-alive");
 
-    // Track token count
-    std::atomic<int32_t> tokenCount{0};
-
-    // Streaming callback
-    struct CallbackData {
-        httplib::Response* res;
-        std::string* requestId;
-        std::string* modelId;
-        int64_t created;
-        std::atomic<int32_t>* tokenCount;
-        bool firstToken;
-    };
-
-    CallbackData cbData = {
-        &res,
-        &requestId,
-        &modelId_,
-        created,
-        &tokenCount,
-        true
-    };
-
-    // Start streaming
+    // Start streaming via content provider
     res.set_content_provider(
         "text/event-stream",
-        [this, prompt, options, cbData](size_t /*offset*/, httplib::DataSink& sink) mutable {
+        [this, prompt, options, requestId, created](size_t /*offset*/, httplib::DataSink& sink) mutable {
             // First chunk: send role
-            if (cbData.firstToken) {
+            {
                 rac_openai_stream_chunk_t chunk = {};
-                chunk.id = cbData.requestId->c_str();
+                chunk.id = requestId.c_str();
                 chunk.object = "chat.completion.chunk";
-                chunk.created = cbData.created;
-                chunk.model = cbData.modelId->c_str();
+                chunk.created = created;
+                chunk.model = modelId_.c_str();
 
                 rac_openai_delta_t delta = {};
                 delta.role = "assistant";
@@ -301,54 +279,82 @@ void OpenAIHandler::processStreaming(const httplib::Request& /*req*/,
 
                 std::string sseData = json::formatSSE(json::serializeStreamChunk(chunk));
                 sink.write(sseData.c_str(), sseData.size());
-
-                cbData.firstToken = false;
             }
 
-            // Note: For a full implementation, we'd use rac_llm_llamacpp_generate_stream
-            // For now, use non-streaming and send all at once
-            rac_llm_result_t result = {};
-            rac_result_t rc = rac_llm_llamacpp_generate(llmHandle_, prompt.c_str(), &options, &result);
+            // Stream tokens incrementally via rac_llm_llamacpp_generate_stream
+            struct StreamCtx {
+                httplib::DataSink* sink;
+                const std::string* requestId;
+                const std::string* modelId;
+                int64_t created;
+                int32_t tokenCount;
+            };
 
-            if (RAC_SUCCEEDED(rc) && result.text) {
-                // Send the content
-                rac_openai_stream_chunk_t chunk = {};
-                chunk.id = cbData.requestId->c_str();
-                chunk.object = "chat.completion.chunk";
-                chunk.created = cbData.created;
-                chunk.model = cbData.modelId->c_str();
+            StreamCtx ctx = { &sink, &requestId, &modelId_, created, 0 };
 
-                rac_openai_delta_t delta = {};
-                delta.role = nullptr;
-                delta.content = result.text;
+            auto streamCallback = [](const char* token, rac_bool_t is_final, void* user_data) -> rac_bool_t {
+                auto* ctx = static_cast<StreamCtx*>(user_data);
 
-                rac_openai_stream_choice_t choice = {};
-                choice.index = 0;
-                choice.delta = delta;
-                choice.finish_reason = RAC_OPENAI_FINISH_NONE;
+                if (is_final) {
+                    // Send finish chunk
+                    rac_openai_stream_chunk_t chunk = {};
+                    chunk.id = ctx->requestId->c_str();
+                    chunk.object = "chat.completion.chunk";
+                    chunk.created = ctx->created;
+                    chunk.model = ctx->modelId->c_str();
 
-                chunk.choices = &choice;
-                chunk.num_choices = 1;
+                    rac_openai_delta_t delta = {};
+                    delta.role = nullptr;
+                    delta.content = nullptr;
 
-                std::string sseData = json::formatSSE(json::serializeStreamChunk(chunk));
-                sink.write(sseData.c_str(), sseData.size());
+                    rac_openai_stream_choice_t choice = {};
+                    choice.index = 0;
+                    choice.delta = delta;
+                    choice.finish_reason = RAC_OPENAI_FINISH_STOP;
 
-                // Send finish chunk
-                delta.content = nullptr;
-                choice.delta = delta;
-                choice.finish_reason = RAC_OPENAI_FINISH_STOP;
-                chunk.choices = &choice;
+                    chunk.choices = &choice;
+                    chunk.num_choices = 1;
 
-                sseData = json::formatSSE(json::serializeStreamChunk(chunk));
-                sink.write(sseData.c_str(), sseData.size());
+                    std::string sseData = json::formatSSE(json::serializeStreamChunk(chunk));
+                    ctx->sink->write(sseData.c_str(), sseData.size());
+                } else if (token && token[0] != '\0') {
+                    // Send content chunk with this token
+                    rac_openai_stream_chunk_t chunk = {};
+                    chunk.id = ctx->requestId->c_str();
+                    chunk.object = "chat.completion.chunk";
+                    chunk.created = ctx->created;
+                    chunk.model = ctx->modelId->c_str();
 
-                *cbData.tokenCount += result.completion_tokens;
-                totalTokensGenerated_ += result.completion_tokens;
+                    rac_openai_delta_t delta = {};
+                    delta.role = nullptr;
+                    delta.content = token;
 
-                rac_llm_result_free(&result);
+                    rac_openai_stream_choice_t choice = {};
+                    choice.index = 0;
+                    choice.delta = delta;
+                    choice.finish_reason = RAC_OPENAI_FINISH_NONE;
+
+                    chunk.choices = &choice;
+                    chunk.num_choices = 1;
+
+                    std::string sseData = json::formatSSE(json::serializeStreamChunk(chunk));
+                    ctx->sink->write(sseData.c_str(), sseData.size());
+                    ctx->tokenCount++;
+                }
+
+                return RAC_TRUE;  // Continue generating
+            };
+
+            rac_result_t rc = rac_llm_llamacpp_generate_stream(
+                llmHandle_, prompt.c_str(), &options, streamCallback, &ctx);
+
+            if (RAC_FAILED(rc)) {
+                RAC_LOG_ERROR("Server", "Streaming generation failed: %d", rc);
             }
 
-            // Send done
+            totalTokensGenerated_ += ctx.tokenCount;
+
+            // Send [DONE]
             std::string doneData = json::formatSSEDone();
             sink.write(doneData.c_str(), doneData.size());
 
