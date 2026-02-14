@@ -7,7 +7,20 @@ Interactive demo projects showcasing what you can build with RunAnywhere.
 | [swift-starter-app](swift-starter-app/) | Privacy-first AI demo — LLM Chat, Speech-to-Text, Text-to-Speech, and Voice Pipeline with VAD | iOS (Swift/SwiftUI) |
 | [on-device-browser-agent](on-device-browser-agent/) | On-device AI browser automation using WebLLM — no cloud, no API keys, fully private | Chrome Extension (TypeScript/React) |
 | [android-use-agent](android-use-agent/) | Autonomous Android agent — navigates phone UI via accessibility + GPT-4o Vision + on-device LLM fallback | Android (Kotlin/Jetpack Compose) |
+| [linux-voice-assistant](linux-voice-assistant/) | Fully on-device voice assistant — Wake Word, VAD, STT, LLM, and TTS with zero cloud dependency | Linux (C++/ALSA) |
 | [openclaw-hybrid-assistant](openclaw-hybrid-assistant/) | Hybrid voice assistant — on-device Wake Word, VAD, STT, and TTS with cloud LLM via OpenClaw WebSocket | Linux (C++/ALSA) |
+
+## linux-voice-assistant
+
+A complete on-device voice AI pipeline for Linux (Raspberry Pi 5, x86_64, ARM64). All inference runs locally — no cloud, no API keys:
+
+- **Wake Word Detection** — "Hey Jarvis" activation using openWakeWord (ONNX)
+- **Voice Activity Detection** — Silero VAD with silence timeout
+- **Speech-to-Text** — Whisper Tiny EN via Sherpa-ONNX
+- **Large Language Model** — Qwen2.5 0.5B Q4 via llama.cpp (fully local)
+- **Text-to-Speech** — Piper Lessac Medium neural TTS
+
+**Requirements:** Linux (ALSA), x86_64 or ARM64, CMake 3.16+, C++17
 
 ## swift-starter-app
 
