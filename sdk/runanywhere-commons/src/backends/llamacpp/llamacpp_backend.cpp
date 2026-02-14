@@ -45,7 +45,7 @@ struct Utf8State {
         state = utf8d[256 + state * 16 + type];
         return (state == 0);
     }
-    
+
     void reset() { state = 0; }
 };
 
@@ -195,15 +195,15 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     model_path_ = model_path;
 
     llama_model_params model_params = llama_model_default_params();
-    
+
     // Detect model size from filename to set appropriate GPU layers BEFORE loading
     // This prevents OOM crashes on mobile devices with limited GPU memory
     // Note: We use filename heuristics here because we can't know param count until after loading
     std::string path_lower = model_path;
     std::transform(path_lower.begin(), path_lower.end(), path_lower.begin(), ::tolower);
-    
+
     int gpu_layers = -1;  // Default: all layers to GPU
-    
+
     // Check for large model indicators in filename using word boundary detection
     // Patterns like "7b", "8b", "13b" should match at word boundaries to avoid
     // false positives like "/backup7b/" or "/2017beta/"
@@ -214,9 +214,9 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
             bool valid_start = (pos == 0) || !std::isalnum(path_lower[pos - 1]);
             // Check for word boundary after (end of string, or non-alphanumeric except digits for patterns like "7b-q4")
             size_t end_pos = pos + strlen(marker);
-            bool valid_end = (end_pos >= path_lower.size()) || 
+            bool valid_end = (end_pos >= path_lower.size()) ||
                             (!std::isalpha(path_lower[end_pos]) || path_lower[end_pos] == '-' || path_lower[end_pos] == '_');
-            
+
             if (valid_start && valid_end) {
                 return true;
             }
@@ -224,7 +224,7 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
         }
         return false;
     };
-    
+
     // Detect large models (7B+) that may need GPU layer limiting on mobile
     // First check for config-based override (for custom-named models)
     bool is_large_model = false;
@@ -235,7 +235,7 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
             LOGI("Large model detected from config (%.1fB expected params)", expected_params);
         }
     }
-    
+
     // Fall back to filename heuristics if no config provided
     if (!is_large_model) {
         is_large_model = is_model_size_marker("7b") ||
@@ -244,23 +244,23 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
                          is_model_size_marker("13b") ||
                          is_model_size_marker("70b");
     }
-    
+
     if (is_large_model) {
         // For 7B+ models on mobile: limit GPU layers to prevent OOM
         // Most 7B models have 32 layers, offload ~24 to GPU, rest to CPU
         gpu_layers = 24;
         LOGI("Large model detected, limiting GPU layers to %d to prevent OOM", gpu_layers);
     }
-    
+
     // Allow user override via config
     if (config.contains("gpu_layers")) {
         gpu_layers = config["gpu_layers"].get<int>();
         LOGI("Using user-provided GPU layers: %d", gpu_layers);
     }
-    
+
     model_params.n_gpu_layers = gpu_layers;
     LOGI("Loading model with n_gpu_layers=%d", gpu_layers);
-    
+
     model_ = llama_model_load_from_file(model_path.c_str(), model_params);
 
     if (!model_) {
@@ -276,7 +276,7 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     uint64_t n_params = llama_model_n_params(model_);
     double params_billions = static_cast<double>(n_params) / 1e9;
     LOGI("Model parameters: %.2fB", params_billions);
-    
+
     // Post-load verification: warn if actual param count differs from filename heuristic
     bool actual_is_large = (params_billions >= 7.0);
     if (actual_is_large && !is_large_model) {
@@ -308,13 +308,14 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
              user_context_size, model_train_ctx);
     } else {
         context_size_ = std::min({model_train_ctx, max_default_context_, adaptive_max_context});
-        LOGI("Auto-detected context size: %d (model: %d, cap: %d, adaptive: %d)", context_size_, 
+        LOGI("Auto-detected context size: %d (model: %d, cap: %d, adaptive: %d)", context_size_,
              model_train_ctx, max_default_context_, adaptive_max_context);
     }
 
     llama_context_params ctx_params = llama_context_default_params();
     ctx_params.n_ctx = context_size_;
-    ctx_params.n_batch = std::min(context_size_, 512);
+    ctx_params.n_batch = context_size_;   // Allow processing full prompt at once
+    ctx_params.n_ubatch = context_size_;  // Physical batch size must also match
     ctx_params.n_threads = backend_->get_num_threads();
     ctx_params.n_threads_batch = backend_->get_num_threads();
     ctx_params.no_perf = true;
@@ -461,6 +462,9 @@ std::string LlamaCppTextGeneration::apply_chat_template(
 }
 
 TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationRequest& request) {
+    LOGI("generate() START: max_tokens=%d, temp=%.2f, prompt_len=%zu",
+         request.max_tokens, request.temperature, request.prompt.length());
+
     TextGenerationResult result;
     result.finish_reason = "error";
 
@@ -470,6 +474,7 @@ TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationReques
 
     auto start_time = std::chrono::high_resolution_clock::now();
 
+    LOGI("generate(): calling generate_stream...");
     bool success = generate_stream(
         request,
         [&](const std::string& token) -> bool {
@@ -478,6 +483,7 @@ TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationReques
             return !cancel_requested_.load();
         },
         &prompt_tokens);
+    LOGI("generate(): generate_stream returned success=%d, tokens=%d", success, tokens_generated);
 
     auto end_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -531,19 +537,24 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
     LOGI("Generation: prompt_tokens=%d, max_tokens=%d, context=%d",
          prompt_tokens, effective_max_tokens, n_ctx);
 
+    LOGI("generate_stream: creating batch with n_ctx=%d", n_ctx);
     llama_batch batch = llama_batch_init(n_ctx, 0, 1);
+    LOGI("generate_stream: batch created, adding %zu tokens", tokens_list.size());
 
     batch.n_tokens = 0;
     for (size_t i = 0; i < tokens_list.size(); i++) {
         common_batch_add(batch, tokens_list[i], i, {0}, false);
     }
     batch.logits[batch.n_tokens - 1] = true;
+    LOGI("generate_stream: tokens added, n_tokens=%d", batch.n_tokens);
 
+    LOGI("generate_stream: calling llama_decode...");
     if (llama_decode(context_, batch) != 0) {
         LOGE("llama_decode failed for prompt");
         llama_batch_free(batch);
         return false;
     }
+    LOGI("generate_stream: llama_decode succeeded");
 
     // Configure sampler with request parameters
     if (sampler_) {
@@ -577,9 +588,6 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
          request.temperature, request.top_p, request.top_k,
          request.max_tokens, effective_max_tokens, request.repetition_penalty,
          request.system_prompt.length());
-
-    // No need to reset as we just created it
-    // llama_sampler_reset(sampler_);
 
     const auto vocab = llama_model_get_vocab(model_);
 

@@ -288,7 +288,7 @@ sdk/runanywhere-kotlin/modules/runanywhere-llm-llamacpp/src/jvmMain/resources/na
 #    cp build/android/unified/arm64-v8a/librac_commons.so \
 #       ../runanywhere-react-native/packages/core/android/src/main/jniLibs/arm64-v8a/
 #
-#    # iOS  
+#    # iOS
 #    rm -rf ../runanywhere-react-native/packages/core/ios/Frameworks/RACommons.xcframework
 #    cp -R dist/RACommons.xcframework \
 #       ../runanywhere-react-native/packages/core/ios/Frameworks/
@@ -360,4 +360,8 @@ sdk/runanywhere-flutter/android/*.aar
 
 # React Native - Pre-built xcframeworks (build artifacts)
 sdk/runanywhere-react-native/packages/*/ios/xcframeworks/
-tools/
+
+
+# Node
+node_modules/
+/tools/
