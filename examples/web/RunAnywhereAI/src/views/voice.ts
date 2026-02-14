@@ -7,8 +7,8 @@
 
 import type { TabLifecycle } from '../app';
 import { showModelSelectionSheet } from '../components/model-selection';
-import { ModelManager, ModelCategory } from '../services/model-manager';
-import { AudioCapture } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
+import { ModelManager, ModelCategory, ensureVADLoaded } from '../services/model-manager';
+import { AudioCapture, VAD, SpeechActivity } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
 
 // Lazy-imported SDK modules (loaded only when pipeline runs)
 type SDKModules = typeof import('../../../../../sdk/runanywhere-web/packages/core/src/index');
@@ -41,15 +41,7 @@ const PIPELINE_STEPS: PipelineStep[] = [
   { modality: ModelCategory.SpeechSynthesis, elementId: 'voice-setup-tts', title: 'Text-to-Speech', defaultStatus: 'Select TTS model' },
 ];
 
-// ---------------------------------------------------------------------------
-// VAD Configuration (matches iOS VoiceSessionConfig defaults)
-// ---------------------------------------------------------------------------
-
-/** Audio level threshold (0–1) to detect speech */
-const SPEECH_THRESHOLD = 0.08;
-/** Seconds of silence after speech before auto-processing */
-const SILENCE_DURATION = 1.5;
-/** Minimum audio buffer (samples at 16kHz) to process — ~0.5s */
+// Minimum audio segment (samples at 16kHz) to process — ~0.5s
 const MIN_AUDIO_SAMPLES = 8000;
 
 // ---------------------------------------------------------------------------
@@ -68,11 +60,10 @@ let particles: Particle[] = [];
 let sessionActive = false;
 /** Cancel function for in-progress LLM generation */
 let cancelGeneration: (() => void) | null = null;
-/** VAD state */
-let isSpeechActive = false;
-let lastSpeechTime: number | null = null;
-/** VAD polling interval */
-let vadInterval: ReturnType<typeof setInterval> | null = null;
+/** Whether SDK VAD is actively monitoring audio. */
+let vadActive = false;
+/** Unsubscribe function for VAD speech activity callback. */
+let unsubscribeVAD: (() => void) | null = null;
 
 interface Particle {
   x: number; y: number;
@@ -326,27 +317,35 @@ function stopSession(): void {
     cancelGeneration();
     cancelGeneration = null;
   }
-  stopVAD();
+  stopVoiceVAD();
   if (micCapture.isCapturing) micCapture.stop();
+  VAD.reset();
   setMicActive(false);
   stopParticles();
   state = 'idle';
   setStatus('Tap to speak');
 }
 
-/** Begin capturing audio and monitoring with VAD */
+/** Begin capturing audio and monitoring with SDK VAD */
 async function startListening(): Promise<void> {
   if (!sessionActive) return;
 
   state = 'listening';
-  isSpeechActive = false;
-  lastSpeechTime = null;
   setStatus('Listening...');
 
+  // Ensure Silero VAD model is loaded (auto-downloads, ~5MB)
+  const vadReady = await ensureVADLoaded();
+  if (!vadReady) {
+    setStatus('Failed to load VAD model');
+    stopSession();
+    return;
+  }
+  VAD.reset();
+
   try {
-    await micCapture.start(undefined, (level) => updateParticles(level));
+    await micCapture.start(onVoiceChunk, (level) => updateParticles(level));
     startParticles();
-    startVAD();
+    startVoiceVAD();
   } catch {
     setStatus('Microphone access denied');
     stopSession();
@@ -354,47 +353,47 @@ async function startListening(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// VAD — energy-threshold voice activity detection (matches iOS)
+// VAD — SDK Silero VAD (replaces energy-threshold approach)
 // ---------------------------------------------------------------------------
 
-function startVAD(): void {
-  stopVAD();
-  vadInterval = setInterval(() => checkSpeechState(micCapture.currentLevel), 50);
+/** AudioCapture onChunk callback — feeds audio to SDK VAD. */
+function onVoiceChunk(samples: Float32Array): void {
+  if (!vadActive || state !== 'listening') return;
+  VAD.processSamples(samples);
 }
 
-function stopVAD(): void {
-  if (vadInterval) {
-    clearInterval(vadInterval);
-    vadInterval = null;
-  }
-}
+function startVoiceVAD(): void {
+  stopVoiceVAD();
+  vadActive = true;
 
-function checkSpeechState(level: number): void {
-  if (!sessionActive || state !== 'listening') return;
+  // Subscribe to speech activity events from the SDK VAD
+  unsubscribeVAD = VAD.onSpeechActivity((activity) => {
+    if (!sessionActive || state !== 'listening') return;
 
-  if (level > SPEECH_THRESHOLD) {
-    if (!isSpeechActive) {
-      console.log('[Voice] Speech started');
-      isSpeechActive = true;
-    }
-    lastSpeechTime = Date.now();
-  } else if (isSpeechActive && lastSpeechTime) {
-    const silenceMs = Date.now() - lastSpeechTime;
-    if (silenceMs > SILENCE_DURATION * 1000) {
-      console.log(`[Voice] Silence detected (${(silenceMs / 1000).toFixed(1)}s)`);
-      isSpeechActive = false;
+    if (activity === SpeechActivity.Started) {
+      console.log('[Voice] Speech started (Silero)');
+    } else if (activity === SpeechActivity.Ended) {
+      console.log('[Voice] Speech ended (Silero)');
 
-      // Drain audio and process if we have enough data
-      const audioData = micCapture.drainBuffer();
-      if (audioData.length >= MIN_AUDIO_SAMPLES) {
+      // Pop the completed speech segment
+      const segment = VAD.popSpeechSegment();
+      if (segment && segment.samples.length >= MIN_AUDIO_SAMPLES) {
+        console.log(`[Voice] Processing segment: ${segment.samples.length} samples (${(segment.samples.length / 16000).toFixed(1)}s)`);
         // Stop mic during processing (will restart after TTS)
-        stopVAD();
+        stopVoiceVAD();
         micCapture.stop();
         stopParticles();
-        runPipeline(audioData);
+        runPipeline(segment.samples);
       }
     }
-  }
+  });
+
+  console.log('[Voice] Started SDK VAD monitoring');
+}
+
+function stopVoiceVAD(): void {
+  vadActive = false;
+  if (unsubscribeVAD) { unsubscribeVAD(); unsubscribeVAD = null; }
 }
 
 // ---------------------------------------------------------------------------

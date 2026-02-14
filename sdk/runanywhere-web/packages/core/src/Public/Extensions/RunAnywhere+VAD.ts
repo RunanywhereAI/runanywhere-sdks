@@ -27,6 +27,9 @@ import { SDKEventType } from '../../types/enums';
 import { SpeechActivity } from './VADTypes';
 import type { SpeechActivityCallback, VADModelConfig, SpeechSegment } from './VADTypes';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+import { initSherpaOnnxVadModelConfig, freeConfig } from '../../../wasm/sherpa/sherpa-onnx-vad.js';
+
 export { SpeechActivity } from './VADTypes';
 export type { SpeechActivityCallback, VADModelConfig, SpeechSegment } from './VADTypes';
 
@@ -66,28 +69,41 @@ export const VAD = {
     });
 
     const startMs = performance.now();
-
-    // Build config JSON for sherpa-onnx VAD
-    const configJson = JSON.stringify({
-      'silero-vad': {
-        'model': config.modelPath,
-        'threshold': config.threshold ?? 0.5,
-        'min-silence-duration': config.minSilenceDuration ?? 0.5,
-        'min-speech-duration': config.minSpeechDuration ?? 0.25,
-        'max-speech-duration': config.maxSpeechDuration ?? 5.0,
-        'window-size': config.windowSize ?? 512,
-      },
-      'sample-rate': _sampleRate,
-      'num-threads': 1,
-      'provider': 'cpu',
-      'debug': 0,
-    });
-
-    const configPtr = sherpa.allocString(configJson);
     const bufferSizeInSeconds = 30; // 30 second circular buffer
 
+    // Build the struct-based config matching sherpa-onnx C API layout.
+    // Uses initSherpaOnnxVadModelConfig from sherpa-onnx-vad.js which
+    // allocates a C struct in WASM memory (not JSON).
+    const configObj = {
+      sileroVad: {
+        model: config.modelPath,
+        threshold: config.threshold ?? 0.5,
+        minSilenceDuration: config.minSilenceDuration ?? 0.5,
+        minSpeechDuration: config.minSpeechDuration ?? 0.25,
+        maxSpeechDuration: config.maxSpeechDuration ?? 5.0,
+        windowSize: config.windowSize ?? 512,
+      },
+      tenVad: {
+        model: '',
+        threshold: 0.5,
+        minSilenceDuration: 0.5,
+        minSpeechDuration: 0.25,
+        maxSpeechDuration: 20,
+        windowSize: 256,
+      },
+      sampleRate: _sampleRate,
+      numThreads: 1,
+      provider: 'cpu',
+      debug: 0,
+    };
+
+    const configStruct = initSherpaOnnxVadModelConfig(configObj, m);
+
     try {
-      _vadHandle = m._SherpaOnnxCreateVoiceActivityDetector(configPtr as unknown as number, bufferSizeInSeconds);
+      _vadHandle = m._SherpaOnnxCreateVoiceActivityDetector(
+        configStruct.ptr, bufferSizeInSeconds
+      );
+      freeConfig(configStruct, m);
 
       if (_vadHandle === 0) {
         throw new SDKError(SDKErrorCode.ModelLoadFailed, 'Failed to create VAD from Silero model');
@@ -101,8 +117,6 @@ export const VAD = {
     } catch (error) {
       VAD.cleanup();
       throw error;
-    } finally {
-      sherpa.free(configPtr);
     }
   },
 
@@ -188,12 +202,13 @@ export const VAD = {
     const segmentPtr = m._SherpaOnnxVoiceActivityDetectorFront(_vadHandle);
     if (segmentPtr === 0) return null;
 
-    // Read segment struct: { float start; int32_t n; const float* samples; }
-    const startTime = m.getValue(segmentPtr, 'float');
-    const numSamples = m.getValue(segmentPtr + 4, 'i32');
-    const samplesPtr = m.getValue(segmentPtr + 8, '*');
+    // Read segment struct: { int32_t start; const float* samples; int32_t n; }
+    // (matches sherpa-onnx-vad.js Vad.front() layout)
+    const startTime = m.HEAP32[segmentPtr / 4];
+    const samplesPtr = m.HEAP32[segmentPtr / 4 + 1];
+    const numSamples = m.HEAP32[segmentPtr / 4 + 2];
 
-    // Copy samples
+    // Copy samples from WASM heap
     const samples = new Float32Array(numSamples);
     if (samplesPtr && numSamples > 0) {
       samples.set(m.HEAPF32.subarray(samplesPtr / 4, samplesPtr / 4 + numSamples));
