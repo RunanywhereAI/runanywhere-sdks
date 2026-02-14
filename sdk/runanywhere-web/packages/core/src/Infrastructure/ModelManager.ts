@@ -16,6 +16,7 @@ import { EventBus } from '../Foundation/EventBus';
 import { TextGeneration } from '../Public/Extensions/RunAnywhere+TextGeneration';
 import { STT, STTModelType } from '../Public/Extensions/RunAnywhere+STT';
 import { TTS } from '../Public/Extensions/RunAnywhere+TTS';
+import { VAD } from '../Public/Extensions/RunAnywhere+VAD';
 import { ModelCategory, LLMFramework, ModelStatus, DownloadStage, SDKEventType } from '../types/enums';
 import { OPFSStorage } from './OPFSStorage';
 import { ModelRegistry } from './ModelRegistry';
@@ -260,6 +261,8 @@ class ModelManagerImpl {
           await this.loadSTTModel(model, data);
         } else if (model.modality === ModelCategory.SpeechSynthesis) {
           await this.loadTTSModel(model, data);
+        } else if (model.modality === ModelCategory.Audio) {
+          await this.loadVADModel(model, data);
         } else {
           await this.loadLLMModel(model, modelId, data);
         }
@@ -750,6 +753,25 @@ class ModelManagerImpl {
   }
 
   /**
+   * Load a VAD model (Silero) into the sherpa-onnx Emscripten FS.
+   * The Silero VAD is a single ONNX file — write it to FS and initialise.
+   */
+  private async loadVADModel(model: ManagedModel, data: Uint8Array): Promise<void> {
+    const sherpa = SherpaONNXBridge.shared;
+    await sherpa.ensureLoaded();
+
+    const modelDir = `/models/${model.id}`;
+    const filename = model.url?.split('/').pop() ?? 'silero_vad.onnx';
+    const fsPath = `${modelDir}/${filename}`;
+
+    console.log(`[ModelManager] Writing VAD model to ${fsPath} (${data.length} bytes)`);
+    sherpa.writeFile(fsPath, data);
+
+    await VAD.loadModel({ modelPath: fsPath });
+    console.log(`[ModelManager] VAD model loaded: ${model.id}`);
+  }
+
+  /**
    * Find the common directory prefix in archive entry paths.
    * Archives typically contain a single top-level directory (nested structure).
    * Returns the prefix including trailing '/', or empty string if no common prefix.
@@ -776,6 +798,8 @@ class ModelManagerImpl {
         await STT.unloadModel();
       } else if (category === ModelCategory.SpeechSynthesis) {
         await TTS.unloadVoice();
+      } else if (category === ModelCategory.Audio) {
+        VAD.cleanup();
       } else if (category === ModelCategory.Multimodal) {
         if (this.vlmLoader) {
           await this.vlmLoader.unloadModel();

@@ -179,6 +179,32 @@ const REGISTERED_MODELS: CompactModelDef[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// VAD Helper — auto-download + load on demand (5MB, fast)
+// ---------------------------------------------------------------------------
+
+/**
+ * Ensure the Silero VAD model is downloaded and loaded.
+ * Called transparently by views that need VAD (live transcription, voice assistant).
+ * Returns true if VAD is ready, false if no VAD model is registered.
+ */
+export async function ensureVADLoaded(): Promise<boolean> {
+  // Already loaded?
+  if (ModelManager.getLoadedModel(ModelCategory.Audio)) return true;
+
+  // Try ensureLoaded (loads an already-downloaded model)
+  const loaded = await ModelManager.ensureLoaded(ModelCategory.Audio);
+  if (loaded) return true;
+
+  // Not downloaded yet — find the VAD model and download + load it
+  const vadModel = ModelManager.getModels().find(m => m.modality === ModelCategory.Audio);
+  if (!vadModel) return false;
+
+  await ModelManager.downloadModel(vadModel.id);
+  await ModelManager.loadModel(vadModel.id);
+  return !!ModelManager.getLoadedModel(ModelCategory.Audio);
+}
+
+// ---------------------------------------------------------------------------
 // Register models and plug in VLM loader via RunAnywhere API
 // ---------------------------------------------------------------------------
 

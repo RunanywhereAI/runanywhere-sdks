@@ -4,8 +4,8 @@
  */
 
 import type { TabLifecycle } from '../app';
-import { AudioCapture } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
-import { ModelManager, ModelCategory, type ModelInfo } from '../services/model-manager';
+import { AudioCapture, VAD, SpeechActivity } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
+import { ModelManager, ModelCategory, ensureVADLoaded, type ModelInfo } from '../services/model-manager';
 import { showModelSelectionSheet } from '../components/model-selection';
 
 let container: HTMLElement;
@@ -24,13 +24,16 @@ let sttMode: STTMode = 'batch';
 let sttState: STTState = 'idle';
 let sttTranscription = '';
 let sttError = '';
-let liveVadTimer: ReturnType<typeof setInterval> | null = null;
-let isLiveTranscribing = false;
 
-// VAD thresholds (matching iOS defaults)
-const SPEECH_THRESHOLD = 0.02;
-const SILENCE_DURATION_MS = 1500;
-const MIN_BUFFER_BYTES = 16000; // ~0.5s at 16kHz float32
+/** Whether the SDK VAD is actively monitoring audio chunks. */
+let liveVadActive = false;
+/** Guard against concurrent live transcriptions. */
+let isLiveTranscribing = false;
+/** Unsubscribe function for VAD speech activity callback. */
+let unsubscribeVAD: (() => void) | null = null;
+
+// Minimum audio segment (samples at 16kHz) worth transcribing — ~0.5s
+const MIN_BUFFER_SAMPLES = 8000;
 
 // ---------------------------------------------------------------------------
 // Init
@@ -165,6 +168,7 @@ async function handleMicToggle(): Promise<void> {
   if (sttState === 'transcribing') return;
 
   if (sttState === 'recording') {
+    // ── Stop recording ──
     stopLiveVAD();
 
     if (sttMode === 'batch') {
@@ -173,13 +177,14 @@ async function handleMicToggle(): Promise<void> {
       renderSTTUI();
       await performBatchTranscription();
     } else {
-      // Live mode: transcribe any remaining audio if substantial enough
-      const remaining = micCapture.drainBuffer();
-      if (remaining.length >= MIN_BUFFER_BYTES) {
+      // Live mode: flush VAD to process any remaining audio
+      VAD.flush();
+      const finalSegment = VAD.popSpeechSegment();
+      if (finalSegment && finalSegment.samples.length >= MIN_BUFFER_SAMPLES) {
         sttState = 'transcribing';
         renderSTTUI();
         try {
-          const text = await transcribeAudio(remaining, micCapture.actualSampleRate);
+          const text = await transcribeAudio(finalSegment.samples, 16000);
           if (text && text.trim().length > 0) {
             sttTranscription += (sttTranscription.length > 0 ? '\n' : '') + text.trim();
           }
@@ -187,7 +192,7 @@ async function handleMicToggle(): Promise<void> {
           sttError = err instanceof Error ? err.message : String(err);
         }
       }
-      // If remaining audio is too short, skip silently (VAD already transcribed earlier segments)
+      VAD.reset();
     }
 
     micCapture.stop();
@@ -195,14 +200,35 @@ async function handleMicToggle(): Promise<void> {
     sttState = 'idle';
     renderSTTUI();
   } else {
+    // ── Start recording ──
     sttError = '';
     sttTranscription = '';
     isLiveTranscribing = false;
+
+    // For live mode, ensure the Silero VAD model is loaded (auto-downloads, ~5MB)
+    if (sttMode === 'live') {
+      const statusText = container.querySelector('#stt-status-text')!;
+      statusText.textContent = 'Loading VAD model...';
+      const vadReady = await ensureVADLoaded();
+      if (!vadReady) {
+        sttError = 'Failed to load VAD model.';
+        renderSTTUI();
+        return;
+      }
+      VAD.reset();
+    }
+
     try {
-      await micCapture.start(undefined, (level) => updateLevelBars(level));
+      if (sttMode === 'live') {
+        // Live mode: feed audio chunks to SDK VAD
+        await micCapture.start(onLiveChunk, (level) => updateLevelBars(level));
+        startLiveVAD();
+      } else {
+        // Batch mode: just accumulate audio
+        await micCapture.start(undefined, (level) => updateLevelBars(level));
+      }
       sttState = 'recording';
       renderSTTUI();
-      if (sttMode === 'live') startLiveVAD();
     } catch {
       sttError = 'Microphone access denied. Please allow microphone access.';
       renderSTTUI();
@@ -221,7 +247,7 @@ async function performBatchTranscription(): Promise<void> {
 
   console.log(`[Transcribe] Buffer: ${audioBuffer.length} samples, ${actualRate}Hz, ${durationSec.toFixed(1)}s`);
 
-  if (audioBuffer.length < MIN_BUFFER_BYTES) {
+  if (audioBuffer.length < MIN_BUFFER_SAMPLES) {
     sttError = 'Recording too short. Please speak longer.';
     return;
   }
@@ -256,65 +282,65 @@ async function transcribeAudio(pcmFloat32: Float32Array, sampleRate?: number): P
 }
 
 // ---------------------------------------------------------------------------
-// Live VAD
+// Live VAD (uses SDK Silero VAD)
 // ---------------------------------------------------------------------------
 
-function startLiveVAD(): void {
-  let speechDetected = false;
-  let silenceStart = 0;
+/** AudioCapture onChunk callback — feeds audio to the SDK VAD. */
+function onLiveChunk(samples: Float32Array): void {
+  if (!liveVadActive) return;
 
-  console.log('[LiveVAD] Started VAD monitoring');
+  VAD.processSamples(samples);
 
-  liveVadTimer = setInterval(async () => {
-    if (sttState !== 'recording' || !micCapture.isCapturing) { stopLiveVAD(); return; }
-
-    // Skip this tick if a previous transcription is still in progress
-    if (isLiveTranscribing) return;
-
-    const level = micCapture.currentLevel;
-    if (level >= SPEECH_THRESHOLD) {
-      if (!speechDetected) {
-        console.log('[LiveVAD] Speech started');
-      }
-      speechDetected = true;
-      silenceStart = 0;
-    } else if (speechDetected) {
-      if (silenceStart === 0) {
-        silenceStart = Date.now();
-      } else if (Date.now() - silenceStart >= SILENCE_DURATION_MS) {
-        console.log('[LiveVAD] Silence detected — triggering transcription');
-        speechDetected = false;
-        silenceStart = 0;
-
-        const segment = micCapture.drainBuffer();
-        if (segment.length >= MIN_BUFFER_BYTES) {
-          isLiveTranscribing = true;
-          try {
-            const durationSec = segment.length / micCapture.actualSampleRate;
-            console.log(`[LiveVAD] Transcribing segment: ${segment.length} samples (${durationSec.toFixed(1)}s)`);
-            const text = await transcribeAudio(segment, micCapture.actualSampleRate);
-            if (text && text.trim().length > 0) {
-              sttTranscription += (sttTranscription.length > 0 ? '\n' : '') + text.trim();
-              console.log(`[LiveVAD] Transcription result: "${text.trim()}"`);
-              renderSTTUI();
-            }
-          } catch (err) {
-            sttError = err instanceof Error ? err.message : String(err);
-            console.error('[LiveVAD] Transcription error:', sttError);
-            renderSTTUI();
-          } finally {
-            isLiveTranscribing = false;
-          }
-        } else {
-          console.log(`[LiveVAD] Segment too short (${segment.length} samples), skipping`);
-        }
-      }
+  // Pop completed speech segments and transcribe them
+  let segment = VAD.popSpeechSegment();
+  while (segment) {
+    if (segment.samples.length >= MIN_BUFFER_SAMPLES) {
+      const segSamples = segment.samples;
+      console.log(`[LiveVAD] Speech segment: ${segSamples.length} samples (${(segSamples.length / 16000).toFixed(1)}s)`);
+      transcribeLiveSegment(segSamples);
     }
-  }, 50);
+    segment = VAD.popSpeechSegment();
+  }
+}
+
+/** Transcribe a single live segment (async, guarded against concurrency). */
+async function transcribeLiveSegment(samples: Float32Array): Promise<void> {
+  if (isLiveTranscribing) {
+    console.log('[LiveVAD] Skipping segment — previous transcription still in progress');
+    return;
+  }
+  isLiveTranscribing = true;
+  try {
+    const text = await transcribeAudio(samples, 16000);
+    if (text && text.trim().length > 0) {
+      sttTranscription += (sttTranscription.length > 0 ? '\n' : '') + text.trim();
+      console.log(`[LiveVAD] Transcription result: "${text.trim()}"`);
+      renderSTTUI();
+    }
+  } catch (err) {
+    sttError = err instanceof Error ? err.message : String(err);
+    console.error('[LiveVAD] Transcription error:', sttError);
+    renderSTTUI();
+  } finally {
+    isLiveTranscribing = false;
+  }
+}
+
+function startLiveVAD(): void {
+  liveVadActive = true;
+  unsubscribeVAD = VAD.onSpeechActivity((activity) => {
+    if (activity === SpeechActivity.Started) {
+      console.log('[LiveVAD] Speech started (Silero)');
+    } else if (activity === SpeechActivity.Ended) {
+      console.log('[LiveVAD] Speech ended (Silero)');
+    }
+  });
+  console.log('[LiveVAD] Started SDK VAD monitoring');
 }
 
 function stopLiveVAD(): void {
-  if (liveVadTimer) { clearInterval(liveVadTimer); liveVadTimer = null; }
+  liveVadActive = false;
+  if (unsubscribeVAD) { unsubscribeVAD(); unsubscribeVAD = null; }
 }
 
 // ---------------------------------------------------------------------------
@@ -322,10 +348,16 @@ function stopLiveVAD(): void {
 // ---------------------------------------------------------------------------
 
 function updateLevelBars(level: number): void {
+  // In live mode, use the SDK VAD for speech detection (much more accurate).
+  // In batch mode, fall back to a simple energy threshold for visual feedback.
+  const isSpeech = (sttMode === 'live' && liveVadActive)
+    ? VAD.isSpeechActive
+    : level > 0.02;
+
   const bars = container.querySelectorAll('.stt-level-bar') as NodeListOf<HTMLElement>;
   bars.forEach((bar) => {
     bar.style.height = (3 + Math.random() * level * 21) + 'px';
-    bar.style.background = level > SPEECH_THRESHOLD ? 'var(--color-green)' : 'var(--bg-gray5)';
+    bar.style.background = isSpeech ? 'var(--color-green)' : 'var(--bg-gray5)';
   });
 }
 
