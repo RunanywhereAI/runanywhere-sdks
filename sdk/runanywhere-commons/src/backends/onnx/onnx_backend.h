@@ -283,6 +283,11 @@ class ONNXSTT {
     int stream_counter_ = 0;
     std::string model_dir_;
     std::string language_;
+    // Kept alive so config string pointers remain valid for recognizer lifetime
+    std::string encoder_path_;
+    std::string decoder_path_;
+    std::string tokens_path_;
+    std::string nemo_ctc_model_path_;
     mutable std::mutex mutex_;
 };
 

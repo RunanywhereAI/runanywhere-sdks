@@ -159,9 +159,58 @@ class DartBridgeToolCalling {
     }
   }
 
+  // =============================================================================
   // MARK: - Format Tools for Prompt (NO FALLBACK)
 
-  /// Format tool definitions into a system prompt using C++ implementation.
+  /// Format tool definitions into a system prompt using C++ implementation
+  /// with a specific format.
+  ///
+  /// [toolsJson] JSON array of tool definitions
+  /// [formatName] Format name ("default", "lfm2")
+  /// Returns formatted system prompt string
+  String formatToolsPromptWithFormat(String toolsJson, String formatName) {
+    if (toolsJson.isEmpty || toolsJson == '[]') {
+      return '';
+    }
+
+    try {
+      final formatFn = lib.lookupFunction<
+          Int32 Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Pointer<Utf8>>),
+          int Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Pointer<Utf8>>)>(
+        'rac_tool_call_format_prompt_json_with_format_name',
+      );
+
+      final racFreeFn = lib.lookupFunction<Void Function(Pointer<Void>),
+          void Function(Pointer<Void>)>('rac_free');
+
+      final toolsPtr = toolsJson.toNativeUtf8();
+      final formatPtr = formatName.toNativeUtf8();
+      final promptPtrPtr = calloc<Pointer<Utf8>>();
+
+      try {
+        final rc = formatFn(toolsPtr, formatPtr, promptPtrPtr);
+
+        if (rc != RAC_SUCCESS || promptPtrPtr.value == nullptr) {
+          _logger.error('formatToolsPromptWithFormat C++ returned error: $rc');
+          return formatToolsPrompt(toolsJson); // Fallback to default
+        }
+
+        final result = promptPtrPtr.value.toDartString();
+        racFreeFn(promptPtrPtr.value.cast());
+        return result;
+      } finally {
+        calloc.free(toolsPtr);
+        calloc.free(formatPtr);
+        calloc.free(promptPtrPtr);
+      }
+    } catch (e) {
+      _logger.error('formatToolsPromptWithFormat failed: $e');
+      return formatToolsPrompt(toolsJson); // Fallback to default
+    }
+  }
+
+  /// Format tool definitions into a system prompt using C++ implementation
+  /// (uses default format).
   ///
   /// [toolsJson] JSON array of tool definitions
   /// Returns formatted system prompt string

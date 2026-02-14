@@ -4,6 +4,12 @@
  * This file implements the ONNX backend using:
  * - ONNX Runtime for general ML inference
  * - Sherpa-ONNX for speech tasks (STT, TTS, VAD)
+ *
+ * ⚠️  SHERPA-ONNX VERSION DEPENDENCY:
+ * The SherpaOnnx*Config structs used here MUST match the prebuilt
+ * libsherpa-onnx-c-api.so exactly (same version of c-api.h).
+ * A mismatch causes SIGSEGV due to ABI/struct layout differences.
+ * See VERSIONS file for the current SHERPA_ONNX_VERSION_ANDROID.
  */
 
 #include "onnx_backend.h"
@@ -270,6 +276,14 @@ bool ONNXSTT::load_model(const std::string& model_path, STTModelType model_type,
         return false;
     }
 
+    // Keep path strings in members so config pointers stay valid for recognizer lifetime
+    encoder_path_ = encoder_path;
+    decoder_path_ = decoder_path;
+    tokens_path_ = tokens_path;
+    nemo_ctc_model_path_ = nemo_ctc_model_path;
+
+    // Initialize all config fields explicitly to avoid any uninitialized pointer issues.
+    // The struct layout MUST match the prebuilt libsherpa-onnx-c-api.so version (v1.12.20).
     SherpaOnnxOfflineRecognizerConfig recognizer_config;
     memset(&recognizer_config, 0, sizeof(recognizer_config));
 
@@ -291,20 +305,20 @@ bool ONNXSTT::load_model(const std::string& model_path, STTModelType model_type,
 
     if (is_nemo_ctc) {
         // Configure for NeMo CTC (Parakeet, etc.)
-        recognizer_config.model_config.nemo_ctc.model = nemo_ctc_model_path.c_str();
+        recognizer_config.model_config.nemo_ctc.model = nemo_ctc_model_path_.c_str();
         recognizer_config.model_config.model_type = "nemo_ctc";
 
         RAC_LOG_INFO("ONNX.STT", "Configuring NeMo CTC recognizer");
     } else {
         // Configure for Whisper (encoder-decoder)
-        recognizer_config.model_config.whisper.encoder = encoder_path.c_str();
-        recognizer_config.model_config.whisper.decoder = decoder_path.c_str();
+        recognizer_config.model_config.whisper.encoder = encoder_path_.c_str();
+        recognizer_config.model_config.whisper.decoder = decoder_path_.c_str();
         recognizer_config.model_config.whisper.language = language_.c_str();
         recognizer_config.model_config.whisper.task = "transcribe";
         recognizer_config.model_config.model_type = "whisper";
     }
 
-    recognizer_config.model_config.tokens = tokens_path.c_str();
+    recognizer_config.model_config.tokens = tokens_path_.c_str();
     recognizer_config.model_config.num_threads = 2;
     recognizer_config.model_config.debug = 1;
     recognizer_config.model_config.provider = "cpu";
@@ -334,6 +348,10 @@ bool ONNXSTT::load_model(const std::string& model_path, STTModelType model_type,
 
     recognizer_config.model_config.wenet_ctc.model = "";
     recognizer_config.model_config.omnilingual.model = "";
+
+    // NOTE: Do NOT set medasr or funasr_nano here - they don't exist in
+    // Sherpa-ONNX v1.12.20 (the prebuilt .so version). Setting them would shift
+    // the struct layout and cause SherpaOnnxCreateOfflineRecognizer to crash.
 
     recognizer_config.lm_config.model = "";
     recognizer_config.lm_config.scale = 1.0f;

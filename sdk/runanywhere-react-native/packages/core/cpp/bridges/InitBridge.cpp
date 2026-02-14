@@ -7,13 +7,16 @@
  */
 
 #include "InitBridge.hpp"
+#include "PlatformDownloadBridge.h"
 #include "rac_model_paths.h"
 #include "rac_environment.h"  // For rac_sdk_init, rac_sdk_config_t
 #include <cstring>
 #include <cstdlib>
 #include <chrono>
+#include <atomic>
 #include <mutex>
 #include <tuple>
+#include <unordered_map>
 
 // Platform-specific logging and bridges
 #if defined(ANDROID) || defined(__ANDROID__)
@@ -48,6 +51,8 @@ extern jmethodID g_getCoreCountMethod;
 extern jmethodID g_getArchitectureMethod;
 extern jmethodID g_getGPUFamilyMethod;
 extern jmethodID g_isTabletMethod;
+extern jmethodID g_httpDownloadMethod;
+extern jmethodID g_httpDownloadCancelMethod;
 // HttpResponse field IDs
 extern jfieldID g_httpResponse_successField;
 extern jfieldID g_httpResponse_statusCodeField;
@@ -427,6 +432,62 @@ namespace AndroidBridge {
         jboolean result = env->CallStaticBooleanMethod(g_platformAdapterBridgeClass, g_isTabletMethod);
         return result == JNI_TRUE;
     }
+
+    rac_result_t httpDownload(const char* url, const char* destinationPath, const char* taskId) {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return RAC_ERROR_NOT_SUPPORTED;
+
+        if (!g_platformAdapterBridgeClass || !g_httpDownloadMethod) {
+            LOGE("PlatformAdapterBridge class or httpDownload method not cached");
+            return RAC_ERROR_NOT_SUPPORTED;
+        }
+
+        jstring jUrl = env->NewStringUTF(url ? url : "");
+        jstring jDest = env->NewStringUTF(destinationPath ? destinationPath : "");
+        jstring jTaskId = env->NewStringUTF(taskId ? taskId : "");
+
+        jint result = env->CallStaticIntMethod(g_platformAdapterBridgeClass,
+                                               g_httpDownloadMethod,
+                                               jUrl,
+                                               jDest,
+                                               jTaskId);
+
+        env->DeleteLocalRef(jUrl);
+        env->DeleteLocalRef(jDest);
+        env->DeleteLocalRef(jTaskId);
+
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            LOGE("Exception in httpDownload");
+            return RAC_ERROR_DOWNLOAD_FAILED;
+        }
+
+        return static_cast<rac_result_t>(result);
+    }
+
+    bool httpDownloadCancel(const char* taskId) {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return false;
+
+        if (!g_platformAdapterBridgeClass || !g_httpDownloadCancelMethod) {
+            LOGE("PlatformAdapterBridge class or httpDownloadCancel method not cached");
+            return false;
+        }
+
+        jstring jTaskId = env->NewStringUTF(taskId ? taskId : "");
+        jboolean result = env->CallStaticBooleanMethod(g_platformAdapterBridgeClass,
+                                                       g_httpDownloadCancelMethod,
+                                                       jTaskId);
+        env->DeleteLocalRef(jTaskId);
+
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            LOGE("Exception in httpDownloadCancel");
+            return false;
+        }
+
+        return result == JNI_TRUE;
+    }
 } // namespace AndroidBridge
 #elif defined(__APPLE__)
 #include <cstdio>
@@ -461,6 +522,14 @@ extern "C" {
         char** outResponseBody,
         char** outErrorMessage
     );
+
+    int PlatformAdapter_httpDownload(
+        const char* url,
+        const char* destinationPath,
+        const char* taskId
+    );
+
+    bool PlatformAdapter_httpDownloadCancel(const char* taskId);
 }
 #define LOGI(...) printf("[InitBridge] "); printf(__VA_ARGS__); printf("\n")
 #define LOGD(...) printf("[InitBridge DEBUG] "); printf(__VA_ARGS__); printf("\n")
@@ -482,6 +551,20 @@ namespace bridges {
 // =============================================================================
 
 static PlatformCallbacks* g_platformCallbacks = nullptr;
+
+// =============================================================================
+// HTTP download callback state (platform adapter)
+// =============================================================================
+
+struct http_download_context {
+    rac_http_progress_callback_fn progress_callback;
+    rac_http_complete_callback_fn complete_callback;
+    void* user_data;
+};
+
+static std::mutex g_http_download_mutex;
+static std::unordered_map<std::string, http_download_context> g_http_downloads;
+static std::atomic<uint64_t> g_http_download_counter{0};
 
 // =============================================================================
 // C Callback Implementations (called by RACommons)
@@ -703,6 +786,134 @@ static void platformTrackErrorCallback(const char* errorJson, void* userData) {
 }
 
 // =============================================================================
+// HTTP Download Callbacks (Platform Adapter)
+// =============================================================================
+
+static int reportHttpDownloadProgressInternal(const char* task_id,
+                                              int64_t downloaded_bytes,
+                                              int64_t total_bytes) {
+    if (!task_id) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    std::lock_guard<std::mutex> lock(g_http_download_mutex);
+    auto it = g_http_downloads.find(task_id);
+    if (it == g_http_downloads.end()) {
+        return RAC_ERROR_NOT_FOUND;
+    }
+
+    if (it->second.progress_callback) {
+        it->second.progress_callback(downloaded_bytes, total_bytes, it->second.user_data);
+    }
+
+    return RAC_SUCCESS;
+}
+
+static int reportHttpDownloadCompleteInternal(const char* task_id,
+                                              int result,
+                                              const char* downloaded_path) {
+    if (!task_id) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    http_download_context ctx{};
+    {
+        std::lock_guard<std::mutex> lock(g_http_download_mutex);
+        auto it = g_http_downloads.find(task_id);
+        if (it == g_http_downloads.end()) {
+            return RAC_ERROR_NOT_FOUND;
+        }
+        ctx = it->second;
+        g_http_downloads.erase(it);
+    }
+
+    if (ctx.complete_callback) {
+        ctx.complete_callback(static_cast<rac_result_t>(result), downloaded_path, ctx.user_data);
+    }
+
+    return RAC_SUCCESS;
+}
+
+static rac_result_t platformHttpDownloadCallback(const char* url,
+                                                 const char* destination_path,
+                                                 rac_http_progress_callback_fn progress_callback,
+                                                 rac_http_complete_callback_fn complete_callback,
+                                                 void* callback_user_data,
+                                                 char** out_task_id,
+                                                 void* user_data) {
+    (void)user_data;
+
+    if (!url || !destination_path || !out_task_id) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    std::string task_id =
+        "http_" + std::to_string(g_http_download_counter.fetch_add(1, std::memory_order_relaxed));
+
+    *out_task_id = strdup(task_id.c_str());
+    if (!*out_task_id) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_http_download_mutex);
+        g_http_downloads[task_id] = {progress_callback, complete_callback, callback_user_data};
+    }
+
+    rac_result_t start_result = RAC_ERROR_NOT_SUPPORTED;
+
+#if defined(ANDROID) || defined(__ANDROID__)
+    start_result = AndroidBridge::httpDownload(url, destination_path, task_id.c_str());
+#elif defined(__APPLE__)
+    start_result = static_cast<rac_result_t>(
+        PlatformAdapter_httpDownload(url, destination_path, task_id.c_str()));
+#endif
+
+    if (start_result != RAC_SUCCESS) {
+        http_download_context ctx{};
+        {
+            std::lock_guard<std::mutex> lock(g_http_download_mutex);
+            auto it = g_http_downloads.find(task_id);
+            if (it != g_http_downloads.end()) {
+                ctx = it->second;
+                g_http_downloads.erase(it);
+            }
+        }
+
+        if (ctx.complete_callback) {
+            ctx.complete_callback(start_result, nullptr, ctx.user_data);
+        }
+    }
+
+    return start_result;
+}
+
+static rac_result_t platformHttpDownloadCancelCallback(const char* task_id, void* user_data) {
+    (void)user_data;
+
+    if (!task_id) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_http_download_mutex);
+        if (g_http_downloads.find(task_id) == g_http_downloads.end()) {
+            return RAC_ERROR_NOT_FOUND;
+        }
+    }
+
+    bool cancelled = false;
+
+#if defined(ANDROID) || defined(__ANDROID__)
+    cancelled = AndroidBridge::httpDownloadCancel(task_id);
+#elif defined(__APPLE__)
+    cancelled = PlatformAdapter_httpDownloadCancel(task_id);
+#endif
+
+    return cancelled ? RAC_SUCCESS : RAC_ERROR_CANCELLED;
+}
+
+// =============================================================================
 // InitBridge Implementation
 // =============================================================================
 
@@ -757,9 +968,9 @@ void InitBridge::registerPlatformAdapter() {
     // Error tracking
     adapter_.track_error = platformTrackErrorCallback;
 
-    // HTTP download (handled by JS layer)
-    adapter_.http_download = nullptr;
-    adapter_.http_download_cancel = nullptr;
+    // HTTP download (platform adapter)
+    adapter_.http_download = platformHttpDownloadCallback;
+    adapter_.http_download_cancel = platformHttpDownloadCancelCallback;
 
     // Archive extraction (handled by JS layer)
     adapter_.extract_archive = nullptr;
@@ -1271,3 +1482,23 @@ std::tuple<bool, int, std::string, std::string> InitBridge::httpPostSync(
 
 } // namespace bridges
 } // namespace runanywhere
+
+// =============================================================================
+// Global C API for platform download reporting
+// =============================================================================
+
+extern "C" int RunAnywhereHttpDownloadReportProgress(const char* task_id,
+                                                     int64_t downloaded_bytes,
+                                                     int64_t total_bytes) {
+    return runanywhere::bridges::reportHttpDownloadProgressInternal(task_id,
+                                                                    downloaded_bytes,
+                                                                    total_bytes);
+}
+
+extern "C" int RunAnywhereHttpDownloadReportComplete(const char* task_id,
+                                                     int result,
+                                                     const char* downloaded_path) {
+    return runanywhere::bridges::reportHttpDownloadCompleteInternal(task_id,
+                                                                    result,
+                                                                    downloaded_path);
+}

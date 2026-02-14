@@ -19,6 +19,9 @@
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/events/rac_events.h"
 
+// Use the RAC logging system
+#define LOGI(...) RAC_LOG_INFO("LLM.LlamaCpp.C-API", __VA_ARGS__)
+
 // =============================================================================
 // INTERNAL HANDLE STRUCTURE
 // =============================================================================
@@ -164,6 +167,9 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
         request.top_p = options->top_p;
         RAC_LOG_INFO("LLM.LlamaCpp", "rac_llm_llamacpp_generate: options max_tokens=%d, temp=%.2f, top_p=%.2f",
                      options->max_tokens, options->temperature, options->top_p);
+        if (options->system_prompt != nullptr) {
+            request.system_prompt = options->system_prompt;
+        }
         // Handle stop sequences if available
         if (options->stop_sequences != nullptr && options->num_stop_sequences > 0) {
             for (int32_t i = 0; i < options->num_stop_sequences; i++) {
@@ -172,6 +178,14 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
                 }
             }
         }
+        LOGI("[PARAMS] LLM C-API (from caller options): max_tokens=%d, temperature=%.4f, "
+             "top_p=%.4f, system_prompt=%s",
+             request.max_tokens, request.temperature, request.top_p,
+             request.system_prompt.empty() ? "(none)" : "(set)");
+    } else {
+        LOGI("[PARAMS] LLM C-API (using struct defaults): max_tokens=%d, temperature=%.4f, "
+             "top_p=%.4f, system_prompt=(none)",
+             request.max_tokens, request.temperature, request.top_p);
     }
 
     // Generate using C++ class
@@ -217,6 +231,9 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
         request.max_tokens = options->max_tokens;
         request.temperature = options->temperature;
         request.top_p = options->top_p;
+        if (options->system_prompt != nullptr) {
+            request.system_prompt = options->system_prompt;
+        }
         if (options->stop_sequences != nullptr && options->num_stop_sequences > 0) {
             for (int32_t i = 0; i < options->num_stop_sequences; i++) {
                 if (options->stop_sequences[i]) {
@@ -224,6 +241,14 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
                 }
             }
         }
+        LOGI("[PARAMS] LLM C-API (from caller options): max_tokens=%d, temperature=%.4f, "
+             "top_p=%.4f, system_prompt=%s",
+             request.max_tokens, request.temperature, request.top_p,
+             request.system_prompt.empty() ? "(none)" : "(set)");
+    } else {
+        LOGI("[PARAMS] LLM C-API (using struct defaults): max_tokens=%d, temperature=%.4f, "
+             "top_p=%.4f, system_prompt=(none)",
+             request.max_tokens, request.temperature, request.top_p);
     }
 
     // Stream using C++ class

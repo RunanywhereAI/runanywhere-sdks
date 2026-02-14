@@ -83,11 +83,7 @@ struct MessageBubbleView: View {
                 Spacer(minLength: AppSpacing.padding60)
             }
 
-            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 6) {
-                if message.role == .assistant && message.modelInfo != nil {
-                    modelBadgeSection
-                }
-
+            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
                 if message.role == .assistant && hasThinking {
                     thinkingSection
                 }
@@ -287,74 +283,23 @@ extension MessageBubbleView {
 // MARK: - MessageBubbleView Badge and Analytics
 
 extension MessageBubbleView {
-    var modelBadgeBackground: some View {
-        RoundedRectangle(cornerRadius: AppSpacing.regular)
-            .fill(
-                LinearGradient(
-                    colors: [
-                        AppColors.primaryAccent,
-                        AppColors.primaryAccent.opacity(0.8)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .shadow(color: AppColors.primaryAccent.opacity(0.3), radius: 2, x: 0, y: 1)
-            .overlay(
-                RoundedRectangle(cornerRadius: AppSpacing.regular)
-                    .strokeBorder(
-                        AppColors.textWhite.opacity(0.2),
-                        lineWidth: AppSpacing.strokeThin
-                    )
-            )
-    }
 
-    var modelBadgeSection: some View {
-        HStack {
-            if message.role == .assistant {
-                Spacer()
-            }
-
-            HStack(spacing: AppSpacing.small) {
-                Image(systemName: "cube")
-                    .font(AppTypography.caption2)
-                    .foregroundColor(AppColors.textWhite)
-
-                Text(message.modelInfo?.modelName ?? "Unknown")
-                    .font(AppTypography.caption2Medium)
-                    .foregroundColor(AppColors.textWhite)
-
-                Text(message.modelInfo?.framework ?? "")
-                    .font(AppTypography.caption2)
-                    .foregroundColor(AppColors.textWhite.opacity(0.8))
-            }
-            .padding(.horizontal, AppSpacing.medium)
-            .padding(.vertical, 5)
-            .background(modelBadgeBackground)
-
-            if message.role == .user {
-                Spacer()
-            }
-        }
-    }
-
+    @ViewBuilder
     var timestampAndAnalyticsSection: some View {
-        HStack(spacing: 8) {
-            if message.role == .assistant {
+        // Only show timestamp for assistant messages when content exists and not generating
+        if message.role == .assistant && !message.content.isEmpty && !isGenerating {
+            HStack(spacing: 6) {
                 Spacer()
-            }
 
-            Text(message.timestamp, style: .time)
-                .font(AppTypography.caption2)
-                .foregroundColor(AppColors.textSecondary)
+                Text(message.timestamp, style: .time)
+                    .font(AppTypography.caption2)
+                    .foregroundColor(AppColors.textSecondary)
 
-            if let analytics = message.analytics {
-                analyticsContent(analytics)
+                if let analytics = message.analytics {
+                    analyticsContent(analytics)
+                }
             }
-
-            if message.role == .user {
-                Spacer()
-            }
+            .padding(.leading, AppSpacing.mediumLarge)
         }
     }
 
@@ -431,29 +376,49 @@ extension MessageBubbleView {
     @ViewBuilder var mainMessageBubble: some View {
         // Only show message bubble if there's content
         if !message.content.isEmpty {
-            // Intelligent adaptive rendering: Content analysis → Best renderer
-            Group {
-                if message.role == .assistant {
-                    AdaptiveMarkdownText(
-                        message.content,
-                        font: AppTypography.body,
-                        color: AppColors.textPrimary
-                    )
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    Text(message.content)
-                        .foregroundColor(AppColors.textWhite)
+            ZStack(alignment: .bottomTrailing) {
+                // Intelligent adaptive rendering: Content analysis → Best renderer
+                Group {
+                    if message.role == .assistant {
+                        VStack(alignment: .leading, spacing: 0) {
+                            AdaptiveMarkdownText(
+                                message.content,
+                                font: AppTypography.body,
+                                color: AppColors.textPrimary
+                            )
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                            // Extra spacing at bottom for model badge
+                            if message.modelInfo != nil {
+                                Spacer()
+                                    .frame(height: 16)
+                            }
+                        }
+                    } else {
+                        Text(message.content)
+                            .foregroundColor(AppColors.textWhite)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.horizontal, AppSpacing.large)
+                .padding(.vertical, AppSpacing.mediumLarge)
+
+                // Model name badge in bottom-right corner (assistant only)
+                if message.role == .assistant, let modelInfo = message.modelInfo {
+                    HStack(spacing: 3) {
+                        Image(systemName: "cube")
+                            .font(.system(size: 8))
+                        Text(modelInfo.modelName)
+                            .font(.system(size: 9, weight: .medium))
+                    }
+                    .foregroundColor(AppColors.textSecondary.opacity(0.6))
+                    .padding(.trailing, AppSpacing.mediumLarge)
+                    .padding(.bottom, AppSpacing.small)
                 }
             }
-            .padding(.horizontal, AppSpacing.large)
-            .padding(.vertical, AppSpacing.mediumLarge)
             .background(messageBubbleBackground)
-            .scaleEffect(shouldPulse ? 1.02 : 1.0)
-            .animation(
-                .easeInOut(duration: AppLayout.animationLoopSlow)
-                    .repeatForever(autoreverses: true),
-                value: isGenerating
-            )
+            .animation(nil, value: message.content)
         }
     }
 }

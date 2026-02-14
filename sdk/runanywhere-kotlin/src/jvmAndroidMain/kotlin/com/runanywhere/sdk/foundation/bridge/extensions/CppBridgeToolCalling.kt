@@ -28,7 +28,7 @@ import kotlinx.serialization.json.*
 object CppBridgeToolCalling {
     private const val TAG = "CppBridgeToolCalling"
     private val logger = SDKLogger(TAG)
-    
+
     /**
      * Parsed tool call result from C++
      */
@@ -37,13 +37,13 @@ object CppBridgeToolCalling {
         val cleanText: String,
         val toolName: String?,
         val argumentsJson: String?,
-        val callId: Long
+        val callId: Long,
     )
-    
+
     // ========================================================================
     // PARSE TOOL CALL (NO FALLBACK)
     // ========================================================================
-    
+
     /**
      * Parse LLM output for tool calls using C++ implementation.
      *
@@ -53,15 +53,16 @@ object CppBridgeToolCalling {
      * @return Parsed result with tool call info
      */
     fun parseToolCall(llmOutput: String): ParseResult {
-        val resultJson = RunAnywhereBridge.racToolCallParse(llmOutput)
-            ?: return ParseResult(
-                hasToolCall = false,
-                cleanText = llmOutput,
-                toolName = null,
-                argumentsJson = null,
-                callId = 0
-            )
-        
+        val resultJson =
+            RunAnywhereBridge.racToolCallParse(llmOutput)
+                ?: return ParseResult(
+                    hasToolCall = false,
+                    cleanText = llmOutput,
+                    toolName = null,
+                    argumentsJson = null,
+                    callId = 0,
+                )
+
         return try {
             val json = Json.parseToJsonElement(resultJson).jsonObject
             ParseResult(
@@ -69,7 +70,7 @@ object CppBridgeToolCalling {
                 cleanText = json["cleanText"]?.jsonPrimitive?.content ?: llmOutput,
                 toolName = json["toolName"]?.jsonPrimitive?.contentOrNull,
                 argumentsJson = json["argumentsJson"]?.toString(),
-                callId = json["callId"]?.jsonPrimitive?.longOrNull ?: 0
+                callId = json["callId"]?.jsonPrimitive?.longOrNull ?: 0,
             )
         } catch (e: Exception) {
             logger.error("Failed to parse tool call result: ${e.message}")
@@ -78,11 +79,11 @@ object CppBridgeToolCalling {
                 cleanText = llmOutput,
                 toolName = null,
                 argumentsJson = null,
-                callId = 0
+                callId = 0,
             )
         }
     }
-    
+
     /**
      * Parse LLM output and return a ToolCall object if found.
      *
@@ -91,49 +92,50 @@ object CppBridgeToolCalling {
      */
     fun parseToolCallToObject(llmOutput: String): Pair<String, ToolCall?> {
         val result = parseToolCall(llmOutput)
-        
+
         if (!result.hasToolCall || result.toolName == null) {
             return Pair(result.cleanText, null)
         }
-        
+
         val arguments = parseArgumentsJson(result.argumentsJson ?: "{}")
-        
+
         return Pair(
             result.cleanText,
             ToolCall(
                 toolName = result.toolName,
                 arguments = arguments,
-                callId = "call_${result.callId}"
-            )
+                callId = "call_${result.callId}",
+            ),
         )
     }
-    
+
     // ========================================================================
     // FORMAT TOOLS FOR PROMPT (NO FALLBACK)
     // ========================================================================
-    
+
     /**
      * Format tool definitions into a system prompt using C++ implementation.
      *
      * @param tools List of tool definitions
-     * @param format Tool calling format name (e.g., "default", "lfm2"). See [ToolCallFormatName].
+     * @param format Tool calling format type. See [ToolCallFormat].
      * @return Formatted system prompt string
      */
     fun formatToolsForPrompt(
         tools: List<ToolDefinition>,
-        format: String = ToolCallFormatName.DEFAULT
+        format: ToolCallFormat = ToolCallFormat.Default,
     ): String {
         if (tools.isEmpty()) return ""
-        
+
         val toolsJson = serializeToolsToJson(tools)
-        // Use string-based C++ API (single source of truth for format names)
-        return RunAnywhereBridge.racToolCallFormatPromptJsonWithFormatName(toolsJson, format) ?: ""
+        // Convert to string at JNI boundary - C++ handles the format logic
+        val formatString = format.toFormatName()
+        return RunAnywhereBridge.racToolCallFormatPromptJsonWithFormatName(toolsJson, formatString) ?: ""
     }
-    
+
     // ========================================================================
     // BUILD INITIAL PROMPT (NO FALLBACK)
     // ========================================================================
-    
+
     /**
      * Build the initial prompt with tools and user query using C++ implementation.
      *
@@ -145,22 +147,22 @@ object CppBridgeToolCalling {
     fun buildInitialPrompt(
         userPrompt: String,
         tools: List<ToolDefinition>,
-        options: ToolCallingOptions
+        options: ToolCallingOptions,
     ): String {
         val toolsJson = serializeToolsToJson(tools)
         val optionsJson = serializeOptionsToJson(options)
-        
+
         return RunAnywhereBridge.racToolCallBuildInitialPrompt(
             userPrompt,
             toolsJson,
-            optionsJson
+            optionsJson,
         ) ?: userPrompt
     }
-    
+
     // ========================================================================
     // BUILD FOLLOW-UP PROMPT (NO FALLBACK)
     // ========================================================================
-    
+
     /**
      * Build follow-up prompt after tool execution using C++ implementation.
      *
@@ -176,21 +178,21 @@ object CppBridgeToolCalling {
         toolsPrompt: String?,
         toolName: String,
         toolResultJson: String,
-        keepToolsAvailable: Boolean
+        keepToolsAvailable: Boolean,
     ): String {
         return RunAnywhereBridge.racToolCallBuildFollowupPrompt(
             originalPrompt,
             toolsPrompt,
             toolName,
             toolResultJson,
-            keepToolsAvailable
+            keepToolsAvailable,
         ) ?: ""
     }
-    
+
     // ========================================================================
     // JSON NORMALIZATION (NO FALLBACK)
     // ========================================================================
-    
+
     /**
      * Normalize JSON by adding quotes around unquoted keys using C++ implementation.
      *
@@ -200,11 +202,11 @@ object CppBridgeToolCalling {
     fun normalizeJson(jsonStr: String): String {
         return RunAnywhereBridge.racToolCallNormalizeJson(jsonStr) ?: jsonStr
     }
-    
+
     // ========================================================================
     // PRIVATE HELPERS
     // ========================================================================
-    
+
     /**
      * Parse arguments JSON string to Map<String, ToolValue>
      */
@@ -221,92 +223,100 @@ object CppBridgeToolCalling {
             emptyMap()
         }
     }
-    
+
     /**
      * Convert JsonElement to ToolValue
      */
-    private fun jsonElementToToolValue(element: JsonElement): ToolValue = when (element) {
-        is JsonPrimitive -> when {
-            element.isString -> ToolValue.string(element.content)
-            element.booleanOrNull != null -> ToolValue.bool(element.boolean)
-            element.doubleOrNull != null -> ToolValue.number(element.double)
-            else -> ToolValue.string(element.content)
+    private fun jsonElementToToolValue(element: JsonElement): ToolValue =
+        when (element) {
+            is JsonPrimitive ->
+                when {
+                    element.isString -> ToolValue.string(element.content)
+                    element.booleanOrNull != null -> ToolValue.bool(element.boolean)
+                    element.doubleOrNull != null -> ToolValue.number(element.double)
+                    else -> ToolValue.string(element.content)
+                }
+            is JsonArray -> ToolValue.array(element.map { jsonElementToToolValue(it) })
+            is JsonObject -> ToolValue.obj(element.mapValues { (_, v) -> jsonElementToToolValue(v) })
+            JsonNull -> ToolValue.nullValue()
         }
-        is JsonArray -> ToolValue.array(element.map { jsonElementToToolValue(it) })
-        is JsonObject -> ToolValue.obj(element.mapValues { (_, v) -> jsonElementToToolValue(v) })
-        JsonNull -> ToolValue.nullValue()
-    }
-    
+
     /**
      * Serialize tool definitions to JSON array string
      */
     private fun serializeToolsToJson(tools: List<ToolDefinition>): String {
-        val jsonArray = buildJsonArray {
-            tools.forEach { tool ->
-                addJsonObject {
-                    put("name", tool.name)
-                    put("description", tool.description)
-                    putJsonArray("parameters") {
-                        tool.parameters.forEach { param ->
-                            addJsonObject {
-                                put("name", param.name)
-                                put("type", param.type.value)
-                                put("description", param.description)
-                                put("required", param.required)
-                                param.enumValues?.let { values ->
-                                    putJsonArray("enumValues") {
-                                        values.forEach { add(it) }
+        val jsonArray =
+            buildJsonArray {
+                tools.forEach { tool ->
+                    addJsonObject {
+                        put("name", tool.name)
+                        put("description", tool.description)
+                        putJsonArray("parameters") {
+                            tool.parameters.forEach { param ->
+                                addJsonObject {
+                                    put("name", param.name)
+                                    put("type", param.type.value)
+                                    put("description", param.description)
+                                    put("required", param.required)
+                                    param.enumValues?.let { values ->
+                                        putJsonArray("enumValues") {
+                                            values.forEach { add(it) }
+                                        }
                                     }
                                 }
                             }
                         }
+                        tool.category?.let { put("category", it) }
                     }
-                    tool.category?.let { put("category", it) }
                 }
             }
-        }
         return jsonArray.toString()
     }
-    
+
     /**
      * Serialize options to JSON string
      */
     private fun serializeOptionsToJson(options: ToolCallingOptions): String {
-        val jsonObj = buildJsonObject {
-            put("maxToolCalls", options.maxToolCalls)
-            put("autoExecute", options.autoExecute)
-            options.temperature?.let { put("temperature", it) }
-            options.maxTokens?.let { put("maxTokens", it) }
-            options.systemPrompt?.let { put("systemPrompt", it) }
-            put("replaceSystemPrompt", options.replaceSystemPrompt)
-            put("keepToolsAvailable", options.keepToolsAvailable)
-            put("format", options.format)  // Pass format as string
-        }
+        val jsonObj =
+            buildJsonObject {
+                put("maxToolCalls", options.maxToolCalls)
+                put("autoExecute", options.autoExecute)
+                options.temperature?.let { put("temperature", it) }
+                options.maxTokens?.let { put("maxTokens", it) }
+                options.systemPrompt?.let { put("systemPrompt", it) }
+                put("replaceSystemPrompt", options.replaceSystemPrompt)
+                put("keepToolsAvailable", options.keepToolsAvailable)
+                put("format", options.format.toFormatName()) // Convert to string at serialization boundary
+            }
         return jsonObj.toString()
     }
-    
+
     /**
      * Convert ToolValue to JSON string
      */
     fun toolValueToJsonString(value: Map<String, ToolValue>): String {
-        val jsonObj = buildJsonObject {
-            value.forEach { (k, v) ->
-                put(k, toolValueToJsonElement(v))
+        val jsonObj =
+            buildJsonObject {
+                value.forEach { (k, v) ->
+                    put(k, toolValueToJsonElement(v))
+                }
             }
-        }
         return jsonObj.toString()
     }
-    
-    private fun toolValueToJsonElement(value: ToolValue): JsonElement = when (value) {
-        is ToolValue.StringValue -> JsonPrimitive(value.value)
-        is ToolValue.NumberValue -> JsonPrimitive(value.value)
-        is ToolValue.BoolValue -> JsonPrimitive(value.value)
-        is ToolValue.ArrayValue -> buildJsonArray {
-            value.value.forEach { add(toolValueToJsonElement(it)) }
+
+    private fun toolValueToJsonElement(value: ToolValue): JsonElement =
+        when (value) {
+            is ToolValue.StringValue -> JsonPrimitive(value.value)
+            is ToolValue.NumberValue -> JsonPrimitive(value.value)
+            is ToolValue.BoolValue -> JsonPrimitive(value.value)
+            is ToolValue.ArrayValue ->
+                buildJsonArray {
+                    value.value.forEach { add(toolValueToJsonElement(it)) }
+                }
+            is ToolValue.ObjectValue ->
+                buildJsonObject {
+                    value.value.forEach { (k, v) -> put(k, toolValueToJsonElement(v)) }
+                }
+            ToolValue.NullValue -> JsonNull
         }
-        is ToolValue.ObjectValue -> buildJsonObject {
-            value.value.forEach { (k, v) -> put(k, toolValueToJsonElement(v)) }
-        }
-        ToolValue.NullValue -> JsonNull
-    }
 }

@@ -140,11 +140,6 @@ class LlamaCppTextGeneration {
     int context_size_ = 0;
     int max_default_context_ = 8192;
 
-    float temperature_ = 0.8f;
-    float top_p_ = 0.95f;
-    float min_p_ = 0.05f;
-    int top_k_ = 40;
-
     mutable std::mutex mutex_;
 };
 

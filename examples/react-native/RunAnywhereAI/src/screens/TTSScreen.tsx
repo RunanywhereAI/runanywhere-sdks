@@ -1012,7 +1012,8 @@ export const TTSScreen: React.FC = () => {
         <View style={styles.settingsSection}>
           <Text style={styles.sectionLabel}>Voice Settings</Text>
           {renderSlider('Speed', speed, setSpeed)}
-          {renderSlider('Pitch', pitch, setPitch)}
+          {/* Pitch slider - Commented out for now as it is not implemented in the current TTS models */}
+          {/* {renderSlider('Pitch', pitch, setPitch)} */}
           {renderSlider(
             'Volume',
             volume,

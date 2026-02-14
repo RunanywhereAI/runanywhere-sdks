@@ -494,6 +494,47 @@ static bool is_standard_key(const char* key) {
     return false;
 }
 
+/**
+ * @brief Escape a string for JSON output (manual implementation)
+ *
+ * Escapes special characters (quotes, backslashes, control characters)
+ * to produce valid JSON string content.
+ */
+static std::string escape_json_string(const char* str) {
+    if (!str) {
+        return "";
+    }
+
+    std::string result;
+    result.reserve(strlen(str) + 16);
+
+    for (size_t i = 0; str[i]; i++) {
+        char c = str[i];
+        switch (c) {
+        case '"':
+            result += "\\\"";
+            break;
+        case '\\':
+            result += "\\\\";
+            break;
+        case '\n':
+            result += "\\n";
+            break;
+        case '\r':
+            result += "\\r";
+            break;
+        case '\t':
+            result += "\\t";
+            break;
+        default:
+            result += c;
+            break;
+        }
+    }
+
+    return result;
+}
+
 // =============================================================================
 // JSON NORMALIZATION
 // =============================================================================
@@ -609,11 +650,12 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
                         if (args_is_obj) {
                             *out_args_json = args_value;
                         } else {
-                            // Wrap scalar in {"input": value}
-                            size_t wrap_len = strlen(args_value) + 20;
+                            // Wrap scalar in {"input": value} - escape the value for valid JSON
+                            std::string escaped_args = escape_json_string(args_value);
+                            size_t wrap_len = escaped_args.size() + 14; // {"input":"" } + null
                             *out_args_json = static_cast<char*>(malloc(wrap_len));
                             if (*out_args_json) {
-                                snprintf(*out_args_json, wrap_len, "{\"input\":\"%s\"}", args_value);
+                                snprintf(*out_args_json, wrap_len, "{\"input\":\"%s\"}", escaped_args.c_str());
                             }
                             free(args_value);
                         }
@@ -624,7 +666,7 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
                 // No arguments found - use empty object
                 *out_args_json = static_cast<char*>(malloc(3));
                 if (*out_args_json) {
-                    strcpy(*out_args_json, "{}");
+                    std::memcpy(*out_args_json, "{}", 3);
                 }
                 return true;
             }
@@ -642,24 +684,25 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
             if (extract_json_value(json_obj, key.c_str(), &value, &is_obj)) {
                 *out_tool_name = static_cast<char*>(malloc(key.size() + 1));
                 if (*out_tool_name) {
-                    strcpy(*out_tool_name, key.c_str());
+                    std::memcpy(*out_tool_name, key.c_str(), key.size() + 1);
                 }
 
                 if (is_obj) {
                     // Value is object - use as arguments
                     *out_args_json = value;
                 } else if (value) {
-                    // Value is scalar - wrap in {"input": value}
-                    size_t wrap_len = strlen(value) + 20;
+                    // Value is scalar - wrap in {"input": value} - escape for valid JSON
+                    std::string escaped_value = escape_json_string(value);
+                    size_t wrap_len = escaped_value.size() + 14; // {"input":"" } + null
                     *out_args_json = static_cast<char*>(malloc(wrap_len));
                     if (*out_args_json) {
-                        snprintf(*out_args_json, wrap_len, "{\"input\":\"%s\"}", value);
+                        snprintf(*out_args_json, wrap_len, "{\"input\":\"%s\"}", escaped_value.c_str());
                     }
                     free(value);
                 } else {
                     *out_args_json = static_cast<char*>(malloc(3));
                     if (*out_args_json) {
-                        strcpy(*out_args_json, "{}");
+                        std::memcpy(*out_args_json, "{}", 3);
                     }
                 }
                 return true;
@@ -743,11 +786,11 @@ static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char
         // No arguments - whole thing is function name
         *out_tool_name = static_cast<char*>(malloc(call_str.size() + 1));
         if (*out_tool_name) {
-            strcpy(*out_tool_name, call_str.c_str());
+            std::memcpy(*out_tool_name, call_str.c_str(), call_str.size() + 1);
         }
         *out_args_json = static_cast<char*>(malloc(3));
         if (*out_args_json) {
-            strcpy(*out_args_json, "{}");
+            std::memcpy(*out_args_json, "{}", 3);
         }
     } else {
         std::string func_name = call_str.substr(0, paren_pos);
@@ -759,7 +802,7 @@ static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char
 
         *out_tool_name = static_cast<char*>(malloc(func_name.size() + 1));
         if (*out_tool_name) {
-            strcpy(*out_tool_name, func_name.c_str());
+            std::memcpy(*out_tool_name, func_name.c_str(), func_name.size() + 1);
         }
 
         // Parse arguments: arg1="val1", arg2="val2", ...
@@ -790,12 +833,14 @@ static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char
             if (in_string) {
                 if (c == string_char && (i == 0 || args_str[i - 1] != '\\')) {
                     in_string = false;
-                    // End of value
+                    // End of value - escape key and value for valid JSON
                     if (!current_key.empty()) {
                         if (!first_arg) {
                             json_args += ",";
                         }
-                        json_args += "\"" + current_key + "\":\"" + current_value + "\"";
+                        std::string escaped_key = escape_json_string(current_key.c_str());
+                        std::string escaped_val = escape_json_string(current_value.c_str());
+                        json_args += "\"" + escaped_key + "\":\"" + escaped_val + "\"";
                         first_arg = false;
                         current_key.clear();
                         current_value.clear();
@@ -817,18 +862,30 @@ static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char
                         if (!first_arg) {
                             json_args += ",";
                         }
-                        // Check if value is numeric
-                        bool is_numeric = true;
-                        for (char vc : current_value) {
-                            if (!isdigit(vc) && vc != '.' && vc != '-') {
+                        // Check if value is numeric (handles edge cases)
+                        bool is_numeric = !current_value.empty();
+                        bool has_dot = false;
+                        bool has_minus = false;
+                        for (size_t i = 0; i < current_value.size() && is_numeric; i++) {
+                            char vc = current_value[i];
+                            if (vc == '-') {
+                                if (i != 0 || has_minus) is_numeric = false;
+                                has_minus = true;
+                            } else if (vc == '.') {
+                                if (has_dot) is_numeric = false;
+                                has_dot = true;
+                            } else if (!isdigit(vc)) {
                                 is_numeric = false;
-                                break;
                             }
                         }
+                        if (current_value == "-" || current_value == ".") is_numeric = false;
+                        // Escape key always; escape value only for non-numeric strings
+                        std::string escaped_key = escape_json_string(current_key.c_str());
                         if (is_numeric) {
-                            json_args += "\"" + current_key + "\":" + current_value;
+                            json_args += "\"" + escaped_key + "\":" + current_value;
                         } else {
-                            json_args += "\"" + current_key + "\":\"" + current_value + "\"";
+                            std::string escaped_val = escape_json_string(current_value.c_str());
+                            json_args += "\"" + escaped_key + "\":\"" + escaped_val + "\"";
                         }
                         first_arg = false;
                     }
@@ -850,17 +907,30 @@ static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char
             if (!first_arg) {
                 json_args += ",";
             }
-            bool is_numeric = true;
-            for (char vc : current_value) {
-                if (!isdigit(vc) && vc != '.' && vc != '-') {
+            // Check if value is numeric (handles edge cases)
+            bool is_numeric = !current_value.empty();
+            bool has_dot = false;
+            bool has_minus = false;
+            for (size_t i = 0; i < current_value.size() && is_numeric; i++) {
+                char vc = current_value[i];
+                if (vc == '-') {
+                    if (i != 0 || has_minus) is_numeric = false;
+                    has_minus = true;
+                } else if (vc == '.') {
+                    if (has_dot) is_numeric = false;
+                    has_dot = true;
+                } else if (!isdigit(vc)) {
                     is_numeric = false;
-                    break;
                 }
             }
+            if (current_value == "-" || current_value == ".") is_numeric = false;
+            // Escape key always; escape value only for non-numeric strings
+            std::string escaped_key = escape_json_string(current_key.c_str());
             if (is_numeric) {
-                json_args += "\"" + current_key + "\":" + current_value;
+                json_args += "\"" + escaped_key + "\":" + current_value;
             } else {
-                json_args += "\"" + current_key + "\":\"" + current_value + "\"";
+                std::string escaped_val = escape_json_string(current_value.c_str());
+                json_args += "\"" + escaped_key + "\":\"" + escaped_val + "\"";
             }
         }
 
@@ -870,7 +940,7 @@ static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char
 
         *out_args_json = static_cast<char*>(malloc(json_args.size() + 1));
         if (*out_args_json) {
-            strcpy(*out_args_json, json_args.c_str());
+            std::memcpy(*out_args_json, json_args.c_str(), json_args.size() + 1);
         }
     }
 
@@ -1077,7 +1147,7 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
         // Return original text as clean_text
         out_result->clean_text = static_cast<char*>(malloc(output_len + 1));
         if (out_result->clean_text) {
-            strcpy(out_result->clean_text, llm_output);
+            std::memcpy(out_result->clean_text, llm_output, output_len + 1);
         }
     }
 
@@ -1113,44 +1183,6 @@ extern "C" void rac_tool_call_free(rac_tool_call_t* result) {
 // =============================================================================
 
 /**
- * @brief Escape a string for JSON output (manual implementation)
- */
-static std::string escape_json_string(const char* str) {
-    if (!str) {
-        return "";
-    }
-
-    std::string result;
-    result.reserve(strlen(str) + 16);
-
-    for (size_t i = 0; str[i]; i++) {
-        char c = str[i];
-        switch (c) {
-        case '"':
-            result += "\\\"";
-            break;
-        case '\\':
-            result += "\\\\";
-            break;
-        case '\n':
-            result += "\\n";
-            break;
-        case '\r':
-            result += "\\r";
-            break;
-        case '\t':
-            result += "\\t";
-            break;
-        default:
-            result += c;
-            break;
-        }
-    }
-
-    return result;
-}
-
-/**
  * @brief Get parameter type name
  */
 static const char* get_param_type_name(rac_tool_param_type_t type) {
@@ -1183,10 +1215,11 @@ static std::string get_format_instructions(rac_tool_call_format_t format) {
         // Liquid AI LFM2 format
         instructions += "TOOL CALLING FORMAT (LFM2):\n";
         instructions += "When you need to use a tool, output ONLY this format:\n";
-        instructions += "<|tool_call_start|>[TOOL_NAME(param1=\"value1\", param2=\"value2\")]<|tool_call_end|>\n\n";
+        instructions += "<|tool_call_start|>[TOOL_NAME(param=\"VALUE_FROM_USER_QUERY\")]<|tool_call_end|>\n\n";
 
-        instructions += "EXAMPLE - If user asks \"what's the weather in Paris\":\n";
-        instructions += "<|tool_call_start|>[get_weather(location=\"Paris\")]<|tool_call_end|>\n\n";
+        instructions += "CRITICAL: Extract the EXACT value from the user's question:\n";
+        instructions += "- User asks 'weather in Tokyo' -> <|tool_call_start|>[get_weather(location=\"Tokyo\")]<|tool_call_end|>\n";
+        instructions += "- User asks 'weather in sf' -> <|tool_call_start|>[get_weather(location=\"San Francisco\")]<|tool_call_end|>\n\n";
 
         instructions += "RULES:\n";
         instructions += "1. For greetings or general chat, respond normally without tools\n";
@@ -1200,10 +1233,11 @@ static std::string get_format_instructions(rac_tool_call_format_t format) {
         // Default SDK format
         instructions += "TOOL CALLING FORMAT - YOU MUST USE THIS EXACT FORMAT:\n";
         instructions += "When you need to use a tool, output ONLY this (no other text before or after):\n";
-        instructions += "<tool_call>{\"tool\": \"TOOL_NAME\", \"arguments\": {\"PARAM_NAME\": \"VALUE\"}}</tool_call>\n\n";
+        instructions += "<tool_call>{\"tool\": \"TOOL_NAME\", \"arguments\": {\"PARAM_NAME\": \"VALUE_FROM_USER_QUERY\"}}</tool_call>\n\n";
 
-        instructions += "EXAMPLE - If user asks \"what's the weather in Paris\":\n";
-        instructions += "<tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"Paris\"}}</tool_call>\n\n";
+        instructions += "CRITICAL: Extract the EXACT value from the user's question:\n";
+        instructions += "- User asks 'weather in Tokyo' -> <tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"Tokyo\"}}</tool_call>\n";
+        instructions += "- User asks 'weather in sf' -> <tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"San Francisco\"}}</tool_call>\n\n";
 
         instructions += "RULES:\n";
         instructions += "1. For greetings or general chat, respond normally without tools\n";
@@ -1223,18 +1257,36 @@ static std::string get_format_example_json(rac_tool_call_format_t format) {
 
     switch (format) {
     case RAC_TOOL_FORMAT_LFM2:
-        example += "Tool call format:\n";
-        example += "<|tool_call_start|>[tool_name(param=\"extracted_value\")]<|tool_call_end|>\n\n";
-        example += "Example: User asks 'What is the weather in Paris?'\n";
-        example += "Response: <|tool_call_start|>[get_weather(location=\"Paris\")]<|tool_call_end|>\n";
+        // LFM2 format - enhanced with more math examples for better reliability
+        example += "## OUTPUT FORMAT\n";
+        example += "You MUST respond with ONLY a tool call in this exact format:\n";
+        example += "<|tool_call_start|>[function_name(param=\"value\")]<|tool_call_end|>\n\n";
+        example += "CRITICAL: Always include the FULL format with <|tool_call_start|> and <|tool_call_end|> tags.\n\n";
+        example += "## EXAMPLES\n";
+        example += "Q: What's the weather in NYC?\n";
+        example += "A: <|tool_call_start|>[get_weather(location=\"New York\")]<|tool_call_end|>\n\n";
+        example += "Q: weather in sf\n";
+        example += "A: <|tool_call_start|>[get_weather(location=\"San Francisco\")]<|tool_call_end|>\n\n";
+        example += "Q: calculate 2+2\n";
+        example += "A: <|tool_call_start|>[calculate(expression=\"2+2\")]<|tool_call_end|>\n\n";
+        example += "Q: What's 5*10?\n";
+        example += "A: <|tool_call_start|>[calculate(expression=\"5*10\")]<|tool_call_end|>\n\n";
+        example += "Q: What is 100/4?\n";
+        example += "A: <|tool_call_start|>[calculate(expression=\"100/4\")]<|tool_call_end|>\n";
         break;
 
     case RAC_TOOL_FORMAT_DEFAULT:
     default:
-        example += "Tool call format:\n";
-        example += "<tool_call>{\"tool\": \"tool_name\", \"arguments\": {\"param\": \"extracted_value\"}}</tool_call>\n\n";
-        example += "Example: User asks 'What is the weather in Paris?'\n";
-        example += "Response: <tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"Paris\"}}</tool_call>\n";
+        example += "## OUTPUT FORMAT\n";
+        example += "You MUST respond with ONLY a tool call in this exact format:\n";
+        example += "<tool_call>{\"tool\": \"function_name\", \"arguments\": {\"param\": \"value\"}}</tool_call>\n\n";
+        example += "## EXAMPLES\n";
+        example += "Q: What's the weather in NYC?\n";
+        example += "A: <tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"New York\"}}</tool_call>\n\n";
+        example += "Q: weather in sf\n";
+        example += "A: <tool_call>{\"tool\": \"get_weather\", \"arguments\": {\"location\": \"San Francisco\"}}</tool_call>\n\n";
+        example += "Q: calculate 2+2\n";
+        example += "A: <tool_call>{\"tool\": \"calculate\", \"arguments\": {\"expression\": \"2+2\"}}</tool_call>\n";
         break;
     }
 
@@ -1328,25 +1380,28 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format(const char*
     std::string prompt;
     prompt.reserve(1024 + strlen(tools_json));
 
-    prompt += "# Available Tools\n\n";
-    prompt += "You have access to the following tools. ONLY use them when the user specifically asks for information that requires them:\n\n";
+    prompt += "# TOOLS\n";
     prompt += tools_json;
     prompt += "\n\n";
 
-    prompt += "# Tool Usage Instructions\n\n";
-    prompt += "CRITICAL: When using a tool, you MUST extract and include ALL required arguments from the user's message.\n\n";
-    prompt += "RULES:\n";
-    prompt += "- For normal conversation (greetings, questions, chat), respond naturally WITHOUT using tools.\n";
-    prompt += "- Only use a tool if the user explicitly asks for something the tool provides.\n";
-    prompt += "- ALWAYS extract parameter values from the user's question. For example:\n";
-    prompt += "  - If user asks 'weather in Tokyo', use location=\"Tokyo\"\n";
-    prompt += "  - If user asks 'weather in India', use location=\"India\"\n";
-    prompt += "  - If user asks 'calculate 5 + 3', use expression=\"5 + 3\"\n\n";
-
-    // Add format-specific example
+    // Add format-specific example with direct instructions
     prompt += get_format_example_json(actual_format);
 
-    prompt += "\nNEVER use empty arguments. Always extract the value from the user's question.";
+    prompt += "\n\n## RULES\n";
+    prompt += "- Weather question = call get_weather\n";
+    prompt += "- Math/calculation question (add, subtract, multiply, divide, \"what's X*Y\", etc.) = call calculate with the EXPRESSION as a string\n";
+    prompt += "- Time question = call get_current_time\n";
+    prompt += "- DO NOT compute answers yourself. ALWAYS use the tool with the original expression.\n";
+
+    // Format-specific tag instructions
+    if (actual_format == RAC_TOOL_FORMAT_LFM2) {
+        prompt += "- ALWAYS include <|tool_call_start|> and <|tool_call_end|> tags.\n";
+    } else {
+        prompt += "- ALWAYS include <tool_call> and </tool_call> tags.\n";
+    }
+    
+    RAC_LOG_INFO("ToolCalling", "Generated tool prompt (format=%d): %.500s...", 
+                 (int)actual_format, prompt.c_str());
 
     *out_prompt = static_cast<char*>(malloc(prompt.size() + 1));
     if (!*out_prompt) {
@@ -1378,6 +1433,8 @@ extern "C" rac_result_t rac_tool_call_format_prompt_json_with_format_name(const 
                                                                           char** out_prompt) {
     // Convert format name to enum and delegate
     rac_tool_call_format_t format = rac_tool_call_format_from_name(format_name);
+    RAC_LOG_INFO("ToolCalling", "Formatting prompt with format_name='%s' -> enum=%d", 
+                 format_name ? format_name : "null", (int)format);
     return rac_tool_call_format_prompt_json_with_format(tools_json, format, out_prompt);
 }
 
@@ -1498,7 +1555,7 @@ extern "C" rac_result_t rac_tool_call_definitions_to_json(const rac_tool_definit
     if (!definitions || num_definitions == 0) {
         *out_json = static_cast<char*>(malloc(3));
         if (*out_json) {
-            strcpy(*out_json, "[]");
+            std::memcpy(*out_json, "[]", 3);
         }
         return RAC_SUCCESS;
     }

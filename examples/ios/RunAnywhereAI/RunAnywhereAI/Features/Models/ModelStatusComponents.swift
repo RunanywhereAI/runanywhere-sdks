@@ -172,73 +172,139 @@ struct ModelRequiredOverlay: View {
     let modality: ModelSelectionContext
     let onSelectModel: () -> Void
 
+    @State private var circle1Offset: CGFloat = -100
+    @State private var circle2Offset: CGFloat = 100
+    @State private var circle3Offset: CGFloat = 0
+
     var body: some View {
-        VStack(spacing: AppSpacing.xLarge) {
-            Spacer()
-
-            // Friendly icon with gradient background
+        ZStack {
+            // Animated floating circles background
             ZStack {
+                // Circle 1 - Top left
                 Circle()
-                    .fill(LinearGradient(
-                        colors: [modalityColor.opacity(0.2), modalityColor.opacity(0.1)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
-                    .frame(width: 120, height: 120)
+                    .fill(modalityColor.opacity(0.15))
+                    .blur(radius: 80)
+                    .frame(width: 300, height: 300)
+                    .offset(x: circle1Offset, y: -200)
 
-                Image(systemName: modalityIcon)
-                    .font(.system(size: 48))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [modalityColor, modalityColor.opacity(0.7)],
+                // Circle 2 - Bottom right
+                Circle()
+                    .fill(modalityColor.opacity(0.12))
+                    .blur(radius: 100)
+                    .frame(width: 250, height: 250)
+                    .offset(x: circle2Offset, y: 300)
+
+                // Circle 3 - Center
+                Circle()
+                    .fill(modalityColor.opacity(0.08))
+                    .blur(radius: 90)
+                    .frame(width: 280, height: 280)
+                    .offset(x: -circle3Offset, y: circle3Offset)
+            }
+            .ignoresSafeArea()
+            .onAppear {
+                withAnimation(
+                    .easeInOut(duration: 8)
+                    .repeatForever(autoreverses: true)
+                ) {
+                    circle1Offset = 100
+                    circle2Offset = -100
+                    circle3Offset = 80
+                }
+            }
+
+            VStack(spacing: AppSpacing.xLarge) {
+                Spacer()
+
+                // Friendly icon with gradient background
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(
+                            colors: [modalityColor.opacity(0.2), modalityColor.opacity(0.1)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
+                        ))
+                        .frame(width: 120, height: 120)
+
+                    Image(systemName: modalityIcon)
+                        .font(.system(size: 48))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [modalityColor, modalityColor.opacity(0.7)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
-                    )
-            }
-
-            // Title
-            Text(modalityTitle)
-                .font(.title2)
-                .fontWeight(.bold)
-
-            // Description
-            Text(modalityDescription)
-                .font(.body)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-
-            // Primary CTA
-            Button(action: onSelectModel) {
-                HStack(spacing: 8) {
-                    Image(systemName: "sparkles")
-                    Text("Get Started")
                 }
-                .font(.headline)
-                .frame(maxWidth: 280)
-                .padding(.vertical, 14)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(modalityColor)
 
-            // Privacy note
-            HStack(spacing: 6) {
-                Image(systemName: "lock.shield.fill")
-                    .font(.caption2)
-                Text("100% Private • Runs on your device")
-                    .font(.caption)
-            }
-            .foregroundColor(.secondary)
-            .padding(.top, AppSpacing.small)
+                // Title
+                Text(modalityTitle)
+                    .font(.title2)
+                    .fontWeight(.bold)
 
-            Spacer()
+                // Description
+                Text(modalityDescription)
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+
+                Spacer()
+
+                // Bottom section with glass effect button
+                VStack(spacing: AppSpacing.medium) {
+                    // Primary CTA with glass effect
+                    if #available(iOS 26.0, *) {
+                        Button(action: onSelectModel) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "sparkles")
+                                Text("Get Started")
+                            }
+                            .font(.headline)
+                            .foregroundColor(modalityColor)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(.thinMaterial)
+                                    .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 16))
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, AppSpacing.xLarge)
+                    } else {
+                        Button(action: onSelectModel) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "sparkles")
+                                Text("Get Started")
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(modalityColor)
+                        .padding(.horizontal, AppSpacing.xLarge)
+                    }
+
+                    // Privacy note
+                    HStack(spacing: 6) {
+                        Image(systemName: "lock.shield.fill")
+                            .font(.caption2)
+                        Text("100% Private • Runs on your device")
+                            .font(.caption)
+                    }
+                    .foregroundColor(.secondary)
+                }
+                .padding(.bottom, AppSpacing.large)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         #if os(iOS)
-        .background(Color(.systemBackground).opacity(0.95))
+        .background(Color(.systemBackground))
         #else
-        .background(Color(NSColor.windowBackgroundColor).opacity(0.95))
+        .background(Color(NSColor.windowBackgroundColor))
         #endif
     }
 
@@ -248,6 +314,7 @@ struct ModelRequiredOverlay: View {
         case .stt: return "waveform"
         case .tts: return "speaker.wave.2.fill"
         case .voice: return "mic.circle.fill"
+        case .vlm: return "camera.viewfinder"
         }
     }
 
@@ -257,6 +324,7 @@ struct ModelRequiredOverlay: View {
         case .stt: return .green
         case .tts: return AppColors.primaryPurple
         case .voice: return AppColors.primaryAccent
+        case .vlm: return .orange
         }
     }
 
@@ -266,6 +334,7 @@ struct ModelRequiredOverlay: View {
         case .stt: return "Voice to Text"
         case .tts: return "Read Aloud"
         case .voice: return "Voice Assistant"
+        case .vlm: return "Vision AI"
         }
     }
 
@@ -275,6 +344,7 @@ struct ModelRequiredOverlay: View {
         case .stt: return "Transcribe your speech to text with powerful on-device voice recognition."
         case .tts: return "Have any text read aloud with natural-sounding voices."
         case .voice: return "Talk naturally with your AI assistant. Let's set up the components together."
+        case .vlm: return "Point your camera at anything and get AI-powered descriptions in real-time."
         }
     }
 }

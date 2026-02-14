@@ -36,13 +36,20 @@ rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle) {
     rac_model_info_t* model_info = nullptr;
     rac_result_t result = rac_get_model(voice_id, &model_info);
 
+    // If not found by voice_id, try looking up by path (voice_id might be a path)
+    if (result != RAC_SUCCESS) {
+        RAC_LOG_DEBUG(LOG_CAT, "Model not found by ID, trying path lookup: %s", voice_id);
+        result = rac_get_model_by_path(voice_id, &model_info);
+    }
+
     rac_inference_framework_t framework = RAC_FRAMEWORK_ONNX;
     const char* model_path = voice_id;
 
     if (result == RAC_SUCCESS && model_info) {
         framework = model_info->framework;
         model_path = model_info->local_path ? model_info->local_path : voice_id;
-        RAC_LOG_DEBUG(LOG_CAT, "Found model in registry, framework=%d", framework);
+        RAC_LOG_DEBUG(LOG_CAT, "Found model in registry: id=%s, framework=%d",
+                      model_info->id ? model_info->id : "NULL", framework);
     }
 
     // Build service request

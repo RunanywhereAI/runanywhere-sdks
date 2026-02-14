@@ -69,6 +69,8 @@ extension ModelFormat {
             return RAC_MODEL_FORMAT_GGUF
         case .bin:
             return RAC_MODEL_FORMAT_BIN
+        case .coreml:
+            return RAC_MODEL_FORMAT_COREML
         case .unknown:
             return RAC_MODEL_FORMAT_UNKNOWN
         }
@@ -85,6 +87,8 @@ extension ModelFormat {
             self = .gguf
         case RAC_MODEL_FORMAT_BIN:
             self = .bin
+        case RAC_MODEL_FORMAT_COREML:
+            self = .coreml
         default:
             self = .unknown
         }
@@ -107,6 +111,10 @@ extension InferenceFramework {
             return RAC_FRAMEWORK_SYSTEM_TTS
         case .fluidAudio:
             return RAC_FRAMEWORK_FLUID_AUDIO
+        case .coreml:
+            return RAC_FRAMEWORK_COREML
+        case .mlx:
+            return RAC_FRAMEWORK_MLX
         case .builtIn:
             return RAC_FRAMEWORK_BUILTIN
         case .none:
@@ -129,6 +137,10 @@ extension InferenceFramework {
             self = .systemTTS
         case RAC_FRAMEWORK_FLUID_AUDIO:
             self = .fluidAudio
+        case RAC_FRAMEWORK_COREML:
+            self = .coreml
+        case RAC_FRAMEWORK_MLX:
+            self = .mlx
         case RAC_FRAMEWORK_BUILTIN:
             self = .builtIn
         case RAC_FRAMEWORK_NONE:

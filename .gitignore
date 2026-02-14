@@ -288,7 +288,7 @@ sdk/runanywhere-kotlin/modules/runanywhere-llm-llamacpp/src/jvmMain/resources/na
 #    cp build/android/unified/arm64-v8a/librac_commons.so \
 #       ../runanywhere-react-native/packages/core/android/src/main/jniLibs/arm64-v8a/
 #
-#    # iOS  
+#    # iOS
 #    rm -rf ../runanywhere-react-native/packages/core/ios/Frameworks/RACommons.xcframework
 #    cp -R dist/RACommons.xcframework \
 #       ../runanywhere-react-native/packages/core/ios/Frameworks/
@@ -340,6 +340,9 @@ sdk/runanywhere-swift/Sources/RunAnywhere/Data/Network/DevelopmentConfig.swift
 # Swift SDK - Local XCFrameworks
 sdk/runanywhere-swift/Binaries/*.xcframework
 
+# Swift SDK - Vendor directory (locally built xcframeworks)
+sdk/runanywhere-swift/vendor/
+
 # Kotlin SDK - Local JNI libs
 sdk/runanywhere-kotlin/src/androidMain/jniLibs/
 
@@ -358,5 +361,7 @@ sdk/runanywhere-flutter/android/*.aar
 # React Native - Pre-built xcframeworks (build artifacts)
 sdk/runanywhere-react-native/packages/*/ios/xcframeworks/
 
+
 # Node
 node_modules/
+tools/

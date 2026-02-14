@@ -325,7 +325,7 @@ public extension RunAnywhere {
     ) async throws -> String {
         let genOptions = LLMGenerationOptions(
             maxTokens: maxTokens ?? 1024,
-            temperature: temperature ?? 0.7
+            temperature: temperature ?? 0.3  // Lower temperature for consistent tool calling
         )
 
         let streamResult = try await generateStream(prompt, options: genOptions)
