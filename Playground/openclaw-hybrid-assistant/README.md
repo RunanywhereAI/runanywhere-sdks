@@ -27,6 +27,38 @@ A lightweight voice assistant that acts as a **channel** for OpenClaw. No local 
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+## Project Structure
+
+```
+openclaw-hybrid-assistant/
+├── src/
+│   ├── main.cpp                          # Entry point, CLI parsing, event loop
+│   ├── audio/                            # Audio I/O (ALSA)
+│   │   ├── audio_capture.h/cpp           #   Microphone input (16kHz, 16-bit PCM, mono)
+│   │   ├── audio_playback.h/cpp          #   Speaker output (cancellable, multi-rate)
+│   │   └── waiting_chime.h/cpp           #   Earcon feedback while waiting for response
+│   ├── pipeline/                         # Voice processing chain
+│   │   ├── voice_pipeline.h/cpp          #   Wake Word → VAD → STT → TTS orchestrator
+│   │   └── tts_queue.h/cpp              #   Producer/consumer streaming TTS playback
+│   ├── network/                          # Network communication
+│   │   └── openclaw_client.h/cpp         #   Raw WebSocket client (RFC 6455)
+│   └── config/                           # Configuration
+│       └── model_config.h                #   Model paths, IDs, availability checks
+├── tests/
+│   ├── test_components.cpp               # Component tests (wake word, VAD, STT)
+│   ├── test_integration.cpp              # E2E tests (fake WS server, sanitization, TTS)
+│   ├── audio/                            # Generated test WAV files
+│   └── scripts/                          # Test audio generation scripts
+├── scripts/
+│   ├── download-models.sh                # Model download (VAD, ASR, TTS, wake word)
+│   ├── openclaw-voice.service            # systemd service unit
+│   └── test-on-mac.sh                    # Mac testing via Docker/Lima
+├── CMakeLists.txt                        # Build configuration (3 targets)
+├── Dockerfile                            # Docker build + test environment
+├── build.sh                              # End-to-end build script
+└── README.md
+```
+
 ## Key Differences from linux-voice-assistant
 
 | Feature | linux-voice-assistant | openclaw-hybrid-assistant |
@@ -68,7 +100,34 @@ A lightweight voice assistant that acts as a **channel** for OpenClaw. No local 
 - Alternative: Kokoro TTS v0.19 available with `--kokoro` download flag (11 speakers, 24kHz, ~330MB)
 - **Text Sanitization**: Automatically removes emojis, markdown, and special characters before synthesis
 
-### 5. Waiting Feedback (Earcon)
+### 5. Audio Capture (`src/audio/audio_capture`)
+- ALSA-based microphone input
+- Format: 16kHz, 16-bit PCM, mono (optimal for STT)
+- Callback-driven: delivers audio chunks to the voice pipeline
+- Device listing and selection support
+
+### 6. Audio Playback (`src/audio/audio_playback`)
+- ALSA-based speaker output
+- **Cancellable playback**: writes period-sized chunks (~46ms at 22kHz), checks cancel flag between each
+- Instant silence on cancel via `snd_pcm_drop()`
+- Dynamic sample rate reinitialize (supports 22050Hz Piper and 24kHz Kokoro)
+
+### 7. TTS Queue (`src/pipeline/tts_queue`)
+- Producer/consumer pattern for gapless streaming TTS
+- Producer thread synthesizes sentences and pushes audio chunks
+- Consumer thread plays chunks via ALSA as they arrive
+- Sentence N+1 synthesizes while sentence N plays
+- Thread-safe cancellation support
+
+### 8. OpenClaw Client (`src/network/openclaw_client`)
+- Raw WebSocket implementation (RFC 6455 compliant, no external WS library)
+- TCP connect, WebSocket upgrade handshake with random key
+- Masked frame sending and extended payload support
+- Ping/pong handling for connection keepalive
+- Background receive thread with thread-safe speak message queue
+- Auto-reconnect with configurable delay and max attempts
+
+### 9. Waiting Feedback (`src/audio/waiting_chime`)
 Plays a brief, pleasant earcon sound while waiting for OpenClaw to process the user's request:
 
 - **Professional earcon**: Generated via `sox` pluck synthesis (sounds like a real glockenspiel chime)
@@ -78,6 +137,13 @@ Plays a brief, pleasant earcon sound while waiting for OpenClaw to process the u
 - **Graceful fallback**: If the earcon WAV is missing, waiting is silent (no crash)
 
 Generated automatically by `./scripts/download-models.sh` (requires `sox`).
+
+### 10. Barge-in Support
+- Wake word detection continues during TTS playback
+- When detected: cancels current speech, clears pending responses, re-enters listening
+- Deferred mutex handling for ARM safety (avoids deadlock between audio and pipeline threads)
+- Text sanitization engine for TTS: removes emojis, markdown, HTML, special chars
+- Abbreviation-aware sentence splitter (handles "Mr.", "Dr.", "e.g.", "U.S.", etc.)
 
 ## OpenClaw WebSocket Protocol
 

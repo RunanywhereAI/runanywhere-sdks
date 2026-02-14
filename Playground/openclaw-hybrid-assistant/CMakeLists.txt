@@ -45,7 +45,7 @@ endif()
 # =============================================================================
 
 include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${RAC_DIST_DIR}/include
     ${SHERPA_DIR}/include
     ${ALSA_INCLUDE_DIRS}
@@ -65,13 +65,13 @@ link_directories(
 # =============================================================================
 
 add_executable(openclaw-assistant
-    main.cpp
-    voice_pipeline.cpp
-    tts_queue.cpp
-    openclaw_client.cpp
-    audio_capture.cpp
-    audio_playback.cpp
-    waiting_chime.cpp
+    src/main.cpp
+    src/pipeline/voice_pipeline.cpp
+    src/pipeline/tts_queue.cpp
+    src/network/openclaw_client.cpp
+    src/audio/audio_capture.cpp
+    src/audio/audio_playback.cpp
+    src/audio/waiting_chime.cpp
 )
 
 target_link_libraries(openclaw-assistant PRIVATE
@@ -104,8 +104,8 @@ set_target_properties(openclaw-assistant PROPERTIES
 
 add_executable(test-components
     tests/test_components.cpp
-    voice_pipeline.cpp
-    tts_queue.cpp
+    src/pipeline/voice_pipeline.cpp
+    src/pipeline/tts_queue.cpp
 )
 
 target_link_libraries(test-components PRIVATE
@@ -144,10 +144,10 @@ set_target_properties(test-components PROPERTIES
 
 add_executable(test-integration
     tests/test_integration.cpp
-    voice_pipeline.cpp
-    tts_queue.cpp
-    openclaw_client.cpp
-    waiting_chime.cpp
+    src/pipeline/voice_pipeline.cpp
+    src/pipeline/tts_queue.cpp
+    src/network/openclaw_client.cpp
+    src/audio/waiting_chime.cpp
 )
 
 target_link_libraries(test-integration PRIVATE

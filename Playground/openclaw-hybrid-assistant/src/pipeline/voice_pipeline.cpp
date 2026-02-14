@@ -8,7 +8,7 @@
 
 #include "voice_pipeline.h"
 #include "tts_queue.h"
-#include "model_config.h"
+#include "config/model_config.h"
 
 // RAC headers - use voice_agent for unified API
 #include <rac/features/voice_agent/rac_voice_agent.h>
