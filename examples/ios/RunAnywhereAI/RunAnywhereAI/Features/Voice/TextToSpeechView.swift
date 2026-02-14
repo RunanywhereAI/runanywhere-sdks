@@ -233,21 +233,23 @@ struct TextToSpeechView: View {
                 Slider(value: $viewModel.speechRate, in: 0.5...2.0, step: 0.1)
                     .tint(AppColors.primaryAccent)
             }
+            
+            // TODO: Find a model for TTS that supports pitch, or manually implement a good quality pitch adjustment
 
-            // Pitch
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("Pitch")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text(String(format: "%.1fx", viewModel.pitch))
-                        .font(.system(size: 15, weight: .medium, design: .rounded))
-                        .foregroundColor(.primary)
-                }
-                Slider(value: $viewModel.pitch, in: 0.5...2.0, step: 0.1)
-                    .tint(AppColors.primaryPurple)
-            }
+            // Pitch (not implemented in the current TTS models. Once supported, we can have this back.)
+            // VStack(alignment: .leading, spacing: 10) {
+            //     HStack {
+            //         Text("Pitch")
+            //             .font(.subheadline)
+            //             .foregroundColor(.secondary)
+            //         Spacer()
+            //         Text(String(format: "%.1fx", viewModel.pitch))
+            //             .font(.system(size: 15, weight: .medium, design: .rounded))
+            //             .foregroundColor(.primary)
+            //     }
+            //     Slider(value: $viewModel.pitch, in: 0.5...2.0, step: 0.1)
+            //         .tint(AppColors.primaryPurple)
+            // }
         }
         .padding(20)
         .background(AppColors.backgroundTertiary)

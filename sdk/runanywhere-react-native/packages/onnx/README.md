@@ -31,7 +31,7 @@ ONNX Runtime backend for the RunAnywhere React Native SDK. Provides on-device Sp
 ## Requirements
 
 - `@runanywhere/core` (peer dependency)
-- React Native 0.71+
+- React Native 0.74+
 - iOS 15.1+ / Android API 24+
 - Microphone permission (for live recording)
 

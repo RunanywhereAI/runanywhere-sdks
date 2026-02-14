@@ -2,6 +2,7 @@
 
 package com.runanywhere.runanywhereai.presentation.settings
 
+import android.app.Application
 import android.content.Intent
 import android.net.Uri
 import android.text.format.Formatter
@@ -31,13 +32,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppTypography
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
-import android.app.Application
 
 /**
- * Settings screen
+ * Settings & Storage Screen
  *
- * Section order: Generation Settings, API Configuration, Storage Overview, Downloaded Models,
- * Storage Management, Logging Configuration, About.
+ * Section order: API Configuration, Generation Settings, Tool Calling,
+ * Storage Overview, Downloaded Models, Storage Management, Logging Configuration, About.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,54 +72,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             )
         }
 
-        // 1. Generation Settings
-        SettingsSection(title = "Generation Settings") {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text = "Temperature: ${"%.2f".format(uiState.temperature)}",
-                    style = AppTypography.caption,
-                    color = AppColors.textSecondary,
-                )
-                Slider(
-                    value = uiState.temperature,
-                    onValueChange = { viewModel.updateTemperature(it) },
-                    valueRange = 0f..2f,
-                    steps = 19,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "Max Tokens: ${uiState.maxTokens}",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedButton(
-                            onClick = { viewModel.updateMaxTokens((uiState.maxTokens - 500).coerceAtLeast(500)) },
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            modifier = Modifier.height(32.dp),
-                        ) { Text("-", style = AppTypography.caption) }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "${uiState.maxTokens}",
-                            style = AppTypography.caption,
-                            modifier = Modifier.widthIn(min = 48.dp),
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        OutlinedButton(
-                            onClick = { viewModel.updateMaxTokens((uiState.maxTokens + 500).coerceAtMost(20000)) },
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            modifier = Modifier.height(32.dp),
-                        ) { Text("+", style = AppTypography.caption) }
-                    }
-                }
-            }
-        }
-
-        // 2. API Configuration (Testing)
+        // 1. API Configuration (Testing)
         SettingsSection(title = "API Configuration (Testing)") {
             Row(
                 modifier = Modifier
@@ -182,10 +135,99 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             )
         }
 
-        // Tool Calling Section
+        // 2. Generation Settings Section
+        SettingsSection(title = "Generation Settings") {
+            // Temperature Slider
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Temperature",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        text = String.format("%.1f", uiState.temperature),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Slider(
+                    value = uiState.temperature,
+                    onValueChange = { viewModel.updateTemperature(it) },
+                    valueRange = 0f..2f,
+                    steps = 19, // 0.1 increments from 0.0 to 2.0
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+            // Max Tokens Slider
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Max Tokens",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        text = uiState.maxTokens.toString(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Slider(
+                    value = uiState.maxTokens.toFloat(),
+                    onValueChange = { viewModel.updateMaxTokens(it.toInt()) },
+                    valueRange = 50f..4096f,
+                    steps = 80, // 50-token increments
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+            // System Prompt TextField
+            OutlinedTextField(
+                value = uiState.systemPrompt,
+                onValueChange = { viewModel.updateSystemPrompt(it) },
+                label = { Text("System Prompt") },
+                placeholder = { Text("Enter system prompt (optional)") },
+                modifier = Modifier.fillMaxWidth(),
+                maxLines = 3,
+                textStyle = MaterialTheme.typography.bodyMedium,
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Save Button
+            OutlinedButton(
+                onClick = { viewModel.saveGenerationSettings() },
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = AppColors.primaryAccent,
+                ),
+            ) {
+                Text("Save Settings")
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "These settings affect LLM text generation.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        // 3. Tool Calling Section
         ToolSettingsSection()
 
-        // 3. Storage Overview - iOS Label(systemImage: "externaldrive") etc.
+        // 4. Storage Overview
         SettingsSection(
             title = "Storage Overview",
             trailing = {
@@ -223,7 +265,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             )
         }
 
-        // 4. Downloaded Models
+        // 5. Downloaded Models
         SettingsSection(title = "Downloaded Models") {
             if (uiState.downloadedModels.isEmpty()) {
                 Text(
@@ -245,7 +287,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             }
         }
 
-        // 5. Storage Management - iOS trash icon, red/orange
+        // 6. Storage Management
         SettingsSection(title = "Storage Management") {
             StorageManagementButton(
                 title = "Clear Cache",
@@ -264,7 +306,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             )
         }
 
-        // 6. Logging Configuration - iOS Toggle "Log Analytics Locally"
+        // 7. Logging Configuration
         SettingsSection(title = "Logging Configuration") {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -288,7 +330,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             )
         }
 
-        // 7. About - iOS Label "RunAnywhere SDK" systemImage "cube", "Documentation" systemImage "book"
+        // 8. About
         SettingsSection(title = "About") {
             Row(
                 modifier = Modifier.padding(vertical = 8.dp),
@@ -394,7 +436,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
         )
     }
 
-    // Restart Required Dialog - iOS exact message
+    // Restart Required Dialog
     if (uiState.showRestartDialog) {
         AlertDialog(
             onDismissRequest = { viewModel.dismissRestartDialog() },
@@ -712,8 +754,7 @@ private fun ApiConfigurationDialog(
 
 /**
  * Tool Calling Settings Section
- * 
- * Allows users to:
+ * * Allows users to:
  * - Enable/disable tool calling
  * - Register demo tools (weather, time, calculator)
  * - Clear all registered tools
