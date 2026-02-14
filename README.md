@@ -27,32 +27,37 @@
 
 ## See It In Action
 
+<div align="center">
 <table>
   <tr>
-    <td align="center">
-      <img src="docs/gifs/text-generation.gif" alt="Text Generation" width="260"/><br/>
+    <td align="center" width="50%">
+      <img src="docs/gifs/text-generation.gif" alt="Text Generation" width="240"/><br/><br/>
       <strong>Text Generation</strong><br/>
       <sub>LLM inference — 100% on-device</sub>
     </td>
-    <td align="center">
-      <img src="docs/gifs/voice-ai.gif" alt="Voice AI" width="260"/><br/>
+    <td width="40"></td>
+    <td align="center" width="50%">
+      <img src="docs/gifs/voice-ai.gif" alt="Voice AI" width="240"/><br/><br/>
       <strong>Voice AI</strong><br/>
       <sub>STT → LLM → TTS pipeline — fully offline</sub>
     </td>
   </tr>
+  <tr><td colspan="3" height="30"></td></tr>
   <tr>
-    <td align="center">
-      <img src="docs/gifs/image-generation.gif" alt="Image Generation" width="260"/><br/>
+    <td align="center" width="50%">
+      <img src="docs/gifs/image-generation.gif" alt="Image Generation" width="240"/><br/><br/>
       <strong>Image Generation</strong><br/>
       <sub>On-device diffusion model</sub>
     </td>
-    <td align="center">
-      <img src="docs/gifs/visual-language-model.gif" alt="Visual Language Model" width="260"/><br/>
+    <td width="40"></td>
+    <td align="center" width="50%">
+      <img src="docs/gifs/visual-language-model.gif" alt="Visual Language Model" width="240"/><br/><br/>
       <strong>Visual Language Model</strong><br/>
       <sub>Vision + language understanding on-device</sub>
     </td>
   </tr>
 </table>
+</div>
 
 ---
 
