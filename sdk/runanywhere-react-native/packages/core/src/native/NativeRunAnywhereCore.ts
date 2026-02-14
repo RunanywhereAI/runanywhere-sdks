@@ -9,11 +9,16 @@
  * - @runanywhere/onnx for speech processing
  */
 
-import { NitroModules } from 'react-native-nitro-modules';
 import type { RunAnywhereCore } from '../specs/RunAnywhereCore.nitro';
 import type { RunAnywhereDeviceInfo } from '../specs/RunAnywhereDeviceInfo.nitro';
 import type { NativeRunAnywhereModule } from './NativeRunAnywhereModule';
 import { SDKLogger } from '../Foundation/Logging';
+import { initializeNitroModulesGlobally, getNitroModulesProxySync } from './NitroModulesGlobalInit';
+
+// Use the global NitroModules initialization
+function getNitroModulesProxy(): any {
+  return getNitroModulesProxySync();
+}
 
 export type { NativeRunAnywhereModule } from './NativeRunAnywhereModule';
 export { hasNativeMethod } from './NativeRunAnywhereModule';
@@ -30,7 +35,14 @@ export type NativeRunAnywhereCoreModule = RunAnywhereCore;
  * Most users should use the RunAnywhere facade class instead.
  */
 export function requireNativeCoreModule(): NativeRunAnywhereCoreModule {
-  return NitroModules.createHybridObject<RunAnywhereCore>('RunAnywhereCore');
+  const NitroProxy = getNitroModulesProxy();
+  if (!NitroProxy) {
+    throw new Error(
+      'NitroModules is not available. This can happen in Bridgeless mode if ' +
+      'react-native-nitro-modules is not properly linked.'
+    );
+  }
+  return NitroProxy.createHybridObject('RunAnywhereCore') as RunAnywhereCore;
 }
 
 /**
@@ -113,7 +125,12 @@ function getDeviceInfoHybridObject(): RunAnywhereDeviceInfo | null {
     return _deviceInfoModule;
   }
   try {
-    _deviceInfoModule = NitroModules.createHybridObject<RunAnywhereDeviceInfo>('RunAnywhereDeviceInfo');
+    const NitroProxy = getNitroModulesProxy();
+    if (!NitroProxy) {
+      console.warn('[NativeRunAnywhereCore] NitroModules not available for RunAnywhereDeviceInfo');
+      return null;
+    }
+    _deviceInfoModule = NitroProxy.createHybridObject('RunAnywhereDeviceInfo') as RunAnywhereDeviceInfo;
     return _deviceInfoModule;
   } catch (error) {
     console.warn('[NativeRunAnywhereCore] Failed to create RunAnywhereDeviceInfo:', error);

@@ -70,10 +70,17 @@ typedef struct rac_log_metadata {
 } rac_log_metadata_t;
 
 /** Default empty metadata */
+#ifdef __cplusplus
+#define RAC_LOG_METADATA_EMPTY                                     \
+    rac_log_metadata_t {                                           \
+        NULL, 0, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL \
+    }
+#else
 #define RAC_LOG_METADATA_EMPTY                                     \
     (rac_log_metadata_t) {                                         \
         NULL, 0, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL \
     }
+#endif
 
 // =============================================================================
 // CORE LOGGING API
@@ -178,26 +185,47 @@ RAC_API void rac_logger_logv(rac_log_level_t level, const char* category,
 /**
  * Helper to create metadata with source location.
  */
+#ifdef __cplusplus
+#define RAC_LOG_META_HERE()                                                       \
+    rac_log_metadata_t {                                                          \
+        __FILE__, __LINE__, __func__, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL \
+    }
+#else
 #define RAC_LOG_META_HERE()                                                       \
     (rac_log_metadata_t) {                                                        \
         __FILE__, __LINE__, __func__, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL \
     }
+#endif
 
 /**
  * Helper to create metadata with source location and error code.
  */
+#ifdef __cplusplus
+#define RAC_LOG_META_ERROR(code, msg)                                                   \
+    rac_log_metadata_t {                                                                \
+        __FILE__, __LINE__, __func__, (code), (msg), NULL, NULL, NULL, NULL, NULL, NULL \
+    }
+#else
 #define RAC_LOG_META_ERROR(code, msg)                                                   \
     (rac_log_metadata_t) {                                                              \
         __FILE__, __LINE__, __func__, (code), (msg), NULL, NULL, NULL, NULL, NULL, NULL \
     }
+#endif
 
 /**
  * Helper to create metadata with model context.
  */
+#ifdef __cplusplus
+#define RAC_LOG_META_MODEL(mid, fw)                                                \
+    rac_log_metadata_t {                                                           \
+        __FILE__, __LINE__, __func__, 0, NULL, (mid), (fw), NULL, NULL, NULL, NULL \
+    }
+#else
 #define RAC_LOG_META_MODEL(mid, fw)                                                \
     (rac_log_metadata_t) {                                                         \
         __FILE__, __LINE__, __func__, 0, NULL, (mid), (fw), NULL, NULL, NULL, NULL \
     }
+#endif
 
 // --- Level-specific logging macros with automatic source location ---
 

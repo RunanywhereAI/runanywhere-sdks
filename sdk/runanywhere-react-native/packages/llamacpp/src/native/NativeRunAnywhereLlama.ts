@@ -5,8 +5,13 @@
  * This module provides Llama-based text generation capabilities.
  */
 
-import { NitroModules } from 'react-native-nitro-modules';
 import type { RunAnywhereLlama } from '../specs/RunAnywhereLlama.nitro';
+import { getNitroModulesProxySync } from '@runanywhere/core';
+
+// Use the global NitroModules initialization
+function getNitroModulesProxy(): any {
+  return getNitroModulesProxySync();
+}
 
 /**
  * The native RunAnywhereLlama module type
@@ -17,7 +22,14 @@ export type NativeRunAnywhereLlamaModule = RunAnywhereLlama;
  * Get the native RunAnywhereLlama Hybrid Object
  */
 export function requireNativeLlamaModule(): NativeRunAnywhereLlamaModule {
-  return NitroModules.createHybridObject<RunAnywhereLlama>('RunAnywhereLlama');
+  const NitroProxy = getNitroModulesProxy();
+  if (!NitroProxy) {
+    throw new Error(
+      'NitroModules is not available. This can happen in Bridgeless mode if ' +
+      'react-native-nitro-modules is not properly linked.'
+    );
+  }
+  return NitroProxy.createHybridObject<RunAnywhereLlama>('RunAnywhereLlama');
 }
 
 /**

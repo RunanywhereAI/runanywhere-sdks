@@ -55,6 +55,17 @@ export interface StorageInfo {
 }
 
 /**
+ * Get models directory path on device
+ * Returns: Documents/RunAnywhere/Models/
+ */
+export async function getModelsDirectory(): Promise<string> {
+  if (!FileSystem.isAvailable()) {
+    return '';
+  }
+  return FileSystem.getModelsDirectory();
+}
+
+/**
  * Get storage information
  * Returns structure matching Swift's StorageInfo
  */

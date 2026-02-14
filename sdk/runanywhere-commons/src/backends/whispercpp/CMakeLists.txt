@@ -76,6 +76,15 @@ set(BUILD_SHARED_LIBS OFF CACHE BOOL "Force static libraries for whisper.cpp" FO
 
 FetchContent_MakeAvailable(whispercpp)
 
+# Fix: Ensure whisper.cpp uses its own ggml headers, not LlamaCPP's
+# This prevents GGML_KQ_MASK_PAD undefined errors when both backends are built
+if(TARGET whisper)
+    target_include_directories(whisper BEFORE PRIVATE
+        ${whispercpp_SOURCE_DIR}/ggml/include
+        ${whispercpp_SOURCE_DIR}/include
+    )
+endif()
+
 # =============================================================================
 # WhisperCPP Backend Library
 # =============================================================================

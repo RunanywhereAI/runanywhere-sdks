@@ -57,6 +57,9 @@ message(STATUS "[RunAnywhereCore] Found RACommons at ${JNILIB_DIR}/librac_common
 # =============================================================================
 # Collect core bridge source files
 file(GLOB BRIDGE_SOURCES "../cpp/bridges/*.cpp")
+# TODO: Re-enable ToolCallingBridge when commons library includes rac_tool_call_* functions
+# Currently disabled because these functions aren't in commons v0.1.4
+list(FILTER BRIDGE_SOURCES EXCLUDE REGEX ".*ToolCallingBridge\\.cpp$")
 
 add_library(${PACKAGE_NAME} SHARED
     src/main/cpp/cpp-adapter.cpp

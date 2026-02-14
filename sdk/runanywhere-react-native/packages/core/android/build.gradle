@@ -117,7 +117,7 @@ android {
         targetSdkVersion getExtOrIntegerDefault('targetSdkVersion')
 
         ndk {
-            abiFilters(*reactNativeArchitectures())
+            abiFilters 'arm64-v8a'
         }
 
         externalNativeBuild {
@@ -126,7 +126,7 @@ android {
                 arguments "-DANDROID_STL=c++_shared",
                           // Fix NitroModules prefab path - use app's build directory
                           "-DREACT_NATIVE_NITRO_BUILD_DIR=${rootProject.buildDir}"
-                abiFilters(*reactNativeArchitectures())
+                abiFilters 'arm64-v8a'
             }
         }
     }

@@ -15,6 +15,12 @@
  */
 
 // =============================================================================
+// Global NitroModules Initialization (MUST be first!)
+// =============================================================================
+
+export { initializeNitroModulesGlobally, getNitroModulesProxySync, isNitroModulesInitialized } from './native/NitroModulesGlobalInit';
+
+// =============================================================================
 // Main SDK
 // =============================================================================
 
