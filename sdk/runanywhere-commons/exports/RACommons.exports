@@ -118,6 +118,7 @@ _rac_model_info_copy
 _rac_model_info_free
 _rac_model_info_is_downloaded
 _rac_model_matches_filter
+_rac_model_check_compatibility
 
 # Model Paths
 _rac_model_paths_extract_framework

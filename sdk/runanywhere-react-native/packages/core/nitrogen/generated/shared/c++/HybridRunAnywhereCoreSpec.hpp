@@ -71,6 +71,7 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> isModelDownloaded(const std::string& modelId) = 0;
       virtual std::shared_ptr<Promise<std::string>> getModelPath(const std::string& modelId) = 0;
       virtual std::shared_ptr<Promise<bool>> registerModel(const std::string& modelJson) = 0;
+      virtual std::shared_ptr<Promise<std::string>> checkCompatibility(const std::string& modelId) = 0;
       virtual std::shared_ptr<Promise<bool>> downloadModel(const std::string& modelId, const std::string& url, const std::string& destPath) = 0;
       virtual std::shared_ptr<Promise<bool>> cancelDownload(const std::string& modelId) = 0;
       virtual std::shared_ptr<Promise<std::string>> getDownloadProgress(const std::string& modelId) = 0;

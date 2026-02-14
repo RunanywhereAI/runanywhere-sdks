@@ -166,14 +166,14 @@ export const RunAnywhere = {
       // This ensures HTTP is ready when C++ callbacks need it
       const envString = environment === SDKEnvironment.Development ? 'development'
         : environment === SDKEnvironment.Staging ? 'staging'
-        : 'production';
+          : 'production';
 
       // Map environment string to SDKEnvironment enum for HTTPService
       const networkEnv = environment === SDKEnvironment.Development
         ? NetworkSDKEnvironment.Development
         : environment === SDKEnvironment.Staging
-        ? NetworkSDKEnvironment.Staging
-        : NetworkSDKEnvironment.Production;
+          ? NetworkSDKEnvironment.Staging
+          : NetworkSDKEnvironment.Production;
 
       // Configure HTTPService with network settings
       HTTPService.shared.configure({
@@ -369,7 +369,7 @@ export const RunAnywhere = {
   ): Promise<void> {
     const envString = environment === SDKEnvironment.Development ? 'development'
       : environment === SDKEnvironment.Staging ? 'staging'
-      : 'production';
+        : 'production';
 
     try {
       const native = requireNativeModule();
@@ -615,6 +615,7 @@ export const RunAnywhere = {
   downloadModel: Models.downloadModel,
   cancelDownload: Models.cancelDownload,
   deleteModel: Models.deleteModel,
+  checkCompatibility: Models.checkCompatibility,
 
   // ============================================================================
   // Utilities

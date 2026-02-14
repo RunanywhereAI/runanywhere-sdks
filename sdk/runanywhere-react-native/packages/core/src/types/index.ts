@@ -36,6 +36,7 @@ export type {
   InitializationResult,
   LLMGenerationOptions,
   ModelInfo,
+  ModelCompatibilityResult,
   ModelInfoMetadata,
   PerformanceMetrics,
   SDKInitOptions,
