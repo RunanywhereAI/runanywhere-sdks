@@ -19,6 +19,7 @@
 
 import { RunAnywhere } from '../RunAnywhere';
 import { WASMBridge } from '../../Foundation/WASMBridge';
+import { Offsets } from '../../Foundation/StructOffsets';
 import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { EventBus } from '../../Foundation/EventBus';
@@ -178,16 +179,15 @@ export const TextGeneration = {
       throw new SDKError(SDKErrorCode.WASMMemoryError, 'Failed to allocate LLM options');
     }
 
-    // Override options if provided
-    // rac_llm_options_t layout: { max_tokens, temperature, top_p, ... }
+    // Override options if provided (offsets from compiler via StructOffsets)
     if (options.maxTokens !== undefined) {
-      m.setValue(optionsPtr, options.maxTokens, 'i32');
+      m.setValue(optionsPtr + Offsets.llmOptions.maxTokens, options.maxTokens, 'i32');
     }
     if (options.temperature !== undefined) {
-      m.setValue(optionsPtr + 4, options.temperature, 'float');
+      m.setValue(optionsPtr + Offsets.llmOptions.temperature, options.temperature, 'float');
     }
     if (options.topP !== undefined) {
-      m.setValue(optionsPtr + 8, options.topP, 'float');
+      m.setValue(optionsPtr + Offsets.llmOptions.topP, options.topP, 'float');
     }
 
     // Allocate and zero-initialise the result struct so any C++ code that
@@ -224,19 +224,11 @@ export const TextGeneration = {
       }
       bridge.checkResult(result, 'rac_llm_component_generate');
 
-      // Read result struct
-      // rac_llm_result_t layout:
-      //   offset 0:  char*   text
-      //   offset 4:  int32   prompt_tokens
-      //   offset 8:  int32   completion_tokens
-      //   offset 12: int32   total_tokens
-      //   offset 16: int64   time_to_first_token_ms
-      //   offset 24: int64   total_time_ms
-      //   offset 32: float   tokens_per_second
-      const textPtr = m.getValue(resultPtr, '*');
+      // Read result struct (offsets from compiler via StructOffsets)
+      const textPtr = m.getValue(resultPtr + Offsets.llmResult.text, '*');
       const text = bridge.readString(textPtr);
-      const inputTokens = m.getValue(resultPtr + 4, 'i32');
-      const outputTokens = m.getValue(resultPtr + 8, 'i32');
+      const inputTokens = m.getValue(resultPtr + Offsets.llmResult.promptTokens, 'i32');
+      const outputTokens = m.getValue(resultPtr + Offsets.llmResult.completionTokens, 'i32');
 
       const latencyMs = performance.now() - startTime;
       const tokensPerSecond = outputTokens > 0 ? (outputTokens / (latencyMs / 1000)) : 0;
@@ -390,10 +382,10 @@ export const TextGeneration = {
     const optionsPtr = m._rac_wasm_create_llm_options_default();
 
     if (options.maxTokens !== undefined) {
-      m.setValue(optionsPtr, options.maxTokens, 'i32');
+      m.setValue(optionsPtr + Offsets.llmOptions.maxTokens, options.maxTokens, 'i32');
     }
     if (options.temperature !== undefined) {
-      m.setValue(optionsPtr + 4, options.temperature, 'float');
+      m.setValue(optionsPtr + Offsets.llmOptions.temperature, options.temperature, 'float');
     }
 
     let startResult: number;

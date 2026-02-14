@@ -26,6 +26,8 @@ import { WASMBridge } from '../Foundation/WASMBridge';
 import type { AccelerationMode } from '../Foundation/WASMBridge';
 import { SherpaONNXBridge } from '../Foundation/SherpaONNXBridge';
 import { PlatformAdapter } from '../Foundation/PlatformAdapter';
+import { loadOffsets } from '../Foundation/StructOffsets';
+import { Offsets } from '../Foundation/StructOffsets';
 import { ModelManager } from '../Infrastructure/ModelManager';
 import type { CompactModelDef, ManagedModel, VLMLoader } from '../Infrastructure/ModelManager';
 
@@ -49,6 +51,8 @@ let _isInitialized = false;
 let _hasCompletedServicesInit = false;
 let _platformAdapter: PlatformAdapter | null = null;
 let _initOptions: SDKInitOptions | null = null;
+/** Guard against concurrent initialize() calls */
+let _initializingPromise: Promise<void> | null = null;
 
 // ---------------------------------------------------------------------------
 // RunAnywhere Public API
@@ -124,84 +128,102 @@ export const RunAnywhere = {
    * ```
    */
   async initialize(options: SDKInitOptions = {}, wasmUrl?: string): Promise<void> {
+    // Guard: already done
     if (_isInitialized) {
       logger.debug('Already initialized');
       return;
     }
 
-    const env = options.environment ?? SDKEnvironment.Development;
-    _initOptions = { ...options, environment: env };
-
-    // Configure logging
-    if (options.debug) {
-      SDKLogger.level = LogLevel.Debug;
+    // Guard: another call is already in flight – wait for it instead of racing
+    if (_initializingPromise) {
+      logger.debug('Initialization already in progress, awaiting...');
+      return _initializingPromise;
     }
 
-    logger.info(`Initializing RunAnywhere Web SDK (${env})...`);
+    _initializingPromise = (async () => {
+      try {
+        const env = options.environment ?? SDKEnvironment.Development;
+        _initOptions = { ...options, environment: env };
 
-    // Phase 1: Load WASM module (auto-detects WebGPU and loads correct variant)
-    const bridge = WASMBridge.shared;
-    const acceleration = options.acceleration ?? AccelerationPreference.Auto;
-    await bridge.load(wasmUrl, options.webgpuWasmUrl, acceleration);
+        // Configure logging
+        if (options.debug) {
+          SDKLogger.level = LogLevel.Debug;
+        }
 
-    logger.info(`Hardware acceleration: ${bridge.accelerationMode}`);
+        logger.info(`Initializing RunAnywhere Web SDK (${env})...`);
 
-    // Emit acceleration mode event so app UIs can show a badge
-    EventBus.shared.emit('sdk.accelerationMode', SDKEventType.Device, {
-      mode: bridge.accelerationMode,
-    });
+        // Phase 1: Load WASM module (auto-detects WebGPU and loads correct variant)
+        const bridge = WASMBridge.shared;
+        const acceleration = options.acceleration ?? AccelerationPreference.Auto;
+        await bridge.load(wasmUrl, options.webgpuWasmUrl, acceleration);
 
-    // Phase 2: Register platform adapter
-    _platformAdapter = new PlatformAdapter();
-    _platformAdapter.register();
+        logger.info(`Hardware acceleration: ${bridge.accelerationMode}`);
 
-    // Phase 3: Initialize RACommons core
-    const m = bridge.module;
+        // Emit acceleration mode event so app UIs can show a badge
+        EventBus.shared.emit('sdk.accelerationMode', SDKEventType.Device, {
+          mode: bridge.accelerationMode,
+        });
 
-    // Create rac_config_t in WASM memory
-    // Layout: { rac_platform_adapter_t* platform_adapter, rac_log_level_t log_level, const char* log_tag }
-    const configSize = m._rac_wasm_sizeof_config();
-    const configPtr = m._malloc(configSize);
+        // Phase 1b: Load struct field offsets from the WASM module.
+        // This must happen before any struct read/write in the SDK.
+        loadOffsets(bridge.module);
 
-    // Zero-initialize
-    for (let i = 0; i < configSize; i++) {
-      m.setValue(configPtr + i, 0, 'i8');
-    }
+        // Phase 2: Register platform adapter
+        _platformAdapter = new PlatformAdapter();
+        _platformAdapter.register();
 
-    // Set platform_adapter pointer (offset 0) -- rac_init checks this field
-    m.setValue(configPtr, _platformAdapter.getAdapterPtr(), '*');
-    // Set log_level (offset 4, after the pointer)
-    const logLevel = options.debug ? 1 : 2; // DEBUG=1, INFO=2
-    m.setValue(configPtr + 4, logLevel, 'i32');
+        // Phase 3: Initialize RACommons core
+        const m = bridge.module;
 
-    const result = m._rac_init(configPtr);
-    m._free(configPtr);
+        // Create rac_config_t in WASM memory
+        const configSize = m._rac_wasm_sizeof_config();
+        const configPtr = m._malloc(configSize);
 
-    if (result !== 0) {
-      const errMsg = bridge.getErrorMessage(result);
-      throw new SDKError(SDKErrorCode.InitializationFailed, `rac_init failed: ${errMsg}`);
-    }
+        // Zero-initialize
+        for (let i = 0; i < configSize; i++) {
+          m.setValue(configPtr + i, 0, 'i8');
+        }
 
-    // Phase 4: Register available backends
-    // The llama.cpp LLM backend must be registered before any LLM/VLM operations.
-    // Check if the function exists (only present when built with --llamacpp).
-    if (typeof (m as any)['_rac_backend_llamacpp_register'] === 'function') {
-      const regResult = m.ccall('rac_backend_llamacpp_register', 'number', [], []) as number;
-      if (regResult === 0) {
-        logger.info('llama.cpp LLM backend registered');
-      } else {
-        logger.warning(`llama.cpp backend registration returned: ${regResult}`);
+        // Set platform_adapter pointer (offset 0) -- always first field
+        m.setValue(configPtr, _platformAdapter.getAdapterPtr(), '*');
+        // Set log_level using compiler-provided offset
+        const logLevel = options.debug ? 1 : 2; // DEBUG=1, INFO=2
+        m.setValue(configPtr + Offsets.config.logLevel, logLevel, 'i32');
+
+        const result = m._rac_init(configPtr);
+        m._free(configPtr);
+
+        if (result !== 0) {
+          const errMsg = bridge.getErrorMessage(result);
+          throw new SDKError(SDKErrorCode.InitializationFailed, `rac_init failed: ${errMsg}`);
+        }
+
+        // Phase 4: Register available backends
+        // The llama.cpp LLM backend must be registered before any LLM/VLM operations.
+        // Check if the function exists (only present when built with --llamacpp).
+        if (typeof (m as any)['_rac_backend_llamacpp_register'] === 'function') {
+          const regResult = m.ccall('rac_backend_llamacpp_register', 'number', [], []) as number;
+          if (regResult === 0) {
+            logger.info('llama.cpp LLM backend registered');
+          } else {
+            logger.warning(`llama.cpp backend registration returned: ${regResult}`);
+          }
+        }
+
+        _isInitialized = true;
+        _hasCompletedServicesInit = true;
+
+        logger.info('RunAnywhere Web SDK initialized successfully');
+        EventBus.shared.emit('sdk.initialized', SDKEventType.Initialization, {
+          environment: env,
+          accelerationMode: bridge.accelerationMode,
+        });
+      } finally {
+        _initializingPromise = null;
       }
-    }
+    })();
 
-    _isInitialized = true;
-    _hasCompletedServicesInit = true;
-
-    logger.info('RunAnywhere Web SDK initialized successfully');
-    EventBus.shared.emit('sdk.initialized', SDKEventType.Initialization, {
-      environment: env,
-      accelerationMode: bridge.accelerationMode,
-    });
+    return _initializingPromise;
   },
 
   // =========================================================================
@@ -326,6 +348,7 @@ export const RunAnywhere = {
     _isInitialized = false;
     _hasCompletedServicesInit = false;
     _initOptions = null;
+    _initializingPromise = null;
 
     logger.info('RunAnywhere Web SDK shut down');
   },

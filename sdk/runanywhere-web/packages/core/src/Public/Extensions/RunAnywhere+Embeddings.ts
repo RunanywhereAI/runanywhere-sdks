@@ -24,6 +24,7 @@
 
 import { RunAnywhere } from '../RunAnywhere';
 import { WASMBridge } from '../../Foundation/WASMBridge';
+import { Offsets } from '../../Foundation/StructOffsets';
 import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { EventBus } from '../../Foundation/EventBus';
@@ -148,9 +149,10 @@ export const Embeddings = {
     // Build rac_embeddings_options_t
     const optSize = m._rac_wasm_sizeof_embeddings_options();
     const optPtr = m._malloc(optSize);
-    m.setValue(optPtr, options.normalize !== undefined ? options.normalize : -1, 'i32');
-    m.setValue(optPtr + 4, options.pooling !== undefined ? options.pooling : -1, 'i32');
-    m.setValue(optPtr + 8, 0, 'i32'); // n_threads = auto
+    const eOpt = Offsets.embeddingsOptions;
+    m.setValue(optPtr + eOpt.normalize, options.normalize !== undefined ? options.normalize : -1, 'i32');
+    m.setValue(optPtr + eOpt.pooling, options.pooling !== undefined ? options.pooling : -1, 'i32');
+    m.setValue(optPtr + eOpt.nThreads, 0, 'i32'); // n_threads = auto
 
     // Result struct
     const resSize = m._rac_wasm_sizeof_embeddings_result();
@@ -198,9 +200,10 @@ export const Embeddings = {
     // Options
     const optSize = m._rac_wasm_sizeof_embeddings_options();
     const optPtr = m._malloc(optSize);
-    m.setValue(optPtr, options.normalize !== undefined ? options.normalize : -1, 'i32');
-    m.setValue(optPtr + 4, options.pooling !== undefined ? options.pooling : -1, 'i32');
-    m.setValue(optPtr + 8, 0, 'i32');
+    const eOpt2 = Offsets.embeddingsOptions;
+    m.setValue(optPtr + eOpt2.normalize, options.normalize !== undefined ? options.normalize : -1, 'i32');
+    m.setValue(optPtr + eOpt2.pooling, options.pooling !== undefined ? options.pooling : -1, 'i32');
+    m.setValue(optPtr + eOpt2.nThreads, 0, 'i32');
 
     // Result
     const resSize = m._rac_wasm_sizeof_embeddings_result();
@@ -264,20 +267,22 @@ function readEmbeddingsResult(
   m: WASMBridge['module'],
   resPtr: number,
 ): EmbeddingsResult {
-  // rac_embeddings_result_t: { embeddings*, num_embeddings, dimension, processing_time_ms, total_tokens }
-  const embeddingsArrayPtr = m.getValue(resPtr, '*');
-  const numEmbeddings = m.getValue(resPtr + 4, 'i32');
-  const dimension = m.getValue(resPtr + 8, 'i32');
-  const processingTimeMs = m.getValue(resPtr + 12, 'i32');
-  const totalTokens = m.getValue(resPtr + 16, 'i32');
+  // rac_embeddings_result_t (offsets from compiler via StructOffsets)
+  const eRes = Offsets.embeddingsResult;
+  const embeddingsArrayPtr = m.getValue(resPtr + eRes.embeddings, '*');
+  const numEmbeddings = m.getValue(resPtr + eRes.numEmbeddings, 'i32');
+  const dimension = m.getValue(resPtr + eRes.dimension, 'i32');
+  const processingTimeMs = m.getValue(resPtr + eRes.processingTimeMs, 'i32'); // low 32 bits of int64
+  const totalTokens = m.getValue(resPtr + eRes.totalTokens, 'i32');
 
   const embeddings: EmbeddingVector[] = [];
+  const ev = Offsets.embeddingVector;
 
   for (let i = 0; i < numEmbeddings; i++) {
-    // Each rac_embedding_vector_t: { data*, dimension }
-    const vecPtr = embeddingsArrayPtr + i * 8; // sizeof(rac_embedding_vector_t) = 8
-    const dataPtr = m.getValue(vecPtr, '*');
-    const vecDim = m.getValue(vecPtr + 4, 'i32');
+    // Each rac_embedding_vector_t
+    const vecPtr = embeddingsArrayPtr + i * ev.structSize;
+    const dataPtr = m.getValue(vecPtr + ev.data, '*');
+    const vecDim = m.getValue(vecPtr + ev.dimension, 'i32');
 
     const data = new Float32Array(vecDim);
     if (dataPtr && vecDim > 0) {

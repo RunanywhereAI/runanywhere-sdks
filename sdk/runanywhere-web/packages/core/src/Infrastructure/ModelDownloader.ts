@@ -17,6 +17,59 @@ import type { ModelRegistry } from './ModelRegistry';
 // ---------------------------------------------------------------------------
 
 /**
+ * Validate that a URL is safe to fetch from.
+ *
+ * Security: Prevents SSRF-like attacks where user-controlled model URLs
+ * could be pointed at internal/private network addresses. Only HTTPS is
+ * allowed in production. HTTP is permitted for localhost during development.
+ *
+ * @param url - The URL to validate
+ * @throws Error if the URL is not allowed
+ */
+function validateModelUrl(url: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(`Invalid model URL: ${url}`);
+  }
+
+  // Only allow HTTPS (and HTTP for localhost during development)
+  const isLocalhost =
+    parsed.hostname === 'localhost' ||
+    parsed.hostname === '127.0.0.1' ||
+    parsed.hostname === '[::1]';
+
+  if (parsed.protocol === 'http:' && !isLocalhost) {
+    throw new Error(
+      `Model URL must use HTTPS (got HTTP for ${parsed.hostname}). ` +
+      'HTTP is only allowed for localhost during development.',
+    );
+  }
+
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    throw new Error(`Model URL has unsupported protocol: ${parsed.protocol}`);
+  }
+
+  // Block common private/internal network ranges
+  const blockedPatterns = [
+    /^10\./,
+    /^172\.(1[6-9]|2\d|3[0-1])\./,
+    /^192\.168\./,
+    /^169\.254\./,
+    /^0\./,
+  ];
+
+  if (!isLocalhost) {
+    for (const pattern of blockedPatterns) {
+      if (pattern.test(parsed.hostname)) {
+        throw new Error(`Model URL points to private network address: ${parsed.hostname}`);
+      }
+    }
+  }
+}
+
+/**
  * ModelDownloader — downloads model files (single or multi-file) and
  * persists them in OPFS via `OPFSStorage`. Reports progress to the
  * `ModelRegistry` and emits events via `EventBus`.
@@ -146,11 +199,14 @@ export class ModelDownloader {
   /**
    * Download a file from a URL with optional progress callback.
    * Exposed so ModelManager can use it for on-demand file downloads during load.
+   *
+   * URLs are validated before fetching to prevent SSRF and enforce HTTPS.
    */
   async downloadFile(
     url: string,
     onProgress?: (progress: number, bytesDownloaded: number, totalBytes: number) => void,
   ): Promise<Uint8Array> {
+    validateModelUrl(url);
     const response = await fetch(url);
     if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
 

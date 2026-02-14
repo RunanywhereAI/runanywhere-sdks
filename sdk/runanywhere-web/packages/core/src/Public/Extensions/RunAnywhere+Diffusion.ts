@@ -19,6 +19,7 @@
 
 import { RunAnywhere } from '../RunAnywhere';
 import { WASMBridge } from '../../Foundation/WASMBridge';
+import { Offsets } from '../../Foundation/StructOffsets';
 import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { EventBus } from '../../Foundation/EventBus';
@@ -146,24 +147,25 @@ export const Diffusion = {
     const promptPtr = bridge.allocString(options.prompt);
     let negPromptPtr = 0;
 
-    m.setValue(optPtr, promptPtr, '*');        // prompt
+    const dOpt = Offsets.diffusionOptions;
+    m.setValue(optPtr + dOpt.prompt, promptPtr, '*');
     if (options.negativePrompt) {
       negPromptPtr = bridge.allocString(options.negativePrompt);
-      m.setValue(optPtr + 4, negPromptPtr, '*'); // negative_prompt
+      m.setValue(optPtr + dOpt.negativePrompt, negPromptPtr, '*');
     }
-    m.setValue(optPtr + 8, options.width ?? 512, 'i32');           // width
-    m.setValue(optPtr + 12, options.height ?? 512, 'i32');          // height
-    m.setValue(optPtr + 16, options.steps ?? 28, 'i32');            // steps
-    m.setValue(optPtr + 20, options.guidanceScale ?? 7.5, 'float'); // guidance_scale
-    // seed is i64 at offset 24 -- write low 32 bits
+    m.setValue(optPtr + dOpt.width, options.width ?? 512, 'i32');
+    m.setValue(optPtr + dOpt.height, options.height ?? 512, 'i32');
+    m.setValue(optPtr + dOpt.steps, options.steps ?? 28, 'i32');
+    m.setValue(optPtr + dOpt.guidanceScale, options.guidanceScale ?? 7.5, 'float');
+    // seed is int64 — write low and high 32-bit halves
     const seed = options.seed ?? -1;
-    m.setValue(optPtr + 24, seed & 0xFFFFFFFF, 'i32');
-    m.setValue(optPtr + 28, seed < 0 ? -1 : 0, 'i32');
-    m.setValue(optPtr + 32, options.scheduler ?? DiffusionScheduler.DPM_PP_2M_Karras, 'i32'); // scheduler
-    m.setValue(optPtr + 36, options.mode ?? DiffusionMode.TextToImage, 'i32'); // mode
-    m.setValue(optPtr + 72, options.denoiseStrength ?? 0.75, 'float'); // denoise_strength
-    m.setValue(optPtr + 76, options.reportIntermediateImages ? 1 : 0, 'i32'); // report_intermediate_images
-    m.setValue(optPtr + 80, 1, 'i32'); // progress_stride
+    m.setValue(optPtr + dOpt.seed, seed & 0xFFFFFFFF, 'i32');
+    m.setValue(optPtr + dOpt.seed + 4, seed < 0 ? -1 : 0, 'i32');
+    m.setValue(optPtr + dOpt.scheduler, options.scheduler ?? DiffusionScheduler.DPM_PP_2M_Karras, 'i32');
+    m.setValue(optPtr + dOpt.mode, options.mode ?? DiffusionMode.TextToImage, 'i32');
+    m.setValue(optPtr + dOpt.denoiseStrength, options.denoiseStrength ?? 0.75, 'float');
+    m.setValue(optPtr + dOpt.reportIntermediate, options.reportIntermediateImages ? 1 : 0, 'i32');
+    m.setValue(optPtr + dOpt.progressStride, 1, 'i32');
 
     // Result struct: rac_diffusion_result_t
     const resSize = m._rac_wasm_sizeof_diffusion_result();
@@ -177,14 +179,15 @@ export const Diffusion = {
       ) as number;
       bridge.checkResult(r, 'rac_diffusion_component_generate');
 
-      // Read rac_diffusion_result_t
-      const imageDataPtr = m.getValue(resPtr, '*');
-      const imageSize = m.getValue(resPtr + 4, 'i32');
-      const width = m.getValue(resPtr + 8, 'i32');
-      const height = m.getValue(resPtr + 12, 'i32');
-      const seedUsed = m.getValue(resPtr + 16, 'i32'); // low 32 bits of seed
-      const generationTimeMs = m.getValue(resPtr + 24, 'i32');
-      const safetyFlagged = m.getValue(resPtr + 28, 'i32') === 1;
+      // Read rac_diffusion_result_t (offsets from compiler via StructOffsets)
+      const dRes = Offsets.diffusionResult;
+      const imageDataPtr = m.getValue(resPtr + dRes.imageData, '*');
+      const imageSize = m.getValue(resPtr + dRes.imageSize, 'i32');
+      const width = m.getValue(resPtr + dRes.width, 'i32');
+      const height = m.getValue(resPtr + dRes.height, 'i32');
+      const seedUsed = m.getValue(resPtr + dRes.seedUsed, 'i32'); // low 32 bits of int64
+      const generationTimeMs = m.getValue(resPtr + dRes.generationTimeMs, 'i32'); // low 32 bits
+      const safetyFlagged = m.getValue(resPtr + dRes.safetyFlagged, 'i32') === 1;
 
       // Copy RGBA image data
       const imageData = new Uint8ClampedArray(imageSize);
