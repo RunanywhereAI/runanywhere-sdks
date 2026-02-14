@@ -11,6 +11,7 @@
 #include <memory>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace runanywhere {
 
@@ -51,6 +52,7 @@ public:
     bool initialize();
 
     // Set callback for received audio
+    /// @note Must be called before start(). Not thread-safe with the capture thread.
     void set_callback(AudioCaptureCallback callback);
 
     // Start/stop capture

@@ -60,7 +60,7 @@ print_info() {
 CLEAN_BUILD=false
 MODELS_ONLY=false
 
-while [[ "$1" == --* ]]; do
+while [[ "$1" == -* ]]; do
     case "$1" in
         --clean)
             CLEAN_BUILD=true
@@ -200,8 +200,8 @@ print_header "Step 3: Download Models"
 MODEL_DIR="${HOME}/.local/share/runanywhere/Models"
 if [ -d "${MODEL_DIR}/ONNX/silero-vad" ] && \
    [ -d "${MODEL_DIR}/ONNX/whisper-tiny-en" ] && \
-   [ -d "${MODEL_DIR}/LlamaCpp/qwen2.5-0.5b-instruct-q4" ] && \
-   [ -d "${MODEL_DIR}/ONNX/vits-piper-en-us" ] && \
+   [ -d "${MODEL_DIR}/LlamaCpp/qwen3-1.7b" ] && \
+   [ -d "${MODEL_DIR}/ONNX/vits-piper-en_US-lessac-medium" ] && \
    [ "$CLEAN_BUILD" = false ]; then
     print_success "Models already downloaded"
 else
@@ -220,7 +220,7 @@ cd "${SCRIPT_DIR}/build"
 cmake .. \
     -DCMAKE_BUILD_TYPE=Release
 
-cmake --build . -j$(nproc)
+cmake --build . -j"$(nproc)"
 
 print_success "Voice Assistant built successfully"
 
@@ -244,7 +244,7 @@ echo ""
 # Quick test
 print_step "Verifying executable..."
 if [ -f "${SCRIPT_DIR}/build/voice-assistant" ]; then
-    print_success "Executable created: $(ls -lh ${SCRIPT_DIR}/build/voice-assistant | awk '{print $5}')"
+    print_success "Executable created: $(ls -lh "${SCRIPT_DIR}/build/voice-assistant" | awk '{print $5}')"
 else
     print_error "Executable not found!"
     exit 1

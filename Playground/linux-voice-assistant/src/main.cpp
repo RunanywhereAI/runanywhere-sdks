@@ -45,7 +45,6 @@ std::atomic<bool> g_running{true};
 
 void signal_handler(int signum) {
     (void)signum;
-    std::cout << "\nShutting down..." << std::endl;
     g_running = false;
 }
 
@@ -339,7 +338,7 @@ int main(int argc, char* argv[]) {
     // Cleanup
     // =============================================================================
 
-    std::cout << "\nStopping..." << std::endl;
+    std::cout << "\nShutting down...\nStopping..." << std::endl;
 
     pipeline.stop();
     capture.stop();

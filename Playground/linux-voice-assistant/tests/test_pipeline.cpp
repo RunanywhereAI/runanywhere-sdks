@@ -24,6 +24,8 @@
 #include <cstdint>
 #include <cstring>
 
+static constexpr uint32_t TTS_SAMPLE_RATE = 22050;
+
 // Read a 16-bit PCM WAV file, return samples
 bool read_wav(const std::string& path, std::vector<int16_t>& samples, uint32_t& sample_rate) {
     std::ifstream file(path, std::ios::binary);
@@ -61,9 +63,27 @@ bool read_wav(const std::string& path, std::vector<int16_t>& samples, uint32_t& 
                 file.seekg(chunk_size - 16, std::ios::cur);
             }
         } else if (strncmp(chunk_id, "data", 4) == 0) {
-            size_t num_samples = chunk_size / (bits_per_sample / 8) / num_channels;
-            samples.resize(num_samples);
-            file.read(reinterpret_cast<char*>(samples.data()), chunk_size);
+            if (bits_per_sample != 16) {
+                std::cerr << "Only 16-bit WAV supported\n";
+                return false;
+            }
+            size_t total_samples = chunk_size / sizeof(int16_t);
+            size_t num_frames = total_samples / num_channels;
+            if (num_channels == 1) {
+                samples.resize(num_frames);
+                file.read(reinterpret_cast<char*>(samples.data()), chunk_size);
+            } else if (num_channels == 2) {
+                std::vector<int16_t> stereo(total_samples);
+                file.read(reinterpret_cast<char*>(stereo.data()), chunk_size);
+                samples.resize(num_frames);
+                for (size_t i = 0; i < num_frames; ++i) {
+                    samples[i] = static_cast<int16_t>(
+                        (static_cast<int32_t>(stereo[i*2]) + stereo[i*2+1]) / 2);
+                }
+            } else {
+                std::cerr << "Unsupported channel count: " << num_channels << "\n";
+                return false;
+            }
             break;
         } else {
             file.seekg(chunk_size, std::ios::cur);
@@ -199,11 +219,11 @@ int main(int argc, char* argv[]) {
     if (result.synthesized_audio && result.synthesized_audio_size > 0) {
         size_t tts_samples = result.synthesized_audio_size / sizeof(int16_t);
         std::cout << "TTS Audio: " << tts_samples << " samples ("
-                  << (float)tts_samples / 22050 << "s at 22050Hz)\n";
+                  << (float)tts_samples / TTS_SAMPLE_RATE << "s at " << TTS_SAMPLE_RATE << "Hz)\n";
 
         // Save TTS output
         std::string out_path = "/tmp/tts_output.wav";
-        if (write_wav(out_path, static_cast<const int16_t*>(result.synthesized_audio), tts_samples, 22050)) {
+        if (write_wav(out_path, static_cast<const int16_t*>(result.synthesized_audio), tts_samples, TTS_SAMPLE_RATE)) {
             std::cout << "TTS output saved to: " << out_path << "\n";
         }
     } else {
