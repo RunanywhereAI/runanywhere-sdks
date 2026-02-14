@@ -104,8 +104,8 @@ data class LLMConfiguration(
  */
 @Serializable
 data class LLMGenerationOptions(
-    val maxTokens: Int = 100,
-    val temperature: Float = 0.8f,
+    val maxTokens: Int = 1000,
+    val temperature: Float = 0.7f,
     val topP: Float = 1.0f,
     val stopSequences: List<String> = emptyList(),
     val streamingEnabled: Boolean = false,

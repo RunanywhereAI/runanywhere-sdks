@@ -31,6 +31,7 @@ import {
   Alert,
   Modal,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
@@ -48,9 +49,10 @@ import {
   ModelSelectionSheet,
   ModelSelectionContext,
 } from '../components/model';
+import { GENERATION_SETTINGS_KEYS } from '../types/settings';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
-import { RunAnywhere, type ModelInfo as SDKModelInfo } from '@runanywhere/core';
+import { RunAnywhere, type ModelInfo as SDKModelInfo, type GenerationOptions } from '@runanywhere/core';
 import { safeEvaluateExpression } from '../utils/mathParser';
 
 // Generate unique ID
@@ -172,8 +174,7 @@ const registerChatTools = () => {
 /**
  * Detect tool call format based on model ID and name
  * LFM2-Tool models use Pythonic format, others use JSON format
- * 
- * Matches iOS: LLMViewModel+ToolCalling.swift detectToolCallFormat()
+ * * Matches iOS: LLMViewModel+ToolCalling.swift detectToolCallFormat()
  * Checks both ID and name since model might be identified by either
  */
 const detectToolCallFormat = (modelId: string | undefined, modelName: string | undefined): string => {
@@ -261,6 +262,24 @@ export const ChatScreen: React.FC = () => {
 
   // Messages from current conversation
   const messages = currentConversation?.messages || [];
+
+  /**
+   * Get generation options from AsyncStorage
+   * Reads user-configured temperature, maxTokens, and systemPrompt
+   */
+  const getGenerationOptions = async (): Promise<GenerationOptions> => {
+    const tempStr = await AsyncStorage.getItem(GENERATION_SETTINGS_KEYS.TEMPERATURE);
+    const maxStr = await AsyncStorage.getItem(GENERATION_SETTINGS_KEYS.MAX_TOKENS);
+    const sysStr = await AsyncStorage.getItem(GENERATION_SETTINGS_KEYS.SYSTEM_PROMPT);
+
+    const temperature = tempStr !== null && !Number.isNaN(parseFloat(tempStr)) ? parseFloat(tempStr) : 0.7;
+    const maxTokens = maxStr ? parseInt(maxStr, 10) : 1000;
+    const systemPrompt = sysStr && sysStr.trim() !== '' ? sysStr : undefined;
+
+    console.log(`[PARAMS] App getGenerationOptions: temperature=${temperature}, maxTokens=${maxTokens}, systemPrompt=${systemPrompt ? `set(${systemPrompt.length} chars)` : 'nil'}`);
+
+    return { temperature, maxTokens, systemPrompt };
+  };
 
   /**
    * Load available LLM models from catalog
@@ -435,13 +454,17 @@ export const ChatScreen: React.FC = () => {
       const format = detectToolCallFormat(currentModel?.id, currentModel?.name);
       console.log('[ChatScreen] Starting generation with tools for:', prompt, 'model:', currentModel?.id, 'format:', format);
 
+      // Get user-configured generation options
+      const options = await getGenerationOptions();
+
       // Use tool-enabled generation
       // If the LLM needs to call a tool (like weather API), it happens automatically
       const result = await RunAnywhere.generateWithTools(prompt, {
         autoExecute: true,
         maxToolCalls: 3,
-        maxTokens: 1000,
-        temperature: 0.7,
+        maxTokens: options.maxTokens,
+        temperature: options.temperature,
+        systemPrompt: options.systemPrompt,
         format: format,
       });
 

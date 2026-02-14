@@ -192,18 +192,6 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     if (config.contains("max_context_size")) {
         max_default_context_ = config["max_context_size"].get<int>();
     }
-    if (config.contains("temperature")) {
-        temperature_ = config["temperature"].get<float>();
-    }
-    if (config.contains("min_p")) {
-        min_p_ = config["min_p"].get<float>();
-    }
-    if (config.contains("top_p")) {
-        top_p_ = config["top_p"].get<float>();
-    }
-    if (config.contains("top_k")) {
-        top_k_ = config["top_k"].get<int>();
-    }
 
     model_config_ = config;
     model_path_ = model_path;
@@ -342,29 +330,15 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
         return false;
     }
 
+    // Note: Sampler chain is rebuilt per-request in generate_stream() using request parameters
+    // This initial sampler is not used for actual generation
     auto sparams = llama_sampler_chain_default_params();
     sparams.no_perf = true;
     sampler_ = llama_sampler_chain_init(sparams);
-
-    if (temperature_ > 0.0f) {
-        llama_sampler_chain_add(sampler_, llama_sampler_init_penalties(64, 1.2f, 0.0f, 0.0f));
-
-        if (top_k_ > 0) {
-            llama_sampler_chain_add(sampler_, llama_sampler_init_top_k(top_k_));
-        }
-
-        llama_sampler_chain_add(sampler_, llama_sampler_init_top_p(top_p_, 1));
-        llama_sampler_chain_add(sampler_, llama_sampler_init_temp(temperature_));
-        llama_sampler_chain_add(sampler_, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
-    } else {
-        llama_sampler_chain_add(sampler_, llama_sampler_init_greedy());
-    }
-
-    LOGI("Sampler chain: penalties(64,1.2) -> top_k(%d) -> top_p(%.2f) -> temp(%.2f) -> dist",
-         top_k_, top_p_, temperature_);
+    llama_sampler_chain_add(sampler_, llama_sampler_init_greedy());
 
     model_loaded_ = true;
-    LOGI("Model loaded successfully: context_size=%d, temp=%.2f", context_size_, temperature_);
+    LOGI("Model loaded successfully: context_size=%d", context_size_);
 
     return true;
 }
@@ -598,7 +572,41 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
         return false;
     }
 
-    llama_sampler_reset(sampler_);
+    // Configure sampler with request parameters
+    if (sampler_) {
+        llama_sampler_free(sampler_);
+    }
+
+    auto sparams = llama_sampler_chain_default_params();
+    sparams.no_perf = true;
+    sampler_ = llama_sampler_chain_init(sparams);
+
+    if (request.temperature > 0.0f) {
+        // Use default penalties (1.2f repetition) or request params if added later
+        llama_sampler_chain_add(sampler_,
+                                llama_sampler_init_penalties(64, request.repetition_penalty, 0.0f, 0.0f));
+
+        if (request.top_k > 0) {
+            llama_sampler_chain_add(sampler_, llama_sampler_init_top_k(request.top_k));
+        }
+
+        llama_sampler_chain_add(sampler_, llama_sampler_init_top_p(request.top_p, 1));
+        llama_sampler_chain_add(sampler_, llama_sampler_init_temp(request.temperature));
+        llama_sampler_chain_add(sampler_, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
+    } else {
+        llama_sampler_chain_add(sampler_, llama_sampler_init_greedy());
+    }
+
+    // Log generation parameters
+    LOGI("[PARAMS] LLM generate_stream (per-request options): temperature=%.4f, top_p=%.4f, top_k=%d, "
+         "max_tokens=%d (effective=%d), repetition_penalty=%.4f, "
+         "system_prompt_len=%zu",
+         request.temperature, request.top_p, request.top_k,
+         request.max_tokens, effective_max_tokens, request.repetition_penalty,
+         request.system_prompt.length());
+
+    // No need to reset as we just created it
+    // llama_sampler_reset(sampler_);
 
     const auto vocab = llama_model_get_vocab(model_);
 
@@ -723,10 +731,6 @@ nlohmann::json LlamaCppTextGeneration::get_model_info() const {
     info["context_size"] = context_size_;
     info["model_training_context"] = llama_model_n_ctx_train(model_);
     info["max_default_context"] = max_default_context_;
-    info["temperature"] = temperature_;
-    info["top_k"] = top_k_;
-    info["top_p"] = top_p_;
-    info["min_p"] = min_p_;
 
     char buf[256];
     if (llama_model_meta_val_str(model_, "general.name", buf, sizeof(buf)) > 0) {
