@@ -13,6 +13,7 @@
 // 4. TTS: Synthesize speech from response
 // =============================================================================
 
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <string>
@@ -133,8 +134,8 @@ private:
 
     VoicePipelineConfig config_;
     std::string last_error_;
-    bool initialized_ = false;
-    bool running_ = false;
+    std::atomic<bool> initialized_{false};
+    std::atomic<bool> running_{false};
 };
 
 } // namespace runanywhere

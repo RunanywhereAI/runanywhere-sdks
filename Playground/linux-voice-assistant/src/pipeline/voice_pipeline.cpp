@@ -33,6 +33,9 @@ static constexpr size_t MIN_SPEECH_SAMPLES = 16000;
 // Wake word detection timeout - return to listening after this many seconds of silence
 static constexpr double WAKE_WORD_TIMEOUT_SEC = 10.0;
 
+// Default TTS output sample rate (Piper default)
+static constexpr int TTS_DEFAULT_SAMPLE_RATE = 22050;
+
 // =============================================================================
 // Implementation
 // =============================================================================
@@ -53,6 +56,9 @@ struct VoicePipeline::Impl {
     // Timestamp-based silence tracking (matches iOS VoiceSession pattern)
     std::chrono::steady_clock::time_point last_speech_time;
     bool speech_callback_fired = false;  // Whether we notified "listening"
+
+    // Thread safety: protects shared state accessed from ALSA capture and main threads
+    std::mutex mutex;
 };
 
 VoicePipeline::VoicePipeline()
@@ -139,7 +145,7 @@ bool VoicePipeline::initialize() {
         impl_->voice_agent,
         llm_path.c_str(),
         LLM_MODEL_ID,
-        "Qwen2.5 0.5B"
+        "Qwen3 1.7B"
     );
     if (result != RAC_SUCCESS) {
         last_error_ = "Failed to load LLM model: " + llm_path;
@@ -239,6 +245,8 @@ void VoicePipeline::process_audio(const int16_t* samples, size_t num_samples) {
     if (!initialized_ || !running_) {
         return;
     }
+
+    std::lock_guard<std::mutex> lock(impl_->mutex);
 
     // Convert to float for processing
     std::vector<float> float_samples(num_samples);
@@ -407,18 +415,20 @@ bool VoicePipeline::process_voice_turn(const int16_t* samples, size_t num_sample
 
     // Report TTS audio
     if (result.synthesized_audio && result.synthesized_audio_size > 0 && config_.on_audio_output) {
-        // Assume 22050 Hz output from TTS (common rate)
         config_.on_audio_output(
             static_cast<const int16_t*>(result.synthesized_audio),
             result.synthesized_audio_size / sizeof(int16_t),
-            22050
+            TTS_DEFAULT_SAMPLE_RATE
         );
     }
+
+    // Capture before freeing (use-after-free fix)
+    bool detected = (result.speech_detected == RAC_TRUE);
 
     // Free result
     rac_voice_agent_result_free(&result);
 
-    return result.speech_detected == RAC_TRUE;
+    return detected;
 }
 
 bool VoicePipeline::speak_text(const std::string& text) {
@@ -441,7 +451,7 @@ bool VoicePipeline::speak_text(const std::string& text) {
             config_.on_audio_output(
                 static_cast<const int16_t*>(audio_data),
                 audio_size / sizeof(int16_t),
-                22050  // Default TTS sample rate
+                TTS_DEFAULT_SAMPLE_RATE
             );
         }
         free(audio_data);
@@ -458,6 +468,7 @@ void VoicePipeline::start() {
 
 void VoicePipeline::stop() {
     running_ = false;
+    std::lock_guard<std::mutex> lock(impl_->mutex);
     impl_->speech_active = false;
     impl_->speech_buffer.clear();
     impl_->speech_callback_fired = false;
@@ -471,6 +482,7 @@ bool VoicePipeline::is_running() const {
 void VoicePipeline::cancel() {
     // Cancel any ongoing generation
     // Note: Voice agent API may not support mid-generation cancellation
+    std::lock_guard<std::mutex> lock(impl_->mutex);
     impl_->speech_active = false;
     impl_->speech_buffer.clear();
     impl_->speech_callback_fired = false;

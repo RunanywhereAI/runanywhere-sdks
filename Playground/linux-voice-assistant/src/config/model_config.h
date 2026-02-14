@@ -13,10 +13,11 @@
 //   │   ├── whisper-tiny-en/
 //   │   └── vits-piper-en_US-lessac-medium/
 //   └── LlamaCpp/
-//       └── qwen2.5-0.5b-instruct-q4/qwen2.5-0.5b-instruct-q4_k_m.gguf
+//       └── qwen3-1.7b/Qwen3-1.7B-Q8_0.gguf
 // =============================================================================
 
 #include <string>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <sys/stat.h>
@@ -34,13 +35,13 @@ namespace runanywhere {
 
 constexpr const char* VAD_MODEL_ID = "silero-vad";
 constexpr const char* STT_MODEL_ID = "whisper-tiny-en";
-constexpr const char* LLM_MODEL_ID = "qwen2.5-0.5b-instruct-q4";
+constexpr const char* LLM_MODEL_ID = "qwen3-1.7b";
 constexpr const char* TTS_MODEL_ID = "vits-piper-en_US-lessac-medium";
 
 // Wake word models (optional - enabled via command line)
 constexpr const char* WAKEWORD_MODEL_ID = "hey-jarvis";
-constexpr const char* WAKEWORD_EMBEDDING_ID = "openwakeword-embedding";
-constexpr const char* WAKEWORD_MELSPEC_ID = "openwakeword-embedding";  // melspec is in same dir as embedding
+constexpr const char* WAKEWORD_EMBEDDING_ID = "openwakeword";
+constexpr const char* WAKEWORD_MELSPEC_ID = "openwakeword";  // melspec is in same dir as embedding
 
 // =============================================================================
 // Model File Names
@@ -49,7 +50,7 @@ constexpr const char* WAKEWORD_MELSPEC_ID = "openwakeword-embedding";  // melspe
 constexpr const char* VAD_MODEL_FILE = "silero_vad.onnx";
 // STT uses directory path (backend scans for encoder/decoder/tokens files)
 constexpr const char* STT_MODEL_FILE = "";
-constexpr const char* LLM_MODEL_FILE = "qwen2.5-0.5b-instruct-q4_k_m.gguf";
+constexpr const char* LLM_MODEL_FILE = "Qwen3-1.7B-Q8_0.gguf";
 constexpr const char* TTS_MODEL_FILE = "en_US-lessac-medium.onnx";
 
 // Wake word model files
@@ -99,12 +100,12 @@ inline const ModelConfig REQUIRED_MODELS[] = {
     // LLM Model
     {
         .id = LLM_MODEL_ID,
-        .name = "Qwen2.5 0.5B Instruct Q4",
+        .name = "Qwen3 1.7B Q8",
         .filename = LLM_MODEL_FILE,
         .category = RAC_MODEL_CATEGORY_LANGUAGE,
         .format = RAC_MODEL_FORMAT_GGUF,
         .framework = RAC_FRAMEWORK_LLAMACPP,
-        .memory_required = 500 * 1024 * 1024,  // ~500MB
+        .memory_required = 2LL * 1024 * 1024 * 1024,  // ~2GB
         .context_length = 4096
     },
     // TTS Model
@@ -160,8 +161,9 @@ constexpr size_t NUM_MODELS = NUM_REQUIRED_MODELS;
 // Get the base directory for model storage
 inline std::string get_base_dir() {
     const char* home = getenv("HOME");
-    if (!home) {
-        home = "/tmp";
+    if (!home || home[0] == '\0') {
+        fprintf(stderr, "ERROR: HOME environment variable is not set\n");
+        return "";
     }
     return std::string(home) + "/.local/share/runanywhere";
 }
