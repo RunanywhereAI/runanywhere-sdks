@@ -36,6 +36,8 @@ export { VAD, SpeechActivity } from './Public/Extensions/RunAnywhere+VAD';
 export type { SpeechActivityCallback, VADModelConfig, SpeechSegment } from './Public/Extensions/RunAnywhere+VAD';
 export { VoiceAgent, VoiceAgentSession, PipelineState } from './Public/Extensions/RunAnywhere+VoiceAgent';
 export type { VoiceAgentModels, VoiceTurnResult, VoiceAgentEventData, VoiceAgentEventCallback } from './Public/Extensions/RunAnywhere+VoiceAgent';
+export { VoicePipeline } from './Public/Extensions/RunAnywhere+VoicePipeline';
+export type { VoicePipelineCallbacks, VoicePipelineOptions, VoicePipelineTurnResult } from './Public/Extensions/VoicePipelineTypes';
 export { VLM, VLMImageFormat, VLMModelFamily } from './Public/Extensions/RunAnywhere+VLM';
 export type { VLMImage, VLMGenerationOptions, VLMGenerationResult, VLMStreamingResult } from './Public/Extensions/RunAnywhere+VLM';
 export { ToolCalling, toToolValue, fromToolValue, getStringArg, getNumberArg } from './Public/Extensions/RunAnywhere+ToolCalling';
@@ -66,6 +68,8 @@ export { detectCapabilities, getDeviceInfo } from './Infrastructure/DeviceCapabi
 export type { WebCapabilities } from './Infrastructure/DeviceCapabilities';
 export { AudioCapture } from './Infrastructure/AudioCapture';
 export type { AudioChunkCallback, AudioLevelCallback, AudioCaptureConfig } from './Infrastructure/AudioCapture';
+export { VideoCapture } from './Infrastructure/VideoCapture';
+export type { VideoCaptureConfig, CapturedFrame } from './Infrastructure/VideoCapture';
 export { AudioPlayback } from './Infrastructure/AudioPlayback';
 export type { PlaybackCompleteCallback, PlaybackConfig } from './Infrastructure/AudioPlayback';
 /** @advanced — Most consumers should use `RunAnywhere.downloadModel / loadModel / registerModels` instead. */

@@ -8,21 +8,15 @@
 import type { TabLifecycle } from '../app';
 import { showModelSelectionSheet } from '../components/model-selection';
 import { ModelManager, ModelCategory, ensureVADLoaded } from '../services/model-manager';
-import { AudioCapture, VAD, SpeechActivity } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
-
-// Lazy-imported SDK modules (loaded only when pipeline runs)
-type SDKModules = typeof import('../../../../../sdk/runanywhere-web/packages/core/src/index');
-let sdkModules: SDKModules | null = null;
-
-async function getSDK(): Promise<SDKModules> {
-  if (!sdkModules) {
-    sdkModules = await import('../../../../../sdk/runanywhere-web/packages/core/src/index');
-  }
-  return sdkModules;
-}
+import {
+  AudioCapture, AudioPlayback, VAD, SpeechActivity, VoicePipeline, PipelineState,
+} from '../../../../../sdk/runanywhere-web/packages/core/src/index';
 
 /** Shared AudioCapture instance for this view (replaces app-level MicCapture singleton). */
 const micCapture = new AudioCapture();
+
+/** SDK VoicePipeline: orchestrates STT -> LLM (streaming) -> TTS. */
+const pipeline = new VoicePipeline();
 
 // ---------------------------------------------------------------------------
 // Pipeline step definitions
@@ -58,8 +52,6 @@ let particles: Particle[] = [];
 
 /** Whether the continuous conversation session is active */
 let sessionActive = false;
-/** Cancel function for in-progress LLM generation */
-let cancelGeneration: (() => void) | null = null;
 /** Whether SDK VAD is actively monitoring audio. */
 let vadActive = false;
 /** Unsubscribe function for VAD speech activity callback. */
@@ -314,10 +306,7 @@ async function startSession(): Promise<void> {
 
 function stopSession(): void {
   sessionActive = false;
-  if (cancelGeneration) {
-    cancelGeneration();
-    cancelGeneration = null;
-  }
+  pipeline.cancel();
   stopVoiceVAD();
   if (micCapture.isCapturing) micCapture.stop();
   VAD.reset();
@@ -399,91 +388,75 @@ function stopVoiceVAD(): void {
 
 // ---------------------------------------------------------------------------
 // Voice Pipeline:  Audio → STT → LLM (streaming) → TTS → Speaker → Listen
+//
+// Uses VoicePipeline from the SDK which orchestrates STT → LLM → TTS
+// with streaming callbacks. The example app only handles UI updates.
 // ---------------------------------------------------------------------------
 
 async function runPipeline(audioData: Float32Array): Promise<void> {
   state = 'processing';
-  const sdk = await getSDK();
 
   try {
-    // ── Step 1: STT ──
     setStatus('Transcribing...');
     console.log(`[Voice] STT: ${(audioData.length / 16000).toFixed(1)}s of audio`);
 
-    const sttResult = await sdk.STT.transcribe(audioData, { sampleRate: 16000 });
-    const userText = sttResult.text.trim();
+    // Prepare a response container for streaming LLM output
+    const responseEl = container.querySelector('#voice-response');
 
-    if (!userText) {
-      console.log('[Voice] No speech detected');
-      // Resume listening in continuous mode
-      if (sessionActive) {
-        await startListening();
-      } else {
-        setStatus('Tap to speak');
-        state = 'idle';
-      }
-      return;
-    }
-
-    console.log(`[Voice] STT result: "${userText}" (${sttResult.processingTimeMs}ms)`);
-    setResponse(`<div class="text-secondary mb-sm"><strong>You:</strong> ${escapeHtml(userText)}</div>`);
-    setStatus('Thinking...');
-
-    // ── Step 2: LLM (streaming) ──
-    const systemPrompt =
-      'You are a helpful voice assistant. Keep responses concise — 1-3 sentences. Be conversational and friendly.';
-
-    const { stream, result, cancel } = await sdk.TextGeneration.generateStream(userText, {
+    await pipeline.processTurn(audioData, {
       maxTokens: 150,
       temperature: 0.7,
-      systemPrompt,
+      systemPrompt:
+        'You are a helpful voice assistant. Keep responses concise — 1-3 sentences. Be conversational and friendly.',
+    }, {
+      onStateChange: (s) => {
+        if (s === PipelineState.ProcessingSTT) setStatus('Transcribing...');
+        else if (s === PipelineState.GeneratingResponse) setStatus('Thinking...');
+        else if (s === PipelineState.PlayingTTS) {
+          state = 'speaking';
+          setStatus('Speaking...');
+        }
+      },
+
+      onTranscription: (text) => {
+        if (!text) {
+          console.log('[Voice] No speech detected');
+          return;
+        }
+        console.log(`[Voice] STT result: "${text}"`);
+        setResponse(`<div class="text-secondary mb-sm"><strong>You:</strong> ${escapeHtml(text)}</div>`);
+        setStatus('Thinking...');
+        // Append streaming response container
+        if (responseEl) {
+          responseEl.innerHTML += `<div><strong>Assistant:</strong> <span id="voice-llm-output"></span></div>`;
+        }
+      },
+
+      onResponseToken: (_token, accumulated) => {
+        const outputSpan = container.querySelector('#voice-llm-output');
+        if (outputSpan) outputSpan.textContent = accumulated;
+      },
+
+      onResponseComplete: (text, llmResult) => {
+        const outputSpan = container.querySelector('#voice-llm-output');
+        if (outputSpan) outputSpan.textContent = text;
+        console.log(`[Voice] LLM: ${llmResult.tokensUsed} tokens, ${llmResult.tokensPerSecond.toFixed(1)} tok/s`);
+      },
+
+      onSynthesisComplete: async (audio, sampleRate) => {
+        console.log(`[Voice] TTS: playing ${(audio.length / sampleRate).toFixed(1)}s of audio`);
+        const player = new AudioPlayback({ sampleRate });
+        await player.play(audio, sampleRate);
+        player.dispose();
+      },
+
+      onError: (err) => {
+        console.error('[Voice] Pipeline error:', err);
+        setStatus(`Error: ${err.message}`);
+      },
     });
-    cancelGeneration = cancel;
 
-    // Append a response container
-    const responseEl = container.querySelector('#voice-response');
-    if (responseEl) {
-      responseEl.innerHTML += `<div><strong>Assistant:</strong> <span id="voice-llm-output"></span></div>`;
-    }
-    const outputSpan = container.querySelector('#voice-llm-output');
-
-    let fullResponse = '';
-    for await (const token of stream) {
-      if (!sessionActive) return; // session was stopped
-      fullResponse += token;
-      if (outputSpan) outputSpan.textContent = fullResponse;
-    }
-
-    cancelGeneration = null;
-
-    const llmResult = await result;
-    fullResponse = llmResult.text || fullResponse;
-    if (outputSpan) outputSpan.textContent = fullResponse;
-    console.log(`[Voice] LLM: ${llmResult.tokensUsed} tokens, ${llmResult.tokensPerSecond.toFixed(1)} tok/s`);
-
-    if (!fullResponse.trim()) {
-      if (sessionActive) {
-        await startListening();
-      } else {
-        setStatus('Tap to speak');
-        state = 'idle';
-      }
-      return;
-    }
-
-    // ── Step 3: TTS ──
-    state = 'speaking';
-    setStatus('Speaking...');
-
-    const ttsResult = await sdk.TTS.synthesize(fullResponse.trim(), { speed: 1.0 });
-    console.log(`[Voice] TTS: ${ttsResult.durationMs}ms audio in ${ttsResult.processingTimeMs}ms`);
-
-    // ── Step 4: Play audio ──
-    const player = new sdk.AudioPlayback({ sampleRate: ttsResult.sampleRate });
-    await player.play(ttsResult.audioData, ttsResult.sampleRate);
-    player.dispose();
-
-    // ── Step 5: Resume listening (continuous mode) ──
+    // Resume listening (continuous mode) or go idle
     if (sessionActive) {
       await startListening();
     } else {
@@ -494,7 +467,6 @@ async function runPipeline(audioData: Float32Array): Promise<void> {
     console.error('[Voice] Pipeline error:', err);
     const msg = err instanceof Error ? err.message : String(err);
     setStatus(`Error: ${msg}`);
-    // Try to resume listening even after an error
     if (sessionActive) {
       await startListening();
     } else {
