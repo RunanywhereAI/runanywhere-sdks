@@ -86,7 +86,7 @@ cmake "${BUILD_TEMP}/sherpa-onnx" \
     -DSHERPA_ONNX_ENABLE_WEBSOCKET=OFF \
     -DSHERPA_ONNX_ENABLE_GPU=OFF
 
-cmake --build . --config Release -j$(sysctl -n hw.ncpu)
+cmake --build . --config Release -j"$(sysctl -n hw.ncpu)"
 
 # Collect static libraries and headers
 echo ""

@@ -213,7 +213,7 @@ build_macos() {
         -DRAC_BUILD_JNI=OFF \
         $BACKEND_FLAGS
 
-    cmake --build . --config "${BUILD_TYPE}" -j$(sysctl -n hw.ncpu)
+    cmake --build . --config "${BUILD_TYPE}" -j"$(sysctl -n hw.ncpu)"
 
     cd "${PROJECT_ROOT}"
     log_info "Built macOS arm64"
@@ -261,7 +261,7 @@ build_platform() {
         -DRAC_BUILD_JNI=OFF \
         $BACKEND_FLAGS
 
-    cmake --build . --config "${BUILD_TYPE}" -j$(sysctl -n hw.ncpu)
+    cmake --build . --config "${BUILD_TYPE}" -j"$(sysctl -n hw.ncpu)"
 
     cd "${PROJECT_ROOT}"
     log_info "Built ${PLATFORM}"

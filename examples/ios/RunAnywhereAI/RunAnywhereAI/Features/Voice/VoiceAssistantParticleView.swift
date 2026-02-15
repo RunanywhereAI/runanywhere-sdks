@@ -404,6 +404,7 @@ struct VoiceAssistantParticleView: NSViewRepresentable {
         view.preferredFramesPerSecond = 60
         view.isPaused = false
         view.enableSetNeedsDisplay = false
+        view.wantsLayer = true
         view.layer?.isOpaque = false
 
         if let device = view.device {
