@@ -362,7 +362,7 @@ object CppBridgeVLM {
                 val jniCallback =
                     RunAnywhereBridge.TokenCallback { token ->
                         try {
-                            callback.onToken(token)
+                            callback.onToken(token.decodeToString())
                         } catch (e: Exception) {
                             CppBridgePlatformAdapter.logCallback(
                                 CppBridgePlatformAdapter.LogLevel.WARN,
