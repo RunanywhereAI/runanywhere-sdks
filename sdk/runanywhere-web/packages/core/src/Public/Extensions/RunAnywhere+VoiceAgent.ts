@@ -22,8 +22,7 @@ import { SDKError } from '../../Foundation/ErrorTypes';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { EventBus } from '../../Foundation/EventBus';
 import { SDKEventType } from '../../types/enums';
-import { PipelineState } from './VoiceAgentTypes';
-import type { VoiceAgentModels, VoiceTurnResult, VoiceAgentEventData, VoiceAgentEventCallback } from './VoiceAgentTypes';
+import type { VoiceAgentModels, VoiceTurnResult } from './VoiceAgentTypes';
 
 export { PipelineState } from './VoiceAgentTypes';
 export type { VoiceAgentModels, VoiceTurnResult, VoiceAgentEventData, VoiceAgentEventCallback } from './VoiceAgentTypes';
@@ -138,8 +137,8 @@ export class VoiceAgentSession {
 
       EventBus.shared.emit('voice.turnCompleted', SDKEventType.Voice, {
         speechDetected,
-        transcription: result.transcription,
-        response: result.response,
+        transcription: result.transcription ?? '',
+        response: result.response ?? '',
       });
 
       return result;

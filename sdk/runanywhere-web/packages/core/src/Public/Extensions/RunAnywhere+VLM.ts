@@ -22,7 +22,7 @@ import { SDKLogger } from '../../Foundation/SDKLogger';
 import { EventBus } from '../../Foundation/EventBus';
 import { SDKEventType, HardwareAcceleration } from '../../types/enums';
 import { VLMImageFormat, VLMModelFamily } from './VLMTypes';
-import type { VLMImage, VLMGenerationOptions, VLMGenerationResult, VLMStreamingResult } from './VLMTypes';
+import type { VLMImage, VLMGenerationOptions, VLMGenerationResult } from './VLMTypes';
 
 const logger = new SDKLogger('VLM');
 

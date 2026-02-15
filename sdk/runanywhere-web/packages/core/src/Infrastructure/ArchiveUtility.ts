@@ -64,7 +64,7 @@ async function decompressGzip(compressed: Uint8Array): Promise<Uint8Array> {
   const reader = ds.readable.getReader();
 
   // Write compressed data and close the stream
-  writer.write(compressed);
+  writer.write(compressed as unknown as BufferSource);
   writer.close();
 
   // Read all decompressed chunks

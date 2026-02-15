@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/web",
-  "version": "0.1.0",
+  "version": "0.1.0-beta.1",
   "description": "RunAnywhere Web SDK - On-device AI inference in the browser via RACommons WASM",
   "type": "module",
   "main": "./dist/index.js",
@@ -40,6 +40,18 @@
   ],
   "author": "RunAnywhere AI",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RunanywhereAI/runanywhere-sdks.git",
+    "directory": "sdk/runanywhere-web/packages/core"
+  },
+  "homepage": "https://github.com/RunanywhereAI/runanywhere-sdks/tree/main/sdk/runanywhere-web",
+  "bugs": {
+    "url": "https://github.com/RunanywhereAI/runanywhere-sdks/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=18.0.0"
   },

@@ -507,6 +507,12 @@ export class ModelDownloader {
 
   /** Emit a structured download progress event via EventBus */
   private emitDownloadProgress(progress: DownloadProgress): void {
-    EventBus.shared.emit('model.downloadProgress', SDKEventType.Model, progress as unknown as Record<string, unknown>);
+    EventBus.shared.emit('model.downloadProgress', SDKEventType.Model, {
+      modelId: progress.modelId,
+      progress: progress.progress,
+      bytesDownloaded: progress.bytesDownloaded,
+      totalBytes: progress.totalBytes,
+      stage: progress.stage as string | undefined,
+    });
   }
 }

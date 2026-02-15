@@ -46,7 +46,6 @@ let offsets: AllOffsets | null = null;
 
 const LOG_PREFIX = '[RunAnywhere:VLMWorker]';
 
-function logDebug(...args: unknown[]): void { console.debug(LOG_PREFIX, ...args); }
 function logInfo(...args: unknown[]): void { console.info(LOG_PREFIX, ...args); }
 function logWarn(...args: unknown[]): void { console.warn(LOG_PREFIX, ...args); }
 function logError(...args: unknown[]): void { console.error(LOG_PREFIX, ...args); }
