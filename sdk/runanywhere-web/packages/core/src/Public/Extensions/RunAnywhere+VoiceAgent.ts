@@ -47,7 +47,6 @@ export class VoiceAgentSession {
    */
   async loadModels(models: VoiceAgentModels): Promise<void> {
     const bridge = WASMBridge.shared;
-    const m = bridge.module;
 
     if (models.stt) {
       logger.info(`Loading STT model: ${models.stt.id}`);
@@ -55,12 +54,9 @@ export class VoiceAgentSession {
       const idPtr = bridge.allocString(models.stt.id);
       const namePtr = bridge.allocString(models.stt.name ?? models.stt.id);
       try {
-        const r = m.ccall(
-          'rac_voice_agent_load_stt_model', 'number',
+        bridge.callWithCheck('rac_voice_agent_load_stt_model',
           ['number', 'number', 'number', 'number'],
-          [this.handle, pathPtr, idPtr, namePtr],
-        ) as number;
-        bridge.checkResult(r, 'rac_voice_agent_load_stt_model');
+          [this.handle, pathPtr, idPtr, namePtr]);
       } finally {
         bridge.free(pathPtr); bridge.free(idPtr); bridge.free(namePtr);
       }
@@ -72,12 +68,9 @@ export class VoiceAgentSession {
       const idPtr = bridge.allocString(models.llm.id);
       const namePtr = bridge.allocString(models.llm.name ?? models.llm.id);
       try {
-        const r = m.ccall(
-          'rac_voice_agent_load_llm_model', 'number',
+        bridge.callWithCheck('rac_voice_agent_load_llm_model',
           ['number', 'number', 'number', 'number'],
-          [this.handle, pathPtr, idPtr, namePtr],
-        ) as number;
-        bridge.checkResult(r, 'rac_voice_agent_load_llm_model');
+          [this.handle, pathPtr, idPtr, namePtr]);
       } finally {
         bridge.free(pathPtr); bridge.free(idPtr); bridge.free(namePtr);
       }
@@ -89,23 +82,17 @@ export class VoiceAgentSession {
       const idPtr = bridge.allocString(models.tts.id);
       const namePtr = bridge.allocString(models.tts.name ?? models.tts.id);
       try {
-        const r = m.ccall(
-          'rac_voice_agent_load_tts_voice', 'number',
+        bridge.callWithCheck('rac_voice_agent_load_tts_voice',
           ['number', 'number', 'number', 'number'],
-          [this.handle, pathPtr, idPtr, namePtr],
-        ) as number;
-        bridge.checkResult(r, 'rac_voice_agent_load_tts_voice');
+          [this.handle, pathPtr, idPtr, namePtr]);
       } finally {
         bridge.free(pathPtr); bridge.free(idPtr); bridge.free(namePtr);
       }
     }
 
     // Initialize with loaded models
-    const initResult = m.ccall(
-      'rac_voice_agent_initialize_with_loaded_models', 'number',
-      ['number'], [this.handle],
-    ) as number;
-    bridge.checkResult(initResult, 'rac_voice_agent_initialize_with_loaded_models');
+    bridge.callWithCheck('rac_voice_agent_initialize_with_loaded_models',
+      ['number'], [this.handle]);
 
     logger.info('VoiceAgent initialized with loaded models');
   }
@@ -125,12 +112,9 @@ export class VoiceAgentSession {
     const resultPtr = m._malloc(resultSize);
 
     try {
-      const r = m.ccall(
-        'rac_voice_agent_process_voice_turn', 'number',
+      bridge.callWithCheck('rac_voice_agent_process_voice_turn',
         ['number', 'number', 'number', 'number'],
-        [this.handle, audioPtr, audioData.length, resultPtr],
-      ) as number;
-      bridge.checkResult(r, 'rac_voice_agent_process_voice_turn');
+        [this.handle, audioPtr, audioData.length, resultPtr]);
 
       const speechDetected = m.getValue(resultPtr, 'i32') === 1;
       const transcriptionPtr = m.getValue(resultPtr + 4, '*');
@@ -150,7 +134,7 @@ export class VoiceAgentSession {
       }
 
       // Free C result
-      m.ccall('rac_voice_agent_result_free', null, ['number'], [resultPtr]);
+      bridge.callFunction('rac_voice_agent_result_free', null, ['number'], [resultPtr]);
 
       EventBus.shared.emit('voice.turnCompleted', SDKEventType.Voice, {
         speechDetected,
@@ -166,10 +150,11 @@ export class VoiceAgentSession {
 
   /** Check if the voice agent is ready. */
   get isReady(): boolean {
-    const m = WASMBridge.shared.module;
+    const bridge = WASMBridge.shared;
+    const m = bridge.module;
     const outPtr = m._malloc(4);
     try {
-      m.ccall('rac_voice_agent_is_ready', 'number', ['number', 'number'], [this.handle, outPtr]);
+      bridge.callFunction('rac_voice_agent_is_ready', 'number', ['number', 'number'], [this.handle, outPtr]);
       return m.getValue(outPtr, 'i32') === 1;
     } finally {
       m._free(outPtr);
@@ -186,12 +171,9 @@ export class VoiceAgentSession {
     const outPtr = m._malloc(4);
 
     try {
-      const r = m.ccall(
-        'rac_voice_agent_transcribe', 'number',
+      bridge.callWithCheck('rac_voice_agent_transcribe',
         ['number', 'number', 'number', 'number'],
-        [this.handle, audioPtr, audioData.length, outPtr],
-      ) as number;
-      bridge.checkResult(r, 'rac_voice_agent_transcribe');
+        [this.handle, audioPtr, audioData.length, outPtr]);
       const textPtr = m.getValue(outPtr, '*');
       const text = bridge.readString(textPtr);
       if (textPtr) m._free(textPtr);
@@ -211,12 +193,9 @@ export class VoiceAgentSession {
     const outPtr = m._malloc(4);
 
     try {
-      const r = m.ccall(
-        'rac_voice_agent_generate_response', 'number',
+      bridge.callWithCheck('rac_voice_agent_generate_response',
         ['number', 'number', 'number'],
-        [this.handle, promptPtr, outPtr],
-      ) as number;
-      bridge.checkResult(r, 'rac_voice_agent_generate_response');
+        [this.handle, promptPtr, outPtr]);
       const textPtr = m.getValue(outPtr, '*');
       const text = bridge.readString(textPtr);
       if (textPtr) m._free(textPtr);
@@ -235,9 +214,7 @@ export class VoiceAgentSession {
     }
     if (this.handle !== 0) {
       try {
-        WASMBridge.shared.module.ccall(
-          'rac_voice_agent_destroy', null, ['number'], [this.handle],
-        );
+        WASMBridge.shared.callFunction('rac_voice_agent_destroy', null, ['number'], [this.handle]);
       } catch { /* ignore */ }
       this.handle = 0;
     }
@@ -258,13 +235,12 @@ export const VoiceAgent = {
       throw SDKError.notInitialized();
     }
 
-    const m = WASMBridge.shared.module;
+    const bridge = WASMBridge.shared;
+    const m = bridge.module;
     const handlePtr = m._malloc(4);
 
-    const result = m.ccall(
-      'rac_voice_agent_create_standalone', 'number',
-      ['number'], [handlePtr],
-    ) as number;
+    const result = bridge.callFunction<number>('rac_voice_agent_create_standalone', 'number',
+      ['number'], [handlePtr]);
 
     if (result !== 0) {
       m._free(handlePtr);

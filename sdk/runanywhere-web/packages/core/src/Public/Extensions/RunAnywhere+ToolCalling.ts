@@ -57,22 +57,26 @@ export {
 const logger = new SDKLogger('ToolCalling');
 
 /**
- * Use streaming generation and collect all tokens into a single result.
- * This avoids the blocking `generate()` C function which can trigger
- * "RuntimeError: unreachable" traps in WASM on some models.
+ * Generate text and return the complete result.
+ *
+ * Uses the streaming path (`generateStream`) and drains the token stream
+ * to collect the full response text.  On WebGPU + JSPI builds the
+ * non-streaming `generate()` C function triggers "trying to suspend
+ * JS frames" because the Emscripten JSPI `Suspending` wrapper cannot
+ * unwind through mixed WASM/JS frames in the non-streaming code path.
+ * The streaming path works because its token callbacks return to JS
+ * cleanly between each suspension point.
  */
-async function collectStream(
+async function collectGeneration(
   prompt: string,
   opts: { maxTokens?: number; temperature?: number },
 ): Promise<{ text: string }> {
-  const { stream, result } = TextGeneration.generateStream(prompt, opts);
-  // Consume the stream so the result promise resolves
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  for await (const _token of stream) {
-    /* drain */
+  const { stream } = await TextGeneration.generateStream(prompt, opts);
+  let text = '';
+  for await (const token of stream) {
+    text += token;
   }
-  const final = await result;
-  return { text: final.text };
+  return { text };
 }
 
 function requireBridge(): WASMBridge {
@@ -132,7 +136,7 @@ export function getNumberArg(args: Record<string, ToolValue>, key: string): numb
 }
 
 // ---------------------------------------------------------------------------
-// Internal: Tool Registry
+// Internal: RegisteredTool interface
 // ---------------------------------------------------------------------------
 
 interface RegisteredTool {
@@ -140,18 +144,25 @@ interface RegisteredTool {
   executor: ToolExecutor;
 }
 
-const toolRegistry = new Map<string, RegisteredTool>();
-
 // ---------------------------------------------------------------------------
 // Internal: C++ Bridge helpers
 // ---------------------------------------------------------------------------
 
 /**
  * Check if C++ tool calling functions are available in the WASM module.
+ *
+ * On WebGPU builds, all WASM imports are wrapped with WebAssembly.Suspending.
+ * Synchronous ccall to C++ tool-calling functions (which are NOT
+ * WebAssembly.promising-wrapped) will throw "trying to suspend without
+ * WebAssembly.promising" if any import inside the C++ code returns a Promise.
+ * To avoid this, we always use the TypeScript fallback on WebGPU builds.
  */
 function hasNativeToolCalling(): boolean {
   try {
     const bridge = requireBridge();
+    // WebGPU builds have JSPI Suspending on ALL imports, so synchronous
+    // ccall to native tool helpers triggers SuspendError.  Use TS fallback.
+    if (bridge.accelerationMode === 'webgpu') return false;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return typeof (bridge.module as any)['_rac_tool_call_parse'] === 'function';
   } catch {
@@ -470,7 +481,10 @@ function serializeToolDefinitions(tools: ToolDefinition[]): string {
 // Tool Calling Extension
 // ---------------------------------------------------------------------------
 
-export const ToolCalling = {
+class ToolCallingImpl {
+  readonly extensionName = 'ToolCalling';
+  private toolRegistry = new Map<string, RegisteredTool>();
+
   /**
    * Register a tool that the LLM can use.
    *
@@ -478,38 +492,38 @@ export const ToolCalling = {
    * @param executor - Async function that executes the tool
    */
   registerTool(definition: ToolDefinition, executor: ToolExecutor): void {
-    toolRegistry.set(definition.name, { definition, executor });
+    this.toolRegistry.set(definition.name, { definition, executor });
     logger.info(`Tool registered: ${definition.name}`);
-  },
+  }
 
   /**
    * Unregister a tool by name.
    */
   unregisterTool(name: string): void {
-    toolRegistry.delete(name);
+    this.toolRegistry.delete(name);
     logger.info(`Tool unregistered: ${name}`);
-  },
+  }
 
   /**
    * Get all registered tool definitions.
    */
   getRegisteredTools(): ToolDefinition[] {
-    return Array.from(toolRegistry.values()).map((t) => t.definition);
-  },
+    return Array.from(this.toolRegistry.values()).map((t) => t.definition);
+  }
 
   /**
    * Clear all registered tools.
    */
   clearTools(): void {
-    toolRegistry.clear();
+    this.toolRegistry.clear();
     logger.info('All tools cleared');
-  },
+  }
 
   /**
    * Execute a tool call by looking up the registered executor.
    */
   async executeTool(toolCall: ToolCall): Promise<ToolResult> {
-    const registered = toolRegistry.get(toolCall.toolName);
+    const registered = this.toolRegistry.get(toolCall.toolName);
     if (!registered) {
       return {
         toolName: toolCall.toolName,
@@ -535,7 +549,7 @@ export const ToolCalling = {
         callId: toolCall.callId,
       };
     }
-  },
+  }
 
   /**
    * Generate a response with tool calling support.
@@ -565,7 +579,16 @@ export const ToolCalling = {
     const tools = options.tools ?? registeredTools;
 
     // Build tool system prompt
-    const toolsPrompt = formatToolsForPrompt(tools, format);
+    logger.debug('[generateWithTools] Formatting tools for prompt...');
+    let toolsPrompt: string;
+    try {
+      toolsPrompt = formatToolsForPrompt(tools, format);
+      logger.debug(`[generateWithTools] Tools prompt formatted (${toolsPrompt.length} chars)`);
+    } catch (fmtErr) {
+      logger.error(`[generateWithTools] formatToolsForPrompt failed: ${fmtErr instanceof Error ? fmtErr.message : String(fmtErr)}`);
+      throw fmtErr;
+    }
+
     let systemPrompt: string;
     if (options.replaceSystemPrompt && options.systemPrompt) {
       systemPrompt = options.systemPrompt;
@@ -582,12 +605,19 @@ export const ToolCalling = {
     let finalText = '';
 
     for (let i = 0; i < maxToolCalls; i++) {
-      // Generate
-      logger.debug(`Tool calling round ${i + 1}/${maxToolCalls}`);
-      const genResult = await TextGeneration.generate(fullPrompt, {
-        maxTokens: options.maxTokens ?? 1024,
-        temperature: options.temperature ?? 0.3,
-      });
+      // Generate – non-streaming avoids JSPI callback issues with WebGPU
+      logger.debug(`[generateWithTools] Round ${i + 1}/${maxToolCalls}, calling collectGeneration...`);
+      let genResult: { text: string };
+      try {
+        genResult = await collectGeneration(fullPrompt, {
+          maxTokens: options.maxTokens ?? 1024,
+          temperature: options.temperature ?? 0.3,
+        });
+        logger.debug(`[generateWithTools] Generation complete (${genResult.text.length} chars)`);
+      } catch (genErr) {
+        logger.error(`[generateWithTools] collectGeneration failed: ${genErr instanceof Error ? `${genErr.message}\nStack: ${genErr.stack}` : String(genErr)}`);
+        throw genErr;
+      }
 
       // Parse for tool calls
       const { text, toolCall } = parseToolCall(genResult.text);
@@ -633,14 +663,14 @@ export const ToolCalling = {
       toolResults: allToolResults,
       isComplete: true,
     };
-  },
+  }
 
   /**
    * Clean up the tool calling extension (clears all registered tools).
    */
   cleanup(): void {
-    toolRegistry.clear();
-  },
+    this.toolRegistry.clear();
+  }
 
   /**
    * Continue generation after manual tool execution.
@@ -662,5 +692,7 @@ export const ToolCalling = {
       ...options,
       maxToolCalls: (options?.maxToolCalls ?? 5) - 1,
     });
-  },
-};
+  }
+}
+
+export const ToolCalling = new ToolCallingImpl();

@@ -13,12 +13,11 @@
 import { WASMBridge } from '../Foundation/WASMBridge';
 import { SherpaONNXBridge } from '../Foundation/SherpaONNXBridge';
 import { EventBus } from '../Foundation/EventBus';
-import { TextGeneration } from '../Public/Extensions/RunAnywhere+TextGeneration';
-import { STT, STTModelType } from '../Public/Extensions/RunAnywhere+STT';
-import { TTS } from '../Public/Extensions/RunAnywhere+TTS';
-import { VAD } from '../Public/Extensions/RunAnywhere+VAD';
+import { STTModelType } from '../Public/Extensions/STTTypes';
 import { ModelCategory, LLMFramework, ModelStatus, DownloadStage, SDKEventType } from '../types/enums';
+import type { LLMModelLoader, STTModelLoader, TTSModelLoader, VADModelLoader } from './ModelLoaderTypes';
 import { OPFSStorage } from './OPFSStorage';
+import type { MetadataMap } from './OPFSStorage';
 import { ModelRegistry } from './ModelRegistry';
 import { ModelDownloader } from './ModelDownloader';
 import { extractTarGz } from './ArchiveUtility';
@@ -47,6 +46,14 @@ export interface VLMLoadParams {
   mmprojFilename: string;
   modelId: string;
   modelName: string;
+  /**
+   * Optional: raw model data to transfer to the Worker when OPFS doesn't
+   * have the file (memory-cache fallback for quota-exceeded scenarios).
+   * Transferred via postMessage (zero-copy).
+   */
+  modelData?: ArrayBuffer;
+  /** Optional: raw mmproj data (same fallback). */
+  mmprojData?: ArrayBuffer;
 }
 
 /**
@@ -76,8 +83,17 @@ class ModelManagerImpl {
    */
   private loadedByCategory: Map<ModelCategory, string> = new Map();
 
+  /** LRU metadata: lastUsedAt timestamps persisted in OPFS */
+  private metadata: MetadataMap = {};
+
   /** Pluggable VLM loader (set by the app via setVLMLoader) */
   private vlmLoader: VLMLoader | null = null;
+
+  /** Pluggable model loaders — registered by the Public layer during init */
+  private llmLoader: LLMModelLoader | null = null;
+  private sttLoader: STTModelLoader | null = null;
+  private ttsLoader: TTSModelLoader | null = null;
+  private vadLoader: VADModelLoader | null = null;
 
   constructor() {
     this.downloader = new ModelDownloader(this.registry, this.storage);
@@ -111,6 +127,18 @@ class ModelManagerImpl {
     this.vlmLoader = loader;
   }
 
+  /** Register the LLM model loader (text generation extension). */
+  setLLMLoader(loader: LLMModelLoader): void { this.llmLoader = loader; }
+
+  /** Register the STT model loader (speech-to-text extension). */
+  setSTTLoader(loader: STTModelLoader): void { this.sttLoader = loader; }
+
+  /** Register the TTS model loader (text-to-speech extension). */
+  setTTSLoader(loader: TTSModelLoader): void { this.ttsLoader = loader; }
+
+  /** Register the VAD model loader (voice activity detection extension). */
+  setVADLoader(loader: VADModelLoader): void { this.vadLoader = loader; }
+
   // --- Internal init ---
 
   /** Request persistent storage to prevent browser from evicting cached models */
@@ -128,20 +156,37 @@ class ModelManagerImpl {
   /**
    * Check OPFS for models that were downloaded in a previous session.
    * Updates their status from 'registered' to 'downloaded'.
+   * Also loads persisted LRU metadata for each model.
    * Only checks file existence + size — does NOT read file contents into memory.
    */
   private async refreshDownloadStatus(): Promise<void> {
+    // Load persisted metadata (lastUsedAt timestamps)
+    this.metadata = await this.storage.loadMetadata();
+
     for (const model of this.registry.getModels()) {
       if (model.status !== ModelStatus.Registered) continue;
       try {
         const size = await this.downloader.getOPFSFileSize(model.id);
         if (size !== null && size > 0) {
           this.registry.updateModel(model.id, { status: ModelStatus.Downloaded, sizeBytes: size });
+
+          // Ensure metadata entry exists — use persisted value or fall back to OPFS lastModified
+          if (!this.metadata[model.id]) {
+            const stored = await this.storage.listModels();
+            const entry = stored.find((s) => s.id === model.id);
+            this.metadata[model.id] = {
+              lastUsedAt: entry?.lastModified ?? Date.now(),
+              sizeBytes: size,
+            };
+          }
         }
       } catch {
         // Not in OPFS, keep as registered
       }
     }
+
+    // Persist any newly created metadata entries
+    await this.storage.saveMetadata(this.metadata);
   }
 
   // --- Queries (delegated to registry) ---
@@ -203,8 +248,11 @@ class ModelManagerImpl {
    * Ensure a model is loaded for the given category.
    * If already loaded, returns the loaded model. If a downloaded model exists,
    * loads it automatically. Returns null if no suitable model is available.
+   *
+   * @param options.coexist  Forwarded to `loadModel()`. When true, only swaps
+   *   models of the same category instead of unloading everything.
    */
-  async ensureLoaded(category: ModelCategory): Promise<ManagedModel | null> {
+  async ensureLoaded(category: ModelCategory, options?: { coexist?: boolean }): Promise<ManagedModel | null> {
     // Check if already loaded
     const loaded = this.getLoadedModel(category);
     if (loaded) return loaded;
@@ -217,11 +265,25 @@ class ModelManagerImpl {
     if (!downloaded) return null;
 
     // Load it
-    await this.loadModel(downloaded.id);
+    await this.loadModel(downloaded.id, options);
     return this.getLoadedModel(category);
   }
 
   // --- Download (delegated to downloader) ---
+
+  /**
+   * Check whether downloading a model will fit in OPFS without eviction.
+   * Returns a result indicating whether it fits and which models could be
+   * evicted if not. Does NOT perform any mutations.
+   */
+  async checkDownloadFit(modelId: string): Promise<import('./ModelDownloader').QuotaCheckResult> {
+    const model = this.registry.getModel(modelId);
+    if (!model) return { fits: true, availableBytes: 0, neededBytes: 0, evictionCandidates: [] };
+
+    // Find the currently loaded model for the same category (excluded from eviction)
+    const loadedId = this.loadedByCategory.get(model.modality ?? ModelCategory.Language);
+    return this.downloader.checkStorageQuota(model, this.metadata, loadedId ?? undefined);
+  }
 
   async downloadModel(modelId: string): Promise<void> {
     return this.downloader.downloadModel(modelId);
@@ -229,15 +291,36 @@ class ModelManagerImpl {
 
   // --- Model loading orchestration ---
 
-  async loadModel(modelId: string): Promise<boolean> {
+  /**
+   * Load a model by ID.
+   *
+   * @param options.coexist  When `true`, only unload the model of the **same
+   *   category** (swap) rather than unloading ALL loaded models. Use this for
+   *   multi-model pipelines like Voice (STT + LLM + TTS).
+   *   Default is `false` — unloads everything to reclaim memory.
+   */
+  async loadModel(modelId: string, options?: { coexist?: boolean }): Promise<boolean> {
     const model = this.registry.getModel(modelId);
     if (!model || (model.status !== ModelStatus.Downloaded && model.status !== ModelStatus.Registered)) return false;
 
-    // Unload current model of the SAME category only (allows STT + LLM + TTS simultaneously)
     const category = model.modality ?? ModelCategory.Language;
-    const currentlyLoadedId = this.loadedByCategory.get(category);
-    if (currentlyLoadedId) {
-      await this.unloadModelByCategory(category);
+
+    if (options?.coexist) {
+      // Pipeline mode: only unload models of the SAME category (swap).
+      // Other categories remain loaded for multi-model workflows.
+      const currentId = this.loadedByCategory.get(category);
+      if (currentId && currentId !== modelId) {
+        console.log(`[ModelManager] Swapping ${category} model: ${currentId} → ${modelId}`);
+        await this.unloadModelByCategory(category);
+      }
+    } else {
+      // Default: Unload ALL currently loaded models before loading the new one.
+      //
+      // In a browser environment, memory is limited (WASM linear memory +
+      // WebGPU buffers). The user interacts with one feature at a time
+      // (chat, vision, transcribe, etc.), so there's no need to keep models
+      // from other categories resident.
+      await this.unloadAll(modelId);
     }
 
     this.registry.updateModel(modelId, { status: ModelStatus.Loading });
@@ -245,12 +328,25 @@ class ModelManagerImpl {
 
     try {
       if (model.modality === ModelCategory.Multimodal) {
-        // VLM: Worker reads from OPFS directly — skip reading 940MB+ into main thread memory.
+        // VLM: Worker reads from OPFS directly when possible.
+        // When OPFS quota is exceeded, models live only in the main-thread
+        // memory cache — we must read and transfer them to the Worker.
         const exists = await this.downloader.existsInOPFS(modelId);
         if (!exists) {
           throw new Error('Model not downloaded — please download the model first.');
         }
-        await this.loadLLMModel(model, modelId, new Uint8Array(0));
+
+        const inActualOPFS = await this.downloader.existsInActualOPFS(modelId);
+        if (inActualOPFS) {
+          // Worker can read from OPFS directly (optimal: avoids main-thread copy)
+          await this.loadLLMModel(model, modelId, new Uint8Array(0));
+        } else {
+          // Model is in memory cache only (OPFS quota exceeded) — read and transfer to Worker
+          console.log(`[ModelManager] VLM model ${modelId} not in OPFS, reading from memory cache to transfer to Worker`);
+          const data = await this.downloader.loadFromOPFS(modelId);
+          if (!data) throw new Error('Model not downloaded — please download the model first.');
+          await this.loadLLMModel(model, modelId, data);
+        }
       } else {
         const data = await this.downloader.loadFromOPFS(modelId);
         if (!data) {
@@ -271,6 +367,10 @@ class ModelManagerImpl {
       this.loadedByCategory.set(category, modelId);
       this.registry.updateModel(modelId, { status: ModelStatus.Loaded });
       EventBus.shared.emit('model.loadCompleted', SDKEventType.Model, { modelId, category });
+
+      // Update LRU metadata
+      this.touchLastUsed(modelId, model.sizeBytes ?? 0);
+
       return true;
     } catch (err) {
       const message = err instanceof Error
@@ -288,6 +388,27 @@ class ModelManagerImpl {
     if (!model) return;
     const category = model.modality ?? ModelCategory.Language;
     await this.unloadModelByCategory(category);
+  }
+
+  /**
+   * Unload ALL currently loaded models.
+   *
+   * Called automatically before loading a new model, and can also be called
+   * explicitly by app code (e.g. on tab switch) to release all resources.
+   *
+   * @param exceptModelId - Optional model ID to skip (the model about to be loaded).
+   *                        Avoids redundant unload+reload of the same model.
+   */
+  async unloadAll(exceptModelId?: string): Promise<void> {
+    // Snapshot categories to avoid mutation during iteration
+    const loaded = [...this.loadedByCategory.entries()];
+    if (loaded.length === 0) return;
+
+    for (const [category, loadedId] of loaded) {
+      if (exceptModelId && loadedId === exceptModelId) continue;
+      console.log(`[ModelManager] Unloading ${category} model (${loadedId}) — freeing resources`);
+      await this.unloadModelByCategory(category);
+    }
   }
 
   async deleteModel(modelId: string): Promise<void> {
@@ -311,6 +432,23 @@ class ModelManagerImpl {
     }
 
     this.registry.updateModel(modelId, { status: ModelStatus.Registered, downloadProgress: undefined, sizeBytes: undefined });
+    this.removeMetadata(modelId);
+  }
+
+  /** Clear all models from OPFS and reset registry statuses. */
+  async clearAll(): Promise<void> {
+    await this.storage.clearAll();
+    this.metadata = {};
+    this.loadedByCategory.clear();
+    for (const model of this.registry.getModels()) {
+      if (model.status !== ModelStatus.Registered) {
+        this.registry.updateModel(model.id, {
+          status: ModelStatus.Registered,
+          downloadProgress: undefined,
+          sizeBytes: undefined,
+        });
+      }
+    }
   }
 
   async getStorageInfo(): Promise<{ modelCount: number; totalSize: number; available: number }> {
@@ -340,6 +478,26 @@ class ModelManagerImpl {
     }
 
     return { modelCount, totalSize, available };
+  }
+
+  // --- LRU Metadata ---
+
+  /** Get the last-used timestamp for a model (0 if never recorded). */
+  getModelLastUsedAt(modelId: string): number {
+    return this.metadata[modelId]?.lastUsedAt ?? 0;
+  }
+
+  /** Update lastUsedAt for a model and persist to OPFS (fire-and-forget). */
+  private touchLastUsed(modelId: string, sizeBytes: number): void {
+    this.metadata[modelId] = { lastUsedAt: Date.now(), sizeBytes };
+    // Persist asynchronously — don't block the caller
+    this.storage.saveMetadata(this.metadata).catch(() => { /* non-critical */ });
+  }
+
+  /** Remove metadata entry when a model is deleted. */
+  private removeMetadata(modelId: string): void {
+    delete this.metadata[modelId];
+    this.storage.saveMetadata(this.metadata).catch(() => { /* non-critical */ });
   }
 
   // --- Subscriptions (delegated to registry) ---
@@ -386,15 +544,16 @@ class ModelManagerImpl {
       const mmprojFile = model.additionalFiles?.find((f) => f.filename.includes('mmproj'));
       if (!mmprojFile) {
         console.warn(`[ModelManager] No mmproj found, loading as text-only LLM: ${modelId}`);
-        await TextGeneration.loadModel(fsPath, modelId, model.name);
+        if (!this.llmLoader) throw new Error('No LLM loader registered. Call ModelManager.setLLMLoader() first.');
+        await this.llmLoader.loadModel(fsPath, modelId, model.name);
       } else {
-        // Ensure mmproj is in OPFS (fallback download if missing)
+        // Ensure mmproj is in OPFS or memory cache (fallback download if missing)
         const mmprojKey = this.downloader.additionalFileKey(modelId, mmprojFile.filename);
         const mmprojExists = await this.downloader.existsInOPFS(mmprojKey);
         if (!mmprojExists && mmprojFile.url) {
           console.log(`[ModelManager] mmproj not in OPFS, downloading on-demand: ${mmprojFile.filename}`);
-          const mmprojData = await this.downloader.downloadFile(mmprojFile.url);
-          await this.downloader.storeInOPFS(mmprojKey, mmprojData);
+          const mmprojDownload = await this.downloader.downloadFile(mmprojFile.url);
+          await this.downloader.storeInOPFS(mmprojKey, mmprojDownload);
         }
 
         if (!this.vlmLoader) {
@@ -407,6 +566,29 @@ class ModelManagerImpl {
           await this.vlmLoader.init();
         }
 
+        // When model/mmproj are only in memory cache (OPFS quota exceeded),
+        // we need to read and transfer the data to the Worker.
+        let modelDataBuf: ArrayBuffer | undefined;
+        let mmprojDataBuf: ArrayBuffer | undefined;
+
+        const modelInOPFS = await this.downloader.existsInActualOPFS(modelId);
+        if (!modelInOPFS && data.length > 0) {
+          // data was already read from memory cache in the caller
+          modelDataBuf = new ArrayBuffer(data.byteLength);
+          new Uint8Array(modelDataBuf).set(data);
+          console.log(`[ModelManager] Transferring model data to VLM Worker (${(data.length / 1024 / 1024).toFixed(1)} MB)`);
+        }
+
+        const mmprojInOPFS = await this.downloader.existsInActualOPFS(mmprojKey);
+        if (!mmprojInOPFS) {
+          const mmprojBytes = await this.downloader.loadFromOPFS(mmprojKey);
+          if (mmprojBytes) {
+            mmprojDataBuf = new ArrayBuffer(mmprojBytes.byteLength);
+            new Uint8Array(mmprojDataBuf).set(mmprojBytes);
+            console.log(`[ModelManager] Transferring mmproj data to VLM Worker (${(mmprojBytes.length / 1024 / 1024).toFixed(1)} MB)`);
+          }
+        }
+
         // Load model via the pluggable VLM loader
         console.log(`[ModelManager] Loading VLM model: ${modelId}`);
         await this.vlmLoader.loadModel({
@@ -416,11 +598,14 @@ class ModelManagerImpl {
           mmprojFilename: mmprojFile.filename,
           modelId,
           modelName: model.name,
+          modelData: modelDataBuf,
+          mmprojData: mmprojDataBuf,
         });
         console.log(`[ModelManager] VLM model loaded: ${modelId}`);
       }
     } else if (model.modality === ModelCategory.Language) {
-      await TextGeneration.loadModel(fsPath, modelId, model.name);
+      if (!this.llmLoader) throw new Error('No LLM loader registered. Call ModelManager.setLLMLoader() first.');
+      await this.llmLoader.loadModel(fsPath, modelId, model.name);
       console.log(`[ModelManager] LLM model loaded via TextGeneration: ${modelId}`);
     }
   }
@@ -434,6 +619,8 @@ class ModelManagerImpl {
    *  2. **Individual files**: Separate encoder/decoder/tokens downloads.
    */
   private async loadSTTModel(model: ManagedModel, primaryData: Uint8Array): Promise<void> {
+    if (!this.sttLoader) throw new Error('No STT loader registered. Call ModelManager.setSTTLoader() first.');
+
     const sherpa = SherpaONNXBridge.shared;
     await sherpa.ensureLoaded();
 
@@ -496,7 +683,7 @@ class ModelManagerImpl {
       if (!encoderPath || !decoderPath || !tokensPath) {
         throw new Error(`Whisper archive for '${model.id}' missing encoder/decoder/tokens`);
       }
-      await STT.loadModel({
+      await this.sttLoader!.loadModel({
         modelId: model.id,
         type: STTModelType.Whisper,
         modelFiles: { encoder: encoderPath, decoder: decoderPath, tokens: tokensPath },
@@ -507,7 +694,7 @@ class ModelManagerImpl {
       if (!modelPath || !tokensPath) {
         throw new Error(`Paraformer archive for '${model.id}' missing model/tokens`);
       }
-      await STT.loadModel({
+      await this.sttLoader!.loadModel({
         modelId: model.id,
         type: STTModelType.Paraformer,
         modelFiles: { model: modelPath, tokens: tokensPath },
@@ -517,7 +704,7 @@ class ModelManagerImpl {
       if (!encoderPath || !decoderPath || !joinerPath || !tokensPath) {
         throw new Error(`Zipformer archive for '${model.id}' missing encoder/decoder/joiner/tokens`);
       }
-      await STT.loadModel({
+      await this.sttLoader!.loadModel({
         modelId: model.id,
         type: STTModelType.Zipformer,
         modelFiles: { encoder: encoderPath, decoder: decoderPath, joiner: joinerPath, tokens: tokensPath },
@@ -571,7 +758,7 @@ class ModelManagerImpl {
         throw new Error('Whisper model requires encoder, decoder, and tokens files');
       }
 
-      await STT.loadModel({
+      await this.sttLoader!.loadModel({
         modelId: model.id,
         type: STTModelType.Whisper,
         modelFiles: {
@@ -587,7 +774,7 @@ class ModelManagerImpl {
       if (!tokensFilename) {
         throw new Error('Paraformer model requires model and tokens files');
       }
-      await STT.loadModel({
+      await this.sttLoader!.loadModel({
         modelId: model.id,
         type: STTModelType.Paraformer,
         modelFiles: { model: primaryPath, tokens: `${modelDir}/${tokensFilename}` },
@@ -600,7 +787,7 @@ class ModelManagerImpl {
       if (!decoderFilename || !joinerFilename || !tokensFilename) {
         throw new Error('Zipformer model requires encoder, decoder, joiner, and tokens files');
       }
-      await STT.loadModel({
+      await this.sttLoader!.loadModel({
         modelId: model.id,
         type: STTModelType.Zipformer,
         modelFiles: {
@@ -625,6 +812,8 @@ class ModelManagerImpl {
    *  2. **Individual files** (legacy): Separate model + companion file downloads.
    */
   private async loadTTSModel(model: ManagedModel, primaryData: Uint8Array): Promise<void> {
+    if (!this.ttsLoader) throw new Error('No TTS loader registered. Call ModelManager.setTTSLoader() first.');
+
     const sherpa = SherpaONNXBridge.shared;
     await sherpa.ensureLoaded();
 
@@ -694,7 +883,7 @@ class ModelManagerImpl {
 
     console.log(`[ModelManager] TTS archive extracted — model: ${modelPath}, tokens: ${tokensPath}, dataDir: ${dataDirPath ?? 'none'}`);
 
-    await TTS.loadVoice({
+    await this.ttsLoader!.loadVoice({
       voiceId: model.id,
       modelPath,
       tokensPath,
@@ -743,7 +932,7 @@ class ModelManagerImpl {
       throw new Error('TTS model requires tokens.txt file');
     }
 
-    await TTS.loadVoice({
+    await this.ttsLoader!.loadVoice({
       voiceId: model.id,
       modelPath: primaryPath,
       tokensPath,
@@ -767,7 +956,8 @@ class ModelManagerImpl {
     console.log(`[ModelManager] Writing VAD model to ${fsPath} (${data.length} bytes)`);
     sherpa.writeFile(fsPath, data);
 
-    await VAD.loadModel({ modelPath: fsPath });
+    if (!this.vadLoader) throw new Error('No VAD loader registered. Call ModelManager.setVADLoader() first.');
+    await this.vadLoader.loadModel({ modelPath: fsPath });
     console.log(`[ModelManager] VAD model loaded: ${model.id}`);
   }
 
@@ -793,22 +983,40 @@ class ModelManagerImpl {
     const modelId = this.loadedByCategory.get(category);
     if (!modelId) return;
 
+    console.log(`[ModelManager] Unloading ${category} model: ${modelId}`);
+
     try {
       if (category === ModelCategory.SpeechRecognition) {
-        await STT.unloadModel();
+        await this.sttLoader?.unloadModel();
       } else if (category === ModelCategory.SpeechSynthesis) {
-        await TTS.unloadVoice();
+        await this.ttsLoader?.unloadVoice();
       } else if (category === ModelCategory.Audio) {
-        VAD.cleanup();
+        this.vadLoader?.cleanup();
       } else if (category === ModelCategory.Multimodal) {
-        if (this.vlmLoader) {
-          await this.vlmLoader.unloadModel();
-        }
+        await this.vlmLoader?.unloadModel();
       } else {
-        await TextGeneration.unloadModel();
+        await this.llmLoader?.unloadModel();
       }
-    } catch {
-      // Ignore unload errors
+
+      // Clean up Emscripten FS model files to release WASM linear memory.
+      // LLM models (Language) write .gguf files into the main-thread
+      // Emscripten FS. VLM (Multimodal) models are handled by the Worker's
+      // own WASM FS and don't need cleanup here.
+      if (category === ModelCategory.Language) {
+        try {
+          const bridge = WASMBridge.shared;
+          if (bridge.isLoaded) {
+            const m = bridge.module as any;
+            const fsPath = `/models/${modelId}.gguf`;
+            try { m.FS_unlink(fsPath); } catch { /* file may not exist */ }
+            console.log(`[ModelManager] Cleaned up Emscripten FS: ${fsPath}`);
+          }
+        } catch {
+          // Non-critical — FS cleanup is best-effort
+        }
+      }
+    } catch (err) {
+      console.warn(`[ModelManager] Error during unload of ${modelId}:`, err);
     }
 
     this.registry.updateModel(modelId, { status: ModelStatus.Downloaded });

@@ -26,65 +26,6 @@ import type { VLMImage, VLMGenerationOptions, VLMGenerationResult, VLMStreamingR
 
 const logger = new SDKLogger('VLM');
 
-let _vlmComponentHandle = 0;
-let _vlmBackendRegistered = false;
-
-function requireBridge(): WASMBridge {
-  if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
-  return WASMBridge.shared;
-}
-
-/**
- * Ensure the llama.cpp VLM backend is registered with the service registry.
- * Must be called before creating the VLM component so it can find a provider.
- */
-function ensureVLMBackendRegistered(): void {
-  if (_vlmBackendRegistered) return;
-
-  const bridge = requireBridge();
-  const m = bridge.module;
-
-  // Check if the backend registration function exists (only when built with --vlm)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const fn = (m as any)['_rac_backend_llamacpp_vlm_register'];
-  if (!fn) {
-    throw new SDKError(
-      SDKErrorCode.BackendNotAvailable,
-      'VLM backend not available. Rebuild WASM with --vlm flag.',
-    );
-  }
-
-  const result = m.ccall('rac_backend_llamacpp_vlm_register', 'number', [], []) as number;
-  if (result !== 0) {
-    bridge.checkResult(result, 'rac_backend_llamacpp_vlm_register');
-  }
-
-  _vlmBackendRegistered = true;
-  logger.info('VLM backend (llama.cpp mtmd) registered');
-}
-
-function ensureVLMComponent(): number {
-  if (_vlmComponentHandle !== 0) return _vlmComponentHandle;
-
-  // Register the VLM backend first
-  ensureVLMBackendRegistered();
-
-  const bridge = requireBridge();
-  const m = bridge.module;
-  const handlePtr = m._malloc(4);
-  const result = m.ccall('rac_vlm_component_create', 'number', ['number'], [handlePtr]) as number;
-
-  if (result !== 0) {
-    m._free(handlePtr);
-    bridge.checkResult(result, 'rac_vlm_component_create');
-  }
-
-  _vlmComponentHandle = m.getValue(handlePtr, 'i32');
-  m._free(handlePtr);
-  logger.debug('VLM component created');
-  return _vlmComponentHandle;
-}
-
 export type { VLMImage, VLMGenerationOptions, VLMGenerationResult, VLMStreamingResult } from './VLMTypes';
 export { VLMImageFormat, VLMModelFamily } from './VLMTypes';
 
@@ -92,7 +33,67 @@ export { VLMImageFormat, VLMModelFamily } from './VLMTypes';
 // VLM Extension
 // ---------------------------------------------------------------------------
 
-export const VLM = {
+class VLMImpl {
+  readonly extensionName = 'VLM';
+  private _vlmComponentHandle = 0;
+  private _vlmBackendRegistered = false;
+
+  private requireBridge(): WASMBridge {
+    if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
+    return WASMBridge.shared;
+  }
+
+  /**
+   * Ensure the llama.cpp VLM backend is registered with the service registry.
+   * Must be called before creating the VLM component so it can find a provider.
+   */
+  private ensureVLMBackendRegistered(): void {
+    if (this._vlmBackendRegistered) return;
+
+    const bridge = this.requireBridge();
+    const m = bridge.module;
+
+    // Check if the backend registration function exists (only when built with --vlm)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fn = (m as any)['_rac_backend_llamacpp_vlm_register'];
+    if (!fn) {
+      throw new SDKError(
+        SDKErrorCode.BackendNotAvailable,
+        'VLM backend not available. Rebuild WASM with --vlm flag.',
+      );
+    }
+
+    const result = m.ccall('rac_backend_llamacpp_vlm_register', 'number', [], []) as number;
+    if (result !== 0) {
+      bridge.checkResult(result, 'rac_backend_llamacpp_vlm_register');
+    }
+
+    this._vlmBackendRegistered = true;
+    logger.info('VLM backend (llama.cpp mtmd) registered');
+  }
+
+  private ensureVLMComponent(): number {
+    if (this._vlmComponentHandle !== 0) return this._vlmComponentHandle;
+
+    // Register the VLM backend first
+    this.ensureVLMBackendRegistered();
+
+    const bridge = this.requireBridge();
+    const m = bridge.module;
+    const handlePtr = m._malloc(4);
+    const result = m.ccall('rac_vlm_component_create', 'number', ['number'], [handlePtr]) as number;
+
+    if (result !== 0) {
+      m._free(handlePtr);
+      bridge.checkResult(result, 'rac_vlm_component_create');
+    }
+
+    this._vlmComponentHandle = m.getValue(handlePtr, 'i32');
+    m._free(handlePtr);
+    logger.debug('VLM component created');
+    return this._vlmComponentHandle;
+  }
+
   /**
    * Load a VLM model (GGUF model + multimodal projector).
    *
@@ -107,9 +108,9 @@ export const VLM = {
     modelId: string,
     modelName?: string,
   ): Promise<void> {
-    const bridge = requireBridge();
+    const bridge = this.requireBridge();
     const m = bridge.module;
-    const handle = ensureVLMComponent();
+    const handle = this.ensureVLMComponent();
 
     logger.info(`Loading VLM model: ${modelId}`);
     EventBus.shared.emit('model.loadStarted', SDKEventType.Model, { modelId, component: 'vlm' });
@@ -134,28 +135,28 @@ export const VLM = {
       bridge.free(idPtr);
       bridge.free(namePtr);
     }
-  },
+  }
 
   /** Unload the VLM model. */
   async unloadModel(): Promise<void> {
-    if (_vlmComponentHandle === 0) return;
-    const bridge = requireBridge();
+    if (this._vlmComponentHandle === 0) return;
+    const bridge = this.requireBridge();
     const result = bridge.module.ccall(
-      'rac_vlm_component_unload', 'number', ['number'], [_vlmComponentHandle],
+      'rac_vlm_component_unload', 'number', ['number'], [this._vlmComponentHandle],
     ) as number;
     bridge.checkResult(result, 'rac_vlm_component_unload');
     logger.info('VLM model unloaded');
-  },
+  }
 
   /** Check if a VLM model is loaded. */
   get isModelLoaded(): boolean {
-    if (_vlmComponentHandle === 0) return false;
+    if (this._vlmComponentHandle === 0) return false;
     try {
       return (WASMBridge.shared.module.ccall(
-        'rac_vlm_component_is_loaded', 'number', ['number'], [_vlmComponentHandle],
+        'rac_vlm_component_is_loaded', 'number', ['number'], [this._vlmComponentHandle],
       ) as number) === 1;
     } catch { return false; }
-  },
+  }
 
   /**
    * Process an image with a text prompt.
@@ -170,11 +171,11 @@ export const VLM = {
     prompt: string,
     options: VLMGenerationOptions = {},
   ): Promise<VLMGenerationResult> {
-    const bridge = requireBridge();
+    const bridge = this.requireBridge();
     const m = bridge.module;
-    const handle = ensureVLMComponent();
+    const handle = this.ensureVLMComponent();
 
-    if (!VLM.isModelLoaded) {
+    if (!this.isModelLoaded) {
       throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No VLM model loaded. Call loadModel() first.');
     }
 
@@ -278,28 +279,28 @@ export const VLM = {
       if (pixelPtr) m._free(pixelPtr);
       if (sysPtr) bridge.free(sysPtr);
     }
-  },
+  }
 
   /** Cancel in-progress VLM generation. */
   cancel(): void {
-    if (_vlmComponentHandle === 0) return;
+    if (this._vlmComponentHandle === 0) return;
     WASMBridge.shared.module.ccall(
-      'rac_vlm_component_cancel', 'number', ['number'], [_vlmComponentHandle],
+      'rac_vlm_component_cancel', 'number', ['number'], [this._vlmComponentHandle],
     );
-  },
+  }
 
   /** Clean up the VLM component and unregister backend. */
   cleanup(): void {
-    if (_vlmComponentHandle !== 0) {
+    if (this._vlmComponentHandle !== 0) {
       try {
         WASMBridge.shared.module.ccall(
-          'rac_vlm_component_destroy', null, ['number'], [_vlmComponentHandle],
+          'rac_vlm_component_destroy', null, ['number'], [this._vlmComponentHandle],
         );
       } catch { /* ignore */ }
-      _vlmComponentHandle = 0;
+      this._vlmComponentHandle = 0;
     }
 
-    if (_vlmBackendRegistered) {
+    if (this._vlmBackendRegistered) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const fn = (WASMBridge.shared.module as any)['_rac_backend_llamacpp_vlm_unregister'];
@@ -307,7 +308,9 @@ export const VLM = {
           WASMBridge.shared.module.ccall('rac_backend_llamacpp_vlm_unregister', 'number', [], []);
         }
       } catch { /* ignore */ }
-      _vlmBackendRegistered = false;
+      this._vlmBackendRegistered = false;
     }
-  },
-};
+  }
+}
+
+export const VLM = new VLMImpl();

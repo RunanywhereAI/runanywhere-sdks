@@ -1754,3 +1754,259 @@ input[type="range"]::-webkit-slider-thumb {
   width: 100%;
   color: var(--color-red);
 }
+
+/* =============================================================================
+ * Dialog System (Confirm / Eviction)
+ * ============================================================================= */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+  padding: var(--space-lg);
+}
+
+.dialog-box {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  padding: var(--space-xl);
+  max-width: 360px;
+  width: 100%;
+  box-shadow: 0 16px 48px var(--shadow-default);
+}
+
+.dialog-box--wide {
+  max-width: 420px;
+}
+
+.dialog-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  margin: 0 0 var(--space-sm) 0;
+}
+
+.dialog-message {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-lg) 0;
+  line-height: 1.5;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: var(--space-sm-md);
+  justify-content: flex-end;
+}
+
+.dialog-btn {
+  padding: var(--space-sm-md) var(--space-lg);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  border: 1px solid var(--border-light);
+  transition: all var(--duration-fast);
+}
+
+.dialog-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.dialog-btn--cancel {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.dialog-btn--cancel:hover {
+  background: var(--bg-tertiary);
+}
+
+.dialog-btn--primary {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+
+.dialog-btn--primary:hover {
+  filter: brightness(1.1);
+}
+
+.dialog-btn--danger {
+  background: var(--color-red);
+  color: white;
+  border-color: var(--color-red);
+}
+
+.dialog-btn--danger:hover {
+  filter: brightness(1.1);
+}
+
+.dialog-btn--danger:disabled {
+  filter: none;
+}
+
+/* Eviction Dialog Specifics */
+.eviction-meter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-sm-md) var(--space-md);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-md);
+  font-size: var(--font-size-sm);
+}
+
+.eviction-meter-label {
+  color: var(--text-secondary);
+}
+
+.eviction-meter-value {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-primary);
+}
+
+.eviction-candidates {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.eviction-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm-md);
+  padding: var(--space-sm-md) var(--space-md);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  transition: background var(--duration-fast);
+}
+
+.eviction-row:hover {
+  background: var(--bg-secondary);
+}
+
+.eviction-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.eviction-model-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eviction-model-size {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+/* =============================================================================
+ * Quota Bar (Storage Tab)
+ * ============================================================================= */
+.quota-bar-container {
+  padding: 0 var(--space-lg) var(--space-md);
+}
+
+.quota-bar {
+  height: 8px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.quota-bar-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+  transition: width 0.4s ease;
+}
+
+.quota-bar-fill.quota-bar-fill--warning {
+  background: var(--color-orange, orange);
+}
+
+.quota-bar-fill.quota-bar-fill--critical {
+  background: var(--color-red);
+}
+
+.quota-bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  margin-top: var(--space-xs);
+}
+
+/* Storage model row: last-used timestamp */
+.model-last-used {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary, var(--text-secondary));
+  margin-top: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   Model-switch info banner
+   --------------------------------------------------------------------------- */
+
+.model-switch-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  margin: var(--space-sm) 0;
+  background: var(--bg-secondary, #1e293b);
+  border: 1px solid var(--border-color, #334155);
+  border-left: 3px solid var(--color-blue, #3b82f6);
+  border-radius: var(--radius-md, 8px);
+  font-size: var(--font-size-sm, 13px);
+  color: var(--text-secondary, #94a3b8);
+  animation: banner-slide-in 0.3s ease-out;
+}
+
+.model-switch-banner svg {
+  flex-shrink: 0;
+  color: var(--color-blue, #3b82f6);
+}
+
+.model-switch-banner strong {
+  color: var(--text-primary, #e2e8f0);
+}
+
+.model-switch-banner .banner-dismiss {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-secondary, #94a3b8);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.model-switch-banner .banner-dismiss:hover {
+  opacity: 1;
+  color: var(--text-primary, #e2e8f0);
+}
+
+@keyframes banner-slide-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

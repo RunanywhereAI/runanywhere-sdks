@@ -40,6 +40,8 @@ export interface SDKEventMap {
   'model.loadCompleted': { modelId: string; component?: string; category?: string; loadTimeMs?: number };
   'model.loadFailed': { modelId: string; error: string };
   'model.unloaded': { modelId: string; category: string };
+  'model.quotaExceeded': { modelId: string; availableBytes: number; neededBytes: number };
+  'model.evicted': { modelId: string; modelName: string; freedBytes: number };
 
   // Text generation
   'generation.started': { prompt: string };

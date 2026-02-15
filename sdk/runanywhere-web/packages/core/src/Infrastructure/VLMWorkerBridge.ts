@@ -39,6 +39,10 @@ export type VLMWorkerCommand =
         modelOpfsKey: string; modelFilename: string;
         mmprojOpfsKey: string; mmprojFilename: string;
         modelId: string; modelName: string;
+        /** Optional: raw model data when OPFS doesn't have it (memory-cache fallback). */
+        modelData?: ArrayBuffer;
+        /** Optional: raw mmproj data when OPFS doesn't have it. */
+        mmprojData?: ArrayBuffer;
       };
     }
   | {
@@ -79,6 +83,10 @@ export interface VLMLoadModelParams {
   mmprojFilename: string;
   modelId: string;
   modelName: string;
+  /** Optional: raw model data when OPFS doesn't have it (memory-cache fallback). */
+  modelData?: ArrayBuffer;
+  /** Optional: raw mmproj data when OPFS doesn't have it. */
+  mmprojData?: ArrayBuffer;
 }
 
 /**
@@ -215,14 +223,23 @@ export class VLMWorkerBridge {
 
   /**
    * Load a VLM model in the Worker's WASM instance.
-   * The Worker reads model files directly from OPFS (zero-copy).
+   *
+   * Normally the Worker reads model files directly from OPFS (zero-copy).
+   * When OPFS quota is exceeded and models are only in the main-thread memory
+   * cache, the data is transferred via postMessage (still zero-copy via
+   * Transferable ArrayBuffers).
    */
   async loadModel(params: VLMLoadModelParams): Promise<void> {
     if (!this._isInitialized) {
       await this.init();
     }
 
-    await this.send('load-model', params);
+    // Transfer data buffers when provided (zero-copy to Worker)
+    const transferables: Transferable[] = [];
+    if (params.modelData) transferables.push(params.modelData);
+    if (params.mmprojData) transferables.push(params.mmprojData);
+
+    await this.send('load-model', params, transferables);
     this._isModelLoaded = true;
     this._lastModelParams = params;
     this._needsRecovery = false;

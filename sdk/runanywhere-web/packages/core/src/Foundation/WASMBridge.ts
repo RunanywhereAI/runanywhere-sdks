@@ -253,6 +253,28 @@ export class WASMBridge {
       this._loadedModuleUrl = moduleUrl;
       logger.info(`Acceleration mode: ${this._accelerationMode} (loading ${useWebGPU ? 'racommons-webgpu' : 'racommons'})`);
 
+      // Safety-net probe: verify the WebGPU glue JS was compiled with
+      // JSPI support.  A JSPI-enabled build contains "WebAssembly.promising"
+      // which wraps exported WASM functions so they can suspend during
+      // async WebGPU operations.  If the marker is absent the build is
+      // either outdated or misconfigured and generation would crash with
+      // "RuntimeError: unreachable".  Fall back to CPU in that case.
+      if (useWebGPU && acceleration === 'auto') {
+        try {
+          const probeResp = await fetch(moduleUrl);
+          const probeText = await probeResp.text();
+          if (!probeText.includes('WebAssembly.promising')) {
+            logger.warning(
+              'WebGPU WASM build lacks JSPI support (WebAssembly.promising not found). Falling back to CPU.',
+            );
+            return this._doLoad(wasmUrl, undefined, 'cpu');
+          }
+        } catch {
+          // If the probe fails, proceed with WebGPU and let runtime errors
+          // surface normally.
+        }
+      }
+
       // Dynamic import of the Emscripten glue JS
       // The glue file exports a factory function: createRACommonsModule()
       const { default: createModule } = await import(/* @vite-ignore */ moduleUrl);
@@ -264,8 +286,13 @@ export class WASMBridge {
         printErr: (text: string) => logger.error(text),
       }) as RACommonsModule;
 
-      // Verify module loaded correctly
-      const pingResult = this._module._rac_wasm_ping();
+      // Verify module loaded correctly.
+      // With JSPI builds some exports may return Promises, so await just
+      // in case _rac_wasm_ping was wrapped with WebAssembly.promising.
+      const pingRaw: unknown = this._module._rac_wasm_ping();
+      const pingResult = (typeof pingRaw === 'object' && pingRaw !== null && 'then' in pingRaw)
+        ? await (pingRaw as Promise<number>)
+        : pingRaw as number;
       if (pingResult !== 42) {
         throw new Error(`WASM ping failed: expected 42, got ${pingResult}`);
       }
@@ -275,7 +302,8 @@ export class WASMBridge {
     } catch (error) {
       // If WebGPU load failed, fall back to CPU automatically
       if (this._accelerationMode === 'webgpu' && acceleration === 'auto') {
-        logger.warning('WebGPU WASM module failed to load, falling back to CPU');
+        const reason = error instanceof Error ? error.message : String(error);
+        logger.warning(`WebGPU WASM module failed to load (${reason}), falling back to CPU`);
         this._accelerationMode = 'cpu';
         this._module = null;
         this._loaded = false;
@@ -307,7 +335,21 @@ export class WASMBridge {
       return false;
     }
 
-    return hasWebGPU;
+    if (!hasWebGPU) return false;
+
+    // The WebGPU WASM module is compiled with JSPI (WebAssembly JavaScript
+    // Promise Integration).  If the browser doesn't expose the JSPI APIs
+    // the module will fail to instantiate.
+    const hasJSPI = WASMBridge.detectJSPI();
+    if (!hasJSPI) {
+      logger.warning(
+        'WebGPU available but browser lacks JSPI support (WebAssembly.promising). ' +
+        'Update Chrome to 128+ or enable chrome://flags/#experimental-wasm-jspi. Falling back to CPU.',
+      );
+      return false;
+    }
+
+    return true;
   }
 
   /**
@@ -321,6 +363,23 @@ export class WASMBridge {
       const gpu = (navigator as NavigatorWithGPU).gpu;
       const adapter = await gpu?.requestAdapter();
       return adapter !== null;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Detect JSPI (JavaScript Promise Integration) support.
+   * The WebGPU WASM module requires WebAssembly.promising and
+   * WebAssembly.Suspending to suspend during async GPU operations.
+   */
+  static detectJSPI(): boolean {
+    try {
+      return (
+        typeof WebAssembly !== 'undefined' &&
+        'promising' in WebAssembly &&
+        'Suspending' in WebAssembly
+      );
     } catch {
       return false;
     }
@@ -460,6 +519,34 @@ export class WASMBridge {
   getErrorMessage(resultCode: number): string {
     const ptr = this.module._rac_error_message(resultCode);
     return this.readString(ptr);
+  }
+
+  /**
+   * Type-safe wrapper around Emscripten ccall().
+   * Centralizes all dynamic WASM function calls through the bridge.
+   */
+  callFunction<T = number>(
+    funcName: string,
+    returnType: string | null,
+    argTypes: string[],
+    args: unknown[],
+    opts?: { async?: boolean },
+  ): T {
+    if (!this._module) throw SDKError.wasmNotLoaded();
+    return this._module.ccall(funcName, returnType, argTypes, args, opts) as T;
+  }
+
+  /**
+   * Call a WASM function that returns rac_result_t and throw SDKError if
+   * the result is non-zero.
+   */
+  callWithCheck(
+    funcName: string,
+    argTypes: string[],
+    args: unknown[],
+  ): void {
+    const result = this.callFunction<number>(funcName, 'number', argTypes, args);
+    this.checkResult(result, funcName);
   }
 
   // -----------------------------------------------------------------------

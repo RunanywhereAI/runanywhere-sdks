@@ -526,7 +526,7 @@ async function sendStreaming(text: string, loaded: ModelInfo): Promise<void> {
     throw new Error('Model not loaded in WASM backend');
   }
 
-  const { stream, result: resultPromise, cancel } = TextGeneration.generateStream(text, {
+  const { stream, result: resultPromise, cancel } = await TextGeneration.generateStream(text, {
     maxTokens: 512,
     temperature: 0.7,
   });

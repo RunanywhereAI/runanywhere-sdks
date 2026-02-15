@@ -42,44 +42,45 @@ export {
 
 const logger = new SDKLogger('Diffusion');
 
-let _diffusionComponentHandle = 0;
-
-function requireBridge(): WASMBridge {
-  if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
-  return WASMBridge.shared;
-}
-
-function ensureDiffusionComponent(): number {
-  if (_diffusionComponentHandle !== 0) return _diffusionComponentHandle;
-
-  const bridge = requireBridge();
-  const m = bridge.module;
-  const handlePtr = m._malloc(4);
-  const result = m.ccall('rac_diffusion_component_create', 'number', ['number'], [handlePtr]) as number;
-
-  if (result !== 0) {
-    m._free(handlePtr);
-    bridge.checkResult(result, 'rac_diffusion_component_create');
-  }
-
-  _diffusionComponentHandle = m.getValue(handlePtr, 'i32');
-  m._free(handlePtr);
-  logger.debug('Diffusion component created');
-  return _diffusionComponentHandle;
-}
-
 // ---------------------------------------------------------------------------
 // Diffusion Extension
 // ---------------------------------------------------------------------------
 
-export const Diffusion = {
+class DiffusionImpl {
+  readonly extensionName = 'Diffusion';
+  private _diffusionComponentHandle = 0;
+
+  private requireBridge(): WASMBridge {
+    if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
+    return WASMBridge.shared;
+  }
+
+  private ensureDiffusionComponent(): number {
+    if (this._diffusionComponentHandle !== 0) return this._diffusionComponentHandle;
+
+    const bridge = this.requireBridge();
+    const m = bridge.module;
+    const handlePtr = m._malloc(4);
+    const result = bridge.callFunction<number>('rac_diffusion_component_create', 'number', ['number'], [handlePtr]);
+
+    if (result !== 0) {
+      m._free(handlePtr);
+      bridge.checkResult(result, 'rac_diffusion_component_create');
+    }
+
+    this._diffusionComponentHandle = m.getValue(handlePtr, 'i32');
+    m._free(handlePtr);
+    logger.debug('Diffusion component created');
+    return this._diffusionComponentHandle;
+  }
+
   /**
    * Load a diffusion model.
    */
   async loadModel(modelPath: string, modelId: string, modelName?: string): Promise<void> {
-    const bridge = requireBridge();
+    const bridge = this.requireBridge();
     const m = bridge.module;
-    const handle = ensureDiffusionComponent();
+    const handle = this.ensureDiffusionComponent();
 
     logger.info(`Loading diffusion model: ${modelId} from ${modelPath}`);
     EventBus.shared.emit('model.loadStarted', SDKEventType.Model, { modelId, component: 'diffusion' });
@@ -102,38 +103,38 @@ export const Diffusion = {
       bridge.free(idPtr);
       bridge.free(namePtr);
     }
-  },
+  }
 
   /** Unload the diffusion model. */
   async unloadModel(): Promise<void> {
-    if (_diffusionComponentHandle === 0) return;
-    const bridge = requireBridge();
+    if (this._diffusionComponentHandle === 0) return;
+    const bridge = this.requireBridge();
     const result = bridge.module.ccall(
-      'rac_diffusion_component_unload', 'number', ['number'], [_diffusionComponentHandle],
+      'rac_diffusion_component_unload', 'number', ['number'], [this._diffusionComponentHandle],
     ) as number;
     bridge.checkResult(result, 'rac_diffusion_component_unload');
     logger.info('Diffusion model unloaded');
-  },
+  }
 
   /** Check if a diffusion model is loaded. */
   get isModelLoaded(): boolean {
-    if (_diffusionComponentHandle === 0) return false;
+    if (this._diffusionComponentHandle === 0) return false;
     try {
       return (WASMBridge.shared.module.ccall(
-        'rac_diffusion_component_is_loaded', 'number', ['number'], [_diffusionComponentHandle],
+        'rac_diffusion_component_is_loaded', 'number', ['number'], [this._diffusionComponentHandle],
       ) as number) === 1;
     } catch { return false; }
-  },
+  }
 
   /**
    * Generate an image from a text prompt.
    */
   async generate(options: DiffusionGenerationOptions): Promise<DiffusionGenerationResult> {
-    const bridge = requireBridge();
+    const bridge = this.requireBridge();
     const m = bridge.module;
-    const handle = ensureDiffusionComponent();
+    const handle = this.ensureDiffusionComponent();
 
-    if (!Diffusion.isModelLoaded) {
+    if (!this.isModelLoaded) {
       throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No diffusion model loaded. Call loadModel() first.');
     }
 
@@ -208,25 +209,27 @@ export const Diffusion = {
       if (negPromptPtr) bridge.free(negPromptPtr);
       m._free(optPtr);
     }
-  },
+  }
 
   /** Cancel in-progress generation. */
   cancel(): void {
-    if (_diffusionComponentHandle === 0) return;
+    if (this._diffusionComponentHandle === 0) return;
     WASMBridge.shared.module.ccall(
-      'rac_diffusion_component_cancel', 'number', ['number'], [_diffusionComponentHandle],
+      'rac_diffusion_component_cancel', 'number', ['number'], [this._diffusionComponentHandle],
     );
-  },
+  }
 
   /** Clean up the diffusion component. */
   cleanup(): void {
-    if (_diffusionComponentHandle !== 0) {
+    if (this._diffusionComponentHandle !== 0) {
       try {
         WASMBridge.shared.module.ccall(
-          'rac_diffusion_component_destroy', null, ['number'], [_diffusionComponentHandle],
+          'rac_diffusion_component_destroy', null, ['number'], [this._diffusionComponentHandle],
         );
       } catch { /* ignore */ }
-      _diffusionComponentHandle = 0;
+      this._diffusionComponentHandle = 0;
     }
-  },
-};
+  }
+}
+
+export const Diffusion = new DiffusionImpl();

@@ -4,6 +4,7 @@
  */
 
 import { ModelManager, ModelCategory, type ModelInfo } from '../services/model-manager';
+import { showToast, showEvictionDialog } from './dialogs';
 
 let modalEl: HTMLElement | null = null;
 
@@ -11,8 +12,24 @@ let modalEl: HTMLElement | null = null;
 // Show Modal
 // ---------------------------------------------------------------------------
 
-export function showModelSelectionSheet(modality?: ModelCategory): void {
+/**
+ * Options for the model selection sheet.
+ */
+export interface ModelSelectionSheetOptions {
+  /**
+   * When true, loading a model only unloads models of the same category
+   * (swap) rather than all loaded models. Use for multi-model pipelines
+   * like Voice (STT + LLM + TTS).
+   */
+  coexist?: boolean;
+}
+
+/** Captured options for the current open sheet. */
+let sheetOptions: ModelSelectionSheetOptions = {};
+
+export function showModelSelectionSheet(modality?: ModelCategory, options?: ModelSelectionSheetOptions): void {
   if (modalEl) return; // Already open
+  sheetOptions = options ?? {};
 
   const models = modality
     ? ModelManager.getModels().filter((m) => m.modality === modality)
@@ -90,6 +107,7 @@ function closeSheet(): void {
   if (typeof unsub === 'function') unsub();
   modalEl.remove();
   modalEl = null;
+  sheetOptions = {};
 }
 
 // ---------------------------------------------------------------------------
@@ -132,9 +150,9 @@ function renderModelList(models: ModelInfo[]): void {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       if (action === 'download') {
-        await ModelManager.downloadModel(modelId);
+        await handleDownload(modelId);
       } else if (action === 'load') {
-        const success = await ModelManager.loadModel(modelId);
+        const success = await ModelManager.loadModel(modelId, { coexist: sheetOptions.coexist });
         if (success) {
           showToast(`${ModelManager.getModels().find((m) => m.id === modelId)?.name ?? 'Model'} Ready`);
           closeSheet();
@@ -142,6 +160,54 @@ function renderModelList(models: ModelInfo[]): void {
       }
     });
   });
+}
+
+// ---------------------------------------------------------------------------
+// Download with Quota Check + Eviction Dialog
+// ---------------------------------------------------------------------------
+
+async function handleDownload(modelId: string): Promise<void> {
+  const check = await ModelManager.checkDownloadFit(modelId);
+
+  if (check.fits) {
+    // Enough space — download directly
+    await ModelManager.downloadModel(modelId);
+    return;
+  }
+
+  // Not enough space — show eviction dialog
+  const model = ModelManager.getModels().find((m) => m.id === modelId);
+  if (!model) return;
+
+  if (check.evictionCandidates.length === 0) {
+    // No candidates to evict — inform user
+    showToast('Not enough storage and no models to remove', 'warning');
+    return;
+  }
+
+  const selectedIds = await showEvictionDialog(
+    model.name,
+    check.neededBytes,
+    check.availableBytes,
+    check.evictionCandidates.map((c) => ({
+      id: c.id,
+      name: c.name,
+      sizeBytes: c.sizeBytes,
+    })),
+  );
+
+  if (!selectedIds || selectedIds.length === 0) {
+    showToast('Download cancelled', 'info');
+    return;
+  }
+
+  // Delete selected models, then download
+  for (const id of selectedIds) {
+    await ModelManager.deleteModel(id);
+  }
+
+  showToast(`Freed storage, downloading ${model.name}...`, 'info');
+  await ModelManager.downloadModel(modelId);
 }
 
 // ---------------------------------------------------------------------------
@@ -165,32 +231,6 @@ function getActionButton(model: ModelInfo): string {
     default:
       return '';
   }
-}
-
-// ---------------------------------------------------------------------------
-// Toast
-// ---------------------------------------------------------------------------
-
-function showToast(message: string): void {
-  const existing = document.querySelector('.toast');
-  existing?.remove();
-
-  const toast = document.createElement('div');
-  toast.className = 'toast';
-  toast.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="var(--color-green)" stroke-width="2" width="18" height="18"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-    <span>${message}</span>
-  `;
-  document.body.appendChild(toast);
-
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => toast.classList.add('show'));
-  });
-
-  setTimeout(() => {
-    toast.classList.remove('show');
-    setTimeout(() => toast.remove(), 300);
-  }, 3000);
 }
 
 // ---------------------------------------------------------------------------

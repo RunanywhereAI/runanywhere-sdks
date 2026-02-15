@@ -47,44 +47,45 @@ export {
 
 const logger = new SDKLogger('Embeddings');
 
-let _embeddingsComponentHandle = 0;
-
-function requireBridge(): WASMBridge {
-  if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
-  return WASMBridge.shared;
-}
-
-function ensureEmbeddingsComponent(): number {
-  if (_embeddingsComponentHandle !== 0) return _embeddingsComponentHandle;
-
-  const bridge = requireBridge();
-  const m = bridge.module;
-  const handlePtr = m._malloc(4);
-  const result = m.ccall('rac_embeddings_component_create', 'number', ['number'], [handlePtr]) as number;
-
-  if (result !== 0) {
-    m._free(handlePtr);
-    bridge.checkResult(result, 'rac_embeddings_component_create');
-  }
-
-  _embeddingsComponentHandle = m.getValue(handlePtr, 'i32');
-  m._free(handlePtr);
-  logger.debug('Embeddings component created');
-  return _embeddingsComponentHandle;
-}
-
 // ---------------------------------------------------------------------------
 // Embeddings Extension
 // ---------------------------------------------------------------------------
 
-export const Embeddings = {
+class EmbeddingsImpl {
+  readonly extensionName = 'Embeddings';
+  private _embeddingsComponentHandle = 0;
+
+  private requireBridge(): WASMBridge {
+    if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
+    return WASMBridge.shared;
+  }
+
+  private ensureEmbeddingsComponent(): number {
+    if (this._embeddingsComponentHandle !== 0) return this._embeddingsComponentHandle;
+
+    const bridge = this.requireBridge();
+    const m = bridge.module;
+    const handlePtr = m._malloc(4);
+    const result = bridge.callFunction<number>('rac_embeddings_component_create', 'number', ['number'], [handlePtr]);
+
+    if (result !== 0) {
+      m._free(handlePtr);
+      bridge.checkResult(result, 'rac_embeddings_component_create');
+    }
+
+    this._embeddingsComponentHandle = m.getValue(handlePtr, 'i32');
+    m._free(handlePtr);
+    logger.debug('Embeddings component created');
+    return this._embeddingsComponentHandle;
+  }
+
   /**
    * Load an embedding model (GGUF format).
    */
   async loadModel(modelPath: string, modelId: string, modelName?: string): Promise<void> {
-    const bridge = requireBridge();
+    const bridge = this.requireBridge();
     const m = bridge.module;
-    const handle = ensureEmbeddingsComponent();
+    const handle = this.ensureEmbeddingsComponent();
 
     logger.info(`Loading embeddings model: ${modelId} from ${modelPath}`);
     EventBus.shared.emit('model.loadStarted', SDKEventType.Model, { modelId, component: 'embeddings' });
@@ -107,38 +108,38 @@ export const Embeddings = {
       bridge.free(idPtr);
       bridge.free(namePtr);
     }
-  },
+  }
 
   /** Unload the embeddings model. */
   async unloadModel(): Promise<void> {
-    if (_embeddingsComponentHandle === 0) return;
-    const bridge = requireBridge();
+    if (this._embeddingsComponentHandle === 0) return;
+    const bridge = this.requireBridge();
     const result = bridge.module.ccall(
-      'rac_embeddings_component_unload', 'number', ['number'], [_embeddingsComponentHandle],
+      'rac_embeddings_component_unload', 'number', ['number'], [this._embeddingsComponentHandle],
     ) as number;
     bridge.checkResult(result, 'rac_embeddings_component_unload');
     logger.info('Embeddings model unloaded');
-  },
+  }
 
   /** Check if an embeddings model is loaded. */
   get isModelLoaded(): boolean {
-    if (_embeddingsComponentHandle === 0) return false;
+    if (this._embeddingsComponentHandle === 0) return false;
     try {
       return (WASMBridge.shared.module.ccall(
-        'rac_embeddings_component_is_loaded', 'number', ['number'], [_embeddingsComponentHandle],
+        'rac_embeddings_component_is_loaded', 'number', ['number'], [this._embeddingsComponentHandle],
       ) as number) === 1;
     } catch { return false; }
-  },
+  }
 
   /**
    * Generate embedding for a single text.
    */
   async embed(text: string, options: EmbeddingsOptions = {}): Promise<EmbeddingsResult> {
-    const bridge = requireBridge();
+    const bridge = this.requireBridge();
     const m = bridge.module;
-    const handle = ensureEmbeddingsComponent();
+    const handle = this.ensureEmbeddingsComponent();
 
-    if (!Embeddings.isModelLoaded) {
+    if (!this.isModelLoaded) {
       throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No embeddings model loaded. Call loadModel() first.');
     }
 
@@ -171,17 +172,17 @@ export const Embeddings = {
       bridge.free(textPtr);
       m._free(optPtr);
     }
-  },
+  }
 
   /**
    * Generate embeddings for multiple texts at once.
    */
   async embedBatch(texts: string[], options: EmbeddingsOptions = {}): Promise<EmbeddingsResult> {
-    const bridge = requireBridge();
+    const bridge = this.requireBridge();
     const m = bridge.module;
-    const handle = ensureEmbeddingsComponent();
+    const handle = this.ensureEmbeddingsComponent();
 
-    if (!Embeddings.isModelLoaded) {
+    if (!this.isModelLoaded) {
       throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No embeddings model loaded. Call loadModel() first.');
     }
 
@@ -223,7 +224,7 @@ export const Embeddings = {
       m._free(textArrayPtr);
       m._free(optPtr);
     }
-  },
+  }
 
   /**
    * Compute cosine similarity between two embedding vectors.
@@ -243,20 +244,22 @@ export const Embeddings = {
 
     const denominator = Math.sqrt(normA) * Math.sqrt(normB);
     return denominator === 0 ? 0 : dot / denominator;
-  },
+  }
 
   /** Clean up the embeddings component. */
   cleanup(): void {
-    if (_embeddingsComponentHandle !== 0) {
+    if (this._embeddingsComponentHandle !== 0) {
       try {
         WASMBridge.shared.module.ccall(
-          'rac_embeddings_component_destroy', null, ['number'], [_embeddingsComponentHandle],
+          'rac_embeddings_component_destroy', null, ['number'], [this._embeddingsComponentHandle],
         );
       } catch { /* ignore */ }
-      _embeddingsComponentHandle = 0;
+      this._embeddingsComponentHandle = 0;
     }
-  },
-};
+  }
+}
+
+export const Embeddings = new EmbeddingsImpl();
 
 // ---------------------------------------------------------------------------
 // Helper: Read rac_embeddings_result_t from WASM memory

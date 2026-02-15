@@ -407,6 +407,11 @@ function startLiveMode(): void {
 }
 
 function stopLiveMode(): void {
+  // Guard: avoid doing work (and logging) when live mode is already off.
+  // onModelsChanged() fires on every download-progress tick, which would
+  // otherwise spam this log thousands of times during a model download.
+  if (!isLiveMode && !liveIntervalId) return;
+
   isLiveMode = false;
   if (liveIntervalId) {
     clearInterval(liveIntervalId);

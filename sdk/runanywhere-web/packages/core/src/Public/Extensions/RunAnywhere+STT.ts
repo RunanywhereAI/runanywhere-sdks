@@ -46,20 +46,6 @@ import { initSherpaOnnxOfflineRecognizerConfig, initSherpaOnnxOnlineRecognizerCo
 const logger = new SDKLogger('STT');
 
 // ---------------------------------------------------------------------------
-// Internal State
-// ---------------------------------------------------------------------------
-
-let _offlineRecognizerHandle = 0;
-let _onlineRecognizerHandle = 0;
-let _currentModelType: STTModelType = STTModelType.Whisper;
-let _currentModelId = '';
-
-/** Returns the currently loaded STT model type. */
-export function getCurrentSTTModelType(): STTModelType {
-  return _currentModelType;
-}
-
-// ---------------------------------------------------------------------------
 // STT Types (re-exported from STTTypes.ts)
 // ---------------------------------------------------------------------------
 
@@ -75,7 +61,7 @@ export interface STTTranscribeOptions {
 export type STTStreamCallback = (text: string, isFinal: boolean) => void;
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Config Builders (stateless helpers)
 // ---------------------------------------------------------------------------
 
 function requireSherpa(): SherpaONNXBridge {
@@ -198,7 +184,18 @@ function buildOnlineRecognizerConfig(config: STTModelConfig): Record<string, any
 // STT Extension
 // ---------------------------------------------------------------------------
 
-export const STT = {
+class STTImpl {
+  readonly extensionName = 'STT';
+  private _offlineRecognizerHandle = 0;
+  private _onlineRecognizerHandle = 0;
+  private _currentModelType: STTModelType = STTModelType.Whisper;
+  private _currentModelId = '';
+
+  /** Returns the currently loaded STT model type. */
+  get currentModelType(): STTModelType {
+    return this._currentModelType;
+  }
+
   /**
    * Load an STT model via sherpa-onnx.
    * Model files must already be written to sherpa-onnx virtual FS
@@ -210,7 +207,7 @@ export const STT = {
     const m = sherpa.module;
 
     // Clean up previous model
-    STT.cleanup();
+    this.cleanup();
 
     logger.info(`Loading STT model: ${config.modelId} (${config.type})`);
     EventBus.shared.emit('model.loadStarted', SDKEventType.Model, {
@@ -225,10 +222,10 @@ export const STT = {
         const configObj = buildOnlineRecognizerConfig(config);
         const configStruct = initSherpaOnnxOnlineRecognizerConfig(configObj, m);
 
-        _onlineRecognizerHandle = m._SherpaOnnxCreateOnlineRecognizer(configStruct.ptr);
+        this._onlineRecognizerHandle = m._SherpaOnnxCreateOnlineRecognizer(configStruct.ptr);
         freeConfig(configStruct, m);
 
-        if (_onlineRecognizerHandle === 0) {
+        if (this._onlineRecognizerHandle === 0) {
           throw new SDKError(SDKErrorCode.ModelLoadFailed,
             `Failed to create online recognizer for ${config.modelId}`);
         }
@@ -238,17 +235,17 @@ export const STT = {
         logger.debug(`Offline config: ${JSON.stringify(configObj.modelConfig.whisper)}`);
         const configStruct = initSherpaOnnxOfflineRecognizerConfig(configObj, m);
 
-        _offlineRecognizerHandle = m._SherpaOnnxCreateOfflineRecognizer(configStruct.ptr);
+        this._offlineRecognizerHandle = m._SherpaOnnxCreateOfflineRecognizer(configStruct.ptr);
         freeConfig(configStruct, m);
 
-        if (_offlineRecognizerHandle === 0) {
+        if (this._offlineRecognizerHandle === 0) {
           throw new SDKError(SDKErrorCode.ModelLoadFailed,
             `Failed to create offline recognizer for ${config.modelId}`);
         }
       }
 
-      _currentModelType = config.type;
-      _currentModelId = config.modelId;
+      this._currentModelType = config.type;
+      this._currentModelId = config.modelId;
 
       const loadTimeMs = Math.round(performance.now() - startMs);
       logger.info(`STT model loaded: ${config.modelId} in ${loadTimeMs}ms`);
@@ -256,26 +253,26 @@ export const STT = {
         modelId: config.modelId, component: 'stt', loadTimeMs,
       });
     } catch (error) {
-      STT.cleanup();
+      this.cleanup();
       throw error;
     }
-  },
+  }
 
   /** Unload the STT model. */
   async unloadModel(): Promise<void> {
-    STT.cleanup();
+    this.cleanup();
     logger.info('STT model unloaded');
-  },
+  }
 
   /** Check if an STT model is loaded. */
   get isModelLoaded(): boolean {
-    return _offlineRecognizerHandle !== 0 || _onlineRecognizerHandle !== 0;
-  },
+    return this._offlineRecognizerHandle !== 0 || this._onlineRecognizerHandle !== 0;
+  }
 
   /** Get the current model ID. */
   get modelId(): string {
-    return _currentModelId;
-  },
+    return this._currentModelId;
+  }
 
   /**
    * Transcribe audio data (offline / non-streaming).
@@ -291,10 +288,10 @@ export const STT = {
     const sherpa = requireSherpa();
     const m = sherpa.module;
 
-    if (_offlineRecognizerHandle === 0) {
-      if (_onlineRecognizerHandle !== 0) {
+    if (this._offlineRecognizerHandle === 0) {
+      if (this._onlineRecognizerHandle !== 0) {
         // Streaming model: process all at once via online recognizer
-        return STT._transcribeViaOnline(audioSamples, options);
+        return this._transcribeViaOnline(audioSamples, options);
       }
       throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No STT model loaded. Call loadModel() first.');
     }
@@ -305,7 +302,7 @@ export const STT = {
     logger.debug(`Transcribing ${audioSamples.length} samples (${(audioSamples.length / sampleRate).toFixed(1)}s)`);
 
     // Create stream
-    const stream = m._SherpaOnnxCreateOfflineStream(_offlineRecognizerHandle);
+    const stream = m._SherpaOnnxCreateOfflineStream(this._offlineRecognizerHandle);
     if (stream === 0) {
       throw new SDKError(SDKErrorCode.GenerationFailed, 'Failed to create offline stream');
     }
@@ -319,7 +316,7 @@ export const STT = {
       m._SherpaOnnxAcceptWaveformOffline(stream, sampleRate, audioPtr, audioSamples.length);
 
       // Decode
-      m._SherpaOnnxDecodeOfflineStream(_offlineRecognizerHandle, stream);
+      m._SherpaOnnxDecodeOfflineStream(this._offlineRecognizerHandle, stream);
 
       // Get result as JSON
       const jsonPtr = m._SherpaOnnxGetOfflineStreamResultAsJson(stream);
@@ -346,7 +343,7 @@ export const STT = {
       m._free(audioPtr);
       m._SherpaOnnxDestroyOfflineStream(stream);
     }
-  },
+  }
 
   /** Internal: Transcribe via online recognizer (for streaming models used non-streaming) */
   async _transcribeViaOnline(
@@ -357,7 +354,7 @@ export const STT = {
     const startMs = performance.now();
     const sampleRate = options.sampleRate ?? 16000;
 
-    const stream = m._SherpaOnnxCreateOnlineStream(_onlineRecognizerHandle);
+    const stream = m._SherpaOnnxCreateOnlineStream(this._onlineRecognizerHandle);
     if (stream === 0) {
       throw new SDKError(SDKErrorCode.GenerationFailed, 'Failed to create online stream');
     }
@@ -369,11 +366,11 @@ export const STT = {
       m._SherpaOnnxOnlineStreamAcceptWaveform(stream, sampleRate, audioPtr, audioSamples.length);
       m._SherpaOnnxOnlineStreamInputFinished(stream);
 
-      while (m._SherpaOnnxIsOnlineStreamReady(_onlineRecognizerHandle, stream)) {
-        m._SherpaOnnxDecodeOnlineStream(_onlineRecognizerHandle, stream);
+      while (m._SherpaOnnxIsOnlineStreamReady(this._onlineRecognizerHandle, stream)) {
+        m._SherpaOnnxDecodeOnlineStream(this._onlineRecognizerHandle, stream);
       }
 
-      const jsonPtr = m._SherpaOnnxGetOnlineStreamResultAsJson(_onlineRecognizerHandle, stream);
+      const jsonPtr = m._SherpaOnnxGetOnlineStreamResultAsJson(this._onlineRecognizerHandle, stream);
       const jsonStr = SherpaONNXBridge.shared.readString(jsonPtr);
       m._SherpaOnnxDestroyOnlineStreamResultJson(jsonPtr);
 
@@ -389,22 +386,22 @@ export const STT = {
       m._free(audioPtr);
       m._SherpaOnnxDestroyOnlineStream(stream);
     }
-  },
+  }
 
   /**
    * Create a streaming transcription session.
    * Returns an object to feed audio chunks and get results.
    */
   createStreamingSession(options: STTTranscribeOptions = {}): STTStreamingSession {
-    if (_onlineRecognizerHandle === 0) {
+    if (this._onlineRecognizerHandle === 0) {
       throw new SDKError(
         SDKErrorCode.ModelNotLoaded,
         'No streaming STT model loaded. Use a zipformer model.',
       );
     }
 
-    return new STTStreamingSessionImpl(_onlineRecognizerHandle, options);
-  },
+    return new STTStreamingSessionImpl(this._onlineRecognizerHandle, options);
+  }
 
   /** Clean up the STT resources. */
   cleanup(): void {
@@ -413,19 +410,26 @@ export const STT = {
 
     const m = sherpa.module;
 
-    if (_offlineRecognizerHandle !== 0) {
-      try { m._SherpaOnnxDestroyOfflineRecognizer(_offlineRecognizerHandle); } catch { /* ignore */ }
-      _offlineRecognizerHandle = 0;
+    if (this._offlineRecognizerHandle !== 0) {
+      try { m._SherpaOnnxDestroyOfflineRecognizer(this._offlineRecognizerHandle); } catch { /* ignore */ }
+      this._offlineRecognizerHandle = 0;
     }
 
-    if (_onlineRecognizerHandle !== 0) {
-      try { m._SherpaOnnxDestroyOnlineRecognizer(_onlineRecognizerHandle); } catch { /* ignore */ }
-      _onlineRecognizerHandle = 0;
+    if (this._onlineRecognizerHandle !== 0) {
+      try { m._SherpaOnnxDestroyOnlineRecognizer(this._onlineRecognizerHandle); } catch { /* ignore */ }
+      this._onlineRecognizerHandle = 0;
     }
 
-    _currentModelId = '';
-  },
-};
+    this._currentModelId = '';
+  }
+}
+
+export const STT = new STTImpl();
+
+/** Returns the currently loaded STT model type. */
+export function getCurrentSTTModelType(): STTModelType {
+  return STT.currentModelType;
+}
 
 // ---------------------------------------------------------------------------
 // Streaming Session

@@ -11,10 +11,12 @@ import {
   ModelCategory,
   LLMFramework,
   VLMWorkerBridge,
+  EventBus,
   type CompactModelDef,
   type ManagedModel,
   type ModelFileDescriptor,
 } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
+import { showToast } from '../components/dialogs';
 
 // Re-export SDK types for existing consumers (ManagedModel aliased as ModelInfo
 // so the 5 view/component files that import ModelInfo need zero changes).
@@ -191,8 +193,12 @@ export async function ensureVADLoaded(): Promise<boolean> {
   // Already loaded?
   if (ModelManager.getLoadedModel(ModelCategory.Audio)) return true;
 
+  // VAD is a tiny helper model (~2MB) that must always coexist with
+  // pipeline models (STT, LLM, TTS). Never unload other models for it.
+  const coexistOpts = { coexist: true };
+
   // Try ensureLoaded (loads an already-downloaded model)
-  const loaded = await ModelManager.ensureLoaded(ModelCategory.Audio);
+  const loaded = await ModelManager.ensureLoaded(ModelCategory.Audio, coexistOpts);
   if (loaded) return true;
 
   // Not downloaded yet — find the VAD model and download + load it
@@ -200,7 +206,7 @@ export async function ensureVADLoaded(): Promise<boolean> {
   if (!vadModel) return false;
 
   await ModelManager.downloadModel(vadModel.id);
-  await ModelManager.loadModel(vadModel.id);
+  await ModelManager.loadModel(vadModel.id, coexistOpts);
   return !!ModelManager.getLoadedModel(ModelCategory.Audio);
 }
 
@@ -216,4 +222,15 @@ RunAnywhere.setVLMLoader({
   init: () => VLMWorkerBridge.shared.init(),
   loadModel: (params) => VLMWorkerBridge.shared.loadModel(params),
   unloadModel: () => VLMWorkerBridge.shared.unloadModel(),
+});
+
+// ---------------------------------------------------------------------------
+// Storage event listeners — show toasts when auto-eviction happens
+// ---------------------------------------------------------------------------
+
+EventBus.shared.on('model.evicted', (event) => {
+  const name = (event as Record<string, unknown>).modelName as string;
+  const freed = (event as Record<string, unknown>).freedBytes as number;
+  const freedMB = (freed / 1024 / 1024).toFixed(0);
+  showToast(`Removed ${name} to free ${freedMB} MB`, 'warning');
 });
