@@ -104,7 +104,6 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(padding)
                     .background(MaterialTheme.colorScheme.background),
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
@@ -725,14 +724,14 @@ private fun extractThinkingSummary(thinking: String): String {
 }
 
 /**
- * Thinking Progress Indicator - matching iOS pattern
+ * Thinking Progress Indicator -  pattern
  * Shows "Thinking..." with animated dots when message is empty but thinking content exists
  */
 @Composable
 fun ThinkingProgressIndicator() {
     val thinkingShape = RoundedCornerShape(Dimensions.medium)
 
-    // Matching iOS: purple gradient background with purple border
+    // : purple gradient background with purple border
     Box(
         modifier =
             Modifier
@@ -816,7 +815,7 @@ fun ThinkingToggle(
         // Toggle button with gradient background
         val toggleShape = RoundedCornerShape(Dimensions.thinkingSectionCornerRadius)
 
-        // Matching iOS: purple gradient background with purple border and shadow
+        // : purple gradient background with purple border and shadow
         Box(
             modifier =
                 Modifier
@@ -924,7 +923,7 @@ fun AnalyticsFooter(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(start = Dimensions.mediumLarge),
         ) {
-            // Timestamp - always shown (matching iOS Text(message.timestamp, style: .time))
+            // Timestamp - always shown ( Text(message.timestamp, style: .time))
             Text(
                 text = formatTimestamp(message.timestamp),
                 style = AppTypography.caption2,
@@ -947,7 +946,7 @@ fun AnalyticsFooter(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
-                // Tokens per second (only if > 0, matching iOS)
+                // Tokens per second (only if > 0, )
                 if (analytics.averageTokensPerSecond > 0) {
                     Text(
                         text = "\u2022",
@@ -962,7 +961,7 @@ fun AnalyticsFooter(
                     )
                 }
 
-                // Thinking indicator (matching iOS lightbulb.min icon)
+                // Thinking indicator ( lightbulb.min icon)
                 if (analytics.wasThinkingMode) {
                     Icon(
                         imageVector = Icons.Default.Lightbulb,
@@ -980,7 +979,7 @@ fun AnalyticsFooter(
 // TYPING INDICATOR
 // ====================
 
-// Typing indicator - matching iOS: dots in separate bubble, text outside, centered with spacers
+// Typing indicator - : dots in separate bubble, text outside, centered with spacers
 @Composable
 fun TypingIndicatorView() {
     Row(
@@ -993,7 +992,7 @@ fun TypingIndicatorView() {
             horizontalArrangement = Arrangement.spacedBy(Dimensions.mediumLarge),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Dots in their own bubble background - matching iOS
+            // Dots in their own bubble background - 
             Box(
                 modifier = Modifier
                     .shadow(
@@ -1049,7 +1048,7 @@ fun TypingIndicatorView() {
                 }
             }
 
-            // Text outside the bubble - matching iOS
+            // Text outside the bubble - 
             Text(
                 text = "AI is thinking...",
                 style = AppTypography.caption,
@@ -1062,7 +1061,7 @@ fun TypingIndicatorView() {
 }
 
 // ====================
-// EMPTY STATE - matching iOS: centered logo with title and subtitle
+// EMPTY STATE - : centered logo with title and subtitle
 // ====================
 
 @Composable
@@ -1074,7 +1073,7 @@ fun EmptyStateView(modifier: Modifier = Modifier) {
     ) {
         Spacer(modifier = Modifier.weight(1f))
 
-        // App logo - matching iOS runanywhere_logo 80x80
+        // App logo -  runanywhere_logo 80x80
         Image(
             painter = painterResource(id = com.runanywhere.runanywhereai.R.drawable.runanywhere_logo),
             contentDescription = "RunAnywhere Logo",
@@ -1149,7 +1148,7 @@ fun ModelSelectionPrompt(onSelectModel: () -> Unit) {
 // INPUT AREA
 // ====================
 
-// Input area matching iOS: plain text field, no shadow, no rounded background, 16dp padding
+// Input area : plain text field, no shadow, no rounded background, 16dp padding
 @Composable
 fun ChatInputView(
     value: String,
@@ -1164,11 +1163,11 @@ fun ChatInputView(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
-            .padding(Dimensions.large),
-        horizontalArrangement = Arrangement.spacedBy(Dimensions.mediumLarge),
-        verticalAlignment = Alignment.Bottom,
+            .padding(Dimensions.small),
+            horizontalArrangement = Arrangement.spacedBy(Dimensions.mediumLarge),
+            verticalAlignment = Alignment.Bottom,
     ) {
-        // Plain text field - matching iOS .textFieldStyle(.plain)
+        // Plain text field -  .textFieldStyle(.plain)
         TextField(
             value = value,
             onValueChange = onValueChange,
@@ -1193,7 +1192,7 @@ fun ChatInputView(
             maxLines = 4,
         )
 
-        // Send button - matching iOS arrow.up.circle.fill 28pt
+        // Send button -  arrow.up.circle.fill 28pt
         IconButton(
             onClick = onSend,
             enabled = canSendMessage,

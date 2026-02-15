@@ -153,9 +153,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 messages = _uiState.value.messages + userMessage,
             )
 
-        // Save user message to conversation
+        // Save user message to conversation and keep ViewModel in sync with store
+        // so the conversation list shows the first message as title/preview immediately
         _uiState.value.currentConversation?.let { conversation ->
             conversationStore.addMessage(userMessage, conversation)
+            conversationStore.loadConversation(conversation.id)?.let { updated ->
+                _uiState.value = _uiState.value.copy(currentConversation = updated)
+            }
         }
 
         // Create assistant message that will be updated with streaming tokens
@@ -322,6 +326,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         // Update message with analytics
         updateAssistantMessageWithAnalytics(messageId, analytics)
 
+        syncCurrentConversationToStore()
         _uiState.value = _uiState.value.copy(isGenerating = false)
         Log.i(TAG, "✅ Streaming generation completed")
     }
@@ -357,6 +362,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 )
 
             updateAssistantMessageWithAnalytics(messageId, analytics)
+            syncCurrentConversationToStore()
         } catch (e: Exception) {
             throw e
         } finally {
@@ -380,6 +386,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
 
         updateAssistantMessage(messageId, errorMessage, null)
+        syncCurrentConversationToStore()
 
         _uiState.value =
             _uiState.value.copy(
@@ -430,6 +437,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
 
         _uiState.value = _uiState.value.copy(messages = updatedMessages)
+    }
+
+    /**
+     * Persist current conversation messages to the store so that loading the conversation
+     * later shows both user and assistant messages.
+     */
+    private fun syncCurrentConversationToStore() {
+        val conv = _uiState.value.currentConversation ?: return
+        val messages = _uiState.value.messages
+        val updated = conv.copy(messages = messages)
+        conversationStore.updateConversation(updated)
+        _uiState.value = _uiState.value.copy(currentConversation = updated)
     }
 
     /**
@@ -651,24 +670,22 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Load a conversation
+     * Load a conversation by ID from store (or disk) so we always have the latest messages,
+     * then update UI state. Using the store ensures we don't rely on a possibly stale list item.
      */
     fun loadConversation(conversation: Conversation) {
-        _uiState.value = _uiState.value.copy(currentConversation = conversation)
+        val loaded = conversationStore.loadConversation(conversation.id) ?: conversation
+        _uiState.value = _uiState.value.copy(currentConversation = loaded)
 
-        // For new conversations (empty messages), start fresh
-        // For existing conversations, load the messages
-        if (conversation.messages.isEmpty()) {
+        if (loaded.messages.isEmpty()) {
             _uiState.value = _uiState.value.copy(messages = emptyList())
         } else {
-            _uiState.value = _uiState.value.copy(messages = conversation.messages)
-
-            val analyticsCount = conversation.messages.mapNotNull { it.analytics }.size
-            Log.i(TAG, "📂 Loaded conversation with ${conversation.messages.size} messages, $analyticsCount have analytics")
+            _uiState.value = _uiState.value.copy(messages = loaded.messages)
+            val analyticsCount = loaded.messages.mapNotNull { it.analytics }.size
+            Log.i(TAG, "📂 Loaded conversation with ${loaded.messages.size} messages, $analyticsCount have analytics")
         }
 
-        // Update model info if available
-        conversation.modelName?.let { modelName ->
+        loaded.modelName?.let { modelName ->
             _uiState.value = _uiState.value.copy(loadedModelName = modelName)
         }
     }
