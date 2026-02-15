@@ -93,7 +93,10 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
                     hasMessages = uiState.messages.isNotEmpty(),
                     modelName = uiState.loadedModelName,
                     supportsStreaming = uiState.useStreaming,
-                    onHistoryClick = { showingConversationList = true },
+                    onHistoryClick = {
+                        viewModel.ensureCurrentConversationInHistory()
+                        showingConversationList = true
+                    },
                     onInfoClick = { showingChatDetails = true },
                     onModelClick = { showingModelSelection = true },
                 )
