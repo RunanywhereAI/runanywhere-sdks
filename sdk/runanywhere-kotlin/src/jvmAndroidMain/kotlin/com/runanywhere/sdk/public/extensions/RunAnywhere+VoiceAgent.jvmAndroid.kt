@@ -27,7 +27,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
@@ -274,190 +273,195 @@ actual suspend fun RunAnywhere.setVoiceSystemPrompt(prompt: String) {
 actual fun RunAnywhere.streamVoiceSession(
     audioChunks: Flow<ByteArray>,
     config: VoiceSessionConfig,
-): Flow<VoiceSessionEvent> = channelFlow {
-    if (!isInitialized) {
-        send(VoiceSessionEvent.Error("SDK not initialized"))
-        return@channelFlow
-    }
-
-    // Check if all components are loaded
-    if (!areAllComponentsLoaded()) {
-        val missing = getMissingComponents()
-        send(VoiceSessionEvent.Error("Models not loaded: ${missing.joinToString(", ")}"))
-        return@channelFlow
-    }
-
-    voiceAgentLogger.info("Starting streaming voice session with auto-silence detection")
-    send(VoiceSessionEvent.Started)
-
-    // Session state
-    val audioBuffer = ByteArrayOutputStream()
-    var isSpeechActive = false
-    var lastSpeechTime = 0L
-    var isProcessingTurn = false
-    val minAudioBytes = 16000 // ~0.5s at 16kHz, 16-bit
-    val silenceDurationMs = (config.silenceDuration * 1000).toLong()
-
-    /**
-     * Calculate RMS (Root Mean Square) for audio level visualization
-     */
-    fun calculateRMS(audioData: ByteArray): Float {
-        if (audioData.isEmpty()) return 0f
-        val shorts = ByteBuffer.wrap(audioData).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
-        var sum = 0.0
-        while (shorts.hasRemaining()) {
-            val sample = shorts.get().toFloat() / Short.MAX_VALUE
-            sum += sample * sample
-        }
-        return sqrt(sum / (audioData.size / 2)).toFloat()
-    }
-
-    /**
-     * Normalize audio level for visualization (0.0 to 1.0)
-     */
-    fun normalizeAudioLevel(rms: Float): Float = (rms * 3.0f).coerceIn(0f, 1f)
-
-    /**
-     * Process accumulated audio through the voice pipeline
-     */
-    suspend fun processAudio(): Boolean {
-        if (isProcessingTurn) return false
-        isProcessingTurn = true
-
-        val audioData = synchronized(audioBuffer) {
-            val data = audioBuffer.toByteArray()
-            audioBuffer.reset()
-            data
+): Flow<VoiceSessionEvent> =
+    channelFlow {
+        if (!isInitialized) {
+            send(VoiceSessionEvent.Error("SDK not initialized"))
+            return@channelFlow
         }
 
-        if (audioData.size < minAudioBytes) {
-            voiceAgentLogger.debug("Audio too short to process (${audioData.size} bytes)")
-            isProcessingTurn = false
-            return false
+        // Check if all components are loaded
+        if (!areAllComponentsLoaded()) {
+            val missing = getMissingComponents()
+            send(VoiceSessionEvent.Error("Models not loaded: ${missing.joinToString(", ")}"))
+            return@channelFlow
         }
 
-        voiceAgentLogger.info("Processing ${audioData.size} bytes through voice pipeline")
-        send(VoiceSessionEvent.Processing)
+        voiceAgentLogger.info("Starting streaming voice session with auto-silence detection")
+        send(VoiceSessionEvent.Started)
 
-        try {
-            // Step 1: Transcribe audio using STT
-            val transcriptionResult = withContext(Dispatchers.Default) {
-                CppBridgeSTT.transcribe(audioData)
+        // Session state
+        val audioBuffer = ByteArrayOutputStream()
+        var isSpeechActive = false
+        var lastSpeechTime = 0L
+        var isProcessingTurn = false
+        val minAudioBytes = 16000 // ~0.5s at 16kHz, 16-bit
+        val silenceDurationMs = (config.silenceDuration * 1000).toLong()
+
+        /**
+         * Calculate RMS (Root Mean Square) for audio level visualization
+         */
+        fun calculateRMS(audioData: ByteArray): Float {
+            if (audioData.isEmpty()) return 0f
+            val shorts = ByteBuffer.wrap(audioData).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
+            var sum = 0.0
+            while (shorts.hasRemaining()) {
+                val sample = shorts.get().toFloat() / Short.MAX_VALUE
+                sum += sample * sample
             }
-            val transcriptionText = transcriptionResult.text
+            return sqrt(sum / (audioData.size / 2)).toFloat()
+        }
 
-            if (transcriptionText.isBlank()) {
-                voiceAgentLogger.debug("No speech detected in audio")
+        /**
+         * Normalize audio level for visualization (0.0 to 1.0)
+         */
+        fun normalizeAudioLevel(rms: Float): Float = (rms * 3.0f).coerceIn(0f, 1f)
+
+        /**
+         * Process accumulated audio through the voice pipeline
+         */
+        suspend fun processAudio(): Boolean {
+            if (isProcessingTurn) return false
+            isProcessingTurn = true
+
+            val audioData =
+                synchronized(audioBuffer) {
+                    val data = audioBuffer.toByteArray()
+                    audioBuffer.reset()
+                    data
+                }
+
+            if (audioData.size < minAudioBytes) {
+                voiceAgentLogger.debug("Audio too short to process (${audioData.size} bytes)")
                 isProcessingTurn = false
                 return false
             }
 
-            voiceAgentLogger.info("Transcription: ${transcriptionText.take(100)}")
-            send(VoiceSessionEvent.Transcribed(transcriptionText))
+            voiceAgentLogger.info("Processing ${audioData.size} bytes through voice pipeline")
+            send(VoiceSessionEvent.Processing)
 
-            // Step 2: Generate response using LLM
-            val systemPrompt = currentSystemPrompt ?: "You are a helpful voice assistant."
-            val chatPrompt = "$systemPrompt\n\nUser: $transcriptionText\n\nAssistant:"
-            val generationResult = withContext(Dispatchers.Default) {
-                CppBridgeLLM.generate(chatPrompt)
-            }
-            val responseText = generationResult.text
+            try {
+                // Step 1: Transcribe audio using STT
+                val transcriptionResult =
+                    withContext(Dispatchers.Default) {
+                        CppBridgeSTT.transcribe(audioData)
+                    }
+                val transcriptionText = transcriptionResult.text
 
-            voiceAgentLogger.info("Response: ${responseText.take(100)}")
-            send(VoiceSessionEvent.Responded(responseText))
-
-            // Step 3: Synthesize speech using TTS
-            var audioOutput: ByteArray? = null
-            if (responseText.isNotBlank()) {
-                send(VoiceSessionEvent.Speaking)
-                val synthesisResult = withContext(Dispatchers.Default) {
-                    CppBridgeTTS.synthesize(responseText)
+                if (transcriptionText.isBlank()) {
+                    voiceAgentLogger.debug("No speech detected in audio")
+                    isProcessingTurn = false
+                    return false
                 }
-                audioOutput = synthesisResult.audioData
-                voiceAgentLogger.debug("TTS synthesis complete: ${audioOutput.size} bytes")
+
+                voiceAgentLogger.info("Transcription: ${transcriptionText.take(100)}")
+                send(VoiceSessionEvent.Transcribed(transcriptionText))
+
+                // Step 2: Generate response using LLM
+                val systemPrompt = currentSystemPrompt ?: "You are a helpful voice assistant."
+                val chatPrompt = "$systemPrompt\n\nUser: $transcriptionText\n\nAssistant:"
+                val generationResult =
+                    withContext(Dispatchers.Default) {
+                        CppBridgeLLM.generate(chatPrompt)
+                    }
+                val responseText = generationResult.text
+
+                voiceAgentLogger.info("Response: ${responseText.take(100)}")
+                send(VoiceSessionEvent.Responded(responseText))
+
+                // Step 3: Synthesize speech using TTS
+                var audioOutput: ByteArray? = null
+                if (responseText.isNotBlank()) {
+                    send(VoiceSessionEvent.Speaking)
+                    val synthesisResult =
+                        withContext(Dispatchers.Default) {
+                            CppBridgeTTS.synthesize(responseText)
+                        }
+                    audioOutput = synthesisResult.audioData
+                    voiceAgentLogger.debug("TTS synthesis complete: ${audioOutput.size} bytes")
+                }
+
+                // Emit turn completed with audio for app to play
+                send(VoiceSessionEvent.TurnCompleted(transcriptionText, responseText, audioOutput))
+
+                isProcessingTurn = false
+                return true
+            } catch (e: Exception) {
+                voiceAgentLogger.error("Voice processing error: ${e.message}", throwable = e)
+                send(VoiceSessionEvent.Error("Processing error: ${e.message}"))
+                isProcessingTurn = false
+                return false
             }
-
-            // Emit turn completed with audio for app to play
-            send(VoiceSessionEvent.TurnCompleted(transcriptionText, responseText, audioOutput))
-
-            isProcessingTurn = false
-            return true
-        } catch (e: Exception) {
-            voiceAgentLogger.error("Voice processing error: ${e.message}", throwable = e)
-            send(VoiceSessionEvent.Error("Processing error: ${e.message}"))
-            isProcessingTurn = false
-            return false
         }
-    }
 
-    // Main audio processing loop
-    var lastCheckTime = System.currentTimeMillis()
+        // Main audio processing loop
+        var lastCheckTime = System.currentTimeMillis()
 
-    try {
-        audioChunks.collect { chunk ->
-            if (!isActive || isProcessingTurn) return@collect
+        try {
+            audioChunks.collect { chunk ->
+                if (!isActive || isProcessingTurn) return@collect
 
-            // Accumulate audio
-            synchronized(audioBuffer) {
-                audioBuffer.write(chunk)
-            }
-
-            // Calculate and emit audio level
-            val rms = calculateRMS(chunk)
-            val normalizedLevel = normalizeAudioLevel(rms)
-            send(VoiceSessionEvent.Listening(normalizedLevel))
-
-            // Speech detection
-            if (normalizedLevel > config.speechThreshold) {
-                if (!isSpeechActive) {
-                    voiceAgentLogger.debug("Speech started (level: $normalizedLevel)")
-                    isSpeechActive = true
-                    send(VoiceSessionEvent.SpeechStarted)
+                // Accumulate audio
+                synchronized(audioBuffer) {
+                    audioBuffer.write(chunk)
                 }
-                lastSpeechTime = System.currentTimeMillis()
-            }
 
-            // Silence detection - check periodically
-            val now = System.currentTimeMillis()
-            if (now - lastCheckTime >= 50) { // Check every 50ms
-                lastCheckTime = now
+                // Calculate and emit audio level
+                val rms = calculateRMS(chunk)
+                val normalizedLevel = normalizeAudioLevel(rms)
+                send(VoiceSessionEvent.Listening(normalizedLevel))
 
-                if (isSpeechActive && lastSpeechTime > 0) {
-                    if (normalizedLevel <= config.speechThreshold) {
-                        val silenceTime = now - lastSpeechTime
-                        if (silenceTime > silenceDurationMs) {
-                            voiceAgentLogger.debug("Speech ended after ${silenceTime}ms of silence")
-                            isSpeechActive = false
+                // Speech detection
+                if (normalizedLevel > config.speechThreshold) {
+                    if (!isSpeechActive) {
+                        voiceAgentLogger.debug("Speech started (level: $normalizedLevel)")
+                        isSpeechActive = true
+                        send(VoiceSessionEvent.SpeechStarted)
+                    }
+                    lastSpeechTime = System.currentTimeMillis()
+                }
 
-                            // Process accumulated audio
-                            val processed = processAudio()
+                // Silence detection - check periodically
+                val now = System.currentTimeMillis()
+                if (now - lastCheckTime >= 50) { // Check every 50ms
+                    lastCheckTime = now
 
-                            // If continuous mode, reset for next turn
-                            if (config.continuousMode && processed) {
-                                lastSpeechTime = 0L
-                                // Continue collecting audio for next turn
+                    if (isSpeechActive && lastSpeechTime > 0) {
+                        if (normalizedLevel <= config.speechThreshold) {
+                            val silenceTime = now - lastSpeechTime
+                            if (silenceTime > silenceDurationMs) {
+                                voiceAgentLogger.debug("Speech ended after ${silenceTime}ms of silence")
+                                isSpeechActive = false
+
+                                // Process accumulated audio
+                                val processed = processAudio()
+
+                                // If continuous mode, reset for next turn
+                                if (config.continuousMode && processed) {
+                                    lastSpeechTime = 0L
+                                    // Continue collecting audio for next turn
+                                }
                             }
                         }
                     }
                 }
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            voiceAgentLogger.debug("Voice session cancelled")
+        } catch (e: Exception) {
+            voiceAgentLogger.error("Voice session error: ${e.message}", throwable = e)
+            send(VoiceSessionEvent.Error("Session error: ${e.message}"))
         }
-    } catch (e: kotlinx.coroutines.CancellationException) {
-        voiceAgentLogger.debug("Voice session cancelled")
-    } catch (e: Exception) {
-        voiceAgentLogger.error("Voice session error: ${e.message}", throwable = e)
-        send(VoiceSessionEvent.Error("Session error: ${e.message}"))
-    }
 
-    // Process any remaining audio when stream ends
-    if (!isProcessingTurn) {
-        val remainingSize = synchronized(audioBuffer) { audioBuffer.size() }
-        if (remainingSize >= minAudioBytes) {
-            voiceAgentLogger.info("Processing remaining audio on stream end")
-            processAudio()
+        // Process any remaining audio when stream ends
+        if (!isProcessingTurn) {
+            val remainingSize = synchronized(audioBuffer) { audioBuffer.size() }
+            if (remainingSize >= minAudioBytes) {
+                voiceAgentLogger.info("Processing remaining audio on stream end")
+                processAudio()
+            }
         }
-    }
 
-    send(VoiceSessionEvent.Stopped)
-    voiceAgentLogger.info("Voice session ended")
-}
+        send(VoiceSessionEvent.Stopped)
+        voiceAgentLogger.info("Voice session ended")
+    }

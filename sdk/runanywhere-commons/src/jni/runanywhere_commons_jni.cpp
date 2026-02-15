@@ -20,6 +20,7 @@
 #include <cstring>
 #include <mutex>
 #include <string>
+#include <nlohmann/json.hpp>
 
 // Include runanywhere-commons C API headers
 #include "rac/core/rac_analytics_events.h"
@@ -532,6 +533,28 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
     options.temperature = 0.7f;
     options.top_p = 1.0f;
     options.streaming_enabled = RAC_FALSE;
+    options.system_prompt = RAC_NULL;
+
+    // Parse configJson if provided
+    std::string sys_prompt_storage;
+    if (config != nullptr) {
+        try {
+            auto j = nlohmann::json::parse(config);
+            options.max_tokens = j.value("max_tokens", 512);
+            options.temperature = j.value("temperature", 0.7f);
+            options.top_p = j.value("top_p", 1.0f);
+            sys_prompt_storage = j.value("system_prompt", std::string(""));
+            if (!sys_prompt_storage.empty()) {
+                options.system_prompt = sys_prompt_storage.c_str();
+            }
+        } catch (const nlohmann::json::exception& e) {
+            LOGe("Failed to parse LLM config JSON: %s", e.what());
+        }
+    }
+
+    LOGi("racLlmComponentGenerate options: temp=%.2f, max_tokens=%d, top_p=%.2f, system_prompt=%s",
+         options.temperature, options.max_tokens, options.top_p,
+         options.system_prompt ? "(set)" : "(none)");
 
     rac_llm_result_t result = {};
     LOGi("racLlmComponentGenerate calling rac_llm_component_generate...");
@@ -551,39 +574,14 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
         LOGi("racLlmComponentGenerate result text length=%zu", strlen(result.text));
 
         // Build JSON result - keys must match what Kotlin expects
-        std::string json = "{";
-        json += "\"text\":\"";
-        // Escape special characters in text for JSON
-        for (const char* p = result.text; *p; p++) {
-            switch (*p) {
-                case '"':
-                    json += "\\\"";
-                    break;
-                case '\\':
-                    json += "\\\\";
-                    break;
-                case '\n':
-                    json += "\\n";
-                    break;
-                case '\r':
-                    json += "\\r";
-                    break;
-                case '\t':
-                    json += "\\t";
-                    break;
-                default:
-                    json += *p;
-                    break;
-            }
-        }
-        json += "\",";
-        // Kotlin expects these keys:
-        json += "\"tokens_generated\":" + std::to_string(result.completion_tokens) + ",";
-        json += "\"tokens_evaluated\":" + std::to_string(result.prompt_tokens) + ",";
-        json += "\"stop_reason\":" + std::to_string(0) + ",";  // 0 = normal completion
-        json += "\"total_time_ms\":" + std::to_string(result.total_time_ms) + ",";
-        json += "\"tokens_per_second\":" + std::to_string(result.tokens_per_second);
-        json += "}";
+        nlohmann::json json_obj;
+        json_obj["text"] = std::string(result.text);
+        json_obj["tokens_generated"] = result.completion_tokens;
+        json_obj["tokens_evaluated"] = result.prompt_tokens;
+        json_obj["stop_reason"] = 0;  // 0 = normal completion
+        json_obj["total_time_ms"] = result.total_time_ms;
+        json_obj["tokens_per_second"] = result.tokens_per_second;
+        std::string json = json_obj.dump();
 
         LOGi("racLlmComponentGenerate returning JSON: %zu bytes", json.length());
 
@@ -715,7 +713,16 @@ static rac_bool_t llm_stream_callback_token(const char* token, void* user_data) 
         }
 
         if (env) {
-            jstring jToken = env->NewStringUTF(token);
+            jsize len = static_cast<jsize>(strlen(token));
+
+            jbyteArray jToken = env->NewByteArray(len);
+            env->SetByteArrayRegion(
+                jToken,
+                0,
+                len,
+                reinterpret_cast<const jbyte*>(token)
+            );
+
             jboolean continueGen =
                 env->CallBooleanMethod(ctx->callback, ctx->onTokenMethod, jToken);
             env->DeleteLocalRef(jToken);
@@ -799,6 +806,28 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
     options.temperature = 0.7f;
     options.top_p = 1.0f;
     options.streaming_enabled = RAC_TRUE;
+    options.system_prompt = RAC_NULL;
+
+    // Parse configJson if provided
+    std::string sys_prompt_storage;
+    if (config != nullptr) {
+        try {
+            auto j = nlohmann::json::parse(config);
+            options.max_tokens = j.value("max_tokens", 512);
+            options.temperature = j.value("temperature", 0.7f);
+            options.top_p = j.value("top_p", 1.0f);
+            sys_prompt_storage = j.value("system_prompt", std::string(""));
+            if (!sys_prompt_storage.empty()) {
+                options.system_prompt = sys_prompt_storage.c_str();
+            }
+        } catch (const nlohmann::json::exception& e) {
+            LOGe("Failed to parse LLM config JSON: %s", e.what());
+        }
+    }
+
+    LOGi("racLlmComponentGenerateStream options: temp=%.2f, max_tokens=%d, top_p=%.2f, system_prompt=%s",
+         options.temperature, options.max_tokens, options.top_p,
+         options.system_prompt ? "(set)" : "(none)");
 
     // Create streaming context
     LLMStreamContext ctx;
@@ -829,39 +858,14 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
          ctx.accumulated_text.length(), ctx.token_count);
 
     // Build JSON result - keys must match what Kotlin expects
-    std::string json = "{";
-    json += "\"text\":\"";
-    // Escape special characters in text for JSON
-    for (char c : ctx.accumulated_text) {
-        switch (c) {
-            case '"':
-                json += "\\\"";
-                break;
-            case '\\':
-                json += "\\\\";
-                break;
-            case '\n':
-                json += "\\n";
-                break;
-            case '\r':
-                json += "\\r";
-                break;
-            case '\t':
-                json += "\\t";
-                break;
-            default:
-                json += c;
-                break;
-        }
-    }
-    json += "\",";
-    // Kotlin expects these keys:
-    json += "\"tokens_generated\":" + std::to_string(ctx.final_result.completion_tokens) + ",";
-    json += "\"tokens_evaluated\":" + std::to_string(ctx.final_result.prompt_tokens) + ",";
-    json += "\"stop_reason\":" + std::to_string(0) + ",";  // 0 = normal completion
-    json += "\"total_time_ms\":" + std::to_string(ctx.final_result.total_time_ms) + ",";
-    json += "\"tokens_per_second\":" + std::to_string(ctx.final_result.tokens_per_second);
-    json += "}";
+    nlohmann::json json_obj;
+    json_obj["text"] = ctx.accumulated_text;
+    json_obj["tokens_generated"] = ctx.final_result.completion_tokens;
+    json_obj["tokens_evaluated"] = ctx.final_result.prompt_tokens;
+    json_obj["stop_reason"] = 0;  // 0 = normal completion
+    json_obj["total_time_ms"] = ctx.final_result.total_time_ms;
+    json_obj["tokens_per_second"] = ctx.final_result.tokens_per_second;
+    std::string json = json_obj.dump();
 
     LOGi("racLlmComponentGenerateStream returning JSON: %zu bytes", json.length());
 
@@ -899,7 +903,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
     env->GetJavaVM(&jvm);
 
     jclass callbackClass = env->GetObjectClass(tokenCallback);
-    jmethodID onTokenMethod = env->GetMethodID(callbackClass, "onToken", "(Ljava/lang/String;)Z");
+    jmethodID onTokenMethod = env->GetMethodID(callbackClass, "onToken", "([B)Z");
 
     if (!onTokenMethod) {
         LOGe("racLlmComponentGenerateStreamWithCallback: could not find onToken method");
@@ -915,6 +919,28 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
     options.temperature = 0.7f;
     options.top_p = 1.0f;
     options.streaming_enabled = RAC_TRUE;
+    options.system_prompt = RAC_NULL;
+
+    // Parse configJson if provided
+    std::string sys_prompt_storage;
+    if (config != nullptr) {
+        try {
+            auto j = nlohmann::json::parse(config);
+            options.max_tokens = j.value("max_tokens", 512);
+            options.temperature = j.value("temperature", 0.7f);
+            options.top_p = j.value("top_p", 1.0f);
+            sys_prompt_storage = j.value("system_prompt", std::string(""));
+            if (!sys_prompt_storage.empty()) {
+                options.system_prompt = sys_prompt_storage.c_str();
+            }
+        } catch (const nlohmann::json::exception& e) {
+            LOGe("Failed to parse LLM config JSON: %s", e.what());
+        }
+    }
+
+    LOGi("racLlmComponentGenerateStreamWithCallback options: temp=%.2f, max_tokens=%d, top_p=%.2f, system_prompt=%s",
+         options.temperature, options.max_tokens, options.top_p,
+         options.system_prompt ? "(set)" : "(none)");
 
     // Create streaming callback context
     LLMStreamCallbackContext ctx;
@@ -945,37 +971,14 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
          ctx.accumulated_text.length(), ctx.token_count);
 
     // Build JSON result
-    std::string json = "{";
-    json += "\"text\":\"";
-    for (char c : ctx.accumulated_text) {
-        switch (c) {
-            case '"':
-                json += "\\\"";
-                break;
-            case '\\':
-                json += "\\\\";
-                break;
-            case '\n':
-                json += "\\n";
-                break;
-            case '\r':
-                json += "\\r";
-                break;
-            case '\t':
-                json += "\\t";
-                break;
-            default:
-                json += c;
-                break;
-        }
-    }
-    json += "\",";
-    json += "\"tokens_generated\":" + std::to_string(ctx.final_result.completion_tokens) + ",";
-    json += "\"tokens_evaluated\":" + std::to_string(ctx.final_result.prompt_tokens) + ",";
-    json += "\"stop_reason\":" + std::to_string(0) + ",";
-    json += "\"total_time_ms\":" + std::to_string(ctx.final_result.total_time_ms) + ",";
-    json += "\"tokens_per_second\":" + std::to_string(ctx.final_result.tokens_per_second);
-    json += "}";
+    nlohmann::json json_obj;
+    json_obj["text"] = ctx.accumulated_text;
+    json_obj["tokens_generated"] = ctx.final_result.completion_tokens;
+    json_obj["tokens_evaluated"] = ctx.final_result.prompt_tokens;
+    json_obj["stop_reason"] = 0;
+    json_obj["total_time_ms"] = ctx.final_result.total_time_ms;
+    json_obj["tokens_per_second"] = ctx.final_result.tokens_per_second;
+    std::string json = json_obj.dump();
 
     LOGi("racLlmComponentGenerateStreamWithCallback returning JSON: %zu bytes", json.length());
 
@@ -1126,20 +1129,21 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentTranscri
 
     // Parse configJson to override sample_rate if provided
     if (configJson != nullptr) {
-        const char* json = env->GetStringUTFChars(configJson, nullptr);
-        if (json != nullptr) {
-            // Simple JSON parsing for sample_rate
-            const char* sample_rate_key = "\"sample_rate\":";
-            const char* pos = strstr(json, sample_rate_key);
-            if (pos != nullptr) {
-                pos += strlen(sample_rate_key);
-                int sample_rate = atoi(pos);
-                if (sample_rate > 0) {
-                    options.sample_rate = sample_rate;
-                    LOGd("Using sample_rate from config: %d", sample_rate);
+        const char* json_str = env->GetStringUTFChars(configJson, nullptr);
+        if (json_str != nullptr) {
+            try {
+                auto json = nlohmann::json::parse(json_str);
+                if (json.contains("sample_rate") && json["sample_rate"].is_number()) {
+                    int sample_rate = json["sample_rate"].get<int>();
+                    if (sample_rate > 0) {
+                        options.sample_rate = sample_rate;
+                        LOGd("Using sample_rate from config: %d", sample_rate);
+                    }
                 }
+            } catch (const nlohmann::json::exception& e) {
+                LOGe("Failed to parse STT config JSON: %s", e.what());
             }
-            env->ReleaseStringUTFChars(configJson, json);
+            env->ReleaseStringUTFChars(configJson, json_str);
         }
     }
 
@@ -1162,40 +1166,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentTranscri
     }
 
     // Build JSON result
-    std::string json_result = "{";
-    json_result += "\"text\":\"";
-    if (result.text != nullptr) {
-        // Escape special characters in text
-        for (const char* p = result.text; *p; ++p) {
-            switch (*p) {
-                case '"':
-                    json_result += "\\\"";
-                    break;
-                case '\\':
-                    json_result += "\\\\";
-                    break;
-                case '\n':
-                    json_result += "\\n";
-                    break;
-                case '\r':
-                    json_result += "\\r";
-                    break;
-                case '\t':
-                    json_result += "\\t";
-                    break;
-                default:
-                    json_result += *p;
-                    break;
-            }
-        }
-    }
-    json_result += "\",";
-    json_result += "\"language\":\"" +
-                   std::string(result.detected_language ? result.detected_language : "en") + "\",";
-    json_result += "\"duration_ms\":" + std::to_string(result.processing_time_ms) + ",";
-    json_result += "\"completion_reason\":1,";  // END_OF_AUDIO
-    json_result += "\"confidence\":" + std::to_string(result.confidence);
-    json_result += "}";
+    nlohmann::json json_obj;
+    json_obj["text"] = result.text ? std::string(result.text) : "";
+    json_obj["language"] = result.detected_language ? std::string(result.detected_language) : "en";
+    json_obj["duration_ms"] = result.processing_time_ms;
+    json_obj["completion_reason"] = 1;  // END_OF_AUDIO
+    json_obj["confidence"] = result.confidence;
+    std::string json_result = json_obj.dump();
 
     rac_stt_result_free(&result);
 
@@ -1670,25 +1647,19 @@ static std::string modelInfoToJson(const rac_model_info_t* model) {
     if (!model)
         return "null";
 
-    std::string json = "{";
-    json += "\"model_id\":\"" + std::string(model->id ? model->id : "") + "\",";
-    json += "\"name\":\"" + std::string(model->name ? model->name : "") + "\",";
-    json += "\"category\":" + std::to_string(static_cast<int>(model->category)) + ",";
-    json += "\"format\":" + std::to_string(static_cast<int>(model->format)) + ",";
-    json += "\"framework\":" + std::to_string(static_cast<int>(model->framework)) + ",";
-    json += "\"download_url\":" +
-            (model->download_url ? ("\"" + std::string(model->download_url) + "\"") : "null") + ",";
-    json += "\"local_path\":" +
-            (model->local_path ? ("\"" + std::string(model->local_path) + "\"") : "null") + ",";
-    json += "\"download_size\":" + std::to_string(model->download_size) + ",";
-    json += "\"context_length\":" + std::to_string(model->context_length) + ",";
-    json +=
-        "\"supports_thinking\":" + std::string(model->supports_thinking ? "true" : "false") + ",";
-    json += "\"description\":" +
-            (model->description ? ("\"" + std::string(model->description) + "\"") : "null");
-    json += "}";
-
-    return json;
+    nlohmann::json j;
+    j["model_id"] = model->id ? model->id : "";
+    j["name"] = model->name ? model->name : "";
+    j["category"] = static_cast<int>(model->category);
+    j["format"] = static_cast<int>(model->format);
+    j["framework"] = static_cast<int>(model->framework);
+    j["download_url"] = model->download_url ? nlohmann::json(model->download_url) : nlohmann::json(nullptr);
+    j["local_path"] = model->local_path ? nlohmann::json(model->local_path) : nlohmann::json(nullptr);
+    j["download_size"] = model->download_size;
+    j["context_length"] = model->context_length;
+    j["supports_thinking"] = static_cast<bool>(model->supports_thinking);
+    j["description"] = model->description ? nlohmann::json(model->description) : nlohmann::json(nullptr);
+    return j.dump();
 }
 
 JNIEXPORT jint JNICALL
@@ -2075,25 +2046,22 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelAssignmentFetch
     }
 
     // Build JSON array of models
-    std::string json = "[";
+    nlohmann::json json_array = nlohmann::json::array();
     for (size_t i = 0; i < count; i++) {
-        if (i > 0) json += ",";
-
         rac_model_info_t* m = models[i];
-        json += "{";
-        json += "\"id\":\"" + std::string(m->id ? m->id : "") + "\",";
-        json += "\"name\":\"" + std::string(m->name ? m->name : "") + "\",";
-        json += "\"category\":" + std::to_string(m->category) + ",";
-        json += "\"format\":" + std::to_string(m->format) + ",";
-        json += "\"framework\":" + std::to_string(m->framework) + ",";
-        json += "\"downloadUrl\":\"" + std::string(m->download_url ? m->download_url : "") + "\",";
-        json += "\"downloadSize\":" + std::to_string(m->download_size) + ",";
-        json += "\"contextLength\":" + std::to_string(m->context_length) + ",";
-        json +=
-            "\"supportsThinking\":" + std::string(m->supports_thinking == RAC_TRUE ? "true" : "false");
-        json += "}";
+        nlohmann::json obj;
+        obj["id"] = m->id ? m->id : "";
+        obj["name"] = m->name ? m->name : "";
+        obj["category"] = static_cast<int>(m->category);
+        obj["format"] = static_cast<int>(m->format);
+        obj["framework"] = static_cast<int>(m->framework);
+        obj["downloadUrl"] = m->download_url ? m->download_url : "";
+        obj["downloadSize"] = m->download_size;
+        obj["contextLength"] = m->context_length;
+        obj["supportsThinking"] = static_cast<bool>(m->supports_thinking == RAC_TRUE);
+        json_array.push_back(obj);
     }
-    json += "]";
+    std::string json = json_array.dump();
 
     // Free models array
     if (models) {
@@ -2259,70 +2227,6 @@ static rac_result_t jni_device_http_post(const char* endpoint, const char* json_
 // Protected by g_device_jni_state.mtx for thread safety
 static std::string g_cached_device_id;
 
-// Helper to extract a string value from JSON (simple parser for known keys)
-// Returns allocated string that must be stored persistently, or nullptr
-static std::string extract_json_string(const char* json, const char* key) {
-    if (!json || !key)
-        return "";
-
-    std::string search_key = "\"" + std::string(key) + "\":";
-    const char* pos = strstr(json, search_key.c_str());
-    if (!pos)
-        return "";
-
-    pos += search_key.length();
-    while (*pos == ' ')
-        pos++;
-
-    if (*pos == 'n' && strncmp(pos, "null", 4) == 0) {
-        return "";
-    }
-
-    if (*pos != '"')
-        return "";
-    pos++;
-
-    const char* end = strchr(pos, '"');
-    if (!end)
-        return "";
-
-    return std::string(pos, end - pos);
-}
-
-// Helper to extract an integer value from JSON
-static int64_t extract_json_int(const char* json, const char* key) {
-    if (!json || !key)
-        return 0;
-
-    std::string search_key = "\"" + std::string(key) + "\":";
-    const char* pos = strstr(json, search_key.c_str());
-    if (!pos)
-        return 0;
-
-    pos += search_key.length();
-    while (*pos == ' ')
-        pos++;
-
-    return strtoll(pos, nullptr, 10);
-}
-
-// Helper to extract a boolean value from JSON
-static bool extract_json_bool(const char* json, const char* key) {
-    if (!json || !key)
-        return false;
-
-    std::string search_key = "\"" + std::string(key) + "\":";
-    const char* pos = strstr(json, search_key.c_str());
-    if (!pos)
-        return false;
-
-    pos += search_key.length();
-    while (*pos == ' ')
-        pos++;
-
-    return strncmp(pos, "true", 4) == 0;
-}
-
 // Static storage for device info strings (need to persist for C callbacks)
 static struct {
     std::string device_id;
@@ -2361,25 +2265,46 @@ static void jni_device_get_info(rac_device_registration_info_t* out_info, void* 
     }
 
     if (jResult && out_info) {
-        const char* json = env->GetStringUTFChars(jResult, nullptr);
-        LOGd("jni_device_get_info: parsing JSON: %.200s...", json);
+        const char* json_str = env->GetStringUTFChars(jResult, nullptr);
+        LOGd("jni_device_get_info: parsing JSON: %.200s...", json_str);
 
         // Parse JSON and extract all fields
         std::lock_guard<std::mutex> lock(g_device_info_strings.mtx);
 
-        // Extract all string fields from Kotlin's getDeviceInfoCallback() JSON
-        g_device_info_strings.device_id = extract_json_string(json, "device_id");
-        g_device_info_strings.device_model = extract_json_string(json, "device_model");
-        g_device_info_strings.device_name = extract_json_string(json, "device_name");
-        g_device_info_strings.platform = extract_json_string(json, "platform");
-        g_device_info_strings.os_version = extract_json_string(json, "os_version");
-        g_device_info_strings.form_factor = extract_json_string(json, "form_factor");
-        g_device_info_strings.architecture = extract_json_string(json, "architecture");
-        g_device_info_strings.chip_name = extract_json_string(json, "chip_name");
-        g_device_info_strings.gpu_family = extract_json_string(json, "gpu_family");
-        g_device_info_strings.battery_state = extract_json_string(json, "battery_state");
-        g_device_info_strings.device_fingerprint = extract_json_string(json, "device_fingerprint");
-        g_device_info_strings.manufacturer = extract_json_string(json, "manufacturer");
+        try {
+            auto j = nlohmann::json::parse(json_str);
+
+            // Extract all string fields from Kotlin's getDeviceInfoCallback() JSON
+            g_device_info_strings.device_id = j.value("device_id", std::string(""));
+            g_device_info_strings.device_model = j.value("device_model", std::string(""));
+            g_device_info_strings.device_name = j.value("device_name", std::string(""));
+            g_device_info_strings.platform = j.value("platform", std::string(""));
+            g_device_info_strings.os_version = j.value("os_version", std::string(""));
+            g_device_info_strings.form_factor = j.value("form_factor", std::string(""));
+            g_device_info_strings.architecture = j.value("architecture", std::string(""));
+            g_device_info_strings.chip_name = j.value("chip_name", std::string(""));
+            g_device_info_strings.gpu_family = j.value("gpu_family", std::string(""));
+            g_device_info_strings.battery_state = j.value("battery_state", std::string(""));
+            g_device_info_strings.device_fingerprint = j.value("device_fingerprint", std::string(""));
+            g_device_info_strings.manufacturer = j.value("manufacturer", std::string(""));
+
+            // Extract integer fields
+            out_info->total_memory = j.value("total_memory", (int64_t)0);
+            out_info->available_memory = j.value("available_memory", (int64_t)0);
+            out_info->neural_engine_cores = j.value("neural_engine_cores", (int32_t)0);
+            out_info->core_count = j.value("core_count", (int32_t)0);
+            out_info->performance_cores = j.value("performance_cores", (int32_t)0);
+            out_info->efficiency_cores = j.value("efficiency_cores", (int32_t)0);
+
+            // Extract boolean fields
+            out_info->has_neural_engine = j.value("has_neural_engine", false) ? RAC_TRUE : RAC_FALSE;
+            out_info->is_low_power_mode = j.value("is_low_power_mode", false) ? RAC_TRUE : RAC_FALSE;
+
+            // Extract float field for battery
+            out_info->battery_level = j.value("battery_level", 0.0f);
+        } catch (const nlohmann::json::exception& e) {
+            LOGe("Failed to parse device info JSON: %s", e.what());
+        }
 
         // Assign pointers to out_info (C struct uses const char*)
         out_info->device_id = g_device_info_strings.device_id.empty()
@@ -2416,32 +2341,12 @@ static void jni_device_get_info(rac_device_registration_info_t* out_info, void* 
                                            ? nullptr
                                            : g_device_info_strings.device_fingerprint.c_str();
 
-        // Extract integer fields
-        out_info->total_memory = extract_json_int(json, "total_memory");
-        out_info->available_memory = extract_json_int(json, "available_memory");
-        out_info->neural_engine_cores =
-            static_cast<int32_t>(extract_json_int(json, "neural_engine_cores"));
-        out_info->core_count = static_cast<int32_t>(extract_json_int(json, "core_count"));
-        out_info->performance_cores =
-            static_cast<int32_t>(extract_json_int(json, "performance_cores"));
-        out_info->efficiency_cores =
-            static_cast<int32_t>(extract_json_int(json, "efficiency_cores"));
-
-        // Extract boolean fields
-        out_info->has_neural_engine =
-            extract_json_bool(json, "has_neural_engine") ? RAC_TRUE : RAC_FALSE;
-        out_info->is_low_power_mode =
-            extract_json_bool(json, "is_low_power_mode") ? RAC_TRUE : RAC_FALSE;
-
-        // Extract float field for battery
-        out_info->battery_level = static_cast<float>(extract_json_int(json, "battery_level"));
-
         LOGi("jni_device_get_info: parsed device_model=%s, os_version=%s, architecture=%s",
              out_info->device_model ? out_info->device_model : "(null)",
              out_info->os_version ? out_info->os_version : "(null)",
              out_info->architecture ? out_info->architecture : "(null)");
 
-        env->ReleaseStringUTFChars(jResult, json);
+        env->ReleaseStringUTFChars(jResult, json_str);
         env->DeleteLocalRef(jResult);
     }
 }

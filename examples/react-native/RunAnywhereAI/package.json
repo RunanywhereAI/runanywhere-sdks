@@ -14,7 +14,8 @@
     "format:fix": "prettier \"src/**/*.{ts,tsx}\" \"App.tsx\" --write",
     "unused": "knip",
     "pod-install": "cd ios && pod install",
-    "clean": "watchman watch-del-all && rm -rf node_modules && rm -rf ios/Pods && npm install && cd ios && pod install"
+    "clean": "watchman watch-del-all && rm -rf node_modules && rm -rf ios/Pods && npm install && cd ios && pod install",
+    "postinstall": "node scripts/patch-agp-version.js"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",

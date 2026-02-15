@@ -23,7 +23,7 @@ struct CombinedSettingsView: View {
             IOSSettingsContent(viewModel: viewModel, toolViewModel: toolViewModel)
             #endif
         }
-        .sheet(isPresented: $viewModel.showApiKeyEntry) {
+        .adaptiveSheet(isPresented: $viewModel.showApiKeyEntry) {
             ApiConfigurationSheet(viewModel: viewModel)
         }
         .task {
@@ -72,6 +72,17 @@ private struct IOSSettingsContent: View {
                     in: 500...20000,
                     step: 500
                 )
+            }
+
+            // System Prompt
+            Section {
+                TextField("Enter system prompt...", text: $viewModel.systemPrompt, axis: .vertical)
+                    .lineLimit(3...8)
+            } header: {
+                Text("System Prompt")
+            } footer: {
+                Text("Optional instructions that define AI behavior and response style.")
+                    .font(AppTypography.caption)
             }
 
             // Tool Calling Settings
@@ -132,74 +143,6 @@ private struct IOSSettingsContent: View {
                     .font(AppTypography.caption)
             }
 
-            // Storage Overview Section
-            Section {
-                StorageOverviewRows(viewModel: viewModel)
-            } header: {
-                HStack {
-                    Text("Storage Overview")
-                    Spacer()
-                    Button("Refresh") {
-                        Task {
-                            await viewModel.refreshStorageData()
-                        }
-                    }
-                    .font(AppTypography.caption)
-                }
-            }
-
-            // Downloaded Models Section
-            Section("Downloaded Models") {
-                if viewModel.storedModels.isEmpty {
-                    Text("No models downloaded yet")
-                        .foregroundColor(AppColors.textSecondary)
-                        .font(AppTypography.caption)
-                } else {
-                    ForEach(viewModel.storedModels, id: \.id) { model in
-                        StoredModelRow(model: model) {
-                            await viewModel.deleteModel(model)
-                        }
-                    }
-                }
-            }
-
-            // Storage Management
-            Section("Storage Management") {
-                Button(
-                    action: {
-                        Task {
-                            await viewModel.clearCache()
-                        }
-                    },
-                    label: {
-                        HStack {
-                            Image(systemName: "trash")
-                                .foregroundColor(AppColors.primaryRed)
-                            Text("Clear Cache")
-                                .foregroundColor(AppColors.primaryRed)
-                            Spacer()
-                        }
-                    }
-                )
-
-                Button(
-                    action: {
-                        Task {
-                            await viewModel.cleanTempFiles()
-                        }
-                    },
-                    label: {
-                        HStack {
-                            Image(systemName: "trash")
-                                .foregroundColor(AppColors.primaryOrange)
-                            Text("Clean Temporary Files")
-                                .foregroundColor(AppColors.primaryOrange)
-                            Spacer()
-                        }
-                    }
-                )
-            }
-
             // Logging Configuration
             Section("Logging Configuration") {
                 Toggle("Log Analytics Locally", isOn: $viewModel.analyticsLogToLocal)
@@ -248,9 +191,6 @@ private struct MacOSSettingsContent: View {
                 GenerationSettingsCard(viewModel: viewModel)
                 ToolSettingsCard(viewModel: toolViewModel)
                 APIConfigurationCard(viewModel: viewModel)
-                StorageCard(viewModel: viewModel)
-                DownloadedModelsCard(viewModel: viewModel)
-                StorageManagementCard(viewModel: viewModel)
                 LoggingConfigurationCard(viewModel: viewModel)
                 AboutCard()
 
@@ -298,6 +238,20 @@ private struct GenerationSettingsCard: View {
                         step: 500
                     )
                     .frame(maxWidth: 200)
+                }
+
+                VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
+                    HStack(alignment: .top) {
+                        Text("System Prompt")
+                            .frame(width: 150, alignment: .leading)
+                        TextField("Enter system prompt...", text: $viewModel.systemPrompt, axis: .vertical)
+                            .lineLimit(3...8)
+                            .textFieldStyle(.plain)
+                            .padding(AppSpacing.small)
+                            .background(AppColors.backgroundTertiary)
+                            .cornerRadius(AppSpacing.cornerRadiusRegular)
+                            .frame(maxWidth: 400)
+                    }
                 }
             }
         }

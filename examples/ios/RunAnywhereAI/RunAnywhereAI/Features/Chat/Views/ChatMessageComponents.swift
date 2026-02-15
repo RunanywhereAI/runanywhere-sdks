@@ -108,7 +108,7 @@ struct MessageBubbleView: View {
                 Spacer(minLength: AppSpacing.padding60)
             }
         }
-        .sheet(isPresented: $showToolCallSheet) {
+        .adaptiveSheet(isPresented: $showToolCallSheet) {
             if let toolCallInfo = message.toolCallInfo {
                 ToolCallDetailSheet(toolCallInfo: toolCallInfo)
                     .adaptiveSheetFrame()
