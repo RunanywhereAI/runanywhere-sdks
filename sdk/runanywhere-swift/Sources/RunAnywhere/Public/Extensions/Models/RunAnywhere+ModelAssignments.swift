@@ -51,11 +51,14 @@ public extension RunAnywhere {
         )
 
         // Save to C++ registry (fire-and-forget)
+        let logger = SDKLogger(category: "RunAnywhere.Models")
+        logger.info("Registering model: \(modelId), framework: \(framework.rawValue) (\(framework.displayName))")
         Task {
             do {
                 try await CppBridge.ModelRegistry.shared.save(modelInfo)
+                logger.info("Model saved to registry: \(modelId)")
             } catch {
-                SDKLogger(category: "RunAnywhere.Models").error("Failed to register model: \(error)")
+                logger.error("Failed to register model: \(error)")
             }
         }
 

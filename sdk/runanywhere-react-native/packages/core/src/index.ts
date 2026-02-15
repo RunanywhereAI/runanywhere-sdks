@@ -183,7 +183,6 @@ export type {
   HTTPServiceConfig,
   DevModeConfig,
   NetworkConfig,
-  TelemetryEvent,
   APIEndpointKey,
   APIEndpointValue,
 } from './services';

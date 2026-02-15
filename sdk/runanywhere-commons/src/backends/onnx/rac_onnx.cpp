@@ -88,6 +88,13 @@ rac_result_t rac_stt_onnx_create(const char* model_path, const rac_stt_onnx_conf
                 case RAC_STT_ONNX_MODEL_PARAFORMER:
                     model_type = runanywhere::STTModelType::PARAFORMER;
                     break;
+                case RAC_STT_ONNX_MODEL_NEMO_CTC:
+                    model_type = runanywhere::STTModelType::NEMO_CTC;
+                    break;
+                case RAC_STT_ONNX_MODEL_AUTO:
+                    // Auto-detect: let load_model figure it out from directory structure
+                    model_type = runanywhere::STTModelType::WHISPER;
+                    break;
                 default:
                     model_type = runanywhere::STTModelType::WHISPER;
             }

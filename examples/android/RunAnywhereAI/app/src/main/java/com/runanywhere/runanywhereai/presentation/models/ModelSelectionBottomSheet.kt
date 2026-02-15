@@ -1,23 +1,31 @@
 package com.runanywhere.runanywhereai.presentation.models
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.R
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppTypography
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
@@ -33,7 +41,6 @@ import kotlinx.coroutines.launch
 
 /**
  * Model Selection Bottom Sheet - Context-Aware Implementation
- * Reference: iOS ModelSelectionSheet.swift
  *
  * Now supports context-based filtering:
  * - LLM: Shows text generation frameworks (llama.cpp, etc.)
@@ -86,68 +93,63 @@ fun ModelSelectionBottomSheet(
                 contentPadding = PaddingValues(Dimensions.large),
                 verticalArrangement = Arrangement.spacedBy(Dimensions.large),
             ) {
-                // HEADER - Context-aware title
+                // HEADER - toolbar: Cancel only, title in center
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        // Cancel button
                         TextButton(
                             onClick = { if (!uiState.isLoadingModel) onDismiss() },
                             enabled = !uiState.isLoadingModel,
                         ) {
-                            Text("Cancel")
+                            Text("Cancel", style = AppTypography.caption, fontWeight = FontWeight.Medium)
                         }
-
-                        // Title - uses context title
                         Text(
                             text = uiState.context.title,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
                         )
-
-                        // Add Model button (placeholder for future)
-                        TextButton(
-                            onClick = { /* TODO: Add model from URL */ },
-                            enabled = false,
-                        ) {
-                            Text("Add Model")
-                        }
+                        Spacer(modifier = Modifier.width(64.dp))
                     }
                 }
 
-                // SECTION 1: DEVICE STATUS
+                // SECTION 1: Device Status
                 item {
                     DeviceStatusSection(deviceInfo = uiState.deviceInfo)
                 }
 
-                // SECTION 2: AVAILABLE FRAMEWORKS (Context-filtered)
+                // SECTION 2: Choose a Model
                 item {
-                    AvailableFrameworksSection(
-                        frameworks = uiState.frameworks,
-                        expandedFramework = uiState.expandedFramework,
-                        isLoading = uiState.isLoading,
-                        onToggleFramework = { viewModel.toggleFramework(it) },
+                    Text(
+                        text = "Choose a Model",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
 
-                // SECTION 3: MODELS FOR [FRAMEWORK] (Conditional)
-                if (uiState.expandedFramework != null) {
-                    val expandedFw = uiState.expandedFramework!!
-
+                if (uiState.isLoading) {
                     item {
-                        Text(
-                            text = if (expandedFw == InferenceFramework.SYSTEM_TTS) "System TTS" else "Models for ${expandedFw.displayName}",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(top = Dimensions.small),
-                        )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = Dimensions.xLarge),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(Dimensions.mediumLarge),
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                            Text(
+                                text = "Loading available models...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = AppColors.textSecondary,
+                            )
+                        }
                     }
-
-                    // Special handling for System TTS (matches iOS ModelSelectionSheet.swift)
-                    if (expandedFw == InferenceFramework.SYSTEM_TTS) {
+                } else {
+                    // System TTS row first when TTS context
+                    if (context == ModelSelectionContext.TTS && uiState.frameworks.contains(InferenceFramework.SYSTEM_TTS)) {
                         item {
                             SystemTTSRow(
                                 isLoading = uiState.isLoadingModel,
@@ -155,17 +157,14 @@ fun ModelSelectionBottomSheet(
                                     scope.launch {
                                         viewModel.setLoadingModel(true)
                                         try {
-                                            // System TTS doesn't require SDK model loading.
-                                            val systemTTSModel =
-                                                ModelInfo(
-                                                    id = SYSTEM_TTS_MODEL_ID,
-                                                    name = "System TTS",
-                                                    downloadURL = null,
-                                                    format = ModelFormat.UNKNOWN,
-                                                    category = ModelCategory.SPEECH_SYNTHESIS,
-                                                    framework = InferenceFramework.SYSTEM_TTS,
-                                                )
-
+                                            val systemTTSModel = ModelInfo(
+                                                id = SYSTEM_TTS_MODEL_ID,
+                                                name = "System TTS",
+                                                downloadURL = null,
+                                                format = ModelFormat.UNKNOWN,
+                                                category = ModelCategory.SPEECH_SYNTHESIS,
+                                                framework = InferenceFramework.SYSTEM_TTS,
+                                            )
                                             onModelSelected(systemTTSModel)
                                             onDismiss()
                                         } finally {
@@ -175,41 +174,46 @@ fun ModelSelectionBottomSheet(
                                 },
                             )
                         }
-                    } else {
-                        // Filter models by expanded framework using enum
-                        val filteredModels = viewModel.getModelsForFramework(expandedFw)
+                    }
 
-                        // Debug logging
-                        android.util.Log.d("ModelSelectionSheet", "🔍 Filtering models for framework: ${expandedFw.displayName}")
-                        android.util.Log.d("ModelSelectionSheet", "📦 Total models: ${uiState.models.size}")
-                        android.util.Log.d("ModelSelectionSheet", "✅ Filtered models: ${filteredModels.size}")
+                    val sortedModels = uiState.models.sortedWith(
+                        compareBy<ModelInfo> { if (it.framework == InferenceFramework.FOUNDATION_MODELS) 0 else if (it.isDownloaded) 1 else 2 }
+                            .thenBy { it.name },
+                    )
+                    items(sortedModels, key = { it.id }) { model ->
+                        SelectableModelRow(
+                            model = model,
+                            isSelected = uiState.currentModel?.id == model.id,
+                            isLoading = uiState.isLoadingModel && uiState.selectedModelId == model.id,
+                            onDownloadModel = { viewModel.startDownload(model.id) },
+                            onSelectModel = {
+                                scope.launch {
+                                    viewModel.selectModel(model.id)
+                                    // Wait for model to actually finish loading instead of fixed delay
+                                    // Poll until loading completes (with timeout to prevent infinite wait)
+                                    var attempts = 0
+                                    val maxAttempts = 120 // 60 seconds max (500ms * 120)
+                                    while (viewModel.uiState.value.isLoadingModel && attempts < maxAttempts) {
+                                        kotlinx.coroutines.delay(500)
+                                        attempts++
+                                    }
+                                    // Only notify success if loading completed (not timed out while still loading)
+                                    if (!viewModel.uiState.value.isLoadingModel) {
+                                        onModelSelected(model)
+                                    }
+                                    onDismiss()
+                                }
+                            },
+                        )
+                    }
 
-                        if (filteredModels.isEmpty()) {
-                            // Empty state
-                            item {
-                                EmptyModelsMessage(framework = expandedFw)
-                            }
-                        } else {
-                            // Model rows
-                            items(filteredModels, key = { it.id }) { model ->
-                                SelectableModelRow(
-                                    model = model,
-                                    isSelected = uiState.currentModel?.id == model.id,
-                                    isLoading = uiState.isLoadingModel && uiState.selectedModelId == model.id,
-                                    onDownloadModel = {
-                                        viewModel.startDownload(model.id)
-                                    },
-                                    onSelectModel = {
-                                        scope.launch {
-                                            viewModel.selectModel(model.id)
-                                            kotlinx.coroutines.delay(500)
-                                            onModelSelected(model)
-                                            onDismiss()
-                                        }
-                                    },
-                                )
-                            }
-                        }
+                    item {
+                        Text(
+                            text = "All models run privately on your device. Larger models may provide better quality but use more memory.",
+                            style = AppTypography.caption,
+                            color = AppColors.textSecondary,
+                            modifier = Modifier.padding(top = Dimensions.mediumLarge),
+                        )
                     }
                 }
             }
@@ -229,67 +233,48 @@ fun ModelSelectionBottomSheet(
 // SECTION 1: DEVICE STATUS
 // ====================
 
+// Device Status section
 @Composable
 private fun DeviceStatusSection(deviceInfo: DeviceInfo?) {
-    Card(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Dimensions.mediumLarge),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        verticalArrangement = Arrangement.spacedBy(Dimensions.smallMedium),
     ) {
-        Column(
-            modifier = Modifier.padding(Dimensions.large),
-            verticalArrangement = Arrangement.spacedBy(Dimensions.smallMedium),
-        ) {
-            Text(
-                text = "Device Status",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
+        Text(
+            text = "Device Status",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
 
-            if (deviceInfo != null) {
-                DeviceInfoRowItem(
-                    label = "Model",
-                    icon = Icons.Default.PhoneAndroid,
-                    value = deviceInfo.modelName,
+        if (deviceInfo != null) {
+            // Device info: Model, Chip, Memory
+            DeviceInfoRow(label = "Model", icon = Icons.Default.PhoneAndroid, value = deviceInfo.modelName)
+            DeviceInfoRow(label = "Chip", icon = Icons.Default.Memory, value = deviceInfo.architecture)
+            DeviceInfoRow(
+                label = "Memory",
+                icon = Icons.Default.Memory,
+                value = "${deviceInfo.totalMemoryMB} MB",
+            )
+        } else {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Dimensions.small),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                Text(
+                    text = "Loading device info...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = AppColors.textSecondary,
                 )
-                DeviceInfoRowItem(
-                    label = "Platform",
-                    icon = Icons.Default.Memory,
-                    value = "${deviceInfo.platform} ${deviceInfo.osVersion}",
-                )
-                DeviceInfoRowItem(
-                    label = "Architecture",
-                    icon = Icons.Default.Android,
-                    value = deviceInfo.architecture,
-                )
-                DeviceInfoRowItem(
-                    label = "CPU Cores",
-                    icon = Icons.Default.Settings,
-                    value = deviceInfo.processorCount.toString(),
-                )
-                DeviceInfoRowItem(
-                    label = "Memory",
-                    icon = Icons.Default.Memory,
-                    value = "${deviceInfo.totalMemoryMB} MB",
-                )
-            } else {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Dimensions.small),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp))
-                    Text(
-                        text = "Loading device info...",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
         }
     }
 }
 
+// DeviceInfoRow: Label + Spacer + Text(value).foregroundColor(AppColors.textSecondary)
 @Composable
-private fun DeviceInfoRowItem(
+private fun DeviceInfoRow(
     label: String,
     icon: ImageVector,
     value: String,
@@ -297,20 +282,24 @@ private fun DeviceInfoRowItem(
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(Dimensions.small)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Dimensions.small),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                modifier = Modifier.size(Dimensions.iconSmall),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(Dimensions.iconRegular),
+                tint = MaterialTheme.colorScheme.onSurface,
             )
-            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
         }
         Text(
             value,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium,
+            color = AppColors.textSecondary,
         )
     }
 }
@@ -432,6 +421,25 @@ private fun FrameworkRow(
 }
 
 /**
+ * Get drawable resource ID for model logo - matches iOS ModelInfo+Logo.swift logoAssetName
+ */
+private fun getModelLogoResId(model: ModelInfo): Int {
+    val name = model.name.lowercase()
+    return when {
+        model.framework == InferenceFramework.FOUNDATION_MODELS ||
+            model.framework == InferenceFramework.SYSTEM_TTS -> R.drawable.foundation_models_logo
+        name.contains("llama") -> R.drawable.llama_logo
+        name.contains("mistral") -> R.drawable.mistral_logo
+        name.contains("qwen") -> R.drawable.qwen_logo
+        name.contains("liquid") -> R.drawable.liquid_ai_logo
+        name.contains("piper") -> R.drawable.hugging_face_logo
+        name.contains("whisper") -> R.drawable.hugging_face_logo
+        name.contains("sherpa") -> R.drawable.hugging_face_logo
+        else -> R.drawable.hugging_face_logo
+    }
+}
+
+/**
  * Get icon for framework - matches iOS iconForFramework
  */
 private fun getFrameworkIcon(framework: InferenceFramework): ImageVector {
@@ -485,6 +493,7 @@ private fun EmptyModelsMessage(framework: InferenceFramework) {
     }
 }
 
+// FlatModelRow-style row
 @Composable
 private fun SelectableModelRow(
     model: ModelInfo,
@@ -493,191 +502,183 @@ private fun SelectableModelRow(
     onDownloadModel: () -> Unit,
     onSelectModel: () -> Unit,
 ) {
-    // State detection - matches iOS logic
+    val isBuiltIn =
+        model.framework == InferenceFramework.FOUNDATION_MODELS ||
+            model.framework == InferenceFramework.SYSTEM_TTS
     val isDownloaded = model.isDownloaded
     val canDownload = model.downloadURL != null
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Dimensions.medium),
-        colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface,
-            ),
-    ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(Dimensions.large),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // LEFT: Model Info
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
-            ) {
-                // Model name
-                Text(
-                    text = model.name,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (isSelected || isLoading) FontWeight.SemiBold else FontWeight.Normal,
-                )
-
-                // Badges row
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Dimensions.smallMedium),
-                ) {
-                    // Size badge
-                    val downloadSize = model.downloadSize ?: 0L
-                    if (downloadSize > 0) {
-                        ModelBadge(
-                            text = formatBytes(downloadSize),
-                            icon = Icons.Default.Memory,
-                        )
-                    }
-
-                    // Format badge
-                    ModelBadge(text = model.format.name.uppercase())
-
-                    // Thinking badge
-                    if (model.supportsThinking) {
-                        ModelBadge(
-                            text = "THINKING",
-                            icon = Icons.Default.Psychology,
-                            backgroundColor = MaterialTheme.colorScheme.secondaryContainer,
-                            textColor = MaterialTheme.colorScheme.secondary,
-                        )
-                    }
-                }
-
-                // Status indicator
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    when {
-                        isSelected -> {
-                            Icon(
-                                imageVector = Icons.Default.CheckCircle,
-                                contentDescription = "Loaded",
-                                modifier = Modifier.size(12.dp),
-                                tint = Color(0xFF4CAF50),
-                            )
-                            Text(
-                                text = "Loaded",
-                                style = AppTypography.caption2,
-                                color = Color(0xFF4CAF50),
-                            )
-                        }
-                        isDownloaded -> {
-                            Icon(
-                                imageVector = Icons.Default.CheckCircle,
-                                contentDescription = "Downloaded",
-                                modifier = Modifier.size(12.dp),
-                                tint = MaterialTheme.colorScheme.tertiary,
-                            )
-                            Text(
-                                text = "Downloaded",
-                                style = AppTypography.caption2,
-                                color = MaterialTheme.colorScheme.tertiary,
-                            )
-                        }
-                        canDownload -> {
-                            Text(
-                                text = "Available for download",
-                                style = AppTypography.caption2,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.width(Dimensions.smallMedium))
-
-            // RIGHT: Action button
-            when {
-                isLoading -> {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                }
-                isSelected -> {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = "Loaded",
-                            tint = Color(0xFF4CAF50),
-                            modifier = Modifier.size(20.dp),
-                        )
-                        Text(
-                            text = "Loaded",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF4CAF50),
-                            fontWeight = FontWeight.Medium,
-                        )
-                    }
-                }
-                isDownloaded -> {
-                    Button(
-                        onClick = onSelectModel,
-                        enabled = !isLoading,
-                        colors =
-                            ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                            ),
-                    ) {
-                        Text("Load")
-                    }
-                }
-                canDownload -> {
-                    Button(
-                        onClick = onDownloadModel,
-                        enabled = !isLoading,
-                        colors =
-                            ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                            ),
-                    ) {
-                        Text("Download")
-                    }
-                }
-            }
-        }
+    val frameworkColor = when (model.framework) {
+        InferenceFramework.LLAMA_CPP -> AppColors.primaryAccent
+        InferenceFramework.ONNX -> AppColors.primaryPurple
+        InferenceFramework.FOUNDATION_MODELS -> MaterialTheme.colorScheme.primary
+        InferenceFramework.SYSTEM_TTS -> AppColors.primaryAccent
+        else -> AppColors.statusGray
     }
-}
+    val frameworkName = when (model.framework) {
+        InferenceFramework.LLAMA_CPP -> "Fast"
+        InferenceFramework.ONNX -> "ONNX"
+        InferenceFramework.FOUNDATION_MODELS -> "Apple"
+        InferenceFramework.SYSTEM_TTS -> "System"
+        else -> model.framework.displayName
+    }
 
-@Composable
-private fun ModelBadge(
-    text: String,
-    icon: ImageVector? = null,
-    backgroundColor: Color = MaterialTheme.colorScheme.surfaceVariant,
-    textColor: Color = MaterialTheme.colorScheme.onSurface,
-) {
+    val statusIcon = Icons.Default.CheckCircle
+    val statusColor = if (isBuiltIn || isDownloaded) AppColors.statusGreen else AppColors.primaryAccent
+    val statusText = when {
+        isBuiltIn -> "Built-in"
+        isDownloaded -> "Ready"
+        else -> ""
+    }
+
     Row(
         modifier =
             Modifier
-                .background(backgroundColor, RoundedCornerShape(Dimensions.cornerRadiusSmall))
-                .padding(horizontal = Dimensions.small, vertical = Dimensions.xxSmall),
-        horizontalArrangement = Arrangement.spacedBy(Dimensions.xxSmall),
+                .fillMaxWidth()
+                .padding(vertical = Dimensions.smallMedium)
+                .then(Modifier.alpha(if (isLoading && !isSelected) 0.6f else 1f)),
+        horizontalArrangement = Arrangement.spacedBy(Dimensions.mediumLarge),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        icon?.let {
-            Icon(
-                imageVector = it,
+        // Model logo
+        Box(
+            modifier =
+                Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(Dimensions.cornerRadiusRegular)),
+        ) {
+            Image(
+                painter = painterResource(id = getModelLogoResId(model)),
                 contentDescription = null,
-                modifier = Modifier.size(10.dp),
-                tint = textColor,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit,
             )
         }
-        Text(
-            text = text,
-            style = AppTypography.caption2,
-            color = textColor,
-        )
+
+        // Model name + framework badge + status row
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Dimensions.smallMedium),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = model.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Surface(
+                    shape = RoundedCornerShape(Dimensions.cornerRadiusSmall),
+                    color = frameworkColor.copy(alpha = 0.15f),
+                ) {
+                    Text(
+                        text = frameworkName,
+                        style = AppTypography.caption2,
+                        fontWeight = FontWeight.Medium,
+                        color = frameworkColor,
+                        modifier = Modifier.padding(horizontal = Dimensions.small, vertical = Dimensions.xxSmall),
+                    )
+                }
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Dimensions.smallMedium),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (statusText.isNotEmpty()) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(Dimensions.xxSmall),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = statusIcon,
+                            contentDescription = null,
+                            modifier = Modifier.size(12.dp),
+                            tint = statusColor,
+                        )
+                        Text(
+                            text = statusText,
+                            style = AppTypography.caption2,
+                            color = statusColor,
+                        )
+                    }
+                }
+                if (model.supportsThinking) {
+                    Surface(
+                        shape = RoundedCornerShape(Dimensions.cornerRadiusSmall),
+                        color = AppColors.badgePurple,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = Dimensions.small, vertical = Dimensions.xxSmall),
+                            horizontalArrangement = Arrangement.spacedBy(Dimensions.xxSmall),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Psychology,
+                                contentDescription = null,
+                                modifier = Modifier.size(10.dp),
+                                tint = AppColors.primaryPurple,
+                            )
+                            Text(
+                                text = "Smart",
+                                style = AppTypography.caption2,
+                                color = AppColors.primaryPurple,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Action button: "Use" (borderedProminent primaryAccent) or "Get" (bordered primaryAccent)
+        when {
+            isLoading -> CircularProgressIndicator(modifier = Modifier.size(24.dp), color = AppColors.primaryAccent)
+            isBuiltIn || isDownloaded -> {
+                Button(
+                    onClick = onSelectModel,
+                    enabled = !isLoading && !isSelected,
+                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.primaryAccent),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                ) {
+                    Text("Use", style = AppTypography.caption, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            canDownload -> {
+                Button(
+                    onClick = onDownloadModel,
+                    enabled = !isLoading,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AppColors.primaryAccent),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(Dimensions.xxSmall),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Download,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Text(
+                            text =
+                                if ((model.downloadSize ?: 0) > 0) {
+                                    formatBytes(model.downloadSize!!)
+                                } else {
+                                    "Get"
+                                },
+                            style = AppTypography.caption,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -685,6 +686,7 @@ private fun ModelBadge(
 // LOADING OVERLAY
 // ====================
 
+// LoadingModelOverlay: overlayMedium, card backgroundPrimary, headline + subheadline textSecondary
 @Composable
 private fun LoadingOverlay(
     @Suppress("UNUSED_PARAMETER") modelName: String,
@@ -694,34 +696,34 @@ private fun LoadingOverlay(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.5f)),
+                .background(AppColors.overlayMedium),
         contentAlignment = Alignment.Center,
     ) {
         Card(
             modifier = Modifier.padding(Dimensions.xxLarge),
             shape = RoundedCornerShape(Dimensions.cornerRadiusXLarge),
-            colors =
-                CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                ),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = Dimensions.shadowXLarge),
         ) {
             Column(
                 modifier = Modifier.padding(Dimensions.xxLarge),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(Dimensions.xLarge),
             ) {
-                CircularProgressIndicator()
-
+                CircularProgressIndicator(
+                    modifier = Modifier.size(36.dp),
+                    color = AppColors.primaryAccent,
+                )
                 Text(
                     text = "Loading Model",
                     style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
-
                 Text(
                     text = progress,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = AppColors.textSecondary,
                 )
             }
         }
@@ -729,101 +731,74 @@ private fun LoadingOverlay(
 }
 
 // ====================
-// SYSTEM TTS ROW (Matches iOS systemTTSRow)
+// SYSTEM TTS ROW
 // ====================
 
-/**
- * System TTS selection row - uses built-in Android TextToSpeech
- * iOS Reference: ModelSelectionSheet.swift - systemTTSRow
- */
+// SystemTTSRow: "System Voice", "System" badge, "Built-in - Always available", "Use" button primaryAccent
 @Composable
 private fun SystemTTSRow(
     isLoading: Boolean,
     onSelect: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Dimensions.mediumLarge),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = Dimensions.smallMedium),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(Dimensions.large),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
         ) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
-                modifier = Modifier.weight(1f),
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Dimensions.smallMedium),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "Default System Voice",
-                    style = MaterialTheme.typography.titleSmall,
+                    text = "System Voice",
+                    style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Dimensions.small),
-                    verticalAlignment = Alignment.CenterVertically,
+                Surface(
+                    shape = RoundedCornerShape(Dimensions.cornerRadiusSmall),
+                    color = AppColors.primaryAccent.copy(alpha = 0.1f),
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.VolumeUp,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                     Text(
-                        text = "Built-in",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    ) {
-                        Text(
-                            text = "Android TTS",
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        )
-                    }
-                }
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Dimensions.small),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                        tint = AppColors.primaryGreen,
-                    )
-                    Text(
-                        text = "Always available",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = AppColors.primaryGreen,
+                        text = "System",
+                        style = AppTypography.caption2,
+                        fontWeight = FontWeight.Medium,
+                        color = AppColors.primaryAccent,
+                        modifier = Modifier.padding(horizontal = Dimensions.small, vertical = Dimensions.xxSmall),
                     )
                 }
             }
-
-            Button(
-                onClick = onSelect,
-                enabled = !isLoading,
-                colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor = AppColors.primaryPurple,
-                    ),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Dimensions.xxSmall),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    modifier = Modifier.size(12.dp),
+                    tint = AppColors.statusGreen,
+                )
                 Text(
-                    text = "Select",
-                    style = MaterialTheme.typography.labelMedium,
+                    text = "Built-in - Always available",
+                    style = AppTypography.caption2,
+                    color = AppColors.statusGreen,
                 )
             }
+        }
+        Button(
+            onClick = onSelect,
+            enabled = !isLoading,
+            colors = ButtonDefaults.buttonColors(containerColor = AppColors.primaryAccent),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+        ) {
+            Text("Use", style = AppTypography.caption, fontWeight = FontWeight.SemiBold)
         }
     }
 }

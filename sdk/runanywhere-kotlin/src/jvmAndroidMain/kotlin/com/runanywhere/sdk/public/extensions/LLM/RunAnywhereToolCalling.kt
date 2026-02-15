@@ -17,10 +17,10 @@
 
 package com.runanywhere.sdk.public.extensions.LLM
 
-import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeToolCalling
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.generateStream
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -31,25 +31,30 @@ private object ToolRegistry {
     private val mutex = Mutex()
     private val tools = mutableMapOf<String, RegisteredTool>()
 
-    suspend fun register(definition: ToolDefinition, executor: ToolExecutor) = mutex.withLock {
-        tools[definition.name] = RegisteredTool(definition, executor)
-    }
+    suspend fun register(definition: ToolDefinition, executor: ToolExecutor) =
+        mutex.withLock {
+            tools[definition.name] = RegisteredTool(definition, executor)
+        }
 
-    suspend fun unregister(toolName: String) = mutex.withLock {
-        tools.remove(toolName)
-    }
+    suspend fun unregister(toolName: String) =
+        mutex.withLock {
+            tools.remove(toolName)
+        }
 
-    suspend fun getAll(): List<ToolDefinition> = mutex.withLock {
-        tools.values.map { it.definition }
-    }
+    suspend fun getAll(): List<ToolDefinition> =
+        mutex.withLock {
+            tools.values.map { it.definition }
+        }
 
-    suspend fun get(toolName: String): RegisteredTool? = mutex.withLock {
-        tools[toolName]
-    }
+    suspend fun get(toolName: String): RegisteredTool? =
+        mutex.withLock {
+            tools[toolName]
+        }
 
-    suspend fun clear() = mutex.withLock {
-        tools.clear()
-    }
+    suspend fun clear() =
+        mutex.withLock {
+            tools.clear()
+        }
 }
 
 /**
@@ -74,7 +79,7 @@ object RunAnywhereToolCalling {
      */
     suspend fun registerTool(
         definition: ToolDefinition,
-        executor: ToolExecutor
+        executor: ToolExecutor,
     ) {
         ToolRegistry.register(definition, executor)
         logger.info("Registered tool: ${definition.name}")
@@ -128,7 +133,7 @@ object RunAnywhereToolCalling {
                 toolName = toolCall.toolName,
                 success = false,
                 error = "Unknown tool: ${toolCall.toolName}",
-                callId = toolCall.callId
+                callId = toolCall.callId,
             )
         }
 
@@ -138,7 +143,7 @@ object RunAnywhereToolCalling {
                 toolName = toolCall.toolName,
                 success = true,
                 result = result,
-                callId = toolCall.callId
+                callId = toolCall.callId,
             )
         } catch (e: Exception) {
             logger.error("Tool execution failed: ${e.message}")
@@ -146,7 +151,7 @@ object RunAnywhereToolCalling {
                 toolName = toolCall.toolName,
                 success = false,
                 error = e.message ?: "Unknown error",
-                callId = toolCall.callId
+                callId = toolCall.callId,
             )
         }
     }
@@ -171,7 +176,7 @@ object RunAnywhereToolCalling {
      */
     suspend fun generateWithTools(
         prompt: String,
-        options: ToolCallingOptions? = null
+        options: ToolCallingOptions? = null,
     ): ToolCallingResult {
         // Ensure SDK is initialized
         require(RunAnywhere.isInitialized) { "SDK not initialized" }
@@ -204,7 +209,7 @@ object RunAnywhereToolCalling {
                     text = finalText,
                     toolCalls = allToolCalls,
                     toolResults = allToolResults,
-                    isComplete = true
+                    isComplete = true,
                 )
             }
 
@@ -216,7 +221,7 @@ object RunAnywhereToolCalling {
                     text = finalText,
                     toolCalls = allToolCalls,
                     toolResults = emptyList(),
-                    isComplete = false
+                    isComplete = false,
                 )
             }
 
@@ -226,24 +231,26 @@ object RunAnywhereToolCalling {
             logger.info("Tool ${toolCall.toolName} executed: ${if (result.success) "success" else "failed"}")
 
             // Build follow-up prompt using C++ (SINGLE SOURCE OF TRUTH)
-            val toolResultJson = CppBridgeToolCalling.toolValueToJsonString(
-                result.result ?: mapOf("error" to ToolValue.string(result.error ?: "Unknown error"))
-            )
+            val toolResultJson =
+                CppBridgeToolCalling.toolValueToJsonString(
+                    result.result ?: mapOf("error" to ToolValue.string(result.error ?: "Unknown error")),
+                )
 
-            fullPrompt = CppBridgeToolCalling.buildFollowupPrompt(
-                originalPrompt = prompt,
-                toolsPrompt = if (opts.keepToolsAvailable) CppBridgeToolCalling.formatToolsForPrompt(tools, opts.format) else null,
-                toolName = toolCall.toolName,
-                toolResultJson = toolResultJson,
-                keepToolsAvailable = opts.keepToolsAvailable
-            )
+            fullPrompt =
+                CppBridgeToolCalling.buildFollowupPrompt(
+                    originalPrompt = prompt,
+                    toolsPrompt = if (opts.keepToolsAvailable) CppBridgeToolCalling.formatToolsForPrompt(tools, opts.format) else null,
+                    toolName = toolCall.toolName,
+                    toolResultJson = toolResultJson,
+                    keepToolsAvailable = opts.keepToolsAvailable,
+                )
         }
 
         return ToolCallingResult(
             text = finalText,
             toolCalls = allToolCalls,
             toolResults = allToolResults,
-            isComplete = true
+            isComplete = true,
         )
     }
 
@@ -263,37 +270,43 @@ object RunAnywhereToolCalling {
         previousPrompt: String,
         toolCall: ToolCall,
         toolResult: ToolResult,
-        options: ToolCallingOptions? = null
+        options: ToolCallingOptions? = null,
     ): ToolCallingResult {
-        val resultJson = CppBridgeToolCalling.toolValueToJsonString(
-            toolResult.result ?: mapOf("error" to ToolValue.string(toolResult.error ?: "Unknown error"))
-        )
+        val resultJson =
+            CppBridgeToolCalling.toolValueToJsonString(
+                toolResult.result ?: mapOf("error" to ToolValue.string(toolResult.error ?: "Unknown error")),
+            )
 
         // Build follow-up prompt using C++ (SINGLE SOURCE OF TRUTH)
         val tools = options?.tools ?: ToolRegistry.getAll()
-        val toolsPrompt = if (options?.keepToolsAvailable == true) {
-            CppBridgeToolCalling.formatToolsForPrompt(tools, options.format)
-        } else null
+        val toolsPrompt =
+            if (options?.keepToolsAvailable == true) {
+                CppBridgeToolCalling.formatToolsForPrompt(tools, options.format)
+            } else {
+                null
+            }
 
-        val continuedPrompt = CppBridgeToolCalling.buildFollowupPrompt(
-            originalPrompt = previousPrompt,
-            toolsPrompt = toolsPrompt,
-            toolName = toolCall.toolName,
-            toolResultJson = resultJson,
-            keepToolsAvailable = options?.keepToolsAvailable ?: false
-        )
+        val continuedPrompt =
+            CppBridgeToolCalling.buildFollowupPrompt(
+                originalPrompt = previousPrompt,
+                toolsPrompt = toolsPrompt,
+                toolName = toolCall.toolName,
+                toolResultJson = resultJson,
+                keepToolsAvailable = options?.keepToolsAvailable ?: false,
+            )
 
-        val continuationOptions = ToolCallingOptions(
-            tools = options?.tools,
-            maxToolCalls = maxOf(0, (options?.maxToolCalls ?: 5) - 1),
-            autoExecute = options?.autoExecute ?: true,
-            temperature = options?.temperature,
-            maxTokens = options?.maxTokens,
-            systemPrompt = options?.systemPrompt,
-            replaceSystemPrompt = options?.replaceSystemPrompt ?: false,
-            keepToolsAvailable = options?.keepToolsAvailable ?: false,
-            format = options?.format ?: ToolCallFormat.Default
-        )
+        val continuationOptions =
+            ToolCallingOptions(
+                tools = options?.tools,
+                maxToolCalls = maxOf(0, (options?.maxToolCalls ?: 5) - 1),
+                autoExecute = options?.autoExecute ?: true,
+                temperature = options?.temperature,
+                maxTokens = options?.maxTokens,
+                systemPrompt = options?.systemPrompt,
+                replaceSystemPrompt = options?.replaceSystemPrompt ?: false,
+                keepToolsAvailable = options?.keepToolsAvailable ?: false,
+                format = options?.format ?: ToolCallFormat.Default,
+            )
 
         return generateWithTools(continuedPrompt, continuationOptions)
     }
@@ -307,7 +320,7 @@ object RunAnywhereToolCalling {
      */
     private fun buildToolSystemPrompt(
         tools: List<ToolDefinition>,
-        options: ToolCallingOptions
+        options: ToolCallingOptions,
     ): String {
         // Use C++ implementation for prompt formatting (SINGLE SOURCE OF TRUTH)
         // Pass the format from options to generate model-specific instructions
@@ -332,12 +345,13 @@ object RunAnywhereToolCalling {
     private suspend fun generateAndCollect(
         prompt: String,
         temperature: Float?,
-        maxTokens: Int?
+        maxTokens: Int?,
     ): String {
-        val genOptions = LLMGenerationOptions(
-            maxTokens = maxTokens ?: 1024,
-            temperature = temperature ?: 0.7f
-        )
+        val genOptions =
+            LLMGenerationOptions(
+                maxTokens = maxTokens ?: 1024,
+                temperature = temperature ?: 0.7f,
+            )
 
         val tokenFlow = RunAnywhere.generateStream(prompt, genOptions)
 

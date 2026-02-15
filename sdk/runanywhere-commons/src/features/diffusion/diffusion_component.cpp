@@ -8,6 +8,7 @@
  * Supports text-to-image, image-to-image, and inpainting.
  */
 
+#include <atomic>
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
@@ -19,6 +20,7 @@
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/diffusion/rac_diffusion_component.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
+#include "rac/features/diffusion/rac_diffusion_tokenizer.h"
 
 // =============================================================================
 // INTERNAL STRUCTURES
@@ -34,14 +36,18 @@ struct rac_diffusion_component {
     /** Current configuration */
     rac_diffusion_config_t config;
 
+    /** Storage for optional string fields in config */
+    std::string model_id_storage;
+    std::string tokenizer_custom_url_storage;
+
     /** Default generation options based on config */
     rac_diffusion_options_t default_options;
 
     /** Mutex for thread safety */
     std::mutex mtx;
 
-    /** Cancellation flag */
-    bool cancel_requested;
+    /** Cancellation flag (atomic for thread-safe access from cancel() while generate holds mutex) */
+    std::atomic<bool> cancel_requested;
 
     rac_diffusion_component() : lifecycle(nullptr), cancel_requested(false) {
         // Initialize with defaults
@@ -53,6 +59,57 @@ struct rac_diffusion_component {
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
+
+/**
+ * Merge user-provided options over component defaults.
+ *
+ * For numeric fields, zero/negative values mean "use default" (except guidance_scale
+ * where 0.0 is valid for CFG-free models like SDXS/SDXL Turbo - use negative to skip).
+ * Pointer fields are copied if non-null. Enums are always copied.
+ */
+static rac_diffusion_options_t merge_diffusion_options(
+    const rac_diffusion_options_t& defaults, const rac_diffusion_options_t* options) {
+    rac_diffusion_options_t effective = defaults;
+
+    effective.prompt = options->prompt;
+    if (options->negative_prompt) {
+        effective.negative_prompt = options->negative_prompt;
+    }
+    if (options->width > 0) {
+        effective.width = options->width;
+    }
+    if (options->height > 0) {
+        effective.height = options->height;
+    }
+    if (options->steps > 0) {
+        effective.steps = options->steps;
+    }
+    // guidance_scale >= 0 allows 0.0 (valid for CFG-free models like SDXS, SDXL Turbo)
+    // Only skip override if user passes a negative sentinel (which is never valid)
+    if (options->guidance_scale >= 0.0f) {
+        effective.guidance_scale = options->guidance_scale;
+    }
+    if (options->seed != 0) {
+        effective.seed = options->seed;
+    }
+    effective.scheduler = options->scheduler;
+    effective.mode = options->mode;
+
+    // Image-to-image / inpainting fields
+    effective.input_image_data = options->input_image_data;
+    effective.input_image_size = options->input_image_size;
+    effective.input_image_width = options->input_image_width;
+    effective.input_image_height = options->input_image_height;
+    effective.mask_data = options->mask_data;
+    effective.mask_size = options->mask_size;
+    effective.denoise_strength = options->denoise_strength;
+
+    // Progress reporting fields
+    effective.report_intermediate_images = options->report_intermediate_images;
+    effective.progress_stride = options->progress_stride > 0 ? options->progress_stride : 1;
+
+    return effective;
+}
 
 /**
  * Generate a unique ID for generation tracking.
@@ -81,8 +138,21 @@ static rac_result_t diffusion_create_service(const char* model_id, void* user_da
     RAC_LOG_INFO("Diffusion.Component", "Creating diffusion service for model: %s",
                  model_id ? model_id : "");
 
+    if (component && model_id) {
+        rac_result_t ensure_result =
+            rac_diffusion_tokenizer_ensure_files(model_id, &component->config.tokenizer);
+        if (ensure_result != RAC_SUCCESS) {
+            RAC_LOG_ERROR("Diffusion.Component",
+                          "Failed to ensure tokenizer files for %s: %d",
+                          model_id, ensure_result);
+            return ensure_result;
+        }
+    }
+
     // Create diffusion service
-    rac_result_t result = rac_diffusion_create(model_id, out_service);
+    rac_result_t result =
+        rac_diffusion_create_with_config(model_id, component ? &component->config : nullptr,
+                                         out_service);
     if (result != RAC_SUCCESS) {
         RAC_LOG_ERROR("Diffusion.Component", "Failed to create diffusion service: %d", result);
         return result;
@@ -161,8 +231,25 @@ extern "C" rac_result_t rac_diffusion_component_configure(rac_handle_t handle,
     auto* component = reinterpret_cast<rac_diffusion_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
 
-    // Copy configuration
+    // Copy configuration (shallow) then normalize owned string fields
     component->config = *config;
+
+    if (config->model_id) {
+        component->model_id_storage = config->model_id;
+        component->config.model_id = component->model_id_storage.c_str();
+    } else {
+        component->model_id_storage.clear();
+        component->config.model_id = nullptr;
+    }
+
+    if (config->tokenizer.custom_base_url) {
+        component->tokenizer_custom_url_storage = config->tokenizer.custom_base_url;
+        component->config.tokenizer.custom_base_url =
+            component->tokenizer_custom_url_storage.c_str();
+    } else {
+        component->tokenizer_custom_url_storage.clear();
+        component->config.tokenizer.custom_base_url = nullptr;
+    }
 
     // Update default options based on model variant
     switch (config->model_variant) {
@@ -175,6 +262,8 @@ extern "C" rac_result_t rac_diffusion_component_configure(rac_handle_t handle,
             component->default_options.width = 768;
             component->default_options.height = 768;
             break;
+        case RAC_DIFFUSION_MODEL_SDXS:
+        case RAC_DIFFUSION_MODEL_LCM:
         case RAC_DIFFUSION_MODEL_SD_1_5:
         default:
             component->default_options.width = 512;
@@ -182,10 +271,28 @@ extern "C" rac_result_t rac_diffusion_component_configure(rac_handle_t handle,
             break;
     }
 
-    // SDXL Turbo uses fewer steps
-    if (config->model_variant == RAC_DIFFUSION_MODEL_SDXL_TURBO) {
-        component->default_options.steps = 4;
-        component->default_options.guidance_scale = 0.0f;  // Turbo doesn't need guidance
+    // Ultra-fast models: SDXS (1 step), SDXL Turbo (4 steps), LCM (4 steps)
+    switch (config->model_variant) {
+        case RAC_DIFFUSION_MODEL_SDXS:
+            // SDXS: 1 step, no CFG
+            component->default_options.steps = 1;
+            component->default_options.guidance_scale = 0.0f;
+            component->default_options.scheduler = RAC_DIFFUSION_SCHEDULER_EULER;
+            break;
+        case RAC_DIFFUSION_MODEL_SDXL_TURBO:
+            // SDXL Turbo: 4 steps, no CFG
+            component->default_options.steps = 4;
+            component->default_options.guidance_scale = 0.0f;
+            break;
+        case RAC_DIFFUSION_MODEL_LCM:
+            // LCM: 4 steps, lower CFG
+            component->default_options.steps = 4;
+            component->default_options.guidance_scale = 1.5f;
+            component->default_options.scheduler = RAC_DIFFUSION_SCHEDULER_EULER;
+            break;
+        default:
+            // Standard models keep default values
+            break;
     }
 
     RAC_LOG_INFO("Diffusion.Component", "Diffusion component configured");
@@ -299,36 +406,9 @@ extern "C" rac_result_t rac_diffusion_component_generate(rac_handle_t handle,
         return result;
     }
 
-    // Merge options with defaults
-    rac_diffusion_options_t effective_options = component->default_options;
-    effective_options.prompt = options->prompt;
-    if (options->negative_prompt) {
-        effective_options.negative_prompt = options->negative_prompt;
-    }
-    if (options->width > 0) {
-        effective_options.width = options->width;
-    }
-    if (options->height > 0) {
-        effective_options.height = options->height;
-    }
-    if (options->steps > 0) {
-        effective_options.steps = options->steps;
-    }
-    if (options->guidance_scale > 0) {
-        effective_options.guidance_scale = options->guidance_scale;
-    }
-    if (options->seed != 0) {
-        effective_options.seed = options->seed;
-    }
-    effective_options.scheduler = options->scheduler;
-    effective_options.mode = options->mode;
-    effective_options.input_image_data = options->input_image_data;
-    effective_options.input_image_size = options->input_image_size;
-    effective_options.input_image_width = options->input_image_width;
-    effective_options.input_image_height = options->input_image_height;
-    effective_options.mask_data = options->mask_data;
-    effective_options.mask_size = options->mask_size;
-    effective_options.denoise_strength = options->denoise_strength;
+    // Merge user options over component defaults
+    rac_diffusion_options_t effective_options = merge_diffusion_options(
+        component->default_options, options);
 
     RAC_LOG_INFO("Diffusion.Component",
                  "Starting generation: %dx%d, %d steps, guidance=%.1f, scheduler=%d",
@@ -419,38 +499,9 @@ extern "C" rac_result_t rac_diffusion_component_generate_with_callbacks(
         return result;
     }
 
-    // Merge options with defaults
-    rac_diffusion_options_t effective_options = component->default_options;
-    effective_options.prompt = options->prompt;
-    if (options->negative_prompt) {
-        effective_options.negative_prompt = options->negative_prompt;
-    }
-    if (options->width > 0) {
-        effective_options.width = options->width;
-    }
-    if (options->height > 0) {
-        effective_options.height = options->height;
-    }
-    if (options->steps > 0) {
-        effective_options.steps = options->steps;
-    }
-    if (options->guidance_scale > 0) {
-        effective_options.guidance_scale = options->guidance_scale;
-    }
-    if (options->seed != 0) {
-        effective_options.seed = options->seed;
-    }
-    effective_options.scheduler = options->scheduler;
-    effective_options.mode = options->mode;
-    effective_options.input_image_data = options->input_image_data;
-    effective_options.input_image_size = options->input_image_size;
-    effective_options.input_image_width = options->input_image_width;
-    effective_options.input_image_height = options->input_image_height;
-    effective_options.mask_data = options->mask_data;
-    effective_options.mask_size = options->mask_size;
-    effective_options.denoise_strength = options->denoise_strength;
-    effective_options.report_intermediate_images = options->report_intermediate_images;
-    effective_options.progress_stride = options->progress_stride > 0 ? options->progress_stride : 1;
+    // Merge user options over component defaults
+    rac_diffusion_options_t effective_options = merge_diffusion_options(
+        component->default_options, options);
 
     RAC_LOG_INFO("Diffusion.Component",
                  "Starting generation with callbacks: %dx%d, %d steps, stride=%d",
@@ -576,6 +627,9 @@ extern "C" rac_result_t rac_diffusion_component_get_info(rac_handle_t handle,
                 out_info->max_width = 768;
                 out_info->max_height = 768;
                 break;
+            case RAC_DIFFUSION_MODEL_SDXS:
+            case RAC_DIFFUSION_MODEL_LCM:
+            case RAC_DIFFUSION_MODEL_SD_1_5:
             default:
                 out_info->max_width = 512;
                 out_info->max_height = 512;

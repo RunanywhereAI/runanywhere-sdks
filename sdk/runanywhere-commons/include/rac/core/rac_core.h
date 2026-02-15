@@ -324,6 +324,17 @@ RAC_API rac_result_t rac_register_model(const struct rac_model_info* model);
  */
 RAC_API rac_result_t rac_get_model(const char* model_id, struct rac_model_info** out_model);
 
+/**
+ * Gets model info from the global registry by local path.
+ * Convenience function that calls rac_model_registry_get_by_path on the global registry.
+ * Useful when loading models by path instead of model_id.
+ *
+ * @param local_path Local path to search for
+ * @param out_model Output: Model info (owned, must be freed with rac_model_info_free)
+ * @return RAC_SUCCESS on success, RAC_ERROR_NOT_FOUND if not registered
+ */
+RAC_API rac_result_t rac_get_model_by_path(const char* local_path, struct rac_model_info** out_model);
+
 #ifdef __cplusplus
 }
 #endif
