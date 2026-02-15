@@ -19,6 +19,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -35,7 +36,7 @@ import {
 } from './src/theme/spacing';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
-import { RunAnywhere, SDKEnvironment, ModelCategory } from '@runanywhere/core';
+import { RunAnywhere, SDKEnvironment, ModelCategory, LLMFramework } from '@runanywhere/core';
 import { LlamaCPP } from '@runanywhere/llamacpp';
 import { ONNX, ModelArtifactType } from '@runanywhere/onnx';
 import { getStoredApiKey, getStoredBaseURL, hasCustomConfiguration } from './src/screens/SettingsScreen';
@@ -208,6 +209,10 @@ const App: React.FC = () => {
       artifactType: ModelArtifactType.TarGzArchive,
       memoryRequirement: 65_000_000,
     });
+
+    // Diffusion (CoreML) is Swift SDK + Swift example app only. React Native does not
+    // depend on the Swift SDK, so we do not register diffusion models or Diffusion.register()
+    // on iOS here. Use the Swift example app for image generation on iOS.
 
     console.warn('[App] All models registered');
   };

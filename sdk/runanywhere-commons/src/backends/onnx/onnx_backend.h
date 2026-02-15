@@ -56,6 +56,7 @@ enum class STTModelType {
     ZIPFORMER,
     TRANSDUCER,
     PARAFORMER,
+    NEMO_CTC,
     CUSTOM
 };
 
@@ -91,6 +92,7 @@ struct STTResult {
 
 enum class TTSModelType {
     PIPER,
+    KOKORO,  // Kokoro TTS (high quality, 24kHz, multi-speaker)
     COQUI,
     BARK,
     ESPEAK,
@@ -281,6 +283,11 @@ class ONNXSTT {
     int stream_counter_ = 0;
     std::string model_dir_;
     std::string language_;
+    // Kept alive so config string pointers remain valid for recognizer lifetime
+    std::string encoder_path_;
+    std::string decoder_path_;
+    std::string tokens_path_;
+    std::string nemo_ctc_model_path_;
     mutable std::mutex mutex_;
 };
 
@@ -352,10 +359,19 @@ class ONNXVAD {
 
    private:
     ONNXBackendNew* backend_;
+#if SHERPA_ONNX_AVAILABLE
+    const SherpaOnnxVoiceActivityDetector* sherpa_vad_ = nullptr;
+#else
     void* sherpa_vad_ = nullptr;
+#endif
+    std::string model_path_;
     VADConfig config_;
     bool model_loaded_ = false;
     mutable std::mutex mutex_;
+
+    // Internal buffer to accumulate audio until we have a full Silero window (512 samples).
+    // Audio capture may deliver chunks smaller than the required window size.
+    std::vector<float> pending_samples_;
 };
 
 }  // namespace runanywhere

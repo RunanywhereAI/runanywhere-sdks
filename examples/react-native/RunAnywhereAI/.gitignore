@@ -43,6 +43,7 @@ android/build/
 android/local.properties
 android/*.iml
 android/.idea/
+android/app/.idea/
 
 # Testing
 coverage/

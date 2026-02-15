@@ -17,6 +17,9 @@
 #include "rac/core/rac_structured_error.h"
 #include "rac/infrastructure/device/rac_device_manager.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
+#if !defined(RAC_PLATFORM_ANDROID)
+#include "rac/features/diffusion/rac_diffusion_model_registry.h"
+#endif
 
 // =============================================================================
 // STATIC STATE
@@ -104,6 +107,11 @@ rac_result_t rac_init(const rac_config_t* config) {
 
     s_initialized.store(true);
 
+#if !defined(RAC_PLATFORM_ANDROID)
+    // Initialize diffusion model registry (iOS/Apple only; extensible model definitions)
+    rac_diffusion_model_registry_init();
+#endif
+
     internal_log(RAC_LOG_INFO, "RunAnywhere Commons initialized");
 
     return RAC_SUCCESS;
@@ -117,6 +125,11 @@ void rac_shutdown(void) {
     }
 
     internal_log(RAC_LOG_INFO, "RunAnywhere Commons shutting down");
+
+#if !defined(RAC_PLATFORM_ANDROID)
+    // Cleanup diffusion model registry (iOS/Apple only)
+    rac_diffusion_model_registry_cleanup();
+#endif
 
     // Clear state
     s_platform_adapter = nullptr;
@@ -253,6 +266,14 @@ rac_result_t rac_get_model(const char* model_id, rac_model_info_t** out_model) {
         return RAC_ERROR_NOT_INITIALIZED;
     }
     return rac_model_registry_get(registry, model_id, out_model);
+}
+
+rac_result_t rac_get_model_by_path(const char* local_path, rac_model_info_t** out_model) {
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    if (registry == nullptr) {
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+    return rac_model_registry_get_by_path(registry, local_path, out_model);
 }
 
 rac_bool_t rac_framework_is_platform_service(rac_inference_framework_t framework) {

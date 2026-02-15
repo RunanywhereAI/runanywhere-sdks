@@ -151,7 +151,7 @@ object RunAnywhereBridge {
      * Token callback interface for streaming generation.
      */
     fun interface TokenCallback {
-        fun onToken(token: String): Boolean
+        fun onToken(token: ByteArray): Boolean
     }
 
     /**
@@ -335,6 +335,16 @@ object RunAnywhereBridge {
         speechEndCallback: Any?,
         progressCallback: Any?,
     )
+
+    // ========================================================================
+    // HTTP DOWNLOAD (platform adapter callbacks)
+    // ========================================================================
+
+    @JvmStatic
+    external fun racHttpDownloadReportProgress(taskId: String, downloadedBytes: Long, totalBytes: Long): Int
+
+    @JvmStatic
+    external fun racHttpDownloadReportComplete(taskId: String, result: Int, downloadedPath: String?): Int
 
     // ========================================================================
     // BACKEND REGISTRATION

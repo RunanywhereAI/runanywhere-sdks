@@ -12,7 +12,7 @@ include(FetchContent)
 include(LoadVersions)
 
 if(NOT DEFINED LLAMACPP_VERSION)
-    set(LLAMACPP_VERSION "b7199")
+    set(LLAMACPP_VERSION "b8011")
 endif()
 set(LLAMA_CPP_VERSION "${LLAMACPP_VERSION}")
 
@@ -73,6 +73,20 @@ elseif(RAC_PLATFORM_MACOS)
     set(GGML_METAL ON CACHE BOOL "" FORCE)
     set(GGML_ACCELERATE ON CACHE BOOL "" FORCE)
     set(GGML_METAL_EMBED_LIBRARY ON CACHE BOOL "" FORCE)  # Embed precompiled Metal shaders
+elseif(RAC_PLATFORM_LINUX)
+    # Disable GPU backends not typically available on Linux ARM
+    set(GGML_METAL OFF CACHE BOOL "" FORCE)
+    set(GGML_CUDA OFF CACHE BOOL "" FORCE)
+    set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
+    set(GGML_OPENCL OFF CACHE BOOL "" FORCE)
+    set(GGML_HIPBLAS OFF CACHE BOOL "" FORCE)
+    set(GGML_SYCL OFF CACHE BOOL "" FORCE)
+
+    # Enable ARM NEON for aarch64 (Raspberry Pi 5)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+        set(GGML_NEON ON CACHE BOOL "" FORCE)
+        message(STATUS "Enabling NEON for Linux aarch64")
+    endif()
 endif()
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Force static libraries for llama.cpp" FORCE)
@@ -84,6 +98,7 @@ FetchContent_MakeAvailable(llamacpp)
 # =============================================================================
 
 set(LLAMACPP_BACKEND_SOURCES
+    # LLM Backend
     llamacpp_backend.cpp
     rac_llm_llamacpp.cpp
     rac_backend_llamacpp_register.cpp
@@ -92,6 +107,43 @@ set(LLAMACPP_BACKEND_SOURCES
 set(LLAMACPP_BACKEND_HEADERS
     llamacpp_backend.h
 )
+
+# Option to enable VLM multimodal support (requires mtmd from llama.cpp)
+option(RAC_VLM_USE_MTMD "Enable VLM multimodal support via llama.cpp mtmd" ON)
+if(RAC_VLM_USE_MTMD)
+    message(STATUS "VLM multimodal support enabled")
+    # Add VLM Backend sources (Vision Language Model)
+    list(APPEND LLAMACPP_BACKEND_SOURCES
+        rac_vlm_llamacpp.cpp
+        rac_backend_llamacpp_vlm_register.cpp
+    )
+    # Add mtmd sources from llama.cpp tools directory
+    list(APPEND LLAMACPP_BACKEND_SOURCES
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd-helper.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/mtmd-audio.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/clip.cpp
+    )
+    # Add mtmd model implementations (clip_graph_* classes)
+    list(APPEND LLAMACPP_BACKEND_SOURCES
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/llava.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/qwen2vl.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/qwen3vl.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/minicpmv.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/glm4v.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/cogvlm.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/internvl.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/kimivl.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/llama4.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/siglip.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/pixtral.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/youtuvl.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/conformer.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/whisper-enc.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/kimik25.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/mobilenetv5.cpp
+    )
+endif()
 
 if(RAC_BUILD_SHARED)
     add_library(rac_backend_llamacpp SHARED
@@ -105,17 +157,33 @@ else()
     )
 endif()
 
+# Resolve the runanywhere-commons root (3 levels up from src/backends/llamacpp/)
+get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
+
 target_include_directories(rac_backend_llamacpp PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/include/rac/backends
+    ${RAC_COMMONS_ROOT_DIR}/include
+    ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
     ${llamacpp_SOURCE_DIR}/include
     ${llamacpp_SOURCE_DIR}/common
     ${llamacpp_SOURCE_DIR}/ggml/include
     ${llamacpp_SOURCE_DIR}/vendor               # nlohmann/json.hpp
 )
 
+# VLM multimodal includes (mtmd)
+if(RAC_VLM_USE_MTMD)
+    target_include_directories(rac_backend_llamacpp PRIVATE
+        ${llamacpp_SOURCE_DIR}/tools/mtmd
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models
+    )
+endif()
+
 target_compile_definitions(rac_backend_llamacpp PRIVATE RAC_LLAMACPP_BUILDING)
+
+# VLM multimodal compile definition
+if(RAC_VLM_USE_MTMD)
+    target_compile_definitions(rac_backend_llamacpp PRIVATE RAC_VLM_USE_MTMD=1)
+endif()
 
 target_link_libraries(rac_backend_llamacpp PUBLIC
     rac_commons
@@ -155,6 +223,11 @@ elseif(RAC_PLATFORM_MACOS)
         "-framework Metal"
         "-framework MetalKit"
     )
+
+elseif(RAC_PLATFORM_LINUX)
+    message(STATUS "Configuring LlamaCPP backend for Linux")
+    # Linux-specific link libraries
+    target_link_libraries(rac_backend_llamacpp PUBLIC pthread dl)
 endif()
 
 # =============================================================================
@@ -171,7 +244,7 @@ if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED)
 
         target_include_directories(rac_backend_llamacpp_jni PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
-            ${CMAKE_SOURCE_DIR}/include
+            ${RAC_COMMONS_ROOT_DIR}/include
         )
 
         target_link_libraries(rac_backend_llamacpp_jni PRIVATE

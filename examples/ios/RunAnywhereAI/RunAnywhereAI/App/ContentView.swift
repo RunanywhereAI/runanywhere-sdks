@@ -2,7 +2,8 @@
 //  ContentView.swift
 //  RunAnywhereAI
 //
-//  Created by Sanchit Monga on 7/21/25.
+//  Main app navigation with 5 tabs (iOS limit)
+//  Organized by AI capability: Chat, Vision, Voice, More utilities, Settings
 //
 
 import SwiftUI
@@ -12,43 +13,38 @@ struct ContentView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            // Tab 0: Chat (LLM)
+            // Tab 0: Chat - Pure text LLM conversation
             ChatInterfaceView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .tabItem {
                     Label("Chat", systemImage: "message")
                 }
                 .tag(0)
 
-            // Tab 1: Speech-to-Text
-            SpeechToTextView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Tab 1: Vision - Image understanding & generation
+            VisionHubView()
                 .tabItem {
-                    Label("Transcribe", systemImage: "waveform")
+                    Label("Vision", systemImage: "eye")
                 }
                 .tag(1)
 
-            // Tab 2: Text-to-Speech
-            TextToSpeechView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Tab 2: Voice - Voice Assistant (hero feature)
+            VoiceAssistantView()
                 .tabItem {
-                    Label("Speak", systemImage: "speaker.wave.2")
+                    Label("Voice", systemImage: "mic.circle")
                 }
                 .tag(2)
 
-            // Tab 3: Voice Assistant (STT + LLM + TTS)
-            VoiceAssistantView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Tab 3: More - Additional utilities
+            MoreHubView()
                 .tabItem {
-                    Label("Voice", systemImage: "mic")
+                    Label("More", systemImage: "ellipsis.circle")
                 }
                 .tag(3)
 
-            // Tab 4: Combined Settings (includes Storage)
+            // Tab 4: Settings
             Group {
                 #if os(macOS)
                 CombinedSettingsView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 #else
                 NavigationView {
                     CombinedSettingsView()
@@ -65,14 +61,134 @@ struct ContentView: View {
         .accentColor(AppColors.primaryAccent)
         #if os(macOS)
         .frame(
-            minWidth: 800,
-            idealWidth: 1200,
-            maxWidth: .infinity,
-            minHeight: 600,
-            idealHeight: 800,
-            maxHeight: .infinity
+            minWidth: 800, idealWidth: 1200, maxWidth: .infinity,
+            minHeight: 600, idealHeight: 800, maxHeight: .infinity
         )
         #endif
+    }
+}
+
+// MARK: - Vision Hub (VLM + Image Generation)
+
+struct VisionHubView: View {
+    var body: some View {
+        NavigationView {
+            List {
+                Section {
+                    NavigationLink {
+                        VLMCameraView()
+                    } label: {
+                        FeatureRow(
+                            icon: "camera.viewfinder",
+                            iconColor: .purple,
+                            title: "Vision Chat",
+                            subtitle: "Chat with images using your camera or photos"
+                        )
+                    }
+
+                    NavigationLink {
+                        ImageGenerationView()
+                    } label: {
+                        FeatureRow(
+                            icon: "photo.on.rectangle.angled",
+                            iconColor: .pink,
+                            title: "Image Generation",
+                            subtitle: "Create images from text prompts"
+                        )
+                    }
+                } header: {
+                    Text("Vision AI")
+                } footer: {
+                    Text("Understand and create visual content with AI")
+                }
+            }
+            .navigationTitle("Vision")
+        }
+        #if os(iOS)
+        .navigationViewStyle(.stack)
+        #endif
+    }
+}
+
+// MARK: - More Hub (Additional Utilities)
+
+struct MoreHubView: View {
+    var body: some View {
+        NavigationView {
+            List {
+                Section {
+                    NavigationLink {
+                        SpeechToTextView()
+                    } label: {
+                        FeatureRow(
+                            icon: "waveform",
+                            iconColor: .blue,
+                            title: "Transcribe",
+                            subtitle: "Convert speech to text"
+                        )
+                    }
+
+                    NavigationLink {
+                        TextToSpeechView()
+                    } label: {
+                        FeatureRow(
+                            icon: "speaker.wave.2",
+                            iconColor: .green,
+                            title: "Speak",
+                            subtitle: "Convert text to speech"
+                        )
+                    }
+
+                    NavigationLink {
+                        StorageView()
+                    } label: {
+                        FeatureRow(
+                            icon: "folder",
+                            iconColor: .orange,
+                            title: "Storage",
+                            subtitle: "Manage models and files"
+                        )
+                    }
+                } header: {
+                    Text("Utilities")
+                } footer: {
+                    Text("Additional tools and utilities")
+                }
+            }
+            .navigationTitle("More")
+        }
+        #if os(iOS)
+        .navigationViewStyle(.stack)
+        #endif
+    }
+}
+
+// MARK: - Feature Row Component
+
+struct FeatureRow: View {
+    let icon: String
+    let iconColor: Color
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        HStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundColor(.white)
+                .frame(width: 44, height: 44)
+                .background(iconColor)
+                .cornerRadius(10)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.headline)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.vertical, 8)
     }
 }
 

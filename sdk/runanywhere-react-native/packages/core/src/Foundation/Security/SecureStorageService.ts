@@ -25,10 +25,9 @@ import type { SDKEnvironment } from '../../types';
  * These methods are optional and may not be available on all platforms
  */
 interface SecureStorageNativeModule {
-  secureStorageIsAvailable?: () => Promise<boolean>;
-  secureStorageStore?: (key: string, value: string) => Promise<void>;
-  secureStorageRetrieve?: (key: string) => Promise<string | null>;
-  secureStorageDelete?: (key: string) => Promise<void>;
+  secureStorageSet?: (key: string, value: string) => Promise<boolean>;
+  secureStorageGet?: (key: string) => Promise<string | null>;
+  secureStorageDelete?: (key: string) => Promise<boolean>;
   secureStorageExists?: (key: string) => Promise<boolean>;
 }
 
@@ -92,6 +91,9 @@ class SecureStorageServiceImpl {
       const native = requireNativeModule() as unknown as SecureStorageNativeModule;
 
       // Use the new native method
+      if (!native.secureStorageSet) {
+        throw new Error('secureStorageSet is not available on this platform');
+      }
       const success = await native.secureStorageSet(key, value);
 
       if (!success) {
@@ -130,6 +132,9 @@ class SecureStorageServiceImpl {
       const native = requireNativeModule() as unknown as SecureStorageNativeModule;
 
       // Use the new native method
+      if (!native.secureStorageGet) {
+        throw new Error('secureStorageGet is not available on this platform');
+      }
       const value = await native.secureStorageGet(key);
 
       if (value !== null && value !== undefined) {
@@ -163,7 +168,7 @@ class SecureStorageServiceImpl {
       const native = requireNativeModule() as unknown as SecureStorageNativeModule;
 
       // Use the new native method
-      await native.secureStorageDelete(key);
+      await native.secureStorageDelete?.(key);
 
       // Remove from cache
       this.cache.delete(key);
@@ -199,7 +204,8 @@ class SecureStorageServiceImpl {
       const native = requireNativeModule() as unknown as SecureStorageNativeModule;
 
       // Use the new native method
-      return await native.secureStorageExists(key);
+      const result = await native.secureStorageExists?.(key);
+      return result ?? false;
     } catch {
       return false;
     }
