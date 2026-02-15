@@ -239,14 +239,15 @@ set(RAC_FEATURES_SOURCES
     src/features/result_free.cpp
 )
 
-# Platform services (Apple Foundation Models + System TTS)
+# Platform services (Apple Foundation Models + System TTS + CoreML Diffusion)
 if(APPLE AND RAC_BUILD_PLATFORM)
     set(RAC_PLATFORM_SOURCES
         src/features/platform/rac_llm_platform.cpp
         src/features/platform/rac_tts_platform.cpp
+        src/features/platform/rac_diffusion_platform.cpp
         src/features/platform/rac_backend_platform_register.cpp
     )
-    message(STATUS "Building platform services: Apple Foundation Models, System TTS")
+    message(STATUS "Building platform services: Apple Foundation Models, System TTS, CoreML Diffusion")
 else()
     set(RAC_PLATFORM_SOURCES "")
 endif()
@@ -303,6 +304,7 @@ if(APPLE)
 endif()
 
 if(RAC_PLATFORM_ANDROID)
+    target_compile_definitions(rac_commons PRIVATE RAC_PLATFORM_ANDROID=1)
     target_link_libraries(rac_commons PUBLIC log)
 endif()
 
