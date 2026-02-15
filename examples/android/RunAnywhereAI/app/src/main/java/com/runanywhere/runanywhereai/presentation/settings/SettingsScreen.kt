@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.text.format.Formatter
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -74,6 +75,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
         modifier =
             Modifier
                 .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
                 .verticalScroll(rememberScrollState()),
     ) {
         // Header
@@ -94,6 +96,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 text = "Settings",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
             )
         }
 
@@ -103,7 +106,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 Text(
                     text = "Temperature: ${"%.2f".format(uiState.temperature)}",
                     style = AppTypography.caption,
-                    color = AppColors.textSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Slider(
                     value = uiState.temperature,
@@ -120,6 +123,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                     Text(
                         text = "Max Tokens: ${uiState.maxTokens}",
                         style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         OutlinedButton(
@@ -154,7 +158,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("API Key", style = MaterialTheme.typography.bodyMedium)
+                Text("API Key", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                 Text(
                     text = if (uiState.isApiKeyConfigured) "Configured" else "Not Set",
                     style = AppTypography.caption,
@@ -169,11 +173,11 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Base URL", style = MaterialTheme.typography.bodyMedium)
+                Text("Base URL", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                 Text(
                     text = if (uiState.isBaseURLConfigured) "Configured" else "Using Default",
                     style = AppTypography.caption,
-                    color = if (uiState.isBaseURLConfigured) AppColors.statusGreen else AppColors.textSecondary,
+                    color = if (uiState.isBaseURLConfigured) AppColors.statusGreen else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             if (uiState.isApiKeyConfigured && uiState.isBaseURLConfigured) {
@@ -203,7 +207,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             Text(
                 text = "Configure custom API key and base URL for testing. Requires app restart to take effect.",
                 style = AppTypography.caption,
-                color = AppColors.textSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
@@ -221,7 +225,6 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 icon = Icons.Filled.Storage,
                 label = "Total Usage",
                 value = Formatter.formatFileSize(context, uiState.totalStorageSize),
-                valueColor = AppColors.textSecondary,
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             StorageOverviewRow(
@@ -242,7 +245,6 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 icon = Icons.Filled.FormatListNumbered,
                 label = "Downloaded Models",
                 value = uiState.downloadedModels.size.toString(),
-                valueColor = AppColors.textSecondary,
             )
         }
 
@@ -252,7 +254,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 Text(
                     text = "No models downloaded yet",
                     style = AppTypography.caption,
-                    color = AppColors.textSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 8.dp),
                 )
             } else {
@@ -297,6 +299,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 Text(
                     text = "Log Analytics Locally",
                     style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Switch(
                     checked = uiState.analyticsLogToLocal,
@@ -307,7 +310,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             Text(
                 text = "When enabled, analytics events will be saved locally on your device.",
                 style = AppTypography.caption,
-                color = AppColors.textSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
@@ -329,11 +332,12 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                         text = "RunAnywhere SDK",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = "Version 0.1",
                         style = AppTypography.caption,
-                        color = AppColors.textSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -479,7 +483,7 @@ private fun SettingsSection(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.headlineMedium,
-                    color = AppColors.textSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             trailing?.invoke()
@@ -488,7 +492,7 @@ private fun SettingsSection(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(Dimensions.cornerRadiusXLarge),
-            color = Color.White,
+            color = MaterialTheme.colorScheme.surface,
         ) {
             Column(
                 modifier = Modifier.padding(Dimensions.padding16),
@@ -506,8 +510,9 @@ private fun StorageOverviewRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     value: String,
-    valueColor: Color = AppColors.textSecondary,
+    valueColor: Color? = null,
 ) {
+    val resolvedValueColor = valueColor ?: MaterialTheme.colorScheme.onSurfaceVariant
     Row(
         modifier =
             Modifier
@@ -527,12 +532,13 @@ private fun StorageOverviewRow(
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
-            color = valueColor,
+            color = resolvedValueColor,
         )
     }
 }
@@ -561,11 +567,12 @@ private fun StoredModelRow(
                 text = model.name,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 text = Formatter.formatFileSize(context, model.size),
                 style = AppTypography.caption2,
-                color = AppColors.textSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
@@ -577,7 +584,7 @@ private fun StoredModelRow(
             Text(
                 text = Formatter.formatFileSize(context, model.size),
                 style = AppTypography.caption,
-                color = AppColors.textSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             IconButton(
                 onClick = onDelete,
@@ -609,6 +616,7 @@ private fun StorageManagementButton(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
+        color = MaterialTheme.colorScheme.surface,
     ) {
         Row(
             modifier = Modifier.padding(Dimensions.padding16),
@@ -632,7 +640,7 @@ private fun StorageManagementButton(
             Text(
                 text = subtitle,
                 style = AppTypography.caption,
-                color = AppColors.textSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -716,7 +724,7 @@ private fun ApiConfigurationDialog(
                         Text(
                             text = "After saving, you must restart the app for changes to take effect. The SDK will reinitialize with your custom configuration.",
                             style = AppTypography.caption,
-                            color = AppColors.textSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
