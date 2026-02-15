@@ -104,6 +104,9 @@ struct VisionHubView: View {
             }
             .navigationTitle("Vision")
         }
+        #if os(iOS)
+        .navigationViewStyle(.stack)
+        #endif
     }
 }
 
@@ -154,6 +157,9 @@ struct MoreHubView: View {
             }
             .navigationTitle("More")
         }
+        #if os(iOS)
+        .navigationViewStyle(.stack)
+        #endif
     }
 }
 

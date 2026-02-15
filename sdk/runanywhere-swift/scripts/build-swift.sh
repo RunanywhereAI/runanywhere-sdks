@@ -19,6 +19,7 @@
 #   --build-commons     Build runanywhere-commons from source
 #
 # OPTIONS:
+#   --skip-macos        Skip macOS build (iOS only). macOS is included by default.
 #   --clean             Clean build artifacts before building
 #   --release           Build in release mode (default: debug)
 #   --skip-build        Skip swift build (only setup frameworks)
@@ -27,8 +28,11 @@
 #   --help              Show this help message
 #
 # EXAMPLES:
-#   # First time setup (recommended)
+#   # First time setup (iOS + macOS, recommended)
 #   ./scripts/build-swift.sh --setup
+#
+#   # First time setup (iOS only, skip macOS)
+#   ./scripts/build-swift.sh --setup --skip-macos
 #
 #   # Rebuild after commons changes
 #   ./scripts/build-swift.sh --local --build-commons
@@ -62,6 +66,7 @@ PACKAGE_FILE="$REPO_ROOT/Package.swift"
 BUILD_MODE="debug"
 MODE=""
 BUILD_COMMONS=false
+INCLUDE_MACOS=true
 CLEAN_BUILD=false
 SKIP_BUILD=false
 SET_LOCAL_MODE=""
@@ -106,6 +111,12 @@ for arg in "$@"; do
         --build-commons)
             BUILD_COMMONS=true
             MODE="local"
+            ;;
+        --include-macos)
+            INCLUDE_MACOS=true
+            ;;
+        --skip-macos)
+            INCLUDE_MACOS=false
             ;;
         --clean)
             CLEAN_BUILD=true
@@ -210,9 +221,11 @@ build_commons() {
 
     local FLAGS=""
     [[ "$CLEAN_BUILD" == true ]] && FLAGS="$FLAGS --clean"
+    [[ "$INCLUDE_MACOS" == true ]] && FLAGS="$FLAGS --include-macos"
 
     log_step "Running: build-ios.sh $FLAGS"
     log_info "This downloads dependencies and builds all frameworks..."
+    [[ "$INCLUDE_MACOS" == true ]] && log_info "Including macOS support (this adds build time)"
     echo ""
     "$COMMONS_BUILD_SCRIPT" $FLAGS
 
@@ -244,6 +257,17 @@ install_frameworks() {
             fi
         fi
     done
+
+    # Create combined ONNX Runtime xcframework if macOS is included
+    if [[ "$INCLUDE_MACOS" == true ]]; then
+        local ONNX_SCRIPT="$SWIFT_SDK_DIR/scripts/create-onnxruntime-xcframework.sh"
+        if [[ -x "$ONNX_SCRIPT" ]]; then
+            log_step "Creating combined ONNX Runtime xcframework (iOS + macOS)..."
+            "$ONNX_SCRIPT"
+        else
+            log_warn "create-onnxruntime-xcframework.sh not found, skipping combined ONNX Runtime"
+        fi
+    fi
 
     log_info "Frameworks installed to: $BINARIES_DIR"
 }
@@ -286,14 +310,28 @@ main() {
         log_header "RunAnywhere Swift SDK - First Time Setup"
         echo ""
         echo "This will:"
-        echo "  1. Download ONNX Runtime & Sherpa-ONNX"
+        echo "  1. Download ONNX Runtime & Sherpa-ONNX (iOS)"
+        if [[ "$INCLUDE_MACOS" == true ]]; then
+            echo "  1b. Download ONNX Runtime & build Sherpa-ONNX (macOS)"
+        fi
         echo "  2. Build RACommons.xcframework"
         echo "  3. Build RABackendLLAMACPP.xcframework"
         echo "  4. Build RABackendONNX.xcframework"
-        echo "  5. Copy frameworks to Binaries/"
-        echo "  6. Set useLocalBinaries = true in Package.swift"
+        if [[ "$INCLUDE_MACOS" == true ]]; then
+            echo "     (all xcframeworks will include macOS arm64 slices)"
+            echo "  5. Create combined ONNX Runtime xcframework (iOS + macOS)"
+            echo "  6. Copy frameworks to Binaries/"
+            echo "  7. Set useLocalBinaries = true in Package.swift"
+        else
+            echo "  5. Copy frameworks to Binaries/"
+            echo "  6. Set useLocalBinaries = true in Package.swift"
+        fi
         echo ""
-        echo "This may take 5-15 minutes..."
+        if [[ "$INCLUDE_MACOS" == true ]]; then
+            echo "This may take 15-30 minutes (includes macOS + Sherpa-ONNX build)..."
+        else
+            echo "This may take 5-15 minutes..."
+        fi
         echo ""
     else
         log_header "RunAnywhere Swift SDK - Build"

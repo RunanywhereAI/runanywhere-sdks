@@ -70,18 +70,28 @@ struct TextToSpeechView: View {
                 }
             }
             .navigationTitle(hasModelSelected ? "Text to Speech" : "")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarHidden(!hasModelSelected)
+            #endif
             .toolbar {
                 if hasModelSelected {
+                    #if os(iOS)
                     ToolbarItem(placement: .navigationBarTrailing) {
                         modelButton
                     }
+                    #else
+                    ToolbarItem(placement: .automatic) {
+                        modelButton
+                    }
+                    #endif
                 }
             }
         }
+        #if os(iOS)
         .navigationViewStyle(.stack)
-        .sheet(isPresented: $showModelPicker) {
+        #endif
+        .adaptiveSheet(isPresented: $showModelPicker) {
             ModelSelectionSheet(context: .tts) { model in
                 Task {
                     await viewModel.loadModelFromSelection(model)
@@ -175,7 +185,7 @@ struct TextToSpeechView: View {
                 #endif
                 .cornerRadius(16)
                 .background {
-                    if #available(iOS 26.0, *) {
+                    if #available(iOS 26.0, macOS 26.0, *) {
                         RoundedRectangle(cornerRadius: 16)
                             .fill(.clear)
                             .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 16))
@@ -233,7 +243,7 @@ struct TextToSpeechView: View {
                 Slider(value: $viewModel.speechRate, in: 0.5...2.0, step: 0.1)
                     .tint(AppColors.primaryAccent)
             }
-            
+
             // TODO: Find a model for TTS that supports pitch, or manually implement a good quality pitch adjustment
 
             // Pitch (not implemented in the current TTS models. Once supported, we can have this back.)
@@ -372,7 +382,7 @@ struct TextToSpeechView: View {
     /// Speak button - synthesizes and plays audio instantly
     private var speakButton: some View {
         Group {
-            if #available(iOS 26.0, *) {
+            if #available(iOS 26.0, macOS 26.0, *) {
                 Button(
                     action: {
                         Task {
