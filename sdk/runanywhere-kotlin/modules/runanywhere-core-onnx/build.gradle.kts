@@ -339,7 +339,8 @@ tasks.withType<Sign>().configureEach {
     }
 }
 
-// Disable debug publications
+// Disable JVM and debug publications - only publish Android release and metadata
 tasks.withType<PublishToMavenRepository>().configureEach {
-    onlyIf { publication.name !in listOf("androidDebug") }
+    onlyIf { publication.name !in listOf("jvm", "androidDebug") }
 }
+
