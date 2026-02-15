@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.ceil
 
 /**
- * Enhanced ChatUiState matching iOS functionality
+ * Enhanced ChatUiState  functionality
  */
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
@@ -49,7 +49,7 @@ data class ChatUiState(
 }
 
 /**
- * Enhanced ChatViewModel matching iOS ChatViewModel functionality
+ * Enhanced ChatViewModel  ChatViewModel functionality
  * Includes streaming, thinking mode, analytics, and conversation management
  *
  * Architecture:
@@ -84,10 +84,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         // Initialize with system message if model is already loaded
         viewModelScope.launch {
             checkModelStatus()
-            // Add system message only if model is loaded
-            if (_uiState.value.isModelLoaded) {
-                addSystemMessage()
-            }
         }
     }
 
@@ -122,28 +118,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Add system message
-     */
-    private fun addSystemMessage() {
-        val modelName = _uiState.value.loadedModelName ?: return
-
-        val content = "Model '$modelName' is loaded and ready to chat!"
-        val systemMessage = ChatMessage.system(content)
-
-        val currentMessages = _uiState.value.messages.toMutableList()
-        currentMessages.add(0, systemMessage)
-        _uiState.value = _uiState.value.copy(messages = currentMessages)
-
-        // Save to conversation store
-        _uiState.value.currentConversation?.let { conversation ->
-            val updatedConversation = conversation.copy(messages = currentMessages)
-            conversationStore.updateConversation(updatedConversation)
-        }
-    }
-
-    /**
      * Send message with streaming support and analytics
-     * Matches iOS sendMessage functionality
+     *  sendMessage functionality
      */
     fun sendMessage() {
         val currentState = _uiState.value
@@ -215,7 +191,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Generate with streaming support and thinking mode
-     * Matches iOS streaming generation pattern
+     *  streaming generation pattern
      */
     private suspend fun generateWithStreaming(
         prompt: String,
@@ -572,11 +548,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         // Create new conversation
         val conversation = conversationStore.createConversation()
         _uiState.value = _uiState.value.copy(currentConversation = conversation)
-
-        // Only add system message if model is loaded
-        if (_uiState.value.isModelLoaded) {
-            addSystemMessage()
-        }
     }
 
     /**
@@ -677,10 +648,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             currentMessages.removeAt(0)
         }
         _uiState.value = _uiState.value.copy(messages = currentMessages)
-
-        if (_uiState.value.isModelLoaded) {
-            addSystemMessage()
-        }
     }
 
     /**
@@ -693,10 +660,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         // For existing conversations, load the messages
         if (conversation.messages.isEmpty()) {
             _uiState.value = _uiState.value.copy(messages = emptyList())
-            // Add system message if model is loaded
-            if (_uiState.value.isModelLoaded) {
-                addSystemMessage()
-            }
         } else {
             _uiState.value = _uiState.value.copy(messages = conversation.messages)
 
