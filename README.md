@@ -25,34 +25,39 @@
   <a href="https://discord.gg/N359FBbDVd"><img src="https://img.shields.io/badge/Discord-Join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord" /></a>
 </p>
 
-<p align="center">
-  <img src="docs/screenshots/main-screenshot.jpg" alt="Chat" width="180"/>
-  &nbsp;&nbsp;
-  <img src="examples/ios/RunAnywhereAI/docs/screenshots/chat-interface.png" alt="Analytics" width="180"/>
-  &nbsp;&nbsp;
-  <img src="examples/ios/RunAnywhereAI/docs/screenshots/quiz-flow.png" alt="Structured Output" width="180"/>
-  &nbsp;&nbsp;
-  <img src="examples/ios/RunAnywhereAI/docs/screenshots/voice-ai.png" alt="Voice AI" width="180"/>
-</p>
-
----
-
 ## See It In Action
 
-<p align="center">
-  <img src="demo.gif" alt="On-device tool calling demo" width="260"/>
-</p>
-
-<p align="center">
-  <strong>Llama 3.2 3B on iPhone 16 Pro Max</strong><br/>
-  Tool calling + LLM reasoning — 100% on-device
-</p>
-
-<p align="center">
-  <a href="https://github.com/RunanywhereAI/runanywhere-sdks/pull/296">View the code</a>
-  &nbsp;·&nbsp;
-  <em>Full tool calling support coming soon</em>
-</p>
+<div align="center">
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/gifs/text-generation.gif" alt="Text Generation" width="240"/><br/><br/>
+      <strong>Text Generation</strong><br/>
+      <sub>LLM inference — 100% on-device</sub>
+    </td>
+    <td width="40"></td>
+    <td align="center" width="50%">
+      <img src="docs/gifs/voice-ai.gif" alt="Voice AI" width="240"/><br/><br/>
+      <strong>Voice AI</strong><br/>
+      <sub>STT → LLM → TTS pipeline — fully offline</sub>
+    </td>
+  </tr>
+  <tr><td colspan="3" height="30"></td></tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/gifs/image-generation.gif" alt="Image Generation" width="240"/><br/><br/>
+      <strong>Image Generation</strong><br/>
+      <sub>On-device diffusion model</sub>
+    </td>
+    <td width="40"></td>
+    <td align="center" width="50%">
+      <img src="docs/gifs/visual-language-model.gif" alt="Visual Language Model" width="240"/><br/><br/>
+      <strong>Visual Language Model</strong><br/>
+      <sub>Vision + language understanding on-device</sub>
+    </td>
+  </tr>
+</table>
+</div>
 
 ---
 

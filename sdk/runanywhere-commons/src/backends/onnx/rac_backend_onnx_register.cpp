@@ -242,7 +242,8 @@ rac_bool_t onnx_stt_can_handle(const rac_service_request_t* request, void* user_
     RAC_LOG_INFO(LOG_CAT, "onnx_stt_can_handle: checking path=%s", path);
 
     if (strstr(path, "whisper") != nullptr || strstr(path, "zipformer") != nullptr ||
-        strstr(path, "paraformer") != nullptr || strstr(path, ".onnx") != nullptr) {
+        strstr(path, "paraformer") != nullptr || strstr(path, "parakeet") != nullptr ||
+        strstr(path, "nemo") != nullptr || strstr(path, ".onnx") != nullptr) {
         RAC_LOG_INFO(LOG_CAT, "onnx_stt_can_handle: path matches -> TRUE");
         return RAC_TRUE;
     }
