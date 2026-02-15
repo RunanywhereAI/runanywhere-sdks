@@ -181,6 +181,7 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
             onDismiss = { showingModelSelection = false },
             onModelSelected = { model ->
                 scope.launch {
+                    viewModel.setLoadedModelName(model.name)
                     viewModel.checkModelStatus()
                     loadedModelToastName = model.name
                     showModelLoadedToast = true

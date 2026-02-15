@@ -26,8 +26,6 @@ import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.SdStorage
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -107,7 +105,7 @@ fun ModelSelectionBottomSheet(
         ?: DeviceStatus(model = "—", chip = "—", memory = "—", hasNeuralEngine = false)
 
     ModalBottomSheet(
-        onDismissRequest = { if (!uiState.isLoadingModel) onDismiss() },
+        onDismissRequest = onDismiss,
         sheetState = sheetState,
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -120,7 +118,7 @@ fun ModelSelectionBottomSheet(
                     .navigationBarsPadding()
                     .verticalScroll(rememberScrollState()),
             ) {
-                SheetHeader(title = uiState.context.title, onCancel = { if (!uiState.isLoadingModel) onDismiss() })
+                SheetHeader(title = uiState.context.title, onCancel = onDismiss)
 
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -183,10 +181,12 @@ fun ModelSelectionBottomSheet(
                         val isBuiltIn = model.framework == InferenceFramework.FOUNDATION_MODELS ||
                             model.framework == InferenceFramework.SYSTEM_TTS
                         val isReady = isBuiltIn || model.isDownloaded
+                        val isThisModelDownloading = uiState.isLoadingModel && uiState.selectedModelId == model.id
                         ModelCard(
                             model = toAIModel(model),
                             isReady = isReady,
-                            isLoading = uiState.isLoadingModel && uiState.selectedModelId == model.id,
+                            isLoading = isThisModelDownloading,
+                            downloadProgress = if (isThisModelDownloading) uiState.loadingProgress else null,
                             onCardClick = {
                                 if (isReady) {
                                     scope.launch {
@@ -224,12 +224,6 @@ fun ModelSelectionBottomSheet(
                 Spacer(modifier = Modifier.height(24.dp))
             }
 
-            if (uiState.isLoadingModel) {
-                LoadingOverlay(
-                    modelName = uiState.models.find { it.id == uiState.selectedModelId }?.name ?: "Model",
-                    progress = uiState.loadingProgress,
-                )
-            }
         }
     }
 }
@@ -455,6 +449,7 @@ private fun ModelCard(
     model: AIModel,
     isReady: Boolean,
     isLoading: Boolean,
+    downloadProgress: String? = null,
     onCardClick: () -> Unit,
     onDownloadClick: () -> Unit,
 ) {
@@ -491,12 +486,21 @@ private fun ModelCard(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            Text(
-                text = model.name,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f),
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = model.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (downloadProgress != null && downloadProgress.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = downloadProgress,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.width(8.dp))
 
@@ -572,54 +576,6 @@ private fun Badge(
             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
             color = textColor,
         )
-    }
-}
-
-// ====================
-// LOADING OVERLAY
-// ====================
-
-// LoadingModelOverlay: overlayMedium, card backgroundPrimary, headline + subheadline textSecondary
-@Composable
-private fun LoadingOverlay(
-    @Suppress("UNUSED_PARAMETER") modelName: String,
-    progress: String,
-) {
-    Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(AppColors.overlayMedium),
-        contentAlignment = Alignment.Center,
-    ) {
-        Card(
-            modifier = Modifier.padding(Dimensions.xxLarge),
-            shape = RoundedCornerShape(Dimensions.cornerRadiusXLarge),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = Dimensions.shadowXLarge),
-        ) {
-            Column(
-                modifier = Modifier.padding(Dimensions.xxLarge),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(Dimensions.xLarge),
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(36.dp),
-                    color = AppColors.primaryAccent,
-                )
-                Text(
-                    text = "Loading Model",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = progress,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = AppColors.textSecondary,
-                )
-            }
-        }
     }
 }
 

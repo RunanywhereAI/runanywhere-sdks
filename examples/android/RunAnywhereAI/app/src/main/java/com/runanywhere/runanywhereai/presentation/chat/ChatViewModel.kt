@@ -18,6 +18,7 @@ import com.runanywhere.sdk.public.events.LLMEvent
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.availableModels
 import com.runanywhere.sdk.public.extensions.cancelGeneration
+import com.runanywhere.sdk.public.extensions.currentLLMModel
 import com.runanywhere.sdk.public.extensions.currentLLMModelId
 import com.runanywhere.sdk.public.extensions.generate
 import com.runanywhere.sdk.public.extensions.generateStream
@@ -579,6 +580,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * Set the loaded model display name (e.g. when user selects a model from the sheet).
+     * Ensures the app bar shows the correct model icon immediately.
+     */
+    fun setLoadedModelName(modelName: String) {
+        _uiState.value = _uiState.value.copy(loadedModelName = modelName)
+    }
+
+    /**
      * Check model status and load appropriate chat model.
      */
     suspend fun checkModelStatus() {
@@ -586,12 +595,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             if (app.isSDKReady()) {
                 // Check if LLM is already loaded via SDK
                 if (RunAnywhere.isLLMModelLoaded()) {
-                    val loadedModelId = RunAnywhere.currentLLMModelId
-                    Log.i(TAG, "✅ LLM model already loaded: $loadedModelId")
+                    val currentModel = RunAnywhere.currentLLMModel()
+                    val displayName = currentModel?.name ?: RunAnywhere.currentLLMModelId
+                    Log.i(TAG, "✅ LLM model already loaded: $displayName")
                     _uiState.value =
                         _uiState.value.copy(
                             isModelLoaded = true,
-                            loadedModelName = loadedModelId,
+                            loadedModelName = displayName,
                         )
                     addSystemMessageIfNeeded()
                     return
