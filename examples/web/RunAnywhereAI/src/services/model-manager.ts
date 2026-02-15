@@ -216,6 +216,12 @@ export async function ensureVADLoaded(): Promise<boolean> {
 
 RunAnywhere.registerModels(REGISTERED_MODELS);
 
+// Import the VLM worker using Vite's ?worker&url suffix so it gets compiled
+// as a standalone bundle with all dependencies resolved — no raw-source data URLs.
+// @ts-ignore — Vite-specific import query
+import vlmWorkerUrl from '../../../../../sdk/runanywhere-web/packages/core/src/workers/vlm-worker.ts?worker&url';
+VLMWorkerBridge.shared.workerUrl = vlmWorkerUrl;
+
 // Plug in VLM worker loading using the SDK's VLMWorkerBridge
 RunAnywhere.setVLMLoader({
   get isInitialized() { return VLMWorkerBridge.shared.isInitialized; },
