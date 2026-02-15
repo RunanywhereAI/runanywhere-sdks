@@ -133,7 +133,7 @@ class DiffusionViewModel: ObservableObject {
             isModelLoaded = true
             currentModelName = model.name
             currentBackend = model.framework.displayName
-            
+
             // Show helpful info about the model
             let stepsInfo = variant.defaultSteps == 1 ? "1 step (ultra-fast)" : "\(variant.defaultSteps) steps"
             statusMessage = "Model loaded (\(currentBackend), \(stepsInfo))"
@@ -161,20 +161,20 @@ class DiffusionViewModel: ObservableObject {
         do {
             // Use model variant defaults for optimal performance
             // - SDXS: 512x512, 1 step, no CFG (ultra-fast ~2-10 sec)
-            // - LCM: 512x512, 4 steps, low CFG (fast ~15-30 sec)  
+            // - LCM: 512x512, 4 steps, low CFG (fast ~15-30 sec)
             // - SD 1.5/Turbo: defaults based on variant
             let variant = self.currentModelVariant
             let resolution = variant.defaultResolution
             let steps = variant.defaultSteps
             let guidanceScale = variant.defaultGuidanceScale
-            
+
             // For mobile, cap resolution to avoid memory issues
             let maxMobileRes = 512
             let width = min(resolution.width, maxMobileRes)
             let height = min(resolution.height, maxMobileRes)
-            
+
             logger.info("Generating with \(variant.rawValue): \(width)x\(height), \(steps) steps, CFG=\(guidanceScale)")
-            
+
             let options = DiffusionGenerationOptions(
                 prompt: prompt,
                 width: width,
@@ -197,8 +197,12 @@ class DiffusionViewModel: ObservableObject {
                 }
                 return true // continue generation
             }
-            if let uiImage = createImage(from: result.imageData, width: result.width, height: result.height) {
-                generatedImage = Image(uiImage: uiImage)
+            if let platformImage = createImage(from: result.imageData, width: result.width, height: result.height) {
+                #if os(iOS)
+                generatedImage = Image(uiImage: platformImage)
+                #elseif os(macOS)
+                generatedImage = Image(nsImage: platformImage)
+                #endif
                 statusMessage = "Done in \(result.generationTimeMs)ms"
             } else {
                 errorMessage = "Failed to create image"
