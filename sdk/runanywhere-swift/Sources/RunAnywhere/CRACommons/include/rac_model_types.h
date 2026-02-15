@@ -179,11 +179,12 @@ typedef enum rac_inference_framework {
     RAC_FRAMEWORK_ONNX = 0,              /**< ONNX Runtime */
     RAC_FRAMEWORK_LLAMACPP = 1,          /**< llama.cpp */
     RAC_FRAMEWORK_FOUNDATION_MODELS = 2, /**< Apple Foundation Models */
-    RAC_FRAMEWORK_SYSTEM_TTS = 3,        /**< System TTS */
-    RAC_FRAMEWORK_FLUID_AUDIO = 4,       /**< FluidAudio */
+    RAC_FRAMEWORK_SYSTEM_TTS = 3,        /**< System TTS (AVSpeechSynthesizer) */
+    RAC_FRAMEWORK_FLUID_AUDIO = 4,       /**< FluidAudio (eSpeak TTS) */
     RAC_FRAMEWORK_BUILTIN = 5,           /**< Built-in (e.g., energy VAD) */
     RAC_FRAMEWORK_NONE = 6,              /**< No framework needed */
-    RAC_FRAMEWORK_COREML = 7,            /**< Core ML (Apple Neural Engine) */
+    RAC_FRAMEWORK_MLX = 7,               /**< MLX C++ (Apple Silicon VLM) */
+    RAC_FRAMEWORK_COREML = 8,            /**< Core ML (Apple Neural Engine) */
     RAC_FRAMEWORK_UNKNOWN = 99           /**< Unknown framework */
 } rac_inference_framework_t;
 

@@ -87,6 +87,21 @@ RAC_API rac_result_t rac_model_registry_get(rac_model_registry_handle_t handle,
                                             const char* model_id, rac_model_info_t** out_model);
 
 /**
+ * @brief Get model metadata by local path.
+ *
+ * Searches through all registered models and returns the one with matching local_path.
+ * This is useful when loading models by path instead of model_id.
+ *
+ * @param handle Registry handle
+ * @param local_path Local path to search for
+ * @param out_model Output: Model info (owned, must be freed with rac_model_info_free)
+ * @return RAC_SUCCESS, RAC_ERROR_NOT_FOUND, or other error code
+ */
+RAC_API rac_result_t rac_model_registry_get_by_path(rac_model_registry_handle_t handle,
+                                                    const char* local_path,
+                                                    rac_model_info_t** out_model);
+
+/**
  * @brief Load all stored models.
  *
  * Mirrors Swift's ModelInfoService.loadStoredModels().

@@ -45,10 +45,12 @@ typedef enum rac_diffusion_scheduler {
  * Different Stable Diffusion model variants with different capabilities.
  */
 typedef enum rac_diffusion_model_variant {
-    RAC_DIFFUSION_MODEL_SD_1_5 = 0,   /**< Stable Diffusion 1.5 (512x512 default) */
-    RAC_DIFFUSION_MODEL_SD_2_1 = 1,   /**< Stable Diffusion 2.1 (768x768 default) */
-    RAC_DIFFUSION_MODEL_SDXL = 2,     /**< SDXL (1024x1024 default, requires 8GB+ RAM) */
-    RAC_DIFFUSION_MODEL_SDXL_TURBO = 3, /**< SDXL Turbo (fast, fewer steps) */
+    RAC_DIFFUSION_MODEL_SD_1_5 = 0,     /**< Stable Diffusion 1.5 (512x512 default) */
+    RAC_DIFFUSION_MODEL_SD_2_1 = 1,     /**< Stable Diffusion 2.1 (768x768 default) */
+    RAC_DIFFUSION_MODEL_SDXL = 2,       /**< SDXL (1024x1024 default, requires 8GB+ RAM) */
+    RAC_DIFFUSION_MODEL_SDXL_TURBO = 3, /**< SDXL Turbo (fast, fewer steps, no CFG) */
+    RAC_DIFFUSION_MODEL_SDXS = 4,       /**< SDXS - Ultra-fast 1-step model (no CFG) */
+    RAC_DIFFUSION_MODEL_LCM = 5,        /**< LCM - Latent Consistency Model (4 steps) */
 } rac_diffusion_model_variant_t;
 
 /**
@@ -59,6 +61,76 @@ typedef enum rac_diffusion_mode {
     RAC_DIFFUSION_MODE_IMAGE_TO_IMAGE = 1, /**< Transform input image with prompt */
     RAC_DIFFUSION_MODE_INPAINTING = 2,     /**< Edit specific regions with mask */
 } rac_diffusion_mode_t;
+
+// =============================================================================
+// TOKENIZER CONFIGURATION
+// =============================================================================
+
+/**
+ * @brief Tokenizer source presets
+ *
+ * Predefined HuggingFace repository sources for tokenizer files.
+ * Apple's compiled CoreML models don't include tokenizer files (vocab.json, merges.txt),
+ * so they must be downloaded separately from HuggingFace.
+ *
+ * Developers can use RAC_DIFFUSION_TOKENIZER_CUSTOM with a custom_base_url
+ * to specify their own tokenizer source.
+ */
+typedef enum rac_diffusion_tokenizer_source {
+    /** Stable Diffusion 1.x tokenizer (CLIP ViT-L/14)
+     *  Source: runwayml/stable-diffusion-v1-5 */
+    RAC_DIFFUSION_TOKENIZER_SD_1_5 = 0,
+
+    /** Stable Diffusion 2.x tokenizer (OpenCLIP ViT-H/14)
+     *  Source: stabilityai/stable-diffusion-2-1 */
+    RAC_DIFFUSION_TOKENIZER_SD_2_X = 1,
+
+    /** Stable Diffusion XL tokenizer (dual tokenizers)
+     *  Source: stabilityai/stable-diffusion-xl-base-1.0 */
+    RAC_DIFFUSION_TOKENIZER_SDXL = 2,
+
+    /** Custom tokenizer from a developer-specified URL
+     *  Requires custom_base_url to be set in rac_diffusion_tokenizer_config_t */
+    RAC_DIFFUSION_TOKENIZER_CUSTOM = 99,
+} rac_diffusion_tokenizer_source_t;
+
+/**
+ * @brief Tokenizer configuration
+ *
+ * Configuration for downloading and using tokenizer files.
+ * The SDK will automatically download missing tokenizer files (vocab.json, merges.txt)
+ * from the specified source URL.
+ *
+ * Example for custom URL:
+ * @code
+ * rac_diffusion_tokenizer_config_t tokenizer_config = {
+ *     .source = RAC_DIFFUSION_TOKENIZER_CUSTOM,
+ *     .custom_base_url = "https://huggingface.co/my-org/my-model/resolve/main/tokenizer",
+ *     .auto_download = RAC_TRUE
+ * };
+ * @endcode
+ */
+typedef struct rac_diffusion_tokenizer_config {
+    /** Tokenizer source preset (SD15, SD21, SDXL, or CUSTOM) */
+    rac_diffusion_tokenizer_source_t source;
+
+    /** Custom base URL for tokenizer files (only used when source == CUSTOM)
+     *  Should be a URL directory containing vocab.json and merges.txt
+     *  Example: "https://huggingface.co/my-org/my-model/resolve/main/tokenizer"
+     *  The SDK will append "/vocab.json" and "/merges.txt" to download files */
+    const char* custom_base_url;
+
+    /** Automatically download missing tokenizer files (default: true) */
+    rac_bool_t auto_download;
+} rac_diffusion_tokenizer_config_t;
+
+/**
+ * @brief Default tokenizer configuration
+ */
+static const rac_diffusion_tokenizer_config_t RAC_DIFFUSION_TOKENIZER_CONFIG_DEFAULT = {
+    .source = RAC_DIFFUSION_TOKENIZER_SD_1_5,
+    .custom_base_url = RAC_NULL,
+    .auto_download = RAC_TRUE};
 
 // =============================================================================
 // CONFIGURATION - Component configuration
@@ -84,6 +156,10 @@ typedef struct rac_diffusion_config {
 
     /** Reduce memory footprint (may reduce quality, default: false) */
     rac_bool_t reduce_memory;
+
+    /** Tokenizer configuration for downloading missing tokenizer files
+     *  Apple's compiled CoreML models don't include tokenizer files */
+    rac_diffusion_tokenizer_config_t tokenizer;
 } rac_diffusion_config_t;
 
 /**
@@ -94,7 +170,10 @@ static const rac_diffusion_config_t RAC_DIFFUSION_CONFIG_DEFAULT = {
     .preferred_framework = 99, // RAC_FRAMEWORK_UNKNOWN
     .model_variant = RAC_DIFFUSION_MODEL_SD_1_5,
     .enable_safety_checker = RAC_TRUE,
-    .reduce_memory = RAC_FALSE};
+    .reduce_memory = RAC_FALSE,
+    .tokenizer = {.source = RAC_DIFFUSION_TOKENIZER_SD_1_5,
+                  .custom_base_url = RAC_NULL,
+                  .auto_download = RAC_TRUE}};
 
 // =============================================================================
 // OPTIONS - Generation options

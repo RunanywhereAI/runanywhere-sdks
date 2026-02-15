@@ -52,7 +52,7 @@ import com.runanywhere.sdk.public.extensions.*
 // Register and download STT model
 val sttModel = RunAnywhere.registerModel(
     name = "Whisper Tiny",
-    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.tar.bz2",
+    url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz",
     framework = InferenceFramework.ONNX,
     modality = ModelCategory.SPEECH_RECOGNITION
 )
@@ -103,7 +103,7 @@ RunAnywhere.transcribeStream(audioData) { partial ->
 // Register and download TTS voice
 val ttsVoice = RunAnywhere.registerModel(
     name = "English US Voice",
-    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-libritts-high.tar.bz2",
+    url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-libritts-high.tar.gz",
     framework = InferenceFramework.ONNX,
     modality = ModelCategory.SPEECH_SYNTHESIS
 )

@@ -1,7 +1,6 @@
 package com.runanywhere.runanywhereai.presentation.navigation
 
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -9,7 +8,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -151,12 +149,10 @@ fun RunAnywhereBottomNav(navController: NavController) {
             ),
         )
 
+    // Selected tab uses primary accent
     NavigationBar(
-        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        modifier =
-            Modifier
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .clip(RoundedCornerShape(24.dp)),
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
     ) {
         items.forEach { item ->
             val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
@@ -174,7 +170,7 @@ fun RunAnywhereBottomNav(navController: NavController) {
                     NavigationBarItemDefaults.colors(
                         selectedIconColor = AppColors.primaryAccent,
                         selectedTextColor = AppColors.primaryAccent,
-                        indicatorColor = AppColors.primaryAccent.copy(alpha = 0.1f),
+                        indicatorColor = AppColors.primaryAccent.copy(alpha = 0.12f),
                         unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     ),

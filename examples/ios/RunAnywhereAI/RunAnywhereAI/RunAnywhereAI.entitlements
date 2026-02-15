@@ -9,6 +9,9 @@
     <!-- macOS Network access for API calls and model downloads -->
     <key>com.apple.security.network.client</key>
     <true/>
+    <!-- macOS Camera access for VLM vision features -->
+    <key>com.apple.security.device.camera</key>
+    <true/>
     <!-- macOS Microphone access for voice features -->
     <key>com.apple.security.device.microphone</key>
     <true/>

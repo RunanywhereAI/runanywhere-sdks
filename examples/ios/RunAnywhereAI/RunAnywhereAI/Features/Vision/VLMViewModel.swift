@@ -15,6 +15,10 @@ import os.log
 import UIKit
 #endif
 
+#if os(macOS)
+import AppKit
+#endif
+
 // MARK: - VLM View Model
 
 @MainActor
@@ -31,7 +35,8 @@ final class VLMViewModel: NSObject {
 
     // Auto-streaming mode
     var isAutoStreamingEnabled = false
-    private var autoStreamTask: Task<Void, Never>?
+    // nonisolated(unsafe) so deinit can cancel the task (deinit is nonisolated in Swift 6)
+    nonisolated(unsafe) private var autoStreamTask: Task<Void, Never>?
     private static let autoStreamInterval: TimeInterval = 2.5 // seconds between auto-captures
 
     // Camera
@@ -54,6 +59,7 @@ final class VLMViewModel: NSObject {
     }
 
     deinit {
+        autoStreamTask?.cancel()
         NotificationCenter.default.removeObserver(self)
         // Note: Camera cleanup is handled by onDisappear in VLMCameraView
     }
@@ -161,6 +167,69 @@ final class VLMViewModel: NSObject {
 
         do {
             let image = VLMImage(image: uiImage)
+            let result = try await RunAnywhere.processImageStream(
+                image,
+                prompt: "Describe this image in detail.",
+                maxTokens: 300
+            )
+
+            for try await token in result.stream {
+                currentDescription += token
+            }
+        } catch {
+            self.error = error
+        }
+
+        isProcessing = false
+    }
+    #endif
+
+    #if os(macOS)
+    func describeImage(_ nsImage: NSImage) async {
+        isProcessing = true
+        error = nil
+        currentDescription = ""
+
+        do {
+            guard let cgImage = nsImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                let conversionError = NSError(
+                    domain: "com.runanywhere.RunAnywhereAI",
+                    code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "Failed to convert NSImage to CGImage"]
+                )
+                self.error = conversionError
+                logger.error("VLM error: failed to convert NSImage to CGImage")
+                isProcessing = false
+                return
+            }
+            let width = cgImage.width
+            let height = cgImage.height
+            let rgbaBytesPerRow = 4 * width
+            let rgbaTotalBytes = rgbaBytesPerRow * height
+            var rgbaData = Data(count: rgbaTotalBytes)
+            rgbaData.withUnsafeMutableBytes { ptr in
+                guard let context = CGContext(
+                    data: ptr.baseAddress,
+                    width: width,
+                    height: height,
+                    bitsPerComponent: 8,
+                    bytesPerRow: rgbaBytesPerRow,
+                    space: CGColorSpaceCreateDeviceRGB(),
+                    bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+                ) else { return }
+                context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+            }
+            // RGBX (4 bytes/pixel) → RGB (3 bytes/pixel): strip the padding byte
+            var rgbData = Data(capacity: width * height * 3)
+            rgbaData.withUnsafeBytes { buffer in
+                let pixels = buffer.bindMemory(to: UInt8.self)
+                for i in stride(from: 0, to: rgbaTotalBytes, by: 4) {
+                    rgbData.append(pixels[i])     // R
+                    rgbData.append(pixels[i + 1]) // G
+                    rgbData.append(pixels[i + 2]) // B
+                }
+            }
+            let image = VLMImage(rgbPixels: rgbData, width: width, height: height)
             let result = try await RunAnywhere.processImageStream(
                 image,
                 prompt: "Describe this image in detail.",

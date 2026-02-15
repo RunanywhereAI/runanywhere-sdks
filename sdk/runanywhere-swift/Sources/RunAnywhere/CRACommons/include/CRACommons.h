@@ -80,8 +80,10 @@
 // Diffusion (Image Generation)
 #include "rac_diffusion.h"
 #include "rac_diffusion_types.h"
+#include "rac_diffusion_tokenizer.h"
 #include "rac_diffusion_service.h"
 #include "rac_diffusion_component.h"
+#include "rac_diffusion_model_registry.h"
 
 // Voice Agent
 #include "rac_voice_agent.h"

@@ -263,6 +263,53 @@ std::string format_vlm_prompt(VLMModelType model_type, const std::string& user_p
     return formatted;
 }
 
+/**
+ * Get the image marker string.
+ * When mtmd is available, uses the default marker from mtmd.
+ * Otherwise falls back to a generic "<image>" marker.
+ */
+const char* get_image_marker() {
+#ifdef RAC_VLM_USE_MTMD
+    return mtmd_default_marker();
+#else
+    return "<image>";
+#endif
+}
+
+/**
+ * Configure the sampler chain with the given generation parameters.
+ * Rebuilds the sampler to apply per-request temperature, top_p, etc.
+ */
+void configure_sampler(LlamaCppVLMBackend* backend, const rac_vlm_options_t* options) {
+    // Free existing sampler
+    if (backend->sampler) {
+        llama_sampler_free(backend->sampler);
+        backend->sampler = nullptr;
+    }
+
+    // Determine parameters from options or use defaults
+    float temperature = 0.7f;
+    float top_p = 0.9f;
+
+    if (options) {
+        if (options->temperature >= 0.0f) {
+            temperature = options->temperature;
+        }
+        if (options->top_p > 0.0f && options->top_p <= 1.0f) {
+            top_p = options->top_p;
+        }
+    }
+
+    // Build new sampler chain
+    llama_sampler_chain_params sampler_params = llama_sampler_chain_default_params();
+    backend->sampler = llama_sampler_chain_init(sampler_params);
+    llama_sampler_chain_add(backend->sampler, llama_sampler_init_temp(temperature));
+    llama_sampler_chain_add(backend->sampler, llama_sampler_init_top_p(top_p, 1));
+    llama_sampler_chain_add(backend->sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
+
+    RAC_LOG_DEBUG(LOG_CAT, "Sampler configured: temp=%.2f, top_p=%.2f", temperature, top_p);
+}
+
 }  // namespace
 
 // =============================================================================
@@ -356,12 +403,9 @@ rac_result_t rac_vlm_llamacpp_load_model(rac_handle_t handle, const char* model_
         return RAC_ERROR_MODEL_LOAD_FAILED;
     }
 
-    // Initialize sampler
-    llama_sampler_chain_params sampler_params = llama_sampler_chain_default_params();
-    backend->sampler = llama_sampler_chain_init(sampler_params);
-    llama_sampler_chain_add(backend->sampler, llama_sampler_init_temp(0.7f));
-    llama_sampler_chain_add(backend->sampler, llama_sampler_init_top_p(0.9f, 1));
-    llama_sampler_chain_add(backend->sampler, llama_sampler_init_dist(42));
+    // Initialize sampler with default parameters
+    // Sampler is reconfigured per-request in process()/process_stream() to respect user options
+    configure_sampler(backend, nullptr);
 
 #ifdef RAC_VLM_USE_MTMD
     // Initialize mtmd context if mmproj provided
@@ -470,6 +514,9 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
 
     backend->cancel_requested = false;
 
+    // Reconfigure sampler with per-request options (temperature, top_p)
+    configure_sampler(backend, options);
+
     // Clear KV cache (memory) before each new request to avoid position conflicts
     llama_memory_t mem = llama_get_memory(backend->ctx);
     if (mem) {
@@ -480,6 +527,7 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
     // Build the prompt with proper chat template formatting
     std::string full_prompt;
     bool has_image = false;
+    const char* image_marker = get_image_marker();
 
 #ifdef RAC_VLM_USE_MTMD
     mtmd_bitmap* bitmap = nullptr;
@@ -504,7 +552,7 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
     }
 
     // Format prompt using model's built-in chat template
-    full_prompt = format_vlm_prompt_with_template(backend->model, prompt, mtmd_default_marker(), has_image);
+    full_prompt = format_vlm_prompt_with_template(backend->model, prompt, image_marker, has_image);
 
     // Tokenize and evaluate
     if (backend->mtmd_ctx && bitmap) {
@@ -551,7 +599,7 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
 #endif
     {
         // Text-only mode - still apply chat template for consistent formatting
-        full_prompt = format_vlm_prompt_with_template(backend->model, prompt, mtmd_default_marker(), false);
+        full_prompt = format_vlm_prompt_with_template(backend->model, prompt, image_marker, false);
 
         const llama_vocab* vocab = llama_model_get_vocab(backend->model);
         std::vector<llama_token> tokens(full_prompt.size() + 16);
@@ -586,7 +634,7 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
     }
 
     // Generate response
-    int max_tokens = (options && options->max_tokens > 0) ? options->max_tokens : 256;
+    int max_tokens = (options && options->max_tokens > 0) ? options->max_tokens : 2048;
     std::string response;
     int tokens_generated = 0;
 
@@ -651,6 +699,9 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
 
     backend->cancel_requested = false;
 
+    // Reconfigure sampler with per-request options (temperature, top_p)
+    configure_sampler(backend, options);
+
     // Clear KV cache (memory) before each new request to avoid position conflicts
     llama_memory_t mem = llama_get_memory(backend->ctx);
     if (mem) {
@@ -662,6 +713,7 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
     // Build the prompt with proper chat template formatting
     std::string full_prompt;
     bool has_image = false;
+    const char* image_marker = get_image_marker();
 
 #ifdef RAC_VLM_USE_MTMD
     mtmd_bitmap* bitmap = nullptr;
@@ -681,7 +733,7 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
     }
 
     // Format prompt using model's built-in chat template
-    full_prompt = format_vlm_prompt_with_template(backend->model, prompt, mtmd_default_marker(), has_image);
+    full_prompt = format_vlm_prompt_with_template(backend->model, prompt, image_marker, has_image);
 
     // Tokenize and evaluate
     if (backend->mtmd_ctx && bitmap) {
@@ -728,7 +780,7 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
 #endif
     {
         // Text-only mode - still apply chat template for consistent formatting
-        full_prompt = format_vlm_prompt_with_template(backend->model, prompt, mtmd_default_marker(), false);
+        full_prompt = format_vlm_prompt_with_template(backend->model, prompt, image_marker, false);
 
         const llama_vocab* vocab = llama_model_get_vocab(backend->model);
         std::vector<llama_token> tokens(full_prompt.size() + 16);
@@ -761,7 +813,7 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
     }
 
     // Generate response with streaming
-    int max_tokens = (options && options->max_tokens > 0) ? options->max_tokens : 256;
+    int max_tokens = (options && options->max_tokens > 0) ? options->max_tokens : 2048;
 
     llama_batch batch = llama_batch_init(1, 0, 1);
     const llama_vocab* vocab = llama_model_get_vocab(backend->model);

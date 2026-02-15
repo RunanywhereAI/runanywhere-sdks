@@ -80,6 +80,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private var generationJob: Job? = null
 
+    private val generationPrefs by lazy {
+        getApplication<Application>().getSharedPreferences("generation_settings", android.content.Context.MODE_PRIVATE)
+    }
+
     init {
         // Always start with a new conversation for a fresh chat experience
         val conversation = conversationStore.createConversation()
@@ -342,7 +346,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         try {
             // Use SDK streaming generation - returns Flow<String>
-            RunAnywhere.generateStream(prompt).collect { token ->
+            RunAnywhere.generateStream(prompt, getGenerationOptions()).collect { token ->
                 fullResponse += token
                 totalTokensReceived++
 
@@ -466,7 +470,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         try {
             // RunAnywhere.generate() returns LLMGenerationResult
-            val result = RunAnywhere.generate(prompt)
+            val result = RunAnywhere.generate(prompt, getGenerationOptions())
             val response = result.text
             val endTime = System.currentTimeMillis()
 
@@ -844,6 +848,25 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
+    }
+
+    /**
+     * Get generation options from SharedPreferences
+     */
+    private fun getGenerationOptions(): com.runanywhere.sdk.public.extensions.LLM.LLMGenerationOptions {
+        val temperature = generationPrefs.getFloat("defaultTemperature", 0.7f)
+        val maxTokens = generationPrefs.getInt("defaultMaxTokens", 1000)
+        val systemPromptValue = generationPrefs.getString("defaultSystemPrompt", "")
+        val systemPrompt = if (systemPromptValue.isNullOrEmpty()) null else systemPromptValue
+        val systemPromptInfo = systemPrompt?.let { "set(${it.length} chars)" } ?: "nil"
+
+        Log.i(TAG, "[PARAMS] App getGenerationOptions: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=$systemPromptInfo")
+
+        return com.runanywhere.sdk.public.extensions.LLM.LLMGenerationOptions(
+            maxTokens = maxTokens,
+            temperature = temperature,
+            systemPrompt = systemPrompt
+        )
     }
 
     /**

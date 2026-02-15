@@ -37,7 +37,7 @@ public extension RunAnywhere {
         let relevantCategories: Set<ModelCategory>
         switch capability {
         case .llm:
-            relevantCategories = [.language, .multimodal]
+            relevantCategories = [.language]
         case .vlm:
             relevantCategories = [.multimodal, .vision]
         case .stt:

@@ -23,7 +23,7 @@ struct CombinedSettingsView: View {
             IOSSettingsContent(viewModel: viewModel, toolViewModel: toolViewModel)
             #endif
         }
-        .sheet(isPresented: $viewModel.showApiKeyEntry) {
+        .adaptiveSheet(isPresented: $viewModel.showApiKeyEntry) {
             ApiConfigurationSheet(viewModel: viewModel)
         }
         .task {
@@ -72,6 +72,17 @@ private struct IOSSettingsContent: View {
                     in: 500...20000,
                     step: 500
                 )
+            }
+
+            // System Prompt
+            Section {
+                TextField("Enter system prompt...", text: $viewModel.systemPrompt, axis: .vertical)
+                    .lineLimit(3...8)
+            } header: {
+                Text("System Prompt")
+            } footer: {
+                Text("Optional instructions that define AI behavior and response style.")
+                    .font(AppTypography.caption)
             }
 
             // Tool Calling Settings
@@ -227,6 +238,20 @@ private struct GenerationSettingsCard: View {
                         step: 500
                     )
                     .frame(maxWidth: 200)
+                }
+
+                VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
+                    HStack(alignment: .top) {
+                        Text("System Prompt")
+                            .frame(width: 150, alignment: .leading)
+                        TextField("Enter system prompt...", text: $viewModel.systemPrompt, axis: .vertical)
+                            .lineLimit(3...8)
+                            .textFieldStyle(.plain)
+                            .padding(AppSpacing.small)
+                            .background(AppColors.backgroundTertiary)
+                            .cornerRadius(AppSpacing.cornerRadiusRegular)
+                            .frame(maxWidth: 400)
+                    }
                 }
             }
         }

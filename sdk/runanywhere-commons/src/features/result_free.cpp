@@ -11,6 +11,7 @@
 #include "rac/features/llm/rac_llm_types.h"
 #include "rac/features/stt/rac_stt_types.h"
 #include "rac/features/tts/rac_tts_types.h"
+#include "rac/features/embeddings/rac_embeddings_types.h"
 
 extern "C" {
 
@@ -54,6 +55,23 @@ __attribute__((weak)) void rac_tts_result_free(rac_tts_result_t* result) {
             result->audio_data = nullptr;
         }
         result->audio_size = 0;
+    }
+}
+
+__attribute__((weak)) void rac_embeddings_result_free(rac_embeddings_result_t* result) {
+    if (result) {
+        if (result->embeddings) {
+            for (size_t i = 0; i < result->num_embeddings; i++) {
+                if (result->embeddings[i].data) {
+                    free(result->embeddings[i].data);
+                    result->embeddings[i].data = nullptr;
+                }
+            }
+            free(result->embeddings);
+            result->embeddings = nullptr;
+        }
+        result->num_embeddings = 0;
+        result->dimension = 0;
     }
 }
 

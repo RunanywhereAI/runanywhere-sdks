@@ -86,6 +86,21 @@ typedef struct rac_diffusion_service {
 RAC_API rac_result_t rac_diffusion_create(const char* model_id, rac_handle_t* out_handle);
 
 /**
+ * @brief Create a diffusion service with configuration
+ *
+ * Routes through service registry to find appropriate backend, honoring
+ * configuration hints such as preferred framework when provided.
+ *
+ * @param model_id Model identifier (registry ID or path to model)
+ * @param config Optional configuration (can be NULL)
+ * @param out_handle Output: Handle to the created service
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_diffusion_create_with_config(const char* model_id,
+                                                      const rac_diffusion_config_t* config,
+                                                      rac_handle_t* out_handle);
+
+/**
  * @brief Initialize a diffusion service
  *
  * @param handle Service handle

@@ -15,6 +15,12 @@
 #include <cstring>
 #include <vector>
 
+// std::filesystem is not available on Emscripten/WASM
+#ifndef __EMSCRIPTEN__
+#include <filesystem>
+namespace fs = std::filesystem;
+#endif
+
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -58,6 +64,15 @@ static rac_result_t onnx_stt_vtable_initialize(void* impl, const char* model_pat
 static rac_result_t onnx_stt_vtable_transcribe(void* impl, const void* audio_data,
                                                size_t audio_size, const rac_stt_options_t* options,
                                                rac_stt_result_t* out_result) {
+    if (!audio_data || audio_size == 0 || !out_result) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    // Minimum ~0.05s at 16kHz 16-bit to avoid Sherpa crash on empty/tiny input
+    if (audio_size < 1600) {
+        out_result->text = nullptr;
+        out_result->confidence = 0.0f;
+        return RAC_SUCCESS;
+    }
     std::vector<float> float_samples = convert_int16_to_float32(audio_data, audio_size);
     return rac_stt_onnx_transcribe(impl, float_samples.data(), float_samples.size(), options,
                                    out_result);
@@ -227,7 +242,8 @@ rac_bool_t onnx_stt_can_handle(const rac_service_request_t* request, void* user_
     RAC_LOG_INFO(LOG_CAT, "onnx_stt_can_handle: checking path=%s", path);
 
     if (strstr(path, "whisper") != nullptr || strstr(path, "zipformer") != nullptr ||
-        strstr(path, "paraformer") != nullptr || strstr(path, ".onnx") != nullptr) {
+        strstr(path, "paraformer") != nullptr || strstr(path, "parakeet") != nullptr ||
+        strstr(path, "nemo") != nullptr || strstr(path, ".onnx") != nullptr) {
         RAC_LOG_INFO(LOG_CAT, "onnx_stt_can_handle: path matches -> TRUE");
         return RAC_TRUE;
     }
@@ -472,13 +488,12 @@ rac_result_t rac_backend_onnx_register(void) {
         return RAC_ERROR_MODULE_ALREADY_REGISTERED;
     }
 
-    // Register module
+    // Register module (STT, TTS, VAD only; diffusion is CoreML-only in Swift SDK)
     rac_module_info_t module_info = {};
     module_info.id = MODULE_ID;
     module_info.name = "ONNX Runtime";
     module_info.version = "1.0.0";
-    module_info.description = "STT/TTS/VAD backend using ONNX Runtime via Sherpa-ONNX";
-
+    module_info.description = "STT/TTS/VAD backend using ONNX Runtime";
     rac_capability_t capabilities[] = {RAC_CAPABILITY_STT, RAC_CAPABILITY_TTS, RAC_CAPABILITY_VAD};
     module_info.capabilities = capabilities;
     module_info.num_capabilities = 3;

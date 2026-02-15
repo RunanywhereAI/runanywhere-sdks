@@ -59,6 +59,12 @@ struct RunAnywhereAIApp: App {
 
     private func initializeSDK() async {
         do {
+            // Register backends with C++ registry FIRST, before any await. Otherwise we can
+            // suspend at the next line and another task may run loadModel() → ensureServicesReady()
+            // → only Platform is registered → -422 "No provider could handle the request".
+            LlamaCPP.register(priority: 100)
+            ONNX.register(priority: 100)
+
             // Clear any previous error
             await MainActor.run { initializationError = nil }
 
@@ -300,21 +306,22 @@ struct RunAnywhereAIApp: App {
         }
         logger.info("✅ ONNX STT/TTS models registered")
 
-        // Register Diffusion models (Core ML Stable Diffusion)
-        // Using Apple's palettized model with split_einsum_v2 for optimized Apple Silicon performance (~1.5GB)
-        // Note: Archive extracts to nested directory (e.g., coreml-stable-diffusion-v1-5-palettized_split_einsum_v2_compiled/)
-        if let sd15URL = URL(string: "https://huggingface.co/apple/coreml-stable-diffusion-v1-5-palettized/resolve/main/coreml-stable-diffusion-v1-5-palettized_split_einsum_v2_compiled.zip") {
+        // Register Diffusion models (Apple Stable Diffusion / CoreML only; no ONNX)
+        // ============================================================================
+        // Apple SD 1.5 CoreML: palettized, split_einsum_v2 for Apple Silicon / ANE (~1.5GB)
+        if let sd15CoreMLURL = URL(string: "https://huggingface.co/apple/coreml-stable-diffusion-v1-5-palettized/resolve/main/coreml-stable-diffusion-v1-5-palettized_split_einsum_v2_compiled.zip") {
             RunAnywhere.registerModel(
                 id: "sd15-coreml-palettized",
-                name: "Stable Diffusion 1.5 (Core ML)",
-                url: sd15URL,
+                name: "Stable Diffusion 1.5 (CoreML)",
+                url: sd15CoreMLURL,
                 framework: .coreml,
                 modality: .imageGeneration,
                 artifactType: .archive(.zip, structure: .nestedDirectory),
                 memoryRequirement: 1_600_000_000  // ~1.6GB
             )
         }
-        logger.info("✅ Diffusion models registered")
+
+        logger.info("✅ Diffusion models registered (Apple Stable Diffusion / CoreML only)")
 
         logger.info("🎉 All modules and models registered")
     }

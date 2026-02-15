@@ -133,6 +133,84 @@ RAC_API rac_result_t rac_diffusion_component_generate_with_callbacks(
     rac_diffusion_complete_callback_fn complete_callback,
     rac_diffusion_error_callback_fn error_callback, void* user_data);
 
+// =============================================================================
+// JSON CONVENIENCE HELPERS
+// =============================================================================
+
+/**
+ * @brief Configure diffusion component from JSON
+ *
+ * JSON schema (flat object):
+ * {
+ *   "model_id": "optional-model-id",
+ *   "model_variant": 0 | "sd15" | "sd21" | "sdxl" | "sdxl_turbo" | "sdxs" | "lcm",
+ *   "enable_safety_checker": true/false,
+ *   "reduce_memory": true/false,
+ *   "tokenizer_source": 0 | 1 | 2 | 99,
+ *   "tokenizer_custom_url": "https://..."
+ * }
+ *
+ * @param handle Component handle
+ * @param config_json JSON string
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_diffusion_component_configure_json(rac_handle_t handle,
+                                                            const char* config_json);
+
+/**
+ * @brief Generate image from JSON options
+ *
+ * JSON schema (flat object):
+ * {
+ *   "prompt": "text prompt",
+ *   "negative_prompt": "optional",
+ *   "width": 512,
+ *   "height": 512,
+ *   "steps": 28,
+ *   "guidance_scale": 7.5,
+ *   "seed": -1,
+ *   "scheduler": 0 | "dpm++_2m_karras" | "dpm++_2m" | "dpm++_2m_sde" | "ddim" | "euler" | "euler_a" | "pndm" | "lms",
+ *   "mode": 0 | "txt2img" | "img2img" | "inpainting",
+ *   "denoise_strength": 0.75,
+ *   "report_intermediate_images": false,
+ *   "progress_stride": 1
+ * }
+ *
+ * @param handle Component handle
+ * @param options_json JSON string
+ * @param input_image_data Optional input image bytes (PNG/JPEG or RGBA)
+ * @param input_image_size Size of input image bytes
+ * @param mask_data Optional mask image bytes (PNG/JPEG or grayscale)
+ * @param mask_size Size of mask bytes
+ * @param out_json Output JSON (caller must free with rac_free)
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_diffusion_component_generate_json(
+    rac_handle_t handle, const char* options_json, const uint8_t* input_image_data,
+    size_t input_image_size, const uint8_t* mask_data, size_t mask_size, char** out_json);
+
+/**
+ * @brief Get diffusion info as JSON
+ *
+ * Output schema:
+ * {
+ *   "is_ready": true/false,
+ *   "current_model": "id",
+ *   "model_variant": 0,
+ *   "supports_text_to_image": true/false,
+ *   "supports_image_to_image": true/false,
+ *   "supports_inpainting": true/false,
+ *   "safety_checker_enabled": true/false,
+ *   "max_width": 512,
+ *   "max_height": 512
+ * }
+ *
+ * @param handle Component handle
+ * @param out_json Output JSON (caller must free with rac_free)
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_diffusion_component_get_info_json(rac_handle_t handle, char** out_json);
+
 /**
  * @brief Get supported capabilities
  *

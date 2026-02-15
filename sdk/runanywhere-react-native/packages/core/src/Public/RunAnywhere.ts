@@ -627,10 +627,12 @@ export const RunAnywhere = {
 
   getAvailableModels: Models.getAvailableModels,
   getModelInfo: Models.getModelInfo,
+  getModelPath: Models.getModelPath,
   isModelDownloaded: Models.isModelDownloaded,
   downloadModel: Models.downloadModel,
   cancelDownload: Models.cancelDownload,
   deleteModel: Models.deleteModel,
+  registerModel: Models.registerModel,
 
   // ============================================================================
   // Utilities

@@ -1,0 +1,245 @@
+/* =============================================================================
+ * RunAnywhere AI - Design System
+ * Matches iOS AppColors, Typography, and AppSpacing
+ * Primary accent: #FF5500 (vibrant orange-red)
+ * ============================================================================= */
+
+/* =============================================================================
+ * CSS Custom Properties (Dark theme default)
+ * ============================================================================= */
+:root {
+  /* ---- Primary Accent Colors ---- */
+  --color-primary: #FF5500;
+  --color-primary-hover: #E64500;
+  --color-primary-light: rgba(255, 85, 0, 0.1);
+  --color-primary-medium: rgba(255, 85, 0, 0.2);
+  --color-blue: #3B82F6;
+  --color-green: #10B981;
+  --color-red: #EF4444;
+  --color-yellow: #EAB308;
+  --color-purple: #8B5CF6;
+
+  /* ---- Text Colors (Dark) ---- */
+  --text-primary: #E4E4EF;
+  --text-secondary: #94A3B8;
+  --text-tertiary: #64748B;
+  --text-white: #FFFFFF;
+  --text-on-primary: #FFFFFF;
+
+  /* ---- Background Colors (Dark) ---- */
+  --bg-primary: #0F172A;
+  --bg-secondary: #1A1F2E;
+  --bg-tertiary: #252B3A;
+  --bg-grouped: #0F172A;
+  --bg-gray5: #2A3142;
+  --bg-gray6: #353B4A;
+  --bg-elevated: #1E2538;
+  --bg-input: #1A1F2E;
+
+  /* ---- Message Bubble Colors ---- */
+  --bubble-user-start: #FF5500;
+  --bubble-user-end: #E64500;
+  --bubble-assistant-start: #2A3142;
+  --bubble-assistant-end: #353B4A;
+
+  /* ---- Thinking Mode Colors ---- */
+  --thinking-bg: rgba(255, 85, 0, 0.1);
+  --thinking-border: rgba(255, 85, 0, 0.2);
+  --thinking-content-bg: #353B4A;
+
+  /* ---- Badge Colors ---- */
+  --badge-primary: rgba(255, 85, 0, 0.2);
+  --badge-blue: rgba(59, 130, 246, 0.2);
+  --badge-green: rgba(16, 185, 129, 0.2);
+  --badge-purple: rgba(139, 92, 246, 0.2);
+  --badge-red: rgba(239, 68, 68, 0.2);
+  --badge-yellow: rgba(234, 179, 8, 0.2);
+  --badge-gray: rgba(148, 163, 184, 0.2);
+
+  /* ---- Status Colors ---- */
+  --status-green: #10B981;
+  --status-orange: #FF5500;
+  --status-red: #EF4444;
+  --status-gray: #64748B;
+  --status-blue: #3B82F6;
+
+  /* ---- Border Colors ---- */
+  --border-light: rgba(255, 255, 255, 0.1);
+  --border-medium: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.15);
+  --separator: #2A3142;
+  --divider: #2A3142;
+
+  /* ---- Shadow Colors ---- */
+  --shadow-default: rgba(0, 0, 0, 0.2);
+  --shadow-medium: rgba(0, 0, 0, 0.3);
+  --shadow-accent: rgba(255, 85, 0, 0.2);
+
+  /* ---- Overlay Colors ---- */
+  --overlay-light: rgba(0, 0, 0, 0.3);
+  --overlay-medium: rgba(0, 0, 0, 0.5);
+  --overlay-dark: rgba(0, 0, 0, 0.7);
+
+  /* ---- Typography ---- */
+  --font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+
+  --font-size-xs: 0.6875rem;    /* 11px */
+  --font-size-sm: 0.75rem;      /* 12px */
+  --font-size-base: 0.875rem;   /* 14px */
+  --font-size-md: 1rem;         /* 16px */
+  --font-size-lg: 1.125rem;     /* 18px */
+  --font-size-xl: 1.5rem;       /* 24px */
+  --font-size-2xl: 1.75rem;     /* 28px */
+  --font-size-3xl: 2.25rem;     /* 36px */
+  --font-size-display: 3rem;    /* 48px */
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.7;
+
+  /* ---- Spacing (matches iOS AppSpacing) ---- */
+  --space-xxs: 2px;
+  --space-xs: 4px;
+  --space-sm: 6px;
+  --space-sm-md: 8px;
+  --space-md: 10px;
+  --space-md-lg: 12px;
+  --space-regular: 14px;
+  --space-lg: 16px;
+  --space-xl: 20px;
+  --space-2xl: 30px;
+  --space-3xl: 40px;
+
+  /* ---- Corner Radii (matches iOS AppSpacing) ---- */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-regular: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 14px;
+  --radius-card: 16px;
+  --radius-bubble: 18px;
+  --radius-modal: 20px;
+  --radius-full: 9999px;
+
+  /* ---- Animation Durations (matches iOS AppLayout) ---- */
+  --duration-fast: 0.25s;
+  --duration-regular: 0.3s;
+  --duration-slow: 0.5s;
+  --duration-very-slow: 0.6s;
+
+  /* ---- Component Sizes ---- */
+  --icon-sm: 18px;
+  --icon-md: 28px;
+  --icon-lg: 48px;
+  --icon-xl: 60px;
+  --icon-2xl: 72px;
+
+  --button-height-sm: 28px;
+  --button-height-md: 44px;
+  --button-height-lg: 72px;
+
+  --tab-bar-height: 56px;
+  --toolbar-height: 48px;
+}
+
+/* =============================================================================
+ * Light Theme
+ * ============================================================================= */
+@media (prefers-color-scheme: light) {
+  :root {
+    --text-primary: #0F172A;
+    --text-secondary: #475569;
+    --text-tertiary: #94A3B8;
+
+    --bg-primary: #FFFFFF;
+    --bg-secondary: #F8FAFC;
+    --bg-tertiary: #F1F5F9;
+    --bg-grouped: #F1F5F9;
+    --bg-gray5: #E2E8F0;
+    --bg-gray6: #F1F5F9;
+    --bg-elevated: #FFFFFF;
+    --bg-input: #F8FAFC;
+
+    --bubble-assistant-start: #E2E8F0;
+    --bubble-assistant-end: #F1F5F9;
+
+    --thinking-content-bg: #F1F5F9;
+
+    --border-light: rgba(0, 0, 0, 0.06);
+    --border-medium: rgba(0, 0, 0, 0.04);
+    --border-strong: rgba(0, 0, 0, 0.1);
+    --separator: #E2E8F0;
+    --divider: #CBD5E1;
+
+    --shadow-default: rgba(0, 0, 0, 0.08);
+    --shadow-medium: rgba(0, 0, 0, 0.12);
+  }
+}
+
+/* =============================================================================
+ * Base Reset & Typography
+ * ============================================================================= */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+/* =============================================================================
+ * Utility Classes
+ * ============================================================================= */
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-tertiary { color: var(--text-tertiary); }
+.text-accent { color: var(--color-primary); }
+.text-success { color: var(--color-green); }
+.text-error { color: var(--color-red); }
+
+.bg-primary { background: var(--bg-primary); }
+.bg-secondary { background: var(--bg-secondary); }
+.bg-tertiary { background: var(--bg-tertiary); }
+
+.font-mono { font-family: var(--font-mono); }
+.font-semibold { font-weight: var(--font-weight-semibold); }
+.font-bold { font-weight: var(--font-weight-bold); }
+
+/* =============================================================================
+ * Scrollbar Styling
+ * ============================================================================= */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}

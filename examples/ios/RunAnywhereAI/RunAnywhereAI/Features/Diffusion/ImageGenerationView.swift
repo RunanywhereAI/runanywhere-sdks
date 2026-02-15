@@ -36,10 +36,13 @@ struct ImageGenerationView: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
         }
+        #if os(iOS)
+        .navigationViewStyle(.stack)
+        #endif
         .task {
             await viewModel.initialize()
         }
-        .sheet(isPresented: $showModelPicker) {
+        .adaptiveSheet(isPresented: $showModelPicker) {
             DiffusionModelPickerView(viewModel: viewModel, isPresented: $showModelPicker)
         }
     }
@@ -52,21 +55,53 @@ struct ImageGenerationView: View {
                 .fill(viewModel.isModelLoaded ? Color.green : Color.orange)
                 .frame(width: 10, height: 10)
 
-            Text(viewModel.isModelLoaded ? (viewModel.currentModelName ?? "Model loaded") : "No model loaded")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(viewModel.isModelLoaded ? (viewModel.currentModelName ?? "Model loaded") : "No model loaded")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+
+                if viewModel.isModelLoaded && !viewModel.currentBackend.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: backendIcon)
+                            .font(.caption2)
+                        Text(viewModel.currentBackend)
+                            .font(.caption2)
+                    }
+                    .foregroundColor(backendColor)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(backendColor.opacity(0.15))
+                    .cornerRadius(4)
+                }
+            }
 
             Spacer()
 
-            if !viewModel.isModelLoaded {
-                Button("Load Model") { showModelPicker = true }
-                    .buttonStyle(.bordered)
-                    .tint(AppColors.primaryAccent)
-            }
+            Button(viewModel.isModelLoaded ? "Change" : "Load Model") { showModelPicker = true }
+                .buttonStyle(.bordered)
+                .tint(AppColors.primaryAccent)
         }
         .padding()
         .background(AppColors.backgroundSecondary)
         .cornerRadius(AppSpacing.cornerRadiusLarge)
+    }
+
+    private var backendIcon: String {
+        if viewModel.currentBackend.contains("CoreML") {
+            return "apple.logo"
+        } else if viewModel.currentBackend.contains("ONNX") {
+            return "cpu"
+        }
+        return "gearshape"
+    }
+
+    private var backendColor: Color {
+        if viewModel.currentBackend.contains("CoreML") {
+            return .blue
+        } else if viewModel.currentBackend.contains("ONNX") {
+            return .purple
+        }
+        return .secondary
     }
 
     // MARK: - Image Display
@@ -270,6 +305,9 @@ struct DiffusionModelPickerView: View {
                 }
             }
         }
+        #if os(iOS)
+        .navigationViewStyle(.stack)
+        #endif
     }
 }
 

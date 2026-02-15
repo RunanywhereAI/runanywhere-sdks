@@ -1,0 +1,16 @@
+{
+  "name": "runanywhere-web-demo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "RunAnywhere Web SDK Demo App",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0",
+    "typescript": "^5.6.0"
+  }
+}
