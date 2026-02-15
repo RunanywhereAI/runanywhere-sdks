@@ -36,8 +36,13 @@ set(RAC_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/src/main/include)
 # RACommons is REQUIRED - it's downloaded via Gradle downloadNativeLibs task
 # =============================================================================
 if(NOT EXISTS "${JNILIB_DIR}/librac_commons.so")
-    message(FATAL_ERROR "[RunAnywhereCore] RACommons not found at ${JNILIB_DIR}/librac_commons.so\n"
-                        "Run: ./gradlew :runanywhere_core:downloadNativeLibs")
+    message(WARNING "[RunAnywhereCore] RACommons not found for ${ANDROID_ABI} at ${JNILIB_DIR}/librac_commons.so\n"
+                    "This ABI will not be functional. To fix, run: ./gradlew :runanywhere_core:downloadNativeLibs\n"
+                    "Or set reactNativeArchitectures=arm64-v8a in gradle.properties to skip this ABI.")
+    # Create a minimal stub library so the build can proceed for other ABIs
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/stub.cpp" "// Stub for missing ABI ${ANDROID_ABI}")
+    add_library(${PACKAGE_NAME} SHARED "${CMAKE_CURRENT_BINARY_DIR}/stub.cpp")
+    return()
 endif()
 
 add_library(rac_commons SHARED IMPORTED)

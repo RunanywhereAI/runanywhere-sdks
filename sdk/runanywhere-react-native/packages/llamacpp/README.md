@@ -10,6 +10,8 @@ LlamaCPP backend for the RunAnywhere React Native SDK. Provides on-device LLM te
 
 - **Text Generation** — Generate text responses from prompts
 - **Streaming** — Real-time token-by-token output
+- **Tool Calling** — Let models invoke registered tools during generation
+- **Structured Output** — Generate type-safe JSON responses
 - **GGUF Support** — Run any GGUF-format model (Llama, Mistral, Qwen, SmolLM, etc.)
 - **Metal GPU Acceleration** — 3-5x faster inference on Apple Silicon (iOS)
 - **CPU Inference** — Works on all devices without GPU requirements
@@ -20,7 +22,7 @@ LlamaCPP backend for the RunAnywhere React Native SDK. Provides on-device LLM te
 ## Requirements
 
 - `@runanywhere/core` (peer dependency)
-- React Native 0.71+
+- React Native 0.74+
 - iOS 15.1+ / Android API 24+
 
 ---
@@ -246,6 +248,51 @@ const result = await streamResult.result;
 console.log('\nSpeed:', result.performanceMetrics.tokensPerSecond, 'tok/s');
 ```
 
+#### Tool Calling
+
+Register tools and let the LLM call them during generation. Tool calling parsing and prompt formatting is handled entirely in C++ for consistency across platforms.
+
+```typescript
+import { RunAnywhere } from '@runanywhere/core';
+import { LlamaCPP } from '@runanywhere/llamacpp';
+
+// Register a tool
+RunAnywhere.registerTool(
+  {
+    name: 'calculate',
+    description: 'Perform a math calculation',
+    parameters: [
+      { name: 'expression', type: 'string', description: 'Math expression', required: true },
+    ],
+  },
+  async (args) => {
+    const result = eval(args.expression as string); // simplified example
+    return { result };
+  }
+);
+
+// Generate with tools
+const result = await RunAnywhere.generateWithTools(
+  'What is 42 * 17?',
+  {
+    autoExecute: true,
+    maxToolCalls: 3,
+    temperature: 0.7,
+    format: 'default', // 'default' for most models, 'lfm2' for Liquid AI models
+  }
+);
+console.log(result.text); // "42 * 17 = 714"
+```
+
+**Supported tool calling formats:**
+
+| Format | Tag Pattern | Models |
+|--------|-------------|--------|
+| `default` | `<tool_call>{"tool":"name","arguments":{}}</tool_call>` | Llama, Qwen, Mistral, SmolLM, most GGUF models |
+| `lfm2` | `<\|tool_call_start\|>[func(arg="val")]<\|tool_call_end\|>` | Liquid AI LFM2-Tool models |
+
+---
+
 #### Model Management
 
 ```typescript
@@ -270,27 +317,38 @@ Any GGUF-format model works with this backend. Recommended models:
 
 ### Small Models (< 1GB RAM)
 
-| Model | Size | Memory | Description |
-|-------|------|--------|-------------|
-| SmolLM2 360M Q8_0 | ~400MB | 500MB | Fast, lightweight |
-| Qwen 2.5 0.5B Q6_K | ~500MB | 600MB | Multilingual |
-| LFM2 350M Q4_K_M | ~200MB | 250MB | Ultra-compact |
+| Model | Size | Memory | Tool Calling | Description |
+|-------|------|--------|:------------:|-------------|
+| SmolLM2 360M Q8_0 | ~400MB | 500MB | - | Fast, lightweight |
+| Qwen 2.5 0.5B Q6_K | ~500MB | 600MB | Yes | Multilingual |
+| LFM2 350M Q4_K_M | ~200MB | 250MB | Yes (lfm2) | Ultra-compact, Liquid AI |
 
 ### Medium Models (1-3GB RAM)
 
-| Model | Size | Memory | Description |
-|-------|------|--------|-------------|
-| Phi-3 Mini Q4_K_M | ~2GB | 2.5GB | Microsoft |
-| Gemma 2B Q4_K_M | ~1.5GB | 2GB | Google |
-| TinyLlama 1.1B Q4_K_M | ~700MB | 1GB | Fast chat |
+| Model | Size | Memory | Tool Calling | Description |
+|-------|------|--------|:------------:|-------------|
+| Phi-3 Mini Q4_K_M | ~2GB | 2.5GB | - | Microsoft |
+| Gemma 2B Q4_K_M | ~1.5GB | 2GB | - | Google |
+| LFM2 1.2B Q4_K_M | ~800MB | 1GB | Yes (lfm2) | Liquid AI tool-calling |
+| Qwen 2.5 1.5B Instruct Q4_K_M | ~1GB | 1.5GB | Yes | Alibaba, multilingual |
+| TinyLlama 1.1B Q4_K_M | ~700MB | 1GB | - | Fast chat |
 
 ### Large Models (4GB+ RAM)
 
-| Model | Size | Memory | Description |
-|-------|------|--------|-------------|
-| Llama 2 7B Q4_K_M | ~4GB | 5GB | Meta |
-| Mistral 7B Q4_K_M | ~4GB | 5GB | Mistral AI |
-| Llama 3.2 3B Q4_K_M | ~2GB | 3GB | Meta latest |
+| Model | Size | Memory | Tool Calling | Description |
+|-------|------|--------|:------------:|-------------|
+| Llama 3.2 3B Instruct Q4_K_M | ~2GB | 3GB | Yes | Meta latest |
+| Mistral 7B Instruct Q4_K_M | ~4GB | 5GB | Yes | Mistral AI |
+| Qwen 2.5 7B Instruct Q4_K_M | ~4GB | 5GB | Yes | Alibaba |
+| Llama 2 7B Chat Q4_K_M | ~4GB | 5GB | - | Meta |
+
+### Tool Calling Model Selection Guide
+
+- **Best for tool calling (small):** LFM2-350M-Tool (use `format: 'lfm2'`) or Qwen 2.5 0.5B
+- **Best for tool calling (medium):** LFM2-1.2B-Tool or Qwen 2.5 1.5B Instruct
+- **Best for tool calling (large):** Mistral 7B Instruct or Qwen 2.5 7B Instruct
+- **Instruct-tuned models** generally perform better at following tool calling instructions
+- Use `format: 'lfm2'` only with Liquid AI LFM2-Tool models; all others use `format: 'default'`
 
 ---
 

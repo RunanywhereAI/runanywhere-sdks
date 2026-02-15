@@ -444,9 +444,10 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
               });
             },
           ),
+          
+          /* Pitch slider - Commented out for now as it is not implemented in the current TTS models. Once supported, we can have this back.
           const SizedBox(height: AppSpacing.mediumLarge),
 
-          // Pitch slider
           _buildSliderRow(
             label: 'Pitch',
             value: _pitch,
@@ -459,6 +460,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
               });
             },
           ),
+          */
         ],
       ),
     );

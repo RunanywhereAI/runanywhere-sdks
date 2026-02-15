@@ -237,23 +237,41 @@ if [ "${HTTP_CODE}" = "200" ] && [ -f "${TEMP_ARCHIVE}" ] && [ -s "${TEMP_ARCHIV
     # Download headers if not present (Android release doesn't include them)
     if [ ! -d "${SHERPA_DIR}/include/sherpa-onnx" ]; then
         echo ""
-        echo "Downloading Sherpa-ONNX headers..."
-        mkdir -p "${SHERPA_DIR}/include"
+        echo "Downloading Sherpa-ONNX headers (v${SHERPA_VERSION})..."
+        mkdir -p "${SHERPA_DIR}/include/sherpa-onnx/c-api"
 
-        # Try to download from iOS since headers are platform-independent
-        IOS_SHERPA_HEADERS="${ROOT_DIR}/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework/ios-arm64/Headers"
-        if [ -d "${IOS_SHERPA_HEADERS}/sherpa-onnx" ]; then
-            echo "Using headers from iOS Sherpa-ONNX..."
-            cp -R "${IOS_SHERPA_HEADERS}"/* "${SHERPA_DIR}/include/"
-        else
-            # Fallback: Download headers from source repo
-            echo "Downloading headers from Sherpa-ONNX source..."
-            curl -sL "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v${SHERPA_VERSION}/sherpa-onnx/c-api/c-api.h" \
-                -o "${SHERPA_DIR}/include/sherpa-onnx/c-api/c-api.h" --create-dirs
-            curl -sL "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v${SHERPA_VERSION}/sherpa-onnx/c-api/cxx-api.h" \
-                -o "${SHERPA_DIR}/include/sherpa-onnx/c-api/cxx-api.h" --create-dirs
+        # ⚠️  CRITICAL: Headers MUST come from the EXACT SAME version as the prebuilt .so files.
+        # DO NOT use iOS headers here — iOS may use a different Sherpa-ONNX version
+        # (e.g., SHERPA_ONNX_VERSION_IOS=1.12.18 vs SHERPA_ONNX_VERSION_ANDROID=1.12.20).
+        # A version mismatch causes struct layout differences (ABI mismatch) that result in
+        # SIGSEGV crashes in SherpaOnnxCreateOfflineRecognizer at runtime.
+        echo "Downloading headers from Sherpa-ONNX source (v${SHERPA_VERSION})..."
+        curl -sL "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v${SHERPA_VERSION}/sherpa-onnx/c-api/c-api.h" \
+            -o "${SHERPA_DIR}/include/sherpa-onnx/c-api/c-api.h"
+        curl -sL "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v${SHERPA_VERSION}/sherpa-onnx/c-api/cxx-api.h" \
+            -o "${SHERPA_DIR}/include/sherpa-onnx/c-api/cxx-api.h"
+
+        # Stamp the version so we can detect mismatches later
+        echo "${SHERPA_VERSION}" > "${SHERPA_DIR}/include/.sherpa-header-version"
+        echo "✅ Sherpa-ONNX headers installed (v${SHERPA_VERSION})"
+    else
+        # Validate that existing headers match the expected version
+        if [ -f "${SHERPA_DIR}/include/.sherpa-header-version" ]; then
+            EXISTING_VER=$(cat "${SHERPA_DIR}/include/.sherpa-header-version")
+            if [ "${EXISTING_VER}" != "${SHERPA_VERSION}" ]; then
+                echo -e "${YELLOW}⚠️  Header version mismatch: headers are v${EXISTING_VER} but .so is v${SHERPA_VERSION}${NC}"
+                echo -e "${YELLOW}   Re-downloading headers to match .so version...${NC}"
+                rm -rf "${SHERPA_DIR}/include/sherpa-onnx"
+                rm -f "${SHERPA_DIR}/include/.sherpa-header-version"
+                mkdir -p "${SHERPA_DIR}/include/sherpa-onnx/c-api"
+                curl -sL "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v${SHERPA_VERSION}/sherpa-onnx/c-api/c-api.h" \
+                    -o "${SHERPA_DIR}/include/sherpa-onnx/c-api/c-api.h"
+                curl -sL "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v${SHERPA_VERSION}/sherpa-onnx/c-api/cxx-api.h" \
+                    -o "${SHERPA_DIR}/include/sherpa-onnx/c-api/cxx-api.h"
+                echo "${SHERPA_VERSION}" > "${SHERPA_DIR}/include/.sherpa-header-version"
+                echo -e "${GREEN}✅ Headers updated to v${SHERPA_VERSION}${NC}"
+            fi
         fi
-        echo "✅ Sherpa-ONNX headers installed"
     fi
 
     # Download ONNX Runtime C API header (required for ONNX backend compilation)

@@ -2,6 +2,7 @@
 #include <string>
 #include <android/log.h>
 #include "runanywherecoreOnLoad.hpp"
+#include "PlatformDownloadBridge.h"
 
 #define LOG_TAG "ArchiveJNI"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -35,6 +36,8 @@ jmethodID g_getCoreCountMethod = nullptr;
 jmethodID g_getArchitectureMethod = nullptr;
 jmethodID g_getGPUFamilyMethod = nullptr;
 jmethodID g_isTabletMethod = nullptr;
+jmethodID g_httpDownloadMethod = nullptr;
+jmethodID g_httpDownloadCancelMethod = nullptr;
 // HttpResponse field IDs
 jfieldID g_httpResponse_successField = nullptr;
 jfieldID g_httpResponse_statusCodeField = nullptr;
@@ -101,11 +104,14 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
       g_getArchitectureMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getArchitecture", "()Ljava/lang/String;");
       g_getGPUFamilyMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getGPUFamily", "()Ljava/lang/String;");
       g_isTabletMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "isTablet", "()Z");
+      g_httpDownloadMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "httpDownload", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I");
+      g_httpDownloadCancelMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "httpDownloadCancel", "(Ljava/lang/String;)Z");
 
-      if (g_secureSetMethod && g_secureGetMethod && g_getPersistentDeviceUUIDMethod && 
+      if (g_secureSetMethod && g_secureGetMethod && g_getPersistentDeviceUUIDMethod &&
           g_getDeviceModelMethod && g_getOSVersionMethod && g_getChipNameMethod &&
-          g_getTotalMemoryMethod && g_getAvailableMemoryMethod && g_getCoreCountMethod && 
-          g_getArchitectureMethod && g_getGPUFamilyMethod && g_isTabletMethod) {
+          g_getTotalMemoryMethod && g_getAvailableMemoryMethod && g_getCoreCountMethod &&
+          g_getArchitectureMethod && g_getGPUFamilyMethod && g_isTabletMethod &&
+          g_httpDownloadMethod && g_httpDownloadCancelMethod) {
         LOGI("PlatformAdapterBridge class and methods cached successfully");
       } else {
         LOGE("Failed to cache some PlatformAdapterBridge methods");
@@ -268,4 +274,46 @@ extern "C" bool ArchiveUtility_extractAndroid(const char* archivePath, const cha
     env->DeleteLocalRef(jDestinationPath);
 
     return result == JNI_TRUE;
+}
+
+// =============================================================================
+// HTTP Download Callback Reporting (from Kotlin to C++)
+// =============================================================================
+
+static std::string jstringToStdString(JNIEnv* env, jstring value) {
+    if (value == nullptr) {
+        return "";
+    }
+    const char* chars = env->GetStringUTFChars(value, nullptr);
+    std::string result = chars ? chars : "";
+    if (chars) {
+        env->ReleaseStringUTFChars(value, chars);
+    }
+    return result;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_margelo_nitro_runanywhere_PlatformAdapterBridge_nativeHttpDownloadReportProgress(
+    JNIEnv* env, jclass clazz, jstring taskId, jlong downloadedBytes, jlong totalBytes) {
+    (void)clazz;
+    std::string task = jstringToStdString(env, taskId);
+    return RunAnywhereHttpDownloadReportProgress(task.c_str(),
+                                                 static_cast<int64_t>(downloadedBytes),
+                                                 static_cast<int64_t>(totalBytes));
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_margelo_nitro_runanywhere_PlatformAdapterBridge_nativeHttpDownloadReportComplete(
+    JNIEnv* env, jclass clazz, jstring taskId, jint result, jstring downloadedPath) {
+    (void)clazz;
+    std::string task = jstringToStdString(env, taskId);
+    if (downloadedPath == nullptr) {
+        return RunAnywhereHttpDownloadReportComplete(task.c_str(),
+                                                     static_cast<int>(result),
+                                                     nullptr);
+    }
+    std::string path = jstringToStdString(env, downloadedPath);
+    return RunAnywhereHttpDownloadReportComplete(task.c_str(),
+                                                 static_cast<int>(result),
+                                                 path.c_str());
 }
