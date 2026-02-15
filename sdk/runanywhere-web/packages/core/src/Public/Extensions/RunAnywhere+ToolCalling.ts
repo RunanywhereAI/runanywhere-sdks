@@ -31,8 +31,6 @@ import { TextGeneration } from './RunAnywhere+TextGeneration';
 import {
   ToolCallFormat,
   type ToolValue,
-  type ToolParameterType,
-  type ToolParameter,
   type ToolDefinition,
   type ToolCall,
   type ToolResult,

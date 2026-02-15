@@ -27,6 +27,7 @@ import { SDKEventType } from '../../types/enums';
 import { SpeechActivity } from './VADTypes';
 import type { SpeechActivityCallback, VADModelConfig, SpeechSegment } from './VADTypes';
 
+// @ts-expect-error -- sherpa-onnx JS wrappers ship without type declarations
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 import { initSherpaOnnxVadModelConfig, freeConfig } from '../../../wasm/sherpa/sherpa-onnx-vad.js';
 

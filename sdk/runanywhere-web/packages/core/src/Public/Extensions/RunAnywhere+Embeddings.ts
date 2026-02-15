@@ -29,12 +29,10 @@ import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { EventBus } from '../../Foundation/EventBus';
 import { SDKEventType } from '../../types/enums';
-import {
-  EmbeddingsNormalize,
-  EmbeddingsPooling,
-  type EmbeddingVector,
-  type EmbeddingsResult,
-  type EmbeddingsOptions,
+import type {
+  EmbeddingVector,
+  EmbeddingsResult,
+  EmbeddingsOptions,
 } from './EmbeddingsTypes';
 
 export {
