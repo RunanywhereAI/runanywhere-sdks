@@ -14,22 +14,19 @@ import kotlin.random.Random
 /**
  * VoiceAssistantParticleView - Particle animation for voice assistant
  *
- * Ported from iOS VoiceAssistantParticleView.swift (Metal-based)
- * This is a Canvas-based Compose implementation that mimics the visual effect.
+ * Particles expand outward from center based on audio amplitude.
+ * Responds to both voice input (microphone) and voice output (TTS).
+ * Non-interactive (no tap/touch handling).
  *
  * Features:
- * - 2000 particles distributed on a Fibonacci sphere
- * - Morphs between sphere (idle) and ring (active) states
- * - Responds to audio amplitude
- * - Touch scatter effect
- * - Smooth breathing animation
+ * - 400 particles distributed on a Fibonacci sphere
+ * - Amplitude-driven expansion from center
+ * - Smooth breathing animation with slow rotation
+ * - Organic per-particle variation for fluid movement
  */
 @Composable
 fun VoiceAssistantParticleView(
     amplitude: Float,
-    morphProgress: Float,
-    scatterAmount: Float,
-    touchPoint: Offset,
     isDarkMode: Boolean = isSystemInDarkTheme(),
     modifier: Modifier = Modifier,
 ) {
@@ -66,10 +63,7 @@ fun VoiceAssistantParticleView(
             drawParticle(
                 particle = particle,
                 time = time,
-                morphProgress = morphProgress,
                 amplitude = amplitude,
-                scatterAmount = scatterAmount,
-                touchPoint = touchPoint,
                 centerX = centerX,
                 centerY = centerY,
                 scale = scale,
@@ -84,11 +78,11 @@ fun VoiceAssistantParticleView(
 private data class Particle(
     val position: Triple<Float, Float, Float>, // x, y, z on unit sphere
     val index: Float, // 0-1 normalized index
-    val radiusOffset: Float, // random offset for ring variation
+    val radiusOffset: Float, // random offset for variation
     val seed: Float // random seed for animation variation
 )
 
-private const val PARTICLE_COUNT = 800 // Reduced from iOS 2000 for performance
+private const val PARTICLE_COUNT = 400
 
 private fun generateFibonacciSphereParticles(count: Int): List<Particle> {
     val goldenRatio = (1.0 + sqrt(5.0)) / 2.0
@@ -115,10 +109,7 @@ private fun generateFibonacciSphereParticles(count: Int): List<Particle> {
 private fun DrawScope.drawParticle(
     particle: Particle,
     time: Float,
-    morphProgress: Float,
     amplitude: Float,
-    scatterAmount: Float,
-    touchPoint: Offset,
     centerX: Float,
     centerY: Float,
     scale: Float,
@@ -129,84 +120,39 @@ private fun DrawScope.drawParticle(
     val (sphereX, sphereY, sphereZ) = particle.position
     val seed = particle.seed
 
-    // === SPHERE STATE ===
-    // Rotate sphere slowly
-    val sphereAngle = -time * 0.2f
-    val cosA = cos(sphereAngle)
-    val sinA = sin(sphereAngle)
+    // === ROTATION (slow rotation for visual interest) ===
+    val rotationAngle = -time * 0.2f
+    val cosA = cos(rotationAngle)
+    val sinA = sin(rotationAngle)
+    val rotatedX = sphereX * cosA - sphereZ * sinA
+    val rotatedY = sphereY
+    val rotatedZ = sphereX * sinA + sphereZ * cosA
 
-    var rotatedX = sphereX * cosA - sphereZ * sinA
-    var rotatedY = sphereY
-    var rotatedZ = sphereX * sinA + sphereZ * cosA
+    // === BREATHING (visible pulsing at all times) ===
+    val breath = 1f + sin(time * 0.8f) * 0.06f
 
-    // Breathing effect
-    val breath = 1f + sin(time) * 0.025f
-    rotatedX *= breath
-    rotatedY *= breath
-    rotatedZ *= breath
+    // === IDLE DRIFT (per-particle movement so they look alive at rest) ===
+    val phaseOffset = seed * PI.toFloat() * 2f
+    val driftX = sin(time * 0.6f + phaseOffset) * 0.04f
+    val driftY = cos(time * 0.5f + phaseOffset * 1.3f) * 0.04f
 
-    // === RING STATE ===
-    val ringAngle = particle.index * PI.toFloat() * 2f + time * 0.25f
-    val baseRingRadius = 1.3f
-    val audioPulse = amplitude * 0.4f
-    val ringRadius = baseRingRadius + audioPulse + sin(time * 1.5f) * 0.03f + particle.radiusOffset * 0.18f
+    // === AMPLITUDE-DRIVEN EXPANSION FROM CENTER ===
+    // At rest (amplitude ≈ 0): large sphere so individual particles are visible
+    // With audio: particles expand further outward proportional to amplitude
+    val idleRadius = 1.0f
+    val maxExpansion = 0.5f
 
-    val ringX = cos(ringAngle) * ringRadius
-    val ringY = sin(ringAngle) * ringRadius
-    val ringZ = 0f
+    // Per-particle wave effect for organic movement (scales with amplitude)
+    val waveEffect = sin(time * 2.5f + phaseOffset) * 0.08f * amplitude
 
-    // === MORPH ===
-    val personalSpeed = 0.6f + seed * 0.8f
-    val personalMorph = (morphProgress * personalSpeed + (seed - 0.5f) * 0.3f).coerceIn(0f, 1f)
-    // Double smoothstep for extra smooth transition
-    var smoothMorph = personalMorph * personalMorph * (3f - 2f * personalMorph)
-    smoothMorph = smoothMorph * smoothMorph * (3f - 2f * smoothMorph)
+    // Per-particle seed variation (each particle expands slightly differently)
+    val seedVariation = (seed - 0.5f) * 0.15f * amplitude
 
-    // Wandering during transition
-    val wanderPhase = morphProgress * (1f - morphProgress) * 4f
-    val wanderX = (noise(seed * 100f, time * 0.3f) - 0.5f) * wanderPhase * 0.6f
-    val wanderY = (noise(seed * 100f + 50f, time * 0.3f) - 0.5f) * wanderPhase * 0.6f
-    val wanderZ = (noise(seed * 100f + 100f, time * 0.3f) - 0.5f) * wanderPhase * 0.6f
+    val expansionRadius = (idleRadius + amplitude * maxExpansion + waveEffect + seedVariation) * breath
 
-    // Spiral during transition
-    val spiralAngle = seed * 6.28f + time * 0.5f
-    val spiralRadius = wanderPhase * 0.25f
-    val spiralX = cos(spiralAngle) * spiralRadius
-    val spiralY = sin(spiralAngle) * spiralRadius
-
-    // Interpolate between sphere and ring
-    var finalX = lerp(rotatedX, ringX, smoothMorph) + wanderX + spiralX
-    var finalY = lerp(rotatedY, ringY, smoothMorph) + wanderY + spiralY
-    val finalZ = lerp(rotatedZ, ringZ, smoothMorph) + wanderZ
-
-    // === TOUCH SCATTER ===
-    if (scatterAmount > 0.001f) {
-        // Calculate screen position
-        val projScale = 0.85f
-        val tempZ = finalZ + 2.5f
-        val screenX = (finalX / tempZ) * projScale
-        val screenY = (finalY / tempZ) * projScale
-
-        // Distance from touch
-        val dx = screenX - touchPoint.x
-        val dy = screenY - touchPoint.y
-        val touchDist = sqrt(dx * dx + dy * dy)
-
-        // Affect particles near touch
-        val touchRadius = 0.35f
-        val touchInfluence = ((1f - (touchDist / touchRadius)).coerceIn(0f, 1f)) * scatterAmount
-
-        if (touchInfluence > 0.001f) {
-            // Push outward from touch
-            val pushLen = sqrt(dx * dx + dy * dy) + 0.001f
-            val pushX = dx / pushLen
-            val pushY = dy / pushLen
-            val pushAmount = touchInfluence * 0.15f
-
-            finalX += pushX * pushAmount
-            finalY += pushY * pushAmount
-        }
-    }
+    val finalX = rotatedX * expansionRadius + driftX
+    val finalY = rotatedY * expansionRadius + driftY
+    val finalZ = rotatedZ * expansionRadius
 
     // === PROJECTION ===
     val z = finalZ + 2.5f
@@ -216,11 +162,11 @@ private fun DrawScope.drawParticle(
 
     // === SIZE ===
     val baseSize = 3f
-    val transitionGlow = 1f + wanderPhase * 0.4f
-    val particleSize = (baseSize * (2.8f / z) * transitionGlow * scale / 100f).coerceIn(2f, 8f)
+    val energyGlow = 1f + amplitude * 0.4f
+    val particleSize = (baseSize * (2.8f / z) * energyGlow * scale / 100f).coerceIn(2f, 8f)
 
     // === COLOR ===
-    val energy = smoothMorph * (0.5f + amplitude * 0.5f)
+    val energy = amplitude * 0.7f
     val particleColor = lerpColor(baseColor, activeColor, energy)
 
     // Brightness adjustment
@@ -233,20 +179,21 @@ private fun DrawScope.drawParticle(
 
     // === ALPHA ===
     val depthShade = 0.5f + 0.5f * (1f - (z - 1.8f) / 2f)
-    val alpha = lerp(depthShade * 0.8f, 1f, smoothMorph).coerceIn(0.3f, 1f)
+    val alpha = (depthShade * (0.6f + amplitude * 0.4f)).coerceIn(0.3f, 1f)
 
-    // Draw particle with glow effect
+    // === DRAW ===
+    // Glow effect (subtle, so particles stay distinct)
     drawCircle(
         brush = Brush.radialGradient(
             colors = listOf(
-                finalColor.copy(alpha = alpha),
-                finalColor.copy(alpha = alpha * 0.5f),
+                finalColor.copy(alpha = alpha * 0.6f),
+                finalColor.copy(alpha = alpha * 0.2f),
                 finalColor.copy(alpha = 0f)
             ),
             center = Offset(projX, projY),
-            radius = particleSize * 2f
+            radius = particleSize * 1.5f
         ),
-        radius = particleSize * 2f,
+        radius = particleSize * 1.5f,
         center = Offset(projX, projY)
     )
 
@@ -256,12 +203,6 @@ private fun DrawScope.drawParticle(
         radius = particleSize,
         center = Offset(projX, projY)
     )
-}
-
-// Simple pseudo-random noise function
-private fun noise(x: Float, y: Float): Float {
-    val n = sin(x * 12.9898f + y * 78.233f) * 43758.5453f
-    return n - floor(n)
 }
 
 private fun lerp(a: Float, b: Float, t: Float): Float = a + (b - a) * t
