@@ -7,7 +7,6 @@ import androidx.compose.animation.core.EaseInOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -22,10 +21,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -571,37 +568,31 @@ private fun MainVoiceAssistantUI(
 
     // Particle animation state
     var amplitude by remember { mutableStateOf(0f) }
-    var morphProgress by remember { mutableStateOf(0f) }
-    var scatterAmount by remember { mutableStateOf(0f) }
-    var touchPoint by remember { mutableStateOf(Offset.Zero) }
     val isDarkMode = isSystemInDarkTheme()
 
+    // Keep a reference that always points to the latest uiState so the
+    // animation coroutine reads fresh audioLevel values each frame.
+    val currentUiState by rememberUpdatedState(uiState)
+
     // Determine if animation should be active to save battery/CPU
-    // Only run when: listening, speaking, scatter recovering, or morph transitioning
     val isListening = uiState.sessionState == SessionState.LISTENING
     val isSpeaking = uiState.sessionState == SessionState.SPEAKING
-    val isAnimationNeeded = isListening || isSpeaking || scatterAmount > 0.001f ||
-        (morphProgress > 0.001f && morphProgress < 0.999f)
+    val isAnimationNeeded = isListening || isSpeaking || amplitude > 0.001f
 
     // Animation timer (60 FPS = ~16ms) - only runs when animation is needed
-    LaunchedEffect(isAnimationNeeded) {
+    LaunchedEffect(isAnimationNeeded, uiState.sessionState) {
         if (isAnimationNeeded) {
             while (true) {
                 delay(16) // ~60 FPS
                 updateAnimation(
-                    uiState = uiState,
+                    uiState = currentUiState,
                     amplitudeState = { amplitude },
-                    morphProgressState = { morphProgress },
-                    scatterAmountState = { scatterAmount },
                     onAmplitudeChange = { amplitude = it },
-                    onMorphProgressChange = { morphProgress = it },
-                    onScatterAmountChange = { scatterAmount = it },
                 )
                 // Re-check if animation is still needed
-                val stillNeeded = uiState.sessionState == SessionState.LISTENING ||
-                    uiState.sessionState == SessionState.SPEAKING ||
-                    scatterAmount > 0.001f ||
-                    (morphProgress > 0.001f && morphProgress < 0.999f)
+                val stillNeeded = currentUiState.sessionState == SessionState.LISTENING ||
+                    currentUiState.sessionState == SessionState.SPEAKING ||
+                    amplitude > 0.001f
                 if (!stillNeeded) break
             }
         }
@@ -612,30 +603,14 @@ private fun MainVoiceAssistantUI(
         // Particle animation setup
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val size = min(constraints.maxWidth, constraints.maxHeight) * 0.9f
-            val centerX = size / 2f
-            val centerY = size / 2f
 
             VoiceAssistantParticleView(
                 amplitude = amplitude,
-                morphProgress = morphProgress,
-                scatterAmount = scatterAmount,
-                touchPoint = touchPoint,
                 isDarkMode = isDarkMode,
                 modifier = Modifier
                     .size(with(density) { size.toDp() })
                     .align(Alignment.Center)
-                    .offset(y = with(density) { (-50).dp })
-                    .pointerInput(Unit) {
-                        detectTapGestures { offset ->
-                            // Convert touch to normalized coordinates (-1 to 1)
-                            // Coordinate system
-                            val normalizedX = ((offset.x - centerX) / (size / 2f)) * 0.85f
-                            val normalizedY = ((offset.y - centerY) / (size / 2f)) * -0.85f // Flip Y
-
-                            touchPoint = Offset(normalizedX, normalizedY)
-                            scatterAmount = 1.0f
-                        }
-                    },
+                    .offset(y = with(density) { (-50).dp }),
             )
         }
 
@@ -731,34 +706,19 @@ private fun MainVoiceAssistantUI(
 
 /**
  * Update animation state
+ *
+ * Drives amplitude for particle expansion:
+ * - Listening: follows real microphone audio level
+ * - Speaking: simulates speech-like pulse pattern
+ * - Idle: smoothly decays back to zero (particles return to center)
  */
 private fun updateAnimation(
     uiState: VoiceUiState,
     amplitudeState: () -> Float,
-    morphProgressState: () -> Float,
-    scatterAmountState: () -> Float,
     onAmplitudeChange: (Float) -> Unit,
-    onMorphProgressChange: (Float) -> Unit,
-    onScatterAmountChange: (Float) -> Unit,
 ) {
-    // Target morph: 0 = sphere (idle/thinking), 1 = ring (listening/speaking)
     val isListening = uiState.sessionState == SessionState.LISTENING
     val isSpeaking = uiState.sessionState == SessionState.SPEAKING
-    val isActive = isListening || isSpeaking
-    val targetMorph = if (isActive) 1.0f else 0.0f
-
-    // Smooth morph transition
-    val currentMorph = morphProgressState()
-    val morphDiff = targetMorph - currentMorph
-    onMorphProgressChange((currentMorph + morphDiff * 0.04f).coerceIn(0f, 1f))
-
-    // Scatter decay
-    val currentScatter = scatterAmountState()
-    if (currentScatter > 0.001f) {
-        onScatterAmountChange(currentScatter * 0.92f)
-    } else {
-        onScatterAmountChange(0f)
-    }
 
     // Audio amplitude - reactive to both input (listening) and output (speaking)
     val currentAmplitude = amplitudeState()
@@ -785,8 +745,9 @@ private fun updateAnimation(
             (currentAmplitude * 0.75f + targetAmplitude * 0.25f).coerceIn(0f, 1f)
         }
         else -> {
-            // Gentle decay when not active
-            currentAmplitude * 0.95f
+            // Smooth decay back to center when not active
+            val decayed = currentAmplitude * 0.93f
+            if (decayed < 0.001f) 0f else decayed
         }
     }
     onAmplitudeChange(newAmplitude)
