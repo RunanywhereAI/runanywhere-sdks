@@ -5,8 +5,8 @@
 <h1 align="center">RunAnywhere</h1>
 
 <p align="center">
-  <strong>On-device AI for mobile apps.</strong><br/>
-  Run LLMs, speech-to-text, and text-to-speech locally—private, offline, fast.
+  <strong>On-device AI for every platform.</strong><br/>
+  Run LLMs, speech-to-text, and text-to-speech locally — private, offline, fast.
 </p>
 
 <p align="center">
@@ -63,7 +63,7 @@
 
 ## What is RunAnywhere?
 
-RunAnywhere lets you add AI features to your mobile app that run entirely on-device:
+RunAnywhere lets you add AI features to your app that run entirely on-device:
 
 - **LLM Chat** — Llama, Mistral, Qwen, SmolLM, and more
 - **Speech-to-Text** — Whisper-powered transcription
@@ -80,6 +80,7 @@ No cloud. No latency. No data leaves the device.
 |----------|--------|--------------|---------------|
 | **Swift** (iOS/macOS) | Stable | [Swift Package Manager](#swift-ios--macos) | [docs.runanywhere.ai/swift](https://docs.runanywhere.ai/swift/introduction) |
 | **Kotlin** (Android) | Stable | [Gradle](#kotlin-android) | [docs.runanywhere.ai/kotlin](https://docs.runanywhere.ai/kotlin/introduction) |
+| **Web** (Browser) | Beta | [npm](#web-browser) | [SDK README](sdk/runanywhere-web/) |
 | **React Native** | Beta | [npm](#react-native) | [docs.runanywhere.ai/react-native](https://docs.runanywhere.ai/react-native/introduction) |
 | **Flutter** | Beta | [pub.dev](#flutter) | [docs.runanywhere.ai/flutter](https://docs.runanywhere.ai/flutter/introduction) |
 
@@ -208,6 +209,32 @@ dependencies:
 
 ---
 
+### Web (Browser)
+
+```typescript
+import { RunAnywhere, TextGeneration } from '@runanywhere/web';
+
+// 1. Initialize
+await RunAnywhere.initialize({ environment: 'development' });
+
+// 2. Load a model
+await TextGeneration.loadModel('/models/qwen2.5-0.5b-instruct-q4_0.gguf', 'qwen2.5-0.5b');
+
+// 3. Generate
+const result = await TextGeneration.generate('What is the capital of France?');
+console.log(result.text); // "Paris is the capital of France."
+```
+
+**Install via npm:**
+
+```bash
+npm install @runanywhere/web
+```
+
+[Full documentation →](sdk/runanywhere-web/) · [Source code](sdk/runanywhere-web/)
+
+---
+
 ## Sample Apps
 
 Full-featured demo applications demonstrating SDK capabilities:
@@ -216,6 +243,7 @@ Full-featured demo applications demonstrating SDK capabilities:
 |----------|-------------|----------|
 | iOS | [examples/ios/RunAnywhereAI](examples/ios/RunAnywhereAI/) | [App Store](https://apps.apple.com/us/app/runanywhere/id6756506307) |
 | Android | [examples/android/RunAnywhereAI](examples/android/RunAnywhereAI/) | [Google Play](https://play.google.com/store/apps/details?id=com.runanywhere.runanywhereai) |
+| Web | [examples/web/RunAnywhereAI](examples/web/RunAnywhereAI/) | Build from source |
 | React Native | [examples/react-native/RunAnywhereAI](examples/react-native/RunAnywhereAI/) | Build from source |
 | Flutter | [examples/flutter/RunAnywhereAI](examples/flutter/RunAnywhereAI/) | Build from source |
 
@@ -234,16 +262,19 @@ Standalone demo projects showcasing what you can build with RunAnywhere:
 
 ## Features
 
-| Feature | iOS | Android | React Native | Flutter |
-|---------|-----|---------|--------------|---------|
-| LLM Text Generation | ✅ | ✅ | ✅ | ✅ |
-| Streaming | ✅ | ✅ | ✅ | ✅ |
-| Speech-to-Text | ✅ | ✅ | ✅ | ✅ |
-| Text-to-Speech | ✅ | ✅ | ✅ | ✅ |
-| Voice Assistant Pipeline | ✅ | ✅ | ✅ | ✅ |
-| Model Download + Progress | ✅ | ✅ | ✅ | ✅ |
-| Structured Output (JSON) | ✅ | ✅ | 🔜 | 🔜 |
-| Apple Foundation Models | ✅ | — | — | — |
+| Feature | iOS | Android | Web | React Native | Flutter |
+|---------|-----|---------|-----|--------------|---------|
+| LLM Text Generation | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Streaming | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Speech-to-Text | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Text-to-Speech | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Voice Assistant Pipeline | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Vision Language Models | ✅ | — | ✅ | — | — |
+| Model Download + Progress | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Structured Output (JSON) | ✅ | ✅ | ✅ | 🔜 | 🔜 |
+| Tool Calling | ✅ | ✅ | ✅ | — | — |
+| Embeddings | — | — | ✅ | — | — |
+| Apple Foundation Models | ✅ | — | — | — | — |
 
 ---
 
@@ -281,6 +312,7 @@ runanywhere-sdks/
 ├── sdk/
 │   ├── runanywhere-swift/          # iOS/macOS SDK
 │   ├── runanywhere-kotlin/         # Android SDK
+│   ├── runanywhere-web/            # Web SDK (WebAssembly)
 │   ├── runanywhere-react-native/   # React Native SDK
 │   ├── runanywhere-flutter/        # Flutter SDK
 │   └── runanywhere-commons/        # Shared C++ core
@@ -288,6 +320,7 @@ runanywhere-sdks/
 ├── examples/
 │   ├── ios/RunAnywhereAI/          # iOS sample app
 │   ├── android/RunAnywhereAI/      # Android sample app
+│   ├── web/RunAnywhereAI/          # Web sample app
 │   ├── react-native/RunAnywhereAI/ # React Native sample app
 │   └── flutter/RunAnywhereAI/      # Flutter sample app
 │
@@ -307,6 +340,7 @@ runanywhere-sdks/
 | iOS | 17.0+ | 17.0+ |
 | macOS | 14.0+ | 14.0+ |
 | Android | API 24 (7.0) | API 28+ |
+| Web | Chrome 96+ / Edge 96+ | Chrome 120+ |
 | React Native | 0.74+ | 0.76+ |
 | Flutter | 3.10+ | 3.24+ |
 

@@ -12,7 +12,7 @@ include(FetchContent)
 include(LoadVersions)
 
 if(NOT DEFINED LLAMACPP_VERSION)
-    set(LLAMACPP_VERSION "b7199")
+    set(LLAMACPP_VERSION "b8011")
 endif()
 set(LLAMA_CPP_VERSION "${LLAMACPP_VERSION}")
 
@@ -140,6 +140,8 @@ if(RAC_VLM_USE_MTMD)
         ${llamacpp_SOURCE_DIR}/tools/mtmd/models/youtuvl.cpp
         ${llamacpp_SOURCE_DIR}/tools/mtmd/models/conformer.cpp
         ${llamacpp_SOURCE_DIR}/tools/mtmd/models/whisper-enc.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/kimik25.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/mobilenetv5.cpp
     )
 endif()
 
@@ -155,10 +157,13 @@ else()
     )
 endif()
 
+# Resolve the runanywhere-commons root (3 levels up from src/backends/llamacpp/)
+get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
+
 target_include_directories(rac_backend_llamacpp PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/include/rac/backends
+    ${RAC_COMMONS_ROOT_DIR}/include
+    ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
     ${llamacpp_SOURCE_DIR}/include
     ${llamacpp_SOURCE_DIR}/common
     ${llamacpp_SOURCE_DIR}/ggml/include
@@ -239,7 +244,7 @@ if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED)
 
         target_include_directories(rac_backend_llamacpp_jni PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
-            ${CMAKE_SOURCE_DIR}/include
+            ${RAC_COMMONS_ROOT_DIR}/include
         )
 
         target_link_libraries(rac_backend_llamacpp_jni PRIVATE

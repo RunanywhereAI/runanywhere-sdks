@@ -141,6 +141,8 @@ DeviceType LlamaCppBackend::get_device_type() const {
     return DeviceType::METAL;
 #elif defined(GGML_USE_CUDA)
     return DeviceType::CUDA;
+#elif defined(GGML_USE_WEBGPU)
+    return DeviceType::WEBGPU;
 #else
     return DeviceType::CPU;
 #endif
@@ -195,6 +197,15 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     model_path_ = model_path;
 
     llama_model_params model_params = llama_model_default_params();
+
+#ifdef __EMSCRIPTEN__
+    // CRITICAL: Disable mmap for WebAssembly builds.
+    // Emscripten's mmap goes through a JS trampoline (_mmap_js).
+    // JSPI can only suspend WASM frames, not JS frames, so mmap
+    // during model loading causes "trying to suspend JS frames".
+    // With mmap disabled, llama.cpp falls back to fread (pure WASM).
+    model_params.use_mmap = false;
+#endif
 
     // Detect model size from filename to set appropriate GPU layers BEFORE loading
     // This prevents OOM crashes on mobile devices with limited GPU memory
@@ -432,12 +443,25 @@ std::string LlamaCppTextGeneration::apply_chat_template(
     std::string formatted;
     formatted.resize(1024 * 256);
 
-    int32_t result =
-        llama_chat_apply_template(tmpl_to_use, chat_messages.data(), chat_messages.size(),
-                                  add_assistant_token, formatted.data(), formatted.size());
+    // llama_chat_apply_template may throw C++ exceptions for unsupported Jinja
+    // template features (e.g. certain model chat templates use advanced Jinja syntax
+    // that llama.cpp's minja parser cannot handle). We catch any exception and fall
+    // back to a simple prompt format so generation can still proceed.
+    int32_t result = -1;
+    try {
+        result =
+            llama_chat_apply_template(tmpl_to_use, chat_messages.data(), chat_messages.size(),
+                                      add_assistant_token, formatted.data(), formatted.size());
+    } catch (const std::exception& e) {
+        LOGE("llama_chat_apply_template threw exception: %s", e.what());
+        result = -1;
+    } catch (...) {
+        LOGE("llama_chat_apply_template threw unknown exception");
+        result = -1;
+    }
 
     if (result < 0) {
-        LOGE("llama_chat_apply_template failed: %d", result);
+        LOGI("Chat template failed (result=%d), using simple fallback format", result);
         std::string fallback;
         for (const auto& msg : chat_messages) {
             fallback += std::string(msg.role) + ": " + msg.content + "\n";
@@ -450,8 +474,20 @@ std::string LlamaCppTextGeneration::apply_chat_template(
 
     if (result > (int32_t)formatted.size()) {
         formatted.resize(result + 1024);
-        result = llama_chat_apply_template(tmpl_to_use, chat_messages.data(), chat_messages.size(),
-                                           add_assistant_token, formatted.data(), formatted.size());
+        try {
+            result = llama_chat_apply_template(tmpl_to_use, chat_messages.data(), chat_messages.size(),
+                                               add_assistant_token, formatted.data(), formatted.size());
+        } catch (...) {
+            LOGE("llama_chat_apply_template threw exception on retry");
+            std::string fallback;
+            for (const auto& msg : chat_messages) {
+                fallback += std::string(msg.role) + ": " + msg.content + "\n";
+            }
+            if (add_assistant_token) {
+                fallback += "assistant: ";
+            }
+            return fallback;
+        }
     }
 
     if (result > 0) {
