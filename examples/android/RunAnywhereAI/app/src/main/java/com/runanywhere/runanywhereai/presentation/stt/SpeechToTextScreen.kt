@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -48,7 +49,6 @@ import com.runanywhere.runanywhereai.presentation.chat.components.ModelLoadedToa
 import com.runanywhere.runanywhereai.presentation.chat.components.ModelRequiredOverlay
 import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
 import com.runanywhere.runanywhereai.ui.theme.AppColors
-import com.runanywhere.runanywhereai.ui.theme.AppTypography
 import com.runanywhere.runanywhereai.util.getModelLogoResIdForName
 import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
 import kotlinx.coroutines.launch
@@ -97,15 +97,25 @@ fun SpeechToTextScreen(viewModel: SpeechToTextViewModel = viewModel()) {
                     title = {
                         Text(
                             text = "Speech to Text",
-                            style = MaterialTheme.typography.headlineMedium,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
                         )
                     },
                     actions = {
-                        IconButton(onClick = { showModelPicker = true }) {
-                            STTModelButton(
+                        Surface(
+                            onClick = { showModelPicker = true },
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        ) {
+                            STTModelChip(
                                 modelName = uiState.selectedModelName,
-                                frameworkDisplayName = uiState.selectedFramework?.displayName,
                                 mode = uiState.mode,
+                                modifier = Modifier.padding(
+                                    start = 6.dp,
+                                    end = 12.dp,
+                                    top = 6.dp,
+                                    bottom = 6.dp,
+                                ),
                             )
                         }
                     },
@@ -732,24 +742,23 @@ private fun ControlsSection(
 }
 
 /**
- * STT toolbar model button - icon, model name to the right, below: electricity icon + Streaming/Batch text
+ * STT app bar model chip - same style as ChatTopBar: pill Surface, model icon + name + Streaming/Batch.
  */
 @Composable
-private fun STTModelButton(
+private fun STTModelChip(
     modelName: String?,
-    frameworkDisplayName: String?,
     mode: STTMode,
+    modifier: Modifier = Modifier,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = modifier,
     ) {
         if (modelName != null) {
             Box(
-                modifier =
-                    Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(4.dp)),
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(6.dp)),
             ) {
                 Image(
                     painter = painterResource(id = getModelLogoResIdForName(modelName)),
@@ -758,15 +767,16 @@ private fun STTModelButton(
                     contentScale = ContentScale.Fit,
                 )
             }
-            Column(
-                horizontalAlignment = Alignment.Start,
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(
-                    text = shortModelNameSTT(modelName),
+                    text = shortModelNameSTT(modelName, maxLength = 12),
                     style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Medium,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -780,21 +790,26 @@ private fun STTModelButton(
                     )
                     Text(
                         text = if (mode == STTMode.LIVE) "Streaming" else "Batch",
-                        style = AppTypography.system10.copy(fontWeight = FontWeight.Medium),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                        ),
                         color = if (mode == STTMode.LIVE) AppColors.primaryGreen else AppColors.primaryOrange,
                     )
                 }
             }
         } else {
             Icon(
-                imageVector = Icons.Default.GraphicEq,
+                imageVector = Icons.Default.ViewInAr,
                 contentDescription = null,
-                modifier = Modifier.size(14.dp),
-                tint = AppColors.primaryGreen,
+                modifier = Modifier.size(16.dp),
+                tint = AppColors.primaryAccent,
             )
+            Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = "Select Model",
                 style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
             )
         }
     }
