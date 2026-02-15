@@ -13,6 +13,7 @@
 import { WASMBridge } from '../Foundation/WASMBridge';
 import { SherpaONNXBridge } from '../Foundation/SherpaONNXBridge';
 import { EventBus } from '../Foundation/EventBus';
+import { SDKLogger } from '../Foundation/SDKLogger';
 import { STTModelType } from '../Public/Extensions/STTTypes';
 import { ModelCategory, LLMFramework, ModelStatus, DownloadStage, SDKEventType } from '../types/enums';
 import type { LLMModelLoader, STTModelLoader, TTSModelLoader, VADModelLoader } from './ModelLoaderTypes';
@@ -71,6 +72,8 @@ export interface VLMLoader {
 // ---------------------------------------------------------------------------
 // Model Manager Singleton
 // ---------------------------------------------------------------------------
+
+const logger = new SDKLogger('ModelManager');
 
 class ModelManagerImpl {
   private readonly registry = new ModelRegistry();
@@ -146,7 +149,7 @@ class ModelManagerImpl {
     try {
       if (navigator.storage?.persist) {
         const persisted = await navigator.storage.persist();
-        console.log(`[ModelManager] Persistent storage: ${persisted ? 'granted' : 'denied'}`);
+        logger.info(`Persistent storage: ${persisted ? 'granted' : 'denied'}`);
       }
     } catch {
       // Not supported or denied — non-critical
@@ -310,7 +313,7 @@ class ModelManagerImpl {
       // Other categories remain loaded for multi-model workflows.
       const currentId = this.loadedByCategory.get(category);
       if (currentId && currentId !== modelId) {
-        console.log(`[ModelManager] Swapping ${category} model: ${currentId} → ${modelId}`);
+        logger.info(`Swapping ${category} model: ${currentId} → ${modelId}`);
         await this.unloadModelByCategory(category);
       }
     } else {
@@ -342,7 +345,7 @@ class ModelManagerImpl {
           await this.loadLLMModel(model, modelId, new Uint8Array(0));
         } else {
           // Model is in memory cache only (OPFS quota exceeded) — read and transfer to Worker
-          console.log(`[ModelManager] VLM model ${modelId} not in OPFS, reading from memory cache to transfer to Worker`);
+          logger.debug(`VLM model ${modelId} not in OPFS, reading from memory cache to transfer to Worker`);
           const data = await this.downloader.loadFromOPFS(modelId);
           if (!data) throw new Error('Model not downloaded — please download the model first.');
           await this.loadLLMModel(model, modelId, data);
@@ -376,7 +379,7 @@ class ModelManagerImpl {
       const message = err instanceof Error
         ? err.message
         : (typeof err === 'object' ? JSON.stringify(err) : String(err));
-      console.error(`[ModelManager] Failed to load model ${modelId}:`, message, err);
+      logger.error(`Failed to load model ${modelId}: ${message}`);
       this.registry.updateModel(modelId, { status: ModelStatus.Error, error: message });
       EventBus.shared.emit('model.loadFailed', SDKEventType.Model, { modelId, error: message });
       return false;
@@ -406,7 +409,7 @@ class ModelManagerImpl {
 
     for (const [category, loadedId] of loaded) {
       if (exceptModelId && loadedId === exceptModelId) continue;
-      console.log(`[ModelManager] Unloading ${category} model (${loadedId}) — freeing resources`);
+      logger.info(`Unloading ${category} model (${loadedId}) — freeing resources`);
       await this.unloadModelByCategory(category);
     }
   }
@@ -535,15 +538,15 @@ class ModelManagerImpl {
 
       m.FS_createPath('/', 'models', true, true);
       try { m.FS_unlink(fsPath); } catch { /* File doesn't exist yet */ }
-      console.log(`[ModelManager] Writing ${data.length} bytes to ${fsPath}`);
+      logger.debug(`Writing ${data.length} bytes to ${fsPath}`);
       m.FS_createDataFile('/models', `${modelId}.gguf`, data, true, true, true);
-      console.log(`[ModelManager] Model file written to ${fsPath}`);
+      logger.debug(`Model file written to ${fsPath}`);
     }
 
     if (model.modality === ModelCategory.Multimodal) {
       const mmprojFile = model.additionalFiles?.find((f) => f.filename.includes('mmproj'));
       if (!mmprojFile) {
-        console.warn(`[ModelManager] No mmproj found, loading as text-only LLM: ${modelId}`);
+        logger.warning(`No mmproj found, loading as text-only LLM: ${modelId}`);
         if (!this.llmLoader) throw new Error('No LLM loader registered. Call ModelManager.setLLMLoader() first.');
         await this.llmLoader.loadModel(fsPath, modelId, model.name);
       } else {
@@ -551,7 +554,7 @@ class ModelManagerImpl {
         const mmprojKey = this.downloader.additionalFileKey(modelId, mmprojFile.filename);
         const mmprojExists = await this.downloader.existsInOPFS(mmprojKey);
         if (!mmprojExists && mmprojFile.url) {
-          console.log(`[ModelManager] mmproj not in OPFS, downloading on-demand: ${mmprojFile.filename}`);
+          logger.debug(`mmproj not in OPFS, downloading on-demand: ${mmprojFile.filename}`);
           const mmprojDownload = await this.downloader.downloadFile(mmprojFile.url);
           await this.downloader.storeInOPFS(mmprojKey, mmprojDownload);
         }
@@ -562,7 +565,7 @@ class ModelManagerImpl {
 
         // Initialize the Worker (loads its own WASM instance)
         if (!this.vlmLoader.isInitialized) {
-          console.log('[ModelManager] Initializing VLM loader...');
+          logger.info('Initializing VLM loader...');
           await this.vlmLoader.init();
         }
 
@@ -576,7 +579,7 @@ class ModelManagerImpl {
           // data was already read from memory cache in the caller
           modelDataBuf = new ArrayBuffer(data.byteLength);
           new Uint8Array(modelDataBuf).set(data);
-          console.log(`[ModelManager] Transferring model data to VLM Worker (${(data.length / 1024 / 1024).toFixed(1)} MB)`);
+          logger.debug(`Transferring model data to VLM Worker (${(data.length / 1024 / 1024).toFixed(1)} MB)`);
         }
 
         const mmprojInOPFS = await this.downloader.existsInActualOPFS(mmprojKey);
@@ -585,12 +588,12 @@ class ModelManagerImpl {
           if (mmprojBytes) {
             mmprojDataBuf = new ArrayBuffer(mmprojBytes.byteLength);
             new Uint8Array(mmprojDataBuf).set(mmprojBytes);
-            console.log(`[ModelManager] Transferring mmproj data to VLM Worker (${(mmprojBytes.length / 1024 / 1024).toFixed(1)} MB)`);
+            logger.debug(`Transferring mmproj data to VLM Worker (${(mmprojBytes.length / 1024 / 1024).toFixed(1)} MB)`);
           }
         }
 
         // Load model via the pluggable VLM loader
-        console.log(`[ModelManager] Loading VLM model: ${modelId}`);
+        logger.info(`Loading VLM model: ${modelId}`);
         await this.vlmLoader.loadModel({
           modelOpfsKey: modelId,
           modelFilename: `${modelId}.gguf`,
@@ -601,12 +604,12 @@ class ModelManagerImpl {
           modelData: modelDataBuf,
           mmprojData: mmprojDataBuf,
         });
-        console.log(`[ModelManager] VLM model loaded: ${modelId}`);
+        logger.info(`VLM model loaded: ${modelId}`);
       }
     } else if (model.modality === ModelCategory.Language) {
       if (!this.llmLoader) throw new Error('No LLM loader registered. Call ModelManager.setLLMLoader() first.');
       await this.llmLoader.loadModel(fsPath, modelId, model.name);
-      console.log(`[ModelManager] LLM model loaded via TextGeneration: ${modelId}`);
+      logger.info(`LLM model loaded via TextGeneration: ${modelId}`);
     }
   }
 
@@ -632,7 +635,7 @@ class ModelManagerImpl {
       await this.loadSTTFromIndividualFiles(model, primaryData, sherpa, modelDir);
     }
 
-    console.log(`[ModelManager] STT model loaded via sherpa-onnx: ${model.id}`);
+    logger.info(`STT model loaded via sherpa-onnx: ${model.id}`);
   }
 
   /**
@@ -645,10 +648,10 @@ class ModelManagerImpl {
     sherpa: SherpaONNXBridge,
     modelDir: string,
   ): Promise<void> {
-    console.log(`[ModelManager] Extracting STT archive for ${model.id} (${archiveData.length} bytes)...`);
+    logger.debug(`Extracting STT archive for ${model.id} (${archiveData.length} bytes)...`);
 
     const entries = await extractTarGz(archiveData);
-    console.log(`[ModelManager] Extracted ${entries.length} files from STT archive`);
+    logger.debug(`Extracted ${entries.length} files from STT archive`);
 
     const prefix = this.findArchivePrefix(entries.map(e => e.path));
 
@@ -727,7 +730,7 @@ class ModelManagerImpl {
     const primaryFilename = model.url.split('/').pop()!;
     const primaryPath = `${modelDir}/${primaryFilename}`;
 
-    console.log(`[ModelManager] Writing STT primary file to ${primaryPath} (${primaryData.length} bytes)`);
+    logger.debug(`Writing STT primary file to ${primaryPath} (${primaryData.length} bytes)`);
     sherpa.writeFile(primaryPath, primaryData);
 
     // Write additional files to sherpa FS (download on-demand if missing from OPFS)
@@ -737,12 +740,12 @@ class ModelManagerImpl {
         const fileKey = this.downloader.additionalFileKey(model.id, file.filename);
         let fileData = await this.downloader.loadFromOPFS(fileKey);
         if (!fileData) {
-          console.log(`[ModelManager] Additional file ${file.filename} not in OPFS, downloading...`);
+          logger.debug(`Additional file ${file.filename} not in OPFS, downloading...`);
           fileData = await this.downloader.downloadFile(file.url);
           await this.downloader.storeInOPFS(fileKey, fileData);
         }
         const filePath = `${modelDir}/${file.filename}`;
-        console.log(`[ModelManager] Writing STT file to ${filePath} (${fileData.length} bytes)`);
+        logger.debug(`Writing STT file to ${filePath} (${fileData.length} bytes)`);
         sherpa.writeFile(filePath, fileData);
         additionalPaths[file.filename] = filePath;
       }
@@ -825,7 +828,7 @@ class ModelManagerImpl {
       await this.loadTTSFromIndividualFiles(model, primaryData, sherpa, modelDir);
     }
 
-    console.log(`[ModelManager] TTS model loaded via sherpa-onnx: ${model.id}`);
+    logger.info(`TTS model loaded via sherpa-onnx: ${model.id}`);
   }
 
   /**
@@ -841,10 +844,10 @@ class ModelManagerImpl {
     sherpa: SherpaONNXBridge,
     modelDir: string,
   ): Promise<void> {
-    console.log(`[ModelManager] Extracting TTS archive for ${model.id} (${archiveData.length} bytes)...`);
+    logger.debug(`Extracting TTS archive for ${model.id} (${archiveData.length} bytes)...`);
 
     const entries = await extractTarGz(archiveData);
-    console.log(`[ModelManager] Extracted ${entries.length} files from archive`);
+    logger.debug(`Extracted ${entries.length} files from archive`);
 
     // Find the common prefix (nested directory) — archives typically contain
     // one top-level directory with all files inside it.
@@ -881,7 +884,7 @@ class ModelManagerImpl {
       throw new Error(`TTS archive for '${model.id}' does not contain tokens.txt`);
     }
 
-    console.log(`[ModelManager] TTS archive extracted — model: ${modelPath}, tokens: ${tokensPath}, dataDir: ${dataDirPath ?? 'none'}`);
+    logger.debug(`TTS archive extracted — model: ${modelPath}, tokens: ${tokensPath}, dataDir: ${dataDirPath ?? 'none'}`);
 
     await this.ttsLoader!.loadVoice({
       voiceId: model.id,
@@ -906,7 +909,7 @@ class ModelManagerImpl {
     const primaryFilename = model.url.split('/').pop()!;
     const primaryPath = `${modelDir}/${primaryFilename}`;
 
-    console.log(`[ModelManager] Writing TTS primary file to ${primaryPath} (${primaryData.length} bytes)`);
+    logger.debug(`Writing TTS primary file to ${primaryPath} (${primaryData.length} bytes)`);
     sherpa.writeFile(primaryPath, primaryData);
 
     // Write additional files (tokens.txt, *.json, etc.)
@@ -916,12 +919,12 @@ class ModelManagerImpl {
         const fileKey = this.downloader.additionalFileKey(model.id, file.filename);
         let fileData = await this.downloader.loadFromOPFS(fileKey);
         if (!fileData) {
-          console.log(`[ModelManager] Additional file ${file.filename} not in OPFS, downloading...`);
+          logger.debug(`Additional file ${file.filename} not in OPFS, downloading...`);
           fileData = await this.downloader.downloadFile(file.url);
           await this.downloader.storeInOPFS(fileKey, fileData);
         }
         const filePath = `${modelDir}/${file.filename}`;
-        console.log(`[ModelManager] Writing TTS file to ${filePath} (${fileData.length} bytes)`);
+        logger.debug(`Writing TTS file to ${filePath} (${fileData.length} bytes)`);
         sherpa.writeFile(filePath, fileData);
         additionalPaths[file.filename] = filePath;
       }
@@ -953,12 +956,12 @@ class ModelManagerImpl {
     const filename = model.url?.split('/').pop() ?? 'silero_vad.onnx';
     const fsPath = `${modelDir}/${filename}`;
 
-    console.log(`[ModelManager] Writing VAD model to ${fsPath} (${data.length} bytes)`);
+    logger.debug(`Writing VAD model to ${fsPath} (${data.length} bytes)`);
     sherpa.writeFile(fsPath, data);
 
     if (!this.vadLoader) throw new Error('No VAD loader registered. Call ModelManager.setVADLoader() first.');
     await this.vadLoader.loadModel({ modelPath: fsPath });
-    console.log(`[ModelManager] VAD model loaded: ${model.id}`);
+    logger.info(`VAD model loaded: ${model.id}`);
   }
 
   /**
@@ -983,7 +986,7 @@ class ModelManagerImpl {
     const modelId = this.loadedByCategory.get(category);
     if (!modelId) return;
 
-    console.log(`[ModelManager] Unloading ${category} model: ${modelId}`);
+    logger.info(`Unloading ${category} model: ${modelId}`);
 
     try {
       if (category === ModelCategory.SpeechRecognition) {
@@ -1009,14 +1012,14 @@ class ModelManagerImpl {
             const m = bridge.module as any;
             const fsPath = `/models/${modelId}.gguf`;
             try { m.FS_unlink(fsPath); } catch { /* file may not exist */ }
-            console.log(`[ModelManager] Cleaned up Emscripten FS: ${fsPath}`);
+            logger.debug(`Cleaned up Emscripten FS: ${fsPath}`);
           }
         } catch {
           // Non-critical — FS cleanup is best-effort
         }
       }
     } catch (err) {
-      console.warn(`[ModelManager] Error during unload of ${modelId}:`, err);
+      logger.warning(`Error during unload of ${modelId}: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     this.registry.updateModel(modelId, { status: ModelStatus.Downloaded });
