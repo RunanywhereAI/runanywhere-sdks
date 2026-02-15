@@ -57,7 +57,7 @@ fun VoiceAssistantParticleView(
     Canvas(modifier = modifier) {
         val centerX = size.width / 2
         val centerY = size.height / 2
-        val scale = minOf(size.width, size.height) * 0.35f
+        val scale = minOf(size.width, size.height) * 0.50f
 
         particles.forEach { particle ->
             drawParticle(
