@@ -7,6 +7,7 @@ import androidx.compose.animation.core.EaseInOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -21,7 +22,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -568,6 +571,9 @@ private fun MainVoiceAssistantUI(
 
     // Particle animation state
     var amplitude by remember { mutableStateOf(0f) }
+    var morphProgress by remember { mutableFloatStateOf(0f) }
+    var scatterAmount by remember { mutableFloatStateOf(0f) }
+    var touchPoint by remember { mutableStateOf(Offset.Zero) }
     val isDarkMode = isSystemInDarkTheme()
 
     // Keep a reference that always points to the latest uiState so the
@@ -577,7 +583,7 @@ private fun MainVoiceAssistantUI(
     // Determine if animation should be active to save battery/CPU
     val isListening = uiState.sessionState == SessionState.LISTENING
     val isSpeaking = uiState.sessionState == SessionState.SPEAKING
-    val isAnimationNeeded = isListening || isSpeaking || amplitude > 0.001f
+    val isAnimationNeeded = isListening || isSpeaking || amplitude > 0.001f || morphProgress > 0.001f
 
     // Animation timer (60 FPS = ~16ms) - only runs when animation is needed
     LaunchedEffect(isAnimationNeeded, uiState.sessionState) {
@@ -589,10 +595,25 @@ private fun MainVoiceAssistantUI(
                     amplitudeState = { amplitude },
                     onAmplitudeChange = { amplitude = it },
                 )
+
+                // Morph: sphere → ring when listening/speaking
+                val targetMorph = if (currentUiState.sessionState == SessionState.LISTENING ||
+                    currentUiState.sessionState == SessionState.SPEAKING) 1f else 0f
+                morphProgress += (targetMorph - morphProgress) * 0.04f
+                morphProgress = morphProgress.coerceIn(0f, 1f)
+
+                // Scatter decay
+                if (scatterAmount > 0.001f) {
+                    scatterAmount *= 0.92f
+                } else {
+                    scatterAmount = 0f
+                }
+
                 // Re-check if animation is still needed
                 val stillNeeded = currentUiState.sessionState == SessionState.LISTENING ||
                     currentUiState.sessionState == SessionState.SPEAKING ||
-                    amplitude > 0.001f
+                    amplitude > 0.001f ||
+                    morphProgress > 0.001f
                 if (!stillNeeded) break
             }
         }
@@ -604,13 +625,30 @@ private fun MainVoiceAssistantUI(
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val size = min(constraints.maxWidth, constraints.maxHeight) * 0.9f
 
-            VoiceAssistantParticleView(
+            VoiceAssistantParticleCanvas(
                 amplitude = amplitude,
+                morphProgress = morphProgress,
+                scatterAmount = scatterAmount,
+                touchPoint = touchPoint,
                 isDarkMode = isDarkMode,
                 modifier = Modifier
                     .size(with(density) { size.toDp() })
                     .align(Alignment.Center)
-                    .offset(y = with(density) { (-50).dp }),
+                    .offset(y = with(density) { (-50).dp })
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDrag = { change, _ ->
+                                change.consume()
+                                val pos = change.position
+                                val w = this.size.width.toFloat()
+                                val h = this.size.height.toFloat()
+                                val normX = ((pos.x - w / 2f) / (w / 2f)) * 0.85f
+                                val normY = -((pos.y - h / 2f) / (h / 2f)) * 0.85f
+                                touchPoint = Offset(normX, normY)
+                                scatterAmount = 1f
+                            }
+                        )
+                    },
             )
         }
 
