@@ -12,7 +12,7 @@
 import type { TabLifecycle } from '../app';
 import { ModelManager, ModelCategory, type ModelInfo } from '../services/model-manager';
 import { showModelSelectionSheet } from '../components/model-selection';
-import { VLMWorkerBridge } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
+import { VLMWorkerBridge, VideoCapture, type CapturedFrame } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
 
 // ---------------------------------------------------------------------------
 // Constants (matching iOS VLMViewModel defaults)
@@ -41,8 +41,6 @@ const MAX_CAPTURE_DIM_LIVE = 256;
 let container: HTMLElement;
 let overlayEl: HTMLElement;
 let toolbarModelEl: HTMLElement;
-let videoEl: HTMLVideoElement;
-let canvasEl: HTMLCanvasElement;
 let descriptionEl: HTMLElement;
 let captureBtn: HTMLElement;
 let liveToggleBtn: HTMLElement;
@@ -51,7 +49,9 @@ let processingOverlay: HTMLElement;
 let metricsEl: HTMLElement;
 let copyBtn: HTMLElement;
 
-let cameraStream: MediaStream | null = null;
+/** SDK VideoCapture manages camera lifecycle + frame extraction. */
+const camera = new VideoCapture({ facingMode: 'environment' });
+
 let isProcessing = false;
 let isLiveMode = false;
 let liveIntervalId: ReturnType<typeof setTimeout> | null = null;
@@ -78,9 +78,7 @@ export function initVisionTab(el: HTMLElement): TabLifecycle {
     <!-- Main Content -->
     <div class="vision-main hidden" id="vision-main">
       <!-- Camera Preview -->
-      <div class="vision-camera-container">
-        <video id="vision-video" autoplay playsinline muted></video>
-        <canvas id="vision-canvas" class="hidden"></canvas>
+      <div class="vision-camera-container" id="vision-camera-container">
         <!-- Processing overlay -->
         <div class="vision-processing-overlay hidden" id="vision-processing-overlay">
           <div class="typing-dots vision-typing-dots-sm">
@@ -147,8 +145,6 @@ export function initVisionTab(el: HTMLElement): TabLifecycle {
   // Cache references
   overlayEl = container.querySelector('#vision-model-overlay')!;
   toolbarModelEl = container.querySelector('#vision-toolbar-model')!;
-  videoEl = container.querySelector('#vision-video')!;
-  canvasEl = container.querySelector('#vision-canvas')!;
   descriptionEl = container.querySelector('#vision-description-text')!;
   captureBtn = container.querySelector('#vision-capture-btn')!;
   liveToggleBtn = container.querySelector('#vision-live-btn')!;
@@ -175,13 +171,13 @@ export function initVisionTab(el: HTMLElement): TabLifecycle {
       // Stop live mode interval (fires VLM inference every 2.5s)
       stopLiveMode();
       // Release the camera hardware to free resources
-      stopCamera();
+      camera.stop();
       console.log('[Vision] Tab deactivated — camera & live mode stopped');
     },
     onActivate(): void {
       // Re-open the camera if a model is loaded (user had it running before)
       const loaded = ModelManager.getLoadedModel(ModelCategory.Multimodal);
-      if (loaded && !cameraStream) {
+      if (loaded && !camera.isCapturing) {
         startCamera();
         console.log('[Vision] Tab activated — camera restarted');
       }
@@ -229,7 +225,7 @@ function onModelsChanged(_models: ModelInfo[]): void {
     overlayEl.classList.add('hidden');
     (container.querySelector('#vision-main') as HTMLElement).classList.remove('hidden');
     // Auto-start camera if not already running
-    if (!cameraStream) {
+    if (!camera.isCapturing) {
       startCamera();
     }
   } else {
@@ -237,7 +233,7 @@ function onModelsChanged(_models: ModelInfo[]): void {
     if (textSpan) textSpan.textContent = 'Select Vision Model';
     (container.querySelector('#vision-main') as HTMLElement).classList.add('hidden');
     stopLiveMode();
-    stopCamera();
+    camera.stop();
   }
 }
 
@@ -260,16 +256,21 @@ async function onGetStarted(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Camera
+// Camera (managed by SDK VideoCapture)
 // ---------------------------------------------------------------------------
 
 async function startCamera(): Promise<void> {
   try {
-    cameraStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
-      audio: false,
-    });
-    videoEl.srcObject = cameraStream;
+    await camera.start();
+
+    // Attach the VideoCapture's video element to the DOM for live preview
+    const cameraContainer = container.querySelector('#vision-camera-container');
+    if (cameraContainer && !cameraContainer.contains(camera.videoElement)) {
+      // Re-insert the processing overlay after the video element
+      const overlay = container.querySelector('#vision-processing-overlay');
+      camera.videoElement.id = 'vision-video';
+      cameraContainer.insertBefore(camera.videoElement, overlay);
+    }
 
     overlayEl.classList.add('hidden');
     (container.querySelector('#vision-main') as HTMLElement).classList.remove('hidden');
@@ -282,81 +283,6 @@ async function startCamera(): Promise<void> {
     overlayEl.classList.add('hidden');
     (container.querySelector('#vision-main') as HTMLElement).classList.remove('hidden');
   }
-}
-
-function stopCamera(): void {
-  if (cameraStream) {
-    cameraStream.getTracks().forEach((t) => t.stop());
-    cameraStream = null;
-    videoEl.srcObject = null;
-  }
-}
-
-/** Captured frame data: raw RGB pixels + dimensions */
-interface CapturedFrame {
-  rgbPixels: Uint8Array;
-  width: number;
-  height: number;
-}
-
-/**
- * Compute a downscaled size that fits within maxDim while
- * preserving aspect ratio. Returns original size if already small enough.
- */
-function fitSize(srcW: number, srcH: number, maxDim: number): { w: number; h: number } {
-  if (srcW <= maxDim && srcH <= maxDim) {
-    return { w: srcW, h: srcH };
-  }
-  const scale = maxDim / Math.max(srcW, srcH);
-  return {
-    w: Math.round(srcW * scale),
-    h: Math.round(srcH * scale),
-  };
-}
-
-/**
- * Capture the current video frame as raw RGB pixels.
- *
- * The C++ VLM backend (llama.cpp mtmd) expects RAC_VLM_IMAGE_FORMAT_RGB_PIXELS
- * with RGBRGBRGB... byte layout — matching how iOS sends CVPixelBuffer data
- * after BGRA→RGB conversion.
- *
- * Frames are downscaled to MAX_CAPTURE_DIM to reduce WASM copy time and
- * memory pressure (the vision encoder resizes to ~384px internally anyway).
- */
-function captureFrame(maxDim: number = MAX_CAPTURE_DIM_SINGLE): CapturedFrame | null {
-  if (!videoEl.videoWidth || !videoEl.videoHeight) return null;
-
-  const { w, h } = fitSize(videoEl.videoWidth, videoEl.videoHeight, maxDim);
-  canvasEl.width = w;
-  canvasEl.height = h;
-  const ctx = canvasEl.getContext('2d');
-  if (!ctx) return null;
-
-  // Draw the video frame scaled down onto the smaller canvas
-  ctx.drawImage(videoEl, 0, 0, w, h);
-  return extractRGBFromCanvas(ctx, w, h);
-}
-
-/**
- * Extract raw RGB pixels from a canvas 2D context.
- * Canvas gives RGBA; we strip the alpha channel to produce RGBRGBRGB...
- */
-function extractRGBFromCanvas(ctx: CanvasRenderingContext2D, w: number, h: number): CapturedFrame {
-  const imageData = ctx.getImageData(0, 0, w, h);
-  const rgba = imageData.data; // Uint8ClampedArray: RGBARGBA...
-  const pixelCount = w * h;
-  const rgb = new Uint8Array(pixelCount * 3);
-
-  for (let i = 0; i < pixelCount; i++) {
-    const src = i * 4;
-    const dst = i * 3;
-    rgb[dst] = rgba[src];         // R
-    rgb[dst + 1] = rgba[src + 1]; // G
-    rgb[dst + 2] = rgba[src + 2]; // B
-  }
-
-  return { rgbPixels: rgb, width: w, height: h };
 }
 
 // ---------------------------------------------------------------------------
@@ -442,7 +368,7 @@ async function describeCurrent(prompt: string, maxTokens: number): Promise<void>
 
   // Live mode uses a smaller capture (256px) for faster CLIP encoding
   const captureDim = isLiveMode ? MAX_CAPTURE_DIM_LIVE : MAX_CAPTURE_DIM_SINGLE;
-  const frame = captureFrame(captureDim);
+  const frame = camera.captureFrame(captureDim);
   if (!frame) {
     descriptionEl.innerHTML = `<span class="text-tertiary">No camera frame available. Make sure the camera is active.</span>`;
     return;
