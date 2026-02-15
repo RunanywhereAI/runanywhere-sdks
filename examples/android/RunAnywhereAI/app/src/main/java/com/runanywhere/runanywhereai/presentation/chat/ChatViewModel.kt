@@ -153,8 +153,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 messages = _uiState.value.messages + userMessage,
             )
 
-        // Save user message to conversation and keep ViewModel in sync with store
-        // so the conversation list shows the first message as title/preview immediately
+        // Save user message to conversation (store sets title from first user input)
+        // Refresh currentConversation from store so title appears in history immediately
         _uiState.value.currentConversation?.let { conversation ->
             conversationStore.addMessage(userMessage, conversation)
             conversationStore.loadConversation(conversation.id)?.let { updated ->
@@ -675,6 +675,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun loadConversation(conversation: Conversation) {
         val loaded = conversationStore.loadConversation(conversation.id) ?: conversation
+        conversationStore.ensureConversationInList(loaded)
         _uiState.value = _uiState.value.copy(currentConversation = loaded)
 
         if (loaded.messages.isEmpty()) {
@@ -695,6 +696,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun createNewConversation() {
         clearChat()
+    }
+
+    /**
+     * Ensure the current chat is in the store's list and persisted before showing history.
+     * Syncs latest messages to the store and adds the conversation to the list if absent.
+     */
+    fun ensureCurrentConversationInHistory() {
+        syncCurrentConversationToStore()
+        _uiState.value.currentConversation?.let { conversationStore.ensureConversationInList(it) }
     }
 
     /**
