@@ -25,8 +25,8 @@ module.exports = {
     },
     'react-native-sound': {
       platforms: {
-        ios: null,
-        android: null, // Disabled on both platforms - using custom audio implementation
+        ios: null, // iOS uses NativeAudioModule for playback
+        // Android: enable so TTS and Audio playback work
       },
     },
     'react-native-tts': {

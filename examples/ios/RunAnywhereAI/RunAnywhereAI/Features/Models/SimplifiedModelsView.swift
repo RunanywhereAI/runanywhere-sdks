@@ -39,6 +39,9 @@ struct SimplifiedModelsView: View {
         NavigationView {
             mainContentView
         }
+        #if os(iOS)
+        .navigationViewStyle(.stack)
+        #endif
     }
 
     private var mainContentView: some View {

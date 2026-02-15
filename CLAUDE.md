@@ -30,10 +30,12 @@ This repository contains cross-platform SDKs for the RunAnywhere on-device AI pl
 - **Kotlin Multiplatform SDK** (`sdk/runanywhere-kotlin/`) - Cross-platform SDK supporting JVM, Android, and Native platforms
 - **Android SDK** (`sdk/runanywhere-android/`) - Kotlin-based SDK for Android
 - **iOS SDK** (`sdk/runanywhere-swift/`) - Swift Package Manager-based SDK for iOS/macOS/tvOS/watchOS
+- **Web SDK** (`sdk/runanywhere-web/`) - TypeScript/WASM SDK for browsers via Emscripten
 
 ### Example Applications
 - **Android Demo** (`examples/android/RunAnywhereAI/`) - Sample Android app demonstrating SDK usage
 - **iOS Demo** (`examples/ios/RunAnywhereAI/`) - Sample iOS app demonstrating SDK usage
+- **Web Demo** (`examples/web/RunAnywhereAI/`) - Sample web app demonstrating SDK usage
 - **IntelliJ Plugin Demo** (`examples/intellij-plugin-demo/`) - IntelliJ/Android Studio plugin for voice features
 
 ## Common Development Commands
@@ -210,6 +212,69 @@ open RunAnywhereAI.xcworkspace
 **Error**: `Sandbox: rsync deny(1) file-write-create`
 **Fix**: After `pod install`, run `./fix_pods_sandbox.sh`
 
+### Web SDK Development
+
+```bash
+# Navigate to Web SDK
+cd sdk/runanywhere-web/
+
+# First-time setup (installs emsdk, npm deps, builds WASM + TypeScript)
+./scripts/build-web.sh --setup
+
+# Build WASM + TypeScript (all backends, default)
+./scripts/build-web.sh
+
+# Build WASM with specific backends
+./scripts/build-web.sh --build-wasm --llamacpp --onnx
+./scripts/build-web.sh --build-wasm --all-backends
+./scripts/build-web.sh --build-wasm --llamacpp --vlm --webgpu
+
+# Build TypeScript only (after WASM is already built)
+./scripts/build-web.sh --build-ts
+
+# Build sherpa-onnx WASM module (TTS/VAD)
+./scripts/build-web.sh --build-sherpa
+
+# Debug build with assertions
+./scripts/build-web.sh --debug --llamacpp
+
+# Clean all build artifacts
+./scripts/build-web.sh --clean
+
+# Direct npm commands (alternative)
+npm run build:wasm            # WASM build (core only, no backends)
+npm run build:ts              # TypeScript compilation
+npm run build                 # TypeScript only (default)
+npm run dev                   # TypeScript watch mode
+npm run typecheck             # Type-check without emitting
+npm run clean                 # Remove all build outputs
+```
+
+#### Build Output Locations
+
+After a successful build:
+- **WASM module**: `packages/core/wasm/racommons.wasm` + `racommons.js`
+- **WebGPU variant**: `packages/core/wasm/racommons-webgpu.wasm` (when --webgpu is used)
+- **Sherpa-ONNX**: `packages/core/wasm/sherpa/sherpa-onnx.wasm`
+- **TypeScript**: `packages/core/dist/`
+
+#### Prerequisites
+
+- **Emscripten SDK**: v5.0.0+ (installed automatically by `--setup`)
+- **CMake**: 3.22+
+- **Node.js**: 18+
+
+### Web Example App
+
+```bash
+# Navigate to web example
+cd examples/web/RunAnywhereAI/
+
+# Install dependencies and run dev server
+npm install
+npm run dev
+```
+
 ### Pre-commit Hooks
 
 ```bash
@@ -298,6 +363,7 @@ Workflows are located in `.github/workflows/`:
 - `ios-sdk.yml` - iOS SDK CI
 - `android-app.yml` - Android example app CI
 - `ios-app.yml` - iOS example app CI
+- `web-sdk-release.yml` - Web SDK release
 
 ## Kotlin Multiplatform (KMP) SDK - Critical Implementation Rules
 

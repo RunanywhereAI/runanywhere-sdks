@@ -5,8 +5,8 @@
 <h1 align="center">RunAnywhere</h1>
 
 <p align="center">
-  <strong>On-device AI for mobile apps.</strong><br/>
-  Run LLMs, speech-to-text, and text-to-speech locally—private, offline, fast.
+  <strong>On-device AI for every platform.</strong><br/>
+  Run LLMs, speech-to-text, and text-to-speech locally — private, offline, fast.
 </p>
 
 <p align="center">
@@ -25,40 +25,45 @@
   <a href="https://discord.gg/N359FBbDVd"><img src="https://img.shields.io/badge/Discord-Join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord" /></a>
 </p>
 
-<p align="center">
-  <img src="docs/screenshots/main-screenshot.jpg" alt="Chat" width="180"/>
-  &nbsp;&nbsp;
-  <img src="examples/ios/RunAnywhereAI/docs/screenshots/chat-interface.png" alt="Analytics" width="180"/>
-  &nbsp;&nbsp;
-  <img src="examples/ios/RunAnywhereAI/docs/screenshots/quiz-flow.png" alt="Structured Output" width="180"/>
-  &nbsp;&nbsp;
-  <img src="examples/ios/RunAnywhereAI/docs/screenshots/voice-ai.png" alt="Voice AI" width="180"/>
-</p>
-
----
-
 ## See It In Action
 
-<p align="center">
-  <img src="demo.gif" alt="On-device tool calling demo" width="260"/>
-</p>
-
-<p align="center">
-  <strong>Llama 3.2 3B on iPhone 16 Pro Max</strong><br/>
-  Tool calling + LLM reasoning — 100% on-device
-</p>
-
-<p align="center">
-  <a href="https://github.com/RunanywhereAI/runanywhere-sdks/pull/296">View the code</a>
-  &nbsp;·&nbsp;
-  <em>Full tool calling support coming soon</em>
-</p>
+<div align="center">
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/gifs/text-generation.gif" alt="Text Generation" width="240"/><br/><br/>
+      <strong>Text Generation</strong><br/>
+      <sub>LLM inference — 100% on-device</sub>
+    </td>
+    <td width="40"></td>
+    <td align="center" width="50%">
+      <img src="docs/gifs/voice-ai.gif" alt="Voice AI" width="240"/><br/><br/>
+      <strong>Voice AI</strong><br/>
+      <sub>STT → LLM → TTS pipeline — fully offline</sub>
+    </td>
+  </tr>
+  <tr><td colspan="3" height="30"></td></tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/gifs/image-generation.gif" alt="Image Generation" width="240"/><br/><br/>
+      <strong>Image Generation</strong><br/>
+      <sub>On-device diffusion model</sub>
+    </td>
+    <td width="40"></td>
+    <td align="center" width="50%">
+      <img src="docs/gifs/visual-language-model.gif" alt="Visual Language Model" width="240"/><br/><br/>
+      <strong>Visual Language Model</strong><br/>
+      <sub>Vision + language understanding on-device</sub>
+    </td>
+  </tr>
+</table>
+</div>
 
 ---
 
 ## What is RunAnywhere?
 
-RunAnywhere lets you add AI features to your mobile app that run entirely on-device:
+RunAnywhere lets you add AI features to your app that run entirely on-device:
 
 - **LLM Chat** — Llama, Mistral, Qwen, SmolLM, and more
 - **Speech-to-Text** — Whisper-powered transcription
@@ -75,6 +80,7 @@ No cloud. No latency. No data leaves the device.
 |----------|--------|--------------|---------------|
 | **Swift** (iOS/macOS) | Stable | [Swift Package Manager](#swift-ios--macos) | [docs.runanywhere.ai/swift](https://docs.runanywhere.ai/swift/introduction) |
 | **Kotlin** (Android) | Stable | [Gradle](#kotlin-android) | [docs.runanywhere.ai/kotlin](https://docs.runanywhere.ai/kotlin/introduction) |
+| **Web** (Browser) | Beta | [npm](#web-browser) | [SDK README](sdk/runanywhere-web/) |
 | **React Native** | Beta | [npm](#react-native) | [docs.runanywhere.ai/react-native](https://docs.runanywhere.ai/react-native/introduction) |
 | **Flutter** | Beta | [pub.dev](#flutter) | [docs.runanywhere.ai/flutter](https://docs.runanywhere.ai/flutter/introduction) |
 
@@ -203,6 +209,32 @@ dependencies:
 
 ---
 
+### Web (Browser)
+
+```typescript
+import { RunAnywhere, TextGeneration } from '@runanywhere/web';
+
+// 1. Initialize
+await RunAnywhere.initialize({ environment: 'development' });
+
+// 2. Load a model
+await TextGeneration.loadModel('/models/qwen2.5-0.5b-instruct-q4_0.gguf', 'qwen2.5-0.5b');
+
+// 3. Generate
+const result = await TextGeneration.generate('What is the capital of France?');
+console.log(result.text); // "Paris is the capital of France."
+```
+
+**Install via npm:**
+
+```bash
+npm install @runanywhere/web
+```
+
+[Full documentation →](sdk/runanywhere-web/) · [Source code](sdk/runanywhere-web/)
+
+---
+
 ## Sample Apps
 
 Full-featured demo applications demonstrating SDK capabilities:
@@ -211,6 +243,7 @@ Full-featured demo applications demonstrating SDK capabilities:
 |----------|-------------|----------|
 | iOS | [examples/ios/RunAnywhereAI](examples/ios/RunAnywhereAI/) | [App Store](https://apps.apple.com/us/app/runanywhere/id6756506307) |
 | Android | [examples/android/RunAnywhereAI](examples/android/RunAnywhereAI/) | [Google Play](https://play.google.com/store/apps/details?id=com.runanywhere.runanywhereai) |
+| Web | [examples/web/RunAnywhereAI](examples/web/RunAnywhereAI/) | Build from source |
 | React Native | [examples/react-native/RunAnywhereAI](examples/react-native/RunAnywhereAI/) | Build from source |
 | Flutter | [examples/flutter/RunAnywhereAI](examples/flutter/RunAnywhereAI/) | Build from source |
 
@@ -229,16 +262,19 @@ Standalone demo projects showcasing what you can build with RunAnywhere:
 
 ## Features
 
-| Feature | iOS | Android | React Native | Flutter |
-|---------|-----|---------|--------------|---------|
-| LLM Text Generation | ✅ | ✅ | ✅ | ✅ |
-| Streaming | ✅ | ✅ | ✅ | ✅ |
-| Speech-to-Text | ✅ | ✅ | ✅ | ✅ |
-| Text-to-Speech | ✅ | ✅ | ✅ | ✅ |
-| Voice Assistant Pipeline | ✅ | ✅ | ✅ | ✅ |
-| Model Download + Progress | ✅ | ✅ | ✅ | ✅ |
-| Structured Output (JSON) | ✅ | ✅ | 🔜 | 🔜 |
-| Apple Foundation Models | ✅ | — | — | — |
+| Feature | iOS | Android | Web | React Native | Flutter |
+|---------|-----|---------|-----|--------------|---------|
+| LLM Text Generation | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Streaming | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Speech-to-Text | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Text-to-Speech | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Voice Assistant Pipeline | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Vision Language Models | ✅ | — | ✅ | — | — |
+| Model Download + Progress | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Structured Output (JSON) | ✅ | ✅ | ✅ | 🔜 | 🔜 |
+| Tool Calling | ✅ | ✅ | ✅ | — | — |
+| Embeddings | — | — | ✅ | — | — |
+| Apple Foundation Models | ✅ | — | — | — | — |
 
 ---
 
@@ -276,6 +312,7 @@ runanywhere-sdks/
 ├── sdk/
 │   ├── runanywhere-swift/          # iOS/macOS SDK
 │   ├── runanywhere-kotlin/         # Android SDK
+│   ├── runanywhere-web/            # Web SDK (WebAssembly)
 │   ├── runanywhere-react-native/   # React Native SDK
 │   ├── runanywhere-flutter/        # Flutter SDK
 │   └── runanywhere-commons/        # Shared C++ core
@@ -283,6 +320,7 @@ runanywhere-sdks/
 ├── examples/
 │   ├── ios/RunAnywhereAI/          # iOS sample app
 │   ├── android/RunAnywhereAI/      # Android sample app
+│   ├── web/RunAnywhereAI/          # Web sample app
 │   ├── react-native/RunAnywhereAI/ # React Native sample app
 │   └── flutter/RunAnywhereAI/      # Flutter sample app
 │
@@ -302,6 +340,7 @@ runanywhere-sdks/
 | iOS | 17.0+ | 17.0+ |
 | macOS | 14.0+ | 14.0+ |
 | Android | API 24 (7.0) | API 28+ |
+| Web | Chrome 96+ / Edge 96+ | Chrome 120+ |
 | React Native | 0.74+ | 0.76+ |
 | Flutter | 3.10+ | 3.24+ |
 
