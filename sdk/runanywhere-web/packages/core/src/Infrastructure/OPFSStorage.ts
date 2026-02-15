@@ -33,6 +33,15 @@ export interface StoredModelInfo {
   lastModified: number;
 }
 
+/** Lightweight per-model metadata persisted alongside model files. */
+export interface ModelMetadata {
+  lastUsedAt: number;
+  sizeBytes: number;
+}
+
+/** The full metadata map stored as `_metadata.json` in the models directory. */
+export type MetadataMap = Record<string, ModelMetadata>;
+
 /**
  * OPFSStorage - Persistent model file storage using Origin Private File System.
  *
@@ -112,8 +121,13 @@ export class OPFSStorage {
 
     try {
       await writable.write(data);
-    } finally {
       await writable.close();
+    } catch (writeError) {
+      // Abort the writable stream instead of closing it (close() throws on errored streams)
+      try { await writable.abort(); } catch { /* ignore abort errors */ }
+      // Remove the corrupted 0-byte file so it doesn't poison the cache
+      try { await dir.removeEntry(filename); } catch { /* ignore cleanup errors */ }
+      throw writeError;
     }
 
     logger.info(`Model saved: ${key}`);
@@ -250,6 +264,49 @@ export class OPFSStorage {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       logger.error(`Failed to clear OPFS: ${msg}`);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Metadata persistence (lightweight JSON alongside model files)
+  // ---------------------------------------------------------------------------
+
+  private static readonly METADATA_FILENAME = '_metadata.json';
+
+  /**
+   * Save model metadata map to OPFS as a small JSON file.
+   * Used for LRU tracking (lastUsedAt timestamps).
+   */
+  async saveMetadata(data: MetadataMap): Promise<void> {
+    if (!this.modelsDir) return;
+
+    try {
+      const json = JSON.stringify(data);
+      const blob = new Blob([json], { type: 'application/json' });
+      const buf = await blob.arrayBuffer();
+      const handle = await this.modelsDir.getFileHandle(OPFSStorage.METADATA_FILENAME, { create: true });
+      const writable = await handle.createWritable();
+      await writable.write(buf);
+      await writable.close();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.warning(`Failed to save metadata: ${msg}`);
+    }
+  }
+
+  /**
+   * Load the persisted metadata map, or return an empty object.
+   */
+  async loadMetadata(): Promise<MetadataMap> {
+    if (!this.modelsDir) return {};
+
+    try {
+      const handle = await this.modelsDir.getFileHandle(OPFSStorage.METADATA_FILENAME);
+      const file = await handle.getFile();
+      const text = await file.text();
+      return JSON.parse(text) as MetadataMap;
+    } catch {
+      return {};
     }
   }
 

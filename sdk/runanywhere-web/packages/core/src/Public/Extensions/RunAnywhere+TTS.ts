@@ -36,17 +36,23 @@ import { initSherpaOnnxOfflineTtsConfig, freeConfig } from '../../../wasm/sherpa
 const logger = new SDKLogger('TTS');
 
 // ---------------------------------------------------------------------------
-// Internal State
+// Internal Helpers
 // ---------------------------------------------------------------------------
 
-let _ttsHandle = 0;
-let _currentVoiceId = '';
+function requireSherpa(): SherpaONNXBridge {
+  if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
+  return SherpaONNXBridge.shared;
+}
 
 // ---------------------------------------------------------------------------
 // TTS Extension
 // ---------------------------------------------------------------------------
 
-export const TTS = {
+class TTSImpl {
+  readonly extensionName = 'TTS';
+  private _ttsHandle = 0;
+  private _currentVoiceId = '';
+
   /**
    * Load a TTS voice model via sherpa-onnx.
    * Model files must already be written to sherpa-onnx virtual FS.
@@ -57,7 +63,7 @@ export const TTS = {
     const m = sherpa.module;
 
     // Clean up previous voice
-    TTS.cleanup();
+    this.cleanup();
 
     logger.info(`Loading TTS voice: ${config.voiceId}`);
     EventBus.shared.emit('model.loadStarted', SDKEventType.Model, {
@@ -104,14 +110,14 @@ export const TTS = {
 
     try {
       logger.debug(`Calling _SherpaOnnxCreateOfflineTts with ptr=${configStruct.ptr}`);
-      _ttsHandle = m._SherpaOnnxCreateOfflineTts(configStruct.ptr);
+      this._ttsHandle = m._SherpaOnnxCreateOfflineTts(configStruct.ptr);
 
-      if (_ttsHandle === 0) {
+      if (this._ttsHandle === 0) {
         throw new SDKError(SDKErrorCode.ModelLoadFailed,
           `Failed to create TTS engine for voice: ${config.voiceId}`);
       }
 
-      _currentVoiceId = config.voiceId;
+      this._currentVoiceId = config.voiceId;
 
       const loadTimeMs = Math.round(performance.now() - startMs);
       logger.info(`TTS voice loaded: ${config.voiceId} in ${loadTimeMs}ms`);
@@ -119,42 +125,42 @@ export const TTS = {
         modelId: config.voiceId, component: 'tts', loadTimeMs,
       });
     } catch (error) {
-      TTS.cleanup();
+      this.cleanup();
       if (error instanceof Error) throw error;
       const msg = typeof error === 'object' ? JSON.stringify(error) : String(error);
       throw new SDKError(SDKErrorCode.ModelLoadFailed, `TTS creation failed: ${msg}`);
     } finally {
       freeConfig(configStruct, m);
     }
-  },
+  }
 
   /** Unload the TTS voice. */
   async unloadVoice(): Promise<void> {
-    TTS.cleanup();
+    this.cleanup();
     logger.info('TTS voice unloaded');
-  },
+  }
 
   /** Check if a TTS voice is loaded. */
   get isVoiceLoaded(): boolean {
-    return _ttsHandle !== 0;
-  },
+    return this._ttsHandle !== 0;
+  }
 
   /** Get current voice ID. */
   get voiceId(): string {
-    return _currentVoiceId;
-  },
+    return this._currentVoiceId;
+  }
 
   /** Get the sample rate of the loaded TTS model. */
   get sampleRate(): number {
-    if (_ttsHandle === 0) return 0;
-    return SherpaONNXBridge.shared.module._SherpaOnnxOfflineTtsSampleRate(_ttsHandle);
-  },
+    if (this._ttsHandle === 0) return 0;
+    return SherpaONNXBridge.shared.module._SherpaOnnxOfflineTtsSampleRate(this._ttsHandle);
+  }
 
   /** Get the number of speakers in the loaded model. */
   get numSpeakers(): number {
-    if (_ttsHandle === 0) return 0;
-    return SherpaONNXBridge.shared.module._SherpaOnnxOfflineTtsNumSpeakers(_ttsHandle);
-  },
+    if (this._ttsHandle === 0) return 0;
+    return SherpaONNXBridge.shared.module._SherpaOnnxOfflineTtsNumSpeakers(this._ttsHandle);
+  }
 
   /**
    * Synthesize speech from text.
@@ -167,7 +173,7 @@ export const TTS = {
     const sherpa = requireSherpa();
     const m = sherpa.module;
 
-    if (_ttsHandle === 0) {
+    if (this._ttsHandle === 0) {
       throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No TTS voice loaded. Call loadVoice() first.');
     }
 
@@ -182,11 +188,11 @@ export const TTS = {
     try {
       // SherpaOnnxOfflineTtsGenerate returns a pointer to generated audio struct:
       // struct { const float* samples; int32_t n; int32_t sample_rate; }
-      logger.debug(`Calling _SherpaOnnxOfflineTtsGenerate (handle=${_ttsHandle})`);
+      logger.debug(`Calling _SherpaOnnxOfflineTtsGenerate (handle=${this._ttsHandle})`);
 
       let audioPtr: number;
       try {
-        audioPtr = m._SherpaOnnxOfflineTtsGenerate(_ttsHandle, textPtr, sid, speed);
+        audioPtr = m._SherpaOnnxOfflineTtsGenerate(this._ttsHandle, textPtr, sid, speed);
       } catch (wasmErr: unknown) {
         // C++ exceptions thrown from WASM appear as numeric exception pointers
         let errMsg: string;
@@ -263,25 +269,18 @@ export const TTS = {
     } finally {
       sherpa.free(textPtr);
     }
-  },
+  }
 
   /** Clean up the TTS resources. */
   cleanup(): void {
-    if (_ttsHandle !== 0) {
+    if (this._ttsHandle !== 0) {
       try {
-        SherpaONNXBridge.shared.module._SherpaOnnxDestroyOfflineTts(_ttsHandle);
+        SherpaONNXBridge.shared.module._SherpaOnnxDestroyOfflineTts(this._ttsHandle);
       } catch { /* ignore */ }
-      _ttsHandle = 0;
+      this._ttsHandle = 0;
     }
-    _currentVoiceId = '';
-  },
-};
-
-// ---------------------------------------------------------------------------
-// Internal Helpers
-// ---------------------------------------------------------------------------
-
-function requireSherpa(): SherpaONNXBridge {
-  if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
-  return SherpaONNXBridge.shared;
+    this._currentVoiceId = '';
+  }
 }
+
+export const TTS = new TTSImpl();

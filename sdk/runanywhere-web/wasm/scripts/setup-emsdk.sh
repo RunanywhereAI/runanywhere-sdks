@@ -8,7 +8,10 @@ set -euo pipefail
 # Installs and activates the Emscripten SDK (emsdk) for building
 # RACommons to WebAssembly.
 #
-# Recommended version: 3.1.51 (stable, compatible with sherpa-onnx WASM)
+# Minimum version: 5.0.0
+#   - Required for WebGPU + JSPI support (-sJSPI / ASYNCIFY=2).
+#   - Older versions (e.g. 3.1.51) lack JSPI and ship a broken
+#     wgpuInstanceWaitAny stub that crashes WebGPU inference.
 #
 # Usage:
 #   ./scripts/setup-emsdk.sh              # Install to ./emsdk/
@@ -19,7 +22,7 @@ set -euo pipefail
 #
 # =============================================================================
 
-EMSDK_VERSION="3.1.51"
+EMSDK_VERSION="5.0.0"
 INSTALL_DIR="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/emsdk}"
 
 echo "======================================"

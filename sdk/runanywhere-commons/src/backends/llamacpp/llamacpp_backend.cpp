@@ -197,6 +197,15 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     model_path_ = model_path;
 
     llama_model_params model_params = llama_model_default_params();
+
+#ifdef __EMSCRIPTEN__
+    // CRITICAL: Disable mmap for WebAssembly builds.
+    // Emscripten's mmap goes through a JS trampoline (_mmap_js).
+    // JSPI can only suspend WASM frames, not JS frames, so mmap
+    // during model loading causes "trying to suspend JS frames".
+    // With mmap disabled, llama.cpp falls back to fread (pure WASM).
+    model_params.use_mmap = false;
+#endif
     
     // Detect model size from filename to set appropriate GPU layers BEFORE loading
     // This prevents OOM crashes on mobile devices with limited GPU memory

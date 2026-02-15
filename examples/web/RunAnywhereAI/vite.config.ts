@@ -1,8 +1,12 @@
 import { defineConfig } from 'vite';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Absolute path to the workspace root
-const workspaceRoot = path.resolve(__dirname, '../../..');
+// __dirname is not available in ESM; derive it from import.meta.url
+const __dir = path.dirname(fileURLToPath(import.meta.url));
+
+// Absolute path to the workspace root (runanywhere-sdks/)
+const workspaceRoot = path.resolve(__dir, '../../..');
 
 export default defineConfig({
   server: {
@@ -19,6 +23,7 @@ export default defineConfig({
       // Allow Vite to serve files from the entire workspace
       // (SDK TypeScript source + WASM output)
       allow: [workspaceRoot],
+      strict: true,
     },
   },
   optimizeDeps: {

@@ -12,6 +12,7 @@ import { initTranscribeTab } from './views/transcribe';
 import { initSpeakTab } from './views/speak';
 import { initStorageTab } from './views/storage';
 import { initSettingsTab } from './views/settings';
+import { ModelManager, ModelCategory } from './services/model-manager';
 
 // ---------------------------------------------------------------------------
 // Tab Lifecycle
@@ -132,6 +133,21 @@ export function buildAppShell(): void {
   switchTab(0);
 }
 
+/**
+ * Map tab IDs to the ModelCategory they primarily use.
+ * When switching from a tab that uses one category to a tab that uses
+ * a different category, we show an info banner.
+ */
+const TAB_MODEL_CATEGORY: Record<string, ModelCategory | null> = {
+  chat: ModelCategory.Language,
+  vision: ModelCategory.Multimodal,
+  voice: ModelCategory.Language,        // voice agent uses LLM + STT + TTS
+  transcribe: ModelCategory.SpeechRecognition,
+  speak: ModelCategory.SpeechSynthesis,
+  storage: null,
+  settings: null,
+};
+
 function switchTab(index: number): void {
   const previousTab = activeTab;
   activeTab = index;
@@ -155,6 +171,11 @@ function switchTab(index: number): void {
     item.classList.toggle('active', i === index);
   });
 
+  // Show model-switch banner if the new tab needs a different model category
+  if (previousTab !== index) {
+    showModelSwitchBanner(previousTab, index);
+  }
+
   // Notify the incoming tab so it can resume if needed
   if (previousTab !== index) {
     try {
@@ -162,6 +183,55 @@ function switchTab(index: number): void {
     } catch (err) {
       console.warn(`[App] Tab ${TABS[index].id} onActivate error:`, err);
     }
+  }
+}
+
+/**
+ * Show an informational banner when switching to a tab that uses a different
+ * model category, so the user understands that the previous model will be
+ * released from memory.
+ */
+function showModelSwitchBanner(fromIndex: number, toIndex: number): void {
+  // Remove any existing banner
+  document.querySelector('.model-switch-banner')?.remove();
+
+  const fromCategory = TAB_MODEL_CATEGORY[TABS[fromIndex].id];
+  const toCategory = TAB_MODEL_CATEGORY[TABS[toIndex].id];
+
+  // No banner needed if destination tab doesn't need a model
+  if (!toCategory) return;
+  // No banner needed if categories are the same
+  if (fromCategory === toCategory) return;
+
+  // Check if there's actually a model loaded that would be released
+  const loadedModel = ModelManager.getLoadedModel();
+  if (!loadedModel) return;
+
+  const fromLabel = TABS[fromIndex].label;
+  const toLabel = TABS[toIndex].label;
+
+  const panel = document.getElementById(`tab-${TABS[toIndex].id}`);
+  if (!panel) return;
+
+  const banner = document.createElement('div');
+  banner.className = 'model-switch-banner';
+  banner.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    <span>Switching from <strong>${fromLabel}</strong> to <strong>${toLabel}</strong> will release the current model from memory. You can reload it when you switch back.</span>
+    <button class="banner-dismiss" aria-label="Dismiss">&times;</button>
+  `;
+
+  banner.querySelector('.banner-dismiss')!.addEventListener('click', () => banner.remove());
+
+  // Auto-dismiss after 6 seconds
+  setTimeout(() => banner.remove(), 6000);
+
+  // Insert at the top of the tab panel (after toolbar if present)
+  const toolbar = panel.querySelector('.toolbar');
+  if (toolbar && toolbar.nextSibling) {
+    panel.insertBefore(banner, toolbar.nextSibling);
+  } else {
+    panel.prepend(banner);
   }
 }
 

@@ -74,8 +74,9 @@ export type {
   ManagedModel, CompactModelDef, DownloadProgress,
   ModelFileDescriptor, ArtifactType, VLMLoader, VLMLoadParams,
 } from './Infrastructure/ModelManager';
+export type { QuotaCheckResult, EvictionCandidateInfo } from './Infrastructure/ModelDownloader';
 export { OPFSStorage } from './Infrastructure/OPFSStorage';
-export type { StoredModelInfo } from './Infrastructure/OPFSStorage';
+export type { StoredModelInfo, MetadataMap, ModelMetadata } from './Infrastructure/OPFSStorage';
 export { VLMWorkerBridge } from './Infrastructure/VLMWorkerBridge';
 export type {
   VLMWorkerResult, VLMLoadModelParams, VLMProcessOptions,

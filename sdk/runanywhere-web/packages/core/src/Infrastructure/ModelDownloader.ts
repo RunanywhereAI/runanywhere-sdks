@@ -8,9 +8,37 @@
 
 import { EventBus } from '../Foundation/EventBus';
 import { OPFSStorage } from './OPFSStorage';
+import type { MetadataMap } from './OPFSStorage';
 import { ModelStatus, DownloadStage, SDKEventType } from '../types/enums';
 import type { ManagedModel, DownloadProgress } from './ModelRegistry';
 import type { ModelRegistry } from './ModelRegistry';
+
+// ---------------------------------------------------------------------------
+// Quota Check Result
+// ---------------------------------------------------------------------------
+
+/** Candidate model that could be evicted to free space. */
+export interface EvictionCandidateInfo {
+  id: string;
+  name: string;
+  sizeBytes: number;
+  lastUsedAt: number;
+}
+
+/** Result of a pre-download quota check. */
+export interface QuotaCheckResult {
+  /** Whether the model fits in available storage without eviction. */
+  fits: boolean;
+  /** Currently available bytes (estimate). */
+  availableBytes: number;
+  /** Total bytes needed for the model (primary + additional files). */
+  neededBytes: number;
+  /**
+   * Models that could be evicted to free space, sorted by lastUsedAt ascending
+   * (least recently used first). Only populated when `fits` is false.
+   */
+  evictionCandidates: EvictionCandidateInfo[];
+}
 
 // ---------------------------------------------------------------------------
 // Model Downloader
@@ -78,6 +106,13 @@ export class ModelDownloader {
   private readonly storage: OPFSStorage;
   private readonly registry: ModelRegistry;
 
+  /**
+   * In-memory fallback cache for models that were downloaded successfully
+   * but failed to persist to OPFS (e.g. storage quota exceeded).
+   * Keyed by modelId/file key. Cleared once the data is consumed by loadFromOPFS.
+   */
+  private readonly memoryCache = new Map<string, Uint8Array>();
+
   constructor(registry: ModelRegistry, storage: OPFSStorage) {
     this.registry = registry;
     this.storage = storage;
@@ -86,6 +121,72 @@ export class ModelDownloader {
   // ---------------------------------------------------------------------------
   // Public API
   // ---------------------------------------------------------------------------
+
+  /**
+   * Check whether a model will fit in OPFS without eviction.
+   *
+   * Uses `navigator.storage.estimate()` for available space and compares
+   * against the model's total size (primary + additional files).
+   * If the model won't fit, returns eviction candidates sorted by LRU.
+   *
+   * @param model       - The model to check
+   * @param metadata    - LRU metadata map (lastUsedAt per model)
+   * @param loadedModelId - Currently loaded model ID (excluded from eviction)
+   */
+  async checkStorageQuota(
+    model: ManagedModel,
+    metadata: MetadataMap,
+    loadedModelId?: string,
+  ): Promise<QuotaCheckResult> {
+    const { usedBytes, quotaBytes } = await this.storage.getStorageUsage();
+    const availableBytes = Math.max(0, quotaBytes - usedBytes);
+
+    // Estimate total download size
+    const neededBytes = model.memoryRequirement ?? 0;
+
+    if (availableBytes >= neededBytes) {
+      return { fits: true, availableBytes, neededBytes, evictionCandidates: [] };
+    }
+
+    // Not enough space — build eviction candidate list
+    const stored = await this.storage.listModels();
+    const keepBase = model.id.split('__')[0];
+
+    const candidates: EvictionCandidateInfo[] = [];
+    for (const s of stored) {
+      // Skip the model being downloaded and its siblings
+      const storedBase = s.id.split('__')[0];
+      if (storedBase === keepBase) continue;
+      // Skip currently loaded model
+      if (loadedModelId && s.id === loadedModelId) continue;
+      // Skip metadata file
+      if (s.id === '_metadata.json') continue;
+
+      const registered = this.registry.getModel(s.id) ?? this.registry.getModel(storedBase);
+      candidates.push({
+        id: storedBase,
+        name: registered?.name ?? s.id,
+        sizeBytes: s.sizeBytes,
+        lastUsedAt: metadata[storedBase]?.lastUsedAt ?? s.lastModified,
+      });
+    }
+
+    // Deduplicate by base id (main model + companion files combined)
+    const deduped = new Map<string, EvictionCandidateInfo>();
+    for (const c of candidates) {
+      const existing = deduped.get(c.id);
+      if (existing) {
+        existing.sizeBytes += c.sizeBytes;
+      } else {
+        deduped.set(c.id, { ...c });
+      }
+    }
+
+    // Sort by least-recently-used first
+    const sorted = [...deduped.values()].sort((a, b) => a.lastUsedAt - b.lastUsedAt);
+
+    return { fits: false, availableBytes, neededBytes, evictionCandidates: sorted };
+  }
 
   /**
    * Download a model (and any additional companion files).
@@ -236,32 +337,150 @@ export class ModelDownloader {
     return data;
   }
 
-  /** Store data in OPFS via OPFSStorage. */
+  /** Store data in OPFS via OPFSStorage. Auto-evicts old models if quota is exceeded, falls back to in-memory cache. */
   async storeInOPFS(key: string, data: Uint8Array): Promise<void> {
+    const sizeMB = (data.length / 1024 / 1024).toFixed(1);
+
     try {
+      // First attempt
       await this.storage.saveModel(key, data.buffer as ArrayBuffer);
-      console.log(`[ModelDownloader] Stored ${key} in OPFS (${(data.length / 1024 / 1024).toFixed(1)} MB)`);
+      console.log(`[ModelDownloader] Stored ${key} in OPFS (${sizeMB} MB)`);
+      this.memoryCache.delete(key);
+      return;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[ModelDownloader] OPFS store failed for "${key}": ${msg}`);
+      const isQuota = msg.toLowerCase().includes('quota');
+
+      if (!isQuota) {
+        // Non-quota error — fall back to memory cache directly
+        console.warn(`[ModelDownloader] OPFS store failed for "${key}": ${msg}`);
+        console.log(`[ModelDownloader] Caching "${key}" in memory (${sizeMB} MB) for current session`);
+        this.memoryCache.set(key, data);
+        return;
+      }
+
+      // Quota exceeded — try to evict old models and retry
+      console.warn(`[ModelDownloader] OPFS quota exceeded for "${key}" (${sizeMB} MB), evicting old models...`);
+      await this.evictOPFSModels(key, data.length);
+    }
+
+    // Retry after eviction
+    try {
+      await this.storage.saveModel(key, data.buffer as ArrayBuffer);
+      console.log(`[ModelDownloader] Stored ${key} in OPFS after eviction (${sizeMB} MB)`);
+      this.memoryCache.delete(key);
+    } catch (retryErr) {
+      const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
+      console.warn(`[ModelDownloader] OPFS store still failed after eviction for "${key}": ${retryMsg}`);
+      console.log(`[ModelDownloader] Caching "${key}" in memory (${sizeMB} MB) for current session`);
+      this.memoryCache.set(key, data);
     }
   }
 
-  /** Load data from OPFS via OPFSStorage. */
-  async loadFromOPFS(key: string): Promise<Uint8Array | null> {
-    const buffer = await this.storage.loadModel(key);
-    if (!buffer) return null;
-    console.log(`[ModelDownloader] Loading ${key} from OPFS (${(buffer.byteLength / 1024 / 1024).toFixed(1)} MB)`);
-    return new Uint8Array(buffer);
+  /**
+   * Evict old models from OPFS to free space for a new model.
+   * Deletes models sorted by oldest-first until enough space is freed,
+   * skipping the model being stored AND any sibling files that belong
+   * to the same model (e.g. main model file and its mmproj companion).
+   *
+   * Sibling detection: files are siblings if one key is a prefix of
+   * the other, separated by "__" (e.g. "modelA" and "modelA__mmproj-...").
+   */
+  private async evictOPFSModels(keepKey: string, neededBytes: number): Promise<void> {
+    const stored = await this.storage.listModels();
+    if (stored.length === 0) return;
+
+    // Extract the base model ID (everything before the first "__" separator).
+    // This links companion files: "modelA__mmproj-..." → base "modelA".
+    const keepBase = keepKey.split('__')[0];
+
+    // Sort by oldest first (least recently modified)
+    stored.sort((a, b) => a.lastModified - b.lastModified);
+
+    let freedBytes = 0;
+    for (const model of stored) {
+      // Never evict the file we're about to store
+      if (model.id === keepKey) continue;
+
+      // Never evict internal metadata files
+      if (model.id === '_metadata.json') continue;
+
+      // Never evict sibling files that belong to the same model.
+      // A stored file is a sibling if its base (before "__") matches keepBase,
+      // or if keepBase starts with the stored file's ID (the stored file IS
+      // the main model and we're storing a companion like mmproj).
+      const storedBase = model.id.split('__')[0];
+      if (storedBase === keepBase) continue;
+
+      const sizeMBEvict = (model.sizeBytes / 1024 / 1024).toFixed(1);
+      console.log(`[ModelDownloader] Evicting "${model.id}" (${sizeMBEvict} MB) from OPFS`);
+      await this.storage.deleteModel(model.id);
+
+      // Also update registry status if this model is registered
+      const registered = this.registry.getModel(model.id);
+      if (registered && registered.status === ModelStatus.Downloaded) {
+        this.registry.updateModel(model.id, { status: ModelStatus.Registered });
+      }
+
+      // Emit event so UI can show a toast notification
+      EventBus.shared.emit('model.evicted', SDKEventType.Storage, {
+        modelId: model.id,
+        modelName: registered?.name ?? model.id,
+        freedBytes: model.sizeBytes,
+      });
+
+      freedBytes += model.sizeBytes;
+      if (freedBytes >= neededBytes) {
+        console.log(`[ModelDownloader] Evicted ${(freedBytes / 1024 / 1024).toFixed(1)} MB, should have room now`);
+        break;
+      }
+    }
   }
 
-  /** Check existence in OPFS via OPFSStorage. */
+  /** Load data from OPFS via OPFSStorage, falling back to in-memory cache. */
+  async loadFromOPFS(key: string): Promise<Uint8Array | null> {
+    // Try OPFS first (persistent storage)
+    const buffer = await this.storage.loadModel(key);
+    if (buffer && buffer.byteLength > 0) {
+      const sizeMB = buffer.byteLength / 1024 / 1024;
+      console.log(`[ModelDownloader] Loading ${key} from OPFS (${sizeMB.toFixed(1)} MB)`);
+      return new Uint8Array(buffer);
+    }
+
+    // Clean up corrupted 0-byte OPFS entries
+    if (buffer && buffer.byteLength === 0) {
+      console.warn(`[ModelDownloader] OPFS entry for "${key}" is 0 bytes (corrupted), deleting`);
+      await this.deleteFromOPFS(key);
+    }
+
+    // Fall back to in-memory cache (populated when OPFS store failed, e.g. quota exceeded).
+    // IMPORTANT: Do NOT delete from cache here — the model may be unloaded and
+    // reloaded later (switching between models). Memory cache entries are only
+    // cleared on explicit model deletion via deleteFromOPFS().
+    const cached = this.memoryCache.get(key);
+    if (cached) {
+      const sizeMB = cached.length / 1024 / 1024;
+      console.log(`[ModelDownloader] Loading ${key} from memory cache (${sizeMB.toFixed(1)} MB) — not persisted to OPFS`);
+      return cached;
+    }
+
+    return null;
+  }
+
+  /** Check existence in OPFS or in-memory cache. */
   async existsInOPFS(key: string): Promise<boolean> {
+    if (this.memoryCache.has(key)) return true;
     return this.storage.hasModel(key);
   }
 
-  /** Delete from OPFS via OPFSStorage. */
+  /** Check if data exists in actual OPFS storage (NOT memory cache). */
+  async existsInActualOPFS(key: string): Promise<boolean> {
+    return this.storage.hasModel(key);
+  }
+
+  /** Delete from OPFS and memory cache. */
   async deleteFromOPFS(key: string): Promise<void> {
+    this.memoryCache.delete(key);
     await this.storage.deleteModel(key);
   }
 

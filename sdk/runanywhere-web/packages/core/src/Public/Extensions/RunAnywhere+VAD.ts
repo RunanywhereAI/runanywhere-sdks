@@ -36,19 +36,25 @@ export type { SpeechActivityCallback, VADModelConfig, SpeechSegment } from './VA
 const logger = new SDKLogger('VAD');
 
 // ---------------------------------------------------------------------------
-// Internal State
+// Internal Helpers
 // ---------------------------------------------------------------------------
 
-let _vadHandle = 0;
-let _sampleRate = 16000;
-let _jsActivityCallback: SpeechActivityCallback | null = null;
-let _lastSpeechState = false;
+function requireSherpa(): SherpaONNXBridge {
+  if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
+  return SherpaONNXBridge.shared;
+}
 
 // ---------------------------------------------------------------------------
 // VAD Extension
 // ---------------------------------------------------------------------------
 
-export const VAD = {
+class VADImpl {
+  readonly extensionName = 'VAD';
+  private _vadHandle = 0;
+  private _sampleRate = 16000;
+  private _jsActivityCallback: SpeechActivityCallback | null = null;
+  private _lastSpeechState = false;
+
   /**
    * Load the Silero VAD model via sherpa-onnx.
    * The model file must already be in the sherpa-onnx virtual FS.
@@ -59,9 +65,9 @@ export const VAD = {
     const m = sherpa.module;
 
     // Clean up previous
-    VAD.cleanup();
+    this.cleanup();
 
-    _sampleRate = config.sampleRate ?? 16000;
+    this._sampleRate = config.sampleRate ?? 16000;
 
     logger.info('Loading Silero VAD model');
     EventBus.shared.emit('model.loadStarted', SDKEventType.Model, {
@@ -91,7 +97,7 @@ export const VAD = {
         maxSpeechDuration: 20,
         windowSize: 256,
       },
-      sampleRate: _sampleRate,
+      sampleRate: this._sampleRate,
       numThreads: 1,
       provider: 'cpu',
       debug: 0,
@@ -100,12 +106,12 @@ export const VAD = {
     const configStruct = initSherpaOnnxVadModelConfig(configObj, m);
 
     try {
-      _vadHandle = m._SherpaOnnxCreateVoiceActivityDetector(
+      this._vadHandle = m._SherpaOnnxCreateVoiceActivityDetector(
         configStruct.ptr, bufferSizeInSeconds
       );
       freeConfig(configStruct, m);
 
-      if (_vadHandle === 0) {
+      if (this._vadHandle === 0) {
         throw new SDKError(SDKErrorCode.ModelLoadFailed, 'Failed to create VAD from Silero model');
       }
 
@@ -115,24 +121,24 @@ export const VAD = {
         modelId: 'silero-vad', component: 'vad', loadTimeMs,
       });
     } catch (error) {
-      VAD.cleanup();
+      this.cleanup();
       throw error;
     }
-  },
+  }
 
   /** Whether VAD model is loaded. */
   get isInitialized(): boolean {
-    return _vadHandle !== 0;
-  },
+    return this._vadHandle !== 0;
+  }
 
   /**
    * Register a callback for speech activity events.
    * Called when speech starts, ends, or is ongoing.
    */
   onSpeechActivity(callback: SpeechActivityCallback): () => void {
-    _jsActivityCallback = callback;
-    return () => { _jsActivityCallback = null; };
-  },
+    this._jsActivityCallback = callback;
+    return () => { this._jsActivityCallback = null; };
+  }
 
   /**
    * Process audio samples through VAD.
@@ -145,7 +151,7 @@ export const VAD = {
    * @returns Whether speech is currently detected
    */
   processSamples(samples: Float32Array): boolean {
-    if (_vadHandle === 0) {
+    if (this._vadHandle === 0) {
       logger.warning('VAD not initialized. Call loadModel() first.');
       return false;
     }
@@ -158,28 +164,28 @@ export const VAD = {
 
     try {
       // Feed samples to VAD
-      m._SherpaOnnxVoiceActivityDetectorAcceptWaveform(_vadHandle, audioPtr, samples.length);
+      m._SherpaOnnxVoiceActivityDetectorAcceptWaveform(this._vadHandle, audioPtr, samples.length);
 
       // Check detection state
-      const detected = m._SherpaOnnxVoiceActivityDetectorDetected(_vadHandle) !== 0;
+      const detected = m._SherpaOnnxVoiceActivityDetectorDetected(this._vadHandle) !== 0;
 
       // Emit speech activity callbacks
-      if (detected && !_lastSpeechState) {
-        _jsActivityCallback?.(SpeechActivity.Started);
+      if (detected && !this._lastSpeechState) {
+        this._jsActivityCallback?.(SpeechActivity.Started);
         EventBus.shared.emit('vad.speechStarted', SDKEventType.Voice, { activity: SpeechActivity.Started });
-      } else if (!detected && _lastSpeechState) {
-        _jsActivityCallback?.(SpeechActivity.Ended);
+      } else if (!detected && this._lastSpeechState) {
+        this._jsActivityCallback?.(SpeechActivity.Ended);
         EventBus.shared.emit('vad.speechEnded', SDKEventType.Voice, { activity: SpeechActivity.Ended });
       } else if (detected) {
-        _jsActivityCallback?.(SpeechActivity.Ongoing);
+        this._jsActivityCallback?.(SpeechActivity.Ongoing);
       }
 
-      _lastSpeechState = detected;
+      this._lastSpeechState = detected;
       return detected;
     } finally {
       m._free(audioPtr);
     }
-  },
+  }
 
   /**
    * Get the next available speech segment (if any).
@@ -189,17 +195,17 @@ export const VAD = {
    * using this method. Call repeatedly until it returns null.
    */
   popSpeechSegment(): SpeechSegment | null {
-    if (_vadHandle === 0) return null;
+    if (this._vadHandle === 0) return null;
 
     const m = SherpaONNXBridge.shared.module;
 
     // Check if there's a segment available
-    if (m._SherpaOnnxVoiceActivityDetectorEmpty(_vadHandle) !== 0) {
+    if (m._SherpaOnnxVoiceActivityDetectorEmpty(this._vadHandle) !== 0) {
       return null;
     }
 
     // Get the front segment
-    const segmentPtr = m._SherpaOnnxVoiceActivityDetectorFront(_vadHandle);
+    const segmentPtr = m._SherpaOnnxVoiceActivityDetectorFront(this._vadHandle);
     if (segmentPtr === 0) return null;
 
     // Read segment struct: { int32_t start; const float* samples; int32_t n; }
@@ -216,48 +222,41 @@ export const VAD = {
 
     // Destroy the segment and pop
     m._SherpaOnnxDestroySpeechSegment(segmentPtr);
-    m._SherpaOnnxVoiceActivityDetectorPop(_vadHandle);
+    m._SherpaOnnxVoiceActivityDetectorPop(this._vadHandle);
 
     return { startTime, samples };
-  },
+  }
 
   /** Whether speech is currently detected. */
   get isSpeechActive(): boolean {
-    if (_vadHandle === 0) return false;
-    return SherpaONNXBridge.shared.module._SherpaOnnxVoiceActivityDetectorDetected(_vadHandle) !== 0;
-  },
+    if (this._vadHandle === 0) return false;
+    return SherpaONNXBridge.shared.module._SherpaOnnxVoiceActivityDetectorDetected(this._vadHandle) !== 0;
+  }
 
   /** Reset VAD state. */
   reset(): void {
-    if (_vadHandle === 0) return;
-    SherpaONNXBridge.shared.module._SherpaOnnxVoiceActivityDetectorReset(_vadHandle);
-    _lastSpeechState = false;
-  },
+    if (this._vadHandle === 0) return;
+    SherpaONNXBridge.shared.module._SherpaOnnxVoiceActivityDetectorReset(this._vadHandle);
+    this._lastSpeechState = false;
+  }
 
   /** Flush remaining audio through VAD. */
   flush(): void {
-    if (_vadHandle === 0) return;
-    SherpaONNXBridge.shared.module._SherpaOnnxVoiceActivityDetectorFlush(_vadHandle);
-  },
+    if (this._vadHandle === 0) return;
+    SherpaONNXBridge.shared.module._SherpaOnnxVoiceActivityDetectorFlush(this._vadHandle);
+  }
 
   /** Clean up the VAD resources. */
   cleanup(): void {
-    if (_vadHandle !== 0) {
+    if (this._vadHandle !== 0) {
       try {
-        SherpaONNXBridge.shared.module._SherpaOnnxDestroyVoiceActivityDetector(_vadHandle);
+        SherpaONNXBridge.shared.module._SherpaOnnxDestroyVoiceActivityDetector(this._vadHandle);
       } catch { /* ignore */ }
-      _vadHandle = 0;
+      this._vadHandle = 0;
     }
-    _jsActivityCallback = null;
-    _lastSpeechState = false;
-  },
-};
-
-// ---------------------------------------------------------------------------
-// Internal Helpers
-// ---------------------------------------------------------------------------
-
-function requireSherpa(): SherpaONNXBridge {
-  if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
-  return SherpaONNXBridge.shared;
+    this._jsActivityCallback = null;
+    this._lastSpeechState = false;
+  }
 }
+
+export const VAD = new VADImpl();

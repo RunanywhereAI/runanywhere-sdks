@@ -155,15 +155,16 @@ export function initVoiceTab(el: HTMLElement): TabLifecycle {
 
   canvas = container.querySelector('#voice-particle-canvas')!;
 
-  // Setup card clicks — open model selection for each modality
+  // Setup card clicks — open model selection for each modality.
+  // coexist: true because Voice needs STT + LLM + TTS loaded simultaneously.
   container.querySelector('#voice-setup-stt')!.addEventListener('click', () => {
-    showModelSelectionSheet(ModelCategory.SpeechRecognition);
+    showModelSelectionSheet(ModelCategory.SpeechRecognition, { coexist: true });
   });
   container.querySelector('#voice-setup-llm')!.addEventListener('click', () => {
-    showModelSelectionSheet(ModelCategory.Language);
+    showModelSelectionSheet(ModelCategory.Language, { coexist: true });
   });
   container.querySelector('#voice-setup-tts')!.addEventListener('click', () => {
-    showModelSelectionSheet(ModelCategory.SpeechSynthesis);
+    showModelSelectionSheet(ModelCategory.SpeechSynthesis, { coexist: true });
   });
 
   // Start Voice Assistant button
@@ -432,7 +433,7 @@ async function runPipeline(audioData: Float32Array): Promise<void> {
     const systemPrompt =
       'You are a helpful voice assistant. Keep responses concise — 1-3 sentences. Be conversational and friendly.';
 
-    const { stream, result, cancel } = sdk.TextGeneration.generateStream(userText, {
+    const { stream, result, cancel } = await sdk.TextGeneration.generateStream(userText, {
       maxTokens: 150,
       temperature: 0.7,
       systemPrompt,

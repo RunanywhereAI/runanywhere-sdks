@@ -30,8 +30,9 @@ import { loadOffsets } from '../Foundation/StructOffsets';
 import { Offsets } from '../Foundation/StructOffsets';
 import { ModelManager } from '../Infrastructure/ModelManager';
 import type { CompactModelDef, ManagedModel, VLMLoader } from '../Infrastructure/ModelManager';
+import { ExtensionRegistry } from '../Infrastructure/ExtensionRegistry';
 
-// Extension imports for shutdown cleanup
+// Extension imports for registration and shutdown cleanup
 import { TextGeneration } from './Extensions/RunAnywhere+TextGeneration';
 import { VLM } from './Extensions/RunAnywhere+VLM';
 import { STT } from './Extensions/RunAnywhere+STT';
@@ -190,7 +191,10 @@ export const RunAnywhere = {
         const logLevel = options.debug ? 1 : 2; // DEBUG=1, INFO=2
         m.setValue(configPtr + Offsets.config.logLevel, logLevel, 'i32');
 
-        const result = m._rac_init(configPtr);
+        // {async: true} lets JSPI suspend during WebGPU adapter/device init.
+        const result = await bridge.callFunction<number | Promise<number>>(
+          'rac_init', 'number', ['number'], [configPtr], { async: true },
+        ) as number;
         m._free(configPtr);
 
         if (result !== 0) {
@@ -202,13 +206,33 @@ export const RunAnywhere = {
         // The llama.cpp LLM backend must be registered before any LLM/VLM operations.
         // Check if the function exists (only present when built with --llamacpp).
         if (typeof (m as any)['_rac_backend_llamacpp_register'] === 'function') {
-          const regResult = m.ccall('rac_backend_llamacpp_register', 'number', [], []) as number;
+          const regResult = await bridge.callFunction<number | Promise<number>>(
+            'rac_backend_llamacpp_register', 'number', [], [], { async: true },
+          ) as number;
           if (regResult === 0) {
             logger.info('llama.cpp LLM backend registered');
           } else {
             logger.warning(`llama.cpp backend registration returned: ${regResult}`);
           }
         }
+
+        // Phase 5: Register model loaders with ModelManager.
+        // This keeps the dependency flow correct: Public -> Infrastructure.
+        ModelManager.setLLMLoader(TextGeneration);
+        ModelManager.setSTTLoader(STT);
+        ModelManager.setTTSLoader(TTS);
+        ModelManager.setVADLoader(VAD);
+
+        // Phase 6: Register extensions with the lifecycle registry.
+        // Order matters: low-level components first (cleaned up last).
+        ExtensionRegistry.register(TextGeneration);
+        ExtensionRegistry.register(STT);
+        ExtensionRegistry.register(TTS);
+        ExtensionRegistry.register(VAD);
+        ExtensionRegistry.register(VLM);
+        ExtensionRegistry.register(Embeddings);
+        ExtensionRegistry.register(Diffusion);
+        ExtensionRegistry.register(ToolCalling);
 
         _isInitialized = true;
         _hasCompletedServicesInit = true;
@@ -279,6 +303,17 @@ export const RunAnywhere = {
   },
 
   /**
+   * Unload ALL loaded models and free their resources.
+   *
+   * Useful when switching between features/tabs to ensure clean state
+   * and reclaim memory. Called automatically by `loadModel()`, but can
+   * also be called explicitly by the app.
+   */
+  async unloadAll(): Promise<void> {
+    return ModelManager.unloadAll();
+  },
+
+  /**
    * Delete a downloaded model from OPFS storage.
    * @param modelId - The model ID to delete
    */
@@ -301,27 +336,12 @@ export const RunAnywhere = {
     logger.info('Shutting down RunAnywhere Web SDK...');
 
     // ------------------------------------------------------------------
-    // 1. Clean up extensions in reverse dependency order
-    //    (high-level orchestrations first, then individual components)
+    // 1. Clean up all registered extensions in reverse dependency order.
+    //    Extensions were registered low-level first, so reverse cleanup
+    //    tears down high-level orchestrations before their dependencies.
     // ------------------------------------------------------------------
 
-    // Diffusion / Embeddings — independent components
-    try { Diffusion.cleanup(); } catch { /* ignore during shutdown */ }
-    try { Embeddings.cleanup(); } catch { /* ignore during shutdown */ }
-
-    // VLM — uses llama.cpp backend (independent of LLM component)
-    try { VLM.cleanup(); } catch { /* ignore during shutdown */ }
-
-    // ToolCalling — depends on TextGeneration, clear registry first
-    try { ToolCalling.cleanup(); } catch { /* ignore during shutdown */ }
-
-    // sherpa-onnx based components: VAD, TTS, STT
-    try { VAD.cleanup(); } catch { /* ignore during shutdown */ }
-    try { TTS.cleanup(); } catch { /* ignore during shutdown */ }
-    try { STT.cleanup(); } catch { /* ignore during shutdown */ }
-
-    // TextGeneration — base LLM component (RACommons WASM)
-    try { TextGeneration.cleanup(); } catch { /* ignore during shutdown */ }
+    ExtensionRegistry.cleanupAll();
 
     // ------------------------------------------------------------------
     // 2. Shut down WASM bridges
@@ -332,18 +352,19 @@ export const RunAnywhere = {
 
     // Platform adapter
     if (_platformAdapter) {
-      _platformAdapter.cleanup();
+      try { _platformAdapter.cleanup(); } catch { /* ignore during shutdown */ }
       _platformAdapter = null;
     }
 
     // RACommons WASM bridge
-    WASMBridge.shared.shutdown();
+    try { WASMBridge.shared.shutdown(); } catch { /* ignore during shutdown */ }
 
     // ------------------------------------------------------------------
     // 3. Reset SDK state
     // ------------------------------------------------------------------
 
     EventBus.reset();
+    ExtensionRegistry.reset();
 
     _isInitialized = false;
     _hasCompletedServicesInit = false;

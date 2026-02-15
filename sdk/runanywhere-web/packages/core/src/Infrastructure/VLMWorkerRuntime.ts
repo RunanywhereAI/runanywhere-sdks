@@ -150,33 +150,40 @@ async function initWASM(wasmJsUrl: string, useWebGPU = false): Promise<void> {
   const adapterPtr = m._malloc(adapterSize);
   for (let i = 0; i < adapterSize; i++) m.setValue(adapterPtr + i, 0, 'i8');
 
-  // Register essential callbacks via addFunction
+  // Register essential callbacks via addFunction.
+  // Signatures MUST match the main-thread PlatformAdapter.ts exactly —
+  // Emscripten's indirect-call table traps on signature mismatch.
   const PTR_SIZE = 4;
   let offset = 0;
 
-  // file_exists (stub — VLM uses Emscripten's C fopen/fread, not the platform adapter)
+  // file_exists: rac_bool_t (*)(const char* path, void* user_data)
   const fileExistsCb = m.addFunction(
-    (_pathPtr: number, outExists: number, _ud: number): number => {
-      m.setValue(outExists, 0, 'i32');
-      return 0;
+    (_pathPtr: number, _ud: number): number => {
+      return 0; // nothing exists — VLM uses Emscripten's C fopen/fread
     },
-    'iiii',
+    'iii',
   );
   m.setValue(adapterPtr + offset, fileExistsCb, '*'); offset += PTR_SIZE;
 
-  // file_read (no-op — model files use fopen/fread via Emscripten FS)
-  const noopReadCb = m.addFunction((): number => -180, 'iiii');
+  // file_read: rac_result_t (*)(const char* path, void** out_data, size_t* out_size, void* user_data)
+  const noopReadCb = m.addFunction(
+    (_pathPtr: number, _outData: number, _outSize: number, _ud: number): number => -180,
+    'iiiii',
+  );
   m.setValue(adapterPtr + offset, noopReadCb, '*'); offset += PTR_SIZE;
 
-  // file_write (no-op)
-  const noopWriteCb = m.addFunction((): number => -180, 'iiiii');
+  // file_write: rac_result_t (*)(const char* path, const void* data, size_t size, void* user_data)
+  const noopWriteCb = m.addFunction(
+    (_pathPtr: number, _data: number, _size: number, _ud: number): number => -180,
+    'iiiii',
+  );
   m.setValue(adapterPtr + offset, noopWriteCb, '*'); offset += PTR_SIZE;
 
-  // file_delete (no-op)
-  const noopDelCb = m.addFunction((): number => -180, 'iii');
+  // file_delete: rac_result_t (*)(const char* path, void* user_data)
+  const noopDelCb = m.addFunction((_pathPtr: number, _ud: number): number => -180, 'iii');
   m.setValue(adapterPtr + offset, noopDelCb, '*'); offset += PTR_SIZE;
 
-  // secure_get (no-op, returns not-found)
+  // secure_get: rac_result_t (*)(const char* key, char** out_value, void* user_data)
   const secureGetCb = m.addFunction(
     (_kp: number, outPtr: number, _ud: number): number => {
       m.setValue(outPtr, 0, '*');
@@ -186,15 +193,18 @@ async function initWASM(wasmJsUrl: string, useWebGPU = false): Promise<void> {
   );
   m.setValue(adapterPtr + offset, secureGetCb, '*'); offset += PTR_SIZE;
 
-  // secure_set (no-op)
-  const secureSetCb = m.addFunction((): number => 0, 'iiii');
+  // secure_set: rac_result_t (*)(const char* key, const char* value, void* user_data)
+  const secureSetCb = m.addFunction(
+    (_keyPtr: number, _valPtr: number, _ud: number): number => 0,
+    'iiii',
+  );
   m.setValue(adapterPtr + offset, secureSetCb, '*'); offset += PTR_SIZE;
 
-  // secure_delete (no-op)
-  const secureDelCb = m.addFunction((): number => 0, 'iii');
+  // secure_delete: rac_result_t (*)(const char* key, void* user_data)
+  const secureDelCb = m.addFunction((_keyPtr: number, _ud: number): number => 0, 'iii');
   m.setValue(adapterPtr + offset, secureDelCb, '*'); offset += PTR_SIZE;
 
-  // log
+  // log: void (*)(rac_log_level_t level, const char* category, const char* message, void* user_data)
   const logCb = m.addFunction(
     (level: number, catPtr: number, msgPtr: number, _ud: number): void => {
       const cat = m.UTF8ToString(catPtr);
@@ -212,18 +222,23 @@ async function initWASM(wasmJsUrl: string, useWebGPU = false): Promise<void> {
   // track_error (null)
   m.setValue(adapterPtr + offset, 0, '*'); offset += PTR_SIZE;
 
-  // now_ms
-  const nowMsCb = m.addFunction((): number => performance.now(), 'i');
+  // now_ms: int64_t (*)(void* user_data)  — signature 'ii' (returns i32, takes i32 user_data)
+  const nowMsCb = m.addFunction((_ud: number): number => Date.now(), 'ii');
   m.setValue(adapterPtr + offset, nowMsCb, '*'); offset += PTR_SIZE;
 
-  // get_memory_info (no-op)
+  // get_memory_info: rac_result_t (*)(rac_memory_info_t* out_info, void* user_data)
   const memInfoCb = m.addFunction(
     (outPtr: number, _ud: number): number => {
-      const total = (navigator as any).deviceMemory
-        ? (navigator as any).deviceMemory * 1024 * 1024 * 1024
-        : 4 * 1024 * 1024 * 1024;
-      m.setValue(outPtr, total, 'i64');     // total
-      m.setValue(outPtr + 8, total, 'i64'); // available (approximate)
+      const totalMB = (navigator as any).deviceMemory ?? 4;
+      const totalBytes = totalMB * 1024 * 1024 * 1024;
+      // rac_memory_info_t: { uint64_t total, available, used }
+      // Write as two i32 values per uint64 (wasm32)
+      m.setValue(outPtr, totalBytes & 0xFFFFFFFF, 'i32');      // total low
+      m.setValue(outPtr + 4, 0, 'i32');                         // total high
+      m.setValue(outPtr + 8, totalBytes & 0xFFFFFFFF, 'i32');  // available low
+      m.setValue(outPtr + 12, 0, 'i32');                        // available high
+      m.setValue(outPtr + 16, 0, 'i32');                        // used low
+      m.setValue(outPtr + 20, 0, 'i32');                        // used high
       return 0;
     },
     'iii',
@@ -233,36 +248,104 @@ async function initWASM(wasmJsUrl: string, useWebGPU = false): Promise<void> {
   // http_download (no-op)
   m.setValue(adapterPtr + offset, 0, '*'); offset += PTR_SIZE;
 
+  // http_download_cancel (no-op) — main-thread PlatformAdapter also sets this slot
+  m.setValue(adapterPtr + offset, 0, '*'); offset += PTR_SIZE;
+
   // extract_archive (no-op)
   m.setValue(adapterPtr + offset, 0, '*'); offset += PTR_SIZE;
 
+  // user_data (null)
+  m.setValue(adapterPtr + offset, 0, '*');
+
+  // ---- Register the adapter with RACommons (must happen before rac_init) ----
+  // _rac_set_platform_adapter is a simple pointer-store: it makes NO indirect
+  // calls into JS, so Emscripten does NOT wrap it with JSPI → returns a plain
+  // number synchronously.
+  logInfo('Step 1: Registering platform adapter...');
+  if (typeof m._rac_set_platform_adapter === 'function') {
+    const adapterResult = m._rac_set_platform_adapter(adapterPtr);
+    if (adapterResult !== 0) {
+      logWarn(`rac_set_platform_adapter returned ${adapterResult}`);
+    }
+  }
+  logInfo('Step 1 done: Platform adapter registered');
+
   // ---- Call rac_init ----
+  //
+  // rac_init is logically synchronous C++ (stores adapter, inits diffusion
+  // registry, logs).  However, in the WebGPU WASM build **every** export that
+  // transitively calls an addFunction-registered callback (e.g. the log
+  // callback via adapter->log) is JSPI-wrapped and returns a Promise.
+  //
+  // The Worker's JSPI suspendable stack is smaller than the main thread's,
+  // and the diffusion-model-registry init inside rac_init calls RAC_LOG_INFO
+  // multiple times — each log allocates 2×2048-byte char[] buffers on the
+  // stack — which overflows the JSPI stack with "memory access out of bounds".
+  //
+  // This is NON-FATAL for VLM: none of rac_backend_llamacpp_vlm_register,
+  // rac_vlm_component_create, rac_vlm_component_load_model, or
+  // rac_vlm_component_process check `s_initialized`. The platform adapter
+  // was already stored in Step 1 via rac_set_platform_adapter, so logging
+  // from subsequent calls still works.
+  //
+  // Strategy: try rac_init, and if it fails (JSPI stack overflow), continue.
+  logInfo('Step 2: Calling rac_init...');
   const configSize = m._rac_wasm_sizeof_config();
   const configPtr = m._malloc(configSize);
   for (let i = 0; i < configSize; i++) m.setValue(configPtr + i, 0, 'i8');
-  m.setValue(configPtr, adapterPtr, '*');   // platform_adapter
-  m.setValue(configPtr + 4, 2, 'i32');     // log_level = INFO
+  m.setValue(configPtr, adapterPtr, '*');   // platform_adapter (offset 0)
 
-  const initResult = m._rac_init(configPtr);
+  const logLevelOffset = typeof m._rac_wasm_offsetof_config_log_level === 'function'
+    ? m._rac_wasm_offsetof_config_log_level()
+    : 4;
+  m.setValue(configPtr + logLevelOffset, 2, 'i32'); // log_level = INFO
+
+  try {
+    const initResult = await m.ccall(
+      'rac_init', 'number', ['number'], [configPtr], { async: true },
+    ) as number;
+    if (initResult !== 0) {
+      logWarn(`rac_init returned non-zero (${initResult}), continuing without full core init`);
+    } else {
+      logInfo('Step 2 done: rac_init succeeded');
+    }
+  } catch (e) {
+    // Expected on WebGPU Workers: diffusion registry logging overflows the
+    // JSPI suspendable stack.  Non-fatal — VLM functions don't depend on it.
+    logWarn(`rac_init failed in Worker (${e}), continuing — VLM does not require full core init`);
+  }
   m._free(configPtr);
 
-  if (initResult !== 0) {
-    throw new Error(`rac_init failed in Worker: ${initResult}`);
-  }
-
   // ---- Load struct field offsets ----
+  // These are simple sizeof / offsetof helper exports that return plain ints.
+  // They do NOT call any callbacks → not JSPI-wrapped → synchronous.
+  logInfo('Step 3: Loading struct offsets...');
   offsets = loadOffsetsFromModule(m);
+  logInfo('Step 3 done: Offsets loaded');
 
   // ---- Register VLM backend ----
-  const regFn = m['_rac_backend_llamacpp_vlm_register'];
-  if (!regFn) {
-    throw new Error('VLM backend not available in WASM build');
+  // rac_backend_llamacpp_vlm_register is only available when the WASM binary
+  // was built with --vlm (RAC_WASM_VLM=ON).  It is in JSPI_EXPORTS so it
+  // returns a Promise → use ccall({async: true}).
+  logInfo('Step 4: Registering VLM backend...');
+  if (typeof m['_rac_backend_llamacpp_vlm_register'] !== 'function') {
+    throw new Error(
+      'VLM backend not available in WASM build. '
+      + 'Rebuild with: ./scripts/build.sh --webgpu --vlm',
+    );
   }
-  m.ccall('rac_backend_llamacpp_vlm_register', 'number', [], []);
+  const regResult = await m.ccall(
+    'rac_backend_llamacpp_vlm_register', 'number', [], [], { async: true },
+  ) as number;
+  logInfo(`Step 4 done: VLM backend registered (result: ${regResult})`);
 
   // ---- Create VLM component ----
+  // rac_vlm_component_create is in JSPI_EXPORTS → returns Promise.
+  logInfo('Step 5: Creating VLM component...');
   const handlePtr = m._malloc(4);
-  const createResult = m.ccall('rac_vlm_component_create', 'number', ['number'], [handlePtr]) as number;
+  const createResult = await m.ccall(
+    'rac_vlm_component_create', 'number', ['number'], [handlePtr], { async: true },
+  ) as number;
   if (createResult !== 0) {
     m._free(handlePtr);
     throw new Error(`rac_vlm_component_create failed: ${createResult}`);
@@ -281,17 +364,25 @@ async function loadModel(
   modelOpfsKey: string, modelFilename: string,
   mmprojOpfsKey: string, mmprojFilename: string,
   modelId: string, modelName: string,
+  providedModelData?: ArrayBuffer, providedMmprojData?: ArrayBuffer,
 ): Promise<void> {
   const m = wasmModule;
 
   // Ensure /models directory exists in Emscripten FS
   m.FS_createPath('/', 'models', true, true);
 
-  // Read model from OPFS
+  // Read model: use provided data (transferred from main thread) or OPFS
   self.postMessage({ id: -1, type: 'progress', payload: { stage: 'Reading model from storage...' } });
-  logInfo(`Reading model from OPFS: key=${modelOpfsKey}`);
-  const modelData = await loadFromOPFS(modelOpfsKey);
-  if (!modelData) throw new Error(`Model not found in OPFS: ${modelOpfsKey}`);
+  let modelData: Uint8Array;
+  if (providedModelData && providedModelData.byteLength > 0) {
+    logInfo(`Using transferred model data: ${(providedModelData.byteLength / 1024 / 1024).toFixed(1)} MB`);
+    modelData = new Uint8Array(providedModelData);
+  } else {
+    logInfo(`Reading model from OPFS: key=${modelOpfsKey}`);
+    const opfsData = await loadFromOPFS(modelOpfsKey);
+    if (!opfsData) throw new Error(`Model not found in OPFS: ${modelOpfsKey}`);
+    modelData = opfsData;
+  }
   logInfo(`Model data: ${(modelData.length / 1024 / 1024).toFixed(1)} MB`);
 
   // Write to WASM FS
@@ -302,11 +393,18 @@ async function loadModel(
   m.FS_createDataFile('/models', modelFilename, modelData, true, true, true);
   logInfo('Model written to WASM FS');
 
-  // Read mmproj from OPFS
+  // Read mmproj: use provided data or OPFS
   self.postMessage({ id: -1, type: 'progress', payload: { stage: 'Reading vision encoder...' } });
-  logInfo(`Reading mmproj from OPFS: key=${mmprojOpfsKey}`);
-  const mmprojData = await loadFromOPFS(mmprojOpfsKey);
-  if (!mmprojData) throw new Error(`mmproj not found in OPFS: ${mmprojOpfsKey}`);
+  let mmprojData: Uint8Array;
+  if (providedMmprojData && providedMmprojData.byteLength > 0) {
+    logInfo(`Using transferred mmproj data: ${(providedMmprojData.byteLength / 1024 / 1024).toFixed(1)} MB`);
+    mmprojData = new Uint8Array(providedMmprojData);
+  } else {
+    logInfo(`Reading mmproj from OPFS: key=${mmprojOpfsKey}`);
+    const opfsMmproj = await loadFromOPFS(mmprojOpfsKey);
+    if (!opfsMmproj) throw new Error(`mmproj not found in OPFS: ${mmprojOpfsKey}`);
+    mmprojData = opfsMmproj;
+  }
   logInfo(`mmproj data: ${(mmprojData.length / 1024 / 1024).toFixed(1)} MB`);
 
   const mmprojPath = `/models/${mmprojFilename}`;
@@ -323,10 +421,13 @@ async function loadModel(
   const namePtr = allocString(modelName);
 
   try {
-    const result = m.ccall(
+    // {async: true} for JSPI — model loading creates WebGPU buffers and
+    // allocates GPU memory, which suspends the WASM stack.
+    const result = await m.ccall(
       'rac_vlm_component_load_model', 'number',
       ['number', 'number', 'number', 'number', 'number'],
       [vlmHandle, pathPtr, projPtr, idPtr, namePtr],
+      { async: true },
     ) as number;
 
     if (result !== 0) {
@@ -346,12 +447,12 @@ async function loadModel(
 // Image processing
 // ---------------------------------------------------------------------------
 
-function processImage(
+async function processImage(
   rgbPixels: ArrayBuffer,
   width: number, height: number,
   prompt: string,
   maxTokens: number, temperature: number,
-): VLMWorkerResult {
+): Promise<VLMWorkerResult> {
   const m = wasmModule;
   const pixelArray = new Uint8Array(rgbPixels);
 
@@ -390,10 +491,13 @@ function processImage(
   for (let i = 0; i < resSize; i++) m.setValue(resPtr + i, 0, 'i8');
 
   try {
-    const r = m.ccall(
+    // {async: true} for JSPI — VLM inference performs extensive GPU compute
+    // (CLIP encoding + LLM generation) that suspends the WASM stack.
+    const r = await m.ccall(
       'rac_vlm_component_process', 'number',
       ['number', 'number', 'number', 'number', 'number'],
       [vlmHandle, imagePtr, promptPtr, optPtr, resPtr],
+      { async: true },
     ) as number;
 
     if (r !== 0) {
@@ -444,6 +548,7 @@ function handleMessage(e: MessageEvent<VLMWorkerCommand>): void {
           p.modelOpfsKey, p.modelFilename,
           p.mmprojOpfsKey, p.mmprojFilename,
           p.modelId, p.modelName,
+          (p as any).modelData, (p as any).mmprojData,
         );
         self.postMessage({ id, type: 'result', payload: { success: true } } satisfies VLMWorkerResponse);
         break;
@@ -451,7 +556,7 @@ function handleMessage(e: MessageEvent<VLMWorkerCommand>): void {
 
       case 'process': {
         const p = e.data.payload;
-        const result = processImage(
+        const result = await processImage(
           p.rgbPixels, p.width, p.height,
           p.prompt, p.maxTokens, p.temperature,
         );

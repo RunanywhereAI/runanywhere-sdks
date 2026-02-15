@@ -755,9 +755,56 @@ if(RAC_WASM_WEBGPU AND RAC_WASM_LLAMACPP)
     # JSPI + wasm-exceptions replace the older JS-based exception mechanism.
     # Remove the conflicting flag and replace it.
     list(REMOVE_ITEM EMSCRIPTEN_LINK_FLAGS "-sDISABLE_EXCEPTION_CATCHING=0")
+    # Only the functions that may suspend during WebGPU operations are
+    # listed in JSPI_EXPORTS.  Everything else stays synchronous so that
+    # direct calls like m._rac_wasm_ping() keep returning plain numbers.
+    #
+    # NOTE: WASM export names do NOT have the leading underscore that
+    # -sEXPORTED_FUNCTIONS uses.  The JSPI regex in the glue JS matches
+    # against the raw export names, so we must omit the underscore here.
+    set(RAC_JSPI_EXPORTS
+        # Module init (static constructors probe for WebGPU adapter)
+        "__wasm_call_ctors"
+        # SDK init (rac_init may initialize GPU context)
+        "rac_init"
+        # Backend registration (may probe GPU capabilities)
+        "rac_backend_llamacpp_register"
+        "rac_backend_llamacpp_vlm_register"
+        # LLM lifecycle (GPU memory allocation / inference / cleanup)
+        "rac_llm_component_create"
+        "rac_llm_component_load_model"
+        "rac_llm_component_generate"
+        "rac_llm_component_generate_stream"
+        "rac_llm_component_unload"
+        # VLM lifecycle (GPU memory allocation / inference / cleanup)
+        "rac_vlm_component_create"
+        "rac_vlm_component_load_model"
+        "rac_vlm_component_process"
+        "rac_vlm_component_process_stream"
+        "rac_vlm_component_unload"
+    )
+    string(JOIN "\",\"" RAC_JSPI_EXPORTS_STR ${RAC_JSPI_EXPORTS})
+
     list(APPEND EMSCRIPTEN_LINK_FLAGS
         "-sJSPI"                     # Enable JSPI for async WebGPU calls from sync C
-        "-sASYNCIFY=0"               # JSPI replaces Asyncify (mutually exclusive)
+        # NOTE: Do NOT add -sASYNCIFY=0 here. -sJSPI internally sets ASYNCIFY=2;
+        # an explicit ASYNCIFY=0 would override and disable JSPI.
+        "-sJSPI_EXPORTS=[\"${RAC_JSPI_EXPORTS_STR}\"]"
+        # Only wrap WebGPU-async imports with WebAssembly.Suspending.
+        #
+        # Using ["*"] wraps ALL imports (including synchronous ones like
+        # fd_write for stderr logging).  During model loading, llama.cpp
+        # prints hundreds of log lines via fd_write between WebGPU buffer
+        # operations.  The mix of synchronous Suspending-wrapped imports
+        # and actual async suspensions causes V8 to report
+        # "trying to suspend JS frames" because the synchronous wrappers
+        # leave transient JS frames on the JSPI stack.
+        #
+        # By limiting JSPI_IMPORTS to only the WebGPU functions that
+        # actually return Promises (adapter/device request, buffer map,
+        # queue sync), fd_write and other synchronous imports remain
+        # plain JS calls with no JSPI overhead.
+        "-sJSPI_IMPORTS=[\"wgpuInstanceRequestAdapter\",\"wgpuAdapterRequestDevice\",\"wgpuBufferMapAsync\",\"wgpuDeviceCreateComputePipelineAsync\",\"wgpuDeviceCreateRenderPipelineAsync\",\"wgpuQueueOnSubmittedWorkDone\",\"wgpuInstanceProcessEvents\"]"
         "-fwasm-exceptions"          # WASM-native exceptions (required by JSPI)
     )
     message(STATUS "WebGPU + JSPI ENABLED (requires Chrome 113+ / Edge 113+)")

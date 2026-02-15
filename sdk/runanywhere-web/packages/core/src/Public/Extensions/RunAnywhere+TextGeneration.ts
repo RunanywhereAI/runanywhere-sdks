@@ -28,51 +28,50 @@ import type { LLMGenerationOptions, LLMGenerationResult, LLMStreamingResult } fr
 
 const logger = new SDKLogger('TextGeneration');
 
-// Internal state
-let _llmComponentHandle = 0;
-
-/**
- * Ensure the SDK is initialized and return the bridge.
- */
-function requireBridge(): WASMBridge {
-  if (!RunAnywhere.isInitialized) {
-    throw SDKError.notInitialized();
-  }
-  return WASMBridge.shared;
-}
-
-/**
- * Ensure the LLM component is created.
- */
-function ensureLLMComponent(): number {
-  if (_llmComponentHandle !== 0) {
-    return _llmComponentHandle;
-  }
-
-  const bridge = requireBridge();
-  const m = bridge.module;
-
-  // Allocate pointer for output handle
-  const handlePtr = m._malloc(4);
-  const result = m._rac_llm_component_create(handlePtr);
-
-  if (result !== 0) {
-    m._free(handlePtr);
-    bridge.checkResult(result, 'rac_llm_component_create');
-  }
-
-  _llmComponentHandle = m.getValue(handlePtr, 'i32');
-  m._free(handlePtr);
-
-  logger.debug('LLM component created');
-  return _llmComponentHandle;
-}
-
 // ---------------------------------------------------------------------------
 // Text Generation Extension
 // ---------------------------------------------------------------------------
 
-export const TextGeneration = {
+class TextGenerationImpl {
+  readonly extensionName = 'TextGeneration';
+  private _llmComponentHandle = 0;
+
+  /** Ensure the SDK is initialized and return the bridge. */
+  private requireBridge(): WASMBridge {
+    if (!RunAnywhere.isInitialized) {
+      throw SDKError.notInitialized();
+    }
+    return WASMBridge.shared;
+  }
+
+  /** Ensure the LLM component is created. */
+  private async ensureLLMComponent(): Promise<number> {
+    if (this._llmComponentHandle !== 0) {
+      return this._llmComponentHandle;
+    }
+
+    const bridge = this.requireBridge();
+    const m = bridge.module;
+
+    // Allocate pointer for output handle
+    const handlePtr = m._malloc(4);
+    // {async: true} for JSPI -- component creation may init WebGPU context
+    const result = await bridge.callFunction<number | Promise<number>>(
+      'rac_llm_component_create', 'number', ['number'], [handlePtr], { async: true },
+    ) as number;
+
+    if (result !== 0) {
+      m._free(handlePtr);
+      bridge.checkResult(result, 'rac_llm_component_create');
+    }
+
+    this._llmComponentHandle = m.getValue(handlePtr, 'i32');
+    m._free(handlePtr);
+
+    logger.debug('LLM component created');
+    return this._llmComponentHandle;
+  }
+
   /**
    * Load an LLM model for text generation.
    *
@@ -81,9 +80,8 @@ export const TextGeneration = {
    * @param modelName - Human-readable model name
    */
   async loadModel(modelPath: string, modelId: string, modelName?: string): Promise<void> {
-    const bridge = requireBridge();
-    const m = bridge.module;
-    const handle = ensureLLMComponent();
+    const bridge = this.requireBridge();
+    const handle = await this.ensureLLMComponent();
 
     logger.info(`Loading LLM model: ${modelId} from ${modelPath}`);
 
@@ -94,7 +92,15 @@ export const TextGeneration = {
     const namePtr = bridge.allocString(modelName ?? modelId);
 
     try {
-      const result = m._rac_llm_component_load_model(handle, pathPtr, idPtr, namePtr);
+      // {async: true} allows JSPI to suspend during WebGPU device/buffer
+      // initialization that happens inside load_model.
+      const result = await bridge.callFunction<number | Promise<number>>(
+        'rac_llm_component_load_model',
+        'number',
+        ['number', 'number', 'number', 'number'],
+        [handle, pathPtr, idPtr, namePtr],
+        { async: true },
+      ) as number;
       bridge.checkResult(result, 'rac_llm_component_load_model');
 
       logger.info(`LLM model loaded: ${modelId}`);
@@ -110,35 +116,40 @@ export const TextGeneration = {
       bridge.free(idPtr);
       bridge.free(namePtr);
     }
-  },
+  }
 
   /**
    * Unload the currently loaded LLM model.
    */
   async unloadModel(): Promise<void> {
-    if (_llmComponentHandle === 0) return;
+    if (this._llmComponentHandle === 0) return;
 
-    const bridge = requireBridge();
-    const m = bridge.module;
+    const bridge = this.requireBridge();
 
-    const result = m._rac_llm_component_unload(_llmComponentHandle);
+    const result = await bridge.callFunction<number | Promise<number>>(
+      'rac_llm_component_unload',
+      'number',
+      ['number'],
+      [this._llmComponentHandle],
+      { async: true },
+    ) as number;
     bridge.checkResult(result, 'rac_llm_component_unload');
 
     logger.info('LLM model unloaded');
-  },
+  }
 
   /**
    * Check if an LLM model is currently loaded.
    */
   get isModelLoaded(): boolean {
-    if (_llmComponentHandle === 0) return false;
+    if (this._llmComponentHandle === 0) return false;
     try {
       const m = WASMBridge.shared.module;
-      return m._rac_llm_component_is_loaded(_llmComponentHandle) === 1;
+      return m._rac_llm_component_is_loaded(this._llmComponentHandle) === 1;
     } catch {
       return false;
     }
-  },
+  }
 
   /**
    * Generate text from a prompt (non-streaming).
@@ -154,11 +165,11 @@ export const TextGeneration = {
    * @returns Generation result with text and metrics
    */
   async generate(prompt: string, options: LLMGenerationOptions = {}): Promise<LLMGenerationResult> {
-    const bridge = requireBridge();
+    const bridge = this.requireBridge();
     const m = bridge.module;
-    const handle = ensureLLMComponent();
+    const handle = await this.ensureLLMComponent();
 
-    if (!TextGeneration.isModelLoaded) {
+    if (!this.isModelLoaded) {
       throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No LLM model loaded. Call loadModel() first.');
     }
 
@@ -204,19 +215,27 @@ export const TextGeneration = {
       // in an already-resolved Promise).
       let result: number;
       try {
-        result = await m.ccall(
+        logger.debug('Calling rac_llm_component_generate via ccall({async:true})');
+        const callResult = bridge.callFunction<number | Promise<number>>(
           'rac_llm_component_generate',
           'number',
           ['number', 'number', 'number', 'number'],
           [handle, promptPtr, optionsPtr, resultPtr],
           { async: true },
-        ) as number;
+        );
+        logger.debug(`ccall returned type=${typeof callResult}, isPromise=${callResult instanceof Promise}`);
+        result = await callResult as number;
+        logger.debug(`Generation returned result=${result}`);
       } catch (wasmErr: unknown) {
-        // Emscripten converts unhandled C++ exceptions into JS throws.
-        // The thrown value is typically the __cxa_exception pointer (a number).
+        // Log the full error details including stack trace
+        if (wasmErr instanceof Error) {
+          logger.error(`WASM generation error: ${wasmErr.message}\nStack: ${wasmErr.stack}`);
+        } else {
+          logger.error(`WASM generation error (raw): type=${typeof wasmErr}, value=${String(wasmErr)}`);
+        }
         const detail = typeof wasmErr === 'number'
           ? `WASM C++ exception (ptr=${wasmErr}). The model's chat template may be unsupported.`
-          : String(wasmErr);
+          : wasmErr instanceof Error ? wasmErr.message : String(wasmErr);
         throw new SDKError(
           SDKErrorCode.GenerationFailed,
           `LLM generation crashed: ${detail}`,
@@ -267,21 +286,25 @@ export const TextGeneration = {
       // which only frees the inner `text` string).
       m._free(resultPtr);
     }
-  },
+  }
 
   /**
    * Generate text with streaming (returns AsyncIterable of tokens).
+   *
+   * Async because the underlying C call uses `{async: true}` so Emscripten's
+   * JSPI can suspend the WASM stack during WebGPU buffer operations.  On
+   * CPU-only builds the result is simply an already-resolved Promise.
    *
    * @param prompt - Input text prompt
    * @param options - Generation options
    * @returns Streaming result with async token stream and final result promise
    */
-  generateStream(prompt: string, options: LLMGenerationOptions = {}): LLMStreamingResult {
-    const bridge = requireBridge();
+  async generateStream(prompt: string, options: LLMGenerationOptions = {}): Promise<LLMStreamingResult> {
+    const bridge = this.requireBridge();
     const m = bridge.module;
-    const handle = ensureLLMComponent();
+    const handle = await this.ensureLLMComponent();
 
-    if (!TextGeneration.isModelLoaded) {
+    if (!this.isModelLoaded) {
       throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No LLM model loaded. Call loadModel() first.');
     }
 
@@ -390,21 +413,31 @@ export const TextGeneration = {
 
     let startResult: number;
     try {
-      startResult = m.ccall(
+      logger.debug('Calling rac_llm_component_generate_stream via ccall({async:true})');
+      const callResult = bridge.callFunction<number | Promise<number>>(
         'rac_llm_component_generate_stream',
         'number',
         ['number', 'number', 'number', 'number', 'number', 'number', 'number'],
         [handle, promptPtr, optionsPtr, tokenCbPtr, completeCbPtr, errorCbPtr, 0],
-      ) as number;
+        { async: true },
+      );
+      logger.debug(`ccall returned type=${typeof callResult}, isPromise=${callResult instanceof Promise}`);
+      startResult = await callResult as number;
+      logger.debug(`Stream generation returned result=${startResult}`);
     } catch (wasmErr: unknown) {
       bridge.free(promptPtr);
       m._free(optionsPtr);
       m.removeFunction(tokenCbPtr);
       m.removeFunction(completeCbPtr);
       m.removeFunction(errorCbPtr);
+      if (wasmErr instanceof Error) {
+        logger.error(`WASM stream generation error: ${wasmErr.message}\nStack: ${wasmErr.stack}`);
+      } else {
+        logger.error(`WASM stream generation error (raw): type=${typeof wasmErr}, value=${String(wasmErr)}`);
+      }
       const detail = typeof wasmErr === 'number'
         ? `WASM C++ exception (ptr=${wasmErr}). The model's chat template may be unsupported.`
-        : String(wasmErr);
+        : wasmErr instanceof Error ? wasmErr.message : String(wasmErr);
       throw new SDKError(
         SDKErrorCode.GenerationFailed,
         `LLM streaming generation crashed: ${detail}`,
@@ -450,33 +483,35 @@ export const TextGeneration = {
         m._rac_llm_component_cancel(handle);
       },
     };
-  },
+  }
 
   /**
    * Cancel any in-progress generation.
    */
   cancel(): void {
-    if (_llmComponentHandle === 0) return;
+    if (this._llmComponentHandle === 0) return;
     try {
       const m = WASMBridge.shared.module;
-      m._rac_llm_component_cancel(_llmComponentHandle);
+      m._rac_llm_component_cancel(this._llmComponentHandle);
     } catch {
       // Ignore cancel errors
     }
-  },
+  }
 
   /**
    * Clean up the LLM component (frees memory).
    */
   cleanup(): void {
-    if (_llmComponentHandle !== 0) {
+    if (this._llmComponentHandle !== 0) {
       try {
         const m = WASMBridge.shared.module;
-        m._rac_llm_component_destroy(_llmComponentHandle);
+        m._rac_llm_component_destroy(this._llmComponentHandle);
       } catch {
         // Ignore cleanup errors
       }
-      _llmComponentHandle = 0;
+      this._llmComponentHandle = 0;
     }
-  },
-};
+  }
+}
+
+export const TextGeneration = new TextGenerationImpl();
