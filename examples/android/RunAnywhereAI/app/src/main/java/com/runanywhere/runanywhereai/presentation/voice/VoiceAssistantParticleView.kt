@@ -14,15 +14,17 @@ import kotlin.random.Random
 /**
  * VoiceAssistantParticleView - Particle animation for voice assistant
  *
- * Particles expand outward from center based on audio amplitude.
+ * Particles form a thick circular ring with scattered fill toward center.
+ * Dense at the circumference, sparse inside -- like a particle nebula ring.
  * Responds to both voice input (microphone) and voice output (TTS).
  * Non-interactive (no tap/touch handling).
  *
  * Features:
- * - 400 particles distributed on a Fibonacci sphere
- * - Amplitude-driven expansion from center
+ * - 2000 particles with edge-biased radial distribution
+ * - Dense outer ring band with sparse inner scatter
+ * - Amplitude-driven ring expansion from center
  * - Smooth breathing animation with slow rotation
- * - Organic per-particle variation for fluid movement
+ * - Organic per-particle drift for fluid movement
  */
 @Composable
 fun VoiceAssistantParticleView(
@@ -31,7 +33,7 @@ fun VoiceAssistantParticleView(
     modifier: Modifier = Modifier,
 ) {
     // Generate particles once
-    val particles = remember { generateFibonacciSphereParticles(PARTICLE_COUNT) }
+    val particles = remember { generateRingParticles(PARTICLE_COUNT) }
 
     // Time for animation
     var time by remember { mutableFloatStateOf(0f) }
@@ -76,32 +78,24 @@ fun VoiceAssistantParticleView(
 }
 
 private data class Particle(
-    val position: Triple<Float, Float, Float>, // x, y, z on unit sphere
-    val index: Float, // 0-1 normalized index
-    val radiusOffset: Float, // random offset for variation
-    val seed: Float // random seed for animation variation
+    val angle: Float,        // position around the ring (0 to 2π)
+    val radialFactor: Float, // 0 = center, 1 = ring edge (biased toward 1)
+    val seed: Float          // random seed for animation variation
 )
 
-private const val PARTICLE_COUNT = 400
+private const val PARTICLE_COUNT = 2000
 
-private fun generateFibonacciSphereParticles(count: Int): List<Particle> {
-    val goldenRatio = (1.0 + sqrt(5.0)) / 2.0
-    val angleIncrement = (PI * 2.0 * goldenRatio).toFloat()
-
-    return (0 until count).map { i ->
-        val t = i.toFloat() / (count - 1).toFloat()
-        val inclination = acos(1f - 2f * t)
-        val azimuth = angleIncrement * i
-
-        val x = sin(inclination) * cos(azimuth)
-        val y = sin(inclination) * sin(azimuth)
-        val z = cos(inclination)
-
+private fun generateRingParticles(count: Int): List<Particle> {
+    val random = Random(42) // Fixed seed for consistent generation
+    return (0 until count).map {
+        val angle = random.nextFloat() * PI.toFloat() * 2f
+        // Power distribution biased toward the ring edge:
+        // pow(0.35) makes most values cluster near 1.0 with a tail toward 0
+        val radialFactor = 0.08f + random.nextFloat().pow(0.35f) * 1.05f
         Particle(
-            position = Triple(x, y, z),
-            index = i.toFloat() / count,
-            radiusOffset = Random.nextFloat() * 2f - 1f,
-            seed = Random.nextFloat()
+            angle = angle,
+            radialFactor = radialFactor.coerceIn(0.05f, 1.15f),
+            seed = random.nextFloat()
         )
     }
 }
@@ -117,87 +111,82 @@ private fun DrawScope.drawParticle(
     activeColor: Color,
     isDarkMode: Boolean
 ) {
-    val (sphereX, sphereY, sphereZ) = particle.position
     val seed = particle.seed
 
-    // === ROTATION (slow rotation for visual interest) ===
-    val rotationAngle = -time * 0.2f
-    val cosA = cos(rotationAngle)
-    val sinA = sin(rotationAngle)
-    val rotatedX = sphereX * cosA - sphereZ * sinA
-    val rotatedY = sphereY
-    val rotatedZ = sphereX * sinA + sphereZ * cosA
+    // === ROTATION (slow rotation of the whole ring) ===
+    val rotation = time * 0.3f
 
     // === BREATHING (visible pulsing at all times) ===
-    val breath = 1f + sin(time * 0.8f) * 0.06f
+    val breath = 1f + sin(time * 0.8f) * 0.04f
 
-    // === IDLE DRIFT (per-particle movement so they look alive at rest) ===
+    // === PER-PARTICLE DRIFT (organic movement) ===
     val phaseOffset = seed * PI.toFloat() * 2f
-    val driftX = sin(time * 0.6f + phaseOffset) * 0.04f
-    val driftY = cos(time * 0.5f + phaseOffset * 1.3f) * 0.04f
+    val angleDrift = sin(time * 0.5f + phaseOffset) * 0.025f
+    val radialDrift = sin(time * 0.6f + phaseOffset * 1.3f) * 0.01f
 
-    // === AMPLITUDE-DRIVEN EXPANSION FROM CENTER ===
-    // At rest (amplitude ≈ 0): large sphere so individual particles are visible
-    // With audio: particles expand further outward proportional to amplitude
-    val idleRadius = 1.0f
-    val maxExpansion = 0.5f
+    // === AMPLITUDE-DRIVEN RING EXPANSION ===
+    val idleRadius = 0.32f
+    val maxExpansion = 0.15f
 
-    // Per-particle wave effect for organic movement (scales with amplitude)
-    val waveEffect = sin(time * 2.5f + phaseOffset) * 0.08f * amplitude
+    // Per-particle wave for organic movement (scales with amplitude)
+    val waveEffect = sin(time * 2.5f + phaseOffset) * 0.03f * amplitude
 
-    // Per-particle seed variation (each particle expands slightly differently)
-    val seedVariation = (seed - 0.5f) * 0.15f * amplitude
+    // Per-particle seed variation
+    val seedVariation = (seed - 0.5f) * 0.04f * amplitude
 
-    val expansionRadius = (idleRadius + amplitude * maxExpansion + waveEffect + seedVariation) * breath
+    val ringRadius = (idleRadius + amplitude * maxExpansion + waveEffect + seedVariation) * breath
 
-    val finalX = rotatedX * expansionRadius + driftX
-    val finalY = rotatedY * expansionRadius + driftY
-    val finalZ = rotatedZ * expansionRadius
+    // === FINAL POSITION ===
+    val angle = particle.angle + rotation + angleDrift
+    val radius = ringRadius * particle.radialFactor + radialDrift
 
-    // === PROJECTION ===
-    val z = finalZ + 2.5f
-    val projScale = 0.85f
-    val projX = centerX + (finalX / z) * projScale * scale
-    val projY = centerY - (finalY / z) * projScale * scale // Flip Y
+    val x = cos(angle) * radius
+    val y = sin(angle) * radius
 
-    // === SIZE ===
-    val baseSize = 3f
+    // Screen position
+    val projX = centerX + x * scale
+    val projY = centerY + y * scale
+
+    // === SIZE (smaller for crisp dots, slightly bigger near edge) ===
+    val edgeFactor = particle.radialFactor.coerceIn(0f, 1f)
+    val baseSize = 1.2f + edgeFactor * 0.8f // 1.2 at center, 2.0 at edge
     val energyGlow = 1f + amplitude * 0.4f
-    val particleSize = (baseSize * (2.8f / z) * energyGlow * scale / 100f).coerceIn(2f, 8f)
+    val particleSize = (baseSize * energyGlow * scale / 250f).coerceIn(1f, 5f)
 
     // === COLOR ===
     val energy = amplitude * 0.7f
     val particleColor = lerpColor(baseColor, activeColor, energy)
 
-    // Brightness adjustment
-    val brightMultiplier = if (isDarkMode) 1.5f + energy * 0.5f else 2.2f + energy * 0.6f
+    // Brightness -- edge particles slightly brighter
+    val edgeBright = 0.85f + edgeFactor * 0.15f
+    val brightMultiplier = (if (isDarkMode) 1.5f + energy * 0.5f else 2.2f + energy * 0.6f) * edgeBright
     val finalColor = particleColor.copy(
         red = (particleColor.red * brightMultiplier).coerceIn(0f, 1f),
         green = (particleColor.green * brightMultiplier).coerceIn(0f, 1f),
         blue = (particleColor.blue * brightMultiplier).coerceIn(0f, 1f)
     )
 
-    // === ALPHA ===
-    val depthShade = 0.5f + 0.5f * (1f - (z - 1.8f) / 2f)
-    val alpha = (depthShade * (0.6f + amplitude * 0.4f)).coerceIn(0.3f, 1f)
+    // === ALPHA (edge particles more opaque, inner particles more transparent) ===
+    val baseAlpha = 0.3f + edgeFactor * 0.5f // 0.3 at center, 0.8 at edge
+    val alpha = (baseAlpha + amplitude * 0.2f).coerceIn(0.2f, 1f)
 
     // === DRAW ===
-    // Glow effect (subtle, so particles stay distinct)
+    // Soft glow
     drawCircle(
         brush = Brush.radialGradient(
             colors = listOf(
-                finalColor.copy(alpha = alpha * 0.6f),
-                finalColor.copy(alpha = alpha * 0.2f),
+                finalColor.copy(alpha = alpha * 0.5f),
+                finalColor.copy(alpha = alpha * 0.15f),
                 finalColor.copy(alpha = 0f)
             ),
             center = Offset(projX, projY),
-            radius = particleSize * 1.5f
+            radius = particleSize * 1.4f
         ),
-        radius = particleSize * 1.5f,
+        radius = particleSize * 1.4f,
         center = Offset(projX, projY)
     )
 
-    // Core
+    // Core dot
     drawCircle(
         color = finalColor.copy(alpha = alpha),
         radius = particleSize,
