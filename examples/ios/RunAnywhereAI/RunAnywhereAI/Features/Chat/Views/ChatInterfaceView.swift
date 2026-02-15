@@ -140,7 +140,7 @@ extension ChatInterfaceView {
                         modelButton
                     }
                     #else
-                    ToolbarItem(placement: .cancellationAction) {
+                    ToolbarItem(placement: .automatic) {
                         Button {
                             showingConversationList = true
                         } label: {

@@ -18,12 +18,8 @@ import Foundation
 //
 // =============================================================================
 
-// Get the package directory for relative path resolution
-let packageDir = URL(fileURLWithPath: #file).deletingLastPathComponent().path
-
-// Path to combined ONNX Runtime xcframework (iOS + macOS)
-// Created by: cd sdk/runanywhere-swift && ./scripts/create-onnxruntime-xcframework.sh
-let onnxRuntimeLocalPath = "\(packageDir)/sdk/runanywhere-swift/Binaries/onnxruntime.xcframework"
+// Combined ONNX Runtime xcframework (local dev) is created by:
+//   cd sdk/runanywhere-swift && ./scripts/create-onnxruntime-xcframework.sh
 
 // =============================================================================
 // BINARY TARGET CONFIGURATION
@@ -45,15 +41,13 @@ let useLocalBinaries = false //  Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when testLocal = false)
 // Updated automatically by CI/CD during releases
-let sdkVersion = "0.19.0"
+let sdkVersion = "0.19.1"
 
 let package = Package(
     name: "runanywhere-sdks",
     platforms: [
         .iOS(.v17),
         .macOS(.v14),
-        .tvOS(.v17),
-        .watchOS(.v10)
     ],
     products: [
         // =================================================================
@@ -219,24 +213,14 @@ func binaryTargets() -> [Target] {
             ),
         ]
 
-        // Use local combined ONNX Runtime xcframework if available (includes macOS),
-        // otherwise fall back to iOS-only pod archive from onnxruntime.ai
-        if FileManager.default.fileExists(atPath: onnxRuntimeLocalPath) {
-            targets.append(
-                .binaryTarget(
-                    name: "ONNXRuntimeBinary",
-                    path: "sdk/runanywhere-swift/Binaries/onnxruntime.xcframework"
-                )
+        // Local combined ONNX Runtime xcframework (iOS + macOS)
+        // Created by: cd sdk/runanywhere-swift && ./scripts/create-onnxruntime-xcframework.sh
+        targets.append(
+            .binaryTarget(
+                name: "ONNXRuntimeBinary",
+                path: "sdk/runanywhere-swift/Binaries/onnxruntime.xcframework"
             )
-        } else {
-            targets.append(
-                .binaryTarget(
-                    name: "ONNXRuntimeBinary",
-                    url: "https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.17.1.zip",
-                    checksum: "9a2d54d4f503fbb82d2f86361a1d22d4fe015e2b5e9fb419767209cc9ab6372c"
-                )
-            )
-        }
+        )
 
         return targets
     } else {

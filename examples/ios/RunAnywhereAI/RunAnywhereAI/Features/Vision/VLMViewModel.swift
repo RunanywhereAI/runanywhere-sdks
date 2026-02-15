@@ -192,24 +192,42 @@ final class VLMViewModel: NSObject {
 
         do {
             guard let cgImage = nsImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                let conversionError = NSError(
+                    domain: "com.runanywhere.RunAnywhereAI",
+                    code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "Failed to convert NSImage to CGImage"]
+                )
+                self.error = conversionError
+                logger.error("VLM error: failed to convert NSImage to CGImage")
                 isProcessing = false
                 return
             }
             let width = cgImage.width
             let height = cgImage.height
-            let bytesPerRow = 4 * width
-            var rgbData = Data(count: bytesPerRow * height)
-            rgbData.withUnsafeMutableBytes { ptr in
+            let rgbaBytesPerRow = 4 * width
+            let rgbaTotalBytes = rgbaBytesPerRow * height
+            var rgbaData = Data(count: rgbaTotalBytes)
+            rgbaData.withUnsafeMutableBytes { ptr in
                 guard let context = CGContext(
                     data: ptr.baseAddress,
                     width: width,
                     height: height,
                     bitsPerComponent: 8,
-                    bytesPerRow: bytesPerRow,
+                    bytesPerRow: rgbaBytesPerRow,
                     space: CGColorSpaceCreateDeviceRGB(),
                     bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
                 ) else { return }
                 context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+            }
+            // RGBX (4 bytes/pixel) → RGB (3 bytes/pixel): strip the padding byte
+            var rgbData = Data(capacity: width * height * 3)
+            rgbaData.withUnsafeBytes { buffer in
+                let pixels = buffer.bindMemory(to: UInt8.self)
+                for i in stride(from: 0, to: rgbaTotalBytes, by: 4) {
+                    rgbData.append(pixels[i])     // R
+                    rgbData.append(pixels[i + 1]) // G
+                    rgbData.append(pixels[i + 2]) // B
+                }
             }
             let image = VLMImage(rgbPixels: rgbData, width: width, height: height)
             let result = try await RunAnywhere.processImageStream(
