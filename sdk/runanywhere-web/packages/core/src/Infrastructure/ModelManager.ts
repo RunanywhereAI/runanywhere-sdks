@@ -149,7 +149,13 @@ class ModelManagerImpl {
     try {
       if (navigator.storage?.persist) {
         const persisted = await navigator.storage.persist();
-        logger.info(`Persistent storage: ${persisted ? 'granted' : 'denied'}`);
+        if (persisted) {
+          logger.info('Persistent storage: granted');
+        } else {
+          // Expected on first visit — browsers require engagement signals
+          // (bookmark, PWA install, etc.) before granting persistence.
+          logger.debug('Persistent storage: denied (expected on first visit)');
+        }
       }
     } catch {
       // Not supported or denied — non-critical
