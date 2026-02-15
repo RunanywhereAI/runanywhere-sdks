@@ -7,6 +7,7 @@
  */
 
 import { EventBus } from '../Foundation/EventBus';
+import { SDKLogger } from '../Foundation/SDKLogger';
 import { OPFSStorage } from './OPFSStorage';
 import type { MetadataMap } from './OPFSStorage';
 import { ModelStatus, DownloadStage, SDKEventType } from '../types/enums';
@@ -102,6 +103,8 @@ function validateModelUrl(url: string): void {
  * persists them in OPFS via `OPFSStorage`. Reports progress to the
  * `ModelRegistry` and emits events via `EventBus`.
  */
+const logger = new SDKLogger('ModelDownloader');
+
 export class ModelDownloader {
   private readonly storage: OPFSStorage;
   private readonly registry: ModelRegistry;
@@ -344,7 +347,7 @@ export class ModelDownloader {
     try {
       // First attempt
       await this.storage.saveModel(key, data.buffer as ArrayBuffer);
-      console.log(`[ModelDownloader] Stored ${key} in OPFS (${sizeMB} MB)`);
+      logger.info(`Stored ${key} in OPFS (${sizeMB} MB)`);
       this.memoryCache.delete(key);
       return;
     } catch (err) {
@@ -353,26 +356,26 @@ export class ModelDownloader {
 
       if (!isQuota) {
         // Non-quota error — fall back to memory cache directly
-        console.warn(`[ModelDownloader] OPFS store failed for "${key}": ${msg}`);
-        console.log(`[ModelDownloader] Caching "${key}" in memory (${sizeMB} MB) for current session`);
+        logger.warning(`OPFS store failed for "${key}": ${msg}`);
+        logger.info(`Caching "${key}" in memory (${sizeMB} MB) for current session`);
         this.memoryCache.set(key, data);
         return;
       }
 
       // Quota exceeded — try to evict old models and retry
-      console.warn(`[ModelDownloader] OPFS quota exceeded for "${key}" (${sizeMB} MB), evicting old models...`);
+      logger.warning(`OPFS quota exceeded for "${key}" (${sizeMB} MB), evicting old models...`);
       await this.evictOPFSModels(key, data.length);
     }
 
     // Retry after eviction
     try {
       await this.storage.saveModel(key, data.buffer as ArrayBuffer);
-      console.log(`[ModelDownloader] Stored ${key} in OPFS after eviction (${sizeMB} MB)`);
+      logger.info(`Stored ${key} in OPFS after eviction (${sizeMB} MB)`);
       this.memoryCache.delete(key);
     } catch (retryErr) {
       const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
-      console.warn(`[ModelDownloader] OPFS store still failed after eviction for "${key}": ${retryMsg}`);
-      console.log(`[ModelDownloader] Caching "${key}" in memory (${sizeMB} MB) for current session`);
+      logger.warning(`OPFS store still failed after eviction for "${key}": ${retryMsg}`);
+      logger.info(`Caching "${key}" in memory (${sizeMB} MB) for current session`);
       this.memoryCache.set(key, data);
     }
   }
@@ -413,7 +416,7 @@ export class ModelDownloader {
       if (storedBase === keepBase) continue;
 
       const sizeMBEvict = (model.sizeBytes / 1024 / 1024).toFixed(1);
-      console.log(`[ModelDownloader] Evicting "${model.id}" (${sizeMBEvict} MB) from OPFS`);
+      logger.info(`Evicting "${model.id}" (${sizeMBEvict} MB) from OPFS`);
       await this.storage.deleteModel(model.id);
 
       // Also update registry status if this model is registered
@@ -431,7 +434,7 @@ export class ModelDownloader {
 
       freedBytes += model.sizeBytes;
       if (freedBytes >= neededBytes) {
-        console.log(`[ModelDownloader] Evicted ${(freedBytes / 1024 / 1024).toFixed(1)} MB, should have room now`);
+        logger.info(`Evicted ${(freedBytes / 1024 / 1024).toFixed(1)} MB, should have room now`);
         break;
       }
     }
@@ -443,13 +446,13 @@ export class ModelDownloader {
     const buffer = await this.storage.loadModel(key);
     if (buffer && buffer.byteLength > 0) {
       const sizeMB = buffer.byteLength / 1024 / 1024;
-      console.log(`[ModelDownloader] Loading ${key} from OPFS (${sizeMB.toFixed(1)} MB)`);
+      logger.debug(`Loading ${key} from OPFS (${sizeMB.toFixed(1)} MB)`);
       return new Uint8Array(buffer);
     }
 
     // Clean up corrupted 0-byte OPFS entries
     if (buffer && buffer.byteLength === 0) {
-      console.warn(`[ModelDownloader] OPFS entry for "${key}" is 0 bytes (corrupted), deleting`);
+      logger.warning(`OPFS entry for "${key}" is 0 bytes (corrupted), deleting`);
       await this.deleteFromOPFS(key);
     }
 
@@ -460,7 +463,7 @@ export class ModelDownloader {
     const cached = this.memoryCache.get(key);
     if (cached) {
       const sizeMB = cached.length / 1024 / 1024;
-      console.log(`[ModelDownloader] Loading ${key} from memory cache (${sizeMB.toFixed(1)} MB) — not persisted to OPFS`);
+      logger.debug(`Loading ${key} from memory cache (${sizeMB.toFixed(1)} MB) — not persisted to OPFS`);
       return cached;
     }
 
