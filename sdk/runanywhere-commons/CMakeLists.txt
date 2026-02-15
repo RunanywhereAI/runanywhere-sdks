@@ -61,7 +61,10 @@ set(RAC_PROJECT_VERSION "${RAC_VERSION}" CACHE STRING "Project version" FORCE)
 # PLATFORM DETECTION
 # =============================================================================
 
-if(IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+if(EMSCRIPTEN)
+    set(RAC_PLATFORM_WASM TRUE)
+    set(RAC_PLATFORM_NAME "Emscripten")
+elseif(IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(RAC_PLATFORM_IOS TRUE)
     set(RAC_PLATFORM_NAME "iOS")
 elseif(ANDROID)
@@ -221,25 +224,19 @@ set(RAC_FEATURES_SOURCES
     # VLM (Vision Language Model)
     src/features/vlm/vlm_component.cpp
     src/features/vlm/rac_vlm_service.cpp
+    # Diffusion
+    src/features/diffusion/diffusion_component.cpp
+    src/features/diffusion/rac_diffusion_service.cpp
+    src/features/diffusion/diffusion_model_registry.cpp
+    src/features/diffusion/diffusion_json.cpp
+    src/features/diffusion/rac_diffusion_tokenizer.cpp
+    # Embeddings
+    src/features/embeddings/rac_embeddings_service.cpp
+    src/features/embeddings/embeddings_component.cpp
     # Voice Agent
     src/features/voice_agent/voice_agent.cpp
     # Result memory management
     src/features/result_free.cpp
-)
-# Diffusion (Image Generation) - Apple only (CoreML/ANE). Not built for Android.
-if(NOT RAC_PLATFORM_ANDROID)
-    list(APPEND RAC_FEATURES_SOURCES
-        src/features/diffusion/diffusion_component.cpp
-        src/features/diffusion/diffusion_json.cpp
-        src/features/diffusion/diffusion_model_registry.cpp
-        src/features/diffusion/rac_diffusion_service.cpp
-        src/features/diffusion/rac_diffusion_tokenizer.cpp
-    )
-endif()
-
-# Image utilities (for VLM)
-set(RAC_UTILS_SOURCES
-    src/utils/rac_image_utils.cpp
 )
 
 # Platform services (Apple Foundation Models + System TTS + CoreML Diffusion)
@@ -260,7 +257,6 @@ set(RAC_COMMONS_SOURCES
     ${RAC_CORE_SOURCES}
     ${RAC_INFRASTRUCTURE_SOURCES}
     ${RAC_FEATURES_SOURCES}
-    ${RAC_UTILS_SOURCES}
     ${RAC_PLATFORM_SOURCES}
 )
 
@@ -406,7 +402,7 @@ message(STATUS "Components:")
 message(STATUS "  Core:         Logging, errors, events, memory")
 message(STATUS "  Registry:     Service & module registration")
 message(STATUS "  Models:       Download strategies, storage")
-message(STATUS "  Services:     LLM, STT, TTS, VAD, Diffusion interfaces")
+message(STATUS "  Services:     LLM, STT, TTS, VAD interfaces")
 if(APPLE AND RAC_BUILD_PLATFORM)
     message(STATUS "  Platform:     Apple Foundation Models, System TTS")
 endif()

@@ -20,7 +20,29 @@ endif()
 
 message(STATUS "ONNX Runtime versions: iOS=${ONNX_VERSION_IOS}, Android=${ONNX_VERSION_ANDROID}, macOS=${ONNX_VERSION_MACOS}, Linux=${ONNX_VERSION_LINUX}")
 
-if(IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+if(EMSCRIPTEN)
+    # ==========================================================================
+    # Emscripten/WASM: Create an interface-only ONNX Runtime target.
+    # When building for WASM, sherpa-onnx is built from source and bundles
+    # ONNX Runtime internally.  We still need the onnxruntime headers so the
+    # ONNX backend can compile.  If a local header copy exists in third_party,
+    # use it; otherwise create a bare INTERFACE target (headers come from
+    # sherpa-onnx's build tree).
+    # ==========================================================================
+    message(STATUS "ONNX Runtime: Creating INTERFACE target for Emscripten/WASM")
+
+    add_library(onnxruntime INTERFACE)
+
+    set(ONNX_WASM_HEADERS "${CMAKE_SOURCE_DIR}/third_party/onnxruntime-wasm/include")
+    if(EXISTS "${ONNX_WASM_HEADERS}")
+        target_include_directories(onnxruntime INTERFACE "${ONNX_WASM_HEADERS}")
+        message(STATUS "ONNX Runtime WASM headers: ${ONNX_WASM_HEADERS}")
+    else()
+        # Headers will come from sherpa-onnx build tree
+        message(STATUS "ONNX Runtime WASM: no local headers (expected from sherpa-onnx)")
+    endif()
+
+elseif(IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     # iOS: Use local ONNX Runtime xcframework from third_party
     # Downloaded by: ./scripts/ios/download-onnx.sh
     # NOTE: Version must match what sherpa-onnx was built against

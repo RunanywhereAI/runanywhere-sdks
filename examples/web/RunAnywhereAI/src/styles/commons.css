@@ -1,0 +1,362 @@
+/* =============================================================================
+ * RunAnywhere AI - Common Utilities
+ *
+ * Reusable utility classes extracted from repeated inline styles and common
+ * patterns across components. Import BETWEEN design-system.css (tokens) and
+ * components.css (component-specific rules) so utilities can be used by both
+ * CSS and TS templates.
+ *
+ * Categories:
+ *   1. Display & Visibility
+ *   2. Flexbox Layout
+ *   3. Grid Layout
+ *   4. Positioning
+ *   5. Sizing
+ *   6. Spacing (padding / margin)
+ *   7. Typography
+ *   8. Colors & Backgrounds
+ *   9. Borders & Radius
+ *  10. Overflow & Scrolling
+ *  11. Interaction
+ *  12. Transitions & Animations
+ *  13. Common Patterns
+ * ============================================================================= */
+
+/* =============================================================================
+ * 1. Display & Visibility
+ * ============================================================================= */
+.hidden        { display: none !important; }
+.block         { display: block; }
+.inline-block  { display: inline-block; }
+.inline-flex   { display: inline-flex; }
+
+/* =============================================================================
+ * 2. Flexbox Layout
+ * ============================================================================= */
+.flex          { display: flex; }
+.flex-col      { display: flex; flex-direction: column; }
+.flex-row      { display: flex; flex-direction: row; }
+.flex-wrap     { flex-wrap: wrap; }
+.flex-1        { flex: 1; }
+.flex-shrink-0 { flex-shrink: 0; }
+
+/* Alignment */
+.items-center    { align-items: center; }
+.items-start     { align-items: flex-start; }
+.items-end       { align-items: flex-end; }
+.items-stretch   { align-items: stretch; }
+.justify-center  { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.justify-around  { justify-content: space-around; }
+.justify-end     { justify-content: flex-end; }
+
+/* Shorthand combos (most common patterns from inline styles) */
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-col-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Gap */
+.gap-xxs { gap: var(--space-xxs); }
+.gap-xs  { gap: var(--space-xs); }
+.gap-sm  { gap: var(--space-sm); }
+.gap-md  { gap: var(--space-md); }
+.gap-lg  { gap: var(--space-lg); }
+.gap-xl  { gap: var(--space-xl); }
+.gap-2xl { gap: var(--space-2xl); }
+.gap-3xl { gap: var(--space-3xl); }
+
+/* =============================================================================
+ * 3. Grid Layout
+ * ============================================================================= */
+.grid           { display: grid; }
+.grid-cols-2    { grid-template-columns: repeat(2, 1fr); }
+.grid-cols-3    { grid-template-columns: repeat(3, 1fr); }
+
+/* =============================================================================
+ * 4. Positioning
+ * ============================================================================= */
+.relative { position: relative; }
+.absolute { position: absolute; }
+.fixed    { position: fixed; }
+.inset-0  { inset: 0; }
+
+/* =============================================================================
+ * 5. Sizing
+ * ============================================================================= */
+.w-full     { width: 100%; }
+.h-full     { height: 100%; }
+.max-w-sm   { max-width: 300px; }
+.max-w-md   { max-width: 400px; }
+.max-w-lg   { max-width: 600px; }
+
+/* =============================================================================
+ * 6. Spacing (padding / margin)
+ * ============================================================================= */
+/* Padding */
+.p-0   { padding: 0; }
+.p-xs  { padding: var(--space-xs); }
+.p-sm  { padding: var(--space-sm); }
+.p-md  { padding: var(--space-md); }
+.p-lg  { padding: var(--space-lg); }
+.p-xl  { padding: var(--space-xl); }
+.p-2xl { padding: var(--space-2xl); }
+.p-3xl { padding: var(--space-3xl); }
+
+.px-sm { padding-left: var(--space-sm); padding-right: var(--space-sm); }
+.px-md { padding-left: var(--space-md); padding-right: var(--space-md); }
+.px-lg { padding-left: var(--space-lg); padding-right: var(--space-lg); }
+.px-xl { padding-left: var(--space-xl); padding-right: var(--space-xl); }
+
+.py-sm { padding-top: var(--space-sm); padding-bottom: var(--space-sm); }
+.py-md { padding-top: var(--space-md); padding-bottom: var(--space-md); }
+.py-lg { padding-top: var(--space-lg); padding-bottom: var(--space-lg); }
+.py-xl { padding-top: var(--space-xl); padding-bottom: var(--space-xl); }
+
+/* Margin */
+.m-0    { margin: 0; }
+.m-auto { margin: auto; }
+.mx-auto { margin-left: auto; margin-right: auto; }
+
+.mt-xs  { margin-top: var(--space-xs); }
+.mt-sm  { margin-top: var(--space-sm); }
+.mt-md  { margin-top: var(--space-md); }
+.mt-lg  { margin-top: var(--space-lg); }
+.mt-xl  { margin-top: var(--space-xl); }
+
+.mb-xs  { margin-bottom: var(--space-xs); }
+.mb-sm  { margin-bottom: var(--space-sm); }
+.mb-md  { margin-bottom: var(--space-md); }
+.mb-lg  { margin-bottom: var(--space-lg); }
+.mb-xl  { margin-bottom: var(--space-xl); }
+
+/* =============================================================================
+ * 7. Typography
+ * ============================================================================= */
+.text-xs    { font-size: var(--font-size-xs); }
+.text-sm    { font-size: var(--font-size-sm); }
+.text-base  { font-size: var(--font-size-base); }
+.text-md    { font-size: var(--font-size-md); }
+.text-lg    { font-size: var(--font-size-lg); }
+.text-xl    { font-size: var(--font-size-xl); }
+.text-2xl   { font-size: var(--font-size-2xl); }
+.text-3xl   { font-size: var(--font-size-3xl); }
+
+.font-normal   { font-weight: var(--font-weight-normal); }
+.font-medium   { font-weight: var(--font-weight-medium); }
+/* .font-semibold and .font-bold already in design-system.css */
+
+.leading-tight   { line-height: var(--line-height-tight); }
+.leading-normal  { line-height: var(--line-height-normal); }
+.leading-relaxed { line-height: var(--line-height-relaxed); }
+
+.text-center { text-align: center; }
+.text-left   { text-align: left; }
+.text-right  { text-align: right; }
+
+.uppercase {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.whitespace-pre-wrap { white-space: pre-wrap; }
+.whitespace-nowrap   { white-space: nowrap; }
+
+/* =============================================================================
+ * 8. Colors & Backgrounds
+ * ============================================================================= */
+/* Text colors (extending design-system.css) */
+.text-white   { color: var(--text-white); }
+.text-blue    { color: var(--color-blue); }
+.text-green   { color: var(--color-green); }
+.text-red     { color: var(--color-red); }
+.text-purple  { color: var(--color-purple); }
+.text-yellow  { color: var(--color-yellow); }
+
+/* Background colors */
+.bg-elevated { background: var(--bg-elevated); }
+.bg-input    { background: var(--bg-input); }
+.bg-blue     { background: var(--color-blue); }
+.bg-green    { background: var(--color-green); }
+.bg-orange   { background: var(--color-primary); }
+.bg-purple   { background: var(--color-purple); }
+
+/* =============================================================================
+ * 9. Borders & Radius
+ * ============================================================================= */
+.border          { border: 1px solid var(--border-light); }
+.border-b        { border-bottom: 1px solid var(--border-light); }
+.border-t        { border-top: 1px solid var(--border-light); }
+.border-none     { border: none; }
+
+.rounded-sm   { border-radius: var(--radius-sm); }
+.rounded-md   { border-radius: var(--radius-md); }
+.rounded-lg   { border-radius: var(--radius-lg); }
+.rounded-xl   { border-radius: var(--radius-xl); }
+.rounded-2xl  { border-radius: var(--radius-2xl); }
+.rounded-full { border-radius: var(--radius-full); }
+
+/* =============================================================================
+ * 10. Overflow & Scrolling
+ * ============================================================================= */
+.overflow-hidden   { overflow: hidden; }
+.overflow-y-auto   { overflow-y: auto; }
+.overflow-x-auto   { overflow-x: auto; }
+
+/* =============================================================================
+ * 11. Interaction
+ * ============================================================================= */
+.cursor-pointer  { cursor: pointer; }
+.cursor-default  { cursor: default; }
+.select-none     { user-select: none; -webkit-user-select: none; }
+.pointer-events-none { pointer-events: none; }
+
+/* =============================================================================
+ * 12. Transitions & Animations
+ * ============================================================================= */
+.transition-fast {
+  transition: all var(--duration-fast);
+}
+
+.transition-regular {
+  transition: all var(--duration-regular);
+}
+
+/* =============================================================================
+ * 13. Common Patterns
+ * ============================================================================= */
+
+/** Truncate text with ellipsis */
+.truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/** Inline code snippet (used in chat markdown) */
+.inline-code {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+
+/** Small status dot (recording / live indicators) */
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot.green  { background: var(--color-green); }
+.status-dot.red    { background: var(--color-red); }
+.status-dot.orange { background: var(--color-primary); }
+.status-dot.blue   { background: var(--color-blue); }
+.status-dot.pulse  { animation: stt-pulse 1s infinite; }
+
+/** Status badge (compact pill with dot + label) */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+}
+.status-badge.recording {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-red);
+}
+.status-badge.processing {
+  background: rgba(249, 115, 22, 0.1);
+  color: var(--color-primary);
+}
+.status-badge.ready {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--color-green);
+}
+
+/** Spinner (small inline loading indicator) */
+.spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--color-primary);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+}
+
+/** Ghost button (no background, no border — toolbar icons etc.) */
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: var(--space-sm-md);
+  border-radius: var(--radius-regular);
+  transition: color var(--duration-fast), background var(--duration-fast);
+}
+.btn-ghost:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+/** Section title (reused in settings, storage, more views) */
+.section-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/** Description / helper text under a heading */
+.helper-text {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+/** Label text (form labels) */
+.label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+/** Result / content panel (transcription result, description panel, etc.) */
+.content-panel {
+  padding: var(--space-lg);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  min-height: 100px;
+  line-height: var(--line-height-relaxed);
+  color: var(--text-primary);
+  white-space: pre-wrap;
+}
+
+/** Error text (inline error messages) */
+.error-text {
+  color: var(--color-red);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+/** Muted message (no content, placeholder states) */
+.muted-text {
+  color: var(--text-tertiary);
+  text-align: center;
+  padding: var(--space-xl);
+}
