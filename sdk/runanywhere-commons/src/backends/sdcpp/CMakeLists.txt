@@ -66,9 +66,10 @@ endif()
 # Allow user override via RAC_SDCPP_OPENCL
 if(NOT DEFINED RAC_SDCPP_OPENCL)
     if(ANDROID)
-        # CPU-only for now — OpenCL hangs on Samsung S25 (Adreno 830).
-        # TODO: Investigate ggml-opencl hang during generate_image() and re-enable.
-        set(RAC_SDCPP_OPENCL OFF)
+        # OpenCL GPU acceleration for Adreno GPUs (Qualcomm Snapdragon).
+        # Uses dlopen shim (opencl_stub.c) to load vendor libOpenCL.so at runtime.
+        # CLIP and VAE run on CPU; only UNet denoising uses GPU.
+        set(RAC_SDCPP_OPENCL ON)
     else()
         set(RAC_SDCPP_OPENCL OFF)
     endif()
