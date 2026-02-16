@@ -38,6 +38,9 @@ end
 target 'RunAnywhereAI' do
   config = use_native_modules!
 
+  # Ensure NitroModules podspec is resolved locally (required by RunAnywhereLlama)
+  pod 'NitroModules', :path => '../node_modules/react-native-nitro-modules'
+
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.

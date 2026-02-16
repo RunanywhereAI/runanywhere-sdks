@@ -9,11 +9,6 @@
 #include "inference_provider.h"
 #include <memory>
 
-// Forward declarations to avoid including ONNX backend headers
-namespace runanywhere {
-class ONNXBackendNew;
-}
-
 namespace runanywhere {
 namespace rag {
 

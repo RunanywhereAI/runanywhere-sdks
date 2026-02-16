@@ -8,11 +8,11 @@ module.exports = {
     },
   },
   dependencies: {
-    // Nitro modules doesn't have Turbo codegen - exclude from autolinking
+    // Nitro modules requires Turbo codegen for iOS (NitroModulesSpec.h)
     'react-native-nitro-modules': {
       platforms: {
         android: null,
-        ios: null,
+        ios: {},
       },
     },
     // Disable audio libraries on iOS - they're incompatible with New Architecture

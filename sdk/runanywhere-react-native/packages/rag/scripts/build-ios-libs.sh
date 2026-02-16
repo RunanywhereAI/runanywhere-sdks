@@ -26,6 +26,7 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PACKAGE_DIR="$(dirname "$SCRIPT_DIR")"
 COMMONS_DIR="$PACKAGE_DIR/../../../runanywhere-commons"
+COMMONS_IOS_SCRIPT="$COMMONS_DIR/scripts/build-ios.sh"
 BUILD_BASE_DIR="$COMMONS_DIR/build/ios"
 
 echo "Package directory: $PACKAGE_DIR"
@@ -41,72 +42,23 @@ if [[ "$CLEAN_BUILD" == true ]]; then
     rm -rf "$BUILD_BASE_DIR"
 fi
 
-# Always clean to avoid generator mismatch
-echo "Cleaning previous build..."
-rm -rf "$BUILD_BASE_DIR/DEVICE"
-rm -rf "$BUILD_BASE_DIR/SIMULATOR"
-
-# Clean commons build cache to ensure fresh CMake configuration
-echo "Cleaning commons build cache..."
-rm -rf "$COMMONS_DIR/build/ios"
-
-# =============================================================================
-# Build for iOS Device (arm64)
-# =============================================================================
+# Build commons (toolchain-based) to produce device + simulator libs
+if [[ ! -x "$COMMONS_IOS_SCRIPT" ]]; then
+    echo "✗ Commons iOS build script not found: $COMMONS_IOS_SCRIPT"
+    exit 1
+fi
 
 echo ""
 echo "========================================"
-echo "Building for iOS Device (arm64)"
+echo "Building commons for iOS (device + simulator)"
 echo "========================================"
 
-BUILD_DIR="$BUILD_BASE_DIR/DEVICE"
-mkdir -p "$BUILD_DIR"
-cd "$BUILD_DIR"
+COMMONS_FLAGS="--backend onnx"
+if [[ "$CLEAN_BUILD" == true ]]; then
+    COMMONS_FLAGS="$COMMONS_FLAGS --clean"
+fi
 
-cmake "$COMMONS_DIR" \
-    -G Xcode \
-    -DCMAKE_SYSTEM_NAME=iOS \
-    -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 \
-    -DCMAKE_OSX_ARCHITECTURES=arm64 \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DRAC_BUILD_SHARED=OFF \
-    -DRAC_BUILD_BACKENDS=ON \
-    -DRAC_BACKEND_LLAMACPP=OFF \
-    -DRAC_BACKEND_ONNX=ON \
-    -DRAC_BACKEND_RAG=ON \
-    -DRAC_BACKEND_WHISPERCPP=OFF
-
-cmake --build . --config Release --target rac_backend_rag --parallel 4
-
-# =============================================================================
-# Build for iOS Simulator (arm64 + x86_64)
-# =============================================================================
-
-echo ""
-echo "========================================"
-echo "Building for iOS Simulator"
-echo "========================================"
-
-BUILD_DIR="$BUILD_BASE_DIR/SIMULATOR"
-mkdir -p "$BUILD_DIR"
-cd "$BUILD_DIR"
-
-cmake "$COMMONS_DIR" \
-    -G Xcode \
-    -DCMAKE_SYSTEM_NAME=iOS \
-    -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 \
-    -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
-    -DCMAKE_OSX_SYSROOT=iphonesimulator \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_CXX_COMPILER=/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++ \
-    -DRAC_BUILD_SHARED=OFF \
-    -DRAC_BUILD_BACKENDS=ON \
-    -DRAC_BACKEND_LLAMACPP=OFF \
-    -DRAC_BACKEND_ONNX=ON \
-    -DRAC_BACKEND_RAG=ON \
-    -DRAC_BACKEND_WHISPERCPP=OFF
-
-cmake --build . --config Release --target rac_backend_rag --parallel 4
+"$COMMONS_IOS_SCRIPT" $COMMONS_FLAGS
 
 # =============================================================================
 # Create XCFrameworks (supports same arch for device/simulator)
@@ -117,11 +69,16 @@ echo "========================================"
 echo "Creating XCFrameworks"
 echo "========================================"
 
-DEVICE_LIB_DIR="$BUILD_BASE_DIR/DEVICE/src/backends/rag/Release-iphoneos"
-SIMULATOR_LIB_DIR="$BUILD_BASE_DIR/SIMULATOR/src/backends/rag/Release-iphonesimulator"
-DEVICE_ONNX_DIR="$BUILD_BASE_DIR/DEVICE/src/backends/onnx/Release-iphoneos"
-SIMULATOR_ONNX_DIR="$BUILD_BASE_DIR/SIMULATOR/src/backends/onnx/Release-iphonesimulator"
+DEVICE_LIB_DIR="$BUILD_BASE_DIR/OS/src/backends/rag"
+SIMULATOR_ARM64_LIB_DIR="$BUILD_BASE_DIR/SIMULATORARM64/src/backends/rag"
+SIMULATOR_X86_LIB_DIR="$BUILD_BASE_DIR/SIMULATOR/src/backends/rag"
+DEVICE_ONNX_DIR="$BUILD_BASE_DIR/OS/src/backends/onnx"
+SIMULATOR_ARM64_ONNX_DIR="$BUILD_BASE_DIR/SIMULATORARM64/src/backends/onnx"
+SIMULATOR_X86_ONNX_DIR="$BUILD_BASE_DIR/SIMULATOR/src/backends/onnx"
+UNIVERSAL_DIR="$BUILD_BASE_DIR/UNIVERSAL"
 OUTPUT_DIR="$PACKAGE_DIR/ios/Libraries"
+
+mkdir -p "$UNIVERSAL_DIR"
 
 # Remove old XCFrameworks if they exist
 rm -rf "$OUTPUT_DIR/rac_backend_rag.xcframework"
@@ -129,17 +86,25 @@ rm -rf "$OUTPUT_DIR/rac_backend_onnx.xcframework"
 
 # Create RAG backend XCFramework
 echo "Creating rac_backend_rag.xcframework..."
+lipo -create \
+    "$SIMULATOR_ARM64_LIB_DIR/librac_backend_rag.a" \
+    "$SIMULATOR_X86_LIB_DIR/librac_backend_rag.a" \
+    -output "$UNIVERSAL_DIR/librac_backend_rag.a"
 xcodebuild -create-xcframework \
     -library "$DEVICE_LIB_DIR/librac_backend_rag.a" \
-    -library "$SIMULATOR_LIB_DIR/librac_backend_rag.a" \
+    -library "$UNIVERSAL_DIR/librac_backend_rag.a" \
     -output "$OUTPUT_DIR/rac_backend_rag.xcframework"
 echo "✓ rac_backend_rag.xcframework created"
 
 # Create ONNX backend XCFramework (provides proven ONNX Runtime setup)
 echo "Creating rac_backend_onnx.xcframework..."
+lipo -create \
+    "$SIMULATOR_ARM64_ONNX_DIR/librac_backend_onnx.a" \
+    "$SIMULATOR_X86_ONNX_DIR/librac_backend_onnx.a" \
+    -output "$UNIVERSAL_DIR/librac_backend_onnx.a"
 xcodebuild -create-xcframework \
     -library "$DEVICE_ONNX_DIR/librac_backend_onnx.a" \
-    -library "$SIMULATOR_ONNX_DIR/librac_backend_onnx.a" \
+    -library "$UNIVERSAL_DIR/librac_backend_onnx.a" \
     -output "$OUTPUT_DIR/rac_backend_onnx.xcframework"
 echo "✓ rac_backend_onnx.xcframework created"
 
