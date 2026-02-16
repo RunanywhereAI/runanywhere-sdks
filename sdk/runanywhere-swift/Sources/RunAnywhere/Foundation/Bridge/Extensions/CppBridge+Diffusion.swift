@@ -222,7 +222,7 @@ extension CppBridge {
                 ctx.capturedSafetyFlagged = r.safety_flagged == RAC_TRUE
             }
 
-            let errorCB: rac_diffusion_error_callback_fn = { errorCode, errorMsg, userData in
+            let errorCB: rac_diffusion_error_callback_fn = { _, errorMsg, userData in
                 guard let userData = userData else { return }
                 let ctx = Unmanaged<CallbackContext>.fromOpaque(userData).takeUnretainedValue()
                 if let errorMsg = errorMsg {
@@ -366,7 +366,7 @@ public enum DiffusionBackend: Int32, Sendable {
     case coreml = 1     /// CoreML (iOS/macOS only, uses ANE → GPU → CPU automatic fallback)
     case tflite = 2     /// TensorFlow Lite (future)
     case auto = 99      /// Auto-select best for platform
-    
+
     /// Convert from C enum
     init(cValue: rac_diffusion_backend_t) {
         switch cValue {
@@ -377,7 +377,7 @@ public enum DiffusionBackend: Int32, Sendable {
         default: self = .onnx
         }
     }
-    
+
     /// Convert to C enum
     var cValue: rac_diffusion_backend_t {
         switch self {
@@ -392,14 +392,14 @@ public enum DiffusionBackend: Int32, Sendable {
 // MARK: - Diffusion Model Registry Bridge
 
 extension CppBridge {
-    
+
     /// Diffusion Model Registry - provides access to built-in and custom model definitions
     public enum DiffusionModelRegistry {
-        
+
         private static let logger = SDKLogger(category: "CppBridge.DiffusionModelRegistry")
-        
+
         /// Select the best backend for a model on the current platform
-        /// 
+        ///
         /// Backend selection follows this priority:
         /// - iOS/macOS: CoreML (ANE → GPU → CPU automatic fallback) if model supports it
         /// - Android: ONNX with NNAPI EP (NPU → DSP → GPU → CPU automatic fallback)
@@ -413,7 +413,7 @@ extension CppBridge {
             }
             return DiffusionBackend(cValue: backend)
         }
-        
+
         /// Check if a model is available on the current platform
         ///
         /// - Parameter modelId: The model identifier
@@ -424,7 +424,7 @@ extension CppBridge {
             }
             return available == RAC_TRUE
         }
-        
+
         /// Check if a model variant requires classifier-free guidance (CFG)
         ///
         /// CFG-free models (SDXS, SDXL Turbo) don't need the unconditional pass,
@@ -435,7 +435,7 @@ extension CppBridge {
         public static func requiresCFG(variant: DiffusionModelVariant) -> Bool {
             return rac_diffusion_model_requires_cfg(variant.cValue) == RAC_TRUE
         }
-        
+
         /// Get the current platform identifier
         public static var currentPlatform: UInt32 {
             return rac_diffusion_model_registry_get_current_platform()

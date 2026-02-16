@@ -171,6 +171,46 @@ RAC_API rac_result_t rac_image_normalize(const rac_image_data_t* image, const fl
 RAC_API rac_result_t rac_image_to_chw(const rac_image_float_t* image, rac_image_float_t* out_chw);
 
 // =============================================================================
+// PIXEL FORMAT CONVERSION
+// =============================================================================
+
+/**
+ * @brief Convert RGBA pixels to RGB (strip alpha channel)
+ *
+ * Handles row stride padding (e.g. from Android CameraX RGBA_8888 buffers).
+ * Output is tightly packed RGB (3 bytes per pixel).
+ *
+ * @param rgba_data Source RGBA pixel data
+ * @param width Image width in pixels
+ * @param height Image height in pixels
+ * @param row_stride Bytes per row in source (may be > width*4 due to padding). Use 0 for tight packing.
+ * @param out_rgb_data Output buffer for RGB data (must be at least width * height * 3 bytes)
+ * @param out_size Size of the output buffer
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_image_convert_rgba_to_rgb(const uint8_t* rgba_data, uint32_t width,
+                                                   uint32_t height, uint32_t row_stride,
+                                                   uint8_t* out_rgb_data, size_t out_size);
+
+/**
+ * @brief Convert BGRA pixels to RGB (reorder channels, strip alpha)
+ *
+ * Handles bytes-per-row padding (e.g. from iOS CVPixelBuffer in kCVPixelFormatType_32BGRA).
+ * Output is tightly packed RGB (3 bytes per pixel).
+ *
+ * @param bgra_data Source BGRA pixel data
+ * @param width Image width in pixels
+ * @param height Image height in pixels
+ * @param bytes_per_row Bytes per row in source (may be > width*4). Use 0 for tight packing.
+ * @param out_rgb_data Output buffer for RGB data (must be at least width * height * 3 bytes)
+ * @param out_size Size of the output buffer
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_image_convert_bgra_to_rgb(const uint8_t* bgra_data, uint32_t width,
+                                                   uint32_t height, uint32_t bytes_per_row,
+                                                   uint8_t* out_rgb_data, size_t out_size);
+
+// =============================================================================
 // MEMORY MANAGEMENT
 // =============================================================================
 

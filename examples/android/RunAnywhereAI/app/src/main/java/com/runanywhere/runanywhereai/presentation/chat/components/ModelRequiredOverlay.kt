@@ -231,6 +231,7 @@ private fun getModalityIcon(modality: ModelSelectionContext): ImageVector {
         ModelSelectionContext.STT -> Icons.Default.GraphicEq
         ModelSelectionContext.TTS -> Icons.Default.VolumeUp
         ModelSelectionContext.VOICE -> Icons.Default.Mic
+        ModelSelectionContext.VLM -> Icons.Default.Visibility
     }
 }
 
@@ -240,6 +241,7 @@ private fun getModalityColor(modality: ModelSelectionContext): Color {
         ModelSelectionContext.STT -> Color(0xFF4CAF50) // Green
         ModelSelectionContext.TTS -> AppColors.primaryPurple
         ModelSelectionContext.VOICE -> AppColors.primaryAccent
+        ModelSelectionContext.VLM -> AppColors.primaryPurple
     }
 }
 
@@ -249,6 +251,7 @@ private fun getModalityTitle(modality: ModelSelectionContext): String {
         ModelSelectionContext.STT -> "Voice to Text"
         ModelSelectionContext.TTS -> "Read Aloud"
         ModelSelectionContext.VOICE -> "Voice Assistant"
+        ModelSelectionContext.VLM -> "Vision Chat"
     }
 }
 
@@ -258,5 +261,6 @@ private fun getModalityDescription(modality: ModelSelectionContext): String {
         ModelSelectionContext.STT -> "Transcribe your speech to text with powerful on-device voice recognition."
         ModelSelectionContext.TTS -> "Have any text read aloud with natural-sounding voices."
         ModelSelectionContext.VOICE -> "Talk naturally with your AI assistant. Let's set up the components together."
+        ModelSelectionContext.VLM -> "Chat with images using your device's camera or photo library."
     }
 }
