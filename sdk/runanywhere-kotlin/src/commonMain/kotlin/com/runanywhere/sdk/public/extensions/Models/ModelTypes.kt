@@ -226,7 +226,7 @@ data class ModelFileDescriptor(
     val isRequired: Boolean = true,
 ) {
     /** Legacy compatibility */
-    val relativePath: String get() = url.substringAfterLast('/')
+    val relativePath: String get() = url.substringAfterLast('/').substringBefore('?')
     val destinationPath: String get() = filename
 }
 

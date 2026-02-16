@@ -193,9 +193,11 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
             for (row in 0 until height) {
                 for (col in 0 until width) {
                     val srcIdx = row * rowStride + col * pixelStride
-                    rgb[rgbIdx++] = buffer[srcIdx]       // R
-                    rgb[rgbIdx++] = buffer[srcIdx + 1]   // G
-                    rgb[rgbIdx++] = buffer[srcIdx + 2]   // B
+                    if (srcIdx + 2 < buffer.limit()) {
+                        rgb[rgbIdx++] = buffer[srcIdx]       // R
+                        rgb[rgbIdx++] = buffer[srcIdx + 1]   // G
+                        rgb[rgbIdx++] = buffer[srcIdx + 2]   // B
+                    }
                 }
             }
 
@@ -219,6 +221,11 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
      * Describe the current camera frame. Mirrors iOS describeCurrentFrame().
      */
     fun describeCurrentFrame() {
+        if (!_uiState.value.isModelLoaded) {
+            _uiState.update { it.copy(error = "Please load a model first") }
+            return
+        }
+
         val frameData: ByteArray
         val w: Int
         val h: Int
@@ -284,8 +291,9 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         generationJob = viewModelScope.launch {
+            var tempFile: File? = null
             try {
-                val tempFile = copyUriToTempFile(uri) ?: throw Exception("Failed to read image")
+                tempFile = copyUriToTempFile(uri) ?: throw Exception("Failed to read image")
                 val image = VLMImage.fromFilePath(tempFile.absolutePath)
                 val options = VLMGenerationOptions(maxTokens = 300, temperature = 0.7f)
 
@@ -298,11 +306,11 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
 
                 _uiState.update { it.copy(currentDescription = it.currentDescription.trim()) }
                 Log.i(TAG, "VLM streaming completed")
-                tempFile.delete()
             } catch (e: Exception) {
                 Log.e(TAG, "VLM processing failed: ${e.message}", e)
                 _uiState.update { it.copy(error = "Processing failed: ${e.message}") }
             } finally {
+                tempFile?.delete()
                 _uiState.update { it.copy(isProcessing = false) }
             }
         }
@@ -419,8 +427,11 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
             val context = getApplication<Application>()
             val inputStream = context.contentResolver.openInputStream(uri) ?: return@withContext null
             val tempFile = File.createTempFile("vlm_image_", ".jpg", context.cacheDir)
-            FileOutputStream(tempFile).use { output -> inputStream.copyTo(output) }
-            inputStream.close()
+            inputStream.use { input ->
+                FileOutputStream(tempFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
             tempFile
         } catch (e: Exception) {
             Log.e(TAG, "Failed to copy URI to temp file: ${e.message}", e)

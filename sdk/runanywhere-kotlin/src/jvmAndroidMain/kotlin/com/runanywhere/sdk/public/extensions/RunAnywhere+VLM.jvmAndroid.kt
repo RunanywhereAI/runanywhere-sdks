@@ -72,7 +72,7 @@ actual suspend fun RunAnywhere.processImage(
 
     vlmLogger.info(
         "VLM processing complete: ${cppResult.completionTokens} tokens in ${cppResult.totalTimeMs}ms " +
-            "(${String.format("%.1f", cppResult.tokensPerSecond)} tok/s)",
+            "(${String.format(java.util.Locale.ROOT, "%.1f", cppResult.tokensPerSecond)} tok/s)",
     )
 
     return cppResult.toVLMResult()
@@ -87,6 +87,8 @@ actual fun RunAnywhere.processImageStream(
         if (!isInitialized) {
             throw SDKError.notInitialized("SDK not initialized")
         }
+
+        ensureServicesReady()
 
         if (!CppBridgeVLM.isLoaded) {
             throw SDKError.vlm("VLM model not loaded")
@@ -283,7 +285,13 @@ private fun buildOptionsJson(options: VLMGenerationOptions): String {
         append(",\"n_threads\":${options.nThreads}")
         append(",\"use_gpu\":${options.useGpu}")
         options.systemPrompt?.let { prompt ->
-            append(",\"system_prompt\":\"${prompt.replace("\"", "\\\"")}\"")
+            val escaped = prompt
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t")
+            append(",\"system_prompt\":\"$escaped\"")
         }
         append("}")
     }
