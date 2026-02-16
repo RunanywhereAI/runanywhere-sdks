@@ -17,10 +17,14 @@ import com.runanywhere.sdk.public.extensions.availableModels
 import com.runanywhere.sdk.public.extensions.currentLLMModelId
 import com.runanywhere.sdk.public.extensions.currentSTTModelId
 import com.runanywhere.sdk.public.extensions.currentTTSVoiceId
+import com.runanywhere.sdk.public.extensions.currentVLMModelId
 import com.runanywhere.sdk.public.extensions.downloadModel
+import com.runanywhere.sdk.public.extensions.isVLMModelLoaded
 import com.runanywhere.sdk.public.extensions.loadLLMModel
 import com.runanywhere.sdk.public.extensions.loadSTTModel
 import com.runanywhere.sdk.public.extensions.loadTTSVoice
+import com.runanywhere.sdk.public.extensions.loadVLMModel
+import com.runanywhere.sdk.public.extensions.unloadVLMModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -181,6 +185,7 @@ class ModelSelectionViewModel(
                 // but typically the voice sheet doesn't auto-select
                 null
             }
+            ModelSelectionContext.VLM -> RunAnywhere.currentVLMModelId
         }
     }
 
@@ -202,6 +207,9 @@ class ModelSelectionViewModel(
                         ModelCategory.SPEECH_RECOGNITION,
                         ModelCategory.SPEECH_SYNTHESIS,
                     )
+            ModelSelectionContext.VLM ->
+                category == ModelCategory.MULTIMODAL ||
+                    category == ModelCategory.VISION
         }
     }
 
@@ -327,6 +335,10 @@ class ModelSelectionViewModel(
                         ModelCategory.SPEECH_SYNTHESIS -> RunAnywhere.loadTTSVoice(modelId)
                         else -> RunAnywhere.loadLLMModel(modelId)
                     }
+                }
+                ModelSelectionContext.VLM -> {
+                    // C++ handles model file resolution (main model + mmproj) automatically
+                    RunAnywhere.loadVLMModel(modelId)
                 }
             }
 

@@ -70,6 +70,45 @@ RAC_API rac_result_t rac_vlm_component_load_model(rac_handle_t handle, const cha
                                                   const char* model_name);
 
 /**
+ * @brief Load a VLM model by model ID using the global model registry
+ *
+ * Looks up the model in the global registry, resolves the model folder,
+ * scans for the main .gguf and mmproj .gguf files, and loads them.
+ * This is the preferred API — callers only need to provide the model ID.
+ *
+ * @param handle Component handle
+ * @param model_id Model identifier (must be registered in the global registry)
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_vlm_component_load_model_by_id(rac_handle_t handle, const char* model_id);
+
+/**
+ * @brief Resolve VLM model files within a directory
+ *
+ * Scans the given directory for .gguf files and identifies:
+ * - Main model file: first .gguf NOT containing "mmproj" in its name
+ * - Vision projector file: first .gguf containing "mmproj" in its name
+ *
+ * @note This is primarily an internal helper used by rac_vlm_component_load_model_by_id().
+ *       It is not exposed via JNI because the Kotlin/JVM layer calls loadModelById() which
+ *       invokes this function internally during C++ path resolution. Exposed as public C API
+ *       for native-only consumers (e.g., iOS Swift bridge, tests).
+ *
+ * @warning If multiple non-mmproj .gguf files exist in the directory, the "first" match
+ *          is non-deterministic (depends on OS directory iteration order).
+ *
+ * @param model_dir Path to the directory containing model files
+ * @param out_model_path Output buffer for the main model file path
+ * @param model_path_size Size of the model path output buffer
+ * @param out_mmproj_path Output buffer for the mmproj file path (empty if not found)
+ * @param mmproj_path_size Size of the mmproj path output buffer
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_vlm_resolve_model_files(const char* model_dir, char* out_model_path,
+                                                 size_t model_path_size, char* out_mmproj_path,
+                                                 size_t mmproj_path_size);
+
+/**
  * @brief Unload the current model
  *
  * @param handle Component handle

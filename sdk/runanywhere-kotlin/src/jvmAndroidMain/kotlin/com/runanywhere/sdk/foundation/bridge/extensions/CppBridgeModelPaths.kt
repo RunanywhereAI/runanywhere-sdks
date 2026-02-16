@@ -69,6 +69,12 @@ object CppBridgeModelPaths {
         /** Embedding models directory */
         const val EMBEDDING = "embedding"
 
+        /** Vision/VLM models directory */
+        const val VISION = "vision"
+
+        /** Multimodal models directory */
+        const val MULTIMODAL = "multimodal"
+
         /** Downloaded models directory */
         const val DOWNLOADS = "downloads"
 
@@ -843,6 +849,8 @@ object CppBridgeModelPaths {
                 CppBridgeModelRegistry.ModelType.TTS,
                 CppBridgeModelRegistry.ModelType.VAD,
                 CppBridgeModelRegistry.ModelType.EMBEDDING,
+                CppBridgeModelRegistry.ModelCategory.VISION,
+                CppBridgeModelRegistry.ModelCategory.MULTIMODAL,
             )) {
                 createModelDirectoryCallback(type)
             }
@@ -943,6 +951,8 @@ object CppBridgeModelPaths {
                 CppBridgeModelRegistry.ModelType.TTS -> ModelDirectory.TTS
                 CppBridgeModelRegistry.ModelType.VAD -> ModelDirectory.VAD
                 CppBridgeModelRegistry.ModelType.EMBEDDING -> ModelDirectory.EMBEDDING
+                CppBridgeModelRegistry.ModelCategory.VISION -> ModelDirectory.VISION
+                CppBridgeModelRegistry.ModelCategory.MULTIMODAL -> ModelDirectory.MULTIMODAL
                 else -> "other"
             }
         return File(modelsDir, typeName).absolutePath
