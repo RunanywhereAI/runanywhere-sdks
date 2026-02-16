@@ -25,8 +25,8 @@
 // Type-only imports are safe — they are erased at compile time and don't pull
 // SDK code into the Worker bundle.
 import type { VLMWorkerCommand, VLMWorkerResponse, VLMWorkerResult } from './VLMWorkerBridge';
-import type { AllOffsets } from '../Foundation/StructOffsets';
-import { loadOffsetsFromModule } from '../Foundation/StructOffsets';
+import type { AllOffsets } from '@runanywhere/web';
+import { loadOffsetsFromModule } from '@runanywhere/web';
 
 // Re-export for the bridge to import
 export type { VLMWorkerResult };

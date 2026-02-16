@@ -350,11 +350,11 @@ build_typescript() {
     log_step "Compiling TypeScript..."
     npm run build:ts
 
-    # Verify output
+    # Verify output (core is the primary package)
     if [ -d "${TS_OUTPUT_DIR}" ]; then
-        log_info "TypeScript build successful"
+        log_info "TypeScript build successful (core + llamacpp + onnx)"
     else
-        log_error "TypeScript build failed - dist/ not found"
+        log_error "TypeScript build failed - core dist/ not found"
         exit 1
     fi
 }

@@ -10,6 +10,7 @@ import { EventBus } from '../Foundation/EventBus';
 import { SDKLogger } from '../Foundation/SDKLogger';
 import { OPFSStorage } from './OPFSStorage';
 import type { MetadataMap } from './OPFSStorage';
+import type { LocalFileStorage } from './LocalFileStorage';
 import { ModelStatus, DownloadStage, SDKEventType } from '../types/enums';
 import type { ManagedModel, DownloadProgress } from './ModelRegistry';
 import type { ModelRegistry } from './ModelRegistry';
@@ -110,6 +111,12 @@ export class ModelDownloader {
   private readonly registry: ModelRegistry;
 
   /**
+   * Optional local filesystem storage. When configured, models are saved
+   * to the user's chosen directory instead of OPFS. Set via setLocalFileStorage().
+   */
+  private localFileStorage: LocalFileStorage | null = null;
+
+  /**
    * In-memory fallback cache for models that were downloaded successfully
    * but failed to persist to OPFS (e.g. storage quota exceeded).
    * Keyed by modelId/file key. Cleared once the data is consumed by loadFromOPFS.
@@ -119,6 +126,14 @@ export class ModelDownloader {
   constructor(registry: ModelRegistry, storage: OPFSStorage) {
     this.registry = registry;
     this.storage = storage;
+  }
+
+  /**
+   * Set the local file storage backend.
+   * When configured and ready, models are saved/loaded from the local filesystem first.
+   */
+  setLocalFileStorage(storage: LocalFileStorage): void {
+    this.localFileStorage = storage;
   }
 
   // ---------------------------------------------------------------------------
@@ -340,12 +355,25 @@ export class ModelDownloader {
     return data;
   }
 
-  /** Store data in OPFS via OPFSStorage. Auto-evicts old models if quota is exceeded, falls back to in-memory cache. */
+  /** Store data, preferring local filesystem when available, then OPFS, then memory cache. */
   async storeInOPFS(key: string, data: Uint8Array): Promise<void> {
     const sizeMB = (data.length / 1024 / 1024).toFixed(1);
 
+    // Try local filesystem first (permanent, no quota issues)
+    if (this.localFileStorage?.isReady) {
+      try {
+        await this.localFileStorage.saveModel(key, data.buffer as ArrayBuffer);
+        logger.info(`Stored ${key} in local storage (${sizeMB} MB)`);
+        this.memoryCache.delete(key);
+        return;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        logger.warning(`Local storage write failed for "${key}": ${msg}, falling back to OPFS`);
+      }
+    }
+
     try {
-      // First attempt
+      // First attempt — OPFS
       await this.storage.saveModel(key, data.buffer as ArrayBuffer);
       logger.info(`Stored ${key} in OPFS (${sizeMB} MB)`);
       this.memoryCache.delete(key);
@@ -440,9 +468,19 @@ export class ModelDownloader {
     }
   }
 
-  /** Load data from OPFS via OPFSStorage, falling back to in-memory cache. */
+  /** Load data from storage. Priority: local filesystem > OPFS > memory cache. */
   async loadFromOPFS(key: string): Promise<Uint8Array | null> {
-    // Try OPFS first (persistent storage)
+    // Try local filesystem first (permanent storage)
+    if (this.localFileStorage?.isReady) {
+      const localBuffer = await this.localFileStorage.loadModel(key);
+      if (localBuffer && localBuffer.byteLength > 0) {
+        const sizeMB = localBuffer.byteLength / 1024 / 1024;
+        logger.debug(`Loading ${key} from local storage (${sizeMB.toFixed(1)} MB)`);
+        return new Uint8Array(localBuffer);
+      }
+    }
+
+    // Try OPFS (persistent browser storage)
     const buffer = await this.storage.loadModel(key);
     if (buffer && buffer.byteLength > 0) {
       const sizeMB = buffer.byteLength / 1024 / 1024;
@@ -470,8 +508,12 @@ export class ModelDownloader {
     return null;
   }
 
-  /** Check existence in OPFS or in-memory cache. */
+  /** Check existence in local storage, OPFS, or in-memory cache. */
   async existsInOPFS(key: string): Promise<boolean> {
+    if (this.localFileStorage?.isReady) {
+      const localExists = await this.localFileStorage.hasModel(key);
+      if (localExists) return true;
+    }
     if (this.memoryCache.has(key)) return true;
     return this.storage.hasModel(key);
   }
@@ -481,14 +523,21 @@ export class ModelDownloader {
     return this.storage.hasModel(key);
   }
 
-  /** Delete from OPFS and memory cache. */
+  /** Delete from all storage backends (local filesystem, OPFS, memory cache). */
   async deleteFromOPFS(key: string): Promise<void> {
     this.memoryCache.delete(key);
+    if (this.localFileStorage?.isReady) {
+      await this.localFileStorage.deleteModel(key);
+    }
     await this.storage.deleteModel(key);
   }
 
-  /** Get file size from OPFS without reading into memory. */
+  /** Get file size from storage without reading into memory. */
   async getOPFSFileSize(key: string): Promise<number | null> {
+    if (this.localFileStorage?.isReady) {
+      const localSize = await this.localFileStorage.getFileSize(key);
+      if (localSize !== null) return localSize;
+    }
     return this.storage.getFileSize(key);
   }
 

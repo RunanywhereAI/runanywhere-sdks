@@ -17,11 +17,7 @@
  *   console.log(validated.extractedJson); // parsed JSON
  */
 
-import { RunAnywhere } from '../RunAnywhere';
-import { WASMBridge } from '../../Foundation/WASMBridge';
-import { Offsets } from '../../Foundation/StructOffsets';
-import { SDKError } from '../../Foundation/ErrorTypes';
-import { SDKLogger } from '../../Foundation/SDKLogger';
+import { RunAnywhere, WASMBridge, Offsets, SDKError, SDKLogger } from '@runanywhere/web';
 
 const logger = new SDKLogger('StructuredOutput');
 

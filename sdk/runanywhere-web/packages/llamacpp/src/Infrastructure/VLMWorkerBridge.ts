@@ -15,8 +15,7 @@
  *   ```
  */
 
-import { WASMBridge } from '../Foundation/WASMBridge';
-import { SDKLogger } from '../Foundation/SDKLogger';
+import { WASMBridge, SDKLogger } from '@runanywhere/web';
 
 // ---------------------------------------------------------------------------
 // Types

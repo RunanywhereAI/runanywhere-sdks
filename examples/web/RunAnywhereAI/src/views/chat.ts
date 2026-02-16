@@ -9,7 +9,7 @@
 import type { TabLifecycle } from '../app';
 import { ModelManager, ModelCategory, type ModelInfo } from '../services/model-manager';
 import { showModelSelectionSheet } from '../components/model-selection';
-import type { ToolValue } from '../../../../../sdk/runanywhere-web/packages/core/src/Public/Extensions/RunAnywhere+ToolCalling';
+import type { ToolValue } from '../../../../../sdk/runanywhere-web/packages/llamacpp/src/Extensions/RunAnywhere+ToolCalling';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -248,7 +248,7 @@ async function toggleTools(): Promise<void> {
  */
 async function registerDemoTools(): Promise<void> {
   const { ToolCalling, toToolValue } = await import(
-    '../../../../../sdk/runanywhere-web/packages/core/src/index'
+    '../../../../../sdk/runanywhere-web/packages/llamacpp/src/index'
   );
 
   // 1. get_weather - uses Open-Meteo API (free, no API key)
@@ -519,7 +519,7 @@ async function sendMessage(): Promise<void> {
  */
 async function sendStreaming(text: string, loaded: ModelInfo): Promise<void> {
   const { TextGeneration } = await import(
-    '../../../../../sdk/runanywhere-web/packages/core/src/index'
+    '../../../../../sdk/runanywhere-web/packages/llamacpp/src/index'
   );
 
   if (!TextGeneration.isModelLoaded) {
@@ -571,7 +571,7 @@ async function sendStreaming(text: string, loaded: ModelInfo): Promise<void> {
  */
 async function sendWithToolCalling(text: string, loaded: ModelInfo): Promise<void> {
   const { ToolCalling } = await import(
-    '../../../../../sdk/runanywhere-web/packages/core/src/index'
+    '../../../../../sdk/runanywhere-web/packages/llamacpp/src/index'
   );
 
   // Show "calling tools" indicator

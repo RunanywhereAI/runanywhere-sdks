@@ -24,7 +24,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WASM_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 BUILD_DIR="${WASM_DIR}/build-sherpa-onnx"
 SHERPA_SRC="${WASM_DIR}/third_party/sherpa-onnx"
-OUTPUT_DIR="${WASM_DIR}/../packages/core/wasm/sherpa"
+OUTPUT_DIR="${WASM_DIR}/../packages/onnx/wasm/sherpa"
 
 SHERPA_VERSION="v1.12.20"
 CLEAN=false

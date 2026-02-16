@@ -47,6 +47,14 @@ function copyWasmPlugin(): Plugin {
 
 export default defineConfig({
   plugins: [copyWasmPlugin()],
+  resolve: {
+    alias: {
+      // Ensure all packages resolve to the same source modules during development.
+      // Without this, @runanywhere/web imports from llamacpp/onnx packages resolve
+      // to dist/ while main.ts imports from src/, creating duplicate singletons.
+      '@runanywhere/web': path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/core/src/index.ts'),
+    },
+  },
   server: {
     headers: {
       // Required for SharedArrayBuffer (pthreads) and WASM threads

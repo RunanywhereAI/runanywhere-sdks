@@ -43,13 +43,4 @@ export type {
   VADConfiguration,
 } from './models';
 
-// LLM Types
-export type {
-  LLMGenerationOptions,
-  LLMGenerationResult,
-  LLMStreamCompleteCallback,
-  LLMStreamErrorCallback,
-  LLMStreamingMetrics,
-  LLMStreamingResult,
-  LLMTokenCallback,
-} from './LLMTypes';
+// Note: LLM types moved to @runanywhere/web-llamacpp package

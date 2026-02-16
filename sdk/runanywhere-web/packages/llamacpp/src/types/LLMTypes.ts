@@ -5,7 +5,7 @@
  * Source of truth: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/LLMTypes.swift
  */
 
-import type { HardwareAcceleration, LLMFramework } from './enums';
+import type { HardwareAcceleration, LLMFramework } from '@runanywhere/web';
 
 export interface LLMGenerationOptions {
   maxTokens?: number;
