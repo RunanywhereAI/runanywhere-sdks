@@ -33,6 +33,7 @@ export interface LLMOptionsOffsets {
   maxTokens: number;
   temperature: number;
   topP: number;
+  systemPrompt: number;
 }
 
 export interface LLMResultOffsets {
@@ -197,6 +198,7 @@ export function loadOffsets(m: any): void {
       maxTokens: off('llm_options_max_tokens'),
       temperature: off('llm_options_temperature'),
       topP: off('llm_options_top_p'),
+      systemPrompt: off('llm_options_system_prompt'),
     },
 
     llmResult: {

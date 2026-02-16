@@ -11,10 +11,64 @@ import './styles/components.css';
 import { buildAppShell } from './app';
 
 // ---------------------------------------------------------------------------
+// Cross-Origin Isolation (enables SharedArrayBuffer on Safari/iOS)
+// ---------------------------------------------------------------------------
+
+/**
+ * Registers a service worker that injects COOP/COEP headers for browsers
+ * that don't support `credentialless` COEP (Safari/WebKit).
+ *
+ * - On Chrome/Firefox: `crossOriginIsolated` is already true via server
+ *   headers, so this is a no-op (SW registers silently for future use).
+ * - On Safari/iOS: `crossOriginIsolated` is false, so the SW installs
+ *   and the page reloads once to activate it.
+ */
+async function ensureCrossOriginIsolation(): Promise<void> {
+  if (crossOriginIsolated) {
+    console.log('[COI] Already cross-origin isolated');
+    return;
+  }
+
+  if (!('serviceWorker' in navigator)) {
+    console.warn('[COI] Service workers not supported — SharedArrayBuffer may be unavailable');
+    return;
+  }
+
+  const registration = await navigator.serviceWorker.register('/coi-serviceworker.js');
+
+  // If the SW is already active and controlling this page, COI should be
+  // enabled. If we're still not isolated, something else is wrong.
+  if (navigator.serviceWorker.controller) {
+    console.warn('[COI] Service worker active but page is not cross-origin isolated');
+    return;
+  }
+
+  // Wait for the newly installed SW to activate, then reload so its
+  // fetch handler can inject the required headers.
+  const sw = registration.installing || registration.waiting;
+  if (sw) {
+    await new Promise<void>((resolve) => {
+      sw.addEventListener('statechange', () => {
+        if (sw.state === 'activated') resolve();
+      });
+      // If it's already activated by the time we check
+      if (sw.state === 'activated') resolve();
+    });
+    console.log('[COI] Service worker activated — reloading for cross-origin isolation');
+    window.location.reload();
+    // Halt execution — the reload will re-enter main()
+    await new Promise(() => {});
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Initialization Flow (matches iOS RunAnywhereAIApp.swift)
 // ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
+  // Step 0: Ensure cross-origin isolation for SharedArrayBuffer (Safari/iOS)
+  await ensureCrossOriginIsolation();
+
   // Show loading screen while SDK initializes
   showLoadingScreen();
 

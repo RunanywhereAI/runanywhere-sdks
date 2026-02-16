@@ -40,10 +40,10 @@ export { VoicePipeline } from './Public/Extensions/RunAnywhere+VoicePipeline';
 export type { VoicePipelineCallbacks, VoicePipelineOptions, VoicePipelineTurnResult } from './Public/Extensions/VoicePipelineTypes';
 export { VLM, VLMImageFormat, VLMModelFamily } from './Public/Extensions/RunAnywhere+VLM';
 export type { VLMImage, VLMGenerationOptions, VLMGenerationResult, VLMStreamingResult } from './Public/Extensions/RunAnywhere+VLM';
-export { ToolCalling, toToolValue, fromToolValue, getStringArg, getNumberArg } from './Public/Extensions/RunAnywhere+ToolCalling';
+export { ToolCalling, ToolCallFormat, toToolValue, fromToolValue, getStringArg, getNumberArg } from './Public/Extensions/RunAnywhere+ToolCalling';
 export type {
   ToolValue, ToolParameterType, ToolParameter, ToolDefinition,
-  ToolCall, ToolResult, ToolCallFormat, ToolCallingOptions, ToolCallingResult, ToolExecutor,
+  ToolCall, ToolResult, ToolCallingOptions, ToolCallingResult, ToolExecutor,
 } from './Public/Extensions/RunAnywhere+ToolCalling';
 export { StructuredOutput } from './Public/Extensions/RunAnywhere+StructuredOutput';
 export type { StructuredOutputConfig, StructuredOutputValidation } from './Public/Extensions/RunAnywhere+StructuredOutput';
@@ -62,6 +62,8 @@ export { SDKError, SDKErrorCode } from './Foundation/ErrorTypes';
 export { SDKLogger, LogLevel } from './Foundation/SDKLogger';
 export { EventBus } from './Foundation/EventBus';
 export type { EventListener, Unsubscribe, SDKEventEnvelope } from './Foundation/EventBus';
+export type { AccelerationMode } from './Foundation/WASMBridge';
+export { SherpaONNXBridge } from './Foundation/SherpaONNXBridge';
 
 // Infrastructure
 export { detectCapabilities, getDeviceInfo } from './Infrastructure/DeviceCapabilities';
@@ -86,3 +88,8 @@ export type {
   VLMWorkerResult, VLMLoadModelParams, VLMProcessOptions,
   VLMWorkerCommand, VLMWorkerResponse, ProgressListener,
 } from './Infrastructure/VLMWorkerBridge';
+
+// VLM Worker entry point — consumers import this in their worker file:
+//   import { startVLMWorkerRuntime } from '@runanywhere/web';
+//   startVLMWorkerRuntime();
+export { startVLMWorkerRuntime } from './Infrastructure/VLMWorkerRuntime';
