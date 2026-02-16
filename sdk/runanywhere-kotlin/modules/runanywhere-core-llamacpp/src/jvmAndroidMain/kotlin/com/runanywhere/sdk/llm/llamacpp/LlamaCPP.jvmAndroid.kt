@@ -50,8 +50,8 @@ internal actual fun LlamaCPP.unregisterNative(): Int {
 internal actual fun LlamaCPP.registerVlmNative(): Int {
     // Ensure native libraries are loaded (should already be from registerNative)
     if (!LlamaCPPBridge.isLoaded) {
-        logger.warning("LlamaCPP native library not loaded, cannot register VLM")
-        return -1
+        logger.error("LlamaCPP native library not loaded, cannot register VLM")
+        throw UnsatisfiedLinkError("LlamaCPP native library not loaded, cannot register VLM")
     }
 
     logger.debug("Calling native registerVlm")

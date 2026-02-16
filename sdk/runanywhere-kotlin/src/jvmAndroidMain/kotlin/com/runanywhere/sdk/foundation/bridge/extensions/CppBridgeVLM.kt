@@ -636,11 +636,11 @@ object CppBridgeVLM {
 
     private fun unescapeJson(value: String): String {
         return value
+            .replace("\\\\", "\\")
             .replace("\\n", "\n")
             .replace("\\r", "\r")
             .replace("\\t", "\t")
             .replace("\\\"", "\"")
-            .replace("\\\\", "\\")
     }
 
     fun getStateSummary(): String {

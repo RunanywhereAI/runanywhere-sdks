@@ -3570,7 +3570,8 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentProcess(
     fillVlmImage(image, imageFormat, imagePathStr, env, imageData,
                  imageBase64Str, imageWidth, imageHeight, pixelBuf);
 
-    // Default options
+    // Default options (optionsJson is intentionally unused for now — VLM options
+    // are configured at the native layer; Kotlin-side overrides will be added later)
     rac_vlm_options_t options = RAC_VLM_OPTIONS_DEFAULT;
     options.streaming_enabled = RAC_FALSE;
 
@@ -3651,6 +3652,10 @@ static rac_bool_t vlm_stream_callback_token(const char* token, void* user_data) 
             if (env->ExceptionCheck()) {
                 env->ExceptionDescribe();
                 env->ExceptionClear();
+                if (needsDetach) {
+                    ctx->jvm->DetachCurrentThread();
+                }
+                return RAC_FALSE;  // Stop generation on exception
             }
 
             if (needsDetach) {
@@ -3743,6 +3748,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentProcessS
 
     jclass callbackClass = env->GetObjectClass(tokenCallback);
     jmethodID onTokenMethod = env->GetMethodID(callbackClass, "onToken", "([B)Z");
+    env->DeleteLocalRef(callbackClass);
 
     if (!onTokenMethod) {
         LOGe("racVlmComponentProcessStream: could not find onToken method");
@@ -3752,7 +3758,8 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentProcessS
 
     jobject globalCallback = env->NewGlobalRef(tokenCallback);
 
-    // Default options
+    // Default options (optionsJson is intentionally unused for now — VLM options
+    // are configured at the native layer; Kotlin-side overrides will be added later)
     rac_vlm_options_t options = RAC_VLM_OPTIONS_DEFAULT;
     options.streaming_enabled = RAC_TRUE;
 

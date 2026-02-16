@@ -114,6 +114,7 @@ fun RunAnywhere.registerMultiFileModel(
     memoryRequirement: Long? = null,
 ): ModelInfo {
     val logger = SDKLogger.models
+    require(files.isNotEmpty()) { "Multi-file model must have at least one file descriptor" }
 
     logger.debug("Registering multi-file model: $id (name: $name, files: ${files.size})")
 

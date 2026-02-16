@@ -74,7 +74,7 @@ data class VLMImage(
         if (other !is VLMImage) return false
         return format == other.format &&
             filePath == other.filePath &&
-            pixelData?.contentEquals(other.pixelData ?: byteArrayOf()) != false &&
+            (pixelData contentEquals other.pixelData) &&
             base64Data == other.base64Data &&
             width == other.width &&
             height == other.height
@@ -161,7 +161,7 @@ data class VLMStreamingResult(
 data class VLMConfiguration(
     override val modelId: String? = null,
     val contextLength: Int = 4096,
-    val temperature: Double = 0.7,
+    val temperature: Float = 0.7f,
     val maxTokens: Int = 2048,
     val systemPrompt: String? = null,
     val streamingEnabled: Boolean = true,
@@ -173,7 +173,7 @@ data class VLMConfiguration(
         require(contextLength in 1..32768) {
             "Context length must be between 1 and 32768"
         }
-        require(temperature in 0.0..2.0) {
+        require(temperature in 0.0f..2.0f) {
             "Temperature must be between 0 and 2.0"
         }
         require(maxTokens in 1..contextLength) {
