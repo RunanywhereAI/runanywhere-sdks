@@ -52,10 +52,10 @@ const logger = new SDKLogger('VoicePipeline');
 // ---------------------------------------------------------------------------
 
 const DEFAULT_OPTIONS: Required<VoicePipelineOptions> = {
-  maxTokens: 150,
+  maxTokens: 60,
   temperature: 0.7,
   systemPrompt:
-    'You are a helpful voice assistant. Keep responses concise — 1-3 sentences. Be conversational and friendly.',
+    'You are a helpful voice assistant. Keep responses concise — 1-2 sentences max.',
   ttsSpeed: 1.0,
   sampleRate: 16000,
 };

@@ -180,8 +180,17 @@ class TextGenerationImpl {
       prompt: prompt.substring(0, 100),
     });
 
+    // If system_prompt WASM offset is not available (WASM not rebuilt yet),
+    // inject the system prompt into the user prompt as a fallback.
+    let effectivePrompt = prompt;
+    const canSetSystemPromptNatively = Offsets.llmOptions.systemPrompt !== 0;
+    if (options.systemPrompt && !canSetSystemPromptNatively) {
+      effectivePrompt = `[System: ${options.systemPrompt}]\n\n${prompt}`;
+      logger.debug('System prompt injected into user prompt (WASM offset not available)');
+    }
+
     // Allocate prompt string
-    const promptPtr = bridge.allocString(prompt);
+    const promptPtr = bridge.allocString(effectivePrompt);
 
     // Create default options struct
     const optionsPtr = m._rac_wasm_create_llm_options_default();
@@ -199,6 +208,12 @@ class TextGenerationImpl {
     }
     if (options.topP !== undefined) {
       m.setValue(optionsPtr + Offsets.llmOptions.topP, options.topP, 'float');
+    }
+    // Set system_prompt if the WASM offset is available (non-zero = real offset)
+    let systemPromptPtr = 0;
+    if (options.systemPrompt && Offsets.llmOptions.systemPrompt) {
+      systemPromptPtr = bridge.allocString(options.systemPrompt);
+      m.setValue(optionsPtr + Offsets.llmOptions.systemPrompt, systemPromptPtr, '*');
     }
 
     // Allocate and zero-initialise the result struct so any C++ code that
@@ -281,6 +296,7 @@ class TextGenerationImpl {
       throw error;
     } finally {
       bridge.free(promptPtr);
+      if (systemPromptPtr) bridge.free(systemPromptPtr);
       m._free(optionsPtr);
       // Free the result struct itself (separate from _rac_llm_result_free
       // which only frees the inner `text` string).
@@ -400,8 +416,17 @@ class TextGenerationImpl {
       m.removeFunction(errorCbPtr);
     }, 'viii');
 
+    // If system_prompt WASM offset is not available (WASM not rebuilt yet),
+    // inject the system prompt into the user prompt as a fallback.
+    let effectivePrompt = prompt;
+    const canSetSystemPromptNatively = Offsets.llmOptions.systemPrompt !== 0;
+    if (options.systemPrompt && !canSetSystemPromptNatively) {
+      effectivePrompt = `[System: ${options.systemPrompt}]\n\n${prompt}`;
+      logger.debug('System prompt injected into user prompt (WASM offset not available)');
+    }
+
     // Start streaming generation
-    const promptPtr = bridge.allocString(prompt);
+    const promptPtr = bridge.allocString(effectivePrompt);
     const optionsPtr = m._rac_wasm_create_llm_options_default();
 
     if (options.maxTokens !== undefined) {
@@ -409,6 +434,12 @@ class TextGenerationImpl {
     }
     if (options.temperature !== undefined) {
       m.setValue(optionsPtr + Offsets.llmOptions.temperature, options.temperature, 'float');
+    }
+    // Set system_prompt if the WASM offset is available (non-zero = real offset)
+    let systemPromptPtr = 0;
+    if (options.systemPrompt && Offsets.llmOptions.systemPrompt) {
+      systemPromptPtr = bridge.allocString(options.systemPrompt);
+      m.setValue(optionsPtr + Offsets.llmOptions.systemPrompt, systemPromptPtr, '*');
     }
 
     let startResult: number;
@@ -426,6 +457,7 @@ class TextGenerationImpl {
       logger.debug(`Stream generation returned result=${startResult}`);
     } catch (wasmErr: unknown) {
       bridge.free(promptPtr);
+      if (systemPromptPtr) bridge.free(systemPromptPtr);
       m._free(optionsPtr);
       m.removeFunction(tokenCbPtr);
       m.removeFunction(completeCbPtr);
@@ -445,6 +477,7 @@ class TextGenerationImpl {
     }
 
     bridge.free(promptPtr);
+    if (systemPromptPtr) bridge.free(systemPromptPtr);
     m._free(optionsPtr);
 
     if (startResult !== 0) {

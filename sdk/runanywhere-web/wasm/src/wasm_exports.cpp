@@ -297,6 +297,9 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_llm_options_temperature(void) {
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_llm_options_top_p(void) {
     return (int)offsetof(rac_llm_options_t, top_p);
 }
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_llm_options_system_prompt(void) {
+    return (int)offsetof(rac_llm_options_t, system_prompt);
+}
 
 // ---- rac_llm_result_t ----
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_llm_result_text(void) {
