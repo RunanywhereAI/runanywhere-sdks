@@ -11,7 +11,9 @@ import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.SDKEnvironment
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
+import com.runanywhere.sdk.public.extensions.Models.ModelFileDescriptor
 import com.runanywhere.sdk.public.extensions.registerModel
+import com.runanywhere.sdk.public.extensions.registerMultiFileModel
 import com.runanywhere.sdk.storage.AndroidPlatformContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -357,6 +359,56 @@ class RunAnywhereApplication : Application() {
             memoryRequirement = 65_000_000,
         )
         Log.i("RunAnywhereApp", "✅ ONNX STT/TTS models registered")
+
+        // Register VLM (Vision Language Model) models — matching iOS exactly
+        // SmolVLM 500M - Ultra-lightweight VLM for mobile (~500MB total, archive)
+        RunAnywhere.registerModel(
+            id = "smolvlm-500m-instruct-q8_0",
+            name = "SmolVLM 500M Instruct",
+            url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz",
+            framework = InferenceFramework.LLAMA_CPP,
+            modality = ModelCategory.MULTIMODAL,
+            memoryRequirement = 600_000_000,
+        )
+        // LFM2-VL 450M - LiquidAI's compact VLM, ideal for mobile (~600MB total)
+        // Uses multi-file download: main model + mmproj from HuggingFace
+        RunAnywhere.registerMultiFileModel(
+            id = "lfm2-vl-450m-q8_0",
+            name = "LFM2-VL 450M",
+            files = listOf(
+                ModelFileDescriptor(
+                    url = "https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf",
+                    filename = "LFM2-VL-450M-Q8_0.gguf",
+                ),
+                ModelFileDescriptor(
+                    url = "https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf",
+                    filename = "mmproj-LFM2-VL-450M-Q8_0.gguf",
+                ),
+            ),
+            framework = InferenceFramework.LLAMA_CPP,
+            modality = ModelCategory.MULTIMODAL,
+            memoryRequirement = 600_000_000,
+        )
+        // Qwen2-VL 2B - Capable VLM, requires powerful hardware (~1.6GB total)
+        // Uses multi-file download: main model (986MB) + mmproj (710MB)
+        RunAnywhere.registerMultiFileModel(
+            id = "qwen2-vl-2b-instruct-q4_k_m",
+            name = "Qwen2-VL 2B Instruct",
+            files = listOf(
+                ModelFileDescriptor(
+                    url = "https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/Qwen2-VL-2B-Instruct-Q4_K_M.gguf",
+                    filename = "Qwen2-VL-2B-Instruct-Q4_K_M.gguf",
+                ),
+                ModelFileDescriptor(
+                    url = "https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf",
+                    filename = "mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf",
+                ),
+            ),
+            framework = InferenceFramework.LLAMA_CPP,
+            modality = ModelCategory.MULTIMODAL,
+            memoryRequirement = 1_800_000_000,
+        )
+        Log.i("RunAnywhereApp", "✅ VLM models registered")
 
         Log.i("RunAnywhereApp", "🎉 All modules and models registered")
     }

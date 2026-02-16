@@ -18,7 +18,10 @@ import com.runanywhere.sdk.public.extensions.Models.ArchiveType
 import com.runanywhere.sdk.public.extensions.Models.DownloadProgress
 import com.runanywhere.sdk.public.extensions.Models.ModelArtifactType
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
+import com.runanywhere.sdk.public.extensions.Models.ModelFileDescriptor
+import com.runanywhere.sdk.public.extensions.Models.ModelFormat
 import com.runanywhere.sdk.public.extensions.Models.ModelInfo
+import com.runanywhere.sdk.public.extensions.Models.ModelSource
 import kotlinx.coroutines.flow.Flow
 
 // MARK: - Model Registration
@@ -87,6 +90,74 @@ fun RunAnywhere.registerModel(
     logger.info("Registered model: $modelId (category: ${modality.value}, framework: ${framework.rawValue})")
     return modelInfo
 }
+
+/**
+ * Register a multi-file model (e.g., VLM with separate main model + mmproj files).
+ * Files are downloaded separately and stored in the same model folder.
+ *
+ * Mirrors Swift RunAnywhere.registerMultiFileModel() exactly.
+ *
+ * @param id Model ID (required for multi-file models)
+ * @param name Display name for the model
+ * @param files Array of file descriptors specifying URL and filename for each file
+ * @param framework Target inference framework
+ * @param modality Model category (default: MULTIMODAL)
+ * @param memoryRequirement Estimated memory usage in bytes
+ * @return The created ModelInfo
+ */
+fun RunAnywhere.registerMultiFileModel(
+    id: String,
+    name: String,
+    files: List<ModelFileDescriptor>,
+    framework: InferenceFramework,
+    modality: ModelCategory = ModelCategory.MULTIMODAL,
+    memoryRequirement: Long? = null,
+): ModelInfo {
+    val logger = SDKLogger.models
+    require(files.isNotEmpty()) { "Multi-file model must have at least one file descriptor" }
+
+    logger.debug("Registering multi-file model: $id (name: $name, files: ${files.size})")
+
+    // Cache the file descriptors (C++ registry doesn't preserve them)
+    cacheMultiFileDescriptors(id, files)
+
+    // Create ModelInfo with multiFile artifact type
+    val modelInfo =
+        ModelInfo(
+            id = id,
+            name = name,
+            category = modality,
+            format = ModelFormat.GGUF, // Assume GGUF for VLM models (matches iOS)
+            downloadURL = files.firstOrNull()?.url, // Use first file URL as primary (for display)
+            localPath = null,
+            artifactType = ModelArtifactType.MultiFile(files),
+            downloadSize = memoryRequirement,
+            framework = framework,
+            contextLength = if (modality.requiresContextLength) 2048 else null,
+            supportsThinking = false,
+            description = "Multi-file model (${files.size} files)",
+            source = ModelSource.LOCAL,
+        )
+
+    // Save to registry (fire-and-forget)
+    registerModelInternal(modelInfo)
+
+    logger.info("Registered multi-file model: $id (${files.size} files, framework: ${framework.rawValue})")
+    return modelInfo
+}
+
+/**
+ * Cache multi-file descriptors for later retrieval during download.
+ * The C++ registry doesn't preserve the file descriptor array.
+ * Implemented via expect/actual for platform-specific thread safety.
+ */
+internal expect fun cacheMultiFileDescriptors(modelId: String, files: List<ModelFileDescriptor>)
+
+/**
+ * Get cached file descriptors for a multi-file model.
+ * Returns null if no cached descriptors exist for the given model ID.
+ */
+expect fun getMultiFileDescriptors(modelId: String): List<ModelFileDescriptor>?
 
 /**
  * Internal implementation to save model to registry.
