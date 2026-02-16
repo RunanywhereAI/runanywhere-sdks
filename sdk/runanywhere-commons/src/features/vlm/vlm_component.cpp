@@ -9,13 +9,18 @@
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
+#include <dirent.h>
 #include <mutex>
 #include <string>
+#include <sys/stat.h>
 
 #include "rac/core/capabilities/rac_lifecycle.h"
+#include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/vlm/rac_vlm_component.h"
 #include "rac/features/vlm/rac_vlm_service.h"
+#include "rac/infrastructure/model_management/rac_model_paths.h"
+#include "rac/infrastructure/model_management/rac_model_types.h"
 
 static const char* LOG_CAT = "VLM.Component";
 
@@ -84,6 +89,128 @@ static std::string generate_unique_id() {
     char buffer[64];
     snprintf(buffer, sizeof(buffer), "vlm_gen_%lld", static_cast<long long>(ns));
     return std::string(buffer);
+}
+
+// =============================================================================
+// SPECIAL TOKEN STRIPPING
+// =============================================================================
+
+/**
+ * Strip model-internal special tokens (e.g. <|im_end|>) from a token string.
+ *
+ * Scans for patterns matching <|...|> and removes them. The cleaned result is
+ * written to buf. Returns a pointer to buf (which may be an empty string if the
+ * entire token was a special token).
+ */
+static const char* vlm_strip_special_tokens(const char* token, char* buf, size_t buf_size) {
+    if (!token || !buf || buf_size == 0) {
+        if (buf && buf_size > 0)
+            buf[0] = '\0';
+        return buf;
+    }
+
+    size_t out = 0;
+    size_t i = 0;
+    size_t len = strlen(token);
+
+    while (i < len && out < buf_size - 1) {
+        if (token[i] == '<' && i + 1 < len && token[i + 1] == '|') {
+            // Scan ahead for closing |>
+            size_t end = i + 2;
+            while (end < len) {
+                if (token[end] == '|' && end + 1 < len && token[end + 1] == '>') {
+                    // Found <|...|> — skip the entire special token
+                    i = end + 2;
+                    break;
+                }
+                end++;
+            }
+            if (end >= len) {
+                // No closing |> found — copy the '<' literally
+                buf[out++] = token[i++];
+            }
+        } else {
+            buf[out++] = token[i++];
+        }
+    }
+
+    buf[out] = '\0';
+    return buf;
+}
+
+// =============================================================================
+// MODEL FILE RESOLUTION
+// =============================================================================
+
+/**
+ * Resolve VLM model files within a directory.
+ *
+ * Scans the given directory for .gguf files and separates them into:
+ * - Main model file: first .gguf NOT containing "mmproj" in its name
+ * - Vision projector file: first .gguf containing "mmproj" in its name
+ *
+ * Uses POSIX opendir/readdir (works on iOS, Android, macOS, Linux).
+ */
+extern "C" rac_result_t rac_vlm_resolve_model_files(const char* model_dir, char* out_model_path,
+                                                    size_t model_path_size, char* out_mmproj_path,
+                                                    size_t mmproj_path_size) {
+    if (!model_dir || !out_model_path || !out_mmproj_path) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    out_model_path[0] = '\0';
+    out_mmproj_path[0] = '\0';
+
+    DIR* dir = opendir(model_dir);
+    if (!dir) {
+        RAC_LOG_ERROR(LOG_CAT, "Cannot open model directory: %s", model_dir);
+        return RAC_ERROR_NOT_FOUND;
+    }
+
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != nullptr) {
+        const char* name = entry->d_name;
+        size_t name_len = strlen(name);
+
+        // Must end with .gguf (case-insensitive)
+        if (name_len < 5) continue;
+        const char* ext = name + name_len - 5;
+        if (strcasecmp(ext, ".gguf") != 0) continue;
+
+        // Check if this is an mmproj file
+        bool is_mmproj = false;
+        for (size_t i = 0; i + 5 < name_len; i++) {
+            if (strncasecmp(name + i, "mmproj", 6) == 0) {
+                is_mmproj = true;
+                break;
+            }
+        }
+
+        if (is_mmproj && out_mmproj_path[0] == '\0') {
+            snprintf(out_mmproj_path, mmproj_path_size, "%s/%s", model_dir, name);
+        } else if (!is_mmproj && out_model_path[0] == '\0') {
+            snprintf(out_model_path, model_path_size, "%s/%s", model_dir, name);
+        }
+
+        // Stop once both are found
+        if (out_model_path[0] != '\0' && out_mmproj_path[0] != '\0') {
+            break;
+        }
+    }
+
+    closedir(dir);
+
+    if (out_model_path[0] == '\0') {
+        RAC_LOG_ERROR(LOG_CAT, "No .gguf model file found in: %s", model_dir);
+        return RAC_ERROR_NOT_FOUND;
+    }
+
+    RAC_LOG_INFO(LOG_CAT, "Resolved model: %s", out_model_path);
+    if (out_mmproj_path[0] != '\0') {
+        RAC_LOG_INFO(LOG_CAT, "Resolved mmproj: %s", out_mmproj_path);
+    }
+
+    return RAC_SUCCESS;
 }
 
 // =============================================================================
@@ -272,6 +399,72 @@ extern "C" rac_result_t rac_vlm_component_cleanup(rac_handle_t handle) {
     return rac_lifecycle_reset(component->lifecycle);
 }
 
+extern "C" rac_result_t rac_vlm_component_load_model_by_id(rac_handle_t handle,
+                                                          const char* model_id) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!model_id)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    // 1. Look up model in global registry
+    rac_model_info_t* model_info = nullptr;
+    rac_result_t result = rac_get_model(model_id, &model_info);
+    if (result != RAC_SUCCESS || !model_info) {
+        RAC_LOG_ERROR(LOG_CAT, "Model not found in registry: %s", model_id);
+        return RAC_ERROR_NOT_FOUND;
+    }
+
+    // 2. Determine model directory
+    char model_folder[1024] = {};
+
+    if (model_info->local_path && model_info->local_path[0] != '\0') {
+        // Use the registered local_path — check if it's a directory or file
+        struct stat st;
+        if (stat(model_info->local_path, &st) == 0 && S_ISDIR(st.st_mode)) {
+            snprintf(model_folder, sizeof(model_folder), "%s", model_info->local_path);
+        } else {
+            // It's a file path — use parent directory
+            strncpy(model_folder, model_info->local_path, sizeof(model_folder) - 1);
+            char* last_sep = strrchr(model_folder, '/');
+            if (last_sep) {
+                *last_sep = '\0';
+            }
+        }
+    } else {
+        // Fall back to convention-based path
+        result = rac_model_paths_get_model_folder(model_id, model_info->framework, model_folder,
+                                                  sizeof(model_folder));
+        if (result != RAC_SUCCESS) {
+            RAC_LOG_ERROR(LOG_CAT, "Failed to resolve model folder for: %s", model_id);
+            rac_model_info_free(model_info);
+            return result;
+        }
+    }
+
+    // 3. Resolve model files within the directory
+    char model_path[1024] = {};
+    char mmproj_path[1024] = {};
+    result = rac_vlm_resolve_model_files(model_folder, model_path, sizeof(model_path), mmproj_path,
+                                         sizeof(mmproj_path));
+    if (result != RAC_SUCCESS) {
+        RAC_LOG_ERROR(LOG_CAT, "Failed to resolve model files in: %s", model_folder);
+        rac_model_info_free(model_info);
+        return result;
+    }
+
+    // 4. Delegate to the existing load function
+    const char* mmproj = mmproj_path[0] != '\0' ? mmproj_path : nullptr;
+    const char* name = model_info->name ? model_info->name : model_id;
+
+    RAC_LOG_INFO(LOG_CAT, "Loading VLM model by ID: %s (model=%s, mmproj=%s)", model_id, model_path,
+                 mmproj ? mmproj : "none");
+
+    result = rac_vlm_component_load_model(handle, model_path, mmproj, model_id, name);
+
+    rac_model_info_free(model_info);
+    return result;
+}
+
 // =============================================================================
 // GENERATION API
 // =============================================================================
@@ -357,6 +550,9 @@ extern "C" rac_bool_t rac_vlm_component_supports_streaming(rac_handle_t handle) 
 
 /**
  * Internal structure for VLM streaming context.
+ *
+ * full_text accumulates raw tokens (including special tokens) for debugging/metrics.
+ * cleaned_text accumulates stripped tokens and is used for the final result text.
  */
 struct vlm_stream_context {
     rac_vlm_component_token_callback_fn token_callback;
@@ -369,31 +565,40 @@ struct vlm_stream_context {
     std::chrono::steady_clock::time_point first_token_time;
     bool first_token_recorded;
     std::string full_text;
+    std::string cleaned_text;
     int32_t prompt_tokens;
     int32_t token_count;
 };
 
 /**
  * Internal token callback that wraps user callback and tracks metrics.
+ * Strips special tokens (e.g. <|im_end|>) before forwarding to the caller.
  */
 static rac_bool_t vlm_stream_token_callback(const char* token, void* user_data) {
     auto* ctx = reinterpret_cast<vlm_stream_context*>(user_data);
 
-    // Track first token time
-    if (!ctx->first_token_recorded) {
+    if (!token) return RAC_TRUE;
+
+    // Strip special tokens from the model output
+    char cleaned[512];
+    vlm_strip_special_tokens(token, cleaned, sizeof(cleaned));
+
+    // Track first token time (only for non-empty cleaned tokens)
+    if (cleaned[0] != '\0' && !ctx->first_token_recorded) {
         ctx->first_token_recorded = true;
         ctx->first_token_time = std::chrono::steady_clock::now();
     }
 
-    // Accumulate text
-    if (token) {
-        ctx->full_text += token;
-        ctx->token_count++;
+    // Accumulate raw text for debugging and cleaned text for the final result
+    ctx->full_text += token;
+    if (cleaned[0] != '\0') {
+        ctx->cleaned_text += cleaned;
     }
+    ctx->token_count++;
 
-    // Call user callback
-    if (ctx->token_callback) {
-        return ctx->token_callback(token, ctx->user_data);
+    // Forward only non-empty cleaned tokens to the user callback
+    if (cleaned[0] != '\0' && ctx->token_callback) {
+        return ctx->token_callback(cleaned, ctx->user_data);
     }
 
     return RAC_TRUE;
@@ -470,9 +675,12 @@ extern "C" rac_result_t rac_vlm_component_process_stream(
     int64_t total_time_ms = total_duration.count();
 
     rac_vlm_result_t final_result = {};
-    final_result.text = strdup(ctx.full_text.c_str());
+    // Use cleaned_text (special tokens stripped) for the final result.
+    // Fall back to full_text if no cleaned tokens were produced.
+    const std::string& result_text = ctx.cleaned_text.empty() ? ctx.full_text : ctx.cleaned_text;
+    final_result.text = strdup(result_text.c_str());
     final_result.prompt_tokens = ctx.prompt_tokens;
-    final_result.completion_tokens = estimate_tokens(ctx.full_text.c_str());
+    final_result.completion_tokens = estimate_tokens(result_text.c_str());
     final_result.total_tokens = final_result.prompt_tokens + final_result.completion_tokens;
     final_result.total_time_ms = total_time_ms;
 
