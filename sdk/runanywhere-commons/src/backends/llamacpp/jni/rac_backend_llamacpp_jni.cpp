@@ -35,9 +35,11 @@
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 
-// Forward declaration for registration function
+// Forward declaration for registration functions
 extern "C" rac_result_t rac_backend_llamacpp_register(void);
 extern "C" rac_result_t rac_backend_llamacpp_unregister(void);
+extern "C" rac_result_t rac_backend_llamacpp_vlm_register(void);
+extern "C" rac_result_t rac_backend_llamacpp_vlm_unregister(void);
 
 extern "C" {
 
@@ -115,6 +117,51 @@ JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeGetVersion(JNIEnv* env, jclass clazz) {
     (void)clazz;
     return env->NewStringUTF("b7199");
+}
+
+// =============================================================================
+// VLM Backend Registration
+// =============================================================================
+
+/**
+ * Register the LlamaCPP VLM backend with the C++ service registry.
+ * Mirrors iOS LlamaCPP.registerVLM() pattern.
+ */
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeRegisterVlm(JNIEnv* env, jclass clazz) {
+    (void)env;
+    (void)clazz;
+    LOGi("LlamaCPP nativeRegisterVlm called");
+
+    rac_result_t result = rac_backend_llamacpp_vlm_register();
+
+    if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+        LOGe("Failed to register LlamaCPP VLM backend: %d", result);
+        return static_cast<jint>(result);
+    }
+
+    LOGi("LlamaCPP VLM backend registered successfully");
+    return RAC_SUCCESS;
+}
+
+/**
+ * Unregister the LlamaCPP VLM backend from the C++ service registry.
+ */
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeUnregisterVlm(JNIEnv* env, jclass clazz) {
+    (void)env;
+    (void)clazz;
+    LOGi("LlamaCPP nativeUnregisterVlm called");
+
+    rac_result_t result = rac_backend_llamacpp_vlm_unregister();
+
+    if (result != RAC_SUCCESS) {
+        LOGe("Failed to unregister LlamaCPP VLM backend: %d", result);
+    } else {
+        LOGi("LlamaCPP VLM backend unregistered");
+    }
+
+    return static_cast<jint>(result);
 }
 
 // =============================================================================

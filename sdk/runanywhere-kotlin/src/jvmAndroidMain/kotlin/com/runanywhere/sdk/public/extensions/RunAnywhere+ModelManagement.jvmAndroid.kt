@@ -361,7 +361,147 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
         val downloadStartTime = System.currentTimeMillis()
         CppBridgeEvents.emitDownloadStarted(modelId, modelInfo.downloadSize ?: 0)
 
-        // 5. Create a CompletableDeferred to wait for download completion
+        // 5. Check for multi-file model (e.g., VLM with model + mmproj)
+        // Mirrors iOS AlamofireDownloadService.downloadMultiFileModel() pattern
+        val multiFileDescriptors = getMultiFileDescriptors(modelId)
+        if (multiFileDescriptors != null && multiFileDescriptors.size > 1) {
+            downloadLogger.info("Multi-file model detected with ${multiFileDescriptors.size} files")
+
+            try {
+                // Create model directory (path = {models_dir}/{type_dir}/{modelId}/)
+                val modelDirPath = CppBridgeModelPaths.getModelPath(modelId, modelType)
+                val modelDir = File(modelDirPath)
+                modelDir.mkdirs()
+                downloadLogger.info("Created model directory: ${modelDir.absolutePath}")
+
+                var totalBytesDownloaded = 0L
+                val fileCount = multiFileDescriptors.size
+                var lastProgressEmitTime = 0L
+
+                // Download each file sequentially (matches iOS pattern)
+                for ((index, fileDescriptor) in multiFileDescriptors.withIndex()) {
+                    val fileDestination = File(modelDir, fileDescriptor.filename)
+                    downloadLogger.info("Downloading file ${index + 1}/$fileCount: ${fileDescriptor.filename}")
+                    downloadLogger.info("  URL: ${fileDescriptor.url}")
+                    downloadLogger.info("  Destination: ${fileDestination.absolutePath}")
+
+                    withContext(Dispatchers.IO) {
+                        val url = java.net.URL(fileDescriptor.url)
+                        val connection = url.openConnection() as java.net.HttpURLConnection
+                        connection.connectTimeout = 30_000
+                        connection.readTimeout = 30_000
+                        connection.setRequestProperty("User-Agent", "RunAnywhere-SDK/1.0")
+
+                        try {
+                            val responseCode = connection.responseCode
+                            if (responseCode != java.net.HttpURLConnection.HTTP_OK) {
+                                throw SDKError.download(
+                                    "HTTP $responseCode downloading ${fileDescriptor.filename}",
+                                )
+                            }
+
+                            val fileTotalBytes = connection.contentLengthLong
+                            var fileBytesRead = 0L
+                            val buffer = ByteArray(8192)
+
+                            connection.inputStream.use { input ->
+                                FileOutputStream(fileDestination).use { output ->
+                                    var len: Int
+                                    while (input.read(buffer).also { len = it } != -1) {
+                                        output.write(buffer, 0, len)
+                                        fileBytesRead += len
+
+                                        // Throttle progress emissions to every 200ms
+                                        val now = System.currentTimeMillis()
+                                        if (now - lastProgressEmitTime >= 200) {
+                                            lastProgressEmitTime = now
+                                            // iOS pattern: offset + (fileProgress * scale)
+                                            val fileProgress = if (fileTotalBytes > 0) {
+                                                fileBytesRead.toFloat() / fileTotalBytes
+                                            } else {
+                                                0f
+                                            }
+                                            val combinedProgress =
+                                                (index.toFloat() + fileProgress) / fileCount
+
+                                            trySend(
+                                                DownloadProgress(
+                                                    modelId = modelId,
+                                                    progress = combinedProgress,
+                                                    bytesDownloaded = totalBytesDownloaded + fileBytesRead,
+                                                    totalBytes = modelInfo.downloadSize,
+                                                    state = DownloadState.DOWNLOADING,
+                                                ),
+                                            )
+
+                                            // Emit SDK event every ~5% overall
+                                            val progressPercent = (combinedProgress * 100).toInt()
+                                            if (progressPercent % 5 == 0) {
+                                                CppBridgeEvents.emitDownloadProgress(
+                                                    modelId,
+                                                    combinedProgress.toDouble(),
+                                                    totalBytesDownloaded + fileBytesRead,
+                                                    modelInfo.downloadSize ?: 0,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            totalBytesDownloaded += fileBytesRead
+                            downloadLogger.info(
+                                "Completed file ${index + 1}/$fileCount: " +
+                                    "${fileDescriptor.filename} ($fileBytesRead bytes)",
+                            )
+                        } finally {
+                            connection.disconnect()
+                        }
+                    }
+                }
+
+                // All files downloaded — update registry with directory path
+                val finalPath = modelDir.absolutePath
+                val updatedModelInfo = modelInfo.copy(localPath = finalPath)
+                addToModelCache(updatedModelInfo)
+                CppBridgeModelRegistry.updateDownloadStatus(modelId, finalPath)
+
+                downloadLogger.info("Multi-file model ready at: $finalPath")
+
+                // Emit completion events
+                val downloadDurationMs = System.currentTimeMillis() - downloadStartTime
+                CppBridgeEvents.emitDownloadCompleted(
+                    modelId,
+                    downloadDurationMs.toDouble(),
+                    totalBytesDownloaded,
+                )
+
+                trySend(
+                    DownloadProgress(
+                        modelId = modelId,
+                        progress = 1f,
+                        bytesDownloaded = totalBytesDownloaded,
+                        totalBytes = totalBytesDownloaded,
+                        state = DownloadState.COMPLETED,
+                    ),
+                )
+
+                close()
+            } catch (e: Exception) {
+                downloadLogger.error("Multi-file download error: ${e.message}")
+                CppBridgeEvents.emitDownloadFailed(modelId, e.message ?: "Unknown error")
+                close(e)
+            }
+
+            awaitClose {
+                downloadLogger.debug("Multi-file download flow closed for: $modelId")
+            }
+            return@callbackFlow
+        }
+
+        // === Single-file download path (existing logic) ===
+
+        // 6. Create a CompletableDeferred to wait for download completion
         // This is used to properly suspend until the async download finishes
         data class DownloadResult(
             val success: Boolean,
@@ -371,7 +511,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
         )
         val downloadCompletion = CompletableDeferred<DownloadResult>()
 
-        // 6. Set up download listener to convert callbacks to Flow
+        // 7. Set up download listener to convert callbacks to Flow
         val downloadListener =
             object : CppBridgeDownload.DownloadListener {
                 override fun onDownloadStarted(downloadId: String, modelId: String, url: String) {
@@ -467,7 +607,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
         CppBridgeDownload.downloadListener = downloadListener
 
         try {
-            // 7. Start the actual download (runs asynchronously on thread pool)
+            // 8. Start the actual download (runs asynchronously on thread pool)
             val downloadId =
                 CppBridgeDownload.startDownload(
                     url = downloadUrl,
@@ -479,10 +619,10 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
 
             downloadLogger.info("Download queued with ID: $downloadId, waiting for completion...")
 
-            // 8. Wait for download to complete (suspends until callback fires)
+            // 9. Wait for download to complete (suspends until callback fires)
             val result = downloadCompletion.await()
 
-            // 9. Handle result
+            // 10. Handle result
             if (!result.success) {
                 val errorMsg = result.error ?: "Unknown download error"
                 CppBridgeEvents.emitDownloadFailed(modelId, errorMsg)
@@ -499,13 +639,13 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
                 throw SDKError.download("Download failed for model: $modelId - $errorMsg")
             }
 
-            // 10. Get the downloaded file path
+            // 11. Get the downloaded file path
             val downloadedPath = result.filePath ?: CppBridgeModelPaths.getModelPath(modelId, modelType)
             val downloadedFile = File(downloadedPath)
 
             downloadLogger.info("Downloaded file: $downloadedPath (exists: ${downloadedFile.exists()}, size: ${result.fileSize})")
 
-            // 11. Handle extraction if needed (for .tar.gz, .tar.bz2, or .zip archives)
+            // 12. Handle extraction if needed (for .tar.gz, .tar.bz2, or .zip archives)
             val finalModelPath =
                 if (requiresExtraction(downloadUrl)) {
                     downloadLogger.info("Archive detected in URL, extracting...")
@@ -527,14 +667,14 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
                     downloadedPath
                 }
 
-            // 12. Update model in C++ registry with local path
+            // 13. Update model in C++ registry with local path
             val updatedModelInfo = modelInfo.copy(localPath = finalModelPath)
             addToModelCache(updatedModelInfo)
             CppBridgeModelRegistry.updateDownloadStatus(modelId, finalModelPath)
 
             downloadLogger.info("Model ready at: $finalModelPath")
 
-            // 13. Emit completion events
+            // 14. Emit completion events
             val downloadDurationMs = System.currentTimeMillis() - downloadStartTime
             CppBridgeEvents.emitDownloadCompleted(modelId, downloadDurationMs.toDouble(), result.fileSize)
 

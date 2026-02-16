@@ -41,3 +41,21 @@ internal actual fun LlamaCPP.unregisterNative(): Int {
     logger.debug("Native unregister returned: $result")
     return result
 }
+
+/**
+ * JVM/Android implementation of LlamaCPP VLM native registration.
+ * Calls rac_backend_llamacpp_vlm_register() via JNI.
+ * Mirrors iOS LlamaCPP.registerVLM() pattern.
+ */
+internal actual fun LlamaCPP.registerVlmNative(): Int {
+    // Ensure native libraries are loaded (should already be from registerNative)
+    if (!LlamaCPPBridge.isLoaded) {
+        logger.warning("LlamaCPP native library not loaded, cannot register VLM")
+        return -1
+    }
+
+    logger.debug("Calling native registerVlm")
+    val result = LlamaCPPBridge.nativeRegisterVlm()
+    logger.debug("Native registerVlm returned: $result")
+    return result
+}

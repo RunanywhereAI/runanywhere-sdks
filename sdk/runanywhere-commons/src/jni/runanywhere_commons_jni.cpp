@@ -3615,7 +3615,12 @@ static rac_bool_t vlm_stream_callback_token(const char* token, void* user_data) 
         }
 
         if (env) {
-            jstring jToken = env->NewStringUTF(token);
+            jsize len = static_cast<jsize>(strlen(token));
+            jbyteArray jToken = env->NewByteArray(len);
+            env->SetByteArrayRegion(
+                jToken, 0, len,
+                reinterpret_cast<const jbyte*>(token));
+
             jboolean continueGen =
                 env->CallBooleanMethod(ctx->callback, ctx->onTokenMethod, jToken);
             env->DeleteLocalRef(jToken);
@@ -3714,7 +3719,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentProcessS
     env->GetJavaVM(&jvm);
 
     jclass callbackClass = env->GetObjectClass(tokenCallback);
-    jmethodID onTokenMethod = env->GetMethodID(callbackClass, "onToken", "(Ljava/lang/String;)Z");
+    jmethodID onTokenMethod = env->GetMethodID(callbackClass, "onToken", "([B)Z");
 
     if (!onTokenMethod) {
         LOGe("racVlmComponentProcessStream: could not find onToken method");
