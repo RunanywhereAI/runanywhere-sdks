@@ -45,19 +45,21 @@ ktlint {
 // Once com.runanywhere is verified, change to: "com.runanywhere"
 val isJitPack = System.getenv("JITPACK") == "true"
 val usePendingNamespace = System.getenv("USE_RUNANYWHERE_NAMESPACE")?.toBoolean() ?: false
-group = when {
-    isJitPack -> "com.github.RunanywhereAI.runanywhere-sdks"
-    usePendingNamespace -> "com.runanywhere"  // Use after DNS verification completes
-    else -> "io.github.sanchitmonga22"  // Currently verified namespace
-}
+group =
+    when {
+        isJitPack -> "com.github.RunanywhereAI.runanywhere-sdks"
+        usePendingNamespace -> "com.runanywhere" // Use after DNS verification completes
+        else -> "io.github.sanchitmonga22" // Currently verified namespace
+    }
 
 // Version resolution priority:
 // 1. SDK_VERSION env var (set by our CI/CD from git tag)
 // 2. VERSION env var (set by JitPack from git tag)
 // 3. Default fallback for local development
-val resolvedVersion = System.getenv("SDK_VERSION")?.removePrefix("v")
-    ?: System.getenv("VERSION")?.removePrefix("v")
-    ?: "0.1.5-SNAPSHOT"
+val resolvedVersion =
+    System.getenv("SDK_VERSION")?.removePrefix("v")
+        ?: System.getenv("VERSION")?.removePrefix("v")
+        ?: "0.1.5-SNAPSHOT"
 version = resolvedVersion
 
 // Log version for debugging
@@ -105,7 +107,7 @@ val rebuildCommons: Boolean =
 val nativeLibVersion: String =
     rootProject.findProperty("runanywhere.nativeLibVersion")?.toString()
         ?: project.findProperty("runanywhere.nativeLibVersion")?.toString()
-        ?: resolvedVersion  // Default to SDK version
+        ?: resolvedVersion // Default to SDK version
 
 // Log the build mode
 logger.lifecycle("RunAnywhere SDK: testLocal=$testLocal, nativeLibVersion=$nativeLibVersion")
@@ -423,7 +425,7 @@ tasks.register<Exec>("buildLocalJniLibs") {
 
                 Or download from releases:
                   ./gradlew -Prunanywhere.testLocal=false assembleDebug
-                """.trimIndent()
+                """.trimIndent(),
             )
         }
 
@@ -525,6 +527,7 @@ tasks.register("downloadJniLibs") {
 
     // Use standard KMP location for jniLibs
     val outputDir = file("src/androidMain/jniLibs")
+    val nativeLibVersionMarker = file("$outputDir/.native_lib_version")
     val tempDir = file("${layout.buildDirectory.get()}/jni-temp")
 
     // GitHub unified release URL - all assets are in one release
@@ -536,11 +539,12 @@ tasks.register("downloadJniLibs") {
     val targetAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64")
 
     // Package types to download for each ABI
-    val packageTypes = listOf(
-        "RACommons-android",      // Core infrastructure + JNI bridge
-        "RABackendLLAMACPP-android", // LLM inference (llama.cpp)
-        "RABackendONNX-android"   // STT/TTS/VAD (Sherpa ONNX)
-    )
+    val packageTypes =
+        listOf(
+            "RACommons-android", // Core infrastructure + JNI bridge
+            "RABackendLLAMACPP-android", // LLM inference (llama.cpp)
+            "RABackendONNX-android", // STT/TTS/VAD (Sherpa ONNX)
+        )
 
     outputs.dir(outputDir)
 
@@ -550,11 +554,22 @@ tasks.register("downloadJniLibs") {
             return@doLast
         }
 
-        // Check if libs already exist (CI pre-populates build/jniLibs/)
+        // Check if libs already exist (CI pre-populates build/jniLibs/).
+        // Guard against stale libs from a different native version.
         val existingLibs = outputDir.walkTopDown().filter { it.extension == "so" }.count()
-        if (existingLibs > 0) {
-            logger.lifecycle("Skipping JNI download: $existingLibs .so files already in $outputDir (CI mode)")
+        val existingVersion = nativeLibVersionMarker.takeIf { it.exists() }?.readText()?.trim()
+        if (existingLibs > 0 && existingVersion == nativeLibVersion) {
+            logger.lifecycle(
+                "Skipping JNI download: $existingLibs .so files already in $outputDir " +
+                    "(native version v$nativeLibVersion)",
+            )
             return@doLast
+        }
+        if (existingLibs > 0 && existingVersion != nativeLibVersion) {
+            logger.lifecycle(
+                "Refreshing JNI libs: found $existingLibs existing .so files " +
+                    "with version '${existingVersion ?: "unknown"}', expected '$nativeLibVersion'",
+            )
         }
 
         // Clean output directories (only if empty)
@@ -600,7 +615,8 @@ tasks.register("downloadJniLibs") {
                     }
 
                     // Copy all .so files (they may be in subdirectories like jni/, onnx/, llamacpp/)
-                    extractDir.walkTopDown()
+                    extractDir
+                        .walkTopDown()
                         .filter { it.extension == "so" }
                         .forEach { soFile ->
                             val targetFile = file("$abiOutputDir/${soFile.name}")
@@ -632,6 +648,10 @@ tasks.register("downloadJniLibs") {
         logger.lifecycle("  ABIs: ${abiDirs.joinToString(", ")}")
         logger.lifecycle("  Output: $outputDir")
         logger.lifecycle("═══════════════════════════════════════════════════════════════")
+
+        // Record native lib version to avoid reusing stale JNI binaries.
+        nativeLibVersionMarker.parentFile.mkdirs()
+        nativeLibVersionMarker.writeText(nativeLibVersion)
 
         // List libraries per ABI
         abiDirs.forEach { abi ->
@@ -678,29 +698,35 @@ tasks.named<Jar>("jvmJar") {
 // =============================================================================
 
 // Get publishing credentials from environment or gradle.properties
-val mavenCentralUsername: String? = System.getenv("MAVEN_CENTRAL_USERNAME")
-    ?: project.findProperty("mavenCentral.username") as String?
-val mavenCentralPassword: String? = System.getenv("MAVEN_CENTRAL_PASSWORD")
-    ?: project.findProperty("mavenCentral.password") as String?
+val mavenCentralUsername: String? =
+    System.getenv("MAVEN_CENTRAL_USERNAME")
+        ?: project.findProperty("mavenCentral.username") as String?
+val mavenCentralPassword: String? =
+    System.getenv("MAVEN_CENTRAL_PASSWORD")
+        ?: project.findProperty("mavenCentral.password") as String?
 
 // GPG signing configuration
-val signingKeyId: String? = System.getenv("GPG_KEY_ID")
-    ?: project.findProperty("signing.keyId") as String?
-val signingPassword: String? = System.getenv("GPG_SIGNING_PASSWORD")
-    ?: project.findProperty("signing.password") as String?
-val signingKey: String? = System.getenv("GPG_SIGNING_KEY")
-    ?: project.findProperty("signing.key") as String?
+val signingKeyId: String? =
+    System.getenv("GPG_KEY_ID")
+        ?: project.findProperty("signing.keyId") as String?
+val signingPassword: String? =
+    System.getenv("GPG_SIGNING_PASSWORD")
+        ?: project.findProperty("signing.password") as String?
+val signingKey: String? =
+    System.getenv("GPG_SIGNING_KEY")
+        ?: project.findProperty("signing.key") as String?
 
 publishing {
     publications.withType<MavenPublication> {
         // Artifact naming for Maven Central
         // Main artifact: com.runanywhere:runanywhere-sdk:1.0.0
-        artifactId = when (name) {
-            "kotlinMultiplatform" -> "runanywhere-sdk"
-            "androidRelease" -> "runanywhere-sdk-android"
-            "jvm" -> "runanywhere-sdk-jvm"
-            else -> "runanywhere-sdk-$name"
-        }
+        artifactId =
+            when (name) {
+                "kotlinMultiplatform" -> "runanywhere-sdk"
+                "androidRelease" -> "runanywhere-sdk-android"
+                "jvm" -> "runanywhere-sdk-jvm"
+                else -> "runanywhere-sdk-$name"
+            }
 
         // POM metadata (required by Maven Central)
         pom {
@@ -790,9 +816,9 @@ signing {
 tasks.withType<Sign>().configureEach {
     onlyIf {
         gradle.taskGraph.hasTask(":publishAllPublicationsToMavenCentralRepository") ||
-        gradle.taskGraph.hasTask(":publish") ||
-        project.hasProperty("signing.gnupg.keyName") ||
-        signingKey != null
+            gradle.taskGraph.hasTask(":publish") ||
+            project.hasProperty("signing.gnupg.keyName") ||
+            signingKey != null
     }
 }
 

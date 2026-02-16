@@ -680,6 +680,7 @@ struct LLMStreamCallbackContext {
     JavaVM* jvm = nullptr;
     jobject callback = nullptr;
     jmethodID onTokenMethod = nullptr;
+    bool onTokenExpectsBytes = true;
     std::string accumulated_text;
     int token_count = 0;
     bool is_complete = false;
@@ -715,19 +716,24 @@ static rac_bool_t llm_stream_callback_token(const char* token, void* user_data) 
         }
 
         if (env) {
-            jsize len = static_cast<jsize>(strlen(token));
+            jboolean continueGen = JNI_TRUE;
 
-            jbyteArray jToken = env->NewByteArray(len);
-            env->SetByteArrayRegion(
-                jToken,
-                0,
-                len,
-                reinterpret_cast<const jbyte*>(token)
-            );
-
-            jboolean continueGen =
-                env->CallBooleanMethod(ctx->callback, ctx->onTokenMethod, jToken);
-            env->DeleteLocalRef(jToken);
+            if (ctx->onTokenExpectsBytes) {
+                jsize len = static_cast<jsize>(strlen(token));
+                jbyteArray jToken = env->NewByteArray(len);
+                env->SetByteArrayRegion(
+                    jToken,
+                    0,
+                    len,
+                    reinterpret_cast<const jbyte*>(token)
+                );
+                continueGen = env->CallBooleanMethod(ctx->callback, ctx->onTokenMethod, jToken);
+                env->DeleteLocalRef(jToken);
+            } else {
+                jstring jToken = env->NewStringUTF(token);
+                continueGen = env->CallBooleanMethod(ctx->callback, ctx->onTokenMethod, jToken);
+                env->DeleteLocalRef(jToken);
+            }
 
             if (env->ExceptionCheck()) {
                 env->ExceptionDescribe();
@@ -908,7 +914,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
     env->GetJavaVM(&jvm);
 
     jclass callbackClass = env->GetObjectClass(tokenCallback);
+    bool onTokenExpectsBytes = true;
     jmethodID onTokenMethod = env->GetMethodID(callbackClass, "onToken", "([B)Z");
+    if (!onTokenMethod) {
+        env->ExceptionClear();
+        onTokenMethod = env->GetMethodID(callbackClass, "onToken", "(Ljava/lang/String;)Z");
+        onTokenExpectsBytes = false;
+    }
 
     if (!onTokenMethod) {
         LOGe("racLlmComponentGenerateStreamWithCallback: could not find onToken method");
@@ -930,6 +942,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
     ctx.jvm = jvm;
     ctx.callback = globalCallback;
     ctx.onTokenMethod = onTokenMethod;
+    ctx.onTokenExpectsBytes = onTokenExpectsBytes;
 
     LOGi("racLlmComponentGenerateStreamWithCallback calling rac_llm_component_generate_stream...");
 
