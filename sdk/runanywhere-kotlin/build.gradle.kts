@@ -297,37 +297,20 @@ android {
     }
 
     // ==========================================================================
-    // JNI Libraries Configuration - ALL LIBS (Commons + Backends)
+    // JNI Libraries Configuration - COMMONS ONLY
     // ==========================================================================
-    // This SDK downloads and bundles all JNI libraries:
-    //
-    // From RACommons (commons-v{commonsVersion}):
+    // This SDK bundles only core commons JNI libraries:
     //   - librac_commons.so - RAC Commons infrastructure
-    //   - librac_commons_jni.so - RAC Commons JNI bridge
+    //   - librunanywhere_jni.so - RAC Commons JNI bridge
     //   - libc++_shared.so - C++ STL (shared by all backends)
+    //   - libomp.so - OpenMP (shared by all backends)
     //
-    // From RABackendLlamaCPP (core-v{coreVersion}):
-    //   - librac_backend_llamacpp_jni.so - LlamaCPP JNI bridge
-    //   - librunanywhere_llamacpp.so - LlamaCPP backend
-    //   - libllama.so, libcommon.so - llama.cpp core
+    // Backend-specific native libs are bundled by their own modules:
+    //   - runanywhere-core-llamacpp → librac_backend_llamacpp*.so
+    //   - runanywhere-core-onnx → librac_backend_onnx*.so, libonnxruntime.so, libsherpa-onnx-*.so
     //
-    // From RABackendONNX (core-v{coreVersion}):
-    //   - librac_backend_onnx_jni.so - ONNX JNI bridge
-    //   - librunanywhere_onnx.so - ONNX backend
-    //   - libonnxruntime.so - ONNX Runtime
-    //   - libsherpa-onnx-*.so - Sherpa ONNX (STT/TTS/VAD)
+    // This ensures zero duplicate .so files across AARs.
     // ==========================================================================
-    // JNI libs are placed in src/androidMain/jniLibs/ (standard KMP location)
-    // This is automatically included by the KMP Android plugin
-    // ==========================================================================
-
-    // Prevent packaging duplicates
-    packaging {
-        jniLibs {
-            // Pick first if duplicates somehow still occur
-            pickFirsts.add("**/*.so")
-        }
-    }
 }
 
 // =============================================================================
@@ -509,43 +492,41 @@ tasks.register<Exec>("rebuildCommons") {
 // =============================================================================
 // JNI Library Download Task (for testLocal=false mode)
 // =============================================================================
-// Downloads ALL JNI libraries from GitHub releases:
-//   - Commons: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/commons-v{version}
-//     - librac_commons.so - RAC Commons infrastructure
-//     - librac_commons_jni.so - RAC Commons JNI bridge
-//   - Core backends: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/core-v{version}
-//     - librac_backend_llamacpp_jni.so - LLM inference (llama.cpp)
-//     - librac_backend_onnx_jni.so - STT/TTS/VAD (Sherpa ONNX)
-//     - libonnxruntime.so - ONNX Runtime
-//     - libsherpa-onnx-*.so - Sherpa ONNX components
-//   - libc++_shared.so - C++ STL (shared)
+// Downloads ONLY commons JNI libraries from GitHub releases.
+// Backend-specific libs are downloaded by their own modules:
+//   - :modules:runanywhere-core-llamacpp → RABackendLLAMACPP-android
+//   - :modules:runanywhere-core-onnx → RABackendONNX-android
+//
+// Commons libs owned by this module:
+//   - librac_commons.so - RAC Commons infrastructure
+//   - librunanywhere_jni.so - RAC Commons JNI bridge
+//   - libc++_shared.so - C++ STL (shared by all backends)
+//   - libomp.so - OpenMP (shared by all backends)
 // =============================================================================
 tasks.register("downloadJniLibs") {
     group = "runanywhere"
-    description = "Download JNI libraries from GitHub releases (when testLocal=false)"
+    description = "Download commons JNI libraries from GitHub releases (when testLocal=false)"
 
     // Only run when NOT using local libs
     onlyIf { !testLocal }
 
-    // Use standard KMP location for jniLibs
     val outputDir = file("src/androidMain/jniLibs")
     val tempDir = file("${layout.buildDirectory.get()}/jni-temp")
 
-    // GitHub unified release URL - all assets are in one release
-    // Format: https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v{version}/{asset}
     val releaseBaseUrl = "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v$nativeLibVersion"
 
-    // ABIs to download - arm64-v8a covers ~85% of devices
-    // Add more ABIs here if needed: "armeabi-v7a", "x86_64"
     val targetAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64")
 
-    // Package types to download for each ABI
-    val packageTypes =
-        listOf(
-            "RACommons-android", // Core infrastructure + JNI bridge
-            "RABackendLLAMACPP-android", // LLM inference (llama.cpp)
-            "RABackendONNX-android", // STT/TTS/VAD (Sherpa ONNX)
-        )
+    // Only download commons package — backend packages are handled by submodules
+    val packageType = "RACommons-android"
+
+    // Whitelist: only keep commons-owned .so files (the RACommons zip is a "fat" zip)
+    val commonsLibs = setOf(
+        "librac_commons.so",
+        "librunanywhere_jni.so",
+        "libc++_shared.so",
+        "libomp.so",
+    )
 
     outputs.dir(outputDir)
 
@@ -555,14 +536,12 @@ tasks.register("downloadJniLibs") {
             return@doLast
         }
 
-        // Check if libs already exist (CI pre-populates build/jniLibs/)
         val existingLibs = outputDir.walkTopDown().filter { it.extension == "so" }.count()
         if (existingLibs > 0) {
-            logger.lifecycle("Skipping JNI download: $existingLibs .so files already in $outputDir (CI mode)")
+            logger.lifecycle("Skipping JNI download: $existingLibs .so files already in $outputDir")
             return@doLast
         }
 
-        // Clean output directories (only if empty)
         outputDir.deleteRecursively()
         tempDir.deleteRecursively()
         outputDir.mkdirs()
@@ -570,7 +549,7 @@ tasks.register("downloadJniLibs") {
 
         logger.lifecycle("")
         logger.lifecycle("═══════════════════════════════════════════════════════════════")
-        logger.lifecycle(" Downloading JNI libraries (testLocal=false)")
+        logger.lifecycle(" Downloading commons JNI libraries (testLocal=false)")
         logger.lifecycle("═══════════════════════════════════════════════════════════════")
         logger.lifecycle("")
         logger.lifecycle("Native lib version: v$nativeLibVersion")
@@ -583,63 +562,53 @@ tasks.register("downloadJniLibs") {
             val abiOutputDir = file("$outputDir/$abi")
             abiOutputDir.mkdirs()
 
-            packageTypes.forEach { packageType ->
-                // Asset naming: {PackageType}-{abi}-v{version}.zip
-                val packageName = "$packageType-$abi-v$nativeLibVersion.zip"
-                val zipUrl = "$releaseBaseUrl/$packageName"
-                val tempZip = file("$tempDir/$packageName")
+            val packageName = "$packageType-$abi-v$nativeLibVersion.zip"
+            val zipUrl = "$releaseBaseUrl/$packageName"
+            val tempZip = file("$tempDir/$packageName")
 
-                logger.lifecycle("▶ Downloading: $packageName")
+            logger.lifecycle("▶ Downloading: $packageName")
 
-                try {
-                    // Download the zip
-                    ant.withGroovyBuilder {
-                        "get"("src" to zipUrl, "dest" to tempZip, "verbose" to false)
-                    }
-
-                    // Extract to temp directory
-                    val extractDir = file("$tempDir/extracted-${packageName.replace(".zip", "")}")
-                    extractDir.mkdirs()
-                    ant.withGroovyBuilder {
-                        "unzip"("src" to tempZip, "dest" to extractDir)
-                    }
-
-                    // Copy all .so files (they may be in subdirectories like jni/, onnx/, llamacpp/)
-                    extractDir
-                        .walkTopDown()
-                        .filter { it.extension == "so" }
-                        .forEach { soFile ->
-                            val targetFile = file("$abiOutputDir/${soFile.name}")
-                            if (!targetFile.exists()) {
-                                soFile.copyTo(targetFile, overwrite = true)
-                                logger.lifecycle("  ✓ ${soFile.name}")
-                                totalDownloaded++
-                            }
-                        }
-
-                    // Clean up temp zip
-                    tempZip.delete()
-                } catch (e: Exception) {
-                    logger.warn("  ⚠ Failed to download $packageName: ${e.message}")
+            try {
+                ant.withGroovyBuilder {
+                    "get"("src" to zipUrl, "dest" to tempZip, "verbose" to false)
                 }
+
+                val extractDir = file("$tempDir/extracted-${packageName.replace(".zip", "")}")
+                extractDir.mkdirs()
+                ant.withGroovyBuilder {
+                    "unzip"("src" to tempZip, "dest" to extractDir)
+                }
+
+                // Only copy commons-owned .so files (whitelist filter)
+                extractDir
+                    .walkTopDown()
+                    .filter { it.extension == "so" && it.name in commonsLibs }
+                    .forEach { soFile ->
+                        val targetFile = file("$abiOutputDir/${soFile.name}")
+                        soFile.copyTo(targetFile, overwrite = true)
+                        logger.lifecycle("  ✓ ${soFile.name}")
+                        totalDownloaded++
+                    }
+
+                tempZip.delete()
+            } catch (e: Exception) {
+                logger.warn("  ⚠ Failed to download $packageName: ${e.message}")
             }
+
             logger.lifecycle("")
         }
 
-        // Clean up temp directory
         tempDir.deleteRecursively()
 
-        // Verify output
         val totalLibs = outputDir.walkTopDown().filter { it.extension == "so" }.count()
         val abiDirs = outputDir.listFiles()?.filter { it.isDirectory }?.map { it.name } ?: emptyList()
 
         logger.lifecycle("═══════════════════════════════════════════════════════════════")
-        logger.lifecycle("✓ JNI libraries ready: $totalLibs .so files")
+        logger.lifecycle("✓ Commons JNI libraries ready: $totalLibs .so files")
         logger.lifecycle("  ABIs: ${abiDirs.joinToString(", ")}")
         logger.lifecycle("  Output: $outputDir")
         logger.lifecycle("═══════════════════════════════════════════════════════════════")
 
-        // List libraries per ABI
         abiDirs.forEach { abi ->
             val libs = file("$outputDir/$abi").listFiles()?.filter { it.extension == "so" }?.map { it.name } ?: emptyList()
             logger.lifecycle("$abi (${libs.size} libs):")
