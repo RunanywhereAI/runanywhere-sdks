@@ -1,7 +1,7 @@
 {
-  "name": "@runanywhere/web",
+  "name": "@runanywhere/web-llamacpp",
   "version": "0.1.0-beta.4",
-  "description": "RunAnywhere Web SDK - On-device AI inference in the browser via RACommons WASM",
+  "description": "RunAnywhere Web SDK - LlamaCpp backend for on-device LLM/VLM inference",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -12,11 +12,13 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
-    "./wasm/*": "./wasm/*"
+    "./vlm-worker": {
+      "import": "./dist/workers/vlm-worker.js",
+      "types": "./dist/workers/vlm-worker.d.ts"
+    }
   },
   "files": [
     "dist/",
-    "wasm/",
     "README.md"
   ],
   "scripts": {
@@ -24,16 +26,14 @@
     "dev": "tsc --watch",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist",
-    "prepublishOnly": "test -f wasm/racommons.wasm || (echo 'ERROR: WASM not built. Run build-web.sh first.' && exit 1)"
+    "clean": "rm -rf dist"
   },
   "keywords": [
     "runanywhere",
     "ai",
     "llm",
-    "stt",
-    "tts",
-    "vad",
+    "vlm",
+    "llamacpp",
     "wasm",
     "webgpu",
     "on-device",
@@ -45,7 +45,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/RunanywhereAI/runanywhere-sdks.git",
-    "directory": "sdk/runanywhere-web/packages/core"
+    "directory": "sdk/runanywhere-web/packages/llamacpp"
   },
   "homepage": "https://github.com/RunanywhereAI/runanywhere-sdks/tree/main/sdk/runanywhere-web",
   "bugs": {
@@ -57,7 +57,9 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "peerDependencies": {},
+  "peerDependencies": {
+    "@runanywhere/web": ">=0.1.0-beta.0"
+  },
   "devDependencies": {
     "typescript": "^5.6.0"
   }

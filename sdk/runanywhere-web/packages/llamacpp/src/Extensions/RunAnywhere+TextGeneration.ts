@@ -17,14 +17,8 @@
  *   }
  */
 
-import { RunAnywhere } from '../RunAnywhere';
-import { WASMBridge } from '../../Foundation/WASMBridge';
-import { Offsets } from '../../Foundation/StructOffsets';
-import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
-import { SDKLogger } from '../../Foundation/SDKLogger';
-import { EventBus } from '../../Foundation/EventBus';
-import { SDKEventType, LLMFramework, HardwareAcceleration } from '../../types/enums';
-import type { LLMGenerationOptions, LLMGenerationResult, LLMStreamingResult } from '../../types/LLMTypes';
+import { RunAnywhere, WASMBridge, Offsets, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, LLMFramework, HardwareAcceleration } from '@runanywhere/web';
+import type { LLMGenerationOptions, LLMGenerationResult, LLMStreamingResult } from '../types/LLMTypes';
 
 const logger = new SDKLogger('TextGeneration');
 

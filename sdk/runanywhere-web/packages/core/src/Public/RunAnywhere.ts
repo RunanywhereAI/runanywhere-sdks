@@ -6,15 +6,19 @@
  *   - RunAnywhere.swift (iOS) - enum with static methods
  *   - RunAnywhere.kt (Kotlin) - object/class
  *   - RunAnywhere.ts (React Native) - object literal
- *   - RunAnywhere.dart (Flutter) - class
  *
  * All operations flow through the WASM bridge to RACommons C++.
+ * Backend packages (@runanywhere/web-llamacpp, @runanywhere/web-onnx)
+ * register themselves via the ExtensionPoint API.
  *
  * Usage:
  *   import { RunAnywhere } from '@runanywhere/web';
+ *   import { LlamaCPP } from '@runanywhere/web-llamacpp';
+ *   import { ONNX } from '@runanywhere/web-onnx';
  *
  *   await RunAnywhere.initialize({ environment: 'development' });
- *   const result = await RunAnywhere.generate('Hello!', { maxTokens: 100 });
+ *   await LlamaCPP.register();
+ *   await ONNX.register();
  */
 
 import { SDKEnvironment, SDKEventType, ModelCategory, AccelerationPreference } from '../types/enums';
@@ -24,23 +28,14 @@ import { EventBus } from '../Foundation/EventBus';
 import { SDKLogger, LogLevel } from '../Foundation/SDKLogger';
 import { WASMBridge } from '../Foundation/WASMBridge';
 import type { AccelerationMode } from '../Foundation/WASMBridge';
-import { SherpaONNXBridge } from '../Foundation/SherpaONNXBridge';
 import { PlatformAdapter } from '../Foundation/PlatformAdapter';
 import { loadOffsets } from '../Foundation/StructOffsets';
 import { Offsets } from '../Foundation/StructOffsets';
 import { ModelManager } from '../Infrastructure/ModelManager';
 import type { CompactModelDef, ManagedModel, VLMLoader } from '../Infrastructure/ModelManager';
 import { ExtensionRegistry } from '../Infrastructure/ExtensionRegistry';
-
-// Extension imports for registration and shutdown cleanup
-import { TextGeneration } from './Extensions/RunAnywhere+TextGeneration';
-import { VLM } from './Extensions/RunAnywhere+VLM';
-import { STT } from './Extensions/RunAnywhere+STT';
-import { TTS } from './Extensions/RunAnywhere+TTS';
-import { VAD } from './Extensions/RunAnywhere+VAD';
-import { Embeddings } from './Extensions/RunAnywhere+Embeddings';
-import { Diffusion } from './Extensions/RunAnywhere+Diffusion';
-import { ToolCalling } from './Extensions/RunAnywhere+ToolCalling';
+import { ExtensionPoint } from '../Infrastructure/ExtensionPoint';
+import { LocalFileStorage } from '../Infrastructure/LocalFileStorage';
 
 const logger = new SDKLogger('RunAnywhere');
 
@@ -52,8 +47,8 @@ let _isInitialized = false;
 let _hasCompletedServicesInit = false;
 let _platformAdapter: PlatformAdapter | null = null;
 let _initOptions: SDKInitOptions | null = null;
-/** Guard against concurrent initialize() calls */
 let _initializingPromise: Promise<void> | null = null;
+let _localFileStorage: LocalFileStorage | null = null;
 
 // ---------------------------------------------------------------------------
 // RunAnywhere Public API
@@ -64,37 +59,30 @@ export const RunAnywhere = {
   // SDK State
   // =========================================================================
 
-  /** Whether the SDK is initialized (Phase 1 complete) */
   get isInitialized(): boolean {
     return _isInitialized;
   },
 
-  /** Whether services are fully ready (Phase 2 complete) */
   get areServicesReady(): boolean {
     return _hasCompletedServicesInit;
   },
 
-  /** Current SDK version */
   get version(): string {
     return '0.1.0';
   },
 
-  /** Current environment */
   get environment(): SDKEnvironment | null {
     return _initOptions?.environment ?? null;
   },
 
-  /** Access to the event bus */
   get events(): EventBus {
     return EventBus.shared;
   },
 
-  /** Whether the WASM module is loaded */
   get isWASMLoaded(): boolean {
     return WASMBridge.shared.isLoaded;
   },
 
-  /** The active hardware acceleration mode ('webgpu' or 'cpu'). */
   get accelerationMode(): AccelerationMode {
     return WASMBridge.shared.accelerationMode;
   },
@@ -112,30 +100,16 @@ export const RunAnywhere = {
    *   3. Call rac_init() (same C function as iOS/Android)
    *   4. Mark SDK as initialized
    *
-   * @param options - SDK initialization options
-   * @param wasmUrl - Optional URL to the racommons.js glue file
-   *
-   * @example
-   * ```typescript
-   * // Development mode (default)
-   * await RunAnywhere.initialize();
-   *
-   * // Production mode
-   * await RunAnywhere.initialize({
-   *   apiKey: 'your-key',
-   *   baseURL: 'https://api.runanywhere.ai',
-   *   environment: 'production',
-   * });
-   * ```
+   * After initialization, register backend packages:
+   *   await LlamaCPP.register();  // @runanywhere/web-llamacpp
+   *   await ONNX.register();      // @runanywhere/web-onnx
    */
   async initialize(options: SDKInitOptions = {}, wasmUrl?: string): Promise<void> {
-    // Guard: already done
     if (_isInitialized) {
       logger.debug('Already initialized');
       return;
     }
 
-    // Guard: another call is already in flight – wait for it instead of racing
     if (_initializingPromise) {
       logger.debug('Initialization already in progress, awaiting...');
       return _initializingPromise;
@@ -146,52 +120,44 @@ export const RunAnywhere = {
         const env = options.environment ?? SDKEnvironment.Development;
         _initOptions = { ...options, environment: env };
 
-        // Configure logging
         if (options.debug) {
           SDKLogger.level = LogLevel.Debug;
         }
 
         logger.info(`Initializing RunAnywhere Web SDK (${env})...`);
 
-        // Phase 1: Load WASM module (auto-detects WebGPU and loads correct variant)
+        // Phase 1: Load WASM module
         const bridge = WASMBridge.shared;
         const acceleration = options.acceleration ?? AccelerationPreference.Auto;
         await bridge.load(wasmUrl, options.webgpuWasmUrl, acceleration);
 
         logger.info(`Hardware acceleration: ${bridge.accelerationMode}`);
 
-        // Emit acceleration mode event so app UIs can show a badge
         EventBus.shared.emit('sdk.accelerationMode', SDKEventType.Device, {
           mode: bridge.accelerationMode,
         });
 
-        // Phase 1b: Load struct field offsets from the WASM module.
-        // This must happen before any struct read/write in the SDK.
+        // Phase 2: Load core struct offsets
         loadOffsets(bridge.module);
 
-        // Phase 2: Register platform adapter
+        // Phase 3: Register platform adapter
         _platformAdapter = new PlatformAdapter();
         _platformAdapter.register();
 
-        // Phase 3: Initialize RACommons core
+        // Phase 4: Initialize RACommons core
         const m = bridge.module;
 
-        // Create rac_config_t in WASM memory
         const configSize = m._rac_wasm_sizeof_config();
         const configPtr = m._malloc(configSize);
 
-        // Zero-initialize
         for (let i = 0; i < configSize; i++) {
           m.setValue(configPtr + i, 0, 'i8');
         }
 
-        // Set platform_adapter pointer (offset 0) -- always first field
         m.setValue(configPtr, _platformAdapter.getAdapterPtr(), '*');
-        // Set log_level using compiler-provided offset
-        const logLevel = options.debug ? 1 : 2; // DEBUG=1, INFO=2
+        const logLevel = options.debug ? 1 : 2;
         m.setValue(configPtr + Offsets.config.logLevel, logLevel, 'i32');
 
-        // {async: true} lets JSPI suspend during WebGPU adapter/device init.
         const result = await bridge.callFunction<number | Promise<number>>(
           'rac_init', 'number', ['number'], [configPtr], { async: true },
         ) as number;
@@ -202,37 +168,8 @@ export const RunAnywhere = {
           throw new SDKError(SDKErrorCode.InitializationFailed, `rac_init failed: ${errMsg}`);
         }
 
-        // Phase 4: Register available backends
-        // The llama.cpp LLM backend must be registered before any LLM/VLM operations.
-        // Check if the function exists (only present when built with --llamacpp).
-        if (typeof (m as any)['_rac_backend_llamacpp_register'] === 'function') {
-          const regResult = await bridge.callFunction<number | Promise<number>>(
-            'rac_backend_llamacpp_register', 'number', [], [], { async: true },
-          ) as number;
-          if (regResult === 0) {
-            logger.info('llama.cpp LLM backend registered');
-          } else {
-            logger.warning(`llama.cpp backend registration returned: ${regResult}`);
-          }
-        }
-
-        // Phase 5: Register model loaders with ModelManager.
-        // This keeps the dependency flow correct: Public -> Infrastructure.
-        ModelManager.setLLMLoader(TextGeneration);
-        ModelManager.setSTTLoader(STT);
-        ModelManager.setTTSLoader(TTS);
-        ModelManager.setVADLoader(VAD);
-
-        // Phase 6: Register extensions with the lifecycle registry.
-        // Order matters: low-level components first (cleaned up last).
-        ExtensionRegistry.register(TextGeneration);
-        ExtensionRegistry.register(STT);
-        ExtensionRegistry.register(TTS);
-        ExtensionRegistry.register(VAD);
-        ExtensionRegistry.register(VLM);
-        ExtensionRegistry.register(Embeddings);
-        ExtensionRegistry.register(Diffusion);
-        ExtensionRegistry.register(ToolCalling);
+        // Phase 5: SDK ready — backend packages register themselves
+        // via LlamaCPP.register() / ONNX.register() after this returns.
 
         _isInitialized = true;
         _hasCompletedServicesInit = true;
@@ -251,125 +188,252 @@ export const RunAnywhere = {
   },
 
   // =========================================================================
-  // Model Management (mirrors iOS RunAnywhere.registerModel / loadModel / etc.)
+  // Model Management
   // =========================================================================
 
-  /**
-   * Register a catalog of models for download and loading.
-   * @param models - Compact model definitions to register
-   */
   registerModels(models: CompactModelDef[]): void {
     ModelManager.registerModels(models);
   },
 
-  /**
-   * Set the VLM (vision-language model) loader implementation.
-   * The app provides an implementation (typically backed by a Web Worker).
-   */
   setVLMLoader(loader: VLMLoader): void {
     ModelManager.setVLMLoader(loader);
   },
 
-  /**
-   * Download a model (and any companion files) to persistent OPFS storage.
-   * @param modelId - The model ID to download
-   */
   async downloadModel(modelId: string): Promise<void> {
     return ModelManager.downloadModel(modelId);
   },
 
-  /**
-   * Load a downloaded model into the inference engine.
-   * @param modelId - The model ID to load
-   * @returns true if loaded successfully
-   */
   async loadModel(modelId: string): Promise<boolean> {
     return ModelManager.loadModel(modelId);
   },
 
-  /**
-   * Get all registered models with their current status.
-   */
   availableModels(): ManagedModel[] {
     return ModelManager.getModels();
   },
 
-  /**
-   * Get the currently loaded model for a given category.
-   * @param category - Optional model category filter
-   */
   getLoadedModel(category?: ModelCategory): ManagedModel | null {
     return ModelManager.getLoadedModel(category);
   },
 
-  /**
-   * Unload ALL loaded models and free their resources.
-   *
-   * Useful when switching between features/tabs to ensure clean state
-   * and reclaim memory. Called automatically by `loadModel()`, but can
-   * also be called explicitly by the app.
-   */
   async unloadAll(): Promise<void> {
     return ModelManager.unloadAll();
   },
 
-  /**
-   * Delete a downloaded model from OPFS storage.
-   * @param modelId - The model ID to delete
-   */
   async deleteModel(modelId: string): Promise<void> {
     return ModelManager.deleteModel(modelId);
+  },
+
+  // =========================================================================
+  // Model Import (file picker / drag-and-drop)
+  // =========================================================================
+
+  /**
+   * Open a file picker to import a model file.
+   *
+   * Progressive enhancement:
+   * - Chrome/Edge: Uses showOpenFilePicker() (modern File System Access API)
+   * - Safari/Firefox/mobile: Falls back to hidden <input type="file">
+   *
+   * Works on ALL browsers and platforms (desktop + mobile).
+   *
+   * @param options.modelId - Optional: associate with an existing registered model
+   * @param options.accept - File extensions to accept (default: .gguf, .onnx, .bin)
+   * @returns The model ID, or null if the user cancelled
+   */
+  async importModelFromPicker(options?: { modelId?: string; accept?: string[] }): Promise<string | null> {
+    const acceptExts = options?.accept ?? ['.gguf', '.onnx', '.bin'];
+
+    // Try modern File System Access API (Chrome/Edge desktop + Android 144+)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ('showOpenFilePicker' in window) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const [handle] = await (window as any).showOpenFilePicker({
+          types: [{
+            description: 'AI Model Files',
+            accept: { 'application/octet-stream': acceptExts },
+          }],
+          multiple: false,
+        });
+        const file: File = await handle.getFile();
+        return this.importModelFromFile(file, options);
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return null;
+        // Fall through to <input> fallback
+        logger.debug('showOpenFilePicker failed, using input fallback');
+      }
+    }
+
+    // Fallback: hidden <input type="file"> (Safari, Firefox, iOS, all mobile)
+    return new Promise<string | null>((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = acceptExts.join(',');
+      input.style.display = 'none';
+
+      input.onchange = async () => {
+        const file = input.files?.[0];
+        document.body.removeChild(input);
+        if (!file) { resolve(null); return; }
+        try {
+          const id = await this.importModelFromFile(file, options);
+          resolve(id);
+        } catch (err) {
+          logger.error(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
+          resolve(null);
+        }
+      };
+
+      // Handle cancel (input doesn't fire change on cancel in all browsers)
+      input.addEventListener('cancel', () => {
+        document.body.removeChild(input);
+        resolve(null);
+      });
+
+      document.body.appendChild(input);
+      input.click();
+    });
+  },
+
+  /**
+   * Import a model from a File object.
+   *
+   * Use this for drag-and-drop, programmatic imports, or any case where
+   * you already have a File/Blob reference.
+   *
+   * Works on ALL browsers and platforms.
+   *
+   * @param file - The File object to import
+   * @param options.modelId - Optional: associate with an existing registered model
+   * @returns The model ID (existing or auto-generated from filename)
+   */
+  async importModelFromFile(file: File, options?: { modelId?: string }): Promise<string> {
+    logger.info(`Importing model from file: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
+    return ModelManager.importModel(file, options?.modelId);
+  },
+
+  // =========================================================================
+  // Local File Storage (persistent model storage)
+  // =========================================================================
+
+  /** Whether the File System Access API is available in this browser. */
+  get isLocalStorageSupported(): boolean {
+    return LocalFileStorage.isSupported;
+  },
+
+  /** Whether a local storage directory is currently configured and authorized. */
+  get isLocalStorageReady(): boolean {
+    return _localFileStorage?.isReady ?? false;
+  },
+
+  /** Whether a directory handle exists in IndexedDB (may need re-authorization). */
+  get hasLocalStorageHandle(): boolean {
+    return _localFileStorage?.hasStoredHandle ?? false;
+  },
+
+  /** The name of the currently configured local storage directory (for UI display). */
+  get localStorageDirectoryName(): string | null {
+    return _localFileStorage?.directoryName ?? null;
+  },
+
+  /**
+   * Prompt the user to choose a local directory for model storage.
+   * Opens the OS folder picker dialog.
+   * Must be called from a user gesture (button click).
+   *
+   * @returns true if a directory was selected
+   */
+  async chooseLocalStorageDirectory(): Promise<boolean> {
+    if (!LocalFileStorage.isSupported) {
+      logger.warning('File System Access API not supported — using browser storage (OPFS)');
+      return false;
+    }
+
+    if (!_localFileStorage) {
+      _localFileStorage = new LocalFileStorage();
+    }
+
+    const success = await _localFileStorage.chooseDirectory();
+    if (success) {
+      ModelManager.setLocalFileStorage(_localFileStorage);
+      EventBus.shared.emit('storage.localDirectorySelected', SDKEventType.Storage, {
+        directoryName: _localFileStorage.directoryName,
+      });
+    }
+    return success;
+  },
+
+  /**
+   * Attempt to restore a previously chosen local storage directory.
+   * Call on app startup — if permission is still granted (Chrome 122+),
+   * models will be loaded from the local filesystem automatically.
+   *
+   * @returns true if directory was restored and permission is granted
+   */
+  async restoreLocalStorage(): Promise<boolean> {
+    if (!LocalFileStorage.isSupported) return false;
+
+    if (!_localFileStorage) {
+      _localFileStorage = new LocalFileStorage();
+    }
+
+    const success = await _localFileStorage.restoreDirectory();
+    if (success) {
+      ModelManager.setLocalFileStorage(_localFileStorage);
+      logger.info(`Local storage restored: ${_localFileStorage.directoryName}`);
+    }
+    return success;
+  },
+
+  /**
+   * Request re-authorization for a previously chosen directory.
+   * Must be called from a user gesture (button click).
+   * Use when `hasLocalStorageHandle` is true but `isLocalStorageReady` is false.
+   *
+   * @returns true if permission was granted
+   */
+  async requestLocalStorageAccess(): Promise<boolean> {
+    if (!_localFileStorage) return false;
+
+    const success = await _localFileStorage.requestAccess();
+    if (success) {
+      ModelManager.setLocalFileStorage(_localFileStorage);
+    }
+    return success;
   },
 
   // =========================================================================
   // Shutdown
   // =========================================================================
 
-  /**
-   * Shutdown the SDK and release all resources.
-   *
-   * Cleans up extensions in reverse dependency order so that
-   * higher-level components (e.g. VoiceAgent pipeline) are torn
-   * down before the lower-level ones they depend on.
-   */
   shutdown(): void {
     logger.info('Shutting down RunAnywhere Web SDK...');
 
-    // ------------------------------------------------------------------
-    // 1. Clean up all registered extensions in reverse dependency order.
-    //    Extensions were registered low-level first, so reverse cleanup
-    //    tears down high-level orchestrations before their dependencies.
-    // ------------------------------------------------------------------
-
+    // 1. Clean up all registered extensions (reverse dependency order)
     ExtensionRegistry.cleanupAll();
 
-    // ------------------------------------------------------------------
-    // 2. Shut down WASM bridges
-    // ------------------------------------------------------------------
+    // 2. Clean up all registered backends (includes sherpa-onnx shutdown)
+    ExtensionPoint.cleanupAll();
 
-    // SherpaONNXBridge (STT/TTS/VAD WASM module)
-    try { SherpaONNXBridge.shared.shutdown(); } catch { /* ignore during shutdown */ }
-
-    // Platform adapter
+    // 3. Platform adapter
     if (_platformAdapter) {
-      try { _platformAdapter.cleanup(); } catch { /* ignore during shutdown */ }
+      try { _platformAdapter.cleanup(); } catch { /* ignore */ }
       _platformAdapter = null;
     }
 
-    // RACommons WASM bridge
-    try { WASMBridge.shared.shutdown(); } catch { /* ignore during shutdown */ }
+    // 4. RACommons WASM bridge
+    try { WASMBridge.shared.shutdown(); } catch { /* ignore */ }
 
-    // ------------------------------------------------------------------
-    // 3. Reset SDK state
-    // ------------------------------------------------------------------
-
+    // 5. Reset state
     EventBus.reset();
     ExtensionRegistry.reset();
+    ExtensionPoint.reset();
 
     _isInitialized = false;
     _hasCompletedServicesInit = false;
     _initOptions = null;
     _initializingPromise = null;
+    _localFileStorage = null;
 
     logger.info('RunAnywhere Web SDK shut down');
   },
@@ -378,9 +442,6 @@ export const RunAnywhere = {
   // Reset (testing)
   // =========================================================================
 
-  /**
-   * Reset SDK state (for testing purposes).
-   */
   reset(): void {
     RunAnywhere.shutdown();
   },

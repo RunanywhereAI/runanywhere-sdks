@@ -9,25 +9,32 @@
  * `offsetof()` in wasm_exports.cpp) exactly once after the WASM module is
  * loaded, and caches the results for the lifetime of the page.
  *
+ * The offset system is extensible: backend packages (llamacpp, onnx) can
+ * register additional offsets via `mergeOffsets()`.
+ *
  * Usage:
- *   import { Offsets, loadOffsets } from '../Foundation/StructOffsets';
+ *   import { Offsets, loadOffsets } from '@runanywhere/web';
  *
  *   // Called once during SDK init (after WASM load):
  *   loadOffsets(wasmModule);
  *
  *   // Then anywhere:
- *   m.setValue(optPtr + Offsets.llmOptions.temperature, 0.8, 'float');
+ *   m.setValue(optPtr + Offsets.config.logLevel, 2, 'i32');
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 // ---------------------------------------------------------------------------
-// Cached offset tables
+// Core Offset Interfaces (always available)
 // ---------------------------------------------------------------------------
 
 export interface ConfigOffsets {
   logLevel: number;
 }
+
+// ---------------------------------------------------------------------------
+// LlamaCPP Offset Interfaces (available after @runanywhere/web-llamacpp registers)
+// ---------------------------------------------------------------------------
 
 export interface LLMOptionsOffsets {
   maxTokens: number;
@@ -129,6 +136,11 @@ export interface DiffusionResultOffsets {
   safetyFlagged: number;
 }
 
+// ---------------------------------------------------------------------------
+// Composite Offset Type
+// ---------------------------------------------------------------------------
+
+/** All possible offsets. Core provides `config`; backend packages add the rest. */
 export interface AllOffsets {
   config: ConfigOffsets;
   llmOptions: LLMOptionsOffsets;
@@ -149,20 +161,19 @@ export interface AllOffsets {
 // Singleton
 // ---------------------------------------------------------------------------
 
-let _offsets: AllOffsets | null = null;
+let _offsets: Partial<AllOffsets> = {};
 
 /**
- * Get the cached struct offsets. Throws if `loadOffsets()` hasn't been called.
+ * Get the cached struct offsets.
+ * Returns the merged offsets from core + all registered backends.
  */
 export function getOffsets(): AllOffsets {
-  if (!_offsets) {
-    throw new Error('StructOffsets not loaded — call loadOffsets(module) after WASM init');
-  }
-  return _offsets;
+  return _offsets as AllOffsets;
 }
 
 /**
  * Convenience re-export so callers can write `Offsets.vlmResult.text`.
+ * Returns a Proxy that dynamically resolves from the cached offset store.
  */
 export const Offsets: AllOffsets = new Proxy({} as AllOffsets, {
   get(_target, prop) {
@@ -170,130 +181,55 @@ export const Offsets: AllOffsets = new Proxy({} as AllOffsets, {
   },
 });
 
+// ---------------------------------------------------------------------------
+// WASM offset helpers (exported for backend packages)
+// ---------------------------------------------------------------------------
+
 /**
- * Read all struct field offsets from the WASM module and cache them.
- * Must be called exactly once, after the WASM module is loaded.
+ * Safely call a `_rac_wasm_offsetof_*` function. Returns 0 if the
+ * function doesn't exist (e.g. backend not compiled in).
+ */
+export function wasmOffsetOf(m: any, name: string): number {
+  const fn = m[`_rac_wasm_offsetof_${name}`];
+  return typeof fn === 'function' ? fn() : 0;
+}
+
+/**
+ * Safely call a `_rac_wasm_sizeof_*` function. Returns 0 if the
+ * function doesn't exist.
+ */
+export function wasmSizeOf(m: any, name: string): number {
+  const fn = m[`_rac_wasm_sizeof_${name}`];
+  return typeof fn === 'function' ? fn() : 0;
+}
+
+// ---------------------------------------------------------------------------
+// Loading
+// ---------------------------------------------------------------------------
+
+/**
+ * Load core struct field offsets from the WASM module.
+ * Called once during SDK init (after WASM load).
  *
  * @param m - The Emscripten WASM module instance
  */
 export function loadOffsets(m: any): void {
-  // Helper: safely call an offset function, returning 0 if it doesn't exist
-  // (e.g. when a backend wasn't compiled in).
-  const off = (name: string): number => {
-    const fn = m[`_rac_wasm_offsetof_${name}`];
-    return typeof fn === 'function' ? fn() : 0;
-  };
-
-  const sz = (name: string): number => {
-    const fn = m[`_rac_wasm_sizeof_${name}`];
-    return typeof fn === 'function' ? fn() : 0;
-  };
-
   _offsets = {
+    ..._offsets,
     config: {
-      logLevel: off('config_log_level'),
-    },
-
-    llmOptions: {
-      maxTokens: off('llm_options_max_tokens'),
-      temperature: off('llm_options_temperature'),
-      topP: off('llm_options_top_p'),
-      systemPrompt: off('llm_options_system_prompt'),
-    },
-
-    llmResult: {
-      text: off('llm_result_text'),
-      promptTokens: off('llm_result_prompt_tokens'),
-      completionTokens: off('llm_result_completion_tokens'),
-    },
-
-    vlmImage: {
-      format: off('vlm_image_format'),
-      filePath: off('vlm_image_file_path'),
-      pixelData: off('vlm_image_pixel_data'),
-      base64Data: off('vlm_image_base64_data'),
-      width: off('vlm_image_width'),
-      height: off('vlm_image_height'),
-      dataSize: off('vlm_image_data_size'),
-    },
-
-    vlmOptions: {
-      maxTokens: off('vlm_options_max_tokens'),
-      temperature: off('vlm_options_temperature'),
-      topP: off('vlm_options_top_p'),
-      streamingEnabled: off('vlm_options_streaming_enabled'),
-      systemPrompt: off('vlm_options_system_prompt'),
-      modelFamily: off('vlm_options_model_family'),
-    },
-
-    vlmResult: {
-      text: off('vlm_result_text'),
-      promptTokens: off('vlm_result_prompt_tokens'),
-      imageTokens: off('vlm_result_image_tokens'),
-      completionTokens: off('vlm_result_completion_tokens'),
-      totalTokens: off('vlm_result_total_tokens'),
-      timeToFirstTokenMs: off('vlm_result_time_to_first_token_ms'),
-      imageEncodeTimeMs: off('vlm_result_image_encode_time_ms'),
-      totalTimeMs: off('vlm_result_total_time_ms'),
-      tokensPerSecond: off('vlm_result_tokens_per_second'),
-    },
-
-    structuredOutputConfig: {
-      jsonSchema: off('structured_output_config_json_schema'),
-      includeSchemaInPrompt: off('structured_output_config_include_schema'),
-    },
-
-    structuredOutputValidation: {
-      isValid: off('structured_output_validation_is_valid'),
-      errorMessage: off('structured_output_validation_error_message'),
-      extractedJson: off('structured_output_validation_extracted_json'),
-    },
-
-    embeddingsOptions: {
-      normalize: off('embeddings_options_normalize'),
-      pooling: off('embeddings_options_pooling'),
-      nThreads: off('embeddings_options_n_threads'),
-    },
-
-    embeddingsResult: {
-      embeddings: off('embeddings_result_embeddings'),
-      numEmbeddings: off('embeddings_result_num_embeddings'),
-      dimension: off('embeddings_result_dimension'),
-      processingTimeMs: off('embeddings_result_processing_time_ms'),
-      totalTokens: off('embeddings_result_total_tokens'),
-    },
-
-    embeddingVector: {
-      data: off('embedding_vector_data'),
-      dimension: off('embedding_vector_dimension'),
-      structSize: sz('embedding_vector'),
-    },
-
-    diffusionOptions: {
-      prompt: off('diffusion_options_prompt'),
-      negativePrompt: off('diffusion_options_negative_prompt'),
-      width: off('diffusion_options_width'),
-      height: off('diffusion_options_height'),
-      steps: off('diffusion_options_steps'),
-      guidanceScale: off('diffusion_options_guidance_scale'),
-      seed: off('diffusion_options_seed'),
-      scheduler: off('diffusion_options_scheduler'),
-      mode: off('diffusion_options_mode'),
-      denoiseStrength: off('diffusion_options_denoise_strength'),
-      reportIntermediate: off('diffusion_options_report_intermediate'),
-      progressStride: off('diffusion_options_progress_stride'),
-    },
-
-    diffusionResult: {
-      imageData: off('diffusion_result_image_data'),
-      imageSize: off('diffusion_result_image_size'),
-      width: off('diffusion_result_width'),
-      height: off('diffusion_result_height'),
-      seedUsed: off('diffusion_result_seed_used'),
-      generationTimeMs: off('diffusion_result_generation_time_ms'),
-      safetyFlagged: off('diffusion_result_safety_flagged'),
+      logLevel: wasmOffsetOf(m, 'config_log_level'),
     },
   };
+}
+
+/**
+ * Merge additional offsets from a backend package.
+ * Called by backend providers during registration.
+ *
+ * @param offsets - Partial offset tables to merge
+ */
+export function mergeOffsets(offsets: Partial<AllOffsets>): void {
+  _offsets = { ..._offsets, ...offsets };
 }
 
 /**
@@ -303,5 +239,115 @@ export function loadOffsets(m: any): void {
  */
 export function loadOffsetsFromModule(m: any): AllOffsets {
   loadOffsets(m);
-  return _offsets!;
+  // Also load all llama.cpp offsets for the worker (VLM Worker needs these)
+  loadLlamaCppOffsetsInto(m);
+  return _offsets as AllOffsets;
+}
+
+/**
+ * Load llama.cpp-specific offsets into the singleton.
+ * Called by LlamaCppProvider.register() and loadOffsetsFromModule().
+ */
+export function loadLlamaCppOffsetsInto(m: any): void {
+  mergeOffsets({
+    llmOptions: {
+      maxTokens: wasmOffsetOf(m, 'llm_options_max_tokens'),
+      temperature: wasmOffsetOf(m, 'llm_options_temperature'),
+      topP: wasmOffsetOf(m, 'llm_options_top_p'),
+      systemPrompt: wasmOffsetOf(m, 'llm_options_system_prompt'),
+    },
+
+    llmResult: {
+      text: wasmOffsetOf(m, 'llm_result_text'),
+      promptTokens: wasmOffsetOf(m, 'llm_result_prompt_tokens'),
+      completionTokens: wasmOffsetOf(m, 'llm_result_completion_tokens'),
+    },
+
+    vlmImage: {
+      format: wasmOffsetOf(m, 'vlm_image_format'),
+      filePath: wasmOffsetOf(m, 'vlm_image_file_path'),
+      pixelData: wasmOffsetOf(m, 'vlm_image_pixel_data'),
+      base64Data: wasmOffsetOf(m, 'vlm_image_base64_data'),
+      width: wasmOffsetOf(m, 'vlm_image_width'),
+      height: wasmOffsetOf(m, 'vlm_image_height'),
+      dataSize: wasmOffsetOf(m, 'vlm_image_data_size'),
+    },
+
+    vlmOptions: {
+      maxTokens: wasmOffsetOf(m, 'vlm_options_max_tokens'),
+      temperature: wasmOffsetOf(m, 'vlm_options_temperature'),
+      topP: wasmOffsetOf(m, 'vlm_options_top_p'),
+      streamingEnabled: wasmOffsetOf(m, 'vlm_options_streaming_enabled'),
+      systemPrompt: wasmOffsetOf(m, 'vlm_options_system_prompt'),
+      modelFamily: wasmOffsetOf(m, 'vlm_options_model_family'),
+    },
+
+    vlmResult: {
+      text: wasmOffsetOf(m, 'vlm_result_text'),
+      promptTokens: wasmOffsetOf(m, 'vlm_result_prompt_tokens'),
+      imageTokens: wasmOffsetOf(m, 'vlm_result_image_tokens'),
+      completionTokens: wasmOffsetOf(m, 'vlm_result_completion_tokens'),
+      totalTokens: wasmOffsetOf(m, 'vlm_result_total_tokens'),
+      timeToFirstTokenMs: wasmOffsetOf(m, 'vlm_result_time_to_first_token_ms'),
+      imageEncodeTimeMs: wasmOffsetOf(m, 'vlm_result_image_encode_time_ms'),
+      totalTimeMs: wasmOffsetOf(m, 'vlm_result_total_time_ms'),
+      tokensPerSecond: wasmOffsetOf(m, 'vlm_result_tokens_per_second'),
+    },
+
+    structuredOutputConfig: {
+      jsonSchema: wasmOffsetOf(m, 'structured_output_config_json_schema'),
+      includeSchemaInPrompt: wasmOffsetOf(m, 'structured_output_config_include_schema'),
+    },
+
+    structuredOutputValidation: {
+      isValid: wasmOffsetOf(m, 'structured_output_validation_is_valid'),
+      errorMessage: wasmOffsetOf(m, 'structured_output_validation_error_message'),
+      extractedJson: wasmOffsetOf(m, 'structured_output_validation_extracted_json'),
+    },
+
+    embeddingsOptions: {
+      normalize: wasmOffsetOf(m, 'embeddings_options_normalize'),
+      pooling: wasmOffsetOf(m, 'embeddings_options_pooling'),
+      nThreads: wasmOffsetOf(m, 'embeddings_options_n_threads'),
+    },
+
+    embeddingsResult: {
+      embeddings: wasmOffsetOf(m, 'embeddings_result_embeddings'),
+      numEmbeddings: wasmOffsetOf(m, 'embeddings_result_num_embeddings'),
+      dimension: wasmOffsetOf(m, 'embeddings_result_dimension'),
+      processingTimeMs: wasmOffsetOf(m, 'embeddings_result_processing_time_ms'),
+      totalTokens: wasmOffsetOf(m, 'embeddings_result_total_tokens'),
+    },
+
+    embeddingVector: {
+      data: wasmOffsetOf(m, 'embedding_vector_data'),
+      dimension: wasmOffsetOf(m, 'embedding_vector_dimension'),
+      structSize: wasmSizeOf(m, 'embedding_vector'),
+    },
+
+    diffusionOptions: {
+      prompt: wasmOffsetOf(m, 'diffusion_options_prompt'),
+      negativePrompt: wasmOffsetOf(m, 'diffusion_options_negative_prompt'),
+      width: wasmOffsetOf(m, 'diffusion_options_width'),
+      height: wasmOffsetOf(m, 'diffusion_options_height'),
+      steps: wasmOffsetOf(m, 'diffusion_options_steps'),
+      guidanceScale: wasmOffsetOf(m, 'diffusion_options_guidance_scale'),
+      seed: wasmOffsetOf(m, 'diffusion_options_seed'),
+      scheduler: wasmOffsetOf(m, 'diffusion_options_scheduler'),
+      mode: wasmOffsetOf(m, 'diffusion_options_mode'),
+      denoiseStrength: wasmOffsetOf(m, 'diffusion_options_denoise_strength'),
+      reportIntermediate: wasmOffsetOf(m, 'diffusion_options_report_intermediate'),
+      progressStride: wasmOffsetOf(m, 'diffusion_options_progress_stride'),
+    },
+
+    diffusionResult: {
+      imageData: wasmOffsetOf(m, 'diffusion_result_image_data'),
+      imageSize: wasmOffsetOf(m, 'diffusion_result_image_size'),
+      width: wasmOffsetOf(m, 'diffusion_result_width'),
+      height: wasmOffsetOf(m, 'diffusion_result_height'),
+      seedUsed: wasmOffsetOf(m, 'diffusion_result_seed_used'),
+      generationTimeMs: wasmOffsetOf(m, 'diffusion_result_generation_time_ms'),
+      safetyFlagged: wasmOffsetOf(m, 'diffusion_result_safety_flagged'),
+    },
+  });
 }

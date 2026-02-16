@@ -104,9 +104,22 @@ async function initializeSDK(): Promise<void> {
       // acceleration: 'auto' is the default — detects WebGPU automatically
     });
 
+    // Import and register backends
+    const { LlamaCPP } = await import('../../../../sdk/runanywhere-web/packages/llamacpp/src/index');
+    const { ONNX } = await import('../../../../sdk/runanywhere-web/packages/onnx/src/index');
+    await LlamaCPP.register();
+    await ONNX.register();
+
+    // Attempt to restore previously chosen local storage directory
+    const localRestored = await RunAnywhere.restoreLocalStorage();
+    if (localRestored) {
+      console.log('[RunAnywhere] Local storage restored:', RunAnywhere.localStorageDirectoryName);
+    }
+
     console.log(
       '[RunAnywhere] SDK initialized, version:', RunAnywhere.version,
       '| acceleration:', RunAnywhere.accelerationMode,
+      '| local storage:', localRestored ? RunAnywhere.localStorageDirectoryName : 'OPFS',
     );
 
     // Show an acceleration badge so the user knows which backend is active

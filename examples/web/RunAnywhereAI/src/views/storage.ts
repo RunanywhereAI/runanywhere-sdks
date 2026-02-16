@@ -7,6 +7,7 @@
 import type { TabLifecycle } from '../app';
 import { ModelManager } from '../services/model-manager';
 import { showToast, showConfirmDialog } from '../components/dialogs';
+import { RunAnywhere } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
 
 let container: HTMLElement;
 
@@ -22,6 +23,18 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
       <div class="toolbar-actions"></div>
     </div>
     <div class="scroll-area">
+      <div class="storage-location" id="storage-location" style="padding: 12px 16px; margin-bottom: 8px; border-radius: 8px; background: var(--surface-secondary, #1a1a2e); display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 200px;">
+          <div style="font-size: 0.75rem; opacity: 0.6; margin-bottom: 2px;">Storage Location</div>
+          <div id="storage-location-label" style="font-size: 0.9rem; font-weight: 500;">Browser Storage (OPFS)</div>
+        </div>
+        <button class="btn btn-secondary" id="storage-choose-dir-btn" style="font-size: 0.8rem; padding: 6px 14px;">
+          Choose Storage Folder
+        </button>
+        <button class="btn btn-secondary" id="storage-reauth-btn" style="font-size: 0.8rem; padding: 6px 14px; display: none;">
+          Re-authorize Access
+        </button>
+      </div>
       <div class="storage-overview" id="storage-overview">
         <div class="storage-stat"><div class="value" id="storage-count">0</div><div class="label">Models</div></div>
         <div class="storage-stat"><div class="value" id="storage-size">0 MB</div><div class="label">Total Size</div></div>
@@ -36,12 +49,101 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
           <span id="quota-bar-total">-- quota</span>
         </div>
       </div>
+      <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+        <button class="btn btn-secondary" id="storage-import-btn" style="flex: 1; min-width: 140px; font-size: 0.85rem; padding: 10px 16px;">
+          Import Model File
+        </button>
+      </div>
+      <div id="storage-drop-zone" style="display: none; border: 2px dashed var(--color-primary, #ff6b35); border-radius: 12px; padding: 32px 16px; text-align: center; margin-bottom: 12px; opacity: 0.8; transition: opacity 0.2s;">
+        <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 4px;">Drop model file here</div>
+        <div style="font-size: 0.8rem; opacity: 0.6;">Supports .gguf, .onnx, .bin files</div>
+      </div>
       <div id="storage-models" class="storage-models-list"></div>
       <div class="storage-actions">
         <button class="btn btn-danger" id="storage-clear-btn">Clear All Models</button>
       </div>
     </div>
   `;
+
+  // Local storage folder picker
+  const chooseDirBtn = container.querySelector('#storage-choose-dir-btn') as HTMLButtonElement;
+  const reauthBtn = container.querySelector('#storage-reauth-btn') as HTMLButtonElement;
+
+  if (!RunAnywhere.isLocalStorageSupported) {
+    chooseDirBtn.disabled = true;
+    chooseDirBtn.title = 'Requires Chrome or Edge browser';
+    chooseDirBtn.style.opacity = '0.5';
+  }
+
+  chooseDirBtn.addEventListener('click', async () => {
+    const success = await RunAnywhere.chooseLocalStorageDirectory();
+    if (success) {
+      showToast(`Local storage: ${RunAnywhere.localStorageDirectoryName}`, 'info');
+      updateStorageLocationUI();
+    }
+  });
+
+  reauthBtn.addEventListener('click', async () => {
+    const success = await RunAnywhere.requestLocalStorageAccess();
+    if (success) {
+      showToast(`Storage access restored: ${RunAnywhere.localStorageDirectoryName}`, 'info');
+      updateStorageLocationUI();
+    } else {
+      showToast('Access denied — try choosing a new folder', 'error');
+    }
+  });
+
+  updateStorageLocationUI();
+
+  // --- Import Model button (works on ALL browsers via SDK progressive enhancement) ---
+  container.querySelector('#storage-import-btn')!.addEventListener('click', async () => {
+    const modelId = await RunAnywhere.importModelFromPicker();
+    if (modelId) {
+      showToast(`Model imported: ${modelId}`, 'info');
+      refreshStorage();
+    }
+  });
+
+  // --- Drag-and-drop zone (desktop only — mobile doesn't support file drag) ---
+  const dropZone = container.querySelector('#storage-drop-zone') as HTMLElement;
+  const scrollArea = container.querySelector('.scroll-area') as HTMLElement;
+
+  if (window.matchMedia('(hover: hover)').matches) {
+    // Desktop: show drop zone when dragging files over the storage tab
+    let dragCounter = 0;
+
+    scrollArea.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      dragCounter++;
+      dropZone.style.display = 'block';
+    });
+
+    scrollArea.addEventListener('dragleave', () => {
+      dragCounter--;
+      if (dragCounter <= 0) {
+        dragCounter = 0;
+        dropZone.style.display = 'none';
+      }
+    });
+
+    scrollArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.style.opacity = '1';
+    });
+
+    scrollArea.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      dragCounter = 0;
+      dropZone.style.display = 'none';
+
+      const file = e.dataTransfer?.files[0];
+      if (!file) return;
+
+      const modelId = await RunAnywhere.importModelFromFile(file);
+      showToast(`Model imported: ${modelId}`, 'info');
+      refreshStorage();
+    });
+  }
 
   container.querySelector('#storage-clear-btn')!.addEventListener('click', async () => {
     const confirmed = await showConfirmDialog(
@@ -65,6 +167,34 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
       refreshStorage();
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Storage Location UI
+// ---------------------------------------------------------------------------
+
+function updateStorageLocationUI(): void {
+  const label = container.querySelector('#storage-location-label') as HTMLElement;
+  const chooseDirBtn = container.querySelector('#storage-choose-dir-btn') as HTMLElement;
+  const reauthBtn = container.querySelector('#storage-reauth-btn') as HTMLElement;
+
+  if (RunAnywhere.isLocalStorageReady) {
+    label.innerHTML = `<strong>Local Folder:</strong> ~/${RunAnywhere.localStorageDirectoryName ?? 'Unknown'}/`
+      + `<br><span style="font-size:0.75rem;opacity:0.5">Models saved as real files — visible in Finder, persists forever</span>`;
+    label.style.color = 'var(--color-success, #4caf50)';
+    chooseDirBtn.textContent = 'Change Folder';
+    reauthBtn.style.display = 'none';
+  } else if (RunAnywhere.hasLocalStorageHandle) {
+    label.innerHTML = 'Local folder configured — needs re-authorization'
+      + `<br><span style="font-size:0.75rem;opacity:0.5">Click "Re-authorize" to reconnect</span>`;
+    label.style.color = 'var(--color-warning, #ff9800)';
+    reauthBtn.style.display = '';
+  } else {
+    label.innerHTML = '<strong>Browser Storage (OPFS)</strong>'
+      + `<br><span style="font-size:0.75rem;opacity:0.5">Sandboxed browser storage — not visible in Finder. Use "Choose Storage Folder" for a real path.</span>`;
+    label.style.color = '';
+    reauthBtn.style.display = 'none';
+  }
 }
 
 // ---------------------------------------------------------------------------

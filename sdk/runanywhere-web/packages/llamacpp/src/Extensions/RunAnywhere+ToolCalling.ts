@@ -23,10 +23,7 @@
  *   console.log(result.text);
  */
 
-import { RunAnywhere } from '../RunAnywhere';
-import { WASMBridge } from '../../Foundation/WASMBridge';
-import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
-import { SDKLogger } from '../../Foundation/SDKLogger';
+import { RunAnywhere, WASMBridge, SDKError, SDKErrorCode, SDKLogger } from '@runanywhere/web';
 import { TextGeneration } from './RunAnywhere+TextGeneration';
 import {
   ToolCallFormat,

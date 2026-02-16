@@ -6,37 +6,112 @@
  * than on the concrete extension objects in the Public layer, keeping the
  * dependency flow correct: Public -> Infrastructure -> Foundation.
  *
- * Registrations are performed by the Public layer during SDK initialisation.
+ * Registrations are performed by backend provider packages during their
+ * registration phase.
+ *
+ * The loader interfaces are self-contained: they receive raw model data
+ * and a context object for fetching additional files. All backend-specific
+ * logic (e.g. writing to sherpa-onnx FS, extracting archives) is handled
+ * by the loader implementation in the backend package.
  */
 
-import type { STTModelConfig } from '../Public/Extensions/STTTypes';
-import type { TTSVoiceConfig } from '../Public/Extensions/TTSTypes';
-import type { VADModelConfig } from '../Public/Extensions/VADTypes';
+import type { ManagedModel } from './ModelRegistry';
+
+// ---------------------------------------------------------------------------
+// Model Load Context
+// ---------------------------------------------------------------------------
+
+/**
+ * Context passed to model loaders during the loading process.
+ * Provides access to the raw model data and helpers for fetching
+ * additional companion files.
+ */
+export interface ModelLoadContext {
+  /** The model being loaded (metadata from the registry). */
+  model: ManagedModel;
+
+  /** Primary model file data (read from storage). */
+  data: Uint8Array;
+
+  /**
+   * Download a file from a URL. Used for on-demand fetching of
+   * companion files that aren't in storage yet.
+   */
+  downloadFile(url: string): Promise<Uint8Array>;
+
+  /**
+   * Load a companion file from storage (OPFS / local FS / memory cache).
+   * Returns null if the file is not found.
+   */
+  loadFile(fileKey: string): Promise<Uint8Array | null>;
+
+  /**
+   * Store a companion file in storage.
+   */
+  storeFile(fileKey: string, data: Uint8Array): Promise<void>;
+
+  /**
+   * Build a storage key for a companion file.
+   * @param modelId - The parent model ID
+   * @param filename - The companion file name
+   */
+  additionalFileKey(modelId: string, filename: string): string;
+}
 
 // ---------------------------------------------------------------------------
 // Loader Interfaces
 // ---------------------------------------------------------------------------
 
-/** Loader for LLM text generation models (RACommons WASM). */
+/**
+ * Loader for LLM text generation models.
+ *
+ * The loader receives model data pre-written to Emscripten FS
+ * (done by ModelManager for LLM/VLM models since WASMBridge is in core).
+ */
 export interface LLMModelLoader {
   loadModel(modelPath: string, modelId: string, modelName?: string): Promise<void>;
   unloadModel(): Promise<void>;
 }
 
-/** Loader for STT models (sherpa-onnx). */
+/**
+ * Loader for STT models (speech-to-text).
+ *
+ * The implementation in @runanywhere/web-onnx handles:
+ * - Loading the sherpa-onnx WASM module
+ * - Writing model files to the sherpa virtual FS
+ * - Extracting .tar.gz archives
+ * - Creating the appropriate recognizer configuration
+ */
 export interface STTModelLoader {
-  loadModel(config: STTModelConfig): Promise<void>;
+  /** Load an STT model from raw data + context for additional files. */
+  loadModelFromData(ctx: ModelLoadContext): Promise<void>;
   unloadModel(): Promise<void>;
 }
 
-/** Loader for TTS voice models (sherpa-onnx). */
+/**
+ * Loader for TTS voice models (text-to-speech).
+ *
+ * The implementation in @runanywhere/web-onnx handles:
+ * - Loading the sherpa-onnx WASM module
+ * - Writing model files to the sherpa virtual FS
+ * - Extracting .tar.gz archives (including espeak-ng-data)
+ * - Creating the TTS engine configuration
+ */
 export interface TTSModelLoader {
-  loadVoice(config: TTSVoiceConfig): Promise<void>;
+  /** Load a TTS model from raw data + context for additional files. */
+  loadModelFromData(ctx: ModelLoadContext): Promise<void>;
   unloadVoice(): Promise<void>;
 }
 
-/** Loader for VAD models (sherpa-onnx). */
+/**
+ * Loader for VAD models (voice activity detection).
+ *
+ * The implementation in @runanywhere/web-onnx handles:
+ * - Loading the sherpa-onnx WASM module
+ * - Writing the Silero VAD model to the sherpa virtual FS
+ */
 export interface VADModelLoader {
-  loadModel(config: VADModelConfig): Promise<void>;
+  /** Load a VAD model from raw data + context. */
+  loadModelFromData(ctx: ModelLoadContext): Promise<void>;
   cleanup(): void;
 }
