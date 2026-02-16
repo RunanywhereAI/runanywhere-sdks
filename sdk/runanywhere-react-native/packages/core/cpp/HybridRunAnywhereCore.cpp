@@ -1425,15 +1425,18 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::generate(
         // Parse options
         int maxTokens = 256;
         float temperature = 0.7f;
+        std::string systemPrompt;
         if (optionsJson.has_value()) {
             maxTokens = extractIntValue(optionsJson.value(), "max_tokens", 256);
             temperature = static_cast<float>(extractDoubleValue(optionsJson.value(), "temperature", 0.7));
+            systemPrompt = extractStringValue(optionsJson.value(), "system_prompt", "");
         }
 
         rac_llm_options_t options = {};
         options.max_tokens = maxTokens;
         options.temperature = temperature;
         options.top_p = 0.9f;
+        options.system_prompt = systemPrompt.empty() ? nullptr : systemPrompt.c_str();
 
         rac_llm_result_t llmResult = {};
         rac_result_t result = rac_llm_component_generate(handle, prompt.c_str(), &options, &llmResult);
@@ -1523,10 +1526,13 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::generateStream(
         }
 
         // Parse options
+        std::string systemPrompt = extractStringValue(optionsJson, "system_prompt", "");
+
         rac_llm_options_t options = {};
         options.max_tokens = extractIntValue(optionsJson, "max_tokens", 256);
         options.temperature = static_cast<float>(extractDoubleValue(optionsJson, "temperature", 0.7));
         options.top_p = 0.9f;
+        options.system_prompt = systemPrompt.empty() ? nullptr : systemPrompt.c_str();
 
         // Create streaming context
         LLMStreamContext ctx;
@@ -1599,14 +1605,17 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::generateStructured(
         }
 
         // Generate with the prepared prompt
+        std::string systemPrompt;
         rac_llm_options_t options = {};
         if (optionsJson.has_value()) {
             options.max_tokens = extractIntValue(optionsJson.value(), "max_tokens", 512);
             options.temperature = static_cast<float>(extractDoubleValue(optionsJson.value(), "temperature", 0.7));
+            systemPrompt = extractStringValue(optionsJson.value(), "system_prompt", "");
         } else {
             options.max_tokens = 512;
             options.temperature = 0.7f;
         }
+        options.system_prompt = systemPrompt.empty() ? nullptr : systemPrompt.c_str();
 
         rac_llm_result_t llmResult = {};
         rac_result_t result = rac_llm_component_generate(handle, preparedPrompt, &options, &llmResult);

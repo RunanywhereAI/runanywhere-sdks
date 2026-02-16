@@ -32,8 +32,10 @@ option(RAC_BUILD_PLATFORM "Build platform backend (Apple Foundation Models, Syst
 option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, WhisperCPP, RAG)" OFF)
 option(RAC_BACKEND_LLAMACPP "Build LlamaCPP backend" ON)
 option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
-option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" ON)
 option(RAC_BACKEND_RAG "Build RAG backend (USearch)" ON)
+# WhisperCPP OFF by default - Sherpa-ONNX (NeMo CTC / Parakeet) is now the primary STT backend
+option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" OFF)
+option(RAC_BUILD_SERVER "Build OpenAI-compatible HTTP server (runanywhere-server)" OFF)
 
 # =============================================================================
 # C++ CONFIGURATION
@@ -68,7 +70,10 @@ set(RAC_PROJECT_VERSION "${RAC_VERSION}" CACHE STRING "Project version" FORCE)
 # PLATFORM DETECTION
 # =============================================================================
 
-if(IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+if(EMSCRIPTEN)
+    set(RAC_PLATFORM_WASM TRUE)
+    set(RAC_PLATFORM_NAME "Emscripten")
+elseif(IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(RAC_PLATFORM_IOS TRUE)
     set(RAC_PLATFORM_NAME "iOS")
 elseif(ANDROID)
@@ -85,6 +90,36 @@ else()
 endif()
 
 message(STATUS "Platform: ${RAC_PLATFORM_NAME}")
+
+# =============================================================================
+# SERVER DEPENDENCIES (FetchContent)
+# =============================================================================
+# Only fetch if building the server - uses header-only libraries for minimal impact
+
+if(RAC_BUILD_SERVER)
+    include(FetchContent)
+
+    # cpp-httplib - header-only HTTP library (same as llama.cpp uses)
+    FetchContent_Declare(
+        cpp-httplib
+        GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
+        GIT_TAG v0.15.3
+        GIT_SHALLOW TRUE
+    )
+
+    # nlohmann/json - header-only JSON library
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.11.3
+        GIT_SHALLOW TRUE
+    )
+
+    # Make available (download on first configure)
+    message(STATUS "Fetching server dependencies (cpp-httplib, nlohmann_json)...")
+    FetchContent_MakeAvailable(cpp-httplib nlohmann_json)
+    message(STATUS "Server dependencies ready")
+endif()
 
 # =============================================================================
 # COMPILER FLAGS
@@ -172,7 +207,7 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/device/rac_device_manager.cpp
 )
 
-# Feature sources - LLM, STT, TTS, VAD, VLM, Diffusion (iOS/Apple only)
+# Feature sources - LLM, STT, TTS, VAD, Wake Word, VLM, Diffusion (iOS/Apple only)
 set(RAC_FEATURES_SOURCES
     # LLM
     src/features/llm/llm_component.cpp
@@ -193,28 +228,24 @@ set(RAC_FEATURES_SOURCES
     src/features/vad/vad_component.cpp
     src/features/vad/energy_vad.cpp
     src/features/vad/vad_analytics.cpp
+    # Wake Word
+    src/features/wakeword/wakeword_service.cpp
     # VLM (Vision Language Model)
     src/features/vlm/vlm_component.cpp
     src/features/vlm/rac_vlm_service.cpp
+    # Diffusion
+    src/features/diffusion/diffusion_component.cpp
+    src/features/diffusion/rac_diffusion_service.cpp
+    src/features/diffusion/diffusion_model_registry.cpp
+    src/features/diffusion/diffusion_json.cpp
+    src/features/diffusion/rac_diffusion_tokenizer.cpp
+    # Embeddings
+    src/features/embeddings/rac_embeddings_service.cpp
+    src/features/embeddings/embeddings_component.cpp
     # Voice Agent
     src/features/voice_agent/voice_agent.cpp
     # Result memory management
     src/features/result_free.cpp
-)
-# Diffusion (Image Generation) - Apple only (CoreML/ANE). Not built for Android.
-if(NOT RAC_PLATFORM_ANDROID)
-    list(APPEND RAC_FEATURES_SOURCES
-        src/features/diffusion/diffusion_component.cpp
-        src/features/diffusion/diffusion_json.cpp
-        src/features/diffusion/diffusion_model_registry.cpp
-        src/features/diffusion/rac_diffusion_service.cpp
-        src/features/diffusion/rac_diffusion_tokenizer.cpp
-    )
-endif()
-
-# Image utilities (for VLM)
-set(RAC_UTILS_SOURCES
-    src/utils/rac_image_utils.cpp
 )
 
 # Platform services (Apple Foundation Models + System TTS + CoreML Diffusion)
@@ -235,7 +266,6 @@ set(RAC_COMMONS_SOURCES
     ${RAC_CORE_SOURCES}
     ${RAC_INFRASTRUCTURE_SOURCES}
     ${RAC_FEATURES_SOURCES}
-    ${RAC_UTILS_SOURCES}
     ${RAC_PLATFORM_SOURCES}
 )
 
@@ -333,6 +363,24 @@ if(RAC_BUILD_BACKENDS)
 endif()
 
 # =============================================================================
+# SERVER (OpenAI-compatible HTTP Server)
+# =============================================================================
+
+if(RAC_BUILD_SERVER)
+    message(STATUS "Building OpenAI-compatible HTTP server...")
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/server/CMakeLists.txt")
+        add_subdirectory(src/server)
+    else()
+        message(WARNING "Server source directory not found: src/server/")
+    endif()
+
+    # Also build the standalone server binary
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/CMakeLists.txt")
+        add_subdirectory(tools)
+    endif()
+endif()
+
+# =============================================================================
 # TESTS
 # =============================================================================
 
@@ -372,14 +420,18 @@ message(STATUS "Components:")
 message(STATUS "  Core:         Logging, errors, events, memory")
 message(STATUS "  Registry:     Service & module registration")
 message(STATUS "  Models:       Download strategies, storage")
-message(STATUS "  Services:     LLM, STT, TTS, VAD, Diffusion interfaces")
+message(STATUS "  Services:     LLM, STT, TTS, VAD interfaces")
 if(APPLE AND RAC_BUILD_PLATFORM)
     message(STATUS "  Platform:     Apple Foundation Models, System TTS")
 endif()
 if(RAC_BUILD_BACKENDS)
     message(STATUS "  Backends:     LlamaCPP=${RAC_BACKEND_LLAMACPP}, ONNX=${RAC_BACKEND_ONNX}, WhisperCPP=${RAC_BACKEND_WHISPERCPP}, RAG=${RAC_BACKEND_RAG}")
 endif()
+if(RAC_BUILD_SERVER)
+    message(STATUS "  Server:       OpenAI-compatible HTTP server (runanywhere-server)")
+endif()
 message(STATUS "")
 message(STATUS "JNI bridge:     ${RAC_BUILD_JNI}")
+message(STATUS "HTTP Server:    ${RAC_BUILD_SERVER}")
 message(STATUS "====================================")
 message(STATUS "")

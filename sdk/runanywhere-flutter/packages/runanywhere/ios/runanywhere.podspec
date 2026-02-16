@@ -14,7 +14,7 @@
 # =============================================================================
 # Version Constants (MUST match Swift Package.swift)
 # =============================================================================
-COMMONS_VERSION = "0.1.5"
+COMMONS_VERSION = "0.1.6"
 
 # =============================================================================
 # Binary Source - RACommons from runanywhere-sdks
@@ -30,7 +30,7 @@ TEST_LOCAL = ENV['RA_TEST_LOCAL'] == '1' || File.exist?(File.join(__dir__, '.tes
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere'
-  s.version          = '0.15.11'
+  s.version          = '0.16.0'
   s.summary          = 'RunAnywhere: Privacy-first, on-device AI SDK for Flutter'
   s.description      = <<-DESC
 Privacy-first, on-device AI SDK for Flutter. This package provides the core

@@ -66,12 +66,15 @@ SHERPA_ONNX_VERSION_ANDROID=1.12.20
 # macOS version
 SHERPA_ONNX_VERSION_MACOS=1.12.18
 
+# Linux version
+SHERPA_ONNX_VERSION_LINUX=1.12.23
+
 # =============================================================================
 # llama.cpp (LLM inference)
 # =============================================================================
-# b7650 - recent stable release (8 versions before b7658)
-# NOTE: b7658 has Android cross-compilation issues, needs investigation
-LLAMACPP_VERSION=b7650
+# b8011 - latest stable release (Feb 2026), includes GGML_WEBGPU backend
+# NOTE: Bumped from b7650 to enable WebGPU acceleration for WASM builds
+LLAMACPP_VERSION=b8011
 
 # =============================================================================
 # nlohmann/json

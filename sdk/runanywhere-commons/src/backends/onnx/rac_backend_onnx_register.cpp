@@ -13,8 +13,13 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <filesystem>
 #include <vector>
+
+// std::filesystem is not available on Emscripten/WASM
+#ifndef __EMSCRIPTEN__
+#include <filesystem>
+namespace fs = std::filesystem;
+#endif
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
@@ -23,8 +28,6 @@
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/infrastructure/model_management/rac_model_strategy.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
-
-namespace fs = std::filesystem;
 
 // =============================================================================
 // STT VTABLE IMPLEMENTATION
@@ -239,7 +242,8 @@ rac_bool_t onnx_stt_can_handle(const rac_service_request_t* request, void* user_
     RAC_LOG_INFO(LOG_CAT, "onnx_stt_can_handle: checking path=%s", path);
 
     if (strstr(path, "whisper") != nullptr || strstr(path, "zipformer") != nullptr ||
-        strstr(path, "paraformer") != nullptr || strstr(path, ".onnx") != nullptr) {
+        strstr(path, "paraformer") != nullptr || strstr(path, "parakeet") != nullptr ||
+        strstr(path, "nemo") != nullptr || strstr(path, ".onnx") != nullptr) {
         RAC_LOG_INFO(LOG_CAT, "onnx_stt_can_handle: path matches -> TRUE");
         return RAC_TRUE;
     }

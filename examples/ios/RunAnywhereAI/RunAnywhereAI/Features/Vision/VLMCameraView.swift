@@ -29,11 +29,15 @@ struct VLMCameraView: View {
             }
         }
         .navigationTitle("Vision AI")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar { toolbarContent }
+        #if os(iOS)
         .toolbarBackground(.black, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .sheet(isPresented: $showingModelSelection) {
+        #endif
+        .adaptiveSheet(isPresented: $showingModelSelection) {
             ModelSelectionSheet(context: .vlm) { _ in
                 await viewModel.checkModelStatus()
                 setupCameraIfNeeded()
@@ -90,19 +94,25 @@ struct VLMCameraView: View {
                 }
             }
         }
+        #if os(iOS)
         .frame(height: UIScreen.main.bounds.height * 0.45)
+        #else
+        .frame(height: 400)
+        #endif
     }
 
     private var cameraPermissionView: some View {
         VStack(spacing: 12) {
             Image(systemName: "camera.fill").font(.largeTitle).foregroundColor(.gray)
             Text("Camera Access Required").font(.headline).foregroundColor(.white)
+            #if os(iOS)
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
             }
             .buttonStyle(.bordered)
+            #endif
         }
     }
 
@@ -128,7 +138,14 @@ struct VLMCameraView: View {
                 }
                 Spacer()
                 if !viewModel.currentDescription.isEmpty {
-                    Button { UIPasteboard.general.string = viewModel.currentDescription } label: {
+                    Button {
+                        #if os(iOS)
+                        UIPasteboard.general.string = viewModel.currentDescription
+                        #elseif os(macOS)
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(viewModel.currentDescription, forType: .string)
+                        #endif
+                    } label: {
                         Image(systemName: "doc.on.doc").font(.subheadline)
                     }.foregroundColor(.secondary)
                 }
@@ -154,7 +171,11 @@ struct VLMCameraView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
+        #if os(iOS)
         .background(Color(.systemBackground))
+        #elseif os(macOS)
+        .background(Color(nsColor: .windowBackgroundColor))
+        #endif
     }
 
     private var controlBar: some View {
@@ -236,11 +257,19 @@ struct VLMCameraView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        #if os(iOS)
         ToolbarItem(placement: .navigationBarTrailing) {
             if let name = viewModel.loadedModelName {
                 Text(name).font(.caption).foregroundColor(.gray)
             }
         }
+        #else
+        ToolbarItem(placement: .automatic) {
+            if let name = viewModel.loadedModelName {
+                Text(name).font(.caption).foregroundColor(.gray)
+            }
+        }
+        #endif
     }
 
     // MARK: - Helpers
@@ -267,14 +296,19 @@ struct VLMCameraView: View {
 
     private func handlePhoto(_ item: PhotosPickerItem?) async {
         guard let item = item,
-              let data = try? await item.loadTransferable(type: Data.self),
-              let image = UIImage(data: data) else { return }
+              let data = try? await item.loadTransferable(type: Data.self) else { return }
+        #if os(iOS)
+        guard let image = UIImage(data: data) else { return }
+        #elseif os(macOS)
+        guard let image = NSImage(data: data) else { return }
+        #endif
         await viewModel.describeImage(image)
     }
 }
 
 // MARK: - Camera Preview
 
+#if os(iOS)
 struct CameraPreview: UIViewRepresentable {
     let session: AVCaptureSession
 
@@ -301,3 +335,21 @@ struct CameraPreview: UIViewRepresentable {
         }
     }
 }
+#elseif os(macOS)
+struct CameraPreview: NSViewRepresentable {
+    let session: AVCaptureSession
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        let previewLayer = AVCaptureVideoPreviewLayer(session: session)
+        previewLayer.videoGravity = .resizeAspectFill
+        previewLayer.frame = view.bounds
+        previewLayer.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+        view.layer = previewLayer
+        view.wantsLayer = true
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+#endif

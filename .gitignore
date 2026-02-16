@@ -211,8 +211,13 @@ sdk/runanywhere-flutter/ios/
 thoughts/shared/plans/
 thoughts
 local/
-examples/web/
-sdk/runanywhere-web/
+# Web SDK build artifacts (source is tracked)
+sdk/runanywhere-web/node_modules/
+sdk/runanywhere-web/packages/core/dist/
+sdk/runanywhere-web/wasm/build/
+sdk/runanywhere-web/packages/core/wasm/
+sdk/runanywhere-web/package-lock.json
+examples/web/RunAnywhereAI/node_modules/
 
 # External repositories and distribution
 EXTERNAL/
@@ -294,7 +299,7 @@ sdk/runanywhere-kotlin/modules/runanywhere-llm-llamacpp/src/jvmMain/resources/na
 #    cp build/android/unified/arm64-v8a/librac_commons.so \
 #       ../runanywhere-react-native/packages/core/android/src/main/jniLibs/arm64-v8a/
 #
-#    # iOS  
+#    # iOS
 #    rm -rf ../runanywhere-react-native/packages/core/ios/Frameworks/RACommons.xcframework
 #    cp -R dist/RACommons.xcframework \
 #       ../runanywhere-react-native/packages/core/ios/Frameworks/
@@ -368,3 +373,8 @@ sdk/runanywhere-flutter/android/*.aar
 sdk/runanywhere-react-native/packages/*/ios/xcframeworks/
 tools/
 sdk/runanywhere-react-native/packages/rag/ios/.testlocal
+
+
+# Node
+node_modules/
+/tools/
