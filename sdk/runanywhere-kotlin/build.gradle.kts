@@ -572,7 +572,7 @@ tasks.register("downloadJniLibs") {
             )
         }
 
-        // Clean output directories (only if empty)
+        // Clean output directories for fresh download
         outputDir.deleteRecursively()
         tempDir.deleteRecursively()
         outputDir.mkdirs()
