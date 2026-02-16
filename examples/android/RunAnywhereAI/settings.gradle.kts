@@ -54,3 +54,7 @@ project(":sdk:runanywhere-kotlin:modules:runanywhere-core-llamacpp").projectDir 
 // ONNX module - STT, TTS, VAD adapter
 include(":sdk:runanywhere-kotlin:modules:runanywhere-core-onnx")
 project(":sdk:runanywhere-kotlin:modules:runanywhere-core-onnx").projectDir = file("../../../sdk/runanywhere-kotlin/modules/runanywhere-core-onnx")
+
+// SDCPP module - stable-diffusion.cpp for diffusion image generation
+include(":sdk:runanywhere-kotlin:modules:runanywhere-core-sdcpp")
+project(":sdk:runanywhere-kotlin:modules:runanywhere-core-sdcpp").projectDir = file("../../../sdk/runanywhere-kotlin/modules/runanywhere-core-sdcpp")

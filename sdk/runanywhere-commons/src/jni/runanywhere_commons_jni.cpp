@@ -29,6 +29,7 @@
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/features/diffusion/rac_diffusion_component.h"
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/tts/rac_tts_component.h"
@@ -3356,6 +3357,216 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallNormalizeJso
     jstring result = env->NewStringUTF(normalized);
     rac_free(normalized);
     return result;
+}
+
+// =============================================================================
+// DIFFUSION COMPONENT (rac_diffusion_component.h)
+// =============================================================================
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionComponentCreate(
+    JNIEnv* /*env*/, jclass /*clazz*/) {
+    rac_handle_t handle = nullptr;
+    rac_result_t result = rac_diffusion_component_create(&handle);
+    return (result == RAC_SUCCESS) ? reinterpret_cast<jlong>(handle) : 0;
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionComponentDestroy(
+    JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
+    if (handle == 0) return;
+    rac_diffusion_component_destroy(reinterpret_cast<rac_handle_t>(handle));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionComponentConfigure(
+    JNIEnv* env, jclass /*clazz*/, jlong handle, jstring configJson) {
+    if (handle == 0) return RAC_ERROR_NULL_POINTER;
+
+    std::string json = getCString(env, configJson);
+    auto j = nlohmann::json::parse(json, nullptr, false);
+    if (j.is_discarded()) return RAC_ERROR_INVALID_PARAMETER;
+
+    rac_diffusion_config_t config = RAC_DIFFUSION_CONFIG_DEFAULT;
+
+    if (j.contains("model_variant")) config.model_variant = static_cast<rac_diffusion_model_variant_t>(j["model_variant"].get<int>());
+    if (j.contains("enable_safety_checker")) config.enable_safety_checker = j["enable_safety_checker"].get<bool>() ? RAC_TRUE : RAC_FALSE;
+    if (j.contains("reduce_memory")) config.reduce_memory = j["reduce_memory"].get<bool>() ? RAC_TRUE : RAC_FALSE;
+    if (j.contains("preferred_framework")) config.preferred_framework = j["preferred_framework"].get<int>();
+
+    return rac_diffusion_component_configure(reinterpret_cast<rac_handle_t>(handle), &config);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionComponentIsLoaded(
+    JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
+    if (handle == 0) return JNI_FALSE;
+    return rac_diffusion_component_is_loaded(reinterpret_cast<rac_handle_t>(handle)) == RAC_TRUE
+               ? JNI_TRUE
+               : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionComponentLoadModel(
+    JNIEnv* env, jclass /*clazz*/, jlong handle, jstring modelPath, jstring modelId,
+    jstring modelName) {
+    if (handle == 0) return RAC_ERROR_NULL_POINTER;
+
+    std::string path = getCString(env, modelPath);
+    std::string id = getCString(env, modelId);
+    std::string name = modelName ? getCString(env, modelName) : "";
+
+    return rac_diffusion_component_load_model(reinterpret_cast<rac_handle_t>(handle), path.c_str(),
+                                               id.c_str(), name.empty() ? nullptr : name.c_str());
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionComponentUnload(
+    JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
+    if (handle == 0) return RAC_ERROR_NULL_POINTER;
+    return rac_diffusion_component_unload(reinterpret_cast<rac_handle_t>(handle));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionComponentCancel(
+    JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
+    if (handle == 0) return RAC_ERROR_NULL_POINTER;
+    return rac_diffusion_component_cancel(reinterpret_cast<rac_handle_t>(handle));
+}
+
+/**
+ * Progress callback interface for diffusion generation.
+ */
+struct DiffusionJniProgressContext {
+    JNIEnv* env;
+    jobject callback;
+    jmethodID method_id;
+};
+
+static rac_bool_t diffusion_jni_progress_callback(const rac_diffusion_progress_t* progress,
+                                                    void* user_data) {
+    if (!user_data || !progress) return RAC_TRUE;
+    auto* ctx = static_cast<DiffusionJniProgressContext*>(user_data);
+
+    // Build progress JSON
+    nlohmann::json j;
+    j["progress"] = progress->progress;
+    j["current_step"] = progress->current_step;
+    j["total_steps"] = progress->total_steps;
+    j["stage"] = progress->stage ? progress->stage : "Unknown";
+    std::string json_str = j.dump();
+
+    jstring jProgress = ctx->env->NewStringUTF(json_str.c_str());
+    jboolean should_continue = ctx->env->CallBooleanMethod(ctx->callback, ctx->method_id, jProgress);
+    ctx->env->DeleteLocalRef(jProgress);
+
+    return should_continue ? RAC_TRUE : RAC_FALSE;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionComponentGenerate(
+    JNIEnv* env, jclass /*clazz*/, jlong handle, jstring optionsJson) {
+    if (handle == 0) return nullptr;
+
+    std::string json = getCString(env, optionsJson);
+    auto j = nlohmann::json::parse(json, nullptr, false);
+    if (j.is_discarded()) return nullptr;
+
+    rac_diffusion_options_t options = RAC_DIFFUSION_OPTIONS_DEFAULT;
+
+    std::string prompt_str;
+    std::string neg_prompt_str;
+    if (j.contains("prompt")) { prompt_str = j["prompt"].get<std::string>(); options.prompt = prompt_str.c_str(); }
+    if (j.contains("negative_prompt")) { neg_prompt_str = j["negative_prompt"].get<std::string>(); options.negative_prompt = neg_prompt_str.c_str(); }
+    if (j.contains("width")) options.width = j["width"].get<int>();
+    if (j.contains("height")) options.height = j["height"].get<int>();
+    if (j.contains("steps")) options.steps = j["steps"].get<int>();
+    if (j.contains("guidance_scale")) options.guidance_scale = j["guidance_scale"].get<float>();
+    if (j.contains("seed")) options.seed = j["seed"].get<int64_t>();
+    if (j.contains("scheduler")) options.scheduler = static_cast<rac_diffusion_scheduler_t>(j["scheduler"].get<int>());
+    if (j.contains("mode")) options.mode = static_cast<rac_diffusion_mode_t>(j["mode"].get<int>());
+    if (j.contains("denoise_strength")) options.denoise_strength = j["denoise_strength"].get<float>();
+
+    rac_diffusion_result_t result = {};
+    rac_result_t rc = rac_diffusion_component_generate(
+        reinterpret_cast<rac_handle_t>(handle), &options, &result);
+
+    if (rc != RAC_SUCCESS) {
+        rac_diffusion_result_free(&result);
+        return nullptr;
+    }
+
+    // Build result JSON (image data encoded as base64 would be too large;
+    // return metadata and store image data for retrieval)
+    nlohmann::json rj;
+    rj["width"] = result.width;
+    rj["height"] = result.height;
+    rj["seed_used"] = result.seed_used;
+    rj["generation_time_ms"] = result.generation_time_ms;
+    rj["safety_flagged"] = result.safety_flagged == RAC_TRUE;
+    rj["image_size"] = result.image_size;
+    rj["error_code"] = result.error_code;
+
+    std::string result_json = rj.dump();
+
+    // Note: The actual image bytes are returned via a separate call or
+    // we encode them here. For efficiency, we store and retrieve separately.
+    // For the initial implementation, we'll store the pointer in the result.
+    rj["image_data_ptr"] = reinterpret_cast<int64_t>(result.image_data);
+    result_json = rj.dump();
+
+    // Don't free image_data yet - it will be retrieved by Kotlin
+    // The Kotlin layer will call racDiffusionResultGetImageData to retrieve it
+
+    return env->NewStringUTF(result_json.c_str());
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionResultGetImageData(
+    JNIEnv* env, jclass /*clazz*/, jlong imageDataPtr, jint imageSize) {
+    if (imageDataPtr == 0 || imageSize <= 0) return nullptr;
+
+    auto* data = reinterpret_cast<uint8_t*>(imageDataPtr);
+    jbyteArray result = env->NewByteArray(imageSize);
+    if (result) {
+        env->SetByteArrayRegion(result, 0, imageSize, reinterpret_cast<const jbyte*>(data));
+    }
+
+    // Free the native image data after copying to JVM
+    free(data);
+
+    return result;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionComponentGetCapabilities(
+    JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
+    if (handle == 0) return 0;
+    return static_cast<jint>(
+        rac_diffusion_component_get_capabilities(reinterpret_cast<rac_handle_t>(handle)));
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionComponentGetInfo(
+    JNIEnv* env, jclass /*clazz*/, jlong handle) {
+    if (handle == 0) return nullptr;
+
+    rac_diffusion_info_t info = {};
+    rac_result_t rc =
+        rac_diffusion_component_get_info(reinterpret_cast<rac_handle_t>(handle), &info);
+    if (rc != RAC_SUCCESS) return nullptr;
+
+    nlohmann::json j;
+    j["is_ready"] = info.is_ready == RAC_TRUE;
+    j["model_variant"] = static_cast<int>(info.model_variant);
+    j["supports_text_to_image"] = info.supports_text_to_image == RAC_TRUE;
+    j["supports_image_to_image"] = info.supports_image_to_image == RAC_TRUE;
+    j["supports_inpainting"] = info.supports_inpainting == RAC_TRUE;
+    j["safety_checker_enabled"] = info.safety_checker_enabled == RAC_TRUE;
+    j["max_width"] = info.max_width;
+    j["max_height"] = info.max_height;
+
+    return env->NewStringUTF(j.dump().c_str());
 }
 
 }  // extern "C"

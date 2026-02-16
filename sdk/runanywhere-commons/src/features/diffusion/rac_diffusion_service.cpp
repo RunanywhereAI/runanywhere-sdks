@@ -26,31 +26,60 @@ namespace fs = std::filesystem;
 // =============================================================================
 
 /**
- * Detect model format from path. Only Apple CoreML diffusion is supported.
- * ONNX diffusion is not supported; we only look for CoreML.
+ * Detect model format from path.
+ * Supports CoreML (.mlmodelc/.mlpackage) and sd.cpp (.safetensors/.gguf/.ckpt).
  */
 static rac_inference_framework_t detect_model_format_from_path(const char* path) {
     if (!path) {
         return RAC_FRAMEWORK_UNKNOWN;
     }
+
     fs::path dir_path(path);
+
+    // Check if path is a single model file (sd.cpp can load .safetensors/.gguf/.ckpt directly)
+    if (fs::exists(dir_path) && fs::is_regular_file(dir_path)) {
+        std::string ext = dir_path.extension().string();
+        if (ext == ".safetensors" || ext == ".gguf" || ext == ".ckpt") {
+            RAC_LOG_DEBUG(LOG_CAT, "Found sd.cpp model file at path: %s", path);
+            return RAC_FRAMEWORK_SDCPP;
+        }
+    }
+
     if (!fs::exists(dir_path) || !fs::is_directory(dir_path)) {
         return RAC_FRAMEWORK_UNKNOWN;
     }
-    // Only support CoreML (.mlmodelc, .mlpackage) for Apple Stable Diffusion
+
+    // Scan directory for model files
+    bool found_coreml = false;
+    bool found_sdcpp = false;
     try {
         for (const auto& entry : fs::directory_iterator(dir_path)) {
             std::string ext = entry.path().extension().string();
             std::string name = entry.path().filename().string();
+
+            // CoreML detection
             if (ext == ".mlmodelc" || ext == ".mlpackage" ||
                 name.find(".mlmodelc") != std::string::npos ||
                 name.find(".mlpackage") != std::string::npos) {
-                RAC_LOG_DEBUG(LOG_CAT, "Found CoreML model at path: %s", path);
-                return RAC_FRAMEWORK_COREML;
+                found_coreml = true;
+            }
+
+            // sd.cpp detection (.safetensors, .gguf, .ckpt)
+            if (ext == ".safetensors" || ext == ".gguf" || ext == ".ckpt") {
+                found_sdcpp = true;
             }
         }
     } catch (const fs::filesystem_error&) {
         // Ignore
+    }
+
+    if (found_coreml) {
+        RAC_LOG_DEBUG(LOG_CAT, "Found CoreML model at path: %s", path);
+        return RAC_FRAMEWORK_COREML;
+    }
+    if (found_sdcpp) {
+        RAC_LOG_DEBUG(LOG_CAT, "Found sd.cpp model at path: %s", path);
+        return RAC_FRAMEWORK_SDCPP;
     }
     return RAC_FRAMEWORK_UNKNOWN;
 }
@@ -95,11 +124,7 @@ static rac_result_t diffusion_create_service_internal(const char* model_id,
         framework = detect_model_format_from_path(model_id);
 
         if (framework == RAC_FRAMEWORK_UNKNOWN) {
-            framework = RAC_FRAMEWORK_COREML;
-            RAC_LOG_INFO(LOG_CAT, "Could not detect format, defaulting to CoreML (Apple only)");
-        } else if (framework == RAC_FRAMEWORK_ONNX) {
-            RAC_LOG_WARNING(LOG_CAT, "ONNX diffusion is not supported; only Apple CoreML. Ignoring ONNX.");
-            framework = RAC_FRAMEWORK_COREML;
+            RAC_LOG_INFO(LOG_CAT, "Could not detect format from path, will rely on service registry");
         } else {
             RAC_LOG_INFO(LOG_CAT, "Detected framework=%d from path inspection",
                          static_cast<int>(framework));
@@ -123,9 +148,10 @@ static rac_result_t diffusion_create_service_internal(const char* model_id,
 
     RAC_LOG_INFO(LOG_CAT, "Diffusion service request: framework=%d (%s), model_path=%s",
                  static_cast<int>(request.framework),
-                 framework == RAC_FRAMEWORK_COREML ? "CoreML" :
-                 framework == RAC_FRAMEWORK_ONNX ? "ONNX" :
-                 framework == RAC_FRAMEWORK_UNKNOWN ? "Unknown" : "Other",
+                 framework == RAC_FRAMEWORK_COREML  ? "CoreML" :
+                 framework == RAC_FRAMEWORK_SDCPP   ? "sd.cpp" :
+                 framework == RAC_FRAMEWORK_ONNX    ? "ONNX" :
+                 framework == RAC_FRAMEWORK_UNKNOWN  ? "Unknown" : "Other",
                  request.model_path ? request.model_path : "NULL");
 
     // Service registry returns an rac_diffusion_service_t* with vtable already set

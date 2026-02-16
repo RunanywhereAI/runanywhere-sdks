@@ -261,13 +261,29 @@ class RunAnywhereApplication : Application() {
 
         // Register backends first (matching iOS pattern)
         // These call the C++ rac_backend_xxx_register() functions via JNI
-        Log.i("RunAnywhereApp", "🔧 Registering LlamaCPP backend...")
-        LlamaCPP.register(priority = 100)
+        // Wrapped in try-catch: backends may not be present if only specific ones are bundled
+        try {
+            Log.i("RunAnywhereApp", "Registering LlamaCPP backend...")
+            LlamaCPP.register(priority = 100)
+        } catch (e: UnsatisfiedLinkError) {
+            Log.w("RunAnywhereApp", "LlamaCPP backend not available: ${e.message}")
+        }
 
-        Log.i("RunAnywhereApp", "🔧 Registering ONNX backend...")
-        ONNX.register(priority = 100)
+        try {
+            Log.i("RunAnywhereApp", "Registering ONNX backend...")
+            ONNX.register(priority = 100)
+        } catch (e: UnsatisfiedLinkError) {
+            Log.w("RunAnywhereApp", "ONNX backend not available: ${e.message}")
+        }
 
-        Log.i("RunAnywhereApp", "✅ Backends registered, now registering models...")
+        try {
+            Log.i("RunAnywhereApp", "Registering sd.cpp diffusion backend...")
+            com.runanywhere.sdk.diffusion.sdcpp.SdcppDiffusion.register()
+        } catch (e: UnsatisfiedLinkError) {
+            Log.w("RunAnywhereApp", "sd.cpp backend not available: ${e.message}")
+        }
+
+        Log.i("RunAnywhereApp", "Backends registered, now registering models...")
 
         // Register LLM models using the new RunAnywhere.registerModel API
         // Using explicit IDs ensures models are recognized after download across app restarts
@@ -356,8 +372,29 @@ class RunAnywhereApplication : Application() {
             modality = ModelCategory.SPEECH_SYNTHESIS,
             memoryRequirement = 65_000_000,
         )
-        Log.i("RunAnywhereApp", "✅ ONNX STT/TTS models registered")
+        Log.i("RunAnywhereApp", "ONNX STT/TTS models registered")
 
-        Log.i("RunAnywhereApp", "🎉 All modules and models registered")
+        // Register diffusion models (same pattern as iOS)
+        // SD 1.5 Q4_0 quantized (~1.57 GB) - smallest viable GGUF
+        RunAnywhere.registerModel(
+            id = "sd15-q4_0-gguf",
+            name = "Stable Diffusion 1.5 (Q4_0 Small)",
+            url = "https://huggingface.co/second-state/stable-diffusion-v1-5-GGUF/resolve/main/stable-diffusion-v1-5-pruned-emaonly-Q4_0.gguf",
+            framework = InferenceFramework.SDCPP,
+            modality = ModelCategory.IMAGE_GENERATION,
+            memoryRequirement = 1_900_000_000,
+        )
+        // SD 1.5 Q8_0 quantized (~2.1 GB) - better quality
+        RunAnywhere.registerModel(
+            id = "sd15-q8_0-gguf",
+            name = "Stable Diffusion 1.5 (Q8_0 Quality)",
+            url = "https://huggingface.co/second-state/stable-diffusion-v1-5-GGUF/resolve/main/stable-diffusion-v1-5-pruned-emaonly-Q8_0.gguf",
+            framework = InferenceFramework.SDCPP,
+            modality = ModelCategory.IMAGE_GENERATION,
+            memoryRequirement = 2_500_000_000,
+        )
+        Log.i("RunAnywhereApp", "Diffusion models registered")
+
+        Log.i("RunAnywhereApp", "All modules and models registered")
     }
 }

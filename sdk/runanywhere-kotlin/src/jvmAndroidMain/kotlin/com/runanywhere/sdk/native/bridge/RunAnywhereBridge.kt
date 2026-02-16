@@ -337,6 +337,51 @@ object RunAnywhereBridge {
     )
 
     // ========================================================================
+    // DIFFUSION COMPONENT (rac_diffusion_component.h)
+    // ========================================================================
+
+    @JvmStatic
+    external fun racDiffusionComponentCreate(): Long
+
+    @JvmStatic
+    external fun racDiffusionComponentDestroy(handle: Long)
+
+    @JvmStatic
+    external fun racDiffusionComponentConfigure(handle: Long, configJson: String): Int
+
+    @JvmStatic
+    external fun racDiffusionComponentIsLoaded(handle: Long): Boolean
+
+    @JvmStatic
+    external fun racDiffusionComponentLoadModel(handle: Long, modelPath: String, modelId: String, modelName: String?): Int
+
+    @JvmStatic
+    external fun racDiffusionComponentUnload(handle: Long): Int
+
+    @JvmStatic
+    external fun racDiffusionComponentCancel(handle: Long): Int
+
+    /**
+     * Generate an image from options JSON.
+     * @return JSON result string with metadata and image_data_ptr for retrieval.
+     */
+    @JvmStatic
+    external fun racDiffusionComponentGenerate(handle: Long, optionsJson: String): String?
+
+    /**
+     * Retrieve RGBA image data from a native pointer (returned by generate).
+     * This copies the data to a JVM byte array and frees the native memory.
+     */
+    @JvmStatic
+    external fun racDiffusionResultGetImageData(imageDataPtr: Long, imageSize: Int): ByteArray?
+
+    @JvmStatic
+    external fun racDiffusionComponentGetCapabilities(handle: Long): Int
+
+    @JvmStatic
+    external fun racDiffusionComponentGetInfo(handle: Long): String?
+
+    // ========================================================================
     // HTTP DOWNLOAD (platform adapter callbacks)
     // ========================================================================
 

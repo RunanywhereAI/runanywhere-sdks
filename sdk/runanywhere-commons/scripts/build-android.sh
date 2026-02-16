@@ -210,6 +210,7 @@ BUILD_ONNX=OFF
 BUILD_LLAMACPP=OFF
 BUILD_WHISPERCPP=OFF
 BUILD_TFLITE=OFF
+BUILD_SDCPP=OFF
 
 case "$BACKENDS" in
     all)
@@ -235,6 +236,10 @@ case "$BACKENDS" in
     tflite)
         BUILD_TFLITE=ON
         DIST_SUBDIR="tflite"
+        ;;
+    sdcpp)
+        BUILD_SDCPP=ON
+        DIST_SUBDIR="sdcpp"
         ;;
     onnx,llamacpp|llamacpp,onnx)
         BUILD_ONNX=ON
@@ -269,7 +274,7 @@ case "$BACKENDS" in
 esac
 
 print_header "RunAnywhere Android Build (Unified)"
-echo "Backends: ONNX=$BUILD_ONNX, LlamaCPP=$BUILD_LLAMACPP, WhisperCPP=$BUILD_WHISPERCPP, TFLite=$BUILD_TFLITE"
+echo "Backends: ONNX=$BUILD_ONNX, LlamaCPP=$BUILD_LLAMACPP, WhisperCPP=$BUILD_WHISPERCPP, TFLite=$BUILD_TFLITE, SDCPP=$BUILD_SDCPP"
 echo "ABIs: ${ABIS}"
 echo "Android API Level: ${ANDROID_API_LEVEL}"
 echo "Output: dist/android/${DIST_SUBDIR}/"
@@ -371,6 +376,7 @@ for ABI in "${ABI_ARRAY[@]}"; do
         -DRAC_BACKEND_ONNX=${BUILD_ONNX} \
         -DRAC_BACKEND_LLAMACPP=${BUILD_LLAMACPP} \
         -DRAC_BACKEND_WHISPERCPP=${BUILD_WHISPERCPP} \
+        -DRAC_BACKEND_SDCPP=${BUILD_SDCPP} \
         -DRAC_BUILD_TESTS=OFF \
         -DRAC_BUILD_SHARED=ON \
         -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON \

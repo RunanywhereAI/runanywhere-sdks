@@ -34,6 +34,7 @@ option(RAC_BACKEND_LLAMACPP "Build LlamaCPP backend" ON)
 option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
 # WhisperCPP OFF by default - Sherpa-ONNX (NeMo CTC / Parakeet) is now the primary STT backend
 option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" OFF)
+option(RAC_BACKEND_SDCPP "Build stable-diffusion.cpp backend (cross-platform diffusion)" OFF)
 option(RAC_BUILD_SERVER "Build OpenAI-compatible HTTP server (runanywhere-server)" OFF)
 
 # =============================================================================
@@ -342,6 +343,11 @@ if(RAC_BUILD_BACKENDS)
         message(STATUS "  - WhisperCPP backend")
         add_subdirectory(src/backends/whispercpp)
     endif()
+
+    if(RAC_BACKEND_SDCPP AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/sdcpp/CMakeLists.txt")
+        message(STATUS "  - stable-diffusion.cpp backend")
+        add_subdirectory(src/backends/sdcpp)
+    endif()
 endif()
 
 # =============================================================================
@@ -407,7 +413,7 @@ if(APPLE AND RAC_BUILD_PLATFORM)
     message(STATUS "  Platform:     Apple Foundation Models, System TTS")
 endif()
 if(RAC_BUILD_BACKENDS)
-    message(STATUS "  Backends:     LlamaCPP=${RAC_BACKEND_LLAMACPP}, ONNX=${RAC_BACKEND_ONNX}, WhisperCPP=${RAC_BACKEND_WHISPERCPP}")
+    message(STATUS "  Backends:     LlamaCPP=${RAC_BACKEND_LLAMACPP}, ONNX=${RAC_BACKEND_ONNX}, WhisperCPP=${RAC_BACKEND_WHISPERCPP}, SDCPP=${RAC_BACKEND_SDCPP}")
 endif()
 if(RAC_BUILD_SERVER)
     message(STATUS "  Server:       OpenAI-compatible HTTP server (runanywhere-server)")
