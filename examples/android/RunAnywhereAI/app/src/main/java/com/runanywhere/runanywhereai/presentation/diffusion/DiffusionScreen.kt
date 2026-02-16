@@ -17,20 +17,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -38,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,11 +46,32 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
+import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiffusionScreen(viewModel: DiffusionViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+
+    // Model selection bottom sheet state
+    var showModelSelection by remember { mutableStateOf(false) }
+
+    // Model Selection Bottom Sheet (same pattern as Chat/STT/TTS screens)
+    if (showModelSelection) {
+        ModelSelectionBottomSheet(
+            context = ModelSelectionContext.DIFFUSION,
+            onDismiss = { showModelSelection = false },
+            onModelSelected = { model ->
+                scope.launch {
+                    viewModel.onModelSelected(model.name)
+                    showModelSelection = false
+                }
+            },
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -61,161 +80,85 @@ fun DiffusionScreen(viewModel: DiffusionViewModel = viewModel()) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // Title
-        Text(
-            text = "Image Generation",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            text = "Powered by stable-diffusion.cpp",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column {
+                Text(
+                    text = "Image Generation",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "Powered by stable-diffusion.cpp",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
 
-        // Status Card
+        // Model Card — tap to open model selection
         Card(
+            onClick = { showModelSelection = true },
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
-                containerColor = if (uiState.errorMessage != null) {
-                    MaterialTheme.colorScheme.errorContainer
+                containerColor = if (uiState.isModelLoaded) {
+                    MaterialTheme.colorScheme.primaryContainer
                 } else {
                     MaterialTheme.colorScheme.surfaceVariant
                 },
             ),
         ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = uiState.status,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                )
-                uiState.errorMessage?.let { error ->
-                    Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = error,
+                        text = if (uiState.isModelLoaded) {
+                            uiState.loadedModelName ?: "Model Loaded"
+                        } else {
+                            "No model selected"
+                        },
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Text(
+                        text = if (uiState.isModelLoaded) "Ready to generate" else "Tap to select a model",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            }
-        }
-
-        // Download progress
-        if (uiState.isDownloading) {
-            LinearProgressIndicator(
-                progress = { uiState.downloadProgress },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-
-        // Model Selector Dropdown
-        if (uiState.availableModels.isNotEmpty()) {
-            var expanded by remember { mutableStateOf(false) }
-            val selectedModel = uiState.availableModels.find { it.id == uiState.selectedModelId }
-
-            ExposedDropdownMenuBox(
-                expanded = expanded,
-                onExpandedChange = { expanded = it },
-            ) {
-                OutlinedTextField(
-                    value = selectedModel?.name ?: "Select a model",
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Model") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                    modifier = Modifier
-                        .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                        .fillMaxWidth(),
-                    supportingText = {
-                        if (selectedModel != null) {
-                            Text(
-                                if (selectedModel.isDownloaded) "Downloaded" else "Not downloaded",
-                                color = if (selectedModel.isDownloaded) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                            )
-                        }
+                Icon(
+                    imageVector = Icons.Filled.AutoAwesome,
+                    contentDescription = "Select model",
+                    tint = if (uiState.isModelLoaded) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
                     },
                 )
-                ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    uiState.availableModels.forEach { model ->
-                        DropdownMenuItem(
-                            text = {
-                                Column {
-                                    Text(model.name)
-                                    Text(
-                                        if (model.isDownloaded) "Ready" else "Needs download",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            },
-                            onClick = {
-                                viewModel.selectModel(model.id)
-                                expanded = false
-                            },
-                        )
-                    }
-                }
             }
         }
 
-        // Action Buttons
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            val selectedModel = uiState.availableModels.find { it.id == uiState.selectedModelId }
-            val needsDownload = selectedModel != null && !selectedModel.isDownloaded
-
-            if (needsDownload) {
-                // Download button
-                Button(
-                    onClick = { viewModel.downloadSelectedModel() },
-                    enabled = !uiState.isDownloading,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    if (uiState.isDownloading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 2.dp,
-                        )
-                        Spacer(modifier = Modifier.size(8.dp))
-                        Text("Downloading...")
-                    } else {
-                        Icon(Icons.Filled.Download, contentDescription = null)
-                        Spacer(modifier = Modifier.size(4.dp))
-                        Text("Download Model")
-                    }
-                }
-            } else {
-                // Load / Unload buttons
-                Button(
-                    onClick = { viewModel.loadSelectedModel() },
-                    enabled = selectedModel?.isDownloaded == true && !uiState.isLoading && !uiState.isModelLoaded,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    if (uiState.isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 2.dp,
-                        )
-                    } else {
-                        Text("Load Model")
-                    }
-                }
-                OutlinedButton(
-                    onClick = { viewModel.unloadModel() },
-                    enabled = uiState.isModelLoaded,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("Unload")
-                }
+        // Error Card
+        uiState.errorMessage?.let { error ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+            ) {
+                Text(
+                    text = error,
+                    modifier = Modifier.padding(12.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
         }
 
@@ -229,24 +172,34 @@ fun DiffusionScreen(viewModel: DiffusionViewModel = viewModel()) {
             enabled = !uiState.isGenerating,
         )
 
-        // Generate Button
-        Button(
-            onClick = { viewModel.generateImage() },
-            enabled = uiState.isModelLoaded && !uiState.isGenerating && uiState.prompt.isNotBlank(),
+        // Generate / Cancel Buttons
+        Row(
             modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            Button(
+                onClick = { viewModel.generateImage() },
+                enabled = uiState.isModelLoaded && !uiState.isGenerating && uiState.prompt.isNotBlank(),
+                modifier = Modifier.weight(1f),
+            ) {
+                if (uiState.isGenerating) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp,
+                    )
+                    Spacer(modifier = Modifier.size(8.dp))
+                    Text("Generating...")
+                } else {
+                    Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                    Spacer(modifier = Modifier.size(4.dp))
+                    Text("Generate Image")
+                }
+            }
             if (uiState.isGenerating) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    strokeWidth = 2.dp,
-                )
-                Spacer(modifier = Modifier.size(8.dp))
-                Text("Generating...")
-            } else {
-                Icon(Icons.Filled.PlayArrow, contentDescription = null)
-                Spacer(modifier = Modifier.size(4.dp))
-                Text("Generate Image")
+                OutlinedButton(onClick = { viewModel.cancelGeneration() }) {
+                    Icon(Icons.Filled.Close, contentDescription = null)
+                }
             }
         }
 
@@ -262,41 +215,85 @@ fun DiffusionScreen(viewModel: DiffusionViewModel = viewModel()) {
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center,
             ) {
-                if (uiState.generatedImage != null) {
-                    Image(
-                        bitmap = uiState.generatedImage!!.asImageBitmap(),
-                        contentDescription = "Generated image",
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(12.dp)),
-                        contentScale = ContentScale.Fit,
-                    )
-                } else if (uiState.isGenerating) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator()
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "This may take 30-60 seconds...",
-                            style = MaterialTheme.typography.bodySmall,
+                when {
+                    uiState.generatedImage != null -> {
+                        Image(
+                            bitmap = uiState.generatedImage!!.asImageBitmap(),
+                            contentDescription = "Generated image",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(12.dp)),
+                            contentScale = ContentScale.Fit,
                         )
                     }
-                } else {
-                    Text(
-                        text = "Generated image will appear here",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    uiState.isGenerating -> {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator()
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "Generating on CPU...",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            Text(
+                                text = "This may take 10-20 minutes",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    !uiState.isModelLoaded -> {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Filled.AutoAwesome,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Select a model to get started",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    else -> {
+                        Text(
+                            text = "Generated image will appear here",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
 
         // Generation stats
         if (uiState.generationTimeMs > 0) {
-            Text(
-                text = "Generation time: ${uiState.generationTimeMs / 1000}.${(uiState.generationTimeMs % 1000) / 100}s",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Column {
+                        Text("Time", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "${uiState.generationTimeMs / 1000}.${(uiState.generationTimeMs % 1000) / 100}s",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                    uiState.loadedModelName?.let {
+                        Column {
+                            Text("Model", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(it, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                }
+            }
         }
     }
 }

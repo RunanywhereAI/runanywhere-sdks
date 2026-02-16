@@ -197,7 +197,7 @@ typedef struct rac_diffusion_options {
     /** Output image height in pixels (default: 512 for SD 1.5, 1024 for SDXL) */
     int32_t height;
 
-    /** Number of denoising steps (default: 28, range: 10-50) */
+    /** Number of denoising steps (default: 20, range: 1-50) */
     int32_t steps;
 
     /** Classifier-free guidance scale (default: 7.5, range: 1.0-20.0) */
@@ -252,7 +252,7 @@ static const rac_diffusion_options_t RAC_DIFFUSION_OPTIONS_DEFAULT = {
     .negative_prompt = RAC_NULL,
     .width = 512,
     .height = 512,
-    .steps = 28,
+    .steps = 20,
     .guidance_scale = 7.5f,
     .seed = -1,
     .scheduler = RAC_DIFFUSION_SCHEDULER_DPM_PP_2M_KARRAS,

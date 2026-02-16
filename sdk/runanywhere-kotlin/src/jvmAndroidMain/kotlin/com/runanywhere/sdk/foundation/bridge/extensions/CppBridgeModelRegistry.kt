@@ -281,6 +281,8 @@ object CppBridgeModelRegistry {
                 "stt" to ModelCategory.SPEECH_RECOGNITION,
                 "tts" to ModelCategory.SPEECH_SYNTHESIS,
                 "vad" to ModelCategory.AUDIO,
+                "diffusion" to ModelCategory.IMAGE_GENERATION,
+                "other" to ModelCategory.LANGUAGE, // fallback for uncategorized models
             )
 
         var restoredCount = 0

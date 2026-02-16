@@ -66,7 +66,19 @@ expect fun RunAnywhere.cancelImageGeneration()
 // MARK: - Model Management
 
 /**
- * Load a diffusion model for image generation.
+ * Load a diffusion model by ID.
+ *
+ * Resolves the model path, framework, and configuration from the model registry.
+ * This is the recommended API — matches [RunAnywhere.loadLLMModel] pattern.
+ *
+ * @param modelId Model identifier (must be registered and downloaded).
+ */
+expect suspend fun RunAnywhere.loadDiffusionModel(modelId: String)
+
+/**
+ * Load a diffusion model for image generation with explicit path and configuration.
+ *
+ * Use [loadDiffusionModel(modelId)] for simpler usage when the model is registered.
  *
  * @param modelPath Path to the model file (.safetensors, .gguf, .ckpt, or CoreML directory).
  * @param modelId Model identifier for the registry.

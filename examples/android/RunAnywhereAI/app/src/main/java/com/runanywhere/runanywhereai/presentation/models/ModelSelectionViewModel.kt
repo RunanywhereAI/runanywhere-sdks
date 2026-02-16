@@ -18,6 +18,7 @@ import com.runanywhere.sdk.public.extensions.currentLLMModelId
 import com.runanywhere.sdk.public.extensions.currentSTTModelId
 import com.runanywhere.sdk.public.extensions.currentTTSVoiceId
 import com.runanywhere.sdk.public.extensions.downloadModel
+import com.runanywhere.sdk.public.extensions.loadDiffusionModel
 import com.runanywhere.sdk.public.extensions.loadLLMModel
 import com.runanywhere.sdk.public.extensions.loadSTTModel
 import com.runanywhere.sdk.public.extensions.loadTTSVoice
@@ -176,11 +177,8 @@ class ModelSelectionViewModel(
             ModelSelectionContext.LLM -> RunAnywhere.currentLLMModelId
             ModelSelectionContext.STT -> RunAnywhere.currentSTTModelId
             ModelSelectionContext.TTS -> RunAnywhere.currentTTSVoiceId
-            ModelSelectionContext.VOICE -> {
-                // For voice context, we could return any of the three
-                // but typically the voice sheet doesn't auto-select
-                null
-            }
+            ModelSelectionContext.DIFFUSION -> null // Diffusion doesn't expose currentModelId yet
+            ModelSelectionContext.VOICE -> null
         }
     }
 
@@ -195,6 +193,7 @@ class ModelSelectionViewModel(
             ModelSelectionContext.LLM -> category == ModelCategory.LANGUAGE
             ModelSelectionContext.STT -> category == ModelCategory.SPEECH_RECOGNITION
             ModelSelectionContext.TTS -> category == ModelCategory.SPEECH_SYNTHESIS
+            ModelSelectionContext.DIFFUSION -> category == ModelCategory.IMAGE_GENERATION
             ModelSelectionContext.VOICE ->
                 category in
                     listOf(
@@ -318,6 +317,9 @@ class ModelSelectionViewModel(
                 }
                 ModelSelectionContext.TTS -> {
                     RunAnywhere.loadTTSVoice(modelId)
+                }
+                ModelSelectionContext.DIFFUSION -> {
+                    RunAnywhere.loadDiffusionModel(modelId)
                 }
                 ModelSelectionContext.VOICE -> {
                     // For voice context, determine from model category

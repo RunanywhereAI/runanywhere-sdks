@@ -5,10 +5,11 @@
 # Unified Android build script - builds JNI bridge + selected backends
 #
 # Usage: ./build-android.sh [options] [backends] [abis]
-#        backends: onnx | llamacpp | all (default: all)
+#        backends: onnx | llamacpp | sdcpp | all (default: all)
 #                  - onnx: STT/TTS/VAD (Sherpa-ONNX models)
 #                  - llamacpp: LLM text generation (GGUF models)
-#                  - all: onnx + llamacpp (default)
+#                  - sdcpp: Diffusion image generation (OpenCL GPU accelerated)
+#                  - all: onnx + llamacpp + sdcpp (default)
 #        NOTE: whispercpp is deprecated (use onnx for STT)
 #        abis: comma-separated list (default: arm64-v8a)
 #              Supported: arm64-v8a, armeabi-v7a, x86_64, x86
@@ -214,11 +215,11 @@ BUILD_SDCPP=OFF
 
 case "$BACKENDS" in
     all)
-        # NOTE: WhisperCPP is deprecated - use ONNX for STT instead
-        # WhisperCPP has build issues with newer ggml versions (GGML_KQ_MASK_PAD)
+        # Build all active backends
         BUILD_ONNX=ON
         BUILD_LLAMACPP=ON
-        BUILD_WHISPERCPP=OFF
+        BUILD_WHISPERCPP=OFF  # Deprecated, use ONNX for STT
+        BUILD_SDCPP=ON
         DIST_SUBDIR="unified"
         ;;
     onnx)
@@ -266,7 +267,7 @@ case "$BACKENDS" in
         else
             print_error "Unknown backend(s): $BACKENDS"
             echo "Usage: $0 [backends] [abis]"
-            echo "  backends: onnx | llamacpp | whispercpp | tflite | all"
+            echo "  backends: onnx | llamacpp | sdcpp | whispercpp | tflite | all"
             echo "  abis: comma-separated list (default: arm64-v8a)"
             exit 1
         fi
@@ -334,6 +335,30 @@ fi
 
 if [ "$BUILD_WHISPERCPP" = "ON" ]; then
     print_success "WhisperCPP will be fetched via CMake FetchContent"
+fi
+
+if [ "$BUILD_SDCPP" = "ON" ]; then
+    print_step "Checking sd.cpp prerequisites..."
+
+    # sd.cpp uses OpenCL GPU acceleration by default on Android (Adreno-optimized).
+    # OpenCL headers and ICD loader are fetched via CMake FetchContent (no host deps).
+    # ggml-opencl requires Python3 to embed OpenCL kernel source files.
+
+    # 1. Check for Python3 (required by ggml-opencl for kernel embedding)
+    if command -v python3 &> /dev/null; then
+        print_success "Found python3 (required by ggml-opencl kernel embedding)"
+    else
+        print_error "python3 not found. Required by ggml-opencl to embed OpenCL kernels."
+        echo "  macOS:  brew install python3"
+        echo "  Linux:  apt install python3"
+        exit 1
+    fi
+
+    # 2. OpenCL headers and ICD loader are auto-fetched via CMake FetchContent
+    #    (KhronosGroup/OpenCL-Headers + OpenCL-ICD-Loader v2024.10.24)
+    print_success "OpenCL dependencies will be fetched via CMake FetchContent"
+
+    print_success "sd.cpp with OpenCL GPU backend ready (API level $ANDROID_API_LEVEL)"
 fi
 
 # =============================================================================
@@ -612,6 +637,41 @@ for ABI in "${ABI_ARRAY[@]}"; do
         if [ -f "${ABI_BUILD_DIR}/backends/tflite/librunanywhere_tflite.so" ]; then
             cp "${ABI_BUILD_DIR}/backends/tflite/librunanywhere_tflite.so" "${DIST_DIR}/tflite/${ABI}/"
             echo "  Copied: librunanywhere_tflite.so -> tflite/${ABI}/"
+        fi
+    fi
+
+    # sd.cpp Diffusion backend (OpenCL GPU acceleration)
+    if [ "$BUILD_SDCPP" = "ON" ]; then
+        mkdir -p "${DIST_DIR}/sdcpp/${ABI}"
+
+        # Copy JNI bridge library (contains sd.cpp + ggml + OpenCL kernels, all statically linked)
+        if [ -f "${ABI_BUILD_DIR}/src/backends/sdcpp/librac_backend_sdcpp_jni.so" ]; then
+            cp "${ABI_BUILD_DIR}/src/backends/sdcpp/librac_backend_sdcpp_jni.so" "${DIST_DIR}/sdcpp/${ABI}/"
+            echo "  Copied: librac_backend_sdcpp_jni.so -> sdcpp/${ABI}/"
+        else
+            print_warning "librac_backend_sdcpp_jni.so not found - sd.cpp JNI bridge not built"
+        fi
+
+        # Copy OpenCL dlopen shim (required for GPU acceleration on Android)
+        if [ -f "${ABI_BUILD_DIR}/src/backends/sdcpp/libOpenCL.so" ]; then
+            cp "${ABI_BUILD_DIR}/src/backends/sdcpp/libOpenCL.so" "${DIST_DIR}/sdcpp/${ABI}/"
+            echo "  Copied: libOpenCL.so -> sdcpp/${ABI}/ (dlopen shim for vendor GPU)"
+        fi
+
+        # Copy OpenMP (required by ggml for multi-threaded CPU ops)
+        LIBOMP_FOUND=$(find "$NDK_PATH/toolchains/llvm/prebuilt" -name "libomp.so" -path "*/${ARCH_PATTERN}/*" 2>/dev/null | head -1)
+        if [ -n "$LIBOMP_FOUND" ] && [ -f "$LIBOMP_FOUND" ]; then
+            cp "$LIBOMP_FOUND" "${DIST_DIR}/sdcpp/${ABI}/"
+            echo "  Copied: libomp.so -> sdcpp/${ABI}/"
+        fi
+
+        # Copy libc++_shared.so
+        if [ -n "$PREBUILT_DIR" ]; then
+            LIBCXX_FOUND=$(find "$NDK_PATH/toolchains/llvm/prebuilt/$PREBUILT_DIR/sysroot/usr/lib" -name "libc++_shared.so" -path "*${ARCH_PATTERN}*" 2>/dev/null | head -1)
+            if [ -n "$LIBCXX_FOUND" ] && [ -f "$LIBCXX_FOUND" ]; then
+                cp "$LIBCXX_FOUND" "${DIST_DIR}/sdcpp/${ABI}/"
+                echo "  Copied: libc++_shared.so -> sdcpp/${ABI}/"
+            fi
         fi
     fi
 
