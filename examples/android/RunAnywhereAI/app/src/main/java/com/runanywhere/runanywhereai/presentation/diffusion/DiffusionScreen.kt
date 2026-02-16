@@ -231,11 +231,11 @@ fun DiffusionScreen(viewModel: DiffusionViewModel = viewModel()) {
                             CircularProgressIndicator()
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
-                                text = "Generating on CPU...",
+                                text = "Generating with GPU acceleration...",
                                 style = MaterialTheme.typography.bodySmall,
                             )
                             Text(
-                                text = "This may take 10-20 minutes",
+                                text = "This may take 5-10 minutes",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

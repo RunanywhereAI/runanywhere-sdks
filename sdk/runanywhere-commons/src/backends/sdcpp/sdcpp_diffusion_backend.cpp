@@ -193,6 +193,17 @@ rac_result_t SdcppDiffusionBackend::load_model(const char* model_path,
     ctx_params.flash_attn = false;
     ctx_params.diffusion_flash_attn = true;
 
+#ifdef __ANDROID__
+    // Android GPU memory optimization: keep CLIP and VAE on CPU,
+    // only run UNet denoising on GPU (OpenCL/Adreno).
+    // This reduces GPU memory pressure and avoids potential issues
+    // with unsupported ops in the text encoder and VAE decoder.
+    ctx_params.keep_clip_on_cpu = true;
+    ctx_params.keep_vae_on_cpu = true;
+    ctx_params.offload_params_to_cpu = true;
+    SDCPP_LOGI("Android: CLIP on CPU, VAE on CPU, params offloaded to CPU");
+#endif
+
     // Create sd.cpp context
     ctx_ = new_sd_ctx(&ctx_params);
 
