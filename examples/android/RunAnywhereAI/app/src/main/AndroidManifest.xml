@@ -33,6 +33,12 @@
         <property
             android:name="android.content.PROPERTY_SUPPORTS_16KB_PAGE_SIZE"
             android:value="true" />
+
+        <!-- Request access to vendor OpenCL library for GPU-accelerated diffusion.
+             required="false" ensures the app still installs on devices without OpenCL. -->
+        <uses-native-library
+            android:name="libOpenCL.so"
+            android:required="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

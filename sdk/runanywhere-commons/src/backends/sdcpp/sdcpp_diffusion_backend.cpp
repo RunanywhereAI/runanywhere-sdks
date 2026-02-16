@@ -21,7 +21,55 @@
 // stable-diffusion.cpp public API header
 #include "stable-diffusion.h"
 
+// On Android, use __android_log_print directly for guaranteed logcat output.
+// RAC_LOG macros fall back to stderr which is invisible on Android.
+#ifdef __ANDROID__
+#include <android/log.h>
+#define SDCPP_LOG_TAG "RAC.sd.cpp"
+#define SDCPP_LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, SDCPP_LOG_TAG, __VA_ARGS__)
+#define SDCPP_LOGI(...) __android_log_print(ANDROID_LOG_INFO, SDCPP_LOG_TAG, __VA_ARGS__)
+#define SDCPP_LOGW(...) __android_log_print(ANDROID_LOG_WARN, SDCPP_LOG_TAG, __VA_ARGS__)
+#define SDCPP_LOGE(...) __android_log_print(ANDROID_LOG_ERROR, SDCPP_LOG_TAG, __VA_ARGS__)
+#else
+#define SDCPP_LOGD(...) RAC_LOG_DEBUG("sd.cpp", __VA_ARGS__)
+#define SDCPP_LOGI(...) RAC_LOG_INFO("sd.cpp", __VA_ARGS__)
+#define SDCPP_LOGW(...) RAC_LOG_WARNING("sd.cpp", __VA_ARGS__)
+#define SDCPP_LOGE(...) RAC_LOG_ERROR("sd.cpp", __VA_ARGS__)
+#endif
+
 static const char* LOG_CAT = "Backend.SDCPP";
+
+// =============================================================================
+// SD.CPP LOG CALLBACK → redirect to logcat (Android) or RAC logger (other)
+// =============================================================================
+
+static void sdcpp_log_callback(enum sd_log_level_t level, const char* text, void* /*data*/) {
+    if (!text) return;
+    // Strip trailing newline that sd.cpp often adds
+    std::string msg(text);
+    while (!msg.empty() && (msg.back() == '\n' || msg.back() == '\r')) {
+        msg.pop_back();
+    }
+    if (msg.empty()) return;
+
+    switch (level) {
+        case SD_LOG_DEBUG:
+            SDCPP_LOGD("%s", msg.c_str());
+            break;
+        case SD_LOG_INFO:
+            SDCPP_LOGI("%s", msg.c_str());
+            break;
+        case SD_LOG_WARN:
+            SDCPP_LOGW("%s", msg.c_str());
+            break;
+        case SD_LOG_ERROR:
+            SDCPP_LOGE("%s", msg.c_str());
+            break;
+        default:
+            SDCPP_LOGI("%s", msg.c_str());
+            break;
+    }
+}
 
 namespace runanywhere {
 
@@ -95,7 +143,10 @@ static void sdcpp_step_callback(int step, int steps, float /*time*/, void* data)
 // CONSTRUCTOR / DESTRUCTOR
 // =============================================================================
 
-SdcppDiffusionBackend::SdcppDiffusionBackend() = default;
+SdcppDiffusionBackend::SdcppDiffusionBackend() {
+    // Redirect sd.cpp logging to RAC logger so it appears in logcat on Android.
+    sd_set_log_callback(sdcpp_log_callback, nullptr);
+}
 
 SdcppDiffusionBackend::~SdcppDiffusionBackend() { cleanup(); }
 
@@ -108,7 +159,7 @@ rac_result_t SdcppDiffusionBackend::load_model(const char* model_path,
     std::lock_guard<std::mutex> lock(mutex_);
 
     if (!model_path) {
-        RAC_LOG_ERROR(LOG_CAT, "Model path is null");
+        SDCPP_LOGE("Model path is null");
         return RAC_ERROR_NULL_POINTER;
     }
 
@@ -126,8 +177,8 @@ rac_result_t SdcppDiffusionBackend::load_model(const char* model_path,
         reduce_memory_ = config->reduce_memory == RAC_TRUE;
     }
 
-    RAC_LOG_INFO(LOG_CAT, "Loading sd.cpp model: %s (variant=%d)", model_path,
-                 static_cast<int>(model_variant_));
+    SDCPP_LOGI("Loading sd.cpp model: %s (variant=%d)", model_path,
+               static_cast<int>(model_variant_));
 
     // Initialize context params with defaults
     sd_ctx_params_t ctx_params;
@@ -146,12 +197,12 @@ rac_result_t SdcppDiffusionBackend::load_model(const char* model_path,
     ctx_ = new_sd_ctx(&ctx_params);
 
     if (!ctx_) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to create sd.cpp context for model: %s", model_path);
+        SDCPP_LOGE("Failed to create sd.cpp context for model: %s", model_path);
         model_path_.clear();
         return RAC_ERROR_GENERATION_FAILED;
     }
 
-    RAC_LOG_INFO(LOG_CAT, "sd.cpp model loaded successfully: %s", model_path);
+    SDCPP_LOGI("sd.cpp model loaded successfully: %s", model_path);
     return RAC_SUCCESS;
 }
 
@@ -178,7 +229,7 @@ rac_result_t SdcppDiffusionBackend::generate_internal(
     std::lock_guard<std::mutex> lock(mutex_);
 
     if (!ctx_) {
-        RAC_LOG_ERROR(LOG_CAT, "No model loaded");
+        SDCPP_LOGE("No model loaded");
         return RAC_ERROR_NOT_INITIALIZED;
     }
     if (!options || !options->prompt || !out_result) {
@@ -208,9 +259,8 @@ rac_result_t SdcppDiffusionBackend::generate_internal(
 
     const char* negative_prompt = options->negative_prompt ? options->negative_prompt : "";
 
-    RAC_LOG_INFO(LOG_CAT,
-                 "Generating image: %dx%d, steps=%d, cfg=%.1f, seed=%lld",
-                 width, height, steps, cfg_scale, static_cast<long long>(seed));
+    SDCPP_LOGI("Generating image: %dx%d, steps=%d, cfg=%.1f, seed=%lld",
+               width, height, steps, cfg_scale, static_cast<long long>(seed));
 
     // Initialize generation params
     sd_img_gen_params_t gen_params;
@@ -270,7 +320,7 @@ rac_result_t SdcppDiffusionBackend::generate_internal(
     }
 
     if (!result_images || !result_images->data) {
-        RAC_LOG_ERROR(LOG_CAT, "sd.cpp generation returned null");
+        SDCPP_LOGE("sd.cpp generation returned null");
         out_result->error_code = RAC_ERROR_GENERATION_FAILED;
         out_result->error_message = strdup("sd.cpp generation failed");
         return RAC_ERROR_GENERATION_FAILED;
@@ -292,7 +342,7 @@ rac_result_t SdcppDiffusionBackend::generate_internal(
     free(result_images);
 
     if (!rgba_data) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to convert RGB to RGBA");
+        SDCPP_LOGE("Failed to convert RGB to RGBA");
         out_result->error_code = RAC_ERROR_GENERATION_FAILED;
         return RAC_ERROR_GENERATION_FAILED;
     }
@@ -306,8 +356,8 @@ rac_result_t SdcppDiffusionBackend::generate_internal(
     out_result->safety_flagged = RAC_FALSE;
     out_result->error_code = RAC_SUCCESS;
 
-    RAC_LOG_INFO(LOG_CAT, "Image generated in %lldms (%dx%d, %zu bytes RGBA)",
-                 static_cast<long long>(duration_ms), width, height, rgba_size);
+    SDCPP_LOGI("Image generated in %lldms (%dx%d, %zu bytes RGBA)",
+               static_cast<long long>(duration_ms), width, height, rgba_size);
 
     return RAC_SUCCESS;
 }

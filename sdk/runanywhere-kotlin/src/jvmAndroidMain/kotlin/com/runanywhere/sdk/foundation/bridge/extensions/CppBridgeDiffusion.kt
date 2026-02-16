@@ -112,6 +112,14 @@ object CppBridgeDiffusion {
 
     fun loadModel(modelPath: String, modelId: String, modelName: String? = null): Boolean {
         synchronized(lock) {
+            // If in ERROR state, destroy and recreate so we can retry
+            if (state == DiffusionState.ERROR && handle != 0L) {
+                logger.info("Resetting from ERROR state before retry")
+                RunAnywhereBridge.racDiffusionComponentDestroy(handle)
+                handle = 0
+                state = DiffusionState.NOT_CREATED
+            }
+
             if (handle == 0L && !create()) return false
 
             state = DiffusionState.LOADING
@@ -123,7 +131,7 @@ object CppBridgeDiffusion {
 
             if (result != RunAnywhereBridge.RAC_SUCCESS) {
                 logger.error("Load model failed: $result")
-                state = DiffusionState.ERROR
+                state = DiffusionState.CREATED  // Go back to CREATED, not ERROR, so retry is possible
                 return false
             }
 

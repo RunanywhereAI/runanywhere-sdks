@@ -8,8 +8,10 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDiffusion
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.errors.SDKError
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Diffusion.DiffusionConfiguration
@@ -99,6 +101,44 @@ actual fun RunAnywhere.cancelImageGeneration() {
 }
 
 // MARK: - Model Management
+
+actual suspend fun RunAnywhere.loadDiffusionModel(modelId: String) {
+    if (!isInitialized) {
+        throw SDKError.notInitialized("SDK not initialized")
+    }
+
+    ensureServicesReady()
+
+    val model = CppBridgeModelRegistry.get(modelId)
+        ?: throw SDKError.model("Model '$modelId' not found in registry")
+
+    val localPath = model.localPath
+        ?: throw SDKError.model("Model '$modelId' is not downloaded")
+
+    // Infer framework from registry
+    val framework = when (model.framework) {
+        CppBridgeModelRegistry.Framework.SDCPP -> InferenceFramework.SDCPP
+        CppBridgeModelRegistry.Framework.COREML -> InferenceFramework.COREML
+        else -> InferenceFramework.SDCPP // Default to sd.cpp on Android/JVM
+    }
+
+    val config = DiffusionConfiguration(
+        modelId = modelId,
+        preferredFramework = framework,
+        modelVariant = DiffusionModelVariant.SD_1_5,
+        enableSafetyChecker = false,
+        reduceMemory = true,
+    )
+
+    diffusionLogger.info("Loading diffusion model by ID: $modelId (path=$localPath, framework=$framework)")
+
+    loadDiffusionModel(
+        modelPath = localPath,
+        modelId = modelId,
+        modelName = model.name,
+        configuration = config,
+    )
+}
 
 actual suspend fun RunAnywhere.loadDiffusionModel(
     modelPath: String,

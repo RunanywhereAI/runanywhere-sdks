@@ -22,7 +22,7 @@
 `runanywhere-commons` is a **unified** C/C++ library containing:
 1. **Core Infrastructure** - Logging, errors, events, lifecycle management, SDK state
 2. **RAC Services** - Public C APIs for LLM, STT, TTS, VAD (vtable-based abstraction)
-3. **Backends** - ML inference backends (LlamaCPP, ONNX/Sherpa-ONNX, WhisperCPP) in `src/backends/`
+3. **Backends** - ML inference backends (LlamaCPP, ONNX/Sherpa-ONNX, sd.cpp, WhisperCPP) in `src/backends/`
 4. **Platform Services** - Apple Foundation Models, System TTS (iOS/macOS only)
 5. **Infrastructure** - Model management, network services, device management, telemetry
 
@@ -126,6 +126,7 @@ runanywhere-commons/
 │   │       └── rac_telemetry_manager.h
 │   └── backends/                   # Backend-specific public headers
 │       ├── rac_llm_llamacpp.h      # LlamaCPP backend API
+│       ├── rac_diffusion_sdcpp.h   # sd.cpp Diffusion backend API
 │       ├── rac_stt_whispercpp.h    # WhisperCPP backend API
 │       ├── rac_stt_onnx.h          # ONNX STT API
 │       ├── rac_tts_onnx.h          # ONNX TTS API
@@ -366,6 +367,17 @@ typedef enum rac_lifecycle_state {
 - **Framework:** Sherpa-ONNX C API
 - **Public APIs:** `rac_stt_onnx.h`, `rac_tts_onnx.h`, `rac_vad_onnx.h`
 - **Registration:** `rac_backend_onnx_register()`
+
+### sd.cpp Diffusion Backend
+
+- **Capability:** Diffusion image generation (text-to-image, img2img, inpainting)
+- **Models:** .safetensors, .gguf, .ckpt (SD 1.5, SD 2.1, SDXL, SD3, FLUX)
+- **Inference Engine:** stable-diffusion.cpp + ggml (fetched via FetchContent)
+- **GPU Acceleration:** Metal (iOS/macOS), Vulkan (Android), CPU fallback
+- **Public API:** `include/rac/backends/rac_diffusion_sdcpp.h`
+- **Registration:** `rac_backend_sdcpp_register()`
+- **Build:** `./scripts/build-android.sh sdcpp arm64-v8a` (auto-configures Vulkan)
+- **Priority:** 90 (below CoreML's 100, so CoreML wins on Apple for .mlmodelc models)
 
 ### WhisperCPP Backend
 

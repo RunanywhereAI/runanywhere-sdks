@@ -66,6 +66,9 @@ object CppBridgeModelPaths {
         /** VAD models directory */
         const val VAD = "vad"
 
+        /** Diffusion models directory */
+        const val DIFFUSION = "diffusion"
+
         /** Embedding models directory */
         const val EMBEDDING = "embedding"
 
@@ -942,6 +945,7 @@ object CppBridgeModelPaths {
                 CppBridgeModelRegistry.ModelType.STT -> ModelDirectory.STT
                 CppBridgeModelRegistry.ModelType.TTS -> ModelDirectory.TTS
                 CppBridgeModelRegistry.ModelType.VAD -> ModelDirectory.VAD
+                CppBridgeModelRegistry.ModelType.DIFFUSION -> ModelDirectory.DIFFUSION
                 CppBridgeModelRegistry.ModelType.EMBEDDING -> ModelDirectory.EMBEDDING
                 else -> "other"
             }
