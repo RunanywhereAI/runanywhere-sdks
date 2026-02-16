@@ -513,9 +513,10 @@ object CppBridgeVLM {
     }
 
     fun cancel() {
-        // Cancel must NOT acquire `lock` — processStream holds it for the
-        // entire JNI call, so acquiring here would deadlock and defeat the
-        // purpose of cancellation.  Reading volatile fields is safe.
+        // Cancel is lock-free by design. State, handle, and isCancelled are
+        // @Volatile, so reads/writes are safe without synchronization. This
+        // allows cancel() to execute immediately without contending with
+        // process() or processStream() state transitions.
         if (state != VLMState.PROCESSING) return
 
         isCancelled = true
@@ -628,58 +629,20 @@ object CppBridgeVLM {
     }
 
     private fun parseProcessingResult(json: String, elapsedMs: Long): ProcessingResult {
-        fun extractString(key: String): String {
-            val pattern = "\"$key\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\""
-            val regex = Regex(pattern)
-            return regex
-                .find(json)
-                ?.groupValues
-                ?.get(1)
-                ?.let { unescapeJson(it) } ?: ""
-        }
+        val obj = org.json.JSONObject(json)
 
-        fun extractInt(key: String): Int {
-            val pattern = "\"$key\"\\s*:\\s*(-?\\d+)"
-            val regex = Regex(pattern)
-            return regex
-                .find(json)
-                ?.groupValues
-                ?.get(1)
-                ?.toIntOrNull() ?: 0
-        }
-
-        fun extractLong(key: String): Long {
-            val pattern = "\"$key\"\\s*:\\s*(-?\\d+)"
-            val regex = Regex(pattern)
-            return regex
-                .find(json)
-                ?.groupValues
-                ?.get(1)
-                ?.toLongOrNull() ?: 0L
-        }
-
-        fun extractFloat(key: String): Float {
-            val pattern = "\"$key\"\\s*:\\s*(-?[\\d.]+)"
-            val regex = Regex(pattern)
-            return regex
-                .find(json)
-                ?.groupValues
-                ?.get(1)
-                ?.toFloatOrNull() ?: 0f
-        }
-
-        val text = extractString("text")
-        val promptTokens = extractInt("prompt_tokens")
-        val imageTokens = extractInt("image_tokens")
-        val completionTokens = extractInt("completion_tokens")
-        val totalTokens = extractInt("total_tokens")
-        val timeToFirstTokenMs = extractLong("time_to_first_token_ms")
-        val imageEncodeTimeMs = extractLong("image_encode_time_ms")
+        val text = obj.optString("text", "")
+        val promptTokens = obj.optInt("prompt_tokens", 0)
+        val imageTokens = obj.optInt("image_tokens", 0)
+        val completionTokens = obj.optInt("completion_tokens", 0)
+        val totalTokens = obj.optInt("total_tokens", 0)
+        val timeToFirstTokenMs = obj.optLong("time_to_first_token_ms", 0L)
+        val imageEncodeTimeMs = obj.optLong("image_encode_time_ms", 0L)
         val tokensPerSecond =
             if (elapsedMs > 0 && completionTokens > 0) {
                 completionTokens * 1000f / elapsedMs
             } else {
-                extractFloat("tokens_per_second")
+                obj.optDouble("tokens_per_second", 0.0).toFloat()
             }
 
         return ProcessingResult(
@@ -693,15 +656,6 @@ object CppBridgeVLM {
             totalTimeMs = elapsedMs,
             tokensPerSecond = tokensPerSecond,
         )
-    }
-
-    private fun unescapeJson(value: String): String {
-        return value
-            .replace("\\\\", "\\")
-            .replace("\\n", "\n")
-            .replace("\\r", "\r")
-            .replace("\\t", "\t")
-            .replace("\\\"", "\"")
     }
 
     fun getStateSummary(): String {

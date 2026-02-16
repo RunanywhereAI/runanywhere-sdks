@@ -399,7 +399,7 @@ rac_result_t rac_image_convert_rgba_to_rgb(const uint8_t* rgba_data, uint32_t wi
     size_t out_idx = 0;
 
     for (uint32_t y = 0; y < height; y++) {
-        const uint8_t* row = rgba_data + y * effective_stride;
+        const uint8_t* row = rgba_data + (size_t)y * effective_stride;
         for (uint32_t x = 0; x < width; x++) {
             uint32_t src = x * 4;
             out_rgb_data[out_idx++] = row[src];     // R
@@ -426,7 +426,7 @@ rac_result_t rac_image_convert_bgra_to_rgb(const uint8_t* bgra_data, uint32_t wi
     size_t out_idx = 0;
 
     for (uint32_t y = 0; y < height; y++) {
-        const uint8_t* row = bgra_data + y * effective_stride;
+        const uint8_t* row = bgra_data + (size_t)y * effective_stride;
         for (uint32_t x = 0; x < width; x++) {
             uint32_t src = x * 4;
             out_rgb_data[out_idx++] = row[src + 2]; // R (from BGRA offset +2)

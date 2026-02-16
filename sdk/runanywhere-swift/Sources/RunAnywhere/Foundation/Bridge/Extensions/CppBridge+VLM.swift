@@ -126,6 +126,9 @@ extension CppBridge {
             }
 
             loadedModelId = modelId
+            // Clear path properties since C++ layer owns path resolution for loadModelById
+            loadedModelPath = nil
+            loadedMmprojPath = nil
             logger.info("VLM model loaded by ID: \(modelId)")
         }
 

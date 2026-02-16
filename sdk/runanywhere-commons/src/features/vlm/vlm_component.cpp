@@ -550,6 +550,9 @@ extern "C" rac_bool_t rac_vlm_component_supports_streaming(rac_handle_t handle) 
 
 /**
  * Internal structure for VLM streaming context.
+ *
+ * full_text accumulates raw tokens (including special tokens) for debugging/metrics.
+ * cleaned_text accumulates stripped tokens and is used for the final result text.
  */
 struct vlm_stream_context {
     rac_vlm_component_token_callback_fn token_callback;
@@ -562,6 +565,7 @@ struct vlm_stream_context {
     std::chrono::steady_clock::time_point first_token_time;
     bool first_token_recorded;
     std::string full_text;
+    std::string cleaned_text;
     int32_t prompt_tokens;
     int32_t token_count;
 };
@@ -585,8 +589,11 @@ static rac_bool_t vlm_stream_token_callback(const char* token, void* user_data) 
         ctx->first_token_time = std::chrono::steady_clock::now();
     }
 
-    // Always accumulate raw text for metrics and full_text tracking
+    // Accumulate raw text for debugging and cleaned text for the final result
     ctx->full_text += token;
+    if (cleaned[0] != '\0') {
+        ctx->cleaned_text += cleaned;
+    }
     ctx->token_count++;
 
     // Forward only non-empty cleaned tokens to the user callback
@@ -668,9 +675,12 @@ extern "C" rac_result_t rac_vlm_component_process_stream(
     int64_t total_time_ms = total_duration.count();
 
     rac_vlm_result_t final_result = {};
-    final_result.text = strdup(ctx.full_text.c_str());
+    // Use cleaned_text (special tokens stripped) for the final result.
+    // Fall back to full_text if no cleaned tokens were produced.
+    const std::string& result_text = ctx.cleaned_text.empty() ? ctx.full_text : ctx.cleaned_text;
+    final_result.text = strdup(result_text.c_str());
     final_result.prompt_tokens = ctx.prompt_tokens;
-    final_result.completion_tokens = estimate_tokens(ctx.full_text.c_str());
+    final_result.completion_tokens = estimate_tokens(result_text.c_str());
     final_result.total_tokens = final_result.prompt_tokens + final_result.completion_tokens;
     final_result.total_time_ms = total_time_ms;
 
