@@ -471,9 +471,12 @@ private func platformHttpDownloadCallback(
     outTaskId.pointee = rac_strdup(taskId)
 
     let session = URLSession(configuration: .default)
-    let task = session.downloadTask(with: downloadURL) { tempURL, response, error in
+    let task = session.downloadTask(with: downloadURL) { [session] tempURL, _, error in
+        // Invalidate the session after task completes to avoid resource leak.
+        // URLSession is not deallocated until explicitly invalidated.
+        defer { session.finishTasksAndInvalidate() }
         var result: rac_result_t = RAC_SUCCESS
-        var finalPath: String? = nil
+        var finalPath: String?
 
         defer {
             httpDownloadQueue.async {
@@ -481,7 +484,7 @@ private func platformHttpDownloadCallback(
             }
         }
 
-        if let _ = error {
+        if error != nil {
             result = RAC_ERROR_DOWNLOAD_FAILED
         } else if let tempURL = tempURL {
             do {
