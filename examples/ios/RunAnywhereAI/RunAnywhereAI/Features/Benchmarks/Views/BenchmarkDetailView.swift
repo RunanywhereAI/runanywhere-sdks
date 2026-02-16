@@ -12,43 +12,106 @@ struct BenchmarkDetailView: View {
     @State private var viewModel = BenchmarkViewModel()
 
     var body: some View {
-        List {
-            // Metadata
-            Section("Run Info") {
-                LabeledContent("Started", value: run.startedAt.formatted(date: .abbreviated, time: .shortened))
-                if let completedAt = run.completedAt {
-                    LabeledContent("Completed", value: completedAt.formatted(date: .abbreviated, time: .shortened))
-                }
-                if let duration = run.duration {
-                    LabeledContent("Duration", value: String(format: "%.1fs", duration))
-                }
-                HStack {
-                    Text("Status")
-                    Spacer()
-                    StatusBadge(status: run.status)
-                }
-                LabeledContent("Results", value: "\(run.results.count)")
-            }
-
-            // Device Info
-            Section("Device") {
-                LabeledContent("Model", value: run.deviceInfo.modelName)
-                LabeledContent("Chip", value: run.deviceInfo.chipName)
-                LabeledContent("RAM", value: ByteCountFormatter.string(fromByteCount: run.deviceInfo.totalMemoryBytes, countStyle: .memory))
-                LabeledContent("OS", value: run.deviceInfo.osVersion)
-            }
-
-            // Results grouped by category
-            let grouped = Dictionary(grouping: run.results, by: { $0.category })
-            ForEach(BenchmarkCategory.allCases) { category in
-                if let results = grouped[category], !results.isEmpty {
-                    Section {
-                        ForEach(results) { result in
-                            ResultCard(result: result)
-                        }
-                    } header: {
-                        Label(category.displayName, systemImage: category.iconName)
+        ZStack {
+            List {
+                // Metadata
+                Section("Run Info") {
+                    LabeledContent("Started", value: run.startedAt.formatted(date: .abbreviated, time: .shortened))
+                    if let completedAt = run.completedAt {
+                        LabeledContent("Completed", value: completedAt.formatted(date: .abbreviated, time: .shortened))
                     }
+                    if let duration = run.duration {
+                        LabeledContent("Duration", value: String(format: "%.1fs", duration))
+                    }
+                    HStack {
+                        Text("Status")
+                        Spacer()
+                        StatusBadge(status: run.status)
+                    }
+                    let successCount = run.results.filter(\.metrics.didSucceed).count
+                    let failCount = run.results.count - successCount
+                    LabeledContent("Results", value: "\(run.results.count) (\(successCount) passed, \(failCount) failed)")
+                }
+
+                // Device Info
+                Section("Device") {
+                    LabeledContent("Model", value: run.deviceInfo.modelName)
+                    LabeledContent("Chip", value: run.deviceInfo.chipName)
+                    LabeledContent("RAM", value: ByteCountFormatter.string(fromByteCount: run.deviceInfo.totalMemoryBytes, countStyle: .memory))
+                    LabeledContent("OS", value: run.deviceInfo.osVersion)
+                }
+
+                // Copy & Export actions
+                Section("Copy & Export") {
+                    // Copy to clipboard
+                    ForEach(BenchmarkExportFormat.allCases) { format in
+                        Button {
+                            viewModel.copyToClipboard(run: run, format: format)
+                        } label: {
+                            Label("Copy as \(format.displayName)", systemImage: "doc.on.doc")
+                        }
+                    }
+
+                    // Export files
+                    ShareLink(item: viewModel.shareJSON(run: run)) {
+                        Label("Export JSON File", systemImage: "curlybraces")
+                    }
+
+                    ShareLink(item: viewModel.shareCSV(run: run)) {
+                        Label("Export CSV File", systemImage: "tablecells")
+                    }
+                }
+
+                // Results grouped by category
+                let grouped = Dictionary(grouping: run.results, by: { $0.category })
+                ForEach(BenchmarkCategory.allCases) { category in
+                    if let results = grouped[category], !results.isEmpty {
+                        Section {
+                            ForEach(results) { result in
+                                ResultCard(result: result)
+                            }
+                        } header: {
+                            Label(category.displayName, systemImage: category.iconName)
+                        }
+                    }
+                }
+
+                // Empty results
+                if run.results.isEmpty {
+                    Section {
+                        VStack(spacing: AppSpacing.mediumLarge) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(AppTypography.system48)
+                                .foregroundColor(AppColors.statusOrange.opacity(0.6))
+                            Text("No results in this run")
+                                .font(AppTypography.callout)
+                                .foregroundColor(AppColors.textSecondary)
+                            Text("This may happen if no downloaded models were available for the selected categories.")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.textTertiary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, AppSpacing.xxLarge)
+                    }
+                }
+            }
+
+            // Copied toast overlay
+            if let toast = viewModel.copiedToastMessage {
+                VStack {
+                    Spacer()
+                    Text(toast)
+                        .font(AppTypography.subheadlineMedium)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, AppSpacing.xxLarge)
+                        .padding(.vertical, AppSpacing.mediumLarge)
+                        .background(AppColors.statusGreen.opacity(0.9))
+                        .cornerRadius(AppSpacing.cornerRadiusLarge)
+                        .shadow(color: AppColors.shadowLight, radius: AppSpacing.shadowSmall)
+                        .padding(.bottom, AppSpacing.xxLarge)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .animation(.easeInOut(duration: 0.3), value: toast)
                 }
             }
         }
@@ -56,27 +119,6 @@ struct BenchmarkDetailView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    Button {
-                        viewModel.copyReportToClipboard(run: run)
-                    } label: {
-                        Label("Copy Report", systemImage: "doc.on.doc")
-                    }
-
-                    ShareLink(item: viewModel.shareJSON(run: run)) {
-                        Label("Export JSON", systemImage: "curlybraces")
-                    }
-
-                    ShareLink(item: viewModel.shareCSV(run: run)) {
-                        Label("Export CSV", systemImage: "tablecells")
-                    }
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
-                }
-            }
-        }
     }
 }
 
