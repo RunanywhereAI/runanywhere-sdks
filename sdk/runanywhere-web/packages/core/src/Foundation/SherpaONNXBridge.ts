@@ -117,6 +117,20 @@ export class SherpaONNXBridge {
   private _loaded = false;
   private _loading: Promise<void> | null = null;
 
+  /**
+   * Override the default URL to the sherpa-onnx-glue.js file.
+   * Set this before any STT/TTS/VAD model is loaded.
+   *
+   * In a Vite app, resolve it like:
+   * ```typescript
+   * SherpaONNXBridge.shared.wasmUrl = new URL(
+   *   '@runanywhere/web/wasm/sherpa/sherpa-onnx-glue.js',
+   *   import.meta.url,
+   * ).href;
+   * ```
+   */
+  wasmUrl: string | null = null;
+
   static get shared(): SherpaONNXBridge {
     if (!SherpaONNXBridge._instance) {
       SherpaONNXBridge._instance = new SherpaONNXBridge();
@@ -163,7 +177,7 @@ export class SherpaONNXBridge {
     logger.info('Loading Sherpa-ONNX WASM module...');
 
     try {
-      const moduleUrl = wasmUrl ?? new URL('../../wasm/sherpa/sherpa-onnx-glue.js', import.meta.url).href;
+      const moduleUrl = wasmUrl ?? this.wasmUrl ?? new URL('../../wasm/sherpa/sherpa-onnx-glue.js', import.meta.url).href;
       const { default: createModule } = await import(/* @vite-ignore */ moduleUrl);
 
       // Derive the base URL for the .wasm binary
