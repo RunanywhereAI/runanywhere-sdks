@@ -388,8 +388,8 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
                     withContext(Dispatchers.IO) {
                         val url = java.net.URL(fileDescriptor.url)
                         val connection = url.openConnection() as java.net.HttpURLConnection
-                        connection.connectTimeout = 30_000
-                        connection.readTimeout = 30_000
+                        connection.connectTimeout = 30_000  // 30s for initial connection
+                        connection.readTimeout = 300_000    // 5 min for large model file transfers
                         connection.setRequestProperty("User-Agent", "RunAnywhere-SDK/1.0")
 
                         try {
@@ -489,6 +489,16 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
                 close()
             } catch (e: Exception) {
                 downloadLogger.error("Multi-file download error: ${e.message}")
+                // Clean up partially downloaded files
+                try {
+                    val modelDir = File(CppBridgeModelPaths.getModelPath(modelId, modelType))
+                    if (modelDir.exists()) {
+                        modelDir.deleteRecursively()
+                        downloadLogger.info("Cleaned up partial download directory: ${modelDir.absolutePath}")
+                    }
+                } catch (cleanupError: Exception) {
+                    downloadLogger.warn("Failed to clean up partial downloads: ${cleanupError.message}")
+                }
                 CppBridgeEvents.emitDownloadFailed(modelId, e.message ?: "Unknown error")
                 close(e)
             }

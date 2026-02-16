@@ -17,6 +17,7 @@ import com.runanywhere.sdk.public.extensions.availableModels
 import com.runanywhere.sdk.public.extensions.currentLLMModelId
 import com.runanywhere.sdk.public.extensions.currentSTTModelId
 import com.runanywhere.sdk.public.extensions.currentTTSVoiceId
+import com.runanywhere.sdk.public.extensions.currentVLMModelId
 import com.runanywhere.sdk.public.extensions.downloadModel
 import com.runanywhere.sdk.public.extensions.isVLMModelLoaded
 import com.runanywhere.sdk.public.extensions.loadLLMModel
@@ -184,14 +185,7 @@ class ModelSelectionViewModel(
                 // but typically the voice sheet doesn't auto-select
                 null
             }
-            ModelSelectionContext.VLM -> {
-                // Query the VLM bridge for the currently loaded model ID
-                try {
-                    com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVLM.getLoadedModelId()
-                } catch (_: Exception) {
-                    null
-                }
-            }
+            ModelSelectionContext.VLM -> RunAnywhere.currentVLMModelId
         }
     }
 

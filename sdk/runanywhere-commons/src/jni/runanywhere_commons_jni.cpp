@@ -3363,37 +3363,19 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallNormalizeJso
 // JNI FUNCTIONS - VLM Component
 // =============================================================================
 
-// Helper: Escape a C string for JSON embedding
-static std::string jsonEscapeString(const char* text) {
-    std::string escaped;
-    if (!text) return escaped;
-    for (const char* p = text; *p; p++) {
-        switch (*p) {
-            case '"':  escaped += "\\\""; break;
-            case '\\': escaped += "\\\\"; break;
-            case '\n': escaped += "\\n";  break;
-            case '\r': escaped += "\\r";  break;
-            case '\t': escaped += "\\t";  break;
-            default:   escaped += *p;     break;
-        }
-    }
-    return escaped;
-}
-
 // Helper: Build a VLM result JSON string matching what Kotlin expects
 static std::string buildVlmResultJson(const std::string& text, const rac_vlm_result_t& result) {
-    std::string json = "{";
-    json += "\"text\":\"" + jsonEscapeString(text.c_str()) + "\",";
-    json += "\"prompt_tokens\":" + std::to_string(result.prompt_tokens) + ",";
-    json += "\"image_tokens\":" + std::to_string(result.image_tokens) + ",";
-    json += "\"completion_tokens\":" + std::to_string(result.completion_tokens) + ",";
-    json += "\"total_tokens\":" + std::to_string(result.total_tokens) + ",";
-    json += "\"time_to_first_token_ms\":" + std::to_string(result.time_to_first_token_ms) + ",";
-    json += "\"image_encode_time_ms\":" + std::to_string(result.image_encode_time_ms) + ",";
-    json += "\"total_time_ms\":" + std::to_string(result.total_time_ms) + ",";
-    json += "\"tokens_per_second\":" + std::to_string(result.tokens_per_second);
-    json += "}";
-    return json;
+    nlohmann::json j;
+    j["text"] = text;
+    j["prompt_tokens"] = result.prompt_tokens;
+    j["image_tokens"] = result.image_tokens;
+    j["completion_tokens"] = result.completion_tokens;
+    j["total_tokens"] = result.total_tokens;
+    j["time_to_first_token_ms"] = result.time_to_first_token_ms;
+    j["image_encode_time_ms"] = result.image_encode_time_ms;
+    j["total_time_ms"] = result.total_time_ms;
+    j["tokens_per_second"] = result.tokens_per_second;
+    return j.dump();
 }
 
 // Helper: Populate rac_vlm_image_t from JNI parameters
@@ -3830,16 +3812,16 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentGetMetri
         return nullptr;
     }
 
-    std::string json = "{";
-    json += "\"total_events\":" + std::to_string(metrics.total_events) + ",";
-    json += "\"start_time_ms\":" + std::to_string(metrics.start_time_ms) + ",";
-    json += "\"last_event_time_ms\":" + std::to_string(metrics.last_event_time_ms) + ",";
-    json += "\"total_loads\":" + std::to_string(metrics.total_loads) + ",";
-    json += "\"successful_loads\":" + std::to_string(metrics.successful_loads) + ",";
-    json += "\"failed_loads\":" + std::to_string(metrics.failed_loads) + ",";
-    json += "\"average_load_time_ms\":" + std::to_string(metrics.average_load_time_ms) + ",";
-    json += "\"total_unloads\":" + std::to_string(metrics.total_unloads);
-    json += "}";
+    nlohmann::json j;
+    j["total_events"] = metrics.total_events;
+    j["start_time_ms"] = metrics.start_time_ms;
+    j["last_event_time_ms"] = metrics.last_event_time_ms;
+    j["total_loads"] = metrics.total_loads;
+    j["successful_loads"] = metrics.successful_loads;
+    j["failed_loads"] = metrics.failed_loads;
+    j["average_load_time_ms"] = metrics.average_load_time_ms;
+    j["total_unloads"] = metrics.total_unloads;
+    std::string json = j.dump();
 
     return env->NewStringUTF(json.c_str());
 }
