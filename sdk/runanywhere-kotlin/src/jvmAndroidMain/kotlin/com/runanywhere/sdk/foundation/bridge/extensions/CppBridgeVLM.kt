@@ -272,6 +272,58 @@ object CppBridgeVLM {
     }
 
     /**
+     * Load a VLM model by ID using the C++ model registry for path resolution.
+     * The C++ layer handles finding the main model and mmproj files automatically.
+     */
+    fun loadModelById(modelId: String): Int {
+        synchronized(lock) {
+            if (handle == 0L) {
+                val createResult = create()
+                if (createResult != 0) return createResult
+            }
+
+            if (loadedModelId != null) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.WARN,
+                    TAG,
+                    "Unloading current model before loading new one: $loadedModelId",
+                )
+                unload()
+            }
+
+            setState(VLMState.LOADING)
+
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.INFO,
+                TAG,
+                "Loading VLM model by ID: $modelId",
+            )
+
+            val result = RunAnywhereBridge.racVlmComponentLoadModelById(handle, modelId)
+            if (result != 0) {
+                setState(VLMState.ERROR)
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.ERROR,
+                    TAG,
+                    "Failed to load VLM model by ID: $modelId (error: $result)",
+                )
+                return result
+            }
+
+            loadedModelId = modelId
+            setState(VLMState.READY)
+
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.INFO,
+                TAG,
+                "VLM model loaded successfully by ID: $modelId",
+            )
+
+            return 0
+        }
+    }
+
+    /**
      * Process an image (non-streaming).
      */
     @Throws(SDKError::class)

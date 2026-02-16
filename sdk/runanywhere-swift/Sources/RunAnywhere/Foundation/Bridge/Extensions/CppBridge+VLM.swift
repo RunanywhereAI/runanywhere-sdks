@@ -110,6 +110,25 @@ extension CppBridge {
             logger.info("VLM model loaded: \(modelId)")
         }
 
+        /// Load a VLM model by ID using the C++ model registry for path resolution.
+        /// The C++ layer handles finding the main model and mmproj files automatically.
+        ///
+        /// - Parameter modelId: Model identifier (must be registered in the global model registry)
+        public func loadModelById(_ modelId: String) throws {
+            let handle = try getHandle()
+
+            let result = modelId.withCString { idPtr in
+                rac_vlm_component_load_model_by_id(handle, idPtr)
+            }
+
+            guard result == RAC_SUCCESS else {
+                throw SDKError.vlm(.modelLoadFailed, "Failed to load VLM model by ID: \(modelId) (error: \(result))")
+            }
+
+            loadedModelId = modelId
+            logger.info("VLM model loaded by ID: \(modelId)")
+        }
+
         /// Unload the current model
         public func unload() {
             guard let handle = handle else { return }

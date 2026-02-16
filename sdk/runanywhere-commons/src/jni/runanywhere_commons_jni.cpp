@@ -3500,6 +3500,29 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentCancel(J
     return static_cast<jint>(rac_vlm_component_cancel(reinterpret_cast<rac_handle_t>(handle)));
 }
 
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentLoadModelById(
+    JNIEnv* env, jclass clazz, jlong handle, jstring modelId) {
+    LOGi("racVlmComponentLoadModelById called with handle=%lld", (long long)handle);
+
+    if (handle == 0) {
+        LOGe("racVlmComponentLoadModelById: invalid handle");
+        return static_cast<jint>(RAC_ERROR_INVALID_HANDLE);
+    }
+
+    std::string modelIdStr = getCString(env, modelId);
+    if (modelIdStr.empty()) {
+        LOGe("racVlmComponentLoadModelById: empty model ID");
+        return static_cast<jint>(RAC_ERROR_INVALID_ARGUMENT);
+    }
+
+    LOGi("racVlmComponentLoadModelById modelId=%s", modelIdStr.c_str());
+    rac_result_t result =
+        rac_vlm_component_load_model_by_id(reinterpret_cast<rac_handle_t>(handle), modelIdStr.c_str());
+    LOGi("rac_vlm_component_load_model_by_id returned: %d", result);
+    return static_cast<jint>(result);
+}
+
 JNIEXPORT jboolean JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentIsLoaded(JNIEnv* env,
                                                                                   jclass clazz,
