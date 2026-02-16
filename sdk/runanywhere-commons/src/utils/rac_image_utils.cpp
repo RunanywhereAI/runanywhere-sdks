@@ -382,6 +382,64 @@ rac_result_t rac_image_to_chw(const rac_image_float_t* image, rac_image_float_t*
 }
 
 // =============================================================================
+// PIXEL FORMAT CONVERSION
+// =============================================================================
+
+rac_result_t rac_image_convert_rgba_to_rgb(const uint8_t* rgba_data, uint32_t width,
+                                           uint32_t height, uint32_t row_stride,
+                                           uint8_t* out_rgb_data, size_t out_size) {
+    if (!rgba_data || !out_rgb_data)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    size_t required = (size_t)width * height * 3;
+    if (out_size < required)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    uint32_t effective_stride = (row_stride > 0) ? row_stride : width * 4;
+    size_t out_idx = 0;
+
+    for (uint32_t y = 0; y < height; y++) {
+        const uint8_t* row = rgba_data + (size_t)y * effective_stride;
+        for (uint32_t x = 0; x < width; x++) {
+            uint32_t src = x * 4;
+            out_rgb_data[out_idx++] = row[src];     // R
+            out_rgb_data[out_idx++] = row[src + 1]; // G
+            out_rgb_data[out_idx++] = row[src + 2]; // B
+            // Skip alpha at row[src + 3]
+        }
+    }
+
+    return RAC_SUCCESS;
+}
+
+rac_result_t rac_image_convert_bgra_to_rgb(const uint8_t* bgra_data, uint32_t width,
+                                           uint32_t height, uint32_t bytes_per_row,
+                                           uint8_t* out_rgb_data, size_t out_size) {
+    if (!bgra_data || !out_rgb_data)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    size_t required = (size_t)width * height * 3;
+    if (out_size < required)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    uint32_t effective_stride = (bytes_per_row > 0) ? bytes_per_row : width * 4;
+    size_t out_idx = 0;
+
+    for (uint32_t y = 0; y < height; y++) {
+        const uint8_t* row = bgra_data + (size_t)y * effective_stride;
+        for (uint32_t x = 0; x < width; x++) {
+            uint32_t src = x * 4;
+            out_rgb_data[out_idx++] = row[src + 2]; // R (from BGRA offset +2)
+            out_rgb_data[out_idx++] = row[src + 1]; // G (from BGRA offset +1)
+            out_rgb_data[out_idx++] = row[src];     // B (from BGRA offset +0)
+            // Skip alpha at row[src + 3]
+        }
+    }
+
+    return RAC_SUCCESS;
+}
+
+// =============================================================================
 // MEMORY MANAGEMENT
 // =============================================================================
 

@@ -319,7 +319,7 @@ extension CppBridge {
                         return RAC_TRUE
                     }
                     // For CoreML diffusion models, check for Unet.mlmodelc or similar
-                    if filename.contains("unet") || filename.contains("textencoder") || 
+                    if filename.contains("unet") || filename.contains("textencoder") ||
                        filename.contains("vaeencoder") || filename.contains("vaedecoder") {
                         return RAC_TRUE
                     }
