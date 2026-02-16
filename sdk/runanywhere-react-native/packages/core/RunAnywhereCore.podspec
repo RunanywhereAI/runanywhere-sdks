@@ -42,7 +42,11 @@ Pod::Spec.new do |s|
       "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64_x86_64-simulator/RACommons.framework/Headers",
     ].join(" "),
     # Framework search paths for framework-style includes like <RACommons/...>
-    "FRAMEWORK_SEARCH_PATHS" => "$(inherited) $(PODS_TARGET_SRCROOT)/ios/Binaries",
+    "FRAMEWORK_SEARCH_PATHS" => [
+      "$(inherited)",
+      "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64",
+      "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64_x86_64-simulator",
+    ].join(" "),
     "GCC_PREPROCESSOR_DEFINITIONS" => "$(inherited) HAS_RACOMMONS=1",
     "DEFINES_MODULE" => "YES",
     "SWIFT_OBJC_INTEROP_MODE" => "objcxx",

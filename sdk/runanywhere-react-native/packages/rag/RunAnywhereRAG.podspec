@@ -33,6 +33,7 @@ Pod::Spec.new do |s|
     "CLANG_CXX_LANGUAGE_STANDARD" => "c++17",
     "HEADER_SEARCH_PATHS" => [
       "$(PODS_TARGET_SRCROOT)/cpp",
+      "$(PODS_TARGET_SRCROOT)/../core/cpp/third_party",
       "$(PODS_TARGET_SRCROOT)/ios/Headers",
       "$(PODS_TARGET_SRCROOT)/../core/ios/Headers",
       "$(PODS_TARGET_SRCROOT)/../llamacpp/ios/Headers",

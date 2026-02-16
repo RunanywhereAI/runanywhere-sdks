@@ -19,9 +19,19 @@
 #include "RAGChunk.hpp"
 
 // RAG C API - stable ABI, proper encapsulation
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
+#if defined(__APPLE__) && (TARGET_OS_IPHONE || TARGET_OS_SIMULATOR)
+#include <RACommons/rac_rag_pipeline.h>
+#include <RACommons/rac_rag.h>
+#include <RACommons/rac_error.h>
+#else
 #include "rac/features/rag/rac_rag_pipeline.h"
 #include "rac/backends/rac_rag.h"
 #include "rac/core/rac_error.h"
+#endif
 
 namespace margelo::nitro::runanywhere::rag {
 
