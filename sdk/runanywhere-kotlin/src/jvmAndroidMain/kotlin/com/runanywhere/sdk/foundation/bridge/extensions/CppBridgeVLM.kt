@@ -400,19 +400,24 @@ object CppBridgeVLM {
     }
 
     fun cancel() {
-        synchronized(lock) {
-            if (state != VLMState.PROCESSING) return
+        // Cancel must NOT acquire `lock` — processStream holds it for the
+        // entire JNI call, so acquiring here would deadlock and defeat the
+        // purpose of cancellation.  Reading volatile fields is safe.
+        if (state != VLMState.PROCESSING) return
 
-            isCancelled = true
+        isCancelled = true
 
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                TAG,
-                "Cancelling VLM generation",
-            )
+        val currentHandle = handle
+        if (currentHandle == 0L) return
 
-            RunAnywhereBridge.racVlmComponentCancel(handle)
-        }
+        CppBridgePlatformAdapter.logCallback(
+            CppBridgePlatformAdapter.LogLevel.DEBUG,
+            TAG,
+            "Cancelling VLM generation",
+        )
+
+        // The C++ cancel sets an atomic flag checked by the generation loop
+        RunAnywhereBridge.racVlmComponentCancel(currentHandle)
     }
 
     fun unload() {

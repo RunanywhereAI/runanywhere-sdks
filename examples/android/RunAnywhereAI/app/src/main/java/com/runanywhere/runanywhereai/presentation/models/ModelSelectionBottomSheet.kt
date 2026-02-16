@@ -197,8 +197,9 @@ fun ModelSelectionBottomSheet(
                                         kotlinx.coroutines.delay(500)
                                         attempts++
                                     }
-                                    // Only notify success if loading completed (not timed out while still loading)
-                                    if (!viewModel.uiState.value.isLoadingModel) {
+                                    // Only notify success if loading completed WITHOUT errors
+                                    val state = viewModel.uiState.value
+                                    if (!state.isLoadingModel && state.error == null) {
                                         onModelSelected(model)
                                     }
                                     onDismiss()

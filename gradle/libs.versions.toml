@@ -146,6 +146,11 @@ playAppUpdateKtx = "2.1.0"
 accompanist = "0.36.0"
 
 # ============================================================================
+# CameraX
+# ============================================================================
+camerax = "1.4.1"
+
+# ============================================================================
 # LIBRARIES
 # ============================================================================
 
@@ -325,6 +330,14 @@ google-play-app-update-ktx = { group = "com.google.android.play", name = "app-up
 # UI Components - Accompanist
 # ----------------------------------------------------------------------------
 accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist" }
+
+# ----------------------------------------------------------------------------
+# CameraX
+# ----------------------------------------------------------------------------
+androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" }
+androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
+androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
+androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
 
 # ============================================================================
 # PLUGINS
