@@ -38,9 +38,9 @@ object CppBridgeModelRegistry {
         const val SPEECH_RECOGNITION = 1 // RAC_MODEL_CATEGORY_SPEECH_RECOGNITION
         const val SPEECH_SYNTHESIS = 2 // RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS
         const val AUDIO = 3 // RAC_MODEL_CATEGORY_AUDIO
-        const val VISION = 4 // RAC_MODEL_CATEGORY_VISION
+        const val IMAGE_GENERATION = 4 // RAC_MODEL_CATEGORY_IMAGE_GENERATION (diffusion)
+        const val VISION = 5 // RAC_MODEL_CATEGORY_VISION
         const val MULTIMODAL = 6 // RAC_MODEL_CATEGORY_MULTIMODAL
-        // 5 = IMAGE_GENERATION (diffusion) not supported on Kotlin/Android; not exposed in API
     }
 
     /**
@@ -51,6 +51,7 @@ object CppBridgeModelRegistry {
         const val STT = ModelCategory.SPEECH_RECOGNITION
         const val TTS = ModelCategory.SPEECH_SYNTHESIS
         const val VAD = ModelCategory.AUDIO
+        const val DIFFUSION = ModelCategory.IMAGE_GENERATION
         const val EMBEDDING = 99
         const val UNKNOWN = 99
 
@@ -93,6 +94,9 @@ object CppBridgeModelRegistry {
         const val FLUID_AUDIO = 4 // RAC_FRAMEWORK_FLUID_AUDIO
         const val BUILTIN = 5 // RAC_FRAMEWORK_BUILTIN
         const val NONE = 6 // RAC_FRAMEWORK_NONE
+        const val MLX = 7 // RAC_FRAMEWORK_MLX
+        const val COREML = 8 // RAC_FRAMEWORK_COREML
+        const val SDCPP = 9 // RAC_FRAMEWORK_SDCPP
         const val UNKNOWN = 99 // RAC_FRAMEWORK_UNKNOWN
     }
 

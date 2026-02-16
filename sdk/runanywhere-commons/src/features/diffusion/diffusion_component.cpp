@@ -19,6 +19,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/diffusion/rac_diffusion_component.h"
+#include "rac/infrastructure/model_management/rac_model_types.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/diffusion/rac_diffusion_tokenizer.h"
 
@@ -138,14 +139,22 @@ static rac_result_t diffusion_create_service(const char* model_id, void* user_da
     RAC_LOG_INFO("Diffusion.Component", "Creating diffusion service for model: %s",
                  model_id ? model_id : "");
 
+    // Tokenizer files are only needed for CoreML models (Apple's ml-stable-diffusion).
+    // sd.cpp bundles its own tokenizer, so skip this check for SDCPP framework.
     if (component && model_id) {
-        rac_result_t ensure_result =
-            rac_diffusion_tokenizer_ensure_files(model_id, &component->config.tokenizer);
-        if (ensure_result != RAC_SUCCESS) {
-            RAC_LOG_ERROR("Diffusion.Component",
-                          "Failed to ensure tokenizer files for %s: %d",
-                          model_id, ensure_result);
-            return ensure_result;
+        auto fw = static_cast<rac_inference_framework_t>(component->config.preferred_framework);
+        if (fw != RAC_FRAMEWORK_SDCPP) {
+            rac_result_t ensure_result =
+                rac_diffusion_tokenizer_ensure_files(model_id, &component->config.tokenizer);
+            if (ensure_result != RAC_SUCCESS) {
+                RAC_LOG_ERROR("Diffusion.Component",
+                              "Failed to ensure tokenizer files for %s: %d",
+                              model_id, ensure_result);
+                return ensure_result;
+            }
+        } else {
+            RAC_LOG_DEBUG("Diffusion.Component",
+                          "Skipping tokenizer check for sd.cpp framework (built-in tokenizer)");
         }
     }
 

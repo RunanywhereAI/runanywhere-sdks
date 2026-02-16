@@ -125,6 +125,7 @@ enum class ModelCategory(
     SPEECH_RECOGNITION("speech-recognition"), // Voice-to-text models (ASR)
     SPEECH_SYNTHESIS("speech-synthesis"), // Text-to-voice models (TTS)
     VISION("vision"), // Image understanding models
+    IMAGE_GENERATION("image-generation"), // Text-to-image models (Diffusion)
     MULTIMODAL("multimodal"), // Models that handle multiple modalities
     AUDIO("audio"), // Audio processing (diarization, etc.)
     ;

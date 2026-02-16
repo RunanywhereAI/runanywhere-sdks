@@ -79,6 +79,7 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
     case systemTTS = "SystemTTS"
     case fluidAudio = "FluidAudio"
     case coreml = "CoreML"        // Core ML (Apple Neural Engine) for diffusion models
+    case sdcpp = "SdCpp"          // stable-diffusion.cpp (cross-platform diffusion)
     case mlx = "MLX"              // MLX (Apple Silicon VLM via MLX C++)
 
     // Special cases
@@ -95,6 +96,7 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
         case .systemTTS: return "System TTS"
         case .fluidAudio: return "FluidAudio"
         case .coreml: return "Core ML"
+        case .sdcpp: return "stable-diffusion.cpp"
         case .mlx: return "MLX"
         case .builtIn: return "Built-in"
         case .none: return "None"
@@ -111,6 +113,7 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
         case .systemTTS: return "system_tts"
         case .fluidAudio: return "fluid_audio"
         case .coreml: return "coreml"
+        case .sdcpp: return "sdcpp"
         case .mlx: return "mlx"
         case .builtIn: return "built_in"
         case .none: return "none"
@@ -131,6 +134,7 @@ public extension InferenceFramework {
         case .systemTTS: return RAC_FRAMEWORK_SYSTEM_TTS
         case .fluidAudio: return RAC_FRAMEWORK_FLUID_AUDIO
         case .coreml: return RAC_FRAMEWORK_COREML
+        case .sdcpp: return RAC_FRAMEWORK_SDCPP
         case .mlx: return RAC_FRAMEWORK_MLX
         case .builtIn: return RAC_FRAMEWORK_BUILTIN
         case .none: return RAC_FRAMEWORK_NONE
@@ -147,6 +151,7 @@ public extension InferenceFramework {
         case RAC_FRAMEWORK_SYSTEM_TTS: return .systemTTS
         case RAC_FRAMEWORK_FLUID_AUDIO: return .fluidAudio
         case RAC_FRAMEWORK_COREML: return .coreml
+        case RAC_FRAMEWORK_SDCPP: return .sdcpp
         case RAC_FRAMEWORK_MLX: return .mlx
         case RAC_FRAMEWORK_BUILTIN: return .builtIn
         case RAC_FRAMEWORK_NONE: return .none

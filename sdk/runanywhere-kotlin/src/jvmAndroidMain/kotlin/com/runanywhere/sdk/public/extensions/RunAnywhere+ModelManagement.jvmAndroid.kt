@@ -63,7 +63,9 @@ internal actual fun registerModelInternal(modelInfo: ModelInfo) {
                         ModelCategory.SPEECH_RECOGNITION -> CppBridgeModelRegistry.ModelCategory.SPEECH_RECOGNITION
                         ModelCategory.SPEECH_SYNTHESIS -> CppBridgeModelRegistry.ModelCategory.SPEECH_SYNTHESIS
                         ModelCategory.AUDIO -> CppBridgeModelRegistry.ModelCategory.AUDIO
-                        else -> CppBridgeModelRegistry.ModelCategory.LANGUAGE
+                        ModelCategory.IMAGE_GENERATION -> CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION
+                        ModelCategory.VISION -> CppBridgeModelRegistry.ModelCategory.VISION
+                        ModelCategory.MULTIMODAL -> CppBridgeModelRegistry.ModelCategory.MULTIMODAL
                     },
                 format =
                     when (modelInfo.format) {
@@ -80,6 +82,9 @@ internal actual fun registerModelInternal(modelInfo: ModelInfo) {
                         InferenceFramework.FOUNDATION_MODELS -> CppBridgeModelRegistry.Framework.FOUNDATION_MODELS
                         InferenceFramework.SYSTEM_TTS -> CppBridgeModelRegistry.Framework.SYSTEM_TTS
                         InferenceFramework.FLUID_AUDIO -> CppBridgeModelRegistry.Framework.FLUID_AUDIO
+                        InferenceFramework.MLX -> CppBridgeModelRegistry.Framework.MLX
+                        InferenceFramework.COREML -> CppBridgeModelRegistry.Framework.COREML
+                        InferenceFramework.SDCPP -> CppBridgeModelRegistry.Framework.SDCPP
                         InferenceFramework.BUILT_IN -> CppBridgeModelRegistry.Framework.BUILTIN
                         InferenceFramework.NONE -> CppBridgeModelRegistry.Framework.NONE
                         InferenceFramework.UNKNOWN -> CppBridgeModelRegistry.Framework.UNKNOWN
@@ -202,6 +207,7 @@ actual suspend fun RunAnywhere.models(category: ModelCategory): List<ModelInfo> 
             ModelCategory.SPEECH_RECOGNITION -> CppBridgeModelRegistry.ModelType.STT
             ModelCategory.SPEECH_SYNTHESIS -> CppBridgeModelRegistry.ModelType.TTS
             ModelCategory.AUDIO -> CppBridgeModelRegistry.ModelType.VAD
+            ModelCategory.IMAGE_GENERATION -> CppBridgeModelRegistry.ModelType.DIFFUSION
             else -> return emptyList()
         }
     return CppBridgeModelRegistry.getModelsByType(type).map { bridgeModelToPublic(it) }
@@ -320,6 +326,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
                 ModelCategory.SPEECH_RECOGNITION -> CppBridgeModelRegistry.ModelType.STT
                 ModelCategory.SPEECH_SYNTHESIS -> CppBridgeModelRegistry.ModelType.TTS
                 ModelCategory.AUDIO -> CppBridgeModelRegistry.ModelType.VAD
+                ModelCategory.IMAGE_GENERATION -> CppBridgeModelRegistry.ModelType.DIFFUSION
                 else -> CppBridgeModelRegistry.ModelType.LLM
             }
 

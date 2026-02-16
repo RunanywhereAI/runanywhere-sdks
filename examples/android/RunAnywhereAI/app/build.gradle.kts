@@ -230,6 +230,7 @@ dependencies {
     // Pick the backends you need:
     implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-llamacpp")) // ~45MB - LLM text generation
     implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-onnx")) // ~30MB - STT, TTS, VAD
+    implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-sdcpp")) // ~58MB - Diffusion image generation
 
     // ========================================
     // AndroidX Core & Lifecycle

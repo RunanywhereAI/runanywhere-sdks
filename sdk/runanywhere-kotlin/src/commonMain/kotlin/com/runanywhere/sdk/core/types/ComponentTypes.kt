@@ -84,6 +84,7 @@ enum class SDKComponent(
     VAD("VAD"),
     VOICE("VOICE"),
     EMBEDDING("EMBEDDING"),
+    DIFFUSION("DIFFUSION"),
     ;
 
     /** Human-readable display name */
@@ -96,6 +97,7 @@ enum class SDKComponent(
                 VAD -> "Voice Activity Detection"
                 VOICE -> "Voice Agent"
                 EMBEDDING -> "Embedding"
+                DIFFUSION -> "Image Generation"
             }
 
     /** Analytics key for the component (lowercase) */
@@ -125,6 +127,11 @@ enum class InferenceFramework(
     SYSTEM_TTS("SystemTTS"),
     FLUID_AUDIO("FluidAudio"),
 
+    // Platform-specific frameworks
+    MLX("MLX"), // MLX C++ (Apple Silicon VLM)
+    COREML("CoreML"), // Core ML (Apple Neural Engine)
+    SDCPP("SdCpp"), // stable-diffusion.cpp (cross-platform diffusion)
+
     // Special cases
     BUILT_IN("BuiltIn"), // For simple services (e.g., energy-based VAD)
     NONE("None"), // For services that don't use a model
@@ -140,6 +147,9 @@ enum class InferenceFramework(
                 FOUNDATION_MODELS -> "Foundation Models"
                 SYSTEM_TTS -> "System TTS"
                 FLUID_AUDIO -> "FluidAudio"
+                MLX -> "MLX"
+                COREML -> "Core ML"
+                SDCPP -> "stable-diffusion.cpp"
                 BUILT_IN -> "Built-in"
                 NONE -> "None"
                 UNKNOWN -> "Unknown"
@@ -154,6 +164,9 @@ enum class InferenceFramework(
                 FOUNDATION_MODELS -> "foundation_models"
                 SYSTEM_TTS -> "system_tts"
                 FLUID_AUDIO -> "fluid_audio"
+                MLX -> "mlx"
+                COREML -> "coreml"
+                SDCPP -> "sdcpp"
                 BUILT_IN -> "built_in"
                 NONE -> "none"
                 UNKNOWN -> "unknown"

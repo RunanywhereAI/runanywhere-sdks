@@ -45,3 +45,8 @@ include(":modules:runanywhere-core-llamacpp")
 // Single file: ONNX.kt which calls rac_backend_onnx_register()
 // Matches iOS: Sources/ONNXRuntime/ONNX.swift
 include(":modules:runanywhere-core-onnx")
+
+// SDCPP module - stable-diffusion.cpp backend for diffusion image generation
+// Single file: SdcppDiffusion.kt which calls rac_backend_sdcpp_register()
+// Cross-platform: Metal on iOS/macOS, CPU/Vulkan on Android
+include(":modules:runanywhere-core-sdcpp")
