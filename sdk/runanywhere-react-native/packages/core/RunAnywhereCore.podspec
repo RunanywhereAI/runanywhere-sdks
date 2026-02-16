@@ -36,10 +36,13 @@ Pod::Spec.new do |s|
       "$(PODS_TARGET_SRCROOT)/cpp",
       "$(PODS_TARGET_SRCROOT)/cpp/bridges",
       "$(PODS_TARGET_SRCROOT)/cpp/third_party",
+      "$(PODS_ROOT)/Headers/Public",
+      # Need headers directory for direct includes like "rac_telemetry_manager.h" from bridge files
       "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64/RACommons.framework/Headers",
       "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64_x86_64-simulator/RACommons.framework/Headers",
-      "$(PODS_ROOT)/Headers/Public",
     ].join(" "),
+    # Framework search paths for framework-style includes like <RACommons/...>
+    "FRAMEWORK_SEARCH_PATHS" => "$(inherited) $(PODS_TARGET_SRCROOT)/ios/Binaries",
     "GCC_PREPROCESSOR_DEFINITIONS" => "$(inherited) HAS_RACOMMONS=1",
     "DEFINES_MODULE" => "YES",
     "SWIFT_OBJC_INTEROP_MODE" => "objcxx",
