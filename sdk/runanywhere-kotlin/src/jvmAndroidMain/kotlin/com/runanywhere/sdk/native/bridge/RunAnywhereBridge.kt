@@ -356,6 +356,9 @@ object RunAnywhereBridge {
     ): Int
 
     @JvmStatic
+    external fun racVlmComponentLoadModelById(handle: Long, modelId: String): Int
+
+    @JvmStatic
     external fun racVlmComponentUnload(handle: Long): Int
 
     @JvmStatic

@@ -471,9 +471,9 @@ private func platformHttpDownloadCallback(
     outTaskId.pointee = rac_strdup(taskId)
 
     let session = URLSession(configuration: .default)
-    let task = session.downloadTask(with: downloadURL) { tempURL, response, error in
+    let task = session.downloadTask(with: downloadURL) { tempURL, _, error in
         var result: rac_result_t = RAC_SUCCESS
-        var finalPath: String? = nil
+        var finalPath: String?
 
         defer {
             httpDownloadQueue.async {

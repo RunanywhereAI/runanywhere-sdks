@@ -102,7 +102,17 @@ expect suspend fun RunAnywhere.processImageStreamWithMetrics(
 // MARK: - Model Management
 
 /**
- * Load a VLM model.
+ * Load a VLM model by ID using the global model registry.
+ *
+ * The C++ layer resolves the model folder, finds the main .gguf and mmproj .gguf
+ * files automatically. This is the preferred API for loading VLM models.
+ *
+ * @param modelId Model identifier (must be registered in the global model registry)
+ */
+expect suspend fun RunAnywhere.loadVLMModel(modelId: String)
+
+/**
+ * Load a VLM model with explicit paths.
  *
  * @param modelPath Path to the main model file (LLM weights)
  * @param mmprojPath Path to the vision projector file (optional, required for llama.cpp)

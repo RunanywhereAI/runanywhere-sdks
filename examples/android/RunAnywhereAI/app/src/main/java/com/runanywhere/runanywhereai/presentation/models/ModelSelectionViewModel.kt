@@ -23,7 +23,6 @@ import com.runanywhere.sdk.public.extensions.loadLLMModel
 import com.runanywhere.sdk.public.extensions.loadSTTModel
 import com.runanywhere.sdk.public.extensions.loadTTSVoice
 import com.runanywhere.sdk.public.extensions.loadVLMModel
-import com.runanywhere.sdk.public.extensions.getMultiFileDescriptors
 import com.runanywhere.sdk.public.extensions.unloadVLMModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -344,71 +343,8 @@ class ModelSelectionViewModel(
                     }
                 }
                 ModelSelectionContext.VLM -> {
-                    // VLM requires model path + optional mmproj path
-                    val model = _uiState.value.models.find { it.id == modelId }
-                    val modelPath = model?.localPath
-                        ?: throw IllegalStateException("VLM model not downloaded: $modelId")
-
-                    val modelFile = java.io.File(modelPath)
-
-                    // Determine model directory: either localPath IS a directory, or its parent
-                    val modelDir = if (modelFile.isDirectory) modelFile else modelFile.parentFile
-
-                    // Use multi-file descriptors to find expected filenames
-                    val fileDescriptors = com.runanywhere.sdk.public.extensions.getMultiFileDescriptors(modelId)
-
-                    var mainModelFile: String = modelPath
-                    var mmprojPath: String? = null
-
-                    if (fileDescriptors != null && modelFile.isDirectory) {
-                        // Multi-file model in a directory: look for specific expected filenames
-                        for (descriptor in fileDescriptors) {
-                            val expectedFile = java.io.File(modelDir, descriptor.filename)
-                            if (expectedFile.exists()) {
-                                if (descriptor.filename.contains("mmproj", ignoreCase = true)) {
-                                    mmprojPath = expectedFile.absolutePath
-                                } else {
-                                    mainModelFile = expectedFile.absolutePath
-                                }
-                            }
-                        }
-                    } else {
-                        // Fallback: search directory for mmproj and main model by naming convention
-                        mmprojPath = modelDir?.listFiles()?.firstOrNull { file ->
-                            file.name.contains("mmproj", ignoreCase = true) &&
-                                (file.extension == "gguf" || file.name.endsWith(".gguf"))
-                        }?.absolutePath
-
-                        if (modelFile.isDirectory) {
-                            mainModelFile = modelDir?.listFiles()?.firstOrNull { file ->
-                                !file.name.contains("mmproj", ignoreCase = true) &&
-                                    (file.extension == "gguf" || file.name.endsWith(".gguf"))
-                            }?.absolutePath ?: modelPath
-                        }
-                    }
-
-                    // Check if this is a multi-file model with missing mmproj
-                    if (fileDescriptors != null && fileDescriptors.size > 1 && mmprojPath == null) {
-                        val mmprojDescriptor = fileDescriptors.firstOrNull {
-                            it.filename.contains("mmproj", ignoreCase = true)
-                        }
-                        if (mmprojDescriptor != null) {
-                            throw IllegalStateException(
-                                "VLM model download is incomplete: the vision projector file " +
-                                    "(${mmprojDescriptor.filename}) is missing. " +
-                                    "Please delete and re-download the model."
-                            )
-                        }
-                    }
-
-                    Log.d(TAG, "VLM loading: model=$mainModelFile, mmproj=${mmprojPath ?: "none"}")
-
-                    RunAnywhere.loadVLMModel(
-                        modelPath = mainModelFile,
-                        mmprojPath = mmprojPath,
-                        modelId = modelId,
-                        modelName = model.name,
-                    )
+                    // C++ handles model file resolution (main model + mmproj) automatically
+                    RunAnywhere.loadVLMModel(modelId)
                 }
             }
 

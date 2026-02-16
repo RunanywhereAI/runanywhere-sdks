@@ -215,6 +215,23 @@ actual suspend fun RunAnywhere.processImageStreamWithMetrics(
 
 // MARK: - Model Management
 
+actual suspend fun RunAnywhere.loadVLMModel(modelId: String) {
+    if (!isInitialized) {
+        throw SDKError.notInitialized("SDK not initialized")
+    }
+
+    ensureServicesReady()
+
+    vlmLogger.info("Loading VLM model by ID: $modelId")
+
+    val result = CppBridgeVLM.loadModelById(modelId)
+    if (result != 0) {
+        throw SDKError.vlm("Failed to load VLM model: $modelId (error: $result)")
+    }
+
+    vlmLogger.info("VLM model loaded successfully by ID: $modelId")
+}
+
 actual suspend fun RunAnywhere.loadVLMModel(
     modelPath: String,
     mmprojPath: String?,

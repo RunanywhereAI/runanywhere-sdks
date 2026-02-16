@@ -212,21 +212,6 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // ========================================================================
-    // TOKEN CLEANING
-    // ========================================================================
-
-    /** Special tokens that leak from model output and should be stripped. */
-    private val specialTokenPattern = Regex("<\\|[^|]*\\|>")
-
-    /** Clean a streamed token by stripping model-internal special tokens (e.g. <|im_end|>). */
-    private fun cleanToken(token: String): String =
-        specialTokenPattern.replace(token, "")
-
-    /** Clean a completed description string — strip special tokens and trim whitespace. */
-    private fun cleanDescription(text: String): String =
-        specialTokenPattern.replace(text, "").trim()
-
-    // ========================================================================
     // DESCRIBE - Mirrors iOS describeCurrentFrame / describeImage
     // ========================================================================
 
@@ -266,13 +251,10 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
                     "Describe what you see briefly.",
                     options,
                 ).collect { token ->
-                    val cleaned = cleanToken(token)
-                    if (cleaned.isNotEmpty()) {
-                        _uiState.update { it.copy(currentDescription = it.currentDescription + cleaned) }
-                    }
+                    _uiState.update { it.copy(currentDescription = it.currentDescription + token) }
                 }
 
-                _uiState.update { it.copy(currentDescription = cleanDescription(it.currentDescription)) }
+                _uiState.update { it.copy(currentDescription = it.currentDescription.trim()) }
                 Log.i(TAG, "Frame description completed")
             } catch (e: Exception) {
                 Log.e(TAG, "Frame description failed: ${e.message}", e)
@@ -311,13 +293,10 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
 
                 RunAnywhere.processImageStream(image, prompt, options)
                     .collect { token ->
-                        val cleaned = cleanToken(token)
-                        if (cleaned.isNotEmpty()) {
-                            _uiState.update { it.copy(currentDescription = it.currentDescription + cleaned) }
-                        }
+                        _uiState.update { it.copy(currentDescription = it.currentDescription + token) }
                     }
 
-                _uiState.update { it.copy(currentDescription = cleanDescription(it.currentDescription)) }
+                _uiState.update { it.copy(currentDescription = it.currentDescription.trim()) }
                 Log.i(TAG, "VLM streaming completed")
                 tempFile.delete()
             } catch (e: Exception) {
@@ -395,14 +374,10 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
                 "Describe what you see in one sentence.",
                 options,
             ).collect { token ->
-                val cleaned = cleanToken(token)
-                if (cleaned.isNotEmpty()) {
-                    newDescription += cleaned
-                    _uiState.update { it.copy(currentDescription = newDescription) }
-                }
+                newDescription += token
+                _uiState.update { it.copy(currentDescription = newDescription) }
             }
-            newDescription = cleanDescription(newDescription)
-            _uiState.update { it.copy(currentDescription = newDescription) }
+            _uiState.update { it.copy(currentDescription = newDescription.trim()) }
         } catch (e: Exception) {
             Log.e(TAG, "Auto-stream VLM error: ${e.message}")
         } finally {
