@@ -140,9 +140,15 @@ object LlamaCPP : RunAnywhereModule {
     fun unregister() {
         if (!isRegistered) return
 
+        // Unregister VLM backend first (matches iOS unregister order)
+        if (isVlmRegistered) {
+            unregisterVlmNative()
+            isVlmRegistered = false
+            logger.info("LlamaCPP VLM backend unregistered")
+        }
+
         unregisterNative()
         isRegistered = false
-        isVlmRegistered = false
         logger.info("LlamaCPP backend unregistered")
     }
 
@@ -185,3 +191,9 @@ internal expect fun LlamaCPP.unregisterNative(): Int
  * Calls rac_backend_llamacpp_vlm_register() via JNI.
  */
 internal expect fun LlamaCPP.registerVlmNative(): Int
+
+/**
+ * Platform-specific VLM native unregistration.
+ * Calls rac_backend_llamacpp_vlm_unregister() via JNI.
+ */
+internal expect fun LlamaCPP.unregisterVlmNative(): Int

@@ -26,8 +26,13 @@ import com.runanywhere.sdk.public.extensions.VLM.VLMResult
  * - Component state tracking
  *
  * Thread Safety:
- * - This object is thread-safe via synchronized blocks
- * - Matches iOS Actor-based pattern using Kotlin synchronized
+ * - State transitions are protected by synchronized(lock) blocks
+ * - Long-running native JNI calls (process, processStream, loadModel,
+ *   loadModelById) release the lock before the native call and re-acquire
+ *   it afterward for state restore.  This prevents cancel() from deadlocking.
+ * - cancel() reads volatile fields directly without acquiring the lock.
+ * - Short-lived lifecycle operations (create, unload, destroy, unregister)
+ *   remain fully synchronized.
  */
 object CppBridgeVLM {
     /**
@@ -213,6 +218,10 @@ object CppBridgeVLM {
 
     /**
      * Load a VLM model with separate model and mmproj paths.
+     *
+     * Lock is only held for state transitions, NOT during the blocking native
+     * JNI load call, so that [cancel] and other short operations are not
+     * blocked for the entire model-load duration.
      */
     fun loadModel(
         modelPath: String,
@@ -220,6 +229,7 @@ object CppBridgeVLM {
         modelId: String,
         modelName: String? = null,
     ): Int {
+        // 1. Acquire lock for pre-load state transitions (create / unload if needed)
         synchronized(lock) {
             if (handle == 0L) {
                 val createResult = create()
@@ -236,46 +246,61 @@ object CppBridgeVLM {
             }
 
             setState(VLMState.LOADING)
+        }
 
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.INFO,
-                TAG,
-                "Loading VLM model: $modelId from $modelPath (mmproj: ${mmprojPath ?: "none"})",
-            )
+        // 2. Capture volatile handle for thread-safe access outside lock
+        val currentHandle = handle
 
-            val result = RunAnywhereBridge.racVlmComponentLoadModel(
-                handle, modelPath, mmprojPath, modelId, modelName,
-            )
-            if (result != 0) {
+        CppBridgePlatformAdapter.logCallback(
+            CppBridgePlatformAdapter.LogLevel.INFO,
+            TAG,
+            "Loading VLM model: $modelId from $modelPath (mmproj: ${mmprojPath ?: "none"})",
+        )
+
+        // 3. Native call runs outside lock
+        val result = RunAnywhereBridge.racVlmComponentLoadModel(
+            currentHandle, modelPath, mmprojPath, modelId, modelName,
+        )
+
+        // 4. Re-acquire lock for state updates
+        if (result != 0) {
+            synchronized(lock) {
                 setState(VLMState.ERROR)
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.ERROR,
-                    TAG,
-                    "Failed to load VLM model: $modelId (error: $result)",
-                )
-                return result
             }
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.ERROR,
+                TAG,
+                "Failed to load VLM model: $modelId (error: $result)",
+            )
+            return result
+        }
 
+        synchronized(lock) {
             loadedModelId = modelId
             loadedModelPath = modelPath
             loadedMmprojPath = mmprojPath
             setState(VLMState.READY)
-
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.INFO,
-                TAG,
-                "VLM model loaded successfully: $modelId",
-            )
-
-            return 0
         }
+
+        CppBridgePlatformAdapter.logCallback(
+            CppBridgePlatformAdapter.LogLevel.INFO,
+            TAG,
+            "VLM model loaded successfully: $modelId",
+        )
+
+        return 0
     }
 
     /**
      * Load a VLM model by ID using the C++ model registry for path resolution.
      * The C++ layer handles finding the main model and mmproj files automatically.
+     *
+     * Lock is only held for state transitions, NOT during the blocking native
+     * JNI load call, so that [cancel] and other short operations are not
+     * blocked for the entire model-load duration.
      */
     fun loadModelById(modelId: String): Int {
+        // 1. Acquire lock for pre-load state transitions (create / unload if needed)
         synchronized(lock) {
             if (handle == 0L) {
                 val createResult = create()
@@ -292,39 +317,53 @@ object CppBridgeVLM {
             }
 
             setState(VLMState.LOADING)
+        }
 
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.INFO,
-                TAG,
-                "Loading VLM model by ID: $modelId",
-            )
+        // 2. Capture volatile handle for thread-safe access outside lock
+        val currentHandle = handle
 
-            val result = RunAnywhereBridge.racVlmComponentLoadModelById(handle, modelId)
-            if (result != 0) {
+        CppBridgePlatformAdapter.logCallback(
+            CppBridgePlatformAdapter.LogLevel.INFO,
+            TAG,
+            "Loading VLM model by ID: $modelId",
+        )
+
+        // 3. Native call runs outside lock
+        val result = RunAnywhereBridge.racVlmComponentLoadModelById(currentHandle, modelId)
+
+        // 4. Re-acquire lock for state updates
+        if (result != 0) {
+            synchronized(lock) {
                 setState(VLMState.ERROR)
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.ERROR,
-                    TAG,
-                    "Failed to load VLM model by ID: $modelId (error: $result)",
-                )
-                return result
             }
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.ERROR,
+                TAG,
+                "Failed to load VLM model by ID: $modelId (error: $result)",
+            )
+            return result
+        }
 
+        synchronized(lock) {
             loadedModelId = modelId
             setState(VLMState.READY)
-
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.INFO,
-                TAG,
-                "VLM model loaded successfully by ID: $modelId",
-            )
-
-            return 0
         }
+
+        CppBridgePlatformAdapter.logCallback(
+            CppBridgePlatformAdapter.LogLevel.INFO,
+            TAG,
+            "VLM model loaded successfully by ID: $modelId",
+        )
+
+        return 0
     }
 
     /**
      * Process an image (non-streaming).
+     *
+     * Lock is only held for state transitions, NOT during the blocking native
+     * JNI call, so that [cancel] (which reads volatile fields directly) can
+     * set the cancellation flag without waiting for processing to finish.
      */
     @Throws(SDKError::class)
     fun process(
@@ -337,49 +376,62 @@ object CppBridgeVLM {
         prompt: String,
         optionsJson: String?,
     ): ProcessingResult {
+        // 1. Acquire lock for state check + transition
         synchronized(lock) {
             if (handle == 0L || state != VLMState.READY) {
                 throw SDKError.vlm("VLM component not ready for processing")
             }
-
             isCancelled = false
             setState(VLMState.PROCESSING)
+        }
+
+        // 2. Capture volatile handle for thread-safe access outside lock
+        val currentHandle = handle
+
+        CppBridgePlatformAdapter.logCallback(
+            CppBridgePlatformAdapter.LogLevel.DEBUG,
+            TAG,
+            "Starting VLM processing (prompt length: ${prompt.length})",
+        )
+
+        val startTime = System.currentTimeMillis()
+
+        // 3. Native call runs outside lock so cancel() is not blocked
+        try {
+            val resultJson =
+                RunAnywhereBridge.racVlmComponentProcess(
+                    currentHandle, imageFormat, imagePath, imageData, imageBase64,
+                    imageWidth, imageHeight, prompt, optionsJson,
+                ) ?: throw SDKError.vlm("VLM processing failed: null result")
+
+            val result = parseProcessingResult(resultJson, System.currentTimeMillis() - startTime)
+
+            // 4. Re-acquire lock for state restore
+            synchronized(lock) {
+                setState(VLMState.READY)
+            }
 
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Starting VLM processing (prompt length: ${prompt.length})",
+                "VLM processing completed: ${result.completionTokens} tokens, ${result.tokensPerSecond} tok/s",
             )
 
-            val startTime = System.currentTimeMillis()
-
-            try {
-                val resultJson =
-                    RunAnywhereBridge.racVlmComponentProcess(
-                        handle, imageFormat, imagePath, imageData, imageBase64,
-                        imageWidth, imageHeight, prompt, optionsJson,
-                    ) ?: throw SDKError.vlm("VLM processing failed: null result")
-
-                val result = parseProcessingResult(resultJson, System.currentTimeMillis() - startTime)
-
+            return result
+        } catch (e: Exception) {
+            synchronized(lock) {
                 setState(VLMState.READY)
-
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.DEBUG,
-                    TAG,
-                    "VLM processing completed: ${result.completionTokens} tokens, ${result.tokensPerSecond} tok/s",
-                )
-
-                return result
-            } catch (e: Exception) {
-                setState(VLMState.READY)
-                throw if (e is SDKError) e else SDKError.vlm("VLM processing failed: ${e.message}")
             }
+            throw if (e is SDKError) e else SDKError.vlm("VLM processing failed: ${e.message}")
         }
     }
 
     /**
      * Process an image with streaming output.
+     *
+     * Lock is only held for state transitions, NOT during the blocking native
+     * JNI call, so that [cancel] (which reads volatile fields directly) can
+     * set the cancellation flag without waiting for processing to finish.
      */
     @Throws(SDKError::class)
     fun processStream(
@@ -393,61 +445,70 @@ object CppBridgeVLM {
         optionsJson: String?,
         callback: StreamCallback,
     ): ProcessingResult {
+        // 1. Acquire lock for state check + transition; set streamCallback while locked
         synchronized(lock) {
             if (handle == 0L || state != VLMState.READY) {
                 throw SDKError.vlm("VLM component not ready for processing")
             }
-
             isCancelled = false
             streamCallback = callback
             setState(VLMState.PROCESSING)
+        }
+
+        // 2. Capture volatile handle for thread-safe access outside lock
+        val currentHandle = handle
+
+        CppBridgePlatformAdapter.logCallback(
+            CppBridgePlatformAdapter.LogLevel.DEBUG,
+            TAG,
+            "Starting VLM streaming processing (prompt length: ${prompt.length})",
+        )
+
+        val startTime = System.currentTimeMillis()
+
+        // 3. Native call runs outside lock so cancel() is not blocked
+        try {
+            val jniCallback =
+                RunAnywhereBridge.TokenCallback { token ->
+                    try {
+                        callback.onToken(token.decodeToString())
+                    } catch (e: Exception) {
+                        CppBridgePlatformAdapter.logCallback(
+                            CppBridgePlatformAdapter.LogLevel.WARN,
+                            TAG,
+                            "Error in VLM stream callback: ${e.message}",
+                        )
+                        true
+                    }
+                }
+
+            val resultJson =
+                RunAnywhereBridge.racVlmComponentProcessStream(
+                    currentHandle, imageFormat, imagePath, imageData, imageBase64,
+                    imageWidth, imageHeight, prompt, optionsJson, jniCallback,
+                ) ?: throw SDKError.vlm("VLM streaming processing failed: null result")
+
+            val result = parseProcessingResult(resultJson, System.currentTimeMillis() - startTime)
+
+            // 4. Re-acquire lock for state restore
+            synchronized(lock) {
+                setState(VLMState.READY)
+                streamCallback = null
+            }
 
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Starting VLM streaming processing (prompt length: ${prompt.length})",
+                "VLM streaming processing completed: ${result.completionTokens} tokens",
             )
 
-            val startTime = System.currentTimeMillis()
-
-            try {
-                val jniCallback =
-                    RunAnywhereBridge.TokenCallback { token ->
-                        try {
-                            callback.onToken(token.decodeToString())
-                        } catch (e: Exception) {
-                            CppBridgePlatformAdapter.logCallback(
-                                CppBridgePlatformAdapter.LogLevel.WARN,
-                                TAG,
-                                "Error in VLM stream callback: ${e.message}",
-                            )
-                            true
-                        }
-                    }
-
-                val resultJson =
-                    RunAnywhereBridge.racVlmComponentProcessStream(
-                        handle, imageFormat, imagePath, imageData, imageBase64,
-                        imageWidth, imageHeight, prompt, optionsJson, jniCallback,
-                    ) ?: throw SDKError.vlm("VLM streaming processing failed: null result")
-
-                val result = parseProcessingResult(resultJson, System.currentTimeMillis() - startTime)
-
+            return result
+        } catch (e: Exception) {
+            synchronized(lock) {
                 setState(VLMState.READY)
                 streamCallback = null
-
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.DEBUG,
-                    TAG,
-                    "VLM streaming processing completed: ${result.completionTokens} tokens",
-                )
-
-                return result
-            } catch (e: Exception) {
-                setState(VLMState.READY)
-                streamCallback = null
-                throw if (e is SDKError) e else SDKError.vlm("VLM streaming processing failed: ${e.message}")
             }
+            throw if (e is SDKError) e else SDKError.vlm("VLM streaming processing failed: ${e.message}")
         }
     }
 

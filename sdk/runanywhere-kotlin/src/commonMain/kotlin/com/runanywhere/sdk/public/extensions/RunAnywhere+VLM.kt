@@ -136,6 +136,15 @@ expect suspend fun RunAnywhere.unloadVLMModel()
  */
 expect val RunAnywhere.isVLMModelLoaded: Boolean
 
+/**
+ * Get the currently loaded VLM model ID.
+ *
+ * This is a synchronous property that returns the ID of the currently loaded VLM model,
+ * or null if no model is loaded. Matches iOS pattern and other component properties
+ * (currentLLMModelId, currentSTTModelId, currentTTSVoiceId).
+ */
+expect val RunAnywhere.currentVLMModelId: String?
+
 // MARK: - Generation Control
 
 /**

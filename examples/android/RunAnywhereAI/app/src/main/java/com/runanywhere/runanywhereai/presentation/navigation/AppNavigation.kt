@@ -11,7 +11,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -109,10 +108,26 @@ fun AppNavigation() {
  * - More (ellipsis icon)
  * - Settings (gear icon)
  */
+/**
+ * Determine if a route should cause a tab to be highlighted.
+ * Maps nested/child routes to their parent tab.
+ */
+private fun isRouteSelectedForTab(currentRoute: String?, tabRoute: String): Boolean {
+    if (currentRoute == null) return false
+    if (currentRoute == tabRoute) return true
+
+    // Map child routes to parent tabs
+    return when (tabRoute) {
+        NavigationRoute.VISION -> currentRoute in listOf(NavigationRoute.VLM)
+        NavigationRoute.MORE -> currentRoute in listOf(NavigationRoute.STT, NavigationRoute.TTS)
+        else -> false
+    }
+}
+
 @Composable
 fun RunAnywhereBottomNav(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentDestination = navBackStackEntry?.destination
+    val currentRoute = navBackStackEntry?.destination?.route
 
     // Match iOS tab order exactly: Chat, Vision, Voice, More, Settings
     val items =
@@ -155,7 +170,7 @@ fun RunAnywhereBottomNav(navController: NavController) {
         tonalElevation = 0.dp,
     ) {
         items.forEach { item ->
-            val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
+            val selected = isRouteSelectedForTab(currentRoute, item.route)
 
             NavigationBarItem(
                 icon = {

@@ -20,10 +20,11 @@ import com.runanywhere.sdk.public.extensions.VLM.VLMStreamingResult
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 
 private val vlmLogger = SDKLogger("VLM")
@@ -83,7 +84,7 @@ actual fun RunAnywhere.processImageStream(
     prompt: String,
     options: VLMGenerationOptions?,
 ): Flow<String> =
-    flow {
+    callbackFlow {
         if (!isInitialized) {
             throw SDKError.notInitialized("SDK not initialized")
         }
@@ -96,12 +97,8 @@ actual fun RunAnywhere.processImageStream(
 
         val optionsJson = options?.let { buildOptionsJson(it) }
 
-        // Use a channel to bridge callback to flow
-        val channel = Channel<String>(Channel.UNLIMITED)
-
-        // Start generation in a separate coroutine
-        val scope = CoroutineScope(Dispatchers.IO)
-        scope.launch {
+        // Run blocking JNI call on IO dispatcher; callbackFlow handles cancellation
+        val job = launch(Dispatchers.IO) {
             try {
                 CppBridgeVLM.processStream(
                     imageFormat = image.format.rawValue,
@@ -113,18 +110,18 @@ actual fun RunAnywhere.processImageStream(
                     prompt = prompt,
                     optionsJson = optionsJson,
                     callback = CppBridgeVLM.StreamCallback { token ->
-                        channel.trySend(token)
-                        true // Continue generation
+                        trySend(token).isSuccess
                     },
                 )
-            } finally {
-                channel.close()
+                close()
+            } catch (e: Exception) {
+                close(e)
             }
         }
 
-        // Emit tokens from the channel
-        for (token in channel) {
-            emit(token)
+        awaitClose {
+            CppBridgeVLM.cancel()
+            job.cancel()
         }
     }
 
@@ -154,9 +151,9 @@ actual suspend fun RunAnywhere.processImageStreamWithMetrics(
     // Use a channel to bridge callback to flow
     val channel = Channel<String>(Channel.UNLIMITED)
 
-    // Start generation in a separate coroutine
-    val scope = CoroutineScope(Dispatchers.IO)
-    scope.launch {
+    // Start generation in a child coroutine tied to a cancellable scope
+    val jobScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    val job = jobScope.launch {
         try {
             val cppResult = CppBridgeVLM.processStream(
                 imageFormat = image.format.rawValue,
@@ -173,8 +170,7 @@ actual suspend fun RunAnywhere.processImageStreamWithMetrics(
                     }
                     fullText += token
                     tokenCount++
-                    channel.trySend(token)
-                    true // Continue generation
+                    channel.trySend(token).isSuccess
                 },
             )
 
@@ -202,16 +198,20 @@ actual suspend fun RunAnywhere.processImageStreamWithMetrics(
         }
     }
 
-    val tokenStream =
-        flow {
-            for (token in channel) {
-                emit(token)
-            }
+    val tokenStream = callbackFlow {
+        for (token in channel) {
+            trySend(token)
         }
+        close()
+        awaitClose {
+            CppBridgeVLM.cancel()
+            job.cancel()
+        }
+    }
 
     return VLMStreamingResult(
         stream = tokenStream,
-        result = scope.async { resultDeferred.await() },
+        result = resultDeferred,
     )
 }
 
@@ -263,6 +263,9 @@ actual suspend fun RunAnywhere.unloadVLMModel() {
 
 actual val RunAnywhere.isVLMModelLoaded: Boolean
     get() = CppBridgeVLM.isLoaded
+
+actual val RunAnywhere.currentVLMModelId: String?
+    get() = CppBridgeVLM.getLoadedModelId()
 
 // MARK: - Generation Control
 

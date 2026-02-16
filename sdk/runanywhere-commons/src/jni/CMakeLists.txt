@@ -43,7 +43,17 @@ FetchContent_MakeAvailable(nlohmann_json)
 # and NOT the host JDK's JVM/AWT libraries.
 if(ANDROID)
     # NDK sysroot contains jni.h and android/jni_md.h
-    set(_NDK_PREBUILT "${CMAKE_ANDROID_NDK}/toolchains/llvm/prebuilt/darwin-x86_64")
+    # Detect NDK host tag dynamically instead of hardcoding
+    if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
+        set(_NDK_HOST_TAG "darwin-x86_64")
+    elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+        set(_NDK_HOST_TAG "linux-x86_64")
+    elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+        set(_NDK_HOST_TAG "windows-x86_64")
+    else()
+        message(FATAL_ERROR "Unsupported host platform: ${CMAKE_HOST_SYSTEM_NAME}")
+    endif()
+    set(_NDK_PREBUILT "${CMAKE_ANDROID_NDK}/toolchains/llvm/prebuilt/${_NDK_HOST_TAG}")
     set(_NDK_SYSROOT_INCLUDE "${_NDK_PREBUILT}/sysroot/usr/include")
 
     if(NOT EXISTS "${_NDK_SYSROOT_INCLUDE}/jni.h")
