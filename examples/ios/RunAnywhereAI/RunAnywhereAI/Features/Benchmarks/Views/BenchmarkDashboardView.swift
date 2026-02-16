@@ -23,6 +23,17 @@ struct BenchmarkDashboardView: View {
                 }
             }
 
+            // Benchmark Suite Info
+            Section {
+                VStack(alignment: .leading, spacing: AppSpacing.small) {
+                    Text("Each category runs deterministic scenarios against every downloaded model of that type. Synthetic inputs (silent audio, sine waves, solid-color images) ensure reproducible results.")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.textSecondary)
+                }
+            } header: {
+                Label("Benchmark Suite", systemImage: "info.circle")
+            }
+
             // Category Selection
             Section("Categories") {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -43,6 +54,11 @@ struct BenchmarkDashboardView: View {
                     .padding(.vertical, AppSpacing.xSmall)
                 }
                 .listRowInsets(EdgeInsets(top: 0, leading: AppSpacing.large, bottom: 0, trailing: AppSpacing.large))
+
+                // Scenario descriptions per selected category
+                ForEach(BenchmarkCategory.allCases.filter { viewModel.selectedCategories.contains($0) }) { category in
+                    CategoryScenariosRow(category: category)
+                }
             }
 
             // Run Controls
@@ -56,14 +72,35 @@ struct BenchmarkDashboardView: View {
                 }
                 .disabled(viewModel.isRunning)
 
-                if viewModel.selectedCategories.count < BenchmarkCategory.allCases.count {
+                if viewModel.selectedCategories.count < BenchmarkCategory.allCases.count,
+                   !viewModel.selectedCategories.isEmpty {
                     Button {
                         viewModel.runBenchmarks()
                     } label: {
                         Label("Run Selected (\(viewModel.selectedCategories.count))", systemImage: "play")
                             .frame(maxWidth: .infinity, alignment: .center)
                     }
-                    .disabled(viewModel.isRunning || viewModel.selectedCategories.isEmpty)
+                    .disabled(viewModel.isRunning)
+                }
+
+                if viewModel.selectedCategories.isEmpty {
+                    Text("Select at least one category to run benchmarks.")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.statusOrange)
+                }
+            }
+
+            // Skipped categories warning
+            if let skippedMsg = viewModel.skippedCategoriesMessage {
+                Section {
+                    Label {
+                        Text(skippedMsg)
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.statusOrange)
+                    } icon: {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(AppColors.statusOrange)
+                    }
                 }
             }
 
@@ -85,9 +122,10 @@ struct BenchmarkDashboardView: View {
                         Text("No benchmark results yet")
                             .font(AppTypography.callout)
                             .foregroundColor(AppColors.textSecondary)
-                        Text("Run a benchmark to see performance data")
+                        Text("Download models first, then run benchmarks to measure on-device AI performance.")
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.textTertiary)
+                            .multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, AppSpacing.xxLarge)
@@ -115,7 +153,7 @@ struct BenchmarkDashboardView: View {
         } message: {
             Text("This will permanently delete all benchmark history.")
         }
-        .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+        .alert("Benchmark Error", isPresented: .constant(viewModel.errorMessage != nil)) {
             Button("OK") { viewModel.errorMessage = nil }
         } message: {
             if let error = viewModel.errorMessage {
@@ -135,6 +173,38 @@ struct BenchmarkDashboardView: View {
         }
         .task {
             viewModel.loadPastRuns()
+        }
+    }
+}
+
+// MARK: - Category Scenarios Row
+
+private struct CategoryScenariosRow: View {
+    let category: BenchmarkCategory
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
+            Label(category.displayName, systemImage: category.iconName)
+                .font(AppTypography.caption2Medium)
+                .foregroundColor(AppColors.textPrimary)
+            Text(scenarioDescription)
+                .font(AppTypography.caption)
+                .foregroundColor(AppColors.textTertiary)
+        }
+    }
+
+    private var scenarioDescription: String {
+        switch category {
+        case .llm:
+            return "Short (50 tok), Medium (256 tok), Long (512 tok) — measures tok/s, TTFT, load time"
+        case .stt:
+            return "Silent 2s, Sine Tone 3s — measures RTF, processing time"
+        case .tts:
+            return "Short text, Medium text — measures audio duration, char throughput"
+        case .vlm:
+            return "Solid color, Gradient image (224×224) — measures tok/s, completion tokens"
+        case .diffusion:
+            return "Simple prompt, 10 steps, seed 42 — measures generation time"
         }
     }
 }
@@ -183,15 +253,22 @@ private struct RunRow: View {
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.textSecondary)
                 }
-                Label("\(run.results.count) results", systemImage: "list.bullet")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.textSecondary)
 
-                let successCount = run.results.filter { $0.metrics.didSucceed }.count
-                if successCount < run.results.count {
-                    Label("\(run.results.count - successCount) failed", systemImage: "exclamationmark.triangle")
+                if run.results.isEmpty {
+                    Label("No results", systemImage: "exclamationmark.triangle")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.statusOrange)
+                } else {
+                    Label("\(run.results.count) results", systemImage: "list.bullet")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.textSecondary)
+
+                    let failCount = run.results.filter { !$0.metrics.didSucceed }.count
+                    if failCount > 0 {
+                        Label("\(failCount) failed", systemImage: "exclamationmark.triangle")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.statusOrange)
+                    }
                 }
             }
         }

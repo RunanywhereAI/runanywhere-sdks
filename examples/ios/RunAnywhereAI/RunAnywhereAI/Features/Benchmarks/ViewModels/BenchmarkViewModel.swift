@@ -27,6 +27,12 @@ final class BenchmarkViewModel {
     var errorMessage: String?
     var showClearConfirmation = false
 
+    /// Brief toast message shown after clipboard copy
+    var copiedToastMessage: String?
+
+    /// Categories that had no downloaded models during the last run
+    var skippedCategoriesMessage: String?
+
     // MARK: - Private
 
     private let runner = BenchmarkRunner()
@@ -45,6 +51,7 @@ final class BenchmarkViewModel {
         guard !isRunning else { return }
         isRunning = true
         errorMessage = nil
+        skippedCategoriesMessage = nil
         progress = 0
         completedCount = 0
         totalCount = 0
@@ -52,19 +59,7 @@ final class BenchmarkViewModel {
         currentModel = ""
 
         runTask = Task {
-            let deviceInfo: BenchmarkDeviceInfo
-            if let sysInfo = DeviceInfoService.shared.deviceInfo {
-                deviceInfo = BenchmarkDeviceInfo.fromSystem(sysInfo)
-            } else {
-                deviceInfo = BenchmarkDeviceInfo(
-                    modelName: "Unknown",
-                    chipName: "Unknown",
-                    totalMemoryBytes: Int64(ProcessInfo.processInfo.physicalMemory),
-                    availableMemoryBytes: SyntheticInputGenerator.availableMemoryBytes(),
-                    osVersion: ProcessInfo.processInfo.operatingSystemVersionString
-                )
-            }
-
+            let deviceInfo = makeDeviceInfo()
             var run = BenchmarkRun(deviceInfo: deviceInfo)
 
             do {
@@ -79,19 +74,34 @@ final class BenchmarkViewModel {
                         self?.currentModel = update.currentModel
                     }
                 }
+
+                // Check for skipped categories via preflight
+                let preflight = try? await runner.preflight(categories: selectedCategories)
+                if let skipped = preflight?.skippedCategories, !skipped.isEmpty {
+                    let names = skipped.map(\.displayName).joined(separator: ", ")
+                    skippedCategoriesMessage = "Skipped (no models): \(names)"
+                }
+
                 run.results = results
-                run.status = .completed
+                run.status = results.allSatisfy(\.metrics.didSucceed) ? .completed : .completed
                 run.completedAt = Date()
             } catch is CancellationError {
                 run.status = .cancelled
                 run.completedAt = Date()
+            } catch let error as BenchmarkRunnerError {
+                run.status = .failed
+                run.completedAt = Date()
+                errorMessage = error.localizedDescription
             } catch {
                 run.status = .failed
                 run.completedAt = Date()
                 errorMessage = error.localizedDescription
             }
 
-            store.save(run: run)
+            // Only save if we got results or it was explicitly cancelled/failed
+            if !run.results.isEmpty || run.status != .running {
+                store.save(run: run)
+            }
             loadPastRuns()
             isRunning = false
         }
@@ -107,16 +117,24 @@ final class BenchmarkViewModel {
         pastRuns = []
     }
 
-    // MARK: - Export
+    // MARK: - Copy to Clipboard
 
-    func copyReportToClipboard(run: BenchmarkRun) {
+    func copyToClipboard(run: BenchmarkRun, format: BenchmarkExportFormat) {
         #if canImport(UIKit)
-        let report = BenchmarkReportFormatter.formatMarkdown(run: run)
+        let report = BenchmarkReportFormatter.formattedString(run: run, format: format)
         UIPasteboard.general.string = report
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
+        copiedToastMessage = "\(format.displayName) copied!"
+        // Auto-dismiss after 2s
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            copiedToastMessage = nil
+        }
         #endif
     }
+
+    // MARK: - File Export
 
     func shareJSON(run: BenchmarkRun) -> URL {
         BenchmarkReportFormatter.writeJSON(run: run)
@@ -124,5 +142,20 @@ final class BenchmarkViewModel {
 
     func shareCSV(run: BenchmarkRun) -> URL {
         BenchmarkReportFormatter.writeCSV(run: run)
+    }
+
+    // MARK: - Helpers
+
+    private func makeDeviceInfo() -> BenchmarkDeviceInfo {
+        if let sysInfo = DeviceInfoService.shared.deviceInfo {
+            return BenchmarkDeviceInfo.fromSystem(sysInfo)
+        }
+        return BenchmarkDeviceInfo(
+            modelName: "Unknown",
+            chipName: "Unknown",
+            totalMemoryBytes: Int64(ProcessInfo.processInfo.physicalMemory),
+            availableMemoryBytes: SyntheticInputGenerator.availableMemoryBytes(),
+            osVersion: ProcessInfo.processInfo.operatingSystemVersionString
+        )
     }
 }
