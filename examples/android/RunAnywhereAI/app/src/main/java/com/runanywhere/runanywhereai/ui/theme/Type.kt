@@ -7,127 +7,134 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 /**
- * iOS-matching typography system
- * All values match iOS text styles exactly
+ * Font family aligned with iOS.
+ * iOS uses San Francisco (Font.system); Android uses system default sans (Roboto).
+ * Set AppFontFamily to a custom FontFamily(Font(R.font.xxx)) to use a bundled font.
+ */
+private val AppFontFamily = FontFamily.Default
+
+/**
+ * iOS-matching typography system.
+ * Font sizes and line heights match iOS AppTypography / SwiftUI text styles.
  * Reference: examples/ios/RunAnywhereAI/RunAnywhereAI/Core/DesignSystem/Typography.swift
+ * iOS point sizes (default): largeTitle 34, title 28, title2 22, title3 20, headline 17, body 17,
+ * callout 16, subheadline 15, footnote 13, caption 12, caption2 11.
  */
 val Typography =
     Typography(
-        // iOS Display (34pt bold) - Large title
+        // iOS largeTitle (34pt bold)
         displayLarge =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = AppFontFamily,
                 fontWeight = FontWeight.Bold,
                 fontSize = 34.sp,
                 lineHeight = 41.sp,
             ),
-        // iOS Title 1 (28pt semibold)
+        // iOS title / Title 1 (28pt semibold)
         displayMedium =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = AppFontFamily,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 28.sp,
                 lineHeight = 34.sp,
             ),
-        // iOS Title 2 (22pt semibold)
+        // iOS title2 / Title 2 (22pt semibold)
         displaySmall =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = AppFontFamily,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 22.sp,
                 lineHeight = 28.sp,
             ),
-        // iOS Title 3 (20pt semibold)
+        // iOS title3 / Title 3 (20pt semibold)
         headlineLarge =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = AppFontFamily,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 20.sp,
                 lineHeight = 25.sp,
             ),
-        // iOS Headline (17pt semibold) - Navigation titles
+        // iOS headline (17pt semibold) - Navigation titles
         headlineMedium =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = AppFontFamily,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 17.sp,
                 lineHeight = 22.sp,
             ),
         headlineSmall =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = AppFontFamily,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 15.sp,
                 lineHeight = 20.sp,
             ),
-        // iOS Title 1 (28pt semibold)
         titleLarge =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = AppFontFamily,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 28.sp,
                 lineHeight = 34.sp,
             ),
-        // iOS Title 2 (22pt semibold) - Empty state titles
+        // iOS title2 (22pt semibold)
         titleMedium =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = AppFontFamily,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 22.sp,
                 lineHeight = 28.sp,
             ),
-        // iOS Title 3 (20pt semibold)
+        // iOS title3 (20pt semibold)
         titleSmall =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = AppFontFamily,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 20.sp,
                 lineHeight = 25.sp,
             ),
-        // iOS Body (17pt regular) - Message content, input field
+        // iOS body (17pt regular)
         bodyLarge =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = AppFontFamily,
                 fontWeight = FontWeight.Normal,
                 fontSize = 17.sp,
                 lineHeight = 22.sp,
             ),
-        // iOS Subheadline (15pt regular) - Empty state subtitles
+        // iOS subheadline (15pt regular)
         bodyMedium =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = AppFontFamily,
                 fontWeight = FontWeight.Normal,
                 fontSize = 15.sp,
                 lineHeight = 20.sp,
             ),
-        // iOS Footnote (13pt regular)
+        // iOS footnote (13pt regular)
         bodySmall =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = AppFontFamily,
                 fontWeight = FontWeight.Normal,
                 fontSize = 13.sp,
                 lineHeight = 18.sp,
             ),
-        // iOS Subheadline (15pt regular)
         labelLarge =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = AppFontFamily,
                 fontWeight = FontWeight.Normal,
                 fontSize = 15.sp,
                 lineHeight = 20.sp,
             ),
-        // iOS Caption (12pt regular) - Thinking labels, timestamps
+        // iOS caption (12pt regular)
         labelMedium =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = AppFontFamily,
                 fontWeight = FontWeight.Normal,
                 fontSize = 12.sp,
                 lineHeight = 16.sp,
             ),
-        // iOS Caption2 (11pt regular) - Analytics text, model badges
+        // iOS caption2 (11pt regular)
         labelSmall =
             TextStyle(
-                fontFamily = FontFamily.Default,
+                fontFamily = AppFontFamily,
                 fontWeight = FontWeight.Normal,
                 fontSize = 11.sp,
                 lineHeight = 13.sp,
@@ -135,13 +142,17 @@ val Typography =
     )
 
 /**
- * Custom text styles for specific iOS components not covered by Material 3 Typography
+ * Custom text styles matching iOS AppTypography.
+ * Sizes: system9–system12, system14, system18, system28, system48, system60, system80.
+ * Weights and semantics match Typography.swift.
  */
 object AppTypography {
-    // Custom sizes matching iOS exactly
+    private val fontFamily = FontFamily.Default
+
+    // Custom sizes matching iOS exactly (Font.system(size: n))
     val system9 =
         TextStyle(
-            fontFamily = FontFamily.Default,
+            fontFamily = fontFamily,
             fontWeight = FontWeight.Normal,
             fontSize = 9.sp,
             lineHeight = 11.sp,
@@ -149,7 +160,7 @@ object AppTypography {
 
     val system10 =
         TextStyle(
-            fontFamily = FontFamily.Default,
+            fontFamily = fontFamily,
             fontWeight = FontWeight.Normal,
             fontSize = 10.sp,
             lineHeight = 12.sp,
@@ -157,7 +168,7 @@ object AppTypography {
 
     val system11 =
         TextStyle(
-            fontFamily = FontFamily.Default,
+            fontFamily = fontFamily,
             fontWeight = FontWeight.Normal,
             fontSize = 11.sp,
             lineHeight = 13.sp,
@@ -167,7 +178,7 @@ object AppTypography {
 
     val system12 =
         TextStyle(
-            fontFamily = FontFamily.Default,
+            fontFamily = fontFamily,
             fontWeight = FontWeight.Normal,
             fontSize = 12.sp,
             lineHeight = 16.sp,
@@ -175,26 +186,67 @@ object AppTypography {
 
     val system12Medium = system12.copy(fontWeight = FontWeight.Medium)
 
+    val system14 =
+        TextStyle(
+            fontFamily = fontFamily,
+            fontWeight = FontWeight.Normal,
+            fontSize = 14.sp,
+            lineHeight = 18.sp,
+        )
+
+    val system18 =
+        TextStyle(
+            fontFamily = fontFamily,
+            fontWeight = FontWeight.Normal,
+            fontSize = 18.sp,
+            lineHeight = 22.sp,
+        )
+
     val system28 =
         TextStyle(
-            fontFamily = FontFamily.Default,
+            fontFamily = fontFamily,
             fontWeight = FontWeight.Normal,
             fontSize = 28.sp,
             lineHeight = 34.sp,
         )
 
+    val system48 =
+        TextStyle(
+            fontFamily = fontFamily,
+            fontWeight = FontWeight.Normal,
+            fontSize = 48.sp,
+            lineHeight = 56.sp,
+        )
+
     val system60 =
         TextStyle(
-            fontFamily = FontFamily.Default,
+            fontFamily = fontFamily,
             fontWeight = FontWeight.Normal,
             fontSize = 60.sp,
             lineHeight = 72.sp,
         )
 
+    val system80 =
+        TextStyle(
+            fontFamily = fontFamily,
+            fontWeight = FontWeight.Normal,
+            fontSize = 80.sp,
+            lineHeight = 88.sp,
+        )
+
+    // iOS callout (16pt regular)
+    val callout =
+        TextStyle(
+            fontFamily = fontFamily,
+            fontWeight = FontWeight.Normal,
+            fontSize = 16.sp,
+            lineHeight = 21.sp,
+        )
+
     // Weight variants (matching iOS)
     val caption =
         TextStyle(
-            fontFamily = FontFamily.Default,
+            fontFamily = fontFamily,
             fontWeight = FontWeight.Normal,
             fontSize = 12.sp,
             lineHeight = 16.sp,
@@ -202,7 +254,7 @@ object AppTypography {
 
     val caption2 =
         TextStyle(
-            fontFamily = FontFamily.Default,
+            fontFamily = fontFamily,
             fontWeight = FontWeight.Normal,
             fontSize = 11.sp,
             lineHeight = 13.sp,
@@ -212,7 +264,7 @@ object AppTypography {
 
     val caption2Bold = caption2.copy(fontWeight = FontWeight.Bold)
 
-    // Monospaced variants (for model info)
+    // Monospaced (iOS: Font.system(.body, design: .monospaced) / size 9 bold)
     val monospacedCaption =
         TextStyle(
             fontFamily = FontFamily.Monospace,
@@ -221,11 +273,10 @@ object AppTypography {
             lineHeight = 11.sp,
         )
 
-    // Rounded variants (for model info stats)
+    // Rounded-style sizes (iOS: design: .rounded)
     val rounded10 =
         TextStyle(
-            // Could use rounded font if available
-            fontFamily = FontFamily.Default,
+            fontFamily = fontFamily,
             fontWeight = FontWeight.Medium,
             fontSize = 10.sp,
             lineHeight = 12.sp,
@@ -233,7 +284,7 @@ object AppTypography {
 
     val rounded11 =
         TextStyle(
-            fontFamily = FontFamily.Default,
+            fontFamily = fontFamily,
             fontWeight = FontWeight.Medium,
             fontSize = 11.sp,
             lineHeight = 13.sp,
