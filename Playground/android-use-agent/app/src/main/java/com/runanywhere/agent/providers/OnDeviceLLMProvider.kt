@@ -82,7 +82,13 @@ class OnDeviceLLMProvider(
 
     override suspend fun decideNextAction(context: ReasoningContext): AgentDecision {
         val systemPrompt = SystemPrompts.SYSTEM_PROMPT
-        val userPrompt = SystemPrompts.buildUserPrompt(context)
+        val userPrompt = SystemPrompts.buildPrompt(
+            goal = context.goal,
+            screenState = context.screenElements,
+            history = context.historyPrompt,
+            lastActionResult = context.lastActionResult,
+            useToolCalling = utilityToolsRegistered
+        )
 
         val responseText = try {
             if (utilityToolsRegistered) {

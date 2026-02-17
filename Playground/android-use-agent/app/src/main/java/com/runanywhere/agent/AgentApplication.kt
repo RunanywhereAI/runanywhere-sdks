@@ -6,10 +6,13 @@ import com.runanywhere.sdk.storage.AndroidPlatformContext
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.SDKEnvironment
 import com.runanywhere.sdk.public.extensions.registerModel
+import com.runanywhere.sdk.public.extensions.registerMultiFileModel
+import com.runanywhere.sdk.public.extensions.Models.ModelCategory
+import com.runanywhere.sdk.public.extensions.Models.ModelFileDescriptor
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.core.onnx.ONNX
 import com.runanywhere.sdk.core.types.InferenceFramework
-import com.runanywhere.sdk.public.extensions.Models.ModelCategory
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -21,7 +24,7 @@ class AgentApplication : Application() {
     companion object {
         private const val TAG = "AgentApplication"
 
-        // Available models
+        // Available LLM models
         val AVAILABLE_MODELS = listOf(
             ModelInfo(
                 id = "smollm2-360m-instruct-q8_0",
@@ -45,6 +48,7 @@ class AgentApplication : Application() {
 
         const val DEFAULT_MODEL = "qwen2.5-1.5b-instruct-q4_k_m"
         const val STT_MODEL_ID = "sherpa-onnx-whisper-tiny.en"
+        const val VLM_MODEL_ID = "smolvlm-256m-instruct"
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -62,11 +66,20 @@ class AgentApplication : Application() {
                 Log.i(TAG, "Initializing RunAnywhere SDK...")
                 AndroidPlatformContext.initialize(applicationContext)
                 RunAnywhere.initialize(environment = SDKEnvironment.DEVELOPMENT)
+
+                // Set base directory for model storage (required for Maven SDK)
+                val runanywherePath = java.io.File(filesDir, "runanywhere").absolutePath
+                CppBridgeModelPaths.setBaseDirectory(runanywherePath)
+
                 RunAnywhere.completeServicesInitialization()
 
                 // Register backends
-                LlamaCPP.register(priority = 100)
-                ONNX.register(priority = 90)
+                try {
+                    LlamaCPP.register(priority = 100) // For LLM + VLM (GGUF models)
+                } catch (e: Throwable) {
+                    Log.w(TAG, "LlamaCPP.register partial failure (VLM may be unavailable): ${e.message}")
+                }
+                ONNX.register(priority = 90) // For STT/TTS (ONNX models)
 
                 // Register STT model (Whisper Tiny English, ~75MB)
                 RunAnywhere.registerModel(
@@ -87,8 +100,28 @@ class AgentApplication : Application() {
                         framework = InferenceFramework.LLAMA_CPP,
                         memoryRequirement = model.sizeBytes
                     )
-                    Log.i(TAG, "Registered model: ${model.id}")
+                    Log.i(TAG, "Registered LLM model: ${model.id}")
                 }
+
+                // Register VLM model (SmolVLM 256M — multi-file: main model + mmproj)
+                RunAnywhere.registerMultiFileModel(
+                    id = VLM_MODEL_ID,
+                    name = "SmolVLM 256M Instruct (Q8)",
+                    files = listOf(
+                        ModelFileDescriptor(
+                            url = "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/SmolVLM-256M-Instruct-Q8_0.gguf",
+                            filename = "SmolVLM-256M-Instruct-Q8_0.gguf"
+                        ),
+                        ModelFileDescriptor(
+                            url = "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/mmproj-SmolVLM-256M-Instruct-f16.gguf",
+                            filename = "mmproj-SmolVLM-256M-Instruct-f16.gguf"
+                        ),
+                    ),
+                    framework = InferenceFramework.LLAMA_CPP,
+                    modality = ModelCategory.MULTIMODAL,
+                    memoryRequirement = 365_000_000
+                )
+                Log.i(TAG, "Registered VLM model: $VLM_MODEL_ID")
 
                 Log.i(TAG, "RunAnywhere SDK initialized successfully")
             } catch (e: Exception) {
