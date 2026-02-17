@@ -10,13 +10,12 @@ import RunAnywhere
 
 // MARK: - Provider Protocol
 
-protocol BenchmarkScenarioProvider {
+protocol BenchmarkScenarioProvider: Sendable {
     var category: BenchmarkCategory { get }
     func scenarios() -> [BenchmarkScenario]
     func execute(
         scenario: BenchmarkScenario,
-        model: ModelInfo,
-        deviceInfo: BenchmarkDeviceInfo
+        model: ModelInfo
     ) async throws -> BenchmarkMetrics
 }
 
@@ -114,7 +113,7 @@ final class BenchmarkRunner {
     func runBenchmarks(
         categories: Set<BenchmarkCategory>,
         onProgress: @escaping @Sendable (BenchmarkProgressUpdate) -> Void
-    ) async throws -> [BenchmarkResult] {
+    ) async throws -> BenchmarkRunOutput {
         let preflight = try await preflight(categories: categories)
 
         // If nothing to run, throw a descriptive error
@@ -156,14 +155,7 @@ final class BenchmarkRunner {
                 guard let provider = providers[category] else { continue }
                 metrics = try await provider.execute(
                     scenario: scenario,
-                    model: model,
-                    deviceInfo: BenchmarkDeviceInfo(
-                        modelName: "",
-                        chipName: "",
-                        totalMemoryBytes: 0,
-                        availableMemoryBytes: SyntheticInputGenerator.availableMemoryBytes(),
-                        osVersion: ""
-                    )
+                    model: model
                 )
             } catch is CancellationError {
                 throw CancellationError()
@@ -189,6 +181,9 @@ final class BenchmarkRunner {
             currentModel: ""
         ))
 
-        return results
+        return BenchmarkRunOutput(
+            results: results,
+            skippedCategories: preflight.skippedCategories
+        )
     }
 }

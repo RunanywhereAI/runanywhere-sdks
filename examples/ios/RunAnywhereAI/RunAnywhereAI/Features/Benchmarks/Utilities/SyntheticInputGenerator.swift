@@ -69,8 +69,13 @@ enum SyntheticInputGenerator {
 
     // MARK: - Memory
 
-    /// Returns the current available memory in bytes via `os_proc_available_memory`.
+    /// Returns the current available memory in bytes.
+    /// Uses `os_proc_available_memory` on iOS/tvOS/watchOS and `ProcessInfo` on macOS.
     static func availableMemoryBytes() -> Int64 {
-        Int64(os_proc_available_memory())
+        #if os(macOS)
+        return Int64(ProcessInfo.processInfo.physicalMemory)
+        #else
+        return Int64(os_proc_available_memory())
+        #endif
     }
 }

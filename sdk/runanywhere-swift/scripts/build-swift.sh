@@ -258,14 +258,26 @@ install_frameworks() {
         fi
     done
 
-    # Create combined ONNX Runtime xcframework if macOS is included
+    # Install ONNX Runtime xcframework
     if [[ "$INCLUDE_MACOS" == true ]]; then
+        # macOS included: create combined iOS + macOS xcframework
         local ONNX_SCRIPT="$SWIFT_SDK_DIR/scripts/create-onnxruntime-xcframework.sh"
         if [[ -x "$ONNX_SCRIPT" ]]; then
             log_step "Creating combined ONNX Runtime xcframework (iOS + macOS)..."
             "$ONNX_SCRIPT"
         else
             log_warn "create-onnxruntime-xcframework.sh not found, skipping combined ONNX Runtime"
+        fi
+    else
+        # iOS only: copy the pre-built iOS onnxruntime xcframework directly
+        local ONNX_SRC="$COMMONS_DIR/third_party/onnxruntime-ios/onnxruntime.xcframework"
+        if [[ -d "$ONNX_SRC" ]]; then
+            log_step "Copying onnxruntime.xcframework (iOS only)"
+            rm -rf "$BINARIES_DIR/onnxruntime.xcframework"
+            cp -r "$ONNX_SRC" "$BINARIES_DIR/"
+            log_info "  onnxruntime.xcframework ($(du -sh "$ONNX_SRC" | cut -f1))"
+        else
+            log_warn "onnxruntime.xcframework not found at $ONNX_SRC"
         fi
     fi
 

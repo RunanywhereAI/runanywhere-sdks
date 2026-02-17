@@ -14,21 +14,24 @@ struct TTSBenchmarkProvider: BenchmarkScenarioProvider {
 
     func scenarios() -> [BenchmarkScenario] {
         [
-            BenchmarkScenario(name: "Short Text", category: .tts),
-            BenchmarkScenario(name: "Medium Text", category: .tts),
+            BenchmarkScenario(name: "Short Text", category: .tts, parameters: ["length": "short"]),
+            BenchmarkScenario(name: "Medium Text", category: .tts, parameters: ["length": "medium"]),
         ]
     }
 
     func execute(
         scenario: BenchmarkScenario,
-        model: ModelInfo,
-        deviceInfo: BenchmarkDeviceInfo
+        model: ModelInfo
     ) async throws -> BenchmarkMetrics {
         var metrics = BenchmarkMetrics()
 
-        let text = scenario.name.contains("Short")
-            ? "Hello, this is a test."
-            : "The quick brown fox jumps over the lazy dog. Machine learning models can generate speech from text with remarkable quality and natural intonation."
+        let text: String
+        switch scenario.parameters?["length"] {
+        case "short":
+            text = "Hello, this is a test."
+        default:
+            text = "The quick brown fox jumps over the lazy dog. Machine learning models can generate speech from text with remarkable quality and natural intonation."
+        }
 
         let memBefore = SyntheticInputGenerator.availableMemoryBytes()
 
@@ -37,21 +40,25 @@ struct TTSBenchmarkProvider: BenchmarkScenarioProvider {
         try await RunAnywhere.loadTTSModel(model.id)
         metrics.loadTimeMs = Date().timeIntervalSince(loadStart) * 1000
 
-        defer { Task { try? await RunAnywhere.unloadTTSVoice() } }
+        do {
+            // Synthesize (not speak)
+            let benchStart = Date()
+            let options = TTSOptions()
+            let result = try await RunAnywhere.synthesize(text, options: options)
+            metrics.endToEndLatencyMs = Date().timeIntervalSince(benchStart) * 1000
 
-        // Synthesize (not speak)
-        let benchStart = Date()
-        let options = TTSOptions()
-        let result = try await RunAnywhere.synthesize(text, options: options)
-        metrics.endToEndLatencyMs = Date().timeIntervalSince(benchStart) * 1000
+            // processingTime is in seconds, convert to ms-context
+            metrics.audioDurationSeconds = result.duration
+            metrics.charactersProcessed = result.metadata.characterCount
 
-        // processingTime is in seconds, convert to ms-context
-        metrics.audioDurationSeconds = result.duration
-        metrics.charactersProcessed = result.metadata.characterCount
+            let memAfter = SyntheticInputGenerator.availableMemoryBytes()
+            metrics.memoryDeltaBytes = memBefore - memAfter
 
-        let memAfter = SyntheticInputGenerator.availableMemoryBytes()
-        metrics.memoryDeltaBytes = memBefore - memAfter
-
-        return metrics
+            try? await RunAnywhere.unloadTTSVoice()
+            return metrics
+        } catch {
+            try? await RunAnywhere.unloadTTSVoice()
+            throw error
+        }
     }
 }
