@@ -52,6 +52,38 @@
 | 6 | Platform adapter null function signature mismatch | Used full PlatformAdapter class instead of inline minimal version |
 | 7 | Storage tab model count included `_metadata.json` | Skip files starting with `_` in `getStorageInfo()` |
 
+## Run 6: Feb 17, 2026 — Sherpa-ONNX Glue Patch Validation
+
+**Fix**: Added `wasm/scripts/patch-sherpa-glue.js` to apply 5 browser-compatibility patches to Emscripten Node.js glue output.
+
+### Test Results — All UI Tests PASS (no ONNX regression)
+
+| Section | Tests | Result |
+|---|---|---|
+| A. App Load & SDK Init | A1-A5 | PASS — Both LlamaCpp + ONNX backends register |
+| K. Cross-Tab Navigation | K1-K2 | PASS — 20 rapid switches, no crash |
+| M. Settings Tab | M1-M10 | PASS |
+| M11. Settings Persistence | localStorage | PASS — Max Tokens 2548 survives reload |
+| N. Chat Tab UI | N1,N5,N7,N12,N13 | PASS |
+| O. Vision Tab | O1-O7 | PASS |
+| P. Voice Tab | P1-P5 | PASS — STT/TTS model sheets show ONNX models |
+| Q. Transcribe Tab | Q1-Q5 | PASS |
+| R. Speak Tab | R1-R7 | PASS |
+| T. Acceleration Badge | T1-T3 | PASS — CPU badge persists across tabs |
+| L/O. Console Audit | Error count | PASS — 1 expected error (WebGPU 404), 0 unexpected |
+
+### ONNX Backend Integration Verified
+
+- `[RunAnywhere:ONNXProvider] ONNX backend registered successfully` in console
+- ONNX capabilities: `[stt, tts, vad]`
+- Voice tab: STT model "Whisper Tiny English (ONNX)" listed with ONNX badge
+- Voice tab: TTS models "Piper TTS US English" + "Piper TTS British English" listed
+- No `createModule is not a function` error (BUG-1 from starter app fixed)
+- No `require is not defined` error (node:path patched)
+- No `NODERAWFS not supported` error (NODERAWFS removed)
+
+---
+
 ### Changes Since Run 4
 
 | # | Change | Type |
