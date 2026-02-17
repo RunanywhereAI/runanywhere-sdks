@@ -37,10 +37,10 @@ object CppBridgeModelRegistry {
         const val LANGUAGE = 0 // RAC_MODEL_CATEGORY_LANGUAGE
         const val SPEECH_RECOGNITION = 1 // RAC_MODEL_CATEGORY_SPEECH_RECOGNITION
         const val SPEECH_SYNTHESIS = 2 // RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS
-        const val AUDIO = 3 // RAC_MODEL_CATEGORY_AUDIO
-        const val IMAGE_GENERATION = 4 // RAC_MODEL_CATEGORY_IMAGE_GENERATION (diffusion)
-        const val VISION = 5 // RAC_MODEL_CATEGORY_VISION
-        const val MULTIMODAL = 6 // RAC_MODEL_CATEGORY_MULTIMODAL
+        const val VISION = 3 // RAC_MODEL_CATEGORY_VISION
+        const val IMAGE_GENERATION = 4 // RAC_MODEL_CATEGORY_IMAGE_GENERATION
+        const val MULTIMODAL = 5 // RAC_MODEL_CATEGORY_MULTIMODAL
+        const val AUDIO = 6 // RAC_MODEL_CATEGORY_AUDIO
     }
 
     /**
@@ -282,7 +282,9 @@ object CppBridgeModelRegistry {
                 "tts" to ModelCategory.SPEECH_SYNTHESIS,
                 "vad" to ModelCategory.AUDIO,
                 "diffusion" to ModelCategory.IMAGE_GENERATION,
-                "other" to ModelCategory.LANGUAGE, // fallback for uncategorized models
+                "vision" to ModelCategory.VISION,
+                "multimodal" to ModelCategory.MULTIMODAL,
+                "other" to -1, // Backward compat: models saved before proper dirs existed
             )
 
         var restoredCount = 0

@@ -152,6 +152,13 @@ private struct IOSSettingsContent: View {
                     .foregroundColor(AppColors.textSecondary)
             }
 
+            // Performance
+            Section("Performance") {
+                NavigationLink(destination: BenchmarkDashboardView()) {
+                    Label("Benchmarks", systemImage: "gauge.with.dots.needle.33percent")
+                }
+            }
+
             // About
             Section {
                 VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
@@ -192,6 +199,7 @@ private struct MacOSSettingsContent: View {
                 ToolSettingsCard(viewModel: toolViewModel)
                 APIConfigurationCard(viewModel: viewModel)
                 LoggingConfigurationCard(viewModel: viewModel)
+                BenchmarksCard()
                 AboutCard()
 
                 Spacer()
@@ -788,6 +796,32 @@ private struct StoredModelRow: View {
         .padding(.vertical, AppSpacing.small)
         .background(AppColors.backgroundTertiary)
         .cornerRadius(AppSpacing.cornerRadiusRegular)
+    }
+}
+
+private struct BenchmarksCard: View {
+    var body: some View {
+        SettingsCard(title: "Performance") {
+            VStack(alignment: .leading, spacing: AppSpacing.padding15) {
+                NavigationLink(destination: BenchmarkDashboardView()) {
+                    HStack {
+                        Image(systemName: "gauge.with.dots.needle.33percent")
+                            .foregroundColor(AppColors.primaryAccent)
+                        Text("Benchmarks")
+                        Spacer()
+                        #if !os(macOS)
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(AppColors.textSecondary)
+                        #endif
+                    }
+                }
+                .buttonStyle(.plain)
+
+                Text("Measure performance of on-device AI models.")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
+            }
+        }
     }
 }
 

@@ -72,6 +72,9 @@ enum class ModelSelectionContext(
 
     /** Select a diffusion model for image generation */
     DIFFUSION("diffusion"),
+
+    /** Select a vision language model (VLM) */
+    VLM("vlm"),
     ;
 
     /** Human-readable title for the selection context */
@@ -83,6 +86,7 @@ enum class ModelSelectionContext(
                 TTS -> "Select TTS Voice"
                 VOICE -> "Select Voice Models"
                 DIFFUSION -> "Select Image Model"
+                VLM -> "Select Vision Model"
             }
 
     /** Check if a category is relevant for this selection context */
@@ -96,6 +100,9 @@ enum class ModelSelectionContext(
                     category == ModelCategory.SPEECH_RECOGNITION ||
                     category == ModelCategory.SPEECH_SYNTHESIS
             DIFFUSION -> category == ModelCategory.IMAGE_GENERATION
+            VLM ->
+                category == ModelCategory.MULTIMODAL ||
+                    category == ModelCategory.VISION
         }
 
     /** Check if a framework is relevant for this selection context */
@@ -116,6 +123,7 @@ enum class ModelSelectionContext(
                 LLM.isFrameworkRelevant(framework) ||
                     STT.isFrameworkRelevant(framework) ||
                     TTS.isFrameworkRelevant(framework)
+            VLM -> framework == com.runanywhere.sdk.core.types.InferenceFramework.LLAMA_CPP
         }
 }
 
@@ -218,10 +226,17 @@ data class ExpectedModelFiles(
  */
 @Serializable
 data class ModelFileDescriptor(
-    val relativePath: String,
-    val destinationPath: String,
+    /** Full URL to download this file from */
+    val url: String,
+    /** Filename to save as (e.g., "model.gguf" or "mmproj.gguf") */
+    val filename: String,
+    /** Whether this file is required for the model to work */
     val isRequired: Boolean = true,
-)
+) {
+    /** Legacy compatibility */
+    val relativePath: String get() = url.substringAfterLast('/').substringBefore('?')
+    val destinationPath: String get() = filename
+}
 
 // MARK: - Model Artifact Type
 
