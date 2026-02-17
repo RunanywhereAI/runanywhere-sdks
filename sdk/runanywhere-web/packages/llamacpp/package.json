@@ -15,10 +15,12 @@
     "./vlm-worker": {
       "import": "./dist/workers/vlm-worker.js",
       "types": "./dist/workers/vlm-worker.d.ts"
-    }
+    },
+    "./wasm/*": "./wasm/*"
   },
   "files": [
     "dist/",
+    "wasm/",
     "README.md"
   ],
   "scripts": {

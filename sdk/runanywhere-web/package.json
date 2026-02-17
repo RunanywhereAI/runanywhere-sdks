@@ -17,7 +17,7 @@
     "dev": "npm run dev -w packages/core",
     "lint": "npm run lint -w packages/core && npm run lint -w packages/llamacpp && npm run lint -w packages/onnx",
     "typecheck": "npm run typecheck -w packages/core && npm run typecheck -w packages/llamacpp && npm run typecheck -w packages/onnx",
-    "clean": "rm -rf packages/core/dist packages/llamacpp/dist packages/onnx/dist packages/core/wasm/*.wasm packages/core/wasm/*.js wasm/build"
+    "clean": "rm -rf packages/core/dist packages/llamacpp/dist packages/onnx/dist packages/llamacpp/wasm/*.wasm packages/llamacpp/wasm/*.js wasm/build"
   },
   "engines": {
     "node": ">=18.0.0"
