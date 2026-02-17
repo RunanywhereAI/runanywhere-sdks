@@ -697,9 +697,12 @@ static rac_bool_t llm_stream_callback_token(const char* token, void* user_data) 
 
     auto* ctx = static_cast<LLMStreamCallbackContext*>(user_data);
 
-    // Accumulate token
-    ctx->accumulated_text += token;
-    ctx->token_count++;
+    // Accumulate token (thread-safe)
+    {
+        std::lock_guard<std::mutex> lock(ctx->mtx);
+        ctx->accumulated_text += token;
+        ctx->token_count++;
+    }
 
     // Call back to Kotlin
     if (ctx->jvm && ctx->callback && ctx->onTokenMethod) {
