@@ -1,0 +1,11 @@
+module SdcppBackend {
+    umbrella header "SdcppBackend.h"
+
+    export *
+    module * { export * }
+
+    link framework "Accelerate"
+    link framework "Metal"
+    link framework "MetalKit"
+    link framework "MetalPerformanceShaders"
+}

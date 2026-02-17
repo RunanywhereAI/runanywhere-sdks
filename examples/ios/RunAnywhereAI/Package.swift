@@ -36,6 +36,7 @@ let package = Package(
         //   - RunAnywhere (core)
         //   - RunAnywhereONNX (STT/TTS/VAD)
         //   - RunAnywhereLlamaCPP (LLM)
+        //   - RunAnywhereSdcpp (Diffusion / image generation)
         .package(path: "../../.."),
     ],
     targets: [
@@ -48,6 +49,7 @@ let package = Package(
                 // Optional modules - pick what you need:
                 .product(name: "RunAnywhereONNX", package: "runanywhere-sdks"),       // STT/TTS/VAD
                 .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-sdks"),   // LLM
+                .product(name: "RunAnywhereSdcpp", package: "runanywhere-sdks"),      // Diffusion (sd.cpp)
             ],
             path: "RunAnywhereAI",
             exclude: [

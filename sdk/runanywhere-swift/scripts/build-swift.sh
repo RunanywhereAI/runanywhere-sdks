@@ -242,7 +242,7 @@ install_frameworks() {
     mkdir -p "$BINARIES_DIR"
 
     # All frameworks are now in dist/ (flat structure from build-ios.sh)
-    for framework in RACommons RABackendLLAMACPP RABackendONNX; do
+    for framework in RACommons RABackendLLAMACPP RABackendONNX RABackendSDCPP; do
         local src="$COMMONS_DIR/dist/${framework}.xcframework"
         if [[ -d "$src" ]]; then
             log_step "Copying ${framework}.xcframework"
@@ -329,6 +329,7 @@ main() {
         echo "  2. Build RACommons.xcframework"
         echo "  3. Build RABackendLLAMACPP.xcframework"
         echo "  4. Build RABackendONNX.xcframework"
+        echo "  5. Build RABackendSDCPP.xcframework"
         if [[ "$INCLUDE_MACOS" == true ]]; then
             echo "     (all xcframeworks will include macOS arm64 slices)"
             echo "  5. Create combined ONNX Runtime xcframework (iOS + macOS)"

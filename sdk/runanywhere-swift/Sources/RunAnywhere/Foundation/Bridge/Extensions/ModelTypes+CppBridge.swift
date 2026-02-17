@@ -115,6 +115,8 @@ extension InferenceFramework {
             return RAC_FRAMEWORK_COREML
         case .mlx:
             return RAC_FRAMEWORK_MLX
+        case .sdcpp:
+            return RAC_FRAMEWORK_SDCPP
         case .builtIn:
             return RAC_FRAMEWORK_BUILTIN
         case .none:
@@ -141,6 +143,8 @@ extension InferenceFramework {
             self = .coreml
         case RAC_FRAMEWORK_MLX:
             self = .mlx
+        case RAC_FRAMEWORK_SDCPP:
+            self = .sdcpp
         case RAC_FRAMEWORK_BUILTIN:
             self = .builtIn
         case RAC_FRAMEWORK_NONE:

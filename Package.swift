@@ -37,7 +37,7 @@ import Foundation
 //   ./scripts/build-swift.sh --set-remote  (sets useLocalBinaries = false)
 //
 // =============================================================================
-let useLocalBinaries = false //  Toggle: true for local dev, false for release
+let useLocalBinaries = true //  Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when testLocal = false)
 // Updated automatically by CI/CD during releases
@@ -73,6 +73,14 @@ let package = Package(
             name: "RunAnywhereLlamaCPP",
             targets: ["LlamaCPPRuntime"]
         ),
+
+        // =================================================================
+        // sd.cpp Backend - adds diffusion image generation (Metal GPU)
+        // =================================================================
+        .library(
+            name: "RunAnywhereSdcpp",
+            targets: ["SdcppRuntime"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
@@ -103,6 +111,16 @@ let package = Package(
             name: "LlamaCPPBackend",
             dependencies: ["RABackendLlamaCPPBinary"],
             path: "sdk/runanywhere-swift/Sources/LlamaCPPRuntime/include",
+            publicHeadersPath: "."
+        ),
+
+        // =================================================================
+        // C Bridge Module - sd.cpp Backend Headers
+        // =================================================================
+        .target(
+            name: "SdcppBackend",
+            dependencies: ["RABackendSdcppBinary"],
+            path: "sdk/runanywhere-swift/Sources/SdcppRuntime/include",
             publicHeadersPath: "."
         ),
 
@@ -181,6 +199,26 @@ let package = Package(
             ]
         ),
 
+        // =================================================================
+        // sd.cpp Runtime Backend - Diffusion image generation (Metal GPU)
+        // =================================================================
+        .target(
+            name: "SdcppRuntime",
+            dependencies: [
+                "RunAnywhere",
+                "SdcppBackend",
+            ],
+            path: "sdk/runanywhere-swift/Sources/SdcppRuntime",
+            exclude: ["include"],
+            linkerSettings: [
+                .linkedLibrary("c++"),
+                .linkedFramework("Accelerate"),
+                .linkedFramework("Metal"),
+                .linkedFramework("MetalKit"),
+                .linkedFramework("MetalPerformanceShaders"),
+            ]
+        ),
+
     ] + binaryTargets()
 )
 
@@ -210,6 +248,10 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 path: "sdk/runanywhere-swift/Binaries/RABackendONNX.xcframework"
+            ),
+            .binaryTarget(
+                name: "RABackendSdcppBinary",
+                path: "sdk/runanywhere-swift/Binaries/RABackendSDCPP.xcframework"
             ),
         ]
 
@@ -244,6 +286,11 @@ func binaryTargets() -> [Target] {
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-v\(sdkVersion).zip",
                 checksum: "00b28c0542ab25585c534b4e33ddacd4a1d24447aa8c2178949aad89eb56cb1f"
+            ),
+            .binaryTarget(
+                name: "RABackendSdcppBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendSDCPP-v\(sdkVersion).zip",
+                checksum: "0000000000000000000000000000000000000000000000000000000000000000" // TODO: Update checksum after first release build
             ),
             .binaryTarget(
                 name: "ONNXRuntimeBinary",

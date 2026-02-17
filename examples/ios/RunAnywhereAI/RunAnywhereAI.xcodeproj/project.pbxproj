@@ -10,6 +10,7 @@
 		541C59DA2E63772A00DD7839 /* RunAnywhere in Frameworks */ = {isa = PBXBuildFile; productRef = 541C59D92E63772A00DD7839 /* RunAnywhere */; };
 		58ABEDD22ED16DA40058D033 /* RunAnywhereONNX in Frameworks */ = {isa = PBXBuildFile; productRef = 58ABEDD12ED16DA40058D033 /* RunAnywhereONNX */; };
 		58LLAMACPP12ED16DA40058D0 /* RunAnywhereLlamaCPP in Frameworks */ = {isa = PBXBuildFile; productRef = 58LLAMACPP02ED16DA40058D0 /* RunAnywhereLlamaCPP */; };
+		58SDCPP00012ED16DA40058D0 /* RunAnywhereSdcpp in Frameworks */ = {isa = PBXBuildFile; productRef = 58SDCPP00002ED16DA40058D0 /* RunAnywhereSdcpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -65,6 +66,7 @@
 				58ABEDD22ED16DA40058D033 /* RunAnywhereONNX in Frameworks */,
 				541C59DA2E63772A00DD7839 /* RunAnywhere in Frameworks */,
 				58LLAMACPP12ED16DA40058D0 /* RunAnywhereLlamaCPP in Frameworks */,
+				58SDCPP00012ED16DA40058D0 /* RunAnywhereSdcpp in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -140,6 +142,7 @@
 				541C59D92E63772A00DD7839 /* RunAnywhere */,
 				58ABEDD12ED16DA40058D033 /* RunAnywhereONNX */,
 				58LLAMACPP02ED16DA40058D0 /* RunAnywhereLlamaCPP */,
+				58SDCPP00002ED16DA40058D0 /* RunAnywhereSdcpp */,
 			);
 			productName = RunAnywhereAI;
 			productReference = 5480A1F02E2F250200337F2F /* RunAnywhereAI.app */;
@@ -699,6 +702,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../.." */;
 			productName = RunAnywhereLlamaCPP;
+		};
+		58SDCPP00002ED16DA40058D0 /* RunAnywhereSdcpp */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../.." */;
+			productName = RunAnywhereSdcpp;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -124,11 +124,15 @@ class DiffusionViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            // App only supports Apple SD 1.5 (CoreML); use .sd15 for configuration
             let variant: DiffusionModelVariant = .sd15
             currentModelVariant = variant
 
-            let config = DiffusionConfiguration(modelVariant: variant, enableSafetyChecker: true, reduceMemory: true)
+            let config = DiffusionConfiguration(
+                modelVariant: variant,
+                enableSafetyChecker: true,
+                reduceMemory: true,
+                preferredFramework: model.framework
+            )
             try await RunAnywhere.loadDiffusionModel(modelPath: path.path, modelId: model.id, modelName: model.name, configuration: config)
             isModelLoaded = true
             currentModelName = model.name
