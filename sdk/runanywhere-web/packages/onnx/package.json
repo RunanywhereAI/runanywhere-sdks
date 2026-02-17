@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/web-onnx",
-  "version": "0.1.0-beta.5",
+  "version": "0.1.0-beta.7",
   "description": "RunAnywhere Web SDK - ONNX backend for STT, TTS, and VAD via sherpa-onnx",
   "type": "module",
   "main": "./dist/index.js",
