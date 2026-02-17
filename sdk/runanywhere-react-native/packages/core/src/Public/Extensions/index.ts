@@ -120,6 +120,7 @@ export {
   getAvailableModels,
   getModelInfo,
   getModelPath,
+  getMmprojPath,
   isModelDownloaded,
   downloadModel,
   cancelDownload,
