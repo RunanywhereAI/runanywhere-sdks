@@ -350,13 +350,22 @@ build_typescript() {
     log_step "Compiling TypeScript..."
     npm run build:ts
 
-    # Verify output (core is the primary package)
-    if [ -d "${TS_OUTPUT_DIR}" ]; then
-        log_info "TypeScript build successful (core + llamacpp + onnx)"
-    else
+    # Verify output for all packages
+    local ts_ok=true
+    if [ ! -d "${TS_OUTPUT_DIR}" ]; then
         log_error "TypeScript build failed - core dist/ not found"
+        ts_ok=false
+    fi
+    if [ ! -d "${WEB_SDK_DIR}/packages/llamacpp/dist" ]; then
+        log_warn "llamacpp dist/ not found — may not have been built"
+    fi
+    if [ ! -d "${WEB_SDK_DIR}/packages/onnx/dist" ]; then
+        log_warn "onnx dist/ not found — may not have been built"
+    fi
+    if [ "$ts_ok" = false ]; then
         exit 1
     fi
+    log_info "TypeScript build successful"
 }
 
 build_sherpa() {

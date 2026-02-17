@@ -217,6 +217,8 @@ local/
 # Web SDK build artifacts (source is tracked)
 sdk/runanywhere-web/node_modules/
 sdk/runanywhere-web/packages/core/dist/
+sdk/runanywhere-web/packages/llamacpp/dist/
+sdk/runanywhere-web/packages/onnx/dist/
 sdk/runanywhere-web/wasm/build/
 sdk/runanywhere-web/packages/core/wasm/
 sdk/runanywhere-web/packages/onnx/wasm/

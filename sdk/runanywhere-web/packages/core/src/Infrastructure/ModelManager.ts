@@ -240,7 +240,7 @@ class ModelManagerImpl {
    * @returns The model ID (existing or auto-generated)
    */
   async importModel(file: File, modelId?: string): Promise<string> {
-    const id = modelId ?? sanitizeId(file.name.replace(/\.[^.]+$/, ''));
+    let id = modelId ?? sanitizeId(file.name.replace(/\.[^.]+$/, ''));
 
     // Auto-register if not in the catalog
     if (!this.registry.getModel(id)) {
@@ -254,9 +254,7 @@ class ModelManagerImpl {
         status: ModelStatus.Registered,
       });
       // Use the inferred ID if different
-      if (meta.id !== id) {
-        return this.importModel(file, meta.id);
-      }
+      id = meta.id;
     }
 
     logger.info(`Importing model from file: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB) -> ${id}`);

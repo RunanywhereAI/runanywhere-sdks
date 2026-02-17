@@ -49,6 +49,9 @@ const llamacppExtension: BackendExtension = {
     ToolCalling.cleanup();
     Embeddings.cleanup();
     Diffusion.cleanup();
+    // Remove globalThis reference set during registration
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (globalThis as any).__runanywhere_textgeneration;
     _isRegistered = false;
     logger.info('LlamaCpp backend cleaned up');
   },

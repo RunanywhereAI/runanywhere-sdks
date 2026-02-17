@@ -73,8 +73,7 @@ export function inferModelFromFilename(filename: string): InferredModelMeta {
         framework: LLMFramework.ONNX,
       };
     }
-    if (lowerName.includes('whisper') || lowerName.includes('encoder') || lowerName.includes('decoder')
-        || lowerName.includes('paraformer') || lowerName.includes('zipformer') || lowerName.includes('stt')) {
+    if (lowerName.includes('whisper') || lowerName.includes('stt') || lowerName.includes('paraformer') || lowerName.includes('zipformer')) {
       return {
         id: sanitizeId(baseName),
         name: humanizeName(baseName),
@@ -82,11 +81,11 @@ export function inferModelFromFilename(filename: string): InferredModelMeta {
         framework: LLMFramework.ONNX,
       };
     }
-    // Default ONNX -> STT
+    // Default ONNX -> generic Language (avoid misclassification)
     return {
       id: sanitizeId(baseName),
       name: humanizeName(baseName),
-      category: ModelCategory.SpeechRecognition,
+      category: ModelCategory.Language,
       framework: LLMFramework.ONNX,
     };
   }
@@ -105,11 +104,17 @@ export function inferModelFromFilename(filename: string): InferredModelMeta {
 // ---------------------------------------------------------------------------
 
 function getExtension(filename: string): string {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith('.tar.gz')) return 'tar.gz';
+  if (lower.endsWith('.tar.bz2')) return 'tar.bz2';
   const lastDot = filename.lastIndexOf('.');
   return lastDot >= 0 ? filename.slice(lastDot + 1).toLowerCase() : '';
 }
 
 function stripExtension(filename: string): string {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith('.tar.gz')) return filename.slice(0, -7);
+  if (lower.endsWith('.tar.bz2')) return filename.slice(0, -8);
   const lastDot = filename.lastIndexOf('.');
   return lastDot >= 0 ? filename.slice(0, lastDot) : filename;
 }

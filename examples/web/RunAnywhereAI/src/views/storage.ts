@@ -89,7 +89,7 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
       showToast(`Storage access restored: ${RunAnywhere.localStorageDirectoryName}`, 'info');
       updateStorageLocationUI();
     } else {
-      showToast('Access denied — try choosing a new folder', 'error');
+      showToast('Access denied — try choosing a new folder', 'warning');
     }
   });
 
@@ -139,9 +139,14 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
       const file = e.dataTransfer?.files[0];
       if (!file) return;
 
-      const modelId = await RunAnywhere.importModelFromFile(file);
-      showToast(`Model imported: ${modelId}`, 'info');
-      refreshStorage();
+      try {
+        const modelId = await RunAnywhere.importModelFromFile(file);
+        showToast(`Model imported: ${modelId}`, 'info');
+        refreshStorage();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        showToast(`Import failed: ${msg}`, 'warning');
+      }
     });
   }
 
@@ -179,7 +184,8 @@ function updateStorageLocationUI(): void {
   const reauthBtn = container.querySelector('#storage-reauth-btn') as HTMLElement;
 
   if (RunAnywhere.isLocalStorageReady) {
-    label.innerHTML = `<strong>Local Folder:</strong> ~/${RunAnywhere.localStorageDirectoryName ?? 'Unknown'}/`
+    const safeName = escapeHtml(RunAnywhere.localStorageDirectoryName ?? 'Unknown');
+    label.innerHTML = `<strong>Local Folder:</strong> ~/${safeName}/`
       + `<br><span style="font-size:0.75rem;opacity:0.5">Models saved as real files — visible in Finder, persists forever</span>`;
     label.style.color = 'var(--color-success, #4caf50)';
     chooseDirBtn.textContent = 'Change Folder';
@@ -289,6 +295,10 @@ async function refreshStorage(): Promise<void> {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
