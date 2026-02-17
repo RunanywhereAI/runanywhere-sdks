@@ -103,12 +103,19 @@ class BenchmarkRunner {
         )
     }
 
+    // -- Run Result (includes skipped categories) --
+
+    data class BenchmarkRunResult(
+        val results: List<BenchmarkResult>,
+        val skippedCategories: List<BenchmarkCategory>,
+    )
+
     // -- Run --
 
     suspend fun runBenchmarks(
         categories: Set<BenchmarkCategory>,
         onProgress: (BenchmarkProgressUpdate) -> Unit,
-    ): List<BenchmarkResult> {
+    ): BenchmarkRunResult {
         val preflightResult = preflight(categories)
 
         if (preflightResult.availableCategories.isEmpty()) {
@@ -189,6 +196,9 @@ class BenchmarkRunner {
             ),
         )
 
-        return results
+        return BenchmarkRunResult(
+            results = results,
+            skippedCategories = preflightResult.skippedCategories,
+        )
     }
 }

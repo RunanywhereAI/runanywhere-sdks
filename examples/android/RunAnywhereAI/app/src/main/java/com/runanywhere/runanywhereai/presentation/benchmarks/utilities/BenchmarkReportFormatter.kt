@@ -7,9 +7,9 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkRun
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 // -- Export Format --
 
@@ -29,7 +29,8 @@ object BenchmarkReportFormatter {
         encodeDefaults = true
     }
 
-    private val dateFormat = SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault())
+    private val dateFormat: DateTimeFormatter =
+        DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a").withZone(ZoneId.systemDefault())
 
     // -- Clipboard String --
 
@@ -52,7 +53,7 @@ object BenchmarkReportFormatter {
         lines.add("**Chip:** ${run.deviceInfo.chipName}")
         lines.add("**RAM:** ${Formatter.formatFileSize(context, run.deviceInfo.totalMemoryBytes)}")
         lines.add("**OS:** ${run.deviceInfo.osVersion}")
-        lines.add("**Date:** ${dateFormat.format(Date(run.startedAt))}")
+        lines.add("**Date:** ${dateFormat.format(Instant.ofEpochMilli(run.startedAt))}")
         run.durationSeconds?.let {
             lines.add("**Duration:** ${"%.1f".format(it)}s")
         }
@@ -144,7 +145,13 @@ object BenchmarkReportFormatter {
                 m.memoryDeltaBytes.toString(),
                 if (m.didSucceed) "true" else "false",
                 m.errorMessage ?: "",
-            ).map { if (it.contains(",")) "\"$it\"" else it }
+            ).map { field ->
+                if (field.contains(",") || field.contains("\"") || field.contains("\n")) {
+                    "\"${field.replace("\"", "\"\"")}\""
+                } else {
+                    field
+                }
+            }
             row.joinToString(",")
         }
         val csv = (listOf(header) + rows).joinToString("\n")

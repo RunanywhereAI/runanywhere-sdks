@@ -8,16 +8,18 @@ import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.Models.ModelInfo
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.util.UUID
 
 // -- Benchmark Category --
 
+@Serializable
 enum class BenchmarkCategory(val value: String) {
-    LLM("llm"),
-    STT("stt"),
-    TTS("tts"),
-    VLM("vlm"),
+    @SerialName("llm") LLM("llm"),
+    @SerialName("stt") STT("stt"),
+    @SerialName("tts") TTS("tts"),
+    @SerialName("vlm") VLM("vlm"),
     ;
 
     val displayName: String
@@ -47,11 +49,12 @@ enum class BenchmarkCategory(val value: String) {
 
 // -- Benchmark Run Status --
 
+@Serializable
 enum class BenchmarkRunStatus(val value: String) {
-    RUNNING("running"),
-    COMPLETED("completed"),
-    FAILED("failed"),
-    CANCELLED("cancelled"),
+    @SerialName("running") RUNNING("running"),
+    @SerialName("completed") COMPLETED("completed"),
+    @SerialName("failed") FAILED("failed"),
+    @SerialName("cancelled") CANCELLED("cancelled"),
 }
 
 // -- Benchmark Scenario --

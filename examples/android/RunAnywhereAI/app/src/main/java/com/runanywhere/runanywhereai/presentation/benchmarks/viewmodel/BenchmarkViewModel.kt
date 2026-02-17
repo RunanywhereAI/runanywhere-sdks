@@ -105,7 +105,7 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
             var run = BenchmarkRun(deviceInfo = deviceInfo)
 
             try {
-                val results = runner.runBenchmarks(
+                val runResult = runner.runBenchmarks(
                     categories = _uiState.value.selectedCategories,
                 ) { update ->
                     _uiState.update { state ->
@@ -119,19 +119,13 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                 }
 
-                // Check for skipped categories
-                val preflight = try {
-                    runner.preflight(_uiState.value.selectedCategories)
-                } catch (_: Exception) {
-                    null
-                }
-                if (preflight != null && preflight.skippedCategories.isNotEmpty()) {
-                    val names = preflight.skippedCategories.joinToString { it.displayName }
+                if (runResult.skippedCategories.isNotEmpty()) {
+                    val names = runResult.skippedCategories.joinToString { it.displayName }
                     _uiState.update { it.copy(skippedCategoriesMessage = "Skipped (no models): $names") }
                 }
 
                 run = run.copy(
-                    results = results,
+                    results = runResult.results,
                     status = BenchmarkRunStatus.COMPLETED,
                     completedAt = System.currentTimeMillis(),
                 )
