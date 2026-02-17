@@ -17,14 +17,23 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.nio.ByteBuffer
 
+data class GenerationRecord(
+    val prompt: String,
+    val image: Bitmap,
+    val generationTimeMs: Long,
+    val width: Int,
+    val height: Int,
+)
+
 data class DiffusionUiState(
     val isModelLoaded: Boolean = false,
     val loadedModelName: String? = null,
     val isGenerating: Boolean = false,
     val generatedImage: Bitmap? = null,
-    val prompt: String = "A beautiful sunset over mountains, oil painting style",
+    val prompt: String = "",
     val generationTimeMs: Long = 0,
     val errorMessage: String? = null,
+    val generationHistory: List<GenerationRecord> = emptyList(),
 )
 
 /**
@@ -36,6 +45,14 @@ data class DiffusionUiState(
 class DiffusionViewModel : ViewModel() {
     companion object {
         private const val TAG = "DiffusionVM"
+
+        val samplePrompts = listOf(
+            "A serene mountain landscape at sunset with golden light",
+            "A futuristic city with flying cars and neon lights",
+            "A cute corgi puppy wearing a tiny astronaut helmet",
+            "An ancient library filled with magical floating books",
+            "A cozy coffee shop on a rainy day, warm lighting",
+        )
     }
 
     private val _uiState = MutableStateFlow(DiffusionUiState())
@@ -74,7 +91,6 @@ class DiffusionViewModel : ViewModel() {
             _uiState.value = _uiState.value.copy(
                 isGenerating = true,
                 errorMessage = null,
-                generatedImage = null,
             )
 
             try {
@@ -88,10 +104,19 @@ class DiffusionViewModel : ViewModel() {
                 val bitmap = Bitmap.createBitmap(result.width, result.height, Bitmap.Config.ARGB_8888)
                 bitmap.copyPixelsFromBuffer(ByteBuffer.wrap(result.imageData))
 
+                val record = GenerationRecord(
+                    prompt = prompt,
+                    image = bitmap,
+                    generationTimeMs = result.generationTimeMs,
+                    width = result.width,
+                    height = result.height,
+                )
+
                 _uiState.value = _uiState.value.copy(
                     isGenerating = false,
                     generatedImage = bitmap,
                     generationTimeMs = result.generationTimeMs,
+                    generationHistory = _uiState.value.generationHistory + record,
                 )
                 Log.i(TAG, "Image generated: ${result.width}x${result.height} in ${result.generationTimeMs}ms")
             } catch (e: Exception) {
