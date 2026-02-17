@@ -22,7 +22,7 @@ const SURPRISE_TEXTS = [
 
 let ttsIsSpeaking = false;
 let ttsPlayback: InstanceType<
-  typeof import('../../../../../sdk/runanywhere-web/packages/core/src/Infrastructure/AudioPlayback').AudioPlayback
+  typeof import('../../../../../sdk/runanywhere-web/packages/onnx/src/Infrastructure/AudioPlayback').AudioPlayback
 > | null = null;
 
 // ---------------------------------------------------------------------------
@@ -140,7 +140,7 @@ async function handleSpeak(): Promise<void> {
     const speed = parseFloat(speedSlider.value);
 
     const { TTS, AudioPlayback } = await import(
-      '../../../../../sdk/runanywhere-web/packages/core/src/index'
+      '../../../../../sdk/runanywhere-web/packages/onnx/src/index'
     );
 
     if (!TTS.isVoiceLoaded) {

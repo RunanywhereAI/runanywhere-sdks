@@ -23,10 +23,8 @@
  *   console.log(result.text);
  */
 
-import { RunAnywhere } from '../RunAnywhere';
-import { WASMBridge } from '../../Foundation/WASMBridge';
-import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
-import { SDKLogger } from '../../Foundation/SDKLogger';
+import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger } from '@runanywhere/web';
+import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
 import { TextGeneration } from './RunAnywhere+TextGeneration';
 import {
   ToolCallFormat,
@@ -77,9 +75,9 @@ async function collectGeneration(
   return { text };
 }
 
-function requireBridge(): WASMBridge {
+function requireBridge(): LlamaCppBridge {
   if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
-  return WASMBridge.shared;
+  return LlamaCppBridge.shared;
 }
 
 // ---------------------------------------------------------------------------

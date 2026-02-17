@@ -5,7 +5,7 @@
  * Extracted from RunAnywhere+VLM.ts for clean separation of concerns.
  */
 
-import { HardwareAcceleration } from '../../types/enums';
+import { HardwareAcceleration } from '@runanywhere/web';
 
 // ---------------------------------------------------------------------------
 // VLM Types

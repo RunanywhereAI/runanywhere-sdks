@@ -38,12 +38,9 @@ export interface WebCapabilities {
  * Detect all browser capabilities relevant to AI inference.
  */
 export async function detectCapabilities(): Promise<WebCapabilities> {
-  // Import WASMBridge lazily to avoid circular imports at module level
-  const { WASMBridge } = await import('../Foundation/WASMBridge');
-
   const capabilities: WebCapabilities = {
     hasWebGPU: false,
-    activeAcceleration: WASMBridge.shared.isLoaded ? WASMBridge.shared.accelerationMode : 'cpu',
+    activeAcceleration: 'cpu',
     hasSharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
     isCrossOriginIsolated: typeof crossOriginIsolated !== 'undefined' ? crossOriginIsolated : false,
     hasWASMSIMD: detectWASMSIMD(),

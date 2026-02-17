@@ -12,7 +12,7 @@
  *   - Audio level monitoring via AnalyserNode (currentLevel getter)
  */
 
-import { SDKLogger } from '../Foundation/SDKLogger';
+import { SDKLogger } from '@runanywhere/web';
 
 const logger = new SDKLogger('AudioCapture');
 

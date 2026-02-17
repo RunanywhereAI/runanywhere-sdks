@@ -20,18 +20,14 @@
  *   // result.audioData is Float32Array of PCM samples
  */
 
-import { RunAnywhere } from '../RunAnywhere';
-import { SherpaONNXBridge } from '../../Foundation/SherpaONNXBridge';
-import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
-import { SDKLogger } from '../../Foundation/SDKLogger';
-import { EventBus } from '../../Foundation/EventBus';
-import { SDKEventType } from '../../types/enums';
+import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType } from '@runanywhere/web';
+import { SherpaONNXBridge } from '../Foundation/SherpaONNXBridge';
 import type { TTSVoiceConfig, TTSSynthesisResult, TTSSynthesizeOptions } from './TTSTypes';
 
 export type { TTSVoiceConfig, TTSSynthesisResult, TTSSynthesizeOptions } from './TTSTypes';
 
 // @ts-ignore – sherpa-onnx-tts.js has no .d.ts
-import { initSherpaOnnxOfflineTtsConfig, freeConfig } from '../../../wasm/sherpa/sherpa-onnx-tts.js';
+import { initSherpaOnnxOfflineTtsConfig, freeConfig } from '../../wasm/sherpa/sherpa-onnx-tts.js';
 
 const logger = new SDKLogger('TTS');
 
