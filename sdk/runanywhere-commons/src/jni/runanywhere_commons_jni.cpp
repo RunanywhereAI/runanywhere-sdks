@@ -739,13 +739,19 @@ static rac_bool_t llm_stream_callback_token(const char* token, void* user_data) 
                 env->DeleteLocalRef(jToken);
             }
 
-            if (env->ExceptionCheck()) {
+            const bool hadException = env->ExceptionCheck();
+            if (hadException) {
                 env->ExceptionDescribe();
                 env->ExceptionClear();
             }
 
             if (needsDetach) {
                 ctx->jvm->DetachCurrentThread();
+            }
+
+            if (hadException) {
+                // Ignore callback return value when JNI exception was thrown.
+                return RAC_TRUE;
             }
 
             if (!continueGen) {
