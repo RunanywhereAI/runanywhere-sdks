@@ -67,7 +67,7 @@ WASM_DIR="${WEB_SDK_DIR}/wasm"
 WASM_BUILD_SCRIPT="${WASM_DIR}/scripts/build.sh"
 WASM_SETUP_SCRIPT="${WASM_DIR}/scripts/setup-emsdk.sh"
 WASM_SHERPA_SCRIPT="${WASM_DIR}/scripts/build-sherpa-onnx.sh"
-WASM_OUTPUT_DIR="${WEB_SDK_DIR}/packages/core/wasm"
+WASM_OUTPUT_DIR="${WEB_SDK_DIR}/packages/llamacpp/wasm"
 TS_OUTPUT_DIR="${WEB_SDK_DIR}/packages/core/dist"
 
 # Defaults
@@ -298,7 +298,7 @@ clean_all() {
 
     # Clean WASM output
     if [ -d "${WASM_OUTPUT_DIR}" ]; then
-        log_step "Cleaning WASM outputs (packages/core/wasm/)"
+        log_step "Cleaning WASM outputs (packages/llamacpp/wasm/)"
         rm -f "${WASM_OUTPUT_DIR}"/*.wasm "${WASM_OUTPUT_DIR}"/*.js 2>/dev/null || true
     fi
 
@@ -328,10 +328,10 @@ build_wasm() {
     bash "${WASM_BUILD_SCRIPT}" "${flags[@]}"
 
     # Verify output
-    if [ -f "${WASM_OUTPUT_DIR}/racommons.wasm" ]; then
+    if [ -f "${WASM_OUTPUT_DIR}/racommons-llamacpp.wasm" ]; then
         log_info "WASM build successful"
     else
-        log_error "WASM build failed - racommons.wasm not found"
+        log_error "WASM build failed - racommons-llamacpp.wasm not found"
         exit 1
     fi
 }
@@ -388,21 +388,21 @@ print_summary() {
     echo ""
     echo "  Artifacts:"
 
-    # WASM artifacts
-    if [ -f "${WASM_OUTPUT_DIR}/racommons.wasm" ]; then
+    # WASM artifacts (llamacpp backend)
+    if [ -f "${WASM_OUTPUT_DIR}/racommons-llamacpp.wasm" ]; then
         local wasm_size
-        wasm_size=$(du -h "${WASM_OUTPUT_DIR}/racommons.wasm" | cut -f1)
-        echo "    racommons.wasm:       ${wasm_size}"
+        wasm_size=$(du -h "${WASM_OUTPUT_DIR}/racommons-llamacpp.wasm" | cut -f1)
+        echo "    racommons-llamacpp.wasm:       ${wasm_size}"
     fi
-    if [ -f "${WASM_OUTPUT_DIR}/racommons.js" ]; then
+    if [ -f "${WASM_OUTPUT_DIR}/racommons-llamacpp.js" ]; then
         local js_size
-        js_size=$(du -h "${WASM_OUTPUT_DIR}/racommons.js" | cut -f1)
-        echo "    racommons.js:         ${js_size}"
+        js_size=$(du -h "${WASM_OUTPUT_DIR}/racommons-llamacpp.js" | cut -f1)
+        echo "    racommons-llamacpp.js:         ${js_size}"
     fi
-    if [ -f "${WASM_OUTPUT_DIR}/racommons-webgpu.wasm" ]; then
+    if [ -f "${WASM_OUTPUT_DIR}/racommons-llamacpp-webgpu.wasm" ]; then
         local webgpu_size
-        webgpu_size=$(du -h "${WASM_OUTPUT_DIR}/racommons-webgpu.wasm" | cut -f1)
-        echo "    racommons-webgpu.wasm: ${webgpu_size}"
+        webgpu_size=$(du -h "${WASM_OUTPUT_DIR}/racommons-llamacpp-webgpu.wasm" | cut -f1)
+        echo "    racommons-llamacpp-webgpu.wasm: ${webgpu_size}"
     fi
     if [ -f "${WASM_OUTPUT_DIR}/sherpa/sherpa-onnx.wasm" ]; then
         local sherpa_size
@@ -419,8 +419,8 @@ print_summary() {
 
     echo ""
     echo "  Output locations:"
-    echo "    WASM:       packages/core/wasm/"
-    echo "    TypeScript: packages/core/dist/"
+    echo "    WASM:       packages/llamacpp/wasm/"
+    echo "    TypeScript: packages/core/dist/ + packages/llamacpp/dist/ + packages/onnx/dist/"
     echo ""
 
     if [ "$SETUP_MODE" = true ]; then

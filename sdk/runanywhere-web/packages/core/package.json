@@ -1,7 +1,7 @@
 {
   "name": "@runanywhere/web",
   "version": "0.1.0-beta.5",
-  "description": "RunAnywhere Web SDK - On-device AI inference in the browser via RACommons WASM",
+  "description": "RunAnywhere Web SDK - Core infrastructure for on-device AI in the browser (pure TypeScript)",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -11,12 +11,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
-    },
-    "./wasm/*": "./wasm/*"
+    }
   },
   "files": [
     "dist/",
-    "wasm/",
     "README.md"
   ],
   "scripts": {
@@ -25,7 +23,7 @@
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "prepublishOnly": "test -f wasm/racommons.wasm || (echo 'ERROR: WASM not built. Run build-web.sh first.' && exit 1)"
+    "prepublishOnly": "test -d dist || (echo 'ERROR: Not built. Run npm run build first.' && exit 1)"
   },
   "keywords": [
     "runanywhere",

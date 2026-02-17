@@ -1,12 +1,10 @@
 /**
- * RunAnywhere Web SDK - Core Package
+ * RunAnywhere Web SDK - Core Package (Pure TypeScript)
  *
- * Foundation, infrastructure, and orchestration for on-device AI
- * inference in the browser via RACommons WebAssembly.
- *
- * Backend packages provide the actual inference capabilities:
- *   - @runanywhere/web-llamacpp — LLM, VLM, embeddings, diffusion
- *   - @runanywhere/web-onnx — STT, TTS, VAD
+ * Backend-agnostic infrastructure for on-device AI in the browser.
+ * This package has ZERO WASM — all inference binaries live in backend packages:
+ *   - @runanywhere/web-llamacpp — LLM, VLM, embeddings, diffusion (ships racommons-llamacpp.wasm)
+ *   - @runanywhere/web-onnx — STT, TTS, VAD (ships sherpa-onnx.wasm)
  *
  * @packageDocumentation
  *
@@ -25,7 +23,7 @@
 // Main entry point
 export { RunAnywhere } from './Public/RunAnywhere';
 
-// Voice orchestration (stays in core — cross-backend)
+// Voice orchestration (cross-backend, uses provider interfaces)
 export { VoiceAgent, VoiceAgentSession, PipelineState } from './Public/Extensions/RunAnywhere+VoiceAgent';
 export type { VoiceAgentModels, VoiceTurnResult, VoiceAgentEventData, VoiceAgentEventCallback } from './Public/Extensions/RunAnywhere+VoiceAgent';
 export { VoicePipeline } from './Public/Extensions/RunAnywhere+VoicePipeline';
@@ -39,15 +37,22 @@ export { SDKError, SDKErrorCode } from './Foundation/ErrorTypes';
 export { SDKLogger, LogLevel } from './Foundation/SDKLogger';
 export { EventBus } from './Foundation/EventBus';
 export type { EventListener, Unsubscribe, SDKEventEnvelope } from './Foundation/EventBus';
-export { WASMBridge } from './Foundation/WASMBridge';
 export type { AccelerationMode } from './Foundation/WASMBridge';
-export { Offsets, loadOffsets, mergeOffsets, loadOffsetsFromModule, loadLlamaCppOffsetsInto, wasmOffsetOf, wasmSizeOf } from './Foundation/StructOffsets';
 export type {
-  ConfigOffsets, LLMOptionsOffsets, LLMResultOffsets, VLMImageOffsets,
-  VLMOptionsOffsets, VLMResultOffsets, StructuredOutputConfigOffsets,
-  StructuredOutputValidationOffsets, EmbeddingsOptionsOffsets,
-  EmbeddingsResultOffsets, EmbeddingVectorOffsets, DiffusionOptionsOffsets,
-  DiffusionResultOffsets, AllOffsets,
+  AllOffsets,
+  ConfigOffsets,
+  LLMOptionsOffsets,
+  LLMResultOffsets,
+  VLMImageOffsets,
+  VLMOptionsOffsets,
+  VLMResultOffsets,
+  StructuredOutputConfigOffsets,
+  StructuredOutputValidationOffsets,
+  EmbeddingsOptionsOffsets,
+  EmbeddingsResultOffsets,
+  EmbeddingVectorOffsets,
+  DiffusionOptionsOffsets,
+  DiffusionResultOffsets,
 } from './Foundation/StructOffsets';
 
 // Infrastructure

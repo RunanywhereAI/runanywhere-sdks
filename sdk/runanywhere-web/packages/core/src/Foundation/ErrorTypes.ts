@@ -103,6 +103,14 @@ export class SDKError extends Error {
     );
   }
 
+  static componentNotReady(component: string, details?: string): SDKError {
+    return new SDKError(
+      SDKErrorCode.ComponentNotReady,
+      `Component not ready: ${component}`,
+      details,
+    );
+  }
+
   static generationFailed(details?: string): SDKError {
     return new SDKError(
       SDKErrorCode.GenerationFailed,

@@ -22,7 +22,9 @@
  *   const batch = await Embeddings.embedBatch(['text1', 'text2', 'text3']);
  */
 
-import { RunAnywhere, WASMBridge, Offsets, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType } from '@runanywhere/web';
+import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType } from '@runanywhere/web';
+import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
+import { Offsets } from '../Foundation/LlamaCppOffsets';
 import type {
   EmbeddingVector,
   EmbeddingsResult,
@@ -47,9 +49,9 @@ class EmbeddingsImpl {
   readonly extensionName = 'Embeddings';
   private _embeddingsComponentHandle = 0;
 
-  private requireBridge(): WASMBridge {
+  private requireBridge(): LlamaCppBridge {
     if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
-    return WASMBridge.shared;
+    return LlamaCppBridge.shared;
   }
 
   private ensureEmbeddingsComponent(): number {
@@ -117,7 +119,7 @@ class EmbeddingsImpl {
   get isModelLoaded(): boolean {
     if (this._embeddingsComponentHandle === 0) return false;
     try {
-      return (WASMBridge.shared.module.ccall(
+      return (LlamaCppBridge.shared.module.ccall(
         'rac_embeddings_component_is_loaded', 'number', ['number'], [this._embeddingsComponentHandle],
       ) as number) === 1;
     } catch { return false; }
@@ -242,7 +244,7 @@ class EmbeddingsImpl {
   cleanup(): void {
     if (this._embeddingsComponentHandle !== 0) {
       try {
-        WASMBridge.shared.module.ccall(
+        LlamaCppBridge.shared.module.ccall(
           'rac_embeddings_component_destroy', null, ['number'], [this._embeddingsComponentHandle],
         );
       } catch { /* ignore */ }
@@ -258,8 +260,8 @@ export const Embeddings = new EmbeddingsImpl();
 // ---------------------------------------------------------------------------
 
 function readEmbeddingsResult(
-  bridge: WASMBridge,
-  m: WASMBridge['module'],
+  bridge: LlamaCppBridge,
+  m: LlamaCppBridge['module'],
   resPtr: number,
 ): EmbeddingsResult {
   // rac_embeddings_result_t (offsets from compiler via StructOffsets)

@@ -9,7 +9,6 @@
  * This keeps ModelManager backend-agnostic — it only depends on core types.
  */
 
-import { WASMBridge } from '../Foundation/WASMBridge';
 import { EventBus } from '../Foundation/EventBus';
 import { SDKLogger } from '../Foundation/SDKLogger';
 import { ModelCategory, LLMFramework, ModelStatus, DownloadStage, SDKEventType } from '../types/enums';
@@ -403,10 +402,10 @@ class ModelManagerImpl {
       const root = await navigator.storage.getDirectory();
       const modelsDir = await root.getDirectoryHandle('models');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      for await (const entry of (modelsDir as any).values()) {
-        if (entry.kind === 'file') {
+      for await (const [name, handle] of (modelsDir as any).entries()) {
+        if (handle.kind === 'file' && !name.startsWith('_')) {
           modelCount++;
-          const file = await entry.getFile();
+          const file = await (handle as FileSystemFileHandle).getFile();
           totalSize += file.size;
         }
       }
@@ -466,35 +465,15 @@ class ModelManagerImpl {
   }
 
   /**
-   * Load an LLM model into the RACommons Emscripten FS.
-   * This logic stays in core because WASMBridge is in core.
+   * Load an LLM model via the pluggable loader.
+   * The loader (in @runanywhere/web-llamacpp) handles writing to its own
+   * Emscripten FS and calling the C API.
    */
-  private async loadLLMModel(model: ManagedModel, modelId: string, data: Uint8Array): Promise<void> {
-    const fsDir = `/models`;
-    const fsPath = `${fsDir}/${modelId}.gguf`;
-
-    // Write to Emscripten FS
-    const bridge = WASMBridge.shared;
-    if (!bridge.isLoaded) {
-      throw new Error('WASM module not loaded — SDK not initialized.');
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const m = bridge.module as any;
-
-    if (typeof m.FS_createPath !== 'function' || typeof m.FS_createDataFile !== 'function') {
-      throw new Error('Emscripten FS helper functions not available on WASM module.');
-    }
-
-    m.FS_createPath('/', 'models', true, true);
-    try { m.FS_unlink(fsPath); } catch { /* File doesn't exist yet */ }
-    logger.debug(`Writing ${data.length} bytes to ${fsPath}`);
-    m.FS_createDataFile('/models', `${modelId}.gguf`, data, true, true, true);
-    logger.debug(`Model file written to ${fsPath}`);
-
+  private async loadLLMModel(model: ManagedModel, _modelId: string, data: Uint8Array): Promise<void> {
     if (!this.llmLoader) throw new Error('No LLM loader registered. Register the @runanywhere/web-llamacpp package.');
-    await this.llmLoader.loadModel(fsPath, modelId, model.name);
-    logger.info(`LLM model loaded: ${modelId}`);
+    const ctx = this.buildLoadContext(model, data);
+    await this.llmLoader.loadModelFromData(ctx);
+    logger.info(`LLM model loaded: ${model.id}`);
   }
 
   /**
@@ -622,22 +601,11 @@ class ModelManagerImpl {
       } else if (category === ModelCategory.Multimodal) {
         await this.vlmLoader?.unloadModel();
       } else {
-        await this.llmLoader?.unloadModel();
-      }
-
-      // Clean up Emscripten FS model files for LLM models
-      if (category === ModelCategory.Language) {
-        try {
-          const bridge = WASMBridge.shared;
-          if (bridge.isLoaded) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const m = bridge.module as any;
-            const fsPath = `/models/${modelId}.gguf`;
-            try { m.FS_unlink(fsPath); } catch { /* file may not exist */ }
-            logger.debug(`Cleaned up Emscripten FS: ${fsPath}`);
-          }
-        } catch {
-          // Non-critical
+        // LLM: delegate unload + FS cleanup to the backend loader
+        if (this.llmLoader?.unloadAndCleanup) {
+          await this.llmLoader.unloadAndCleanup(modelId);
+        } else {
+          await this.llmLoader?.unloadModel();
         }
       }
     } catch (err) {

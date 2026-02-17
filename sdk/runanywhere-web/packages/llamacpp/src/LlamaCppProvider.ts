@@ -10,14 +10,15 @@
  */
 
 import {
-  WASMBridge,
   SDKLogger,
   ModelManager,
   ExtensionPoint,
   BackendCapability,
   ExtensionRegistry,
-  loadLlamaCppOffsetsInto,
 } from '@runanywhere/web';
+
+import { LlamaCppBridge } from './Foundation/LlamaCppBridge';
+import { loadOffsets } from './Foundation/LlamaCppOffsets';
 
 import { TextGeneration } from './Extensions/RunAnywhere+TextGeneration';
 import { VLM } from './Extensions/RunAnywhere+VLM';
@@ -63,7 +64,7 @@ export const LlamaCppProvider = {
    * Register the llama.cpp backend with the RunAnywhere SDK.
    *
    * This:
-   * 1. Calls rac_backend_llamacpp_register() via WASMBridge (if available)
+   * 1. Ensures LlamaCppBridge WASM is loaded (which registers the C++ backend)
    * 2. Loads llama.cpp-specific struct offsets
    * 3. Registers LLM model loader with ModelManager
    * 4. Registers all extension singletons with ExtensionRegistry
@@ -75,27 +76,11 @@ export const LlamaCppProvider = {
       return;
     }
 
-    const bridge = WASMBridge.shared;
-    if (!bridge.isLoaded) {
-      throw new Error('WASM module not loaded — call RunAnywhere.initialize() first.');
-    }
+    const bridge = LlamaCppBridge.shared;
+    await bridge.ensureLoaded();
 
-    // Register the C++ backend (if compiled in)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const m = bridge.module as any;
-    if (typeof m['_rac_backend_llamacpp_register'] === 'function') {
-      const regResult = await bridge.callFunction<number | Promise<number>>(
-        'rac_backend_llamacpp_register', 'number', [], [], { async: true },
-      ) as number;
-      if (regResult === 0) {
-        logger.info('llama.cpp C++ backend registered');
-      } else {
-        logger.warning(`llama.cpp backend registration returned: ${regResult}`);
-      }
-    }
-
-    // Load llama.cpp struct offsets
-    loadLlamaCppOffsetsInto(bridge.module);
+    // Load llama.cpp struct offsets from the WASM module
+    loadOffsets();
 
     // Register model loaders with ModelManager
     ModelManager.setLLMLoader(TextGeneration);

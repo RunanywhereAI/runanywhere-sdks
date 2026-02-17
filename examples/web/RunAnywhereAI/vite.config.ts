@@ -9,8 +9,9 @@ const __dir = path.dirname(fileURLToPath(import.meta.url));
 // Absolute path to the workspace root (runanywhere-sdks/)
 const workspaceRoot = path.resolve(__dir, '../../..');
 
-// SDK WASM directory
-const sdkWasmDir = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/core/wasm');
+// SDK WASM directories (each backend ships its own WASM)
+const llamacppWasmDir = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/llamacpp/wasm');
+const onnxWasmDir = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/onnx/wasm/sherpa');
 
 /**
  * Vite plugin to copy WASM binaries into the build output.
@@ -20,9 +21,11 @@ const sdkWasmDir = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/cor
  */
 function copyWasmPlugin(): Plugin {
   const wasmFiles = [
-    { src: path.join(sdkWasmDir, 'racommons.wasm'), dest: 'racommons.wasm' },
-    { src: path.join(sdkWasmDir, 'racommons-webgpu.wasm'), dest: 'racommons-webgpu.wasm' },
-    { src: path.join(sdkWasmDir, 'sherpa/sherpa-onnx.wasm'), dest: 'sherpa-onnx.wasm' },
+    // LlamaCpp backend WASM
+    { src: path.join(llamacppWasmDir, 'racommons-llamacpp.wasm'), dest: 'racommons-llamacpp.wasm' },
+    { src: path.join(llamacppWasmDir, 'racommons-llamacpp-webgpu.wasm'), dest: 'racommons-llamacpp-webgpu.wasm' },
+    // ONNX backend WASM (sherpa-onnx)
+    { src: path.join(onnxWasmDir, 'sherpa-onnx.wasm'), dest: 'sherpa-onnx.wasm' },
   ];
 
   return {
@@ -59,15 +62,11 @@ export default defineConfig({
     headers: {
       // Required for SharedArrayBuffer (pthreads) and WASM threads
       'Cross-Origin-Opener-Policy': 'same-origin',
-      // 'credentialless' allows cross-origin resource loading (e.g. model downloads
-      // from GitHub releases, HuggingFace CDN) without requiring CORS headers on every
-      // response, while still enabling SharedArrayBuffer for WASM pthreads.
-      // Supported in Chrome 96+ and Firefox 119+.
+      // 'credentialless' allows cross-origin resource loading
       'Cross-Origin-Embedder-Policy': 'credentialless',
     },
     fs: {
       // Allow Vite to serve files from the entire workspace
-      // (SDK TypeScript source + WASM output)
       allow: [workspaceRoot],
       strict: true,
     },
@@ -75,6 +74,5 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['@runanywhere/web'],
   },
-  // Ensure .wasm files are treated as assets
   assetsInclude: ['**/*.wasm'],
 });

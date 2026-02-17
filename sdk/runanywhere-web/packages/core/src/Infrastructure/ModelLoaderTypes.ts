@@ -65,12 +65,17 @@ export interface ModelLoadContext {
 /**
  * Loader for LLM text generation models.
  *
- * The loader receives model data pre-written to Emscripten FS
- * (done by ModelManager for LLM/VLM models since WASMBridge is in core).
+ * The implementation in @runanywhere/web-llamacpp handles:
+ * - Loading the LlamaCpp WASM module
+ * - Writing model files to the LlamaCpp Emscripten FS
+ * - Calling the C API to load the model into inference engine
  */
 export interface LLMModelLoader {
-  loadModel(modelPath: string, modelId: string, modelName?: string): Promise<void>;
+  /** Load an LLM model from raw data + context for additional files. */
+  loadModelFromData(ctx: ModelLoadContext): Promise<void>;
   unloadModel(): Promise<void>;
+  /** Unload model and clean up Emscripten FS. */
+  unloadAndCleanup?(modelId: string): Promise<void>;
 }
 
 /**
