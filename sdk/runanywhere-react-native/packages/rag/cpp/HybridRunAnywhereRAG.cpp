@@ -93,13 +93,19 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereRAG::createPipeline(const RAGCon
     rac_rag_config_t c_config = convertConfig(config);
     
     // Create RAG pipeline using C API
-    rac_result_t result = rac_rag_pipeline_create(&c_config, &_pipeline);
-    
-    if (result != RAC_SUCCESS || _pipeline == nullptr) {
+    rac_rag_pipeline_t* new_pipeline = nullptr;
+    rac_result_t result = rac_rag_pipeline_create(&c_config, &new_pipeline);
+
+    if (result != RAC_SUCCESS || new_pipeline == nullptr) {
+      if (new_pipeline != nullptr) {
+        rac_rag_pipeline_destroy(new_pipeline);
+      }
       throw std::runtime_error(
           std::string("Failed to create RAG pipeline: ") + rac_error_message(result)
       );
     }
+
+    _pipeline = new_pipeline;
     
     return true;
   });
