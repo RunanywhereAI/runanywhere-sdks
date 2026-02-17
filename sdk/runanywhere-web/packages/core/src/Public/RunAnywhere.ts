@@ -100,8 +100,12 @@ export const RunAnywhere = {
 
         logger.info(`Initializing RunAnywhere Web SDK (${env})...`);
 
-        // Restore local file storage from previous session
-        await RunAnywhere.restoreLocalStorage();
+        // Restore local file storage from previous session (non-blocking)
+        try {
+          await RunAnywhere.restoreLocalStorage();
+        } catch (err) {
+          logger.warning(`Failed to restore local storage: ${err instanceof Error ? err.message : String(err)}`);
+        }
 
         _isInitialized = true;
 
@@ -284,6 +288,9 @@ export const RunAnywhere = {
 
   shutdown(): void {
     logger.info('Shutting down RunAnywhere Web SDK...');
+
+    // Unload all models before tearing down extensions
+    ModelManager.unloadAll().catch(() => { /* ignore during shutdown */ });
 
     // Clean up all registered extensions and backends
     ExtensionRegistry.cleanupAll();

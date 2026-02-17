@@ -44,8 +44,9 @@ export const LlamaCPP = {
 
 /**
  * Auto-register the llama.cpp backend.
- * Import for fire-and-forget registration:
- *   import '@runanywhere/web-llamacpp/autoRegister';
+ * Usage:
+ *   import { autoRegister } from '@runanywhere/web-llamacpp';
+ *   autoRegister();
  */
 export function autoRegister(): void {
   LlamaCppProvider.register().catch(() => {
