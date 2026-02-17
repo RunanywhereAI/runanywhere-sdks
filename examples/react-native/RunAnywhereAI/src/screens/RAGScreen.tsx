@@ -171,12 +171,12 @@ export const RAGScreen: React.FC = () => {
 
   const stripModelExtension = (modelId: string): string => {
     return modelId
-      .replace('.gguf', '')
-      .replace('.onnx', '')
-      .replace('.tar.bz2', '')
-      .replace('.tar.gz', '')
-      .replace('.zip', '')
-      .replace('.bin', '');
+      .replace(/\.tar\.bz2$/i, '')
+      .replace(/\.tar\.gz$/i, '')
+      .replace(/\.zip$/i, '')
+      .replace(/\.gguf$/i, '')
+      .replace(/\.onnx$/i, '')
+      .replace(/\.bin$/i, '');
   };
 
   const resolveModelPath = (model: SDKModelInfo, modelsDir: string): string | null => {
