@@ -30,7 +30,16 @@ export interface ModelLoadContext {
   /** The model being loaded (metadata from the registry). */
   model: ManagedModel;
 
-  /** Primary model file data (read from storage). */
+  /**
+   * Primary model file data (read from storage).
+   *
+   * NOTE: This requires the full model file in memory as a Uint8Array.
+   * For the *import* path, files are streamed directly to OPFS/LocalFileStorage
+   * to avoid peak memory issues. However, when *loading* into a WASM backend,
+   * the full buffer is needed because Emscripten's FS.writeFile() requires it.
+   * A future optimisation could use Emscripten's FS.createLazyFile() or
+   * direct OPFS-to-WASM piping to avoid this buffering.
+   */
   data: Uint8Array;
 
   /**

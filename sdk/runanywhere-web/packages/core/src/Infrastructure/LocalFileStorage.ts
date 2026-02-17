@@ -65,6 +65,9 @@ export class LocalFileStorage {
   private _isReady = false;
   private _hasStoredHandle = false;
 
+  /** Per-key write lock to prevent concurrent writes to the same file. */
+  private writeLocks: Map<string, Promise<void>> = new Map();
+
   // -------------------------------------------------------------------------
   // Static
   // -------------------------------------------------------------------------
@@ -228,10 +231,26 @@ export class LocalFileStorage {
 
   /**
    * Save model data to the local filesystem.
+   * Uses a per-key lock to prevent concurrent writes from corrupting files.
    * @param key - Model identifier (used as filename)
    * @param data - Model file data
    */
   async saveModel(key: string, data: ArrayBuffer): Promise<void> {
+    return this.withWriteLock(key, () => this._saveModelImpl(key, data));
+  }
+
+  /**
+   * Save model data from a ReadableStream to the local filesystem.
+   * Streams data directly to disk without buffering the entire file in memory.
+   * Uses a per-key lock to prevent concurrent writes from corrupting files.
+   * @param key - Model identifier (used as filename)
+   * @param stream - Readable stream of model data
+   */
+  async saveModelFromStream(key: string, stream: ReadableStream<Uint8Array>): Promise<void> {
+    return this.withWriteLock(key, () => this._saveStreamImpl(key, stream));
+  }
+
+  private async _saveModelImpl(key: string, data: ArrayBuffer): Promise<void> {
     if (!this.dirHandle || !this._isReady) {
       throw new Error('LocalFileStorage not ready — call chooseDirectory() or restoreDirectory() first.');
     }
@@ -247,6 +266,48 @@ export class LocalFileStorage {
     } catch (err) {
       try { await writable.abort(); } catch { /* ignore */ }
       throw err;
+    }
+  }
+
+  private async _saveStreamImpl(key: string, stream: ReadableStream<Uint8Array>): Promise<void> {
+    if (!this.dirHandle || !this._isReady) {
+      throw new Error('LocalFileStorage not ready — call chooseDirectory() or restoreDirectory() first.');
+    }
+
+    const filename = this.sanitizeFilename(key);
+    const fileHandle = await this.dirHandle.getFileHandle(filename, { create: true });
+    const writable = await fileHandle.createWritable();
+
+    try {
+      const reader = stream.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        await writable.write(value as unknown as ArrayBuffer);
+      }
+      await writable.close();
+      logger.info(`Streamed model to local storage: ${filename}`);
+    } catch (err) {
+      try { await writable.abort(); } catch { /* ignore */ }
+      throw err;
+    }
+  }
+
+  /**
+   * Per-key write lock: ensures only one write operation per key at a time.
+   * Concurrent calls for the same key will be serialized.
+   */
+  private async withWriteLock(key: string, fn: () => Promise<void>): Promise<void> {
+    const prev = this.writeLocks.get(key) ?? Promise.resolve();
+    const next = prev.then(fn, fn); // chain even if previous rejected
+    this.writeLocks.set(key, next);
+    try {
+      await next;
+    } finally {
+      // Clean up lock if this was the last write in the chain
+      if (this.writeLocks.get(key) === next) {
+        this.writeLocks.delete(key);
+      }
     }
   }
 

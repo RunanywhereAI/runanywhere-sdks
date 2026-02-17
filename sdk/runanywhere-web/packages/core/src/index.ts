@@ -68,7 +68,7 @@ export { OPFSStorage } from './Infrastructure/OPFSStorage';
 export type { StoredModelInfo, MetadataMap, ModelMetadata } from './Infrastructure/OPFSStorage';
 export { ExtensionRegistry } from './Infrastructure/ExtensionRegistry';
 export type { SDKExtension } from './Infrastructure/ExtensionRegistry';
-export { ExtensionPoint, BackendCapability } from './Infrastructure/ExtensionPoint';
+export { ExtensionPoint, BackendCapability, ServiceKey } from './Infrastructure/ExtensionPoint';
 export type { BackendExtension } from './Infrastructure/ExtensionPoint';
 export type { ModelLoadContext, LLMModelLoader, STTModelLoader, TTSModelLoader, VADModelLoader } from './Infrastructure/ModelLoaderTypes';
 export { extractTarGz } from './Infrastructure/ArchiveUtility';

@@ -15,6 +15,7 @@ import {
   ExtensionPoint,
   BackendCapability,
   ExtensionRegistry,
+  ServiceKey,
 } from '@runanywhere/web';
 
 import { LlamaCppBridge } from './Foundation/LlamaCppBridge';
@@ -49,9 +50,8 @@ const llamacppExtension: BackendExtension = {
     ToolCalling.cleanup();
     Embeddings.cleanup();
     Diffusion.cleanup();
-    // Remove globalThis reference set during registration
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    delete (globalThis as any).__runanywhere_textgeneration;
+    // Remove service registrations
+    ExtensionPoint.removeService(ServiceKey.TextGeneration);
     _isRegistered = false;
     logger.info('LlamaCpp backend cleaned up');
   },
@@ -99,10 +99,9 @@ export const LlamaCppProvider = {
     // Register with ExtensionPoint for capability lookups
     ExtensionPoint.registerBackend(llamacppExtension);
 
-    // Register singletons on globalThis so VoicePipeline (in core) can
-    // access them at runtime without importing from this package directly.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (globalThis as any).__runanywhere_textgeneration = TextGeneration;
+    // Register service singletons with ExtensionPoint so VoicePipeline
+    // (in core) can access them via typed keys at runtime.
+    ExtensionPoint.registerService(ServiceKey.TextGeneration, TextGeneration);
 
     _isRegistered = true;
     logger.info('LlamaCpp backend registered successfully');

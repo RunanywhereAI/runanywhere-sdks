@@ -134,6 +134,38 @@ export class OPFSStorage {
   }
 
   /**
+   * Save model data to OPFS from a ReadableStream.
+   * Streams data directly to disk without buffering the entire file in memory.
+   *
+   * @param key - Model identifier or nested path
+   * @param stream - Readable stream of model data
+   */
+  async saveModelFromStream(key: string, stream: ReadableStream<Uint8Array>): Promise<void> {
+    if (!this.modelsDir) throw new Error('OPFS not initialized. Call initialize() first.');
+
+    const dir = await this.resolveParentDir(key, /* create */ true);
+    const filename = this.resolveFilename(key);
+
+    const fileHandle = await dir.getFileHandle(filename, { create: true });
+    const writable = await fileHandle.createWritable();
+
+    try {
+      const reader = stream.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        await writable.write(value as unknown as ArrayBuffer);
+      }
+      await writable.close();
+      logger.info(`Model streamed to OPFS: ${key}`);
+    } catch (writeError) {
+      try { await writable.abort(); } catch { /* ignore */ }
+      try { await dir.removeEntry(filename); } catch { /* ignore */ }
+      throw writeError;
+    }
+  }
+
+  /**
    * Load model data from OPFS.
    *
    * @param key - Model identifier or nested path

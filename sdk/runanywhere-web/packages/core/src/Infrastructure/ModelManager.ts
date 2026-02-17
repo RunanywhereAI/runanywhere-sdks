@@ -259,23 +259,33 @@ class ModelManagerImpl {
 
     logger.info(`Importing model from file: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB) -> ${id}`);
 
-    const data = new Uint8Array(await file.arrayBuffer());
-    await this.downloader.storeInOPFS(id, data);
+    // Stream the file directly to storage to avoid loading the entire file into memory.
+    // file.stream() returns a ReadableStream<Uint8Array> in modern browsers.
+    if (typeof file.stream === 'function') {
+      await this.downloader.storeStreamInOPFS(id, file.stream());
+    } else {
+      // Fallback for older browsers: buffer the entire file
+      const data = new Uint8Array(await file.arrayBuffer());
+      await this.downloader.storeInOPFS(id, data);
+    }
+
+    // Use file.size (already known) instead of data.length to avoid extra reference
+    const sizeBytes = file.size;
 
     this.registry.updateModel(id, {
       status: ModelStatus.Downloaded,
-      sizeBytes: data.length,
+      sizeBytes,
     });
 
-    this.touchLastUsed(id, data.length);
+    this.touchLastUsed(id, sizeBytes);
 
     EventBus.shared.emit('model.imported', SDKEventType.Model, {
       modelId: id,
       filename: file.name,
-      sizeBytes: data.length,
+      sizeBytes,
     });
 
-    logger.info(`Model imported: ${id} (${(data.length / 1024 / 1024).toFixed(1)} MB)`);
+    logger.info(`Model imported: ${id} (${(sizeBytes / 1024 / 1024).toFixed(1)} MB)`);
     return id;
   }
 

@@ -42,6 +42,25 @@ export enum BackendCapability {
 }
 
 /**
+ * Typed service keys for cross-package singleton access.
+ *
+ * Backend packages register service instances (e.g. TextGeneration, STT, TTS)
+ * under these keys during their registration phase. Core code (e.g. VoicePipeline)
+ * retrieves them at runtime via `ExtensionPoint.getService(ServiceKey.XXX)` instead
+ * of relying on untyped globalThis keys.
+ */
+export enum ServiceKey {
+  TextGeneration = 'textGeneration',
+  STT = 'stt',
+  TTS = 'tts',
+  VLM = 'vlm',
+  Embeddings = 'embeddings',
+  Diffusion = 'diffusion',
+  ToolCalling = 'toolCalling',
+  VAD = 'vad',
+}
+
+/**
  * Interface that every backend package must implement to register
  * itself with the core SDK.
  */
@@ -66,6 +85,8 @@ export interface BackendExtension {
 class ExtensionPointImpl {
   private backends: Map<string, BackendExtension> = new Map();
   private capabilityMap: Map<BackendCapability, BackendExtension> = new Map();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private services: Map<ServiceKey, any> = new Map();
 
   /**
    * Register a backend extension.
@@ -129,6 +150,53 @@ class ExtensionPointImpl {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Service Registry — typed singleton access for cross-package communication
+  // -------------------------------------------------------------------------
+
+  /**
+   * Register a service singleton under a typed key.
+   * Backend packages call this during their registration phase.
+   */
+  registerService<T>(key: ServiceKey, service: T): void {
+    if (this.services.has(key)) {
+      logger.debug(`Service '${key}' already registered, overwriting`);
+    }
+    this.services.set(key, service);
+  }
+
+  /**
+   * Retrieve a registered service singleton.
+   * Returns undefined if the service is not registered yet.
+   */
+  getService<T>(key: ServiceKey): T | undefined {
+    return this.services.get(key) as T | undefined;
+  }
+
+  /**
+   * Retrieve a registered service or throw a descriptive error.
+   * Use in code that requires a specific backend to be registered.
+   */
+  requireService<T>(key: ServiceKey, packageHint?: string): T {
+    const service = this.services.get(key);
+    if (!service) {
+      const hint = packageHint ?? (
+        key === ServiceKey.STT || key === ServiceKey.TTS || key === ServiceKey.VAD
+          ? '@runanywhere/web-onnx'
+          : '@runanywhere/web-llamacpp'
+      );
+      throw new Error(
+        `Service '${key}' not available. Install and register the ${hint} package.`,
+      );
+    }
+    return service as T;
+  }
+
+  /** Remove a registered service. */
+  removeService(key: ServiceKey): void {
+    this.services.delete(key);
+  }
+
   /**
    * Cleanup all registered backends in reverse registration order.
    * Called during SDK shutdown.
@@ -149,6 +217,7 @@ class ExtensionPointImpl {
   reset(): void {
     this.backends.clear();
     this.capabilityMap.clear();
+    this.services.clear();
   }
 }
 
