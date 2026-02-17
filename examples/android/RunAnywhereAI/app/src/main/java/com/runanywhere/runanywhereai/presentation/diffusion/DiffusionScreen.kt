@@ -2,6 +2,7 @@ package com.runanywhere.runanywhereai.presentation.diffusion
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -20,13 +22,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -43,6 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -172,6 +176,33 @@ fun DiffusionScreen(viewModel: DiffusionViewModel = viewModel()) {
             enabled = !uiState.isGenerating,
         )
 
+        // Sample Prompts — horizontally scrollable chips (matching iOS)
+        if (!uiState.isGenerating) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                DiffusionViewModel.samplePrompts.forEach { samplePrompt ->
+                    AssistChip(
+                        onClick = { viewModel.updatePrompt(samplePrompt) },
+                        label = {
+                            Text(
+                                text = if (samplePrompt.length > 30) {
+                                    samplePrompt.take(30) + "..."
+                                } else {
+                                    samplePrompt
+                                },
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
+                    )
+                }
+            }
+        }
+
         // Generate / Cancel Buttons
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -268,7 +299,7 @@ fun DiffusionScreen(viewModel: DiffusionViewModel = viewModel()) {
             }
         }
 
-        // Generation stats
+        // Current generation stats
         if (uiState.generationTimeMs > 0) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -281,7 +312,7 @@ fun DiffusionScreen(viewModel: DiffusionViewModel = viewModel()) {
                     Column {
                         Text("Time", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
-                            "${uiState.generationTimeMs / 1000}.${(uiState.generationTimeMs % 1000) / 100}s",
+                            formatDuration(uiState.generationTimeMs),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
                         )
@@ -295,5 +326,116 @@ fun DiffusionScreen(viewModel: DiffusionViewModel = viewModel()) {
                 }
             }
         }
+
+        // Generation History with metrics
+        if (uiState.generationHistory.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            HorizontalDivider()
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = "Generation History (${uiState.generationHistory.size} images)",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+            )
+
+            // Summary metrics
+            val totalTime = uiState.generationHistory.sumOf { it.generationTimeMs }
+            val avgTime = totalTime / uiState.generationHistory.size
+            val fastestTime = uiState.generationHistory.minOf { it.generationTimeMs }
+            val slowestTime = uiState.generationHistory.maxOf { it.generationTimeMs }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        "Performance Summary",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        MetricColumn("Average", formatDuration(avgTime))
+                        MetricColumn("Fastest", formatDuration(fastestTime))
+                        MetricColumn("Slowest", formatDuration(slowestTime))
+                        MetricColumn("Total", formatDuration(totalTime))
+                    }
+                }
+            }
+
+            // Individual history entries
+            uiState.generationHistory.reversed().forEachIndexed { index, record ->
+                val displayIndex = uiState.generationHistory.size - index
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        // Thumbnail
+                        Image(
+                            bitmap = record.image.asImageBitmap(),
+                            contentDescription = "Generated image #$displayIndex",
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop,
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "#$displayIndex: ${record.prompt}",
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                fontWeight = FontWeight.Medium,
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "${formatDuration(record.generationTimeMs)} | ${record.width}x${record.height}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MetricColumn(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onTertiaryContainer,
+        )
+    }
+}
+
+private fun formatDuration(ms: Long): String {
+    val totalSeconds = ms / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return if (minutes > 0) {
+        "${minutes}m ${seconds}s"
+    } else {
+        "${seconds}.${(ms % 1000) / 100}s"
     }
 }
