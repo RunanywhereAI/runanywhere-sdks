@@ -16,6 +16,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.runanywhere.runanywhereai.presentation.benchmarks.views.BenchmarkDashboardScreen
+import com.runanywhere.runanywhereai.presentation.benchmarks.views.BenchmarkDetailScreen
 import com.runanywhere.runanywhereai.presentation.chat.ChatScreen
 import com.runanywhere.runanywhereai.presentation.settings.SettingsScreen
 import com.runanywhere.runanywhereai.presentation.stt.SpeechToTextScreen
@@ -71,7 +73,7 @@ fun AppNavigation() {
                 VoiceAssistantScreen()
             }
 
-            // "More" hub routes — STT and TTS moved here to match iOS structure
+            // "More" hub routes — STT, TTS, and Benchmarks here to match iOS structure
             composable(NavigationRoute.MORE) {
                 MoreHubScreen(
                     onNavigateToSTT = {
@@ -79,6 +81,9 @@ fun AppNavigation() {
                     },
                     onNavigateToTTS = {
                         navController.navigate(NavigationRoute.TTS)
+                    },
+                    onNavigateToBenchmarks = {
+                        navController.navigate(NavigationRoute.BENCHMARKS)
                     },
                 )
             }
@@ -89,6 +94,19 @@ fun AppNavigation() {
 
             composable(NavigationRoute.TTS) {
                 TextToSpeechScreen()
+            }
+
+            composable(NavigationRoute.BENCHMARKS) {
+                BenchmarkDashboardScreen(
+                    onNavigateToDetail = { runId ->
+                        navController.navigate("${NavigationRoute.BENCHMARK_DETAIL}/$runId")
+                    },
+                )
+            }
+
+            composable("${NavigationRoute.BENCHMARK_DETAIL}/{runId}") { backStackEntry ->
+                val runId = backStackEntry.arguments?.getString("runId") ?: return@composable
+                BenchmarkDetailScreen(runId = runId)
             }
 
             composable(NavigationRoute.SETTINGS) {
@@ -119,7 +137,7 @@ private fun isRouteSelectedForTab(currentRoute: String?, tabRoute: String): Bool
     // Map child routes to parent tabs
     return when (tabRoute) {
         NavigationRoute.VISION -> currentRoute in listOf(NavigationRoute.VLM)
-        NavigationRoute.MORE -> currentRoute in listOf(NavigationRoute.STT, NavigationRoute.TTS)
+        NavigationRoute.MORE -> currentRoute in listOf(NavigationRoute.STT, NavigationRoute.TTS, NavigationRoute.BENCHMARKS) || currentRoute?.startsWith(NavigationRoute.BENCHMARK_DETAIL) == true
         else -> false
     }
 }
@@ -219,6 +237,8 @@ object NavigationRoute {
     const val MORE = "more"
     const val STT = "stt"
     const val TTS = "tts"
+    const val BENCHMARKS = "benchmarks"
+    const val BENCHMARK_DETAIL = "benchmark_detail"
     const val SETTINGS = "settings"
 }
 
