@@ -9,7 +9,6 @@
  */
 
 import { RunAnywhere } from '../RunAnywhere';
-import { WASMBridge } from '../../Foundation/WASMBridge';
 import { SDKError } from '../../Foundation/ErrorTypes';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { EventBus } from '../../Foundation/EventBus';
@@ -59,22 +58,12 @@ export const ModelManagement = {
       throw SDKError.notInitialized();
     }
 
-    const bridge = WASMBridge.shared;
-    const m = bridge.module;
-
     // Determine destination path
     const filename = url.split('/').pop() ?? `${modelId}.gguf`;
     const destPath = options.destPath ?? `${MODELS_DIR}/${filename}`;
 
     logger.info(`Downloading model: ${modelId} from ${url}`);
     EventBus.shared.emit('model.downloadStarted', SDKEventType.Model, { modelId, url });
-
-    // Ensure models directory exists
-    try {
-      m.FS.mkdir(MODELS_DIR);
-    } catch {
-      // Directory already exists
-    }
 
     try {
       const response = await fetch(url, { signal: options.signal });
@@ -88,14 +77,12 @@ export const ModelManagement = {
         throw new Error('ReadableStream not supported');
       }
 
-      const chunks: Uint8Array[] = [];
       let downloaded = 0;
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        chunks.push(value);
         downloaded += value.length;
 
         const progress = contentLength > 0 ? downloaded / contentLength : 0;
@@ -110,25 +97,16 @@ export const ModelManagement = {
         });
       }
 
-      // Combine chunks
-      const totalData = new Uint8Array(downloaded);
-      let offset = 0;
-      for (const chunk of chunks) {
-        totalData.set(chunk, offset);
-        offset += chunk.length;
-      }
+      // TODO: Store downloaded bytes via backend-specific storage (OPFS / Emscripten FS).
+      // The old Emscripten FS write was removed because core is now pure TS.
+      // Backend packages should provide a storage provider through ExtensionPoint.
 
-      // Write to Emscripten FS
-      m.FS.writeFile(destPath, totalData);
-
-      // Verify
-      const stat = m.FS.stat(destPath);
-      logger.info(`Model downloaded: ${modelId} (${(stat.size / 1024 / 1024).toFixed(1)} MB) -> ${destPath}`);
+      logger.info(`Model downloaded: ${modelId} (${(downloaded / 1024 / 1024).toFixed(1)} MB) -> ${destPath}`);
 
       EventBus.shared.emit('model.downloadCompleted', SDKEventType.Model, {
         modelId,
         localPath: destPath,
-        sizeBytes: stat.size,
+        sizeBytes: downloaded,
       });
 
       return destPath;
@@ -146,41 +124,36 @@ export const ModelManagement = {
   },
 
   /**
-   * Check if a model file exists in Emscripten FS.
+   * Check if a model file exists.
+   *
+   * TODO: Delegate to backend-specific storage provider via ExtensionPoint.
+   * Emscripten FS was removed — core is now pure TS.
    */
-  isModelDownloaded(path: string): boolean {
-    try {
-      const m = WASMBridge.shared.module;
-      return m.FS.analyzePath(path).exists;
-    } catch {
-      return false;
-    }
+  isModelDownloaded(_path: string): boolean {
+    // TODO: query backend storage provider
+    return false;
   },
 
   /**
-   * Delete a downloaded model from Emscripten FS.
+   * Delete a downloaded model.
+   *
+   * TODO: Delegate to backend-specific storage provider via ExtensionPoint.
+   * Emscripten FS was removed — core is now pure TS.
    */
   deleteModel(path: string): void {
-    try {
-      const m = WASMBridge.shared.module;
-      m.FS.unlink(path);
-      logger.info(`Model deleted: ${path}`);
-    } catch (error) {
-      logger.error(`Failed to delete model: ${error}`);
-    }
+    // TODO: delegate to backend storage provider
+    logger.warning(`deleteModel(${path}) — no storage backend registered (core is pure TS)`);
   },
 
   /**
    * Get the size of a downloaded model file.
    * @returns Size in bytes, or 0 if not found
+   *
+   * TODO: Delegate to backend-specific storage provider via ExtensionPoint.
    */
-  getModelSize(path: string): number {
-    try {
-      const m = WASMBridge.shared.module;
-      return m.FS.stat(path).size;
-    } catch {
-      return 0;
-    }
+  getModelSize(_path: string): number {
+    // TODO: query backend storage provider
+    return 0;
   },
 
   /**

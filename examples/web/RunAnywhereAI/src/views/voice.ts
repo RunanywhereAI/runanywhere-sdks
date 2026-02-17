@@ -8,9 +8,10 @@
 import type { TabLifecycle } from '../app';
 import { showModelSelectionSheet } from '../components/model-selection';
 import { ModelManager, ModelCategory, ensureVADLoaded } from '../services/model-manager';
+import { VoicePipeline, PipelineState } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
 import {
-  AudioCapture, AudioPlayback, VAD, SpeechActivity, VoicePipeline, PipelineState,
-} from '../../../../../sdk/runanywhere-web/packages/core/src/index';
+  AudioCapture, AudioPlayback, VAD, SpeechActivity,
+} from '../../../../../sdk/runanywhere-web/packages/onnx/src/index';
 
 /** Shared AudioCapture instance for this view (replaces app-level MicCapture singleton). */
 const micCapture = new AudioCapture();

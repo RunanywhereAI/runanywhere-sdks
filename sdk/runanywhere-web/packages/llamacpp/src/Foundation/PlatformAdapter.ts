@@ -12,9 +12,9 @@
  * struct in WASM memory.
  */
 
-import type { RACommonsModule } from './WASMBridge';
-import { WASMBridge } from './WASMBridge';
-import { SDKLogger } from './SDKLogger';
+import type { LlamaCppModule } from './LlamaCppBridge';
+import { LlamaCppBridge } from './LlamaCppBridge';
+import { SDKLogger } from '@runanywhere/web';
 
 const logger = new SDKLogger('PlatformAdapter');
 
@@ -52,7 +52,7 @@ export class PlatformAdapter {
    * Must be called after WASM module is loaded but before rac_init().
    */
   register(): void {
-    const bridge = WASMBridge.shared;
+    const bridge = LlamaCppBridge.shared;
     const m = bridge.module;
 
     logger.info('Registering platform adapter callbacks...');
@@ -130,7 +130,7 @@ export class PlatformAdapter {
    * Clean up allocated callbacks and memory.
    */
   cleanup(): void {
-    const m = WASMBridge.shared.module;
+    const m = LlamaCppBridge.shared.module;
 
     if (this.callbacks) {
       for (const ptr of Object.values(this.callbacks)) {
@@ -152,7 +152,7 @@ export class PlatformAdapter {
   // -----------------------------------------------------------------------
 
   /** file_exists: rac_bool_t (*)(const char* path, void* user_data) */
-  private registerFileExists(m: RACommonsModule): number {
+  private registerFileExists(m: LlamaCppModule): number {
     return m.addFunction((pathPtr: number, _userData: number): number => {
       try {
         const path = m.UTF8ToString(pathPtr);
@@ -165,13 +165,13 @@ export class PlatformAdapter {
   }
 
   /** file_read: rac_result_t (*)(const char* path, void** out_data, size_t* out_size, void* user_data) */
-  private registerFileRead(m: RACommonsModule): number {
+  private registerFileRead(m: LlamaCppModule): number {
     return m.addFunction((pathPtr: number, outDataPtr: number, outSizePtr: number, _userData: number): number => {
       try {
         const path = m.UTF8ToString(pathPtr);
         const data = m.FS.readFile(path);
         const wasmPtr = m._malloc(data.length);
-        WASMBridge.shared.writeBytes(data, wasmPtr);
+        LlamaCppBridge.shared.writeBytes(data, wasmPtr);
         m.setValue(outDataPtr, wasmPtr, '*');
         m.setValue(outSizePtr, data.length, 'i32');
         return 0; // RAC_OK
@@ -182,11 +182,11 @@ export class PlatformAdapter {
   }
 
   /** file_write: rac_result_t (*)(const char* path, const void* data, size_t size, void* user_data) */
-  private registerFileWrite(m: RACommonsModule): number {
+  private registerFileWrite(m: LlamaCppModule): number {
     return m.addFunction((pathPtr: number, dataPtr: number, size: number, _userData: number): number => {
       try {
         const path = m.UTF8ToString(pathPtr);
-        const data = WASMBridge.shared.readBytes(dataPtr, size);
+        const data = LlamaCppBridge.shared.readBytes(dataPtr, size);
         m.FS.writeFile(path, data);
         return 0;
       } catch {
@@ -196,7 +196,7 @@ export class PlatformAdapter {
   }
 
   /** file_delete: rac_result_t (*)(const char* path, void* user_data) */
-  private registerFileDelete(m: RACommonsModule): number {
+  private registerFileDelete(m: LlamaCppModule): number {
     return m.addFunction((pathPtr: number, _userData: number): number => {
       try {
         const path = m.UTF8ToString(pathPtr);
@@ -220,7 +220,7 @@ export class PlatformAdapter {
    * For the web platform this is intentionally best-effort: the RACommons C
    * layer only uses it for non-sensitive SDK state (e.g. cached environment).
    */
-  private registerSecureGet(m: RACommonsModule): number {
+  private registerSecureGet(m: LlamaCppModule): number {
     return m.addFunction((keyPtr: number, outValuePtr: number, _userData: number): number => {
       try {
         const key = m.UTF8ToString(keyPtr);
@@ -229,7 +229,7 @@ export class PlatformAdapter {
           m.setValue(outValuePtr, 0, '*');
           return -182;
         }
-        const strPtr = WASMBridge.shared.allocString(value);
+        const strPtr = LlamaCppBridge.shared.allocString(value);
         m.setValue(outValuePtr, strPtr, '*');
         return 0;
       } catch {
@@ -244,7 +244,7 @@ export class PlatformAdapter {
    * SECURITY NOTE: See registerSecureGet — localStorage is NOT secure on web.
    * Do not use for sensitive data.
    */
-  private registerSecureSet(m: RACommonsModule): number {
+  private registerSecureSet(m: LlamaCppModule): number {
     return m.addFunction((keyPtr: number, valuePtr: number, _userData: number): number => {
       try {
         const key = m.UTF8ToString(keyPtr);
@@ -262,7 +262,7 @@ export class PlatformAdapter {
    *
    * SECURITY NOTE: See registerSecureGet — localStorage is NOT secure on web.
    */
-  private registerSecureDelete(m: RACommonsModule): number {
+  private registerSecureDelete(m: LlamaCppModule): number {
     return m.addFunction((keyPtr: number, _userData: number): number => {
       try {
         const key = m.UTF8ToString(keyPtr);
@@ -275,7 +275,7 @@ export class PlatformAdapter {
   }
 
   /** log: void (*)(rac_log_level_t level, const char* category, const char* message, void* user_data) */
-  private registerLog(m: RACommonsModule): number {
+  private registerLog(m: LlamaCppModule): number {
     return m.addFunction((level: number, categoryPtr: number, messagePtr: number, _userData: number): void => {
       const category = m.UTF8ToString(categoryPtr);
       const message = m.UTF8ToString(messagePtr);
@@ -303,7 +303,7 @@ export class PlatformAdapter {
   }
 
   /** now_ms: int64_t (*)(void* user_data) */
-  private registerNowMs(m: RACommonsModule): number {
+  private registerNowMs(m: LlamaCppModule): number {
     // Note: Emscripten represents int64_t as two i32 values (lo, hi) in some cases.
     // For simplicity, we use 'ii' return (returns i32 which truncates but is fine for ms).
     return m.addFunction((_userData: number): number => {
@@ -312,7 +312,7 @@ export class PlatformAdapter {
   }
 
   /** get_memory_info: rac_result_t (*)(rac_memory_info_t* out_info, void* user_data) */
-  private registerGetMemoryInfo(m: RACommonsModule): number {
+  private registerGetMemoryInfo(m: LlamaCppModule): number {
     return m.addFunction((outInfoPtr: number, _userData: number): number => {
       try {
         // rac_memory_info_t: { uint64_t total, available, used }
@@ -347,7 +347,7 @@ export class PlatformAdapter {
    *   progress_cb, complete_cb, void* cb_user_data, char** out_task_id, void* user_data)
    * Note: 7 params in C
    */
-  private registerHttpDownload(m: RACommonsModule): number {
+  private registerHttpDownload(m: LlamaCppModule): number {
     return m.addFunction(
       (urlPtr: number, destPathPtr: number, progressCbPtr: number, completeCbPtr: number, cbUserData: number, outTaskIdPtr: number, _userData: number): number => {
         const url = m.UTF8ToString(urlPtr);
@@ -356,7 +356,7 @@ export class PlatformAdapter {
         // Generate task ID string
         const taskId = `dl_${Date.now()}`;
         if (outTaskIdPtr !== 0) {
-          const strPtr = WASMBridge.shared.allocString(taskId);
+          const strPtr = LlamaCppBridge.shared.allocString(taskId);
           m.setValue(outTaskIdPtr, strPtr, '*');
         }
 
@@ -377,7 +377,7 @@ export class PlatformAdapter {
    *   progress_cb, void* cb_user_data, void* user_data)
    * Note: 5 params in C
    */
-  private registerExtractArchive(m: RACommonsModule): number {
+  private registerExtractArchive(m: LlamaCppModule): number {
     return m.addFunction((_archivePtr: number, _destPtr: number, _progressCb: number, _cbUserData: number, _userData: number): number => {
       // Archive extraction not yet implemented for WASM
       logger.warning('Archive extraction not yet implemented for WASM');
@@ -393,7 +393,7 @@ export class PlatformAdapter {
    * Perform an HTTP download using fetch() and stream to Emscripten FS.
    */
   private async performDownload(
-    m: RACommonsModule,
+    m: LlamaCppModule,
     url: string,
     destPath: string,
     progressCbPtr: number,
@@ -446,14 +446,14 @@ export class PlatformAdapter {
 
       // Report completion via C callback
       if (completeCbPtr !== 0) {
-        const pathPtr = WASMBridge.shared.allocString(destPath);
+        const pathPtr = LlamaCppBridge.shared.allocString(destPath);
         m.dynCall('viii', completeCbPtr, [0, pathPtr, cbUserData]); // 0 = RAC_OK
         m._free(pathPtr);
       }
     } catch (error) {
       logger.error(`Download failed for ${url}: ${error}`);
       if (completeCbPtr !== 0) {
-        const pathPtr = WASMBridge.shared.allocString('');
+        const pathPtr = LlamaCppBridge.shared.allocString('');
         m.dynCall('viii', completeCbPtr, [-160, pathPtr, cbUserData]); // RAC_ERROR_DOWNLOAD_FAILED
         m._free(pathPtr);
       }
@@ -474,10 +474,16 @@ interface PerformanceWithMemory extends Performance {
   };
 }
 
-// Extend RACommonsModule with dynCall
-declare module './WASMBridge' {
-  interface RACommonsModule {
-    HEAPU8: Uint8Array;
+// Extend LlamaCppModule with dynCall and FS
+declare module './LlamaCppBridge' {
+  interface LlamaCppModule {
     dynCall: (sig: string, ptr: number, args: number[]) => unknown;
+    FS: {
+      analyzePath: (path: string) => { exists: boolean };
+      readFile: (path: string) => Uint8Array;
+      writeFile: (path: string, data: Uint8Array) => void;
+      unlink: (path: string) => void;
+      mkdir: (path: string) => void;
+    };
   }
 }

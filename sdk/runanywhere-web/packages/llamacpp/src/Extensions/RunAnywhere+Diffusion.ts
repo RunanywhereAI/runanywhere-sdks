@@ -17,13 +17,9 @@
  *   // result.imageData is Uint8ClampedArray RGBA
  */
 
-import { RunAnywhere } from '../RunAnywhere';
-import { WASMBridge } from '../../Foundation/WASMBridge';
-import { Offsets } from '../../Foundation/StructOffsets';
-import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
-import { SDKLogger } from '../../Foundation/SDKLogger';
-import { EventBus } from '../../Foundation/EventBus';
-import { SDKEventType } from '../../types/enums';
+import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType } from '@runanywhere/web';
+import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
+import { Offsets } from '../Foundation/LlamaCppOffsets';
 import {
   DiffusionScheduler,
   DiffusionMode,
@@ -50,9 +46,9 @@ class DiffusionImpl {
   readonly extensionName = 'Diffusion';
   private _diffusionComponentHandle = 0;
 
-  private requireBridge(): WASMBridge {
+  private requireBridge(): LlamaCppBridge {
     if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
-    return WASMBridge.shared;
+    return LlamaCppBridge.shared;
   }
 
   private ensureDiffusionComponent(): number {
@@ -120,7 +116,7 @@ class DiffusionImpl {
   get isModelLoaded(): boolean {
     if (this._diffusionComponentHandle === 0) return false;
     try {
-      return (WASMBridge.shared.module.ccall(
+      return (LlamaCppBridge.shared.module.ccall(
         'rac_diffusion_component_is_loaded', 'number', ['number'], [this._diffusionComponentHandle],
       ) as number) === 1;
     } catch { return false; }
@@ -214,7 +210,7 @@ class DiffusionImpl {
   /** Cancel in-progress generation. */
   cancel(): void {
     if (this._diffusionComponentHandle === 0) return;
-    WASMBridge.shared.module.ccall(
+    LlamaCppBridge.shared.module.ccall(
       'rac_diffusion_component_cancel', 'number', ['number'], [this._diffusionComponentHandle],
     );
   }
@@ -223,7 +219,7 @@ class DiffusionImpl {
   cleanup(): void {
     if (this._diffusionComponentHandle !== 0) {
       try {
-        WASMBridge.shared.module.ccall(
+        LlamaCppBridge.shared.module.ccall(
           'rac_diffusion_component_destroy', null, ['number'], [this._diffusionComponentHandle],
         );
       } catch { /* ignore */ }

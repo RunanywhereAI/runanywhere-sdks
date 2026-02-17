@@ -25,8 +25,7 @@
 // Type-only imports are safe — they are erased at compile time and don't pull
 // SDK code into the Worker bundle.
 import type { VLMWorkerCommand, VLMWorkerResponse, VLMWorkerResult } from './VLMWorkerBridge';
-import type { AllOffsets } from '../Foundation/StructOffsets';
-import { loadOffsetsFromModule } from '../Foundation/StructOffsets';
+import type { AllOffsets } from '@runanywhere/web';
 
 // Re-export for the bridge to import
 export type { VLMWorkerResult };
@@ -39,6 +38,118 @@ let wasmModule: any = null;
 let vlmHandle = 0;
 let isWebGPU = false;
 let offsets: AllOffsets | null = null;
+
+// ---------------------------------------------------------------------------
+// Inline offset loader for Worker context
+//
+// The Worker cannot import from the main SDK or LlamaCppBridge (they assume
+// a main-thread context). Instead, we read offsets directly from the WASM
+// module's _rac_wasm_offsetof_* / _rac_wasm_sizeof_* exports.
+// ---------------------------------------------------------------------------
+
+function workerOffsetOf(m: any, name: string): number {
+  const fn = m[`_rac_wasm_offsetof_${name}`];
+  return typeof fn === 'function' ? fn() : 0;
+}
+
+function workerSizeOf(m: any, name: string): number {
+  const fn = m[`_rac_wasm_sizeof_${name}`];
+  return typeof fn === 'function' ? fn() : 0;
+}
+
+function loadOffsetsFromModule(m: any): AllOffsets {
+  return {
+    config: { logLevel: workerOffsetOf(m, 'config_log_level') },
+    llmOptions: {
+      maxTokens: workerOffsetOf(m, 'llm_options_max_tokens'),
+      temperature: workerOffsetOf(m, 'llm_options_temperature'),
+      topP: workerOffsetOf(m, 'llm_options_top_p'),
+      systemPrompt: workerOffsetOf(m, 'llm_options_system_prompt'),
+    },
+    llmResult: {
+      text: workerOffsetOf(m, 'llm_result_text'),
+      promptTokens: workerOffsetOf(m, 'llm_result_prompt_tokens'),
+      completionTokens: workerOffsetOf(m, 'llm_result_completion_tokens'),
+    },
+    vlmImage: {
+      format: workerOffsetOf(m, 'vlm_image_format'),
+      filePath: workerOffsetOf(m, 'vlm_image_file_path'),
+      pixelData: workerOffsetOf(m, 'vlm_image_pixel_data'),
+      base64Data: workerOffsetOf(m, 'vlm_image_base64_data'),
+      width: workerOffsetOf(m, 'vlm_image_width'),
+      height: workerOffsetOf(m, 'vlm_image_height'),
+      dataSize: workerOffsetOf(m, 'vlm_image_data_size'),
+    },
+    vlmOptions: {
+      maxTokens: workerOffsetOf(m, 'vlm_options_max_tokens'),
+      temperature: workerOffsetOf(m, 'vlm_options_temperature'),
+      topP: workerOffsetOf(m, 'vlm_options_top_p'),
+      streamingEnabled: workerOffsetOf(m, 'vlm_options_streaming_enabled'),
+      systemPrompt: workerOffsetOf(m, 'vlm_options_system_prompt'),
+      modelFamily: workerOffsetOf(m, 'vlm_options_model_family'),
+    },
+    vlmResult: {
+      text: workerOffsetOf(m, 'vlm_result_text'),
+      promptTokens: workerOffsetOf(m, 'vlm_result_prompt_tokens'),
+      imageTokens: workerOffsetOf(m, 'vlm_result_image_tokens'),
+      completionTokens: workerOffsetOf(m, 'vlm_result_completion_tokens'),
+      totalTokens: workerOffsetOf(m, 'vlm_result_total_tokens'),
+      timeToFirstTokenMs: workerOffsetOf(m, 'vlm_result_time_to_first_token_ms'),
+      imageEncodeTimeMs: workerOffsetOf(m, 'vlm_result_image_encode_time_ms'),
+      totalTimeMs: workerOffsetOf(m, 'vlm_result_total_time_ms'),
+      tokensPerSecond: workerOffsetOf(m, 'vlm_result_tokens_per_second'),
+    },
+    structuredOutputConfig: {
+      jsonSchema: workerOffsetOf(m, 'structured_output_config_json_schema'),
+      includeSchemaInPrompt: workerOffsetOf(m, 'structured_output_config_include_schema_in_prompt'),
+    },
+    structuredOutputValidation: {
+      isValid: workerOffsetOf(m, 'structured_output_validation_is_valid'),
+      errorMessage: workerOffsetOf(m, 'structured_output_validation_error_message'),
+      extractedJson: workerOffsetOf(m, 'structured_output_validation_extracted_json'),
+    },
+    embeddingsOptions: {
+      normalize: workerOffsetOf(m, 'embeddings_options_normalize'),
+      pooling: workerOffsetOf(m, 'embeddings_options_pooling'),
+      nThreads: workerOffsetOf(m, 'embeddings_options_n_threads'),
+    },
+    embeddingsResult: {
+      embeddings: workerOffsetOf(m, 'embeddings_result_embeddings'),
+      numEmbeddings: workerOffsetOf(m, 'embeddings_result_num_embeddings'),
+      dimension: workerOffsetOf(m, 'embeddings_result_dimension'),
+      processingTimeMs: workerOffsetOf(m, 'embeddings_result_processing_time_ms'),
+      totalTokens: workerOffsetOf(m, 'embeddings_result_total_tokens'),
+    },
+    embeddingVector: {
+      data: workerOffsetOf(m, 'embedding_vector_data'),
+      dimension: workerOffsetOf(m, 'embedding_vector_dimension'),
+      structSize: workerSizeOf(m, 'embedding_vector'),
+    },
+    diffusionOptions: {
+      prompt: workerOffsetOf(m, 'diffusion_options_prompt'),
+      negativePrompt: workerOffsetOf(m, 'diffusion_options_negative_prompt'),
+      width: workerOffsetOf(m, 'diffusion_options_width'),
+      height: workerOffsetOf(m, 'diffusion_options_height'),
+      steps: workerOffsetOf(m, 'diffusion_options_steps'),
+      guidanceScale: workerOffsetOf(m, 'diffusion_options_guidance_scale'),
+      seed: workerOffsetOf(m, 'diffusion_options_seed'),
+      scheduler: workerOffsetOf(m, 'diffusion_options_scheduler'),
+      mode: workerOffsetOf(m, 'diffusion_options_mode'),
+      denoiseStrength: workerOffsetOf(m, 'diffusion_options_denoise_strength'),
+      reportIntermediate: workerOffsetOf(m, 'diffusion_options_report_intermediate'),
+      progressStride: workerOffsetOf(m, 'diffusion_options_progress_stride'),
+    },
+    diffusionResult: {
+      imageData: workerOffsetOf(m, 'diffusion_result_image_data'),
+      imageSize: workerOffsetOf(m, 'diffusion_result_image_size'),
+      width: workerOffsetOf(m, 'diffusion_result_width'),
+      height: workerOffsetOf(m, 'diffusion_result_height'),
+      seedUsed: workerOffsetOf(m, 'diffusion_result_seed_used'),
+      generationTimeMs: workerOffsetOf(m, 'diffusion_result_generation_time_ms'),
+      safetyFlagged: workerOffsetOf(m, 'diffusion_result_safety_flagged'),
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Logging (lightweight — no SDKLogger dependency in Worker context)
