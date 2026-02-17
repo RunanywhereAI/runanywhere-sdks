@@ -204,6 +204,51 @@ rac_result_t rac_model_registry_get(rac_model_registry_handle_t handle, const ch
     return RAC_SUCCESS;
 }
 
+rac_result_t rac_model_registry_get_by_path(rac_model_registry_handle_t handle,
+                                            const char* local_path,
+                                            rac_model_info_t** out_model) {
+    if (!handle || !local_path || !out_model) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    std::lock_guard<std::mutex> lock(handle->mutex);
+
+    // Search through all models for matching local_path
+    for (const auto& pair : handle->models) {
+        const rac_model_info_t* model = pair.second;
+        if (model->local_path && strcmp(model->local_path, local_path) == 0) {
+            *out_model = deep_copy_model(model);
+            if (!*out_model) {
+                return RAC_ERROR_OUT_OF_MEMORY;
+            }
+            RAC_LOG_DEBUG("ModelRegistry", "Found model by path: %s -> %s", local_path, model->id);
+            return RAC_SUCCESS;
+        }
+    }
+
+    // Also check if the path starts with or contains the local_path
+    // This handles cases where the input path has extra components
+    std::string search_path(local_path);
+    for (const auto& pair : handle->models) {
+        const rac_model_info_t* model = pair.second;
+        if (model->local_path) {
+            std::string model_path(model->local_path);
+            // Check if search path starts with model's local_path
+            if (search_path.find(model_path) == 0 || model_path.find(search_path) == 0) {
+                *out_model = deep_copy_model(model);
+                if (!*out_model) {
+                    return RAC_ERROR_OUT_OF_MEMORY;
+                }
+                RAC_LOG_DEBUG("ModelRegistry", "Found model by partial path match: %s -> %s",
+                              local_path, model->id);
+                return RAC_SUCCESS;
+            }
+        }
+    }
+
+    return RAC_ERROR_NOT_FOUND;
+}
+
 rac_result_t rac_model_registry_get_all(rac_model_registry_handle_t handle,
                                         rac_model_info_t*** out_models, size_t* out_count) {
     if (!handle || !out_models || !out_count) {
@@ -546,10 +591,13 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
         return RAC_SUCCESS;
     }
 
-    // Frameworks to scan
-    rac_inference_framework_t frameworks[] = {RAC_FRAMEWORK_LLAMACPP, RAC_FRAMEWORK_ONNX,
-                                              RAC_FRAMEWORK_FOUNDATION_MODELS,
-                                              RAC_FRAMEWORK_SYSTEM_TTS};
+    // Frameworks to scan - include all frameworks that can have downloaded models
+    // Note: RAC_FRAMEWORK_UNKNOWN is included to recover models that were incorrectly
+    // stored in the "Unknown" directory due to missing framework mappings
+    rac_inference_framework_t frameworks[] = {RAC_FRAMEWORK_LLAMACPP,   RAC_FRAMEWORK_ONNX,
+                                              RAC_FRAMEWORK_COREML,     RAC_FRAMEWORK_MLX,
+                                              RAC_FRAMEWORK_FLUID_AUDIO, RAC_FRAMEWORK_FOUNDATION_MODELS,
+                                              RAC_FRAMEWORK_SYSTEM_TTS, RAC_FRAMEWORK_UNKNOWN};
     size_t framework_count = sizeof(frameworks) / sizeof(frameworks[0]);
 
     // Collect discovered models

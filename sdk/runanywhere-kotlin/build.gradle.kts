@@ -45,19 +45,21 @@ ktlint {
 // Once com.runanywhere is verified, change to: "com.runanywhere"
 val isJitPack = System.getenv("JITPACK") == "true"
 val usePendingNamespace = System.getenv("USE_RUNANYWHERE_NAMESPACE")?.toBoolean() ?: false
-group = when {
-    isJitPack -> "com.github.RunanywhereAI.runanywhere-sdks"
-    usePendingNamespace -> "com.runanywhere"  // Use after DNS verification completes
-    else -> "io.github.sanchitmonga22"  // Currently verified namespace
-}
+group =
+    when {
+        isJitPack -> "com.github.RunanywhereAI.runanywhere-sdks"
+        usePendingNamespace -> "com.runanywhere" // Use after DNS verification completes
+        else -> "io.github.sanchitmonga22" // Currently verified namespace
+    }
 
 // Version resolution priority:
 // 1. SDK_VERSION env var (set by our CI/CD from git tag)
 // 2. VERSION env var (set by JitPack from git tag)
 // 3. Default fallback for local development
-val resolvedVersion = System.getenv("SDK_VERSION")?.removePrefix("v")
-    ?: System.getenv("VERSION")?.removePrefix("v")
-    ?: "0.1.5-SNAPSHOT"
+val resolvedVersion =
+    System.getenv("SDK_VERSION")?.removePrefix("v")
+        ?: System.getenv("VERSION")?.removePrefix("v")
+        ?: "0.1.5-SNAPSHOT"
 version = resolvedVersion
 
 // Log version for debugging
@@ -105,7 +107,7 @@ val rebuildCommons: Boolean =
 val nativeLibVersion: String =
     rootProject.findProperty("runanywhere.nativeLibVersion")?.toString()
         ?: project.findProperty("runanywhere.nativeLibVersion")?.toString()
-        ?: resolvedVersion  // Default to SDK version
+        ?: resolvedVersion // Default to SDK version
 
 // Log the build mode
 logger.lifecycle("RunAnywhere SDK: testLocal=$testLocal, nativeLibVersion=$nativeLibVersion")
@@ -227,6 +229,8 @@ kotlin {
                 implementation(libs.ktor.client.okhttp)
                 // Error tracking - Sentry (matches iOS SDK SentryDestination)
                 implementation(libs.sentry)
+                // org.json - available on Android via SDK, needed explicitly for JVM
+                implementation("org.json:json:20240303")
             }
         }
 
@@ -293,37 +297,20 @@ android {
     }
 
     // ==========================================================================
-    // JNI Libraries Configuration - ALL LIBS (Commons + Backends)
+    // JNI Libraries Configuration - COMMONS ONLY
     // ==========================================================================
-    // This SDK downloads and bundles all JNI libraries:
-    //
-    // From RACommons (commons-v{commonsVersion}):
+    // This SDK bundles only core commons JNI libraries:
     //   - librac_commons.so - RAC Commons infrastructure
-    //   - librac_commons_jni.so - RAC Commons JNI bridge
+    //   - librunanywhere_jni.so - RAC Commons JNI bridge
     //   - libc++_shared.so - C++ STL (shared by all backends)
+    //   - libomp.so - OpenMP (shared by all backends)
     //
-    // From RABackendLlamaCPP (core-v{coreVersion}):
-    //   - librac_backend_llamacpp_jni.so - LlamaCPP JNI bridge
-    //   - librunanywhere_llamacpp.so - LlamaCPP backend
-    //   - libllama.so, libcommon.so - llama.cpp core
+    // Backend-specific native libs are bundled by their own modules:
+    //   - runanywhere-core-llamacpp → librac_backend_llamacpp*.so
+    //   - runanywhere-core-onnx → librac_backend_onnx*.so, libonnxruntime.so, libsherpa-onnx-*.so
     //
-    // From RABackendONNX (core-v{coreVersion}):
-    //   - librac_backend_onnx_jni.so - ONNX JNI bridge
-    //   - librunanywhere_onnx.so - ONNX backend
-    //   - libonnxruntime.so - ONNX Runtime
-    //   - libsherpa-onnx-*.so - Sherpa ONNX (STT/TTS/VAD)
+    // This ensures zero duplicate .so files across AARs.
     // ==========================================================================
-    // JNI libs are placed in src/androidMain/jniLibs/ (standard KMP location)
-    // This is automatically included by the KMP Android plugin
-    // ==========================================================================
-
-    // Prevent packaging duplicates
-    packaging {
-        jniLibs {
-            // Pick first if duplicates somehow still occur
-            pickFirsts.add("**/*.so")
-        }
-    }
 }
 
 // =============================================================================
@@ -423,7 +410,7 @@ tasks.register<Exec>("buildLocalJniLibs") {
 
                 Or download from releases:
                   ./gradlew -Prunanywhere.testLocal=false assembleDebug
-                """.trimIndent()
+                """.trimIndent(),
             )
         }
 
@@ -505,41 +492,40 @@ tasks.register<Exec>("rebuildCommons") {
 // =============================================================================
 // JNI Library Download Task (for testLocal=false mode)
 // =============================================================================
-// Downloads ALL JNI libraries from GitHub releases:
-//   - Commons: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/commons-v{version}
-//     - librac_commons.so - RAC Commons infrastructure
-//     - librac_commons_jni.so - RAC Commons JNI bridge
-//   - Core backends: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/core-v{version}
-//     - librac_backend_llamacpp_jni.so - LLM inference (llama.cpp)
-//     - librac_backend_onnx_jni.so - STT/TTS/VAD (Sherpa ONNX)
-//     - libonnxruntime.so - ONNX Runtime
-//     - libsherpa-onnx-*.so - Sherpa ONNX components
-//   - libc++_shared.so - C++ STL (shared)
+// Downloads ONLY commons JNI libraries from GitHub releases.
+// Backend-specific libs are downloaded by their own modules:
+//   - :modules:runanywhere-core-llamacpp → RABackendLLAMACPP-android
+//   - :modules:runanywhere-core-onnx → RABackendONNX-android
+//
+// Commons libs owned by this module:
+//   - librac_commons.so - RAC Commons infrastructure
+//   - librunanywhere_jni.so - RAC Commons JNI bridge
+//   - libc++_shared.so - C++ STL (shared by all backends)
+//   - libomp.so - OpenMP (shared by all backends)
 // =============================================================================
 tasks.register("downloadJniLibs") {
     group = "runanywhere"
-    description = "Download JNI libraries from GitHub releases (when testLocal=false)"
+    description = "Download commons JNI libraries from GitHub releases (when testLocal=false)"
 
     // Only run when NOT using local libs
     onlyIf { !testLocal }
 
-    // Use standard KMP location for jniLibs
     val outputDir = file("src/androidMain/jniLibs")
     val tempDir = file("${layout.buildDirectory.get()}/jni-temp")
 
-    // GitHub unified release URL - all assets are in one release
-    // Format: https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v{version}/{asset}
     val releaseBaseUrl = "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v$nativeLibVersion"
 
-    // ABIs to download - arm64-v8a covers ~85% of devices
-    // Add more ABIs here if needed: "armeabi-v7a", "x86_64"
     val targetAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64")
 
-    // Package types to download for each ABI
-    val packageTypes = listOf(
-        "RACommons-android",      // Core infrastructure + JNI bridge
-        "RABackendLLAMACPP-android", // LLM inference (llama.cpp)
-        "RABackendONNX-android"   // STT/TTS/VAD (Sherpa ONNX)
+    // Only download commons package — backend packages are handled by submodules
+    val packageType = "RACommons-android"
+
+    // Whitelist: only keep commons-owned .so files (the RACommons zip is a "fat" zip)
+    val commonsLibs = setOf(
+        "librac_commons.so",
+        "librunanywhere_jni.so",
+        "libc++_shared.so",
+        "libomp.so",
     )
 
     outputs.dir(outputDir)
@@ -550,14 +536,12 @@ tasks.register("downloadJniLibs") {
             return@doLast
         }
 
-        // Check if libs already exist (CI pre-populates build/jniLibs/)
         val existingLibs = outputDir.walkTopDown().filter { it.extension == "so" }.count()
         if (existingLibs > 0) {
-            logger.lifecycle("Skipping JNI download: $existingLibs .so files already in $outputDir (CI mode)")
+            logger.lifecycle("Skipping JNI download: $existingLibs .so files already in $outputDir")
             return@doLast
         }
 
-        // Clean output directories (only if empty)
         outputDir.deleteRecursively()
         tempDir.deleteRecursively()
         outputDir.mkdirs()
@@ -565,7 +549,7 @@ tasks.register("downloadJniLibs") {
 
         logger.lifecycle("")
         logger.lifecycle("═══════════════════════════════════════════════════════════════")
-        logger.lifecycle(" Downloading JNI libraries (testLocal=false)")
+        logger.lifecycle(" Downloading commons JNI libraries (testLocal=false)")
         logger.lifecycle("═══════════════════════════════════════════════════════════════")
         logger.lifecycle("")
         logger.lifecycle("Native lib version: v$nativeLibVersion")
@@ -578,62 +562,53 @@ tasks.register("downloadJniLibs") {
             val abiOutputDir = file("$outputDir/$abi")
             abiOutputDir.mkdirs()
 
-            packageTypes.forEach { packageType ->
-                // Asset naming: {PackageType}-{abi}-v{version}.zip
-                val packageName = "$packageType-$abi-v$nativeLibVersion.zip"
-                val zipUrl = "$releaseBaseUrl/$packageName"
-                val tempZip = file("$tempDir/$packageName")
+            val packageName = "$packageType-$abi-v$nativeLibVersion.zip"
+            val zipUrl = "$releaseBaseUrl/$packageName"
+            val tempZip = file("$tempDir/$packageName")
 
-                logger.lifecycle("▶ Downloading: $packageName")
+            logger.lifecycle("▶ Downloading: $packageName")
 
-                try {
-                    // Download the zip
-                    ant.withGroovyBuilder {
-                        "get"("src" to zipUrl, "dest" to tempZip, "verbose" to false)
-                    }
-
-                    // Extract to temp directory
-                    val extractDir = file("$tempDir/extracted-${packageName.replace(".zip", "")}")
-                    extractDir.mkdirs()
-                    ant.withGroovyBuilder {
-                        "unzip"("src" to tempZip, "dest" to extractDir)
-                    }
-
-                    // Copy all .so files (they may be in subdirectories like jni/, onnx/, llamacpp/)
-                    extractDir.walkTopDown()
-                        .filter { it.extension == "so" }
-                        .forEach { soFile ->
-                            val targetFile = file("$abiOutputDir/${soFile.name}")
-                            if (!targetFile.exists()) {
-                                soFile.copyTo(targetFile, overwrite = true)
-                                logger.lifecycle("  ✓ ${soFile.name}")
-                                totalDownloaded++
-                            }
-                        }
-
-                    // Clean up temp zip
-                    tempZip.delete()
-                } catch (e: Exception) {
-                    logger.warn("  ⚠ Failed to download $packageName: ${e.message}")
+            try {
+                ant.withGroovyBuilder {
+                    "get"("src" to zipUrl, "dest" to tempZip, "verbose" to false)
                 }
+
+                val extractDir = file("$tempDir/extracted-${packageName.replace(".zip", "")}")
+                extractDir.mkdirs()
+                ant.withGroovyBuilder {
+                    "unzip"("src" to tempZip, "dest" to extractDir)
+                }
+
+                // Only copy commons-owned .so files (whitelist filter)
+                extractDir
+                    .walkTopDown()
+                    .filter { it.extension == "so" && it.name in commonsLibs }
+                    .forEach { soFile ->
+                        val targetFile = file("$abiOutputDir/${soFile.name}")
+                        soFile.copyTo(targetFile, overwrite = true)
+                        logger.lifecycle("  ✓ ${soFile.name}")
+                        totalDownloaded++
+                    }
+
+                tempZip.delete()
+            } catch (e: Exception) {
+                logger.warn("  ⚠ Failed to download $packageName: ${e.message}")
             }
+
             logger.lifecycle("")
         }
 
-        // Clean up temp directory
         tempDir.deleteRecursively()
 
-        // Verify output
         val totalLibs = outputDir.walkTopDown().filter { it.extension == "so" }.count()
         val abiDirs = outputDir.listFiles()?.filter { it.isDirectory }?.map { it.name } ?: emptyList()
 
         logger.lifecycle("═══════════════════════════════════════════════════════════════")
-        logger.lifecycle("✓ JNI libraries ready: $totalLibs .so files")
+        logger.lifecycle("✓ Commons JNI libraries ready: $totalLibs .so files")
         logger.lifecycle("  ABIs: ${abiDirs.joinToString(", ")}")
         logger.lifecycle("  Output: $outputDir")
         logger.lifecycle("═══════════════════════════════════════════════════════════════")
 
-        // List libraries per ABI
         abiDirs.forEach { abi ->
             val libs = file("$outputDir/$abi").listFiles()?.filter { it.extension == "so" }?.map { it.name } ?: emptyList()
             logger.lifecycle("$abi (${libs.size} libs):")
@@ -678,29 +653,35 @@ tasks.named<Jar>("jvmJar") {
 // =============================================================================
 
 // Get publishing credentials from environment or gradle.properties
-val mavenCentralUsername: String? = System.getenv("MAVEN_CENTRAL_USERNAME")
-    ?: project.findProperty("mavenCentral.username") as String?
-val mavenCentralPassword: String? = System.getenv("MAVEN_CENTRAL_PASSWORD")
-    ?: project.findProperty("mavenCentral.password") as String?
+val mavenCentralUsername: String? =
+    System.getenv("MAVEN_CENTRAL_USERNAME")
+        ?: project.findProperty("mavenCentral.username") as String?
+val mavenCentralPassword: String? =
+    System.getenv("MAVEN_CENTRAL_PASSWORD")
+        ?: project.findProperty("mavenCentral.password") as String?
 
 // GPG signing configuration
-val signingKeyId: String? = System.getenv("GPG_KEY_ID")
-    ?: project.findProperty("signing.keyId") as String?
-val signingPassword: String? = System.getenv("GPG_SIGNING_PASSWORD")
-    ?: project.findProperty("signing.password") as String?
-val signingKey: String? = System.getenv("GPG_SIGNING_KEY")
-    ?: project.findProperty("signing.key") as String?
+val signingKeyId: String? =
+    System.getenv("GPG_KEY_ID")
+        ?: project.findProperty("signing.keyId") as String?
+val signingPassword: String? =
+    System.getenv("GPG_SIGNING_PASSWORD")
+        ?: project.findProperty("signing.password") as String?
+val signingKey: String? =
+    System.getenv("GPG_SIGNING_KEY")
+        ?: project.findProperty("signing.key") as String?
 
 publishing {
     publications.withType<MavenPublication> {
         // Artifact naming for Maven Central
         // Main artifact: com.runanywhere:runanywhere-sdk:1.0.0
-        artifactId = when (name) {
-            "kotlinMultiplatform" -> "runanywhere-sdk"
-            "androidRelease" -> "runanywhere-sdk-android"
-            "jvm" -> "runanywhere-sdk-jvm"
-            else -> "runanywhere-sdk-$name"
-        }
+        artifactId =
+            when (name) {
+                "kotlinMultiplatform" -> "runanywhere-sdk"
+                "androidRelease" -> "runanywhere-sdk-android"
+                "jvm" -> "runanywhere-sdk-jvm"
+                else -> "runanywhere-sdk-$name"
+            }
 
         // POM metadata (required by Maven Central)
         pom {
@@ -790,9 +771,9 @@ signing {
 tasks.withType<Sign>().configureEach {
     onlyIf {
         gradle.taskGraph.hasTask(":publishAllPublicationsToMavenCentralRepository") ||
-        gradle.taskGraph.hasTask(":publish") ||
-        project.hasProperty("signing.gnupg.keyName") ||
-        signingKey != null
+            gradle.taskGraph.hasTask(":publish") ||
+            project.hasProperty("signing.gnupg.keyName") ||
+            signingKey != null
     }
 }
 
@@ -803,3 +784,4 @@ tasks.withType<PublishToMavenRepository>().configureEach {
         !dominated
     }
 }
+

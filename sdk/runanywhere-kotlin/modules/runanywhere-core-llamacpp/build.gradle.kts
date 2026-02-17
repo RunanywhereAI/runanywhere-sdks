@@ -166,33 +166,122 @@ android {
     }
 
     // ==========================================================================
-    // JNI Libraries - Handled by Main SDK
+    // JNI Libraries - Self-Contained
     // ==========================================================================
-    // Backend modules do NOT bundle their own native libs.
-    // All native libs are bundled by the main SDK (runanywhere-kotlin).
-    // This module only contains Kotlin code for the LlamaCPP backend.
+    // This module bundles its own native libs:
+    //   - librac_backend_llamacpp.so - LlamaCPP C++ backend (with VLM mtmd)
+    //   - librac_backend_llamacpp_jni.so - LlamaCPP JNI bridge
+    //
+    // Downloaded from RABackendLLAMACPP-android GitHub release assets.
+    // In local mode, build-kotlin.sh copies them to src/androidMain/jniLibs/.
     // ==========================================================================
 }
 
 // =============================================================================
-// JNI Library Download Task - DISABLED for backend modules
+// Native Library Version for Downloads (mirrors root SDK pattern)
 // =============================================================================
-// Backend modules do NOT download their own native libs.
-// The main SDK's downloadJniLibs task downloads ALL native libs (including backend libs)
-// to src/androidMain/jniLibs/ which is shared across all modules.
-//
-// This task is kept as a no-op for backwards compatibility.
+val nativeLibVersion: String =
+    rootProject.findProperty("runanywhere.nativeLibVersion")?.toString()
+        ?: project.findProperty("runanywhere.nativeLibVersion")?.toString()
+        ?: (System.getenv("SDK_VERSION")?.removePrefix("v") ?: "0.1.5-SNAPSHOT")
+
+// =============================================================================
+// JNI Library Download Task (for testLocal=false mode)
+// =============================================================================
+// Downloads LlamaCPP backend native libs from GitHub releases.
+// Only libs owned by this module:
+//   - librac_backend_llamacpp.so
+//   - librac_backend_llamacpp_jni.so
 // =============================================================================
 tasks.register("downloadJniLibs") {
     group = "runanywhere"
-    description = "No-op: Main SDK handles all native library downloads"
+    description = "Download LlamaCPP backend JNI libraries from GitHub releases"
+
+    onlyIf { !testLocal }
+
+    val outputDir = file("src/androidMain/jniLibs")
+    val tempDir = file("${layout.buildDirectory.get()}/jni-temp")
+
+    val releaseBaseUrl = "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v$nativeLibVersion"
+    val targetAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+    val packageType = "RABackendLLAMACPP-android"
+
+    // Whitelist: only keep LlamaCPP-owned .so files
+    val llamacppLibs = setOf(
+        "librac_backend_llamacpp.so",
+        "librac_backend_llamacpp_jni.so",
+    )
+
+    outputs.dir(outputDir)
 
     doLast {
-        logger.lifecycle("LlamaCPP Module: Skipping downloadJniLibs (main SDK handles all native libs)")
+        val existingLibs = outputDir.walkTopDown().filter { it.extension == "so" }.count()
+        if (existingLibs > 0) {
+            logger.lifecycle("LlamaCPP: Skipping download, $existingLibs .so files already present")
+            return@doLast
+        }
+
+        outputDir.deleteRecursively()
+        tempDir.deleteRecursively()
+        outputDir.mkdirs()
+        tempDir.mkdirs()
+
+        logger.lifecycle("")
+        logger.lifecycle("═══════════════════════════════════════════════════════════════")
+        logger.lifecycle(" LlamaCPP Module: Downloading backend JNI libraries")
+        logger.lifecycle("═══════════════════════════════════════════════════════════════")
+
+        var totalDownloaded = 0
+
+        targetAbis.forEach { abi ->
+            val abiOutputDir = file("$outputDir/$abi")
+            abiOutputDir.mkdirs()
+
+            val packageName = "$packageType-$abi-v$nativeLibVersion.zip"
+            val zipUrl = "$releaseBaseUrl/$packageName"
+            val tempZip = file("$tempDir/$packageName")
+
+            logger.lifecycle("▶ Downloading: $packageName")
+
+            try {
+                ant.withGroovyBuilder {
+                    "get"("src" to zipUrl, "dest" to tempZip, "verbose" to false)
+                }
+
+                val extractDir = file("$tempDir/extracted-${packageName.replace(".zip", "")}")
+                extractDir.mkdirs()
+                ant.withGroovyBuilder {
+                    "unzip"("src" to tempZip, "dest" to extractDir)
+                }
+
+                extractDir
+                    .walkTopDown()
+                    .filter { it.extension == "so" && it.name in llamacppLibs }
+                    .forEach { soFile ->
+                        val targetFile = file("$abiOutputDir/${soFile.name}")
+                        soFile.copyTo(targetFile, overwrite = true)
+                        logger.lifecycle("  ✓ ${soFile.name}")
+                        totalDownloaded++
+                    }
+
+                tempZip.delete()
+            } catch (e: Exception) {
+                logger.warn("  ⚠ Failed to download $packageName: ${e.message}")
+            }
+        }
+
+        tempDir.deleteRecursively()
+        logger.lifecycle("✓ LlamaCPP: $totalDownloaded .so files downloaded")
     }
 }
 
-// Note: JNI libs are handled by the main SDK, not by backend modules
+// Ensure JNI libs are available before Android build
+tasks.matching { it.name.contains("merge") && it.name.contains("JniLibFolders") }.configureEach {
+    if (!testLocal) dependsOn("downloadJniLibs")
+}
+tasks.matching { it.name == "preBuild" }.configureEach {
+    if (!testLocal) dependsOn("downloadJniLibs")
+}
 
 // =============================================================================
 // Include third-party licenses in JVM JAR
@@ -214,11 +303,12 @@ tasks.named<Jar>("jvmJar") {
 // Maven Central group ID - using verified namespace
 val isJitPack = System.getenv("JITPACK") == "true"
 val usePendingNamespace = System.getenv("USE_RUNANYWHERE_NAMESPACE")?.toBoolean() ?: false
-group = when {
-    isJitPack -> "com.github.RunanywhereAI.runanywhere-sdks"
-    usePendingNamespace -> "com.runanywhere"
-    else -> "io.github.sanchitmonga22"  // Currently verified namespace
-}
+group =
+    when {
+        isJitPack -> "com.github.RunanywhereAI.runanywhere-sdks"
+        usePendingNamespace -> "com.runanywhere"
+        else -> "io.github.sanchitmonga22" // Currently verified namespace
+    }
 
 // Version: SDK_VERSION (our CI), VERSION (JitPack), or fallback
 version = System.getenv("SDK_VERSION")?.removePrefix("v")
@@ -226,26 +316,32 @@ version = System.getenv("SDK_VERSION")?.removePrefix("v")
     ?: "0.1.5-SNAPSHOT"
 
 // Get publishing credentials
-val mavenCentralUsername: String? = System.getenv("MAVEN_CENTRAL_USERNAME")
-    ?: project.findProperty("mavenCentral.username") as String?
-val mavenCentralPassword: String? = System.getenv("MAVEN_CENTRAL_PASSWORD")
-    ?: project.findProperty("mavenCentral.password") as String?
-val signingKeyId: String? = System.getenv("GPG_KEY_ID")
-    ?: project.findProperty("signing.keyId") as String?
-val signingPassword: String? = System.getenv("GPG_SIGNING_PASSWORD")
-    ?: project.findProperty("signing.password") as String?
-val signingKey: String? = System.getenv("GPG_SIGNING_KEY")
-    ?: project.findProperty("signing.key") as String?
+val mavenCentralUsername: String? =
+    System.getenv("MAVEN_CENTRAL_USERNAME")
+        ?: project.findProperty("mavenCentral.username") as String?
+val mavenCentralPassword: String? =
+    System.getenv("MAVEN_CENTRAL_PASSWORD")
+        ?: project.findProperty("mavenCentral.password") as String?
+val signingKeyId: String? =
+    System.getenv("GPG_KEY_ID")
+        ?: project.findProperty("signing.keyId") as String?
+val signingPassword: String? =
+    System.getenv("GPG_SIGNING_PASSWORD")
+        ?: project.findProperty("signing.password") as String?
+val signingKey: String? =
+    System.getenv("GPG_SIGNING_KEY")
+        ?: project.findProperty("signing.key") as String?
 
 publishing {
     publications.withType<MavenPublication> {
         // Maven Central artifact naming
-        artifactId = when (name) {
-            "kotlinMultiplatform" -> "runanywhere-llamacpp"
-            "androidRelease" -> "runanywhere-llamacpp-android"
-            "jvm" -> "runanywhere-llamacpp-jvm"
-            else -> "runanywhere-llamacpp-$name"
-        }
+        artifactId =
+            when (name) {
+                "kotlinMultiplatform" -> "runanywhere-llamacpp"
+                "androidRelease" -> "runanywhere-llamacpp-android"
+                "jvm" -> "runanywhere-llamacpp-jvm"
+                else -> "runanywhere-llamacpp-$name"
+            }
 
         pom {
             name.set("RunAnywhere LlamaCPP Backend")
@@ -319,7 +415,8 @@ tasks.withType<Sign>().configureEach {
     }
 }
 
-// Disable debug publications
+// Disable JVM and debug publications - only publish Android release and metadata
 tasks.withType<PublishToMavenRepository>().configureEach {
-    onlyIf { publication.name !in listOf("androidDebug") }
+    onlyIf { publication.name !in listOf("jvm", "androidDebug") }
 }
+

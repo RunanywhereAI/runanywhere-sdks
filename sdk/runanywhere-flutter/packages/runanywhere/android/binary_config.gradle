@@ -11,12 +11,12 @@
 ext {
     // Set this to true for local development/testing
     // Set to false for production builds (downloads from GitHub releases)
-    testLocal = true
+    testLocal = false
 
     // =============================================================================
     // Version Configuration (MUST match Swift Package.swift and Kotlin build.gradle.kts)
     // =============================================================================
-    commonsVersion = "0.1.4"
+    commonsVersion = "0.1.6"
 
     // =============================================================================
     // Remote binary URLs

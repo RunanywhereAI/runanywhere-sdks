@@ -50,7 +50,10 @@ actual suspend fun RunAnywhere.generate(
             maxTokens = opts.maxTokens,
             temperature = opts.temperature,
             topP = opts.topP,
+            systemPrompt = opts.systemPrompt,
         )
+
+    llmLogger.info("[PARAMS] generate: temperature=${opts.temperature}, top_p=${opts.topP}, max_tokens=${opts.maxTokens}, system_prompt=${opts.systemPrompt?.let { "set(${it.length} chars)" } ?: "nil"}, streaming=false")
 
     // Call CppBridgeLLM to generate
     val cppResult = CppBridgeLLM.generate(prompt, config)
@@ -85,11 +88,14 @@ actual fun RunAnywhere.generateStream(
 
         val opts = options ?: LLMGenerationOptions.DEFAULT
 
+        llmLogger.info("[PARAMS] generateStream: temperature=${opts.temperature}, top_p=${opts.topP}, max_tokens=${opts.maxTokens}, system_prompt=${opts.systemPrompt?.let { "set(${it.length} chars)" } ?: "nil"}, streaming=true")
+
         val config =
             CppBridgeLLM.GenerationConfig(
                 maxTokens = opts.maxTokens,
                 temperature = opts.temperature,
                 topP = opts.topP,
+                systemPrompt = opts.systemPrompt,
             )
 
         // Use a channel to bridge callback to flow
@@ -132,11 +138,14 @@ actual suspend fun RunAnywhere.generateStreamWithMetrics(
     var tokenCount = 0
     var firstTokenTime: Long? = null
 
+    llmLogger.info("[PARAMS] generateStreamWithMetrics: temperature=${opts.temperature}, top_p=${opts.topP}, max_tokens=${opts.maxTokens}, system_prompt=${opts.systemPrompt?.let { "set(${it.length} chars)" } ?: "nil"}, streaming=true")
+
     val config =
         CppBridgeLLM.GenerationConfig(
             maxTokens = opts.maxTokens,
             temperature = opts.temperature,
             topP = opts.topP,
+            systemPrompt = opts.systemPrompt,
         )
 
     // Use a channel to bridge callback to flow

@@ -35,6 +35,7 @@
 #include "bridges/HTTPBridge.hpp"
 #include "bridges/DownloadBridge.hpp"
 #include "bridges/TelemetryBridge.hpp"
+#include "bridges/ToolCallingBridge.hpp"
 
 // RACommons C API headers for capability methods
 // These are backend-agnostic - they work with any registered backend
@@ -198,6 +199,7 @@ bool extractBoolValue(const std::string& json, const std::string& key, bool defa
 rac_inference_framework_t frameworkFromString(const std::string& framework) {
     if (framework == "LlamaCpp" || framework == "llamacpp") return RAC_FRAMEWORK_LLAMACPP;
     if (framework == "ONNX" || framework == "onnx") return RAC_FRAMEWORK_ONNX;
+    if (framework == "CoreML" || framework == "coreml") return RAC_FRAMEWORK_COREML;
     if (framework == "FoundationModels") return RAC_FRAMEWORK_FOUNDATION_MODELS;
     if (framework == "SystemTTS") return RAC_FRAMEWORK_SYSTEM_TTS;
     return RAC_FRAMEWORK_UNKNOWN;
@@ -810,6 +812,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getAvailableModels(
                 case RAC_MODEL_CATEGORY_SPEECH_RECOGNITION: categoryStr = "speech-recognition"; break;
                 case RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS: categoryStr = "speech-synthesis"; break;
                 case RAC_MODEL_CATEGORY_VISION: categoryStr = "vision"; break;
+                case RAC_MODEL_CATEGORY_IMAGE_GENERATION: categoryStr = "image-generation"; break;
                 case RAC_MODEL_CATEGORY_AUDIO: categoryStr = "audio"; break;
                 case RAC_MODEL_CATEGORY_MULTIMODAL: categoryStr = "multimodal"; break;
                 default: categoryStr = "unknown"; break;
@@ -826,6 +829,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getAvailableModels(
             switch (m.framework) {
                 case RAC_FRAMEWORK_LLAMACPP: frameworkStr = "LlamaCpp"; break;
                 case RAC_FRAMEWORK_ONNX: frameworkStr = "ONNX"; break;
+                case RAC_FRAMEWORK_COREML: frameworkStr = "CoreML"; break;
                 case RAC_FRAMEWORK_FOUNDATION_MODELS: frameworkStr = "FoundationModels"; break;
                 case RAC_FRAMEWORK_SYSTEM_TTS: frameworkStr = "SystemTTS"; break;
                 default: frameworkStr = "unknown"; break;
@@ -888,6 +892,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getModelInfo(
         switch (m.framework) {
             case RAC_FRAMEWORK_LLAMACPP: frameworkStr = "LlamaCpp"; break;
             case RAC_FRAMEWORK_ONNX: frameworkStr = "ONNX"; break;
+            case RAC_FRAMEWORK_COREML: frameworkStr = "CoreML"; break;
             case RAC_FRAMEWORK_FOUNDATION_MODELS: frameworkStr = "FoundationModels"; break;
             case RAC_FRAMEWORK_SYSTEM_TTS: frameworkStr = "SystemTTS"; break;
             default: frameworkStr = "unknown"; break;
@@ -1411,15 +1416,18 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::generate(
         // Parse options
         int maxTokens = 256;
         float temperature = 0.7f;
+        std::string systemPrompt;
         if (optionsJson.has_value()) {
             maxTokens = extractIntValue(optionsJson.value(), "max_tokens", 256);
             temperature = static_cast<float>(extractDoubleValue(optionsJson.value(), "temperature", 0.7));
+            systemPrompt = extractStringValue(optionsJson.value(), "system_prompt", "");
         }
 
         rac_llm_options_t options = {};
         options.max_tokens = maxTokens;
         options.temperature = temperature;
         options.top_p = 0.9f;
+        options.system_prompt = systemPrompt.empty() ? nullptr : systemPrompt.c_str();
 
         rac_llm_result_t llmResult = {};
         rac_result_t result = rac_llm_component_generate(handle, prompt.c_str(), &options, &llmResult);
@@ -1509,10 +1517,13 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::generateStream(
         }
 
         // Parse options
+        std::string systemPrompt = extractStringValue(optionsJson, "system_prompt", "");
+
         rac_llm_options_t options = {};
         options.max_tokens = extractIntValue(optionsJson, "max_tokens", 256);
         options.temperature = static_cast<float>(extractDoubleValue(optionsJson, "temperature", 0.7));
         options.top_p = 0.9f;
+        options.system_prompt = systemPrompt.empty() ? nullptr : systemPrompt.c_str();
 
         // Create streaming context
         LLMStreamContext ctx;
@@ -1585,14 +1596,17 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::generateStructured(
         }
 
         // Generate with the prepared prompt
+        std::string systemPrompt;
         rac_llm_options_t options = {};
         if (optionsJson.has_value()) {
             options.max_tokens = extractIntValue(optionsJson.value(), "max_tokens", 512);
             options.temperature = static_cast<float>(extractDoubleValue(optionsJson.value(), "temperature", 0.7));
+            systemPrompt = extractStringValue(optionsJson.value(), "system_prompt", "");
         } else {
             options.max_tokens = 512;
             options.temperature = 0.7f;
         }
+        options.system_prompt = systemPrompt.empty() ? nullptr : systemPrompt.c_str();
 
         rac_llm_result_t llmResult = {};
         rac_result_t result = rac_llm_component_generate(handle, preparedPrompt, &options, &llmResult);
@@ -1653,21 +1667,38 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::loadSTTModel(
     const std::string& modelType,
     const std::optional<std::string>& configJson) {
     return Promise<bool>::async([this, modelPath, modelType]() -> bool {
-        LOGI("Loading STT model: %s", modelPath.c_str());
+        try {
+            LOGI("Loading STT model: %s", modelPath.c_str());
 
-        rac_handle_t handle = getGlobalSTTHandle();
-        if (!handle) {
-            setLastError("Failed to create STT component. Is an STT backend registered?");
-            throw std::runtime_error("STT backend not registered. Install @runanywhere/onnx.");
+            if (modelPath.empty()) {
+                setLastError("STT model path is empty. Download the model first.");
+                return false;
+            }
+
+            rac_handle_t handle = getGlobalSTTHandle();
+            if (!handle) {
+                setLastError("Failed to create STT component. Is an STT backend registered?");
+                return false;
+            }
+
+            rac_result_t result = rac_stt_component_load_model(
+                handle, modelPath.c_str(), modelPath.c_str(), modelType.c_str());
+            if (result != RAC_SUCCESS) {
+                setLastError("Failed to load STT model: " + std::to_string(result));
+                return false;
+            }
+
+            LOGI("STT model loaded successfully");
+            return true;
+        } catch (const std::exception& e) {
+            std::string msg = e.what();
+            LOGI("loadSTTModel exception: %s", msg.c_str());
+            setLastError(msg);
+            return false;
+        } catch (...) {
+            setLastError("STT model load failed (unknown error)");
+            return false;
         }
-
-        rac_result_t result = rac_stt_component_load_model(handle, modelPath.c_str(), modelPath.c_str(), modelType.c_str());
-        if (result != RAC_SUCCESS) {
-            throw std::runtime_error("Failed to load STT model: " + std::to_string(result));
-        }
-
-        LOGI("STT model loaded successfully");
-        return true;
     });
 }
 
@@ -1704,57 +1735,71 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::transcribe(
     double sampleRate,
     const std::optional<std::string>& language) {
     return Promise<std::string>::async([this, audioBase64, sampleRate, language]() -> std::string {
-        LOGI("Transcribing audio (base64)...");
+        try {
+            LOGI("Transcribing audio (base64)...");
 
-        rac_handle_t handle = getGlobalSTTHandle();
-        if (!handle) {
-            throw std::runtime_error("STT component not available. Is an STT backend registered?");
+            rac_handle_t handle = getGlobalSTTHandle();
+            if (!handle) {
+                return "{\"error\":\"STT component not available. Is an STT backend registered?\"}";
+            }
+
+            if (rac_stt_component_is_loaded(handle) != RAC_TRUE) {
+                return "{\"error\":\"No STT model loaded. Call loadSTTModel first.\"}";
+            }
+
+            // Decode base64 audio data
+            std::vector<uint8_t> audioData = base64Decode(audioBase64);
+            if (audioData.empty()) {
+                return "{\"error\":\"Failed to decode base64 audio data\"}";
+            }
+
+            // Minimum ~0.05s at 16kHz 16-bit to avoid backend crash on tiny input
+            if (audioData.size() < 1600) {
+                return "{\"text\":\"\",\"confidence\":0.0}";
+            }
+
+            LOGI("Decoded %zu bytes of audio data", audioData.size());
+
+            // Set up transcription options
+            rac_stt_options_t options = RAC_STT_OPTIONS_DEFAULT;
+            options.sample_rate = static_cast<int32_t>(sampleRate > 0 ? sampleRate : 16000);
+            options.audio_format = RAC_AUDIO_FORMAT_PCM;
+            if (language.has_value() && !language->empty()) {
+                options.language = language->c_str();
+            }
+
+            // Transcribe
+            rac_stt_result_t result = {};
+            rac_result_t status = rac_stt_component_transcribe(
+                handle,
+                audioData.data(),
+                audioData.size(),
+                &options,
+                &result
+            );
+
+            if (status != RAC_SUCCESS) {
+                rac_stt_result_free(&result);
+                return "{\"error\":\"Transcription failed with error code: " + std::to_string(status) + "\"}";
+            }
+
+            std::string transcribedText;
+            if (result.text) {
+                transcribedText = std::string(result.text);
+            }
+            float confidence = result.confidence;
+
+            rac_stt_result_free(&result);
+
+            LOGI("Transcription result: %s", transcribedText.c_str());
+            return "{\"text\":" + jsonString(transcribedText) + ",\"confidence\":" + std::to_string(confidence) + "}";
+        } catch (const std::exception& e) {
+            std::string msg = e.what();
+            LOGI("Transcribe exception: %s", msg.c_str());
+            return "{\"error\":" + jsonString(msg) + "}";
+        } catch (...) {
+            return "{\"error\":\"Transcription failed (unknown error)\"}";
         }
-
-        if (rac_stt_component_is_loaded(handle) != RAC_TRUE) {
-            throw std::runtime_error("No STT model loaded. Call loadSTTModel first.");
-        }
-
-        // Decode base64 audio data
-        std::vector<uint8_t> audioData = base64Decode(audioBase64);
-        if (audioData.empty()) {
-            throw std::runtime_error("Failed to decode base64 audio data");
-        }
-
-        LOGI("Decoded %zu bytes of audio data", audioData.size());
-
-        // Set up transcription options
-        rac_stt_options_t options = RAC_STT_OPTIONS_DEFAULT;
-        options.sample_rate = static_cast<int32_t>(sampleRate > 0 ? sampleRate : 16000);
-        options.audio_format = RAC_AUDIO_FORMAT_PCM;
-        if (language.has_value() && !language->empty()) {
-            options.language = language->c_str();
-        }
-
-        // Transcribe
-        rac_stt_result_t result = {};
-        rac_result_t status = rac_stt_component_transcribe(
-            handle,
-            audioData.data(),
-            audioData.size(),
-            &options,
-            &result
-        );
-
-        if (status != RAC_SUCCESS) {
-            throw std::runtime_error("Transcription failed with error code: " + std::to_string(status));
-        }
-
-        std::string transcribedText;
-        if (result.text) {
-            transcribedText = std::string(result.text);
-        }
-
-        // Free the result
-        rac_stt_result_free(&result);
-
-        LOGI("Transcription result: %s", transcribedText.c_str());
-        return transcribedText;
     });
 }
 
@@ -1762,137 +1807,133 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::transcribeFile(
     const std::string& filePath,
     const std::optional<std::string>& language) {
     return Promise<std::string>::async([this, filePath, language]() -> std::string {
-        LOGI("Transcribing file: %s", filePath.c_str());
+        try {
+            LOGI("Transcribing file: %s", filePath.c_str());
 
-        rac_handle_t handle = getGlobalSTTHandle();
-        if (!handle) {
-            throw std::runtime_error("STT component not available. Is an STT backend registered?");
-        }
-
-        if (rac_stt_component_is_loaded(handle) != RAC_TRUE) {
-            throw std::runtime_error("No STT model loaded. Call loadSTTModel first.");
-        }
-
-        // Open the file
-        FILE* file = fopen(filePath.c_str(), "rb");
-        if (!file) {
-            throw std::runtime_error("Failed to open audio file: " + filePath);
-        }
-
-        // Get file size
-        fseek(file, 0, SEEK_END);
-        long fileSize = ftell(file);
-        fseek(file, 0, SEEK_SET);
-
-        if (fileSize <= 0) {
-            fclose(file);
-            throw std::runtime_error("Audio file is empty: " + filePath);
-        }
-
-        LOGI("File size: %ld bytes", fileSize);
-
-        // Read the entire file into memory
-        std::vector<uint8_t> fileData(fileSize);
-        size_t bytesRead = fread(fileData.data(), 1, fileSize, file);
-        fclose(file);
-
-        if (bytesRead != static_cast<size_t>(fileSize)) {
-            throw std::runtime_error("Failed to read audio file completely");
-        }
-
-        // Parse WAV header to extract audio data
-        // WAV header: RIFF chunk (12 bytes) + fmt chunk + data chunk
-        // We need to find the "data" chunk and extract PCM audio
-
-        const uint8_t* data = fileData.data();
-        size_t dataSize = fileData.size();
-        int32_t sampleRate = 16000;
-
-        // Check RIFF header
-        if (dataSize < 44) {
-            throw std::runtime_error("File too small to be a valid WAV file");
-        }
-
-        // Check "RIFF" signature
-        if (data[0] != 'R' || data[1] != 'I' || data[2] != 'F' || data[3] != 'F') {
-            throw std::runtime_error("Invalid WAV file: missing RIFF header");
-        }
-
-        // Check "WAVE" format
-        if (data[8] != 'W' || data[9] != 'A' || data[10] != 'V' || data[11] != 'E') {
-            throw std::runtime_error("Invalid WAV file: missing WAVE format");
-        }
-
-        // Find "fmt " and "data" chunks
-        size_t pos = 12;
-        size_t audioDataOffset = 0;
-        size_t audioDataSize = 0;
-
-        while (pos + 8 < dataSize) {
-            char chunkId[5] = {0};
-            memcpy(chunkId, &data[pos], 4);
-            uint32_t chunkSize = *reinterpret_cast<const uint32_t*>(&data[pos + 4]);
-
-            if (strcmp(chunkId, "fmt ") == 0) {
-                // Parse fmt chunk
-                if (pos + 8 + chunkSize <= dataSize && chunkSize >= 16) {
-                    // Bytes 12-13: Audio format (1 = PCM)
-                    // Bytes 14-15: Number of channels
-                    // Bytes 16-19: Sample rate
-                    sampleRate = *reinterpret_cast<const int32_t*>(&data[pos + 12]);
-                    LOGI("WAV sample rate: %d Hz", sampleRate);
-                }
-            } else if (strcmp(chunkId, "data") == 0) {
-                // Found data chunk
-                audioDataOffset = pos + 8;
-                audioDataSize = chunkSize;
-                LOGI("Found audio data: offset=%zu, size=%zu", audioDataOffset, audioDataSize);
-                break;
+            rac_handle_t handle = getGlobalSTTHandle();
+            if (!handle) {
+                return "{\"error\":\"STT component not available. Is an STT backend registered?\"}";
             }
 
-            pos += 8 + chunkSize;
-            // Align to 2-byte boundary
-            if (chunkSize % 2 != 0) pos++;
+            if (rac_stt_component_is_loaded(handle) != RAC_TRUE) {
+                return "{\"error\":\"No STT model loaded. Call loadSTTModel first.\"}";
+            }
+
+            // Open the file
+            FILE* file = fopen(filePath.c_str(), "rb");
+            if (!file) {
+                return "{\"error\":\"Failed to open audio file. Check that the path is valid.\"}";
+            }
+
+            // Get file size
+            fseek(file, 0, SEEK_END);
+            long fileSize = ftell(file);
+            fseek(file, 0, SEEK_SET);
+
+            if (fileSize <= 0) {
+                fclose(file);
+                return "{\"error\":\"Audio file is empty\"}";
+            }
+
+            LOGI("File size: %ld bytes", fileSize);
+
+            // Read the entire file into memory
+            std::vector<uint8_t> fileData(static_cast<size_t>(fileSize));
+            size_t bytesRead = fread(fileData.data(), 1, static_cast<size_t>(fileSize), file);
+            fclose(file);
+
+            if (bytesRead != static_cast<size_t>(fileSize)) {
+                return "{\"error\":\"Failed to read audio file completely\"}";
+            }
+
+            // Parse WAV header to extract audio data
+            const uint8_t* data = fileData.data();
+            size_t dataSize = fileData.size();
+            int32_t sampleRate = 16000;
+
+            if (dataSize < 44) {
+                return "{\"error\":\"File too small to be a valid WAV file\"}";
+            }
+            if (data[0] != 'R' || data[1] != 'I' || data[2] != 'F' || data[3] != 'F') {
+                return "{\"error\":\"Invalid WAV file: missing RIFF header\"}";
+            }
+            if (data[8] != 'W' || data[9] != 'A' || data[10] != 'V' || data[11] != 'E') {
+                return "{\"error\":\"Invalid WAV file: missing WAVE format\"}";
+            }
+
+            size_t pos = 12;
+            size_t audioDataOffset = 0;
+            size_t audioDataSize = 0;
+
+            while (pos + 8 < dataSize) {
+                char chunkId[5] = {0};
+                memcpy(chunkId, &data[pos], 4);
+                uint32_t chunkSize = *reinterpret_cast<const uint32_t*>(&data[pos + 4]);
+
+                if (strcmp(chunkId, "fmt ") == 0) {
+                    if (pos + 8 + chunkSize <= dataSize && chunkSize >= 16) {
+                        sampleRate = *reinterpret_cast<const int32_t*>(&data[pos + 12]);
+                        if (sampleRate <= 0 || sampleRate > 48000) sampleRate = 16000;
+                        LOGI("WAV sample rate: %d Hz", sampleRate);
+                    }
+                } else if (strcmp(chunkId, "data") == 0) {
+                    audioDataOffset = pos + 8;
+                    audioDataSize = chunkSize;
+                    LOGI("Found audio data: offset=%zu, size=%zu", audioDataOffset, audioDataSize);
+                    break;
+                }
+
+                pos += 8 + chunkSize;
+                if (chunkSize % 2 != 0) pos++;
+            }
+
+            if (audioDataSize == 0 || audioDataOffset + audioDataSize > dataSize) {
+                return "{\"error\":\"Could not find valid audio data in WAV file\"}";
+            }
+
+            // Minimum ~0.1s at 16kHz 16-bit; avoid empty or tiny buffers
+            if (audioDataSize < 3200) {
+                return "{\"error\":\"Recording too short to transcribe\"}";
+            }
+
+            rac_stt_options_t options = RAC_STT_OPTIONS_DEFAULT;
+            options.sample_rate = sampleRate;
+            options.audio_format = RAC_AUDIO_FORMAT_PCM;
+            if (language.has_value() && !language->empty()) {
+                options.language = language->c_str();
+            }
+
+            LOGI("Transcribing %zu bytes of audio at %d Hz", audioDataSize, sampleRate);
+
+            rac_stt_result_t result = {};
+            rac_result_t status = rac_stt_component_transcribe(
+                handle,
+                &data[audioDataOffset],
+                audioDataSize,
+                &options,
+                &result
+            );
+
+            if (status != RAC_SUCCESS) {
+                rac_stt_result_free(&result);
+                return "{\"error\":\"Transcription failed with error code: " + std::to_string(status) + "\"}";
+            }
+
+            std::string transcribedText;
+            if (result.text) {
+                transcribedText = std::string(result.text);
+            }
+
+            rac_stt_result_free(&result);
+            LOGI("Transcription result: %s", transcribedText.c_str());
+            return transcribedText;
+        } catch (const std::exception& e) {
+            std::string msg = e.what();
+            LOGI("TranscribeFile exception: %s", msg.c_str());
+            return "{\"error\":\"" + msg + "\"}";
+        } catch (...) {
+            return "{\"error\":\"Transcription failed (unknown error)\"}";
         }
-
-        if (audioDataSize == 0 || audioDataOffset + audioDataSize > dataSize) {
-            throw std::runtime_error("Could not find valid audio data in WAV file");
-        }
-
-        // Set up transcription options
-        rac_stt_options_t options = RAC_STT_OPTIONS_DEFAULT;
-        options.sample_rate = sampleRate;
-        options.audio_format = RAC_AUDIO_FORMAT_WAV;  // Tell the backend it's WAV format
-        if (language.has_value() && !language->empty()) {
-            options.language = language->c_str();
-        }
-
-        LOGI("Transcribing %zu bytes of audio at %d Hz", audioDataSize, sampleRate);
-
-        // Transcribe - pass the raw PCM data (after WAV header)
-        rac_stt_result_t result = {};
-        rac_result_t status = rac_stt_component_transcribe(
-            handle,
-            &data[audioDataOffset],
-            audioDataSize,
-            &options,
-            &result
-        );
-
-        if (status != RAC_SUCCESS) {
-            throw std::runtime_error("Transcription failed with error code: " + std::to_string(status));
-        }
-
-        std::string transcribedText;
-        if (result.text) {
-            transcribedText = std::string(result.text);
-        }
-
-        // Free the result
-        rac_stt_result_free(&result);
-
-        LOGI("Transcription result: %s", transcribedText.c_str());
-        return transcribedText;
     });
 }
 
@@ -2566,6 +2607,73 @@ std::shared_ptr<Promise<void>> HybridRunAnywhereCore::flushTelemetry() {
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isTelemetryInitialized() {
     return Promise<bool>::async([]() -> bool {
         return TelemetryBridge::shared().isInitialized();
+    });
+}
+
+// ============================================================================
+// Tool Calling
+//
+// ARCHITECTURE:
+// - C++ (ToolCallingBridge): Parses <tool_call> tags from LLM output.
+//   This is the SINGLE SOURCE OF TRUTH for parsing, ensuring consistency.
+//
+// - TypeScript (RunAnywhere+ToolCalling.ts): Handles tool registry, executor
+//   storage, prompt formatting, and orchestration. Executors MUST stay in
+//   TypeScript because they need JavaScript APIs (fetch, device APIs, etc.).
+//
+// Only parseToolCallFromOutput is implemented in C++. All other tool calling
+// functionality (registration, execution, prompt formatting) is in TypeScript.
+// ============================================================================
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::parseToolCallFromOutput(const std::string& llmOutput) {
+    return Promise<std::string>::async([llmOutput]() -> std::string {
+        LOGD("parseToolCallFromOutput: input length=%zu", llmOutput.length());
+
+        // Use ToolCallingBridge for parsing - single source of truth
+        // This ensures consistent <tool_call> tag parsing across all platforms
+        return ::runanywhere::bridges::ToolCallingBridge::shared().parseToolCall(llmOutput);
+    });
+}
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::formatToolsForPrompt(
+    const std::string& toolsJson,
+    const std::string& format
+) {
+    return Promise<std::string>::async([toolsJson, format]() -> std::string {
+        LOGD("formatToolsForPrompt: tools length=%zu, format=%s", toolsJson.length(), format.c_str());
+
+        // Use C++ single source of truth for prompt formatting
+        // This eliminates duplicate TypeScript implementation
+        return ::runanywhere::bridges::ToolCallingBridge::shared().formatToolsPrompt(toolsJson, format);
+    });
+}
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::buildInitialPrompt(
+    const std::string& userPrompt,
+    const std::string& toolsJson,
+    const std::string& optionsJson
+) {
+    return Promise<std::string>::async([userPrompt, toolsJson, optionsJson]() -> std::string {
+        LOGD("buildInitialPrompt: prompt length=%zu, tools length=%zu", userPrompt.length(), toolsJson.length());
+
+        // Use C++ single source of truth for initial prompt building
+        return ::runanywhere::bridges::ToolCallingBridge::shared().buildInitialPrompt(userPrompt, toolsJson, optionsJson);
+    });
+}
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::buildFollowupPrompt(
+    const std::string& originalPrompt,
+    const std::string& toolsPrompt,
+    const std::string& toolName,
+    const std::string& resultJson,
+    bool keepToolsAvailable
+) {
+    return Promise<std::string>::async([originalPrompt, toolsPrompt, toolName, resultJson, keepToolsAvailable]() -> std::string {
+        LOGD("buildFollowupPrompt: tool=%s, keepTools=%d", toolName.c_str(), keepToolsAvailable);
+
+        // Use C++ single source of truth for follow-up prompt building
+        return ::runanywhere::bridges::ToolCallingBridge::shared().buildFollowupPrompt(
+            originalPrompt, toolsPrompt, toolName, resultJson, keepToolsAvailable);
     });
 }
 

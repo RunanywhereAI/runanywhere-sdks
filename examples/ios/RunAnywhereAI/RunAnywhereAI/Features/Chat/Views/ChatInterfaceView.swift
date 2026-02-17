@@ -44,15 +44,15 @@ struct ChatInterfaceView: View {
             iOSView
             #endif
         }
-        .sheet(isPresented: $showingConversationList) {
+        .adaptiveSheet(isPresented: $showingConversationList) {
             ConversationListView()
         }
-        .sheet(isPresented: $showingModelSelection) {
+        .adaptiveSheet(isPresented: $showingModelSelection) {
             ModelSelectionSheet(context: .llm) { model in
                 await handleModelSelected(model)
             }
         }
-        .sheet(isPresented: $showingChatDetails) {
+        .adaptiveSheet(isPresented: $showingChatDetails) {
             ChatDetailsView(
                 messages: viewModel.messages,
                 conversation: viewModel.currentConversation
@@ -111,10 +111,13 @@ extension ChatInterfaceView {
                 modelRequiredOverlayIfNeeded
             }
             .navigationTitle(hasModelSelected ? "Chat" : "")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarHidden(!hasModelSelected)
+            #endif
             .toolbar {
                 if hasModelSelected {
+                    #if os(iOS)
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button {
                             showingConversationList = true
@@ -136,10 +139,35 @@ extension ChatInterfaceView {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         modelButton
                     }
+                    #else
+                    ToolbarItem(placement: .automatic) {
+                        Button {
+                            showingConversationList = true
+                        } label: {
+                            Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                        }
+                    }
+
+                    ToolbarItem(placement: .automatic) {
+                        Button {
+                            showingChatDetails = true
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .foregroundColor(viewModel.messages.isEmpty ? .gray : AppColors.primaryAccent)
+                        }
+                        .disabled(viewModel.messages.isEmpty)
+                    }
+
+                    ToolbarItem(placement: .automatic) {
+                        modelButton
+                    }
+                    #endif
                 }
             }
         }
+        #if os(iOS)
         .navigationViewStyle(.stack)
+        #endif
     }
 }
 
@@ -366,6 +394,12 @@ extension ChatInterfaceView {
     var inputArea: some View {
         VStack(spacing: 0) {
             Divider()
+
+            // Tool calling indicator
+            if viewModel.useToolCalling {
+                toolCallingBadge
+            }
+
             HStack(spacing: AppSpacing.mediumLarge) {
                 TextField("Type a message...", text: $viewModel.currentInput, axis: .vertical)
                     .textFieldStyle(.plain)
@@ -385,7 +419,7 @@ extension ChatInterfaceView {
                 }
                 .disabled(!viewModel.canSend)
                 .background {
-                    if #available(iOS 26.0, *) {
+                    if #available(iOS 26.0, macOS 26.0, *) {
                         Circle()
                             .fill(.clear)
                             .glassEffect(.regular.interactive())
@@ -396,6 +430,21 @@ extension ChatInterfaceView {
             .background(AppColors.backgroundPrimary)
             .animation(.easeInOut(duration: AppLayout.animationFast), value: isTextFieldFocused)
         }
+    }
+
+    var toolCallingBadge: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "wrench.and.screwdriver")
+                .font(.system(size: 10))
+            Text("Tools enabled")
+                .font(AppTypography.caption2)
+        }
+        .foregroundColor(AppColors.primaryAccent)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(AppColors.primaryAccent.opacity(0.1))
+        .cornerRadius(6)
+        .padding(.top, 8)
     }
 }
 

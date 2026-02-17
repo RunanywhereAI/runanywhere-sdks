@@ -5,7 +5,7 @@
 #
 # The commons JNI library includes:
 # - Core commons bindings (rac_init, rac_shutdown, etc.)
-# - LLM/STT/TTS/VAD component bindings
+# - LLM/STT/TTS/VAD/VLM component bindings
 # - Model registry bindings
 # - Platform adapter callbacks
 #
@@ -22,8 +22,53 @@ project(runanywhere_commons_jni)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+include(FetchContent)
+
+# needed for string parsing
+if(NOT DEFINED NLOHMANN_JSON_VERSION)
+    set(NLOHMANN_JSON_VERSION "3.11.3")
+endif()
+
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG        v${NLOHMANN_JSON_VERSION}
+    GIT_SHALLOW    TRUE
+)
+set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(nlohmann_json)
+
 # Find JNI
-find_package(JNI REQUIRED)
+# When cross-compiling for Android, we should use the NDK's JNI headers (jni.h)
+# and NOT the host JDK's JVM/AWT libraries.
+if(ANDROID)
+    # NDK sysroot contains jni.h and android/jni_md.h
+    # Detect NDK host tag dynamically instead of hardcoding
+    if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
+        set(_NDK_HOST_TAG "darwin-x86_64")
+    elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+        set(_NDK_HOST_TAG "linux-x86_64")
+    elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+        set(_NDK_HOST_TAG "windows-x86_64")
+    else()
+        message(FATAL_ERROR "Unsupported host platform: ${CMAKE_HOST_SYSTEM_NAME}")
+    endif()
+    set(_NDK_PREBUILT "${CMAKE_ANDROID_NDK}/toolchains/llvm/prebuilt/${_NDK_HOST_TAG}")
+    set(_NDK_SYSROOT_INCLUDE "${_NDK_PREBUILT}/sysroot/usr/include")
+
+    if(NOT EXISTS "${_NDK_SYSROOT_INCLUDE}/jni.h")
+        message(FATAL_ERROR "Could not locate NDK JNI headers at: ${_NDK_SYSROOT_INCLUDE}. Is CMAKE_ANDROID_NDK set correctly?")
+    endif()
+
+    set(JNI_INCLUDE_DIRS
+        "${_NDK_SYSROOT_INCLUDE}"
+        "${_NDK_SYSROOT_INCLUDE}/android"
+    )
+    set(JNI_LIBRARIES "")
+else()
+    find_package(JNI REQUIRED)
+endif()
+
 include_directories(${JNI_INCLUDE_DIRS})
 
 # Include runanywhere-commons headers
@@ -41,6 +86,7 @@ add_library(runanywhere_commons_jni SHARED ${JNI_SOURCES})
 # Backend libraries are NOT linked here - they have their own JNI libraries
 target_link_libraries(runanywhere_commons_jni
     rac_commons
+    nlohmann_json::nlohmann_json
     ${JNI_LIBRARIES}
 )
 

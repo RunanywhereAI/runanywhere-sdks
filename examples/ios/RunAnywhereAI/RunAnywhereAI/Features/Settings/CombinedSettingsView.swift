@@ -13,20 +13,22 @@ import Combine
 struct CombinedSettingsView: View {
     // ViewModel - all business logic is here
     @StateObject private var viewModel = SettingsViewModel()
+    @StateObject private var toolViewModel = ToolSettingsViewModel.shared
 
     var body: some View {
         Group {
             #if os(macOS)
-            MacOSSettingsContent(viewModel: viewModel)
+            MacOSSettingsContent(viewModel: viewModel, toolViewModel: toolViewModel)
             #else
-            IOSSettingsContent(viewModel: viewModel)
+            IOSSettingsContent(viewModel: viewModel, toolViewModel: toolViewModel)
             #endif
         }
-        .sheet(isPresented: $viewModel.showApiKeyEntry) {
+        .adaptiveSheet(isPresented: $viewModel.showApiKeyEntry) {
             ApiConfigurationSheet(viewModel: viewModel)
         }
         .task {
             await viewModel.loadStorageData()
+            await toolViewModel.refreshRegisteredTools()
         }
         .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
             Button("OK") {
@@ -51,6 +53,7 @@ struct CombinedSettingsView: View {
 
 private struct IOSSettingsContent: View {
     @ObservedObject var viewModel: SettingsViewModel
+    @ObservedObject var toolViewModel: ToolSettingsViewModel
 
     var body: some View {
         Form {
@@ -70,6 +73,20 @@ private struct IOSSettingsContent: View {
                     step: 500
                 )
             }
+
+            // System Prompt
+            Section {
+                TextField("Enter system prompt...", text: $viewModel.systemPrompt, axis: .vertical)
+                    .lineLimit(3...8)
+            } header: {
+                Text("System Prompt")
+            } footer: {
+                Text("Optional instructions that define AI behavior and response style.")
+                    .font(AppTypography.caption)
+            }
+
+            // Tool Calling Settings
+            ToolSettingsSection(viewModel: toolViewModel)
 
             // API Configuration (for testing custom backend)
             Section {
@@ -126,74 +143,6 @@ private struct IOSSettingsContent: View {
                     .font(AppTypography.caption)
             }
 
-            // Storage Overview Section
-            Section {
-                StorageOverviewRows(viewModel: viewModel)
-            } header: {
-                HStack {
-                    Text("Storage Overview")
-                    Spacer()
-                    Button("Refresh") {
-                        Task {
-                            await viewModel.refreshStorageData()
-                        }
-                    }
-                    .font(AppTypography.caption)
-                }
-            }
-
-            // Downloaded Models Section
-            Section("Downloaded Models") {
-                if viewModel.storedModels.isEmpty {
-                    Text("No models downloaded yet")
-                        .foregroundColor(AppColors.textSecondary)
-                        .font(AppTypography.caption)
-                } else {
-                    ForEach(viewModel.storedModels, id: \.id) { model in
-                        StoredModelRow(model: model) {
-                            await viewModel.deleteModel(model)
-                        }
-                    }
-                }
-            }
-
-            // Storage Management
-            Section("Storage Management") {
-                Button(
-                    action: {
-                        Task {
-                            await viewModel.clearCache()
-                        }
-                    },
-                    label: {
-                        HStack {
-                            Image(systemName: "trash")
-                                .foregroundColor(AppColors.primaryRed)
-                            Text("Clear Cache")
-                                .foregroundColor(AppColors.primaryRed)
-                            Spacer()
-                        }
-                    }
-                )
-
-                Button(
-                    action: {
-                        Task {
-                            await viewModel.cleanTempFiles()
-                        }
-                    },
-                    label: {
-                        HStack {
-                            Image(systemName: "trash")
-                                .foregroundColor(AppColors.primaryOrange)
-                            Text("Clean Temporary Files")
-                                .foregroundColor(AppColors.primaryOrange)
-                            Spacer()
-                        }
-                    }
-                )
-            }
-
             // Logging Configuration
             Section("Logging Configuration") {
                 Toggle("Log Analytics Locally", isOn: $viewModel.analyticsLogToLocal)
@@ -201,6 +150,13 @@ private struct IOSSettingsContent: View {
                 Text("When enabled, analytics events will be saved locally on your device.")
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.textSecondary)
+            }
+
+            // Performance
+            Section("Performance") {
+                NavigationLink(destination: BenchmarkDashboardView()) {
+                    Label("Benchmarks", systemImage: "gauge.with.dots.needle.33percent")
+                }
             }
 
             // About
@@ -230,6 +186,7 @@ private struct IOSSettingsContent: View {
 
 private struct MacOSSettingsContent: View {
     @ObservedObject var viewModel: SettingsViewModel
+    @ObservedObject var toolViewModel: ToolSettingsViewModel
 
     var body: some View {
         ScrollView {
@@ -239,11 +196,10 @@ private struct MacOSSettingsContent: View {
                     .padding(.bottom, AppSpacing.medium)
 
                 GenerationSettingsCard(viewModel: viewModel)
+                ToolSettingsCard(viewModel: toolViewModel)
                 APIConfigurationCard(viewModel: viewModel)
-                StorageCard(viewModel: viewModel)
-                DownloadedModelsCard(viewModel: viewModel)
-                StorageManagementCard(viewModel: viewModel)
                 LoggingConfigurationCard(viewModel: viewModel)
+                BenchmarksCard()
                 AboutCard()
 
                 Spacer()
@@ -290,6 +246,20 @@ private struct GenerationSettingsCard: View {
                         step: 500
                     )
                     .frame(maxWidth: 200)
+                }
+
+                VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
+                    HStack(alignment: .top) {
+                        Text("System Prompt")
+                            .frame(width: 150, alignment: .leading)
+                        TextField("Enter system prompt...", text: $viewModel.systemPrompt, axis: .vertical)
+                            .lineLimit(3...8)
+                            .textFieldStyle(.plain)
+                            .padding(AppSpacing.small)
+                            .background(AppColors.backgroundTertiary)
+                            .cornerRadius(AppSpacing.cornerRadiusRegular)
+                            .frame(maxWidth: 400)
+                    }
                 }
             }
         }
@@ -728,6 +698,12 @@ private struct StoredModelRow: View {
     @State private var showingDeleteConfirmation = false
     @State private var isDeleting = false
 
+    private var isDeletable: Bool {
+        // Platform models (built-in) can't be deleted
+        guard let framework = model.framework else { return false }
+        return framework != .foundationModels && framework != .systemTTS
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
             HStack {
@@ -757,20 +733,23 @@ private struct StoredModelRow: View {
                         .tint(AppColors.primaryAccent)
                         .controlSize(.mini)
 
-                        Button(
-                            action: {
-                                showingDeleteConfirmation = true
-                            },
-                            label: {
-                                Image(systemName: "trash")
-                                    .foregroundColor(AppColors.primaryRed)
-                            }
-                        )
-                        .font(AppTypography.caption2)
-                        .buttonStyle(.bordered)
-                        .tint(AppColors.primaryRed)
-                        .controlSize(.mini)
-                        .disabled(isDeleting)
+                        // ONLY show delete button if deletable
+                        if isDeletable {
+                            Button(
+                                action: {
+                                    showingDeleteConfirmation = true
+                                },
+                                label: {
+                                    Image(systemName: "trash")
+                                        .foregroundColor(AppColors.primaryRed)
+                                }
+                            )
+                            .font(AppTypography.caption2)
+                            .buttonStyle(.bordered)
+                            .tint(AppColors.primaryRed)
+                            .controlSize(.mini)
+                            .disabled(isDeleting)
+                        }
                     }
                 }
             }
@@ -817,6 +796,32 @@ private struct StoredModelRow: View {
         .padding(.vertical, AppSpacing.small)
         .background(AppColors.backgroundTertiary)
         .cornerRadius(AppSpacing.cornerRadiusRegular)
+    }
+}
+
+private struct BenchmarksCard: View {
+    var body: some View {
+        SettingsCard(title: "Performance") {
+            VStack(alignment: .leading, spacing: AppSpacing.padding15) {
+                NavigationLink(destination: BenchmarkDashboardView()) {
+                    HStack {
+                        Image(systemName: "gauge.with.dots.needle.33percent")
+                            .foregroundColor(AppColors.primaryAccent)
+                        Text("Benchmarks")
+                        Spacer()
+                        #if !os(macOS)
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(AppColors.textSecondary)
+                        #endif
+                    }
+                }
+                .buttonStyle(.plain)
+
+                Text("Measure performance of on-device AI models.")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
+            }
+        }
     }
 }
 

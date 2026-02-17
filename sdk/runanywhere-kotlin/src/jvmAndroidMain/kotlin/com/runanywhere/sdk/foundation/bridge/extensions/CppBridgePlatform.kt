@@ -57,11 +57,9 @@ object CppBridgePlatform {
         /** Platform embedding service */
         const val EMBEDDING = 4
 
-        /** Platform image generation service */
-        const val IMAGE_GENERATION = 5
-
         /** Platform vision/image understanding service */
         const val VISION = 6
+        // 5 = IMAGE_GENERATION (diffusion) not supported on Kotlin/Android; not exposed
 
         /**
          * Get a human-readable name for the service type.
@@ -73,7 +71,6 @@ object CppBridgePlatform {
                 TTS -> "TTS"
                 STT -> "STT"
                 EMBEDDING -> "EMBEDDING"
-                IMAGE_GENERATION -> "IMAGE_GENERATION"
                 VISION -> "VISION"
                 else -> "UNKNOWN($type)"
             }
@@ -1326,8 +1323,9 @@ object CppBridgePlatform {
         serviceAvailability[ServiceType.TTS] = AvailabilityStatus.UNKNOWN
         serviceAvailability[ServiceType.STT] = AvailabilityStatus.UNKNOWN
         serviceAvailability[ServiceType.EMBEDDING] = AvailabilityStatus.UNKNOWN
-        serviceAvailability[ServiceType.IMAGE_GENERATION] = AvailabilityStatus.UNKNOWN
         serviceAvailability[ServiceType.VISION] = AvailabilityStatus.UNKNOWN
+        // 5 = IMAGE_GENERATION (diffusion) not supported on Android
+        serviceAvailability[5] = AvailabilityStatus.UNKNOWN
     }
 
     /**

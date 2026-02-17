@@ -56,7 +56,9 @@ extension CppBridge {
                 throw SDKError.general(.initializationFailed, "Registry not initialized")
             }
 
+            logger.info("Saving model: \(model.id), Swift framework: \(model.framework.rawValue) (\(model.framework.displayName))")
             var cModel = model.toCModelInfo()
+            logger.info("Converted to C++: framework=\(cModel.framework) (expected CoreML=8, Unknown=99)")
             defer { freeCModelInfo(&cModel) }
 
             let result = rac_model_registry_save(handle, &cModel)
@@ -64,7 +66,7 @@ extension CppBridge {
                 throw SDKError.general(.processingFailed, "Failed to save model")
             }
 
-            logger.debug("Model saved: \(model.id)")
+            logger.info("Model saved successfully: \(model.id)")
         }
 
         /// Get model metadata by ID
@@ -96,7 +98,10 @@ extension CppBridge {
             var modelInfos: [ModelInfo] = []
             for i in 0..<count {
                 if let model = models[i] {
-                    modelInfos.append(ModelInfo(from: model.pointee))
+                    let cFramework = model.pointee.framework
+                    let modelInfo = ModelInfo(from: model.pointee)
+                    logger.debug("Retrieved model: \(modelInfo.id), C++ framework=\(cFramework), Swift framework=\(modelInfo.framework.rawValue)")
+                    modelInfos.append(modelInfo)
                 }
             }
 
@@ -299,6 +304,7 @@ extension CppBridge {
                 guard let path = path else { return RAC_FALSE }
                 let pathStr = String(cString: path)
                 let ext = (pathStr as NSString).pathExtension.lowercased()
+                let filename = (pathStr as NSString).lastPathComponent.lowercased()
 
                 // Check based on framework
                 switch framework {
@@ -306,11 +312,23 @@ extension CppBridge {
                     return (ext == "gguf" || ext == "bin") ? RAC_TRUE : RAC_FALSE
                 case RAC_FRAMEWORK_ONNX:
                     return (ext == "onnx" || ext == "ort") ? RAC_TRUE : RAC_FALSE
+                case RAC_FRAMEWORK_COREML:
+                    // CoreML compiled models have .mlmodelc extension (actually a directory)
+                    // Also check for .mlpackage and common CoreML diffusion model files
+                    if ext == "mlmodelc" || ext == "mlpackage" || ext == "mlmodel" {
+                        return RAC_TRUE
+                    }
+                    // For CoreML diffusion models, check for Unet.mlmodelc or similar
+                    if filename.contains("unet") || filename.contains("textencoder") ||
+                       filename.contains("vaeencoder") || filename.contains("vaedecoder") {
+                        return RAC_TRUE
+                    }
+                    return RAC_FALSE
                 case RAC_FRAMEWORK_FOUNDATION_MODELS, RAC_FRAMEWORK_SYSTEM_TTS:
                     // Built-in models don't need file check
                     return RAC_TRUE
                 default:
-                    return (ext == "gguf" || ext == "onnx" || ext == "bin" || ext == "ort") ? RAC_TRUE : RAC_FALSE
+                    return (ext == "gguf" || ext == "onnx" || ext == "bin" || ext == "ort" || ext == "mlmodelc") ? RAC_TRUE : RAC_FALSE
                 }
             }
 

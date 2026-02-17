@@ -19,15 +19,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.VolumeUp
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -46,8 +46,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 
+/**
+ * Bottom nav tabs matching iOS exactly:
+ * Chat, Vision, Voice, More, Settings
+ *
+ * iOS Reference: ContentView.swift TabView
+ */
 enum class BottomNavTab {
-    Chat, Transcribe, Speak, Voice, Settings
+    Chat, Vision, Voice, More, Settings
 }
 
 @Composable
@@ -162,19 +168,19 @@ private fun BottomNavItem(
 private fun getTabLabel(tab: BottomNavTab): String {
     return when (tab) {
         BottomNavTab.Chat -> "Chat"
-        BottomNavTab.Transcribe -> "Transcribe"
-        BottomNavTab.Speak -> "Speak"
+        BottomNavTab.Vision -> "Vision"
         BottomNavTab.Voice -> "Voice"
+        BottomNavTab.More -> "More"
         BottomNavTab.Settings -> "Settings"
     }
 }
 
 private fun getTabIconFilled(tab: BottomNavTab): ImageVector {
     return when (tab) {
-        BottomNavTab.Chat -> Icons.Outlined.ChatBubbleOutline // Use your filled chat icon
-        BottomNavTab.Transcribe -> Icons.Filled.GraphicEq
-        BottomNavTab.Speak -> Icons.Filled.VolumeUp
+        BottomNavTab.Chat -> Icons.Outlined.ChatBubbleOutline
+        BottomNavTab.Vision -> Icons.Filled.Visibility
         BottomNavTab.Voice -> Icons.Filled.Mic
+        BottomNavTab.More -> Icons.Filled.MoreHoriz
         BottomNavTab.Settings -> Icons.Filled.Settings
     }
 }
@@ -182,9 +188,9 @@ private fun getTabIconFilled(tab: BottomNavTab): ImageVector {
 private fun getTabIconOutlined(tab: BottomNavTab): ImageVector {
     return when (tab) {
         BottomNavTab.Chat -> Icons.Outlined.ChatBubbleOutline
-        BottomNavTab.Transcribe -> Icons.Outlined.GraphicEq
-        BottomNavTab.Speak -> Icons.Outlined.VolumeUp
+        BottomNavTab.Vision -> Icons.Outlined.Visibility
         BottomNavTab.Voice -> Icons.Outlined.Mic
+        BottomNavTab.More -> Icons.Outlined.MoreHoriz
         BottomNavTab.Settings -> Icons.Outlined.Settings
     }
 }
@@ -192,9 +198,9 @@ private fun getTabIconOutlined(tab: BottomNavTab): ImageVector {
 private fun getTabAccentColor(tab: BottomNavTab): Color {
     return when (tab) {
         BottomNavTab.Chat -> AppColors.primaryAccent
-        BottomNavTab.Transcribe -> AppColors.primaryAccent
-        BottomNavTab.Speak -> AppColors.primaryAccent
+        BottomNavTab.Vision -> AppColors.primaryAccent
         BottomNavTab.Voice -> AppColors.primaryAccent
+        BottomNavTab.More -> AppColors.primaryAccent
         BottomNavTab.Settings -> AppColors.primaryAccent
     }
 }
