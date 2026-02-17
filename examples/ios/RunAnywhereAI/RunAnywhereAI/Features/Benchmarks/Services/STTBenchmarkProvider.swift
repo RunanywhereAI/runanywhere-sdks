@@ -14,15 +14,14 @@ struct STTBenchmarkProvider: BenchmarkScenarioProvider {
 
     func scenarios() -> [BenchmarkScenario] {
         [
-            BenchmarkScenario(name: "Silent 2s", category: .stt),
-            BenchmarkScenario(name: "Sine Tone 3s", category: .stt),
+            BenchmarkScenario(name: "Silent 2s", category: .stt, parameters: ["type": "silent"]),
+            BenchmarkScenario(name: "Sine Tone 3s", category: .stt, parameters: ["type": "sine"]),
         ]
     }
 
     func execute(
         scenario: BenchmarkScenario,
-        model: ModelInfo,
-        deviceInfo: BenchmarkDeviceInfo
+        model: ModelInfo
     ) async throws -> BenchmarkMetrics {
         var metrics = BenchmarkMetrics()
 
@@ -33,32 +32,37 @@ struct STTBenchmarkProvider: BenchmarkScenarioProvider {
         try await RunAnywhere.loadSTTModel(model.id)
         metrics.loadTimeMs = Date().timeIntervalSince(loadStart) * 1000
 
-        defer { Task { try? await RunAnywhere.unloadSTTModel() } }
+        do {
+            // Generate audio
+            let audioData: Data
+            let audioDuration: Double
+            switch scenario.parameters?["type"] {
+            case "silent":
+                audioDuration = 2.0
+                audioData = SyntheticInputGenerator.silentAudio(durationSeconds: audioDuration)
+            default:
+                audioDuration = 3.0
+                audioData = SyntheticInputGenerator.sineWaveAudio(durationSeconds: audioDuration)
+            }
 
-        // Generate audio
-        let audioData: Data
-        let audioDuration: Double
-        if scenario.name.contains("Silent") {
-            audioDuration = 2.0
-            audioData = SyntheticInputGenerator.silentAudio(durationSeconds: audioDuration)
-        } else {
-            audioDuration = 3.0
-            audioData = SyntheticInputGenerator.sineWaveAudio(durationSeconds: audioDuration)
+            // Transcribe
+            let benchStart = Date()
+            let options = STTOptions()
+            let result = try await RunAnywhere.transcribeWithOptions(audioData, options: options)
+            metrics.endToEndLatencyMs = Date().timeIntervalSince(benchStart) * 1000
+
+            // processingTime is in seconds
+            metrics.audioLengthSeconds = audioDuration
+            metrics.realTimeFactor = result.metadata.realTimeFactor
+
+            let memAfter = SyntheticInputGenerator.availableMemoryBytes()
+            metrics.memoryDeltaBytes = memBefore - memAfter
+
+            try? await RunAnywhere.unloadSTTModel()
+            return metrics
+        } catch {
+            try? await RunAnywhere.unloadSTTModel()
+            throw error
         }
-
-        // Transcribe
-        let benchStart = Date()
-        let options = STTOptions()
-        let result = try await RunAnywhere.transcribeWithOptions(audioData, options: options)
-        metrics.endToEndLatencyMs = Date().timeIntervalSince(benchStart) * 1000
-
-        // processingTime is in seconds
-        metrics.audioLengthSeconds = audioDuration
-        metrics.realTimeFactor = result.metadata.realTimeFactor
-
-        let memAfter = SyntheticInputGenerator.availableMemoryBytes()
-        metrics.memoryDeltaBytes = memBefore - memAfter
-
-        return metrics
     }
 }

@@ -64,8 +64,15 @@ enum BenchmarkRunStatus: String, Codable, Sendable {
 struct BenchmarkScenario: Codable, Sendable, Identifiable {
     let name: String
     let category: BenchmarkCategory
+    let parameters: [String: String]?
 
     var id: String { "\(category.rawValue)_\(name)" }
+
+    init(name: String, category: BenchmarkCategory, parameters: [String: String]? = nil) {
+        self.name = name
+        self.category = category
+        self.parameters = parameters
+    }
 }
 
 // MARK: - Component Model Info (snapshot of ModelInfo for persistence)
@@ -98,7 +105,7 @@ struct BenchmarkDeviceInfo: Codable, Sendable {
             modelName: info.modelName,
             chipName: info.chipName,
             totalMemoryBytes: info.totalMemory,
-            availableMemoryBytes: Int64(SyntheticInputGenerator.availableMemoryBytes()),
+            availableMemoryBytes: SyntheticInputGenerator.availableMemoryBytes(),
             osVersion: info.osVersion
         )
     }
@@ -186,6 +193,16 @@ struct BenchmarkRun: Codable, Sendable, Identifiable {
         self.status = .running
         self.deviceInfo = deviceInfo
     }
+}
+
+// MARK: - Benchmark Run Output
+
+/// Returned by `BenchmarkRunner.runBenchmarks` so callers get both results
+/// and the categories that were skipped (no downloaded models) in one shot,
+/// eliminating the need for a redundant preflight call.
+struct BenchmarkRunOutput: Sendable {
+    let results: [BenchmarkResult]
+    let skippedCategories: [BenchmarkCategory]
 }
 
 // MARK: - Progress Update

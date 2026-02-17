@@ -10,6 +10,8 @@ import SwiftUI
 struct BenchmarkDetailView: View {
     let run: BenchmarkRun
     @State private var viewModel = BenchmarkViewModel()
+    @State private var jsonURL: URL?
+    @State private var csvURL: URL?
 
     var body: some View {
         ZStack {
@@ -26,7 +28,7 @@ struct BenchmarkDetailView: View {
                     HStack {
                         Text("Status")
                         Spacer()
-                        StatusBadge(status: run.status)
+                        RunStatusBadge(status: run.status)
                     }
                     let successCount = run.results.filter(\.metrics.didSucceed).count
                     let failCount = run.results.count - successCount
@@ -53,12 +55,16 @@ struct BenchmarkDetailView: View {
                     }
 
                     // Export files
-                    ShareLink(item: viewModel.shareJSON(run: run)) {
-                        Label("Export JSON File", systemImage: "curlybraces")
+                    if let url = jsonURL {
+                        ShareLink(item: url) {
+                            Label("Export JSON File", systemImage: "curlybraces")
+                        }
                     }
 
-                    ShareLink(item: viewModel.shareCSV(run: run)) {
-                        Label("Export CSV File", systemImage: "tablecells")
+                    if let url = csvURL {
+                        ShareLink(item: url) {
+                            Label("Export CSV File", systemImage: "tablecells")
+                        }
                     }
                 }
 
@@ -119,6 +125,10 @@ struct BenchmarkDetailView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .task {
+            jsonURL = viewModel.shareJSON(run: run)
+            csvURL = viewModel.shareCSV(run: run)
+        }
     }
 }
 
@@ -211,27 +221,3 @@ private struct MetricsGrid: View {
     }
 }
 
-// MARK: - Status Badge
-
-private struct StatusBadge: View {
-    let status: BenchmarkRunStatus
-
-    var body: some View {
-        Text(status.rawValue.capitalized)
-            .font(AppTypography.caption2Medium)
-            .padding(.horizontal, AppSpacing.smallMedium)
-            .padding(.vertical, AppSpacing.xxSmall)
-            .background(backgroundColor.opacity(0.2))
-            .foregroundColor(backgroundColor)
-            .cornerRadius(AppSpacing.cornerRadiusSmall)
-    }
-
-    private var backgroundColor: Color {
-        switch status {
-        case .completed: return AppColors.statusGreen
-        case .running: return AppColors.statusBlue
-        case .cancelled: return AppColors.statusOrange
-        case .failed: return AppColors.statusRed
-        }
-    }
-}

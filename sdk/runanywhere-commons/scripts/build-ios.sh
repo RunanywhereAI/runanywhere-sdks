@@ -251,6 +251,13 @@ build_platform() {
         esac
     fi
 
+    # BLAS (Accelerate) works on device but FindBLAS fails during simulator
+    # cross-compilation. Disable BLAS for simulator targets.
+    local BLAS_FLAGS="-DGGML_BLAS=ON -DGGML_BLAS_VENDOR=Apple"
+    if [[ "$PLATFORM" == "SIMULATOR"* ]]; then
+        BLAS_FLAGS="-DGGML_BLAS=OFF"
+    fi
+
     cmake "${PROJECT_ROOT}" \
         -DCMAKE_TOOLCHAIN_FILE="${PROJECT_ROOT}/cmake/ios.toolchain.cmake" \
         -DIOS_PLATFORM="${PLATFORM}" \
@@ -259,6 +266,7 @@ build_platform() {
         -DRAC_BUILD_PLATFORM=ON \
         -DRAC_BUILD_SHARED=OFF \
         -DRAC_BUILD_JNI=OFF \
+        $BLAS_FLAGS \
         $BACKEND_FLAGS
 
     cmake --build . --config "${BUILD_TYPE}" -j"$(sysctl -n hw.ncpu)"
