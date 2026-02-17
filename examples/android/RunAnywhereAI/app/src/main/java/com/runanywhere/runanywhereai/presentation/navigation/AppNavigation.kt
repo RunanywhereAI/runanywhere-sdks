@@ -1,5 +1,6 @@
 package com.runanywhere.runanywhereai.presentation.navigation
 
+import android.util.Log
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -60,7 +61,8 @@ fun AppNavigation() {
                         navController.navigate(NavigationRoute.VLM)
                     },
                     onNavigateToImageGeneration = {
-                        // Future: navigate to image generation screen
+                        Log.d("AppNavigation", "Navigating to DIFFUSION route")
+                        navController.navigate(NavigationRoute.DIFFUSION)
                     },
                 )
             }
@@ -141,7 +143,7 @@ private fun isRouteSelectedForTab(currentRoute: String?, tabRoute: String): Bool
 
     // Map child routes to parent tabs
     return when (tabRoute) {
-        NavigationRoute.VISION -> currentRoute in listOf(NavigationRoute.VLM)
+        NavigationRoute.VISION -> currentRoute in listOf(NavigationRoute.VLM, NavigationRoute.DIFFUSION)
         NavigationRoute.MORE -> currentRoute in listOf(NavigationRoute.STT, NavigationRoute.TTS, NavigationRoute.BENCHMARKS) || currentRoute?.startsWith(NavigationRoute.BENCHMARK_DETAIL) == true
         else -> false
     }

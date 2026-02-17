@@ -9,6 +9,7 @@ import SwiftUI
 import RunAnywhere
 import LlamaCPPRuntime
 import ONNXRuntime
+import SdcppRuntime
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -64,6 +65,7 @@ struct RunAnywhereAIApp: App {
             // → only Platform is registered → -422 "No provider could handle the request".
             LlamaCPP.register(priority: 100)
             ONNX.register(priority: 100)
+            Sdcpp.register(priority: 90)
 
             // Clear any previous error
             await MainActor.run { initializationError = nil }
@@ -153,6 +155,10 @@ struct RunAnywhereAIApp: App {
         // Register ONNX backend service providers
         ONNX.register(priority: 100)
         logger.info("✅ ONNX backend registered")
+
+        // Register sd.cpp diffusion backend (cross-platform, Metal GPU on Apple)
+        Sdcpp.register(priority: 90)
+        logger.info("✅ sd.cpp diffusion backend registered")
 
         // Register LLM models using the new RunAnywhere.registerModel API
         // Using explicit IDs ensures models are recognized after download across app restarts
@@ -337,7 +343,29 @@ struct RunAnywhereAIApp: App {
             )
         }
 
-        logger.info("✅ Diffusion models registered (Apple Stable Diffusion / CoreML only)")
+        // sd.cpp GGUF diffusion models (cross-platform, same models as Android)
+        if let sd15Q4URL = URL(string: "https://huggingface.co/second-state/stable-diffusion-v1-5-GGUF/resolve/main/stable-diffusion-v1-5-pruned-emaonly-Q4_0.gguf") {
+            RunAnywhere.registerModel(
+                id: "sd15-q4_0-gguf",
+                name: "Stable Diffusion 1.5 (Q4_0 Small)",
+                url: sd15Q4URL,
+                framework: .sdcpp,
+                modality: .imageGeneration,
+                memoryRequirement: 1_900_000_000
+            )
+        }
+        if let sd15Q8URL = URL(string: "https://huggingface.co/second-state/stable-diffusion-v1-5-GGUF/resolve/main/stable-diffusion-v1-5-pruned-emaonly-Q8_0.gguf") {
+            RunAnywhere.registerModel(
+                id: "sd15-q8_0-gguf",
+                name: "Stable Diffusion 1.5 (Q8_0 Quality)",
+                url: sd15Q8URL,
+                framework: .sdcpp,
+                modality: .imageGeneration,
+                memoryRequirement: 2_500_000_000
+            )
+        }
+
+        logger.info("✅ Diffusion models registered (CoreML + sd.cpp GGUF)")
 
         logger.info("🎉 All modules and models registered")
     }

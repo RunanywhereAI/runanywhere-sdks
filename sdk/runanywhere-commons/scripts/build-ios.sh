@@ -12,10 +12,11 @@
 # OPTIONS:
 #   --skip-download     Skip downloading dependencies
 #   --skip-backends     Build RACommons only, skip backend frameworks
-#   --backend NAME      Build specific backend: llamacpp, onnx, all (default: all)
+#   --backend NAME      Build specific backend: llamacpp, onnx, sdcpp, all (default: all)
 #                       - llamacpp: LLM text generation (GGUF models)
 #                       - onnx: STT/TTS/VAD (Sherpa-ONNX models)
-#                       - all: Both backends (default)
+#                       - sdcpp: Diffusion image generation (stable-diffusion.cpp, Metal)
+#                       - all: All backends (default)
 #   --skip-macos        Skip macOS build (iOS only). macOS is included by default.
 #   --clean             Clean build directories first
 #   --release           Release build (default)
@@ -27,6 +28,7 @@
 #   dist/RACommons.xcframework                 (always built)
 #   dist/RABackendLLAMACPP.xcframework         (if --backend llamacpp or all)
 #   dist/RABackendONNX.xcframework             (if --backend onnx or all)
+#   dist/RABackendSDCPP.xcframework            (if --backend sdcpp or all)
 #
 # EXAMPLES:
 #   # Full build (all backends, iOS only)
@@ -40,6 +42,9 @@
 #
 #   # Build only ONNX backend (speech-to-text/text-to-speech)
 #   ./scripts/build-ios.sh --backend onnx
+#
+#   # Build only sd.cpp backend (diffusion image generation)
+#   ./scripts/build-ios.sh --backend sdcpp
 #
 #   # Build only RACommons (no backends)
 #   ./scripts/build-ios.sh --skip-backends
@@ -192,13 +197,16 @@ build_macos() {
         BACKEND_FLAGS="-DRAC_BUILD_BACKENDS=ON"
         case "$BUILD_BACKEND" in
             llamacpp)
-                BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=ON -DRAC_BACKEND_ONNX=OFF -DRAC_BACKEND_WHISPERCPP=OFF"
+                BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=ON -DRAC_BACKEND_ONNX=OFF -DRAC_BACKEND_WHISPERCPP=OFF -DRAC_BACKEND_SDCPP=OFF"
                 ;;
             onnx)
-                BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=OFF -DRAC_BACKEND_ONNX=ON -DRAC_BACKEND_WHISPERCPP=OFF"
+                BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=OFF -DRAC_BACKEND_ONNX=ON -DRAC_BACKEND_WHISPERCPP=OFF -DRAC_BACKEND_SDCPP=OFF"
+                ;;
+            sdcpp)
+                BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=OFF -DRAC_BACKEND_ONNX=OFF -DRAC_BACKEND_WHISPERCPP=OFF -DRAC_BACKEND_SDCPP=ON"
                 ;;
             all|*)
-                BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=ON -DRAC_BACKEND_ONNX=ON -DRAC_BACKEND_WHISPERCPP=OFF"
+                BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=ON -DRAC_BACKEND_ONNX=ON -DRAC_BACKEND_WHISPERCPP=OFF -DRAC_BACKEND_SDCPP=ON"
                 ;;
         esac
     fi
@@ -240,13 +248,16 @@ build_platform() {
         BACKEND_FLAGS="-DRAC_BUILD_BACKENDS=ON"
         case "$BUILD_BACKEND" in
             llamacpp)
-                BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=ON -DRAC_BACKEND_ONNX=OFF -DRAC_BACKEND_WHISPERCPP=OFF"
+                BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=ON -DRAC_BACKEND_ONNX=OFF -DRAC_BACKEND_WHISPERCPP=OFF -DRAC_BACKEND_SDCPP=OFF"
                 ;;
             onnx)
-                BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=OFF -DRAC_BACKEND_ONNX=ON -DRAC_BACKEND_WHISPERCPP=OFF"
+                BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=OFF -DRAC_BACKEND_ONNX=ON -DRAC_BACKEND_WHISPERCPP=OFF -DRAC_BACKEND_SDCPP=OFF"
+                ;;
+            sdcpp)
+                BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=OFF -DRAC_BACKEND_ONNX=OFF -DRAC_BACKEND_WHISPERCPP=OFF -DRAC_BACKEND_SDCPP=ON"
                 ;;
             all|*)
-                BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=ON -DRAC_BACKEND_ONNX=ON -DRAC_BACKEND_WHISPERCPP=OFF"
+                BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=ON -DRAC_BACKEND_ONNX=ON -DRAC_BACKEND_WHISPERCPP=OFF -DRAC_BACKEND_SDCPP=ON"
                 ;;
         esac
     fi
@@ -509,6 +520,35 @@ create_backend_xcframework() {
                 done
                 [[ -n "$lib_path" ]] && LIBS_TO_BUNDLE+=("$lib_path")
             done
+        elif [[ "$BACKEND_NAME" == "sdcpp" ]]; then
+            # Bundle stable-diffusion.cpp + ggml libraries (Metal GPU on Apple)
+            local SDCPP_BUILD="${PLATFORM_DIR}/src/backends/sdcpp/_deps/stable_diffusion_cpp-build"
+            [[ ! -d "$SDCPP_BUILD" ]] && SDCPP_BUILD="${PLATFORM_DIR}/_deps/stable_diffusion_cpp-build"
+
+            # stable-diffusion.cpp main library
+            for possible in \
+                "${SDCPP_BUILD}/libstable-diffusion.a" \
+                "${SDCPP_BUILD}/src/libstable-diffusion.a"; do
+                if [[ -f "$possible" ]]; then
+                    LIBS_TO_BUNDLE+=("$possible")
+                    break
+                fi
+            done
+
+            # ggml libraries (shared with sd.cpp, includes Metal backend)
+            for lib in ggml ggml-base ggml-cpu ggml-metal; do
+                local lib_path=""
+                for possible in \
+                    "${SDCPP_BUILD}/ggml/src/lib${lib}.a" \
+                    "${SDCPP_BUILD}/ggml/src/ggml-metal/lib${lib}.a" \
+                    "${SDCPP_BUILD}/ggml/src/ggml-cpu/lib${lib}.a"; do
+                    if [[ -f "$possible" ]]; then
+                        lib_path="$possible"
+                        break
+                    fi
+                done
+                [[ -n "$lib_path" ]] && LIBS_TO_BUNDLE+=("$lib_path")
+            done
         elif [[ "$BACKEND_NAME" == "onnx" ]]; then
             if [[ "$PLATFORM" == "MACOS" ]]; then
                 # Bundle Sherpa-ONNX static libs for macOS
@@ -555,9 +595,23 @@ create_backend_xcframework() {
             continue
         fi
 
-        # Headers
-        local header_src="${PROJECT_ROOT}/include/rac/backends/rac_${BACKEND_NAME}.h"
-        [[ -f "$header_src" ]] && cp "$header_src" "${FRAMEWORK_DIR}/Headers/"
+        # Headers — find backend header (may use different naming convention)
+        local header_src=""
+        for possible_header in \
+            "${PROJECT_ROOT}/include/rac/backends/rac_${BACKEND_NAME}.h" \
+            "${PROJECT_ROOT}/include/rac/backends/rac_diffusion_${BACKEND_NAME}.h" \
+            "${PROJECT_ROOT}/include/rac/backends/rac_llm_${BACKEND_NAME}.h" \
+            "${PROJECT_ROOT}/include/rac/backends/rac_stt_${BACKEND_NAME}.h"; do
+            if [[ -f "$possible_header" ]]; then
+                header_src="$possible_header"
+                break
+            fi
+        done
+        local header_filename=""
+        if [[ -n "$header_src" ]]; then
+            header_filename=$(basename "$header_src")
+            cp "$header_src" "${FRAMEWORK_DIR}/Headers/"
+        fi
 
         # Module map and umbrella header
         cat > "${FRAMEWORK_DIR}/Modules/module.modulemap" << EOF
@@ -568,7 +622,9 @@ framework module ${FRAMEWORK_NAME} {
 }
 EOF
         echo "// ${FRAMEWORK_NAME}" > "${FRAMEWORK_DIR}/Headers/${FRAMEWORK_NAME}.h"
-        echo "#include \"rac_${BACKEND_NAME}.h\"" >> "${FRAMEWORK_DIR}/Headers/${FRAMEWORK_NAME}.h"
+        if [[ -n "$header_filename" ]]; then
+            echo "#include \"${header_filename}\"" >> "${FRAMEWORK_DIR}/Headers/${FRAMEWORK_NAME}.h"
+        fi
 
         # Info.plist
         local MIN_OS_KEY="MinimumOSVersion"
@@ -712,6 +768,9 @@ main() {
         fi
         if [[ "$BUILD_BACKEND" == "all" || "$BUILD_BACKEND" == "onnx" ]]; then
             create_backend_xcframework "onnx" "RABackendONNX"
+        fi
+        if [[ "$BUILD_BACKEND" == "all" || "$BUILD_BACKEND" == "sdcpp" ]]; then
+            create_backend_xcframework "sdcpp" "RABackendSDCPP"
         fi
     fi
 

@@ -68,6 +68,7 @@ static const char *opencl_search_paths[] = {
 
 static void *g_opencl_handle = NULL;
 static int   g_opencl_tried  = 0;
+static int   g_opencl_disabled = 0; /* Set to 1 to force-disable OpenCL */
 
 static int file_exists(const char *path) {
     struct stat buf;
@@ -110,7 +111,75 @@ static void load_opencl_library(void) {
 /* Public: check if vendor OpenCL is available (callable from JNI/Kotlin) */
 int opencl_stub_is_available(void) {
     load_opencl_library();
-    return (g_opencl_handle != NULL) ? 1 : 0;
+    return (g_opencl_handle != NULL && !g_opencl_disabled) ? 1 : 0;
+}
+
+/* Public: force-disable OpenCL so all subsequent CL calls fail gracefully.
+ * Call this when the GPU is detected but unsupported (e.g. Mali on ggml-opencl
+ * which only supports Adreno/Intel). Closes the vendor library handle so
+ * all subsequent dlsym resolutions return NULL, causing ggml-opencl to see
+ * "no OpenCL available" and fall back to CPU without aborting. */
+void opencl_stub_disable(void) {
+    LOGI("OpenCL explicitly disabled — closing vendor library handle");
+    g_opencl_disabled = 1;
+    if (g_opencl_handle) {
+        dlclose(g_opencl_handle);
+        g_opencl_handle = NULL;
+    }
+}
+
+/* Public: probe the GPU and check if it's supported by ggml-opencl.
+ * ggml-opencl only supports Adreno (Qualcomm) and Intel GPUs.
+ * Returns 1 if supported, 0 if unsupported or unavailable. */
+int opencl_stub_is_gpu_supported(void) {
+    load_opencl_library();
+    if (!g_opencl_handle) return 0;
+
+    /* Resolve the CL functions we need */
+    typedef cl_int (*PFN_clGetPlatformIDs)(cl_uint, cl_platform_id *, cl_uint *);
+    typedef cl_int (*PFN_clGetDeviceIDs)(cl_platform_id, cl_device_type, cl_uint, cl_device_id *, cl_uint *);
+    typedef cl_int (*PFN_clGetDeviceInfo)(cl_device_id, cl_device_info, size_t, void *, size_t *);
+
+    PFN_clGetPlatformIDs fn_getPlatformIDs = (PFN_clGetPlatformIDs)dlsym(g_opencl_handle, "clGetPlatformIDs");
+    PFN_clGetDeviceIDs fn_getDeviceIDs = (PFN_clGetDeviceIDs)dlsym(g_opencl_handle, "clGetDeviceIDs");
+    PFN_clGetDeviceInfo fn_getDeviceInfo = (PFN_clGetDeviceInfo)dlsym(g_opencl_handle, "clGetDeviceInfo");
+
+    if (!fn_getPlatformIDs || !fn_getDeviceIDs || !fn_getDeviceInfo) {
+        LOGW("Cannot probe GPU: missing CL functions");
+        return 0;
+    }
+
+    /* Get first platform */
+    cl_platform_id platform;
+    cl_uint num_platforms = 0;
+    if (fn_getPlatformIDs(1, &platform, &num_platforms) != CL_SUCCESS || num_platforms == 0) {
+        LOGW("No OpenCL platforms found");
+        return 0;
+    }
+
+    /* Get first GPU device */
+    cl_device_id device;
+    cl_uint num_devices = 0;
+    if (fn_getDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 1, &device, &num_devices) != CL_SUCCESS || num_devices == 0) {
+        LOGW("No OpenCL GPU devices found");
+        return 0;
+    }
+
+    /* Get device name */
+    char device_name[256] = {0};
+    fn_getDeviceInfo(device, CL_DEVICE_NAME, sizeof(device_name) - 1, device_name, NULL);
+
+    LOGI("OpenCL GPU detected: %s", device_name);
+
+    /* ggml-opencl supports Adreno (Qualcomm) and Intel only */
+    if (strstr(device_name, "Adreno") || strstr(device_name, "QUALCOMM") ||
+        strstr(device_name, "Intel") || strstr(device_name, "INTEL")) {
+        LOGI("GPU is supported by ggml-opencl");
+        return 1;
+    }
+
+    LOGW("GPU '%s' is NOT supported by ggml-opencl (only Adreno/Intel). Will use CPU.", device_name);
+    return 0;
 }
 
 /* ========================================================================= */
@@ -118,6 +187,7 @@ int opencl_stub_is_available(void) {
 /* ========================================================================= */
 
 static void *resolve(const char *name) {
+    if (g_opencl_disabled) return NULL;
     load_opencl_library();
     if (!g_opencl_handle) return NULL;
     return dlsym(g_opencl_handle, name);
@@ -132,6 +202,13 @@ static void *resolve(const char *name) {
 /* --- Platform & Device --- */
 
 cl_int clGetPlatformIDs(cl_uint n, cl_platform_id *p, cl_uint *np) {
+    /* When OpenCL is disabled (unsupported GPU), return "0 platforms found"
+     * instead of an error. This makes ggml-opencl fall back to CPU gracefully
+     * instead of aborting on CL_INVALID_PLATFORM. */
+    if (g_opencl_disabled) {
+        if (np) *np = 0;
+        return CL_SUCCESS;
+    }
     typedef cl_int (*F)(cl_uint, cl_platform_id *, cl_uint *);
     F f = (F)resolve("clGetPlatformIDs");
     return f ? f(n, p, np) : CL_INVALID_PLATFORM;

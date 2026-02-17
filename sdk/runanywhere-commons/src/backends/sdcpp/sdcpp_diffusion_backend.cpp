@@ -14,12 +14,23 @@
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
+#include <string>
+#include <sys/stat.h>
+#include <dirent.h>
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 
 // stable-diffusion.cpp public API header
 #include "stable-diffusion.h"
+
+// On Android, use opencl_stub to probe GPU support before loading model.
+#ifdef __ANDROID__
+extern "C" {
+    int opencl_stub_is_gpu_supported(void);
+    void opencl_stub_disable(void);
+}
+#endif
 
 // On Android, use __android_log_print directly for guaranteed logcat output.
 // RAC_LOG macros fall back to stderr which is invisible on Android.
@@ -151,6 +162,71 @@ SdcppDiffusionBackend::SdcppDiffusionBackend() {
 SdcppDiffusionBackend::~SdcppDiffusionBackend() { cleanup(); }
 
 // =============================================================================
+// PATH RESOLUTION
+// =============================================================================
+
+/**
+ * Resolve a model path that may be a directory containing a single model file.
+ *
+ * When models are downloaded via the SDK, they're stored in a directory:
+ *   .../sd15-q4_0-gguf/sd15-q4_0-gguf.gguf
+ *
+ * sd.cpp expects either:
+ *   - A direct path to a .gguf/.safetensors/.ckpt file (single-file model), or
+ *   - A directory in diffusers format (with unet/, text_encoder/ subdirs)
+ *
+ * This function checks if the path is a directory containing a single model file
+ * and returns the resolved file path. Otherwise returns the original path.
+ */
+static std::string resolve_model_path(const char* path) {
+    struct stat st;
+    if (stat(path, &st) != 0) {
+        return path;  // Path doesn't exist, return as-is and let sd.cpp report error
+    }
+
+    if (!S_ISDIR(st.st_mode)) {
+        return path;  // Already a file path
+    }
+
+    // It's a directory — scan for a model file (.gguf, .safetensors, .ckpt)
+    DIR* dir = opendir(path);
+    if (!dir) {
+        return path;
+    }
+
+    std::string resolved;
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != nullptr) {
+        std::string name(entry->d_name);
+        if (name == "." || name == "..") continue;
+
+        // Check for model file extensions
+        bool is_model = false;
+        for (const char* ext : {".gguf", ".safetensors", ".ckpt"}) {
+            if (name.size() > strlen(ext) &&
+                name.compare(name.size() - strlen(ext), strlen(ext), ext) == 0) {
+                is_model = true;
+                break;
+            }
+        }
+
+        if (is_model) {
+            resolved = std::string(path) + "/" + name;
+            SDCPP_LOGI("Resolved model directory to file: %s", resolved.c_str());
+            break;
+        }
+    }
+    closedir(dir);
+
+    if (resolved.empty()) {
+        // No model file found — pass directory as-is (may be diffusers format)
+        return path;
+    }
+
+    return resolved;
+}
+
+// =============================================================================
 // MODEL LOADING
 // =============================================================================
 
@@ -169,7 +245,9 @@ rac_result_t SdcppDiffusionBackend::load_model(const char* model_path,
         ctx_ = nullptr;
     }
 
-    model_path_ = model_path;
+    // Resolve directory path to actual model file if needed
+    std::string resolved_path = resolve_model_path(model_path);
+    model_path_ = resolved_path;
     cancel_requested_.store(false);
 
     if (config) {
@@ -177,14 +255,14 @@ rac_result_t SdcppDiffusionBackend::load_model(const char* model_path,
         reduce_memory_ = config->reduce_memory == RAC_TRUE;
     }
 
-    SDCPP_LOGI("Loading sd.cpp model: %s (variant=%d)", model_path,
+    SDCPP_LOGI("Loading sd.cpp model: %s (variant=%d)", resolved_path.c_str(),
                static_cast<int>(model_variant_));
 
     // Initialize context params with defaults
     sd_ctx_params_t ctx_params;
     sd_ctx_params_init(&ctx_params);
 
-    ctx_params.model_path = model_path;
+    ctx_params.model_path = resolved_path.c_str();
     ctx_params.vae_decode_only = true;  // Only need decoding for txt2img
     ctx_params.free_params_immediately = reduce_memory_;
     ctx_params.n_threads = -1;  // Auto-detect
@@ -194,26 +272,39 @@ rac_result_t SdcppDiffusionBackend::load_model(const char* model_path,
     ctx_params.diffusion_flash_attn = true;
 
 #ifdef __ANDROID__
-    // Android GPU memory optimization: keep CLIP and VAE on CPU,
-    // only run UNet denoising on GPU (OpenCL/Adreno).
-    // This reduces GPU memory pressure and avoids potential issues
-    // with unsupported ops in the text encoder and VAE decoder.
-    ctx_params.keep_clip_on_cpu = true;
-    ctx_params.keep_vae_on_cpu = true;
-    ctx_params.offload_params_to_cpu = true;
-    SDCPP_LOGI("Android: CLIP on CPU, VAE on CPU, params offloaded to CPU");
+    // Probe GPU: only use OpenCL offload if the GPU is supported (Adreno/Intel).
+    // Unsupported GPUs (e.g. Mali) crash ggml-opencl, so we disable OpenCL
+    // and fall back to CPU-only inference.
+    if (opencl_stub_is_gpu_supported()) {
+        // GPU is supported — keep CLIP and VAE on CPU,
+        // only run UNet denoising on GPU (OpenCL/Adreno).
+        ctx_params.keep_clip_on_cpu = true;
+        ctx_params.keep_vae_on_cpu = true;
+        ctx_params.offload_params_to_cpu = true;
+        SDCPP_LOGI("Android: GPU supported, CLIP on CPU, VAE on CPU, UNet on GPU");
+    } else {
+        // GPU unsupported (e.g. Mali) — ggml-opencl aborts when no supported
+        // device is found (even with 0 platforms). sd.cpp was compiled with
+        // SD_OPENCL=ON so there is no CPU fallback path in this binary.
+        // A separate CPU-only build would be needed for non-Adreno devices.
+        SDCPP_LOGE("Android: GPU not supported for diffusion. This device has a Mali GPU "
+                    "but sd.cpp requires Adreno (Qualcomm) GPU for OpenCL acceleration. "
+                    "CPU-only diffusion requires a build without OpenCL.");
+        model_path_.clear();
+        return RAC_ERROR_HARDWARE_UNSUPPORTED;
+    }
 #endif
 
     // Create sd.cpp context
     ctx_ = new_sd_ctx(&ctx_params);
 
     if (!ctx_) {
-        SDCPP_LOGE("Failed to create sd.cpp context for model: %s", model_path);
+        SDCPP_LOGE("Failed to create sd.cpp context for model: %s", resolved_path.c_str());
         model_path_.clear();
         return RAC_ERROR_GENERATION_FAILED;
     }
 
-    SDCPP_LOGI("sd.cpp model loaded successfully: %s", model_path);
+    SDCPP_LOGI("sd.cpp model loaded successfully: %s", resolved_path.c_str());
     return RAC_SUCCESS;
 }
 
