@@ -468,6 +468,31 @@ export class ModelDownloader {
     }
   }
 
+  /**
+   * Store a file from a ReadableStream, avoiding loading the entire file into memory.
+   * Priority: local filesystem > OPFS. Falls back to buffered write if streaming not supported.
+   */
+  async storeStreamInOPFS(key: string, stream: ReadableStream<Uint8Array>): Promise<void> {
+    // Try local filesystem first (permanent, no quota issues)
+    if (this.localFileStorage?.isReady) {
+      try {
+        await this.localFileStorage.saveModelFromStream(key, stream);
+        return;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        logger.warning(`Local storage stream write failed for "${key}": ${msg}, falling back to OPFS`);
+      }
+    }
+
+    try {
+      await this.storage.saveModelFromStream(key, stream);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.warning(`OPFS stream store failed for "${key}": ${msg}`);
+      throw err;
+    }
+  }
+
   /** Load data from storage. Priority: local filesystem > OPFS > memory cache. */
   async loadFromOPFS(key: string): Promise<Uint8Array | null> {
     // Try local filesystem first (permanent storage)

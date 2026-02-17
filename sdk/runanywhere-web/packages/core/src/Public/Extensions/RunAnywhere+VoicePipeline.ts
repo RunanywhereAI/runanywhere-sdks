@@ -24,7 +24,7 @@
  */
 
 import { SDKLogger } from '../../Foundation/SDKLogger';
-import { ExtensionPoint, BackendCapability } from '../../Infrastructure/ExtensionPoint';
+import { ExtensionPoint, ServiceKey } from '../../Infrastructure/ExtensionPoint';
 import { PipelineState } from './VoiceAgentTypes';
 import type {
   VoicePipelineCallbacks,
@@ -42,42 +42,39 @@ export type {
 const logger = new SDKLogger('VoicePipeline');
 
 // ---------------------------------------------------------------------------
-// Dynamic backend access helpers
+// Service interfaces for cross-package access
 // ---------------------------------------------------------------------------
 
-/**
- * Dynamically access the STT singleton from the registered onnx backend.
- * The STT extension is attached to the global scope by the onnx provider.
- */
-function requireSTT(): { transcribe(audio: Float32Array, options?: { sampleRate?: number }): Promise<{ text: string; [key: string]: unknown }> } {
-  ExtensionPoint.requireCapability(BackendCapability.STT);
-  // Access via globalThis registry (set by onnx provider during registration)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const stt = (globalThis as any).__runanywhere_stt;
-  if (!stt) throw new Error('STT extension not available. Register @runanywhere/web-onnx first.');
-  return stt;
+interface STTService {
+  transcribe(audio: Float32Array, options?: { sampleRate?: number }): Promise<{ text: string; [key: string]: unknown }>;
 }
 
-function requireTextGeneration(): {
+interface TextGenerationService {
   generateStream(prompt: string, options?: { maxTokens?: number; temperature?: number; systemPrompt?: string }): Promise<{
     stream: AsyncIterable<string>;
     result: Promise<{ text: string; tokensUsed: number; tokensPerSecond: number; [key: string]: unknown }>;
     cancel: () => void;
   }>;
-} {
-  ExtensionPoint.requireCapability(BackendCapability.LLM);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const tg = (globalThis as any).__runanywhere_textgeneration;
-  if (!tg) throw new Error('TextGeneration extension not available. Register @runanywhere/web-llamacpp first.');
-  return tg;
 }
 
-function requireTTS(): { synthesize(text: string, options?: { speed?: number }): Promise<{ audioData: Float32Array; sampleRate: number; durationMs: number; processingTimeMs: number; [key: string]: unknown }> } {
-  ExtensionPoint.requireCapability(BackendCapability.TTS);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const tts = (globalThis as any).__runanywhere_tts;
-  if (!tts) throw new Error('TTS extension not available. Register @runanywhere/web-onnx first.');
-  return tts;
+interface TTSService {
+  synthesize(text: string, options?: { speed?: number }): Promise<{ audioData: Float32Array; sampleRate: number; durationMs: number; processingTimeMs: number; [key: string]: unknown }>;
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic backend access helpers (typed via ExtensionPoint service registry)
+// ---------------------------------------------------------------------------
+
+function requireSTT(): STTService {
+  return ExtensionPoint.requireService<STTService>(ServiceKey.STT, '@runanywhere/web-onnx');
+}
+
+function requireTextGeneration(): TextGenerationService {
+  return ExtensionPoint.requireService<TextGenerationService>(ServiceKey.TextGeneration, '@runanywhere/web-llamacpp');
+}
+
+function requireTTS(): TTSService {
+  return ExtensionPoint.requireService<TTSService>(ServiceKey.TTS, '@runanywhere/web-onnx');
 }
 
 // ---------------------------------------------------------------------------

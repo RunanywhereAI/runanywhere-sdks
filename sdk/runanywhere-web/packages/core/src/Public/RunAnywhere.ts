@@ -188,24 +188,51 @@ export const RunAnywhere = {
       input.type = 'file';
       input.accept = acceptExts.join(',');
       input.style.display = 'none';
+      let settled = false;
 
-      input.onchange = async () => {
-        const file = input.files?.[0];
-        document.body.removeChild(input);
-        if (!file) { resolve(null); return; }
-        try {
-          const id = await this.importModelFromFile(file, options);
-          resolve(id);
-        } catch (err) {
-          logger.error(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
-          resolve(null);
+      const cleanup = () => {
+        if (input.parentNode) {
+          document.body.removeChild(input);
         }
       };
 
-      input.addEventListener('cancel', () => {
-        document.body.removeChild(input);
-        resolve(null);
-      });
+      const settle = (value: string | null) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(value);
+      };
+
+      input.onchange = async () => {
+        const file = input.files?.[0];
+        if (!file) { settle(null); return; }
+        try {
+          const id = await this.importModelFromFile(file, options);
+          settle(id);
+        } catch (err) {
+          logger.error(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
+          settle(null);
+        }
+      };
+
+      input.addEventListener('cancel', () => settle(null));
+
+      // Safety net: on older browsers the `cancel` event may not fire when
+      // the user dismisses the picker. Use a focus/visibilitychange listener
+      // to detect that the picker was closed without selection.
+      const fallbackCleanup = () => {
+        // Wait a tick — onchange fires after focus returns
+        setTimeout(() => {
+          if (!settled) {
+            settle(null);
+          }
+        }, 300);
+        window.removeEventListener('focus', fallbackCleanup);
+        document.removeEventListener('visibilitychange', fallbackCleanup);
+      };
+
+      window.addEventListener('focus', fallbackCleanup);
+      document.addEventListener('visibilitychange', fallbackCleanup);
 
       document.body.appendChild(input);
       input.click();
