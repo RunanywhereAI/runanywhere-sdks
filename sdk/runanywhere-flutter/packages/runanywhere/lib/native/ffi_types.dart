@@ -390,6 +390,14 @@ typedef RacBackendLlamacppRegisterDart = int Function();
 typedef RacBackendLlamacppUnregisterNative = Int32 Function();
 typedef RacBackendLlamacppUnregisterDart = int Function();
 
+/// rac_result_t rac_backend_llamacpp_vlm_register(void)
+typedef RacBackendLlamacppVlmRegisterNative = Int32 Function();
+typedef RacBackendLlamacppVlmRegisterDart = int Function();
+
+/// rac_result_t rac_backend_llamacpp_vlm_unregister(void)
+typedef RacBackendLlamacppVlmUnregisterNative = Int32 Function();
+typedef RacBackendLlamacppVlmUnregisterDart = int Function();
+
 // =============================================================================
 // LLM Component API Function Signatures (from rac_llm_component.h)
 // =============================================================================
