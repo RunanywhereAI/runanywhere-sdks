@@ -59,6 +59,26 @@ const VisionHubScreen: React.FC = () => {
           </View>
           <Icon name="chevron-forward" size={20} color={Colors.textSecondary} />
         </TouchableOpacity>
+
+        {/* Image Generation - Coming Soon */}
+        <View style={[styles.row, styles.rowDisabled]}>
+          <View style={[styles.iconWrap, styles.iconWrapDisabled]}>
+            <Icon
+              name="sparkles-outline"
+              size={24}
+              color={Colors.textTertiary}
+            />
+          </View>
+          <View style={styles.rowContent}>
+            <Text style={[styles.rowTitle, styles.textDisabled]}>Image Generation</Text>
+            <Text style={[styles.rowSubtitle, styles.textDisabled]}>
+              Generate images from text descriptions
+            </Text>
+          </View>
+          <View style={styles.comingSoonBadge}>
+            <Text style={styles.comingSoonText}>Coming Soon</Text>
+          </View>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -114,6 +134,25 @@ const styles = StyleSheet.create({
     ...Typography.caption1,
     color: Colors.textSecondary,
     marginTop: 2,
+  },
+  rowDisabled: {
+    opacity: 0.5,
+  },
+  iconWrapDisabled: {
+    backgroundColor: Colors.backgroundGray5,
+  },
+  textDisabled: {
+    color: Colors.textTertiary,
+  },
+  comingSoonBadge: {
+    backgroundColor: Colors.badgeGray,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.small,
+  },
+  comingSoonText: {
+    ...Typography.caption2,
+    color: Colors.textSecondary,
   },
 });
 

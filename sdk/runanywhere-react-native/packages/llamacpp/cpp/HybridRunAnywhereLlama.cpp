@@ -161,8 +161,11 @@ HybridRunAnywhereLlama::HybridRunAnywhereLlama() : HybridObject(TAG) {
 
 HybridRunAnywhereLlama::~HybridRunAnywhereLlama() {
   RAC_LOG_DEBUG(LOG_CATEGORY, "HybridRunAnywhereLlama destructor");
-  LLMBridge::shared().destroy();
-  VLMBridge::shared().destroy();
+  // NOTE: Do NOT call LLMBridge::shared().destroy() or VLMBridge::shared().destroy() here.
+  // The bridges are process-lifetime singletons. Destroying them from any HybridObject
+  // destructor would tear down shared model state when garbage-collected temporary
+  // instances are cleaned up (e.g., from isNativeLlamaModuleAvailable() checks).
+  // Bridge cleanup happens naturally at process exit via their own static destructors.
 }
 
 // ============================================================================

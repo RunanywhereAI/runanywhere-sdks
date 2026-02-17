@@ -9,7 +9,7 @@
  */
 
 import {
-  requireNativeLlamaModule,
+  getNativeLlamaModule,
   isNativeLlamaModuleAvailable,
 } from './native/NativeRunAnywhereLlama';
 import { SDKLogger } from '@runanywhere/core';
@@ -42,7 +42,7 @@ export async function registerVLMBackend(): Promise<boolean> {
     logger.warning('Native Llama module not available for registerVLMBackend');
     return false;
   }
-  const native = requireNativeLlamaModule();
+  const native = getNativeLlamaModule();
   try {
     const result = await native.registerVLMBackend();
     if (result) {
@@ -78,7 +78,7 @@ export async function loadVLMModel(
     logger.warning('Native Llama module not available for loadVLMModel');
     return false;
   }
-  const native = requireNativeLlamaModule();
+  const native = getNativeLlamaModule();
   return native.loadVLMModel(
     modelPath,
     mmprojPath ?? '',
@@ -98,7 +98,7 @@ export async function isVLMModelLoaded(): Promise<boolean> {
   if (!isNativeLlamaModuleAvailable()) {
     return false;
   }
-  const native = requireNativeLlamaModule();
+  const native = getNativeLlamaModule();
   return native.isVLMModelLoaded();
 }
 
@@ -113,7 +113,7 @@ export async function unloadVLMModel(): Promise<boolean> {
   if (!isNativeLlamaModuleAvailable()) {
     return false;
   }
-  const native = requireNativeLlamaModule();
+  const native = getNativeLlamaModule();
   return native.unloadVLMModel();
 }
 
@@ -169,7 +169,7 @@ export async function processImage(
   if (!isNativeLlamaModuleAvailable()) {
     throw new Error('Native Llama module not available');
   }
-  const native = requireNativeLlamaModule();
+  const native = getNativeLlamaModule();
 
   // Convert VLMImage to native format
   const { imageFormat, imageData, imageWidth, imageHeight } =
@@ -247,7 +247,7 @@ export async function processImageStream(
     throw new Error('Native Llama module not available');
   }
 
-  const native = requireNativeLlamaModule();
+  const native = getNativeLlamaModule();
   const startTime = Date.now();
   let firstTokenTime: number | null = null;
   let cancelled = false;
@@ -391,7 +391,7 @@ export function cancelVLMGeneration(): void {
   if (!isNativeLlamaModuleAvailable()) {
     return;
   }
-  const native = requireNativeLlamaModule();
+  const native = getNativeLlamaModule();
   native.cancelVLMGeneration();
 }
 
