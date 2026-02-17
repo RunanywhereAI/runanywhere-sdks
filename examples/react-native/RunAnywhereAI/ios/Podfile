@@ -27,6 +27,8 @@ node_require('react-native-permissions/scripts/setup.rb')
 # Only include the permissions we need
 setup_permissions([
   'Microphone',
+  'Camera',
+  'PhotoLibrary',
 ])
 
 linkage = ENV['USE_FRAMEWORKS']
