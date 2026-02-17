@@ -56,6 +56,8 @@ data class ReasoningContext(
     val lastActionResult: String?,
     /** Optional VLM-generated screen description (null when no VLM available). */
     val visionContext: String?,
+    /** Raw base64 screenshot for cloud fallback (null when no screenshot). */
+    val screenshotBase64: String?,
     /** True if the agent is repeating the same action. */
     val isLoopDetected: Boolean,
     /** True if a recent action failed. */
@@ -81,3 +83,14 @@ data class PlanResult(
     val steps: List<String>,
     val successCriteria: String?
 )
+
+/**
+ * Tracks which provider is actively handling reasoning.
+ * Emitted as events so the UI can show clear indicators.
+ */
+enum class ProviderMode(val label: String) {
+    LOCAL("On-Device"),
+    LOCAL_NO_VISION("On-Device (text)"),
+    CLOUD("Cloud"),
+    CLOUD_FALLBACK("Cloud (fallback)")
+}

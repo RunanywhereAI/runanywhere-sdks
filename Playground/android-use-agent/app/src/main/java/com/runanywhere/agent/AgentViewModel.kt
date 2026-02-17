@@ -11,9 +11,12 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.agent.accessibility.AgentAccessibilityService
 import com.runanywhere.agent.kernel.AgentKernel
+import com.runanywhere.agent.providers.OnDeviceVisionProvider
+import com.runanywhere.agent.providers.ProviderMode
 import com.runanywhere.agent.tts.TTSManager
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.downloadModel
+import com.runanywhere.sdk.public.extensions.isVLMModelLoaded
 import com.runanywhere.sdk.public.extensions.loadSTTModel
 import com.runanywhere.sdk.public.extensions.transcribe
 import kotlinx.coroutines.Dispatchers
@@ -46,11 +49,19 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         val isServiceEnabled: Boolean = false,
         val selectedModelIndex: Int = 1, // Default to Qwen (best)
         val availableModels: List<ModelInfo> = AgentApplication.AVAILABLE_MODELS,
+        // Provider mode
+        val providerMode: ProviderMode = ProviderMode.LOCAL,
+        // STT state
         val isRecording: Boolean = false,
         val isTranscribing: Boolean = false,
         val isSTTModelLoaded: Boolean = false,
         val isSTTModelLoading: Boolean = false,
         val sttDownloadProgress: Float = 0f,
+        // VLM state
+        val isVLMLoaded: Boolean = false,
+        val isVLMDownloading: Boolean = false,
+        val vlmDownloadProgress: Float = 0f,
+        // Voice
         val isVoiceMode: Boolean = false,
         val isSpeaking: Boolean = false
     )
@@ -58,8 +69,14 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
+    private val visionProvider = OnDeviceVisionProvider(
+        vlmModelId = AgentApplication.VLM_MODEL_ID,
+        context = application
+    )
+
     private val agentKernel = AgentKernel(
         context = application,
+        visionProvider = visionProvider,
         onLog = { log -> addLog(log) }
     )
 
@@ -76,6 +93,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         checkServiceStatus()
+        refreshVLMState()
     }
 
     fun checkServiceStatus() {
@@ -105,6 +123,43 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(isVoiceMode = !_uiState.value.isVoiceMode)
     }
 
+    // ========== VLM Model Management ==========
+
+    private fun refreshVLMState() {
+        try {
+            _uiState.value = _uiState.value.copy(isVLMLoaded = RunAnywhere.isVLMModelLoaded)
+        } catch (_: Exception) {
+            // SDK not yet initialized
+        }
+    }
+
+    fun loadVLMModel() {
+        if (_uiState.value.isVLMLoaded || _uiState.value.isVLMDownloading) return
+
+        _uiState.value = _uiState.value.copy(isVLMDownloading = true, vlmDownloadProgress = 0f)
+
+        viewModelScope.launch {
+            try {
+                visionProvider.ensureModelReady(
+                    onProgress = { progress ->
+                        _uiState.value = _uiState.value.copy(vlmDownloadProgress = progress)
+                    },
+                    onLog = { msg -> addLog(msg) }
+                )
+                _uiState.value = _uiState.value.copy(
+                    isVLMLoaded = true,
+                    isVLMDownloading = false
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "VLM model load failed: ${e.message}", e)
+                addLog("VLM model load failed: ${e.message}")
+                _uiState.value = _uiState.value.copy(isVLMDownloading = false)
+            }
+        }
+    }
+
+    // ========== Agent Control ==========
+
     fun startAgent() {
         val goal = _uiState.value.goal.trim()
         if (goal.isEmpty()) {
@@ -119,6 +174,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
 
         _uiState.value = _uiState.value.copy(
             status = Status.RUNNING,
+            providerMode = ProviderMode.LOCAL,
             logs = listOf("Starting: $goal")
         )
 
@@ -139,6 +195,9 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                         if (_uiState.value.isVoiceMode) {
                             ttsManager.speak(event.text)
                         }
+                    }
+                    is AgentKernel.AgentEvent.ProviderChanged -> {
+                        _uiState.value = _uiState.value.copy(providerMode = event.mode)
                     }
                 }
             }
@@ -167,7 +226,6 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             try {
-                // Download model if needed
                 var downloadFailed = false
                 RunAnywhere.downloadModel(AgentApplication.STT_MODEL_ID)
                     .catch { e ->
@@ -184,7 +242,6 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                     return@launch
                 }
 
-                // Load model
                 RunAnywhere.loadSTTModel(AgentApplication.STT_MODEL_ID)
                 _uiState.value = _uiState.value.copy(
                     isSTTModelLoaded = true,
@@ -230,7 +287,6 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             isCapturing = true
             _uiState.value = _uiState.value.copy(isRecording = true)
 
-            // Capture audio in background thread
             viewModelScope.launch(Dispatchers.IO) {
                 val buffer = ByteArray(bufferSize)
                 while (isCapturing) {
@@ -253,7 +309,6 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     fun stopRecordingAndTranscribe() {
         if (!_uiState.value.isRecording) return
 
-        // Stop capturing
         isCapturing = false
         audioRecord?.let { record ->
             if (record.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
@@ -287,7 +342,6 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                         goal = result.trim(),
                         isTranscribing = false
                     )
-                    // Auto-start agent in voice mode
                     if (_uiState.value.isVoiceMode) {
                         startAgent()
                     }
@@ -308,9 +362,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
-        // Clean up TTS
         ttsManager.shutdown()
-        // Clean up audio resources
         isCapturing = false
         audioRecord?.let { record ->
             try {
@@ -326,7 +378,6 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     private fun addLog(message: String) {
         val current = _uiState.value.logs.toMutableList()
         current.add(message)
-        // Keep last 50 logs
         if (current.size > 50) {
             current.removeAt(0)
         }

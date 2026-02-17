@@ -6,6 +6,8 @@ import com.runanywhere.agent.AgentApplication
 import com.runanywhere.agent.BuildConfig
 import com.runanywhere.agent.accessibility.AgentAccessibilityService
 import com.runanywhere.agent.actions.AppActions
+import com.runanywhere.agent.providers.ProviderMode
+import com.runanywhere.agent.providers.VisionProvider
 import com.runanywhere.agent.toolcalling.BuiltInTools
 import com.runanywhere.agent.toolcalling.LLMResponse
 import com.runanywhere.agent.toolcalling.ToolCall
@@ -35,6 +37,7 @@ import java.util.regex.Pattern
 
 class AgentKernel(
     private val context: Context,
+    private val visionProvider: VisionProvider,
     private val onLog: (String) -> Unit
 ) {
     companion object {
@@ -88,6 +91,7 @@ class AgentKernel(
         data class Done(val message: String) : AgentEvent()
         data class Error(val message: String) : AgentEvent()
         data class Speak(val text: String) : AgentEvent()
+        data class ProviderChanged(val mode: ProviderMode) : AgentEvent()
     }
 
     fun run(goal: String): Flow<AgentEvent> = flow {
@@ -104,6 +108,7 @@ class AgentKernel(
             emit(AgentEvent.Log("Starting agent..."))
             emit(AgentEvent.Speak("Working on it."))
 
+            // Planning: prefer cloud if available, skip otherwise
             if (gptClient.isConfigured()) {
                 emit(AgentEvent.Log("Requesting GPT-4o plan..."))
                 planResult = gptClient.generatePlan(goal)
@@ -119,7 +124,7 @@ class AgentKernel(
                     }
                 }
             } else {
-                emit(AgentEvent.Log("GPT-4o API key missing. Skipping planning."))
+                emit(AgentEvent.Log("No cloud API key. Running fully local."))
             }
 
             val toolCount = toolRegistry.getDefinitions().size
@@ -134,7 +139,7 @@ class AgentKernel(
                 delay(1500) // Wait for app to fully launch
             }
 
-            // Ensure model is ready
+            // Ensure LLM model is ready
             emit(AgentEvent.Log("Loading model: $activeModelId"))
             ensureModelReady()
             emit(AgentEvent.Log("Model ready"))
@@ -157,7 +162,7 @@ class AgentKernel(
                 // Update UI action context with fresh coordinates
                 uiActionContext.indexToCoords = screen.indexToCoords
 
-                // Capture screenshot for VLM
+                // Capture screenshot
                 val screenshotBase64 = try {
                     AgentAccessibilityService.instance?.captureScreenshotBase64()
                 } catch (e: Exception) {
@@ -165,12 +170,24 @@ class AgentKernel(
                     null
                 }
 
-                val useVision = screenshotBase64 != null && gptClient.isConfigured()
-                if (useVision) {
-                    emit(AgentEvent.Log("Using VLM (screenshot + elements)"))
-                } else if (screenshotBase64 == null) {
-                    emit(AgentEvent.Log("No screenshot, using text-only mode"))
+                // On-device VLM: analyze screenshot locally
+                val visionContext = if (screenshotBase64 != null && visionProvider.isAvailable) {
+                    emit(AgentEvent.Log("[LOCAL] Analyzing screen with VLM..."))
+                    try {
+                        visionProvider.analyzeScreen(screenshotBase64, screen.compactText, goal)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "VLM analysis failed: ${e.message}")
+                        null
+                    }
+                } else null
+
+                if (visionContext != null) {
+                    emit(AgentEvent.Log("[LOCAL] VLM: ${visionContext.take(80)}..."))
                 }
+
+                // Determine vision availability (either local VLM or cloud GPT-4o)
+                val hasVisionContext = visionContext != null
+                val useVision = hasVisionContext || (screenshotBase64 != null && gptClient.isConfigured())
 
                 // Get LLM decision with context
                 val historyPrompt = history.formatForPrompt()
@@ -180,8 +197,8 @@ class AgentKernel(
                 val loopDetected = lastAction != null && history.isRepetitive(lastAction.action, lastAction.target)
                 val hadFailure = history.hadRecentFailure()
 
-                // Choose appropriate prompt based on context
-                val useToolCalling = gptClient.isConfigured()
+                // Build prompt — use tool calling format always
+                val useToolCalling = true
                 val prompt = if (useVision) {
                     when {
                         loopDetected -> {
@@ -212,29 +229,22 @@ class AgentKernel(
                     }
                 }
 
-                lastPrompt = prompt
-
-                // Get LLM response (with tool calling support and optional vision)
-                val response = if (gptClient.isConfigured()) {
-                    if (useVision) {
-                        emit(AgentEvent.Log("Calling GPT-4o Vision..."))
-                        callRemoteLLMWithVision(prompt, screenshotBase64!!) ?: run {
-                            emit(AgentEvent.Log("Vision failed, falling back to text-only"))
-                            callRemoteLLMWithTools(prompt) ?: callLocalLLMWithTools(prompt)
-                        }
-                    } else {
-                        emit(AgentEvent.Log("Using GPT-4o..."))
-                        callRemoteLLMWithTools(prompt) ?: run {
-                            emit(AgentEvent.Log("GPT-4o unavailable, falling back to local model"))
-                            callLocalLLMWithTools(prompt)
-                        }
-                    }
+                // Inject VLM context into prompt if available
+                val enrichedPrompt = if (visionContext != null) {
+                    "$prompt\n\nVISION_CONTEXT (from on-device VLM):\n$visionContext"
                 } else {
-                    callLocalLLMWithTools(prompt)
+                    prompt
+                }
+
+                lastPrompt = enrichedPrompt
+
+                // ========== LOCAL-FIRST LLM ROUTING ==========
+                val response = getDecision(enrichedPrompt, screenshotBase64, hasVisionContext) { event ->
+                    emit(event)
                 }
 
                 // Resolve any tool calls (sub-loop)
-                val finalResponse = resolveToolCalls(response, prompt) { event -> emit(event) }
+                val finalResponse = resolveToolCalls(response, enrichedPrompt) { event -> emit(event) }
 
                 // Handle UI action tool calls from GPT-4o function calling
                 if (finalResponse is LLMResponse.UIActionToolCall) {
@@ -276,7 +286,7 @@ class AgentKernel(
                     continue
                 }
 
-                // Legacy path: handle JSON-based UI actions (local model fallback)
+                // Legacy path: handle JSON-based UI actions (local model)
                 val decision = when (finalResponse) {
                     is LLMResponse.UIAction -> parseDecision(finalResponse.json)
                     is LLMResponse.TextAnswer -> {
@@ -355,6 +365,52 @@ class AgentKernel(
         isRunning = false
     }
 
+    // ========== Local-First Decision Routing ==========
+
+    /**
+     * LOCAL FIRST: Try on-device LLM, fall back to cloud on failure.
+     */
+    private suspend fun getDecision(
+        prompt: String,
+        screenshotBase64: String?,
+        hasVisionContext: Boolean,
+        emitEvent: suspend (AgentEvent) -> Unit
+    ): LLMResponse {
+        // Try local first
+        val localResponse = try {
+            val mode = if (hasVisionContext) ProviderMode.LOCAL else ProviderMode.LOCAL_NO_VISION
+            emitEvent(AgentEvent.ProviderChanged(mode))
+            emitEvent(AgentEvent.Log("[LOCAL] Reasoning with $activeModelId..."))
+            callLocalLLMWithTools(prompt)
+        } catch (e: Exception) {
+            Log.w(TAG, "Local LLM failed: ${e.message}")
+            null
+        }
+
+        // If local succeeded, return it
+        if (localResponse != null && localResponse !is LLMResponse.Error) {
+            return localResponse
+        }
+
+        // Fall back to cloud if configured
+        if (gptClient.isConfigured()) {
+            emitEvent(AgentEvent.ProviderChanged(ProviderMode.CLOUD_FALLBACK))
+            emitEvent(AgentEvent.Log("[CLOUD] Falling back to GPT-4o..."))
+
+            val cloudResponse = if (screenshotBase64 != null) {
+                callRemoteLLMWithVision(prompt, screenshotBase64)
+                    ?: callRemoteLLMWithTools(prompt)
+            } else {
+                callRemoteLLMWithTools(prompt)
+            }
+
+            if (cloudResponse != null) return cloudResponse
+        }
+
+        // Both failed
+        return localResponse ?: LLMResponse.Error("No LLM available")
+    }
+
     // ========== Tool Calling Integration ==========
 
     private suspend fun callRemoteLLMWithVision(prompt: String, screenshotBase64: String): LLMResponse? {
@@ -367,15 +423,17 @@ class AgentKernel(
         return if (tools.isNotEmpty()) {
             gptClient.generateActionWithTools(prompt, tools)
         } else {
-            // No tools registered, use existing path
             val json = gptClient.generateAction(prompt) ?: return null
             LLMResponse.UIAction(json)
         }
     }
 
+    /**
+     * Call local LLM with ALL tools (including ui_* tools).
+     * The local model gets the full tool set for autonomous UI control.
+     */
     private suspend fun callLocalLLMWithTools(prompt: String): LLMResponse {
-        // Filter out ui_* tools for local models — too many tools overwhelms small models
-        val tools = toolRegistry.getDefinitions().filter { !it.name.startsWith("ui_") }
+        val tools = toolRegistry.getDefinitions()
         val hasTools = tools.isNotEmpty()
 
         val options = if (hasTools) {
@@ -482,7 +540,6 @@ class AgentKernel(
             current = if (gptClient.isConfigured()) {
                 // GPT-4o path: build multi-turn conversation history
                 if (!historyInitialized) {
-                    // Add initial system + user messages
                     conversationHistory.add(JSONObject().apply {
                         put("role", "system")
                         put("content", SystemPrompts.TOOL_CALLING_SYSTEM_PROMPT)
@@ -522,7 +579,6 @@ class AgentKernel(
 
     /**
      * Try to extract a UI action decision from a text answer.
-     * Sometimes the LLM returns a text answer that contains a JSON action.
      */
     private fun tryExtractDecisionFromText(text: String): Decision? {
         val matcher = Pattern.compile("\\{.*?\\}", Pattern.DOTALL).matcher(text)
@@ -608,15 +664,12 @@ class AgentKernel(
 
     /**
      * Pre-launch: analyze the goal and open the target app directly via intent.
-     * Returns a log message if an app was launched, or null if no app was detected.
      */
     private fun preLaunchApp(goal: String): String? {
         val goalLower = goal.lowercase()
 
-        // Map keywords to app launchers
         val appMatch = when {
             goalLower.contains("youtube") -> {
-                // Extract search query if present
                 val searchQuery = extractSearchQuery(goalLower, "youtube")
                 if (searchQuery != null) {
                     AppActions.openYouTubeSearch(context, searchQuery)
@@ -668,13 +721,7 @@ class AgentKernel(
         return appMatch
     }
 
-    /**
-     * Try to extract a search query from the goal.
-     * E.g., "open youtube and search for lofi music" -> "lofi music"
-     * E.g., "search for cheap flights on youtube" -> "cheap flights"
-     */
     private fun extractSearchQuery(goalLower: String, appName: String): String? {
-        // Patterns like "search for X on YouTube", "search X on YouTube"
         val patterns = listOf(
             Regex("search\\s+(?:for\\s+)?[\"']?(.+?)[\"']?\\s+on\\s+$appName"),
             Regex("$appName.*?search\\s+(?:for\\s+)?[\"']?(.+?)(?:[\"']|$)"),
@@ -694,10 +741,6 @@ class AgentKernel(
         return null
     }
 
-    /**
-     * Map a ui_* tool name to the legacy action name for logging/history.
-     * e.g., "ui_tap" → "tap", "ui_open_app" → "open"
-     */
     private fun mapToolNameToAction(toolName: String): String {
         return when (toolName) {
             "ui_tap" -> "tap"
@@ -718,9 +761,6 @@ class AgentKernel(
         }
     }
 
-    /**
-     * Extract a human-readable target from a tool call's arguments for history/logging.
-     */
     private fun extractTargetFromToolCall(call: ToolCall): String? {
         return when (call.toolName) {
             "ui_tap", "ui_long_press" -> {
