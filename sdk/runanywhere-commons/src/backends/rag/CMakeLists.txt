@@ -153,6 +153,8 @@ if(RAC_PLATFORM_IOS)
 elseif(RAC_PLATFORM_ANDROID)
     message(STATUS "Configuring RAG backend for Android")
     target_link_libraries(rac_backend_rag PRIVATE log)
+    # Ensure ORT_API_VERSION matches bundled libonnxruntime (1.17.x -> API 17)
+    target_compile_definitions(rac_backend_rag PRIVATE ORT_API_VERSION=17)
     target_compile_options(rac_backend_rag PRIVATE -O3 -ffunction-sections -fdata-sections)
     # 16KB page alignment for Android 15+ (API 35) compliance
     target_link_options(rac_backend_rag PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)

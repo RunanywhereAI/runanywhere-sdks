@@ -19,8 +19,8 @@ RAGBackend::RAGBackend(
     std::unique_ptr<IEmbeddingProvider> embedding_provider,
     std::unique_ptr<ITextGenerator> text_generator
 ) : config_(config),
-    embedding_provider_(std::move(embedding_provider)),
-    text_generator_(std::move(text_generator)) {
+    embedding_provider_(std::shared_ptr<IEmbeddingProvider>(std::move(embedding_provider))),
+    text_generator_(std::shared_ptr<ITextGenerator>(std::move(text_generator))) {
     // Create vector store
     VectorStoreConfig store_config;
     store_config.dimension = config.embedding_dimension;
@@ -43,7 +43,7 @@ RAGBackend::~RAGBackend() {
 
 void RAGBackend::set_embedding_provider(std::unique_ptr<IEmbeddingProvider> provider) {
     std::lock_guard<std::mutex> lock(mutex_);
-    embedding_provider_ = std::move(provider);
+    embedding_provider_ = std::shared_ptr<IEmbeddingProvider>(std::move(provider));
     
     // Update embedding dimension if provider is ready
     if (embedding_provider_ && embedding_provider_->is_ready()) {
@@ -55,7 +55,7 @@ void RAGBackend::set_embedding_provider(std::unique_ptr<IEmbeddingProvider> prov
 
 void RAGBackend::set_text_generator(std::unique_ptr<ITextGenerator> generator) {
     std::lock_guard<std::mutex> lock(mutex_);
-    text_generator_ = std::move(generator);
+    text_generator_ = std::shared_ptr<ITextGenerator>(std::move(generator));
     
     if (text_generator_ && text_generator_->is_ready()) {
         LOGI("Set text generator: %s", text_generator_->name());
@@ -125,20 +125,51 @@ std::vector<SearchResult> RAGBackend::search(
     const std::string& query_text,
     size_t top_k
 ) const {
-    if (!initialized_) {
+    std::shared_ptr<IEmbeddingProvider> embedding_provider;
+    size_t embedding_dimension = 0;
+    float similarity_threshold = 0.0f;
+    bool initialized = false;
+
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        embedding_provider = embedding_provider_;
+        embedding_dimension = config_.embedding_dimension;
+        similarity_threshold = config_.similarity_threshold;
+        initialized = initialized_;
+    }
+
+    return search_with_provider(
+        query_text,
+        top_k,
+        embedding_provider,
+        embedding_dimension,
+        similarity_threshold,
+        initialized
+    );
+}
+
+std::vector<SearchResult> RAGBackend::search_with_provider(
+    const std::string& query_text,
+    size_t top_k,
+    const std::shared_ptr<IEmbeddingProvider>& embedding_provider,
+    size_t embedding_dimension,
+    float similarity_threshold,
+    bool initialized
+) const {
+    if (!initialized) {
         return {};
     }
 
-    if (!embedding_provider_ || !embedding_provider_->is_ready()) {
+    if (!embedding_provider || !embedding_provider->is_ready()) {
         LOGE("Embedding provider not available for search");
         return {};
     }
 
     try {
         // Generate embedding for query
-        auto query_embedding = embedding_provider_->embed(query_text);
+        auto query_embedding = embedding_provider->embed(query_text);
         
-        if (query_embedding.size() != config_.embedding_dimension) {
+        if (query_embedding.size() != embedding_dimension) {
             LOGE("Query embedding dimension mismatch");
             return {};
         }
@@ -146,7 +177,7 @@ std::vector<SearchResult> RAGBackend::search(
         return vector_store_->search(
             query_embedding,
             top_k,
-            config_.similarity_threshold
+            similarity_threshold
         );
         
     } catch (const std::exception& e) {
@@ -193,8 +224,27 @@ GenerationResult RAGBackend::query(
     const std::string& query,
     const GenerationOptions& options
 ) {
+    std::shared_ptr<IEmbeddingProvider> embedding_provider;
+    std::shared_ptr<ITextGenerator> text_generator;
+    size_t embedding_dimension = 0;
+    float similarity_threshold = 0.0f;
+    size_t top_k = 0;
+    std::string prompt_template;
+    bool initialized = false;
+
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        embedding_provider = embedding_provider_;
+        text_generator = text_generator_;
+        embedding_dimension = config_.embedding_dimension;
+        similarity_threshold = config_.similarity_threshold;
+        top_k = config_.top_k;
+        prompt_template = config_.prompt_template;
+        initialized = initialized_;
+    }
+
     // Validate providers are available
-    if (!embedding_provider_ || !embedding_provider_->is_ready()) {
+    if (!embedding_provider || !embedding_provider->is_ready()) {
         LOGE("Embedding provider not available for query");
         GenerationResult error_result;
         error_result.text = "Error: Embedding provider not available";
@@ -202,7 +252,7 @@ GenerationResult RAGBackend::query(
         return error_result;
     }
     
-    if (!text_generator_ || !text_generator_->is_ready()) {
+    if (!text_generator || !text_generator->is_ready()) {
         LOGE("Text generator not available for query");
         GenerationResult error_result;
         error_result.text = "Error: Text generator not available";
@@ -212,7 +262,14 @@ GenerationResult RAGBackend::query(
     
     try {
         // Step 1: Search for relevant context
-        auto search_results = search(query, config_.top_k);
+        auto search_results = search_with_provider(
+            query,
+            top_k,
+            embedding_provider,
+            embedding_dimension,
+            similarity_threshold,
+            initialized
+        );
         
         if (search_results.empty()) {
             LOGE("No relevant documents found for query");
@@ -229,10 +286,18 @@ GenerationResult RAGBackend::query(
              search_results.size(), context.size());
         
         // Step 3: Format prompt
-        std::string prompt = format_prompt(query, context);
+        std::string prompt = prompt_template;
+        size_t pos = prompt.find("{context}");
+        if (pos != std::string::npos) {
+            prompt.replace(pos, 9, context);
+        }
+        pos = prompt.find("{query}");
+        if (pos != std::string::npos) {
+            prompt.replace(pos, 7, query);
+        }
         
         // Step 4: Generate answer
-        auto result = text_generator_->generate(prompt, options);
+        auto result = text_generator->generate(prompt, options);
         
         // Add search metadata
         if (result.success) {

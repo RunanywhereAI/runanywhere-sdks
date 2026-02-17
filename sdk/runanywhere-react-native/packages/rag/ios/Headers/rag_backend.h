@@ -139,11 +139,20 @@ public:
     size_t document_count() const;
 
 private:
+    std::vector<SearchResult> search_with_provider(
+        const std::string& query_text,
+        size_t top_k,
+        const std::shared_ptr<IEmbeddingProvider>& embedding_provider,
+        size_t embedding_dimension,
+        float similarity_threshold,
+        bool initialized
+    ) const;
+
     RAGBackendConfig config_;
     std::unique_ptr<VectorStoreUSearch> vector_store_;
     std::unique_ptr<DocumentChunker> chunker_;
-    std::unique_ptr<IEmbeddingProvider> embedding_provider_;
-    std::unique_ptr<ITextGenerator> text_generator_;
+    std::shared_ptr<IEmbeddingProvider> embedding_provider_;
+    std::shared_ptr<ITextGenerator> text_generator_;
     bool initialized_ = false;
     mutable std::mutex mutex_;
     size_t next_chunk_id_ = 0;

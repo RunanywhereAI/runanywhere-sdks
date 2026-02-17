@@ -666,9 +666,11 @@ public:
 
 private:
     bool initialize_onnx_runtime() {
-        ort_api_ = OrtGetApiBase()->GetApi(ORT_API_VERSION);
+        const OrtApiBase* ort_api_base = OrtGetApiBase();
+        const char* ort_version = ort_api_base ? ort_api_base->GetVersionString() : "unknown";
+        ort_api_ = ort_api_base ? ort_api_base->GetApi(ORT_API_VERSION) : nullptr;
         if (!ort_api_) {
-            LOGE("Failed to get ONNX Runtime API");
+            LOGE("Failed to get ONNX Runtime API (ORT_API_VERSION=%d, runtime=%s)", ORT_API_VERSION, ort_version);
             return false;
         }
         

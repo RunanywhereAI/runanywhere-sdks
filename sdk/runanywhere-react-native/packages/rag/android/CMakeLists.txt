@@ -171,6 +171,7 @@ target_compile_definitions(${PACKAGE_NAME} PRIVATE
     HAS_RACOMMONS=1
     RAG_HAS_LLAMACPP_PROVIDER=1
     RAG_HAS_ONNX_PROVIDER=1
+    ORT_API_VERSION=17
 )
 
 # 16KB page alignment - MUST be on target for Android 15+ compliance
