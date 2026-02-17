@@ -34,6 +34,7 @@
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/vad/rac_vad_component.h"
+#include "rac/features/vlm/rac_vlm_component.h"
 #include "rac/infrastructure/device/rac_device_manager.h"
 #include "rac/infrastructure/model_management/rac_model_assignment.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
@@ -3177,15 +3178,15 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallParse(JNIEnv
                                                                           jstring llmOutput) {
     std::string outputStr = getCString(env, llmOutput);
     rac_tool_call_t result;
-    
+
     rac_result_t rc = rac_tool_call_parse(outputStr.c_str(), &result);
-    
+
     // Build JSON response
     std::string json = "{";
     json += "\"hasToolCall\":";
     json += (result.has_tool_call == RAC_TRUE) ? "true" : "false";
     json += ",\"cleanText\":\"";
-    
+
     // Escape clean text
     if (result.clean_text) {
         for (const char* p = result.clean_text; *p; p++) {
@@ -3200,7 +3201,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallParse(JNIEnv
         }
     }
     json += "\"";
-    
+
     if (result.has_tool_call == RAC_TRUE) {
         json += ",\"toolName\":\"";
         if (result.tool_name) json += result.tool_name;
@@ -3225,9 +3226,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallParse(JNIEnv
         json += ",\"callId\":";
         json += std::to_string(result.call_id);
     }
-    
+
     json += "}";
-    
+
     rac_tool_call_free(&result);
     return env->NewStringUTF(json.c_str());
 }
@@ -3237,13 +3238,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallFormatPrompt
     JNIEnv* env, jclass clazz, jstring toolsJson) {
     std::string toolsStr = getCString(env, toolsJson);
     char* prompt = nullptr;
-    
+
     rac_result_t rc = rac_tool_call_format_prompt_json(toolsStr.c_str(), &prompt);
-    
+
     if (rc != RAC_SUCCESS || prompt == nullptr) {
         return nullptr;
     }
-    
+
     jstring result = env->NewStringUTF(prompt);
     rac_free(prompt);
     return result;
@@ -3254,17 +3255,17 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallFormatPrompt
     JNIEnv* env, jclass clazz, jstring toolsJson, jint format) {
     std::string toolsStr = getCString(env, toolsJson);
     char* prompt = nullptr;
-    
+
     rac_result_t rc = rac_tool_call_format_prompt_json_with_format(
         toolsStr.c_str(),
         static_cast<rac_tool_call_format_t>(format),
         &prompt
     );
-    
+
     if (rc != RAC_SUCCESS || prompt == nullptr) {
         return nullptr;
     }
-    
+
     jstring result = env->NewStringUTF(prompt);
     rac_free(prompt);
     return result;
@@ -3276,18 +3277,18 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallFormatPrompt
     std::string toolsStr = getCString(env, toolsJson);
     std::string formatStr = getCString(env, formatName);
     char* prompt = nullptr;
-    
+
     // Use string-based API (C++ is single source of truth for format names)
     rac_result_t rc = rac_tool_call_format_prompt_json_with_format_name(
         toolsStr.c_str(),
         formatStr.c_str(),
         &prompt
     );
-    
+
     if (rc != RAC_SUCCESS || prompt == nullptr) {
         return nullptr;
     }
-    
+
     jstring result = env->NewStringUTF(prompt);
     rac_free(prompt);
     return result;
@@ -3298,17 +3299,17 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallBuildInitial
     JNIEnv* env, jclass clazz, jstring userPrompt, jstring toolsJson, jstring optionsJson) {
     std::string userStr = getCString(env, userPrompt);
     std::string toolsStr = getCString(env, toolsJson);
-    
+
     // Parse options if provided (simplified - use defaults for now)
     rac_tool_calling_options_t options = {5, RAC_TRUE, 0.7f, 1024, nullptr, RAC_FALSE, RAC_FALSE};
-    
+
     char* prompt = nullptr;
     rac_result_t rc = rac_tool_call_build_initial_prompt(userStr.c_str(), toolsStr.c_str(), &options, &prompt);
-    
+
     if (rc != RAC_SUCCESS || prompt == nullptr) {
         return nullptr;
     }
-    
+
     jstring result = env->NewStringUTF(prompt);
     rac_free(prompt);
     return result;
@@ -3322,7 +3323,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallBuildFollowu
     std::string toolsPromptStr = getCString(env, toolsPrompt);
     std::string toolNameStr = getCString(env, toolName);
     std::string resultJsonStr = getCString(env, toolResultJson);
-    
+
     char* prompt = nullptr;
     rac_result_t rc = rac_tool_call_build_followup_prompt(
         originalStr.c_str(),
@@ -3331,11 +3332,11 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallBuildFollowu
         resultJsonStr.c_str(),
         keepToolsAvailable ? RAC_TRUE : RAC_FALSE,
         &prompt);
-    
+
     if (rc != RAC_SUCCESS || prompt == nullptr) {
         return nullptr;
     }
-    
+
     jstring result = env->NewStringUTF(prompt);
     rac_free(prompt);
     return result;
@@ -3347,13 +3348,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallNormalizeJso
                                                                                    jstring jsonStr) {
     std::string inputStr = getCString(env, jsonStr);
     char* normalized = nullptr;
-    
+
     rac_result_t rc = rac_tool_call_normalize_json(inputStr.c_str(), &normalized);
-    
+
     if (rc != RAC_SUCCESS || normalized == nullptr) {
         return nullptr;
     }
-    
+
     jstring result = env->NewStringUTF(normalized);
     rac_free(normalized);
     return result;
@@ -3567,6 +3568,473 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDiffusionComponentGe
     j["max_height"] = info.max_height;
 
     return env->NewStringUTF(j.dump().c_str());
+}
+
+// =============================================================================
+// JNI FUNCTIONS - VLM Component
+// =============================================================================
+
+// Helper: Build a VLM result JSON string matching what Kotlin expects
+static std::string buildVlmResultJson(const std::string& text, const rac_vlm_result_t& result) {
+    nlohmann::json j;
+    j["text"] = text;
+    j["prompt_tokens"] = result.prompt_tokens;
+    j["image_tokens"] = result.image_tokens;
+    j["completion_tokens"] = result.completion_tokens;
+    j["total_tokens"] = result.total_tokens;
+    j["time_to_first_token_ms"] = result.time_to_first_token_ms;
+    j["image_encode_time_ms"] = result.image_encode_time_ms;
+    j["total_time_ms"] = result.total_time_ms;
+    j["tokens_per_second"] = result.tokens_per_second;
+    return j.dump();
+}
+
+// Helper: Populate rac_vlm_image_t from JNI parameters
+static void fillVlmImage(rac_vlm_image_t& image,
+                          jint imageFormat,
+                          const std::string& imagePath,
+                          JNIEnv* env, jbyteArray imageData,
+                          const std::string& imageBase64,
+                          jint imageWidth, jint imageHeight,
+                          const uint8_t*& pixelDataOut) {
+    memset(&image, 0, sizeof(image));
+    image.format = static_cast<rac_vlm_image_format_t>(imageFormat);
+    image.width = static_cast<uint32_t>(imageWidth);
+    image.height = static_cast<uint32_t>(imageHeight);
+
+    switch (image.format) {
+        case RAC_VLM_IMAGE_FORMAT_FILE_PATH:
+            image.file_path = imagePath.empty() ? nullptr : imagePath.c_str();
+            break;
+        case RAC_VLM_IMAGE_FORMAT_RGB_PIXELS:
+            if (imageData != nullptr) {
+                jsize len = env->GetArrayLength(imageData);
+                auto* buf = new uint8_t[len];
+                env->GetByteArrayRegion(imageData, 0, len, reinterpret_cast<jbyte*>(buf));
+                image.pixel_data = buf;
+                image.data_size = static_cast<size_t>(len);
+                pixelDataOut = buf;
+            }
+            break;
+        case RAC_VLM_IMAGE_FORMAT_BASE64:
+            image.base64_data = imageBase64.empty() ? nullptr : imageBase64.c_str();
+            if (image.base64_data) {
+                image.data_size = imageBase64.length();
+            }
+            break;
+    }
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentCreate(JNIEnv* env,
+                                                                               jclass clazz) {
+    rac_handle_t handle = RAC_INVALID_HANDLE;
+    rac_result_t result = rac_vlm_component_create(&handle);
+    if (result != RAC_SUCCESS) {
+        LOGe("Failed to create VLM component: %d", result);
+        return 0;
+    }
+    return reinterpret_cast<jlong>(handle);
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentDestroy(JNIEnv* env,
+                                                                                jclass clazz,
+                                                                                jlong handle) {
+    if (handle != 0) {
+        rac_vlm_component_destroy(reinterpret_cast<rac_handle_t>(handle));
+    }
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentLoadModel(
+    JNIEnv* env, jclass clazz, jlong handle, jstring modelPath, jstring mmprojPath,
+    jstring modelId, jstring modelName) {
+    LOGi("racVlmComponentLoadModel called with handle=%lld", (long long)handle);
+    if (handle == 0)
+        return RAC_ERROR_INVALID_HANDLE;
+
+    std::string path = getCString(env, modelPath);
+    std::string mmprojStorage;
+    const char* mmproj = getNullableCString(env, mmprojPath, mmprojStorage);
+    std::string id = getCString(env, modelId);
+    std::string nameStorage;
+    const char* name = getNullableCString(env, modelName, nameStorage);
+
+    LOGi("racVlmComponentLoadModel path=%s, mmproj=%s, id=%s, name=%s",
+         path.c_str(), mmproj ? mmproj : "NULL", id.c_str(), name ? name : "NULL");
+
+    rac_result_t result = rac_vlm_component_load_model(
+        reinterpret_cast<rac_handle_t>(handle),
+        path.c_str(),
+        mmproj,
+        id.c_str(),
+        name);
+
+    LOGi("rac_vlm_component_load_model returned: %d", result);
+    return static_cast<jint>(result);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentUnload(JNIEnv* env,
+                                                                               jclass clazz,
+                                                                               jlong handle) {
+    if (handle == 0)
+        return RAC_ERROR_INVALID_HANDLE;
+    return static_cast<jint>(rac_vlm_component_unload(reinterpret_cast<rac_handle_t>(handle)));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentCancel(JNIEnv* env,
+                                                                               jclass clazz,
+                                                                               jlong handle) {
+    if (handle == 0)
+        return RAC_ERROR_INVALID_HANDLE;
+    return static_cast<jint>(rac_vlm_component_cancel(reinterpret_cast<rac_handle_t>(handle)));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentLoadModelById(
+    JNIEnv* env, jclass clazz, jlong handle, jstring modelId) {
+    LOGi("racVlmComponentLoadModelById called with handle=%lld", (long long)handle);
+
+    if (handle == 0) {
+        LOGe("racVlmComponentLoadModelById: invalid handle");
+        return static_cast<jint>(RAC_ERROR_INVALID_HANDLE);
+    }
+
+    std::string modelIdStr = getCString(env, modelId);
+    if (modelIdStr.empty()) {
+        LOGe("racVlmComponentLoadModelById: empty model ID");
+        return static_cast<jint>(RAC_ERROR_INVALID_ARGUMENT);
+    }
+
+    LOGi("racVlmComponentLoadModelById modelId=%s", modelIdStr.c_str());
+    rac_result_t result =
+        rac_vlm_component_load_model_by_id(reinterpret_cast<rac_handle_t>(handle), modelIdStr.c_str());
+    LOGi("rac_vlm_component_load_model_by_id returned: %d", result);
+    return static_cast<jint>(result);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentIsLoaded(JNIEnv* env,
+                                                                                  jclass clazz,
+                                                                                  jlong handle) {
+    if (handle == 0)
+        return JNI_FALSE;
+    return rac_vlm_component_is_loaded(reinterpret_cast<rac_handle_t>(handle)) ? JNI_TRUE
+                                                                               : JNI_FALSE;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentGetModelId(JNIEnv* env,
+                                                                                    jclass clazz,
+                                                                                    jlong handle) {
+    if (handle == 0)
+        return nullptr;
+    const char* modelId = rac_vlm_component_get_model_id(reinterpret_cast<rac_handle_t>(handle));
+    if (modelId == nullptr)
+        return nullptr;
+    return env->NewStringUTF(modelId);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentProcess(
+    JNIEnv* env, jclass clazz, jlong handle, jint imageFormat, jstring imagePath,
+    jbyteArray imageData, jstring imageBase64, jint imageWidth, jint imageHeight,
+    jstring prompt, jstring optionsJson) {
+    LOGi("racVlmComponentProcess called with handle=%lld", (long long)handle);
+
+    if (handle == 0) {
+        LOGe("racVlmComponentProcess: invalid handle");
+        return nullptr;
+    }
+
+    std::string promptStr = getCString(env, prompt);
+    std::string imagePathStr = getCString(env, imagePath);
+    std::string imageBase64Str = getCString(env, imageBase64);
+
+    LOGi("racVlmComponentProcess prompt length=%zu, imageFormat=%d",
+         promptStr.length(), imageFormat);
+
+    // Build image struct
+    rac_vlm_image_t image;
+    const uint8_t* pixelBuf = nullptr;
+    fillVlmImage(image, imageFormat, imagePathStr, env, imageData,
+                 imageBase64Str, imageWidth, imageHeight, pixelBuf);
+
+    // Default options (optionsJson is intentionally unused for now — VLM options
+    // are configured at the native layer; Kotlin-side overrides will be added later)
+    rac_vlm_options_t options = RAC_VLM_OPTIONS_DEFAULT;
+    options.streaming_enabled = RAC_FALSE;
+
+    rac_vlm_result_t result = {};
+    rac_result_t status = rac_vlm_component_process(
+        reinterpret_cast<rac_handle_t>(handle), &image, promptStr.c_str(), &options, &result);
+
+    // Clean up pixel buffer if allocated
+    delete[] pixelBuf;
+
+    if (status != RAC_SUCCESS) {
+        LOGe("racVlmComponentProcess failed with status=%d", status);
+        return nullptr;
+    }
+
+    std::string text = result.text ? result.text : "";
+    std::string json = buildVlmResultJson(text, result);
+
+    LOGi("racVlmComponentProcess returning JSON: %zu bytes", json.length());
+
+    jstring jResult = env->NewStringUTF(json.c_str());
+    rac_vlm_result_free(&result);
+    return jResult;
+}
+
+// ========================================================================
+// VLM STREAMING CONTEXT
+// ========================================================================
+
+struct VLMStreamCallbackContext {
+    JavaVM* jvm = nullptr;
+    jobject callback = nullptr;
+    jmethodID onTokenMethod = nullptr;
+    std::string accumulated_text;
+    int token_count = 0;
+    bool is_complete = false;
+    bool has_error = false;
+    rac_result_t error_code = RAC_SUCCESS;
+    std::string error_message;
+    rac_vlm_result_t final_result = {};
+};
+
+static rac_bool_t vlm_stream_callback_token(const char* token, void* user_data) {
+    if (!user_data || !token)
+        return RAC_TRUE;
+
+    auto* ctx = static_cast<VLMStreamCallbackContext*>(user_data);
+
+    ctx->accumulated_text += token;
+    ctx->token_count++;
+
+    // Call back to Kotlin
+    if (ctx->jvm && ctx->callback && ctx->onTokenMethod) {
+        JNIEnv* env = nullptr;
+        bool needsDetach = false;
+
+        jint result = ctx->jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+        if (result == JNI_EDETACHED) {
+            if (ctx->jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
+                needsDetach = true;
+            } else {
+                LOGe("VLM: Failed to attach thread for streaming callback");
+                return RAC_TRUE;
+            }
+        }
+
+        if (env) {
+            jsize len = static_cast<jsize>(strlen(token));
+            jbyteArray jToken = env->NewByteArray(len);
+            env->SetByteArrayRegion(
+                jToken, 0, len,
+                reinterpret_cast<const jbyte*>(token));
+
+            jboolean continueGen =
+                env->CallBooleanMethod(ctx->callback, ctx->onTokenMethod, jToken);
+            env->DeleteLocalRef(jToken);
+
+            if (env->ExceptionCheck()) {
+                env->ExceptionDescribe();
+                env->ExceptionClear();
+                if (needsDetach) {
+                    ctx->jvm->DetachCurrentThread();
+                }
+                return RAC_FALSE;  // Stop generation on exception
+            }
+
+            if (needsDetach) {
+                ctx->jvm->DetachCurrentThread();
+            }
+
+            if (!continueGen) {
+                LOGi("VLM: Streaming cancelled by callback");
+                return RAC_FALSE;
+            }
+        }
+    }
+
+    return RAC_TRUE;
+}
+
+static void vlm_stream_callback_complete(const rac_vlm_result_t* result, void* user_data) {
+    if (!user_data)
+        return;
+
+    auto* ctx = static_cast<VLMStreamCallbackContext*>(user_data);
+
+    LOGi("VLM streaming complete: %d tokens", ctx->token_count);
+
+    if (result) {
+        ctx->final_result.prompt_tokens = result->prompt_tokens;
+        ctx->final_result.image_tokens = result->image_tokens;
+        ctx->final_result.completion_tokens =
+            result->completion_tokens > 0 ? result->completion_tokens : ctx->token_count;
+        ctx->final_result.total_tokens = result->total_tokens;
+        ctx->final_result.time_to_first_token_ms = result->time_to_first_token_ms;
+        ctx->final_result.image_encode_time_ms = result->image_encode_time_ms;
+        ctx->final_result.total_time_ms = result->total_time_ms;
+        ctx->final_result.tokens_per_second = result->tokens_per_second;
+    } else {
+        ctx->final_result.completion_tokens = ctx->token_count;
+    }
+
+    ctx->is_complete = true;
+}
+
+static void vlm_stream_callback_error(rac_result_t error_code, const char* error_message,
+                                       void* user_data) {
+    if (!user_data)
+        return;
+
+    auto* ctx = static_cast<VLMStreamCallbackContext*>(user_data);
+
+    LOGe("VLM streaming error: %d - %s", error_code, error_message ? error_message : "Unknown");
+
+    ctx->has_error = true;
+    ctx->error_code = error_code;
+    ctx->error_message = error_message ? error_message : "Unknown error";
+    ctx->is_complete = true;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentProcessStream(
+    JNIEnv* env, jclass clazz, jlong handle, jint imageFormat, jstring imagePath,
+    jbyteArray imageData, jstring imageBase64, jint imageWidth, jint imageHeight,
+    jstring prompt, jstring optionsJson, jobject tokenCallback) {
+    LOGi("racVlmComponentProcessStream called with handle=%lld", (long long)handle);
+
+    if (handle == 0) {
+        LOGe("racVlmComponentProcessStream: invalid handle");
+        return nullptr;
+    }
+
+    if (!tokenCallback) {
+        LOGe("racVlmComponentProcessStream: null callback");
+        return nullptr;
+    }
+
+    std::string promptStr = getCString(env, prompt);
+    std::string imagePathStr = getCString(env, imagePath);
+    std::string imageBase64Str = getCString(env, imageBase64);
+
+    LOGi("racVlmComponentProcessStream prompt length=%zu, imageFormat=%d",
+         promptStr.length(), imageFormat);
+
+    // Build image struct
+    rac_vlm_image_t image;
+    const uint8_t* pixelBuf = nullptr;
+    fillVlmImage(image, imageFormat, imagePathStr, env, imageData,
+                 imageBase64Str, imageWidth, imageHeight, pixelBuf);
+
+    // Get JVM and callback method
+    JavaVM* jvm = nullptr;
+    env->GetJavaVM(&jvm);
+
+    jclass callbackClass = env->GetObjectClass(tokenCallback);
+    jmethodID onTokenMethod = env->GetMethodID(callbackClass, "onToken", "([B)Z");
+    env->DeleteLocalRef(callbackClass);
+
+    if (!onTokenMethod) {
+        LOGe("racVlmComponentProcessStream: could not find onToken method");
+        delete[] pixelBuf;
+        return nullptr;
+    }
+
+    jobject globalCallback = env->NewGlobalRef(tokenCallback);
+
+    // Default options (optionsJson is intentionally unused for now — VLM options
+    // are configured at the native layer; Kotlin-side overrides will be added later)
+    rac_vlm_options_t options = RAC_VLM_OPTIONS_DEFAULT;
+    options.streaming_enabled = RAC_TRUE;
+
+    // Create streaming callback context
+    VLMStreamCallbackContext ctx;
+    ctx.jvm = jvm;
+    ctx.callback = globalCallback;
+    ctx.onTokenMethod = onTokenMethod;
+
+    LOGi("racVlmComponentProcessStream calling rac_vlm_component_process_stream...");
+
+    rac_result_t status = rac_vlm_component_process_stream(
+        reinterpret_cast<rac_handle_t>(handle), &image, promptStr.c_str(), &options,
+        vlm_stream_callback_token, vlm_stream_callback_complete, vlm_stream_callback_error, &ctx);
+
+    // Clean up
+    env->DeleteGlobalRef(globalCallback);
+    delete[] pixelBuf;
+
+    if (status != RAC_SUCCESS) {
+        LOGe("rac_vlm_component_process_stream failed with status=%d", status);
+        return nullptr;
+    }
+
+    if (ctx.has_error) {
+        LOGe("VLM streaming failed: %s", ctx.error_message.c_str());
+        return nullptr;
+    }
+
+    std::string json = buildVlmResultJson(ctx.accumulated_text, ctx.final_result);
+
+    LOGi("racVlmComponentProcessStream returning JSON: %zu bytes", json.length());
+
+    return env->NewStringUTF(json.c_str());
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentSupportsStreaming(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    if (handle == 0)
+        return JNI_FALSE;
+    return rac_vlm_component_supports_streaming(reinterpret_cast<rac_handle_t>(handle)) ? JNI_TRUE
+                                                                                        : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentGetState(JNIEnv* env,
+                                                                                  jclass clazz,
+                                                                                  jlong handle) {
+    if (handle == 0)
+        return 0;
+    return static_cast<jint>(rac_vlm_component_get_state(reinterpret_cast<rac_handle_t>(handle)));
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentGetMetrics(JNIEnv* env,
+                                                                                    jclass clazz,
+                                                                                    jlong handle) {
+    if (handle == 0)
+        return nullptr;
+
+    rac_lifecycle_metrics_t metrics = {};
+    rac_result_t status =
+        rac_vlm_component_get_metrics(reinterpret_cast<rac_handle_t>(handle), &metrics);
+
+    if (status != RAC_SUCCESS) {
+        LOGe("racVlmComponentGetMetrics failed with status=%d", status);
+        return nullptr;
+    }
+
+    nlohmann::json j;
+    j["total_events"] = metrics.total_events;
+    j["start_time_ms"] = metrics.start_time_ms;
+    j["last_event_time_ms"] = metrics.last_event_time_ms;
+    j["total_loads"] = metrics.total_loads;
+    j["successful_loads"] = metrics.successful_loads;
+    j["failed_loads"] = metrics.failed_loads;
+    j["average_load_time_ms"] = metrics.average_load_time_ms;
+    j["total_unloads"] = metrics.total_unloads;
+    std::string json = j.dump();
+
+    return env->NewStringUTF(json.c_str());
 }
 
 }  // extern "C"
