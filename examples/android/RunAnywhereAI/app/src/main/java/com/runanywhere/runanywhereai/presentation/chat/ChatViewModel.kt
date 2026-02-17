@@ -20,6 +20,7 @@ import com.runanywhere.sdk.public.events.LLMEvent
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.availableModels
 import com.runanywhere.sdk.public.extensions.cancelGeneration
+import com.runanywhere.sdk.public.extensions.currentLLMModel
 import com.runanywhere.sdk.public.extensions.currentLLMModelId
 import com.runanywhere.sdk.public.extensions.generate
 import com.runanywhere.sdk.public.extensions.generateStream
@@ -45,7 +46,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.ceil
 
 /**
- * Enhanced ChatUiState matching iOS functionality
+ * Enhanced ChatUiState  functionality
  */
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
@@ -62,7 +63,7 @@ data class ChatUiState(
 }
 
 /**
- * Enhanced ChatViewModel matching iOS ChatViewModel functionality
+ * Enhanced ChatViewModel  ChatViewModel functionality
  * Includes streaming, thinking mode, analytics, and conversation management
  *
  * Architecture:
@@ -101,10 +102,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         // Initialize with system message if model is already loaded
         viewModelScope.launch {
             checkModelStatus()
-            // Add system message only if model is loaded
-            if (_uiState.value.isModelLoaded) {
-                addSystemMessage()
-            }
         }
     }
 
@@ -139,28 +136,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Add system message
-     */
-    private fun addSystemMessage() {
-        val modelName = _uiState.value.loadedModelName ?: return
-
-        val content = "Model '$modelName' is loaded and ready to chat!"
-        val systemMessage = ChatMessage.system(content)
-
-        val currentMessages = _uiState.value.messages.toMutableList()
-        currentMessages.add(0, systemMessage)
-        _uiState.value = _uiState.value.copy(messages = currentMessages)
-
-        // Save to conversation store
-        _uiState.value.currentConversation?.let { conversation ->
-            val updatedConversation = conversation.copy(messages = currentMessages)
-            conversationStore.updateConversation(updatedConversation)
-        }
-    }
-
-    /**
      * Send message with streaming support and analytics
-     * Matches iOS sendMessage functionality
+     *  sendMessage functionality
      */
     fun sendMessage() {
         val currentState = _uiState.value
@@ -194,9 +171,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 messages = _uiState.value.messages + userMessage,
             )
 
-        // Save user message to conversation
+        // Save user message to conversation (store sets title from first user input)
+        // Refresh currentConversation from store so title appears in history immediately
         _uiState.value.currentConversation?.let { conversation ->
             conversationStore.addMessage(userMessage, conversation)
+            conversationStore.loadConversation(conversation.id)?.let { updated ->
+                _uiState.value = _uiState.value.copy(currentConversation = updated)
+            }
         }
 
         // Create assistant message that will be updated with streaming tokens
@@ -324,7 +305,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Generate with streaming support and thinking mode
-     * Matches iOS streaming generation pattern
+     *  streaming generation pattern
      */
     private suspend fun generateWithStreaming(
         prompt: String,
@@ -455,6 +436,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         // Update message with analytics
         updateAssistantMessageWithAnalytics(messageId, analytics)
 
+        syncCurrentConversationToStore()
         _uiState.value = _uiState.value.copy(isGenerating = false)
         Log.i(TAG, "✅ Streaming generation completed")
     }
@@ -490,6 +472,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 )
 
             updateAssistantMessageWithAnalytics(messageId, analytics)
+            syncCurrentConversationToStore()
         } catch (e: Exception) {
             throw e
         } finally {
@@ -513,6 +496,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
 
         updateAssistantMessage(messageId, errorMessage, null)
+        syncCurrentConversationToStore()
 
         _uiState.value =
             _uiState.value.copy(
@@ -580,6 +564,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
 
         _uiState.value = _uiState.value.copy(messages = updatedMessages)
+    }
+
+    /**
+     * Persist current conversation messages to the store so that loading the conversation
+     * later shows both user and assistant messages.
+     */
+    private fun syncCurrentConversationToStore() {
+        val conv = _uiState.value.currentConversation ?: return
+        val messages = _uiState.value.messages
+        val updated = conv.copy(messages = messages)
+        conversationStore.updateConversation(updated)
+        _uiState.value = _uiState.value.copy(currentConversation = updated)
     }
 
     /**
@@ -698,11 +694,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         // Create new conversation
         val conversation = conversationStore.createConversation()
         _uiState.value = _uiState.value.copy(currentConversation = conversation)
-
-        // Only add system message if model is loaded
-        if (_uiState.value.isModelLoaded) {
-            addSystemMessage()
-        }
     }
 
     /**
@@ -715,6 +706,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * Set the loaded model display name (e.g. when user selects a model from the sheet).
+     * Ensures the app bar shows the correct model icon immediately.
+     */
+    fun setLoadedModelName(modelName: String) {
+        _uiState.value = _uiState.value.copy(loadedModelName = modelName)
+    }
+
+    /**
      * Check model status and load appropriate chat model.
      */
     suspend fun checkModelStatus() {
@@ -722,12 +721,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             if (app.isSDKReady()) {
                 // Check if LLM is already loaded via SDK
                 if (RunAnywhere.isLLMModelLoaded()) {
-                    val loadedModelId = RunAnywhere.currentLLMModelId
-                    Log.i(TAG, "✅ LLM model already loaded: $loadedModelId")
+                    val currentModel = RunAnywhere.currentLLMModel()
+                    val displayName = currentModel?.name ?: RunAnywhere.currentLLMModelId
+                    Log.i(TAG, "✅ LLM model already loaded: $displayName")
                     _uiState.value =
                         _uiState.value.copy(
                             isModelLoaded = true,
-                            loadedModelName = loadedModelId,
+                            loadedModelName = displayName,
                         )
                     addSystemMessageIfNeeded()
                     return
@@ -803,35 +803,26 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             currentMessages.removeAt(0)
         }
         _uiState.value = _uiState.value.copy(messages = currentMessages)
-
-        if (_uiState.value.isModelLoaded) {
-            addSystemMessage()
-        }
     }
 
     /**
-     * Load a conversation
+     * Load a conversation by ID from store (or disk) so we always have the latest messages,
+     * then update UI state. Using the store ensures we don't rely on a possibly stale list item.
      */
     fun loadConversation(conversation: Conversation) {
-        _uiState.value = _uiState.value.copy(currentConversation = conversation)
+        val loaded = conversationStore.loadConversation(conversation.id) ?: conversation
+        conversationStore.ensureConversationInList(loaded)
+        _uiState.value = _uiState.value.copy(currentConversation = loaded)
 
-        // For new conversations (empty messages), start fresh
-        // For existing conversations, load the messages
-        if (conversation.messages.isEmpty()) {
+        if (loaded.messages.isEmpty()) {
             _uiState.value = _uiState.value.copy(messages = emptyList())
-            // Add system message if model is loaded
-            if (_uiState.value.isModelLoaded) {
-                addSystemMessage()
-            }
         } else {
-            _uiState.value = _uiState.value.copy(messages = conversation.messages)
-
-            val analyticsCount = conversation.messages.mapNotNull { it.analytics }.size
-            Log.i(TAG, "📂 Loaded conversation with ${conversation.messages.size} messages, $analyticsCount have analytics")
+            _uiState.value = _uiState.value.copy(messages = loaded.messages)
+            val analyticsCount = loaded.messages.mapNotNull { it.analytics }.size
+            Log.i(TAG, "📂 Loaded conversation with ${loaded.messages.size} messages, $analyticsCount have analytics")
         }
 
-        // Update model info if available
-        conversation.modelName?.let { modelName ->
+        loaded.modelName?.let { modelName ->
             _uiState.value = _uiState.value.copy(loadedModelName = modelName)
         }
     }
@@ -841,6 +832,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun createNewConversation() {
         clearChat()
+    }
+
+    /**
+     * Ensure the current chat is in the store's list and persisted before showing history.
+     * Syncs latest messages to the store and adds the conversation to the list if absent.
+     */
+    fun ensureCurrentConversationInHistory() {
+        syncCurrentConversationToStore()
+        _uiState.value.currentConversation?.let { conversationStore.ensureConversationInList(it) }
     }
 
     /**
