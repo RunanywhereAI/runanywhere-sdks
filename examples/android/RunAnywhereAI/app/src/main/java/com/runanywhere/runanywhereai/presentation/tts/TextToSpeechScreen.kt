@@ -499,7 +499,8 @@ private fun VoiceSettingsSection(
                 )
             }
 
-            // Pitch slider
+            // Pitch slider - Commented out for now
+            /*
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -527,6 +528,7 @@ private fun VoiceSettingsSection(
                         ),
                 )
             }
+            */
         }
     }
 }

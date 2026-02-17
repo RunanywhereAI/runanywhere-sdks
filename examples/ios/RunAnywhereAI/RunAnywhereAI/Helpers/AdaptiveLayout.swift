@@ -470,7 +470,7 @@ struct AdaptiveMicButton: View {
 
     var body: some View {
         Group {
-            if #available(iOS 26.0, *) {
+            if #available(iOS 26.0, macOS 26.0, *) {
                 Button(action: action) {
                     ZStack {
                         // Background circle

@@ -411,9 +411,9 @@ object CppBridge {
             val shouldFetchModels = _environment != Environment.DEVELOPMENT
             logger.info("📦 Environment: ${_environment.name}, shouldFetchModels: $shouldFetchModels")
             logger.info("📦 Registering model assignment callbacks (autoFetch: false)")
-            val registrationSucceeded = CppBridgeModelAssignment.register(autoFetch = false)  // Always false!
+            val registrationSucceeded = CppBridgeModelAssignment.register(autoFetch = false) // Always false!
             logger.info("📦 Registration result: $registrationSucceeded")
-            
+
             // If auto-fetch is needed, trigger it asynchronously off the synchronized block
             // This mirrors Swift SDK's Task.detached pattern:
             //   Task.detached {

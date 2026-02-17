@@ -12,6 +12,8 @@ import com.runanywhere.runanywhereai.domain.models.Conversation
 import com.runanywhere.runanywhereai.domain.models.MessageAnalytics
 import com.runanywhere.runanywhereai.domain.models.MessageModelInfo
 import com.runanywhere.runanywhereai.domain.models.MessageRole
+import com.runanywhere.runanywhereai.domain.models.ToolCallInfo
+import com.runanywhere.sdk.public.extensions.LLM.ToolValue
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.events.LLMEvent
@@ -24,8 +26,19 @@ import com.runanywhere.sdk.public.extensions.generate
 import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.public.extensions.isLLMModelLoaded
 import com.runanywhere.sdk.public.extensions.loadLLMModel
+import com.runanywhere.sdk.public.extensions.LLM.ToolCallingOptions
+import com.runanywhere.sdk.public.extensions.LLM.ToolCallFormat
+import com.runanywhere.sdk.public.extensions.LLM.RunAnywhereToolCalling
+import com.runanywhere.runanywhereai.presentation.settings.ToolSettingsViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterIsInstance
@@ -67,6 +80,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
     private var generationJob: Job? = null
+
+    private val generationPrefs by lazy {
+        getApplication<Application>().getSharedPreferences("generation_settings", android.content.Context.MODE_PRIVATE)
+    }
 
     init {
         // Always start with a new conversation for a fresh chat experience
@@ -183,7 +200,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     // Clear metrics from previous generation
                     tokensPerSecondHistory.clear()
 
-                    if (currentState.useStreaming) {
+                    // Check if tool calling is enabled and tools are registered
+                    val toolViewModel = ToolSettingsViewModel.getInstance(app)
+                    val useToolCalling = toolViewModel.toolCallingEnabled
+                    val registeredTools = RunAnywhereToolCalling.getRegisteredTools()
+
+                    if (useToolCalling && registeredTools.isNotEmpty()) {
+                        Log.i(TAG, "🔧 Using tool calling with ${registeredTools.size} tools")
+                        generateWithToolCalling(prompt, assistantMessage.id)
+                    } else if (currentState.useStreaming) {
                         generateWithStreaming(prompt, assistantMessage.id)
                     } else {
                         generateWithoutStreaming(prompt, assistantMessage.id)
@@ -192,6 +217,90 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     handleGenerationError(e, assistantMessage.id)
                 }
             }
+    }
+
+    /**
+     * Generate with tool calling support
+     * Matches iOS generateWithToolCalling pattern
+     */
+    private suspend fun generateWithToolCalling(
+        prompt: String,
+        messageId: String,
+    ) {
+        val startTime = System.currentTimeMillis()
+
+        try {
+            // Detect the appropriate tool call format based on loaded model
+            // Note: loadedModelName can be null if model state changes during generation
+            val modelName = _uiState.value.loadedModelName
+            if (modelName == null) {
+                Log.w(TAG, "⚠️ Tool calling initiated but model name is null, using default format")
+            }
+            val toolViewModel = ToolSettingsViewModel.getInstance(app)
+            val format = toolViewModel.detectToolCallFormat(modelName)
+
+            Log.i(TAG, "🔧 Tool calling with format: $format for model: ${modelName ?: "unknown"}")
+
+            // Create tool calling options
+            val toolOptions = ToolCallingOptions(
+                maxToolCalls = 3,
+                autoExecute = true,
+                temperature = 0.7f,
+                maxTokens = 1024,
+                format = format
+            )
+
+            // Generate with tools
+            val result = RunAnywhereToolCalling.generateWithTools(prompt, toolOptions)
+            val endTime = System.currentTimeMillis()
+
+            // Update the assistant message with the result
+            val response = result.text
+            updateAssistantMessage(messageId, response, null)
+
+            // Log tool calls and create tool call info
+            if (result.toolCalls.isNotEmpty()) {
+                Log.i(TAG, "🔧 Tool calls made: ${result.toolCalls.map { it.toolName }}")
+                result.toolResults.forEach { toolResult ->
+                    Log.i(TAG, "📋 Tool result: ${toolResult.toolName} - success: ${toolResult.success}")
+                }
+
+                // Create ToolCallInfo from the first tool call and result
+                val firstToolCall = result.toolCalls.first()
+                val firstToolResult = result.toolResults.firstOrNull { it.toolName == firstToolCall.toolName }
+
+                val toolCallInfo = ToolCallInfo(
+                    toolName = firstToolCall.toolName,
+                    arguments = formatToolValueMapToJson(firstToolCall.arguments),
+                    result = firstToolResult?.result?.let { formatToolValueMapToJson(it) },
+                    success = firstToolResult?.success ?: false,
+                    error = firstToolResult?.error,
+                )
+
+                updateAssistantMessageWithToolCallInfo(messageId, toolCallInfo)
+            }
+
+            // Create analytics
+            val analytics = createMessageAnalytics(
+                startTime = startTime,
+                endTime = endTime,
+                firstTokenTime = null,
+                thinkingStartTime = null,
+                thinkingEndTime = null,
+                inputText = prompt,
+                outputText = response,
+                thinkingText = null,
+                wasInterrupted = false,
+            )
+
+            updateAssistantMessageWithAnalytics(messageId, analytics)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Tool calling failed", e)
+            throw e
+        } finally {
+            _uiState.value = _uiState.value.copy(isGenerating = false)
+        }
     }
 
     /**
@@ -218,7 +327,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         try {
             // Use SDK streaming generation - returns Flow<String>
-            RunAnywhere.generateStream(prompt).collect { token ->
+            RunAnywhere.generateStream(prompt, getGenerationOptions()).collect { token ->
                 fullResponse += token
                 totalTokensReceived++
 
@@ -343,7 +452,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         try {
             // RunAnywhere.generate() returns LLMGenerationResult
-            val result = RunAnywhere.generate(prompt)
+            val result = RunAnywhere.generate(prompt, getGenerationOptions())
             val response = result.text
             val endTime = System.currentTimeMillis()
 
@@ -432,6 +541,23 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             currentMessages.map { message ->
                 if (message.id == messageId) {
                     message.copy(analytics = analytics)
+                } else {
+                    message
+                }
+            }
+
+        _uiState.value = _uiState.value.copy(messages = updatedMessages)
+    }
+
+    private fun updateAssistantMessageWithToolCallInfo(
+        messageId: String,
+        toolCallInfo: ToolCallInfo,
+    ) {
+        val currentMessages = _uiState.value.messages
+        val updatedMessages =
+            currentMessages.map { message ->
+                if (message.id == messageId) {
+                    message.copy(toolCallInfo = toolCallInfo)
                 } else {
                     message
                 }
@@ -722,6 +848,57 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
+    }
+
+    /**
+     * Get generation options from SharedPreferences
+     */
+    private fun getGenerationOptions(): com.runanywhere.sdk.public.extensions.LLM.LLMGenerationOptions {
+        val temperature = generationPrefs.getFloat("defaultTemperature", 0.7f)
+        val maxTokens = generationPrefs.getInt("defaultMaxTokens", 1000)
+        val systemPromptValue = generationPrefs.getString("defaultSystemPrompt", "")
+        val systemPrompt = if (systemPromptValue.isNullOrEmpty()) null else systemPromptValue
+        val systemPromptInfo = systemPrompt?.let { "set(${it.length} chars)" } ?: "nil"
+
+        Log.i(TAG, "[PARAMS] App getGenerationOptions: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=$systemPromptInfo")
+
+        return com.runanywhere.sdk.public.extensions.LLM.LLMGenerationOptions(
+            maxTokens = maxTokens,
+            temperature = temperature,
+            systemPrompt = systemPrompt
+        )
+    }
+
+    /**
+     * Format a ToolValue map to JSON string for display.
+     * Uses kotlinx.serialization for proper JSON escaping of special characters.
+     */
+    private fun formatToolValueMapToJson(map: Map<String, ToolValue>): String {
+        val jsonObject = buildJsonObject {
+            map.forEach { (key, value) ->
+                put(key, formatToolValueToJsonElement(value))
+            }
+        }
+        return Json.encodeToString(JsonObject.serializer(), jsonObject)
+    }
+
+    /**
+     * Convert a ToolValue to the appropriate JsonElement type.
+     * Handles all ToolValue variants with proper JSON escaping.
+     */
+    private fun formatToolValueToJsonElement(value: ToolValue): JsonElement {
+        return when (value) {
+            is ToolValue.StringValue -> JsonPrimitive(value.value)
+            is ToolValue.NumberValue -> JsonPrimitive(value.value)
+            is ToolValue.BoolValue -> JsonPrimitive(value.value)
+            is ToolValue.NullValue -> JsonNull
+            is ToolValue.ArrayValue -> buildJsonArray {
+                value.value.forEach { add(formatToolValueToJsonElement(it)) }
+            }
+            is ToolValue.ObjectValue -> buildJsonObject {
+                value.value.forEach { (k, v) -> put(k, formatToolValueToJsonElement(v)) }
+            }
+        }
     }
 
     companion object {

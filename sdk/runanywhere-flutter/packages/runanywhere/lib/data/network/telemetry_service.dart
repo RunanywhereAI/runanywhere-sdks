@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:runanywhere/data/network/http_service.dart';
 import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
@@ -182,13 +181,6 @@ class TelemetryEvent {
       // But keep zero for doubles (confidence, real_time_factor, etc. can be 0.0)
       if (value is int && value == 0) return;
       json[key] = value;
-    }
-
-    // Helper to always add a value, even if zero (for fields that must be present)
-    void addAlways(String key, dynamic value) {
-      if (value != null) {
-        json[key] = value;
-      }
     }
 
     // Helper to get value from properties

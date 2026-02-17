@@ -274,9 +274,11 @@ private fun VoicePipelineSetupView(
             )
         }
 
-        // VStack(spacing: 16), .padding(.horizontal)
+        // VStack(spacing: 16), .padding(.horizontal) — scrollable for small screens
         Column(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             ModelSetupCard(

@@ -11,17 +11,23 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.runanywhere.runanywhereai.presentation.benchmarks.views.BenchmarkDashboardScreen
+import com.runanywhere.runanywhereai.presentation.benchmarks.views.BenchmarkDetailScreen
 import com.runanywhere.runanywhereai.presentation.chat.ChatScreen
 import com.runanywhere.runanywhereai.presentation.components.AppBottomNavigationBar
 import com.runanywhere.runanywhereai.presentation.components.BottomNavTab
 import com.runanywhere.runanywhereai.presentation.settings.SettingsScreen
 import com.runanywhere.runanywhereai.presentation.stt.SpeechToTextScreen
 import com.runanywhere.runanywhereai.presentation.tts.TextToSpeechScreen
+import com.runanywhere.runanywhereai.presentation.vision.VLMScreen
+import com.runanywhere.runanywhereai.presentation.vision.VisionHubScreen
 import com.runanywhere.runanywhereai.presentation.voice.VoiceAssistantScreen
 
 /**
- * Main navigation component
- * 5 tabs: Chat, Transcribe, Speak, Voice, Settings
+ * Main navigation component matching iOS app structure exactly.
+ * 5 tabs: Chat, Vision, Voice, More, Settings
+ *
+ * iOS Reference: examples/ios/RunAnywhereAI/RunAnywhereAI/App/ContentView.swift
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,6 +63,42 @@ fun AppNavigation() {
                 ChatScreen()
             }
 
+            // Vision hub — matches iOS VisionHubView
+            composable(NavigationRoute.VISION) {
+                VisionHubScreen(
+                    onNavigateToVLM = {
+                        navController.navigate(NavigationRoute.VLM)
+                    },
+                    onNavigateToImageGeneration = {
+                        // Future: navigate to image generation screen
+                    },
+                )
+            }
+
+            // VLM screen — nested route from Vision hub
+            composable(NavigationRoute.VLM) {
+                VLMScreen()
+            }
+
+            composable(NavigationRoute.VOICE) {
+                VoiceAssistantScreen()
+            }
+
+            // "More" hub routes — STT, TTS, and Benchmarks here to match iOS structure
+            composable(NavigationRoute.MORE) {
+                MoreHubScreen(
+                    onNavigateToSTT = {
+                        navController.navigate(NavigationRoute.STT)
+                    },
+                    onNavigateToTTS = {
+                        navController.navigate(NavigationRoute.TTS)
+                    },
+                    onNavigateToBenchmarks = {
+                        navController.navigate(NavigationRoute.BENCHMARKS)
+                    },
+                )
+            }
+
             composable(NavigationRoute.STT) {
                 SpeechToTextScreen()
             }
@@ -65,8 +107,17 @@ fun AppNavigation() {
                 TextToSpeechScreen()
             }
 
-            composable(NavigationRoute.VOICE) {
-                VoiceAssistantScreen()
+            composable(NavigationRoute.BENCHMARKS) {
+                BenchmarkDashboardScreen(
+                    onNavigateToDetail = { runId ->
+                        navController.navigate("${NavigationRoute.BENCHMARK_DETAIL}/$runId")
+                    },
+                )
+            }
+
+            composable("${NavigationRoute.BENCHMARK_DETAIL}/{runId}") { backStackEntry ->
+                val runId = backStackEntry.arguments?.getString("runId") ?: return@composable
+                BenchmarkDetailScreen(runId = runId)
             }
 
             composable(NavigationRoute.SETTINGS) {
@@ -76,13 +127,22 @@ fun AppNavigation() {
     }
 }
 
+/**
+ * Maps current route to bottom nav tab, including nested/child routes.
+ */
 private fun routeToBottomNavTab(route: String?): BottomNavTab {
-    return when (route) {
-        NavigationRoute.CHAT -> BottomNavTab.Chat
-        NavigationRoute.STT -> BottomNavTab.Transcribe
-        NavigationRoute.TTS -> BottomNavTab.Speak
-        NavigationRoute.VOICE -> BottomNavTab.Voice
-        NavigationRoute.SETTINGS -> BottomNavTab.Settings
+    return when {
+        route == null -> BottomNavTab.Chat
+        route == NavigationRoute.CHAT -> BottomNavTab.Chat
+        route == NavigationRoute.VISION || route == NavigationRoute.VLM -> BottomNavTab.Vision
+        route == NavigationRoute.VOICE -> BottomNavTab.Voice
+        route in listOf(
+            NavigationRoute.MORE,
+            NavigationRoute.STT,
+            NavigationRoute.TTS,
+            NavigationRoute.BENCHMARKS,
+        ) || route.startsWith(NavigationRoute.BENCHMARK_DETAIL) -> BottomNavTab.More
+        route == NavigationRoute.SETTINGS -> BottomNavTab.Settings
         else -> BottomNavTab.Chat
     }
 }
@@ -90,20 +150,27 @@ private fun routeToBottomNavTab(route: String?): BottomNavTab {
 private fun bottomNavTabToRoute(tab: BottomNavTab): String {
     return when (tab) {
         BottomNavTab.Chat -> NavigationRoute.CHAT
-        BottomNavTab.Transcribe -> NavigationRoute.STT
-        BottomNavTab.Speak -> NavigationRoute.TTS
+        BottomNavTab.Vision -> NavigationRoute.VISION
         BottomNavTab.Voice -> NavigationRoute.VOICE
+        BottomNavTab.More -> NavigationRoute.MORE
         BottomNavTab.Settings -> NavigationRoute.SETTINGS
     }
 }
 
 /**
- * Navigation routes
+ * Navigation routes matching iOS tabs exactly.
+ *
+ * iOS Reference: ContentView.swift TabView
  */
 object NavigationRoute {
     const val CHAT = "chat"
+    const val VISION = "vision"
+    const val VLM = "vlm"
+    const val VOICE = "voice"
+    const val MORE = "more"
     const val STT = "stt"
     const val TTS = "tts"
-    const val VOICE = "voice"
+    const val BENCHMARKS = "benchmarks"
+    const val BENCHMARK_DETAIL = "benchmark_detail"
     const val SETTINGS = "settings"
 }

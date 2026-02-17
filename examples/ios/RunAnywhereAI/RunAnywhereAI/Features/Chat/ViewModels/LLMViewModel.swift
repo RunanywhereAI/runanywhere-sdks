@@ -37,6 +37,10 @@ final class LLMViewModel {
 
     var currentInput = ""
     var useStreaming = true
+    var useToolCalling: Bool {
+        get { ToolSettingsViewModel.shared.toolCallingEnabled }
+        set { ToolSettingsViewModel.shared.toolCallingEnabled = newValue }
+    }
 
     // MARK: - Dependencies
 
@@ -241,6 +245,16 @@ final class LLMViewModel {
         options: LLMGenerationOptions,
         messageIndex: Int
     ) async throws {
+        // Check if tool calling is enabled and we have registered tools
+        let registeredTools = await RunAnywhere.getRegisteredTools()
+        let shouldUseToolCalling = useToolCalling && !registeredTools.isEmpty
+
+        if shouldUseToolCalling {
+            logger.info("Using tool calling with \(registeredTools.count) registered tools")
+            try await generateWithToolCalling(prompt: prompt, options: options, messageIndex: messageIndex)
+            return
+        }
+
         let modelSupportsStreaming = await RunAnywhere.supportsLLMStreaming
         let effectiveUseStreaming = useStreaming && modelSupportsStreaming
 
@@ -310,17 +324,30 @@ final class LLMViewModel {
     private func getGenerationOptions() -> LLMGenerationOptions {
         let savedTemperature = UserDefaults.standard.double(forKey: "defaultTemperature")
         let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
+        let savedSystemPrompt = UserDefaults.standard.string(forKey: "defaultSystemPrompt")
 
         let effectiveSettings = (
             temperature: savedTemperature != 0 ? savedTemperature : Self.defaultTemperatureValue,
             maxTokens: savedMaxTokens != 0 ? savedMaxTokens : Self.defaultMaxTokensValue
         )
 
-        return LLMGenerationOptions(
-            maxTokens: effectiveSettings.maxTokens,
-            temperature: Float(effectiveSettings.temperature)
-        )
-    }
+        let effectiveSystemPrompt = (savedSystemPrompt?.isEmpty == false) ? savedSystemPrompt : nil
+
+    let systemPromptInfo: String = {
+        guard let prompt = effectiveSystemPrompt else { return "nil" }
+        return "set(\(prompt.count) chars)"
+    }()
+
+    logger.info(
+        "[PARAMS] App getGenerationOptions: temperature=\(effectiveSettings.temperature), maxTokens=\(effectiveSettings.maxTokens), systemPrompt=\(systemPromptInfo)"
+    )
+
+    return LLMGenerationOptions(
+        maxTokens: effectiveSettings.maxTokens,
+        temperature: Float(effectiveSettings.temperature),
+        systemPrompt: effectiveSystemPrompt
+    )
+}
 
     // MARK: - Internal Methods - Helpers
 
@@ -336,10 +363,12 @@ final class LLMViewModel {
         let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
         let maxTokens = savedMaxTokens != 0 ? savedMaxTokens : Self.defaultMaxTokensValue
 
+        let savedSystemPrompt = UserDefaults.standard.string(forKey: "defaultSystemPrompt")
+
         UserDefaults.standard.set(temperature, forKey: "defaultTemperature")
         UserDefaults.standard.set(maxTokens, forKey: "defaultMaxTokens")
 
-        logger.info("Settings applied - Temperature: \(temperature), MaxTokens: \(maxTokens)")
+        logger.info("Settings applied - Temperature: \(temperature), MaxTokens: \(maxTokens), SystemPrompt: \(savedSystemPrompt ?? "nil")")
     }
 
     @objc

@@ -151,7 +151,7 @@ object RunAnywhereBridge {
      * Token callback interface for streaming generation.
      */
     fun interface TokenCallback {
-        fun onToken(token: String): Boolean
+        fun onToken(token: ByteArray): Boolean
     }
 
     /**
@@ -335,6 +335,116 @@ object RunAnywhereBridge {
         speechEndCallback: Any?,
         progressCallback: Any?,
     )
+
+    // ========================================================================
+    // VLM COMPONENT (rac_vlm_component.h)
+    // ========================================================================
+
+    @JvmStatic
+    external fun racVlmComponentCreate(): Long
+
+    @JvmStatic
+    external fun racVlmComponentDestroy(handle: Long)
+
+    @JvmStatic
+    external fun racVlmComponentLoadModel(
+        handle: Long,
+        modelPath: String,
+        mmprojPath: String?,
+        modelId: String,
+        modelName: String?,
+    ): Int
+
+    @JvmStatic
+    external fun racVlmComponentLoadModelById(handle: Long, modelId: String): Int
+
+    @JvmStatic
+    external fun racVlmComponentUnload(handle: Long): Int
+
+    @JvmStatic
+    external fun racVlmComponentCancel(handle: Long): Int
+
+    @JvmStatic
+    external fun racVlmComponentIsLoaded(handle: Long): Boolean
+
+    @JvmStatic
+    external fun racVlmComponentGetModelId(handle: Long): String?
+
+    /**
+     * Process an image (non-streaming).
+     *
+     * @param handle VLM component handle
+     * @param imageFormat Image format (0=FILE_PATH, 1=RGB_PIXELS, 2=BASE64)
+     * @param imagePath File path (for FILE_PATH format)
+     * @param imageData RGB pixel data (for RGB_PIXELS format)
+     * @param imageBase64 Base64-encoded data (for BASE64 format)
+     * @param imageWidth Image width (for RGB_PIXELS format)
+     * @param imageHeight Image height (for RGB_PIXELS format)
+     * @param prompt Text prompt
+     * @param optionsJson Generation options as JSON string
+     * @return JSON result string or null on error
+     */
+    @JvmStatic
+    external fun racVlmComponentProcess(
+        handle: Long,
+        imageFormat: Int,
+        imagePath: String?,
+        imageData: ByteArray?,
+        imageBase64: String?,
+        imageWidth: Int,
+        imageHeight: Int,
+        prompt: String,
+        optionsJson: String?,
+    ): String?
+
+    /**
+     * Process an image with streaming output.
+     * Calls tokenCallback for each generated token.
+     *
+     * @param handle VLM component handle
+     * @param imageFormat Image format (0=FILE_PATH, 1=RGB_PIXELS, 2=BASE64)
+     * @param imagePath File path (for FILE_PATH format)
+     * @param imageData RGB pixel data (for RGB_PIXELS format)
+     * @param imageBase64 Base64-encoded data (for BASE64 format)
+     * @param imageWidth Image width (for RGB_PIXELS format)
+     * @param imageHeight Image height (for RGB_PIXELS format)
+     * @param prompt Text prompt
+     * @param optionsJson Generation options as JSON string
+     * @param tokenCallback Callback invoked for each generated token
+     * @return JSON result string with final metrics, or null on error
+     */
+    @JvmStatic
+    external fun racVlmComponentProcessStream(
+        handle: Long,
+        imageFormat: Int,
+        imagePath: String?,
+        imageData: ByteArray?,
+        imageBase64: String?,
+        imageWidth: Int,
+        imageHeight: Int,
+        prompt: String,
+        optionsJson: String?,
+        tokenCallback: TokenCallback,
+    ): String?
+
+    @JvmStatic
+    external fun racVlmComponentSupportsStreaming(handle: Long): Boolean
+
+    @JvmStatic
+    external fun racVlmComponentGetState(handle: Long): Int
+
+    @JvmStatic
+    external fun racVlmComponentGetMetrics(handle: Long): String?
+
+    // ========================================================================
+    // HTTP DOWNLOAD (platform adapter callbacks)
+    // ========================================================================
+
+    @JvmStatic
+    external fun racHttpDownloadReportProgress(taskId: String, downloadedBytes: Long, totalBytes: Long): Int
+
+    @JvmStatic
+    external fun racHttpDownloadReportComplete(taskId: String, result: Int, downloadedPath: String?): Int
 
     // ========================================================================
     // BACKEND REGISTRATION
@@ -854,6 +964,97 @@ object RunAnywhereBridge {
         apiKey: String?,
         baseUrl: String?,
     ): Int
+
+    // ========================================================================
+    // TOOL CALLING API (rac_tool_calling.h)
+    // Mirrors Swift SDK's CppBridge+ToolCalling.swift
+    // ========================================================================
+
+    /**
+     * Parse LLM output for tool calls.
+     *
+     * @param llmOutput Raw LLM output text
+     * @return JSON string with parsed result, or null on error
+     */
+    @JvmStatic
+    external fun racToolCallParse(llmOutput: String): String?
+
+    /**
+     * Format tool definitions into system prompt.
+     *
+     * @param toolsJson JSON array of tool definitions
+     * @return Formatted prompt string, or null on error
+     */
+    @JvmStatic
+    external fun racToolCallFormatPromptJson(toolsJson: String): String?
+
+    /**
+     * Format tool definitions into system prompt with specified format (int).
+     *
+     * @param toolsJson JSON array of tool definitions
+     * @param format Tool calling format (0=AUTO, 1=DEFAULT, 2=LFM2, 3=OPENAI)
+     * @return Formatted prompt string, or null on error
+     */
+    @JvmStatic
+    external fun racToolCallFormatPromptJsonWithFormat(toolsJson: String, format: Int): String?
+
+    /**
+     * Format tool definitions into system prompt with format specified by name.
+     *
+     * *** PREFERRED API - Uses string format name ***
+     *
+     * Valid format names (case-insensitive): "auto", "default", "lfm2", "openai"
+     * C++ is single source of truth for format validation.
+     *
+     * @param toolsJson JSON array of tool definitions
+     * @param formatName Format name string (e.g., "lfm2", "default")
+     * @return Formatted prompt string, or null on error
+     */
+    @JvmStatic
+    external fun racToolCallFormatPromptJsonWithFormatName(toolsJson: String, formatName: String): String?
+
+    /**
+     * Build initial prompt with tools and user query.
+     *
+     * @param userPrompt The user's question/request
+     * @param toolsJson JSON array of tool definitions
+     * @param optionsJson Options as JSON (nullable)
+     * @return Complete formatted prompt, or null on error
+     */
+    @JvmStatic
+    external fun racToolCallBuildInitialPrompt(
+        userPrompt: String,
+        toolsJson: String,
+        optionsJson: String?,
+    ): String?
+
+    /**
+     * Build follow-up prompt after tool execution.
+     *
+     * @param originalPrompt The original user prompt
+     * @param toolsPrompt Formatted tools prompt (nullable)
+     * @param toolName Name of the tool that was executed
+     * @param toolResultJson JSON string of the tool result
+     * @param keepToolsAvailable Whether to include tool definitions
+     * @return Follow-up prompt, or null on error
+     */
+    @JvmStatic
+    external fun racToolCallBuildFollowupPrompt(
+        originalPrompt: String,
+        toolsPrompt: String?,
+        toolName: String,
+        toolResultJson: String,
+        keepToolsAvailable: Boolean,
+    ): String?
+
+    /**
+     * Normalize JSON by adding quotes around unquoted keys.
+     *
+     * @param jsonStr Raw JSON string possibly with unquoted keys
+     * @return Normalized JSON string, or null on error
+     */
+    @JvmStatic
+    external fun racToolCallNormalizeJson(jsonStr: String): String?
 
     // ========================================================================
     // CONSTANTS
