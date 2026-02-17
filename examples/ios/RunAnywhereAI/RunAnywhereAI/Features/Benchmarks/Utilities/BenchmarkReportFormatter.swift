@@ -152,7 +152,12 @@ enum BenchmarkReportFormatter {
             row.append(String(m.memoryDeltaBytes))
             row.append(m.didSucceed ? "true" : "false")
             row.append(m.errorMessage ?? "")
-            let escaped = row.map { $0.contains(",") ? "\"\($0)\"" : $0 }
+            let escaped = row.map { field -> String in
+                if field.contains(",") || field.contains("\"") || field.contains("\n") || field.contains("\r") {
+                    return "\"\(field.replacingOccurrences(of: "\"", with: "\"\""))\""
+                }
+                return field
+            }
             csv += escaped.joined(separator: ",") + "\n"
         }
         let url = FileManager.default.temporaryDirectory

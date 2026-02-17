@@ -20,8 +20,7 @@ struct DiffusionBenchmarkProvider: BenchmarkScenarioProvider {
 
     func execute(
         scenario: BenchmarkScenario,
-        model: ModelInfo,
-        deviceInfo: BenchmarkDeviceInfo
+        model: ModelInfo
     ) async throws -> BenchmarkMetrics {
         var metrics = BenchmarkMetrics()
 
@@ -47,26 +46,32 @@ struct DiffusionBenchmarkProvider: BenchmarkScenarioProvider {
         )
         metrics.loadTimeMs = Date().timeIntervalSince(loadStart) * 1000
 
-        defer { Task { try? await RunAnywhere.unloadDiffusionModel() } }
-
-        // Generate
-        let benchStart = Date()
-        let options = DiffusionGenerationOptions(
-            prompt: "A red circle on a white background",
-            width: 512,
-            height: 512,
-            steps: 10,
-            guidanceScale: 0.0,
-            seed: 42
-        )
+        do {
+            // Generate
+            let benchStart = Date()
+            let options = DiffusionGenerationOptions(
+                prompt: "A red circle on a white background",
+                width: 512,
+                height: 512,
+                steps: 10,
+                guidanceScale: 0.0,
+                seed: 42
+            )
+            // Note: prompt: is required by the SDK API signature, but is ignored when options is provided
+        // (the SDK uses `options ?? DiffusionGenerationOptions(prompt: prompt)`).
         let result = try await RunAnywhere.generateImage(prompt: options.prompt, options: options)
 
-        metrics.endToEndLatencyMs = Date().timeIntervalSince(benchStart) * 1000
-        metrics.generationTimeMs = Double(result.generationTimeMs)
+            metrics.endToEndLatencyMs = Date().timeIntervalSince(benchStart) * 1000
+            metrics.generationTimeMs = Double(result.generationTimeMs)
 
-        let memAfter = SyntheticInputGenerator.availableMemoryBytes()
-        metrics.memoryDeltaBytes = memBefore - memAfter
+            let memAfter = SyntheticInputGenerator.availableMemoryBytes()
+            metrics.memoryDeltaBytes = memBefore - memAfter
 
-        return metrics
+            try? await RunAnywhere.unloadDiffusionModel()
+            return metrics
+        } catch {
+            try? await RunAnywhere.unloadDiffusionModel()
+            throw error
+        }
     }
 }
