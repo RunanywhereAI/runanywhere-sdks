@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -43,6 +44,7 @@ import androidx.compose.ui.unit.sp
 fun MoreHubScreen(
     onNavigateToSTT: () -> Unit,
     onNavigateToTTS: () -> Unit,
+    onNavigateToBenchmarks: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -83,6 +85,25 @@ fun MoreHubScreen(
                 title = "Text to Speech",
                 subtitle = "Convert text to natural-sounding speech",
                 onClick = onNavigateToTTS,
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Performance section
+            Text(
+                "Performance",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+            )
+
+            // Benchmarks
+            MoreFeatureCard(
+                icon = Icons.Filled.Speed,
+                iconColor = Color(0xFFFF5500), // Brand orange
+                title = "Benchmarks",
+                subtitle = "Measure on-device AI performance across models",
+                onClick = onNavigateToBenchmarks,
             )
 
             Spacer(modifier = Modifier.height(16.dp))

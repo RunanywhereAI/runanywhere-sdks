@@ -38,6 +38,7 @@ final class BenchmarkViewModel {
     private let runner = BenchmarkRunner()
     private let store = BenchmarkStore()
     private var runTask: Task<Void, Never>?
+    private var toastTask: Task<Void, Never>?
 
     // MARK: - Lifecycle
 
@@ -63,7 +64,7 @@ final class BenchmarkViewModel {
             var run = BenchmarkRun(deviceInfo: deviceInfo)
 
             do {
-                let results = try await runner.runBenchmarks(
+                let output = try await runner.runBenchmarks(
                     categories: selectedCategories
                 ) { [weak self] update in
                     Task { @MainActor in
@@ -75,15 +76,13 @@ final class BenchmarkViewModel {
                     }
                 }
 
-                // Check for skipped categories via preflight
-                let preflight = try? await runner.preflight(categories: selectedCategories)
-                if let skipped = preflight?.skippedCategories, !skipped.isEmpty {
-                    let names = skipped.map(\.displayName).joined(separator: ", ")
+                if !output.skippedCategories.isEmpty {
+                    let names = output.skippedCategories.map(\.displayName).joined(separator: ", ")
                     skippedCategoriesMessage = "Skipped (no models): \(names)"
                 }
 
-                run.results = results
-                run.status = results.allSatisfy(\.metrics.didSucceed) ? .completed : .completed
+                run.results = output.results
+                run.status = output.results.allSatisfy(\.metrics.didSucceed) ? .completed : .failed
                 run.completedAt = Date()
             } catch is CancellationError {
                 run.status = .cancelled
@@ -126,8 +125,9 @@ final class BenchmarkViewModel {
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
         copiedToastMessage = "\(format.displayName) copied!"
-        // Auto-dismiss after 2s
-        Task {
+        // Auto-dismiss after 2s — cancel any previous dismiss task
+        toastTask?.cancel()
+        toastTask = Task {
             try? await Task.sleep(for: .seconds(2))
             copiedToastMessage = nil
         }

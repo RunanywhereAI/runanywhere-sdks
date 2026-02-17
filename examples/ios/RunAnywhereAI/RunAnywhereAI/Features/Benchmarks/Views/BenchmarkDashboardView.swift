@@ -153,7 +153,10 @@ struct BenchmarkDashboardView: View {
         } message: {
             Text("This will permanently delete all benchmark history.")
         }
-        .alert("Benchmark Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+        .alert("Benchmark Error", isPresented: Binding(
+            get: { viewModel.errorMessage != nil },
+            set: { if !$0 { viewModel.errorMessage = nil } }
+        )) {
             Button("OK") { viewModel.errorMessage = nil }
         } message: {
             if let error = viewModel.errorMessage {
@@ -278,7 +281,7 @@ private struct RunRow: View {
 
 // MARK: - Run Status Badge
 
-private struct RunStatusBadge: View {
+struct RunStatusBadge: View {
     let status: BenchmarkRunStatus
 
     var body: some View {

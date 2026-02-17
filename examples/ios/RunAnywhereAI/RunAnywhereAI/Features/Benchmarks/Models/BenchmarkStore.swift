@@ -17,18 +17,18 @@ final class BenchmarkStore: Sendable {
         return docs.appendingPathComponent(fileName)
     }
 
-    private static var decoder: JSONDecoder {
+    private static let decoder: JSONDecoder = {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .iso8601
         return d
-    }
+    }()
 
-    private static var encoder: JSONEncoder {
+    private static let encoder: JSONEncoder = {
         let e = JSONEncoder()
         e.dateEncodingStrategy = .iso8601
         e.outputFormatting = [.prettyPrinted, .sortedKeys]
         return e
-    }
+    }()
 
     func loadRuns() -> [BenchmarkRun] {
         guard FileManager.default.fileExists(atPath: Self.fileURL.path) else { return [] }
