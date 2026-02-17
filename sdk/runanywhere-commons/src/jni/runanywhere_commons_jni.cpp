@@ -17,6 +17,7 @@
 #include <jni.h>
 
 #include <condition_variable>
+#include <chrono>
 #include <cstring>
 #include <mutex>
 #include <string>
@@ -868,7 +869,12 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
     // Wait for streaming to complete
     {
         std::unique_lock<std::mutex> lock(ctx.mtx);
-        ctx.cv.wait(lock, [&ctx] { return ctx.is_complete; });
+        constexpr auto kStreamWaitTimeout = std::chrono::minutes(10);
+        if (!ctx.cv.wait_for(lock, kStreamWaitTimeout, [&ctx] { return ctx.is_complete; })) {
+            ctx.has_error = true;
+            ctx.error_message = "Streaming timed out waiting for completion callback";
+            ctx.is_complete = true;
+        }
     }
 
     if (ctx.has_error) {
@@ -992,7 +998,12 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
     // Wait until completion/error before releasing callback/context.
     {
         std::unique_lock<std::mutex> lock(ctx.mtx);
-        ctx.cv.wait(lock, [&ctx] { return ctx.is_complete; });
+        constexpr auto kStreamWaitTimeout = std::chrono::minutes(10);
+        if (!ctx.cv.wait_for(lock, kStreamWaitTimeout, [&ctx] { return ctx.is_complete; })) {
+            ctx.has_error = true;
+            ctx.error_message = "Streaming timed out waiting for completion callback";
+            ctx.is_complete = true;
+        }
     }
 
     // Clean up global ref after callbacks have finished.
