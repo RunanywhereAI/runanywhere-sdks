@@ -356,18 +356,12 @@ struct FlatModelRow: View {
             let progressStream = try await RunAnywhere.downloadModel(model.id)
 
             for await progress in progressStream {
-                await MainActor.run {
-                    self.downloadProgress = progress.overallProgress
-                    if progress.stage != .completed {
-                        self.downloadStage = progress.stage
-                    }
-                }
-
                 switch progress.state {
                 case .completed:
                     await MainActor.run {
                         self.downloadProgress = 1.0
                         self.isDownloading = false
+                        self.downloadStage = .downloading
                         onDownloadCompleted()
                     }
                     return
@@ -381,6 +375,10 @@ struct FlatModelRow: View {
                     return
 
                 default:
+                    await MainActor.run {
+                        self.downloadProgress = progress.overallProgress
+                        self.downloadStage = progress.stage
+                    }
                     continue
                 }
             }
