@@ -74,8 +74,8 @@ public final class LiveTranscriptionSession: ObservableObject {
                     continuation.yield(text)
                 }
             }
-            continuation.onTermination = { [weak self] _ in
-                Task { @MainActor in
+            continuation.onTermination = { @Sendable [weak self] _ in
+                Task { @MainActor [weak self] in
                     self?.onPartialCallback = nil
                 }
             }
