@@ -319,7 +319,14 @@ public enum RunAnywhere {
             logger.info("Initializing services for \(environment.description) mode...")
 
             // Step 1: Configure HTTP transport
-            try await setupHTTP(params: params, environment: environment, logger: logger)
+            do {
+                try await setupHTTP(params: params, environment: environment, logger: logger)
+            } catch {
+                // If HTTP/auth setup fails (e.g. device is offline), log warning but
+                // continue initialization so local/cached models remain accessible.
+                logger.warning("⚠️ HTTP/Auth setup failed (offline?): \(error.localizedDescription)")
+                logger.info("Continuing SDK init in offline mode – local models will be available")
+            }
 
             // Step 1.5: Flush any queued telemetry events now that HTTP is configured
             // This ensures events queued during initialization are sent
