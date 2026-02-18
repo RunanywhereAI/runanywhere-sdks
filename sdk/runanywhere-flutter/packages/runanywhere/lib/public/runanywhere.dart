@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -20,6 +21,7 @@ import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_model_paths.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart'
     hide ModelInfo;
+import 'package:runanywhere/native/dart_bridge_structured_output.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
@@ -1215,6 +1217,15 @@ class RunAnywhere {
         isStreaming: false,
       );
 
+      // Extract structured data if structuredOutput is provided
+      dynamic structuredData;
+      if (opts.structuredOutput != null) {
+        final jsonString = DartBridgeStructuredOutput.shared.extractJson(result.text);
+        if (jsonString != null) {
+          structuredData = jsonDecode(jsonString);
+        }
+      }
+
       return LLMGenerationResult(
         text: result.text,
         inputTokens: result.promptTokens,
@@ -1223,6 +1234,7 @@ class RunAnywhere {
         latencyMs: latencyMs,
         framework: 'llamacpp',
         tokensPerSecond: tokensPerSecond,
+        structuredData: structuredData,
       );
     } catch (e) {
       // Track generation failure
@@ -1360,14 +1372,25 @@ class RunAnywhere {
         isStreaming: true,
       );
 
+      // Extract structured data if structuredOutput is provided
+      dynamic structuredData;
+      final fullText = allTokens.join();
+      if (opts.structuredOutput != null) {
+        final jsonString = DartBridgeStructuredOutput.shared.extractJson(fullText);
+        if (jsonString != null) {
+          structuredData = jsonDecode(jsonString);
+        }
+      }
+
       return LLMGenerationResult(
-        text: allTokens.join(),
+        text: fullText,
         inputTokens: promptTokens,
         tokensUsed: completionTokens,
         modelUsed: modelId,
         latencyMs: latencyMs,
         framework: 'llamacpp',
         tokensPerSecond: tokensPerSecond,
+        structuredData: structuredData,
       );
     });
 

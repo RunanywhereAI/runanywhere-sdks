@@ -7,6 +7,7 @@ library generation_types;
 import 'dart:typed_data';
 
 import 'package:runanywhere/core/types/model_types.dart';
+import 'package:runanywhere/public/types/structured_output_types.dart';
 
 /// Options for LLM text generation
 /// Matches Swift's LLMGenerationOptions
@@ -18,6 +19,7 @@ class LLMGenerationOptions {
   final bool streamingEnabled;
   final InferenceFramework? preferredFramework;
   final String? systemPrompt;
+  final StructuredOutputConfig? structuredOutput;
 
   const LLMGenerationOptions({
     this.maxTokens = 100,
@@ -27,6 +29,7 @@ class LLMGenerationOptions {
     this.streamingEnabled = false,
     this.preferredFramework,
     this.systemPrompt,
+    this.structuredOutput,
   });
 }
 
@@ -44,6 +47,7 @@ class LLMGenerationResult {
   final double? timeToFirstTokenMs;
   final int thinkingTokens;
   final int responseTokens;
+  final dynamic structuredData;
 
   const LLMGenerationResult({
     required this.text,
@@ -57,6 +61,7 @@ class LLMGenerationResult {
     this.timeToFirstTokenMs,
     this.thinkingTokens = 0,
     this.responseTokens = 0,
+    this.structuredData,
   });
 }
 
