@@ -29,6 +29,10 @@ Brief description of the changes made.
 - [ ] Tested on iOS
 - [ ] Tested on Android
 
+**Playground:**
+- [ ] Tested on target platform
+- [ ] Verified no regressions in existing Playground projects
+
 ## Labels
 Please add the appropriate label(s):
 
