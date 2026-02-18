@@ -28,7 +28,7 @@ Or open the project in Android Studio and wait for Gradle sync.
 
 ## Gradle Project Structure
 
-```
+```text
 RunAnywhere (root)
 ├── :runanywhere-kotlin           # KMP SDK (JVM + Android)
 ├── :runanywhere-core-llamacpp    # LLM backend (optional)

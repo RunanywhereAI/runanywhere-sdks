@@ -81,9 +81,9 @@ kotlin {
             dependencies {
                 // Core SDK — resolve by finding the project whose dir matches the SDK root
                 api(
-                    rootProject.allprojects.first {
+                    rootProject.allprojects.firstOrNull {
                         it.projectDir.canonicalPath == projectDir.resolve("../..").canonicalPath
-                    },
+                    } ?: error("Cannot find core SDK project at ${projectDir.resolve("../..")}"),
                 )
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)

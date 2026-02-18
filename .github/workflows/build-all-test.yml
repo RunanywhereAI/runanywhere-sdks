@@ -150,7 +150,6 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew publishToMavenLocal -Prunanywhere.testLocal=false
-        continue-on-error: true
 
       - name: Build IntelliJ Plugin
         working-directory: examples/intellij-plugin-demo/plugin
