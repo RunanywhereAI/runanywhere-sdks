@@ -162,11 +162,78 @@ echo "Version: ${SHERPA_VERSION}"
 echo -e "${GREEN}✅ Pre-built libraries are 16KB aligned (Play Store ready)${NC}"
 echo ""
 
+# Function to ensure all required headers are present
+# Can be called independently of the main archive download
+ensure_headers() {
+    # Download Sherpa-ONNX headers if not present
+    if [ ! -d "${SHERPA_DIR}/include/sherpa-onnx" ]; then
+        echo ""
+        echo "Downloading Sherpa-ONNX headers (v${SHERPA_VERSION})..."
+        mkdir -p "${SHERPA_DIR}/include/sherpa-onnx/c-api"
+
+        # ⚠️  CRITICAL: Headers MUST come from the EXACT SAME version as the prebuilt .so files.
+        echo "Downloading headers from Sherpa-ONNX source (v${SHERPA_VERSION})..."
+        curl -sL "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v${SHERPA_VERSION}/sherpa-onnx/c-api/c-api.h" \
+            -o "${SHERPA_DIR}/include/sherpa-onnx/c-api/c-api.h"
+        curl -sL "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v${SHERPA_VERSION}/sherpa-onnx/c-api/cxx-api.h" \
+            -o "${SHERPA_DIR}/include/sherpa-onnx/c-api/cxx-api.h"
+
+        echo "${SHERPA_VERSION}" > "${SHERPA_DIR}/include/.sherpa-header-version"
+        echo "✅ Sherpa-ONNX headers installed (v${SHERPA_VERSION})"
+    else
+        # Validate that existing headers match the expected version
+        if [ -f "${SHERPA_DIR}/include/.sherpa-header-version" ]; then
+            local EXISTING_VER
+            EXISTING_VER=$(cat "${SHERPA_DIR}/include/.sherpa-header-version")
+            if [ "${EXISTING_VER}" != "${SHERPA_VERSION}" ]; then
+                echo -e "${YELLOW}⚠️  Header version mismatch: headers are v${EXISTING_VER} but .so is v${SHERPA_VERSION}${NC}"
+                echo -e "${YELLOW}   Re-downloading headers to match .so version...${NC}"
+                rm -rf "${SHERPA_DIR}/include/sherpa-onnx"
+                rm -f "${SHERPA_DIR}/include/.sherpa-header-version"
+                mkdir -p "${SHERPA_DIR}/include/sherpa-onnx/c-api"
+                curl -sL "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v${SHERPA_VERSION}/sherpa-onnx/c-api/c-api.h" \
+                    -o "${SHERPA_DIR}/include/sherpa-onnx/c-api/c-api.h"
+                curl -sL "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v${SHERPA_VERSION}/sherpa-onnx/c-api/cxx-api.h" \
+                    -o "${SHERPA_DIR}/include/sherpa-onnx/c-api/cxx-api.h"
+                echo "${SHERPA_VERSION}" > "${SHERPA_DIR}/include/.sherpa-header-version"
+                echo -e "${GREEN}✅ Headers updated to v${SHERPA_VERSION}${NC}"
+            fi
+        fi
+    fi
+
+    # Download ONNX Runtime headers (required for ONNX backend compilation)
+    if [ ! -f "${SHERPA_DIR}/include/onnxruntime_c_api.h" ] || [ ! -f "${SHERPA_DIR}/include/onnxruntime_cxx_api.h" ]; then
+        echo ""
+        echo "Downloading ONNX Runtime headers..."
+        if [ -z "${ONNX_VERSION_ANDROID:-}" ]; then
+            echo "ERROR: ONNX_VERSION_ANDROID not loaded from VERSIONS file" >&2
+            exit 1
+        fi
+        local ONNX_RT_VERSION="${ONNX_VERSION_ANDROID}"
+        local ONNX_HEADER_BASE="https://raw.githubusercontent.com/microsoft/onnxruntime/v${ONNX_RT_VERSION}/include/onnxruntime/core/session"
+        # C API (used by onnx_backend.cpp)
+        curl -sL "${ONNX_HEADER_BASE}/onnxruntime_c_api.h" \
+            -o "${SHERPA_DIR}/include/onnxruntime_c_api.h"
+        # C++ API wrapper (used by wakeword_onnx.cpp)
+        curl -sL "${ONNX_HEADER_BASE}/onnxruntime_cxx_api.h" \
+            -o "${SHERPA_DIR}/include/onnxruntime_cxx_api.h"
+        curl -sL "${ONNX_HEADER_BASE}/onnxruntime_cxx_inline.h" \
+            -o "${SHERPA_DIR}/include/onnxruntime_cxx_inline.h"
+        curl -sL "${ONNX_HEADER_BASE}/onnxruntime_float16.h" \
+            -o "${SHERPA_DIR}/include/onnxruntime_float16.h"
+        echo "✅ ONNX Runtime headers installed (v${ONNX_RT_VERSION})"
+    fi
+}
+
 # Check if already exists
 if [ -d "${SHERPA_DIR}/jniLibs" ]; then
     if [ -f "${SHERPA_DIR}/jniLibs/arm64-v8a/libsherpa-onnx-jni.so" ]; then
         echo "✅ Sherpa-ONNX Android libraries already exist"
         echo "   Location: ${SHERPA_DIR}"
+
+        # Ensure headers are present (may have been added after initial download)
+        ensure_headers
+
         echo ""
         echo "To force re-download, remove the directory first:"
         echo "   rm -rf ${SHERPA_DIR}"
@@ -234,60 +301,8 @@ if [ "${HTTP_CODE}" = "200" ] && [ -f "${TEMP_ARCHIVE}" ] && [ -s "${TEMP_ARCHIV
     # Clean up
     rm -rf "${TEMP_DIR}"
 
-    # Download headers if not present (Android release doesn't include them)
-    if [ ! -d "${SHERPA_DIR}/include/sherpa-onnx" ]; then
-        echo ""
-        echo "Downloading Sherpa-ONNX headers (v${SHERPA_VERSION})..."
-        mkdir -p "${SHERPA_DIR}/include/sherpa-onnx/c-api"
-
-        # ⚠️  CRITICAL: Headers MUST come from the EXACT SAME version as the prebuilt .so files.
-        # DO NOT use iOS headers here — iOS may use a different Sherpa-ONNX version
-        # (e.g., SHERPA_ONNX_VERSION_IOS=1.12.18 vs SHERPA_ONNX_VERSION_ANDROID=1.12.20).
-        # A version mismatch causes struct layout differences (ABI mismatch) that result in
-        # SIGSEGV crashes in SherpaOnnxCreateOfflineRecognizer at runtime.
-        echo "Downloading headers from Sherpa-ONNX source (v${SHERPA_VERSION})..."
-        curl -sL "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v${SHERPA_VERSION}/sherpa-onnx/c-api/c-api.h" \
-            -o "${SHERPA_DIR}/include/sherpa-onnx/c-api/c-api.h"
-        curl -sL "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v${SHERPA_VERSION}/sherpa-onnx/c-api/cxx-api.h" \
-            -o "${SHERPA_DIR}/include/sherpa-onnx/c-api/cxx-api.h"
-
-        # Stamp the version so we can detect mismatches later
-        echo "${SHERPA_VERSION}" > "${SHERPA_DIR}/include/.sherpa-header-version"
-        echo "✅ Sherpa-ONNX headers installed (v${SHERPA_VERSION})"
-    else
-        # Validate that existing headers match the expected version
-        if [ -f "${SHERPA_DIR}/include/.sherpa-header-version" ]; then
-            EXISTING_VER=$(cat "${SHERPA_DIR}/include/.sherpa-header-version")
-            if [ "${EXISTING_VER}" != "${SHERPA_VERSION}" ]; then
-                echo -e "${YELLOW}⚠️  Header version mismatch: headers are v${EXISTING_VER} but .so is v${SHERPA_VERSION}${NC}"
-                echo -e "${YELLOW}   Re-downloading headers to match .so version...${NC}"
-                rm -rf "${SHERPA_DIR}/include/sherpa-onnx"
-                rm -f "${SHERPA_DIR}/include/.sherpa-header-version"
-                mkdir -p "${SHERPA_DIR}/include/sherpa-onnx/c-api"
-                curl -sL "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v${SHERPA_VERSION}/sherpa-onnx/c-api/c-api.h" \
-                    -o "${SHERPA_DIR}/include/sherpa-onnx/c-api/c-api.h"
-                curl -sL "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v${SHERPA_VERSION}/sherpa-onnx/c-api/cxx-api.h" \
-                    -o "${SHERPA_DIR}/include/sherpa-onnx/c-api/cxx-api.h"
-                echo "${SHERPA_VERSION}" > "${SHERPA_DIR}/include/.sherpa-header-version"
-                echo -e "${GREEN}✅ Headers updated to v${SHERPA_VERSION}${NC}"
-            fi
-        fi
-    fi
-
-    # Download ONNX Runtime C API header (required for ONNX backend compilation)
-    # Uses ONNX_VERSION_ANDROID from VERSIONS file (Sherpa-ONNX must be compatible)
-    if [ ! -f "${SHERPA_DIR}/include/onnxruntime_c_api.h" ]; then
-        echo ""
-        echo "Downloading ONNX Runtime C API header..."
-        if [ -z "${ONNX_VERSION_ANDROID:-}" ]; then
-            echo "ERROR: ONNX_VERSION_ANDROID not loaded from VERSIONS file" >&2
-            exit 1
-        fi
-        ONNX_RT_VERSION="${ONNX_VERSION_ANDROID}"
-        curl -sL "https://raw.githubusercontent.com/microsoft/onnxruntime/v${ONNX_RT_VERSION}/include/onnxruntime/core/session/onnxruntime_c_api.h" \
-            -o "${SHERPA_DIR}/include/onnxruntime_c_api.h"
-        echo "✅ ONNX Runtime header installed (v${ONNX_RT_VERSION})"
-    fi
+    # Ensure all headers are present (Sherpa-ONNX + ONNX Runtime)
+    ensure_headers
 
     echo ""
     echo "✅ Sherpa-ONNX Android libraries downloaded to ${SHERPA_DIR}"

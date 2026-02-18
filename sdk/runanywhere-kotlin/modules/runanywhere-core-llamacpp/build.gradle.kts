@@ -24,20 +24,14 @@ plugins {
     signing
 }
 
-// =============================================================================
-// Configuration
-// =============================================================================
-// Note: This module does NOT handle native libs - main SDK bundles everything
 val testLocal: Boolean =
     rootProject.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
         ?: project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
         ?: false
 
-logger.lifecycle("LlamaCPP Module: testLocal=$testLocal (native libs handled by main SDK)")
+logger.lifecycle("LlamaCPP Module: testLocal=$testLocal")
 
-// =============================================================================
-// Detekt Configuration
-// =============================================================================
+// Detekt
 detekt {
     buildUponDefaultConfig = true
     allRules = false
@@ -50,9 +44,7 @@ detekt {
     )
 }
 
-// =============================================================================
-// ktlint Configuration
-// =============================================================================
+// ktlint
 ktlint {
     version.set("1.5.0")
     android.set(true)
@@ -65,10 +57,6 @@ ktlint {
     }
 }
 
-// =============================================================================
-// Kotlin Multiplatform Configuration
-// =============================================================================
-
 kotlin {
     jvm {
         compilations.all {
@@ -77,10 +65,8 @@ kotlin {
     }
 
     androidTarget {
-        // Enable publishing Android AAR to Maven
         publishLibraryVariants("release")
 
-        // Set correct artifact ID for Android publication
         mavenPublication {
             artifactId = "runanywhere-llamacpp-android"
         }
@@ -93,8 +79,12 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                // Core SDK dependency for interfaces and models
-                api(project.parent!!.parent!!)
+                // Core SDK — resolve by finding the project whose dir matches the SDK root
+                api(
+                    rootProject.allprojects.first {
+                        it.projectDir.canonicalPath == projectDir.resolve("../..").canonicalPath
+                    },
+                )
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
             }
@@ -107,7 +97,6 @@ kotlin {
             }
         }
 
-        // Shared JVM/Android code
         val jvmAndroidMain by creating {
             dependsOn(commonMain)
         }
@@ -125,21 +114,15 @@ kotlin {
     }
 }
 
-// =============================================================================
-// Android Configuration
-// =============================================================================
-
 android {
     namespace = "com.runanywhere.sdk.core.llamacpp"
     compileSdk = 36
 
     defaultConfig {
         minSdk = 24
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
-            // Support ARM64 devices and x86_64 emulators
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
     }
@@ -165,34 +148,17 @@ android {
         }
     }
 
-    // ==========================================================================
-    // JNI Libraries - Self-Contained
-    // ==========================================================================
-    // This module bundles its own native libs:
-    //   - librac_backend_llamacpp.so - LlamaCPP C++ backend (with VLM mtmd)
-    //   - librac_backend_llamacpp_jni.so - LlamaCPP JNI bridge
-    //
-    // Downloaded from RABackendLLAMACPP-android GitHub release assets.
-    // In local mode, build-kotlin.sh copies them to src/androidMain/jniLibs/.
-    // ==========================================================================
+    // Native libs: librac_backend_llamacpp.so, librac_backend_llamacpp_jni.so
+    // Downloaded from RABackendLLAMACPP-android GitHub release assets, or built locally.
 }
 
-// =============================================================================
-// Native Library Version for Downloads (mirrors root SDK pattern)
-// =============================================================================
+// Native lib version for downloads
 val nativeLibVersion: String =
     rootProject.findProperty("runanywhere.nativeLibVersion")?.toString()
         ?: project.findProperty("runanywhere.nativeLibVersion")?.toString()
         ?: (System.getenv("SDK_VERSION")?.removePrefix("v") ?: "0.1.5-SNAPSHOT")
 
-// =============================================================================
-// JNI Library Download Task (for testLocal=false mode)
-// =============================================================================
-// Downloads LlamaCPP backend native libs from GitHub releases.
-// Only libs owned by this module:
-//   - librac_backend_llamacpp.so
-//   - librac_backend_llamacpp_jni.so
-// =============================================================================
+// Download LlamaCPP backend libs from GitHub releases (testLocal=false)
 tasks.register("downloadJniLibs") {
     group = "runanywhere"
     description = "Download LlamaCPP backend JNI libraries from GitHub releases"
@@ -206,7 +172,6 @@ tasks.register("downloadJniLibs") {
     val targetAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64")
     val packageType = "RABackendLLAMACPP-android"
 
-    // Whitelist: only keep LlamaCPP-owned .so files
     val llamacppLibs = setOf(
         "librac_backend_llamacpp.so",
         "librac_backend_llamacpp_jni.so",
@@ -226,10 +191,7 @@ tasks.register("downloadJniLibs") {
         outputDir.mkdirs()
         tempDir.mkdirs()
 
-        logger.lifecycle("")
-        logger.lifecycle("═══════════════════════════════════════════════════════════════")
-        logger.lifecycle(" LlamaCPP Module: Downloading backend JNI libraries")
-        logger.lifecycle("═══════════════════════════════════════════════════════════════")
+        logger.lifecycle("LlamaCPP Module: Downloading backend JNI libraries")
 
         var totalDownloaded = 0
 
@@ -241,7 +203,7 @@ tasks.register("downloadJniLibs") {
             val zipUrl = "$releaseBaseUrl/$packageName"
             val tempZip = file("$tempDir/$packageName")
 
-            logger.lifecycle("▶ Downloading: $packageName")
+            logger.lifecycle("  Downloading: $packageName")
 
             try {
                 ant.withGroovyBuilder {
@@ -260,22 +222,21 @@ tasks.register("downloadJniLibs") {
                     .forEach { soFile ->
                         val targetFile = file("$abiOutputDir/${soFile.name}")
                         soFile.copyTo(targetFile, overwrite = true)
-                        logger.lifecycle("  ✓ ${soFile.name}")
+                        logger.lifecycle("    ${soFile.name}")
                         totalDownloaded++
                     }
 
                 tempZip.delete()
             } catch (e: Exception) {
-                logger.warn("  ⚠ Failed to download $packageName: ${e.message}")
+                logger.warn("  Failed to download $packageName: ${e.message}")
             }
         }
 
         tempDir.deleteRecursively()
-        logger.lifecycle("✓ LlamaCPP: $totalDownloaded .so files downloaded")
+        logger.lifecycle("LlamaCPP: $totalDownloaded .so files downloaded")
     }
 }
 
-// Ensure JNI libs are available before Android build
 tasks.matching { it.name.contains("merge") && it.name.contains("JniLibFolders") }.configureEach {
     if (!testLocal) dependsOn("downloadJniLibs")
 }
@@ -283,39 +244,28 @@ tasks.matching { it.name == "preBuild" }.configureEach {
     if (!testLocal) dependsOn("downloadJniLibs")
 }
 
-// =============================================================================
-// Include third-party licenses in JVM JAR
-// =============================================================================
-
 tasks.named<Jar>("jvmJar") {
     from(rootProject.file("THIRD_PARTY_LICENSES.md")) {
         into("META-INF")
     }
 }
 
-// =============================================================================
-// Maven Central Publishing Configuration
-// =============================================================================
-// Consumer usage (after publishing):
-//   implementation("com.runanywhere:runanywhere-llamacpp:1.0.0")
-// =============================================================================
+// Maven Central publishing
+// Usage: implementation("com.runanywhere:runanywhere-llamacpp:1.0.0")
 
-// Maven Central group ID - using verified namespace
 val isJitPack = System.getenv("JITPACK") == "true"
 val usePendingNamespace = System.getenv("USE_RUNANYWHERE_NAMESPACE")?.toBoolean() ?: false
 group =
     when {
         isJitPack -> "com.github.RunanywhereAI.runanywhere-sdks"
         usePendingNamespace -> "com.runanywhere"
-        else -> "io.github.sanchitmonga22" // Currently verified namespace
+        else -> "io.github.sanchitmonga22"
     }
 
-// Version: SDK_VERSION (our CI), VERSION (JitPack), or fallback
 version = System.getenv("SDK_VERSION")?.removePrefix("v")
     ?: System.getenv("VERSION")?.removePrefix("v")
     ?: "0.1.5-SNAPSHOT"
 
-// Get publishing credentials
 val mavenCentralUsername: String? =
     System.getenv("MAVEN_CENTRAL_USERNAME")
         ?: project.findProperty("mavenCentral.username") as String?
@@ -334,7 +284,6 @@ val signingKey: String? =
 
 publishing {
     publications.withType<MavenPublication> {
-        // Maven Central artifact naming
         artifactId =
             when (name) {
                 "kotlinMultiplatform" -> "runanywhere-llamacpp"
@@ -345,7 +294,7 @@ publishing {
 
         pom {
             name.set("RunAnywhere LlamaCPP Backend")
-            description.set("LlamaCPP backend for RunAnywhere SDK - enables on-device LLM text generation using llama.cpp. Includes LlamaCPP-specific native libraries.")
+            description.set("LlamaCPP backend for RunAnywhere SDK - on-device LLM text generation using llama.cpp.")
             url.set("https://runanywhere.ai")
             inceptionYear.set("2024")
 
@@ -376,7 +325,6 @@ publishing {
     }
 
     repositories {
-        // Maven Central (Sonatype Central Portal - new API)
         maven {
             name = "MavenCentral"
             url = uri("https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/")
@@ -385,8 +333,6 @@ publishing {
                 password = mavenCentralPassword
             }
         }
-
-        // GitHub Packages (backup)
         maven {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/RunanywhereAI/runanywhere-sdks")
@@ -398,7 +344,6 @@ publishing {
     }
 }
 
-// Configure signing
 signing {
     if (signingKey != null && signingKey.contains("BEGIN PGP")) {
         useInMemoryPgpKeys(signingKeyId, signingKey, signingPassword)
@@ -408,15 +353,13 @@ signing {
     sign(publishing.publications)
 }
 
-// Only sign when needed
 tasks.withType<Sign>().configureEach {
     onlyIf {
         project.hasProperty("signing.gnupg.keyName") || signingKey != null
     }
 }
 
-// Disable JVM and debug publications - only publish Android release and metadata
+// Only publish Android release and metadata (skip JVM and debug)
 tasks.withType<PublishToMavenRepository>().configureEach {
     onlyIf { publication.name !in listOf("jvm", "androidDebug") }
 }
-
