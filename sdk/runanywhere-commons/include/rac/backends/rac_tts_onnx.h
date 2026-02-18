@@ -43,7 +43,10 @@ typedef struct rac_tts_onnx_config {
 } rac_tts_onnx_config_t;
 
 static const rac_tts_onnx_config_t RAC_TTS_ONNX_CONFIG_DEFAULT = {
-    .num_threads = 0, .use_coreml = RAC_TRUE, .sample_rate = 22050};
+    0,                              /* num_threads */
+    RAC_TRUE,                       /* use_coreml */
+    22050                            /* sample_rate */
+};
 
 // =============================================================================
 // ONNX TTS API

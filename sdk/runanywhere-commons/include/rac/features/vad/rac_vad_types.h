@@ -87,13 +87,14 @@ typedef struct rac_vad_config {
  * @brief Default VAD configuration
  */
 static const rac_vad_config_t RAC_VAD_CONFIG_DEFAULT = {
-    .model_id = RAC_NULL,
-    .preferred_framework = -1,
-    .energy_threshold = RAC_VAD_DEFAULT_ENERGY_THRESHOLD,
-    .sample_rate = RAC_VAD_DEFAULT_SAMPLE_RATE,
-    .frame_length = RAC_VAD_DEFAULT_FRAME_LENGTH,
-    .enable_auto_calibration = RAC_FALSE,
-    .calibration_multiplier = RAC_VAD_DEFAULT_CALIBRATION_MULTIPLIER};
+    RAC_NULL,                       /* model_id */
+    -1,                             /* preferred_framework */
+    RAC_VAD_DEFAULT_ENERGY_THRESHOLD, /* energy_threshold */
+    RAC_VAD_DEFAULT_SAMPLE_RATE,    /* sample_rate */
+    RAC_VAD_DEFAULT_FRAME_LENGTH,   /* frame_length */
+    RAC_FALSE,                      /* enable_auto_calibration */
+    RAC_VAD_DEFAULT_CALIBRATION_MULTIPLIER /* calibration_multiplier */
+};
 
 // =============================================================================
 // SPEECH ACTIVITY - Mirrors Swift's SpeechActivityEvent
@@ -133,9 +134,9 @@ typedef struct rac_vad_input {
  * @brief Default VAD input
  */
 static const rac_vad_input_t RAC_VAD_INPUT_DEFAULT = {
-    .audio_samples = RAC_NULL,
-    .num_samples = 0,
-    .energy_threshold_override = -1.0f /* No override */
+    RAC_NULL,                       /* audio_samples */
+    0,                              /* num_samples */
+    -1.0f                           /* energy_threshold_override */
 };
 
 // =============================================================================

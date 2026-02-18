@@ -140,12 +140,12 @@ static void onnx_stt_vtable_destroy(void* impl) {
 
 // Static vtable for ONNX STT
 static const rac_stt_service_ops_t g_onnx_stt_ops = {
-    .initialize = onnx_stt_vtable_initialize,
-    .transcribe = onnx_stt_vtable_transcribe,
-    .transcribe_stream = onnx_stt_vtable_transcribe_stream,
-    .get_info = onnx_stt_vtable_get_info,
-    .cleanup = onnx_stt_vtable_cleanup,
-    .destroy = onnx_stt_vtable_destroy,
+    onnx_stt_vtable_initialize,
+    onnx_stt_vtable_transcribe,
+    onnx_stt_vtable_transcribe_stream,
+    onnx_stt_vtable_get_info,
+    onnx_stt_vtable_cleanup,
+    onnx_stt_vtable_destroy,
 };
 
 // =============================================================================
@@ -204,13 +204,13 @@ static void onnx_tts_vtable_destroy(void* impl) {
 }
 
 static const rac_tts_service_ops_t g_onnx_tts_ops = {
-    .initialize = onnx_tts_vtable_initialize,
-    .synthesize = onnx_tts_vtable_synthesize,
-    .synthesize_stream = onnx_tts_vtable_synthesize_stream,
-    .stop = onnx_tts_vtable_stop,
-    .get_info = onnx_tts_vtable_get_info,
-    .cleanup = onnx_tts_vtable_cleanup,
-    .destroy = onnx_tts_vtable_destroy,
+    onnx_tts_vtable_initialize,
+    onnx_tts_vtable_synthesize,
+    onnx_tts_vtable_synthesize_stream,
+    onnx_tts_vtable_stop,
+    onnx_tts_vtable_get_info,
+    onnx_tts_vtable_cleanup,
+    onnx_tts_vtable_destroy,
 };
 
 // =============================================================================

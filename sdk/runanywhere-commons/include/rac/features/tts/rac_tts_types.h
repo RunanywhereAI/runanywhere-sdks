@@ -88,16 +88,18 @@ typedef struct rac_tts_config {
 /**
  * @brief Default TTS configuration
  */
-static const rac_tts_config_t RAC_TTS_CONFIG_DEFAULT = {.model_id = RAC_NULL,
-                                                        .preferred_framework = -1,
-                                                        .voice = RAC_NULL,
-                                                        .language = "en-US",
-                                                        .speaking_rate = 1.0f,
-                                                        .pitch = 1.0f,
-                                                        .volume = 1.0f,
-                                                        .audio_format = RAC_AUDIO_FORMAT_PCM,
-                                                        .use_neural_voice = RAC_TRUE,
-                                                        .enable_ssml = RAC_FALSE};
+static const rac_tts_config_t RAC_TTS_CONFIG_DEFAULT = {
+    RAC_NULL,                        /* model_id */
+    -1,                             /* preferred_framework */
+    RAC_NULL,                       /* voice */
+    "en-US",                        /* language */
+    1.0f,                           /* speaking_rate */
+    1.0f,                           /* pitch */
+    1.0f,                           /* volume */
+    RAC_AUDIO_FORMAT_PCM,           /* audio_format */
+    RAC_TRUE,                       /* use_neural_voice */
+    RAC_FALSE                        /* enable_ssml */
+};
 
 // =============================================================================
 // OPTIONS - Mirrors Swift's TTSOptions
@@ -138,15 +140,15 @@ typedef struct rac_tts_options {
 /**
  * @brief Default TTS options
  */
-static const rac_tts_options_t RAC_TTS_OPTIONS_DEFAULT = {.voice = RAC_NULL,
-                                                          .language = "en-US",
-                                                          .rate = 1.0f,
-                                                          .pitch = 1.0f,
-                                                          .volume = 1.0f,
-                                                          .audio_format = RAC_AUDIO_FORMAT_PCM,
-                                                          .sample_rate =
-                                                              RAC_TTS_DEFAULT_SAMPLE_RATE,
-                                                          .use_ssml = RAC_FALSE};
+static const rac_tts_options_t RAC_TTS_OPTIONS_DEFAULT = {RAC_NULL,
+                                                          "en-US",                        /* language */
+                                                          1.0f,                           /* rate */
+                                                          1.0f,                           /* pitch */
+                                                          1.0f,                           /* volume */
+                                                          RAC_AUDIO_FORMAT_PCM,           /* audio_format */
+                                                          RAC_TTS_DEFAULT_SAMPLE_RATE,    /* sample_rate */
+                                                          RAC_FALSE                        /* use_ssml */
+};
 
 // =============================================================================
 // INPUT - Mirrors Swift's TTSInput
@@ -178,11 +180,13 @@ typedef struct rac_tts_input {
 /**
  * @brief Default TTS input
  */
-static const rac_tts_input_t RAC_TTS_INPUT_DEFAULT = {.text = RAC_NULL,
-                                                      .ssml = RAC_NULL,
-                                                      .voice_id = RAC_NULL,
-                                                      .language = RAC_NULL,
-                                                      .options = RAC_NULL};
+static const rac_tts_input_t RAC_TTS_INPUT_DEFAULT = {
+    RAC_NULL,                       /* text */
+    RAC_NULL,                       /* ssml */
+    RAC_NULL,                       /* voice_id */
+    RAC_NULL,                       /* language */
+    RAC_NULL                        /* options */
+};
 
 // =============================================================================
 // RESULT - Mirrors Swift's TTS result

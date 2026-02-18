@@ -44,7 +44,11 @@ typedef struct rac_vad_onnx_config {
 } rac_vad_onnx_config_t;
 
 static const rac_vad_onnx_config_t RAC_VAD_ONNX_CONFIG_DEFAULT = {
-    .sample_rate = 16000, .energy_threshold = 0.5f, .frame_length = 0.032f, .num_threads = 0};
+    RAC_VAD_DEFAULT_SAMPLE_RATE,    /* sample_rate */
+    RAC_VAD_DEFAULT_ENERGY_THRESHOLD, /* energy_threshold */
+    RAC_VAD_DEFAULT_FRAME_LENGTH,   /* frame_length */
+    0,                              /* num_threads */
+};
 
 // =============================================================================
 // ONNX VAD API

@@ -58,7 +58,10 @@ typedef struct rac_stt_onnx_config {
 } rac_stt_onnx_config_t;
 
 static const rac_stt_onnx_config_t RAC_STT_ONNX_CONFIG_DEFAULT = {
-    .model_type = RAC_STT_ONNX_MODEL_AUTO, .num_threads = 0, .use_coreml = RAC_TRUE};
+    RAC_STT_ONNX_MODEL_AUTO,         /* model_type */
+    0,                              /* num_threads */
+    RAC_TRUE,                       /* use_coreml */
+};
 
 // =============================================================================
 // ONNX STT API

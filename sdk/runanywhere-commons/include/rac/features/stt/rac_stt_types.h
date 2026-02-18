@@ -106,16 +106,18 @@ typedef struct rac_stt_config {
 /**
  * @brief Default STT configuration
  */
-static const rac_stt_config_t RAC_STT_CONFIG_DEFAULT = {.model_id = RAC_NULL,
-                                                        .preferred_framework = -1,
-                                                        .language = "en-US",
-                                                        .sample_rate = RAC_STT_DEFAULT_SAMPLE_RATE,
-                                                        .enable_punctuation = RAC_TRUE,
-                                                        .enable_diarization = RAC_FALSE,
-                                                        .vocabulary_list = RAC_NULL,
-                                                        .num_vocabulary = 0,
-                                                        .max_alternatives = 1,
-                                                        .enable_timestamps = RAC_TRUE};
+static const rac_stt_config_t RAC_STT_CONFIG_DEFAULT = {
+    RAC_NULL,                       /* model_id */
+    -1,                             /* preferred_framework */
+    "en-US",                        /* language */
+    RAC_STT_DEFAULT_SAMPLE_RATE,    /* sample_rate */
+    RAC_TRUE,                       /* enable_punctuation */
+    RAC_FALSE,                      /* enable_diarization */
+    RAC_NULL,                       /* vocabulary_list */
+    0,                              /* num_vocabulary */
+    1,                              /* max_alternatives */
+    RAC_TRUE                        /* enable_timestamps */
+};
 
 // =============================================================================
 // OPTIONS - Mirrors Swift's STTOptions
@@ -156,14 +158,16 @@ typedef struct rac_stt_options {
 /**
  * @brief Default STT options
  */
-static const rac_stt_options_t RAC_STT_OPTIONS_DEFAULT = {.language = "en",
-                                                          .detect_language = RAC_FALSE,
-                                                          .enable_punctuation = RAC_TRUE,
-                                                          .enable_diarization = RAC_FALSE,
-                                                          .max_speakers = 0,
-                                                          .enable_timestamps = RAC_TRUE,
-                                                          .audio_format = RAC_AUDIO_FORMAT_PCM,
-                                                          .sample_rate = 16000};
+static const rac_stt_options_t RAC_STT_OPTIONS_DEFAULT = {
+    "en",                    /* language */
+    RAC_FALSE,               /* detect_language */
+    RAC_TRUE,                /* enable_punctuation */
+    RAC_FALSE,               /* enable_diarization */
+    0,                       /* max_speakers */
+    RAC_TRUE,                /* enable_timestamps */
+    RAC_AUDIO_FORMAT_PCM,    /* audio_format */
+    16000                    /* sample_rate */
+};
 
 // =============================================================================
 // RESULT - Mirrors Swift's STTTranscriptionResult
@@ -275,14 +279,16 @@ typedef struct rac_stt_input {
 /**
  * @brief Default STT input
  */
-static const rac_stt_input_t RAC_STT_INPUT_DEFAULT = {.audio_data = RAC_NULL,
-                                                      .audio_data_size = 0,
-                                                      .audio_samples = RAC_NULL,
-                                                      .num_samples = 0,
-                                                      .format = RAC_AUDIO_FORMAT_PCM,
-                                                      .language = RAC_NULL,
-                                                      .sample_rate = RAC_STT_DEFAULT_SAMPLE_RATE,
-                                                      .options = RAC_NULL};
+static const rac_stt_input_t RAC_STT_INPUT_DEFAULT = {
+    RAC_NULL,                       /* audio_data */
+    0,                              /* audio_data_size */
+    RAC_NULL,                       /* audio_samples */
+    0,                              /* num_samples */
+    RAC_AUDIO_FORMAT_PCM,           /* format */
+    RAC_NULL,                       /* language */
+    RAC_STT_DEFAULT_SAMPLE_RATE,    /* sample_rate */
+    RAC_NULL                        /* options */
+};
 
 // =============================================================================
 // TRANSCRIPTION METADATA - Mirrors Swift's TranscriptionMetadata

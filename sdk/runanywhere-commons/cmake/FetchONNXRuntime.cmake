@@ -17,8 +17,11 @@ endif()
 if(NOT DEFINED ONNX_VERSION_LINUX OR "${ONNX_VERSION_LINUX}" STREQUAL "")
     message(FATAL_ERROR "ONNX_VERSION_LINUX not defined in VERSIONS file")
 endif()
+if(NOT DEFINED ONNX_VERSION_WINDOWS OR "${ONNX_VERSION_WINDOWS}" STREQUAL "")
+    message(FATAL_ERROR "ONNX_VERSION_WINDOWS not defined in VERSIONS file")
+endif()
 
-message(STATUS "ONNX Runtime versions: iOS=${ONNX_VERSION_IOS}, Android=${ONNX_VERSION_ANDROID}, macOS=${ONNX_VERSION_MACOS}, Linux=${ONNX_VERSION_LINUX}")
+message(STATUS "ONNX Runtime versions: iOS=${ONNX_VERSION_IOS}, Android=${ONNX_VERSION_ANDROID}, macOS=${ONNX_VERSION_MACOS}, Linux=${ONNX_VERSION_LINUX}, Windows=${ONNX_VERSION_WINDOWS}")
 
 if(EMSCRIPTEN)
     # ==========================================================================
@@ -231,7 +234,76 @@ elseif(UNIX)
     )
 
     message(STATUS "ONNX Runtime Linux library: ${onnxruntime_SOURCE_DIR}/lib/libonnxruntime.so")
+elseif(WIN32)
+    set(ONNX_TARGET_ARCH "UNKNOWN")
 
+    if(CMAKE_VS_PLATFORM_NAME)
+        if(CMAKE_VS_PLATFORM_NAME STREQUAL "Win32")
+            set(ONNX_TARGET_ARCH "x86")
+        elseif(CMAKE_VS_PLATFORM_NAME STREQUAL "x64")
+            set(ONNX_TARGET_ARCH "x64")
+        elseif(CMAKE_VS_PLATFORM_NAME STREQUAL "ARM")
+            set(ONNX_TARGET_ARCH "ARM")
+        elseif(CMAKE_VS_PLATFORM_NAME STREQUAL "ARM64")
+            set(ONNX_TARGET_ARCH "ARM64")
+        endif()
+    else()
+        # Alternative: use system processor variable to determine architecture (cross-platform compatible)
+        if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86|i[3-6]86)$")
+            set(ONNX_TARGET_ARCH "x86")
+        elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+            set(ONNX_TARGET_ARCH "x64")
+        elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM|arm)$")
+            set(ONNX_TARGET_ARCH "ARM")
+        elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|arm64|aarch64)$")
+            set(ONNX_TARGET_ARCH "ARM64")
+        endif()
+    endif()
+    # Windows: Download Windows binaries
+    if(ONNX_TARGET_ARCH MATCHES "x64")
+        set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNX_VERSION_WINDOWS}/onnxruntime-win-x64-${ONNX_VERSION_WINDOWS}.zip")
+    elseif(ONNX_TARGET_ARCH MATCHES "ARM64")
+        set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNX_VERSION_WINDOWS}/onnxruntime-win-arm64-${ONNX_VERSION_WINDOWS}.zip")
+    elseif(ONNX_TARGET_ARCH MATCHES "x86")
+        # TODO: @sylar
+        # The official ONNX Runtime does not offer x86 binaries, but we can use the binaries from sherpa-onnx which contains x86 binaries
+        message(FATAL_ERROR "x86 architecture is not supported for ONNX Runtime")
+    else()
+        message(FATAL_ERROR "Unsupported architecture for ONNX Runtime: ${ONNX_TARGET_ARCH}")
+    endif()
+
+    FetchContent_Declare(
+        onnxruntime
+        URL ${ONNX_URL}
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    )
+    FetchContent_MakeAvailable(onnxruntime)
+
+    add_library(onnxruntime SHARED IMPORTED GLOBAL)
+
+    # Windows DLL: IMPORTED_LOCATION = .dll (runtime), IMPORTED_IMPLIB = .lib (link time).
+    # Multi-config generators (VS) require per-config props; prebuilt ORT usually ships Release only.
+    set(ONNX_WIN_DLL "${onnxruntime_SOURCE_DIR}/lib/onnxruntime.dll")
+    set(ONNX_WIN_IMPLIB "${onnxruntime_SOURCE_DIR}/lib/onnxruntime.lib")
+    set_target_properties(onnxruntime PROPERTIES
+        IMPORTED_LOCATION "${ONNX_WIN_DLL}"
+        IMPORTED_IMPLIB "${ONNX_WIN_IMPLIB}"
+        # IMPORTED_LOCATION_DEBUG "${ONNX_WIN_DLL}"
+        # IMPORTED_IMPLIB_DEBUG "${ONNX_WIN_IMPLIB}"
+        # IMPORTED_LOCATION_RELEASE "${ONNX_WIN_DLL}"
+        # IMPORTED_IMPLIB_RELEASE "${ONNX_WIN_IMPLIB}"
+        # IMPORTED_LOCATION_MINSIZEREL "${ONNX_WIN_DLL}"
+        # IMPORTED_IMPLIB_MINSIZEREL "${ONNX_WIN_IMPLIB}"
+        # IMPORTED_LOCATION_RELWITHDEBINFO "${ONNX_WIN_DLL}"
+        # IMPORTED_IMPLIB_RELWITHDEBINFO "${ONNX_WIN_IMPLIB}"
+    )
+
+    target_include_directories(onnxruntime INTERFACE
+        "${onnxruntime_SOURCE_DIR}/include"
+    )
+
+    message(STATUS "ONNX Runtime Windows DLL: ${ONNX_WIN_DLL}")
+    message(STATUS "ONNX Runtime Windows headers: ${onnxruntime_SOURCE_DIR}/include")
 else()
     message(FATAL_ERROR "Unsupported platform for ONNX Runtime")
 endif()

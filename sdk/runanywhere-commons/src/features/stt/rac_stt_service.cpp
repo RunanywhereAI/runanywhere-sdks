@@ -139,6 +139,9 @@ void rac_stt_destroy(rac_handle_t handle) {
     free(service);
 }
 
+#if !defined(_WIN32) || !defined(_MSC_VER)
+// On Windows/MSVC, this is defined in result_free.cpp (no weak symbol support)
+// On other platforms, this weak symbol can be overridden by backends
 void rac_stt_result_free(rac_stt_result_t* result) {
     if (!result)
         return;
@@ -147,5 +150,6 @@ void rac_stt_result_free(rac_stt_result_t* result) {
         result->text = nullptr;
     }
 }
+#endif
 
 }  // extern "C"
