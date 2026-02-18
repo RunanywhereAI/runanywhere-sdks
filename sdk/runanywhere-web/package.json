@@ -4,18 +4,20 @@
   "version": "0.1.0",
   "description": "RunAnywhere Web SDK - On-device AI for the browser via RACommons WASM",
   "workspaces": [
-    "packages/core"
+    "packages/core",
+    "packages/llamacpp",
+    "packages/onnx"
   ],
   "scripts": {
     "build:wasm": "cd wasm && ./scripts/build.sh",
     "build:wasm:debug": "cd wasm && ./scripts/build.sh --debug",
     "build:wasm:clean": "cd wasm && ./scripts/build.sh --clean",
-    "build:ts": "npm run build -w packages/core",
+    "build:ts": "npm run build -w packages/core && npm run build -w packages/llamacpp && npm run build -w packages/onnx",
     "build": "npm run build:ts",
     "dev": "npm run dev -w packages/core",
-    "lint": "npm run lint -w packages/core",
-    "typecheck": "npm run typecheck -w packages/core",
-    "clean": "rm -rf packages/core/dist packages/core/wasm/*.wasm packages/core/wasm/*.js wasm/build"
+    "lint": "npm run lint -w packages/core && npm run lint -w packages/llamacpp && npm run lint -w packages/onnx",
+    "typecheck": "npm run typecheck -w packages/core && npm run typecheck -w packages/llamacpp && npm run typecheck -w packages/onnx",
+    "clean": "rm -rf packages/core/dist packages/llamacpp/dist packages/onnx/dist packages/llamacpp/wasm/*.wasm packages/llamacpp/wasm/*.js packages/onnx/wasm/sherpa packages/core/wasm wasm/build"
   },
   "engines": {
     "node": ">=18.0.0"

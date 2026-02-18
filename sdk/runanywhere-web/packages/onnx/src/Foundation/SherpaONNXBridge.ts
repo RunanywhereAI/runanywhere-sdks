@@ -14,8 +14,7 @@
  * The sherpa-onnx module is lazy-loaded on first use of STT/TTS/VAD.
  */
 
-import { SDKError, SDKErrorCode } from './ErrorTypes';
-import { SDKLogger } from './SDKLogger';
+import { SDKError, SDKErrorCode, SDKLogger } from '@runanywhere/web';
 
 const logger = new SDKLogger('SherpaONNX');
 

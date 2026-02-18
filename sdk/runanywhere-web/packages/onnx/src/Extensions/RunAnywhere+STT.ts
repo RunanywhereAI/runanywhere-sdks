@@ -27,12 +27,8 @@
  *   console.log(result.text);
  */
 
-import { RunAnywhere } from '../RunAnywhere';
-import { SherpaONNXBridge } from '../../Foundation/SherpaONNXBridge';
-import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
-import { SDKLogger } from '../../Foundation/SDKLogger';
-import { EventBus } from '../../Foundation/EventBus';
-import { SDKEventType } from '../../types/enums';
+import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType } from '@runanywhere/web';
+import { SherpaONNXBridge } from '../Foundation/SherpaONNXBridge';
 import { STTModelType } from './STTTypes';
 import type { STTModelConfig, STTWhisperFiles, STTZipformerFiles, STTParaformerFiles, STTTranscriptionResult } from './STTTypes';
 
@@ -41,7 +37,7 @@ import type { STTModelConfig, STTWhisperFiles, STTZipformerFiles, STTParaformerF
 // for passing to the sherpa-onnx C API.
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore — JS helper file, no .d.ts available
-import { initSherpaOnnxOfflineRecognizerConfig, initSherpaOnnxOnlineRecognizerConfig, freeConfig } from '../../../wasm/sherpa/sherpa-onnx-asr.js';
+import { initSherpaOnnxOfflineRecognizerConfig, initSherpaOnnxOnlineRecognizerConfig, freeConfig } from '../../wasm/sherpa/sherpa-onnx-asr.js';
 
 const logger = new SDKLogger('STT');
 
