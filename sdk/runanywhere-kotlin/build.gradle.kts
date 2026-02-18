@@ -399,6 +399,7 @@ tasks.register("downloadJniLibs") {
     onlyIf { !testLocal }
 
     val outputDir = file("src/androidMain/jniLibs")
+    val nativeLibVersionMarker = file("$outputDir/.native_lib_version")
     val tempDir = file("${layout.buildDirectory.get()}/jni-temp")
 
     val releaseBaseUrl = "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v$nativeLibVersion"
@@ -424,12 +425,25 @@ tasks.register("downloadJniLibs") {
             return@doLast
         }
 
+        // Check if libs already exist (CI pre-populates build/jniLibs/).
+        // Guard against stale libs from a different native version.
         val existingLibs = outputDir.walkTopDown().filter { it.extension == "so" }.count()
-        if (existingLibs > 0) {
-            logger.lifecycle("Skipping JNI download: $existingLibs .so files already in $outputDir")
+        val existingVersion = nativeLibVersionMarker.takeIf { it.exists() }?.readText()?.trim()
+        if (existingLibs > 0 && existingVersion == nativeLibVersion) {
+            logger.lifecycle(
+                "Skipping JNI download: $existingLibs .so files already in $outputDir " +
+                    "(native version v$nativeLibVersion)",
+            )
             return@doLast
         }
+        if (existingLibs > 0 && existingVersion != nativeLibVersion) {
+            logger.lifecycle(
+                "Refreshing JNI libs: found $existingLibs existing .so files " +
+                    "with version '${existingVersion ?: "unknown"}', expected '$nativeLibVersion'",
+            )
+        }
 
+        // Clean output directories for a fresh download
         outputDir.deleteRecursively()
         tempDir.deleteRecursively()
         outputDir.mkdirs()
@@ -497,6 +511,11 @@ tasks.register("downloadJniLibs") {
         logger.lifecycle("  Output: $outputDir")
         logger.lifecycle("═══════════════════════════════════════════════════════════════")
 
+        // Record native lib version to avoid reusing stale JNI binaries.
+        nativeLibVersionMarker.parentFile.mkdirs()
+        nativeLibVersionMarker.writeText(nativeLibVersion)
+
+        // List libraries per ABI
         abiDirs.forEach { abi ->
             val libs = file("$outputDir/$abi").listFiles()?.filter { it.extension == "so" }?.map { it.name } ?: emptyList()
             logger.lifecycle("$abi (${libs.size} libs):")
@@ -662,4 +681,3 @@ tasks.withType<PublishToMavenRepository>().configureEach {
         !dominated
     }
 }
-
