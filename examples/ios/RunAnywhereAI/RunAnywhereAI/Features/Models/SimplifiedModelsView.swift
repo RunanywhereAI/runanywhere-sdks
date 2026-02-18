@@ -349,6 +349,7 @@ private struct SimplifiedModelRow: View {
         await MainActor.run {
             isDownloading = true
             downloadProgress = 0.0
+            downloadStage = .downloading
         }
 
         do {
@@ -358,8 +359,9 @@ private struct SimplifiedModelRow: View {
             for await progress in progressStream {
                 await MainActor.run {
                     self.downloadProgress = progress.overallProgress
-                    self.downloadStage = progress.stage
-                    print("Download progress for \(model.name): \(progress.stage.displayName) \(Int(progress.overallProgress * 100))%")
+                    if progress.stage != .completed {
+                        self.downloadStage = progress.stage
+                    }
                 }
 
                 // Check if download completed
@@ -383,6 +385,7 @@ private struct SimplifiedModelRow: View {
             await MainActor.run {
                 downloadProgress = 0.0
                 isDownloading = false
+                downloadStage = .downloading
             }
         }
     }
