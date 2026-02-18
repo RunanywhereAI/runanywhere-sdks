@@ -22,21 +22,7 @@ project(runanywhere_commons_jni)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-include(FetchContent)
-
-# needed for string parsing
-if(NOT DEFINED NLOHMANN_JSON_VERSION)
-    set(NLOHMANN_JSON_VERSION "3.11.3")
-endif()
-
-FetchContent_Declare(
-    nlohmann_json
-    GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG        v${NLOHMANN_JSON_VERSION}
-    GIT_SHALLOW    TRUE
-)
-set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(nlohmann_json)
+# nlohmann_json is provided by the parent CMakeLists.txt
 
 # Find JNI
 # When cross-compiling for Android, we should use the NDK's JNI headers (jni.h)
@@ -66,29 +52,15 @@ if(ANDROID)
     )
     set(JNI_LIBRARIES "")
 else()
-    # Auto-detect JAVA_HOME if not set (common with SDKMAN, jenv, etc.)
-    if(NOT DEFINED ENV{JAVA_HOME} OR "$ENV{JAVA_HOME}" STREQUAL "")
-        find_program(_JAVA_EXEC java)
-        if(_JAVA_EXEC)
-            # Resolve symlinks: java -> /path/to/jdk/bin/java -> go up to jdk root
-            get_filename_component(_JAVA_EXEC_REAL "${_JAVA_EXEC}" REALPATH)
-            get_filename_component(_JAVA_BIN_DIR "${_JAVA_EXEC_REAL}" DIRECTORY)
-            get_filename_component(_JAVA_HOME_DETECTED "${_JAVA_BIN_DIR}" DIRECTORY)
-            set(ENV{JAVA_HOME} "${_JAVA_HOME_DETECTED}")
-            message(STATUS "Auto-detected JAVA_HOME: ${_JAVA_HOME_DETECTED}")
+    # JNI detection is handled by the parent CMakeLists.txt (project-wide).
+    # If we're built standalone, fall back to find_package here.
+    if(NOT JNI_FOUND)
+        find_package(JNI QUIET)
+        if(NOT JNI_FOUND)
+            message(WARNING "JNI not found. Set JAVA_HOME to your JDK installation.")
         endif()
     endif()
-
-    find_package(JNI QUIET)
-    if(NOT JNI_FOUND)
-        message(WARNING "JNI not found. Set JAVA_HOME to your JDK installation for IDE indexing support.")
-    endif()
 endif()
-
-include_directories(${JNI_INCLUDE_DIRS})
-
-# Include runanywhere-commons headers
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../include)
 
 # Source files
 set(JNI_SOURCES
@@ -97,6 +69,12 @@ set(JNI_SOURCES
 
 # Create shared library
 add_library(runanywhere_commons_jni SHARED ${JNI_SOURCES})
+
+# JNI and project include paths (target-level for proper IDE indexing)
+target_include_directories(runanywhere_commons_jni PRIVATE
+    ${JNI_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include
+)
 
 # Link against runanywhere-commons core ONLY
 # Backend libraries are NOT linked here - they have their own JNI libraries
