@@ -357,7 +357,7 @@ struct FlatModelRow: View {
 
             for await progress in progressStream {
                 await MainActor.run {
-                    self.downloadProgress = progress.percentage
+                    self.downloadProgress = progress.overallProgress
                     if progress.stage != .completed {
                         self.downloadStage = progress.stage
                     }
