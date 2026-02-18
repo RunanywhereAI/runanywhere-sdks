@@ -106,16 +106,21 @@ IMPORTANT RULES:
         screenState: String,
         history: String,
         lastActionResult: String? = null,
-        useToolCalling: Boolean = false
+        useToolCalling: Boolean = false,
+        visionHint: String? = null
     ): String {
         val lastResultSection = lastActionResult?.let {
             "\nLAST_RESULT: $it"
         } ?: ""
 
+        val visionSection = visionHint?.let {
+            "\nVISION_HINT: $it"
+        } ?: ""
+
         val instruction = if (useToolCalling) {
-            "A screenshot of the current screen is attached. Use BOTH the screenshot and the element list to decide your next action.\nCall the appropriate tool for your next action."
+            "Use the VISION_HINT and SCREEN_ELEMENTS to decide your next action. Tap the element that matches the goal.\nCall the appropriate tool for your next action."
         } else {
-            "A screenshot of the current screen is attached. Use BOTH the screenshot and the element list to decide your next action.\nOutput ONLY a JSON object with your next action."
+            "Use the VISION_HINT and SCREEN_ELEMENTS to decide your next action.\nOutput ONLY a JSON object with your next action."
         }
 
         return """
@@ -123,7 +128,7 @@ GOAL: $goal
 
 SCREEN_ELEMENTS (indexed — use these indices for tap/type actions):
 $screenState
-$lastResultSection$history
+$lastResultSection$history$visionSection
 
 $instruction
         """.trimIndent()
@@ -134,11 +139,14 @@ $instruction
         screenState: String,
         history: String,
         lastActionResult: String? = null,
-        useToolCalling: Boolean = false
+        useToolCalling: Boolean = false,
+        visionHint: String? = null
     ): String {
         val lastResultSection = lastActionResult?.let {
             "\nLAST_RESULT: $it"
         } ?: ""
+
+        val visionSection = visionHint?.let { "\nVISION_HINT: $it" } ?: ""
 
         val instruction = if (useToolCalling) "Call a DIFFERENT tool or use different parameters." else "Output ONLY a JSON object with your next action."
 
@@ -147,9 +155,9 @@ GOAL: $goal
 
 SCREEN_ELEMENTS:
 $screenState
-$lastResultSection$history
+$lastResultSection$history$visionSection
 
-WARNING: You are repeating the same action. Look at the screenshot carefully — the screen may have changed and the element you need might have a different index. Try a DIFFERENT action or element.
+WARNING: You are repeating the same action. Try a DIFFERENT action or element.
 
 $instruction
         """.trimIndent()
@@ -160,11 +168,14 @@ $instruction
         screenState: String,
         history: String,
         lastActionResult: String? = null,
-        useToolCalling: Boolean = false
+        useToolCalling: Boolean = false,
+        visionHint: String? = null
     ): String {
         val lastResultSection = lastActionResult?.let {
             "\nLAST_RESULT (FAILED): $it"
         } ?: ""
+
+        val visionSection = visionHint?.let { "\nVISION_HINT: $it" } ?: ""
 
         val instruction = if (useToolCalling) "Call a different tool or use different parameters." else "Output ONLY a JSON object with your next action."
 
@@ -173,12 +184,9 @@ GOAL: $goal
 
 SCREEN_ELEMENTS:
 $screenState
-$lastResultSection$history
+$lastResultSection$history$visionSection
 
-WARNING: Your last action FAILED. Look at the screenshot to understand what went wrong:
-- The element may have moved or the screen may have changed
-- You may need to scroll to find the element
-- Try a different element or approach based on what you see
+WARNING: Your last action FAILED. Try a different element or scroll to find what you need.
 
 $instruction
         """.trimIndent()
@@ -381,6 +389,24 @@ IMPORTANT RULES:
 - When the goal is achieved (verify visually from the screenshot), call ui_done.
 - SEARCH RESULTS: If the screenshot shows search results, do NOT search again. Use ui_tap on a result.
 - TIMER NUMPAD: The Android Clock timer numpad fills digits from RIGHT to LEFT.
+    """.trimIndent()
+
+    /**
+     * Compact system prompt for on-device 1.2B models.
+     * Kept under ~150 tokens to maximize context for screen elements and reasoning.
+     */
+    val COMPACT_SYSTEM_PROMPT = """
+You are an Android UI agent. Achieve the user's GOAL by calling ONE tool per turn.
+Output ONLY: <tool_call>{"tool":"tool_name","arguments":{...}}</tool_call>
+
+Rules:
+- Use ui_open_app to launch apps. NEVER search for app icons.
+- Use ui_tap(index) to tap elements. Match index from SCREEN_ELEMENTS.
+- After tapping an edit field, use ui_type(text) then ui_enter().
+- If the element you need is NOT in SCREEN_ELEMENTS, use ui_swipe(direction="up") to scroll.
+- Do NOT repeat the same action. Check PREVIOUS_ACTIONS.
+- If an app is already open (see SCREEN_ELEMENTS), do NOT open it again.
+- When the goal is achieved, call ui_done.
     """.trimIndent()
 
     val TOOL_AWARE_ADDENDUM = """

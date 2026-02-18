@@ -81,11 +81,13 @@ class AgentAccessibilityService : AccessibilityService() {
     data class ScreenState(
         val compactText: String,
         val elements: List<ScreenElement>,
-        val indexToCoords: Map<Int, Pair<Int, Int>>
+        val indexToCoords: Map<Int, Pair<Int, Int>>,
+        val foregroundPackage: String? = null
     )
 
     fun getScreenState(maxElements: Int = 30, maxTextLength: Int = 50): ScreenState {
         val root = rootInActiveWindow ?: return ScreenState("", emptyList(), emptyMap())
+        val foregroundPkg = root.packageName?.toString()
         val elements = mutableListOf<ScreenElement>()
         val indexToCoords = mutableMapOf<Int, Pair<Int, Int>>()
         val lines = mutableListOf<String>()
@@ -106,7 +108,7 @@ class AgentAccessibilityService : AccessibilityService() {
             lines.add("$idx: $displayLabel ($typeStr) $capsStr".trim())
         }
 
-        return ScreenState(lines.joinToString("\n"), elements, indexToCoords)
+        return ScreenState(lines.joinToString("\n"), elements, indexToCoords, foregroundPkg)
     }
 
     private fun traverseForElements(

@@ -24,11 +24,19 @@ object ToolCallParser {
         Pattern.DOTALL
     )
 
+    /** Matches function-call style: ui_tap(index=5) or ui_open_app(app_name="Settings") */
+    private val FUNCTION_CALL_PATTERN = Pattern.compile(
+        "(ui_\\w+)\\(([^)]*)\\)"
+    )
+
     fun parse(rawOutput: String): List<ToolCall> {
         val calls = mutableListOf<ToolCall>()
 
+        // Strip <think>...</think> tags (DS-R1 reasoning models emit chain-of-thought before tool calls)
+        val cleaned = stripThinkTags(rawOutput)
+
         // Try primary <tool_call>...</tool_call> tags
-        val matcher = TOOL_CALL_PATTERN.matcher(rawOutput)
+        val matcher = TOOL_CALL_PATTERN.matcher(cleaned)
         while (matcher.find()) {
             val inner = matcher.group(1)?.trim() ?: continue
             parseToolCallJson(inner)?.let { calls.add(it) }
@@ -36,7 +44,7 @@ object ToolCallParser {
         if (calls.isNotEmpty()) return calls
 
         // Try unclosed tag (model ran out of tokens)
-        val unclosedMatcher = UNCLOSED_TOOL_CALL_PATTERN.matcher(rawOutput)
+        val unclosedMatcher = UNCLOSED_TOOL_CALL_PATTERN.matcher(cleaned)
         if (unclosedMatcher.find()) {
             val inner = unclosedMatcher.group(1)?.trim() ?: ""
             val balanced = balanceBraces(inner)
@@ -45,19 +53,29 @@ object ToolCallParser {
         if (calls.isNotEmpty()) return calls
 
         // Try inline format {"tool_call": {...}}
-        val inlineMatcher = INLINE_TOOL_CALL_PATTERN.matcher(rawOutput)
+        val inlineMatcher = INLINE_TOOL_CALL_PATTERN.matcher(cleaned)
         if (inlineMatcher.find()) {
             val inner = inlineMatcher.group(1)?.trim() ?: ""
             parseToolCallJson(inner)?.let { calls.add(it) }
+        }
+        if (calls.isNotEmpty()) return calls
+
+        // Try function-call style: ui_tap(index=5), ui_open_app(app_name="Settings")
+        val funcMatcher = FUNCTION_CALL_PATTERN.matcher(cleaned)
+        if (funcMatcher.find()) {
+            parseFunctionCall(funcMatcher.group(1) ?: "", funcMatcher.group(2) ?: "")
+                ?.let { calls.add(it) }
         }
 
         return calls
     }
 
     fun containsToolCall(rawOutput: String): Boolean {
-        return rawOutput.contains("<tool_call>") ||
-                rawOutput.contains("\"tool_call\"") ||
-                TOOL_CALL_PATTERN.matcher(rawOutput).find()
+        val cleaned = stripThinkTags(rawOutput)
+        return cleaned.contains("<tool_call>") ||
+                cleaned.contains("\"tool_call\"") ||
+                TOOL_CALL_PATTERN.matcher(cleaned).find() ||
+                FUNCTION_CALL_PATTERN.matcher(cleaned).find()
     }
 
     fun extractCleanText(rawOutput: String): String {
@@ -67,6 +85,50 @@ object ToolCallParser {
         // Remove unclosed <tool_call> to end
         text = text.replace(Regex("<tool_call>.*", RegexOption.DOT_MATCHES_ALL), "")
         return text.trim()
+    }
+
+    /**
+     * Parse function-call-style output: `ui_tap(index=5)`, `ui_open_app(app_name="Settings")`.
+     * Small on-device models sometimes emit this format instead of `<tool_call>` XML.
+     */
+    private fun parseFunctionCall(toolName: String, argsStr: String): ToolCall? {
+        if (toolName.isEmpty()) return null
+
+        val arguments = mutableMapOf<String, Any?>()
+        if (argsStr.isNotBlank()) {
+            // Split on commas (respecting quotes)
+            val parts = argsStr.split(",").map { it.trim() }
+            for (part in parts) {
+                val eqIndex = part.indexOf('=')
+                if (eqIndex > 0) {
+                    val key = part.substring(0, eqIndex).trim()
+                    val value = part.substring(eqIndex + 1).trim()
+                        .removeSurrounding("\"")
+                        .removeSurrounding("'")
+                    // Try to parse as integer
+                    arguments[key] = value.toIntOrNull() ?: value
+                } else {
+                    // Single unnamed argument — guess the key based on tool name
+                    val value = part.removeSurrounding("\"").removeSurrounding("'")
+                    val key = when {
+                        toolName == "ui_tap" || toolName == "ui_long_press" -> "index"
+                        toolName == "ui_type" -> "text"
+                        toolName == "ui_open_app" -> "app_name"
+                        toolName == "ui_swipe" -> "direction"
+                        toolName == "ui_done" -> "reason"
+                        else -> "value"
+                    }
+                    arguments[key] = value.toIntOrNull() ?: value
+                }
+            }
+        }
+
+        Log.d(TAG, "Parsed function call: $toolName($arguments)")
+        return ToolCall(
+            id = UUID.randomUUID().toString(),
+            toolName = toolName,
+            arguments = arguments
+        )
     }
 
     private fun parseToolCallJson(jsonStr: String): ToolCall? {
@@ -123,6 +185,11 @@ object ToolCallParser {
         }
 
         return result
+    }
+
+    /** Strip DS-R1 chain-of-thought <think>...</think> tags so they don't interfere with parsing. */
+    private fun stripThinkTags(input: String): String {
+        return input.replace(Regex("<think>.*?</think>", RegexOption.DOT_MATCHES_ALL), "").trim()
     }
 
     private fun balanceBraces(input: String): String {
