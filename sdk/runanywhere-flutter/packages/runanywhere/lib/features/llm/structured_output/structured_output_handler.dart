@@ -50,9 +50,6 @@ Remember: Output ONLY the JSON object, nothing else.
     final instructions = '''
 CRITICAL INSTRUCTION: You MUST respond with ONLY a valid JSON object. No other text is allowed.
 
-JSON Schema:
-${config.schema}
-
 RULES:
 1. Start your response with { and end with }
 2. Include NO text before the opening {
@@ -67,8 +64,11 @@ IMPORTANT: Your entire response must be valid JSON that can be parsed. Do not in
 
     return '''
 System: You are a JSON generator. You must output only valid JSON.
-
+Convert this Data :
 $originalPrompt
+
+to JSON Schema:
+${config.schema}
 
 $instructions
 

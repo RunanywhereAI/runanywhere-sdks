@@ -1188,13 +1188,27 @@ class RunAnywhere {
     final modelInfo = await DartBridgeModelRegistry.instance.getPublicModel(modelId);
     final modelName = modelInfo?.name;
 
+    // Determine effective system prompt - add JSON conversion instructions if structuredOutput is provided
+    String? effectiveSystemPrompt = opts.systemPrompt;
+    if (opts.structuredOutput != null) {
+      final jsonSystemPrompt = DartBridgeStructuredOutput.shared.getSystemPrompt(
+        opts.structuredOutput!.schema,
+      );
+      // If user already provided a system prompt, prepend the JSON instructions
+      if (effectiveSystemPrompt != null && effectiveSystemPrompt.isNotEmpty) {
+        effectiveSystemPrompt = '$jsonSystemPrompt\n\n$effectiveSystemPrompt';
+      } else {
+        effectiveSystemPrompt = jsonSystemPrompt;
+      }
+    }
+
     try {
       // Generate directly via DartBridgeLLM (calls rac_llm_component_generate)
       final result = await DartBridge.llm.generate(
         prompt,
         maxTokens: opts.maxTokens,
         temperature: opts.temperature,
-        systemPrompt: opts.systemPrompt,
+        systemPrompt: effectiveSystemPrompt,
       );
 
       final endTime = DateTime.now();
@@ -1296,6 +1310,20 @@ class RunAnywhere {
     final modelInfo = await DartBridgeModelRegistry.instance.getPublicModel(modelId);
     final modelName = modelInfo?.name;
 
+    // Determine effective system prompt - add JSON conversion instructions if structuredOutput is provided
+    String? effectiveSystemPrompt = opts.systemPrompt;
+    if (opts.structuredOutput != null) {
+      final jsonSystemPrompt = DartBridgeStructuredOutput.shared.getSystemPrompt(
+        opts.structuredOutput!.schema,
+      );
+      // If user already provided a system prompt, prepend the JSON instructions
+      if (effectiveSystemPrompt != null && effectiveSystemPrompt.isNotEmpty) {
+        effectiveSystemPrompt = '$jsonSystemPrompt\n\n$effectiveSystemPrompt';
+      } else {
+        effectiveSystemPrompt = jsonSystemPrompt;
+      }
+    }
+
     // Create a broadcast stream controller for the tokens
     final controller = StreamController<String>.broadcast();
     final allTokens = <String>[];
@@ -1305,7 +1333,7 @@ class RunAnywhere {
       prompt,
       maxTokens: opts.maxTokens,
       temperature: opts.temperature,
-      systemPrompt: opts.systemPrompt,
+      systemPrompt: effectiveSystemPrompt,
     );
 
     // Forward tokens and collect them, track subscription in bridge for cancellation
