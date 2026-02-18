@@ -10,9 +10,7 @@ plugins {
     signing
 }
 
-// =============================================================================
-// Detekt Configuration
-// =============================================================================
+// Detekt
 detekt {
     buildUponDefaultConfig = true
     allRules = false
@@ -25,9 +23,7 @@ detekt {
     )
 }
 
-// =============================================================================
-// ktlint Configuration
-// =============================================================================
+// ktlint
 ktlint {
     version.set("1.5.0")
     android.set(true)
@@ -40,9 +36,8 @@ ktlint {
     }
 }
 
-// Maven Central group ID - must match verified Sonatype namespace
-// Using io.github.sanchitmonga22 (verified) until com.runanywhere is verified
-// Once com.runanywhere is verified, change to: "com.runanywhere"
+// Maven Central group ID
+// TODO: Change to "com.runanywhere" once DNS verification completes
 val isJitPack = System.getenv("JITPACK") == "true"
 val usePendingNamespace = System.getenv("USE_RUNANYWHERE_NAMESPACE")?.toBoolean() ?: false
 group =
@@ -52,100 +47,37 @@ group =
         else -> "io.github.sanchitmonga22" // Currently verified namespace
     }
 
-// Version resolution priority:
-// 1. SDK_VERSION env var (set by our CI/CD from git tag)
-// 2. VERSION env var (set by JitPack from git tag)
-// 3. Default fallback for local development
+// Version: SDK_VERSION (CI) → VERSION (JitPack) → fallback
 val resolvedVersion =
     System.getenv("SDK_VERSION")?.removePrefix("v")
         ?: System.getenv("VERSION")?.removePrefix("v")
         ?: "0.1.5-SNAPSHOT"
 version = resolvedVersion
 
-// Log version for debugging
 logger.lifecycle("RunAnywhere SDK version: $resolvedVersion (JitPack=$isJitPack)")
 
-// =============================================================================
-// Local vs Remote JNI Library Configuration
-// =============================================================================
-// testLocal = true  → Use locally built JNI libs from src/androidMain/jniLibs/
-//                     Run: ./scripts/build-kotlin.sh --setup for first-time setup
-//
-// testLocal = false → Download pre-built JNI libs from GitHub releases (default)
-//                     Downloads from: https://github.com/RunanywhereAI/runanywhere-sdks/releases
-//
-// rebuildCommons = true → Force rebuild of runanywhere-commons C++ code
-//                         Use when you've made changes to C++ source
-//
-// Mirrors Swift SDK's Package.swift testLocal pattern
-// =============================================================================
-// IMPORTANT: Check rootProject first to support composite builds (e.g., when SDK is included from example app)
-// This ensures the app's gradle.properties takes precedence over the SDK's default
+// JNI library mode:
+//   testLocal=true  → locally built libs from src/androidMain/jniLibs/ (run ./scripts/build-kotlin.sh --setup)
+//   testLocal=false → download pre-built libs from GitHub releases
+// rootProject checked first to support composite builds (app's gradle.properties takes precedence)
 val testLocal: Boolean =
     rootProject.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
         ?: project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
         ?: false
 
-// Force rebuild of runanywhere-commons when true
+// rebuildCommons=true → force rebuild of runanywhere-commons C++ code
 val rebuildCommons: Boolean =
     rootProject.findProperty("runanywhere.rebuildCommons")?.toString()?.toBoolean()
         ?: project.findProperty("runanywhere.rebuildCommons")?.toString()?.toBoolean()
         ?: false
 
-// =============================================================================
-// Native Library Version for Downloads
-// =============================================================================
-// When testLocal=false, native libraries are downloaded from GitHub unified releases.
-// The native lib version should match the SDK version for consistency.
-// Format: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/v{version}
-//
-// Assets per ABI:
-//   - RACommons-android-{abi}-v{version}.zip
-//   - RABackendLLAMACPP-android-{abi}-v{version}.zip
-//   - RABackendONNX-android-{abi}-v{version}.zip
-// =============================================================================
+// Native lib version for GitHub release downloads (when testLocal=false)
 val nativeLibVersion: String =
     rootProject.findProperty("runanywhere.nativeLibVersion")?.toString()
         ?: project.findProperty("runanywhere.nativeLibVersion")?.toString()
         ?: resolvedVersion // Default to SDK version
 
-// Log the build mode
 logger.lifecycle("RunAnywhere SDK: testLocal=$testLocal, nativeLibVersion=$nativeLibVersion")
-
-// =============================================================================
-// Project Path Resolution
-// =============================================================================
-// When included as a subproject in composite builds (e.g., from example app or Android Studio),
-// the module path changes. This function constructs the full absolute path for sibling modules
-// based on the current project's location in the hierarchy.
-//
-// Examples:
-// - When SDK is root project: path = ":" → module path = ":modules:$moduleName"
-// - When SDK is at ":sdk:runanywhere-kotlin": path → ":sdk:runanywhere-kotlin:modules:$moduleName"
-fun resolveModulePath(moduleName: String): String {
-    val basePath = project.path
-    val computedPath =
-        if (basePath == ":") {
-            ":modules:$moduleName"
-        } else {
-            "$basePath:modules:$moduleName"
-        }
-
-    // Try to find the project using rootProject to handle Android Studio sync ordering
-    val foundProject = rootProject.findProject(computedPath)
-    if (foundProject != null) {
-        return computedPath
-    }
-
-    // Fallback: Try just :modules:$moduleName (when SDK is at non-root but modules are siblings)
-    val simplePath = ":modules:$moduleName"
-    if (rootProject.findProject(simplePath) != null) {
-        return simplePath
-    }
-
-    // Return computed path (will fail with clear error if not found)
-    return computedPath
-}
 
 kotlin {
     // Use Java 17 toolchain across targets
@@ -296,36 +228,11 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    // ==========================================================================
-    // JNI Libraries Configuration - COMMONS ONLY
-    // ==========================================================================
-    // This SDK bundles only core commons JNI libraries:
-    //   - librac_commons.so - RAC Commons infrastructure
-    //   - librunanywhere_jni.so - RAC Commons JNI bridge
-    //   - libc++_shared.so - C++ STL (shared by all backends)
-    //   - libomp.so - OpenMP (shared by all backends)
-    //
-    // Backend-specific native libs are bundled by their own modules:
-    //   - runanywhere-core-llamacpp → librac_backend_llamacpp*.so
-    //   - runanywhere-core-onnx → librac_backend_onnx*.so, libonnxruntime.so, libsherpa-onnx-*.so
-    //
-    // This ensures zero duplicate .so files across AARs.
-    // ==========================================================================
+    // This SDK bundles commons JNI libs (librac_commons, librunanywhere_jni, libc++_shared, libomp).
+    // Backend-specific libs are in their own modules (runanywhere-core-llamacpp, runanywhere-core-onnx).
 }
 
-// =============================================================================
-// Local JNI Build Task (for testLocal=true mode)
-// =============================================================================
-// Smart build task that:
-// - Skips rebuild if JNI libs exist and C++ source hasn't changed
-// - Forces rebuild if rebuildCommons=true
-// - Uses build-kotlin.sh --setup for first-time setup
-// - Uses build-local.sh for subsequent builds
-//
-// Usage:
-//   ./gradlew buildLocalJniLibs                              # Build if needed
-//   ./gradlew buildLocalJniLibs -Prunanywhere.rebuildCommons=true  # Force rebuild
-// =============================================================================
+// Build JNI libs locally (testLocal=true). Skips if libs exist unless rebuildCommons=true.
 tasks.register<Exec>("buildLocalJniLibs") {
     group = "runanywhere"
     description = "Build JNI libraries locally from runanywhere-commons (when testLocal=true)"
@@ -423,12 +330,7 @@ tasks.register<Exec>("buildLocalJniLibs") {
     }
 }
 
-// =============================================================================
-// Setup Task - First-time local development setup
-// =============================================================================
-// Convenience task for first-time setup. Equivalent to:
-//   ./scripts/build-kotlin.sh --setup
-// =============================================================================
+// First-time setup: download dependencies, build commons, copy JNI libs
 tasks.register<Exec>("setupLocalDevelopment") {
     group = "runanywhere"
     description = "First-time setup: download dependencies, build commons, copy JNI libs"
@@ -465,9 +367,7 @@ tasks.register<Exec>("setupLocalDevelopment") {
     }
 }
 
-// =============================================================================
-// Rebuild Commons Task - For when C++ code changes
-// =============================================================================
+// Rebuild C++ code after changes to runanywhere-commons
 tasks.register<Exec>("rebuildCommons") {
     group = "runanywhere"
     description = "Rebuild runanywhere-commons C++ code (use after making C++ changes)"
@@ -489,20 +389,8 @@ tasks.register<Exec>("rebuildCommons") {
     }
 }
 
-// =============================================================================
-// JNI Library Download Task (for testLocal=false mode)
-// =============================================================================
-// Downloads ONLY commons JNI libraries from GitHub releases.
-// Backend-specific libs are downloaded by their own modules:
-//   - :modules:runanywhere-core-llamacpp → RABackendLLAMACPP-android
-//   - :modules:runanywhere-core-onnx → RABackendONNX-android
-//
-// Commons libs owned by this module:
-//   - librac_commons.so - RAC Commons infrastructure
-//   - librunanywhere_jni.so - RAC Commons JNI bridge
-//   - libc++_shared.so - C++ STL (shared by all backends)
-//   - libomp.so - OpenMP (shared by all backends)
-// =============================================================================
+// Download commons JNI libs from GitHub releases (testLocal=false).
+// Backend libs are downloaded by their own modules.
 tasks.register("downloadJniLibs") {
     group = "runanywhere"
     description = "Download commons JNI libraries from GitHub releases (when testLocal=false)"
@@ -638,21 +526,15 @@ tasks.matching { it.name == "preBuild" }.configureEach {
     }
 }
 
-// Include third-party licenses in JVM JAR
+// Bundle third-party licenses in JVM JAR
 tasks.named<Jar>("jvmJar") {
     from(rootProject.file("THIRD_PARTY_LICENSES.md")) {
         into("META-INF")
     }
 }
 
-// =============================================================================
-// Maven Central Publishing Configuration
-// =============================================================================
-// Consumer usage (after publishing):
-//   implementation("com.runanywhere:runanywhere-sdk:1.0.0")
-// =============================================================================
-
-// Get publishing credentials from environment or gradle.properties
+// Maven Central publishing
+// Usage: implementation("com.runanywhere:runanywhere-sdk:1.0.0")
 val mavenCentralUsername: String? =
     System.getenv("MAVEN_CENTRAL_USERNAME")
         ?: project.findProperty("mavenCentral.username") as String?
@@ -660,7 +542,7 @@ val mavenCentralPassword: String? =
     System.getenv("MAVEN_CENTRAL_PASSWORD")
         ?: project.findProperty("mavenCentral.password") as String?
 
-// GPG signing configuration
+// GPG signing
 val signingKeyId: String? =
     System.getenv("GPG_KEY_ID")
         ?: project.findProperty("signing.keyId") as String?
@@ -754,20 +636,16 @@ publishing {
     }
 }
 
-// Configure signing (required for Maven Central)
 signing {
-    // Use in-memory key if provided via environment, otherwise use system GPG
     if (signingKey != null && signingKey.contains("BEGIN PGP")) {
         useInMemoryPgpKeys(signingKeyId, signingKey, signingPassword)
     } else {
-        // Use system GPG (configured via gradle.properties)
         useGpgCmd()
     }
-    // Sign all publications
     sign(publishing.publications)
 }
 
-// Only sign when publishing to Maven Central (not for local builds)
+// Only sign when publishing (not for local builds)
 tasks.withType<Sign>().configureEach {
     onlyIf {
         gradle.taskGraph.hasTask(":publishAllPublicationsToMavenCentralRepository") ||
@@ -777,7 +655,7 @@ tasks.withType<Sign>().configureEach {
     }
 }
 
-// Disable JVM and debug publications - only publish Android release and metadata
+// Only publish Android release and metadata (skip JVM and debug)
 tasks.withType<PublishToMavenRepository>().configureEach {
     onlyIf {
         val dominated = publication.name in listOf("jvm", "androidDebug")

@@ -1,0 +1,32 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "dev",
+      "displayName": "Development (all features)",
+      "description": "Desktop development with all backends and JNI enabled for IDE indexing",
+      "binaryDir": "${sourceDir}/build/dev",
+      "cacheVariables": {
+        "RAC_BUILD_JNI": "ON",
+        "RAC_BUILD_BACKENDS": "ON",
+        "RAC_BACKEND_LLAMACPP": "ON",
+        "RAC_BACKEND_ONNX": "ON",
+        "RAC_BACKEND_WHISPERCPP": "OFF",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "dev-no-backends",
+      "displayName": "Development (core + JNI only)",
+      "description": "Core library and JNI bridge without ML backends",
+      "binaryDir": "${sourceDir}/build/dev-core",
+      "cacheVariables": {
+        "RAC_BUILD_JNI": "ON",
+        "RAC_BUILD_BACKENDS": "OFF",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    }
+  ]
+}
