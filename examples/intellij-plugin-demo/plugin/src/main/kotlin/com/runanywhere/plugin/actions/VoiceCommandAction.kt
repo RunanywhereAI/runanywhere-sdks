@@ -4,30 +4,30 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.command.WriteCommandAction
-import com.intellij.openapi.components.service
 import com.intellij.openapi.ui.Messages
 import com.runanywhere.plugin.isInitialized
-import com.runanywhere.plugin.services.VoiceService
-import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.components.stt.STTStreamEvent
+import com.runanywhere.sdk.`public`.RunAnywhere
+import com.runanywhere.sdk.`public`.extensions.transcribe
+import com.runanywhere.sdk.features.stt.JvmAudioCaptureManager
+import com.runanywhere.sdk.features.stt.AudioChunk
 import kotlinx.coroutines.*
-import com.intellij.openapi.application.ApplicationManager
+import kotlinx.coroutines.flow.*
 import javax.swing.SwingUtilities
 
 /**
- * Action to trigger voice command input with STT
+ * Action to trigger voice command input with STT.
+ * Records audio using JvmAudioCaptureManager, then transcribes with RunAnywhere.transcribe().
  */
 class VoiceCommandAction : AnAction("Voice Command") {
 
     private var isRecording = false
+    private var recordingJob: Job? = null
+    private var audioCaptureManager: JvmAudioCaptureManager? = null
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project
         if (project == null) {
-            Messages.showErrorDialog(
-                "No project is open",
-                "Voice Command Error"
-            )
+            Messages.showErrorDialog("No project is open", "Voice Command Error")
             return
         }
 
@@ -40,109 +40,71 @@ class VoiceCommandAction : AnAction("Voice Command") {
             return
         }
 
-        val voiceService = project.service<VoiceService>()
         val editor = e.getData(CommonDataKeys.EDITOR)
 
         if (!isRecording) {
-            // Start recording
             isRecording = true
             e.presentation.text = "Stop Recording"
 
-            // Use the new streaming transcription API
+            val captureManager = JvmAudioCaptureManager()
+            audioCaptureManager = captureManager
+
             @OptIn(DelicateCoroutinesApi::class)
-            GlobalScope.launch {
+            recordingJob = GlobalScope.launch {
+                val audioBuffer = mutableListOf<AudioChunk>()
                 try {
-                    RunAnywhere.startStreamingTranscription()
-                        .collect { sttEvent ->
-                            // Handle different STT event types
-                            when (sttEvent) {
-                                is STTStreamEvent.FinalTranscription -> {
-                                    val transcription = sttEvent.result.transcript
-                                    SwingUtilities.invokeLater {
-                                        if (editor != null && editor.document.isWritable) {
-                                            // Insert transcription at cursor position
-                                            WriteCommandAction.runWriteCommandAction(project) {
-                                                val offset = editor.caretModel.offset
-                                                editor.document.insertString(offset, transcription)
-                                                editor.caretModel.moveToOffset(offset + transcription.length)
-                                            }
-                                        } else {
-                                            // Show in dialog if no editor available
-                                            Messages.showInfoMessage(
-                                                project,
-                                                "Transcription: $transcription",
-                                                "Voice Command Result"
-                                            )
-                                        }
-                                    }
+                    captureManager.startRecording().collect { chunk ->
+                        audioBuffer.add(chunk)
+                    }
+                } catch (_: CancellationException) {
+                    // Normal cancellation when user stops recording
+                }
+
+                // Transcribe collected audio
+                if (audioBuffer.isNotEmpty()) {
+                    try {
+                        val audioData = audioBuffer.flatMap { it.data.toList() }.toByteArray()
+                        val transcription = RunAnywhere.transcribe(audioData)
+
+                        SwingUtilities.invokeLater {
+                            if (editor != null && editor.document.isWritable) {
+                                WriteCommandAction.runWriteCommandAction(project) {
+                                    val offset = editor.caretModel.offset
+                                    editor.document.insertString(offset, transcription)
+                                    editor.caretModel.moveToOffset(offset + transcription.length)
                                 }
-                                is STTStreamEvent.PartialTranscription -> {
-                                    // Could show partial results in status bar if desired
-                                    // For now, we'll just ignore partial results
-                                }
-                                is STTStreamEvent.AudioLevelChanged -> {
-                                    // Could show audio level indicator if desired
-                                    // For now, we'll just ignore audio level changes
-                                }
-                                is STTStreamEvent.Error -> {
-                                    // Handle transcription errors
-                                    SwingUtilities.invokeLater {
-                                        Messages.showErrorDialog(
-                                            project,
-                                            "Transcription error: ${sttEvent.error}",
-                                            "Voice Command Error"
-                                        )
-                                    }
-                                }
-                                is STTStreamEvent.LanguageDetected -> {
-                                    // Language detection - could log or ignore
-                                }
-                                STTStreamEvent.SilenceDetected -> {
-                                    // Silence detection - could use for UI feedback
-                                }
-                                is STTStreamEvent.SpeakerChanged -> {
-                                    // Speaker change - could use for multi-speaker scenarios
-                                }
-                                STTStreamEvent.SpeechEnded -> {
-                                    // Speech ended - could use for UI feedback
-                                }
-                                STTStreamEvent.SpeechStarted -> {
-                                    // Speech started - could use for UI feedback
-                                }
+                            } else {
+                                Messages.showInfoMessage(
+                                    project,
+                                    "Transcription: $transcription",
+                                    "Voice Command Result"
+                                )
                             }
                         }
-                } catch (e: Exception) {
-                    SwingUtilities.invokeLater {
-                        Messages.showErrorDialog(
-                            project,
-                            "Voice transcription failed: ${e.message}",
-                            "Voice Command Error"
-                        )
-                    }
-                } finally {
-                    SwingUtilities.invokeLater {
-                        isRecording = false
-                        e.presentation.text = "Voice Command"
+                    } catch (e: Exception) {
+                        SwingUtilities.invokeLater {
+                            Messages.showErrorDialog(
+                                project,
+                                "Transcription failed: ${e.message}",
+                                "Voice Command Error"
+                            )
+                        }
                     }
                 }
             }
         } else {
-            // Stop recording
-            RunAnywhere.stopStreamingTranscription()
+            // Stop recording — cancels the collection which triggers transcription
+            audioCaptureManager?.stopRecording()
+            recordingJob?.cancel()
+            recordingJob = null
+            audioCaptureManager = null
             isRecording = false
             e.presentation.text = "Voice Command"
         }
     }
 
     override fun update(e: AnActionEvent) {
-        // Enable the action only when a project is open
         e.presentation.isEnabled = e.project != null
-
-        // Update text based on recording state
-        if (isRecording) {
-            e.presentation.text = "Stop Recording"
-        } else {
-            e.presentation.text = "Voice Command"
-        }
+        e.presentation.text = if (isRecording) "Stop Recording" else "Voice Command"
     }
 }
