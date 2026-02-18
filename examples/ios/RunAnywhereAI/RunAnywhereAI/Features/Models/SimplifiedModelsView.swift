@@ -364,22 +364,26 @@ private struct SimplifiedModelRow: View {
                     }
                 }
 
-                // Check if download completed
-                if progress.stage == .completed {
+                switch progress.state {
+                case .completed:
                     await MainActor.run {
                         self.downloadProgress = 1.0
                         self.isDownloading = false
                         onDownloadCompleted()
                     }
                     return
-                }
-            }
 
-            // If we exit the loop normally, download completed
-            await MainActor.run {
-                self.downloadProgress = 1.0
-                self.isDownloading = false
-                onDownloadCompleted()
+                case .failed:
+                    await MainActor.run {
+                        self.downloadProgress = 0.0
+                        self.isDownloading = false
+                        self.downloadStage = .downloading
+                    }
+                    return
+
+                default:
+                    continue
+                }
             }
         } catch {
             await MainActor.run {
