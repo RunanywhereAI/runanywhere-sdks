@@ -349,6 +349,7 @@ struct FlatModelRow: View {
         await MainActor.run {
             isDownloading = true
             downloadProgress = 0.0
+            downloadStage = .downloading
         }
 
         do {
@@ -357,7 +358,9 @@ struct FlatModelRow: View {
             for await progress in progressStream {
                 await MainActor.run {
                     self.downloadProgress = progress.percentage
-                    self.downloadStage = progress.stage
+                    if progress.stage != .completed {
+                        self.downloadStage = progress.stage
+                    }
                 }
 
                 switch progress.state {
@@ -373,6 +376,7 @@ struct FlatModelRow: View {
                     await MainActor.run {
                         self.downloadProgress = 0.0
                         self.isDownloading = false
+                        self.downloadStage = .downloading
                     }
                     return
 
@@ -384,6 +388,7 @@ struct FlatModelRow: View {
             await MainActor.run {
                 downloadProgress = 0.0
                 isDownloading = false
+                downloadStage = .downloading
             }
         }
     }
