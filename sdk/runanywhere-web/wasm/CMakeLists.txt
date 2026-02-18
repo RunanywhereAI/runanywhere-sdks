@@ -113,10 +113,10 @@ if(RAC_WASM_LLAMACPP)
         set(GGML_WEBGPU ON CACHE BOOL "" FORCE)
         # JSPI bridges async WebGPU calls from synchronous C code
         set(GGML_WEBGPU_JSPI ON CACHE BOOL "" FORCE)
-        set(WASM_OUTPUT_NAME "racommons-webgpu")
+        set(WASM_OUTPUT_NAME "racommons-llamacpp-webgpu")
     else()
         set(GGML_WEBGPU OFF CACHE BOOL "" FORCE)
-        set(WASM_OUTPUT_NAME "racommons")
+        set(WASM_OUTPUT_NAME "racommons-llamacpp")
     endif()
 
     # Disable wasm64 / MEMORY64 mode -- not yet widely supported in browsers
@@ -705,7 +705,7 @@ set(EMSCRIPTEN_LINK_FLAGS
     "-sWASM=1"
     "-sMODULARIZE=1"
     "-sEXPORT_ES6=1"
-    "-sEXPORT_NAME=createRACommonsModule"
+    "-sEXPORT_NAME=createLlamaCppModule"
     "-sENVIRONMENT=web,worker"
 
     # Memory
@@ -833,7 +833,7 @@ string(JOIN " " EMSCRIPTEN_LINK_FLAGS_STR ${EMSCRIPTEN_LINK_FLAGS})
 
 # Determine output file name (racommons or racommons-webgpu)
 if(NOT DEFINED WASM_OUTPUT_NAME)
-    set(WASM_OUTPUT_NAME "racommons")
+    set(WASM_OUTPUT_NAME "racommons-llamacpp")
 endif()
 
 set_target_properties(racommons PROPERTIES
@@ -846,7 +846,7 @@ set_target_properties(racommons PROPERTIES
 # POST-BUILD: Copy outputs to packages/core/wasm/
 # =============================================================================
 
-set(WASM_OUTPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../packages/core/wasm")
+set(WASM_OUTPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../packages/llamacpp/wasm")
 
 add_custom_command(TARGET racommons POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "${WASM_OUTPUT_DIR}"
@@ -856,7 +856,7 @@ add_custom_command(TARGET racommons POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
         "${CMAKE_CURRENT_BINARY_DIR}/${WASM_OUTPUT_NAME}.wasm"
         "${WASM_OUTPUT_DIR}/${WASM_OUTPUT_NAME}.wasm"
-    COMMENT "Copying ${WASM_OUTPUT_NAME} WASM outputs to packages/core/wasm/"
+    COMMENT "Copying ${WASM_OUTPUT_NAME} WASM outputs to packages/llamacpp/wasm/"
 )
 
 # Also copy worker file if pthreads enabled
@@ -865,7 +865,7 @@ if(RAC_WASM_PTHREADS)
         COMMAND ${CMAKE_COMMAND} -E copy
             "${CMAKE_CURRENT_BINARY_DIR}/racommons.worker.js"
             "${WASM_OUTPUT_DIR}/racommons.worker.js"
-        COMMENT "Copying pthread worker to packages/core/wasm/"
+        COMMENT "Copying pthread worker to packages/llamacpp/wasm/"
     )
 endif()
 

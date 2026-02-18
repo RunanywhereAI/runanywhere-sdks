@@ -17,17 +17,15 @@
  *   console.log(validated.extractedJson); // parsed JSON
  */
 
-import { RunAnywhere } from '../RunAnywhere';
-import { WASMBridge } from '../../Foundation/WASMBridge';
-import { Offsets } from '../../Foundation/StructOffsets';
-import { SDKError } from '../../Foundation/ErrorTypes';
-import { SDKLogger } from '../../Foundation/SDKLogger';
+import { RunAnywhere, SDKError, SDKLogger } from '@runanywhere/web';
+import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
+import { Offsets } from '../Foundation/LlamaCppOffsets';
 
 const logger = new SDKLogger('StructuredOutput');
 
-function requireBridge(): WASMBridge {
+function requireBridge(): LlamaCppBridge {
   if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
-  return WASMBridge.shared;
+  return LlamaCppBridge.shared;
 }
 
 // ---------------------------------------------------------------------------

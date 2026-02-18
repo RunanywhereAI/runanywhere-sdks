@@ -18,18 +18,14 @@
  *   if (hasVoice) console.log('Speech detected!');
  */
 
-import { RunAnywhere } from '../RunAnywhere';
-import { SherpaONNXBridge } from '../../Foundation/SherpaONNXBridge';
-import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
-import { SDKLogger } from '../../Foundation/SDKLogger';
-import { EventBus } from '../../Foundation/EventBus';
-import { SDKEventType } from '../../types/enums';
+import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType } from '@runanywhere/web';
+import { SherpaONNXBridge } from '../Foundation/SherpaONNXBridge';
 import { SpeechActivity } from './VADTypes';
 import type { SpeechActivityCallback, VADModelConfig, SpeechSegment } from './VADTypes';
 
 // @ts-expect-error -- sherpa-onnx JS wrappers ship without type declarations
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-import { initSherpaOnnxVadModelConfig, freeConfig } from '../../../wasm/sherpa/sherpa-onnx-vad.js';
+import { initSherpaOnnxVadModelConfig, freeConfig } from '../../wasm/sherpa/sherpa-onnx-vad.js';
 
 export { SpeechActivity } from './VADTypes';
 export type { SpeechActivityCallback, VADModelConfig, SpeechSegment } from './VADTypes';

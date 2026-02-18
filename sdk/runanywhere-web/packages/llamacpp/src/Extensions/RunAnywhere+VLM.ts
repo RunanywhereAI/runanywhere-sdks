@@ -14,13 +14,9 @@
  *   console.log(result.text);
  */
 
-import { RunAnywhere } from '../RunAnywhere';
-import { WASMBridge } from '../../Foundation/WASMBridge';
-import { Offsets } from '../../Foundation/StructOffsets';
-import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
-import { SDKLogger } from '../../Foundation/SDKLogger';
-import { EventBus } from '../../Foundation/EventBus';
-import { SDKEventType, HardwareAcceleration } from '../../types/enums';
+import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, HardwareAcceleration } from '@runanywhere/web';
+import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
+import { Offsets } from '../Foundation/LlamaCppOffsets';
 import { VLMImageFormat, VLMModelFamily } from './VLMTypes';
 import type { VLMImage, VLMGenerationOptions, VLMGenerationResult } from './VLMTypes';
 
@@ -38,9 +34,9 @@ class VLMImpl {
   private _vlmComponentHandle = 0;
   private _vlmBackendRegistered = false;
 
-  private requireBridge(): WASMBridge {
+  private requireBridge(): LlamaCppBridge {
     if (!RunAnywhere.isInitialized) throw SDKError.notInitialized();
-    return WASMBridge.shared;
+    return LlamaCppBridge.shared;
   }
 
   /**
@@ -152,7 +148,7 @@ class VLMImpl {
   get isModelLoaded(): boolean {
     if (this._vlmComponentHandle === 0) return false;
     try {
-      return (WASMBridge.shared.module.ccall(
+      return (LlamaCppBridge.shared.module.ccall(
         'rac_vlm_component_is_loaded', 'number', ['number'], [this._vlmComponentHandle],
       ) as number) === 1;
     } catch { return false; }
@@ -284,7 +280,7 @@ class VLMImpl {
   /** Cancel in-progress VLM generation. */
   cancel(): void {
     if (this._vlmComponentHandle === 0) return;
-    WASMBridge.shared.module.ccall(
+    LlamaCppBridge.shared.module.ccall(
       'rac_vlm_component_cancel', 'number', ['number'], [this._vlmComponentHandle],
     );
   }
@@ -293,7 +289,7 @@ class VLMImpl {
   cleanup(): void {
     if (this._vlmComponentHandle !== 0) {
       try {
-        WASMBridge.shared.module.ccall(
+        LlamaCppBridge.shared.module.ccall(
           'rac_vlm_component_destroy', null, ['number'], [this._vlmComponentHandle],
         );
       } catch { /* ignore */ }
@@ -303,9 +299,9 @@ class VLMImpl {
     if (this._vlmBackendRegistered) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const fn = (WASMBridge.shared.module as any)['_rac_backend_llamacpp_vlm_unregister'];
+        const fn = (LlamaCppBridge.shared.module as any)['_rac_backend_llamacpp_vlm_unregister'];
         if (fn) {
-          WASMBridge.shared.module.ccall('rac_backend_llamacpp_vlm_unregister', 'number', [], []);
+          LlamaCppBridge.shared.module.ccall('rac_backend_llamacpp_vlm_unregister', 'number', [], []);
         }
       } catch { /* ignore */ }
       this._vlmBackendRegistered = false;

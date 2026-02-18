@@ -17,14 +17,11 @@
  *   }
  */
 
-import { RunAnywhere } from '../RunAnywhere';
-import { WASMBridge } from '../../Foundation/WASMBridge';
-import { Offsets } from '../../Foundation/StructOffsets';
-import { SDKError, SDKErrorCode } from '../../Foundation/ErrorTypes';
-import { SDKLogger } from '../../Foundation/SDKLogger';
-import { EventBus } from '../../Foundation/EventBus';
-import { SDKEventType, LLMFramework, HardwareAcceleration } from '../../types/enums';
-import type { LLMGenerationOptions, LLMGenerationResult, LLMStreamingResult } from '../../types/LLMTypes';
+import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, LLMFramework, HardwareAcceleration } from '@runanywhere/web';
+import type { ModelLoadContext } from '@runanywhere/web';
+import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
+import { Offsets } from '../Foundation/LlamaCppOffsets';
+import type { LLMGenerationOptions, LLMGenerationResult, LLMStreamingResult } from '../types/LLMTypes';
 
 const logger = new SDKLogger('TextGeneration');
 
@@ -37,11 +34,11 @@ class TextGenerationImpl {
   private _llmComponentHandle = 0;
 
   /** Ensure the SDK is initialized and return the bridge. */
-  private requireBridge(): WASMBridge {
+  private requireBridge(): LlamaCppBridge {
     if (!RunAnywhere.isInitialized) {
       throw SDKError.notInitialized();
     }
-    return WASMBridge.shared;
+    return LlamaCppBridge.shared;
   }
 
   /** Ensure the LLM component is created. */
@@ -70,6 +67,17 @@ class TextGenerationImpl {
 
     logger.debug('LLM component created');
     return this._llmComponentHandle;
+  }
+
+  /**
+   * Load an LLM model from raw data via ModelLoadContext.
+   * Implements LLMModelLoader interface for ModelManager integration.
+   */
+  async loadModelFromData(ctx: ModelLoadContext): Promise<void> {
+    const bridge = this.requireBridge();
+    const modelPath = `/models/${ctx.model.id}.gguf`;
+    bridge.writeFile(modelPath, ctx.data);
+    await this.loadModel(modelPath, ctx.model.id, ctx.model.name);
   }
 
   /**
@@ -144,7 +152,7 @@ class TextGenerationImpl {
   get isModelLoaded(): boolean {
     if (this._llmComponentHandle === 0) return false;
     try {
-      const m = WASMBridge.shared.module;
+      const m = LlamaCppBridge.shared.module;
       return m._rac_llm_component_is_loaded(this._llmComponentHandle) === 1;
     } catch {
       return false;
@@ -524,7 +532,7 @@ class TextGenerationImpl {
   cancel(): void {
     if (this._llmComponentHandle === 0) return;
     try {
-      const m = WASMBridge.shared.module;
+      const m = LlamaCppBridge.shared.module;
       m._rac_llm_component_cancel(this._llmComponentHandle);
     } catch {
       // Ignore cancel errors
@@ -537,7 +545,7 @@ class TextGenerationImpl {
   cleanup(): void {
     if (this._llmComponentHandle !== 0) {
       try {
-        const m = WASMBridge.shared.module;
+        const m = LlamaCppBridge.shared.module;
         m._rac_llm_component_destroy(this._llmComponentHandle);
       } catch {
         // Ignore cleanup errors

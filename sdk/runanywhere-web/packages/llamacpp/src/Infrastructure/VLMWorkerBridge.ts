@@ -15,8 +15,8 @@
  *   ```
  */
 
-import { WASMBridge } from '../Foundation/WASMBridge';
-import { SDKLogger } from '../Foundation/SDKLogger';
+import { SDKLogger } from '@runanywhere/web';
+import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -186,22 +186,22 @@ export class VLMWorkerBridge {
    * Initialize the Worker and its WASM instance.
    * Must be called once before loadModel/process.
    *
-   * Reads the WASM URL and acceleration mode from WASMBridge internally — the
-   * app does not need to pass these.
+   * Reads the WASM URL and acceleration mode from LlamaCppBridge internally —
+   * the app does not need to pass these.
    *
    * @param wasmJsUrl - Optional explicit URL for the WASM glue JS.
-   *                    When omitted, the SDK's WASMBridge.workerWasmUrl is used
+   *                    When omitted, the SDK's LlamaCppBridge.wasmUrl is used
    *                    so the worker loads the exact same variant (WebGPU or CPU)
    *                    that the main thread successfully loaded.
    */
   async init(wasmJsUrl?: string): Promise<void> {
     if (this._isInitialized) return;
 
-    // All acceleration logic lives in the SDK's WASMBridge.
+    // All acceleration logic lives in the SDK's LlamaCppBridge.
     // We just read the decision it already made.
-    const bridge = WASMBridge.shared;
+    const bridge = LlamaCppBridge.shared;
     const useWebGPU = bridge.accelerationMode === 'webgpu';
-    const resolvedUrl = wasmJsUrl ?? bridge.workerWasmUrl ?? '';
+    const resolvedUrl = wasmJsUrl ?? bridge.wasmUrl ?? '';
 
     if (!resolvedUrl) {
       throw new Error('[VLMWorkerBridge] SDK not initialized — no WASM URL available');

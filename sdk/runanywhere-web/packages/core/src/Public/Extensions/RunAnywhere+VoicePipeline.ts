@@ -3,10 +3,9 @@
  *
  * High-level streaming voice orchestrator: STT -> LLM (streaming) -> TTS.
  *
- * Unlike VoiceAgent (which uses the C API for a batch pipeline), VoicePipeline
- * composes the existing TypeScript SDK extensions (STT, TextGeneration, TTS)
- * and provides streaming callbacks so the UI can update in real-time as each
- * stage progresses.
+ * Uses runtime capability lookups via ExtensionPoint, so it doesn't import
+ * backend packages directly. Requires both @runanywhere/web-llamacpp and
+ * @runanywhere/web-onnx to be registered.
  *
  * Usage:
  *   ```typescript
@@ -22,15 +21,10 @@
  *     onSynthesisComplete: (audio, sr) => playAudio(audio, sr),
  *   });
  *   ```
- *
- * The pipeline does NOT handle audio capture, VAD, or playback — those are
- * app-level concerns (mic control, VAD thresholds, speaker output).
  */
 
-import { STT } from './RunAnywhere+STT';
-import { TextGeneration } from './RunAnywhere+TextGeneration';
-import { TTS } from './RunAnywhere+TTS';
 import { SDKLogger } from '../../Foundation/SDKLogger';
+import { ExtensionPoint, ServiceKey } from '../../Infrastructure/ExtensionPoint';
 import { PipelineState } from './VoiceAgentTypes';
 import type {
   VoicePipelineCallbacks,
@@ -46,6 +40,42 @@ export type {
 } from './VoicePipelineTypes';
 
 const logger = new SDKLogger('VoicePipeline');
+
+// ---------------------------------------------------------------------------
+// Service interfaces for cross-package access
+// ---------------------------------------------------------------------------
+
+interface STTService {
+  transcribe(audio: Float32Array, options?: { sampleRate?: number }): Promise<{ text: string; [key: string]: unknown }>;
+}
+
+interface TextGenerationService {
+  generateStream(prompt: string, options?: { maxTokens?: number; temperature?: number; systemPrompt?: string }): Promise<{
+    stream: AsyncIterable<string>;
+    result: Promise<{ text: string; tokensUsed: number; tokensPerSecond: number; [key: string]: unknown }>;
+    cancel: () => void;
+  }>;
+}
+
+interface TTSService {
+  synthesize(text: string, options?: { speed?: number }): Promise<{ audioData: Float32Array; sampleRate: number; durationMs: number; processingTimeMs: number; [key: string]: unknown }>;
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic backend access helpers (typed via ExtensionPoint service registry)
+// ---------------------------------------------------------------------------
+
+function requireSTT(): STTService {
+  return ExtensionPoint.requireService<STTService>(ServiceKey.STT, '@runanywhere/web-onnx');
+}
+
+function requireTextGeneration(): TextGenerationService {
+  return ExtensionPoint.requireService<TextGenerationService>(ServiceKey.TextGeneration, '@runanywhere/web-llamacpp');
+}
+
+function requireTTS(): TTSService {
+  return ExtensionPoint.requireService<TTSService>(ServiceKey.TTS, '@runanywhere/web-onnx');
+}
 
 // ---------------------------------------------------------------------------
 // Default options
@@ -64,32 +94,14 @@ const DEFAULT_OPTIONS: Required<VoicePipelineOptions> = {
 // VoicePipeline
 // ---------------------------------------------------------------------------
 
-/**
- * Streaming voice pipeline that orchestrates STT -> LLM -> TTS.
- *
- * Create one instance and reuse it across conversation turns. Each call to
- * `processTurn()` runs the full pipeline once and returns the result.
- *
- * The LLM step uses streaming generation, so the `onResponseToken` callback
- * fires for each token — enabling real-time UI updates.
- */
 export class VoicePipeline {
   private _cancelGeneration: (() => void) | null = null;
   private _state: PipelineState = PipelineState.Idle;
 
-  /** Current pipeline state. */
   get state(): PipelineState {
     return this._state;
   }
 
-  /**
-   * Run a complete voice turn: audio in -> transcription -> LLM response -> TTS audio.
-   *
-   * @param audioData  Float32Array of PCM samples (mono, typically 16 kHz).
-   * @param options    LLM / TTS / STT configuration for this turn.
-   * @param callbacks  Streaming callbacks for real-time UI updates.
-   * @returns          The full turn result once all stages complete.
-   */
   async processTurn(
     audioData: Float32Array,
     options?: VoicePipelineOptions,
@@ -98,13 +110,14 @@ export class VoicePipeline {
     const opts = { ...DEFAULT_OPTIONS, ...options };
     const totalStart = performance.now();
 
-    // ── Step 1: STT ────────────────────────────────────────────────────
+    // Step 1: STT
     this.transition(PipelineState.ProcessingSTT, callbacks);
 
     const sttStart = performance.now();
     logger.info(`STT: ${(audioData.length / opts.sampleRate).toFixed(1)}s of audio`);
 
-    const sttResult = await STT.transcribe(audioData, {
+    const stt = requireSTT();
+    const sttResult = await stt.transcribe(audioData, {
       sampleRate: opts.sampleRate,
     });
     const sttMs = performance.now() - sttStart;
@@ -122,11 +135,12 @@ export class VoicePipeline {
       };
     }
 
-    // ── Step 2: LLM (streaming) ────────────────────────────────────────
+    // Step 2: LLM (streaming)
     this.transition(PipelineState.GeneratingResponse, callbacks);
 
     const llmStart = performance.now();
-    const { stream, result: llmResultPromise, cancel } = await TextGeneration.generateStream(
+    const textGen = requireTextGeneration();
+    const { stream, result: llmResultPromise, cancel } = await textGen.generateStream(
       userText,
       {
         maxTokens: opts.maxTokens,
@@ -160,11 +174,12 @@ export class VoicePipeline {
       };
     }
 
-    // ── Step 3: TTS ────────────────────────────────────────────────────
+    // Step 3: TTS
     this.transition(PipelineState.PlayingTTS, callbacks);
 
     const ttsStart = performance.now();
-    const ttsResult = await TTS.synthesize(fullResponse.trim(), {
+    const tts = requireTTS();
+    const ttsResult = await tts.synthesize(fullResponse.trim(), {
       speed: opts.ttsSpeed,
     });
     const ttsMs = performance.now() - ttsStart;
@@ -172,7 +187,7 @@ export class VoicePipeline {
     logger.info(`TTS complete: ${ttsResult.durationMs}ms audio in ${ttsResult.processingTimeMs}ms`);
     callbacks?.onSynthesisComplete?.(ttsResult.audioData, ttsResult.sampleRate, ttsResult);
 
-    // ── Done ───────────────────────────────────────────────────────────
+    // Done
     this.transition(PipelineState.Idle, callbacks);
 
     return {
@@ -190,10 +205,6 @@ export class VoicePipeline {
     };
   }
 
-  /**
-   * Cancel in-progress LLM generation.
-   * Safe to call at any time — no-ops if nothing is in progress.
-   */
   cancel(): void {
     if (this._cancelGeneration) {
       this._cancelGeneration();
@@ -201,10 +212,6 @@ export class VoicePipeline {
       logger.info('Generation cancelled');
     }
   }
-
-  // ---------------------------------------------------------------------------
-  // Internals
-  // ---------------------------------------------------------------------------
 
   private transition(newState: PipelineState, callbacks?: VoicePipelineCallbacks): void {
     this._state = newState;

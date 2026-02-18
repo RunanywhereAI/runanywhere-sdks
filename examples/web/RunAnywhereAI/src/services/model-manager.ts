@@ -10,12 +10,12 @@ import {
   ModelManager,
   ModelCategory,
   LLMFramework,
-  VLMWorkerBridge,
   EventBus,
   type CompactModelDef,
   type ManagedModel,
   type ModelFileDescriptor,
 } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
+import { VLMWorkerBridge } from '../../../../../sdk/runanywhere-web/packages/llamacpp/src/index';
 import { showToast } from '../components/dialogs';
 
 // Re-export SDK types for existing consumers (ManagedModel aliased as ModelInfo
@@ -219,7 +219,7 @@ RunAnywhere.registerModels(REGISTERED_MODELS);
 // Import the VLM worker using Vite's ?worker&url suffix so it gets compiled
 // as a standalone bundle with all dependencies resolved — no raw-source data URLs.
 // @ts-ignore — Vite-specific import query
-import vlmWorkerUrl from '../../../../../sdk/runanywhere-web/packages/core/src/workers/vlm-worker.ts?worker&url';
+import vlmWorkerUrl from '../../../../../sdk/runanywhere-web/packages/llamacpp/src/workers/vlm-worker.ts?worker&url';
 VLMWorkerBridge.shared.workerUrl = vlmWorkerUrl;
 
 // Plug in VLM worker loading using the SDK's VLMWorkerBridge

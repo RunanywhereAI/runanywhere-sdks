@@ -65,7 +65,7 @@ class ConversationStore private constructor(context: Context) {
         val conversation =
             Conversation(
                 id = UUID.randomUUID().toString(),
-                title = title ?: "New Chat",
+                title = title,
                 messages = emptyList(),
                 createdAt = System.currentTimeMillis(),
                 updatedAt = System.currentTimeMillis(),
@@ -81,6 +81,20 @@ class ConversationStore private constructor(context: Context) {
 
         saveConversation(conversation)
         return conversation
+    }
+
+    /**
+     * Ensure a conversation is in the in-memory list and persisted.
+     * If not present (by id), adds it at the front so it appears in history.
+     */
+    fun ensureConversationInList(conversation: Conversation) {
+        val index = _conversations.value.indexOfFirst { it.id == conversation.id }
+        if (index == -1) {
+            val list = _conversations.value.toMutableList()
+            list.add(0, conversation)
+            _conversations.value = list
+            saveConversation(conversation)
+        }
     }
 
     /**
@@ -136,8 +150,10 @@ class ConversationStore private constructor(context: Context) {
                 updatedAt = System.currentTimeMillis(),
             )
 
-        // Auto-generate title from first user message if needed
-        if (updated.title == "New Chat" && message.role == MessageRole.USER && message.content.isNotEmpty()) {
+        // Use first user input as conversation title (instead of "New Chat")
+        if (message.role == MessageRole.USER && message.content.isNotEmpty() &&
+            (updated.title.isNullOrBlank() || updated.title == "New Chat")
+        ) {
             updated = updated.copy(title = generateTitle(message.content))
         }
 
