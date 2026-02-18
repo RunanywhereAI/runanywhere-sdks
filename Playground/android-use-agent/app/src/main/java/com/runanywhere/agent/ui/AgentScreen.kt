@@ -403,7 +403,7 @@ private fun VLMModelCard(
                         color = if (isVLMLoaded) Color(0xFF198754) else MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "SmolVLM 256M (~365 MB)",
+                        text = "LFM2-VL 450M (~323 MB)",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.Gray
                     )

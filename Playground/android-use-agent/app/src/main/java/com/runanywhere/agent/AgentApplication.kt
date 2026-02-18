@@ -24,31 +24,43 @@ class AgentApplication : Application() {
     companion object {
         private const val TAG = "AgentApplication"
 
-        // Available LLM models
+        // Available LLM models — ordered by recommended usage on Galaxy S24 (8GB RAM).
         val AVAILABLE_MODELS = listOf(
             ModelInfo(
-                id = "smollm2-360m-instruct-q8_0",
-                name = "SmolLM2 360M (Fast)",
-                url = "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q8_0.gguf",
-                sizeBytes = 400_000_000L
-            ),
-            ModelInfo(
-                id = "qwen2.5-1.5b-instruct-q4_k_m",
-                name = "Qwen2.5 1.5B (Best)",
-                url = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
-                sizeBytes = 1_200_000_000L
+                id = "qwen3-4b-q4_k_m",
+                name = "Qwen3 4B (Recommended)",
+                url = "https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf",
+                sizeBytes = 2_500_000_000L
             ),
             ModelInfo(
                 id = "lfm2.5-1.2b-instruct-q4_k_m",
-                name = "LFM2.5 1.2B (Edge)",
+                name = "LFM2.5 1.2B Instruct",
                 url = "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf",
-                sizeBytes = 800_000_000L
+                sizeBytes = 731_000_000L
+            ),
+            ModelInfo(
+                id = "lfm2-8b-a1b-q4_k_m",
+                name = "LFM2 8B-A1B MoE (5GB)",
+                url = "https://huggingface.co/LiquidAI/LFM2-8B-A1B-GGUF/resolve/main/LFM2-8B-A1B-Q4_K_M.gguf",
+                sizeBytes = 5_040_000_000L
+            ),
+            ModelInfo(
+                id = "ds-r1-qwen3-8b-q4_k_m",
+                name = "DS-R1 Qwen3 8B (Reasoning, 5GB)",
+                url = "https://huggingface.co/unsloth/DeepSeek-R1-0528-Qwen3-8B-GGUF/resolve/main/DeepSeek-R1-0528-Qwen3-8B-Q4_K_M.gguf",
+                sizeBytes = 5_030_000_000L
+            ),
+            ModelInfo(
+                id = "lfm2-350m-q4_k_m",
+                name = "LFM2 350M (Base, lightweight)",
+                url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
+                sizeBytes = 229_000_000L
             )
         )
 
-        const val DEFAULT_MODEL = "qwen2.5-1.5b-instruct-q4_k_m"
+        const val DEFAULT_MODEL = "qwen3-4b-q4_k_m"
         const val STT_MODEL_ID = "sherpa-onnx-whisper-tiny.en"
-        const val VLM_MODEL_ID = "smolvlm-256m-instruct"
+        const val VLM_MODEL_ID = "lfm2-vl-450m"
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -103,23 +115,23 @@ class AgentApplication : Application() {
                     Log.i(TAG, "Registered LLM model: ${model.id}")
                 }
 
-                // Register VLM model (SmolVLM 256M — multi-file: main model + mmproj)
+                // Register VLM model (LFM2-VL-450M — Liquid AI, multi-file: Q4_0 main + Q8_0 mmproj)
                 RunAnywhere.registerMultiFileModel(
                     id = VLM_MODEL_ID,
-                    name = "SmolVLM 256M Instruct (Q8)",
+                    name = "LFM2-VL 450M (Q4)",
                     files = listOf(
                         ModelFileDescriptor(
-                            url = "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/SmolVLM-256M-Instruct-Q8_0.gguf",
-                            filename = "SmolVLM-256M-Instruct-Q8_0.gguf"
+                            url = "https://huggingface.co/LiquidAI/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q4_0.gguf",
+                            filename = "LFM2-VL-450M-Q4_0.gguf"
                         ),
                         ModelFileDescriptor(
-                            url = "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/mmproj-SmolVLM-256M-Instruct-f16.gguf",
-                            filename = "mmproj-SmolVLM-256M-Instruct-f16.gguf"
+                            url = "https://huggingface.co/LiquidAI/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf",
+                            filename = "mmproj-LFM2-VL-450M-Q8_0.gguf"
                         ),
                     ),
                     framework = InferenceFramework.LLAMA_CPP,
                     modality = ModelCategory.MULTIMODAL,
-                    memoryRequirement = 365_000_000
+                    memoryRequirement = 323_000_000
                 )
                 Log.i(TAG, "Registered VLM model: $VLM_MODEL_ID")
 

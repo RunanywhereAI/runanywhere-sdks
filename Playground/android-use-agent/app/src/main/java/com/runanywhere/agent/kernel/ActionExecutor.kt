@@ -222,6 +222,8 @@ class ActionExecutor(
                 AppActions.openApp(context, AppActions.Packages.CALCULATOR) || AppActions.openApp(context, AppActions.Packages.CALCULATOR_SAMSUNG)
             appLower.contains("files") || appLower.contains("file manager") ->
                 AppActions.openApp(context, AppActions.Packages.FILES) || AppActions.openApp(context, AppActions.Packages.FILES_SAMSUNG)
+            appLower.contains("note") ->
+                AppActions.openNotes(context)
             appLower.contains("setting") -> {
                 openSettings()
                 true
@@ -246,6 +248,17 @@ class ActionExecutor(
             "sound", "audio" -> android.provider.Settings.ACTION_SOUND_SETTINGS
             "battery" -> android.provider.Settings.ACTION_BATTERY_SAVER_SETTINGS
             "location" -> android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS
+            "notification", "notifications" -> android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS
+            "storage" -> android.provider.Settings.ACTION_INTERNAL_STORAGE_SETTINGS
+            "security", "privacy" -> android.provider.Settings.ACTION_SECURITY_SETTINGS
+            "accessibility" -> android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS
+            "about" -> android.provider.Settings.ACTION_DEVICE_INFO_SETTINGS
+            "developer", "dev" -> android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS
+            "date", "time" -> android.provider.Settings.ACTION_DATE_SETTINGS
+            "language" -> android.provider.Settings.ACTION_LOCALE_SETTINGS
+            "airplane", "flight" -> android.provider.Settings.ACTION_AIRPLANE_MODE_SETTINGS
+            "nfc" -> android.provider.Settings.ACTION_NFC_SETTINGS
+            "apps", "applications" -> android.provider.Settings.ACTION_APPLICATION_SETTINGS
             else -> android.provider.Settings.ACTION_SETTINGS
         }
 

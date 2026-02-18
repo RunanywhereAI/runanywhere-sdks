@@ -8,7 +8,6 @@ import com.runanywhere.agent.accessibility.AgentAccessibilityService
 import com.runanywhere.agent.actions.AppActions
 import com.runanywhere.agent.providers.ProviderMode
 import com.runanywhere.agent.providers.VisionProvider
-import com.runanywhere.agent.toolcalling.BuiltInTools
 import com.runanywhere.agent.toolcalling.LLMResponse
 import com.runanywhere.agent.toolcalling.ToolCall
 import com.runanywhere.agent.toolcalling.ToolCallParser
@@ -33,6 +32,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import org.json.JSONException
 import org.json.JSONObject
+import java.util.UUID
 import java.util.regex.Pattern
 
 class AgentKernel(
@@ -43,8 +43,8 @@ class AgentKernel(
     companion object {
         private const val TAG = "AgentKernel"
         private const val MAX_STEPS = 30
-        private const val MAX_DURATION_MS = 180_000L
-        private const val STEP_DELAY_MS = 1500L
+        private const val MAX_DURATION_MS = 600_000L // 10 min — on-device LLM+VLM takes ~60s/step
+        private const val STEP_DELAY_MS = 1000L
         private const val MAX_TOOL_ITERATIONS = 5
     }
 
@@ -64,7 +64,8 @@ class AgentKernel(
     private val uiActionContext = UIActionContext()
 
     private val toolRegistry = ToolRegistry().also { registry ->
-        BuiltInTools.registerAll(registry, context)
+        // Only register UI action tools — utility tools (time, weather, etc.)
+        // confuse small on-device LLMs and cause tool-calling loops.
         UIActionTools.registerAll(registry, uiActionContext, actionExecutor)
     }
 
@@ -133,23 +134,93 @@ class AgentKernel(
             }
 
             // Smart pre-launch: open the target app before the agent loop
-            val preLaunchResult = preLaunchApp(goal)
-            if (preLaunchResult != null) {
-                emit(AgentEvent.Log(preLaunchResult))
-                delay(1500) // Wait for app to fully launch
+            var hasNavigatedAway = false
+            var lastTargetPackage: String? = null
+            val preLaunch = preLaunchApp(goal)
+            if (preLaunch != null) {
+                emit(AgentEvent.Log(preLaunch.message))
+                hasNavigatedAway = true
+                lastTargetPackage = preLaunch.packageName
+                delay(2000) // Wait for app to fully launch
+
+                // If preLaunch already completed the goal (e.g., timer set, search done)
+                if (preLaunch.goalComplete) {
+                    emit(AgentEvent.Log("Pre-launch completed goal directly"))
+                    emit(AgentEvent.Speak("Task complete."))
+                    emit(AgentEvent.Done("Goal achieved via pre-launch"))
+                    return@flow
+                }
+
+                // If preLaunch performed a search, verify we navigated away
+                if (preLaunch.didSearch) {
+                    val screen = screenParser.parse()
+                    if (screen.foregroundPackage != null && screen.foregroundPackage != "com.runanywhere.agent") {
+                        emit(AgentEvent.Log("Pre-launch completed goal (search already performed)"))
+                        emit(AgentEvent.Speak("Task complete."))
+                        emit(AgentEvent.Done("Goal achieved via pre-launch"))
+                        return@flow
+                    }
+                }
             }
 
-            // Ensure LLM model is ready
-            emit(AgentEvent.Log("Loading model: $activeModelId"))
-            ensureModelReady()
-            emit(AgentEvent.Log("Model ready"))
+            // Load LLM model — graceful if VLM is available as fallback
+            val llmReady = try {
+                emit(AgentEvent.Log("Loading LLM model: $activeModelId"))
+                ensureModelReady()
+                emit(AgentEvent.Log("LLM model ready"))
+                true
+            } catch (e: Exception) {
+                if (visionProvider.isAvailable) {
+                    emit(AgentEvent.Log("LLM load failed, using VLM-only mode"))
+                    false
+                } else {
+                    throw e // No fallback available
+                }
+            }
+
+            val vlmOnly = !llmReady && visionProvider.isAvailable
+            if (vlmOnly) {
+                emit(AgentEvent.Log("Running in VLM-only mode (no LLM)"))
+                emit(AgentEvent.ProviderChanged(ProviderMode.LOCAL))
+            }
 
             val startTime = System.currentTimeMillis()
             var step = 0
 
             while (step < MAX_STEPS && isRunning) {
                 step++
+                val stepStart = System.currentTimeMillis()
                 emit(AgentEvent.Log("Step $step/$MAX_STEPS"))
+
+                // Self-detection: never analyze/interact with our own UI
+                val currentFgCheck = screenParser.parse().foregroundPackage
+                if (currentFgCheck == "com.runanywhere.agent") {
+                    if (hasNavigatedAway && lastTargetPackage != null) {
+                        Log.i(TAG, "Returning to target app: $lastTargetPackage")
+                        bringAppToForeground(lastTargetPackage!!)
+                        delay(800)
+                    } else {
+                        // preLaunch didn't fire — try to open the target app from goal
+                        Log.w(TAG, "Agent sees own UI but no target app set. Attempting preLaunch.")
+                        val latePre = preLaunchApp(goal)
+                        if (latePre != null) {
+                            emit(AgentEvent.Log(latePre.message))
+                            hasNavigatedAway = true
+                            lastTargetPackage = latePre.packageName
+                            delay(2000)
+                            if (latePre.goalComplete) {
+                                emit(AgentEvent.Done("Goal achieved via late pre-launch"))
+                                return@flow
+                            }
+                        } else {
+                            // Last resort: press Home and wait — avoids interacting with own UI
+                            Log.w(TAG, "No preLaunch match — pressing Home to escape own UI")
+                            actionExecutor.execute(Decision("home"), emptyMap())
+                            delay(1000)
+                        }
+                    }
+                    continue // Re-parse after navigating away
+                }
 
                 // Parse screen
                 val screen = screenParser.parse()
@@ -158,6 +229,14 @@ class AgentKernel(
                     delay(STEP_DELAY_MS)
                     continue
                 }
+
+                // Track the target app package
+                if (screen.foregroundPackage != null && screen.foregroundPackage != "com.runanywhere.agent") {
+                    lastTargetPackage = screen.foregroundPackage
+                }
+
+                Log.i(TAG, "Screen: pkg=${screen.foregroundPackage}, ${screen.elementCount} elements")
+                Log.i(TAG, "Elements: ${screen.compactText.take(600)}")
 
                 // Update UI action context with fresh coordinates
                 uiActionContext.indexToCoords = screen.indexToCoords
@@ -170,7 +249,118 @@ class AgentKernel(
                     null
                 }
 
-                // On-device VLM: analyze screenshot locally
+                // Common context for both paths — use compact history for local models
+                val historyPrompt = history.formatCompact()
+                val lastActionResult = history.getLastActionResult()
+                val lastAction = history.getLastAction()
+                val loopDetected = lastAction != null && history.isRepetitive(lastAction.action, lastAction.target)
+                val hadFailure = history.hadRecentFailure()
+
+                // Smart recovery on loop: try to find a matching element or use search.
+                if (loopDetected) {
+                    val recoveryResult = trySmartRecovery(goal, screen, step) { event -> emit(event) }
+                    when (recoveryResult) {
+                        RecoveryResult.GOAL_ACHIEVED -> return@flow
+                        RecoveryResult.ACTION_TAKEN -> { delay(STEP_DELAY_MS); continue }
+                        RecoveryResult.NO_ACTION -> { /* fall through to LLM */ }
+                    }
+                }
+
+                // ========== VLM-ONLY PATH ==========
+                if (vlmOnly && screenshotBase64 != null) {
+                    // Foreground boost for VLM inference too
+                    if (screen.foregroundPackage != "com.runanywhere.agent") {
+                        bringToForeground()
+                        delay(300)
+                    }
+                    emit(AgentEvent.Log("[VLM-ONLY] Deciding next action..."))
+                    val vlmRawOutput = try {
+                        visionProvider.decideNextAction(
+                            screenshotBase64, screen.compactText, goal,
+                            historyPrompt, lastActionResult
+                        )
+                    } catch (e: Exception) {
+                        Log.w(TAG, "VLM decision failed: ${e.message}")
+                        null
+                    }
+
+                    if (vlmRawOutput != null) {
+                        emit(AgentEvent.Log("[VLM-ONLY] Output: ${vlmRawOutput.take(100)}"))
+
+                        // Go back to target app after VLM inference
+                        if (screen.foregroundPackage != null && screen.foregroundPackage != "com.runanywhere.agent") {
+                            val currentFgVlm = screenParser.parse().foregroundPackage
+                            if (currentFgVlm == "com.runanywhere.agent") {
+                                bringAppToForeground(screen.foregroundPackage!!)
+                                delay(500)
+                            }
+                        }
+
+                        // Try parsing as tool call first
+                        if (ToolCallParser.containsToolCall(vlmRawOutput)) {
+                            val calls = ToolCallParser.parse(vlmRawOutput)
+                            val uiCall = calls.firstOrNull { it.toolName.startsWith("ui_") }
+                            if (uiCall != null) {
+                                val actionName = mapToolNameToAction(uiCall.toolName)
+                                val target = extractTargetFromToolCall(uiCall)
+                                emit(AgentEvent.Log("Action (vlm): $actionName"))
+                                val result = toolRegistry.execute(uiCall)
+                                emit(AgentEvent.Step(step, actionName, result.result))
+                                history.record(actionName, target, result.result, !result.isError)
+
+                                if (uiCall.toolName == "ui_done") {
+                                    emit(AgentEvent.Speak("Task complete."))
+                                    emit(AgentEvent.Done("Goal achieved"))
+                                    return@flow
+                                }
+
+                                val stepElapsed = System.currentTimeMillis() - stepStart
+                                emit(AgentEvent.Log("Step $step took ${stepElapsed / 1000}s"))
+                                if (System.currentTimeMillis() - startTime > MAX_DURATION_MS) {
+                                    emit(AgentEvent.Done("Max duration reached"))
+                                    return@flow
+                                }
+                                delay(STEP_DELAY_MS)
+                                continue
+                            }
+                        }
+
+                        // Fallback: try parsing as JSON decision
+                        val decision = parseDecision(vlmRawOutput)
+                        emit(AgentEvent.Log("Action (vlm-json): ${decision.action}"))
+                        val result = actionExecutor.execute(decision, screen.indexToCoords)
+                        emit(AgentEvent.Step(step, decision.action, result.message))
+                        val target = when {
+                            decision.elementIndex != null -> screenParser.getElementLabel(decision.elementIndex)
+                            decision.text != null -> decision.text
+                            else -> null
+                        }
+                        history.record(decision.action, target, result.message, result.success)
+
+                        if (decision.action == "done") {
+                            emit(AgentEvent.Speak("Task complete."))
+                            emit(AgentEvent.Done("Goal achieved"))
+                            return@flow
+                        }
+
+                        val stepElapsed = System.currentTimeMillis() - stepStart
+                        emit(AgentEvent.Log("Step $step took ${stepElapsed / 1000}s"))
+                        if (System.currentTimeMillis() - startTime > MAX_DURATION_MS) {
+                            emit(AgentEvent.Done("Max duration reached"))
+                            return@flow
+                        }
+                        delay(STEP_DELAY_MS)
+                        continue
+                    } else {
+                        emit(AgentEvent.Log("[VLM-ONLY] No output, waiting..."))
+                        delay(STEP_DELAY_MS)
+                        continue
+                    }
+                }
+
+                // ========== LLM PATH (with optional VLM context) ==========
+
+                // On-device VLM: analyze screenshot locally for context enrichment
                 val visionContext = if (screenshotBase64 != null && visionProvider.isAvailable) {
                     emit(AgentEvent.Log("[LOCAL] Analyzing screen with VLM..."))
                     try {
@@ -185,17 +375,8 @@ class AgentKernel(
                     emit(AgentEvent.Log("[LOCAL] VLM: ${visionContext.take(80)}..."))
                 }
 
-                // Determine vision availability (either local VLM or cloud GPT-4o)
                 val hasVisionContext = visionContext != null
                 val useVision = hasVisionContext || (screenshotBase64 != null && gptClient.isConfigured())
-
-                // Get LLM decision with context
-                val historyPrompt = history.formatForPrompt()
-                val lastActionResult = history.getLastActionResult()
-                val lastAction = history.getLastAction()
-
-                val loopDetected = lastAction != null && history.isRepetitive(lastAction.action, lastAction.target)
-                val hadFailure = history.hadRecentFailure()
 
                 // Build prompt — use tool calling format always
                 val useToolCalling = true
@@ -203,14 +384,14 @@ class AgentKernel(
                     when {
                         loopDetected -> {
                             emit(AgentEvent.Log("Loop detected, adding recovery prompt"))
-                            SystemPrompts.buildVisionLoopRecoveryPrompt(goal, screen.compactText, historyPrompt, lastActionResult, useToolCalling)
+                            SystemPrompts.buildVisionLoopRecoveryPrompt(goal, screen.compactText, historyPrompt, lastActionResult, useToolCalling, visionContext)
                         }
                         hadFailure -> {
                             emit(AgentEvent.Log("Recent failure, adding recovery hints"))
-                            SystemPrompts.buildVisionFailureRecoveryPrompt(goal, screen.compactText, historyPrompt, lastActionResult, useToolCalling)
+                            SystemPrompts.buildVisionFailureRecoveryPrompt(goal, screen.compactText, historyPrompt, lastActionResult, useToolCalling, visionContext)
                         }
                         else -> {
-                            SystemPrompts.buildVisionPrompt(goal, screen.compactText, historyPrompt, lastActionResult, useToolCalling)
+                            SystemPrompts.buildVisionPrompt(goal, screen.compactText, historyPrompt, lastActionResult, useToolCalling, visionContext)
                         }
                     }
                 } else {
@@ -229,22 +410,36 @@ class AgentKernel(
                     }
                 }
 
-                // Inject VLM context into prompt if available
-                val enrichedPrompt = if (visionContext != null) {
-                    "$prompt\n\nVISION_CONTEXT (from on-device VLM):\n$visionContext"
-                } else {
-                    prompt
+                lastPrompt = prompt
+
+                // ========== FOREGROUND BOOST ==========
+                // Bring our activity to foreground during LLM inference.
+                // Samsung's OneUI scheduler pins background processes to efficiency cores,
+                // causing ~20x slowdown. Being foreground during inference restores full speed.
+                if (screen.foregroundPackage != "com.runanywhere.agent") {
+                    bringToForeground()
+                    delay(300)
                 }
 
-                lastPrompt = enrichedPrompt
-
                 // ========== LOCAL-FIRST LLM ROUTING ==========
-                val response = getDecision(enrichedPrompt, screenshotBase64, hasVisionContext) { event ->
+                val response = getDecision(prompt, screenshotBase64, hasVisionContext) { event ->
                     emit(event)
                 }
 
+                // After inference, return to the target app if we came to foreground
+                val targetPkg = screen.foregroundPackage
+                if (targetPkg != null && targetPkg != "com.runanywhere.agent") {
+                    val currentFg = screenParser.parse().foregroundPackage
+                    if (currentFg == "com.runanywhere.agent") {
+                        bringAppToForeground(targetPkg)
+                        delay(500)
+                    }
+                }
+
                 // Resolve any tool calls (sub-loop)
-                val finalResponse = resolveToolCalls(response, enrichedPrompt) { event -> emit(event) }
+                Log.i(TAG, "Initial response type: ${response::class.simpleName}")
+                val finalResponse = resolveToolCalls(response, prompt) { event -> emit(event) }
+                Log.i(TAG, "After resolveToolCalls: ${finalResponse::class.simpleName}")
 
                 // Handle UI action tool calls from GPT-4o function calling
                 if (finalResponse is LLMResponse.UIActionToolCall) {
@@ -269,12 +464,16 @@ class AgentKernel(
                     val result = toolRegistry.execute(call)
                     emit(AgentEvent.Step(step, actionName, result.result))
                     history.record(actionName, target, result.result, !result.isError)
+                    hasNavigatedAway = true
 
                     if (call.toolName == "ui_done") {
                         emit(AgentEvent.Speak("Task complete."))
                         emit(AgentEvent.Done("Goal achieved"))
                         return@flow
                     }
+
+                    val stepElapsed = System.currentTimeMillis() - stepStart
+                    emit(AgentEvent.Log("Step $step took ${stepElapsed / 1000}s"))
 
                     // Check timeout
                     if (System.currentTimeMillis() - startTime > MAX_DURATION_MS) {
@@ -287,8 +486,12 @@ class AgentKernel(
                 }
 
                 // Legacy path: handle JSON-based UI actions (local model)
+                Log.i(TAG, "Final response type: ${finalResponse::class.simpleName}")
                 val decision = when (finalResponse) {
-                    is LLMResponse.UIAction -> parseDecision(finalResponse.json)
+                    is LLMResponse.UIAction -> {
+                        Log.i(TAG, "Parsing UIAction: ${finalResponse.json.take(100)}")
+                        parseDecision(finalResponse.json)
+                    }
                     is LLMResponse.TextAnswer -> {
                         emit(AgentEvent.Log("LLM answer: ${finalResponse.text}"))
                         tryExtractDecisionFromText(finalResponse.text) ?: Decision("wait")
@@ -306,6 +509,7 @@ class AgentKernel(
                         Decision("wait")
                     }
                 }
+                Log.i(TAG, "Decision: action=${decision.action}, index=${decision.elementIndex}, text=${decision.text}")
 
                 emit(AgentEvent.Log("Action: ${decision.action}"))
 
@@ -331,6 +535,7 @@ class AgentKernel(
                     else -> null
                 }
                 history.record(decision.action, target, result.message, result.success)
+                hasNavigatedAway = true
 
                 // Check for completion
                 if (decision.action == "done") {
@@ -338,6 +543,9 @@ class AgentKernel(
                     emit(AgentEvent.Done("Goal achieved"))
                     return@flow
                 }
+
+                val stepElapsedLegacy = System.currentTimeMillis() - stepStart
+                emit(AgentEvent.Log("Step $step took ${stepElapsedLegacy / 1000}s"))
 
                 // Check timeout
                 if (System.currentTimeMillis() - startTime > MAX_DURATION_MS) {
@@ -363,6 +571,141 @@ class AgentKernel(
 
     fun stop() {
         isRunning = false
+    }
+
+    /**
+     * Bring our activity to the foreground before LLM inference.
+     * Samsung's OneUI scheduler pins background processes to efficiency cores,
+     * causing ~20x slowdown for on-device LLM inference. Being foreground restores full speed.
+     */
+    private fun bringToForeground() {
+        try {
+            val intent = android.content.Intent(context, Class.forName("com.runanywhere.agent.MainActivity"))
+            intent.flags = android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                    android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            Log.i(TAG, "Brought agent to foreground for inference")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to bring to foreground: ${e.message}")
+        }
+    }
+
+    /**
+     * Bring a target app back to the foreground after inference completes.
+     * Multiple strategies because Samsung's PackageManager sometimes returns null
+     * from getLaunchIntentForPackage() for apps like YouTube.
+     */
+    private fun bringAppToForeground(packageName: String) {
+        try {
+            // Strategy 1: Standard launch intent (works for most apps)
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
+            if (launchIntent != null) {
+                launchIntent.flags = android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                        android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                        android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                context.startActivity(launchIntent)
+                Log.i(TAG, "Returned to target app: $packageName (launch intent)")
+                return
+            }
+
+            // Strategy 2: Resolve MAIN/LAUNCHER intent manually
+            val mainIntent = android.content.Intent(android.content.Intent.ACTION_MAIN).apply {
+                addCategory(android.content.Intent.CATEGORY_LAUNCHER)
+                setPackage(packageName)
+            }
+            val resolveInfo = context.packageManager.resolveActivity(mainIntent, 0)
+            if (resolveInfo != null) {
+                mainIntent.component = android.content.ComponentName(
+                    resolveInfo.activityInfo.packageName,
+                    resolveInfo.activityInfo.name
+                )
+                mainIntent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                        android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                context.startActivity(mainIntent)
+                Log.i(TAG, "Returned to target app: $packageName (resolved main/launcher)")
+                return
+            }
+
+            // Strategy 3: Shell command fallback (works even when PM returns null)
+            Log.i(TAG, "Trying shell am start for $packageName")
+            val process = Runtime.getRuntime().exec(
+                arrayOf("am", "start", "-a", "android.intent.action.MAIN",
+                    "-c", "android.intent.category.LAUNCHER", "-p", packageName)
+            )
+            process.waitFor()
+            if (process.exitValue() == 0) {
+                Log.i(TAG, "Returned to target app: $packageName (shell am start)")
+            } else {
+                Log.w(TAG, "Shell am start failed for $packageName (exit=${process.exitValue()})")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to bring app to foreground: ${e.message}")
+        }
+    }
+
+    // ========== Smart Recovery ==========
+
+    private enum class RecoveryResult { GOAL_ACHIEVED, ACTION_TAKEN, NO_ACTION }
+
+    /**
+     * Minimal recovery when the model gets stuck in a loop.
+     * We intentionally keep this simple — the model should do the reasoning, not heuristics.
+     * Only handles: (1) dismiss blocking dialogs, (2) scroll to reveal more elements.
+     */
+    private suspend fun trySmartRecovery(
+        goal: String,
+        screen: ScreenParser.ParsedScreen,
+        step: Int,
+        emitEvent: suspend (AgentEvent) -> Unit
+    ): RecoveryResult {
+        Log.i(TAG, "[RECOVERY] Loop detected at step $step")
+
+        // Strategy 1: Dismiss common app dialogs/sign-in screens that block progress
+        val dismissIndex = findDismissableDialog(screen.compactText)
+        if (dismissIndex != null && screen.indexToCoords.containsKey(dismissIndex)) {
+            emitEvent(AgentEvent.Log("[RECOVERY] Dismissing dialog at index $dismissIndex"))
+            val tapResult = actionExecutor.execute(
+                Decision("tap", elementIndex = dismissIndex),
+                screen.indexToCoords
+            )
+            history.record("tap", "dismiss dialog", "Recovery: dismissed blocking dialog", tapResult.success)
+            emitEvent(AgentEvent.Step(step, "tap (recovery)", "Dismissed dialog"))
+            return RecoveryResult.ACTION_TAKEN
+        }
+
+        // Strategy 2: Scroll to reveal more elements
+        emitEvent(AgentEvent.Log("[RECOVERY] Scrolling to find more elements"))
+        val swipeResult = actionExecutor.execute(
+            Decision("swipe", direction = "u"),
+            screen.indexToCoords
+        )
+        history.record("swipe", "up", "Recovery: scroll to find elements", swipeResult.success)
+        return RecoveryResult.ACTION_TAKEN
+    }
+
+    /**
+     * Find a dismissable dialog/sign-in/welcome screen button.
+     * Returns the index of a clickable element that can bypass the dialog.
+     */
+    private fun findDismissableDialog(compactText: String): Int? {
+        val dismissLabels = listOf(
+            "stay signed out", "no thanks", "skip", "not now", "maybe later",
+            "dismiss", "close", "got it", "accept & continue", "accept", "i agree"
+        )
+        val lines = compactText.split("\n")
+        for (label in dismissLabels) {
+            for (line in lines) {
+                if (!line.contains("[tap]")) continue
+                if (line.lowercase().contains(label)) {
+                    val indexMatch = Regex("^(\\d+):").find(line.trim())
+                    if (indexMatch != null) {
+                        return indexMatch.groupValues[1].toIntOrNull()
+                    }
+                }
+            }
+        }
+        return null
     }
 
     // ========== Local-First Decision Routing ==========
@@ -428,23 +771,44 @@ class AgentKernel(
         }
     }
 
+    /** Only these tools are sent to local models to avoid context bloat and confusion. */
+    private val essentialToolNames = setOf(
+        "ui_tap", "ui_type", "ui_enter", "ui_swipe",
+        "ui_back", "ui_home", "ui_open_app", "ui_done"
+    )
+
     /**
-     * Call local LLM with ALL tools (including ui_* tools).
-     * The local model gets the full tool set for autonomous UI control.
+     * Call local LLM with essential UI tools.
+     * Adapts system prompt and token budget based on model size.
      */
     private suspend fun callLocalLLMWithTools(prompt: String): LLMResponse {
-        val tools = toolRegistry.getDefinitions()
-        val hasTools = tools.isNotEmpty()
+        val allTools = toolRegistry.getDefinitions()
+        val essentialTools = allTools.filter { it.name in essentialToolNames }
+        val hasTools = essentialTools.isNotEmpty()
+
+        // Larger models get richer prompts and more reasoning tokens
+        val isLargeModel = activeModelId.contains("8b", ignoreCase = true) ||
+                activeModelId.contains("4b", ignoreCase = true)
+        val systemPrompt = if (isLargeModel) {
+            SystemPrompts.TOOL_CALLING_SYSTEM_PROMPT
+        } else {
+            SystemPrompts.COMPACT_SYSTEM_PROMPT
+        }
+        val maxTokens = when {
+            activeModelId.contains("8b", ignoreCase = true) -> 512
+            activeModelId.contains("4b", ignoreCase = true) -> 512
+            else -> 256
+        }
 
         val options = if (hasTools) {
-            // When tools are registered: more tokens, no structured output
+            // When tools are registered: no structured output
             // (grammar enforcement would block <tool_call> tags)
             LLMGenerationOptions(
-                maxTokens = 128,
+                maxTokens = maxTokens,
                 temperature = 0.0f,
                 topP = 0.95f,
                 streamingEnabled = false,
-                systemPrompt = null,
+                systemPrompt = systemPrompt,
                 structuredOutput = null
             )
         } else {
@@ -454,7 +818,7 @@ class AgentKernel(
                 temperature = 0.0f,
                 topP = 0.95f,
                 streamingEnabled = false,
-                systemPrompt = null,
+                systemPrompt = systemPrompt,
                 structuredOutput = StructuredOutputConfig(
                     typeName = "Act",
                     includeSchemaInPrompt = true,
@@ -463,32 +827,48 @@ class AgentKernel(
             )
         }
 
+        // Qwen3 models use <think> chain-of-thought by default which consumes the entire
+        // token budget. Appending /no_think disables this and produces direct tool calls.
+        val noThinkSuffix = if (activeModelId.contains("qwen", ignoreCase = true)) "\n/no_think" else ""
+
         val fullPrompt = if (hasTools) {
-            prompt + SystemPrompts.TOOL_AWARE_ADDENDUM +
-                    ToolPromptFormatter.formatForLocalPrompt(tools)
+            prompt + "\n" + ToolPromptFormatter.formatCompactForLocal(essentialTools) + noThinkSuffix
         } else {
-            prompt
+            prompt + noThinkSuffix
         }
 
         return try {
             val result = withContext(Dispatchers.Default) {
-                RunAnywhere.generate(fullPrompt, options)
+                // Request high thread priority to mitigate Samsung background CPU throttling.
+                // THREAD_PRIORITY_URGENT_AUDIO gets special scheduler treatment on most OEMs.
+                val prevPriority = android.os.Process.getThreadPriority(android.os.Process.myTid())
+                try {
+                    android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
+                } catch (_: Exception) { /* Best-effort */ }
+                try {
+                    RunAnywhere.generate(fullPrompt, options)
+                } finally {
+                    try { android.os.Process.setThreadPriority(prevPriority) } catch (_: Exception) {}
+                }
             }
             val text = result.text
+            Log.i(TAG, "LLM raw output (${text.length} chars): $text")
 
             // Check for tool calls first (only when tools are registered)
             if (hasTools && ToolCallParser.containsToolCall(text)) {
                 val calls = ToolCallParser.parse(text)
+                Log.i(TAG, "Parsed ${calls.size} tool calls: ${calls.map { it.toolName }}")
                 if (calls.isNotEmpty()) {
                     return LLMResponse.ToolCalls(calls)
                 }
             }
 
             // Otherwise treat as UI action
+            Log.i(TAG, "No tool call found, treating as UI action")
             LLMResponse.UIAction(text)
         } catch (e: Exception) {
             Log.e(TAG, "LLM call failed: ${e.message}", e)
-            LLMResponse.UIAction("{\"a\":\"done\"}")
+            LLMResponse.UIAction("{\"action\":\"wait\",\"reason\":\"LLM error\"}")
         }
     }
 
@@ -617,22 +997,30 @@ class AgentKernel(
             .replace("```json", "")
             .replace("```", "")
             .trim()
+        Log.i(TAG, "parseDecision input: $cleaned")
 
         // Try parsing as JSON
         try {
             val obj = JSONObject(cleaned)
-            return extractDecision(obj)
-        } catch (_: JSONException) {}
+            val d = extractDecision(obj)
+            Log.i(TAG, "Parsed JSON decision: ${d.action}")
+            return d
+        } catch (_: JSONException) {
+            Log.i(TAG, "Not valid JSON, trying regex extraction")
+        }
 
         // Try extracting JSON from text
         val matcher = Pattern.compile("\\{.*?\\}", Pattern.DOTALL).matcher(cleaned)
         if (matcher.find()) {
             try {
-                return extractDecision(JSONObject(matcher.group()))
+                val d = extractDecision(JSONObject(matcher.group()))
+                Log.i(TAG, "Extracted JSON decision: ${d.action}")
+                return d
             } catch (_: JSONException) {}
         }
 
         // Fallback: heuristic parsing
+        Log.i(TAG, "Falling back to heuristic parsing")
         return heuristicDecision(cleaned)
     }
 
@@ -662,63 +1050,141 @@ class AgentKernel(
         )
     }
 
+    private data class PreLaunchResult(
+        val message: String,
+        val packageName: String,
+        val didSearch: Boolean = false,
+        /** When true, goal is complete without verifying foreground app (e.g., timer set with skipUi). */
+        val goalComplete: Boolean = false
+    )
+
     /**
      * Pre-launch: analyze the goal and open the target app directly via intent.
      */
-    private fun preLaunchApp(goal: String): String? {
+    private fun preLaunchApp(goal: String): PreLaunchResult? {
         val goalLower = goal.lowercase()
 
-        val appMatch = when {
+        return when {
             goalLower.contains("youtube") -> {
                 val searchQuery = extractSearchQuery(goalLower, "youtube")
                 if (searchQuery != null) {
                     AppActions.openYouTubeSearch(context, searchQuery)
-                    return "Pre-launched YouTube with search: $searchQuery"
+                    PreLaunchResult("Pre-launched YouTube with search: $searchQuery", AppActions.Packages.YOUTUBE, didSearch = true)
+                } else {
+                    AppActions.openApp(context, AppActions.Packages.YOUTUBE)
+                    PreLaunchResult("Pre-launched YouTube", AppActions.Packages.YOUTUBE)
                 }
-                AppActions.openApp(context, AppActions.Packages.YOUTUBE)
-                "Pre-launched YouTube"
             }
             goalLower.contains("chrome") || goalLower.contains("browser") -> {
-                AppActions.openApp(context, AppActions.Packages.CHROME)
-                "Pre-launched Chrome"
+                // Check if the goal is just "open Chrome" or "go to google.com" (Chrome's default homepage)
+                val isGoToGoogle = goalLower.contains("google.com") || goalLower.contains("google .com")
+                if (isGoToGoogle) {
+                    // Chrome's homepage is google.com — opening Chrome achieves the goal
+                    AppActions.openApp(context, AppActions.Packages.CHROME)
+                    PreLaunchResult("Pre-launched Chrome (google.com is homepage)", AppActions.Packages.CHROME, didSearch = true)
+                } else {
+                    AppActions.openApp(context, AppActions.Packages.CHROME)
+                    PreLaunchResult("Pre-launched Chrome", AppActions.Packages.CHROME)
+                }
+            }
+            // X (Twitter) — match "open x", "x app", "twitter" but not random "x" in words
+            goalLower.contains("twitter") || Regex("\\bopen\\s+x\\b|\\bx\\s+app\\b|\\bopen\\s+x\\s|\\btap.*\\bx\\b").containsMatchIn(goalLower) -> {
+                AppActions.openX(context)
+                PreLaunchResult("Pre-launched X (Twitter)", AppActions.Packages.TWITTER)
             }
             goalLower.contains("whatsapp") -> {
                 AppActions.openApp(context, AppActions.Packages.WHATSAPP)
-                "Pre-launched WhatsApp"
+                PreLaunchResult("Pre-launched WhatsApp", AppActions.Packages.WHATSAPP)
             }
             goalLower.contains("gmail") -> {
                 AppActions.openApp(context, AppActions.Packages.GMAIL)
-                "Pre-launched Gmail"
+                PreLaunchResult("Pre-launched Gmail", AppActions.Packages.GMAIL)
             }
             goalLower.contains("spotify") -> {
                 val searchQuery = extractSearchQuery(goalLower, "spotify")
                 if (searchQuery != null) {
                     AppActions.openSpotifySearch(context, searchQuery)
-                    return "Pre-launched Spotify with search: $searchQuery"
+                    PreLaunchResult("Pre-launched Spotify with search: $searchQuery", AppActions.Packages.SPOTIFY, didSearch = true)
+                } else {
+                    AppActions.openApp(context, AppActions.Packages.SPOTIFY)
+                    PreLaunchResult("Pre-launched Spotify", AppActions.Packages.SPOTIFY)
                 }
-                AppActions.openApp(context, AppActions.Packages.SPOTIFY)
-                "Pre-launched Spotify"
             }
             goalLower.contains("maps") || goalLower.contains("navigate to") || goalLower.contains("directions to") -> {
                 AppActions.openApp(context, AppActions.Packages.MAPS)
-                "Pre-launched Maps"
+                PreLaunchResult("Pre-launched Maps", AppActions.Packages.MAPS)
             }
-            goalLower.contains("timer") || goalLower.contains("alarm") || goalLower.contains("clock") -> {
+            goalLower.contains("timer") -> {
+                val seconds = parseTimerDuration(goalLower)
+                if (seconds != null) {
+                    val label = Regex("(?:called|named|labeled)\\s+[\"']?(.+?)[\"']?$").find(goalLower)?.groupValues?.get(1)
+                    AppActions.setTimer(context, seconds, label, skipUi = true)
+                    val display = formatDuration(seconds)
+                    PreLaunchResult("Set timer for $display", AppActions.Packages.CLOCK, goalComplete = true)
+                } else {
+                    AppActions.openClock(context)
+                    PreLaunchResult("Pre-launched Clock (timer)", AppActions.Packages.CLOCK)
+                }
+            }
+            goalLower.contains("alarm") -> {
+                val time = parseAlarmTime(goalLower)
+                if (time != null) {
+                    AppActions.setAlarm(context, time.first, time.second, skipUi = true)
+                    val display = String.format("%d:%02d", time.first, time.second)
+                    PreLaunchResult("Set alarm for $display", AppActions.Packages.CLOCK, goalComplete = true)
+                } else {
+                    AppActions.openClock(context)
+                    PreLaunchResult("Pre-launched Clock (alarm)", AppActions.Packages.CLOCK)
+                }
+            }
+            goalLower.contains("clock") -> {
                 AppActions.openClock(context)
-                "Pre-launched Clock"
+                PreLaunchResult("Pre-launched Clock", AppActions.Packages.CLOCK)
+            }
+            goalLower.contains("note") || goalLower.contains("write a note") || goalLower.contains("take a note") -> {
+                AppActions.openNotes(context)
+                PreLaunchResult("Pre-launched Notes", AppActions.Packages.NOTES_SAMSUNG)
+            }
+            goalLower.contains("calculator") || goalLower.contains("calculate") -> {
+                val success = AppActions.openApp(context, AppActions.Packages.CALCULATOR)
+                    || AppActions.openApp(context, AppActions.Packages.CALCULATOR_SAMSUNG)
+                if (success) {
+                    PreLaunchResult("Pre-launched Calculator", AppActions.Packages.CALCULATOR)
+                } else null
             }
             goalLower.contains("camera") || goalLower.contains("photo") || goalLower.contains("picture") -> {
                 AppActions.openCamera(context)
-                "Pre-launched Camera"
+                PreLaunchResult("Pre-launched Camera", "com.android.camera")
             }
             goalLower.contains("settings") -> {
-                actionExecutor.openSettings()
-                "Pre-launched Settings"
+                // Try to open a specific settings sub-page directly
+                val settingType = when {
+                    goalLower.contains("wifi") || goalLower.contains("wi-fi") -> "wifi"
+                    goalLower.contains("bluetooth") -> "bluetooth"
+                    goalLower.contains("display") || goalLower.contains("brightness") -> "display"
+                    goalLower.contains("sound") || goalLower.contains("volume") || goalLower.contains("ringtone") -> "sound"
+                    goalLower.contains("battery") -> "battery"
+                    goalLower.contains("location") || goalLower.contains("gps") -> "location"
+                    goalLower.contains("notification") -> "notification"
+                    goalLower.contains("storage") -> "storage"
+                    goalLower.contains("security") || goalLower.contains("privacy") -> "security"
+                    goalLower.contains("accessibility") -> "accessibility"
+                    goalLower.contains("about") || goalLower.contains("phone info") -> "about"
+                    goalLower.contains("developer") || goalLower.contains("dev options") -> "developer"
+                    goalLower.contains("date") || goalLower.contains("time") -> "date"
+                    goalLower.contains("language") -> "language"
+                    else -> null
+                }
+                if (settingType != null) {
+                    actionExecutor.openSettings(settingType)
+                    PreLaunchResult("Pre-launched $settingType Settings", "com.android.settings", goalComplete = true)
+                } else {
+                    actionExecutor.openSettings()
+                    PreLaunchResult("Pre-launched Settings", "com.android.settings")
+                }
             }
             else -> null
         }
-
-        return appMatch
     }
 
     private fun extractSearchQuery(goalLower: String, appName: String): String? {
@@ -777,34 +1243,104 @@ class AgentKernel(
         }
     }
 
+    /**
+     * Parse a timer duration from natural language.
+     * Supports: "5 minutes", "30 seconds", "1 hour and 30 minutes", "1h30m", etc.
+     * Returns total seconds or null if unparseable.
+     */
+    private fun parseTimerDuration(goalLower: String): Int? {
+        var totalSeconds = 0
+
+        // Match "X hour(s)"
+        Regex("(\\d+)\\s*(?:hour|hr|h)").find(goalLower)?.let {
+            totalSeconds += it.groupValues[1].toInt() * 3600
+        }
+        // Match "X minute(s)"
+        Regex("(\\d+)\\s*(?:minute|min|m(?!s|onth))").find(goalLower)?.let {
+            totalSeconds += it.groupValues[1].toInt() * 60
+        }
+        // Match "X second(s)"
+        Regex("(\\d+)\\s*(?:second|sec|s(?!et|ound))").find(goalLower)?.let {
+            totalSeconds += it.groupValues[1].toInt()
+        }
+
+        return if (totalSeconds > 0) totalSeconds else null
+    }
+
+    /** Format seconds as human-readable duration (e.g., "5 minutes", "1 hour 30 minutes"). */
+    private fun formatDuration(totalSeconds: Int): String {
+        val hours = totalSeconds / 3600
+        val minutes = (totalSeconds % 3600) / 60
+        val seconds = totalSeconds % 60
+        val parts = mutableListOf<String>()
+        if (hours > 0) parts.add("$hours hour${if (hours > 1) "s" else ""}")
+        if (minutes > 0) parts.add("$minutes minute${if (minutes > 1) "s" else ""}")
+        if (seconds > 0 && hours == 0) parts.add("$seconds second${if (seconds > 1) "s" else ""}")
+        return parts.joinToString(" ")
+    }
+
+    /**
+     * Parse an alarm time from natural language.
+     * Supports: "7:30 am", "7:30", "7 am", "at 7", "for 7:30 pm", etc.
+     * Returns (hour, minute) in 24h format or null.
+     */
+    private fun parseAlarmTime(goalLower: String): Pair<Int, Int>? {
+        // Match "H:MM am/pm" or "H:MM"
+        Regex("(\\d{1,2}):(\\d{2})\\s*(am|pm)?").find(goalLower)?.let { match ->
+            var hour = match.groupValues[1].toInt()
+            val minute = match.groupValues[2].toInt()
+            val ampm = match.groupValues[3]
+            if (ampm == "pm" && hour < 12) hour += 12
+            if (ampm == "am" && hour == 12) hour = 0
+            if (hour in 0..23 && minute in 0..59) return Pair(hour, minute)
+        }
+        // Match "H am/pm"
+        Regex("(\\d{1,2})\\s*(am|pm)").find(goalLower)?.let { match ->
+            var hour = match.groupValues[1].toInt()
+            val ampm = match.groupValues[2]
+            if (ampm == "pm" && hour < 12) hour += 12
+            if (ampm == "am" && hour == 12) hour = 0
+            if (hour in 0..23) return Pair(hour, 0)
+        }
+        return null
+    }
+
     private fun heuristicDecision(text: String): Decision {
         val lower = text.lowercase()
+        Log.i(TAG, "Heuristic parsing text: $lower")
+
+        // Strip <think> tags before heuristic matching — reasoning text often
+        // mentions actions like "home screen" or "go back" which causes false matches.
+        val stripped = lower.replace(Regex("<think>.*?</think>", RegexOption.DOT_MATCHES_ALL), "").trim()
+        val match = stripped.ifEmpty { lower }
 
         return when {
-            lower.contains("done") -> Decision("done")
-            lower.contains("back") -> Decision("back")
-            lower.contains("home") -> Decision("home")
-            lower.contains("enter") -> Decision("enter")
-            lower.contains("wait") -> Decision("wait")
-            lower.contains("swipe") || lower.contains("scroll") -> {
+            match.contains("done") || match.contains("complete") || match.contains("achieved") -> Decision("done")
+            match.contains("back") -> Decision("back")
+            match.contains("go home") || match.contains("press home") || match.contains("\"home\"") -> Decision("home")
+            match.contains("enter") -> Decision("enter")
+            match.contains("swipe") || match.contains("scroll") -> {
                 val dir = when {
-                    lower.contains("up") -> "u"
-                    lower.contains("down") -> "d"
-                    lower.contains("left") -> "l"
-                    lower.contains("right") -> "r"
+                    match.contains("up") -> "u"
+                    match.contains("down") -> "d"
+                    match.contains("left") -> "l"
+                    match.contains("right") -> "r"
                     else -> "u"
                 }
                 Decision("swipe", direction = dir)
             }
-            lower.contains("tap") || lower.contains("click") -> {
-                val idx = Regex("\\d+").find(text)?.value?.toIntOrNull() ?: 0
+            match.contains("tap") || match.contains("click") -> {
+                val idx = Regex("\\d+").find(match)?.value?.toIntOrNull() ?: 0
                 Decision("tap", elementIndex = idx)
             }
-            lower.contains("type") -> {
-                val textMatch = Regex("\"([^\"]+)\"").find(text)
+            match.contains("type") -> {
+                val textMatch = Regex("\"([^\"]+)\"").find(match)
                 Decision("type", text = textMatch?.groupValues?.getOrNull(1) ?: "")
             }
-            else -> Decision("done")
+            else -> {
+                Log.w(TAG, "Unrecognized LLM output, defaulting to wait")
+                Decision("wait")
+            }
         }
     }
 }

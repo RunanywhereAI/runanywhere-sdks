@@ -39,6 +39,25 @@ interface VisionProvider {
         goal: String
     ): String?
 
+    /**
+     * VLM-only mode: analyze a screenshot and return a tool call / action decision.
+     * Used when LLM is not loaded and VLM drives the agent autonomously.
+     *
+     * @param screenshotBase64 Base64-encoded JPEG screenshot
+     * @param screenElements Compact text list of interactive UI elements
+     * @param goal The user's stated goal
+     * @param history Formatted action history
+     * @param lastActionResult Result of the last executed action
+     * @return Raw VLM output containing a tool call or JSON action, or null
+     */
+    suspend fun decideNextAction(
+        screenshotBase64: String,
+        screenElements: String,
+        goal: String,
+        history: String,
+        lastActionResult: String?
+    ): String? = null
+
     /** Whether this provider can actually analyze screenshots. */
     val isAvailable: Boolean
 }
@@ -89,10 +108,11 @@ class OnDeviceVisionProvider(
                 val tempFile = decodeBase64ToTempFile(screenshotBase64)
                 try {
                     val image = VLMImage.fromFilePath(tempFile.absolutePath)
-                    val prompt = "Briefly describe this Android screen. " +
-                            "Focus on the main content, key UI elements, and what app is showing. " +
-                            "The user wants to: $goal"
-                    val options = VLMGenerationOptions(maxTokens = 150)
+                    // Action-focused prompt: tell the LLM what to do, not what the screen looks like
+                    val prompt = "Look at this Android screen. The user's goal is: $goal\n" +
+                            "Which element should they interact with next? " +
+                            "Name the element and suggest the action (tap, type, swipe, etc). Be brief."
+                    val options = VLMGenerationOptions(maxTokens = 80)
 
                     val result = StringBuilder()
                     RunAnywhere.processImageStream(image, prompt, options).collect { token ->
@@ -104,6 +124,51 @@ class OnDeviceVisionProvider(
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "VLM screen analysis failed: ${e.message}")
+                null
+            }
+        }
+    }
+
+    /**
+     * VLM-only mode: use the VLM to decide the next UI action directly.
+     * The VLM sees the screenshot + element list and outputs a tool call.
+     */
+    override suspend fun decideNextAction(
+        screenshotBase64: String,
+        screenElements: String,
+        goal: String,
+        history: String,
+        lastActionResult: String?
+    ): String? {
+        if (!isAvailable) return null
+
+        return withContext(Dispatchers.Default) {
+            try {
+                val tempFile = decodeBase64ToTempFile(screenshotBase64)
+                try {
+                    val image = VLMImage.fromFilePath(tempFile.absolutePath)
+                    val lastResult = lastActionResult?.let { "\nLAST_RESULT: $it" } ?: ""
+                    val prompt = """You are an Android UI agent. Look at this screenshot and the SCREEN_ELEMENTS below.
+GOAL: $goal
+
+SCREEN_ELEMENTS:
+$screenElements
+$lastResult$history
+
+Pick ONE action. Use ui_open_app to launch apps. Use ui_tap(index) to tap elements. Use ui_type(text) then ui_enter() for text fields. Call ui_done when finished.
+Output ONLY: <tool_call>{"tool":"tool_name","arguments":{...}}</tool_call>"""
+
+                    val options = VLMGenerationOptions(maxTokens = 100)
+                    val result = StringBuilder()
+                    RunAnywhere.processImageStream(image, prompt, options).collect { token ->
+                        result.append(token)
+                    }
+                    result.toString().trim().ifEmpty { null }
+                } finally {
+                    tempFile.delete()
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "VLM decision failed: ${e.message}")
                 null
             }
         }

@@ -47,7 +47,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         val status: Status = Status.IDLE,
         val logs: List<String> = emptyList(),
         val isServiceEnabled: Boolean = false,
-        val selectedModelIndex: Int = 1, // Default to Qwen (best)
+        val selectedModelIndex: Int = 0, // Default to LFM2.5 1.2B (on-device)
         val availableModels: List<ModelInfo> = AgentApplication.AVAILABLE_MODELS,
         // Provider mode
         val providerMode: ProviderMode = ProviderMode.LOCAL,
@@ -178,28 +178,35 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             logs = listOf("Starting: $goal")
         )
 
+        // Start foreground service to prevent Android from freezing/killing the process
+        AgentForegroundService.start(getApplication())
+
         agentJob = viewModelScope.launch {
-            agentKernel.run(goal).collect { event ->
-                when (event) {
-                    is AgentKernel.AgentEvent.Log -> addLog(event.message)
-                    is AgentKernel.AgentEvent.Step -> addLog("${event.action}: ${event.result}")
-                    is AgentKernel.AgentEvent.Done -> {
-                        addLog(event.message)
-                        _uiState.value = _uiState.value.copy(status = Status.DONE)
-                    }
-                    is AgentKernel.AgentEvent.Error -> {
-                        addLog("ERROR: ${event.message}")
-                        _uiState.value = _uiState.value.copy(status = Status.ERROR)
-                    }
-                    is AgentKernel.AgentEvent.Speak -> {
-                        if (_uiState.value.isVoiceMode) {
-                            ttsManager.speak(event.text)
+            try {
+                agentKernel.run(goal).collect { event ->
+                    when (event) {
+                        is AgentKernel.AgentEvent.Log -> addLog(event.message)
+                        is AgentKernel.AgentEvent.Step -> addLog("${event.action}: ${event.result}")
+                        is AgentKernel.AgentEvent.Done -> {
+                            addLog(event.message)
+                            _uiState.value = _uiState.value.copy(status = Status.DONE)
+                        }
+                        is AgentKernel.AgentEvent.Error -> {
+                            addLog("ERROR: ${event.message}")
+                            _uiState.value = _uiState.value.copy(status = Status.ERROR)
+                        }
+                        is AgentKernel.AgentEvent.Speak -> {
+                            if (_uiState.value.isVoiceMode) {
+                                ttsManager.speak(event.text)
+                            }
+                        }
+                        is AgentKernel.AgentEvent.ProviderChanged -> {
+                            _uiState.value = _uiState.value.copy(providerMode = event.mode)
                         }
                     }
-                    is AgentKernel.AgentEvent.ProviderChanged -> {
-                        _uiState.value = _uiState.value.copy(providerMode = event.mode)
-                    }
                 }
+            } finally {
+                AgentForegroundService.stop(getApplication())
             }
         }
     }
@@ -209,6 +216,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         agentJob?.cancel()
         agentJob = null
         ttsManager.stop()
+        AgentForegroundService.stop(getApplication())
         addLog("Agent stopped")
         _uiState.value = _uiState.value.copy(status = Status.IDLE)
     }
