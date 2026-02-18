@@ -222,7 +222,7 @@ class ActionExecutor(
                 AppActions.openApp(context, AppActions.Packages.CALCULATOR) || AppActions.openApp(context, AppActions.Packages.CALCULATOR_SAMSUNG)
             appLower.contains("files") || appLower.contains("file manager") ->
                 AppActions.openApp(context, AppActions.Packages.FILES) || AppActions.openApp(context, AppActions.Packages.FILES_SAMSUNG)
-            appLower.contains("note") ->
+            appLower == "notes" || appLower == "note" || appLower == "samsung notes" || appLower == "google keep" ->
                 AppActions.openNotes(context)
             appLower.contains("setting") -> {
                 openSettings()

@@ -79,7 +79,7 @@ class TextOnlyVisionProvider : VisionProvider {
 /**
  * On-device VLM implementation using the RunAnywhere SDK.
  *
- * Uses SmolVLM 256M to analyze screenshots locally on the device.
+ * Uses LFM2-VL 450M to analyze screenshots locally on the device.
  * The VLM model must be downloaded and loaded before use — call
  * [ensureModelReady] during agent startup.
  */
@@ -190,6 +190,7 @@ Output ONLY: <tool_call>{"tool":"tool_name","arguments":{...}}</tool_call>"""
         try {
             RunAnywhere.loadVLMModel(vlmModelId)
         } catch (e: Exception) {
+            Log.w(TAG, "VLM load failed, attempting re-download", e)
             onLog("Downloading VLM model...")
             var lastPercent = -1
             RunAnywhere.downloadModel(vlmModelId).collect { progress ->

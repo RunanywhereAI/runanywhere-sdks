@@ -426,6 +426,7 @@ private fun VLMModelCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     CircularProgressIndicator(
+                        progress = { vlmDownloadProgress },
                         modifier = Modifier.size(16.dp),
                         strokeWidth = 2.dp
                     )
