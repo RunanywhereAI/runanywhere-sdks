@@ -88,13 +88,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build XCFrameworks from source
-        working-directory: sdk/runanywhere-swift
-        run: |
-          chmod +x scripts/build-swift.sh
-          ./scripts/build-swift.sh --setup --skip-macos --skip-build
-
-      - name: Swift Build
+      - name: Swift Build (remote XCFrameworks)
         run: swift build
 
       - name: Swift Test
@@ -153,8 +147,6 @@ jobs:
 
       - name: Publish SDK to Maven Local
         working-directory: sdk/runanywhere-kotlin
-        env:
-          USE_RUNANYWHERE_NAMESPACE: "true"
         run: |
           chmod +x gradlew
           ./gradlew publishToMavenLocal -Prunanywhere.testLocal=false
