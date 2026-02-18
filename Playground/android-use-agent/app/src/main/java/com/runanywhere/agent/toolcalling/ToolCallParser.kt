@@ -96,8 +96,20 @@ object ToolCallParser {
 
         val arguments = mutableMapOf<String, Any?>()
         if (argsStr.isNotBlank()) {
-            // Split on commas (respecting quotes)
-            val parts = argsStr.split(",").map { it.trim() }
+            // Split on commas that are not inside quotes
+            val parts = mutableListOf<String>()
+            var current = StringBuilder()
+            var inQuotes = false
+            var quoteChar = ' '
+            for (c in argsStr) {
+                when {
+                    !inQuotes && (c == '"' || c == '\'') -> { inQuotes = true; quoteChar = c; current.append(c) }
+                    inQuotes && c == quoteChar -> { inQuotes = false; current.append(c) }
+                    !inQuotes && c == ',' -> { parts.add(current.toString().trim()); current = StringBuilder() }
+                    else -> current.append(c)
+                }
+            }
+            if (current.isNotEmpty()) parts.add(current.toString().trim())
             for (part in parts) {
                 val eqIndex = part.indexOf('=')
                 if (eqIndex > 0) {

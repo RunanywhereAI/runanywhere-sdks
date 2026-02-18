@@ -32,7 +32,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import org.json.JSONException
 import org.json.JSONObject
-import java.util.UUID
+import java.util.Locale
 import java.util.regex.Pattern
 
 class AgentKernel(
@@ -70,6 +70,7 @@ class AgentKernel(
     }
 
     private var activeModelId: String = AgentApplication.DEFAULT_MODEL
+    @Volatile
     private var isRunning = false
     private var planResult: PlanResult? = null
 
@@ -868,7 +869,7 @@ class AgentKernel(
             LLMResponse.UIAction(text)
         } catch (e: Exception) {
             Log.e(TAG, "LLM call failed: ${e.message}", e)
-            LLMResponse.UIAction("{\"action\":\"wait\",\"reason\":\"LLM error\"}")
+            LLMResponse.Error(e.message ?: "LLM call failed")
         }
     }
 
@@ -1130,7 +1131,7 @@ class AgentKernel(
                 val time = parseAlarmTime(goalLower)
                 if (time != null) {
                     AppActions.setAlarm(context, time.first, time.second, skipUi = true)
-                    val display = String.format("%d:%02d", time.first, time.second)
+                    val display = String.format(Locale.ROOT, "%d:%02d", time.first, time.second)
                     PreLaunchResult("Set alarm for $display", AppActions.Packages.CLOCK, goalComplete = true)
                 } else {
                     AppActions.openClock(context)
@@ -1177,7 +1178,14 @@ class AgentKernel(
                 }
                 if (settingType != null) {
                     actionExecutor.openSettings(settingType)
-                    PreLaunchResult("Pre-launched $settingType Settings", "com.android.settings", goalComplete = true)
+                    // Only mark goal complete if the user just wants to open/navigate to the settings page.
+                    // If they want to perform an action (enable, disable, toggle, etc.), keep the agent loop running.
+                    val isNavigationOnly = Regex(
+                        "\\b(open|go\\s+to|show|navigate\\s+to|launch|view|pull\\s+up|bring\\s+up)\\b"
+                    ).containsMatchIn(goalLower) && !Regex(
+                        "\\b(enable|disable|turn\\s+on|turn\\s+off|toggle|change|set|configure|switch|activate|deactivate|connect|disconnect|pair|adjust|increase|decrease|lower|raise)\\b"
+                    ).containsMatchIn(goalLower)
+                    PreLaunchResult("Pre-launched $settingType Settings", "com.android.settings", goalComplete = isNavigationOnly)
                 } else {
                     actionExecutor.openSettings()
                     PreLaunchResult("Pre-launched Settings", "com.android.settings")

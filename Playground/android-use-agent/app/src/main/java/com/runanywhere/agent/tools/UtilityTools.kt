@@ -206,23 +206,26 @@ object UtilityTools {
                         val conn = url.openConnection() as HttpURLConnection
                         conn.connectTimeout = 10_000
                         conn.readTimeout = 10_000
-                        val body = conn.inputStream.bufferedReader().use { it.readText() }
-                        conn.disconnect()
+                        try {
+                            val body = conn.inputStream.bufferedReader().use { it.readText() }
 
-                        val json = org.json.JSONObject(body)
-                        val current = json.getJSONObject("current")
-                        val temp = current.getDouble("temperature_2m")
-                        val humidity = current.getInt("relative_humidity_2m")
-                        val wind = current.getDouble("wind_speed_10m")
-                        val code = current.getInt("weather_code")
+                            val json = org.json.JSONObject(body)
+                            val current = json.getJSONObject("current")
+                            val temp = current.getDouble("temperature_2m")
+                            val humidity = current.getInt("relative_humidity_2m")
+                            val wind = current.getDouble("wind_speed_10m")
+                            val code = current.getInt("weather_code")
 
-                        mapOf(
-                            "location" to ToolValue.string(name),
-                            "temperature_celsius" to ToolValue.number(temp),
-                            "humidity_percent" to ToolValue.number(humidity),
-                            "wind_speed_kmh" to ToolValue.number(wind),
-                            "condition" to ToolValue.string(weatherCodeToDescription(code))
-                        )
+                            mapOf(
+                                "location" to ToolValue.string(name),
+                                "temperature_celsius" to ToolValue.number(temp),
+                                "humidity_percent" to ToolValue.number(humidity),
+                                "wind_speed_kmh" to ToolValue.number(wind),
+                                "condition" to ToolValue.string(weatherCodeToDescription(code))
+                            )
+                        } finally {
+                            conn.disconnect()
+                        }
                     } catch (e: Exception) {
                         mapOf("error" to ToolValue.string("Weather lookup failed: ${e.message}"))
                     }

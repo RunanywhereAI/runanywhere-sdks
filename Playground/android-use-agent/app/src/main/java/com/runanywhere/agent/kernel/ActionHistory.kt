@@ -20,7 +20,7 @@ class ActionHistory {
     fun formatForPrompt(maxEntries: Int = 8): String {
         if (history.isEmpty()) return ""
 
-        val lines = history.takeLast(maxEntries).map { record ->
+        val lines = history.takeLast(maxEntries.coerceAtLeast(1)).map { record ->
             val targetStr = record.target?.let { " \"$it\"" } ?: ""
             val resultStr = record.result?.let { " -> $it" } ?: ""
             val status = if (record.success) "OK" else "FAILED"

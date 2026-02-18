@@ -65,7 +65,7 @@ class AgentForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun acquireWakeLock() {
-        if (wakeLock == null) {
+        if (wakeLock == null || wakeLock?.isHeld != true) {
             val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
             wakeLock = powerManager.newWakeLock(
                 PowerManager.PARTIAL_WAKE_LOCK,

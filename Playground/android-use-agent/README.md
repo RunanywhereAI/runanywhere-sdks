@@ -6,7 +6,7 @@ A fully on-device autonomous Android agent powered by the RunAnywhere SDK. Navig
 
 The agent follows an observe-reason-act loop. Each step captures the current screen state, reasons about the next action using an on-device LLM, and executes that action via the Android Accessibility API.
 
-```
+```text
                          +---------------------+
                          |     User Goal       |
                          | "Play lofi on YT"   |
@@ -133,7 +133,7 @@ Note: Qwen3-4B is the only model that reliably selects correct UI elements and f
 
 ## Project Structure
 
-```
+```text
 app/src/main/java/com/runanywhere/agent/
 |-- AgentApplication.kt              # SDK init, model registry (LLM, STT, VLM)
 |-- AgentForegroundService.kt        # Foreground service + PARTIAL_WAKE_LOCK
@@ -209,7 +209,7 @@ All UI actions are registered as tools that the LLM can invoke:
 1. Place RunAnywhere SDK AARs in `libs/`.
 
 2. (Optional) Add your OpenAI API key to `gradle.properties` for cloud fallback:
-   ```
+   ```text
    GPT52_API_KEY=sk-your-key-here
    ```
 

@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -128,8 +129,8 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     private fun refreshVLMState() {
         try {
             _uiState.value = _uiState.value.copy(isVLMLoaded = RunAnywhere.isVLMModelLoaded)
-        } catch (_: Exception) {
-            // SDK not yet initialized
+        } catch (e: Exception) {
+            Log.w(TAG, "Error refreshing VLM state", e)
         }
     }
 
@@ -183,7 +184,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
 
         agentJob = viewModelScope.launch {
             try {
-                agentKernel.run(goal).collect { event ->
+                agentKernel.run(goal).flowOn(Dispatchers.IO).collect { event ->
                     when (event) {
                         is AgentKernel.AgentEvent.Log -> addLog(event.message)
                         is AgentKernel.AgentEvent.Step -> addLog("${event.action}: ${event.result}")

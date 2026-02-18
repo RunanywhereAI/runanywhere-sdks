@@ -297,10 +297,12 @@ object AppActions {
      * Set an alarm at a specific hour/minute.
      */
     fun setAlarm(context: Context, hour: Int, minute: Int, label: String? = null, skipUi: Boolean = false): Boolean {
+        val validHour = hour.coerceIn(0, 23)
+        val validMinute = minute.coerceIn(0, 59)
         return try {
             val intent = Intent(AlarmClock.ACTION_SET_ALARM).apply {
-                putExtra(AlarmClock.EXTRA_HOUR, hour)
-                putExtra(AlarmClock.EXTRA_MINUTES, minute)
+                putExtra(AlarmClock.EXTRA_HOUR, validHour)
+                putExtra(AlarmClock.EXTRA_MINUTES, validMinute)
                 putExtra(AlarmClock.EXTRA_SKIP_UI, skipUi)
                 label?.let { putExtra(AlarmClock.EXTRA_MESSAGE, it.take(30)) }
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
