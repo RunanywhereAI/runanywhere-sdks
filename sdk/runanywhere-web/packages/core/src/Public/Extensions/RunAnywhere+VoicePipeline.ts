@@ -24,7 +24,8 @@
  */
 
 import { SDKLogger } from '../../Foundation/SDKLogger';
-import { ExtensionPoint, ServiceKey } from '../../Infrastructure/ExtensionPoint';
+import { ExtensionPoint } from '../../Infrastructure/ExtensionPoint';
+import type { LLMProvider, STTProvider, TTSProvider } from '../../Infrastructure/ProviderTypes';
 import { PipelineState } from './VoiceAgentTypes';
 import type {
   VoicePipelineCallbacks,
@@ -42,39 +43,19 @@ export type {
 const logger = new SDKLogger('VoicePipeline');
 
 // ---------------------------------------------------------------------------
-// Service interfaces for cross-package access
+// Dynamic backend access helpers (typed via ExtensionPoint provider registry)
 // ---------------------------------------------------------------------------
 
-interface STTService {
-  transcribe(audio: Float32Array, options?: { sampleRate?: number }): Promise<{ text: string; [key: string]: unknown }>;
+function requireSTT(): STTProvider {
+  return ExtensionPoint.requireProvider('stt', '@runanywhere/web-onnx');
 }
 
-interface TextGenerationService {
-  generateStream(prompt: string, options?: { maxTokens?: number; temperature?: number; systemPrompt?: string }): Promise<{
-    stream: AsyncIterable<string>;
-    result: Promise<{ text: string; tokensUsed: number; tokensPerSecond: number; [key: string]: unknown }>;
-    cancel: () => void;
-  }>;
+function requireTextGeneration(): LLMProvider {
+  return ExtensionPoint.requireProvider('llm', '@runanywhere/web-llamacpp');
 }
 
-interface TTSService {
-  synthesize(text: string, options?: { speed?: number }): Promise<{ audioData: Float32Array; sampleRate: number; durationMs: number; processingTimeMs: number; [key: string]: unknown }>;
-}
-
-// ---------------------------------------------------------------------------
-// Dynamic backend access helpers (typed via ExtensionPoint service registry)
-// ---------------------------------------------------------------------------
-
-function requireSTT(): STTService {
-  return ExtensionPoint.requireService<STTService>(ServiceKey.STT, '@runanywhere/web-onnx');
-}
-
-function requireTextGeneration(): TextGenerationService {
-  return ExtensionPoint.requireService<TextGenerationService>(ServiceKey.TextGeneration, '@runanywhere/web-llamacpp');
-}
-
-function requireTTS(): TTSService {
-  return ExtensionPoint.requireService<TTSService>(ServiceKey.TTS, '@runanywhere/web-onnx');
+function requireTTS(): TTSProvider {
+  return ExtensionPoint.requireProvider('tts', '@runanywhere/web-onnx');
 }
 
 // ---------------------------------------------------------------------------
