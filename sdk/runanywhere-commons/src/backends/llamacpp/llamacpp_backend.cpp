@@ -365,7 +365,7 @@ bool LlamaCppTextGeneration::unload_model_internal() {
     LOGI("Unloading model");
 
     // Clear LoRA adapters from context before freeing
-    // (adapter memory is freed with the model automatically)
+    // (adapter memory is freed automatically with the model per llama.cpp API)
     if (context_ && !lora_adapters_.empty()) {
         llama_clear_adapter_lora(context_);
     }
@@ -901,7 +901,8 @@ bool LlamaCppTextGeneration::remove_lora_adapter(const std::string& adapter_path
         return false;
     }
 
-    // Remove from tracking (adapter memory freed with model)
+    // Remove from tracking (adapter memory is freed automatically with the model
+    // per llama.cpp API — llama_adapter_lora_free is deprecated since b8011)
     lora_adapters_.erase(it);
 
     // Clear KV cache after adapter changes

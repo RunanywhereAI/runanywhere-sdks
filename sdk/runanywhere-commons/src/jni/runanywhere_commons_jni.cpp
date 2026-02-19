@@ -1094,22 +1094,18 @@ JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentLoadLora(
     JNIEnv* env, jclass clazz, jlong handle, jstring adapterPath, jfloat scale) {
-    if (handle == 0 || adapterPath == nullptr) {
-        return -1;
-    }
+    if (handle == 0)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (adapterPath == nullptr)
+        return RAC_ERROR_INVALID_ARGUMENT;
 
-    const char* path = env->GetStringUTFChars(adapterPath, nullptr);
-    if (!path) {
-        return -1;
-    }
+    std::string path = getCString(env, adapterPath);
 
     LOGi("racLlmComponentLoadLora: handle=%lld, path=%s, scale=%.2f",
-         (long long)handle, path, (float)scale);
+         (long long)handle, path.c_str(), (float)scale);
 
     rac_result_t result = rac_llm_component_load_lora(
-        reinterpret_cast<rac_handle_t>(handle), path, static_cast<float>(scale));
-
-    env->ReleaseStringUTFChars(adapterPath, path);
+        reinterpret_cast<rac_handle_t>(handle), path.c_str(), static_cast<float>(scale));
 
     LOGi("racLlmComponentLoadLora result=%d", result);
     return static_cast<jint>(result);
@@ -1118,31 +1114,29 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentLoadLora
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentRemoveLora(
     JNIEnv* env, jclass clazz, jlong handle, jstring adapterPath) {
-    if (handle == 0 || adapterPath == nullptr) {
-        return -1;
-    }
+    if (handle == 0)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (adapterPath == nullptr)
+        return RAC_ERROR_INVALID_ARGUMENT;
 
-    const char* path = env->GetStringUTFChars(adapterPath, nullptr);
-    if (!path) {
-        return -1;
-    }
+    std::string path = getCString(env, adapterPath);
 
     rac_result_t result = rac_llm_component_remove_lora(
-        reinterpret_cast<rac_handle_t>(handle), path);
+        reinterpret_cast<rac_handle_t>(handle), path.c_str());
 
-    env->ReleaseStringUTFChars(adapterPath, path);
+    LOGi("racLlmComponentRemoveLora result=%d", result);
     return static_cast<jint>(result);
 }
 
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentClearLora(
     JNIEnv* env, jclass clazz, jlong handle) {
-    if (handle == 0) {
-        return -1;
-    }
+    if (handle == 0)
+        return RAC_ERROR_INVALID_HANDLE;
 
-    return static_cast<jint>(
-        rac_llm_component_clear_lora(reinterpret_cast<rac_handle_t>(handle)));
+    rac_result_t result = rac_llm_component_clear_lora(reinterpret_cast<rac_handle_t>(handle));
+    LOGi("racLlmComponentClearLora result=%d", result);
+    return static_cast<jint>(result);
 }
 
 JNIEXPORT jstring JNICALL
@@ -1161,7 +1155,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGetLoraI
     }
 
     jstring jresult = env->NewStringUTF(json);
-    free(json);
+    rac_free(json);
     return jresult;
 }
 
