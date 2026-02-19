@@ -1302,7 +1302,7 @@ class RunAnywhere {
     final startTime = DateTime.now();
     DateTime? firstTokenTime;
 
-    // Verify model is loaded via DartBridgeLLM (mirrors Swift CppBridge.LLM pattern)
+    final modelId = await getLoadedModel() ?? throw SDKError.notInitialized();
     if (!DartBridge.llm.isLoaded) {
       throw SDKError.componentNotReady(
         'LLM model not loaded. Call loadModel() first.',
