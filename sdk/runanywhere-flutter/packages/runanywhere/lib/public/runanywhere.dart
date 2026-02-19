@@ -1153,7 +1153,7 @@ class RunAnywhere {
   }
 
   /// Full text generation with metrics
-    final modelId = await getLoadedModel() ?? throw SDKError.notInitialized();
+  ///
   /// Matches Swift `RunAnywhere.generate(_:options:)`.
   ///
   /// ```dart
@@ -1302,7 +1302,7 @@ class RunAnywhere {
     final startTime = DateTime.now();
     DateTime? firstTokenTime;
 
-    final modelId = await getLoadedModel() ?? throw SDKError.notInitialized();
+    // Verify model is loaded via DartBridgeLLM (mirrors Swift CppBridge.LLM pattern)
     if (!DartBridge.llm.isLoaded) {
       throw SDKError.componentNotReady(
         'LLM model not loaded. Call loadModel() first.',
