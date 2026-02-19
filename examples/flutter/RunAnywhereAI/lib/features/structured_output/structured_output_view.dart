@@ -320,7 +320,7 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
             // Stream toggle and generate button
             _buildGenerateControls(),
 
-            const SizedBox(width: AppSpacing.large),
+            const SizedBox(height: AppSpacing.large),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.large),
               child: Row(
