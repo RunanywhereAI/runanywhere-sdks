@@ -368,14 +368,15 @@ private actor LLMStreamingMetricsCollector {
             timeToFirstTokenMs = firstToken.timeIntervalSince(start) * 1000
         }
 
-        let inputTokens = max(1, promptLength / 4)
-        let outputTokens = max(1, fullText.count / 4)
-        let tokensPerSecond = latencyMs > 0 ? Double(outputTokens) / (latencyMs / 1000.0) : 0
+        // Use actual token count from streaming callbacks, not character estimation (fixes #339)
+        let outputTokens = max(1, tokenCount)
+        let totalTimeSec = latencyMs / 1000.0
+        let tokensPerSecond = totalTimeSec > 0 ? Double(outputTokens) / totalTimeSec : 0
 
         return LLMGenerationResult(
             text: fullText,
             thinkingContent: nil,
-            inputTokens: inputTokens,
+            inputTokens: 0,
             tokensUsed: outputTokens,
             modelUsed: modelId,
             latencyMs: latencyMs,
