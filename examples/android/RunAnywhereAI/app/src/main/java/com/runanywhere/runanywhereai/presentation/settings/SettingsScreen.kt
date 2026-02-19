@@ -15,8 +15,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.CloudQueue
@@ -38,6 +36,8 @@ import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.Warning
+import androidx.compose.material.icons.outlined.Build
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -811,7 +811,7 @@ fun ToolSettingsSection() {
     val application = context.applicationContext as Application
     val toolViewModel = remember { ToolSettingsViewModel.getInstance(application) }
     val toolState by toolViewModel.uiState.collectAsStateWithLifecycle()
-    
+
     SettingsSection(title = "Tool Calling") {
         // Enable/Disable Toggle
         Row(
@@ -841,10 +841,10 @@ fun ToolSettingsSection() {
                 ),
             )
         }
-        
+
         if (toolState.toolCallingEnabled) {
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            
+
             // Registered Tools Count
             Row(
                 modifier = Modifier
@@ -875,7 +875,7 @@ fun ToolSettingsSection() {
                     color = AppColors.primaryAccent,
                 )
             }
-            
+
             // Tool List (if any)
             if (toolState.registeredTools.isNotEmpty()) {
                 toolState.registeredTools.forEach { tool ->
@@ -893,9 +893,9 @@ fun ToolSettingsSection() {
                     }
                 }
             }
-            
+
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-            
+
             // Action Buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -917,7 +917,7 @@ fun ToolSettingsSection() {
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(if (toolState.isLoading) "Loading..." else "Add Demo Tools")
                 }
-                
+
                 if (toolState.registeredTools.isNotEmpty()) {
                     OutlinedButton(
                         onClick = { toolViewModel.clearAllTools() },
@@ -936,7 +936,7 @@ fun ToolSettingsSection() {
                     }
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "Demo tools: get_weather (Open-Meteo API), get_current_time, calculate",
