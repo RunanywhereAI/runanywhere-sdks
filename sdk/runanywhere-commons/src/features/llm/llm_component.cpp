@@ -726,6 +726,96 @@ extern "C" rac_result_t rac_llm_component_cancel(rac_handle_t handle) {
 }
 
 // =============================================================================
+// LORA ADAPTER API
+// =============================================================================
+
+extern "C" rac_result_t rac_llm_component_load_lora(rac_handle_t handle,
+                                                     const char* adapter_path,
+                                                     float scale) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!adapter_path)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
+    if (!service) {
+        log_error("LLM.Component", "Cannot load LoRA adapter: no model loaded");
+        return RAC_ERROR_COMPONENT_NOT_READY;
+    }
+
+    // Dispatch through vtable (backend-agnostic)
+    auto* llm_service = reinterpret_cast<rac_llm_service_t*>(service);
+    if (!llm_service->ops || !llm_service->ops->load_lora)
+        return RAC_ERROR_NOT_SUPPORTED;
+    return llm_service->ops->load_lora(llm_service->impl, adapter_path, scale);
+}
+
+extern "C" rac_result_t rac_llm_component_remove_lora(rac_handle_t handle,
+                                                       const char* adapter_path) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!adapter_path)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
+    if (!service) {
+        log_error("LLM.Component", "Cannot remove LoRA adapter: no model loaded");
+        return RAC_ERROR_COMPONENT_NOT_READY;
+    }
+
+    auto* llm_service = reinterpret_cast<rac_llm_service_t*>(service);
+    if (!llm_service->ops || !llm_service->ops->remove_lora)
+        return RAC_ERROR_NOT_SUPPORTED;
+    return llm_service->ops->remove_lora(llm_service->impl, adapter_path);
+}
+
+extern "C" rac_result_t rac_llm_component_clear_lora(rac_handle_t handle) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
+    if (!service) {
+        return RAC_SUCCESS;  // No service = no adapters to clear
+    }
+
+    auto* llm_service = reinterpret_cast<rac_llm_service_t*>(service);
+    if (!llm_service->ops || !llm_service->ops->clear_lora)
+        return RAC_ERROR_NOT_SUPPORTED;
+    return llm_service->ops->clear_lora(llm_service->impl);
+}
+
+extern "C" rac_result_t rac_llm_component_get_lora_info(rac_handle_t handle,
+                                                         char** out_json) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!out_json)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
+    if (!service) {
+        log_error("LLM.Component", "Cannot get LoRA info: no model loaded");
+        return RAC_ERROR_COMPONENT_NOT_READY;
+    }
+
+    auto* llm_service = reinterpret_cast<rac_llm_service_t*>(service);
+    if (!llm_service->ops || !llm_service->ops->get_lora_info)
+        return RAC_ERROR_NOT_SUPPORTED;
+    return llm_service->ops->get_lora_info(llm_service->impl, out_json);
+}
+
+// =============================================================================
 // STATE QUERY API
 // =============================================================================
 

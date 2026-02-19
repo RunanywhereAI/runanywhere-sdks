@@ -128,7 +128,7 @@ static JNIEnv* getJNIEnv() {
     int status = g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
 
     if (status == JNI_EDETACHED) {
-        if (g_jvm->AttachCurrentThread(reinterpret_cast<void**>(&env), nullptr) != JNI_OK) {
+        if (g_jvm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
             return nullptr;
         }
     }
@@ -712,7 +712,7 @@ static rac_bool_t llm_stream_callback_token(const char* token, void* user_data) 
 
         jint result = ctx->jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
         if (result == JNI_EDETACHED) {
-            if (ctx->jvm->AttachCurrentThread(reinterpret_cast<void**>(&env), nullptr) == JNI_OK) {
+            if (ctx->jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
                 needsDetach = true;
             } else {
                 LOGe("Failed to attach thread for streaming callback");
@@ -1085,6 +1085,84 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentIsLoaded
 JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmSetCallbacks(
     JNIEnv* env, jclass clazz, jobject streamCallback, jobject progressCallback) {
     // TODO: Implement callback registration
+}
+
+// =============================================================================
+// JNI FUNCTIONS - LLM LoRA Adapter Management
+// =============================================================================
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentLoadLora(
+    JNIEnv* env, jclass clazz, jlong handle, jstring adapterPath, jfloat scale) {
+    if (handle == 0 || adapterPath == nullptr) {
+        return -1;
+    }
+
+    const char* path = env->GetStringUTFChars(adapterPath, nullptr);
+    if (!path) {
+        return -1;
+    }
+
+    LOGi("racLlmComponentLoadLora: handle=%lld, path=%s, scale=%.2f",
+         (long long)handle, path, (float)scale);
+
+    rac_result_t result = rac_llm_component_load_lora(
+        reinterpret_cast<rac_handle_t>(handle), path, static_cast<float>(scale));
+
+    env->ReleaseStringUTFChars(adapterPath, path);
+
+    LOGi("racLlmComponentLoadLora result=%d", result);
+    return static_cast<jint>(result);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentRemoveLora(
+    JNIEnv* env, jclass clazz, jlong handle, jstring adapterPath) {
+    if (handle == 0 || adapterPath == nullptr) {
+        return -1;
+    }
+
+    const char* path = env->GetStringUTFChars(adapterPath, nullptr);
+    if (!path) {
+        return -1;
+    }
+
+    rac_result_t result = rac_llm_component_remove_lora(
+        reinterpret_cast<rac_handle_t>(handle), path);
+
+    env->ReleaseStringUTFChars(adapterPath, path);
+    return static_cast<jint>(result);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentClearLora(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    if (handle == 0) {
+        return -1;
+    }
+
+    return static_cast<jint>(
+        rac_llm_component_clear_lora(reinterpret_cast<rac_handle_t>(handle)));
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGetLoraInfo(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    if (handle == 0) {
+        return nullptr;
+    }
+
+    char* json = nullptr;
+    rac_result_t result = rac_llm_component_get_lora_info(
+        reinterpret_cast<rac_handle_t>(handle), &json);
+
+    if (result != RAC_SUCCESS || !json) {
+        return nullptr;
+    }
+
+    jstring jresult = env->NewStringUTF(json);
+    free(json);
+    return jresult;
 }
 
 // =============================================================================
@@ -1948,7 +2026,7 @@ static rac_result_t model_assignment_http_get_callback(const char* endpoint,
     jint get_result = g_model_assignment_state.jvm->GetEnv((void**)&env, JNI_VERSION_1_6);
 
     if (get_result == JNI_EDETACHED) {
-        if (g_model_assignment_state.jvm->AttachCurrentThread(reinterpret_cast<void**>(&env), nullptr) == JNI_OK) {
+        if (g_model_assignment_state.jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
             did_attach = true;
         } else {
             LOGe("model_assignment_http_get_callback: failed to attach thread");
@@ -3658,7 +3736,7 @@ static rac_bool_t vlm_stream_callback_token(const char* token, void* user_data) 
 
         jint result = ctx->jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
         if (result == JNI_EDETACHED) {
-            if (ctx->jvm->AttachCurrentThread(reinterpret_cast<void**>(&env), nullptr) == JNI_OK) {
+            if (ctx->jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
                 needsDetach = true;
             } else {
                 LOGe("VLM: Failed to attach thread for streaming callback");
