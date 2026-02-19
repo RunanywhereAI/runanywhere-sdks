@@ -9,6 +9,10 @@
 import CRACommons
 import Foundation
 
+// C struct with raw pointers — safe to send across concurrency boundaries
+// because the backing Data (rgbData) is kept alive alongside it.
+extension rac_vlm_image_t: @unchecked Sendable {}
+
 // MARK: - Vision Language Model
 
 public extension RunAnywhere {
@@ -102,8 +106,6 @@ public extension RunAnywhere {
 
         let stream = AsyncThrowingStream<String, Error> { continuation in
             Task {
-                await collector.start()
-
                 let context = StreamContext(continuation: continuation, collector: collector)
                 let contextPtr = Unmanaged.passRetained(context).toOpaque()
 
@@ -191,14 +193,12 @@ private final class StreamContext: @unchecked Sendable {
 }
 
 private actor StreamingCollector {
-    private var startTime: Date?
+    private let startTime = Date()
     private var text = ""
     private var tokens = 0
     private var isDone = false
     private var error: Error?
     private var waiting: CheckedContinuation<VLMResult, Error>?
-
-    func start() { startTime = Date() }
 
     func addToken(_ token: String) {
         text += token
@@ -224,7 +224,7 @@ private actor StreamingCollector {
     }
 
     private func buildResult() -> VLMResult {
-        let elapsed = startTime.map { Date().timeIntervalSince($0) * 1000 } ?? 0
+        let elapsed = Date().timeIntervalSince(startTime) * 1000
         let tps = elapsed > 0 ? Double(tokens) / (elapsed / 1000) : 0
         return VLMResult(text: text, promptTokens: 0, completionTokens: tokens, totalTimeMs: elapsed, tokensPerSecond: tps)
     }

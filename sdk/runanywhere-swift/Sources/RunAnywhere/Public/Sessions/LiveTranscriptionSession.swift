@@ -36,7 +36,7 @@ import Foundation
 /// await session.stop()
 /// ```
 @MainActor
-public final class LiveTranscriptionSession: ObservableObject {
+public final class LiveTranscriptionSession: ObservableObject, @unchecked Sendable {
     private let logger = SDKLogger(category: "LiveTranscription")
 
     // MARK: - Published State
