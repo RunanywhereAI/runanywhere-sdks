@@ -53,7 +53,7 @@ echo "========================================"
 echo "Building commons for iOS (device + simulator)"
 echo "========================================"
 
-COMMONS_FLAGS="--backend onnx"
+COMMONS_FLAGS="--backend all"
 if [[ "$CLEAN_BUILD" == true ]]; then
     COMMONS_FLAGS="$COMMONS_FLAGS --clean"
 fi

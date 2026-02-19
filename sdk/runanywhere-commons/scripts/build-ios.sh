@@ -510,22 +510,41 @@ create_backend_xcframework() {
                 [[ -n "$lib_path" ]] && LIBS_TO_BUNDLE+=("$lib_path")
             done
         elif [[ "$BACKEND_NAME" == "onnx" ]]; then
-            if [[ "$PLATFORM" == "MACOS" ]]; then
-                # Bundle Sherpa-ONNX static libs for macOS
-                local SHERPA_MACOS="${PROJECT_ROOT}/third_party/sherpa-onnx-macos"
-                if [[ -f "${SHERPA_MACOS}/lib/libsherpa-onnx-c-api.a" ]]; then
-                    LIBS_TO_BUNDLE+=("${SHERPA_MACOS}/lib/libsherpa-onnx-c-api.a")
-                    # Also bundle all dependency static libs
-                    for dep_lib in \
-                        sherpa-onnx-core sherpa-onnx-fst sherpa-onnx-fstfar \
-                        sherpa-onnx-kaldifst-core kaldi-decoder-core kaldi-native-fbank-core \
-                        piper_phonemize espeak-ng ucd cppinyin_core ssentencepiece_core kissfft-float; do
-                        if [[ -f "${SHERPA_MACOS}/lib/lib${dep_lib}.a" ]]; then
-                            LIBS_TO_BUNDLE+=("${SHERPA_MACOS}/lib/lib${dep_lib}.a")
-                        fi
-                    done
+    if [[ "$PLATFORM" == "MACOS" ]]; then
+        # Bundle Sherpa-ONNX static libs for macOS
+        local SHERPA_MACOS="${PROJECT_ROOT}/third_party/sherpa-onnx-macos"
+        if [[ -f "${SHERPA_MACOS}/lib/libsherpa-onnx-c-api.a" ]]; then
+            LIBS_TO_BUNDLE+=("${SHERPA_MACOS}/lib/libsherpa-onnx-c-api.a")
+            for dep_lib in \
+                sherpa-onnx-core sherpa-onnx-fst sherpa-onnx-fstfar \
+                sherpa-onnx-kaldifst-core kaldi-decoder-core kaldi-native-fbank-core \
+                piper_phonemize espeak-ng ucd cppinyin_core ssentencepiece_core kissfft-float; do
+                if [[ -f "${SHERPA_MACOS}/lib/lib${dep_lib}.a" ]]; then
+                    LIBS_TO_BUNDLE+=("${SHERPA_MACOS}/lib/lib${dep_lib}.a")
                 fi
             done
+        fi
+    else
+        # iOS - bundle Sherpa-ONNX static library
+        local SHERPA_XCFW="${PROJECT_ROOT}/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework"
+        local SHERPA_ARCH
+
+        case $PLATFORM in
+            OS) SHERPA_ARCH="ios-arm64" ;;
+            *)  SHERPA_ARCH="ios-arm64_x86_64-simulator" ;;
+        esac
+
+        for possible in \
+            "${SHERPA_XCFW}/${SHERPA_ARCH}/libsherpa-onnx.a" \
+            "${SHERPA_XCFW}/${SHERPA_ARCH}/sherpa-onnx.framework/sherpa-onnx"; do
+            if [[ -f "$possible" ]]; then
+                LIBS_TO_BUNDLE+=("$possible")
+                break
+            fi
+        done
+    fi
+
+            
         elif [[ "$BACKEND_NAME" == "rag" ]]; then
             # RAG backend uses separation of concerns:
             # - Has its own providers (onnx_embedding_provider.cpp, onnx_generator.cpp)

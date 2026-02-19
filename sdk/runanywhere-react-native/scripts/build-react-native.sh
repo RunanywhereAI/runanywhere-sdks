@@ -125,7 +125,7 @@ SKIP_BUILD=false
 BUILD_IOS=true
 BUILD_ANDROID=true
 ABIS="arm64-v8a"
-BACKENDS="onnx"  # Default: only ONNX (RAG works without LlamaCPP due to separation of concerns)
+BACKENDS="onnx,llamacpp"  # Default: only ONNX (RAG works without LlamaCPP due to separation of concerns)
 
 # =============================================================================
 # Colors & Logging

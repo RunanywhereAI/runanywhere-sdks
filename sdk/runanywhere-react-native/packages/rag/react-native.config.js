@@ -6,7 +6,9 @@ module.exports = {
         packageImportPath: 'import com.margelo.nitro.runanywhere.rag.RunAnywhereRAGPackage;',
         packageInstance: 'new RunAnywhereRAGPackage()',
       },
-      ios: {},
+      ios: {
+        podspecPath: './RunAnywhereRAG.podspec',
+      },
     },
   },
 };
