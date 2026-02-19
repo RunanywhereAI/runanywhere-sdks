@@ -296,7 +296,10 @@ public enum RunAnywhere {
     /// Complete services initialization (Phase 2)
     ///
     /// Called automatically in background by `initialize()`, or can be awaited directly
-    /// via `initializeAsync()`. Safe to call multiple times - returns immediately if already done.
+    /// via `initializeAsync()`. Safe to call multiple times — returns immediately if Phase 2
+    /// is already complete. Note: if initialization succeeded in offline mode (HTTP/auth setup
+    /// failed), this fast-path still returns immediately. HTTP/auth retry is handled
+    /// automatically by `ensureServicesReady()` on the next API call.
     ///
     /// This method:
     /// 1. Sets up API client (with authentication for production/staging)
@@ -388,7 +391,7 @@ public enum RunAnywhere {
         if hasCompletedServicesInit && !hasCompletedHTTPSetup {
             // Core services done, but HTTP/auth failed earlier (offline init).
             // Retry HTTP setup only — safe because setupHTTP is idempotent.
-            try? await retryHTTPSetup()
+            await retryHTTPSetup()
             return
         }
         try await completeServicesInitialization()
@@ -397,7 +400,7 @@ public enum RunAnywhere {
     /// Retry HTTP/auth setup after an offline initialization.
     /// Safe to call multiple times — checks `CppBridge.HTTP.shared.isConfigured` first.
     /// Failures are silently logged; the next `ensureServicesReady()` call will retry.
-    private static func retryHTTPSetup() async throws {
+    private static func retryHTTPSetup() async {
         guard let params = initParams, let environment = currentEnvironment else { return }
         let logger = SDKLogger(category: "RunAnywhere.HTTPRetry")
 
