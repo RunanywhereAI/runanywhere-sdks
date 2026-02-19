@@ -16,7 +16,6 @@ import {
   ExtensionPoint,
   BackendCapability,
   ExtensionRegistry,
-  ServiceKey,
   extractTarGz,
 } from '@runanywhere/web';
 
@@ -369,10 +368,8 @@ const onnxExtension: BackendExtension = {
     STT.cleanup();
     TTS.cleanup();
     VAD.cleanup();
-    // Remove service registrations
-    ExtensionPoint.removeService(ServiceKey.STT);
-    ExtensionPoint.removeService(ServiceKey.TTS);
-    ExtensionPoint.removeService(ServiceKey.VAD);
+    ExtensionPoint.removeProvider('stt');
+    ExtensionPoint.removeProvider('tts');
     try { SherpaONNXBridge.shared.shutdown(); } catch { /* ignore */ }
     _isRegistered = false;
     logger.info('ONNX backend cleaned up');
@@ -414,11 +411,10 @@ export const ONNXProvider = {
     // Register with ExtensionPoint
     ExtensionPoint.registerBackend(onnxExtension);
 
-    // Register service singletons with ExtensionPoint so VoicePipeline
-    // (in core) can access them via typed keys at runtime.
-    ExtensionPoint.registerService(ServiceKey.STT, STT);
-    ExtensionPoint.registerService(ServiceKey.TTS, TTS);
-    ExtensionPoint.registerService(ServiceKey.VAD, VAD);
+    // Register typed providers so VoicePipeline (in core) can access
+    // STT/TTS via ExtensionPoint.getProvider() at runtime.
+    ExtensionPoint.registerProvider('stt', STT);
+    ExtensionPoint.registerProvider('tts', TTS);
 
     _isRegistered = true;
     logger.info('ONNX backend registered successfully');

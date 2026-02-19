@@ -70,6 +70,13 @@ export { ExtensionRegistry } from './Infrastructure/ExtensionRegistry';
 export type { SDKExtension } from './Infrastructure/ExtensionRegistry';
 export { ExtensionPoint, BackendCapability, ServiceKey } from './Infrastructure/ExtensionPoint';
 export type { BackendExtension } from './Infrastructure/ExtensionPoint';
+export type {
+  ProviderCapability,
+  ProviderMap,
+  LLMProvider,
+  STTProvider,
+  TTSProvider,
+} from './Infrastructure/ProviderTypes';
 export type { ModelLoadContext, LLMModelLoader, STTModelLoader, TTSModelLoader, VADModelLoader } from './Infrastructure/ModelLoaderTypes';
 export { extractTarGz } from './Infrastructure/ArchiveUtility';
 export { LocalFileStorage } from './Infrastructure/LocalFileStorage';

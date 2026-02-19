@@ -134,8 +134,13 @@ public class AudioCaptureManager: ObservableObject {
             }
         }
 
-        // Start engine
-        try engine.start()
+        // Start engine (remove tap on failure to avoid resource leak)
+        do {
+            try engine.start()
+        } catch {
+            inputNode.removeTap(onBus: 0)
+            throw error
+        }
 
         self.audioEngine = engine
         self.inputNode = inputNode
@@ -172,7 +177,8 @@ public class AudioCaptureManager: ObservableObject {
 
     // MARK: - Private Helpers
 
-    private func convert(
+    /// Converts a PCM buffer to the target format. Internal for unit testing (converter input block single-use behavior).
+    internal func convert(
         buffer: AVAudioPCMBuffer,
         using converter: AVAudioConverter,
         to format: AVAudioFormat
@@ -187,7 +193,13 @@ public class AudioCaptureManager: ObservableObject {
         }
 
         var error: NSError?
+        var hasProvidedData = false
         let inputBlock: AVAudioConverterInputBlock = { _, outStatus in
+            if hasProvidedData {
+                outStatus.pointee = .endOfStream
+                return nil
+            }
+            hasProvidedData = true
             outStatus.pointee = .haveData
             return buffer
         }
