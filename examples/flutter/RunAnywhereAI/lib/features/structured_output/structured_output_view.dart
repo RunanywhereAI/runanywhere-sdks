@@ -585,7 +585,8 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
     }
 
     return ListView(
-      controller: _scrollController,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.all(AppSpacing.large),
       children: [
         // Raw Response
