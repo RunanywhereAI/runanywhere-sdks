@@ -1232,13 +1232,13 @@ class RunAnywhere {
       );
 
       // Extract structured data if structuredOutput is provided
-      dynamic structuredData;
-      dynamic structuredData;
+      Map<String, dynamic>? structuredData;
       if (opts.structuredOutput != null) {
         try {
           final jsonString = DartBridgeStructuredOutput.shared.extractJson(result.text);
           if (jsonString != null) {
-            structuredData = jsonDecode(jsonString);
+            final parsed = jsonDecode(jsonString);
+            structuredData = _normalizeStructuredData(parsed);
           }
         } catch (_) {
           // JSON extraction/parse failed — return text result without structured data
@@ -1406,15 +1406,14 @@ class RunAnywhere {
       );
 
       // Extract structured data if structuredOutput is provided
-      dynamic structuredData;
-      final fullText = allTokens.join();
-      dynamic structuredData;
+      Map<String, dynamic>? structuredData;
       final fullText = allTokens.join();
       if (opts.structuredOutput != null) {
         try {
           final jsonString = DartBridgeStructuredOutput.shared.extractJson(fullText);
           if (jsonString != null) {
-            structuredData = jsonDecode(jsonString);
+            final parsed = jsonDecode(jsonString);
+            structuredData = _normalizeStructuredData(parsed);
           }
         } catch (_) {
           // JSON extraction/parse failed — return text result without structured data
@@ -1861,5 +1860,26 @@ class RunAnywhere {
     if (lower.endsWith('.bin')) return ModelFormat.bin;
     if (lower.endsWith('.ort')) return ModelFormat.ort;
     return ModelFormat.unknown;
+  }
+
+  // ============================================================================
+  // Structured Output Helpers
+  // ============================================================================
+
+  /// Normalizes parsed JSON to Map<String, dynamic>.
+  /// If the parsed result is a List, wraps it in a Map with 'items' key.
+  /// If it's already a Map, returns it directly.
+  /// Returns null if parsing fails.
+  static Map<String, dynamic>? _normalizeStructuredData(dynamic parsed) {
+    if (parsed is Map<String, dynamic>) {
+      return parsed;
+    } else if (parsed is List) {
+      // Wrap array in object with 'items' key
+      return {'items': parsed};
+    } else if (parsed is Map) {
+      // Convert Map to Map<String, dynamic>
+      return Map<String, dynamic>.from(parsed);
+    }
+    return null;
   }
 }

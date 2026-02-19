@@ -47,7 +47,7 @@ class LLMGenerationResult {
   final double? timeToFirstTokenMs;
   final int thinkingTokens;
   final int responseTokens;
-  final dynamic structuredData;
+  final Map<String, dynamic>? structuredData;
 
   const LLMGenerationResult({
     required this.text,

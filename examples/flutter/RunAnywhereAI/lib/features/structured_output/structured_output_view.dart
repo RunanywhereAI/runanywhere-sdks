@@ -31,7 +31,7 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
   bool _isGenerating = false;
   String? _errorMessage;
   String? _rawResponse;
-  dynamic _structuredData;
+  Map<String, dynamic>? _structuredData;
 
   // Examples with both schema and prompt templates
   final List<StructuredOutputExample> _examples = [
@@ -349,10 +349,7 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
             if (_errorMessage != null) _buildErrorBanner(),
 
             // Results
-            SizedBox(
-              height: MediaQuery.of(context).size.height * 0.5,
-              child: _buildResults(),
-            ),
+            _buildResults()
           ],
         ),
       ),
@@ -616,7 +613,7 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
 
         // Structured Data
         if (_structuredData != null) ...[
-          _buildSectionHeader('Structured Data', Icons.data_object),
+          _buildSectionHeader('Structured Data ', Icons.data_object),
           const SizedBox(height: AppSpacing.smallMedium),
           Container(
             width: double.infinity,
@@ -648,6 +645,8 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
             ),
           ),
         ],
+
+        const SizedBox(height: AppSpacing.large),
       ],
     );
   }
