@@ -234,9 +234,24 @@ struct DiffusionModelPickerView: View {
     @ObservedObject var viewModel: DiffusionViewModel
     @Binding var isPresented: Bool
 
+    private static let firstLoadBannerText = "First load may take 1–2 minutes depending on model size and device performance."
+
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
+                // First-load info banner
+                HStack(spacing: AppSpacing.small) {
+                    Image(systemName: "clock.badge.checkmark")
+                        .font(.body)
+                        .foregroundStyle(AppColors.primaryAccent)
+                    Text(Self.firstLoadBannerText)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(AppColors.backgroundSecondary)
+
                 if viewModel.availableModels.isEmpty {
                     VStack(spacing: AppSpacing.large) {
                         Image(systemName: "photo.artframe")
@@ -261,15 +276,24 @@ struct DiffusionModelPickerView: View {
                                 }
                                 Spacer()
                                 if model.isDownloaded {
-                                    Button("Load") {
-                                        viewModel.selectedModel = model
-                                        Task {
-                                            await viewModel.loadSelectedModel()
-                                            if viewModel.isModelLoaded { isPresented = false }
+                                    if viewModel.isLoadingModel && viewModel.selectedModel?.id == model.id {
+                                        HStack(spacing: AppSpacing.small) {
+                                            ProgressView()
+                                            Text("Loading...")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
                                         }
+                                    } else {
+                                        Button("Load") {
+                                            viewModel.selectedModel = model
+                                            Task {
+                                                await viewModel.loadSelectedModel()
+                                                if viewModel.isModelLoaded { isPresented = false }
+                                            }
+                                        }
+                                        .buttonStyle(.borderedProminent)
+                                        .disabled(viewModel.isDownloading)
                                     }
-                                    .buttonStyle(.borderedProminent)
-                                    .disabled(viewModel.isDownloading)
                                 } else {
                                     Button("Download") {
                                         viewModel.selectedModel = model

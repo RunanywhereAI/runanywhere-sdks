@@ -140,7 +140,8 @@ public extension RunAnywhere {
                     Task { await ctx.collector.fail(error) }
                 }
 
-                let result: rac_result_t = image.withCPointers(cImage: &cImage, rgbData: rgbData) { cImagePtr in
+                var localCImage = cImage
+                let result: rac_result_t = image.withCPointers(cImage: &localCImage, rgbData: rgbData) { cImagePtr in
                     prompt.withCString { promptPtr in
                         rac_vlm_component_process_stream(handle, cImagePtr, promptPtr, &opts, tokenCb, completeCb, errorCb, contextPtr)
                     }

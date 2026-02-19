@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -45,9 +46,9 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.presentation.chat.components.ModelLoadedToast
+import com.runanywhere.runanywhereai.presentation.chat.components.ModelRequiredOverlay
 import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
 import com.runanywhere.runanywhereai.ui.theme.AppColors
-import com.runanywhere.runanywhereai.ui.theme.AppTypography
 import com.runanywhere.runanywhereai.util.getModelLogoResIdForName
 import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
 import kotlinx.coroutines.launch
@@ -96,15 +97,25 @@ fun SpeechToTextScreen(viewModel: SpeechToTextViewModel = viewModel()) {
                     title = {
                         Text(
                             text = "Speech to Text",
-                            style = MaterialTheme.typography.headlineMedium,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
                         )
                     },
                     actions = {
-                        IconButton(onClick = { showModelPicker = true }) {
-                            STTModelButton(
+                        Surface(
+                            onClick = { showModelPicker = true },
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        ) {
+                            STTModelChip(
                                 modelName = uiState.selectedModelName,
-                                frameworkDisplayName = uiState.selectedFramework?.displayName,
                                 mode = uiState.mode,
+                                modifier = Modifier.padding(
+                                    start = 6.dp,
+                                    end = 12.dp,
+                                    top = 6.dp,
+                                    bottom = 6.dp,
+                                ),
                             )
                         }
                     },
@@ -186,7 +197,8 @@ fun SpeechToTextScreen(viewModel: SpeechToTextViewModel = viewModel()) {
             }
 
             if (!uiState.isModelLoaded && uiState.recordingState != RecordingState.PROCESSING) {
-                ModelRequiredOverlaySTT(
+                ModelRequiredOverlay(
+                    modality = ModelSelectionContext.STT,
                     onSelectModel = { showModelPicker = true },
                     modifier = Modifier.matchParentSize(),
                 )
@@ -730,24 +742,23 @@ private fun ControlsSection(
 }
 
 /**
- * STT toolbar model button - icon, model name to the right, below: electricity icon + Streaming/Batch text
+ * STT app bar model chip - same style as ChatTopBar: pill Surface, model icon + name + Streaming/Batch.
  */
 @Composable
-private fun STTModelButton(
+private fun STTModelChip(
     modelName: String?,
-    frameworkDisplayName: String?,
     mode: STTMode,
+    modifier: Modifier = Modifier,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = modifier,
     ) {
         if (modelName != null) {
             Box(
-                modifier =
-                    Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(4.dp)),
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(6.dp)),
             ) {
                 Image(
                     painter = painterResource(id = getModelLogoResIdForName(modelName)),
@@ -756,15 +767,16 @@ private fun STTModelButton(
                     contentScale = ContentScale.Fit,
                 )
             }
-            Column(
-                horizontalAlignment = Alignment.Start,
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(
-                    text = shortModelNameSTT(modelName),
+                    text = shortModelNameSTT(modelName, maxLength = 12),
                     style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Medium,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -778,21 +790,26 @@ private fun STTModelButton(
                     )
                     Text(
                         text = if (mode == STTMode.LIVE) "Streaming" else "Batch",
-                        style = AppTypography.caption2.copy(fontSize = 10.sp, fontWeight = FontWeight.Medium),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                        ),
                         color = if (mode == STTMode.LIVE) AppColors.primaryGreen else AppColors.primaryOrange,
                     )
                 }
             }
         } else {
             Icon(
-                imageVector = Icons.Default.GraphicEq,
+                imageVector = Icons.Default.ViewInAr,
                 contentDescription = null,
-                modifier = Modifier.size(14.dp),
-                tint = AppColors.primaryGreen,
+                modifier = Modifier.size(16.dp),
+                tint = AppColors.primaryAccent,
             )
+            Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = "Select Model",
                 style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
             )
         }
     }
@@ -1061,138 +1078,6 @@ private fun RecordingButton(
                         modifier = Modifier.size(32.dp),
                     )
                 }
-            }
-        }
-    }
-}
-
-/**
- * Model Required Overlay for STT - green, "Voice to Text", same layout as Chat overlay
- */
-@Composable
-private fun ModelRequiredOverlaySTT(
-    onSelectModel: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val modalityColor = AppColors.primaryGreen
-    val infiniteTransition = rememberInfiniteTransition(label = "stt_overlay_circles")
-    val circle1Offset by infiniteTransition.animateFloat(
-        initialValue = -100f,
-        targetValue = 100f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 8000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "c1",
-    )
-    val circle2Offset by infiniteTransition.animateFloat(
-        initialValue = 100f,
-        targetValue = -100f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 8000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "c2",
-    )
-    val circle3Offset by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 80f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 8000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "c3",
-    )
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    val c1Dp = with(density) { circle1Offset.toDp() }
-    val c2Dp = with(density) { circle2Offset.toDp() }
-    val c3Dp = with(density) { circle3Offset.toDp() }
-
-    Box(modifier = modifier.fillMaxSize()) {
-        Box(modifier = Modifier.fillMaxSize().blur(32.dp)) {
-            Box(
-                modifier = Modifier
-                    .size(300.dp)
-                    .offset(x = c1Dp, y = (-200).dp)
-                    .clip(CircleShape)
-                    .background(modalityColor.copy(alpha = 0.15f)),
-            )
-            Box(
-                modifier = Modifier
-                    .size(250.dp)
-                    .offset(x = c2Dp, y = 300.dp)
-                    .clip(CircleShape)
-                    .background(modalityColor.copy(alpha = 0.12f)),
-            )
-            Box(
-                modifier = Modifier
-                    .size(280.dp)
-                    .offset(x = -c3Dp, y = c3Dp)
-                    .clip(CircleShape)
-                    .background(modalityColor.copy(alpha = 0.08f)),
-            )
-        }
-        Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Spacer(modifier = Modifier.weight(1f))
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(120.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(
-                            listOf(
-                                modalityColor.copy(alpha = 0.2f),
-                                modalityColor.copy(alpha = 0.1f),
-                            ),
-                        ),
-                    ),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.GraphicEq,
-                    contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = modalityColor,
-                )
-            }
-            Spacer(modifier = Modifier.height(20.dp))
-            Text(
-                text = "Voice to Text",
-                style = MaterialTheme.typography.titleLarge,
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Transcribe your speech to text with powerful on-device voice recognition.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            Button(
-                onClick = onSelectModel,
-                colors = ButtonDefaults.buttonColors(containerColor = modalityColor),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color.White)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Get Started", style = MaterialTheme.typography.titleMedium)
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.padding(bottom = 16.dp),
-            ) {
-                Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "100% Private • Runs on your device",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
     }
