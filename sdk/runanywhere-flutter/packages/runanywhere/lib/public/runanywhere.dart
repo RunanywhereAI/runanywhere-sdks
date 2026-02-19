@@ -1408,10 +1408,16 @@ class RunAnywhere {
       // Extract structured data if structuredOutput is provided
       dynamic structuredData;
       final fullText = allTokens.join();
+      dynamic structuredData;
+      final fullText = allTokens.join();
       if (opts.structuredOutput != null) {
-        final jsonString = DartBridgeStructuredOutput.shared.extractJson(fullText);
-        if (jsonString != null) {
-          structuredData = jsonDecode(jsonString);
+        try {
+          final jsonString = DartBridgeStructuredOutput.shared.extractJson(fullText);
+          if (jsonString != null) {
+            structuredData = jsonDecode(jsonString);
+          }
+        } catch (_) {
+          // JSON extraction/parse failed — return text result without structured data
         }
       }
 
