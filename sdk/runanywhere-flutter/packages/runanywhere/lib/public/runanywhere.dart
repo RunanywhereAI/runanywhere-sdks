@@ -1153,7 +1153,7 @@ class RunAnywhere {
   }
 
   /// Full text generation with metrics
-  ///
+    final modelId = await getLoadedModel() ?? throw SDKError.notInitialized();
   /// Matches Swift `RunAnywhere.generate(_:options:)`.
   ///
   /// ```dart
