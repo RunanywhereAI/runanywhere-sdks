@@ -20,9 +20,11 @@ import com.runanywhere.agent.toolcalling.UIActionContext
 import com.runanywhere.agent.toolcalling.UIActionTools
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LLM.LLMGenerationOptions
+import com.runanywhere.sdk.public.extensions.LLM.LLMGenerationResult
 import com.runanywhere.sdk.public.extensions.LLM.StructuredOutputConfig
 import com.runanywhere.sdk.public.extensions.downloadModel
 import com.runanywhere.sdk.public.extensions.generate
+import com.runanywhere.sdk.public.extensions.generateStreamWithMetrics
 import com.runanywhere.sdk.public.extensions.loadLLMModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -43,7 +45,7 @@ class AgentKernel(
     companion object {
         private const val TAG = "AgentKernel"
         private const val MAX_STEPS = 30
-        private const val MAX_DURATION_MS = 600_000L // 10 min — on-device LLM+VLM takes ~60s/step
+        private const val MAX_DURATION_MS = 1_800_000L // 30 min — Qwen3-4B at 0.2 tok/s takes ~100s/step
         private const val STEP_DELAY_MS = 1000L
         private const val MAX_TOOL_ITERATIONS = 5
     }
@@ -74,6 +76,9 @@ class AgentKernel(
     private var isRunning = false
     private var planResult: PlanResult? = null
 
+    /** Tweet text if compose was pre-launched via deep link. Non-null means compose should stay open. */
+    private var xComposeMessage: String? = null
+
     // Tracks the last prompt for local model tool result re-injection
     private var lastPrompt: String = ""
 
@@ -94,7 +99,35 @@ class AgentKernel(
         data class Error(val message: String) : AgentEvent()
         data class Speak(val text: String) : AgentEvent()
         data class ProviderChanged(val mode: ProviderMode) : AgentEvent()
+        /** Live token emitted during on-device LLM inference — for streaming overlay UI. */
+        data class ThinkingToken(val token: String) : AgentEvent()
+        /** Per-step performance metrics emitted after LLM inference completes. */
+        data class PerfMetrics(
+            val step: Int,
+            val tokensPerSecond: Double,
+            val outputTokens: Int,
+            val inputTokens: Int,
+            val latencyMs: Double,
+            val thinkingContent: String?,
+        ) : AgentEvent()
     }
+
+    /** Structured record of one agent step — used for log export. */
+    data class StepRecord(
+        val step: Int,
+        val timestampMs: Long,
+        val promptSnippet: String,
+        val rawOutput: String,
+        val thinkingContent: String?,
+        val action: String,
+        val durationMs: Long,
+        val tokensPerSecond: Double,
+        val outputTokens: Int,
+        val inputTokens: Int,
+    )
+
+    private val _stepRecords = mutableListOf<StepRecord>()
+    fun getStepRecords(): List<StepRecord> = _stepRecords.toList()
 
     fun run(goal: String): Flow<AgentEvent> = flow {
         if (isRunning) {
@@ -104,6 +137,7 @@ class AgentKernel(
 
         isRunning = true
         history.clear()
+        _stepRecords.clear()
         planResult = null
 
         try {
@@ -237,7 +271,7 @@ class AgentKernel(
                 }
 
                 Log.i(TAG, "Screen: pkg=${screen.foregroundPackage}, ${screen.elementCount} elements")
-                Log.i(TAG, "Elements: ${screen.compactText.take(600)}")
+                Log.i(TAG, "Elements: ${screen.compactText.take(1500)}")
 
                 // Update UI action context with fresh coordinates
                 uiActionContext.indexToCoords = screen.indexToCoords
@@ -264,6 +298,25 @@ class AgentKernel(
                         RecoveryResult.GOAL_ACHIEVED -> return@flow
                         RecoveryResult.ACTION_TAKEN -> { delay(STEP_DELAY_MS); continue }
                         RecoveryResult.NO_ACTION -> { /* fall through to LLM */ }
+                    }
+                }
+
+                // Quick completion check for X compose: if POST button is visible, tap it directly.
+                // MUST run before bringToForeground() so compose screen is never disrupted by inference.
+                if (xComposeMessage != null && screen.foregroundPackage == AppActions.Packages.TWITTER) {
+                    val postIndex = findPostButtonIndex(screen.compactText)
+                    if (postIndex != null && screen.indexToCoords.containsKey(postIndex)) {
+                        emit(AgentEvent.Log("[X] POST button at index $postIndex — tapping directly"))
+                        val tapResult = actionExecutor.execute(Decision("tap", elementIndex = postIndex), screen.indexToCoords)
+                        emit(AgentEvent.Step(step, "tap", tapResult.message))
+                        history.record("tap", "POST", tapResult.message, tapResult.success)
+                        if (tapResult.success) {
+                            xComposeMessage = null
+                            delay(1500)
+                            emit(AgentEvent.Speak("Posted successfully."))
+                            emit(AgentEvent.Done("Successfully posted on X"))
+                            return@flow
+                        }
                     }
                 }
 
@@ -475,6 +528,19 @@ class AgentKernel(
 
                     val stepElapsed = System.currentTimeMillis() - stepStart
                     emit(AgentEvent.Log("Step $step took ${stepElapsed / 1000}s"))
+                    // Record step for export
+                    _stepRecords.add(StepRecord(
+                        step = step,
+                        timestampMs = stepStart,
+                        promptSnippet = lastPrompt.take(200),
+                        rawOutput = call.toolName + "(${call.arguments})",
+                        thinkingContent = null,
+                        action = actionName,
+                        durationMs = stepElapsed,
+                        tokensPerSecond = 0.0,
+                        outputTokens = 0,
+                        inputTokens = 0,
+                    ))
 
                     // Check timeout
                     if (System.currentTimeMillis() - startTime > MAX_DURATION_MS) {
@@ -599,6 +665,28 @@ class AgentKernel(
      */
     private fun bringAppToForeground(packageName: String) {
         try {
+            // Strategy 0 (X-specific): preserve compose screen by targeting ComposerActivity directly.
+            // X's main activity (singleTask) clears compose from the back stack when started.
+            // ComposerActivity with SINGLE_TOP brings the existing compose instance to front instead.
+            if (packageName == AppActions.Packages.TWITTER && xComposeMessage != null) {
+                try {
+                    val composeIntent = android.content.Intent().apply {
+                        component = android.content.ComponentName(
+                            "com.twitter.android",
+                            "com.twitter.composer.ComposerActivity"
+                        )
+                        flags = android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                                android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(composeIntent)
+                    Log.i(TAG, "Returned to X compose: ComposerActivity (SINGLE_TOP)")
+                    return
+                } catch (e: Exception) {
+                    Log.w(TAG, "ComposerActivity bring-to-front failed: ${e.message}")
+                    // Fall through to standard strategies
+                }
+            }
+
             // Strategy 1: Standard launch intent (works for most apps)
             val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
             if (launchIntent != null) {
@@ -725,7 +813,7 @@ class AgentKernel(
             val mode = if (hasVisionContext) ProviderMode.LOCAL else ProviderMode.LOCAL_NO_VISION
             emitEvent(AgentEvent.ProviderChanged(mode))
             emitEvent(AgentEvent.Log("[LOCAL] Reasoning with $activeModelId..."))
-            callLocalLLMWithTools(prompt)
+            callLocalLLMWithTools(prompt, emitEvent)
         } catch (e: Exception) {
             Log.w(TAG, "Local LLM failed: ${e.message}")
             null
@@ -780,9 +868,13 @@ class AgentKernel(
 
     /**
      * Call local LLM with essential UI tools.
-     * Adapts system prompt and token budget based on model size.
+     * Uses streaming generation so tokens appear live in the UI.
+     * Emits ThinkingToken events per token and PerfMetrics after completion.
      */
-    private suspend fun callLocalLLMWithTools(prompt: String): LLMResponse {
+    private suspend fun callLocalLLMWithTools(
+        prompt: String,
+        emitEvent: (suspend (AgentEvent) -> Unit)? = null,
+    ): LLMResponse {
         val allTools = toolRegistry.getDefinitions()
         val essentialTools = allTools.filter { it.name in essentialToolNames }
         val hasTools = essentialTools.isNotEmpty()
@@ -802,23 +894,20 @@ class AgentKernel(
         }
 
         val options = if (hasTools) {
-            // When tools are registered: no structured output
-            // (grammar enforcement would block <tool_call> tags)
             LLMGenerationOptions(
                 maxTokens = maxTokens,
                 temperature = 0.0f,
                 topP = 0.95f,
-                streamingEnabled = false,
+                streamingEnabled = true,
                 systemPrompt = systemPrompt,
                 structuredOutput = null
             )
         } else {
-            // No tools: existing behavior with structured output
             LLMGenerationOptions(
                 maxTokens = 32,
                 temperature = 0.0f,
                 topP = 0.95f,
-                streamingEnabled = false,
+                streamingEnabled = true,
                 systemPrompt = systemPrompt,
                 structuredOutput = StructuredOutputConfig(
                     typeName = "Act",
@@ -839,21 +928,52 @@ class AgentKernel(
         }
 
         return try {
-            val result = withContext(Dispatchers.Default) {
-                // Request high thread priority to mitigate Samsung background CPU throttling.
-                // THREAD_PRIORITY_URGENT_AUDIO gets special scheduler treatment on most OEMs.
-                val prevPriority = android.os.Process.getThreadPriority(android.os.Process.myTid())
-                try {
-                    android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
-                } catch (_: Exception) { /* Best-effort */ }
-                try {
-                    RunAnywhere.generate(fullPrompt, options)
-                } finally {
-                    try { android.os.Process.setThreadPriority(prevPriority) } catch (_: Exception) {}
+            // Boost thread priority for inference (mitigates Samsung background CPU throttling)
+            val prevPriority = android.os.Process.getThreadPriority(android.os.Process.myTid())
+            try {
+                android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
+            } catch (_: Exception) {}
+
+            val metrics: LLMGenerationResult
+            val text: String
+            try {
+                val streamResult = withContext(Dispatchers.Default) {
+                    RunAnywhere.generateStreamWithMetrics(fullPrompt, options)
                 }
+                // Collect tokens and emit them live for the streaming overlay
+                val sb = StringBuilder()
+                streamResult.stream.collect { token ->
+                    sb.append(token)
+                    emitEvent?.invoke(AgentEvent.ThinkingToken(token))
+                }
+                metrics = streamResult.result.await()
+                text = metrics.text.ifBlank { sb.toString() }
+            } finally {
+                try { android.os.Process.setThreadPriority(prevPriority) } catch (_: Exception) {}
             }
-            val text = result.text
+
             Log.i(TAG, "LLM raw output (${text.length} chars): $text")
+
+            // Emit perf metrics so the UI and export log can capture them
+            val currentStep = _stepRecords.size + 1
+            emitEvent?.invoke(AgentEvent.PerfMetrics(
+                step = currentStep,
+                tokensPerSecond = metrics.tokensPerSecond,
+                outputTokens = metrics.tokensUsed,
+                inputTokens = metrics.inputTokens,
+                latencyMs = metrics.latencyMs,
+                thinkingContent = metrics.thinkingContent,
+            ))
+            val perfLine = buildString {
+                append("[PERF] ")
+                append("%.1f tok/s".format(metrics.tokensPerSecond))
+                append(" | out:${metrics.tokensUsed}")
+                append(" | in:${metrics.inputTokens}")
+                append(" | %.1fs".format(metrics.latencyMs / 1000.0))
+                metrics.thinkingContent?.let { append(" | think:${it.length}ch") }
+            }
+            Log.i(TAG, perfLine)
+            emitEvent?.invoke(AgentEvent.Log(perfLine))
 
             // Check for tool calls first (only when tools are registered)
             if (hasTools && ToolCallParser.containsToolCall(text)) {
@@ -947,7 +1067,7 @@ class AgentKernel(
             } else {
                 // Local model path: append tool results to prompt and re-generate
                 val toolResultText = ToolPromptFormatter.formatToolResults(results)
-                callLocalLLMWithTools(originalPrompt + toolResultText)
+                callLocalLLMWithTools(originalPrompt + toolResultText, emitEvent)
             }
         }
 
@@ -1089,9 +1209,16 @@ class AgentKernel(
                 }
             }
             // X (Twitter) — match "open x", "x app", "twitter" but not random "x" in words
-            goalLower.contains("twitter") || Regex("\\bopen\\s+x\\b|\\bx\\s+app\\b|\\bopen\\s+x\\s|\\btap.*\\bx\\b").containsMatchIn(goalLower) -> {
-                AppActions.openX(context)
-                PreLaunchResult("Pre-launched X (Twitter)", AppActions.Packages.TWITTER)
+            goalLower.contains("twitter") || Regex("\\bopen\\s+x\\b|\\bx\\s+app\\b|\\bopen\\s+x\\s|\\btap.*\\bx\\b|\\bpost.*\\bon\\s+x\\b|\\bx.*\\bpost\\b|\\btweet\\b").containsMatchIn(goalLower) -> {
+                val tweetText = extractTweetText(goal)
+                if (tweetText != null && (goalLower.contains("post") || goalLower.contains("tweet"))) {
+                    AppActions.openXCompose(context, tweetText)
+                    xComposeMessage = tweetText
+                    PreLaunchResult("Pre-launched X compose: ${tweetText.take(40)}", AppActions.Packages.TWITTER)
+                } else {
+                    AppActions.openX(context)
+                    PreLaunchResult("Pre-launched X (Twitter)", AppActions.Packages.TWITTER)
+                }
             }
             goalLower.contains("whatsapp") -> {
                 AppActions.openApp(context, AppActions.Packages.WHATSAPP)
@@ -1210,6 +1337,43 @@ class AgentKernel(
                     .replace(Regex("\\s+and\\s+(play|click|tap|open|select).*"), "")
                     .trim()
                 if (query.isNotEmpty() && query.length > 2) return query
+            }
+        }
+        return null
+    }
+
+    /**
+     * Extract tweet/post text from the goal string.
+     * Handles: "post Hi from RunAnywhere on X", "tweet 'Hello' on Twitter", etc.
+     */
+    private fun extractTweetText(goal: String): String? {
+        // Pattern 1: post/tweet <text> on x/twitter (with optional quotes)
+        Regex("""(?:post|tweet)\s+['"]?(.+?)['"]?\s+on\s+(?:x|twitter)""", RegexOption.IGNORE_CASE).find(goal)?.let {
+            val text = it.groupValues[1].trim()
+            if (text.isNotEmpty()) return text
+        }
+        // Pattern 2: quoted text when goal contains post/tweet keyword
+        val goalLower = goal.lowercase()
+        if (goalLower.contains("post") || goalLower.contains("tweet")) {
+            Regex("""['"]([^'"]+)['"]""").find(goal)?.let {
+                val text = it.groupValues[1].trim()
+                if (text.isNotEmpty()) return text
+            }
+        }
+        return null
+    }
+
+    /**
+     * Find the index of X's POST submit button in the compact element list.
+     * Returns the element index of "POST (Button) [tap]" or null if not found.
+     */
+    private fun findPostButtonIndex(compactText: String): Int? {
+        for (line in compactText.split("\n")) {
+            if (!line.contains("[tap]")) continue
+            val lineLower = line.lowercase()
+            if (lineLower.contains("post") && lineLower.contains("button")) {
+                val indexMatch = Regex("^(\\d+):").find(line.trim())
+                if (indexMatch != null) return indexMatch.groupValues[1].toIntOrNull()
             }
         }
         return null

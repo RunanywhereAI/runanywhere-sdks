@@ -428,6 +428,30 @@ UC5 failed partly because the agent's tool set lacks a `ui_press_volume_key` too
 
 ---
 
+## X Compose Shortcut: Why Custom Code Instead of Pure LLM Navigation
+
+The X (Twitter) compose flow uses three pieces of custom code — a deep link, a `ComposerActivity` foreground fix, and a quick POST tap — rather than letting the LLM navigate autonomously. Three compounding problems make pure LLM navigation unviable:
+
+**Problem 1 — Speed**: Qwen3-4B runs at ~0.2 tok/s on a thermally throttled S24, producing 125s per inference step. A minimal write flow (home feed → tap FAB → compose opens → tap text field → type tweet → tap POST) is 5–6 LLM steps minimum. That is 10+ minutes for a single tweet, and failure at any step requires restarting. LFM2.5-1.2B is faster (8–14s/step) but cannot select the correct element from a 22-element X home feed — it always picks index 0–2 regardless of context (see UC1 results).
+
+**Problem 2 — Navigation reliability**: Even with a capable model, the X home feed renders 40-46 accessibility elements including unlabeled `ViewGroup [tap]` and `FrameLayout [tap]` containers from tweet rows. Qwen3-4B successfully found the FAB in UC1 (index 15 out of 22 elements), but that was with a clean, low-noise feed. Under real conditions with 45+ elements including media players, Grok promotions, and nested tweet layouts, the model navigated into Grok and repeated wrong taps across multiple live runs.
+
+**Problem 3 — Compose screen destruction**: The agent must steal the foreground during inference (15-17x CPU boost on Samsung). When returning to X after inference, `getLaunchIntentForPackage()` starts X's main activity which uses `singleTask` launch mode — this clears the back stack and **destroys any open compose screen**. A tweet typed in step 4 would be lost before step 5 executes.
+
+**The three-piece solution**:
+
+| Code | Problem solved |
+|------|---------------|
+| `openXCompose()` — `twitter://post?message=...` deep link | Opens compose directly with pre-filled text. Eliminates home-feed navigation (Problems 1 + 2) |
+| `bringAppToForeground()` with `ComposerActivity + FLAG_ACTIVITY_SINGLE_TOP` | Brings compose back to front after inference without clearing it (Problem 3) |
+| `findPostButtonIndex()` quick-tap | Taps POST button directly before any LLM inference step. Eliminates the final LLM step entirely |
+
+**Trigger**: Only activates when the goal contains "post"/"tweet" AND quoted text (e.g. `post "Hello" on X`). Goals without quoted text (e.g. `open X and write a post saying Hello`) skip the deep link and fall through to pure LLM navigation.
+
+**With 3-step assisted flow, LFM2.5-1.2B requires 0 correct LLM decisions**: deep link opens compose with pre-filled text → `findPostButtonIndex` quick-taps POST before LLM is ever called → done. This is the recommended path for 1.2B.
+
+---
+
 ## Agent Pipeline Components
 
 | Component | Implementation | Role |

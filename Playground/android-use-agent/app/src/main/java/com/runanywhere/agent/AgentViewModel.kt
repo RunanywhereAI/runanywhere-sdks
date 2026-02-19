@@ -1,6 +1,9 @@
 package com.runanywhere.agent
 
 import android.app.Application
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.media.AudioFormat
 import android.media.AudioRecord
@@ -64,7 +67,11 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         val vlmDownloadProgress: Float = 0f,
         // Voice
         val isVoiceMode: Boolean = false,
-        val isSpeaking: Boolean = false
+        val isSpeaking: Boolean = false,
+        // Live LLM streaming text (cleared after each step)
+        val thinkingText: String = "",
+        // Whether logs were copied to clipboard (briefly true for feedback)
+        val logsCopied: Boolean = false,
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -186,13 +193,24 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 agentKernel.run(goal).flowOn(Dispatchers.IO).collect { event ->
                     when (event) {
-                        is AgentKernel.AgentEvent.Log -> addLog(event.message)
-                        is AgentKernel.AgentEvent.Step -> addLog("${event.action}: ${event.result}")
+                        is AgentKernel.AgentEvent.Log -> {
+                            // Clear thinking text when a new step begins
+                            if (event.message.startsWith("Step ")) {
+                                _uiState.value = _uiState.value.copy(thinkingText = "")
+                            }
+                            addLog(event.message)
+                        }
+                        is AgentKernel.AgentEvent.Step -> {
+                            _uiState.value = _uiState.value.copy(thinkingText = "")
+                            addLog("${event.action}: ${event.result}")
+                        }
                         is AgentKernel.AgentEvent.Done -> {
+                            _uiState.value = _uiState.value.copy(thinkingText = "")
                             addLog(event.message)
                             _uiState.value = _uiState.value.copy(status = Status.DONE)
                         }
                         is AgentKernel.AgentEvent.Error -> {
+                            _uiState.value = _uiState.value.copy(thinkingText = "")
                             addLog("ERROR: ${event.message}")
                             _uiState.value = _uiState.value.copy(status = Status.ERROR)
                         }
@@ -203,6 +221,14 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                         }
                         is AgentKernel.AgentEvent.ProviderChanged -> {
                             _uiState.value = _uiState.value.copy(providerMode = event.mode)
+                        }
+                        is AgentKernel.AgentEvent.ThinkingToken -> {
+                            _uiState.value = _uiState.value.copy(
+                                thinkingText = _uiState.value.thinkingText + event.token
+                            )
+                        }
+                        is AgentKernel.AgentEvent.PerfMetrics -> {
+                            // thinkingText already cleared by the [PERF] log line above
                         }
                     }
                 }
@@ -223,7 +249,49 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearLogs() {
-        _uiState.value = _uiState.value.copy(logs = emptyList())
+        _uiState.value = _uiState.value.copy(logs = emptyList(), thinkingText = "")
+    }
+
+    /** Build a human-readable export of the full run: logs + per-step LLM I/O + perf. */
+    fun buildExportText(): String {
+        val state = _uiState.value
+        val sb = StringBuilder()
+        sb.appendLine("=== RunAnywhere Agent Run Log ===")
+        sb.appendLine("Goal: ${state.goal}")
+        sb.appendLine("Model: ${state.availableModels.getOrNull(state.selectedModelIndex)?.name ?: "Unknown"}")
+        sb.appendLine()
+
+        // Full event log
+        sb.appendLine("--- Event Log ---")
+        state.logs.forEach { sb.appendLine(it) }
+
+        // Per-step structured records
+        val records = agentKernel.getStepRecords()
+        if (records.isNotEmpty()) {
+            sb.appendLine()
+            sb.appendLine("--- Per-Step Details ---")
+            records.forEach { r ->
+                sb.appendLine("Step ${r.step} | action=${r.action} | duration=${r.durationMs}ms | ${r.tokensPerSecond.let { if (it > 0) "%.1f tok/s".format(it) else "" }}")
+                sb.appendLine("  prompt (first 200ch): ${r.promptSnippet}")
+                sb.appendLine("  output: ${r.rawOutput.take(300)}")
+                r.thinkingContent?.let { sb.appendLine("  thinking: ${it.take(200)}") }
+            }
+        }
+
+        sb.appendLine()
+        sb.appendLine("=== End of Log ===")
+        return sb.toString()
+    }
+
+    fun copyLogsToClipboard() {
+        val text = buildExportText()
+        val clipboard = getApplication<Application>().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("Agent Run Log", text))
+        _uiState.value = _uiState.value.copy(logsCopied = true)
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(2000)
+            _uiState.value = _uiState.value.copy(logsCopied = false)
+        }
     }
 
     // ========== STT Methods ==========
