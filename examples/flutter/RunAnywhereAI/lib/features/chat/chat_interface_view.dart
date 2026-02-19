@@ -16,6 +16,7 @@ import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_status_components.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
 import 'package:runanywhere_ai/features/settings/tool_settings_view_model.dart';
+import 'package:runanywhere_ai/features/structured_output/structured_output_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// ChatInterfaceView (mirroring iOS ChatInterfaceView.swift)
@@ -452,7 +453,18 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Chat'),
-        actions: [
+      actions: [
+          IconButton(
+            icon: const Icon(Icons.data_object),
+            onPressed: () {
+              Navigator.of(context).push<void>(
+                MaterialPageRoute<void>(
+                  builder: (context) => const StructuredOutputView(),
+                ),
+              );
+            },
+            tooltip: 'Structured Output Examples',
+          ),
           if (_messages.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_outline),

@@ -1553,5 +1553,4 @@ throw generationError('Generation timed out');
 ## See Also
 
 - [README.md](../README.md) — Quick start guide
-- [ARCHITECTURE.md](../ARCHITECTURE.md) — System architecture
 - [React Native Sample App](../../../examples/react-native/RunAnywhereAI/) — Working demo
