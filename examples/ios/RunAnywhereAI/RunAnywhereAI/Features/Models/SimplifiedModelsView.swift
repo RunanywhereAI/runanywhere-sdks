@@ -184,6 +184,7 @@ private struct SimplifiedModelRow: View {
 
     @State private var isDownloading = false
     @State private var downloadProgress: Double = 0.0
+    @State private var downloadStage: DownloadStage = .downloading
 
     private var frameworkColor: Color {
         switch model.framework {
@@ -252,7 +253,7 @@ private struct SimplifiedModelRow: View {
                         HStack(spacing: AppSpacing.xSmall) {
                             ProgressView()
                                 .scaleEffect(0.6)
-                            Text("\(Int(downloadProgress * 100))%")
+                            Text("\(downloadStage.displayName)… \(Int(downloadProgress * 100))%")
                                 .font(AppTypography.caption2)
                                 .foregroundColor(AppColors.textSecondary)
                         }
@@ -348,6 +349,7 @@ private struct SimplifiedModelRow: View {
         await MainActor.run {
             isDownloading = true
             downloadProgress = 0.0
+            downloadStage = .downloading
         }
 
         do {
@@ -355,32 +357,37 @@ private struct SimplifiedModelRow: View {
             let progressStream = try await RunAnywhere.downloadModel(model.id)
 
             for await progress in progressStream {
-                await MainActor.run {
-                    self.downloadProgress = progress.overallProgress
-                    print("Download progress for \(model.name): \(Int(progress.overallProgress * 100))%")
-                }
-
-                // Check if download completed
-                if progress.stage == .completed {
+                switch progress.state {
+                case .completed:
                     await MainActor.run {
                         self.downloadProgress = 1.0
                         self.isDownloading = false
+                        self.downloadStage = .downloading
                         onDownloadCompleted()
                     }
                     return
-                }
-            }
 
-            // If we exit the loop normally, download completed
-            await MainActor.run {
-                self.downloadProgress = 1.0
-                self.isDownloading = false
-                onDownloadCompleted()
+                case .failed:
+                    await MainActor.run {
+                        self.downloadProgress = 0.0
+                        self.isDownloading = false
+                        self.downloadStage = .downloading
+                    }
+                    return
+
+                default:
+                    await MainActor.run {
+                        self.downloadProgress = progress.overallProgress
+                        self.downloadStage = progress.stage
+                    }
+                    continue
+                }
             }
         } catch {
             await MainActor.run {
                 downloadProgress = 0.0
                 isDownloading = false
+                downloadStage = .downloading
             }
         }
     }

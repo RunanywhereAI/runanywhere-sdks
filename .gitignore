@@ -183,7 +183,7 @@ lint/tmp/
 lint/reports/
 .kotlin/
 *.jar
-!gradle/wrapper/gradle-wrapper.jar
+!**/gradle/wrapper/gradle-wrapper.jar
 *.war
 *.nar
 *.ear

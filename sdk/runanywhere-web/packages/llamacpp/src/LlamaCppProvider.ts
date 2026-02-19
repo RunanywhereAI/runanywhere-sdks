@@ -15,7 +15,6 @@ import {
   ExtensionPoint,
   BackendCapability,
   ExtensionRegistry,
-  ServiceKey,
 } from '@runanywhere/web';
 
 import { LlamaCppBridge } from './Foundation/LlamaCppBridge';
@@ -44,14 +43,12 @@ const llamacppExtension: BackendExtension = {
     BackendCapability.Diffusion,
   ],
   cleanup() {
-    // Cleanup all extension singletons
     TextGeneration.cleanup();
     VLM.cleanup();
     ToolCalling.cleanup();
     Embeddings.cleanup();
     Diffusion.cleanup();
-    // Remove service registrations
-    ExtensionPoint.removeService(ServiceKey.TextGeneration);
+    ExtensionPoint.removeProvider('llm');
     _isRegistered = false;
     logger.info('LlamaCpp backend cleaned up');
   },
@@ -99,9 +96,9 @@ export const LlamaCppProvider = {
     // Register with ExtensionPoint for capability lookups
     ExtensionPoint.registerBackend(llamacppExtension);
 
-    // Register service singletons with ExtensionPoint so VoicePipeline
-    // (in core) can access them via typed keys at runtime.
-    ExtensionPoint.registerService(ServiceKey.TextGeneration, TextGeneration);
+    // Register typed provider so VoicePipeline (in core) can access
+    // the LLM via ExtensionPoint.getProvider('llm') at runtime.
+    ExtensionPoint.registerProvider('llm', TextGeneration);
 
     _isRegistered = true;
     logger.info('LlamaCpp backend registered successfully');
