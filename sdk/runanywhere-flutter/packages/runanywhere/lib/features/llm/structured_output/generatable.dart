@@ -18,5 +18,5 @@ abstract class Generatable {
   Map<String, dynamic> toJson();
 }
 
-// Note: StructuredOutputConfig is now defined in structured_output_handler.dart
-// to avoid duplication and maintain iOS parity with a more complete implementation
+// Note: StructuredOutputConfig is defined in public/types/structured_output_types.dart
+// and imported by structured_output_handler.dart
