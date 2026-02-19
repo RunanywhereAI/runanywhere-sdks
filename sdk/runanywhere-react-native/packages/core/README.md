@@ -631,7 +631,6 @@ Native libraries (`librac_commons.so`, `librunanywhere_jni.so`) are automaticall
 ## See Also
 
 - [Main SDK README](../../README.md) — Full SDK documentation
-- [ARCHITECTURE.md](../../ARCHITECTURE.md) — System architecture
 - [API Reference](../../Docs/Documentation.md) — Complete API docs
 - [@runanywhere/llamacpp](../llamacpp/README.md) — LLM backend
 - [@runanywhere/onnx](../onnx/README.md) — STT/TTS backend

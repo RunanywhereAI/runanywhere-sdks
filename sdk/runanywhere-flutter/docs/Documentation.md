@@ -1152,7 +1152,6 @@ Future<void> main() async {
 ## See Also
 
 - [README.md](README.md) – Getting started guide
-- [ARCHITECTURE.md](ARCHITECTURE.md) – Architecture overview
 - [Flutter Starter Example](https://github.com/RunanywhereAI/flutter-starter-example) – Minimal starter project
 
 ## Packages on pub.dev
