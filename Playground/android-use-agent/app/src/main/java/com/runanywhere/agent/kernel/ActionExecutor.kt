@@ -51,15 +51,26 @@ class ActionExecutor(
         decision: Decision,
         indexToCoords: Map<Int, Pair<Int, Int>>
     ): ExecutionResult {
-        val coords = indexToCoords[decision.elementIndex]
-            ?: return ExecutionResult(false, "Invalid element index: ${decision.elementIndex}")
+        val index = decision.elementIndex
+            ?: return ExecutionResult(false, "No element index provided")
 
-        onLog("Tapping element ${decision.elementIndex} at (${coords.first}, ${coords.second})")
+        // Try ACTION_CLICK first — bypasses gesture interceptor overlays (e.g., X's fab_menu_background_overlay)
+        val clickSuccess = service.performClickAtIndex(index)
+        if (clickSuccess) {
+            onLog("Clicked element $index via accessibility action")
+            return ExecutionResult(true, "Clicked element $index")
+        }
+
+        // Fall back to coordinate gesture
+        val coords = indexToCoords[index]
+            ?: return ExecutionResult(false, "Invalid element index: $index")
+
+        onLog("Tapping element $index at (${coords.first}, ${coords.second})")
 
         return suspendCancellableCoroutine { cont ->
             service.tap(coords.first, coords.second) { success ->
                 if (success) {
-                    cont.resume(ExecutionResult(true, "Tapped element ${decision.elementIndex}"))
+                    cont.resume(ExecutionResult(true, "Tapped element $index"))
                 } else {
                     cont.resume(ExecutionResult(false, "Tap failed"))
                 }

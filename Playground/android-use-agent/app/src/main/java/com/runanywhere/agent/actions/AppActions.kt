@@ -255,17 +255,31 @@ object AppActions {
      */
     fun openX(context: Context): Boolean {
         return try {
-            val intent = Intent(Intent.ACTION_MAIN).apply {
-                addCategory(Intent.CATEGORY_LAUNCHER)
-                component = ComponentName(Packages.TWITTER, "com.twitter.android.StartActivity")
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("twitter://timeline")).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to open X via StartActivity: ${e.message}")
-            // Fallback to generic package launch
+            Log.e(TAG, "Failed to open X via URI: ${e.message}")
             openApp(context, Packages.TWITTER)
+        }
+    }
+
+    /**
+     * Open X compose screen with pre-filled tweet text.
+     * Uses twitter://post?message=... deep link to bypass the home feed entirely.
+     */
+    fun openXCompose(context: Context, message: String): Boolean {
+        return try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("twitter://post?message=${Uri.encode(message)}")).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to open X compose: ${e.message}")
+            openX(context)
         }
     }
 

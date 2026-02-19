@@ -344,11 +344,29 @@ fun AgentScreen(viewModel: AgentViewModel) {
                     }
                 }
 
-                if (uiState.logs.isNotEmpty()) {
-                    TextButton(onClick = viewModel::clearLogs) {
-                        Text("Clear Logs")
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (uiState.logs.isNotEmpty()) {
+                        TextButton(onClick = viewModel::copyLogsToClipboard) {
+                            Text(if (uiState.logsCopied) "Copied!" else "Export")
+                        }
+                        TextButton(onClick = viewModel::clearLogs) {
+                            Text("Clear Logs")
+                        }
                     }
                 }
+            }
+
+            // Live Thinking Overlay — shows streaming tokens while LLM is reasoning
+            if (uiState.thinkingText.isNotEmpty()) {
+                ThinkingPanel(
+                    text = uiState.thinkingText,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 120.dp)
+                )
             }
 
             // Log Output
@@ -471,6 +489,44 @@ private fun MicButton(
                 imageVector = Icons.Rounded.Mic,
                 contentDescription = "Start recording",
                 tint = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+/**
+ * Shows streaming LLM tokens in real-time while the model is reasoning.
+ * Styled in amber/yellow to visually distinguish from the completed log panel.
+ */
+@Composable
+fun ThinkingPanel(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1200)),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Text(
+                text = "▶ ",
+                color = Color(0xFFFFD43B),
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace
+            )
+            Text(
+                text = text,
+                color = Color(0xFFFFD43B),
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                lineHeight = 16.sp,
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }
