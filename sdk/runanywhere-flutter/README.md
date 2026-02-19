@@ -398,8 +398,6 @@ The RunAnywhere Flutter SDK follows a **modular, provider-based architecture** w
 | `runanywhere_llamacpp` | ~15-25MB | LLM capability (GGUF models) |
 | `runanywhere_onnx` | ~50-70MB | STT, TTS, VAD (ONNX models) |
 
-> For detailed architecture documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
-
 ---
 
 ## Configuration
@@ -786,7 +784,6 @@ For commercial licensing inquiries, contact san@runanywhere.ai.
 
 ## Related Documentation
 
-- [Architecture Overview](ARCHITECTURE.md) — Detailed system design
 - [API Reference](Documentation.md) — Complete public API documentation
 - [Flutter Starter Example](https://github.com/RunanywhereAI/flutter-starter-example) — Minimal starter project
 - [Swift SDK](../runanywhere-swift/) — iOS/macOS native SDK

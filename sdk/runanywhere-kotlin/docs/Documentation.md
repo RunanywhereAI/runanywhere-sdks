@@ -1776,5 +1776,4 @@ if (allModelsLoaded) {
 ## See Also
 
 - [README.md](./README.md) - Getting started guide
-- [ARCHITECTURE.md](./ARCHITECTURE.md) - SDK architecture details
 - [Sample App](../../examples/android/RunAnywhereAI/) - Working example
