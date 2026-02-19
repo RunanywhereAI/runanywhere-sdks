@@ -83,7 +83,8 @@ Remember: Output ONLY the JSON object, nothing else.
     final jsonString = extractJSON(text);
 
     // Parse JSON
-    final jsonData = jsonDecode(jsonString);
+    try {
+      final jsonData = jsonDecode(jsonString);
 
     if (jsonData is! Map<String, dynamic>) {
       throw StructuredOutputError.validationFailed(
