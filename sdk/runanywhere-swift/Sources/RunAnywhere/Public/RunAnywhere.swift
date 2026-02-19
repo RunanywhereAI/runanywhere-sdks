@@ -65,6 +65,8 @@ public enum RunAnywhere {
 
     /// Track if services initialization is complete (makes API calls O(1) after first use)
     internal static var hasCompletedServicesInit = false
+    /// Track if HTTP/auth setup succeeded (separate from core services so auth can be retried on reconnect)
+    internal static var hasCompletedHTTPSetup = false
 
     // MARK: - SDK State
 
@@ -140,6 +142,7 @@ public enum RunAnywhere {
 
         isInitialized = false
         hasCompletedServicesInit = false
+        hasCompletedHTTPSetup = false
         initParams = nil
         currentEnvironment = nil
 
@@ -293,7 +296,10 @@ public enum RunAnywhere {
     /// Complete services initialization (Phase 2)
     ///
     /// Called automatically in background by `initialize()`, or can be awaited directly
-    /// via `initializeAsync()`. Safe to call multiple times - returns immediately if already done.
+    /// via `initializeAsync()`. Safe to call multiple times — returns immediately if Phase 2
+    /// is already complete. Note: if initialization succeeded in offline mode (HTTP/auth setup
+    /// failed), this fast-path still returns immediately. HTTP/auth retry is handled
+    /// automatically by `ensureServicesReady()` on the next API call.
     ///
     /// This method:
     /// 1. Sets up API client (with authentication for production/staging)
@@ -321,6 +327,7 @@ public enum RunAnywhere {
             // Step 1: Configure HTTP transport
             do {
                 try await setupHTTP(params: params, environment: environment, logger: logger)
+                hasCompletedHTTPSetup = true
             } catch {
                 // If HTTP/auth setup fails (e.g. device is offline), log warning but
                 // continue initialization so local/cached models remain accessible.
@@ -328,10 +335,9 @@ public enum RunAnywhere {
                 logger.info("Continuing SDK init in offline mode – local models will be available")
             }
 
-            // Step 1.5: Flush any queued telemetry events now that HTTP is configured
-            // This ensures events queued during initialization are sent
+            // Step 1.5: Flush any queued telemetry events (may be no-op if HTTP unconfigured)
             CppBridge.Telemetry.flush()
-            logger.debug("Flushed queued telemetry events after HTTP configuration")
+            logger.debug("Attempted telemetry flush (may be no-op if HTTP unconfigured)")
         }
 
         // Step 2: Initialize C++ state
@@ -376,12 +382,45 @@ public enum RunAnywhere {
     }
 
     /// Ensure services are ready before API calls (internal guard)
-    /// O(1) after first successful initialization
+    /// O(1) after first successful initialization with HTTP configured.
+    /// If core services are done but HTTP/auth failed (offline init), retries auth only.
     internal static func ensureServicesReady() async throws {
-        if hasCompletedServicesInit {
-            return // O(1) fast path
+        if hasCompletedServicesInit && hasCompletedHTTPSetup {
+            return // O(1) fast path — fully initialized
+        }
+        if hasCompletedServicesInit && !hasCompletedHTTPSetup {
+            // Core services done, but HTTP/auth failed earlier (offline init).
+            // Retry HTTP setup only — safe because setupHTTP is idempotent.
+            await retryHTTPSetup()
+            return
         }
         try await completeServicesInitialization()
+    }
+
+    /// Retry HTTP/auth setup after an offline initialization.
+    /// Safe to call multiple times — checks `CppBridge.HTTP.shared.isConfigured` first.
+    /// Failures are silently logged; the next `ensureServicesReady()` call will retry.
+    private static func retryHTTPSetup() async {
+        guard let params = initParams, let environment = currentEnvironment else { return }
+        let logger = SDKLogger(category: "RunAnywhere.HTTPRetry")
+
+        let httpNeedsInit = await !CppBridge.HTTP.shared.isConfigured
+        guard httpNeedsInit else {
+            hasCompletedHTTPSetup = true
+            return
+        }
+
+        do {
+            try await setupHTTP(params: params, environment: environment, logger: logger)
+            hasCompletedHTTPSetup = true
+            logger.info("✅ HTTP/Auth setup succeeded on retry")
+
+            // Flush any telemetry events queued during offline period
+            CppBridge.Telemetry.flush()
+            logger.debug("Flushed queued telemetry after successful HTTP retry")
+        } catch {
+            logger.debug("HTTP/Auth retry failed (still offline?): \(error.localizedDescription)")
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
