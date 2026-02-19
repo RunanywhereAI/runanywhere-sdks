@@ -207,6 +207,11 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
     }
     RAC_LOG_INFO("LLM.LlamaCpp", "rac_llm_llamacpp_generate: generate() returned, tokens=%d", result.tokens_generated);
 
+    if (result.finish_reason == "error") {
+        RAC_LOG_ERROR("LLM.LlamaCpp", "rac_llm_llamacpp_generate: generation failed (e.g. llama_decode error)");
+        return RAC_ERROR_GENERATION_FAILED;
+    }
+
     // Fill RAC result struct
     out_result->text = result.text.empty() ? nullptr : strdup(result.text.c_str());
     out_result->completion_tokens = result.tokens_generated;

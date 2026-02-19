@@ -548,6 +548,13 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
         return false;
     }
 
+    // Clear KV cache before each new generation to avoid position conflicts on
+    // sequential calls (fixes #356: SIGABRT on second decode on Android arm64).
+    llama_memory_t mem = llama_get_memory(context_);
+    if (mem) {
+        llama_memory_clear(mem, true);
+    }
+
     cancel_requested_.store(false);
 
     std::string prompt = build_prompt(request);

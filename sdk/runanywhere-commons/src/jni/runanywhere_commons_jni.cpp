@@ -567,6 +567,14 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
 
     if (status != RAC_SUCCESS) {
         LOGe("racLlmComponentGenerate failed with status=%d", status);
+        const char* msg = rac_error_message(status);
+        if (msg && *msg) {
+            jclass exClass = env->FindClass("java/lang/RuntimeException");
+            if (exClass) {
+                env->ThrowNew(exClass, msg);
+                env->DeleteLocalRef(exClass);
+            }
+        }
         return nullptr;
     }
 
