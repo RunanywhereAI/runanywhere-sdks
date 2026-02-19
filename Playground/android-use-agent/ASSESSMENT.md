@@ -426,6 +426,8 @@ UC5 failed partly because the agent's tool set lacks a `ui_press_volume_key` too
 
 8. **Fine-tune small models for this specific task**. A 1.2B model fine-tuned on "GOAL + SCREEN_ELEMENTS -> correct tool call" pairs could potentially match the 4B model's accuracy at 8-14s per step. UC2/UC3/UC5 failures are likely addressable with supervised fine-tuning on Settings navigation trajectories.
 
+9. **Use the 3-piece assisted flow for X posting with any model size**. Live testing confirmed: pure LLM navigation (Approach 1) fails for sub-4B models; keyword FAB tap (Approach 2) opens compose but compose is destroyed during inference; only the full 3-piece flow (deep link + `ComposerActivity SINGLE_TOP` + `findPostButtonIndex`) reliably posts a tweet in ~20s with 0 LLM inference steps. See [X Compose Live Test Results](#x-compose-live-test-results--lfm25-12b-feb-2026).
+
 ---
 
 ## X Compose Shortcut: Why Custom Code Instead of Pure LLM Navigation
@@ -446,9 +448,81 @@ The X (Twitter) compose flow uses three pieces of custom code — a deep link, a
 | `bringAppToForeground()` with `ComposerActivity + FLAG_ACTIVITY_SINGLE_TOP` | Brings compose back to front after inference without clearing it (Problem 3) |
 | `findPostButtonIndex()` quick-tap | Taps POST button directly before any LLM inference step. Eliminates the final LLM step entirely |
 
-**Trigger**: Only activates when the goal contains "post"/"tweet" AND quoted text (e.g. `post "Hello" on X`). Goals without quoted text (e.g. `open X and write a post saying Hello`) skip the deep link and fall through to pure LLM navigation.
+**Trigger**: Activates when the goal contains "post"/"tweet" AND one of: (a) quoted text (`post "Hello" on X`), (b) text after `saying` (`post saying Hello`), or (c) text before `on x/twitter` (`post Hello on X`). Goals that only say "open X and write a post" without specifying text fall through to pure LLM navigation.
 
 **With 3-step assisted flow, LFM2.5-1.2B requires 0 correct LLM decisions**: deep link opens compose with pre-filled text → `findPostButtonIndex` quick-taps POST before LLM is ever called → done. This is the recommended path for 1.2B.
+
+---
+
+## X Compose Live Test Results — LFM2.5-1.2B (Feb 2026)
+
+Three approaches were tested end-to-end on device to post "Hi from RunAnywhere Android agent" on X using LFM2.5-1.2B Instruct (Q4_K_M).
+
+### Approach 1: Fully Unassisted (Pure LLM Navigation)
+
+All custom X shortcuts reverted. Agent must navigate X home feed → tap FAB → compose → type → POST using only LLM inference.
+
+**Goal**: `Open X app and post saying Hi from RunAnywhere Android agent`
+**Model**: LFM2.5 1.2B Instruct
+**Result**: ❌ **FAIL**
+
+| Step | What happened |
+|------|--------------|
+| Pre-launch | `openX()` → X home feed with 18 elements (element filter working) |
+| Step 1 | Element 12 = `New post (ImageButton) [tap]`. LLM tapped index 0 = `Show navigation drawer` |
+| Steps 2–24 | Stuck in nav drawer. LLM tapped index 0 at every step |
+| Step 24 | Loop detection triggered, smart recovery attempted |
+| Step 30 | Max steps reached, WakeLock released |
+
+**Root cause**: LFM2.5-1.2B always selects index 0–2 regardless of screen content. The model has insufficient reasoning capacity to identify the correct element (index 12) from an 18-element home feed.
+
+---
+
+### Approach 2: Semi-Assisted (Keyword FAB Tap)
+
+Added `findNewPostFabIndex()` — scans `compactText` for `"New post"` in `[tap]` elements and taps directly, bypassing LLM for home-feed navigation. LLM still handles compose screen.
+
+**Goal**: `Open X app and post saying Hi from RunAnywhere Android agent`
+**Model**: LFM2.5 1.2B Instruct
+**Result**: ❌ **FAIL**
+
+| Step | What happened |
+|------|--------------|
+| Pre-launch | `openX()` → X home feed |
+| Step 1 | `[X-FAB]` found `New post` at index 12 → tapped directly ✅ |
+| Step 2 | FAB expanded to 4 buttons. `[X-FAB]` found `New post` at index 15 → tapped ✅ |
+| — | `ComposerActivity` opened, keyboard shown ✅ |
+| Step 3 | Agent brought itself to foreground for LLM inference → `getLaunchIntentForPackage()` fired → `ComposerActivity` **destroyed** |
+| Steps 3–14 | Returned to home feed, LLM tapped index 0 (nav drawer), loop detection at steps 3, 6, 9, 14 |
+
+**Root cause**: Keyword FAB tap correctly solves home-feed navigation, but `ComposerActivity` is destroyed every time the agent steals the foreground for inference. Without `ComposerActivity + SINGLE_TOP`, the compose screen is irrecoverably lost.
+
+---
+
+### Approach 3: Fully Assisted (Deep Link + SINGLE_TOP + Quick POST Tap)
+
+All three pieces of custom code enabled: `openXCompose()` deep link with pre-filled text, `ComposerActivity + FLAG_ACTIVITY_SINGLE_TOP` to survive inference, and `findPostButtonIndex()` quick-tap.
+
+**Goal**: `Open X app and post saying Hi from RunAnywhere Android agent`
+**Model**: LFM2.5 1.2B Instruct
+**Result**: ✅ **PASS — Tweet posted in ~20 seconds, 0 LLM inference steps**
+
+| Step | What happened |
+|------|--------------|
+| Pre-launch | `extractTweetText()` Pattern 3 matched: text = `"Hi from RunAnywhere Android agent"` |
+| Pre-launch | `openXCompose(context, "Hi from RunAnywhere Android agent")` → `twitter://post?message=...` deep link |
+| — | X `ComposerActivity` opened with text pre-filled, `xComposeMessage` set ✅ |
+| Step 1 (13:24:01) | Screen: `pkg=com.twitter.android`, 13 elements. Index 1 = `POST (Button) [tap]`, Index 2 = `Hi from RunAnywhere Android agent (EditText)` ✅ |
+| Step 1 | `[X-POST]` found POST button at index 1 → tapped directly (no LLM called) ✅ |
+| 13:24:03 | WakeLock released — agent completed. Total runtime: ~20s (model load only) |
+| Confirmed | Tweet "Hi from RunAnywhere Android agent" visible on @RunAnywhereAI profile ✅ |
+
+**Key insight**: The `extractTweetText()` Pattern 3 (`post/tweet saying <text>`) was added during this test to handle goals like `post saying Hello` (no quotes, no "on X" suffix). The deep link eliminates home-feed navigation entirely. The `findPostButtonIndex()` quick-tap fires at step 1 before any LLM inference, making the total agent runtime equal to model load time only.
+
+**Performance breakdown**:
+- Model load: ~17s (LFM2.5-1.2B, cold start)
+- LLM inference steps: 0
+- Total: ~20s end-to-end
 
 ---
 
