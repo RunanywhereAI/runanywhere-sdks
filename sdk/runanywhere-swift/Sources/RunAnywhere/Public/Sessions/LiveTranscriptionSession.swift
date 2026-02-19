@@ -68,15 +68,16 @@ public final class LiveTranscriptionSession: ObservableObject, @unchecked Sendab
 
     /// Async stream of transcription text updates
     public var transcriptions: AsyncStream<String> {
-        AsyncStream { [weak self] continuation in
+        let session = self
+        return AsyncStream { continuation in
             Task { @MainActor in
-                self?.onPartialCallback = { text in
+                session.onPartialCallback = { text in
                     continuation.yield(text)
                 }
             }
-            continuation.onTermination = { @Sendable [weak self] _ in
+            continuation.onTermination = { @Sendable _ in
                 Task { @MainActor in
-                    self?.onPartialCallback = nil
+                    session.onPartialCallback = nil
                 }
             }
         }
@@ -126,7 +127,7 @@ public final class LiveTranscriptionSession: ObservableObject, @unchecked Sendab
 
         // Start streaming transcription with callbacks
         do {
-            try await RunAnywhere.startStreamingTranscription(
+            try await Self.startLegacyStreaming(
                 options: options,
                 onPartialResult: { [weak self] result in
                     Task { @MainActor in
@@ -210,6 +211,22 @@ public final class LiveTranscriptionSession: ObservableObject, @unchecked Sendab
     /// Get the final transcription text
     public var finalText: String {
         currentText
+    }
+
+    // Wrapper to silence deprecation warning until migration to transcribeStream
+    @available(*, deprecated, message: "Migrate to transcribeStream API")
+    private static func startLegacyStreaming(
+        options: STTOptions,
+        onPartialResult: @escaping (STTTranscriptionResult) -> Void,
+        onFinalResult: @escaping (STTOutput) -> Void,
+        onError: @escaping (Error) -> Void
+    ) async throws {
+        try await RunAnywhere.startStreamingTranscription(
+            options: options,
+            onPartialResult: onPartialResult,
+            onFinalResult: onFinalResult,
+            onError: onError
+        )
     }
 }
 

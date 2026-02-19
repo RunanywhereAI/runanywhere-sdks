@@ -101,6 +101,7 @@ public extension RunAnywhere {
         }
         var cImage = imageData.0
         let rgbData = imageData.1
+        let capturedCImage = cImage
 
         let collector = StreamingCollector()
 
@@ -142,7 +143,7 @@ public extension RunAnywhere {
                     Task { await ctx.collector.fail(error) }
                 }
 
-                var localCImage = cImage
+                var localCImage = capturedCImage
                 let result: rac_result_t = image.withCPointers(cImage: &localCImage, rgbData: rgbData) { cImagePtr in
                     prompt.withCString { promptPtr in
                         rac_vlm_component_process_stream(handle, cImagePtr, promptPtr, &opts, tokenCb, completeCb, errorCb, contextPtr)
