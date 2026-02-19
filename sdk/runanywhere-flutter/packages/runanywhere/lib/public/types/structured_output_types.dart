@@ -4,8 +4,6 @@
 /// Mirrors Swift's Structured Output types.
 library structured_output_types;
 
-import 'dart:async';
-
 /// Configuration for structured output generation
 /// Mirrors Swift's StructuredOutputConfig
 class StructuredOutputConfig {
@@ -30,39 +28,6 @@ class StructuredOutputConfig {
     this.includeSchemaInPrompt = true,
     this.name,
     this.strict = false,
-  });
-}
-
-/// Token emitted during streaming structured output
-/// Mirrors Swift's StreamToken
-class StreamToken {
-  final String text;
-  final DateTime timestamp;
-  final int tokenIndex;
-
-  StreamToken({
-    required this.text,
-    DateTime? timestamp,
-    required this.tokenIndex,
-  }) : timestamp = timestamp ?? DateTime.now();
-}
-
-/// Result container for streaming structured output
-/// Mirrors Swift's StructuredOutputStreamResult<T>
-class StructuredOutputStreamResult<T> {
-  /// Stream of individual tokens as they are generated
-  final Stream<StreamToken> stream;
-
-  /// Future that resolves to the final parsed object
-  final Future<T> result;
-
-  /// Function to cancel the streaming generation
-  final void Function() cancel;
-
-  const StructuredOutputStreamResult({
-    required this.stream,
-    required this.result,
-    required this.cancel,
   });
 }
 

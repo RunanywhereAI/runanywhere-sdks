@@ -63,10 +63,10 @@ IMPORTANT: Your entire response must be valid JSON that can be parsed. Do not in
 
     return '''
 System: You are a JSON generator. You must output only valid JSON.
-Convert this Data :
+Convert this data:
 $originalPrompt
 
-to JSON Schema:
+Use the following JSON Schema:
 ${config.schema}
 
 $instructions
@@ -92,6 +92,9 @@ Remember: Output ONLY the JSON object, nothing else.
       }
 
       return fromJson(jsonData);
+    } on FormatException catch (e) {
+      throw StructuredOutputError.invalidJSON(
+          'Invalid JSON format: ${e.message}');
     } catch (e) {
       throw StructuredOutputError.invalidJSON(e.toString());
     }
@@ -244,5 +247,3 @@ class _BraceMatch {
   final int end;
   _BraceMatch({required this.start, required this.end});
 }
-
-

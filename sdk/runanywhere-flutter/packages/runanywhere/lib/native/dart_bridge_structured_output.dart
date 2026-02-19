@@ -36,8 +36,8 @@ class DartBridgeStructuredOutput {
     try {
       final lib = PlatformLoader.loadCommons();
       final getSystemPromptFn = lib.lookupFunction<
-          Int32 Function(Pointer<Utf8>, Pointer<Pointer<Utf8>>),
-          int Function(Pointer<Utf8>, Pointer<Pointer<Utf8>>)>(
+              Int32 Function(Pointer<Utf8>, Pointer<Pointer<Utf8>>),
+              int Function(Pointer<Utf8>, Pointer<Pointer<Utf8>>)>(
           'rac_structured_output_get_system_prompt');
 
       final result = getSystemPromptFn(schemaPtr, promptPtrPtr);
@@ -54,8 +54,8 @@ class DartBridgeStructuredOutput {
       }
 
       final prompt = promptPtr.toDartString();
-      lib.lookupFunction<Void Function(Pointer<Void>), void Function(
-          Pointer<Void>)>('rac_free')(promptPtr.cast<Void>());
+      lib.lookupFunction<Void Function(Pointer<Void>),
+          void Function(Pointer<Void>)>('rac_free')(promptPtr.cast<Void>());
 
       return prompt;
     } catch (e) {
@@ -98,8 +98,8 @@ Remember: Output ONLY the JSON object, nothing else.
       final lib = PlatformLoader.loadCommons();
       final extractJsonFn = lib.lookupFunction<
           Int32 Function(Pointer<Utf8>, Pointer<Pointer<Utf8>>, Pointer<Void>),
-          int Function(Pointer<Utf8>, Pointer<Pointer<Utf8>>, Pointer<Void>)>(
-          'rac_structured_output_extract_json');
+          int Function(Pointer<Utf8>, Pointer<Pointer<Utf8>>,
+              Pointer<Void>)>('rac_structured_output_extract_json');
 
       final result = extractJsonFn(textPtr, jsonPtrPtr, nullptr);
 
@@ -114,8 +114,8 @@ Remember: Output ONLY the JSON object, nothing else.
       }
 
       final jsonString = jsonPtr.toDartString();
-      lib.lookupFunction<Void Function(Pointer<Void>), void Function(
-          Pointer<Void>)>('rac_free')(jsonPtr.cast<Void>());
+      lib.lookupFunction<Void Function(Pointer<Void>),
+          void Function(Pointer<Void>)>('rac_free')(jsonPtr.cast<Void>());
 
       return jsonString;
     } catch (e) {
@@ -131,22 +131,24 @@ Remember: Output ONLY the JSON object, nothing else.
   String? _fallbackExtractJson(String text) {
     final trimmed = text.trim();
 
-    // Try to find complete JSON object
-    final startIndex = trimmed.indexOf('{');
-    final endIndex = trimmed.lastIndexOf('}');
+    for (final pair in [
+      ('{', '}'),
+      ('[', ']'),
+    ]) {
+      final open = pair.$1;
+      final close = pair.$2;
+      final startIndex = trimmed.indexOf(open);
+      if (startIndex == -1) continue;
 
-    if (startIndex != -1 && endIndex != -1 && startIndex < endIndex) {
-      return trimmed.substring(startIndex, endIndex + 1);
+      int depth = 0;
+      for (int i = startIndex; i < trimmed.length; i++) {
+        if (trimmed[i] == open) depth++;
+        if (trimmed[i] == close) depth--;
+        if (depth == 0) {
+          return trimmed.substring(startIndex, i + 1);
+        }
+      }
     }
-
-    // Try array
-    final arrayStart = trimmed.indexOf('[');
-    final arrayEnd = trimmed.lastIndexOf(']');
-
-    if (arrayStart != -1 && arrayEnd != -1 && arrayStart < arrayEnd) {
-      return trimmed.substring(arrayStart, arrayEnd + 1);
-    }
-
     return null;
   }
 
@@ -167,32 +169,34 @@ Remember: Output ONLY the JSON object, nothing else.
     try {
       final lib = PlatformLoader.loadCommons();
       final preparePromptFn = lib.lookupFunction<
-          Int32 Function(Pointer<Utf8>, Pointer<RacStructuredOutputConfigStruct>,
-              Pointer<Pointer<Utf8>>),
+          Int32 Function(Pointer<Utf8>,
+              Pointer<RacStructuredOutputConfigStruct>, Pointer<Pointer<Utf8>>),
           int Function(Pointer<Utf8>, Pointer<RacStructuredOutputConfigStruct>,
-              Pointer<Pointer<Utf8>>)>(
-          'rac_structured_output_prepare_prompt');
+              Pointer<Pointer<Utf8>>)>('rac_structured_output_prepare_prompt');
 
       final result = preparePromptFn(promptPtr, configPtr, preparedPtrPtr);
 
       if (result != RAC_SUCCESS) {
         _logger.warning('preparePrompt failed with code $result');
-        return _fallbackPreparePrompt(originalPrompt, schema);
+        return _fallbackPreparePrompt(originalPrompt, schema,
+            includeSchemaInPrompt: includeSchemaInPrompt);
       }
 
       final preparedPtr = preparedPtrPtr.value;
       if (preparedPtr == nullptr) {
-        return _fallbackPreparePrompt(originalPrompt, schema);
+        return _fallbackPreparePrompt(originalPrompt, schema,
+            includeSchemaInPrompt: includeSchemaInPrompt);
       }
 
       final prepared = preparedPtr.toDartString();
-      lib.lookupFunction<Void Function(Pointer<Void>), void Function(
-          Pointer<Void>)>('rac_free')(preparedPtr.cast<Void>());
+      lib.lookupFunction<Void Function(Pointer<Void>),
+          void Function(Pointer<Void>)>('rac_free')(preparedPtr.cast<Void>());
 
       return prepared;
     } catch (e) {
       _logger.error('preparePrompt exception: $e');
-      return _fallbackPreparePrompt(originalPrompt, schema);
+      return _fallbackPreparePrompt(originalPrompt, schema,
+          includeSchemaInPrompt: includeSchemaInPrompt);
     } finally {
       calloc.free(promptPtr);
       calloc.free(schemaPtr);
@@ -202,7 +206,10 @@ Remember: Output ONLY the JSON object, nothing else.
   }
 
   /// Fallback prepare prompt when C++ fails
-  String _fallbackPreparePrompt(String originalPrompt, String schema) {
+  String _fallbackPreparePrompt(String originalPrompt, String schema,
+      {bool includeSchemaInPrompt = true}) {
+    final schemaPart =
+        includeSchemaInPrompt ? '\n\nJSON Schema:\n$schema\n' : '';
     return '''
 System: You are a JSON generator. You must output only valid JSON.
 
@@ -210,8 +217,7 @@ $originalPrompt
 
 CRITICAL INSTRUCTION: You MUST respond with ONLY a valid JSON object. No other text is allowed.
 
-JSON Schema:
-$schema
+$schemaPart
 
 RULES:
 1. Start your response with { and end with }
@@ -239,10 +245,14 @@ Remember: Output ONLY the JSON object, nothing else.
     try {
       final lib = PlatformLoader.loadCommons();
       final validateFn = lib.lookupFunction<
-          Int32 Function(Pointer<Utf8>, Pointer<RacStructuredOutputConfigStruct>,
-              Pointer<RacStructuredOutputValidationStruct>),
-          int Function(Pointer<Utf8>, Pointer<RacStructuredOutputConfigStruct>,
-              Pointer<RacStructuredOutputValidationStruct>)>(
+              Int32 Function(
+                  Pointer<Utf8>,
+                  Pointer<RacStructuredOutputConfigStruct>,
+                  Pointer<RacStructuredOutputValidationStruct>),
+              int Function(
+                  Pointer<Utf8>,
+                  Pointer<RacStructuredOutputConfigStruct>,
+                  Pointer<RacStructuredOutputValidationStruct>)>(
           'rac_structured_output_validate');
 
       final result = validateFn(textPtr, configPtr, validationPtr);
@@ -253,15 +263,27 @@ Remember: Output ONLY the JSON object, nothing else.
 
       final validation = validationPtr.ref;
       final isValid = validation.isValid == 1;
+      final containsJson = validation.extractedJson != nullptr;
 
       String? errorMessage;
       if (validation.errorMessage != nullptr) {
         errorMessage = validation.errorMessage.toDartString();
+        lib.lookupFunction<Void Function(Pointer<Void>),
+            void Function(Pointer<Void>)>('rac_free')(
+          validation.errorMessage.cast<Void>(),
+        );
+      }
+
+      if (validation.extractedJson != nullptr) {
+        lib.lookupFunction<Void Function(Pointer<Void>),
+            void Function(Pointer<Void>)>('rac_free')(
+          validation.extractedJson.cast<Void>(),
+        );
       }
 
       return StructuredOutputValidationResult(
         isValid: isValid,
-        containsJSON: isValid,
+        containsJSON: containsJson,
         error: errorMessage,
       );
     } catch (e) {
