@@ -27,7 +27,7 @@ export interface SDKEventEnvelope {
 /** Known SDK event types and their payload shapes. */
 export interface SDKEventMap {
   // SDK lifecycle
-  'sdk.initialized': { environment: string; accelerationMode: string };
+  'sdk.initialized': { environment: string };
   'sdk.accelerationMode': { mode: string };
 
   // Model management

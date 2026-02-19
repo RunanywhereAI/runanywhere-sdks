@@ -22,7 +22,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WASM_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-OUTPUT_DIR="${WASM_DIR}/../packages/core/wasm"
+OUTPUT_DIR="${WASM_DIR}/../packages/llamacpp/wasm"
 
 # Defaults
 BUILD_TYPE="Release"
@@ -168,9 +168,9 @@ echo ">>> Verifying outputs..."
 
 # Output file names depend on whether WebGPU variant was built
 if [ "$WEBGPU" = "ON" ]; then
-    OUTPUT_NAME="racommons-webgpu"
+    OUTPUT_NAME="racommons-llamacpp-webgpu"
 else
-    OUTPUT_NAME="racommons"
+    OUTPUT_NAME="racommons-llamacpp"
 fi
 
 WASM_FILE="${OUTPUT_DIR}/${OUTPUT_NAME}.wasm"

@@ -14,6 +14,7 @@ import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.events.EventCategory
 import com.runanywhere.sdk.public.events.ModelEvent
 import com.runanywhere.sdk.public.extensions.STT.STTOptions
+import com.runanywhere.sdk.public.extensions.currentSTTModel
 import com.runanywhere.sdk.public.extensions.currentSTTModelId
 import com.runanywhere.sdk.public.extensions.isSTTModelLoadedSync
 import com.runanywhere.sdk.public.extensions.loadSTTModel
@@ -237,18 +238,21 @@ class SpeechToTextViewModel : ViewModel() {
     /**
      * Check initial STT model state
      * iOS Reference: checkInitialModelState() in STTViewModel.swift
+     * Uses currentSTTModel() for display name so app bar shows correct model icon.
      */
-    private fun checkInitialModelState() {
+    private suspend fun checkInitialModelState() {
         if (RunAnywhere.isSTTModelLoadedSync) {
+            val currentModel = RunAnywhere.currentSTTModel()
             val modelId = RunAnywhere.currentSTTModelId
+            val displayName = currentModel?.name ?: modelId
             _uiState.update {
                 it.copy(
                     isModelLoaded = true,
                     selectedModelId = modelId,
-                    selectedModelName = modelId,
+                    selectedModelName = displayName,
                 )
             }
-            Log.i(TAG, "STT model already loaded: $modelId")
+            Log.i(TAG, "STT model already loaded: $displayName")
         }
     }
 

@@ -1,0 +1,65 @@
+{
+  "name": "@runanywhere/web-onnx",
+  "version": "0.1.0-beta.8",
+  "description": "RunAnywhere Web SDK - ONNX backend for STT, TTS, and VAD via sherpa-onnx",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./wasm/*": "./wasm/*"
+  },
+  "files": [
+    "dist/",
+    "wasm/",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "runanywhere",
+    "ai",
+    "stt",
+    "tts",
+    "vad",
+    "onnx",
+    "sherpa-onnx",
+    "wasm",
+    "on-device",
+    "browser",
+    "speech"
+  ],
+  "author": "RunAnywhere AI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RunanywhereAI/runanywhere-sdks.git",
+    "directory": "sdk/runanywhere-web/packages/onnx"
+  },
+  "homepage": "https://github.com/RunanywhereAI/runanywhere-sdks/tree/main/sdk/runanywhere-web",
+  "bugs": {
+    "url": "https://github.com/RunanywhereAI/runanywhere-sdks/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "peerDependencies": {
+    "@runanywhere/web": ">=0.1.0-beta.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}
