@@ -21,6 +21,7 @@
  */
 
 import { SDKLogger } from '../Foundation/SDKLogger';
+import type { ProviderCapability, ProviderMap } from './ProviderTypes';
 
 const logger = new SDKLogger('ExtensionPoint');
 
@@ -151,6 +152,70 @@ class ExtensionPointImpl {
   }
 
   // -------------------------------------------------------------------------
+  // Provider Registry — typed cross-package provider access (issue #371)
+  // -------------------------------------------------------------------------
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private providers: Map<ProviderCapability, any> = new Map();
+
+  /**
+   * Register a typed provider implementation for a capability.
+   *
+   * Backend packages call this during their registration phase:
+   * ```ts
+   * ExtensionPoint.registerProvider('llm', TextGeneration);
+   * ExtensionPoint.registerProvider('stt', STT);
+   * ```
+   */
+  registerProvider<K extends ProviderCapability>(
+    capability: K,
+    implementation: ProviderMap[K],
+  ): void {
+    if (this.providers.has(capability)) {
+      logger.debug(`Provider '${capability}' already registered, overwriting`);
+    }
+    this.providers.set(capability, implementation);
+    logger.debug(`Provider '${capability}' registered`);
+  }
+
+  /**
+   * Retrieve a registered provider by capability.
+   * Returns undefined if no provider is registered for the given capability.
+   */
+  getProvider<K extends ProviderCapability>(
+    capability: K,
+  ): ProviderMap[K] | undefined {
+    return this.providers.get(capability) as ProviderMap[K] | undefined;
+  }
+
+  /**
+   * Retrieve a registered provider or throw a descriptive error.
+   * Use in code that requires a specific backend to be registered.
+   */
+  requireProvider<K extends ProviderCapability>(
+    capability: K,
+    packageHint?: string,
+  ): ProviderMap[K] {
+    const provider = this.providers.get(capability);
+    if (!provider) {
+      const hint = packageHint ?? (
+        capability === 'stt' || capability === 'tts'
+          ? '@runanywhere/web-onnx'
+          : '@runanywhere/web-llamacpp'
+      );
+      throw new Error(
+        `Provider '${capability}' not available. Install and register the ${hint} package.`,
+      );
+    }
+    return provider as ProviderMap[K];
+  }
+
+  /** Remove a registered provider. */
+  removeProvider(capability: ProviderCapability): void {
+    this.providers.delete(capability);
+  }
+
+  // -------------------------------------------------------------------------
   // Service Registry — typed singleton access for cross-package communication
   // -------------------------------------------------------------------------
 
@@ -218,6 +283,7 @@ class ExtensionPointImpl {
     this.backends.clear();
     this.capabilityMap.clear();
     this.services.clear();
+    this.providers.clear();
   }
 }
 

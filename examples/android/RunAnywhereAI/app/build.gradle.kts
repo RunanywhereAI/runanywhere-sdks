@@ -233,22 +233,24 @@ dependencies {
     implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-sdcpp")) // ~58MB - Diffusion image generation
 
     // ========================================
+    // SDK
+    implementation(project(":runanywhere-kotlin"))
+
+    // Backend modules (optional, pick what you need)
+    implementation(project(":runanywhere-core-llamacpp")) // LLM text generation
+    implementation(project(":runanywhere-core-onnx")) // STT, TTS, VAD
+
     // AndroidX Core & Lifecycle
-    // ========================================
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
 
-    // ========================================
     // Material Design
-    // ========================================
     implementation(libs.material)
 
-    // ========================================
     // Compose
-    // ========================================
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
@@ -256,92 +258,62 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
 
-    // ========================================
     // Navigation
-    // ========================================
     implementation(libs.androidx.navigation.compose)
 
-    // ========================================
     // Coroutines
-    // ========================================
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
 
-    // ========================================
     // Serialization & DateTime
-    // ========================================
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.datetime)
 
-    // ========================================
     // Networking
-    // ========================================
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging)
     implementation(libs.retrofit)
     implementation(libs.retrofit.gson)
     implementation(libs.gson)
 
-    // ========================================
     // File Management & Storage
-    // ========================================
     implementation(libs.commons.io)
 
-    // ========================================
     // Background Work
-    // ========================================
     implementation(libs.androidx.work.runtime.ktx)
 
-    // ========================================
     // Speech Recognition & Audio Processing
-    // ========================================
     implementation(libs.whisper.jni)
     implementation(libs.android.vad.webrtc)
     implementation(libs.prdownloader)
 
-    // ========================================
     // Security
-    // ========================================
     implementation(libs.androidx.security.crypto)
 
-    // ========================================
     // DataStore
-    // ========================================
     implementation(libs.androidx.datastore.preferences)
 
-    // ========================================
     // Permissions
-    // ========================================
     implementation(libs.accompanist.permissions)
 
-    // ========================================
-    // CameraX (for VLM camera preview)
-    // ========================================
+    // CameraX
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
 
-    // ========================================
     // Database
-    // ========================================
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
 
-    // ========================================
-    // Play Services (Updated for targetSdk 34+)
-    // ========================================
+    // Play Services
     implementation(libs.google.play.app.update)
     implementation(libs.google.play.app.update.ktx)
 
-    // ========================================
     // Logging
-    // ========================================
     implementation(libs.timber)
 
-    // ========================================
     // Testing
-    // ========================================
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
@@ -354,9 +326,7 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 
-    // ========================================
-    // Kotlin Version Constraints
-    // ========================================
+    // Kotlin version constraints
     constraints {
         implementation("org.jetbrains.kotlin:kotlin-stdlib") {
             version {

@@ -22,6 +22,8 @@ class DiffusionViewModel: ObservableObject {
     @Published var downloadProgress: Double = 0.0
     @Published var downloadStatus: String = ""
 
+    @Published var isLoadingModel = false
+
     @Published var isGenerating = false
     @Published var progress: Float = 0.0
     @Published var statusMessage: String = "Ready"
@@ -120,8 +122,11 @@ class DiffusionViewModel: ObservableObject {
             return
         }
 
+        isLoadingModel = true
         statusMessage = "Loading model..."
         errorMessage = nil
+
+        defer { isLoadingModel = false }
 
         do {
             let variant: DiffusionModelVariant = .sd15

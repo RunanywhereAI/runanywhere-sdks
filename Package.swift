@@ -217,6 +217,12 @@ let package = Package(
                 .linkedFramework("MetalKit"),
                 .linkedFramework("MetalPerformanceShaders"),
             ]
+        // RunAnywhere unit tests (e.g. AudioCaptureManager – Issue #198)
+        // =================================================================
+        .testTarget(
+            name: "RunAnywhereTests",
+            dependencies: ["RunAnywhere"],
+            path: "sdk/runanywhere-swift/Tests/RunAnywhereTests"
         ),
 
     ] + binaryTargets()

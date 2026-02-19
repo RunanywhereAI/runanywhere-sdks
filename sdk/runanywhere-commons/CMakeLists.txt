@@ -84,13 +84,33 @@ endif()
 message(STATUS "Platform: ${RAC_PLATFORM_NAME}")
 
 # =============================================================================
+# SHARED DEPENDENCIES (FetchContent)
+# =============================================================================
+
+include(FetchContent)
+
+# nlohmann/json - header-only JSON library (used by JNI, backends, server)
+if(NOT DEFINED NLOHMANN_JSON_VERSION)
+    set(NLOHMANN_JSON_VERSION "3.11.3")
+endif()
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v${NLOHMANN_JSON_VERSION}
+    GIT_SHALLOW TRUE
+)
+set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(nlohmann_json)
+
+# Make nlohmann_json headers available project-wide for IDE indexing
+# (nlohmann_json_SOURCE_DIR is set by FetchContent_MakeAvailable)
+include_directories(SYSTEM ${nlohmann_json_SOURCE_DIR}/include)
+
+# =============================================================================
 # SERVER DEPENDENCIES (FetchContent)
 # =============================================================================
-# Only fetch if building the server - uses header-only libraries for minimal impact
 
 if(RAC_BUILD_SERVER)
-    include(FetchContent)
-
     # cpp-httplib - header-only HTTP library (same as llama.cpp uses)
     FetchContent_Declare(
         cpp-httplib
@@ -99,17 +119,8 @@ if(RAC_BUILD_SERVER)
         GIT_SHALLOW TRUE
     )
 
-    # nlohmann/json - header-only JSON library
-    FetchContent_Declare(
-        nlohmann_json
-        GIT_REPOSITORY https://github.com/nlohmann/json.git
-        GIT_TAG v3.11.3
-        GIT_SHALLOW TRUE
-    )
-
-    # Make available (download on first configure)
-    message(STATUS "Fetching server dependencies (cpp-httplib, nlohmann_json)...")
-    FetchContent_MakeAvailable(cpp-httplib nlohmann_json)
+    message(STATUS "Fetching server dependencies (cpp-httplib)...")
+    FetchContent_MakeAvailable(cpp-httplib)
     message(STATUS "Server dependencies ready")
 endif()
 
@@ -316,6 +327,31 @@ target_compile_features(rac_commons PUBLIC cxx_std_17)
 # =============================================================================
 
 if(RAC_BUILD_JNI)
+    # Make JNI headers available project-wide so CLion can resolve jni.h
+    # in ALL source files (including backend JNI files not in the current build)
+    if(NOT ANDROID)
+        # Auto-detect JAVA_HOME if not set or invalid
+        if(NOT DEFINED ENV{JAVA_HOME} OR "$ENV{JAVA_HOME}" STREQUAL ""
+           OR NOT EXISTS "$ENV{JAVA_HOME}/include/jni.h")
+            find_program(_JAVA_EXEC java)
+            if(_JAVA_EXEC)
+                get_filename_component(_JAVA_EXEC_REAL "${_JAVA_EXEC}" REALPATH)
+                get_filename_component(_JAVA_BIN_DIR "${_JAVA_EXEC_REAL}" DIRECTORY)
+                get_filename_component(_JAVA_HOME_DETECTED "${_JAVA_BIN_DIR}" DIRECTORY)
+                set(ENV{JAVA_HOME} "${_JAVA_HOME_DETECTED}")
+                message(STATUS "Auto-detected JAVA_HOME: ${_JAVA_HOME_DETECTED}")
+            endif()
+        endif()
+        find_package(JNI QUIET)
+        if(JNI_FOUND)
+            # Project-wide include so IDE resolves jni.h in all files
+            include_directories(SYSTEM ${JNI_INCLUDE_DIRS})
+            message(STATUS "JNI include dirs: ${JNI_INCLUDE_DIRS}")
+        else()
+            message(WARNING "JNI not found. Set JAVA_HOME for IDE indexing.")
+        endif()
+    endif()
+
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/jni/CMakeLists.txt")
         message(STATUS "Building JNI bridge for Android/JVM")
         add_subdirectory(src/jni)
