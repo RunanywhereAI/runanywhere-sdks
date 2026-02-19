@@ -533,9 +533,15 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_telemetry_manager_set_device_info"
     "_rac_telemetry_manager_set_http_callback"
     "_rac_telemetry_manager_track"
+    "_rac_telemetry_manager_track_analytics"
+    "_rac_telemetry_manager_http_complete"
     "_rac_telemetry_manager_flush"
     "_rac_telemetry_payload_default"
     "_rac_telemetry_payload_free"
+
+    # Analytics Events
+    "_rac_analytics_events_set_callback"
+    "_rac_analytics_events_has_callback"
 
     # WASM helper functions (sizeof, ping, version)
     "_rac_wasm_ping"
@@ -562,6 +568,12 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_wasm_sizeof_diffusion_result"
     "_rac_wasm_sizeof_embeddings_options"
     "_rac_wasm_sizeof_embeddings_result"
+
+    # Dev config WASM wrappers
+    "_rac_wasm_dev_config_is_available"
+    "_rac_wasm_dev_config_get_supabase_url"
+    "_rac_wasm_dev_config_get_supabase_key"
+    "_rac_wasm_dev_config_get_build_token"
 
     # Emscripten runtime helpers
     "_malloc"

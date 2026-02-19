@@ -27,8 +27,9 @@
  *   console.log(result.text);
  */
 
-import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType } from '@runanywhere/web';
+import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, HTTPService } from '@runanywhere/web';
 import { SherpaONNXBridge } from '../Foundation/SherpaONNXBridge';
+import { AudioFileLoader } from '../Infrastructure/AudioFileLoader';
 import { STTModelType } from './STTTypes';
 import type { STTModelConfig, STTWhisperFiles, STTZipformerFiles, STTParaformerFiles, STTTranscriptionResult } from './STTTypes';
 
@@ -248,6 +249,14 @@ class STTImpl {
       EventBus.shared.emit('model.loadCompleted', SDKEventType.Model, {
         modelId: config.modelId, component: 'stt', loadTimeMs,
       });
+      HTTPService.shared.postTelemetryEvent({
+        event_type: 'stt.model.load.completed',
+        modality: 'stt',
+        model_id: config.modelId,
+        framework: 'onnx',
+        processing_time_ms: loadTimeMs,
+        success: true,
+      });
     } catch (error) {
       this.cleanup();
       throw error;
@@ -333,6 +342,20 @@ class STTImpl {
         text: transcription.text,
         confidence: transcription.confidence,
       });
+      HTTPService.shared.postTelemetryEvent({
+        event_type: 'stt.transcription.completed',
+        modality: 'stt',
+        model_id: this._currentModelId,
+        framework: 'onnx',
+        processing_time_ms: processingTimeMs,
+        success: true,
+        audio_duration_ms: Math.round(audioSamples.length / sampleRate * 1000),
+        word_count: transcription.text ? transcription.text.split(/\s+/).filter(Boolean).length : 0,
+        confidence: transcription.confidence,
+        real_time_factor: processingTimeMs > 0
+          ? Math.round(audioSamples.length / sampleRate * 1000) / processingTimeMs
+          : 0,
+      });
 
       return transcription;
     } finally {
@@ -373,11 +396,28 @@ class STTImpl {
       const result = JSON.parse(jsonStr || '{}');
       const processingTimeMs = Math.round(performance.now() - startMs);
 
-      return {
+      const transcription = {
         text: (result.text ?? '').trim(),
         confidence: result.confidence ?? 0,
         processingTimeMs,
       };
+
+      HTTPService.shared.postTelemetryEvent({
+        event_type: 'stt.transcription.completed',
+        modality: 'stt',
+        model_id: this._currentModelId,
+        framework: 'onnx',
+        processing_time_ms: processingTimeMs,
+        success: true,
+        audio_duration_ms: Math.round(audioSamples.length / sampleRate * 1000),
+        word_count: transcription.text ? transcription.text.split(/\s+/).filter(Boolean).length : 0,
+        confidence: transcription.confidence,
+        real_time_factor: processingTimeMs > 0
+          ? Math.round(audioSamples.length / sampleRate * 1000) / processingTimeMs
+          : 0,
+      });
+
+      return transcription;
     } finally {
       m._free(audioPtr);
       m._SherpaOnnxDestroyOnlineStream(stream);
@@ -397,6 +437,22 @@ class STTImpl {
     }
 
     return new STTStreamingSessionImpl(this._onlineRecognizerHandle, options);
+  }
+
+  /**
+   * Transcribe an audio file (wav, mp3, m4a, ogg, flac, etc.).
+   * Handles decoding and resampling to 16 kHz internally via AudioFileLoader.
+   *
+   * @param file    Audio file from a file picker, drag-drop, or any File source
+   * @param options Optional transcription options (language, sampleRate override)
+   */
+  async transcribeFile(
+    file: File,
+    options: STTTranscribeOptions = {},
+  ): Promise<STTTranscriptionResult> {
+    const targetRate = options.sampleRate ?? 16000;
+    const { samples, sampleRate } = await AudioFileLoader.toFloat32Array(file, targetRate);
+    return this.transcribe(samples, { ...options, sampleRate });
   }
 
   /** Clean up the STT resources. */

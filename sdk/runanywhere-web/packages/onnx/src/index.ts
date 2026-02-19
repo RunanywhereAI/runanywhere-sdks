@@ -43,3 +43,5 @@ export { AudioCapture } from './Infrastructure/AudioCapture';
 export type { AudioChunkCallback, AudioLevelCallback, AudioCaptureConfig } from './Infrastructure/AudioCapture';
 export { AudioPlayback } from './Infrastructure/AudioPlayback';
 export type { PlaybackCompleteCallback, PlaybackConfig } from './Infrastructure/AudioPlayback';
+export { AudioFileLoader } from './Infrastructure/AudioFileLoader';
+export type { AudioFileLoaderResult } from './Infrastructure/AudioFileLoader';
