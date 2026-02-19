@@ -302,23 +302,43 @@ class AgentKernel(
                     }
                 }
 
-                // Quick completion check for X compose: if POST button is visible, tap it directly.
-                // This fires when deep link opened ComposerActivity with text pre-filled.
+                // Quick completion check for X compose: if POST button visible AND tweet text already in compose.
                 if (xComposeMessage != null && screen.foregroundPackage == AppActions.Packages.TWITTER) {
-                    val postIndex = findPostButtonIndex(screen.compactText)
-                    if (postIndex != null && screen.indexToCoords.containsKey(postIndex)) {
-                        emit(AgentEvent.Log("[X-POST] Found POST button at index $postIndex — tapping directly"))
-                        val tapResult = actionExecutor.execute(Decision("tap", elementIndex = postIndex), screen.indexToCoords)
-                        emit(AgentEvent.Step(step, "tap", tapResult.message))
-                        history.record("tap", "POST", tapResult.message, tapResult.success)
-                        delay(STEP_DELAY_MS)
-                        if (tapResult.success) {
-                            emit(AgentEvent.Log("Tweet posted successfully!"))
-                            emit(AgentEvent.Speak("Tweet posted."))
-                            emit(AgentEvent.Done("Goal achieved: tweet posted"))
-                            return@flow
+                    val textTyped = screen.compactText.contains(xComposeMessage!!, ignoreCase = true)
+                    if (textTyped) {
+                        val postIndex = findPostButtonIndex(screen.compactText)
+                        if (postIndex != null && screen.indexToCoords.containsKey(postIndex)) {
+                            emit(AgentEvent.Log("[X-POST] Found POST button at index $postIndex — tapping directly"))
+                            val tapResult = actionExecutor.execute(Decision("tap", elementIndex = postIndex), screen.indexToCoords)
+                            emit(AgentEvent.Step(step, "tap", tapResult.message))
+                            history.record("tap", "POST", tapResult.message, tapResult.success)
+                            delay(STEP_DELAY_MS)
+                            if (tapResult.success) {
+                                emit(AgentEvent.Log("Tweet posted successfully!"))
+                                emit(AgentEvent.Speak("Tweet posted."))
+                                emit(AgentEvent.Done("Goal achieved: tweet posted"))
+                                return@flow
+                            }
+                            continue
                         }
-                        continue
+                    }
+                }
+
+                // Auto-type tweet text when compose screen is open but text not yet entered.
+                if (xComposeMessage != null && screen.foregroundPackage == AppActions.Packages.TWITTER) {
+                    val textTyped = screen.compactText.contains(xComposeMessage!!, ignoreCase = true)
+                    if (!textTyped) {
+                        val composeIndex = findComposeTextFieldIndex(screen.compactText)
+                        if (composeIndex != null && screen.indexToCoords.containsKey(composeIndex)) {
+                            emit(AgentEvent.Log("[X-TYPE] Typing tweet into compose field at index $composeIndex"))
+                            actionExecutor.execute(Decision("tap", elementIndex = composeIndex), screen.indexToCoords)
+                            delay(300)
+                            val typeResult = actionExecutor.execute(Decision("type", text = xComposeMessage!!), screen.indexToCoords)
+                            emit(AgentEvent.Step(step, "type", typeResult.message))
+                            history.record("type", "compose", typeResult.message, typeResult.success)
+                            delay(STEP_DELAY_MS)
+                            continue
+                        }
                     }
                 }
 
@@ -1227,15 +1247,14 @@ class AgentKernel(
             }
             // X (Twitter) — match "open x", "x app", "twitter" but not random "x" in words
             goalLower.contains("twitter") || Regex("\\bopen\\s+x\\b|\\bx\\s+app\\b|\\bopen\\s+x\\s|\\btap.*\\bx\\b|\\bpost.*\\bon\\s+x\\b|\\bx.*\\bpost\\b|\\btweet\\b").containsMatchIn(goalLower) -> {
+                // Always open X home feed so the demo shows full navigation steps.
+                // xComposeMessage is set here so ComposerActivity SINGLE_TOP + auto-type + quick-POST activate later.
+                AppActions.openX(context)
                 val tweetText = extractTweetText(goal)
                 if (tweetText != null && (goalLower.contains("post") || goalLower.contains("tweet"))) {
-                    AppActions.openXCompose(context, tweetText)
                     xComposeMessage = tweetText
-                    PreLaunchResult("Pre-launched X compose: ${tweetText.take(40)}", AppActions.Packages.TWITTER)
-                } else {
-                    AppActions.openX(context)
-                    PreLaunchResult("Pre-launched X (Twitter)", AppActions.Packages.TWITTER)
                 }
+                PreLaunchResult("Pre-launched X (Twitter)", AppActions.Packages.TWITTER)
             }
             goalLower.contains("whatsapp") -> {
                 AppActions.openApp(context, AppActions.Packages.WHATSAPP)
@@ -1415,6 +1434,19 @@ class AgentKernel(
                 val indexMatch = Regex("^(\\d+):").find(line.trim())
                 if (indexMatch != null) return indexMatch.groupValues[1].toIntOrNull()
             }
+        }
+        return null
+    }
+
+    /**
+     * Find the compose text field index in X's ComposerActivity.
+     * Returns the element index of an [edit]-capable field, or null if not found.
+     */
+    private fun findComposeTextFieldIndex(compactText: String): Int? {
+        for (line in compactText.split("\n")) {
+            if (!line.contains("[edit]") && !line.contains("[tap,edit]")) continue
+            val indexMatch = Regex("^(\\d+):").find(line.trim())
+            if (indexMatch != null) return indexMatch.groupValues[1].toIntOrNull()
         }
         return null
     }
