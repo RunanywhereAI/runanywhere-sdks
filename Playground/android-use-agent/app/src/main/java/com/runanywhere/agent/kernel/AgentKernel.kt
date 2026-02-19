@@ -75,9 +75,9 @@ class AgentKernel(
     @Volatile
     private var isRunning = false
     private var planResult: PlanResult? = null
-
     /** Tweet text if compose was pre-launched via deep link. Non-null means compose should stay open. */
     private var xComposeMessage: String? = null
+
 
     // Tracks the last prompt for local model tool result re-injection
     private var lastPrompt: String = ""
@@ -139,6 +139,7 @@ class AgentKernel(
         history.clear()
         _stepRecords.clear()
         planResult = null
+        xComposeMessage = null
 
         try {
             emit(AgentEvent.Log("Starting agent..."))
@@ -302,21 +303,41 @@ class AgentKernel(
                 }
 
                 // Quick completion check for X compose: if POST button is visible, tap it directly.
-                // MUST run before bringToForeground() so compose screen is never disrupted by inference.
+                // This fires when deep link opened ComposerActivity with text pre-filled.
                 if (xComposeMessage != null && screen.foregroundPackage == AppActions.Packages.TWITTER) {
                     val postIndex = findPostButtonIndex(screen.compactText)
                     if (postIndex != null && screen.indexToCoords.containsKey(postIndex)) {
-                        emit(AgentEvent.Log("[X] POST button at index $postIndex — tapping directly"))
+                        emit(AgentEvent.Log("[X-POST] Found POST button at index $postIndex — tapping directly"))
                         val tapResult = actionExecutor.execute(Decision("tap", elementIndex = postIndex), screen.indexToCoords)
                         emit(AgentEvent.Step(step, "tap", tapResult.message))
                         history.record("tap", "POST", tapResult.message, tapResult.success)
+                        delay(STEP_DELAY_MS)
                         if (tapResult.success) {
-                            xComposeMessage = null
-                            delay(1500)
-                            emit(AgentEvent.Speak("Posted successfully."))
-                            emit(AgentEvent.Done("Successfully posted on X"))
+                            emit(AgentEvent.Log("Tweet posted successfully!"))
+                            emit(AgentEvent.Speak("Tweet posted."))
+                            emit(AgentEvent.Done("Goal achieved: tweet posted"))
                             return@flow
                         }
+                        continue
+                    }
+                }
+
+                // Approach 2 — keyword FAB tap: when on X home feed with a post/tweet goal,
+                // scan the element list for the "New post" FAB and tap it directly.
+                // This bypasses the 1.2B model's inability to select high-index elements from
+                // the home feed, while still letting the LLM handle the compose screen.
+                val goalLowerForX = goal.lowercase()
+                val isXPostGoal = screen.foregroundPackage == AppActions.Packages.TWITTER &&
+                        (goalLowerForX.contains("post") || goalLowerForX.contains("tweet"))
+                if (isXPostGoal) {
+                    val fabIndex = findNewPostFabIndex(screen.compactText)
+                    if (fabIndex != null && screen.indexToCoords.containsKey(fabIndex)) {
+                        emit(AgentEvent.Log("[X-FAB] Found New Post button at index $fabIndex — tapping directly"))
+                        val tapResult = actionExecutor.execute(Decision("tap", elementIndex = fabIndex), screen.indexToCoords)
+                        emit(AgentEvent.Step(step, "tap", tapResult.message))
+                        history.record("tap", "New post", tapResult.message, tapResult.success)
+                        delay(STEP_DELAY_MS)
+                        continue
                     }
                 }
 
@@ -665,25 +686,21 @@ class AgentKernel(
      */
     private fun bringAppToForeground(packageName: String) {
         try {
+
             // Strategy 0 (X-specific): preserve compose screen by targeting ComposerActivity directly.
-            // X's main activity (singleTask) clears compose from the back stack when started.
-            // ComposerActivity with SINGLE_TOP brings the existing compose instance to front instead.
+            // Using SINGLE_TOP prevents singleTask main activity from clearing the back stack.
             if (packageName == AppActions.Packages.TWITTER && xComposeMessage != null) {
+                val composerIntent = android.content.Intent().apply {
+                    setClassName(AppActions.Packages.TWITTER, "com.twitter.composer.ComposerActivity")
+                    flags = android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                            android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                }
                 try {
-                    val composeIntent = android.content.Intent().apply {
-                        component = android.content.ComponentName(
-                            "com.twitter.android",
-                            "com.twitter.composer.ComposerActivity"
-                        )
-                        flags = android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                                android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-                    }
-                    context.startActivity(composeIntent)
-                    Log.i(TAG, "Returned to X compose: ComposerActivity (SINGLE_TOP)")
+                    context.startActivity(composerIntent)
+                    Log.i(TAG, "Returned to X ComposerActivity (SINGLE_TOP)")
                     return
                 } catch (e: Exception) {
-                    Log.w(TAG, "ComposerActivity bring-to-front failed: ${e.message}")
-                    // Fall through to standard strategies
+                    Log.w(TAG, "ComposerActivity SINGLE_TOP failed, falling back: ${e.message}")
                 }
             }
 
@@ -1346,6 +1363,22 @@ class AgentKernel(
      * Extract tweet/post text from the goal string.
      * Handles: "post Hi from RunAnywhere on X", "tweet 'Hello' on Twitter", etc.
      */
+    /**
+     * Find X's "New post" FAB on the home feed by keyword.
+     * Looks for clickable elements whose label contains "new post" (case-insensitive).
+     * Returns the element index or null if not found.
+     */
+    private fun findNewPostFabIndex(compactText: String): Int? {
+        for (line in compactText.split("\n")) {
+            if (!line.contains("[tap]")) continue
+            if (line.lowercase().contains("new post")) {
+                val indexMatch = Regex("^(\\d+):").find(line.trim())
+                if (indexMatch != null) return indexMatch.groupValues[1].toIntOrNull()
+            }
+        }
+        return null
+    }
+
     private fun extractTweetText(goal: String): String? {
         // Pattern 1: post/tweet <text> on x/twitter (with optional quotes)
         Regex("""(?:post|tweet)\s+['"]?(.+?)['"]?\s+on\s+(?:x|twitter)""", RegexOption.IGNORE_CASE).find(goal)?.let {
@@ -1356,6 +1389,13 @@ class AgentKernel(
         val goalLower = goal.lowercase()
         if (goalLower.contains("post") || goalLower.contains("tweet")) {
             Regex("""['"]([^'"]+)['"]""").find(goal)?.let {
+                val text = it.groupValues[1].trim()
+                if (text.isNotEmpty()) return text
+            }
+        }
+        // Pattern 3: post/tweet saying <text> (no quotes required)
+        if (goalLower.contains("post") || goalLower.contains("tweet")) {
+            Regex("""(?:post|tweet)\s+saying\s+['"]?(.+?)['"]?$""", RegexOption.IGNORE_CASE).find(goal)?.let {
                 val text = it.groupValues[1].trim()
                 if (text.isNotEmpty()) return text
             }
