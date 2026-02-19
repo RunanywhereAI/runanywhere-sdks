@@ -8,6 +8,7 @@
 
 import { EventBus } from '../Foundation/EventBus';
 import { SDKLogger } from '../Foundation/SDKLogger';
+import { HTTPService } from '../services/HTTPService';
 import { OPFSStorage } from './OPFSStorage';
 import type { MetadataMap } from './OPFSStorage';
 import type { LocalFileStorage } from './LocalFileStorage';
@@ -216,6 +217,13 @@ export class ModelDownloader {
 
     this.registry.updateModel(modelId, { status: ModelStatus.Downloading, downloadProgress: 0 });
     EventBus.shared.emit('model.downloadStarted', SDKEventType.Model, { modelId, url: model.url });
+    HTTPService.shared.postTelemetryEvent({
+      event_type: 'model.download.started',
+      modality: 'download',
+      model_id: modelId,
+      framework: 'web',
+      success: true,
+    });
 
     try {
       const totalFiles = 1 + (model.additionalFiles?.length ?? 0);
@@ -304,10 +312,26 @@ export class ModelDownloader {
         filesTotal: totalFiles,
       });
       EventBus.shared.emit('model.downloadCompleted', SDKEventType.Model, { modelId, sizeBytes: totalSize });
+      HTTPService.shared.postTelemetryEvent({
+        event_type: 'model.download.completed',
+        modality: 'download',
+        model_id: modelId,
+        framework: 'web',
+        success: true,
+        file_size_bytes: totalSize,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.registry.updateModel(modelId, { status: ModelStatus.Error, error: message });
       EventBus.shared.emit('model.downloadFailed', SDKEventType.Model, { modelId, error: message });
+      HTTPService.shared.postTelemetryEvent({
+        event_type: 'model.download.failed',
+        modality: 'download',
+        model_id: modelId,
+        framework: 'web',
+        success: false,
+        error_message: message,
+      });
     }
   }
 

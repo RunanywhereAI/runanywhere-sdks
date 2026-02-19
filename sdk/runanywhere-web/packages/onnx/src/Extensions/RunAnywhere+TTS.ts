@@ -20,7 +20,7 @@
  *   // result.audioData is Float32Array of PCM samples
  */
 
-import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType } from '@runanywhere/web';
+import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, HTTPService } from '@runanywhere/web';
 import { SherpaONNXBridge } from '../Foundation/SherpaONNXBridge';
 import type { TTSVoiceConfig, TTSSynthesisResult, TTSSynthesizeOptions } from './TTSTypes';
 
@@ -119,6 +119,14 @@ class TTSImpl {
       logger.info(`TTS voice loaded: ${config.voiceId} in ${loadTimeMs}ms`);
       EventBus.shared.emit('model.loadCompleted', SDKEventType.Model, {
         modelId: config.voiceId, component: 'tts', loadTimeMs,
+      });
+      HTTPService.shared.postTelemetryEvent({
+        event_type: 'tts.voice.load.completed',
+        modality: 'tts',
+        model_id: config.voiceId,
+        framework: 'onnx',
+        processing_time_ms: loadTimeMs,
+        success: true,
       });
     } catch (error) {
       this.cleanup();
@@ -258,6 +266,19 @@ class TTSImpl {
         durationMs,
         sampleRate,
         textLength: text.length,
+      });
+      HTTPService.shared.postTelemetryEvent({
+        event_type: 'tts.synthesis.completed',
+        modality: 'tts',
+        model_id: this._currentVoiceId,
+        framework: 'onnx',
+        processing_time_ms: processingTimeMs,
+        success: true,
+        character_count: text.length,
+        output_duration_ms: durationMs,
+        characters_per_second: processingTimeMs > 0 ? Math.round(text.length / processingTimeMs * 1000) : 0,
+        audio_size_bytes: numSamples * 4,
+        sample_rate: sampleRate,
       });
 
       logger.debug(`TTS generated ${durationMs}ms audio in ${processingTimeMs}ms`);

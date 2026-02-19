@@ -49,14 +49,16 @@ export interface SDKEventMap {
   'generation.failed': { error: string };
 
   // Speech-to-text
-  'stt.transcribed': { text: string; confidence: number };
+  'stt.transcribed': { text: string; confidence: number; audioDurationMs?: number; wordCount?: number };
+  'stt.transcriptionFailed': { error: string };
 
   // Text-to-speech
-  'tts.synthesized': { durationMs: number; sampleRate: number; textLength: number };
+  'tts.synthesized': { durationMs: number; sampleRate: number; characterCount?: number; processingMs?: number; charsPerSec?: number; textLength?: number };
+  'tts.synthesisFailed': { error: string };
 
   // Voice activity detection
   'vad.speechStarted': { activity: string };
-  'vad.speechEnded': { activity: string };
+  'vad.speechEnded': { activity: string; speechDurationMs?: number };
 
   // Voice agent
   'voice.turnCompleted': { speechDetected: boolean; transcription: string; response: string };

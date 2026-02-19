@@ -75,3 +75,7 @@ export { extractTarGz } from './Infrastructure/ArchiveUtility';
 export { LocalFileStorage } from './Infrastructure/LocalFileStorage';
 export { inferModelFromFilename, sanitizeId } from './Infrastructure/ModelFileInference';
 export type { InferredModelMeta } from './Infrastructure/ModelFileInference';
+
+// Services
+export { HTTPService } from './services/HTTPService';
+export type { HTTPServiceConfig, DevModeConfig } from './services/HTTPService';
