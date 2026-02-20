@@ -115,6 +115,11 @@ export interface LlamaCppModule {
   FS_createPath?: (parent: string, path: string, canRead: boolean, canWrite: boolean) => void;
   FS_createDataFile?: (parent: string, name: string, data: Uint8Array, canRead: boolean, canWrite: boolean, canOwn: boolean) => void;
   FS_unlink?: (path: string) => void;
+  FS_mkdir?: (path: string) => void;
+  FS_rmdir?: (path: string) => void;
+  FS_mount?: (type: any, opts: any, mountpoint: string) => void;
+  FS_unmount?: (mountpoint: string) => void;
+  WORKERFS?: any;
 
   // Generic index access for dynamic function lookups
   [key: string]: unknown;
@@ -368,6 +373,69 @@ export class LlamaCppBridge {
    */
   unlinkFile(path: string): void {
     try { this.module.FS_unlink?.(path); } catch { /* doesn't exist */ }
+  }
+
+  /**
+   * Mount a File object into the WASM filesystem (if WORKERFS is available).
+   * Returns the path to the mounted file, or null if mounting failed/unsupported.
+   *
+   * @param file - The browser File object
+   * @returns The absolute path to the file in WASM FS (e.g. /mnt-123/model.gguf) or null
+   */
+  mountFile(file: File): string | null {
+    const m = this.module;
+    if (!m.FS_mount || !m.WORKERFS) return null;
+
+    try {
+      // Create a unique mount point directory
+      const mountId = Math.floor(Math.random() * 1000000);
+      const mountDir = `/mnt-${mountId}`;
+
+      if (m.FS_mkdir) m.FS_mkdir(mountDir);
+
+      // Mount the file. WORKERFS expects { files: [File, ...] } or { files: [{name, data: File}] }
+      // We assume the standard Emscripten WORKERFS behavior where `files` array mounts them by name.
+      m.FS_mount(m.WORKERFS, { files: [file] }, mountDir);
+
+      logger.debug(`Mounted ${file.name} to ${mountDir}`);
+      return `${mountDir}/${file.name}`;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.warning(`Failed to mount file (WORKERFS): ${msg}`);
+      return null;
+    }
+  }
+
+  /**
+   * Unmount a directory (and remove it).
+   * @param mountDir - The directory path (e.g. /mnt-123)
+   */
+  unmount(mountPath: string): void {
+    const m = this.module;
+
+    // If path is a file inside mount, get the dir
+    // logic: /mnt-123/file.gguf -> /mnt-123
+    // But simplistic helper: assume caller tracks the mount dir?
+    // Actually TextGeneration will likely pass the model path.
+    // If model path is /mnt-123/model.gguf, we want to unmount /mnt-123.
+
+    let dir = mountPath;
+    if (!mountPath.startsWith('/mnt-')) return; // Safety check
+
+    // Strip filename if present
+    const parts = mountPath.split('/');
+    // formatted like ["", "mnt-123", "filename"]
+    if (parts.length >= 3) {
+      dir = `/${parts[1]}`;
+    }
+
+    try {
+      if (m.FS_unmount) m.FS_unmount(dir);
+      if (m.FS_rmdir) m.FS_rmdir(dir);
+      logger.debug(`Unmounted ${dir}`);
+    } catch {
+      /* ignore cleanup errors */
+    }
   }
 
   // -----------------------------------------------------------------------

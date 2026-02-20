@@ -32,6 +32,7 @@ const logger = new SDKLogger('TextGeneration');
 class TextGenerationImpl {
   readonly extensionName = 'TextGeneration';
   private _llmComponentHandle = 0;
+  private _mountedPath: string | null = null;
 
   /** Ensure the SDK is initialized and return the bridge. */
   private requireBridge(): LlamaCppBridge {
@@ -75,15 +76,40 @@ class TextGenerationImpl {
    */
   async loadModelFromData(ctx: ModelLoadContext): Promise<void> {
     const bridge = this.requireBridge();
-    const modelPath = `/models/${ctx.model.id}.gguf`;
-    if (ctx.dataStream) {
+    let modelPath: string | null = null;
+    let isMounted = false;
+
+    if (ctx.file) {
+      modelPath = bridge.mountFile(ctx.file);
+      if (modelPath) {
+        isMounted = true;
+        this._mountedPath = modelPath;
+      } else {
+        logger.warning('Mounting failed, falling back to reading file as stream');
+        modelPath = `/models/${ctx.model.id}.gguf`;
+        await bridge.writeFileStream(modelPath, ctx.file.stream() as unknown as ReadableStream<Uint8Array>);
+      }
+    } else if (ctx.dataStream) {
+      modelPath = `/models/${ctx.model.id}.gguf`;
       await bridge.writeFileStream(modelPath, ctx.dataStream);
     } else if (ctx.data) {
+      modelPath = `/models/${ctx.model.id}.gguf`;
       bridge.writeFile(modelPath, ctx.data);
     } else {
       throw new Error('No data provided to loadModelFromData');
     }
-    await this.loadModel(modelPath, ctx.model.id, ctx.model.name);
+
+    if (!modelPath) throw new Error('Failed to determine model path');
+
+    try {
+      await this.loadModel(modelPath, ctx.model.id, ctx.model.name);
+    } catch (err) {
+      if (isMounted && modelPath) {
+        bridge.unmount(modelPath);
+        this._mountedPath = null;
+      }
+      throw err;
+    }
   }
 
   /**
@@ -150,6 +176,12 @@ class TextGenerationImpl {
     bridge.checkResult(result, 'rac_llm_component_unload');
 
     logger.info('LLM model unloaded');
+
+    // Clean up mounted file if applicable
+    if (this._mountedPath) {
+      bridge.unmount(this._mountedPath);
+      this._mountedPath = null;
+    }
   }
 
   /**

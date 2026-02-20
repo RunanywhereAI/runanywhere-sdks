@@ -34,7 +34,7 @@ export interface ModelLoadContext {
    * Primary model file data (read from storage).
    *
    * Note: This is optional. Backend loaders that support streaming
-   * should prefer `dataStream` to avoid large memory allocations.
+   * should prefer `dataStream` or `file` to avoid large memory allocations.
    */
   data?: Uint8Array;
 
@@ -45,6 +45,15 @@ export interface ModelLoadContext {
    * to the WASM backend in pieces, completely avoiding full-file buffering in JS.
    */
   dataStream?: ReadableStream<Uint8Array>;
+
+  /**
+   * Primary model file object.
+   *
+   * When available, this allows backends to mount the file directly into
+   * the WASM virtual filesystem (using WORKERFS) without loading it entirely
+   * into JS memory, preventing OOM crashes with large models.
+   */
+  file?: File;
 
   /**
    * Download a file from a URL. Used for on-demand fetching of
