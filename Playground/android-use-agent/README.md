@@ -246,5 +246,11 @@ All UI actions are registered as tools that the LLM can invoke:
 
 ---
 
+## Inspiration
+
+This project was inspired by [android-action-kernel](https://github.com/Action-State-Labs/android-action-kernel) by Action State Labs.
+
+---
+
 Built by the RunAnywhere team.
 For questions, reach out to san@runanywhere.ai
