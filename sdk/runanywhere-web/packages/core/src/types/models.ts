@@ -102,6 +102,7 @@ export interface STTResult {
   confidence: number;
   duration: number;
   alternatives: STTAlternative[];
+  [key: string]: unknown;
 }
 
 export interface STTSegment {
