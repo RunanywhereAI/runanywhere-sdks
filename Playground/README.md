@@ -6,7 +6,7 @@ Interactive demo projects showcasing what you can build with RunAnywhere.
 |---------|-------------|----------|
 | [swift-starter-app](swift-starter-app/) | Privacy-first AI demo — LLM Chat, Speech-to-Text, Text-to-Speech, and Voice Pipeline with VAD | iOS (Swift/SwiftUI) |
 | [on-device-browser-agent](on-device-browser-agent/) | On-device AI browser automation using WebLLM — no cloud, no API keys, fully private | Chrome Extension (TypeScript/React) |
-| [android-use-agent](android-use-agent/) | Autonomous Android agent — navigates phone UI via accessibility + GPT-4o Vision + on-device LLM fallback | Android (Kotlin/Jetpack Compose) |
+| [android-use-agent](android-use-agent/) | Fully on-device autonomous Android agent — navigates phone UI via accessibility + on-device LLM (Qwen3-4B). See [benchmarks](android-use-agent/ASSESSMENT.md) | Android (Kotlin/Jetpack Compose) |
 | [linux-voice-assistant](linux-voice-assistant/) | Fully on-device voice assistant — Wake Word, VAD, STT, LLM, and TTS with zero cloud dependency | Linux (C++/ALSA) |
 | [openclaw-hybrid-assistant](openclaw-hybrid-assistant/) | Hybrid voice assistant — on-device Wake Word, VAD, STT, and TTS with cloud LLM via OpenClaw WebSocket | Linux (C++/ALSA) |
 
@@ -46,13 +46,17 @@ A Chrome extension that automates browser tasks entirely on-device using WebLLM 
 
 ## android-use-agent
 
-An autonomous Android agent that navigates your phone's UI to accomplish tasks:
+A fully on-device autonomous Android agent that navigates your phone's UI to accomplish tasks. All LLM inference runs locally via RunAnywhere SDK with llama.cpp -- no cloud dependency required.
 
-- **Autonomous UI Navigation** — Taps, types, swipes, and navigates apps to complete goals
-- **GPT-4o Vision** — Screenshots sent to GPT-4o for visual screen understanding
-- **Unified Tool Calling** — All UI actions registered as OpenAI function calling tools
-- **On-Device Fallback** — Falls back to local LLM via RunAnywhere SDK when offline
+- **Fully On-Device AI** — LLM inference via RunAnywhere SDK + llama.cpp (Qwen3-4B recommended)
+- **Accessibility-Based Screen Parsing** — Reads UI tree via Android Accessibility API, no root required
+- **Tool Calling** — LLM outputs structured tool calls (`<tool_call>` XML or `ui_tap(index=5)` function-call style)
+- **Samsung Foreground Boost** — 15x inference speedup by bringing agent to foreground during inference
+- **Smart Pre-Launch** — Opens target apps via Android intents before the agent loop
+- **Optional Cloud Fallback** — GPT-4o with vision and function calling when an API key is configured
 - **Voice Mode** — Speak goals via on-device Whisper STT, hear progress via TTS
+
+See [android-use-agent/ASSESSMENT.md](android-use-agent/ASSESSMENT.md) for detailed model benchmarks across Qwen3-4B, LFM2.5-1.2B, LFM2-8B-A1B MoE, and DS-R1-Qwen3-8B on Samsung Galaxy S24.
 
 **Requirements:** Android 8.0+ (API 26), arm64-v8a device, Accessibility service permission
 

@@ -13,14 +13,19 @@ import com.intellij.ui.content.ContentFactory
 import com.runanywhere.plugin.services.VoiceService
 import com.runanywhere.plugin.ui.ModelManagerDialog
 import com.runanywhere.plugin.ui.WaveformVisualization
-import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.`public`.RunAnywhere
+import com.runanywhere.sdk.`public`.extensions.availableModels
+import com.runanywhere.sdk.`public`.extensions.transcribe
+import com.runanywhere.sdk.features.stt.JvmAudioCaptureManager
+import com.runanywhere.sdk.features.stt.AudioChunk
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.awt.BorderLayout
 import java.awt.Color
@@ -56,16 +61,14 @@ class STTToolWindow : ToolWindowFactory {
 /**
  * Main panel for STT functionality with two modes:
  * 1. Simple recording - Record audio then transcribe once
- * 2. Continuous streaming - Real-time transcription as you speak
+ * 2. Continuous streaming - Periodic transcription as you speak
  */
 class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposable {
 
-    private val logger = SDKLogger("STTPanel")
     private val voiceService = project.getService(VoiceService::class.java)
 
-    // Create a coroutine scope with proper exception handling for IntelliJ
     private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
-        logger.error("Coroutine exception", throwable)
+        println("[STTPanel] Coroutine exception: ${throwable.message}")
     }
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob() + exceptionHandler)
 
@@ -87,23 +90,21 @@ class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposabl
     private var isSimpleRecording = false
     private var isStreaming = false
     private var recordingJob: Job? = null
+    private var waveformJob: Job? = null
     private var recordingStartTime = 0L
+    private var audioCaptureManager: JvmAudioCaptureManager? = null
 
     init {
         setupUI()
         setupListeners()
         updateStatus()
-
-        // Register for disposal
         Disposer.register(project, this)
     }
 
     private fun setupUI() {
-        // Main layout
         layout = BorderLayout(10, 10)
         border = EmptyBorder(10, 10, 10, 10)
 
-        // Top panel with title and status
         val topPanel = JPanel(BorderLayout()).apply {
             val titleLabel = JLabel("RunAnywhere Speech-to-Text").apply {
                 font = font.deriveFont(Font.BOLD, 14f)
@@ -117,7 +118,6 @@ class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposabl
             add(statusPanel, BorderLayout.EAST)
         }
 
-        // Control panel with recording buttons
         val controlPanel = JPanel(GridBagLayout()).apply {
             border = TitledBorder("Controls")
             val gbc = GridBagConstraints().apply {
@@ -125,78 +125,52 @@ class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposabl
                 insets = Insets(5, 5, 5, 5)
             }
 
-            // Simple Recording Section
-            gbc.gridx = 0
-            gbc.gridy = 0
-            gbc.gridwidth = 2
-            add(JLabel("Simple Recording:").apply {
-                font = font.deriveFont(Font.BOLD)
-            }, gbc)
+            gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 2
+            add(JLabel("Simple Recording:").apply { font = font.deriveFont(Font.BOLD) }, gbc)
 
-            gbc.gridy = 1
-            gbc.gridwidth = 1
+            gbc.gridy = 1; gbc.gridwidth = 1
             add(JLabel("Record and transcribe once:"), gbc)
-
             gbc.gridx = 1
             add(simpleRecordButton, gbc)
 
-            // Separator
-            gbc.gridx = 0
-            gbc.gridy = 2
-            gbc.gridwidth = 2
+            gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 2
             add(JSeparator(), gbc)
 
-            // Streaming Section
             gbc.gridy = 3
-            add(JLabel("Continuous Streaming:").apply {
-                font = font.deriveFont(Font.BOLD)
-            }, gbc)
+            add(JLabel("Continuous Streaming:").apply { font = font.deriveFont(Font.BOLD) }, gbc)
 
-            gbc.gridy = 4
-            gbc.gridwidth = 1
-            add(JLabel("Real-time transcription:"), gbc)
-
+            gbc.gridy = 4; gbc.gridwidth = 1
+            add(JLabel("Periodic transcription:"), gbc)
             gbc.gridx = 1
             add(streamingButton, gbc)
 
-            // Separator
-            gbc.gridx = 0
-            gbc.gridy = 5
-            gbc.gridwidth = 2
+            gbc.gridx = 0; gbc.gridy = 5; gbc.gridwidth = 2
             add(JSeparator(), gbc)
 
-            // Model Manager and Clear buttons
-            gbc.gridy = 6
-            gbc.gridwidth = 1
+            gbc.gridy = 6; gbc.gridwidth = 1
             add(modelManagerButton, gbc)
-
             gbc.gridx = 1
             add(clearButton, gbc)
         }
 
-        // Waveform panel
         val waveformPanel = JPanel(BorderLayout()).apply {
             border = TitledBorder("Audio Waveform")
             add(waveformVisualization, BorderLayout.CENTER)
             preferredSize = Dimension(400, 120)
         }
 
-        // Center panel with transcription area
         val transcriptionPanel = JPanel(BorderLayout()).apply {
             border = TitledBorder("Transcriptions")
             add(JBScrollPane(transcriptionArea), BorderLayout.CENTER)
             preferredSize = Dimension(400, 200)
         }
 
-        // Right panel with waveform and transcription
         val rightPanel = JPanel(BorderLayout(0, 10)).apply {
             add(waveformPanel, BorderLayout.NORTH)
             add(transcriptionPanel, BorderLayout.CENTER)
         }
 
-        // Add all panels
         add(topPanel, BorderLayout.NORTH)
-
         val mainPanel = JPanel(BorderLayout(10, 10)).apply {
             add(controlPanel, BorderLayout.WEST)
             add(rightPanel, BorderLayout.CENTER)
@@ -205,42 +179,25 @@ class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposabl
     }
 
     private fun setupListeners() {
-        // Simple recording button - Start/Stop recording then transcribe
         simpleRecordButton.addActionListener {
-            if (!isStreaming) {
-                toggleSimpleRecording()
-            }
+            if (!isStreaming) toggleSimpleRecording()
         }
-
-        // Streaming button - Continuous real-time transcription
         streamingButton.addActionListener {
-            if (!isSimpleRecording) {
-                toggleStreaming()
-            }
+            if (!isSimpleRecording) toggleStreaming()
         }
-
-        // Model manager button
-        modelManagerButton.addActionListener {
-            showModelManager()
-        }
-
-        // Clear button
+        modelManagerButton.addActionListener { showModelManager() }
         clearButton.addActionListener {
             transcriptionArea.text = ""
             waveformVisualization.clear()
         }
     }
 
-    /**
-     * Toggle simple recording mode
-     * This records audio for a fixed duration and transcribes it once
-     */
+    // =========================================================================
+    // SIMPLE RECORDING MODE
+    // =========================================================================
+
     private fun toggleSimpleRecording() {
-        if (!isSimpleRecording) {
-            startSimpleRecording()
-        } else {
-            stopSimpleRecording()
-        }
+        if (!isSimpleRecording) startSimpleRecording() else stopSimpleRecording()
     }
 
     private fun startSimpleRecording() {
@@ -257,50 +214,59 @@ class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposabl
         statusLabel.foreground = Color.RED
         recordingStartTime = System.currentTimeMillis()
 
-        // Start recording with waveform visualization using SDK's new API
+        val captureManager = JvmAudioCaptureManager()
+        audioCaptureManager = captureManager
+
+        // Collect waveform energy from audioLevel StateFlow
+        waveformJob = scope.launch {
+            captureManager.audioLevel.collect { level ->
+                ApplicationManager.getApplication().invokeLater {
+                    waveformVisualization.updateEnergy(level)
+                }
+            }
+        }
+
+        // Collect audio chunks
         recordingJob = scope.launch {
+            val audioBuffer = mutableListOf<AudioChunk>()
             try {
-                // Start recording with waveform feedback
-                RunAnywhere.startRecordingWithWaveform()
-                    .collect { audioEvent ->
-                        // Update waveform with audio energy
+                captureManager.startRecording().collect { chunk ->
+                    audioBuffer.add(chunk)
+
+                    // Auto-stop after 30 seconds
+                    val elapsed = (System.currentTimeMillis() - recordingStartTime) / 1000
+                    if (elapsed >= 30) {
                         ApplicationManager.getApplication().invokeLater {
-                            waveformVisualization.updateEnergy(audioEvent.level)
+                            stopSimpleRecording()
                         }
+                        return@collect
+                    }
 
-                        // Auto-stop after 30 seconds
-                        val elapsed = (System.currentTimeMillis() - recordingStartTime) / 1000
-                        if (elapsed >= 30) {
-                            ApplicationManager.getApplication().invokeLater {
-                                stopSimpleRecording()
-                            }
-                            return@collect
-                        }
-
-                        // Update status to show recording time
-                        if (elapsed % 1 == 0L) { // Update every second
-                            ApplicationManager.getApplication().invokeLater {
-                                statusLabel.text = "Recording... (${elapsed}s)"
-                            }
+                    if (elapsed % 1 == 0L) {
+                        ApplicationManager.getApplication().invokeLater {
+                            statusLabel.text = "Recording... (${elapsed}s)"
                         }
                     }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                // Normal cancellation when user stops
-                logger.info("Recording with waveform cancelled")
+                }
+            } catch (_: CancellationException) {
+                println("[STTPanel] Recording cancelled")
             } catch (e: Exception) {
                 ApplicationManager.getApplication().invokeLater {
-                    logger.error("Recording with waveform error", e)
+                    println("[STTPanel] Recording error: ${e.message}")
                     statusLabel.text = "Recording error"
                     statusLabel.foreground = Color.RED
                 }
+                return@launch
             }
+
+            // Transcribe collected audio
+            transcribeBuffer(audioBuffer)
         }
     }
 
     private fun stopSimpleRecording() {
         if (!isSimpleRecording) return
 
-        // Calculate recording duration
         val recordingDuration = ((System.currentTimeMillis() - recordingStartTime) / 1000).toInt()
 
         isSimpleRecording = false
@@ -309,49 +275,46 @@ class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposabl
         statusLabel.text = "Transcribing ${recordingDuration}s of audio..."
         statusLabel.foreground = Color.ORANGE
 
-        // Cancel the recording job
-        recordingJob?.cancel()
-        recordingJob = null
-
-        // Clear waveform
+        audioCaptureManager?.stopRecording()
+        waveformJob?.cancel()
+        waveformJob = null
         waveformVisualization.clear()
+    }
 
-        // Stop recording and transcribe using SDK's new API
-        scope.launch {
-            try {
-                // Stop recording and get transcription of what was recorded
-                val text = RunAnywhere.stopRecordingAndTranscribe()
+    private suspend fun transcribeBuffer(audioBuffer: List<AudioChunk>) {
+        if (audioBuffer.isEmpty()) return
 
-                ApplicationManager.getApplication().invokeLater {
-                    if (text.isNotEmpty()) {
-                        appendTranscription("[Recorded ${recordingDuration}s] $text")
-                    } else {
-                        appendTranscription("[Recorded ${recordingDuration}s] (No speech detected)")
-                    }
-                    statusLabel.text = "Ready"
-                    statusLabel.foreground = Color.BLACK
+        val recordingDuration = ((System.currentTimeMillis() - recordingStartTime) / 1000).toInt()
+
+        try {
+            val audioData = audioBuffer.flatMap { it.data.toList() }.toByteArray()
+            val text = RunAnywhere.transcribe(audioData)
+
+            ApplicationManager.getApplication().invokeLater {
+                if (text.isNotEmpty()) {
+                    appendTranscription("[Recorded ${recordingDuration}s] $text")
+                } else {
+                    appendTranscription("[Recorded ${recordingDuration}s] (No speech detected)")
                 }
-            } catch (e: Exception) {
-                ApplicationManager.getApplication().invokeLater {
-                    logger.error("Transcription error", e)
-                    appendTranscription("[Error] Failed to transcribe: ${e.message}")
-                    statusLabel.text = "Ready"
-                    statusLabel.foreground = Color.BLACK
-                }
+                statusLabel.text = "Ready"
+                statusLabel.foreground = Color.BLACK
+            }
+        } catch (e: Exception) {
+            ApplicationManager.getApplication().invokeLater {
+                println("[STTPanel] Transcription error: ${e.message}")
+                appendTranscription("[Error] Failed to transcribe: ${e.message}")
+                statusLabel.text = "Ready"
+                statusLabel.foreground = Color.BLACK
             }
         }
     }
 
-    /**
-     * Toggle streaming transcription mode
-     * This provides real-time transcription as you speak
-     */
+    // =========================================================================
+    // STREAMING MODE (periodic batch transcription)
+    // =========================================================================
+
     private fun toggleStreaming() {
-        if (!isStreaming) {
-            startStreaming()
-        } else {
-            stopStreaming()
-        }
+        if (!isStreaming) startStreaming() else stopStreaming()
     }
 
     private fun startStreaming() {
@@ -367,78 +330,57 @@ class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposabl
         statusLabel.text = "Listening..."
         statusLabel.foreground = Color.GREEN
 
-        // Use SDK's startStreamingTranscription API directly
-        // The SDK handles all audio capture internally
+        val captureManager = JvmAudioCaptureManager()
+        audioCaptureManager = captureManager
+
+        // Waveform visualization from audio level
+        waveformJob = scope.launch {
+            captureManager.audioLevel.collect { level ->
+                ApplicationManager.getApplication().invokeLater {
+                    waveformVisualization.updateEnergy(level)
+                }
+            }
+        }
+
+        // Collect audio and periodically transcribe
         recordingJob = scope.launch {
+            val audioBuffer = mutableListOf<AudioChunk>()
+            val transcribeIntervalMs = 3000L
+            var lastTranscribeTime = System.currentTimeMillis()
+
             try {
-                RunAnywhere.startStreamingTranscription(100) // 100ms chunks
-                    .collect { event ->
-                        when (event) {
-                            is com.runanywhere.sdk.components.stt.STTStreamEvent.SpeechStarted -> {
-                                ApplicationManager.getApplication().invokeLater {
-                                    statusLabel.text = "Speaking..."
-                                    statusLabel.foreground = Color.GREEN
-                                }
-                            }
+                captureManager.startRecording().collect { chunk ->
+                    audioBuffer.add(chunk)
 
-                            is com.runanywhere.sdk.components.stt.STTStreamEvent.PartialTranscription -> {
-                                ApplicationManager.getApplication().invokeLater {
-                                    // Show partial transcription in status
-                                    val partial = event.text.take(50)
-                                    statusLabel.text =
-                                        "Speaking: $partial${if (event.text.length > 50) "..." else ""}"
-                                }
-                            }
+                    val now = System.currentTimeMillis()
+                    if (now - lastTranscribeTime >= transcribeIntervalMs && audioBuffer.isNotEmpty()) {
+                        // Transcribe accumulated audio
+                        val audioData = audioBuffer.flatMap { it.data.toList() }.toByteArray()
+                        audioBuffer.clear()
+                        lastTranscribeTime = now
 
-                            is com.runanywhere.sdk.components.stt.STTStreamEvent.FinalTranscription -> {
-                                val text = event.result.transcript
-                                if (text.isNotEmpty()) {
-                                    ApplicationManager.getApplication().invokeLater {
-                                        appendTranscription("[Streaming] $text")
-                                        statusLabel.text = "Listening..."
-                                        statusLabel.foreground = Color.GREEN
-                                    }
-                                }
-                            }
-
-                            is com.runanywhere.sdk.components.stt.STTStreamEvent.SpeechEnded -> {
+                        try {
+                            val text = RunAnywhere.transcribe(audioData)
+                            if (text.isNotEmpty()) {
                                 ApplicationManager.getApplication().invokeLater {
+                                    appendTranscription("[Streaming] $text")
                                     statusLabel.text = "Listening..."
                                     statusLabel.foreground = Color.GREEN
                                 }
                             }
-
-                            is com.runanywhere.sdk.components.stt.STTStreamEvent.SilenceDetected -> {
-                                // Optionally update UI for silence
-                            }
-
-                            is com.runanywhere.sdk.components.stt.STTStreamEvent.AudioLevelChanged -> {
-                                ApplicationManager.getApplication().invokeLater {
-                                    waveformVisualization.updateEnergy(event.level)
-                                }
-                            }
-
-                            is com.runanywhere.sdk.components.stt.STTStreamEvent.Error -> {
-                                ApplicationManager.getApplication().invokeLater {
-                                    logger.error("Streaming error: ${event.error.message}")
-                                    appendTranscription("[Error] ${event.error.message}")
-                                    statusLabel.text = "Error - Restarting..."
-                                    statusLabel.foreground = Color.RED
-                                }
-                            }
-
-                            else -> {
-                                // Handle any other events
-                                logger.debug("Streaming event: $event")
+                        } catch (e: Exception) {
+                            ApplicationManager.getApplication().invokeLater {
+                                println("[STTPanel] Streaming transcription error: ${e.message}")
+                                appendTranscription("[Error] ${e.message}")
                             }
                         }
                     }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                // Normal cancellation when stopping
-                logger.info("Streaming cancelled")
+                }
+            } catch (_: CancellationException) {
+                println("[STTPanel] Streaming cancelled")
             } catch (e: Exception) {
                 ApplicationManager.getApplication().invokeLater {
-                    logger.error("Streaming error", e)
+                    println("[STTPanel] Streaming error: ${e.message}")
                     appendTranscription("[Error] Streaming failed: ${e.message}")
                     statusLabel.text = "Ready"
                     statusLabel.foreground = Color.BLACK
@@ -457,17 +399,14 @@ class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposabl
         statusLabel.text = "Stopping..."
         statusLabel.foreground = Color.ORANGE
 
-        // Stop SDK's internal audio capture
-        RunAnywhere.stopStreamingTranscription()
-
-        // Cancel the streaming job
+        audioCaptureManager?.stopRecording()
         recordingJob?.cancel()
         recordingJob = null
-
-        // Clear waveform
+        waveformJob?.cancel()
+        waveformJob = null
+        audioCaptureManager = null
         waveformVisualization.clear()
 
-        // Reset status after a short delay
         Timer(1000) {
             ApplicationManager.getApplication().invokeLater {
                 statusLabel.text = "Ready"
@@ -479,13 +418,16 @@ class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposabl
         }
     }
 
+    // =========================================================================
+    // HELPERS
+    // =========================================================================
+
     private fun appendTranscription(text: String) {
         val timestamp = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
         val entry = "[$timestamp] $text\n"
         transcriptionArea.append(entry)
         transcriptionArea.caretPosition = transcriptionArea.document.length
 
-        // Insert into active editor if available
         val cleanText = text.removePrefix("[Recorded] ").removePrefix("[Streaming] ")
         if (cleanText.isNotEmpty() && !text.startsWith("[Listening...]")) {
             val editor = FileEditorManager.getInstance(project).selectedTextEditor
@@ -510,12 +452,12 @@ class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposabl
                 if (com.runanywhere.plugin.isInitialized) {
                     val models = RunAnywhere.availableModels()
                     ApplicationManager.getApplication().invokeLater {
-                        logger.info("Found ${models.size} available models")
+                        println("[STTPanel] Found ${models.size} available models")
                     }
                 }
             } catch (e: Exception) {
                 ApplicationManager.getApplication().invokeLater {
-                    logger.warn("Failed to fetch models: ${e.message}")
+                    println("[STTPanel] Failed to fetch models: ${e.message}")
                 }
             }
         }
@@ -523,13 +465,15 @@ class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposabl
 
     override fun dispose() {
         if (isStreaming) {
-            voiceService.stopVoiceCapture()
+            audioCaptureManager?.stopRecording()
         }
         if (isSimpleRecording) {
-            RunAnywhere.stopStreamingTranscription()
+            audioCaptureManager?.stopRecording()
         }
         recordingJob?.cancel()
+        waveformJob?.cancel()
+        audioCaptureManager = null
         scope.cancel()
-        logger.info("STTPanel disposed")
+        println("[STTPanel] Disposed")
     }
 }
