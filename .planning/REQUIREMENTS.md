@@ -8,9 +8,9 @@
 ### Swift SDK — RAG Component
 
 - [x] **SDK-01**: RAG component wrapper following CppBridge + RunAnywhere extension pattern (matching STT/LLM/TTS)
-- [ ] **SDK-02**: Document ingestion API that passes text strings to C++ RAG backend
-- [ ] **SDK-03**: Query API that sends questions to C++ and returns RAG-augmented answers
-- [ ] **SDK-04**: RAG event types published on EventBus for status and results
+- [x] **SDK-02**: Document ingestion API that passes text strings to C++ RAG backend
+- [x] **SDK-03**: Query API that sends questions to C++ and returns RAG-augmented answers
+- [x] **SDK-04**: RAG event types published on EventBus for status and results
 
 ### iOS Example App — RAG Feature
 
@@ -46,9 +46,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | SDK-01 | Phase 1 | Complete (Plan 01) |
-| SDK-02 | Phase 1 | Pending |
-| SDK-03 | Phase 1 | Pending |
-| SDK-04 | Phase 1 | Pending |
+| SDK-02 | Phase 1 | Complete |
+| SDK-03 | Phase 1 | Complete |
+| SDK-04 | Phase 1 | Complete |
 | APP-01 | Phase 2 | Pending |
 | APP-02 | Phase 2 | Pending |
 | APP-03 | Phase 2 | Pending |

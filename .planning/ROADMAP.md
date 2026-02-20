@@ -12,7 +12,7 @@ Two natural delivery boundaries drive this project. First, the Swift SDK gets a 
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Swift SDK RAG Component** - Expose RAG as a first-class SDK component via CppBridge + extension pattern
+- [x] **Phase 1: Swift SDK RAG Component** - Expose RAG as a first-class SDK component via CppBridge + extension pattern
 - [ ] **Phase 2: iOS App RAG Feature** - User-facing document upload and natural-language Q&A over loaded documents
 
 ## Phase Details
@@ -30,7 +30,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md — RAG C headers in CRACommons, error/event/component enums, CppBridge.RAG actor
-- [ ] 01-02-PLAN.md — RAGTypes, RunAnywhere+RAG public API, RAGEvents
+- [x] 01-02-PLAN.md — RAGTypes, RunAnywhere+RAG public API, RAGEvents
 
 ### Phase 2: iOS App RAG Feature
 **Goal**: Users can pick a PDF or JSON document in the iOS app, load it once, and ask multiple natural-language questions about it
@@ -50,5 +50,5 @@ Phases execute in numeric order: 1 → 2
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Swift SDK RAG Component | 1/2 | In progress | - |
+| 1. Swift SDK RAG Component | 2/2 | Complete | 2026-02-20 |
 | 2. iOS App RAG Feature | 0/TBD | Not started | - |
