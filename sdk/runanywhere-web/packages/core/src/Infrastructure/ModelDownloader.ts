@@ -533,6 +533,43 @@ export class ModelDownloader {
     return null;
   }
 
+  /** Load data from storage as a ReadableStream. Priority: local filesystem > OPFS > memory cache. */
+  async loadStreamFromOPFS(key: string): Promise<ReadableStream<Uint8Array> | null> {
+    // Try local filesystem first
+    if (this.localFileStorage?.isReady) {
+      const localStream = await this.localFileStorage.loadModelStream(key);
+      if (localStream) {
+        logger.debug(`Loading ${key} stream from local storage`);
+        return localStream;
+      }
+    }
+
+    // Try OPFS
+    const opfsStream = await this.storage.loadModelStream(key);
+    if (opfsStream) {
+      logger.debug(`Loading ${key} stream from OPFS`);
+      return opfsStream;
+    }
+
+    // Clean up corrupted 0-byte entries - we can't easily check length on the stream without consuming it,
+    // so we skip the 0-byte check here for now and rely on loadFromOPFS to clean them up.
+
+    // Fall back to in-memory cache
+    const cached = this.memoryCache.get(key);
+    if (cached) {
+      const sizeMB = cached.length / 1024 / 1024;
+      logger.debug(`Loading ${key} stream from memory cache (${sizeMB.toFixed(1)} MB)`);
+      return new ReadableStream({
+        start(controller) {
+          controller.enqueue(cached);
+          controller.close();
+        }
+      });
+    }
+
+    return null;
+  }
+
   /** Check existence in local storage, OPFS, or in-memory cache. */
   async existsInOPFS(key: string): Promise<boolean> {
     if (this.localFileStorage?.isReady) {

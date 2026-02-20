@@ -44,12 +44,16 @@ const sttModelLoader = {
     const sherpa = SherpaONNXBridge.shared;
     await sherpa.ensureLoaded();
 
+    if (!ctx.data) {
+      throw new Error('No data provided for STT model');
+    }
+
     const modelDir = `/models/${ctx.model.id}`;
 
     if (ctx.model.isArchive) {
-      await loadSTTFromArchive(ctx, sherpa, modelDir);
+      await loadSTTFromArchive(ctx as ModelLoadContext & { data: Uint8Array }, sherpa, modelDir);
     } else {
-      await loadSTTFromIndividualFiles(ctx, sherpa, modelDir);
+      await loadSTTFromIndividualFiles(ctx as ModelLoadContext & { data: Uint8Array }, sherpa, modelDir);
     }
   },
 
@@ -59,7 +63,7 @@ const sttModelLoader = {
 };
 
 async function loadSTTFromArchive(
-  ctx: ModelLoadContext,
+  ctx: ModelLoadContext & { data: Uint8Array },
   sherpa: SherpaONNXBridge,
   modelDir: string,
 ): Promise<void> {
@@ -131,7 +135,7 @@ async function loadSTTFromArchive(
 }
 
 async function loadSTTFromIndividualFiles(
-  ctx: ModelLoadContext,
+  ctx: ModelLoadContext & { data: Uint8Array },
   sherpa: SherpaONNXBridge,
   modelDir: string,
 ): Promise<void> {
@@ -220,12 +224,16 @@ const ttsModelLoader = {
     const sherpa = SherpaONNXBridge.shared;
     await sherpa.ensureLoaded();
 
+    if (!ctx.data) {
+      throw new Error('No data provided for TTS model');
+    }
+
     const modelDir = `/models/${ctx.model.id}`;
 
     if (ctx.model.isArchive) {
-      await loadTTSFromArchive(ctx, sherpa, modelDir);
+      await loadTTSFromArchive(ctx as ModelLoadContext & { data: Uint8Array }, sherpa, modelDir);
     } else {
-      await loadTTSFromIndividualFiles(ctx, sherpa, modelDir);
+      await loadTTSFromIndividualFiles(ctx as ModelLoadContext & { data: Uint8Array }, sherpa, modelDir);
     }
   },
 
@@ -235,7 +243,7 @@ const ttsModelLoader = {
 };
 
 async function loadTTSFromArchive(
-  ctx: ModelLoadContext,
+  ctx: ModelLoadContext & { data: Uint8Array },
   sherpa: SherpaONNXBridge,
   modelDir: string,
 ): Promise<void> {
@@ -279,7 +287,7 @@ async function loadTTSFromArchive(
 }
 
 async function loadTTSFromIndividualFiles(
-  ctx: ModelLoadContext,
+  ctx: ModelLoadContext & { data: Uint8Array },
   sherpa: SherpaONNXBridge,
   modelDir: string,
 ): Promise<void> {
@@ -323,6 +331,10 @@ const vadModelLoader = {
   async loadModelFromData(ctx: ModelLoadContext): Promise<void> {
     const sherpa = SherpaONNXBridge.shared;
     await sherpa.ensureLoaded();
+
+    if (!ctx.data) {
+      throw new Error('No data provided for VAD model');
+    }
 
     const modelDir = `/models/${ctx.model.id}`;
     const filename = ctx.model.url?.split('/').pop() ?? 'silero_vad.onnx';

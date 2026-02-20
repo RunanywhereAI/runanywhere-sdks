@@ -70,13 +70,19 @@ class TextGenerationImpl {
   }
 
   /**
-   * Load an LLM model from raw data via ModelLoadContext.
+   * Load an LLM model from raw data or stream via ModelLoadContext.
    * Implements LLMModelLoader interface for ModelManager integration.
    */
   async loadModelFromData(ctx: ModelLoadContext): Promise<void> {
     const bridge = this.requireBridge();
     const modelPath = `/models/${ctx.model.id}.gguf`;
-    bridge.writeFile(modelPath, ctx.data);
+    if (ctx.dataStream) {
+      await bridge.writeFileStream(modelPath, ctx.dataStream);
+    } else if (ctx.data) {
+      bridge.writeFile(modelPath, ctx.data);
+    } else {
+      throw new Error('No data provided to loadModelFromData');
+    }
     await this.loadModel(modelPath, ctx.model.id, ctx.model.name);
   }
 
@@ -417,7 +423,7 @@ class TextGenerationImpl {
         resolve({ value: undefined as unknown as string, done: true });
       }
 
-      rejectResult?.(streamError);
+      rejectResult?.(streamError!);
 
       m.removeFunction(tokenCbPtr);
       m.removeFunction(completeCbPtr);

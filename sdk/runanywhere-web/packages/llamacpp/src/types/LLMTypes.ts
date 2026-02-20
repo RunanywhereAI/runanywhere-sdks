@@ -18,6 +18,7 @@ export interface LLMGenerationOptions {
 }
 
 export interface LLMGenerationResult {
+  [key: string]: unknown;
   text: string;
   thinkingContent?: string;
   inputTokens: number;

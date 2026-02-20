@@ -48,6 +48,7 @@ export interface STTParaformerFiles {
 }
 
 export interface STTTranscriptionResult {
+  [key: string]: unknown;
   text: string;
   confidence: number;
   detectedLanguage?: string;

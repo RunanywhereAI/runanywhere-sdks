@@ -331,6 +331,25 @@ export class LocalFileStorage {
   }
 
   /**
+   * Load model data from the local filesystem as a ReadableStream.
+   * @param key - Model identifier
+   * @returns Readable stream of the model data, or null if not found
+   */
+  async loadModelStream(key: string): Promise<ReadableStream<Uint8Array> | null> {
+    if (!this.dirHandle || !this._isReady) return null;
+
+    try {
+      const filename = this.sanitizeFilename(key);
+      const fileHandle = await this.dirHandle.getFileHandle(filename);
+      const file = await fileHandle.getFile();
+      logger.info(`Loading model stream from local storage: ${filename} (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
+      return file.stream() as unknown as ReadableStream<Uint8Array>;
+    } catch {
+      return null; // File not found
+    }
+  }
+
+  /**
    * Check if a model file exists in local storage.
    * @param key - Model identifier
    */
