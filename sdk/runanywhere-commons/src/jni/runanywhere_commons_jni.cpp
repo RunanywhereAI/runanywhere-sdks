@@ -17,7 +17,6 @@
 #include <jni.h>
 
 #include <condition_variable>
-#include <chrono>
 #include <cstring>
 #include <mutex>
 #include <string>
@@ -568,6 +567,18 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
 
     if (status != RAC_SUCCESS) {
         LOGe("racLlmComponentGenerate failed with status=%d", status);
+        rac_llm_result_free(&result);
+        const char* msg = rac_error_message(status);
+        jclass exClass = env->FindClass("java/lang/RuntimeException");
+        if (exClass) {
+            char fallback[64];
+            if (!msg || !*msg) {
+                snprintf(fallback, sizeof(fallback), "LLM generation failed (status=%d)", status);
+                msg = fallback;
+            }
+            env->ThrowNew(exClass, msg);
+            env->DeleteLocalRef(exClass);
+        }
         return nullptr;
     }
 
@@ -863,6 +874,17 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
 
     if (status != RAC_SUCCESS) {
         LOGe("rac_llm_component_generate_stream failed with status=%d", status);
+        const char* msg = rac_error_message(status);
+        jclass exClass = env->FindClass("java/lang/RuntimeException");
+        if (exClass) {
+            char fallback[64];
+            if (!msg || !*msg) {
+                snprintf(fallback, sizeof(fallback), "LLM stream generation failed (status=%d)", status);
+                msg = fallback;
+            }
+            env->ThrowNew(exClass, msg);
+            env->DeleteLocalRef(exClass);
+        }
         return nullptr;
     }
 
