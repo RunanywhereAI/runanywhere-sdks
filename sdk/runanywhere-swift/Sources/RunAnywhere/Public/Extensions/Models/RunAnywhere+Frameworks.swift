@@ -53,6 +53,8 @@ public extension RunAnywhere {
             relevantCategories = [.language, .multimodal]
         case .diffusion:
             relevantCategories = [.imageGeneration]
+        case .rag:
+            relevantCategories = [.language]
         }
 
         for model in allModels where relevantCategories.contains(model.category) {

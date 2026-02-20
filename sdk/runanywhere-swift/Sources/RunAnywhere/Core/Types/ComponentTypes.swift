@@ -59,6 +59,7 @@ public enum SDKComponent: String, CaseIterable, Codable, Sendable, Hashable {
     case voice = "VOICE"
     case embedding = "EMBEDDING"
     case diffusion = "DIFFUSION"
+    case rag = "RAG"
 
     /// Human-readable display name
     public var displayName: String {
@@ -71,6 +72,7 @@ public enum SDKComponent: String, CaseIterable, Codable, Sendable, Hashable {
         case .voice: return "Voice Agent"
         case .embedding: return "Embedding"
         case .diffusion: return "Image Generation"
+        case .rag: return "Retrieval-Augmented Generation"
         }
     }
 
