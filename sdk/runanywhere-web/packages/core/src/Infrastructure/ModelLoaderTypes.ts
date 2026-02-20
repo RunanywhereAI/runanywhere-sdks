@@ -33,14 +33,18 @@ export interface ModelLoadContext {
   /**
    * Primary model file data (read from storage).
    *
-   * NOTE: This requires the full model file in memory as a Uint8Array.
-   * For the *import* path, files are streamed directly to OPFS/LocalFileStorage
-   * to avoid peak memory issues. However, when *loading* into a WASM backend,
-   * the full buffer is needed because Emscripten's FS.writeFile() requires it.
-   * A future optimisation could use Emscripten's FS.createLazyFile() or
-   * direct OPFS-to-WASM piping to avoid this buffering.
+   * Note: This is optional. Backend loaders that support streaming
+   * should prefer `dataStream` to avoid large memory allocations.
    */
-  data: Uint8Array;
+  data?: Uint8Array;
+
+  /**
+   * Primary model file data as a ReadableStream.
+   *
+   * For large models (e.g. LLMs 2-8GB), use this stream and pipe the chunks
+   * to the WASM backend in pieces, completely avoiding full-file buffering in JS.
+   */
+  dataStream?: ReadableStream<Uint8Array>;
 
   /**
    * Download a file from a URL. Used for on-demand fetching of

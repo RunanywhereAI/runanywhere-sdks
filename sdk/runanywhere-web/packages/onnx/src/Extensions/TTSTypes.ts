@@ -15,6 +15,7 @@ export interface TTSVoiceConfig {
 }
 
 export interface TTSSynthesisResult {
+  [key: string]: unknown;
   /** Raw PCM audio data */
   audioData: Float32Array;
   /** Audio sample rate */

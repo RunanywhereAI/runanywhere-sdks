@@ -327,6 +327,39 @@ export class LlamaCppBridge {
   }
 
   /**
+   * Write a model from a ReadableStream to this WASM module's Emscripten virtual filesystem.
+   * Useful for loading models without buffering the entire file in JS memory.
+   */
+  async writeFileStream(path: string, stream: ReadableStream<Uint8Array>): Promise<void> {
+    const m = this.module as any;
+    const FS = m.FS;
+    if (!FS) throw new Error('Emscripten FS not available on module');
+
+    const dir = path.substring(0, path.lastIndexOf('/'));
+    if (dir && typeof m.FS_createPath === 'function') {
+      m.FS_createPath('/', dir.replace(/^\//, ''), true, true);
+    }
+
+    try { FS.unlink(path); } catch { /* ignore */ }
+
+    logger.debug(`Streaming to LlamaCpp FS: ${path}...`);
+    const fileStream = FS.open(path, 'w+');
+    try {
+      const reader = stream.getReader();
+      let totalBytes = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        FS.write(fileStream, value, 0, value.length, undefined);
+        totalBytes += value.length;
+      }
+      logger.debug(`Finished streaming ${totalBytes} bytes to LlamaCpp FS: ${path}`);
+    } finally {
+      FS.close(fileStream);
+    }
+  }
+
+  /**
    * Remove a file from this WASM module's filesystem.
    */
   unlinkFile(path: string): void {
