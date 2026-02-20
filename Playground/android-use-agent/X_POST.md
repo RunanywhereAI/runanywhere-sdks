@@ -4,7 +4,7 @@
 
 **Result:** ✅ PASS — Qwen3 4B, 6 steps, 3 real LLM inferences, goal-aware element filtering, ~4 min total.
 
-<video src="https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/Playground/android-use-agent/assets/android_agent_muted.mov" controls width="640"></video>
+<video src="https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/Playground/android-use-agent/assets/android_agent_muted.mp4" controls width="640"></video>
 
 ---
 
@@ -195,7 +195,7 @@ Tweet posted live during screen recording. Agent status: **DONE** (green), logs:
 > **Hi from RunAnywhere Android agent**
 > — @RunAnywhereAI · Feb 20, 2026
 
-<video src="https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/Playground/android-use-agent/assets/android_agent_muted.mov" controls width="640"></video>
+<video src="https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/Playground/android-use-agent/assets/android_agent_muted.mp4" controls width="640"></video>
 
 ---
 
