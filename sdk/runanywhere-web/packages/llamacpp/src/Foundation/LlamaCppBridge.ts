@@ -347,13 +347,17 @@ export class LlamaCppBridge {
     try {
       const reader = stream.getReader();
       let totalBytes = 0;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        FS.write(fileStream, value, 0, value.length, undefined);
-        totalBytes += value.length;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          FS.write(fileStream, value, 0, value.length, undefined);
+          totalBytes += value.length;
+        }
+        logger.debug(`Finished streaming ${totalBytes} bytes to LlamaCpp FS: ${path}`);
+      } finally {
+        reader.releaseLock();
       }
-      logger.debug(`Finished streaming ${totalBytes} bytes to LlamaCpp FS: ${path}`);
     } finally {
       FS.close(fileStream);
     }
