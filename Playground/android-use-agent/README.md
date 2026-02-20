@@ -2,6 +2,14 @@
 
 A fully on-device autonomous Android agent powered by the RunAnywhere SDK. Navigates your phone's UI to accomplish tasks using local LLM inference via llama.cpp -- no cloud dependency required.
 
+## Demo
+
+X post demo — Qwen3 4B, 6 steps, 3 real LLM inferences, goal-aware element filtering, ~4 min end-to-end.
+
+<video src="./assets/android_agent_muted.mov" controls width="640"></video>
+
+> Full write-up and run trace: [X_POST.md](X_POST.md)
+
 ## Architecture
 
 The agent follows an observe-reason-act loop. Each step captures the current screen state, reasons about the next action using an on-device LLM, and executes that action via the Android Accessibility API.
