@@ -222,16 +222,17 @@ $instruction
         screenState: String,
         history: String,
         lastActionResult: String? = null,
-        useToolCalling: Boolean = false
+        useToolCalling: Boolean = false,
+        foregroundApp: String? = null
     ): String {
         val lastResultSection = lastActionResult?.let {
             "\nLAST_RESULT: $it"
         } ?: ""
-
+        val appLine = foregroundApp?.let { "\nAPP: $it (already open — do NOT call ui_open_app for it)" } ?: ""
         val instruction = if (useToolCalling) "Call the appropriate tool for your next action." else "Output ONLY a JSON object with your next action."
 
         return """
-GOAL: $goal
+GOAL: $goal$appLine
 
 SCREEN_ELEMENTS:
 $screenState
@@ -246,16 +247,18 @@ $instruction
         screenState: String,
         history: String,
         lastActionResult: String? = null,
-        useToolCalling: Boolean = false
+        useToolCalling: Boolean = false,
+        foregroundApp: String? = null
     ): String {
         val lastResultSection = lastActionResult?.let {
             "\nLAST_RESULT: $it"
         } ?: ""
+        val appLine = foregroundApp?.let { "\nAPP: $it (already open)" } ?: ""
 
         val instruction = if (useToolCalling) "Call a DIFFERENT tool or use different parameters." else "Output ONLY a JSON object with your next action."
 
         return """
-GOAL: $goal
+GOAL: $goal$appLine
 
 SCREEN_ELEMENTS:
 $screenState
@@ -272,16 +275,18 @@ $instruction
         screenState: String,
         history: String,
         lastActionResult: String? = null,
-        useToolCalling: Boolean = false
+        useToolCalling: Boolean = false,
+        foregroundApp: String? = null
     ): String {
         val lastResultSection = lastActionResult?.let {
             "\nLAST_RESULT (FAILED): $it"
         } ?: ""
+        val appLine = foregroundApp?.let { "\nAPP: $it (already open)" } ?: ""
 
         val instruction = if (useToolCalling) "Call a different tool or use different parameters." else "Output ONLY a JSON object with your next action."
 
         return """
-GOAL: $goal
+GOAL: $goal$appLine
 
 SCREEN_ELEMENTS:
 $screenState
@@ -393,20 +398,20 @@ IMPORTANT RULES:
 
     /**
      * Compact system prompt for on-device 1.2B models.
-     * Kept under ~150 tokens to maximize context for screen elements and reasoning.
+     * SCREEN_ELEMENTS is pre-filtered to interactive elements only, goal-relevant ones first.
+     * Kept minimal (~100 tokens) to leave maximum context for screen state and reasoning.
      */
     val COMPACT_SYSTEM_PROMPT = """
-You are an Android UI agent. Achieve the user's GOAL by calling ONE tool per turn.
+You are an Android UI agent. Achieve the GOAL by calling ONE tool per turn.
 Output ONLY: <tool_call>{"tool":"tool_name","arguments":{...}}</tool_call>
 
-Rules:
-- Use ui_open_app to launch apps. NEVER search for app icons.
-- Use ui_tap(index) to tap elements. Match index from SCREEN_ELEMENTS.
-- After tapping an edit field, use ui_type(text) then ui_enter().
-- If the element you need is NOT in SCREEN_ELEMENTS, use ui_swipe(direction="up") to scroll.
-- Do NOT repeat the same action. Check PREVIOUS_ACTIONS.
-- If an app is already open (see SCREEN_ELEMENTS), do NOT open it again.
-- When the goal is achieved, call ui_done.
+SCREEN_ELEMENTS shows only interactive elements, most relevant to your goal listed first.
+- ui_tap(index) — tap element by index. Pick the element that best matches the goal.
+- ui_type(text) — type text into a focused edit field.
+- ui_open_app(app_name) — launch an app ONLY if not already open (check APP below).
+- ui_swipe(direction) — scroll "up" or "down" if needed element isn't visible.
+- ui_done(reason) — call when goal is complete.
+Do NOT call ui_open_app if APP already shows the target app. Check PREVIOUS_ACTIONS.
     """.trimIndent()
 
     val TOOL_AWARE_ADDENDUM = """

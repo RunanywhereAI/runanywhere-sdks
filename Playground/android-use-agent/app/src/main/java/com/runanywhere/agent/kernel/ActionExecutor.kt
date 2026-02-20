@@ -51,26 +51,30 @@ class ActionExecutor(
         decision: Decision,
         indexToCoords: Map<Int, Pair<Int, Int>>
     ): ExecutionResult {
-        val index = decision.elementIndex
+        val filteredIdx = decision.elementIndex
             ?: return ExecutionResult(false, "No element index provided")
 
+        // originalElementIndex is the position in the original accessibility tree (used by performClickAtIndex).
+        // elementIndex may be a re-indexed filtered index — use origIdx for ACTION_CLICK.
+        val origIdx = decision.originalElementIndex ?: filteredIdx
+
         // Try ACTION_CLICK first — bypasses gesture interceptor overlays (e.g., X's fab_menu_background_overlay)
-        val clickSuccess = service.performClickAtIndex(index)
+        val clickSuccess = service.performClickAtIndex(origIdx)
         if (clickSuccess) {
-            onLog("Clicked element $index via accessibility action")
-            return ExecutionResult(true, "Clicked element $index")
+            onLog("Clicked element orig=$origIdx (filtered=$filteredIdx) via accessibility action")
+            return ExecutionResult(true, "Clicked element $filteredIdx")
         }
 
-        // Fall back to coordinate gesture
-        val coords = indexToCoords[index]
-            ?: return ExecutionResult(false, "Invalid element index: $index")
+        // Fall back to coordinate gesture — use filteredIdx for coord lookup (mappedCoords is keyed by filteredIdx)
+        val coords = indexToCoords[filteredIdx]
+            ?: return ExecutionResult(false, "Invalid element index: $filteredIdx")
 
-        onLog("Tapping element $index at (${coords.first}, ${coords.second})")
+        onLog("Tapping element $filteredIdx at (${coords.first}, ${coords.second})")
 
         return suspendCancellableCoroutine { cont ->
             service.tap(coords.first, coords.second) { success ->
                 if (success) {
-                    cont.resume(ExecutionResult(true, "Tapped element $index"))
+                    cont.resume(ExecutionResult(true, "Tapped element $filteredIdx"))
                 } else {
                     cont.resume(ExecutionResult(false, "Tap failed"))
                 }
@@ -290,6 +294,9 @@ class ActionExecutor(
 data class Decision(
     val action: String,
     val elementIndex: Int? = null,
+    /** Original accessibility-tree index when elementIndex is a filtered index.
+     *  If set, performClickAtIndex uses this; elementIndex is used for coordinate lookup. */
+    val originalElementIndex: Int? = null,
     val text: String? = null,
     val direction: String? = null,
     val url: String? = null,
