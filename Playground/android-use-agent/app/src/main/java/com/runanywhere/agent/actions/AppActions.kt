@@ -39,6 +39,8 @@ object AppActions {
         const val TWITTER = "com.twitter.android"
         const val TELEGRAM = "org.telegram.messenger"
         const val NETFLIX = "com.netflix.mediaclient"
+        const val NOTES_SAMSUNG = "com.samsung.android.app.notes"
+        const val KEEP = "com.google.android.keep"
     }
 
     /** Package names that should never be opened by the agent */
@@ -253,17 +255,77 @@ object AppActions {
      */
     fun openX(context: Context): Boolean {
         return try {
-            val intent = Intent(Intent.ACTION_MAIN).apply {
-                addCategory(Intent.CATEGORY_LAUNCHER)
-                component = ComponentName(Packages.TWITTER, "com.twitter.android.StartActivity")
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("twitter://timeline")).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to open X via StartActivity: ${e.message}")
-            // Fallback to generic package launch
+            Log.e(TAG, "Failed to open X via URI: ${e.message}")
             openApp(context, Packages.TWITTER)
+        }
+    }
+
+    /**
+     * Open X compose screen with pre-filled tweet text.
+     * Uses twitter://post?message=... deep link to bypass the home feed entirely.
+     */
+    fun openXCompose(context: Context, message: String): Boolean {
+        return try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("twitter://post?message=${Uri.encode(message)}")).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to open X compose: ${e.message}")
+            openX(context)
+        }
+    }
+
+    /**
+     * Open a notes app (Samsung Notes or Google Keep) and optionally create a new note.
+     * Returns true if successfully launched.
+     */
+    fun openNotes(context: Context, text: String? = null): Boolean {
+        // Try Samsung Notes first (on Samsung devices), then Google Keep
+        if (openApp(context, Packages.NOTES_SAMSUNG)) return true
+        if (openApp(context, Packages.KEEP)) return true
+
+        // Fallback: use ACTION_SEND to any notes app
+        return try {
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                text?.let { putExtra(Intent.EXTRA_TEXT, it) }
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to open notes app: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Set an alarm at a specific hour/minute.
+     */
+    fun setAlarm(context: Context, hour: Int, minute: Int, label: String? = null, skipUi: Boolean = false): Boolean {
+        val validHour = hour.coerceIn(0, 23)
+        val validMinute = minute.coerceIn(0, 59)
+        return try {
+            val intent = Intent(AlarmClock.ACTION_SET_ALARM).apply {
+                putExtra(AlarmClock.EXTRA_HOUR, validHour)
+                putExtra(AlarmClock.EXTRA_MINUTES, validMinute)
+                putExtra(AlarmClock.EXTRA_SKIP_UI, skipUi)
+                label?.let { putExtra(AlarmClock.EXTRA_MESSAGE, it.take(30)) }
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to set alarm: ${e.message}")
+            openClock(context)
         }
     }
 

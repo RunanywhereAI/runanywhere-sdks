@@ -17,10 +17,10 @@ class ActionHistory {
         history.add(ActionRecord(stepCounter, action, target, result, success))
     }
 
-    fun formatForPrompt(): String {
+    fun formatForPrompt(maxEntries: Int = 8): String {
         if (history.isEmpty()) return ""
 
-        val lines = history.takeLast(8).map { record ->
+        val lines = history.takeLast(maxEntries.coerceAtLeast(1)).map { record ->
             val targetStr = record.target?.let { " \"$it\"" } ?: ""
             val resultStr = record.result?.let { " -> $it" } ?: ""
             val status = if (record.success) "OK" else "FAILED"
@@ -28,6 +28,19 @@ class ActionHistory {
         }
 
         return "\n\nPREVIOUS_ACTIONS:\n${lines.joinToString("\n")}"
+    }
+
+    /** Compact format for local models — fewer entries, shorter text. */
+    fun formatCompact(): String {
+        if (history.isEmpty()) return ""
+
+        val lines = history.takeLast(3).map { record ->
+            val targetStr = record.target?.let { " $it" } ?: ""
+            val status = if (record.success) "ok" else "fail"
+            "${record.action}$targetStr ($status)"
+        }
+
+        return "\n\nLAST_ACTIONS:\n${lines.joinToString("\n")}"
     }
 
     fun getLastActionResult(): String? {

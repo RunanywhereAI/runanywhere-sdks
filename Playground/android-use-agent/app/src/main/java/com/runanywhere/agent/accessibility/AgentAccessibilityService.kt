@@ -81,11 +81,13 @@ class AgentAccessibilityService : AccessibilityService() {
     data class ScreenState(
         val compactText: String,
         val elements: List<ScreenElement>,
-        val indexToCoords: Map<Int, Pair<Int, Int>>
+        val indexToCoords: Map<Int, Pair<Int, Int>>,
+        val foregroundPackage: String? = null
     )
 
     fun getScreenState(maxElements: Int = 30, maxTextLength: Int = 50): ScreenState {
         val root = rootInActiveWindow ?: return ScreenState("", emptyList(), emptyMap())
+        val foregroundPkg = root.packageName?.toString()
         val elements = mutableListOf<ScreenElement>()
         val indexToCoords = mutableMapOf<Int, Pair<Int, Int>>()
         val lines = mutableListOf<String>()
@@ -106,7 +108,38 @@ class AgentAccessibilityService : AccessibilityService() {
             lines.add("$idx: $displayLabel ($typeStr) $capsStr".trim())
         }
 
-        return ScreenState(lines.joinToString("\n"), elements, indexToCoords)
+        return ScreenState(lines.joinToString("\n"), elements, indexToCoords, foregroundPkg)
+    }
+
+    /**
+     * Generic container class names that contribute no useful information to the LLM
+     * when they have no label. Clicking an unlabeled ViewGroup or FrameLayout is
+     * indistinguishable from tapping its labeled child — so we skip the parent.
+     */
+    private val UNLABELED_SKIP_CLASSES = setOf(
+        "ViewGroup", "FrameLayout", "LinearLayout", "RelativeLayout",
+        "ConstraintLayout", "CoordinatorLayout", "ScrollView", "HorizontalScrollView",
+        "NestedScrollView", "RecyclerView", "ListView", "GridView",
+        "ViewPager", "ViewPager2", "WebView"
+    )
+
+    /**
+     * Returns true if this node should be included in the element list.
+     * Shared by [traverseForElements] and [collectInteractiveNodes] so tap indices stay in sync.
+     */
+    private fun shouldIncludeNode(node: AccessibilityNodeInfo, label: String): Boolean {
+        if (!node.isEnabled) return false
+        val hasAction = node.isClickable || node.isEditable || node.isCheckable
+        if (!hasAction && label.isEmpty()) return false
+
+        // Skip unlabeled clickable containers — they add noise with no context for the LLM.
+        // A labeled container (e.g. a tweet row with text) is kept because the label is useful.
+        if (label.isEmpty() && node.isClickable && !node.isEditable && !node.isCheckable) {
+            val simpleClass = node.className?.toString()?.split(".")?.lastOrNull() ?: ""
+            if (simpleClass in UNLABELED_SKIP_CLASSES) return false
+        }
+
+        return true
     }
 
     private fun traverseForElements(
@@ -123,13 +156,10 @@ class AgentAccessibilityService : AccessibilityService() {
         val clickable = node.isClickable
         val editable = node.isEditable
         val checkable = node.isCheckable
-        val checked = node.isChecked
-        val enabled = node.isEnabled
         val className = node.className?.toString() ?: ""
         val resourceId = node.viewIdResourceName?.substringAfterLast("/") ?: ""
 
-        // Include interactive or labeled elements
-        if (enabled && (label.isNotEmpty() || clickable || editable || checkable)) {
+        if (shouldIncludeNode(node, label)) {
             val bounds = Rect()
             node.getBoundsInScreen(bounds)
 
@@ -152,7 +182,7 @@ class AgentAccessibilityService : AccessibilityService() {
                         isClickable = clickable,
                         isEditable = editable,
                         isCheckable = checkable,
-                        isChecked = checked,
+                        isChecked = node.isChecked,
                         suggestedAction = suggestedAction
                     )
                 )
@@ -168,6 +198,48 @@ class AgentAccessibilityService : AccessibilityService() {
     }
 
     // ========== Actions ==========
+
+    /**
+     * Perform ACTION_CLICK on the Nth element in the accessibility tree
+     * (same traversal order as getScreenState). Bypasses gesture interceptor overlays
+     * like X's fab_menu_background_overlay that intercept dispatchGesture() calls.
+     */
+    fun performClickAtIndex(index: Int, maxElements: Int = 30, maxTextLength: Int = 50): Boolean {
+        val root = rootInActiveWindow ?: return false
+        val nodes = mutableListOf<AccessibilityNodeInfo>()
+        collectInteractiveNodes(root, nodes, maxElements, maxTextLength)
+        val node = nodes.getOrNull(index) ?: return false
+        return node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+    }
+
+    private fun collectInteractiveNodes(
+        node: AccessibilityNodeInfo,
+        nodes: MutableList<AccessibilityNodeInfo>,
+        maxElements: Int,
+        maxTextLength: Int
+    ) {
+        if (nodes.size >= maxElements) return
+
+        val text = node.text?.toString()?.trim()?.take(maxTextLength) ?: ""
+        val desc = node.contentDescription?.toString()?.trim()?.take(maxTextLength) ?: ""
+        val label = text.ifEmpty { desc }
+
+        // Must use same filter as traverseForElements so indices match getScreenState()
+        if (shouldIncludeNode(node, label)) {
+            val bounds = Rect()
+            node.getBoundsInScreen(bounds)
+            if (bounds.width() > 0 && bounds.height() > 0) {
+                nodes.add(node)
+            }
+        }
+
+        for (i in 0 until node.childCount) {
+            if (nodes.size >= maxElements) return
+            node.getChild(i)?.let { child ->
+                collectInteractiveNodes(child, nodes, maxElements, maxTextLength)
+            }
+        }
+    }
 
     fun tap(x: Int, y: Int, callback: ((Boolean) -> Unit)? = null) {
         val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
