@@ -14,10 +14,10 @@
 
 ### iOS Example App — RAG Feature
 
-- [ ] **APP-01**: User can pick PDF or JSON files via document picker
-- [ ] **APP-02**: App extracts text from PDF and JSON documents before passing to C++
-- [ ] **APP-03**: User can type questions and receive RAG-augmented answers
-- [ ] **APP-04**: Document stays loaded across multiple queries (persistent session)
+- [x] **APP-01**: User can pick PDF or JSON files via document picker
+- [x] **APP-02**: App extracts text from PDF and JSON documents before passing to C++
+- [x] **APP-03**: User can type questions and receive RAG-augmented answers
+- [x] **APP-04**: Document stays loaded across multiple queries (persistent session)
 
 ## v2 Requirements
 
@@ -49,10 +49,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SDK-02 | Phase 1 | Complete |
 | SDK-03 | Phase 1 | Complete |
 | SDK-04 | Phase 1 | Complete |
-| APP-01 | Phase 2 | Pending |
-| APP-02 | Phase 2 | Pending |
-| APP-03 | Phase 2 | Pending |
-| APP-04 | Phase 2 | Pending |
+| APP-01 | Phase 2 | Complete |
+| APP-02 | Phase 2 | Complete |
+| APP-03 | Phase 2 | Complete |
+| APP-04 | Phase 2 | Complete |
 
 **Coverage:**
 - v1 requirements: 8 total

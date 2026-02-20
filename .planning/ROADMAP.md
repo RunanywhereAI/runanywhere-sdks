@@ -41,7 +41,7 @@ Plans:
   2. App extracts plain text from the selected file and passes it to the SDK ingest API
   3. User can type a question and receive an answer grounded in the loaded document
   4. User can ask follow-up questions without re-uploading the document (document stays loaded)
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 02-01-PLAN.md — DocumentService (PDF/JSON extraction) + RAGViewModel (orchestration logic)
@@ -55,4 +55,4 @@ Phases execute in numeric order: 1 → 2
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Swift SDK RAG Component | 2/2 | Complete    | 2026-02-20 |
-| 2. iOS App RAG Feature | 0/TBD | Not started | - |
+| 2. iOS App RAG Feature | 1/2 | In Progress|  |
