@@ -134,7 +134,7 @@ class LlamaCppTextGeneration {
 
     bool model_loaded_ = false;
     std::atomic<bool> cancel_requested_{false};
-    bool decode_failed_ = false;
+    std::atomic<bool> decode_failed_{false};
 
     std::string model_path_;
     nlohmann::json model_config_;
