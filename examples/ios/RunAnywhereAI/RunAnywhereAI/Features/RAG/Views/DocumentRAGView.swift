@@ -3,7 +3,7 @@
 //  RunAnywhereAI
 //
 //  SwiftUI view for the RAG document Q&A feature.
-//  Handles document picking, loading state, and Q&A chat interface.
+//  Handles model selection, document picking, loading state, and Q&A chat interface.
 //
 
 import SwiftUI
@@ -15,21 +15,33 @@ import RunAnywhere
 struct DocumentRAGView: View {
     @State private var viewModel = RAGViewModel()
     @State private var isShowingFilePicker = false
+    @State private var isShowingEmbeddingModelPicker = false
+    @State private var isShowingLLMModelPicker = false
     @State private var isErrorBannerVisible = false
+    @State private var selectedEmbeddingModel: ModelInfo?
+    @State private var selectedLLMModel: ModelInfo?
     @FocusState private var isInputFocused: Bool
 
-    // Placeholder RAG configuration — model paths will be wired from
-    // the app's model manager in a future iteration.
-    private var ragConfig: RAGConfiguration {
-        RAGConfiguration(
-            embeddingModelPath: "",  // Placeholder — real path from model manager
-            llmModelPath: ""         // Placeholder — real path from model manager
+    private var areModelsReady: Bool {
+        selectedEmbeddingModel?.localPath != nil && selectedLLMModel?.localPath != nil
+    }
+
+    private var ragConfig: RAGConfiguration? {
+        guard
+            let embeddingPath = selectedEmbeddingModel?.localPath?.path,
+            let llmPath = selectedLLMModel?.localPath?.path
+        else { return nil }
+
+        return RAGConfiguration(
+            embeddingModelPath: embeddingPath,
+            llmModelPath: llmPath
         )
     }
 
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
+                modelSetupSection
                 documentStatusBar
                 errorBanner
                 messagesArea
@@ -51,11 +63,92 @@ struct DocumentRAGView: View {
         ) { result in
             handleFileImport(result)
         }
+        .adaptiveSheet(isPresented: $isShowingEmbeddingModelPicker) {
+            ModelSelectionSheet(context: .ragEmbedding) { model in
+                selectedEmbeddingModel = model
+            }
+        }
+        .adaptiveSheet(isPresented: $isShowingLLMModelPicker) {
+            ModelSelectionSheet(context: .ragLLM) { model in
+                selectedLLMModel = model
+            }
+        }
         .onChange(of: viewModel.error != nil) { _, hasError in
             withAnimation {
                 isErrorBannerVisible = hasError
             }
         }
+    }
+}
+
+// MARK: - Model Setup Section
+
+extension DocumentRAGView {
+    @ViewBuilder
+    private var modelSetupSection: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: AppSpacing.smallMedium) {
+                modelPickerRow(
+                    label: "Embedding Model",
+                    systemImage: "brain",
+                    model: selectedEmbeddingModel,
+                    action: { isShowingEmbeddingModelPicker = true }
+                )
+                modelPickerRow(
+                    label: "LLM Model",
+                    systemImage: "text.bubble",
+                    model: selectedLLMModel,
+                    action: { isShowingLLMModelPicker = true }
+                )
+            }
+            .padding(.horizontal, AppSpacing.large)
+            .padding(.vertical, AppSpacing.mediumLarge)
+            Divider()
+        }
+        .background(AppColors.backgroundPrimary)
+    }
+
+    private func modelPickerRow(
+        label: String,
+        systemImage: String,
+        model: ModelInfo?,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: AppSpacing.mediumLarge) {
+                Image(systemName: systemImage)
+                    .foregroundColor(AppColors.textSecondary)
+                    .frame(width: 20)
+
+                Text(label)
+                    .font(.subheadline)
+                    .foregroundColor(AppColors.textSecondary)
+
+                Spacer()
+
+                if let model {
+                    Text(model.name)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(AppColors.textPrimary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(AppColors.primaryGreen)
+                        .font(.caption)
+                } else {
+                    Text("Not selected")
+                        .font(.subheadline)
+                        .foregroundColor(AppColors.primaryAccent)
+
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(AppColors.textTertiary)
+                        .font(.caption)
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -88,9 +181,10 @@ extension DocumentRAGView {
                     .foregroundColor(.white)
                     .padding(.horizontal, AppSpacing.xLarge)
                     .padding(.vertical, AppSpacing.mediumLarge)
-                    .background(AppColors.primaryAccent)
+                    .background(areModelsReady ? AppColors.primaryAccent : AppColors.statusGray)
                     .cornerRadius(AppSpacing.cornerRadiusLarge)
             }
+            .disabled(!areModelsReady)
             Spacer()
         }
         .padding(AppSpacing.large)
@@ -211,6 +305,15 @@ extension DocumentRAGView {
                         .font(.subheadline)
                         .foregroundColor(AppColors.textSecondary)
                         .multilineTextAlignment(.center)
+                } else if !areModelsReady {
+                    Text("Select models to get started")
+                        .font(.headline)
+                        .foregroundColor(AppColors.textPrimary)
+                    Text("Choose an embedding model and an LLM model above, then pick a document")
+                        .font(.subheadline)
+                        .foregroundColor(AppColors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, AppSpacing.xxxLarge)
                 } else {
                     Text("No document selected")
                         .font(.headline)
@@ -320,15 +423,12 @@ extension DocumentRAGView {
     private func handleFileImport(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
-            guard let url = urls.first else { return }
+            guard let url = urls.first, let config = ragConfig else { return }
             Task {
-                await viewModel.loadDocument(url: url, config: ragConfig)
+                await viewModel.loadDocument(url: url, config: config)
             }
         case .failure(let error):
-            // Assign import error to viewModel so it surfaces in the error banner
-            Task { @MainActor in
-                _ = error  // Error is surfaced via viewModel.error set by loadDocument
-            }
+            viewModel.error = error
         }
     }
 }

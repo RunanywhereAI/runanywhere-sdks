@@ -12,11 +12,13 @@ import RunAnywhere
 
 /// Context for filtering frameworks and models based on the current experience/modality
 enum ModelSelectionContext {
-    case llm       // Chat experience - show LLM frameworks (llama.cpp, Foundation Models)
-    case stt       // Speech-to-Text - show STT frameworks (ONNX STT)
-    case tts       // Text-to-Speech - show TTS frameworks (ONNX TTS/Piper, System TTS)
-    case voice     // Voice Assistant - show all voice-related (LLM + STT + TTS)
-    case vlm       // Vision Language Model - show VLM frameworks
+    case llm           // Chat experience - show LLM frameworks (llama.cpp, Foundation Models)
+    case stt           // Speech-to-Text - show STT frameworks (ONNX STT)
+    case tts           // Text-to-Speech - show TTS frameworks (ONNX TTS/Piper, System TTS)
+    case voice         // Voice Assistant - show all voice-related (LLM + STT + TTS)
+    case vlm           // Vision Language Model - show VLM frameworks
+    case ragEmbedding  // RAG embedding model - ONNX language/embedding models
+    case ragLLM        // RAG generation model - LLM for answering questions
 
     var title: String {
         switch self {
@@ -25,6 +27,8 @@ enum ModelSelectionContext {
         case .tts: return "Select TTS Model"
         case .voice: return "Select Model"
         case .vlm: return "Select Vision Model"
+        case .ragEmbedding: return "Select Embedding Model"
+        case .ragLLM: return "Select LLM Model"
         }
     }
 
@@ -40,6 +44,22 @@ enum ModelSelectionContext {
             return [.language, .speechRecognition, .speechSynthesis]
         case .vlm:
             return [.multimodal, .vision]
+        case .ragEmbedding:
+            return [.language]
+        case .ragLLM:
+            return [.language]
+        }
+    }
+
+    /// Frameworks to include. nil means all frameworks that have matching models.
+    var allowedFrameworks: Set<InferenceFramework>? {
+        switch self {
+        case .ragEmbedding:
+            return [.onnx]
+        case .ragLLM:
+            return [.llamaCpp]
+        default:
+            return nil
         }
     }
 }
@@ -70,7 +90,13 @@ struct ModelSelectionSheet: View {
 
     private var availableModels: [ModelInfo] {
         viewModel.availableModels
-            .filter { context.relevantCategories.contains($0.category) }
+            .filter { model in
+                guard context.relevantCategories.contains(model.category) else { return false }
+                if let allowed = context.allowedFrameworks {
+                    return allowed.contains(model.framework)
+                }
+                return true
+            }
             .sorted { modelPriority($0) != modelPriority($1)
                 ? modelPriority($0) < modelPriority($1)
                 : $0.name < $1.name
@@ -129,7 +155,10 @@ struct ModelSelectionSheet: View {
     }
 
     private func shouldShowFramework(_ framework: InferenceFramework) -> Bool {
-        viewModel.availableModels
+        if let allowed = context.allowedFrameworks, !allowed.contains(framework) {
+            return false
+        }
+        return viewModel.availableModels
             .filter { $0.framework == framework }
             .contains { context.relevantCategories.contains($0.category) }
     }
@@ -217,6 +246,15 @@ extension ModelSelectionSheet {
             guard model.localPath != nil else { return }
         }
 
+        // RAG model selection does not pre-load into memory; just select and dismiss.
+        let isRAGContext = context == .ragEmbedding || context == .ragLLM
+        if isRAGContext {
+            await MainActor.run { selectedModel = model }
+            await handleModelLoadSuccess(model)
+            await MainActor.run { dismiss() }
+            return
+        }
+
         await MainActor.run {
             isLoadingModel = true
             loadingProgress = "Initializing \(model.name)..."
@@ -247,6 +285,10 @@ extension ModelSelectionSheet {
         case .tts: try await RunAnywhere.loadTTSModel(model.id)
         case .voice: try await loadModelForVoiceContext(model)
         case .vlm: try await RunAnywhere.loadVLMModel(model)
+        case .ragEmbedding, .ragLLM:
+            // RAG models are referenced by local file path at pipeline creation time,
+            // not pre-loaded into memory via the SDK model loader.
+            break
         }
     }
 
