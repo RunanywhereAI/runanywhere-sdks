@@ -60,7 +60,7 @@ public:
     llama_context* context = nullptr;
     
     std::string model_path;
-    int context_size = 1024;  // Reduced from 2048 for Android stability
+    int context_size = 2048;
     int batch_size = 64;
     float temperature = 0.7f;
     float top_p = 0.95f;
@@ -169,7 +169,7 @@ public:
         
         // Create context with safe defaults for ARM64/embedded platforms
         llama_context_params ctx_params = llama_context_default_params();
-        ctx_params.n_ctx = std::min(context_size, 512);        // Force smaller context for stability testing
+        ctx_params.n_ctx = context_size;
         ctx_params.n_batch = 64;                               // Very conservative batch size
         ctx_params.n_ubatch = 64;                              // Very conservative micro-batch size
         ctx_params.n_seq_max = 1;                              // Single sequence only
@@ -283,7 +283,7 @@ public:
             return finalize(result);
         }
         
-        int max_tokens = options.max_tokens > 0 ? std::min(options.max_tokens, 100) : 100;  // Force small for testing
+        int max_tokens = options.max_tokens > 0 ? options.max_tokens : 512;
         int n_max_tokens = std::min(max_tokens, available_tokens);
         
         LOGI("Generation: prompt_tokens=%d, max_tokens=%d, context=%d", 

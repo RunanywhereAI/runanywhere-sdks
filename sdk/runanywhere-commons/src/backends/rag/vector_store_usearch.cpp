@@ -154,11 +154,16 @@ public:
             return {};
         }
 
-        // Search
+        // Search for the closest K matches
         auto matches = index_.search(query_embedding.data(), top_k);
 
         LOGI("USearch returned %zu matches from %zu total vectors", 
              matches.size(), index_.size());
+
+        // Dense embeddings (like all-minilm) rarely score above 0.3-0.5 for natural questions.
+        // We cap the incoming threshold to a realistic semantic boundary (e.g., 0.15) 
+        // to ensure we actually return the Top-K results instead of blocking them.
+        float effective_threshold = std::min(threshold, 0.15f);
 
         std::vector<SearchResult> results;
         results.reserve(matches.size());
@@ -171,11 +176,12 @@ public:
             // USearch cosine distance is 1 - cosine_similarity
             float similarity = 1.0f - distance;
 
-            LOGI("Match %zu: key=%zu, distance=%.4f, similarity=%.4f, threshold=%.4f",
-                 i, key, distance, similarity, threshold);
+            LOGI("Match %zu: key=%zu, distance=%.4f, similarity=%.4f, effective_threshold=%.4f",
+                 i, key, distance, similarity, effective_threshold);
 
-            if (similarity < threshold) {
-                LOGI("  Skipping: similarity %.4f < threshold %.4f", similarity, threshold);
+            // Use our capped threshold for filtering
+            if (similarity < effective_threshold) {
+                LOGI("  Skipping: similarity %.4f < effective_threshold %.4f", similarity, effective_threshold);
                 continue;
             }
 

@@ -307,27 +307,21 @@ struct RunAnywhereAIApp: App {
         logger.info("✅ ONNX STT/TTS models registered")
 
         // Register ONNX Embedding models for RAG
-        // all-MiniLM-L6-v2: lightweight sentence embedding model (~23MB)
-        // Produces 384-dimensional vectors, compatible with RAGConfiguration default embeddingDimension
-        if let miniLMURL = URL(string: "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx") {
-            RunAnywhere.registerModel(
+        // all-MiniLM-L6-v2: registered as multi-file so model.onnx and vocab.txt
+        // download into the same folder - C++ RAG pipeline looks for vocab.txt
+        // next to model.onnx, so they must be co-located.
+        if let miniLMModelURL = URL(string: "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx"),
+           let miniLMVocabURL = URL(string: "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt") {
+            RunAnywhere.registerMultiFileModel(
                 id: "all-minilm-l6-v2",
                 name: "All MiniLM L6 v2 (Embedding)",
-                url: miniLMURL,
+                files: [
+                    ModelFileDescriptor(url: miniLMModelURL, filename: "model.onnx"),
+                    ModelFileDescriptor(url: miniLMVocabURL, filename: "vocab.txt")
+                ],
                 framework: .onnx,
                 modality: .embedding,
-                memoryRequirement: 25_000_000
-            )
-        }
-        // vocab.txt required by the RAG ONNX embedding provider for tokenization
-        if let miniLMVocabURL = URL(string: "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt") {
-            RunAnywhere.registerModel(
-                id: "all-minilm-l6-v2-vocab",
-                name: "All MiniLM L6 v2 (Vocab)",
-                url: miniLMVocabURL,
-                framework: .onnx,
-                modality: .embedding,
-                memoryRequirement: 500_000
+                memoryRequirement: 25_500_000
             )
         }
         logger.info("✅ ONNX Embedding models registered")

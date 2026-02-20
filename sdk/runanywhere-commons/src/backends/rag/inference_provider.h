@@ -70,7 +70,7 @@ public:
  * @brief Generation options
  */
 struct GenerationOptions {
-    int max_tokens = 512;
+    int max_tokens = 1024;
     float temperature = 0.7f;
     float top_p = 0.9f;
     int top_k = 40;

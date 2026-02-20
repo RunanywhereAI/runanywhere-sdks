@@ -35,7 +35,8 @@ final class RAGViewModel {
 
     private(set) var messages: [(role: MessageRole, text: String)] = []
     private(set) var isQuerying = false
-    private(set) var error: Error?
+    /// Settable from the view layer to surface file-picker failures in the error banner.
+    var error: Error?
 
     // MARK: - Input
 

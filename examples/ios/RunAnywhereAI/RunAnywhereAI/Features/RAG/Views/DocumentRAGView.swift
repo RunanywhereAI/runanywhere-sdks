@@ -26,37 +26,63 @@ struct DocumentRAGView: View {
         selectedEmbeddingModel?.localPath != nil && selectedLLMModel?.localPath != nil
     }
 
+    /// Resolve the actual embedding model file path.
+    ///
+    /// Multi-file models (like all-minilm-l6-v2) set localPath to the folder after download.
+    /// In that case we return the path to model.onnx inside that folder.
+    private func resolveEmbeddingFilePath(localPath: URL) -> String {
+        var isDir: ObjCBool = false
+        if FileManager.default.fileExists(atPath: localPath.path, isDirectory: &isDir), isDir.boolValue {
+            return localPath.appendingPathComponent("model.onnx").path
+        }
+        return localPath.path
+    }
+
+    /// Resolve the actual LLM model file path.
+    ///
+    /// Single-file LlamaCpp models are stored inside a directory named after the model ID.
+    /// In that case we return the path to the first `.gguf` file found in the directory.
+    private func resolveLLMFilePath(localPath: URL) -> String {
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: localPath.path, isDirectory: &isDir),
+              isDir.boolValue else {
+            return localPath.path
+        }
+        let ggufFile = (try? FileManager.default.contentsOfDirectory(at: localPath, includingPropertiesForKeys: nil))?
+            .first { $0.pathExtension.lowercased() == "gguf" }
+        return ggufFile?.path ?? localPath.path
+    }
+
     /// Resolve the vocab file path for the embedding model.
     ///
-    /// Looks for a downloaded vocab model with id "<embeddingModelId>-vocab".
-    /// Falls back to deriving the vocab path from the embedding model's directory
-    /// (same folder, filename "vocab.txt").
-    private func resolveVocabPath(for embeddingModel: ModelInfo) async -> String? {
-        // Try to find a downloaded vocab model paired with the embedding model
-        let vocabModelId = "\(embeddingModel.id)-vocab"
-        if let allModels = try? await RunAnywhere.availableModels(),
-           let vocabModel = allModels.first(where: { $0.id == vocabModelId }),
-           let vocabPath = vocabModel.localPath {
-            return vocabPath.path
+    /// Multi-file embedding models (localPath = folder) have vocab.txt directly inside
+    /// the folder. Single-file models fall back to the sibling-file convention.
+    private func resolveVocabPath(for embeddingModel: ModelInfo) -> String? {
+        guard let embeddingPath = embeddingModel.localPath else { return nil }
+
+        var isDir: ObjCBool = false
+        if FileManager.default.fileExists(atPath: embeddingPath.path, isDirectory: &isDir), isDir.boolValue {
+            // Multi-file model: vocab.txt is in the same folder as model.onnx
+            return embeddingPath.appendingPathComponent("vocab.txt").path
         }
 
-        // Fallback: derive vocab.txt path from the embedding model's parent directory
-        guard let embeddingPath = embeddingModel.localPath else { return nil }
+        // Single-file model: vocab.txt is a sibling of the model file
         return embeddingPath.deletingLastPathComponent().appendingPathComponent("vocab.txt").path
     }
 
     private var ragConfig: RAGConfiguration? {
         guard
-            let embeddingPath = selectedEmbeddingModel?.localPath?.path,
-            let llmPath = selectedLLMModel?.localPath?.path
+            let embeddingModel = selectedEmbeddingModel,
+            let embeddingLocalPath = embeddingModel.localPath,
+            let llmLocalPath = selectedLLMModel?.localPath
         else { return nil }
 
         // embeddingConfigJSON is set asynchronously via loadDocument(url:config:) after
         // vocab path is resolved. Here we build the base config; vocab is injected by the
         // ViewModel when it calls loadDocument.
         return RAGConfiguration(
-            embeddingModelPath: embeddingPath,
-            llmModelPath: llmPath
+            embeddingModelPath: resolveEmbeddingFilePath(localPath: embeddingLocalPath),
+            llmModelPath: resolveLLMFilePath(localPath: llmLocalPath)
         )
     }
 
@@ -447,10 +473,10 @@ extension DocumentRAGView {
         case .success(let urls):
             guard let url = urls.first, let baseConfig = ragConfig else { return }
             Task {
-                // Resolve vocab path and inject into embeddingConfigJSON before pipeline creation
+                // Inject the vocab path into embeddingConfigJSON so C++ knows where to find vocab.txt
                 var finalConfig = baseConfig
                 if let embeddingModel = selectedEmbeddingModel,
-                   let vocabPath = await resolveVocabPath(for: embeddingModel) {
+                   let vocabPath = resolveVocabPath(for: embeddingModel) {
                     let vocabJSON = "{\"vocab_path\":\"\(vocabPath)\"}"
                     finalConfig = RAGConfiguration(
                         embeddingModelPath: baseConfig.embeddingModelPath,
