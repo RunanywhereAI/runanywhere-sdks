@@ -571,8 +571,8 @@ export class ModelDownloader {
   async loadModelFile(key: string): Promise<File | null> {
     // Try local filesystem first
     if (this.localFileStorage?.isReady) {
-      // LocalFileStorage needs to implement loadModelFile too, but for now we skip it
-      // or assume usage of OPFS mainly for this feature.
+      const file = await this.localFileStorage.loadModelFile(key);
+      if (file) return file;
     }
 
     // Try OPFS

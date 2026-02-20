@@ -85,7 +85,7 @@ class TextGenerationImpl {
         isMounted = true;
         this._mountedPath = modelPath;
       } else {
-        logger.warning('Mounting failed, falling back to reading file as stream');
+        logger.warning('Mounting failed (WORKERFS unavailable?), falling back to reading file as stream');
         modelPath = `/models/${ctx.model.id}.gguf`;
         await bridge.writeFileStream(modelPath, ctx.file.stream() as unknown as ReadableStream<Uint8Array>);
       }
@@ -99,6 +99,7 @@ class TextGenerationImpl {
       throw new Error('No data provided to loadModelFromData');
     }
 
+    // modelPath is guaranteed to be set by one of the branches above
     if (!modelPath) throw new Error('Failed to determine model path');
 
     try {
@@ -166,21 +167,23 @@ class TextGenerationImpl {
 
     const bridge = this.requireBridge();
 
-    const result = await bridge.callFunction<number | Promise<number>>(
-      'rac_llm_component_unload',
-      'number',
-      ['number'],
-      [this._llmComponentHandle],
-      { async: true },
-    ) as number;
-    bridge.checkResult(result, 'rac_llm_component_unload');
+    try {
+      const result = await bridge.callFunction<number | Promise<number>>(
+        'rac_llm_component_unload',
+        'number',
+        ['number'],
+        [this._llmComponentHandle],
+        { async: true },
+      ) as number;
+      bridge.checkResult(result, 'rac_llm_component_unload');
 
-    logger.info('LLM model unloaded');
-
-    // Clean up mounted file if applicable
-    if (this._mountedPath) {
-      bridge.unmount(this._mountedPath);
-      this._mountedPath = null;
+      logger.info('LLM model unloaded');
+    } finally {
+      // Clean up mounted file if applicable (always run cleanup even if unload fails)
+      if (this._mountedPath) {
+        bridge.unmount(this._mountedPath);
+        this._mountedPath = null;
+      }
     }
   }
 

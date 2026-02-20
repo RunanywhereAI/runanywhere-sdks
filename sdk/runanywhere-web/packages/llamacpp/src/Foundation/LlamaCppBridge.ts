@@ -131,6 +131,7 @@ export interface LlamaCppModule {
 
 export class LlamaCppBridge {
   private static _instance: LlamaCppBridge | null = null;
+  private static _nextMountId = 0;
   private _module: LlamaCppModule | null = null;
   private _loaded = false;
   private _loading: Promise<void> | null = null;
@@ -388,7 +389,7 @@ export class LlamaCppBridge {
 
     try {
       // Create a unique mount point directory
-      const mountId = Math.floor(Math.random() * 1000000);
+      const mountId = LlamaCppBridge._nextMountId++;
       const mountDir = `/mnt-${mountId}`;
 
       if (m.FS_mkdir) m.FS_mkdir(mountDir);
