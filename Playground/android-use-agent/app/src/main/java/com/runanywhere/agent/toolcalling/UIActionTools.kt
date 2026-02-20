@@ -37,9 +37,13 @@ object UIActionTools {
                 )
             )
         ) { args ->
-            val index = (args["index"] as? Number)?.toInt()
+            val filteredIdx = (args["index"] as? Number)?.toInt()
                 ?: return@register "Error: index parameter required"
-            val decision = Decision("tap", elementIndex = index)
+            // Resolve the original accessibility-tree index so performClickAtIndex
+            // hits the correct node (filteredIdx is re-indexed 0..N, origIdx is the
+            // position in the full tree returned by getScreenState/collectInteractiveNodes).
+            val origIdx = ctx.indexMapping[filteredIdx] ?: filteredIdx
+            val decision = Decision("tap", elementIndex = filteredIdx, originalElementIndex = origIdx)
             val result = executor.execute(decision, ctx.indexToCoords)
             result.message
         }

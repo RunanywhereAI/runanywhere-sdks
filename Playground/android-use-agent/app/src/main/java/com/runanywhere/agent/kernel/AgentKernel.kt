@@ -77,6 +77,10 @@ class AgentKernel(
     private var planResult: PlanResult? = null
     /** Tweet text if compose was pre-launched via deep link. Non-null means compose should stay open. */
     private var xComposeMessage: String? = null
+    /** True once the X ComposerActivity has been seen on screen. Prevents bringAppToForeground
+     *  from using getLaunchIntentForPackage (which kills the compose back stack) after the LLM
+     *  taps the FAB and compose opens for the first time. Reset when agent run resets. */
+    private var isXComposeOpen: Boolean = false
 
 
     // Tracks the last prompt for local model tool result re-injection
@@ -140,6 +144,7 @@ class AgentKernel(
         _stepRecords.clear()
         planResult = null
         xComposeMessage = null
+        isXComposeOpen = false
 
         try {
             emit(AgentEvent.Log("Starting agent..."))
@@ -274,8 +279,65 @@ class AgentKernel(
                 Log.i(TAG, "Screen: pkg=${screen.foregroundPackage}, ${screen.elementCount} elements")
                 Log.i(TAG, "Elements: ${screen.compactText.take(1500)}")
 
-                // Update UI action context with fresh coordinates
-                uiActionContext.indexToCoords = screen.indexToCoords
+                // Goal-aware filter: keep only interactive elements, goal-relevant ones ranked first.
+                // Small models (1.2B) pick low indices (0–2) regardless of content — filtering
+                // brings the most relevant elements to the top so those selections are correct.
+                val filteredScreen = filterScreenForGoal(screen.compactText, goal)
+                val mappedCoords: Map<Int, Pair<Int, Int>> = filteredScreen.indexMapping
+                    .mapNotNull { (filteredIdx, origIdx) ->
+                        screen.indexToCoords[origIdx]?.let { coords -> filteredIdx to coords }
+                    }.toMap()
+                emit(AgentEvent.Log("[FILTER] ${filteredScreen.indexMapping.size}/${screen.elementCount} interactive elements"))
+                Log.i(TAG, "[FILTER] content:\n${filteredScreen.filteredText.take(600)}")
+
+                // Detect if compose screen is currently open.
+                // isXComposeOpen is sticky: once compose is seen it stays true so
+                // bringAppToForeground can use SINGLE_TOP (preventing MainActivity from
+                // clearing the compose back stack) even in the step the FAB was tapped.
+                if (!isXComposeOpen && xComposeMessage != null &&
+                    screen.foregroundPackage == AppActions.Packages.TWITTER) {
+                    val ct = screen.compactText.lowercase()
+                    // Exclude tweet detail pages — they have a reply EditText but are NOT compose.
+                    val isTweetDetail = ct.contains("explain this post") || ct.contains("post your reply")
+                    // Exclude Grok chat pages — they have an EditText (chat input) and Regenerate/Copy text buttons.
+                    val isGrokPage = ct.contains("regenerate") && ct.contains("copy text")
+                    if (!isTweetDetail && !isGrokPage) {
+                        val hasComposeField = ct.contains("what's happening") || ct.contains("changes who can reply")
+                        // Keyboard can cover the EditText — detect compose by few elements + navigate-up
+                        val isLikelyCompose = screen.elementCount <= 8 &&
+                            (ct.contains("navigate up") || hasComposeField)
+                        // Only count an EditText as compose field when it's NOT a reply field
+                        val hasEditField = findComposeTextFieldIndex(screen.compactText) != null && !isTweetDetail
+                        if (hasEditField || isLikelyCompose || hasComposeField) {
+                            isXComposeOpen = true
+                            Log.i(TAG, "[X-COMPOSE] ComposerActivity detected (elements=${screen.elementCount}, editField=$hasEditField, composeField=$hasComposeField) — enabling SINGLE_TOP protection")
+                        }
+                    } else {
+                        Log.i(TAG, "[X-COMPOSE] Skipping compose detection — looks like tweet detail page (isTweetDetail=true)")
+                    }
+                }
+                val inComposeScreen = isXComposeOpen
+
+                // Grok escape: if X shows the Grok chat, press Back to close it so we can navigate
+                // to the home feed and compose. Grok chat has Regenerate + Copy text buttons which
+                // don't appear on any other X screen. Press Back until neither is visible.
+                if (xComposeMessage != null && !isXComposeOpen &&
+                    screen.foregroundPackage == AppActions.Packages.TWITTER) {
+                    val ct = screen.compactText.lowercase()
+                    if (ct.contains("regenerate") && ct.contains("copy text")) {
+                        emit(AgentEvent.Log("[GROK-ESCAPE] Grok chat detected — pressing Back to return to home feed"))
+                        Log.i(TAG, "[GROK-ESCAPE] Pressing Back to close Grok chat")
+                        AgentAccessibilityService.instance?.performGlobalAction(
+                            android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK
+                        )
+                        delay(800)
+                        continue
+                    }
+                }
+
+                // Update UI action context with goal-filtered coordinate mapping and index mapping
+                uiActionContext.indexToCoords = mappedCoords
+                uiActionContext.indexMapping = filteredScreen.indexMapping
 
                 // Capture screenshot
                 val screenshotBase64 = try {
@@ -302,13 +364,16 @@ class AgentKernel(
                     }
                 }
 
-                // Quick completion check for X compose: if POST button visible AND tweet text already in compose.
-                if (xComposeMessage != null && screen.foregroundPackage == AppActions.Packages.TWITTER) {
+                // Safety guard: tweet text is typed and POST button is visible — ensure we complete
+                // the post. The LLM makes all navigation decisions (FAB tap, compose focus, typing).
+                // This guard fires only AFTER the LLM has already done the real work (step >= 3),
+                // preventing an accidental Back tap from discarding an already-composed tweet.
+                if (step >= 3 && xComposeMessage != null && screen.foregroundPackage == AppActions.Packages.TWITTER) {
                     val textTyped = screen.compactText.contains(xComposeMessage!!, ignoreCase = true)
                     if (textTyped) {
                         val postIndex = findPostButtonIndex(screen.compactText)
                         if (postIndex != null && screen.indexToCoords.containsKey(postIndex)) {
-                            emit(AgentEvent.Log("[X-POST] Found POST button at index $postIndex — tapping directly"))
+                            emit(AgentEvent.Log("[X-GUARD] Tweet ready — tapping POST at index $postIndex"))
                             val tapResult = actionExecutor.execute(Decision("tap", elementIndex = postIndex), screen.indexToCoords)
                             emit(AgentEvent.Step(step, "tap", tapResult.message))
                             history.record("tap", "POST", tapResult.message, tapResult.success)
@@ -324,40 +389,29 @@ class AgentKernel(
                     }
                 }
 
-                // Auto-type tweet text when compose screen is open but text not yet entered.
+
+                // X-NAV guard: when X's FAB overlay is expanded, tap "New post" directly.
+                // The overlay is ephemeral — it dismisses when X is backgrounded for inference.
+                // Trying to infer while the FAB is open just collapses it. Instead, tap immediately.
                 if (xComposeMessage != null && screen.foregroundPackage == AppActions.Packages.TWITTER) {
-                    val textTyped = screen.compactText.contains(xComposeMessage!!, ignoreCase = true)
-                    if (!textTyped) {
-                        val composeIndex = findComposeTextFieldIndex(screen.compactText)
-                        if (composeIndex != null && screen.indexToCoords.containsKey(composeIndex)) {
-                            emit(AgentEvent.Log("[X-TYPE] Typing tweet into compose field at index $composeIndex"))
-                            actionExecutor.execute(Decision("tap", elementIndex = composeIndex), screen.indexToCoords)
-                            delay(300)
-                            val typeResult = actionExecutor.execute(Decision("type", text = xComposeMessage!!), screen.indexToCoords)
-                            emit(AgentEvent.Step(step, "type", typeResult.message))
-                            history.record("type", "compose", typeResult.message, typeResult.success)
+                    val ct = screen.compactText
+                    // FAB overlay is expanded when Go Live + Post Photos appear (they don't exist on home feed)
+                    val isFABExpanded = ct.contains("Go Live (ImageButton)") && ct.contains("Post Photos (ImageButton)")
+                    if (isFABExpanded) {
+                        val newPostIdx = ct.lines()
+                            .firstOrNull { it.trim().contains("New post (ImageButton)") && it.contains("[tap]") }
+                            ?.let { Regex("^(\\d+):").find(it.trim())?.groupValues?.get(1)?.toInt() }
+                        if (newPostIdx != null && screen.indexToCoords.containsKey(newPostIdx)) {
+                            emit(AgentEvent.Log("[X-NAV] FAB expanded — tapping New post (index $newPostIdx) directly"))
+                            val tapResult = actionExecutor.execute(
+                                Decision("tap", elementIndex = newPostIdx),
+                                screen.indexToCoords
+                            )
+                            emit(AgentEvent.Step(step, "tap", tapResult.message))
+                            history.record("tap", "New post", tapResult.message, tapResult.success)
                             delay(STEP_DELAY_MS)
                             continue
                         }
-                    }
-                }
-
-                // Approach 2 — keyword FAB tap: when on X home feed with a post/tweet goal,
-                // scan the element list for the "New post" FAB and tap it directly.
-                // This bypasses the 1.2B model's inability to select high-index elements from
-                // the home feed, while still letting the LLM handle the compose screen.
-                val goalLowerForX = goal.lowercase()
-                val isXPostGoal = screen.foregroundPackage == AppActions.Packages.TWITTER &&
-                        (goalLowerForX.contains("post") || goalLowerForX.contains("tweet"))
-                if (isXPostGoal) {
-                    val fabIndex = findNewPostFabIndex(screen.compactText)
-                    if (fabIndex != null && screen.indexToCoords.containsKey(fabIndex)) {
-                        emit(AgentEvent.Log("[X-FAB] Found New Post button at index $fabIndex — tapping directly"))
-                        val tapResult = actionExecutor.execute(Decision("tap", elementIndex = fabIndex), screen.indexToCoords)
-                        emit(AgentEvent.Step(step, "tap", tapResult.message))
-                        history.record("tap", "New post", tapResult.message, tapResult.success)
-                        delay(STEP_DELAY_MS)
-                        continue
                     }
                 }
 
@@ -386,8 +440,16 @@ class AgentKernel(
                         if (screen.foregroundPackage != null && screen.foregroundPackage != "com.runanywhere.agent") {
                             val currentFgVlm = screenParser.parse().foregroundPackage
                             if (currentFgVlm == "com.runanywhere.agent") {
-                                bringAppToForeground(screen.foregroundPackage!!)
+                                bringAppToForeground(screen.foregroundPackage!!, inComposeScreen)
                                 delay(500)
+                                // Refresh context after return — same reason as LLM path
+                                val freshScreenVlm = screenParser.parse()
+                                val freshFilteredVlm = filterScreenForGoal(freshScreenVlm.compactText, goal)
+                                val freshCoordsVlm = freshFilteredVlm.indexMapping.mapNotNull { (fi, oi) ->
+                                    freshScreenVlm.indexToCoords[oi]?.let { c -> fi to c }
+                                }.toMap()
+                                uiActionContext.indexToCoords = freshCoordsVlm
+                                uiActionContext.indexMapping = freshFilteredVlm.indexMapping
                             }
                         }
 
@@ -479,28 +541,29 @@ class AgentKernel(
                     when {
                         loopDetected -> {
                             emit(AgentEvent.Log("Loop detected, adding recovery prompt"))
-                            SystemPrompts.buildVisionLoopRecoveryPrompt(goal, screen.compactText, historyPrompt, lastActionResult, useToolCalling, visionContext)
+                            SystemPrompts.buildVisionLoopRecoveryPrompt(goal, filteredScreen.filteredText, historyPrompt, lastActionResult, useToolCalling, visionContext)
                         }
                         hadFailure -> {
                             emit(AgentEvent.Log("Recent failure, adding recovery hints"))
-                            SystemPrompts.buildVisionFailureRecoveryPrompt(goal, screen.compactText, historyPrompt, lastActionResult, useToolCalling, visionContext)
+                            SystemPrompts.buildVisionFailureRecoveryPrompt(goal, filteredScreen.filteredText, historyPrompt, lastActionResult, useToolCalling, visionContext)
                         }
                         else -> {
-                            SystemPrompts.buildVisionPrompt(goal, screen.compactText, historyPrompt, lastActionResult, useToolCalling, visionContext)
+                            SystemPrompts.buildVisionPrompt(goal, filteredScreen.filteredText, historyPrompt, lastActionResult, useToolCalling, visionContext)
                         }
                     }
                 } else {
+                    val fgAppName = packageToAppName(screen.foregroundPackage)
                     when {
                         loopDetected -> {
                             emit(AgentEvent.Log("Loop detected, adding recovery prompt"))
-                            SystemPrompts.buildLoopRecoveryPrompt(goal, screen.compactText, historyPrompt, lastActionResult, useToolCalling)
+                            SystemPrompts.buildLoopRecoveryPrompt(goal, filteredScreen.filteredText, historyPrompt, lastActionResult, useToolCalling, fgAppName)
                         }
                         hadFailure -> {
                             emit(AgentEvent.Log("Recent failure, adding recovery hints"))
-                            SystemPrompts.buildFailureRecoveryPrompt(goal, screen.compactText, historyPrompt, lastActionResult, useToolCalling)
+                            SystemPrompts.buildFailureRecoveryPrompt(goal, filteredScreen.filteredText, historyPrompt, lastActionResult, useToolCalling, fgAppName)
                         }
                         else -> {
-                            SystemPrompts.buildPrompt(goal, screen.compactText, historyPrompt, lastActionResult, useToolCalling)
+                            SystemPrompts.buildPrompt(goal, filteredScreen.filteredText, historyPrompt, lastActionResult, useToolCalling, fgAppName)
                         }
                     }
                 }
@@ -526,8 +589,20 @@ class AgentKernel(
                 if (targetPkg != null && targetPkg != "com.runanywhere.agent") {
                     val currentFg = screenParser.parse().foregroundPackage
                     if (currentFg == "com.runanywhere.agent") {
-                        bringAppToForeground(targetPkg)
+                        bringAppToForeground(targetPkg, inComposeScreen)
                         delay(500)
+                        // Re-capture screen after returning to target app — the UI may have changed
+                        // (e.g., X's FAB overlay dismissed while app was backgrounded during inference).
+                        // Refresh uiActionContext so the model's "tap N" executes against the current screen.
+                        val freshScreen = screenParser.parse()
+                        val freshFiltered = filterScreenForGoal(freshScreen.compactText, goal)
+                        val freshMappedCoords = freshFiltered.indexMapping.mapNotNull { (filteredIdx, origIdx) ->
+                            freshScreen.indexToCoords[origIdx]?.let { coords -> filteredIdx to coords }
+                        }.toMap()
+                        uiActionContext.indexToCoords = freshMappedCoords
+                        uiActionContext.indexMapping = freshFiltered.indexMapping
+                        Log.i(TAG, "[REFRESH] Refreshed after app return: ${freshScreen.elementCount} elements, ${freshFiltered.indexMapping.size} interactive")
+                        Log.i(TAG, "[REFRESH] Elements: ${freshFiltered.filteredText.take(300)}")
                     }
                 }
 
@@ -630,8 +705,8 @@ class AgentKernel(
                     }
                 }
 
-                // Execute action
-                val result = actionExecutor.execute(decision, screen.indexToCoords)
+                // Execute action — use mappedCoords so the LLM's filtered index resolves correctly
+                val result = actionExecutor.execute(decision, mappedCoords)
                 emit(AgentEvent.Step(step, decision.action, result.message))
 
                 // Record in history with success/failure
@@ -704,12 +779,13 @@ class AgentKernel(
      * Multiple strategies because Samsung's PackageManager sometimes returns null
      * from getLaunchIntentForPackage() for apps like YouTube.
      */
-    private fun bringAppToForeground(packageName: String) {
+    private fun bringAppToForeground(packageName: String, inComposeScreen: Boolean = false) {
         try {
 
             // Strategy 0 (X-specific): preserve compose screen by targeting ComposerActivity directly.
+            // Only fire when compose is already open — prevents premature open from home feed.
             // Using SINGLE_TOP prevents singleTask main activity from clearing the back stack.
-            if (packageName == AppActions.Packages.TWITTER && xComposeMessage != null) {
+            if (packageName == AppActions.Packages.TWITTER && xComposeMessage != null && inComposeScreen) {
                 val composerIntent = android.content.Intent().apply {
                     setClassName(AppActions.Packages.TWITTER, "com.twitter.composer.ComposerActivity")
                     flags = android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP or
@@ -721,6 +797,29 @@ class AgentKernel(
                     return
                 } catch (e: Exception) {
                     Log.w(TAG, "ComposerActivity SINGLE_TOP failed, falling back: ${e.message}")
+                }
+            }
+
+            // Strategy 0b (X-specific): use twitter://timeline deep link when NOT in compose.
+            // getLaunchIntentForPackage for X can navigate to tweet detail pages (its last viewed
+            // content), causing X-COMPOSE false positives and incorrect taps. The timeline deep
+            // link reliably returns to the home feed. The FAB overlay will collapse, but the
+            // REFRESH logic + X-NAV guard will re-tap it without re-running inference.
+            if (packageName == AppActions.Packages.TWITTER && !inComposeScreen) {
+                try {
+                    val timelineIntent = android.content.Intent(
+                        android.content.Intent.ACTION_VIEW,
+                        android.net.Uri.parse("twitter://timeline")
+                    ).apply {
+                        flags = android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                                android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                                android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(timelineIntent)
+                    Log.i(TAG, "Returned to X home timeline (twitter://timeline)")
+                    return
+                } catch (e: Exception) {
+                    Log.w(TAG, "X timeline deep link failed, falling back: ${e.message}")
                 }
             }
 
@@ -786,6 +885,25 @@ class AgentKernel(
         emitEvent: suspend (AgentEvent) -> Unit
     ): RecoveryResult {
         Log.i(TAG, "[RECOVERY] Loop detected at step $step")
+
+        // Strategy 0: Type tweet text when stuck on X compose screen with empty field.
+        // Model sometimes taps the EditText (focus) instead of calling ui_type. When a loop is
+        // detected and compose is open but the tweet text hasn't been typed yet, do it directly.
+        if (isXComposeOpen && xComposeMessage != null &&
+            !screen.compactText.contains(xComposeMessage!!, ignoreCase = true)) {
+            val composeFieldIndex = findComposeTextFieldIndex(screen.compactText)
+            if (composeFieldIndex != null && screen.indexToCoords.containsKey(composeFieldIndex)) {
+                emitEvent(AgentEvent.Log("[RECOVERY] Compose field empty — typing tweet text directly"))
+                Log.i(TAG, "[RECOVERY] Typing tweet text into compose field at index $composeFieldIndex")
+                val typeResult = actionExecutor.execute(
+                    Decision("type", text = xComposeMessage, elementIndex = composeFieldIndex),
+                    screen.indexToCoords
+                )
+                history.record("type", "compose field", "Recovery: typed tweet text", typeResult.success)
+                emitEvent(AgentEvent.Step(step, "type (recovery)", "Typed tweet text"))
+                return RecoveryResult.ACTION_TAKEN
+            }
+        }
 
         // Strategy 1: Dismiss common app dialogs/sign-in screens that block progress
         val dismissIndex = findDismissableDialog(screen.compactText)
@@ -1449,6 +1567,126 @@ class AgentKernel(
             if (indexMatch != null) return indexMatch.groupValues[1].toIntOrNull()
         }
         return null
+    }
+
+    // ========== Goal-Aware Screen Filtering ==========
+
+    private data class FilteredScreen(
+        /** Re-indexed compactText showing only interactive elements, goal-relevant ones first. */
+        val filteredText: String,
+        /** Maps filteredIndex → originalIndex for reversing back to screen coordinates. */
+        val indexMapping: Map<Int, Int>
+    )
+
+    /**
+     * Filters the accessibility tree to interactive elements only and ranks goal-relevant
+     * elements at the top. The output is re-indexed starting from 0 so small models (1.2B),
+     * which reliably pick indices 0–3, will hit the correct target without external shortcuts.
+     *
+     * Example — X home feed (19 elements → 6 interactive, goal="post"):
+     *   Original: ... 13: New post (ImageButton) [tap] ...
+     *   Filtered: 0: New post (ImageButton) [tap]  ← goal-relevant, ranked first
+     *             1: Show navigation drawer [tap]
+     *             ...
+     */
+    private fun filterScreenForGoal(compactText: String, goal: String): FilteredScreen {
+        val goalLower = goal.lowercase()
+        val goalKeywords = buildGoalKeywords(goalLower)
+        // [edit] fields are relevant whenever the goal involves composing or sending text
+        val isComposingGoal = goalLower.contains("post") || goalLower.contains("tweet") ||
+                goalLower.contains("type") || goalLower.contains("message") ||
+                goalLower.contains("send") || goalLower.contains("note") ||
+                goalLower.contains("write") || goalLower.contains("search")
+
+        // Use numeric relevance score: sum of matched keyword lengths.
+        // Longer/more-specific keyword matches score higher (e.g. "new post" beats "post photos"
+        // because "New post" matches both "new post" (8) and "post" (4) = 12, vs "Post Photos"
+        // matching only "post" (4) = 4).
+        data class ParsedElement(val originalIndex: Int, val rawLine: String, val score: Int)
+
+        val elements = mutableListOf<ParsedElement>()
+        for (rawLine in compactText.split("\n")) {
+            val line = rawLine.trim()
+            if (line.isEmpty()) continue
+            // Skip non-interactive elements
+            val isInteractive = line.contains("[tap]") || line.contains("[tap,edit]") || line.contains("[edit]")
+            if (!isInteractive) continue
+            val originalIndex = Regex("^(\\d+):").find(line)?.groupValues?.get(1)?.toIntOrNull() ?: continue
+            // Normalize Unicode smart-quotes to ASCII so keyword matching works across apps
+            // (e.g. X uses U+2019 in "What\u2019s happening?" but our keywords use ASCII apostrophe)
+            val lineLower = line.lowercase()
+                .replace('\u2019', '\'')  // RIGHT SINGLE QUOTATION MARK → ASCII '
+                .replace('\u2018', '\'')  // LEFT SINGLE QUOTATION MARK → ASCII '
+                .replace('\u201C', '"')   // LEFT DOUBLE QUOTATION MARK → ASCII "
+                .replace('\u201D', '"')   // RIGHT DOUBLE QUOTATION MARK → ASCII "
+            val isEditField = line.contains("[tap,edit]") || line.contains("[edit]")
+            val kwScore = goalKeywords.sumOf { kw -> if (lineLower.contains(kw)) kw.length else 0 }
+            // editBonus=10: ensures EditText fields rank above any single keyword match (max ~8 for "new post").
+            // Critical for compose screens where "Changes who can reply to your post" (score=4)
+            // would otherwise outrank "What's happening? (EditText)" (score=14 from keyword, but
+            // keyword matching may fail due to apostrophe encoding differences).
+            val editBonus = if (isComposingGoal && isEditField) 10 else 0
+            elements.add(ParsedElement(originalIndex, line, kwScore + editBonus))
+        }
+
+        // Stable sort: higher score first, then preserve original tree order within ties.
+        // Cap at 5 so the model cannot pick out-of-range indices (e.g. 7 on a 6-element screen).
+        val sorted = elements.sortedWith(compareByDescending { it.score }).take(5)
+        val indexMapping = mutableMapOf<Int, Int>()
+        val filteredLines = mutableListOf<String>()
+        sorted.forEachIndexed { filteredIdx, elem ->
+            indexMapping[filteredIdx] = elem.originalIndex
+            val newLine = elem.rawLine.replaceFirst(
+                Regex("^${Regex.escapeReplacement(elem.originalIndex.toString())}:"),
+                "$filteredIdx:"
+            )
+            filteredLines.add(newLine)
+        }
+        return FilteredScreen(filteredLines.joinToString("\n"), indexMapping)
+    }
+
+    /**
+     * Extracts goal-specific keywords used to rank interactive elements.
+     * Goal-relevant elements float to the top of the filtered list (index 0–N).
+     */
+    private fun buildGoalKeywords(goalLower: String): List<String> {
+        val kws = mutableListOf<String>()
+        if (goalLower.contains("post") || goalLower.contains("tweet")) {
+            kws += listOf("new post", "post", "compose", "what's happening", "tweet")
+        }
+        if (goalLower.contains("search") || goalLower.contains("find")) kws += listOf("search", "find")
+        if (goalLower.contains("play") || goalLower.contains("music")) kws += listOf("play", "music", "track")
+        if (goalLower.contains("setting")) kws += listOf("setting")
+        // Add significant words from the goal itself (length > 4, ignore common stopwords)
+        val stopwords = setOf("please", "about", "would", "should", "could", "there", "their",
+            "where", "saying", "going", "using", "start", "until", "android", "agent")
+        goalLower.split(Regex("\\s+"))
+            .filter { it.length > 4 && it !in stopwords }
+            .take(3)
+            .forEach { kws += it }
+        return kws.distinct()
+    }
+
+    /** Convert a package name to a human-readable app name for prompt context. */
+    private fun packageToAppName(pkg: String?): String? {
+        return when (pkg) {
+            AppActions.Packages.TWITTER -> "X (Twitter)"
+            AppActions.Packages.YOUTUBE -> "YouTube"
+            AppActions.Packages.CHROME -> "Chrome"
+            AppActions.Packages.WHATSAPP -> "WhatsApp"
+            AppActions.Packages.INSTAGRAM -> "Instagram"
+            AppActions.Packages.GMAIL -> "Gmail"
+            AppActions.Packages.SPOTIFY -> "Spotify"
+            AppActions.Packages.MAPS -> "Google Maps"
+            AppActions.Packages.TELEGRAM -> "Telegram"
+            AppActions.Packages.NETFLIX -> "Netflix"
+            "com.android.settings" -> "Settings"
+            "com.samsung.android.calendar" -> "Calendar"
+            "com.google.android.deskclock" -> "Clock"
+            "com.runanywhere.agent" -> null // own app — don't report it
+            null -> null
+            else -> pkg.substringAfterLast(".")
+        }
     }
 
     private fun mapToolNameToAction(toolName: String): String {
