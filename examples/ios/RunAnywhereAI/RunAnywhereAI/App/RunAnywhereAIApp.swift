@@ -306,6 +306,32 @@ struct RunAnywhereAIApp: App {
         }
         logger.info("✅ ONNX STT/TTS models registered")
 
+        // Register ONNX Embedding models for RAG
+        // all-MiniLM-L6-v2: lightweight sentence embedding model (~23MB)
+        // Produces 384-dimensional vectors, compatible with RAGConfiguration default embeddingDimension
+        if let miniLMURL = URL(string: "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx") {
+            RunAnywhere.registerModel(
+                id: "all-minilm-l6-v2",
+                name: "All MiniLM L6 v2 (Embedding)",
+                url: miniLMURL,
+                framework: .onnx,
+                modality: .embedding,
+                memoryRequirement: 25_000_000
+            )
+        }
+        // vocab.txt required by the RAG ONNX embedding provider for tokenization
+        if let miniLMVocabURL = URL(string: "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt") {
+            RunAnywhere.registerModel(
+                id: "all-minilm-l6-v2-vocab",
+                name: "All MiniLM L6 v2 (Vocab)",
+                url: miniLMVocabURL,
+                framework: .onnx,
+                modality: .embedding,
+                memoryRequirement: 500_000
+            )
+        }
+        logger.info("✅ ONNX Embedding models registered")
+
         // Register Diffusion models (Apple Stable Diffusion / CoreML only; no ONNX)
         // ============================================================================
         // Apple SD 1.5 CoreML: palettized, split_einsum_v2 for Apple Silicon / ANE (~1.5GB)

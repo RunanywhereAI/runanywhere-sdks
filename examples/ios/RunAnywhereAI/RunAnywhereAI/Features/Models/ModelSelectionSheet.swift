@@ -45,7 +45,7 @@ enum ModelSelectionContext {
         case .vlm:
             return [.multimodal, .vision]
         case .ragEmbedding:
-            return [.language]
+            return [.embedding]
         case .ragLLM:
             return [.language]
         }
@@ -93,7 +93,15 @@ struct ModelSelectionSheet: View {
             .filter { model in
                 guard context.relevantCategories.contains(model.category) else { return false }
                 if let allowed = context.allowedFrameworks {
-                    return allowed.contains(model.framework)
+                    guard allowed.contains(model.framework) else { return false }
+                }
+                // For RAG embedding context, exclude supporting files (vocab, tokenizer)
+                // that are not selectable as standalone embedding models.
+                // Supporting files have ids ending in "-vocab" or "-tokenizer".
+                if context == .ragEmbedding {
+                    guard !model.id.hasSuffix("-vocab") && !model.id.hasSuffix("-tokenizer") else {
+                        return false
+                    }
                 }
                 return true
             }

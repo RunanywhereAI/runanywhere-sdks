@@ -26,12 +26,34 @@ struct DocumentRAGView: View {
         selectedEmbeddingModel?.localPath != nil && selectedLLMModel?.localPath != nil
     }
 
+    /// Resolve the vocab file path for the embedding model.
+    ///
+    /// Looks for a downloaded vocab model with id "<embeddingModelId>-vocab".
+    /// Falls back to deriving the vocab path from the embedding model's directory
+    /// (same folder, filename "vocab.txt").
+    private func resolveVocabPath(for embeddingModel: ModelInfo) async -> String? {
+        // Try to find a downloaded vocab model paired with the embedding model
+        let vocabModelId = "\(embeddingModel.id)-vocab"
+        if let allModels = try? await RunAnywhere.availableModels(),
+           let vocabModel = allModels.first(where: { $0.id == vocabModelId }),
+           let vocabPath = vocabModel.localPath {
+            return vocabPath.path
+        }
+
+        // Fallback: derive vocab.txt path from the embedding model's parent directory
+        guard let embeddingPath = embeddingModel.localPath else { return nil }
+        return embeddingPath.deletingLastPathComponent().appendingPathComponent("vocab.txt").path
+    }
+
     private var ragConfig: RAGConfiguration? {
         guard
             let embeddingPath = selectedEmbeddingModel?.localPath?.path,
             let llmPath = selectedLLMModel?.localPath?.path
         else { return nil }
 
+        // embeddingConfigJSON is set asynchronously via loadDocument(url:config:) after
+        // vocab path is resolved. Here we build the base config; vocab is injected by the
+        // ViewModel when it calls loadDocument.
         return RAGConfiguration(
             embeddingModelPath: embeddingPath,
             llmModelPath: llmPath
@@ -423,9 +445,28 @@ extension DocumentRAGView {
     private func handleFileImport(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
-            guard let url = urls.first, let config = ragConfig else { return }
+            guard let url = urls.first, let baseConfig = ragConfig else { return }
             Task {
-                await viewModel.loadDocument(url: url, config: config)
+                // Resolve vocab path and inject into embeddingConfigJSON before pipeline creation
+                var finalConfig = baseConfig
+                if let embeddingModel = selectedEmbeddingModel,
+                   let vocabPath = await resolveVocabPath(for: embeddingModel) {
+                    let vocabJSON = "{\"vocab_path\":\"\(vocabPath)\"}"
+                    finalConfig = RAGConfiguration(
+                        embeddingModelPath: baseConfig.embeddingModelPath,
+                        llmModelPath: baseConfig.llmModelPath,
+                        embeddingDimension: baseConfig.embeddingDimension,
+                        topK: baseConfig.topK,
+                        similarityThreshold: baseConfig.similarityThreshold,
+                        maxContextTokens: baseConfig.maxContextTokens,
+                        chunkSize: baseConfig.chunkSize,
+                        chunkOverlap: baseConfig.chunkOverlap,
+                        promptTemplate: baseConfig.promptTemplate,
+                        embeddingConfigJSON: vocabJSON,
+                        llmConfigJSON: baseConfig.llmConfigJSON
+                    )
+                }
+                await viewModel.loadDocument(url: url, config: finalConfig)
             }
         case .failure(let error):
             viewModel.error = error
