@@ -6,7 +6,7 @@ A fully on-device autonomous Android agent powered by the RunAnywhere SDK. Navig
 
 X post demo — Qwen3 4B, 6 steps, 3 real LLM inferences, goal-aware element filtering, ~4 min end-to-end.
 
-<video src="https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/Playground/android-use-agent/assets/android_agent_muted.mov" controls width="640"></video>
+<video src="https://raw.githubusercontent.com/RunanywhereAI/runanywhere-sdks/main/Playground/android-use-agent/assets/android_agent_muted.mp4" controls width="640"></video>
 
 > Full write-up and run trace: [X_POST.md](X_POST.md)
 
