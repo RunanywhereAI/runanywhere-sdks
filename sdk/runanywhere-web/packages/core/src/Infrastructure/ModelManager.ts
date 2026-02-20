@@ -514,9 +514,18 @@ class ModelManagerImpl {
     if (!mmprojFile) {
       // No mmproj — load as text-only LLM
       logger.warning(`No mmproj found, loading as text-only LLM: ${modelId}`);
-      const dataStream = await this.downloader.loadStreamFromOPFS(modelId);
-      if (!dataStream) throw new Error('Model not downloaded.');
-      await this.loadLLMModel(model, modelId, undefined, dataStream);
+
+      const file = await this.downloader.loadModelFile(modelId);
+      let dataStream: ReadableStream<Uint8Array> | undefined;
+      let data: Uint8Array | undefined;
+
+      if (!file) {
+        dataStream = await this.downloader.loadStreamFromOPFS(modelId) ?? undefined;
+        if (!dataStream) data = await this.downloader.loadFromOPFS(modelId) ?? undefined;
+      }
+
+      if (!file && !dataStream && !data) throw new Error('Model not downloaded.');
+      await this.loadLLMModel(model, modelId, data, dataStream, file ?? undefined);
       return;
     }
 

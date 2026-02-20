@@ -387,12 +387,18 @@ export class LlamaCppBridge {
     const m = this.module;
     if (!m.FS_mount || !m.WORKERFS) return null;
 
+    let createdMountDir = false;
+    let mountDir = '';
+
     try {
       // Create a unique mount point directory
       const mountId = LlamaCppBridge._nextMountId++;
-      const mountDir = `/mnt-${mountId}`;
+      mountDir = `/mnt-${mountId}`;
 
-      if (m.FS_mkdir) m.FS_mkdir(mountDir);
+      if (m.FS_mkdir) {
+        m.FS_mkdir(mountDir);
+        createdMountDir = true;
+      }
 
       // Mount the file. WORKERFS expects { files: [File, ...] } or { files: [{name, data: File}] }
       // We assume the standard Emscripten WORKERFS behavior where `files` array mounts them by name.
@@ -401,6 +407,9 @@ export class LlamaCppBridge {
       logger.debug(`Mounted ${file.name} to ${mountDir}`);
       return `${mountDir}/${file.name}`;
     } catch (err) {
+      if (createdMountDir && m.FS_rmdir) {
+        try { m.FS_rmdir(mountDir); } catch { logger.warning(`Failed to clean up mount dir ${mountDir}`); }
+      }
       const msg = err instanceof Error ? err.message : String(err);
       logger.warning(`Failed to mount file (WORKERFS): ${msg}`);
       return null;
@@ -412,25 +421,18 @@ export class LlamaCppBridge {
    * @param mountDir - The directory path (e.g. /mnt-123)
    */
   unmount(mountPath: string): void {
-    const m = this.module;
-
-    // If path is a file inside mount, get the dir
-    // logic: /mnt-123/file.gguf -> /mnt-123
-    // But simplistic helper: assume caller tracks the mount dir?
-    // Actually TextGeneration will likely pass the model path.
-    // If model path is /mnt-123/model.gguf, we want to unmount /mnt-123.
-
-    let dir = mountPath;
     if (!mountPath.startsWith('/mnt-')) return; // Safety check
 
     // Strip filename if present
     const parts = mountPath.split('/');
     // formatted like ["", "mnt-123", "filename"]
+    let dir = mountPath;
     if (parts.length >= 3) {
       dir = `/${parts[1]}`;
     }
 
     try {
+      const m = this.module;
       if (m.FS_unmount) m.FS_unmount(dir);
       if (m.FS_rmdir) m.FS_rmdir(dir);
       logger.debug(`Unmounted ${dir}`);

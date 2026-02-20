@@ -79,6 +79,11 @@ class TextGenerationImpl {
     let modelPath: string | null = null;
     let isMounted = false;
 
+    if (this._mountedPath) {
+      try { bridge.unmount(this._mountedPath); } catch { /* ignore */ }
+      this._mountedPath = null;
+    }
+
     if (ctx.file) {
       modelPath = bridge.mountFile(ctx.file);
       if (modelPath) {
@@ -99,13 +104,10 @@ class TextGenerationImpl {
       throw new Error('No data provided to loadModelFromData');
     }
 
-    // modelPath is guaranteed to be set by one of the branches above
-    if (!modelPath) throw new Error('Failed to determine model path');
-
     try {
       await this.loadModel(modelPath, ctx.model.id, ctx.model.name);
     } catch (err) {
-      if (isMounted && modelPath) {
+      if (isMounted) {
         bridge.unmount(modelPath);
         this._mountedPath = null;
       }
