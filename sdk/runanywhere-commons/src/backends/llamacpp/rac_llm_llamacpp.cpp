@@ -207,8 +207,10 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
     }
     RAC_LOG_INFO("LLM.LlamaCpp", "rac_llm_llamacpp_generate: generate() returned, tokens=%d", result.tokens_generated);
 
+    // finish_reason is std::string; TODO: migrate to enum if TextGenerationResult gains one
     if (result.finish_reason == "error") {
         RAC_LOG_ERROR("LLM.LlamaCpp", "rac_llm_llamacpp_generate: generation failed (e.g. llama_decode error)");
+        rac_error_set_details("Generation failed: llama_decode returned non-zero");
         return RAC_ERROR_GENERATION_FAILED;
     }
 

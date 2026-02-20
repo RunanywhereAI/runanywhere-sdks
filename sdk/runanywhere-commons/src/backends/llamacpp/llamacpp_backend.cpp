@@ -529,7 +529,9 @@ TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationReques
     result.prompt_tokens = prompt_tokens;
     result.inference_time_ms = duration.count();
 
-    if (cancel_requested_.load()) {
+    if (decode_failed_) {
+        result.finish_reason = "error";
+    } else if (cancel_requested_.load()) {
         result.finish_reason = "cancelled";
     } else if (success) {
         result.finish_reason = tokens_generated >= request.max_tokens ? "length" : "stop";
@@ -556,6 +558,7 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
     }
 
     cancel_requested_.store(false);
+    decode_failed_ = false;
 
     std::string prompt = build_prompt(request);
     LOGI("Generating with prompt length: %zu", prompt.length());
@@ -724,6 +727,7 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
 
         if (llama_decode(context_, batch) != 0) {
             LOGE("llama_decode failed during generation");
+            decode_failed_ = true;
             break;
         }
     }
@@ -732,7 +736,9 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
         callback(stop_window);
     }
 
-    llama_memory_clear(llama_get_memory(context_), true);
+    if (llama_memory_t post_mem = llama_get_memory(context_)) {
+        llama_memory_clear(post_mem, true);
+    }
 
     llama_batch_free(batch);
 
