@@ -59,8 +59,8 @@ export class OPFSStorage {
    */
   static get isSupported(): boolean {
     return typeof navigator !== 'undefined' &&
-           'storage' in navigator &&
-           'getDirectory' in (navigator.storage || {});
+      'storage' in navigator &&
+      'getDirectory' in (navigator.storage || {});
   }
 
   /**
@@ -181,6 +181,27 @@ export class OPFSStorage {
       const file = await fileHandle.getFile();
       logger.info(`Loaded model from OPFS: ${key} (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
       return await file.arrayBuffer();
+    } catch {
+      return null; // File not found
+    }
+  }
+
+  /**
+   * Load model data from OPFS as a ReadableStream.
+   *
+   * @param key - Model identifier or nested path
+   * @returns Readable stream of the model data, or null if not found
+   */
+  async loadModelStream(key: string): Promise<ReadableStream<Uint8Array> | null> {
+    if (!this.modelsDir) return null;
+
+    try {
+      const dir = await this.resolveParentDir(key, /* create */ false);
+      const filename = this.resolveFilename(key);
+      const fileHandle = await dir.getFileHandle(filename);
+      const file = await fileHandle.getFile();
+      logger.info(`Loading model stream from OPFS: ${key} (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
+      return file.stream() as unknown as ReadableStream<Uint8Array>;
     } catch {
       return null; // File not found
     }
