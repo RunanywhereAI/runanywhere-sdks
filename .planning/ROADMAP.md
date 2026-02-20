@@ -26,7 +26,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Calling the SDK query API with a question string returns a RAG-augmented answer string
   3. RAG events (ingestion started, ingestion complete, query result) appear on the EventBus
   4. The component follows the same CppBridge + RunAnywhere extension file structure as STT/LLM/TTS
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 01-01-PLAN.md — RAG C headers in CRACommons, error/event/component enums, CppBridge.RAG actor
@@ -41,7 +41,11 @@ Plans:
   2. App extracts plain text from the selected file and passes it to the SDK ingest API
   3. User can type a question and receive an answer grounded in the loaded document
   4. User can ask follow-up questions without re-uploading the document (document stays loaded)
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — DocumentService (PDF/JSON extraction) + RAGViewModel (orchestration logic)
+- [ ] 02-02-PLAN.md — DocumentRAGView (SwiftUI Q&A interface) + ContentView wiring
 
 ## Progress
 
@@ -50,5 +54,5 @@ Phases execute in numeric order: 1 → 2
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Swift SDK RAG Component | 2/2 | Complete | 2026-02-20 |
+| 1. Swift SDK RAG Component | 2/2 | Complete    | 2026-02-20 |
 | 2. iOS App RAG Feature | 0/TBD | Not started | - |
