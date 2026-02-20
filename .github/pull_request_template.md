@@ -29,6 +29,9 @@ Brief description of the changes made.
 - [ ] Tested on iOS
 - [ ] Tested on Android
 
+**Playground:**
+- [ ] Tested on target platform
+- [ ] Verified no regressions in existing Playground projects
 **Web SDK / Web Sample:**
 - [ ] Tested in Chrome (Desktop)
 - [ ] Tested in Firefox
